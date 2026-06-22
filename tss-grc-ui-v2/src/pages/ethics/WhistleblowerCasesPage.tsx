@@ -153,13 +153,17 @@ export function WhistleblowerCasesPage() {
       }}>
         <Kpi Icon={MessageCircle} tone="primary"
           label={lang === 'ar' ? 'إجمالي البلاغات' : 'Total reports'}
-          value={kpis.total} />
+          value={kpis.total}
+          onClick={() => { setFilterStatus('ALL'); setFilterSeverity('ALL'); setFilterCategory('ALL'); }}
+          active={filterStatus === 'ALL' && filterSeverity === 'ALL' && filterCategory === 'ALL'} />
         <Kpi Icon={AlertOctagon} tone="info"
           label={lang === 'ar' ? 'وارد / فرز' : 'New / triage'}
           value={kpis.newOnes} />
         <Kpi Icon={UserCheck} tone="warning"
           label={lang === 'ar' ? 'قيد التحقيق' : 'Under investigation'}
-          value={kpis.investigating} />
+          value={kpis.investigating}
+          onClick={() => setFilterStatus('UNDER_INVESTIGATION')}
+          active={filterStatus === 'UNDER_INVESTIGATION'} />
         <Kpi Icon={ShieldAlert} tone="danger"
           label={lang === 'ar' ? 'تورّط مسؤول تنفيذي' : 'Senior exec flagged'}
           value={kpis.seniorExec} />

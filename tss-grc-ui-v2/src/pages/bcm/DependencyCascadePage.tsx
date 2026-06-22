@@ -165,12 +165,13 @@ export function DependencyCascadePage() {
         <>
           <div className="kpi-grid" style={{ marginBottom: 16 }}>
             <Kpi Icon={Layers}        label={isAr ? 'عمليات متأثّرة' : 'Processes impacted'} value={result.totalImpactedCount} tone={result.totalImpactedCount > 0 ? 'primary' : 'neutral'} to="/bcm/dependency" />
-            <Kpi Icon={ShieldAlert}   label={isAr ? 'تجاوزات MTPD' : 'MTPD breaches'} value={result.breachedCount} tone={result.breachedCount > 0 ? 'danger' : 'success'} />
-            <Kpi Icon={Clock}         label={isAr ? 'أقصى زمن وصول' : 'Furthest reach'} value={maxReach ? `${maxReach}h` : '—'} tone="warning" />
-            <Kpi Icon={GitBranch}     label={isAr ? 'أقصى عمق تتالي' : 'Deepest tier'} value={maxDepth || '—'} tone="info" />
+            <Kpi Icon={ShieldAlert}   label={isAr ? 'تجاوزات MTPD' : 'MTPD breaches'} value={result.breachedCount} tone={result.breachedCount > 0 ? 'danger' : 'success'} onClick={() => document.getElementById('cascade-impact-register')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+            <Kpi Icon={Clock}         label={isAr ? 'أقصى زمن وصول' : 'Furthest reach'} value={maxReach ? `${maxReach}h` : '—'} tone="warning" onClick={() => document.getElementById('cascade-blast-radius')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+            <Kpi Icon={GitBranch}     label={isAr ? 'أقصى عمق تتالي' : 'Deepest tier'} value={maxDepth || '—'} tone="info" onClick={() => document.getElementById('cascade-impact-register')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
           </div>
 
           {/* Time-band blast radius */}
+          <div id="cascade-blast-radius">
           <Card title={isAr ? 'نطاق الأثر عبر زمن التعافي' : 'Blast radius across recovery time'} Icon={Clock}
             action={<span className="text-2xs text-muted">{isAr ? 'تراكمي · متأثّر / متجاوز' : 'cumulative · impacted / breached'}</span>}>
             {result.totalImpactedCount === 0 ? (
@@ -209,9 +210,11 @@ export function DependencyCascadePage() {
               </>
             )}
           </Card>
+          </div>
 
           {/* Impact register */}
           {impacts.length > 0 && (
+            <div id="cascade-impact-register">
             <Card title={isAr ? 'سجلّ العمليات المتأثّرة' : 'Impacted-process register'} Icon={AlertTriangle}>
               <div style={{ overflowX: 'auto' }}>
                 <table className="grc-table">
@@ -261,6 +264,7 @@ export function DependencyCascadePage() {
                   : 'Reach is estimated from cascade depth (tier 1 = 1h, 2 = 4h, 3 = 8h, deeper = 24h); confidence decays with depth.'}
               </p>
             </Card>
+            </div>
           )}
         </>
       )}

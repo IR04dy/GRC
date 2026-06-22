@@ -100,6 +100,8 @@ export function OutsourcingRegisterPage() {
           Icon={Briefcase}
           label={isAr ? 'إجمالي ترتيبات الإسناد' : 'Total arrangements'}
           value={dashboard?.totalArrangements ?? items.length}
+          onClick={() => { setMaterialFilter('all'); setStageFilter(''); setCriticalFnFilter(''); }}
+          active={materialFilter === 'all' && !stageFilter && !criticalFnFilter}
         />
         <Kpi
           Icon={ShieldCheck}

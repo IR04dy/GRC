@@ -94,10 +94,10 @@ export function IntakeInboxPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Inbox}         label={t('inboxKpiOpen')}     value={open.length}     tone="primary" />
-        <Kpi Icon={AlertTriangle} label={t('inboxKpiOverdue')}  value={overdue.length}  tone="danger" />
-        <Kpi Icon={CheckCheck}    label={t('inboxKpiPromoted')} value={promoted.length} tone="success" />
-        <Kpi Icon={ListChecks}    label={t('inboxKpiTotal')}    value={items.length}    tone="info" />
+        <Kpi Icon={Inbox}         label={t('inboxKpiOpen')}     value={open.length}     tone="primary" onClick={() => setTab('open')}     active={tab === 'open'} />
+        <Kpi Icon={AlertTriangle} label={t('inboxKpiOverdue')}  value={overdue.length}  tone="danger"  onClick={() => setTab('overdue')}  active={tab === 'overdue'} />
+        <Kpi Icon={CheckCheck}    label={t('inboxKpiPromoted')} value={promoted.length} tone="success" onClick={() => setTab('promoted')} active={tab === 'promoted'} />
+        <Kpi Icon={ListChecks}    label={t('inboxKpiTotal')}    value={items.length}    tone="info"    onClick={() => setTab('all')}      active={tab === 'all'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

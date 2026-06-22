@@ -196,7 +196,8 @@ export function DrPlansPage() {
 
       <div className="kpi-grid">
         <Kpi Icon={Server}       label={t('drpKpiApproved')}   value={stats.APPROVED + stats.ACTIVATED} tone="success" />
-        <Kpi Icon={Play}          label={t('drpKpiActivated')}  value={stats.ACTIVATED} tone="primary" />
+        <Kpi Icon={Play}          label={t('drpKpiActivated')}  value={stats.ACTIVATED} tone="primary"
+             onClick={() => setTab('activated')} active={tab === 'activated'} />
         <Kpi Icon={FlaskConical}  label={t('drpKpiPassed')}     value={stats.testedPassed} tone="success" to="/resilience-tests" />
         <Kpi Icon={Clock}         label={t('drpKpiOverdue')}    value={stats.overdue} tone="danger" to="/resilience-tests" />
       </div>

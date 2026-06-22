@@ -140,10 +140,10 @@ export function MaDueDiligencePage() {
         actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Briefcase}    label={isAr ? 'صفقات قيد العناية' : 'In-flight engagements'} value={String(counts.inFlight)} tone={counts.inFlight > 0 ? 'info' : 'success'} />
-        <Kpi Icon={AlertOctagon} label={isAr ? 'حُكم أحمر/مانع' : 'RED / Deal-blocker'}      value={String(counts.red)}      tone={counts.red > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={AlertOctagon} label={isAr ? 'ملاحظات حرجة' : 'CRITICAL findings'}        value={String(counts.criticalFindings)} tone={counts.criticalFindings > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={CheckCircle2} label={isAr ? 'مغلقة' : 'Closed'}                          value={String(counts.closed)}   tone="neutral" />
+        <Kpi Icon={Briefcase}    label={isAr ? 'صفقات قيد العناية' : 'In-flight engagements'} value={String(counts.inFlight)} tone={counts.inFlight > 0 ? 'info' : 'success'} onClick={() => setFilter('in_flight')} active={filter === 'in_flight'} />
+        <Kpi Icon={AlertOctagon} label={isAr ? 'حُكم أحمر/مانع' : 'RED / Deal-blocker'}      value={String(counts.red)}      tone={counts.red > 0 ? 'danger' : 'success'} onClick={() => setFilter('red_verdict')} active={filter === 'red_verdict'} />
+        <Kpi Icon={AlertOctagon} label={isAr ? 'ملاحظات حرجة' : 'CRITICAL findings'}        value={String(counts.criticalFindings)} tone={counts.criticalFindings > 0 ? 'danger' : 'success'} onClick={() => setFilter('critical_findings')} active={filter === 'critical_findings'} />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'مغلقة' : 'Closed'}                          value={String(counts.closed)}   tone="neutral" onClick={() => setFilter('closed')} active={filter === 'closed'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>

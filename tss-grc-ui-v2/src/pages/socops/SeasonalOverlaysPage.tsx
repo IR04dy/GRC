@@ -56,10 +56,10 @@ export function SeasonalOverlaysPage() {
         actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={CalendarClock} label={isAr ? 'نشطة الآن' : 'Active now'}             value={String(counts.active)}        tone={counts.active > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={CalendarClock} label={isAr ? 'نشطة الآن' : 'Active now'}             value={String(counts.active)}        tone={counts.active > 0 ? 'warning' : 'success'} onClick={() => setFilter('active')} active={filter === 'active'} />
         <Kpi Icon={AlertCircle}   label={isAr ? 'يشد العتبات' : 'Tightening KRI/SLA'} value={String(counts.tighteningNow)} tone={counts.tighteningNow > 0 ? 'warning' : 'success'} to="/risk/kri/dashboard" />
-        <Kpi Icon={Flag}          label={isAr ? 'قادمة خلال ٩٠ يوم' : 'Upcoming ≤90d'}  value={String(counts.upcoming)}      tone="info" />
-        <Kpi Icon={CalendarClock} label={isAr ? 'الإجمالي' : 'Total catalog'}            value={String(counts.total)}         tone="neutral" />
+        <Kpi Icon={Flag}          label={isAr ? 'قادمة خلال ٩٠ يوم' : 'Upcoming ≤90d'}  value={String(counts.upcoming)}      tone="info" onClick={() => setFilter('upcoming')} active={filter === 'upcoming'} />
+        <Kpi Icon={CalendarClock} label={isAr ? 'الإجمالي' : 'Total catalog'}            value={String(counts.total)}         tone="neutral" onClick={() => setFilter('all')} active={filter === 'all'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>

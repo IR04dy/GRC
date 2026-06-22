@@ -876,13 +876,17 @@ function FrameworkTab() {
   return (
     <div className="ndi-stack">
       <div className="kpi-grid">
-        <Kpi Icon={FileText}     label={isAr ? 'إجمالي البنود' : 'Total items'}   value={agg?.total ?? 0}            tone="primary" />
+        <Kpi Icon={FileText}     label={isAr ? 'إجمالي البنود' : 'Total items'}   value={agg?.total ?? 0}            tone="primary"
+             onClick={() => setFilterComponent('ALL')} active={filterComponent === 'ALL'} />
         <Kpi Icon={CheckCircle2} label={isAr ? 'بنود رسمية'   : 'Official'}      value={agg?.officialCount ?? 0}    tone="success" />
         <Kpi Icon={AlertCircle}  label={isAr ? 'بنود مؤقتة'   : 'Placeholder'}   value={agg?.placeholderCount ?? 0} tone="warning" />
         <Kpi Icon={Target}       label={isAr ? 'إلزامية'      : 'Mandatory'}     value={agg?.mandatoryCount ?? 0}   tone="danger" />
-        <Kpi Icon={CheckCircle2} label={isAr ? 'الامتثال'    : 'Compliance'}    value={agg?.byComponent.COMPLIANCE ?? 0}             tone="info" />
-        <Kpi Icon={Target}       label={isAr ? 'النضج'        : 'Maturity'}      value={agg?.byComponent.MATURITY ?? 0}               tone="primary" />
-        <Kpi Icon={Target}       label={isAr ? 'تميز تشغيلي' : 'Op. excellence'} value={agg?.byComponent.OPERATIONAL_EXCELLENCE ?? 0} tone="success" />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'الامتثال'    : 'Compliance'}    value={agg?.byComponent.COMPLIANCE ?? 0}             tone="info"
+             onClick={() => setFilterComponent('COMPLIANCE')} active={filterComponent === 'COMPLIANCE'} />
+        <Kpi Icon={Target}       label={isAr ? 'النضج'        : 'Maturity'}      value={agg?.byComponent.MATURITY ?? 0}               tone="primary"
+             onClick={() => setFilterComponent('MATURITY')} active={filterComponent === 'MATURITY'} />
+        <Kpi Icon={Target}       label={isAr ? 'تميز تشغيلي' : 'Op. excellence'} value={agg?.byComponent.OPERATIONAL_EXCELLENCE ?? 0} tone="success"
+             onClick={() => setFilterComponent('OPERATIONAL_EXCELLENCE')} active={filterComponent === 'OPERATIONAL_EXCELLENCE'} />
       </div>
 
       {agg && agg.placeholderCount > 0 && (
@@ -2726,12 +2730,16 @@ function EvidenceTab() {
         {agg && (
           <div className="kpi-grid">
             <Kpi Icon={Paperclip}    label={isAr ? 'إجمالي الأدلة' : 'Total'}        value={agg.total}            tone="primary" />
-            <Kpi Icon={CheckCircle2} label={isAr ? 'سارٍ'         : 'Active'}       value={agg.activeCount}      tone="success" />
-            <Kpi Icon={FileText}     label={isAr ? 'قيد المراجعة' : 'Pending'}      value={agg.pendingCount}     tone="primary" />
-            <Kpi Icon={AlertCircle}  label={isAr ? 'منتهي'        : 'Expired'}      value={agg.expiredCount}     tone={agg.expiredCount > 0 ? 'danger' : 'success'} />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'سارٍ'         : 'Active'}       value={agg.activeCount}      tone="success"
+                 onClick={() => setStatusFilter('ACTIVE')} active={statusFilter === 'ACTIVE'} />
+            <Kpi Icon={FileText}     label={isAr ? 'قيد المراجعة' : 'Pending'}      value={agg.pendingCount}     tone="primary"
+                 onClick={() => setStatusFilter('PENDING')} active={statusFilter === 'PENDING'} />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'منتهي'        : 'Expired'}      value={agg.expiredCount}     tone={agg.expiredCount > 0 ? 'danger' : 'success'}
+                 onClick={() => setStatusFilter('EXPIRED')} active={statusFilter === 'EXPIRED'} />
             <Kpi Icon={AlertCircle}  label={isAr ? 'قريب الانتهاء' : 'Expiring soon'} value={agg.expiringSoonCount}
                  tone={agg.expiringSoonCount > 0 ? 'warning' : 'success'} />
-            <Kpi Icon={Trash2}       label={isAr ? 'مرفوض'        : 'Rejected'}     value={agg.rejectedCount}    tone={agg.rejectedCount > 0 ? 'danger' : 'success'} />
+            <Kpi Icon={Trash2}       label={isAr ? 'مرفوض'        : 'Rejected'}     value={agg.rejectedCount}    tone={agg.rejectedCount > 0 ? 'danger' : 'success'}
+                 onClick={() => setStatusFilter('REJECTED')} active={statusFilter === 'REJECTED'} />
           </div>
         )}
       </Card>
@@ -3100,7 +3108,8 @@ function GapsTab() {
             <Kpi Icon={AlertCircle}  label={isAr ? 'إجمالي الفجوات' : 'Total gaps'} value={agg.total}              tone="primary" />
             <Kpi Icon={AlertCircle}  label={isAr ? 'حرجة مفتوحة'   : 'Critical open'} value={agg.criticalOpenCount}
                  tone={agg.criticalOpenCount > 0 ? 'danger' : 'success'} />
-            <Kpi Icon={ArrowRight}   label={isAr ? 'قيد المعالجة'   : 'In progress'} value={agg.inProgressCount}   tone="warning" />
+            <Kpi Icon={ArrowRight}   label={isAr ? 'قيد المعالجة'   : 'In progress'} value={agg.inProgressCount}   tone="warning"
+                 onClick={() => setStatusFilter('IN_PROGRESS')} active={statusFilter === 'IN_PROGRESS'} />
             <Kpi Icon={CheckCircle2} label={isAr ? 'محلولة/مغلقة'   : 'Resolved'}    value={agg.resolvedOrClosedCount} tone="success" />
             <Kpi Icon={AlertCircle}  label={isAr ? 'إجراءات متأخرة' : 'Overdue CAPAs'} value={agg.overdueCount}
                  tone={agg.overdueCount > 0 ? 'danger' : 'success'} />
@@ -4842,12 +4851,17 @@ function AuditTab() {
           <div className="kpi-grid">
             <Kpi Icon={FileText}    label={isAr ? 'إجمالي الأحداث' : 'Total events'} value={agg.total} tone="primary" />
             <Kpi Icon={AlertCircle} label={isAr ? 'تحذيرات' : 'Warnings'} value={agg.bySeverity.WARN ?? 0}
-                 tone={(agg.bySeverity.WARN ?? 0) > 0 ? 'warning' : 'success'} />
+                 tone={(agg.bySeverity.WARN ?? 0) > 0 ? 'warning' : 'success'}
+                 onClick={() => setSeverityFilter('WARN')} active={severityFilter === 'WARN'} />
             <Kpi Icon={AlertCircle} label={isAr ? 'أخطاء' : 'Errors'} value={agg.bySeverity.ERROR ?? 0}
-                 tone={(agg.bySeverity.ERROR ?? 0) > 0 ? 'danger' : 'success'} />
-            <Kpi Icon={CheckCircle2} label={isAr ? 'إنشاءات' : 'Creates'} value={agg.byAction.CREATE ?? 0} tone="info" />
-            <Kpi Icon={ArrowRight}   label={isAr ? 'انتقالات' : 'Transitions'} value={agg.byAction.TRANSITION ?? 0} tone="info" />
-            <Kpi Icon={Upload}       label={isAr ? 'تقديم' : 'Submits'} value={agg.byAction.SUBMIT ?? 0} tone="success" />
+                 tone={(agg.bySeverity.ERROR ?? 0) > 0 ? 'danger' : 'success'}
+                 onClick={() => setSeverityFilter('ERROR')} active={severityFilter === 'ERROR'} />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'إنشاءات' : 'Creates'} value={agg.byAction.CREATE ?? 0} tone="info"
+                 onClick={() => setActionFilter('CREATE')} active={actionFilter === 'CREATE'} />
+            <Kpi Icon={ArrowRight}   label={isAr ? 'انتقالات' : 'Transitions'} value={agg.byAction.TRANSITION ?? 0} tone="info"
+                 onClick={() => setActionFilter('TRANSITION')} active={actionFilter === 'TRANSITION'} />
+            <Kpi Icon={Upload}       label={isAr ? 'تقديم' : 'Submits'} value={agg.byAction.SUBMIT ?? 0} tone="success"
+                 onClick={() => setActionFilter('SUBMIT')} active={actionFilter === 'SUBMIT'} />
           </div>
         )}
       </Card>

@@ -287,10 +287,10 @@ export function TprmReassessmentDashboard({ vendors }: { vendors: TprmVendorDto[
   return (
     <>
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={AlertTriangle} label={t('tprmReassessKpiOverdue')}  value={overdue.length}  tone="danger" />
-        <Kpi Icon={Clock}         label={t('tprmReassessKpiDueSoon')}  value={dueSoon.length}  tone="warning" />
-        <Kpi Icon={CheckCircle2}  label={t('tprmReassessKpiOnTrack')}  value={onTrack.length}  tone="success" />
-        <Kpi Icon={ShieldCheck}   label={t('tprmReassessKpiAdHoc')}    value={adHoc.length}    tone="info" />
+        <Kpi Icon={AlertTriangle} label={t('tprmReassessKpiOverdue')}  value={overdue.length}  tone="danger" onClick={() => document.getElementById('tprm-reassess-overdue')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={Clock}         label={t('tprmReassessKpiDueSoon')}  value={dueSoon.length}  tone="warning" onClick={() => document.getElementById('tprm-reassess-duesoon')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={CheckCircle2}  label={t('tprmReassessKpiOnTrack')}  value={onTrack.length}  tone="success" onClick={() => document.getElementById('tprm-reassess-ontrack')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={ShieldCheck}   label={t('tprmReassessKpiAdHoc')}    value={adHoc.length}    tone="info" onClick={() => document.getElementById('tprm-reassess-adhoc')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
       </div>
 
       <Card title={t('tprmReassessTitle')} Icon={Clock}>
@@ -300,10 +300,10 @@ export function TprmReassessmentDashboard({ vendors }: { vendors: TprmVendorDto[
         {enriched.length === 0
           ? <EmptyState Icon={Clock} title={t('tprmReassessEmpty')} sub={t('tprmReassessEmptySub')} />
           : <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <ReassessSection title={t('tprmReassessSecOverdue')} tone="danger" rows={overdue} t={t} lang={lang} />
-              <ReassessSection title={t('tprmReassessSecDueSoon')} tone="warning" rows={dueSoon} t={t} lang={lang} />
-              <ReassessSection title={t('tprmReassessSecOnTrack')} tone="success" rows={onTrack} t={t} lang={lang} />
-              <ReassessSection title={t('tprmReassessSecAdHoc')} tone="neutral" rows={adHoc} t={t} lang={lang} />
+              <ReassessSection id="tprm-reassess-overdue" title={t('tprmReassessSecOverdue')} tone="danger" rows={overdue} t={t} lang={lang} />
+              <ReassessSection id="tprm-reassess-duesoon" title={t('tprmReassessSecDueSoon')} tone="warning" rows={dueSoon} t={t} lang={lang} />
+              <ReassessSection id="tprm-reassess-ontrack" title={t('tprmReassessSecOnTrack')} tone="success" rows={onTrack} t={t} lang={lang} />
+              <ReassessSection id="tprm-reassess-adhoc" title={t('tprmReassessSecAdHoc')} tone="neutral" rows={adHoc} t={t} lang={lang} />
             </div>
         }
       </Card>
@@ -335,7 +335,8 @@ export function TprmReassessmentDashboard({ vendors }: { vendors: TprmVendorDto[
   );
 }
 
-function ReassessSection({ title, tone, rows, t, lang }: {
+function ReassessSection({ id, title, tone, rows, t, lang }: {
+  id?: string;
   title: string;
   tone: 'danger' | 'warning' | 'success' | 'neutral';
   rows: EnrichedVendor[];
@@ -344,7 +345,7 @@ function ReassessSection({ title, tone, rows, t, lang }: {
 }) {
   if (rows.length === 0) return null;
   return (
-    <div style={{ marginTop: 6, marginBottom: 10 }}>
+    <div id={id} style={{ marginTop: 6, marginBottom: 10 }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '6px 0', marginBottom: 4,

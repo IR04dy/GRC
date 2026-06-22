@@ -68,10 +68,10 @@ export function CryptoAssetsPage() {
         actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={AlertTriangle} label={isAr ? 'منتهية' : 'Expired'}             value={String(counts.expired)}      tone={counts.expired > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={KeyRound}      label={isAr ? 'تنتهي ≤٣٠ يوم' : 'Expiring ≤30d'} value={String(counts.expiring30)}   tone={counts.expiring30 > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Lock}          label={isAr ? 'تنتهي ≤٩٠ يوم' : 'Expiring ≤90d'} value={String(counts.expiring90)}   tone={counts.expiring90 > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Atom}          label={isAr ? 'غير آمنة كموماً' : 'Quantum-unsafe'} value={String(counts.quantumUnsafe)} tone={counts.quantumUnsafe > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={AlertTriangle} label={isAr ? 'منتهية' : 'Expired'}             value={String(counts.expired)}      tone={counts.expired > 0 ? 'danger' : 'success'} onClick={() => setFilter('expired')} active={filter === 'expired'} />
+        <Kpi Icon={KeyRound}      label={isAr ? 'تنتهي ≤٣٠ يوم' : 'Expiring ≤30d'} value={String(counts.expiring30)}   tone={counts.expiring30 > 0 ? 'danger' : 'success'} onClick={() => setFilter('expiring_30')} active={filter === 'expiring_30'} />
+        <Kpi Icon={Lock}          label={isAr ? 'تنتهي ≤٩٠ يوم' : 'Expiring ≤90d'} value={String(counts.expiring90)}   tone={counts.expiring90 > 0 ? 'warning' : 'success'} onClick={() => setFilter('expiring_90')} active={filter === 'expiring_90'} />
+        <Kpi Icon={Atom}          label={isAr ? 'غير آمنة كموماً' : 'Quantum-unsafe'} value={String(counts.quantumUnsafe)} tone={counts.quantumUnsafe > 0 ? 'warning' : 'success'} onClick={() => setFilter('quantum_unsafe')} active={filter === 'quantum_unsafe'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>

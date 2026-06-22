@@ -76,10 +76,10 @@ export function AppsecPage() {
         actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={AlertOctagon} label={isAr ? 'حرجة مفتوحة' : 'Open CRITICAL'} value={String(counts.critical)}    tone={counts.critical > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Bug}          label={isAr ? 'عالية مفتوحة' : 'Open HIGH'}    value={String(counts.high)}        tone={counts.high > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Clock}        label={isAr ? 'SLA تجاوزت' : 'SLA breached'}   value={String(counts.slaBreached)} tone={counts.slaBreached > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={GitBranch}    label={isAr ? 'الإجمالي المفتوح' : 'Total open'} value={String(counts.open)}      tone={counts.open > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={AlertOctagon} label={isAr ? 'حرجة مفتوحة' : 'Open CRITICAL'} value={String(counts.critical)}    tone={counts.critical > 0 ? 'danger' : 'success'} onClick={() => setFilter('critical')} active={filter === 'critical'} />
+        <Kpi Icon={Bug}          label={isAr ? 'عالية مفتوحة' : 'Open HIGH'}    value={String(counts.high)}        tone={counts.high > 0 ? 'warning' : 'success'} onClick={() => setFilter('high')} active={filter === 'high'} />
+        <Kpi Icon={Clock}        label={isAr ? 'SLA تجاوزت' : 'SLA breached'}   value={String(counts.slaBreached)} tone={counts.slaBreached > 0 ? 'danger' : 'success'} onClick={() => setFilter('sla_breached')} active={filter === 'sla_breached'} />
+        <Kpi Icon={GitBranch}    label={isAr ? 'الإجمالي المفتوح' : 'Total open'} value={String(counts.open)}      tone={counts.open > 0 ? 'warning' : 'success'} onClick={() => setFilter('open')} active={filter === 'open'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>

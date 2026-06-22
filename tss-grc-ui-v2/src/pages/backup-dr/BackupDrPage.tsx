@@ -38,14 +38,15 @@ export function BackupDrPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Database}     label={t('drKpiBackupJobs')}    value={String(stats.totalJobs)} tone="primary" />
-        <Kpi Icon={ShieldCheck}   label={t('drKpiBackupOk')}      value={String(stats.okJobs)} tone={stats.failedJobs > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Cloud}          label={t('drKpiReplication')}   value={`${stats.inSyncLinks} / ${stats.totalReplLinks}`} tone={stats.laggingLinks > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={Database}     label={t('drKpiBackupJobs')}    value={String(stats.totalJobs)} tone="primary" onClick={() => document.getElementById('dr-backups-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={ShieldCheck}   label={t('drKpiBackupOk')}      value={String(stats.okJobs)} tone={stats.failedJobs > 0 ? 'warning' : 'success'} onClick={() => document.getElementById('dr-backups-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={Cloud}          label={t('drKpiReplication')}   value={`${stats.inSyncLinks} / ${stats.totalReplLinks}`} tone={stats.laggingLinks > 0 ? 'warning' : 'success'} onClick={() => document.getElementById('dr-replication-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         <Kpi Icon={Calendar}       label={t('drKpiDrills')}        value={String(stats.drillsCompleted)} tone="info" to="/dr-plans" />
         <Kpi Icon={Clock}          label={t('drKpiLastRto')}       value={stats.lastDrillRtoMin ? `${stats.lastDrillRtoMin}m` : '—'} tone="success" to="/dr-plans" />
       </div>
 
       {/* Backup jobs */}
+      <div id="dr-backups-section">
       <Card title={t('drBackupsTitle')} Icon={Database}>
         <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
           {t('drBackupsSub')}
@@ -92,9 +93,10 @@ export function BackupDrPage() {
           </tbody>
         </table>
       </Card>
+      </div>
 
       {/* Replication */}
-      <div style={{ marginTop: 16 }}>
+      <div id="dr-replication-section" style={{ marginTop: 16 }}>
         <Card title={t('drReplicationTitle')} Icon={Cloud}>
           <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
             {t('drReplicationSub')}

@@ -78,11 +78,11 @@ export function RegulatoryChangePage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Newspaper}    label={t('regChangeKpiTotal')}        value={String(stats.total)}            tone="primary" />
-        <Kpi Icon={Activity}     label={t('regChangeKpiNew')}          value={String(stats.newCount)}         tone="info" />
-        <Kpi Icon={Filter}       label={t('regChangeKpiTriaged')}      value={String(stats.triagedCount)}     tone="warning" />
-        <Kpi Icon={AlertOctagon} label={t('regChangeKpiApplicable')}    value={String(stats.applicableCount)}  tone="danger" />
-        <Kpi Icon={FileText}     label={t('regChangeKpiImplemented')}   value={String(stats.implementedCount)} tone="success" />
+        <Kpi Icon={Newspaper}    label={t('regChangeKpiTotal')}        value={String(stats.total)}            tone="primary" onClick={() => setStatusFilter('ALL')} active={statusFilter === 'ALL'} />
+        <Kpi Icon={Activity}     label={t('regChangeKpiNew')}          value={String(stats.newCount)}         tone="info" onClick={() => setStatusFilter('NEW')} active={statusFilter === 'NEW'} />
+        <Kpi Icon={Filter}       label={t('regChangeKpiTriaged')}      value={String(stats.triagedCount)}     tone="warning" onClick={() => setStatusFilter('TRIAGED')} active={statusFilter === 'TRIAGED'} />
+        <Kpi Icon={AlertOctagon} label={t('regChangeKpiApplicable')}    value={String(stats.applicableCount)}  tone="danger" onClick={() => setStatusFilter('APPLICABLE')} active={statusFilter === 'APPLICABLE'} />
+        <Kpi Icon={FileText}     label={t('regChangeKpiImplemented')}   value={String(stats.implementedCount)} tone="success" onClick={() => setStatusFilter('IMPLEMENTED')} active={statusFilter === 'IMPLEMENTED'} />
         <Kpi Icon={Calendar}     label={t('regChangeKpiOverdue')}       value={String(stats.overdueCount)}     tone={stats.overdueCount > 0 ? 'danger' : 'success'} />
       </div>
 

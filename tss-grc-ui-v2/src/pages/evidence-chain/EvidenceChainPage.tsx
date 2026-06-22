@@ -97,10 +97,10 @@ export function EvidenceChainPage() {
       />
 
       <div className="kpi-grid">
-        <Kpi Icon={Link2}         label={t('echKpiTotal')}      value={stats.total}      tone="primary" />
-        <Kpi Icon={CheckCircle2}  label={t('echKpiValid')}      value={stats.valid}      tone="success" />
-        <Kpi Icon={AlertOctagon}  label={t('echKpiBroken')}     value={stats.broken}     tone="danger" />
-        <Kpi Icon={ShieldCheck}   label={t('echKpiUnverified')} value={stats.unverified} tone="warning" />
+        <Kpi Icon={Link2}         label={t('echKpiTotal')}      value={stats.total}      tone="primary" onClick={() => setTab('all')}        active={tab === 'all'} />
+        <Kpi Icon={CheckCircle2}  label={t('echKpiValid')}      value={stats.valid}      tone="success" onClick={() => setTab('VALID')}      active={tab === 'VALID'} />
+        <Kpi Icon={AlertOctagon}  label={t('echKpiBroken')}     value={stats.broken}     tone="danger"  onClick={() => setTab('BROKEN')}     active={tab === 'BROKEN'} />
+        <Kpi Icon={ShieldCheck}   label={t('echKpiUnverified')} value={stats.unverified} tone="warning" onClick={() => setTab('UNVERIFIED')} active={tab === 'UNVERIFIED'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

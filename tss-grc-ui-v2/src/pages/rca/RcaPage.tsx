@@ -216,10 +216,14 @@ export function RcaPage() {
       />
 
       <div className="kpi-grid">
-        <Kpi Icon={FileText}     label={t('rcaKpiDraft')}    value={stats.DRAFT}     tone="warning" />
-        <Kpi Icon={Clock}        label={t('rcaKpiInReview')} value={stats.IN_REVIEW} tone="primary" />
-        <Kpi Icon={CheckCircle2} label={t('rcaKpiApproved')} value={stats.APPROVED}  tone="success" />
-        <Kpi Icon={XCircle}      label={t('rcaKpiRejected')} value={stats.REJECTED}  tone="danger" />
+        <Kpi Icon={FileText}     label={t('rcaKpiDraft')}    value={stats.DRAFT}     tone="warning"
+          onClick={() => setTab('draft')}     active={tab === 'draft'} />
+        <Kpi Icon={Clock}        label={t('rcaKpiInReview')} value={stats.IN_REVIEW} tone="primary"
+          onClick={() => setTab('in_review')} active={tab === 'in_review'} />
+        <Kpi Icon={CheckCircle2} label={t('rcaKpiApproved')} value={stats.APPROVED}  tone="success"
+          onClick={() => setTab('approved')}  active={tab === 'approved'} />
+        <Kpi Icon={XCircle}      label={t('rcaKpiRejected')} value={stats.REJECTED}  tone="danger"
+          onClick={() => setTab('rejected')}  active={tab === 'rejected'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

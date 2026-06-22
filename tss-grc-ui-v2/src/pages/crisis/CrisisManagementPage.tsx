@@ -161,16 +161,23 @@ export function CrisisManagementPage() {
       )}
 
       <div className="kpi-grid crisis-kpi-row">
-        <Kpi Icon={Siren}        label={t('crisisKpiScenarios')}      value={String(stats.totalScenarios)} tone="primary" />
-        <Kpi Icon={ShieldAlert}    label={t('crisisKpiCyber')}            value={String(stats.cyberScenarios)} tone="warning" />
-        <Kpi Icon={AlertOctagon}   label={t('crisisKpiHighImpact')}       value={String(stats.highImpactScenarios)} tone="danger" />
-        <Kpi Icon={Calendar}        label={t('crisisKpiPlanned')}          value={String(stats.exercisesPlanned)} tone="info" />
-        <Kpi Icon={Users}            label={t('crisisKpiCrossSector')}      value={String(stats.ncemaCrossSector)} tone="primary" />
-        <Kpi Icon={Award}            label={t('crisisKpiAvgScore')}         value={String(stats.avgExerciseScore)} tone={stats.avgExerciseScore >= 80 ? 'success' : 'warning'} />
-        <Kpi Icon={Calendar}         label={t('crisisKpiOldest')}            value={`${stats.oldestExercise}d`} tone={stats.oldestExercise > 365 ? 'danger' : stats.oldestExercise > 180 ? 'warning' : 'success'} />
+        <Kpi Icon={Siren}        label={t('crisisKpiScenarios')}      value={String(stats.totalScenarios)} tone="primary"
+             onClick={() => document.getElementById('crisis-scenario-register')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={ShieldAlert}    label={t('crisisKpiCyber')}            value={String(stats.cyberScenarios)} tone="warning"
+             onClick={() => document.getElementById('crisis-scenario-register')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={AlertOctagon}   label={t('crisisKpiHighImpact')}       value={String(stats.highImpactScenarios)} tone="danger"
+             onClick={() => document.getElementById('crisis-scenario-register')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={Calendar}        label={t('crisisKpiPlanned')}          value={String(stats.exercisesPlanned)} tone="info"
+             onClick={() => document.getElementById('crisis-exercise-calendar')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={Users}            label={t('crisisKpiCrossSector')}      value={String(stats.ncemaCrossSector)} tone="primary"
+             onClick={() => document.getElementById('crisis-scenario-register')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={Award}            label={t('crisisKpiAvgScore')}         value={String(stats.avgExerciseScore)} tone={stats.avgExerciseScore >= 80 ? 'success' : 'warning'}
+             onClick={() => document.getElementById('crisis-exercise-calendar')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={Calendar}         label={t('crisisKpiOldest')}            value={`${stats.oldestExercise}d`} tone={stats.oldestExercise > 365 ? 'danger' : stats.oldestExercise > 180 ? 'warning' : 'success'}
+             onClick={() => document.getElementById('crisis-exercise-calendar')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
       </div>
 
-      <div className="crisis-main-grid">
+      <div id="crisis-scenario-register" className="crisis-main-grid">
         {/* Scenario picker */}
         <Card padded={false} title={t('crisisScenariosTitle')} Icon={Siren}
           action={<Badge tone="primary">{SCENARIOS.length}</Badge>}>
@@ -291,7 +298,7 @@ export function CrisisManagementPage() {
       )}
 
       {/* Exercise calendar */}
-      <div className="crisis-section-top">
+      <div id="crisis-exercise-calendar" className="crisis-section-top">
         <Card title={t('crisisExercisesTitle')} Icon={Calendar}
           action={<Badge tone="primary">{EXERCISES.length}</Badge>}>
           <div className="crisis-card-sub">

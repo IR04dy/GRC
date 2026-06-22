@@ -163,8 +163,8 @@ export function DataclassDashboardPage() {
         <Kpi label={lang === 'ar' ? 'فئة حسّاسة (المادة ٤)' : 'Special category (Art.4)'} value={data?.assetsSpecialCategory ?? 0} tone="danger" Icon={ShieldAlert} to="/dataclass/assets" />
         <Kpi label={lang === 'ar' ? 'تدفقات نشطة' : 'Active flows'} value={data?.flowsActive ?? 0} tone="success" Icon={Globe} to="/dataclass/flows" />
         <Kpi label={lang === 'ar' ? 'تدفقات عبر الحدود' : 'Cross-border flows'} value={data?.flowsCrossBorder ?? 0} tone="warning" Icon={Globe} to="/dataclass/flows" />
-        <Kpi label={lang === 'ar' ? 'استثناءات نشطة' : 'Active exceptions'} value={data?.exceptionsActive ?? 0} tone="info" Icon={FileWarning} />
-        <Kpi label={lang === 'ar' ? 'تنتهي خلال ٣٠ يوماً' : 'Expiring ≤30d'} value={data?.exceptionsExpiringNext30d ?? 0} tone={data && data.exceptionsExpiringNext30d > 0 ? 'warning' : 'neutral'} Icon={BadgeAlert} />
+        <Kpi label={lang === 'ar' ? 'استثناءات نشطة' : 'Active exceptions'} value={data?.exceptionsActive ?? 0} tone="info" Icon={FileWarning} onClick={() => document.getElementById('dataclass-exceptions-by-type')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi label={lang === 'ar' ? 'تنتهي خلال ٣٠ يوماً' : 'Expiring ≤30d'} value={data?.exceptionsExpiringNext30d ?? 0} tone={data && data.exceptionsExpiringNext30d > 0 ? 'warning' : 'neutral'} Icon={BadgeAlert} onClick={() => document.getElementById('dataclass-exceptions-by-type')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 16 }}>
@@ -204,7 +204,7 @@ export function DataclassDashboardPage() {
           ) : <InlineEmpty />}
         </section>
 
-        <section style={{ padding: 16, borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
+        <section id="dataclass-exceptions-by-type" style={{ padding: 16, borderRadius: 12, background: 'var(--color-surface, #fff)', border: '1px solid rgba(0,0,0,0.08)' }}>
           <h3 style={{ marginTop: 0, fontSize: 14 }}>
             {lang === 'ar' ? 'الاستثناءات حسب النوع' : 'Exceptions by type'}
           </h3>

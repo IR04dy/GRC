@@ -196,11 +196,13 @@ export function CommunicationsPage() {
       />
 
       <div className="kpi-grid">
-        <Kpi Icon={Inbox}         label={t('commsKpiPending')}    value={pending.length}        tone="warning" />
+        <Kpi Icon={Inbox}         label={t('commsKpiPending')}    value={pending.length}        tone="warning"
+             onClick={() => setTab('pending')} active={tab === 'pending'} />
         <Kpi Icon={AlertOctagon}  label={t('commsKpiOverdue')}    value={overdueCount}          tone="danger" />
         <Kpi Icon={CalendarClock} label={t('commsKpiDueSoon')}    value={dueSoon24h}            tone="accent" />
         <Kpi Icon={CheckCheck}    label={t('commsKpiSent7d')}     value={sentLast7d}            tone="success" />
-        <Kpi Icon={Users}         label={t('commsKpiStakeholders')} value={STAKEHOLDERS.length} tone="primary" />
+        <Kpi Icon={Users}         label={t('commsKpiStakeholders')} value={STAKEHOLDERS.length} tone="primary"
+             onClick={() => setTab('directory')} active={tab === 'directory'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

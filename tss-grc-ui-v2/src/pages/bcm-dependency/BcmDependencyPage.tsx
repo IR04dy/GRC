@@ -49,7 +49,7 @@ export function BcmDependencyPage() {
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={Activity}      label={t('bdKpiProcesses')} value={String(stats.criticalProcessCount)} tone="primary" to="/bcm/bia" />
         <Kpi Icon={Truck}          label={t('bdKpiVendors')}    value={String(stats.uniqueVendors)} tone="info" to="/tprm" />
-        <Kpi Icon={Cloud}          label={t('bdKpiRegions')}    value={String(stats.uniqueRegions)} tone="info" />
+        <Kpi Icon={Cloud}          label={t('bdKpiRegions')}    value={String(stats.uniqueRegions)} tone="info" onClick={() => document.getElementById('bd-region-rollup')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         <Kpi Icon={AlertTriangle}  label={t('bdKpiRtoMismatch')} value={String(stats.rtoMismatches)} tone={stats.rtoMismatches > 0 ? 'danger' : 'success'} to="/bcm/mtpd-inheritance" />
         <Kpi Icon={GitBranch}      label={t('bdKpiLargest')}    value={String(stats.largestProcessImpact.impact)} tone="warning" to="/bcm/bia-quantitative" />
       </div>
@@ -204,7 +204,7 @@ export function BcmDependencyPage() {
                     ))}
                   </div>}
             </Card>
-            <Card title={t('bdRegionRollupTitle')} Icon={Cloud}
+            <div id="bd-region-rollup"><Card title={t('bdRegionRollupTitle')} Icon={Cloud}
               action={<Badge tone="primary">{regions.length}</Badge>}>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>
                 {t('bdRegionRollupSub')}
@@ -222,7 +222,7 @@ export function BcmDependencyPage() {
                       </div>
                     ))}
                   </div>}
-            </Card>
+            </Card></div>
           </div>
         </div>
       </div>

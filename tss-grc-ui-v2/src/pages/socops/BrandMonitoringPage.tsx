@@ -81,10 +81,10 @@ export function BrandMonitoringPage() {
         actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={AlertTriangle} label={isAr ? 'حرجة' : 'CRITICAL'}              value={String(counts.critical)}  tone={counts.critical > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Globe}         label={isAr ? 'مفتوحة' : 'Open'}                value={String(counts.open)}      tone={counts.open > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Send}          label={isAr ? 'إزالة قيد المعالجة' : 'Takedown in progress'} value={String(counts.takedown)} tone={counts.takedown > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={CheckCircle2}  label={isAr ? 'إزالة مكتملة' : 'Takedown done'} value={String(counts.completed)} tone="info" />
+        <Kpi Icon={AlertTriangle} label={isAr ? 'حرجة' : 'CRITICAL'}              value={String(counts.critical)}  tone={counts.critical > 0 ? 'danger' : 'success'} onClick={() => setFilter('critical')} active={filter === 'critical'} />
+        <Kpi Icon={Globe}         label={isAr ? 'مفتوحة' : 'Open'}                value={String(counts.open)}      tone={counts.open > 0 ? 'warning' : 'success'} onClick={() => setFilter('open')} active={filter === 'open'} />
+        <Kpi Icon={Send}          label={isAr ? 'إزالة قيد المعالجة' : 'Takedown in progress'} value={String(counts.takedown)} tone={counts.takedown > 0 ? 'warning' : 'success'} onClick={() => setFilter('takedown_pending')} active={filter === 'takedown_pending'} />
+        <Kpi Icon={CheckCircle2}  label={isAr ? 'إزالة مكتملة' : 'Takedown done'} value={String(counts.completed)} tone="info" onClick={() => setFilter('completed')} active={filter === 'completed'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>

@@ -629,10 +629,10 @@ function CapaTab() {
     <div className="esg-stack">
       {/* KPI strip — live status counts + overdue alarm */}
       <div className="kpi-grid">
-        <Kpi Icon={Wrench}        label={isAr ? 'مفتوحة' : 'Open'}          value={agg?.open ?? 0}        tone="warning" />
-        <Kpi Icon={ArrowRight}    label={isAr ? 'قيد التنفيذ' : 'In progress'} value={agg?.inProgress ?? 0} tone="info" />
-        <Kpi Icon={CheckCircle2}  label={isAr ? 'بانتظار التحقّق' : 'Awaiting verification'} value={agg?.completed ?? 0} tone="primary" />
-        <Kpi Icon={CheckCircle2}  label={isAr ? 'مُتحقَّق منها' : 'Verified'} value={agg?.verified ?? 0}   tone="success" />
+        <Kpi Icon={Wrench}        label={isAr ? 'مفتوحة' : 'Open'}          value={agg?.open ?? 0}        tone="warning" onClick={() => setStatusFilter('OPEN')} active={statusFilter === 'OPEN'} />
+        <Kpi Icon={ArrowRight}    label={isAr ? 'قيد التنفيذ' : 'In progress'} value={agg?.inProgress ?? 0} tone="info" onClick={() => setStatusFilter('IN_PROGRESS')} active={statusFilter === 'IN_PROGRESS'} />
+        <Kpi Icon={CheckCircle2}  label={isAr ? 'بانتظار التحقّق' : 'Awaiting verification'} value={agg?.completed ?? 0} tone="primary" onClick={() => setStatusFilter('COMPLETED')} active={statusFilter === 'COMPLETED'} />
+        <Kpi Icon={CheckCircle2}  label={isAr ? 'مُتحقَّق منها' : 'Verified'} value={agg?.verified ?? 0}   tone="success" onClick={() => setStatusFilter('VERIFIED')} active={statusFilter === 'VERIFIED'} />
         <Kpi Icon={AlertCircle}   label={isAr ? 'متأخّرة' : 'Overdue'}        value={agg?.overdue ?? 0}     tone={(agg?.overdue ?? 0) > 0 ? 'danger' : 'success'} />
         <Kpi Icon={Clock}         label={isAr ? 'مستحقّة قريباً' : 'Due soon'} value={agg?.dueSoon ?? 0}     tone={(agg?.dueSoon ?? 0) > 0 ? 'warning' : 'success'} />
       </div>
@@ -2624,12 +2624,12 @@ function MaterialityTab() {
     <div className="esg-stack">
       {/* KPI strip — tier counts + category counts */}
       <div className="kpi-grid">
-        <Kpi Icon={Target}       label={isAr ? 'إجمالي الموضوعات' : 'Total topics'}     value={matrix?.total ?? 0} tone="primary" />
+        <Kpi Icon={Target}       label={isAr ? 'إجمالي الموضوعات' : 'Total topics'}     value={matrix?.total ?? 0} tone="primary" onClick={() => setCategoryFilter('ALL')} active={categoryFilter === 'ALL'} />
         <Kpi Icon={AlertCircle}  label={isAr ? 'حرج' : 'Critical'}                       value={matrix?.byTier.CRITICAL ?? 0} tone="danger" />
         <Kpi Icon={AlertCircle}  label={isAr ? 'مرتفع' : 'High'}                         value={matrix?.byTier.HIGH ?? 0}     tone="warning" />
-        <Kpi Icon={Leaf}         label={isAr ? 'البيئة' : 'Environmental'}                value={matrix?.byCategory.ENVIRONMENTAL ?? 0} tone="success" />
-        <Kpi Icon={Building2}    label={isAr ? 'الاجتماع' : 'Social'}                     value={matrix?.byCategory.SOCIAL ?? 0}        tone="info" />
-        <Kpi Icon={Building2}    label={isAr ? 'الحوكمة' : 'Governance'}                  value={matrix?.byCategory.GOVERNANCE ?? 0}    tone="primary" />
+        <Kpi Icon={Leaf}         label={isAr ? 'البيئة' : 'Environmental'}                value={matrix?.byCategory.ENVIRONMENTAL ?? 0} tone="success" onClick={() => setCategoryFilter('ENVIRONMENTAL')} active={categoryFilter === 'ENVIRONMENTAL'} />
+        <Kpi Icon={Building2}    label={isAr ? 'الاجتماع' : 'Social'}                     value={matrix?.byCategory.SOCIAL ?? 0}        tone="info" onClick={() => setCategoryFilter('SOCIAL')} active={categoryFilter === 'SOCIAL'} />
+        <Kpi Icon={Building2}    label={isAr ? 'الحوكمة' : 'Governance'}                  value={matrix?.byCategory.GOVERNANCE ?? 0}    tone="primary" onClick={() => setCategoryFilter('GOVERNANCE')} active={categoryFilter === 'GOVERNANCE'} />
       </div>
 
       <Card title={isAr ? 'مصفوفة تقييم الجوهرية المزدوجة' : 'Double-materiality assessment matrix'} Icon={Target}
@@ -3071,10 +3071,10 @@ function MetricsTab() {
     <div className="esg-stack">
       {/* Per-pillar mean-progress strip */}
       <div className="kpi-grid">
-        <Kpi Icon={TrendingDown} label={isAr ? 'إجمالي المؤشّرات' : 'Total metrics'}                value={agg?.total ?? 0} tone="primary" />
-        <Kpi Icon={Leaf}         label={isAr ? 'متوسّط تقدّم البيئة' : 'Env. mean progress'}     value={`${agg ? Number(agg.meanProgressByCategory.ENVIRONMENTAL ?? 0).toFixed(0) : 0}%`} tone="success" />
-        <Kpi Icon={Building2}    label={isAr ? 'متوسّط تقدّم الاجتماع' : 'Social mean progress'} value={`${agg ? Number(agg.meanProgressByCategory.SOCIAL ?? 0).toFixed(0) : 0}%`}        tone="info" />
-        <Kpi Icon={Building2}    label={isAr ? 'متوسّط تقدّم الحوكمة' : 'Gov. mean progress'}   value={`${agg ? Number(agg.meanProgressByCategory.GOVERNANCE ?? 0).toFixed(0) : 0}%`}    tone="primary" />
+        <Kpi Icon={TrendingDown} label={isAr ? 'إجمالي المؤشّرات' : 'Total metrics'}                value={agg?.total ?? 0} tone="primary" onClick={() => setCategoryFilter('ALL')} active={categoryFilter === 'ALL'} />
+        <Kpi Icon={Leaf}         label={isAr ? 'متوسّط تقدّم البيئة' : 'Env. mean progress'}     value={`${agg ? Number(agg.meanProgressByCategory.ENVIRONMENTAL ?? 0).toFixed(0) : 0}%`} tone="success" onClick={() => setCategoryFilter('ENVIRONMENTAL')} active={categoryFilter === 'ENVIRONMENTAL'} />
+        <Kpi Icon={Building2}    label={isAr ? 'متوسّط تقدّم الاجتماع' : 'Social mean progress'} value={`${agg ? Number(agg.meanProgressByCategory.SOCIAL ?? 0).toFixed(0) : 0}%`}        tone="info" onClick={() => setCategoryFilter('SOCIAL')} active={categoryFilter === 'SOCIAL'} />
+        <Kpi Icon={Building2}    label={isAr ? 'متوسّط تقدّم الحوكمة' : 'Gov. mean progress'}   value={`${agg ? Number(agg.meanProgressByCategory.GOVERNANCE ?? 0).toFixed(0) : 0}%`}    tone="primary" onClick={() => setCategoryFilter('GOVERNANCE')} active={categoryFilter === 'GOVERNANCE'} />
         <Kpi Icon={CheckCircle2} label={isAr ? 'بلغ الهدف' : 'At target'}                       value={agg
           ? (agg.atTargetByCategory.ENVIRONMENTAL + agg.atTargetByCategory.SOCIAL + agg.atTargetByCategory.GOVERNANCE)
           : 0} tone="success" />
@@ -3319,12 +3319,12 @@ function EvidenceTab() {
     <div className="esg-stack">
       {/* KPI strip */}
       <div className="kpi-grid">
-        <Kpi Icon={Paperclip}    label={isAr ? 'إجمالي الأدلة' : 'Total evidence'}            value={agg?.total ?? 0} tone="primary" />
-        <Kpi Icon={CheckCircle2} label={isAr ? 'معتمدة' : 'Approved'}                          value={agg?.byStatus.APPROVED ?? 0}       tone="success" />
-        <Kpi Icon={ArrowRight}   label={isAr ? 'قيد المراجعة' : 'Pending review'}              value={agg?.byStatus.PENDING_REVIEW ?? 0} tone="info" />
-        <Kpi Icon={AlertCircle}  label={isAr ? 'مرفوضة' : 'Rejected'}                          value={agg?.byStatus.REJECTED ?? 0}       tone="danger" />
+        <Kpi Icon={Paperclip}    label={isAr ? 'إجمالي الأدلة' : 'Total evidence'}            value={agg?.total ?? 0} tone="primary" onClick={() => setStatusFilter('ALL')} active={statusFilter === 'ALL'} />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'معتمدة' : 'Approved'}                          value={agg?.byStatus.APPROVED ?? 0}       tone="success" onClick={() => setStatusFilter('APPROVED')} active={statusFilter === 'APPROVED'} />
+        <Kpi Icon={ArrowRight}   label={isAr ? 'قيد المراجعة' : 'Pending review'}              value={agg?.byStatus.PENDING_REVIEW ?? 0} tone="info" onClick={() => setStatusFilter('PENDING_REVIEW')} active={statusFilter === 'PENDING_REVIEW'} />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'مرفوضة' : 'Rejected'}                          value={agg?.byStatus.REJECTED ?? 0}       tone="danger" onClick={() => setStatusFilter('REJECTED')} active={statusFilter === 'REJECTED'} />
         <Kpi Icon={Clock}        label={isAr ? 'تنتهي خلال 30 يوماً' : 'Expiring within 30d'}  value={agg?.expiringSoon30d ?? 0}         tone={(agg?.expiringSoon30d ?? 0) > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={AlertCircle}  label={isAr ? 'منتهية' : 'Expired'}                           value={agg?.byStatus.EXPIRED ?? 0}        tone={(agg?.byStatus.EXPIRED ?? 0) > 0 ? 'danger' : 'success'} />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'منتهية' : 'Expired'}                           value={agg?.byStatus.EXPIRED ?? 0}        tone={(agg?.byStatus.EXPIRED ?? 0) > 0 ? 'danger' : 'success'} onClick={() => setStatusFilter('EXPIRED')} active={statusFilter === 'EXPIRED'} />
       </div>
 
       <Card title={isAr ? 'مستودع أدلة الاستدامة' : 'Sustainability Evidence Repository'}
@@ -3998,10 +3998,10 @@ function GhgInventoryTab() {
 
       {/* KPI strip — totals + YoY + Rule-1 flag */}
       <div className="kpi-grid">
-        <Kpi Icon={Leaf} label={t('ghgKpiScope1')} value={agg ? `${(Number(agg.scope1Total) / 1000).toFixed(1)}k` : '—'} tone="success" />
-        <Kpi Icon={Leaf} label={t('ghgKpiScope2')} value={agg ? `${(Number(agg.scope2Total) / 1000).toFixed(1)}k` : '—'} tone="success" />
-        <Kpi Icon={Leaf} label={t('ghgKpiScope3')} value={agg ? `${(Number(agg.scope3Total) / 1000).toFixed(1)}k` : '—'} tone="warning" />
-        <Kpi Icon={Leaf} label={t('ghgKpiTotal')}  value={agg ? `${(Number(agg.grandTotal) / 1000).toFixed(1)}k` : '—'} tone="primary" />
+        <Kpi Icon={Leaf} label={t('ghgKpiScope1')} value={agg ? `${(Number(agg.scope1Total) / 1000).toFixed(1)}k` : '—'} tone="success" onClick={() => setScope(1)} active={scope === 1} />
+        <Kpi Icon={Leaf} label={t('ghgKpiScope2')} value={agg ? `${(Number(agg.scope2Total) / 1000).toFixed(1)}k` : '—'} tone="success" onClick={() => setScope(2)} active={scope === 2} />
+        <Kpi Icon={Leaf} label={t('ghgKpiScope3')} value={agg ? `${(Number(agg.scope3Total) / 1000).toFixed(1)}k` : '—'} tone="warning" onClick={() => setScope(3)} active={scope === 3} />
+        <Kpi Icon={Leaf} label={t('ghgKpiTotal')}  value={agg ? `${(Number(agg.grandTotal) / 1000).toFixed(1)}k` : '—'} tone="primary" onClick={() => setScope(undefined)} active={scope === undefined} />
         <Kpi Icon={CheckCircle2} label={t('ghgKpiS3Coverage')} value={agg ? `${Number(agg.scope3Coverage).toFixed(0)}%` : '—'}
           tone={agg?.scope3PartialFlag ? 'danger' : 'success'} />
       </div>

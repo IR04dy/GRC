@@ -245,9 +245,13 @@ export function AiModelRegisterPage() {
              value={stats.unacknowledgedDrift}
              tone={stats.unacknowledgedDrift > 0 ? 'warning' : 'success'} />
         <Kpi Icon={Cpu}          label={lang === 'ar' ? 'EU AI Act عالي الخطورة' : 'EU AI Act high-risk'}
-             value={stats.euAiActHighRisk} tone="accent" />
+             value={stats.euAiActHighRisk} tone="accent"
+             onClick={() => setFilterEuAi(prev => (prev === 'YES' ? 'ALL' : 'YES'))}
+             active={filterEuAi === 'YES'} />
         <Kpi Icon={CheckCircle2} label={lang === 'ar' ? 'مُمتثل لسدايا' : 'SDAIA compliant'}
-             value={stats.sdaiaCompliant} tone="success" />
+             value={stats.sdaiaCompliant} tone="success"
+             onClick={() => setFilterSdaia(prev => (prev === 'COMPLIANT' ? 'ALL' : 'COMPLIANT'))}
+             active={filterSdaia === 'COMPLIANT'} />
         <Kpi Icon={Shield}       label={lang === 'ar' ? 'مُمتثل للبنك المركزي' : 'SAMA compliant'}
              value={stats.samaCompliant} tone="success" />
         {/* ─── Governance-posture gaps (clickable filters) ─── */}

@@ -571,9 +571,12 @@ export function CommitteesPage() {
 
       <div className="kpi-grid">
         <Kpi Icon={Landmark}    label={t('comKpiActive')}     value={stats.activeCommittees} tone="success" />
-        <Kpi Icon={Calendar}    label={t('comKpiUpcoming')}   value={stats.upcoming}         tone="primary" />
-        <Kpi Icon={Gavel}       label={t('comTabResolutions')} value={resolutions.length}    tone="info" />
-        <Kpi Icon={ListChecks}  label={t('comTabActionRegister')} value={stats.openActions}  tone={stats.overdueActions > 0 ? 'danger' : 'warning'} />
+        <Kpi Icon={Calendar}    label={t('comKpiUpcoming')}   value={stats.upcoming}         tone="primary"
+             onClick={() => setTab('scheduled')} active={tab === 'scheduled'} />
+        <Kpi Icon={Gavel}       label={t('comTabResolutions')} value={resolutions.length}    tone="info"
+             onClick={() => setTab('resolutions')} active={tab === 'resolutions'} />
+        <Kpi Icon={ListChecks}  label={t('comTabActionRegister')} value={stats.openActions}  tone={stats.overdueActions > 0 ? 'danger' : 'warning'}
+             onClick={() => setTab('actions')} active={tab === 'actions'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

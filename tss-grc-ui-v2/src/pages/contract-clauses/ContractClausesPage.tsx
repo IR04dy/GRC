@@ -190,7 +190,8 @@ export function ContractClausesPage() {
 
       <div className="kpi-grid">
         <Kpi Icon={BookOpen}      label={t('cclKpiApproved')}   value={stats.approved} tone="success" />
-        <Kpi Icon={Files}         label={t('cclKpiDraft')}      value={stats.draft}    tone="warning" />
+        <Kpi Icon={Files}         label={t('cclKpiDraft')}      value={stats.draft}    tone="warning"
+          onClick={() => setTab('draft')} active={tab === 'draft'} />
         <Kpi Icon={AlertTriangle} label={t('cclKpiCritical')}   value={stats.critical} tone="danger" />
         <Kpi Icon={Stamp}         label={t('cclKpiFixed')}      value={stats.fixed}    tone="primary" />
       </div>

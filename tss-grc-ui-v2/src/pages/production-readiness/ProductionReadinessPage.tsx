@@ -168,14 +168,20 @@ export function ProductionReadinessPage() {
 
       {/* Inventory KPIs */}
       <div className="kpi-grid" style={{ margin: '16px 0' }}>
-        <Kpi Icon={Database}    label={t('prKpiStores')}    value={String(inventory.length)} tone="primary" />
-        <Kpi Icon={Server}       label={t('prKpiRows')}       value={totalRows.toLocaleString()} tone="info" />
-        <Kpi Icon={Cloud}        label={t('prKpiBytes')}      value={`${(totalBytes / 1024).toFixed(1)}KB`} tone="info" />
-        <Kpi Icon={Upload}       label={t('prKpiBackendReady')} value={String(PERSISTENCE_REGISTRY.filter(r => r.backendReady).length)} tone="success" />
-        <Kpi Icon={CheckCheck}   label={t('prKpiChecklistOk')} value={`${okItems} / ${checklistItems.length}`} tone={okItems === checklistItems.length ? 'success' : 'warning'} />
+        <Kpi Icon={Database}    label={t('prKpiStores')}    value={String(inventory.length)} tone="primary"
+          onClick={() => document.getElementById('pr-inventory-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={Server}       label={t('prKpiRows')}       value={totalRows.toLocaleString()} tone="info"
+          onClick={() => document.getElementById('pr-inventory-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={Cloud}        label={t('prKpiBytes')}      value={`${(totalBytes / 1024).toFixed(1)}KB`} tone="info"
+          onClick={() => document.getElementById('pr-inventory-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={Upload}       label={t('prKpiBackendReady')} value={String(PERSISTENCE_REGISTRY.filter(r => r.backendReady).length)} tone="success"
+          onClick={() => document.getElementById('pr-inventory-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={CheckCheck}   label={t('prKpiChecklistOk')} value={`${okItems} / ${checklistItems.length}`} tone={okItems === checklistItems.length ? 'success' : 'warning'}
+          onClick={() => document.getElementById('pr-checklist-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
       </div>
 
       {/* Store inventory */}
+      <div id="pr-inventory-section">
       <Card title={t('prInventoryTitle')} Icon={Database}
         action={
           <Button variant="primary" Icon={Upload} onClick={migrateAll} disabled={migrating || inventory.length === 0}>
@@ -244,9 +250,10 @@ export function ProductionReadinessPage() {
           </tbody>
         </table>
       </Card>
+      </div>
 
       {/* Production checklist */}
-      <div style={{ marginTop: 16 }}>
+      <div id="pr-checklist-section" style={{ marginTop: 16 }}>
         <Card title={t('prChecklistTitle')} Icon={ShieldCheck}
           action={<Badge tone={okItems === checklistItems.length ? 'success' : 'warning'}>{okItems} / {checklistItems.length}</Badge>}>
           <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>

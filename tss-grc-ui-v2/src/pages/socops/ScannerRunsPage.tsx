@@ -63,10 +63,10 @@ export function ScannerRunsPage() {
         actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Scan}         label={isAr ? 'قيد التشغيل' : 'Running / queued'} value={String(counts.running)}      tone={counts.running > 0 ? 'info' : 'neutral'} />
+        <Kpi Icon={Scan}         label={isAr ? 'قيد التشغيل' : 'Running / queued'} value={String(counts.running)}      tone={counts.running > 0 ? 'info' : 'neutral'} onClick={() => setFilter('running')} active={filter === 'running'} />
         <Kpi Icon={AlertOctagon} label={isAr ? 'بثغرات حرجة' : 'With CRITICAL'}    value={String(counts.withCritical)} tone={counts.withCritical > 0 ? 'danger' : 'success'} to="/cyber/vuln-sla/dashboard" />
         <Kpi Icon={Activity}     label={isAr ? 'إجمالي الحرج' : 'Total CRITICAL'}  value={String(counts.totalCritical)} tone={counts.totalCritical > 0 ? 'danger' : 'success'} to="/cyber/vuln-sla/dashboard" />
-        <Kpi Icon={Scan}         label={isAr ? 'مكتملة' : 'Completed'}             value={String(counts.completed)}     tone="info" />
+        <Kpi Icon={Scan}         label={isAr ? 'مكتملة' : 'Completed'}             value={String(counts.completed)}     tone="info" onClick={() => setFilter('completed')} active={filter === 'completed'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>

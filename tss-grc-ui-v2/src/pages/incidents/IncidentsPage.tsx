@@ -444,9 +444,11 @@ export function IncidentsPage() {
       <ModuleSubmissionsPanel module="INCIDENT" />
       <div className="kpi-grid">
         <Kpi Icon={AlertOctagon} label={t('incidentsKpiOpen')}     value={open_count} tone="warning" />
-        <Kpi Icon={Flame}        label={t('incidentsKpiCritical')} value={critical}    tone="danger" />
+        <Kpi Icon={Flame}        label={t('incidentsKpiCritical')} value={critical}    tone="danger"
+          onClick={() => setAdvFilters({ severity: 'CRITICAL' })} active={advFilters.severity === 'CRITICAL'} />
         <Kpi Icon={Timer}        label={t('incidentsKpiMttr')}     value="4.2h" trend={{ dir: 'down', value: '−1.1h' }} tone="success" />
-        <Kpi Icon={CheckCircle2} label={t('incidentsKpiClosed')}   value={closed} tone="primary" />
+        <Kpi Icon={CheckCircle2} label={t('incidentsKpiClosed')}   value={closed} tone="primary"
+          onClick={() => setAdvFilters({ status: 'CLOSED' })} active={advFilters.status === 'CLOSED'} />
       </div>
 
       <OverviewStrip

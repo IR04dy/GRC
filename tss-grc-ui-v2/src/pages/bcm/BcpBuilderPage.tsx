@@ -512,8 +512,10 @@ export function BcpBuilderPage() {
         />
 
         <div className="bcp-builder-kpis">
-          <Kpi Icon={FileText} label={isAr ? 'BCP'      : 'BCP plans'}   value={items.filter(p => p.planType === 'BCP').length} tone="info" />
-          <Kpi Icon={FileText} label={isAr ? 'DRP'      : 'DRP plans'}   value={items.filter(p => p.planType === 'DRP').length} tone="info" />
+          <Kpi Icon={FileText} label={isAr ? 'BCP'      : 'BCP plans'}   value={items.filter(p => p.planType === 'BCP').length} tone="info"
+               onClick={() => setPlanTypeFilter(planTypeFilter === 'BCP' ? '' : 'BCP')} active={planTypeFilter === 'BCP'} />
+          <Kpi Icon={FileText} label={isAr ? 'DRP'      : 'DRP plans'}   value={items.filter(p => p.planType === 'DRP').length} tone="info"
+               onClick={() => setPlanTypeFilter(planTypeFilter === 'DRP' ? '' : 'DRP')} active={planTypeFilter === 'DRP'} />
           <Kpi Icon={Wrench}   label={isAr ? 'منشورة'   : 'Published'}   value={stats.status_published ?? 0}                   tone="success" />
           <Kpi Icon={History}  label={isAr ? 'في التحرير' : 'Draft'}     value={stats.status_draft ?? 0}                       tone="warning" />
           {/* Tier-2 #10 review-state KPIs sit alongside the lifecycle KPIs so

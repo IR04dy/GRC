@@ -361,9 +361,9 @@ export function EvidencePage() {
         }
       />
       <div className="kpi-grid">
-        <Kpi Icon={Files}      label={t('evidenceKpiTotal')}    value={items.data.length} tone="primary" />
+        <Kpi Icon={Files}      label={t('evidenceKpiTotal')}    value={items.data.length} tone="primary" onClick={() => setTab('catalog')} active={tab === 'catalog'} />
         <Kpi Icon={Inbox}      label={t('evidenceKpiPending')}  value={items.data.filter(i => i.status === 'PENDING' || i.status === 'UNDER_REVIEW').length + requests.data.filter(r => r.status === 'PENDING' || r.status === 'IN_PROGRESS').length} tone="warning" />
-        <Kpi Icon={CalendarX}  label={t('evidenceKpiExpiring')} value={expiredItems.length} tone="danger" />
+        <Kpi Icon={CalendarX}  label={t('evidenceKpiExpiring')} value={expiredItems.length} tone="danger" onClick={() => setTab('expired')} active={tab === 'expired'} />
         <Kpi Icon={BadgeCheck} label={t('evidenceKpiApproved')} value={`${pct}%`} tone="success" />
       </div>
 

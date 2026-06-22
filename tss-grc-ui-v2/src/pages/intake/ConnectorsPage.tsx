@@ -81,9 +81,9 @@ export function ConnectorsPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Activity} label={t('connectorsKpiActive')}     value={active.length}     tone="success" />
-        <Kpi Icon={Plug}     label={t('connectorsKpiConfigured')} value={configured.length} tone="info" />
-        <Kpi Icon={Database} label={t('connectorsKpiTotal')}      value={connectors.length} tone="primary" />
+        <Kpi Icon={Activity} label={t('connectorsKpiActive')}     value={active.length}     tone="success" onClick={() => setFilter('ACTIVE')}     active={filter === 'ACTIVE'} />
+        <Kpi Icon={Plug}     label={t('connectorsKpiConfigured')} value={configured.length} tone="info"    onClick={() => setFilter('CONFIGURED')} active={filter === 'CONFIGURED'} />
+        <Kpi Icon={Database} label={t('connectorsKpiTotal')}      value={connectors.length} tone="primary" onClick={() => setFilter('ALL')}        active={filter === 'ALL'} />
         <Kpi Icon={Zap}      label={t('connectorsKpiIntake30d')}  value={intake30d}         tone="accent" to="/intake-inbox" />
       </div>
 

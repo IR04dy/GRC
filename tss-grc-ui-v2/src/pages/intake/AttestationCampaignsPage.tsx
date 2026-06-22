@@ -85,9 +85,9 @@ export function AttestationCampaignsPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={FileCheck2} label={t('campaignsKpiInFlight')}     value={inFlight.length}     tone="info" />
-        <Kpi Icon={CheckCircle2} label={t('campaignsKpiCompleted')}  value={completed.length}    tone="success" />
-        <Kpi Icon={Clock}      label={t('campaignsKpiClosing')}      value={closing.length}      tone="warning" />
+        <Kpi Icon={FileCheck2} label={t('campaignsKpiInFlight')}     value={inFlight.length}     tone="info"    onClick={() => setTab('in_flight')} active={tab === 'in_flight'} />
+        <Kpi Icon={CheckCircle2} label={t('campaignsKpiCompleted')}  value={completed.length}    tone="success" onClick={() => setTab('completed')} active={tab === 'completed'} />
+        <Kpi Icon={Clock}      label={t('campaignsKpiClosing')}      value={closing.length}      tone="warning" onClick={() => setTab('closing')}   active={tab === 'closing'} />
         <Kpi Icon={ListChecks} label={t('campaignsKpiTotalRespondents')}
           value={campaigns.reduce((acc, c) => acc + c.respondents.length, 0)} tone="primary" />
       </div>

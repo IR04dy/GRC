@@ -102,10 +102,10 @@ export function OtAssetsPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Cog}            label={isAr ? 'إجمالي الأصول' : 'Total assets'}                value={String(counts.total)}    tone="info" />
-        <Kpi Icon={AlertTriangle}  label={isAr ? 'حرجة / عالية' : 'CRITICAL / HIGH'}              value={String(counts.critical)} tone={counts.critical > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Network}        label={isAr ? 'وصول عن بُعد مفعّل' : 'Remote access enabled'} value={String(counts.remote)}   tone={counts.remote > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Activity}       label={isAr ? 'بدون ترقيع ≥٦ أشهر' : 'Unpatched ≥6 months'}    value={String(counts.unpatched)} tone={counts.unpatched > 0 ? 'danger' : 'success'} />
+        <Kpi Icon={Cog}            label={isAr ? 'إجمالي الأصول' : 'Total assets'}                value={String(counts.total)}    tone="info" onClick={() => setFilter('all')} active={filter === 'all'} />
+        <Kpi Icon={AlertTriangle}  label={isAr ? 'حرجة / عالية' : 'CRITICAL / HIGH'}              value={String(counts.critical)} tone={counts.critical > 0 ? 'warning' : 'success'} onClick={() => setFilter('critical')} active={filter === 'critical'} />
+        <Kpi Icon={Network}        label={isAr ? 'وصول عن بُعد مفعّل' : 'Remote access enabled'} value={String(counts.remote)}   tone={counts.remote > 0 ? 'warning' : 'success'} onClick={() => setFilter('remote')} active={filter === 'remote'} />
+        <Kpi Icon={Activity}       label={isAr ? 'بدون ترقيع ≥٦ أشهر' : 'Unpatched ≥6 months'}    value={String(counts.unpatched)} tone={counts.unpatched > 0 ? 'danger' : 'success'} onClick={() => setFilter('unpatched')} active={filter === 'unpatched'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>

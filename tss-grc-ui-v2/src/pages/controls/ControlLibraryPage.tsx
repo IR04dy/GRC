@@ -466,7 +466,8 @@ export function ControlLibraryPage() {
 
       {/* KPIs */}
       <div className="kpi-strip-4">
-        <Kpi Icon={Shield} label={isAr ? 'الضوابط' : 'Controls'} value={controls.length} />
+        <Kpi Icon={Shield} label={isAr ? 'الضوابط' : 'Controls'} value={controls.length}
+             onClick={() => setDomain('')} active={domain === ''} />
         <Kpi Icon={Layers} label={isAr ? 'مرجعيات تنظيمية' : 'Authority documents'} value={docs.length} to="/regulatory/library" />
         <Kpi Icon={Wrench} label={isAr ? 'مرجعيات مؤقتة' : 'Placeholder docs'} value={placeholderDocs}
              tone={placeholderDocs > 0 ? 'warning' : 'success'} to="/regulatory/library" />

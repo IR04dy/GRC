@@ -211,9 +211,13 @@ export function AdminPage() {
         }
       />
       <div className="kpi-grid">
-        <Kpi Icon={Users}     label={t('adminKpiUsers')}   value={users.data.length} tone="primary" />
+        <Kpi Icon={Users}     label={t('adminKpiUsers')}   value={users.data.length} tone="primary"
+          onClick={() => setAdvFilters({})}
+          active={Object.values(advFilters).filter(Boolean).length === 0} />
         <Kpi Icon={UserCheck} label={t('adminKpiActive')}  value={active} tone="success" />
-        <Kpi Icon={UserPlus}  label={t('adminKpiPending')} value={pending} tone="warning" />
+        <Kpi Icon={UserPlus}  label={t('adminKpiPending')} value={pending} tone="warning"
+          onClick={() => setAdvFilters({ isActive: 'false' })}
+          active={advFilters.isActive === 'false'} />
         <Kpi Icon={Shield}    label={t('adminKpiRoles')}   value={roles.length || ROLE_OPTIONS.length} tone="info" />
       </div>
       <Tabs items={tabs} active={tab} onChange={setTab} />

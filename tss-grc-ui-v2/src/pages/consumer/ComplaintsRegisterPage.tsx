@@ -167,7 +167,8 @@ export function ComplaintsRegisterPage() {
         <Kpi Icon={ListChecks} label={t('complaints.kpiOpen')} value={kpis.open} tone="info" />
         <Kpi Icon={AlertTriangle} label={t('complaints.kpiAckBreach')} value={kpis.ackBreach} tone="warning" />
         <Kpi Icon={AlertOctagon} label={t('complaints.kpiResolutionBreach')} value={kpis.resolutionBreach} tone="danger" />
-        <Kpi Icon={Send} label={t('complaints.kpiSamaEscalated')} value={kpis.sama} tone="accent" />
+        <Kpi Icon={Send} label={t('complaints.kpiSamaEscalated')} value={kpis.sama} tone="accent"
+          onClick={() => setFilterStatus('ESCALATED_TO_SAMA')} active={filterStatus === 'ESCALATED_TO_SAMA'} />
       </div>
 
       <Card padded>

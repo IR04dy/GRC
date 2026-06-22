@@ -169,7 +169,8 @@ export function RiskControlFindingPivotPage() {
                  label={t('Effective', 'فعّالة')}
                  value={`${Math.round(pivot.summary.effectiveControlsPct)}%`}
                  tone={pivot.summary.effectiveControlsPct >= 70 ? 'success'
-                     : pivot.summary.effectiveControlsPct >= 40 ? 'warning' : 'danger'} />
+                     : pivot.summary.effectiveControlsPct >= 40 ? 'warning' : 'danger'}
+                 onClick={() => document.getElementById('pivot-linked-controls')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
             <Kpi Icon={FileWarning}
                  label={t('Open findings', 'النتائج المفتوحة')}
                  value={pivot.summary.openFindingsCount}
@@ -185,7 +186,8 @@ export function RiskControlFindingPivotPage() {
                  label={t('Data completeness', 'اكتمال البيانات')}
                  value={`${Math.round(pivot.summary.dataCompletenessPct)}%`}
                  tone={pivot.summary.dataCompletenessPct >= 80 ? 'success'
-                     : pivot.summary.dataCompletenessPct >= 50 ? 'warning' : 'danger'} />
+                     : pivot.summary.dataCompletenessPct >= 50 ? 'warning' : 'danger'}
+                 onClick={() => document.getElementById('pivot-auditor-checklist')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px',
@@ -229,6 +231,7 @@ export function RiskControlFindingPivotPage() {
               )}
 
               {/* Linked Controls */}
+              <div id="pivot-linked-controls">
               <Card padded>
                 <SectionTitle Icon={ShieldCheck}
                               title={t('Linked controls', 'الضوابط المرتبطة')}
@@ -274,6 +277,7 @@ export function RiskControlFindingPivotPage() {
                   </ul>
                 )}
               </Card>
+              </div>
 
               {/* Linked Findings */}
               <Card padded>
@@ -384,7 +388,7 @@ export function RiskControlFindingPivotPage() {
 
             {/* Right rail — Auditor's checklist */}
             {checklist && (
-              <div>
+              <div id="pivot-auditor-checklist">
                 <Card padded>
                   <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
                     {t("Auditor's checklist", 'قائمة المدقق')}

@@ -71,8 +71,8 @@ export function AwarenessPage() {
         actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={GraduationCap}      label={isAr ? 'حملات نشطة' : 'Running campaigns'}    value={String(counts.running)}     tone="info" />
-        <Kpi Icon={MailCheck}          label={isAr ? 'مكتملة' : 'Completed'}                value={String(counts.completed)}   tone="info" />
+        <Kpi Icon={GraduationCap}      label={isAr ? 'حملات نشطة' : 'Running campaigns'}    value={String(counts.running)}     tone="info" onClick={() => setFilter('running')} active={filter === 'running'} />
+        <Kpi Icon={MailCheck}          label={isAr ? 'مكتملة' : 'Completed'}                value={String(counts.completed)}   tone="info" onClick={() => setFilter('completed')} active={filter === 'completed'} />
         <Kpi Icon={MousePointerClick}  label={isAr ? 'متوسط النجاح %' : 'Avg pass rate %'} value={counts.avgPassRate == null ? '—' : `${counts.avgPassRate}%`} tone="info" />
         <Kpi Icon={Repeat}             label={isAr ? 'متكرر فشل' : 'Repeat offenders'}     value={String(counts.repeatOff)}   tone={counts.repeatOff > 0 ? 'warning' : 'success'} />
       </div>

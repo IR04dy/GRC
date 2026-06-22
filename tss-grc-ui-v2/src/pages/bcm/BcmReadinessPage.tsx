@@ -518,23 +518,28 @@ export function BcmReadinessPage() {
              value={activeCycle ? String(activeCycle.reportingYear) : '—'}
              tone={activeCycle && cycleStatusTone(activeCycle.status) !== 'neutral'
                    ? (cycleStatusTone(activeCycle.status) as 'info' | 'warning' | 'success')
-                   : 'primary'} />
+                   : 'primary'}
+             onClick={() => setTab('cycles')} active={tab === 'cycles'} />
         <Kpi Icon={Shield}
              label={isAr ? 'سياسات معتمدة' : 'Active policies'}
              value={governance.filter(g => g.approvalStatus === 'APPROVED' || g.approvalStatus === 'ACTIVE').length}
-             tone="success" />
+             tone="success"
+             onClick={() => setTab('governance')} active={tab === 'governance'} />
         <Kpi Icon={AlertTriangle}
              label={isAr ? 'مخاطر BCM مفتوحة' : 'Open BCM risks'}
              value={openRisks}
-             tone={openRisks > 0 ? 'warning' : 'success'} />
+             tone={openRisks > 0 ? 'warning' : 'success'}
+             onClick={() => setTab('risks')} active={tab === 'risks'} />
         <Kpi Icon={Activity}
              label={isAr ? 'استراتيجيات معتمدة' : 'Approved strategies'}
              value={approvedStrategies}
-             tone="info" />
+             tone="info"
+             onClick={() => setTab('strategies')} active={tab === 'strategies'} />
         <Kpi Icon={Phone}
              label={isAr ? 'فشل في شجرة الاتصال' : 'Call-tree failures'}
              value={failedCallTrees}
-             tone={failedCallTrees > 0 ? 'danger' : 'success'} />
+             tone={failedCallTrees > 0 ? 'danger' : 'success'}
+             onClick={() => setTab('calltree')} active={tab === 'calltree'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

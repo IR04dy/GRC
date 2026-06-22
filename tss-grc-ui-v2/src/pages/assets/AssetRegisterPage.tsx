@@ -73,8 +73,8 @@ export function AssetRegisterPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Server}       label={t('assetsKpiTotal')}        value={String(kpiTotal)}        tone="primary" />
-        <Kpi Icon={AlertOctagon} label={t('assetsKpiCritical')}      value={String(kpiCritical)}     tone="danger" />
+        <Kpi Icon={Server}       label={t('assetsKpiTotal')}        value={String(kpiTotal)}        tone="primary" onClick={() => { setTypeFilter('ALL'); setCritFilter('ALL'); }} active={typeFilter === 'ALL' && critFilter === 'ALL'} />
+        <Kpi Icon={AlertOctagon} label={t('assetsKpiCritical')}      value={String(kpiCritical)}     tone="danger" onClick={() => setCritFilter(critFilter === 'CRITICAL' ? 'ALL' : 'CRITICAL')} active={critFilter === 'CRITICAL'} />
         <Kpi Icon={Cloud}         label={t('assetsKpiKsa')}          value={String(kpiKsa)}          tone="success" />
         <Kpi Icon={Cloud}         label={t('assetsKpiCrossBorder')}  value={String(kpiCrossBorder)}  tone="warning" />
         <Kpi Icon={Landmark}      label={t('assetsKpiSama')}         value={String(kpiSama)}         tone="info" />

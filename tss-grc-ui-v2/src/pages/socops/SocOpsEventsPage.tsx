@@ -123,10 +123,10 @@ export function SocOpsEventsPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Siren}          label={isAr ? 'حرجة مفتوحة' : 'Open CRITICAL'} value={String(counts.crit)}   tone={counts.crit > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={AlertTriangle}  label={isAr ? 'مفتوحة (الكل)' : 'Open (all)'}  value={String(counts.open)}   tone={counts.open > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Clock}          label={isAr ? 'اقتراب SLA' : 'SLA approaching'} value={String(counts.sla)}    tone={counts.sla > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={CheckCircle2}   label={isAr ? 'مغلقة' : 'Closed'}                value={String(counts.closed)} tone="info" />
+        <Kpi Icon={Siren}          label={isAr ? 'حرجة مفتوحة' : 'Open CRITICAL'} value={String(counts.crit)}   tone={counts.crit > 0 ? 'danger' : 'success'} onClick={() => setFilter('critical')} active={filter === 'critical'} />
+        <Kpi Icon={AlertTriangle}  label={isAr ? 'مفتوحة (الكل)' : 'Open (all)'}  value={String(counts.open)}   tone={counts.open > 0 ? 'warning' : 'success'} onClick={() => setFilter('open')} active={filter === 'open'} />
+        <Kpi Icon={Clock}          label={isAr ? 'اقتراب SLA' : 'SLA approaching'} value={String(counts.sla)}    tone={counts.sla > 0 ? 'warning' : 'success'} onClick={() => setFilter('sla')} active={filter === 'sla'} />
+        <Kpi Icon={CheckCircle2}   label={isAr ? 'مغلقة' : 'Closed'}                value={String(counts.closed)} tone="info" onClick={() => setFilter('closed')} active={filter === 'closed'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>

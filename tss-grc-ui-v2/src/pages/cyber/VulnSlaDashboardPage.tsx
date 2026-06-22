@@ -232,10 +232,12 @@ export function VulnSlaDashboardPage() {
              value={kpis.open} />
         <Kpi Icon={TimerReset} tone="warning"
              label={lang === 'ar' ? 'تنبيه قبل الإخلال' : 'Warning'}
-             value={kpis.warning} />
+             value={kpis.warning}
+             onClick={() => document.getElementById('vuln-sla-warning')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         <Kpi Icon={AlertOctagon} tone="danger"
              label={lang === 'ar' ? 'مُخَلّة بالاتفاقية' : 'Breached'}
-             value={kpis.breached} />
+             value={kpis.breached}
+             onClick={() => document.getElementById('vuln-sla-breached')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         <Kpi Icon={ShieldCheck} tone="success"
              label={lang === 'ar' ? 'مُعالَجة' : 'Remediated'}
              value={kpis.remediated} />
@@ -270,7 +272,7 @@ export function VulnSlaDashboardPage() {
 
       {/* Breached findings */}
       <Card padded>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <div id="vuln-sla-breached" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <AlertOctagon size={18} style={{ color: 'var(--danger)' }} />
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
             {lang === 'ar' ? 'نتائج مُخَلّة بالاتفاقية' : 'Breached findings'}
@@ -295,7 +297,7 @@ export function VulnSlaDashboardPage() {
 
       {/* Warning findings */}
       <Card padded>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <div id="vuln-sla-warning" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <TimerReset size={18} style={{ color: 'var(--warning)' }} />
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
             {lang === 'ar' ? 'تنبيهات قبل الإخلال' : 'Warning findings'}

@@ -70,9 +70,9 @@ export function CyberInsurancePage() {
         actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={ShieldPlus} label={isAr ? 'وثائق نشطة' : 'Active policies'}      value={String(counts.active)}    tone={counts.active > 0 ? 'success' : 'warning'} />
-        <Kpi Icon={Clock}      label={isAr ? 'تجديد ≤٣٠ يوم' : 'Renewal ≤30d'}    value={String(counts.renewal30)} tone={counts.renewal30 > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Clock}      label={isAr ? 'تجديد ≤٩٠ يوم' : 'Renewal ≤90d'}    value={String(counts.renewal90)} tone={counts.renewal90 > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={ShieldPlus} label={isAr ? 'وثائق نشطة' : 'Active policies'}      value={String(counts.active)}    tone={counts.active > 0 ? 'success' : 'warning'} onClick={() => setFilter('active')} active={filter === 'active'} />
+        <Kpi Icon={Clock}      label={isAr ? 'تجديد ≤٣٠ يوم' : 'Renewal ≤30d'}    value={String(counts.renewal30)} tone={counts.renewal30 > 0 ? 'danger' : 'success'} onClick={() => setFilter('renewal_30')} active={filter === 'renewal_30'} />
+        <Kpi Icon={Clock}      label={isAr ? 'تجديد ≤٩٠ يوم' : 'Renewal ≤90d'}    value={String(counts.renewal90)} tone={counts.renewal90 > 0 ? 'warning' : 'success'} onClick={() => setFilter('renewal_90')} active={filter === 'renewal_90'} />
         <Kpi Icon={Wallet}     label={isAr ? 'إجمالي السقف (SAR)' : 'Total limit (SAR)'} value={sar(counts.aggregateLimit)} tone="info" />
       </div>
 

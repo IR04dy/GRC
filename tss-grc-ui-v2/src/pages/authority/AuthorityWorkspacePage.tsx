@@ -158,7 +158,7 @@ export function AuthorityWorkspacePage() {
         <Kpi Icon={BookCopy}        label={t('authKpiFrameworks')}  value={authority.frameworkCodes.length}                          tone="primary" to="/regulatory/library" />
         <Kpi Icon={ClipboardCheck}  label={t('authKpiCited')}       value={myAnchors.length}                                         tone="info" to="/controls/library" />
         <Kpi Icon={FileText}        label={t('authKpiEvidence')}    value={evidenceForMe.length}                                     tone="success" to="/evidence" />
-        <Kpi Icon={AlertTriangle}   label={t('authKpiFindings')}    value={findingsForMe.filter(f => f.status !== 'CLOSED').length}  tone="danger" />
+        <Kpi Icon={AlertTriangle}   label={t('authKpiFindings')}    value={findingsForMe.filter(f => f.status !== 'CLOSED').length}  tone="danger" onClick={() => document.getElementById('authws-findings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         <Kpi Icon={Briefcase}       label={t('authKpiEngagements')} value={engagementsForMe.length}                                  tone="accent" to="/audit-workspace" />
       </div>
 
@@ -396,7 +396,7 @@ export function AuthorityWorkspacePage() {
       </Card>
 
       {/* Findings + Engagements */}
-      <div className="dash-grid" style={{ marginTop: 12 }}>
+      <div id="authws-findings-section" className="dash-grid" style={{ marginTop: 12 }}>
         <Card title={t('authwsFindings')} Icon={AlertTriangle}
           action={<Badge tone="danger">{findingsForMe.filter(f => f.status !== 'CLOSED').length} {t('audwsAgingCenterSub')}</Badge>}>
           {findingsForMe.length === 0

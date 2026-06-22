@@ -192,8 +192,8 @@ export function RiskScenariosPage() {
       />
 
       <div className="kpi-grid">
-        <Kpi Icon={FileText}     label={t('scnKpiDraft')}      value={stats.DRAFT}     tone="warning" />
-        <Kpi Icon={CheckCircle2} label={t('scnKpiApproved')}   value={stats.APPROVED}  tone="success" />
+        <Kpi Icon={FileText}     label={t('scnKpiDraft')}      value={stats.DRAFT}     tone="warning" onClick={() => setTab('draft')} active={tab === 'draft'} />
+        <Kpi Icon={CheckCircle2} label={t('scnKpiApproved')}   value={stats.APPROVED}  tone="success" onClick={() => setTab('approved')} active={tab === 'approved'} />
         <Kpi Icon={TrendingUp}   label={t('scnKpiAvgExpected')} value={fmtSar(stats.avgExpected || undefined)} tone="primary" />
         <Kpi Icon={AlertTriangle} label={t('scnKpiSumP95')}    value={fmtSar(stats.sumP95 || undefined)} tone="danger" />
       </div>

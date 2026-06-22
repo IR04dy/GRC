@@ -61,10 +61,10 @@ export function SbomPage() {
         actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Package}      label={isAr ? 'الإجمالي' : 'Total components'} value={String(counts.total)}    tone="info" />
+        <Kpi Icon={Package}      label={isAr ? 'الإجمالي' : 'Total components'} value={String(counts.total)}    tone="info" onClick={() => setFilter('all')} active={filter === 'all'} />
         <Kpi Icon={AlertOctagon} label={isAr ? 'بثغرات معروفة' : 'With known CVEs'} value={String(counts.withCves)} tone={counts.withCves > 0 ? 'danger' : 'success'} to="/cyber/vuln-sla/dashboard" />
         <Kpi Icon={AlertOctagon} label={isAr ? 'بحرج' : 'CRITICAL CVE'}          value={String(counts.criticalCve)} tone={counts.criticalCve > 0 ? 'danger' : 'success'} to="/cyber/vuln-sla/dashboard" />
-        <Kpi Icon={ArrowUpCircle} label={isAr ? 'ترقية متاحة' : 'Upgrade available'} value={String(counts.upgrade)} tone={counts.upgrade > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={ArrowUpCircle} label={isAr ? 'ترقية متاحة' : 'Upgrade available'} value={String(counts.upgrade)} tone={counts.upgrade > 0 ? 'warning' : 'success'} onClick={() => setFilter('upgrade_available')} active={filter === 'upgrade_available'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>

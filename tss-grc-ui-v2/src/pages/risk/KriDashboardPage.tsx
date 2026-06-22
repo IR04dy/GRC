@@ -115,7 +115,8 @@ export function KriDashboardPage() {
              label={lang === 'ar' ? 'خروقات مفتوحة' : 'Open breaches'}
              value={(snap?.openBreachAmber ?? 0) + (snap?.openBreachRed ?? 0)}
              tone={(snap?.openBreachRed ?? 0) > 0 ? 'danger'
-                 : (snap?.openBreachAmber ?? 0) > 0 ? 'warning' : 'success'} />
+                 : (snap?.openBreachAmber ?? 0) > 0 ? 'warning' : 'success'}
+             onClick={() => document.getElementById('kri-open-breaches')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
       </div>
 
       {error && (
@@ -189,6 +190,7 @@ export function KriDashboardPage() {
         </div>
       </Card>
 
+      <div id="kri-open-breaches">
       <Card padded>
         <h3 style={{ marginTop: 0 }}>
           {lang === 'ar' ? 'الخروقات المفتوحة' : 'Open breaches'}
@@ -227,6 +229,7 @@ export function KriDashboardPage() {
             </ul>
         }
       </Card>
+      </div>
     </Shell>
   );
 }

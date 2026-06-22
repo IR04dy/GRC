@@ -196,9 +196,12 @@ export function EmergingRiskPage() {
       />
 
       <div className="kpi-grid">
-        <Kpi Icon={Eye}            label={t('emrKpiHorizon')}    value={stats.HORIZON}    tone="info" />
-        <Kpi Icon={Telescope}      label={t('emrKpiMonitoring')} value={stats.MONITORING} tone="primary" />
-        <Kpi Icon={ArrowUpRight}   label={t('emrKpiEscalated')}  value={stats.ESCALATED}  tone="warning" />
+        <Kpi Icon={Eye}            label={t('emrKpiHorizon')}    value={stats.HORIZON}    tone="info"
+          onClick={() => setTab('horizon')}    active={tab === 'horizon'} />
+        <Kpi Icon={Telescope}      label={t('emrKpiMonitoring')} value={stats.MONITORING} tone="primary"
+          onClick={() => setTab('monitoring')} active={tab === 'monitoring'} />
+        <Kpi Icon={ArrowUpRight}   label={t('emrKpiEscalated')}  value={stats.ESCALATED}  tone="warning"
+          onClick={() => setTab('escalated')}  active={tab === 'escalated'} />
         <Kpi Icon={AlertTriangle}  label={t('emrKpiConfirmed')}  value={stats.confirmed}  tone="danger" />
       </div>
 

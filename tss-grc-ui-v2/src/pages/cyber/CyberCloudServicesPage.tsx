@@ -163,10 +163,13 @@ export function CyberCloudServicesPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Server}       label={isAr ? 'خدمات نشطة' : 'Active services'} value={stats?.status_active ?? '—'} tone="primary" />
+        <Kpi Icon={Server}       label={isAr ? 'خدمات نشطة' : 'Active services'} value={stats?.status_active ?? '—'} tone="primary"
+          onClick={() => setStatusFilter(statusFilter === 'ACTIVE' ? '' : 'ACTIVE')} active={statusFilter === 'ACTIVE'} />
         <Kpi Icon={Globe2}       label={isAr ? 'خارج المملكة' : 'Off-Kingdom'} value={stats?.off_kingdom ?? '—'} tone="danger" />
-        <Kpi Icon={AlertOctagon} label={isAr ? 'أهمية حرجة' : 'Critical'} value={stats?.crit_critical ?? '—'} tone="danger" />
-        <Kpi Icon={ClipboardCheck} label={isAr ? 'قيد المراجعة' : 'Under review'} value={stats?.status_under_review ?? '—'} tone="warning" />
+        <Kpi Icon={AlertOctagon} label={isAr ? 'أهمية حرجة' : 'Critical'} value={stats?.crit_critical ?? '—'} tone="danger"
+          onClick={() => setCritFilter(critFilter === 'CRITICAL' ? '' : 'CRITICAL')} active={critFilter === 'CRITICAL'} />
+        <Kpi Icon={ClipboardCheck} label={isAr ? 'قيد المراجعة' : 'Under review'} value={stats?.status_under_review ?? '—'} tone="warning"
+          onClick={() => setStatusFilter(statusFilter === 'UNDER_REVIEW' ? '' : 'UNDER_REVIEW')} active={statusFilter === 'UNDER_REVIEW'} />
       </div>
 
       <Card title={isAr ? 'سجل الخدمات السحابية' : 'Cloud-service register'} Icon={Cloud}

@@ -83,10 +83,10 @@ export function DlpPage() {
         actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={ShieldX}     label={isAr ? 'حرجة' : 'CRITICAL'}             value={String(counts.critical)}   tone={counts.critical > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={EyeOff}      label={isAr ? 'بانتظار المراجعة' : 'Unreviewed'} value={String(counts.unreviewed)} tone={counts.unreviewed > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={FileWarning} label={isAr ? 'سري/سري للغاية' : 'TOP_SECRET / SECRET'} value={String(counts.topSecret)} tone={counts.topSecret > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={ShieldX}     label={isAr ? 'محظور' : 'Blocked'}              value={String(counts.blocked)}    tone="info" />
+        <Kpi Icon={ShieldX}     label={isAr ? 'حرجة' : 'CRITICAL'}             value={String(counts.critical)}   tone={counts.critical > 0 ? 'danger' : 'success'} onClick={() => setFilter('critical')} active={filter === 'critical'} />
+        <Kpi Icon={EyeOff}      label={isAr ? 'بانتظار المراجعة' : 'Unreviewed'} value={String(counts.unreviewed)} tone={counts.unreviewed > 0 ? 'warning' : 'success'} onClick={() => setFilter('unreviewed')} active={filter === 'unreviewed'} />
+        <Kpi Icon={FileWarning} label={isAr ? 'سري/سري للغاية' : 'TOP_SECRET / SECRET'} value={String(counts.topSecret)} tone={counts.topSecret > 0 ? 'danger' : 'success'} onClick={() => setFilter('top_secret')} active={filter === 'top_secret'} />
+        <Kpi Icon={ShieldX}     label={isAr ? 'محظور' : 'Blocked'}              value={String(counts.blocked)}    tone="info" onClick={() => setFilter('blocked')} active={filter === 'blocked'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>

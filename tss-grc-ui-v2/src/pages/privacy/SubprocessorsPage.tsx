@@ -169,10 +169,14 @@ export function SubprocessorsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
         <Kpi Icon={Database} tone="primary"
              label={lang === 'ar' ? 'إجمالي المعالجين' : 'Total sub-processors'}
-             value={kpis.total} />
+             value={kpis.total}
+             onClick={() => { setFilterLifecycle('ALL'); setFilterCountry('ALL'); setFilterSafeguard('ALL'); }}
+             active={filterLifecycle === 'ALL' && filterCountry === 'ALL' && filterSafeguard === 'ALL'} />
         <Kpi Icon={FileSignature} tone="success"
              label={lang === 'ar' ? 'مُعتَمد' : 'Approved'}
-             value={kpis.approved} />
+             value={kpis.approved}
+             onClick={() => setFilterLifecycle('APPROVED')}
+             active={filterLifecycle === 'APPROVED'} />
         <Kpi Icon={Globe2} tone="info"
              label={lang === 'ar' ? 'خارج المملكة (مُعتَمد)' : 'Cross-border (approved)'}
              value={kpis.crossBorder} to="/privacy/data-flow" />

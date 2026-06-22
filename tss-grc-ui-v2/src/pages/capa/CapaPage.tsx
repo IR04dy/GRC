@@ -185,9 +185,9 @@ export function CapaPage() {
       <div className="kpi-grid capa-kpi-strip">
         <Kpi Icon={ListChecks}    label={t('capaKpiOpen')}            value={open.length}                tone="primary" />
         <Kpi Icon={AlertTriangle} label={t('capaKpiOverdue')}         value={overdue.length}             tone="danger" />
-        <Kpi Icon={Repeat}        label={t('capaKpiVerificationFail')} value={failed.length}             tone="warning" />
+        <Kpi Icon={Repeat}        label={t('capaKpiVerificationFail')} value={failed.length}             tone="warning" onClick={() => setFilterStatus('VERIFICATION_FAILED')} active={filterStatus === 'VERIFICATION_FAILED'} />
         <Kpi Icon={Hourglass}     label={t('capaKpiEffectiveness')}    value={effectivenessDue.length}   tone="warning" />
-        <Kpi Icon={Workflow}      label={t('capaKpiPreventive')}      value={preventive.length}          tone="info" />
+        <Kpi Icon={Workflow}      label={t('capaKpiPreventive')}      value={preventive.length}          tone="info" onClick={() => setFilterType('PREVENTIVE')} active={filterType === 'PREVENTIVE'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

@@ -105,6 +105,8 @@ export function ObligationsPage() {
           label={isAr ? 'الالتزامات النشطة' : 'Active obligations'}
           value={String(kpis?.activeCount ?? '—')}
           tone="info"
+          onClick={() => setStageFilter('ACTIVE')}
+          active={stageFilter === 'ACTIVE'}
         />
         <Kpi
           Icon={AlertTriangle}

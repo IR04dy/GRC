@@ -383,7 +383,8 @@ export function AttackSurfacePage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
         <Kpi Icon={Server} tone="primary"
              label={lang === 'ar' ? 'إجمالي الأصول' : 'Total assets'}
-             value={kpis.totalAssets} />
+             value={kpis.totalAssets}
+             onClick={() => setTab('assets')} active={tab === 'assets'} />
         <Kpi Icon={Globe} tone="danger"
              label={lang === 'ar' ? 'أصول عامة حرجة' : 'Public + critical'}
              value={kpis.criticalExposure} />

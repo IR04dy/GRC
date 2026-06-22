@@ -115,7 +115,7 @@ export function CommitteeCatalogPage() {
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={Landmark}      label={isAr ? 'قوالب اللجان'      : 'Committee templates'} value={String(stats.templates)} tone="info" />
-        <Kpi Icon={FileText}      label={isAr ? 'النماذج المتاحة'    : 'Forms available'}      value={String(stats.forms)}     tone="success" />
+        <Kpi Icon={FileText}      label={isAr ? 'النماذج المتاحة'    : 'Forms available'}      value={String(stats.forms)}     tone="success" onClick={() => document.getElementById('forms-library-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         <Kpi Icon={BookOpen}      label={isAr ? 'النطاقات التنظيمية' : 'Regulatory domains'}    value={String(stats.domains)}   tone="neutral" />
         <Kpi Icon={AlertTriangle} label={isAr ? 'تتطلب الاستقلالية'   : 'Independence required'} value={String(stats.independenceRequired)} tone="warning" />
       </div>
@@ -186,6 +186,7 @@ export function CommitteeCatalogPage() {
 
       {/* Forms library card */}
       {!loading && !error && forms.length > 0 && (
+        <div id="forms-library-section">
         <Card
           title={isAr ? 'مكتبة نماذج اللجان' : 'Forms Library'}
           Icon={FileText}
@@ -226,6 +227,7 @@ export function CommitteeCatalogPage() {
             ))}
           </div>
         </Card>
+        </div>
       )}
     </Shell>
   );

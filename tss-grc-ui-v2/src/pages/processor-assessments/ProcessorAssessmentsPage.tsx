@@ -119,7 +119,8 @@ export function ProcessorAssessmentsPage() {
         actions={<Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('procNew')}</Button>} />
 
       <div className="kpi-grid">
-        <Kpi Icon={ClipboardCheck} label={t('procKpiApproved')} value={stats.APPROVED} tone="success" />
+        <Kpi Icon={ClipboardCheck} label={t('procKpiApproved')} value={stats.APPROVED} tone="success"
+          onClick={() => setTab('APPROVED')} active={tab === 'APPROVED'} />
         <Kpi Icon={AlertTriangle}  label={t('procKpiPwc')}      value={stats.pwc}      tone="warning" />
         <Kpi Icon={XCircle}        label={t('procKpiFailed')}   value={stats.fail}     tone="danger" />
         <Kpi Icon={Shield}         label={t('procKpiInProgress')} value={stats.IN_PROGRESS + stats.COMPLETED} tone="primary" />

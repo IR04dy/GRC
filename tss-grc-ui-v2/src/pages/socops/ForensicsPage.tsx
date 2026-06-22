@@ -100,10 +100,10 @@ export function ForensicsPage() {
         actions={<Button variant="ghost" size="sm" Icon={RefreshCw} onClick={() => void load()}>{isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Fingerprint} label={isAr ? 'إجمالي الأدلة' : 'Total artefacts'}     value={String(counts.total)}        tone="info" />
-        <Kpi Icon={Gavel}       label={isAr ? 'تحت الحجز القانوني' : 'Under legal hold'} value={String(counts.legalHold)}    tone="warning" />
-        <Kpi Icon={ShieldX}     label={isAr ? 'سلامة مخترقة' : 'Integrity compromised'} value={String(counts.compromised)}  tone={counts.compromised > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Gavel}       label={isAr ? 'إتلاف قادم ≤٣٠ يوم' : 'Disposal ≤30d'}  value={String(counts.disposal)}     tone={counts.disposal > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={Fingerprint} label={isAr ? 'إجمالي الأدلة' : 'Total artefacts'}     value={String(counts.total)}        tone="info" onClick={() => setFilter('all')} active={filter === 'all'} />
+        <Kpi Icon={Gavel}       label={isAr ? 'تحت الحجز القانوني' : 'Under legal hold'} value={String(counts.legalHold)}    tone="warning" onClick={() => setFilter('legal_hold')} active={filter === 'legal_hold'} />
+        <Kpi Icon={ShieldX}     label={isAr ? 'سلامة مخترقة' : 'Integrity compromised'} value={String(counts.compromised)}  tone={counts.compromised > 0 ? 'danger' : 'success'} onClick={() => setFilter('compromised')} active={filter === 'compromised'} />
+        <Kpi Icon={Gavel}       label={isAr ? 'إتلاف قادم ≤٣٠ يوم' : 'Disposal ≤30d'}  value={String(counts.disposal)}     tone={counts.disposal > 0 ? 'warning' : 'success'} onClick={() => setFilter('disposal_due')} active={filter === 'disposal_due'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>

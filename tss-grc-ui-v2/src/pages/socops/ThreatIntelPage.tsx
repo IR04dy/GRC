@@ -74,10 +74,10 @@ export function ThreatIntelPage() {
         actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={ShieldAlert} label={isAr ? 'بانتظار الإجراء' : 'Unactioned'} value={String(counts.unactioned)} tone={counts.unactioned > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Crosshair}   label={isAr ? 'حرجة/عالية' : 'CRITICAL/HIGH'}    value={String(counts.critical)}   tone={counts.critical > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={CheckCircle2} label={isAr ? 'تم' : 'Actioned'}                 value={String(counts.actioned)}   tone="info" />
-        <Kpi Icon={Globe}       label={isAr ? 'الإجمالي' : 'Total'}                value={String(counts.total)}      tone="neutral" />
+        <Kpi Icon={ShieldAlert} label={isAr ? 'بانتظار الإجراء' : 'Unactioned'} value={String(counts.unactioned)} tone={counts.unactioned > 0 ? 'warning' : 'success'} onClick={() => setFilter('unactioned')} active={filter === 'unactioned'} />
+        <Kpi Icon={Crosshair}   label={isAr ? 'حرجة/عالية' : 'CRITICAL/HIGH'}    value={String(counts.critical)}   tone={counts.critical > 0 ? 'danger' : 'success'} onClick={() => setFilter('critical')} active={filter === 'critical'} />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'تم' : 'Actioned'}                 value={String(counts.actioned)}   tone="info" onClick={() => setFilter('actioned')} active={filter === 'actioned'} />
+        <Kpi Icon={Globe}       label={isAr ? 'الإجمالي' : 'Total'}                value={String(counts.total)}      tone="neutral" onClick={() => setFilter('all')} active={filter === 'all'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>

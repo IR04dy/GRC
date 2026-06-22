@@ -42,15 +42,22 @@ export function MonitoringPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Server}        label={t('monKpiServices')}    value={String(stats.totalServices)} tone="primary" />
-        <Kpi Icon={ShieldCheck}    label={t('monKpiHealthy')}      value={String(stats.healthyServices)} tone="success" />
-        <Kpi Icon={Activity}       label={t('monKpiDegraded')}     value={String(stats.degradedServices)} tone={stats.degradedServices > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={AlertOctagon}    label={t('monKpiAlerts')}       value={String(stats.activeAlerts)} tone={stats.activeAlerts > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={TrendingUp}      label={t('monKpiSlo')}          value={`${stats.slosOnTrack} / ${stats.totalSlos}`} tone={stats.slosOnTrack === stats.totalSlos ? 'success' : 'warning'} />
-        <Kpi Icon={Calendar}        label={t('monKpiOnCall')}       value={lang === 'ar' ? ON_CALL[0].primaryAr : ON_CALL[0].primaryEn} tone="info" />
+        <Kpi Icon={Server}        label={t('monKpiServices')}    value={String(stats.totalServices)} tone="primary"
+          onClick={() => document.getElementById('mon-services')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={ShieldCheck}    label={t('monKpiHealthy')}      value={String(stats.healthyServices)} tone="success"
+          onClick={() => document.getElementById('mon-services')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={Activity}       label={t('monKpiDegraded')}     value={String(stats.degradedServices)} tone={stats.degradedServices > 0 ? 'warning' : 'success'}
+          onClick={() => document.getElementById('mon-services')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={AlertOctagon}    label={t('monKpiAlerts')}       value={String(stats.activeAlerts)} tone={stats.activeAlerts > 0 ? 'warning' : 'success'}
+          onClick={() => document.getElementById('mon-alerts')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={TrendingUp}      label={t('monKpiSlo')}          value={`${stats.slosOnTrack} / ${stats.totalSlos}`} tone={stats.slosOnTrack === stats.totalSlos ? 'success' : 'warning'}
+          onClick={() => document.getElementById('mon-slo')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Kpi Icon={Calendar}        label={t('monKpiOnCall')}       value={lang === 'ar' ? ON_CALL[0].primaryAr : ON_CALL[0].primaryEn} tone="info"
+          onClick={() => document.getElementById('mon-oncall')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
       </div>
 
       {/* Service health grid */}
+      <div id="mon-services">
       <Card title={t('monServicesTitle')} Icon={Server}>
         <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
           {t('monServicesSub')}
@@ -87,9 +94,10 @@ export function MonitoringPage() {
           </tbody>
         </table>
       </Card>
+      </div>
 
       {/* SLO panel */}
-      <div style={{ marginTop: 16 }}>
+      <div id="mon-slo" style={{ marginTop: 16 }}>
         <Card title={t('monSloTitle')} Icon={TrendingUp}>
           <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
             {t('monSloSub')}
@@ -134,7 +142,7 @@ export function MonitoringPage() {
       </div>
 
       {/* Active alerts */}
-      <div style={{ marginTop: 16 }}>
+      <div id="mon-alerts" style={{ marginTop: 16 }}>
         <Card title={t('monAlertsTitle')} Icon={AlertOctagon}
           action={<Badge tone={stats.activeAlerts > 0 ? 'warning' : 'success'}>{stats.activeAlerts}</Badge>}>
           <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
@@ -167,7 +175,7 @@ export function MonitoringPage() {
       </div>
 
       {/* On-call rotation */}
-      <div style={{ marginTop: 16 }}>
+      <div id="mon-oncall" style={{ marginTop: 16 }}>
         <Card title={t('monOnCallTitle')} Icon={Calendar}>
           <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
             {t('monOnCallSub')}
