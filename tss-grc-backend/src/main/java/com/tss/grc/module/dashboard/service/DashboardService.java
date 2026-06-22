@@ -11,6 +11,7 @@ import com.tss.grc.module.incident.repository.IncidentRepository;
 import com.tss.grc.module.risk.dto.RiskResponse;
 import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.repository.RiskRepository;
+import com.tss.grc.module.workflow.approval_chains.repository.ApprovalChainInstanceRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class DashboardService {
     private final IncidentRepository incidentRepository;
     private final ControlRepository controlRepository;
     private final ComplianceAssessmentRepository assessmentRepository;
+    private final ApprovalChainInstanceRepository approvalInstanceRepository;
 
     @PersistenceContext
     private EntityManager em;
@@ -71,8 +73,18 @@ public class DashboardService {
                 .setParameter("today", LocalDate.now())
                 .getSingleResult()).longValue();
 
+        // QUAL-BCMP-005: the openCriticalRisks/openHighRisks alias tiles must be
+        // genuinely open-filtered, not the unfiltered critical/high totals.
+        long openCritical = riskRepository.countByOrganisationIdAndRiskLevelAndStatusNot(organisationId, "CRITICAL", "CLOSED");
+        long openHigh     = riskRepository.countByOrganisationIdAndRiskLevelAndStatusNot(organisationId, "HIGH", "CLOSED");
+
+        // QUAL-BCMP-005: pendingTasks was hardcoded 0L. Feed it the real count of
+        // approval-chain instances awaiting action (PENDING + IN_PROGRESS).
+        long pendingTasks = approvalInstanceRepository.countByOrganisationIdAndStatusAndIsDeletedFalse(organisationId, "PENDING")
+                          + approvalInstanceRepository.countByOrganisationIdAndStatusAndIsDeletedFalse(organisationId, "IN_PROGRESS");
+
         return new DashboardStats(total, critical, high, medium, low, open, closed, totalUsers, activeUsers,
-                critical, high, openIncidents, complianceScore, 0L, overdueItems);
+                openCritical, openHigh, openIncidents, complianceScore, pendingTasks, overdueItems);
     }
 
     @Cacheable(value = "heatmapData", key = "#organisationId")

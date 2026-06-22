@@ -18,6 +18,9 @@ public interface RiskRepository extends JpaRepository<Risk, Long> {
     long countByOrganisationId(Long organisationId);
     long countByOrganisationIdAndRiskLevel(Long organisationId, String riskLevel);
     long countByOrganisationIdAndStatus(Long organisationId, String status);
+    // QUAL-BCMP-005: "open <level> risks" = that level AND not in a terminal
+    // (CLOSED) status — distinct from the unfiltered countByRiskLevel total.
+    long countByOrganisationIdAndRiskLevelAndStatusNot(Long organisationId, String riskLevel, String status);
 
     @Query("SELECT r FROM Risk r WHERE r.organisationId = :orgId ORDER BY r.createdAt DESC")
     List<Risk> findTop5ByOrganisationIdOrderByCreatedAtDesc(@Param("orgId") Long orgId, Pageable pageable);
