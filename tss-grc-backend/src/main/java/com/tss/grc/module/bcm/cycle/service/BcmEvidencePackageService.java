@@ -330,7 +330,16 @@ public class BcmEvidencePackageService {
 
     private static String csv(String v) {
         if (v == null) return "";
-        if (v.contains(",") || v.contains("\"") || v.contains("\n")) {
+        // SEC-BCM-005: defend against CSV/spreadsheet formula injection. Audit-log
+        // messages are attacker-influenceable free text; a cell beginning with
+        // = + - @ (or tab/CR) is executed as a formula when a regulator opens the
+        // package in Excel/Sheets. Prefix such cells with a single quote so the
+        // value is rendered as literal text (OWASP CSV-injection guidance).
+        if (!v.isEmpty() && "=+-@\t\r".indexOf(v.charAt(0)) >= 0) {
+            v = "'" + v;
+        }
+        if (v.contains(",") || v.contains("\"") || v.contains("\n")
+                || v.contains("\r") || v.contains("\t")) {
             return "\"" + v.replace("\"", "\"\"") + "\"";
         }
         return v;
