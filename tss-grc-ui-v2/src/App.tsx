@@ -356,6 +356,7 @@ const RiskBowTieDetailPage   = lazy(() => import('./pages/risk/RiskBowTieDetailP
 // GRC Expert — SME surface linking framework controls to evidence lifecycle.
 const GrcExpertPage          = lazy(() => import('./pages/expert/GrcExpertPage').then(m => ({ default: m.GrcExpertPage })));
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { AppLayout } from './components/layout/AppLayout';
 
 export function App() {
   return (
@@ -367,6 +368,10 @@ export function App() {
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Suspense fallback={<WizardChunkFallback />}>
             <Routes>
+              {/* Single persistent shell. AppLayout mounts the sidebar once and
+                  renders each page through <Outlet/>; it drops the chrome for
+                  public/full-screen routes (see isBarePath). */}
+              <Route element={<AppLayout />}>
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -865,6 +870,7 @@ export function App() {
                   link to /dashboard. */}
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Route>
             </Routes>
             </Suspense>
             </BrowserRouter>
