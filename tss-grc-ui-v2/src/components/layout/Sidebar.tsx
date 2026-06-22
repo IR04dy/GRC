@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
          GitBranch, ShieldAlert, Calendar, Settings, Landmark, Stamp, Send, Wrench,
@@ -567,19 +567,24 @@ export function Sidebar({ open = false }: { open?: boolean }) {
     return () => { save(); el.removeEventListener('scroll', save); };
   }, []);
 
-  // Restore scroll on every route change. Without this, a NavLink
-  // click that re-renders the Sidebar can let layout reflow snap
-  // scrollTop back to 0. We restore in a microtask so the DOM has
-  // finished applying the new active-class / auto-expand changes
-  // before we set scrollTop.
-  useEffect(() => {
+  // Restore scroll on every route change / mount. Because each page
+  // renders its own <Shell>, the Sidebar is a *fresh* instance on every
+  // navigation — it always mounts at scrollTop 0. We MUST re-apply the
+  // saved position synchronously, before the browser paints, or the user
+  // sees the nav flash to the top and then jump back down (the "click a
+  // slice and exit returns to upper" complaint). useLayoutEffect runs
+  // after the DOM is laid out (active-class + auto-expand already applied)
+  // but before paint, so there is no visible top-flash. A post-paint
+  // useEffect + microtask — the previous approach — paints at the top
+  // first and is exactly what made the reset visible.
+  useLayoutEffect(() => {
     const el = asideRef.current;
     if (!el) return;
     const saved = sessionStorage.getItem(STORAGE_SCROLL);
     if (!saved) return;
     const n = Number(saved);
     if (Number.isNaN(n)) return;
-    queueMicrotask(() => { if (asideRef.current) asideRef.current.scrollTop = n; });
+    el.scrollTop = n;
   }, [pathname]);
 
   function toggleGroup(id: string) {
