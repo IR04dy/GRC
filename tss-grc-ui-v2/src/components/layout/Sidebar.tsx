@@ -532,6 +532,23 @@ function pathMatches(pathname: string, to: string): boolean {
   return pathname.startsWith(to + '/');
 }
 
+/** Active-state for a child whose sibling set uses query-string tabs
+ *  (e.g. /ndi?tab=cycles). NavLink matches on pathname only and ignores
+ *  the query string, so without this every NDI tab — plus the bare /ndi
+ *  link — highlighted simultaneously. A query child is active iff the path
+ *  matches AND all of its query params equal the current location's; a
+ *  bare-path child (no query) is active only when no query is present. */
+function queryAwareChildActive(to: string, pathname: string, search: string): boolean {
+  const qIdx = to.indexOf('?');
+  const path = qIdx >= 0 ? to.slice(0, qIdx) : to;
+  if (pathname !== path && !pathname.startsWith(path + '/')) return false;
+  const current = new URLSearchParams(search);
+  if (qIdx < 0) return [...current.keys()].length === 0;
+  const want = new URLSearchParams(to.slice(qIdx + 1));
+  for (const [k, v] of want) if (current.get(k) !== v) return false;
+  return true;
+}
+
 function itemContainsActive(item: NavItem, pathname: string): boolean {
   if (pathMatches(pathname, item.to)) return true;
   return !!item.children?.some(c => pathMatches(pathname, c.to));
@@ -544,7 +561,7 @@ function groupContainsActive(group: NavGroup, pathname: string): boolean {
 export function Sidebar({ open = false }: { open?: boolean }) {
   const { t } = useI18n();
   const counts = useInboxCounts();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const asideRef = useRef<HTMLElement>(null);
 
   // Manual collapse/expand state — read from localStorage on first
@@ -697,6 +714,7 @@ export function Sidebar({ open = false }: { open?: boolean }) {
                     t={t}
                     badge={badgeFor(it.id)}
                     pathname={pathname}
+                    search={search}
                     expandedItems={expandedItems}
                     autoExpandItems={autoExpandItems}
                     onToggleChildren={toggleItem}
@@ -718,17 +736,19 @@ interface NavBadge { value: number; title: string; tone?: 'danger'; }
  *  with a vertical guide line + reduced size so the hierarchy reads at
  *  a glance. */
 function NavRowWithChildren({
-  item, t, badge, pathname, expandedItems, autoExpandItems, onToggleChildren,
+  item, t, badge, pathname, search, expandedItems, autoExpandItems, onToggleChildren,
 }: {
   item: NavItem;
   t: (k: string) => string;
   badge: NavBadge | null;
   pathname: string;
+  search: string;
   expandedItems: Set<string>;
   autoExpandItems: Set<string>;
   onToggleChildren: (id: string) => void;
 }) {
   const hasChildren = !!item.children && item.children.length > 0;
+  const childrenUseQuery = !!item.children?.some(c => c.to.includes('?'));
   const childrenOpen = hasChildren && (
     expandedItems.has(item.id) || autoExpandItems.has(item.id) || pathMatches(pathname, item.to)
   );
@@ -759,12 +779,20 @@ function NavRowWithChildren({
       </div>
       {hasChildren && childrenOpen && (
         <div className="sb-children">
-          {item.children!.map(child => (
-            <NavLink key={child.id} to={child.to} className={({ isActive }) => cn('sb-item sb-item-child', isActive && 'active')}>
-              <child.Icon size={14} strokeWidth={1.8} />
-              <span>{t(child.labelKey)}</span>
-            </NavLink>
-          ))}
+          {item.children!.map(child => {
+            // When a parent's children use query-string tabs (NDI), match on
+            // path+query so only the active tab highlights — not all of them.
+            const forced = childrenUseQuery
+              ? queryAwareChildActive(child.to, pathname, search)
+              : null;
+            return (
+              <NavLink key={child.id} to={child.to}
+                className={({ isActive }) => cn('sb-item sb-item-child', (forced ?? isActive) && 'active')}>
+                <child.Icon size={14} strokeWidth={1.8} />
+                <span>{t(child.labelKey)}</span>
+              </NavLink>
+            );
+          })}
         </div>
       )}
     </>
