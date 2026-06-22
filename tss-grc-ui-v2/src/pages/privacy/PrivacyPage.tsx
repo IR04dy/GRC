@@ -335,10 +335,10 @@ export function PrivacyPage() {
       <WorkflowQuickLaunch modules="PDPL" />
       <ModuleSubmissionsPanel module="PDPL" />
       <div className="kpi-grid">
-        <Kpi Icon={FileText}    label={t('privacyKpiActivities')} value={ropa.data.length || 142} tone="primary" />
-        <Kpi Icon={Inbox}       label={t('privacyKpiDsr')}        value={openDsrs} tone="warning" />
-        <Kpi Icon={Users}       label={t('privacyKpiConsent')}    value="98%" tone="success" />
-        <Kpi Icon={ShieldAlert} label={t('privacyKpiBreaches')}   value={allBreaches.filter(b => b.status !== 'CLOSED').length} tone="danger" />
+        <Kpi Icon={FileText}    label={t('privacyKpiActivities')} value={ropa.data.length || 142} tone="primary" to="/ropa" />
+        <Kpi Icon={Inbox}       label={t('privacyKpiDsr')}        value={openDsrs} tone="warning" to="/data-officer/dsr" />
+        <Kpi Icon={Users}       label={t('privacyKpiConsent')}    value="98%" tone="success" to="/data-officer/consents" />
+        <Kpi Icon={ShieldAlert} label={t('privacyKpiBreaches')}   value={allBreaches.filter(b => b.status !== 'CLOSED').length} tone="danger" to="/data-officer/breaches" />
       </div>
 
       <OverviewStrip

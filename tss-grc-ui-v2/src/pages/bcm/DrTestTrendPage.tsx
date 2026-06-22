@@ -109,10 +109,10 @@ export function DrTestTrendPage() {
       {report && snap && (
         <>
           <div className="kpi-grid" style={{ marginBottom: 16 }}>
-            <Kpi Icon={Activity}      label={isAr ? 'إجمالي خطط التعافي' : 'Total DR plans'} value={snap.totalDrps} tone="primary" />
-            <Kpi Icon={TrendingUp}    label={isAr ? `نسبة النجاح · ${snap.passedRecently}/${snap.testedRecently} (آخر 12 شهرًا)` : `Pass rate · ${snap.passedRecently}/${snap.testedRecently} (last 12 mo)`} value={pct(snap.recentPassRate)} tone={passTone} />
-            <Kpi Icon={CalendarClock} label={isAr ? 'متأخّرة (> 12 شهرًا)' : 'Overdue (> 12 mo)'} value={snap.testedOverdue} tone={snap.testedOverdue > 0 ? 'warning' : 'success'} />
-            <Kpi Icon={HelpCircle}    label={isAr ? 'لم تُختبر قط' : 'Never tested'} value={snap.neverTested} tone={snap.neverTested > 0 ? 'danger' : 'success'} />
+            <Kpi Icon={Activity}      label={isAr ? 'إجمالي خطط التعافي' : 'Total DR plans'} value={snap.totalDrps} tone="primary" to="/dr-plans" />
+            <Kpi Icon={TrendingUp}    label={isAr ? `نسبة النجاح · ${snap.passedRecently}/${snap.testedRecently} (آخر 12 شهرًا)` : `Pass rate · ${snap.passedRecently}/${snap.testedRecently} (last 12 mo)`} value={pct(snap.recentPassRate)} tone={passTone} to="/resilience-tests" />
+            <Kpi Icon={CalendarClock} label={isAr ? 'متأخّرة (> 12 شهرًا)' : 'Overdue (> 12 mo)'} value={snap.testedOverdue} tone={snap.testedOverdue > 0 ? 'warning' : 'success'} to="/resilience-tests" />
+            <Kpi Icon={HelpCircle}    label={isAr ? 'لم تُختبر قط' : 'Never tested'} value={snap.neverTested} tone={snap.neverTested > 0 ? 'danger' : 'success'} to="/dr-plans" />
           </div>
 
           <Card

@@ -70,13 +70,13 @@ export function LiveSlaPulse({ instances }: { instances: ReadonlyArray<WorkflowI
       }>
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Activity}      label={t('slaKpiTotal')}     value={String(pulse.total)} tone="primary" />
-        <Kpi Icon={ShieldCheck}   label={t('slaKpiOnTrack')}   value={String(pulse.onTrack)} tone="success" />
-        <Kpi Icon={Clock}         label={t('slaKpiAtRisk')}    value={String(pulse.atRisk)} tone="info" />
-        <Kpi Icon={AlertTriangle} label={t('slaKpiOverdue')}   value={String(pulse.byTier.OVERDUE)} tone="warning" />
-        <Kpi Icon={AlertOctagon}  label={t('slaKpiManager')}   value={String(pulse.byTier.MANAGER_ESC)} tone="warning" />
-        <Kpi Icon={AlertOctagon}  label={t('slaKpiDirector')}  value={String(pulse.byTier.DIRECTOR_ESC)} tone="danger" />
-        <Kpi Icon={Flame}         label={t('slaKpiExec')}      value={String(pulse.byTier.EXEC_ESC)} tone="danger" />
+        <Kpi Icon={Activity}      label={t('slaKpiTotal')}     value={String(pulse.total)} tone="primary" to="/workflows/submissions" />
+        <Kpi Icon={ShieldCheck}   label={t('slaKpiOnTrack')}   value={String(pulse.onTrack)} tone="success" to="/workflows/submissions" />
+        <Kpi Icon={Clock}         label={t('slaKpiAtRisk')}    value={String(pulse.atRisk)} tone="info" to="/workflows/submissions" />
+        <Kpi Icon={AlertTriangle} label={t('slaKpiOverdue')}   value={String(pulse.byTier.OVERDUE)} tone="warning" to="/workflows/submissions" />
+        <Kpi Icon={AlertOctagon}  label={t('slaKpiManager')}   value={String(pulse.byTier.MANAGER_ESC)} tone="warning" to="/workflows/submissions" />
+        <Kpi Icon={AlertOctagon}  label={t('slaKpiDirector')}  value={String(pulse.byTier.DIRECTOR_ESC)} tone="danger" to="/workflows/submissions" />
+        <Kpi Icon={Flame}         label={t('slaKpiExec')}      value={String(pulse.byTier.EXEC_ESC)} tone="danger" to="/workflows/submissions" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>

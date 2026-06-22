@@ -57,7 +57,7 @@ export function SeasonalOverlaysPage() {
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={CalendarClock} label={isAr ? 'نشطة الآن' : 'Active now'}             value={String(counts.active)}        tone={counts.active > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={AlertCircle}   label={isAr ? 'يشد العتبات' : 'Tightening KRI/SLA'} value={String(counts.tighteningNow)} tone={counts.tighteningNow > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={AlertCircle}   label={isAr ? 'يشد العتبات' : 'Tightening KRI/SLA'} value={String(counts.tighteningNow)} tone={counts.tighteningNow > 0 ? 'warning' : 'success'} to="/risk/kri/dashboard" />
         <Kpi Icon={Flag}          label={isAr ? 'قادمة خلال ٩٠ يوم' : 'Upcoming ≤90d'}  value={String(counts.upcoming)}      tone="info" />
         <Kpi Icon={CalendarClock} label={isAr ? 'الإجمالي' : 'Total catalog'}            value={String(counts.total)}         tone="neutral" />
       </div>

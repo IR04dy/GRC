@@ -89,17 +89,21 @@ export function RegulatoryAlignmentTab({ domain, families }: RegulatoryAlignment
       <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         <Kpi Icon={BookOpen}
           label={isAr ? 'المرجعيات' : 'Authority documents'}
-          value={data.documents.length} />
+          value={data.documents.length}
+          to="/regulatory/library" />
         <Kpi Icon={Shield}
           label={isAr ? 'البنود المغطّاة' : 'Citations covered'}
-          value={`${data.mappedCitations} / ${data.totalCitations}`} />
+          value={`${data.mappedCitations} / ${data.totalCitations}`}
+          to="/compliance/posture" />
         <Kpi Icon={AlertTriangle}
           label={isAr ? 'فجوات' : 'Gap citations'}
           value={data.gapCitations}
+          to="/controls/library"
           tone={data.gapCitations > 0 ? 'warning' : 'success'} />
         <Kpi Icon={Shield}
           label={isAr ? 'متوسط التغطية' : 'Avg coverage'}
           value={`${data.averageCoveragePct}%`}
+          to="/compliance/posture"
           tone={coverageBandTone(data.averageCoveragePct)} />
       </div>
 

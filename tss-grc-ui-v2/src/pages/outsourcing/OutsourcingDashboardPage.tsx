@@ -135,47 +135,55 @@ export function OutsourcingDashboardPage() {
           label={lang === 'ar' ? 'ترتيبات الإسناد' : 'Arrangements'}
           value={data?.arrangementsTotal ?? 0}
           Icon={Building2}
+          to="/outsourcing/arrangements"
         />
         <Kpi
           label={lang === 'ar' ? 'جوهرية فعّالة' : 'Material active'}
           value={data?.materialActive ?? 0}
           tone="warning"
           Icon={ShieldAlert}
+          to="/outsourcing/arrangements"
         />
         <Kpi
           label={lang === 'ar' ? 'نافذة' : 'Live'}
           value={data?.arrangementsLive ?? 0}
           tone="success"
           Icon={ShieldCheck}
+          to="/outsourcing/arrangements"
         />
         <Kpi
           label={lang === 'ar' ? 'خدمات سحابية' : 'Cloud services'}
           value={data?.cloudServicesTotal ?? 0}
           Icon={Cloud}
+          to="/outsourcing/cloud-services"
         />
         <Kpi
           label={lang === 'ar' ? 'سرّية+ (T3/T4)' : 'T3/T4 services'}
           value={data?.cloudServicesT3T4 ?? 0}
           tone="warning"
           Icon={Database}
+          to="/outsourcing/cloud-services"
         />
         <Kpi
           label={lang === 'ar' ? 'محظورة' : 'Blocked'}
           value={data?.cloudServicesBlocked ?? 0}
           tone="danger"
           Icon={ShieldAlert}
+          to="/outsourcing/cloud-services"
         />
         <Kpi
           label={lang === 'ar' ? 'مراجعات متأخرة' : 'Reviews overdue'}
           value={data?.reviewsOverdue ?? 0}
           tone={data && data.reviewsOverdue > 0 ? 'danger' : 'neutral'}
           Icon={ShieldAlert}
+          to="/outsourcing/arrangements"
         />
         <Kpi
           label={lang === 'ar' ? 'خطط خروج جاهزة' : 'Exit plans ready'}
           value={data?.exitPlansReady ?? 0}
           tone="info"
           Icon={LogOut}
+          to="/outsourcing/arrangements"
         />
       </div>
 

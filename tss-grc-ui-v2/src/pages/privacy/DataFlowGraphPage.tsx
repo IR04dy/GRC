@@ -130,10 +130,10 @@ export function DataFlowGraphPage() {
       {graph && model && (
         <>
           <div className="kpi-grid" style={{ marginBottom: 16 }}>
-            <Kpi Icon={FileText}    label={isAr ? 'أنشطة المعالجة' : 'Processing activities'} value={graph.summary.activityCount} tone="primary" />
-            <Kpi Icon={Globe2}      label={isAr ? 'تحويلات عبر الحدود' : 'Cross-border transfers'} value={graph.summary.crossBorderActivityCount} tone={graph.summary.crossBorderActivityCount > 0 ? 'warning' : 'success'} />
-            <Kpi Icon={Share2}      label={isAr ? 'وجهات متمايزة' : 'Distinct destinations'} value={graph.summary.distinctDestinations} tone="info" />
-            <Kpi Icon={ShieldAlert} label={isAr ? 'أنشطة بيانات حسّاسة' : 'Special-category activities'} value={specialCount} tone={specialCount > 0 ? 'danger' : 'success'} />
+            <Kpi Icon={FileText}    label={isAr ? 'أنشطة المعالجة' : 'Processing activities'} value={graph.summary.activityCount} tone="primary" to="/ropa" />
+            <Kpi Icon={Globe2}      label={isAr ? 'تحويلات عبر الحدود' : 'Cross-border transfers'} value={graph.summary.crossBorderActivityCount} tone={graph.summary.crossBorderActivityCount > 0 ? 'warning' : 'success'} to="/privacy/subprocessors" />
+            <Kpi Icon={Share2}      label={isAr ? 'وجهات متمايزة' : 'Distinct destinations'} value={graph.summary.distinctDestinations} tone="info" to="/privacy/subprocessors" />
+            <Kpi Icon={ShieldAlert} label={isAr ? 'أنشطة بيانات حسّاسة' : 'Special-category activities'} value={specialCount} tone={specialCount > 0 ? 'danger' : 'success'} to="/ropa" />
           </div>
 
           {/* ── 3-lane flow graph ──────────────────────────────────── */}

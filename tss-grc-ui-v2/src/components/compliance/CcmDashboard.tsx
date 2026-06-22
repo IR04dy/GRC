@@ -59,12 +59,12 @@ export function CcmDashboard() {
       </div>
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={FileCheck2}    label={t('ccmKpiChecks')}     value={String(coverage.totalChecks)} tone="primary" />
-        <Kpi Icon={ShieldCheck}   label={t('ccmKpiFresh')}      value={String(coverage.fresh)}       tone="success" />
-        <Kpi Icon={AlertTriangle} label={t('ccmKpiStale')}      value={String(coverage.stale)}       tone="warning" />
-        <Kpi Icon={AlertOctagon}  label={t('ccmKpiExpired')}    value={String(coverage.expired)}     tone="danger" />
-        <Kpi Icon={Database}      label={t('ccmKpiControls')}   value={String(coverage.controlsCovered)} tone="info" />
-        <Kpi Icon={Plug}          label={t('ccmKpiConnectors')} value={String(coverage.activeConnectors)} tone="primary" />
+        <Kpi Icon={FileCheck2}    label={t('ccmKpiChecks')}     value={String(coverage.totalChecks)} tone="primary" to="/ccm/tests" />
+        <Kpi Icon={ShieldCheck}   label={t('ccmKpiFresh')}      value={String(coverage.fresh)}       tone="success" to="/ccm/tests" />
+        <Kpi Icon={AlertTriangle} label={t('ccmKpiStale')}      value={String(coverage.stale)}       tone="warning" to="/ccm/tests" />
+        <Kpi Icon={AlertOctagon}  label={t('ccmKpiExpired')}    value={String(coverage.expired)}     tone="danger" to="/ccm/tests" />
+        <Kpi Icon={Database}      label={t('ccmKpiControls')}   value={String(coverage.controlsCovered)} tone="info" to="/controls/library" />
+        <Kpi Icon={Plug}          label={t('ccmKpiConnectors')} value={String(coverage.activeConnectors)} tone="primary" to="/connectors" />
       </div>
 
       {/* ── Stale evidence feed (driven by SLA engine) ── */}

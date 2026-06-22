@@ -141,10 +141,10 @@ export function PdplBreachConsole({ breaches, onDispatch, onRecorded }: {
 
       {/* ── KPI row ────────────────────────────────────────────────── */}
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Clock}      label={t('pdplKpiHoursElapsed')}  value={formatHoursLabel(clock.hoursElapsed, lang)} tone="info" />
-        <Kpi Icon={AlertOctagon} label={t('pdplKpiSdaiaDue')}    value={clock.hoursRemaining < 0 ? t('pdplBreachedLabel') : formatHoursLabel(clock.hoursRemaining, lang)} tone={clock.tier === 'GREEN' ? 'success' : clock.tier === 'AMBER' ? 'warning' : 'danger'} />
-        <Kpi Icon={Users}      label={t('pdplKpiDataSubjects')}  value={needsDataSubjectNotice ? formatHoursLabel(clock.hoursToDataSubjects, lang) : t('pdplNotRequired')} tone={needsDataSubjectNotice ? 'warning' : 'success'} />
-        <Kpi Icon={Fingerprint} label={t('pdplKpiBudget')}       value={`${clock.pctConsumed}%`} tone={clock.pctConsumed >= 100 ? 'danger' : clock.pctConsumed >= 80 ? 'warning' : clock.pctConsumed >= 50 ? 'info' : 'success'} />
+        <Kpi Icon={Clock}      label={t('pdplKpiHoursElapsed')}  value={formatHoursLabel(clock.hoursElapsed, lang)} tone="info" to="/data-officer/breaches" />
+        <Kpi Icon={AlertOctagon} label={t('pdplKpiSdaiaDue')}    value={clock.hoursRemaining < 0 ? t('pdplBreachedLabel') : formatHoursLabel(clock.hoursRemaining, lang)} tone={clock.tier === 'GREEN' ? 'success' : clock.tier === 'AMBER' ? 'warning' : 'danger'} to="/data-officer/breaches" />
+        <Kpi Icon={Users}      label={t('pdplKpiDataSubjects')}  value={needsDataSubjectNotice ? formatHoursLabel(clock.hoursToDataSubjects, lang) : t('pdplNotRequired')} tone={needsDataSubjectNotice ? 'warning' : 'success'} to="/data-officer/breaches" />
+        <Kpi Icon={Fingerprint} label={t('pdplKpiBudget')}       value={`${clock.pctConsumed}%`} tone={clock.pctConsumed >= 100 ? 'danger' : clock.pctConsumed >= 80 ? 'warning' : clock.pctConsumed >= 50 ? 'info' : 'success'} to="/data-officer/breaches" />
       </div>
 
       {/* ── Stage timeline ─────────────────────────────────────────── */}

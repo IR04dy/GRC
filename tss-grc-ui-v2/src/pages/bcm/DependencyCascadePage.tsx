@@ -164,7 +164,7 @@ export function DependencyCascadePage() {
       {result && (
         <>
           <div className="kpi-grid" style={{ marginBottom: 16 }}>
-            <Kpi Icon={Layers}        label={isAr ? 'عمليات متأثّرة' : 'Processes impacted'} value={result.totalImpactedCount} tone={result.totalImpactedCount > 0 ? 'primary' : 'neutral'} />
+            <Kpi Icon={Layers}        label={isAr ? 'عمليات متأثّرة' : 'Processes impacted'} value={result.totalImpactedCount} tone={result.totalImpactedCount > 0 ? 'primary' : 'neutral'} to="/bcm/dependency" />
             <Kpi Icon={ShieldAlert}   label={isAr ? 'تجاوزات MTPD' : 'MTPD breaches'} value={result.breachedCount} tone={result.breachedCount > 0 ? 'danger' : 'success'} />
             <Kpi Icon={Clock}         label={isAr ? 'أقصى زمن وصول' : 'Furthest reach'} value={maxReach ? `${maxReach}h` : '—'} tone="warning" />
             <Kpi Icon={GitBranch}     label={isAr ? 'أقصى عمق تتالي' : 'Deepest tier'} value={maxDepth || '—'} tone="info" />

@@ -61,10 +61,10 @@ export function ChainCatalog() {
       </div>
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={GitBranch} label={t('chainKpiTotal')}    value={String(stats.totalRules)}      tone="primary" />
-        <Kpi Icon={Zap}       label={t('chainKpiActive')}   value={String(stats.activeRules)}     tone="success" />
-        <Kpi Icon={Zap}       label={t('chainKpiFires24h')} value={String(stats.totalFires24h)}   tone="info" />
-        <Kpi Icon={Zap}       label={t('chainKpiFires7d')}  value={String(stats.totalFires7d)}    tone="accent" />
+        <Kpi Icon={GitBranch} label={t('chainKpiTotal')}    value={String(stats.totalRules)}      tone="primary" to="/workflows/chains" />
+        <Kpi Icon={Zap}       label={t('chainKpiActive')}   value={String(stats.activeRules)}     tone="success" to="/workflows/chains" />
+        <Kpi Icon={Zap}       label={t('chainKpiFires24h')} value={String(stats.totalFires24h)}   tone="info" to="/workflows/chains" />
+        <Kpi Icon={Zap}       label={t('chainKpiFires7d')}  value={String(stats.totalFires7d)}    tone="accent" to="/workflows/chains" />
       </div>
 
       {/* ── Rule catalogue ───────────────────────────────────────── */}

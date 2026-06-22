@@ -59,12 +59,12 @@ export function ProcessMiningPage() {
 
       {/* KPIs */}
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Activity}      label={t('pmKpiTotal')}    value={String(kpis.totalInFlight)} tone="primary" />
-        <Kpi Icon={ShieldCheck}   label={t('pmKpiWithin')}    value={String(kpis.withinSla)} tone="success" />
-        <Kpi Icon={AlertOctagon}  label={t('pmKpiStuck')}     value={String(kpis.stuck)} tone={kpis.stuck > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Activity}      label={t('pmKpiPct')}       value={`${kpis.withinSlaPct}%`} tone={kpis.withinSlaPct >= 80 ? 'success' : 'warning'} />
-        <Kpi Icon={Clock}         label={t('pmKpiAvgAge')}    value={`${kpis.avgAgeDays}d`} tone="info" />
-        <Kpi Icon={TrendingDown}  label={t('pmKpiAvgBreach')} value={`${Math.round(kpis.avgBreach * 100)}%`} tone={kpis.avgBreach >= 1 ? 'danger' : kpis.avgBreach >= 0.7 ? 'warning' : 'success'} />
+        <Kpi Icon={Activity}      label={t('pmKpiTotal')}    value={String(kpis.totalInFlight)} tone="primary" to="/workflows" />
+        <Kpi Icon={ShieldCheck}   label={t('pmKpiWithin')}    value={String(kpis.withinSla)} tone="success" to="/workflows" />
+        <Kpi Icon={AlertOctagon}  label={t('pmKpiStuck')}     value={String(kpis.stuck)} tone={kpis.stuck > 0 ? 'danger' : 'success'} to="/workflows" />
+        <Kpi Icon={Activity}      label={t('pmKpiPct')}       value={`${kpis.withinSlaPct}%`} tone={kpis.withinSlaPct >= 80 ? 'success' : 'warning'} to="/workflows" />
+        <Kpi Icon={Clock}         label={t('pmKpiAvgAge')}    value={`${kpis.avgAgeDays}d`} tone="info" to="/workflows" />
+        <Kpi Icon={TrendingDown}  label={t('pmKpiAvgBreach')} value={`${Math.round(kpis.avgBreach * 100)}%`} tone={kpis.avgBreach >= 1 ? 'danger' : kpis.avgBreach >= 0.7 ? 'warning' : 'success'} to="/workflows" />
       </div>
 
       {/* Workflow leaderboard */}

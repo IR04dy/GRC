@@ -986,10 +986,10 @@ export function CyberPage() {
       <WorkflowQuickLaunch modules="NCA" />
       <ModuleSubmissionsPanel module="NCA" />
       <div className="kpi-grid">
-        <Kpi Icon={ShieldCheck}    label={t('cyberKpiControls')}   value={controls.data.length} tone="primary" />
-        <Kpi Icon={Bug}            label={t('cyberKpiVuln')}       value={vulns.data.filter(v => v.workflowStatus !== 'CLOSED').length} tone="warning" />
-        <Kpi Icon={Flame}          label={t('cyberKpiIncidents')}  value={cyberIncidents.data.filter(i => i.severity === 'CRITICAL' || i.severity === 'HIGH').length} tone="danger" />
-        <Kpi Icon={ClipboardCheck} label={t('cyberKpiCompliance')} value="87%" trend={{ dir: 'up', value: '+4%' }} tone="success" />
+        <Kpi Icon={ShieldCheck}    label={t('cyberKpiControls')}   value={controls.data.length} tone="primary" to="/controls/library" />
+        <Kpi Icon={Bug}            label={t('cyberKpiVuln')}       value={vulns.data.filter(v => v.workflowStatus !== 'CLOSED').length} tone="warning" to="/cyber/vulns/v2" />
+        <Kpi Icon={Flame}          label={t('cyberKpiIncidents')}  value={cyberIncidents.data.filter(i => i.severity === 'CRITICAL' || i.severity === 'HIGH').length} tone="danger" to="/incidents" />
+        <Kpi Icon={ClipboardCheck} label={t('cyberKpiCompliance')} value="87%" trend={{ dir: 'up', value: '+4%' }} tone="success" to="/compliance/posture" />
       </div>
 
       <OverviewStrip

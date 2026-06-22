@@ -45,14 +45,14 @@ export function DataOfficerDashboardPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 16 }}>
         <Kpi Icon={Inbox} label={lang === 'ar' ? 'طلبات حقوق أصحاب البيانات المفتوحة' : 'Open DSRs'}
              value={d ? d.dsrOpen : '—'}
-             tone={d && d.dsrOverdue > 0 ? 'danger' : 'primary'} />
+             tone={d && d.dsrOverdue > 0 ? 'danger' : 'primary'} to="/data-officer/dsr" />
         <Kpi Icon={Siren} label={lang === 'ar' ? 'خروقات مفتوحة' : 'Open Breaches'}
              value={d ? d.breachOpen : '—'}
-             tone={d && d.breachOverdueSdaia > 0 ? 'danger' : 'primary'} />
+             tone={d && d.breachOverdueSdaia > 0 ? 'danger' : 'primary'} to="/data-officer/breaches" />
         <Kpi Icon={ShieldCheck} label={lang === 'ar' ? 'موافقات نافذة' : 'Active Consents'}
-             value={d ? d.consentActive : '—'} tone="success" />
+             value={d ? d.consentActive : '—'} tone="success" to="/data-officer/consents" />
         <Kpi Icon={ScrollText} label={lang === 'ar' ? 'تقييمات الأثر المفتوحة' : 'Open DPIAs'}
-             value={d ? d.dpiaOpen : '—'} tone="info" />
+             value={d ? d.dpiaOpen : '—'} tone="info" to="/data-officer/dpia" />
       </div>
 
       {/* Sub-module tiles — one click into each surface */}

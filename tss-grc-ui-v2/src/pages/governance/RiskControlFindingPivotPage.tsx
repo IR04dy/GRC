@@ -163,7 +163,8 @@ export function RiskControlFindingPivotPage() {
             <Kpi Icon={ShieldCheck}
                  label={t('Linked controls', 'الضوابط المرتبطة')}
                  value={pivot.summary.controlsCount}
-                 tone={pivot.summary.controlsCount > 0 ? 'primary' : 'neutral'} />
+                 tone={pivot.summary.controlsCount > 0 ? 'primary' : 'neutral'}
+                 to="/controls/library" />
             <Kpi Icon={CheckCircle2}
                  label={t('Effective', 'فعّالة')}
                  value={`${Math.round(pivot.summary.effectiveControlsPct)}%`}
@@ -173,11 +174,13 @@ export function RiskControlFindingPivotPage() {
                  label={t('Open findings', 'النتائج المفتوحة')}
                  value={pivot.summary.openFindingsCount}
                  tone={pivot.summary.openFindingsCount === 0 ? 'success'
-                     : pivot.summary.openFindingsCount > 3 ? 'danger' : 'warning'} />
+                     : pivot.summary.openFindingsCount > 3 ? 'danger' : 'warning'}
+                 to="/audit-lifecycle" />
             <Kpi Icon={ClipboardCheck}
                  label={t('Overdue CAPA', 'إجراءات متأخرة')}
                  value={pivot.summary.overdueCapaCount}
-                 tone={pivot.summary.overdueCapaCount === 0 ? 'success' : 'danger'} />
+                 tone={pivot.summary.overdueCapaCount === 0 ? 'success' : 'danger'}
+                 to="/capa" />
             <Kpi Icon={Activity}
                  label={t('Data completeness', 'اكتمال البيانات')}
                  value={`${Math.round(pivot.summary.dataCompletenessPct)}%`}
@@ -367,13 +370,13 @@ export function RiskControlFindingPivotPage() {
                                 gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))',
                                 gap: 12 }}>
                     <Kpi Icon={CheckCircle2} label={t('Passing 24h', 'ناجح 24س')}
-                         value={pivot.ccmCoverage.passingLast24h} tone="success" />
+                         value={pivot.ccmCoverage.passingLast24h} tone="success" to="/ccm/tests" />
                     <Kpi Icon={XCircle} label={t('Failing 24h', 'فاشل 24س')}
                          value={pivot.ccmCoverage.failingLast24h}
-                         tone={pivot.ccmCoverage.failingLast24h > 0 ? 'danger' : 'neutral'} />
+                         tone={pivot.ccmCoverage.failingLast24h > 0 ? 'danger' : 'neutral'} to="/ccm/tests" />
                     <Kpi Icon={MinusCircle} label={t('Errors 24h', 'أخطاء 24س')}
                          value={pivot.ccmCoverage.errorLast24h}
-                         tone={pivot.ccmCoverage.errorLast24h > 0 ? 'warning' : 'neutral'} />
+                         tone={pivot.ccmCoverage.errorLast24h > 0 ? 'warning' : 'neutral'} to="/ccm/tests" />
                   </div>
                 )}
               </Card>

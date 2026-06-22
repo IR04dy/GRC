@@ -100,8 +100,8 @@ export function BcmLibraryPage() {
       {/* Upcoming-peak strip ALWAYS visible — it's the most actionable
           piece of the library so we surface it above the tabs. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12, marginBottom: 14 }}>
-        <Kpi Icon={Library}       label={isAr ? 'قوالب خطط'       : 'Plan templates'}      value={templates.length} tone="info" />
-        <Kpi Icon={ClipboardList} label={isAr ? 'سيناريوهات'      : 'Exercise scenarios'}  value={scenarios.length} tone="info" />
+        <Kpi Icon={Library}       label={isAr ? 'قوالب خطط'       : 'Plan templates'}      value={templates.length} tone="info" to="/bcm/plans" />
+        <Kpi Icon={ClipboardList} label={isAr ? 'سيناريوهات'      : 'Exercise scenarios'}  value={scenarios.length} tone="info" to="/bcm/scenarios" />
         <Kpi Icon={Calendar}      label={isAr ? 'مواسم ذروة'      : 'KSA peak seasons'}    value={peaks.length}     tone="info" />
         <Kpi Icon={Calendar}      label={isAr ? 'قادمة (120 يوم)' : 'Upcoming (120d)'}     value={upcoming.length}  tone={upcoming.length > 0 ? 'warning' : 'success'} />
       </div>

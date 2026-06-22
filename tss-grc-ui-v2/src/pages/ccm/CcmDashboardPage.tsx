@@ -126,25 +126,25 @@ export function CcmDashboardPage() {
       <div className="kpi-grid-sm">
         <Kpi Icon={ClipboardCheck}
              label={lang === 'ar' ? 'إجمالي الاختبارات' : 'Total tests'}
-             value={snap?.totalTests ?? 0} tone="primary" />
+             value={snap?.totalTests ?? 0} tone="primary" to="/ccm/tests" />
         <Kpi Icon={ShieldCheck}
              label={lang === 'ar' ? 'المُفعَّلة' : 'Enabled'}
-             value={snap?.enabledTests ?? 0} tone="info" />
+             value={snap?.enabledTests ?? 0} tone="info" to="/ccm/tests" />
         <Kpi Icon={Activity}
              label={lang === 'ar' ? 'ناجح (24 ساعة)' : 'Passing (24h)'}
-             value={snap?.passingLast24h ?? 0} tone="success" />
+             value={snap?.passingLast24h ?? 0} tone="success" to="/ccm/tests" />
         <Kpi Icon={AlertOctagon}
              label={lang === 'ar' ? 'فاشل (24 ساعة)' : 'Failing (24h)'}
              value={snap?.failingLast24h ?? 0}
-             tone={(snap?.failingLast24h ?? 0) > 0 ? 'danger' : 'success'} />
+             tone={(snap?.failingLast24h ?? 0) > 0 ? 'danger' : 'success'} to="/ccm/tests" />
         <Kpi Icon={AlertTriangle}
              label={lang === 'ar' ? 'أخطاء (24 ساعة)' : 'Errors (24h)'}
              value={snap?.errorLast24h ?? 0}
-             tone={(snap?.errorLast24h ?? 0) > 0 ? 'warning' : 'success'} />
+             tone={(snap?.errorLast24h ?? 0) > 0 ? 'warning' : 'success'} to="/ccm/tests" />
         <Kpi Icon={BarChart3}
              label={lang === 'ar' ? 'نسبة النجاح (24 ساعة)' : 'Pass rate (24h)'}
              value={`${passRatePct}%`}
-             tone={passRatePct >= 95 ? 'success' : passRatePct >= 80 ? 'warning' : 'danger'} />
+             tone={passRatePct >= 95 ? 'success' : passRatePct >= 80 ? 'warning' : 'danger'} to="/ccm/tests" />
       </div>
 
       {error && (

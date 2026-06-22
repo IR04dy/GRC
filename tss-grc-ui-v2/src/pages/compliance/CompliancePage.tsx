@@ -1136,11 +1136,11 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
                 page. Default 220px-minimum auto-fit gives 3-4 cols at the
                 usual viewport and wraps to 2 below ~700px. */}
             <div className="kpi-grid">
-              <Kpi Icon={ClipboardCheck} label={t('frameworkKpiControls')}     value={activeCov?.controlCount ?? 0} tone="primary" />
-              <Kpi Icon={CheckCheck}     label={t('frameworkKpiImplemented')} value={activeCov?.implementedControls ?? 0} tone="success" />
+              <Kpi Icon={ClipboardCheck} label={t('frameworkKpiControls')}     value={activeCov?.controlCount ?? 0} tone="primary" to="/controls/library" />
+              <Kpi Icon={CheckCheck}     label={t('frameworkKpiImplemented')} value={activeCov?.implementedControls ?? 0} tone="success" to="/controls/library" />
               <Kpi Icon={Award}          label={t('frameworkKpiMaturity')}     value={typeof activeCov?.avgMaturity === 'number' ? `L${activeCov.avgMaturity}` : '—'} tone="accent" />
-              <Kpi Icon={BookCopy}       label={t('frameworkKpiPolicies')}     value={total}                                   tone="info" />
-              <Kpi Icon={Flag}           label={t('frameworkKpiCoverage')}     value={`${fullPct}%`}                            tone={fullPct >= 80 ? 'success' : fullPct >= 50 ? 'primary' : 'warning'} />
+              <Kpi Icon={BookCopy}       label={t('frameworkKpiPolicies')}     value={total}                                   tone="info" to="/policy-management" />
+              <Kpi Icon={Flag}           label={t('frameworkKpiCoverage')}     value={`${fullPct}%`}                            tone={fullPct >= 80 ? 'success' : fullPct >= 50 ? 'primary' : 'warning'} to="/compliance/posture" />
               <Kpi Icon={AlertTriangle}  label={t('frameworkKpiOpenFindings')} value={activeCov?.openFindings ?? 0} tone="danger" />
             </div>
           </Card>

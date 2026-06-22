@@ -47,11 +47,11 @@ export function BcmDependencyPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Activity}      label={t('bdKpiProcesses')} value={String(stats.criticalProcessCount)} tone="primary" />
-        <Kpi Icon={Truck}          label={t('bdKpiVendors')}    value={String(stats.uniqueVendors)} tone="info" />
+        <Kpi Icon={Activity}      label={t('bdKpiProcesses')} value={String(stats.criticalProcessCount)} tone="primary" to="/bcm/bia" />
+        <Kpi Icon={Truck}          label={t('bdKpiVendors')}    value={String(stats.uniqueVendors)} tone="info" to="/tprm" />
         <Kpi Icon={Cloud}          label={t('bdKpiRegions')}    value={String(stats.uniqueRegions)} tone="info" />
-        <Kpi Icon={AlertTriangle}  label={t('bdKpiRtoMismatch')} value={String(stats.rtoMismatches)} tone={stats.rtoMismatches > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={GitBranch}      label={t('bdKpiLargest')}    value={String(stats.largestProcessImpact.impact)} tone="warning" />
+        <Kpi Icon={AlertTriangle}  label={t('bdKpiRtoMismatch')} value={String(stats.rtoMismatches)} tone={stats.rtoMismatches > 0 ? 'danger' : 'success'} to="/bcm/mtpd-inheritance" />
+        <Kpi Icon={GitBranch}      label={t('bdKpiLargest')}    value={String(stats.largestProcessImpact.impact)} tone="warning" to="/bcm/bia-quantitative" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>

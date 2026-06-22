@@ -157,15 +157,18 @@ export function RrpDashboardPage() {
           to="/rrp/cycles" />
         <Kpi Icon={CheckCircle2} tone="success"
           label={lang === 'ar' ? 'مُقدَّمة لساما' : 'Submitted to SAMA'}
-          value={data?.submittedCycleCount ?? 0} />
+          value={data?.submittedCycleCount ?? 0}
+          to="/rrp/cycles" />
         <Kpi Icon={AlertTriangle} tone="danger"
           label={lang === 'ar' ? 'مؤشّرات أحمر/كهرماني' : 'Amber / Red indicators'}
-          value={(data?.indicatorsRed ?? 0) + (data?.indicatorsAmber ?? 0)} />
+          value={(data?.indicatorsRed ?? 0) + (data?.indicatorsAmber ?? 0)}
+          to="/rrp/cycles" />
         <Kpi Icon={Banknote} tone="info"
           label={lang === 'ar' ? 'طاقة الاستعادة' : 'Recovery capacity'}
           value={(data?.currentRecoveryCapacitySarM ?? 0).toLocaleString(
             lang === 'ar' ? 'ar-SA' : 'en-US') + ' ' +
-            (lang === 'ar' ? 'مليون' : 'SAR M')} />
+            (lang === 'ar' ? 'مليون' : 'SAR M')}
+          to="/rrp/cycles" />
       </div>
 
       {/* Status breakdown */}

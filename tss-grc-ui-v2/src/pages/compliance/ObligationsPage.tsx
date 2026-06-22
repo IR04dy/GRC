@@ -123,6 +123,7 @@ export function ObligationsPage() {
           label={isAr ? 'مُقَرَّة هذه الدورة' : 'Attested this cycle'}
           value={String(kpis?.attestedThisCycleCount ?? '—')}
           tone="success"
+          to="/compliance/obligation-campaigns"
         />
       </div>
 

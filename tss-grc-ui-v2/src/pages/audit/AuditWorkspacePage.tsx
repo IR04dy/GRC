@@ -149,11 +149,12 @@ export function AuditWorkspacePage() {
             ? `${t('audwsKpiSignoff')} · ${signoffCriticalCount} ${t('audwsCapaSeverityCrit')}`
             : t('audwsKpiSignoff')}
           value={signoffQueue.length}
+          to="/capa"
           tone="primary" />
-        <Kpi Icon={BookCopy}       label={t('audwsKpiPolicies')}     value={policyQueue.length}                       tone="info" />
-        <Kpi Icon={FileCheck2}     label={t('audwsKpiEvidence')}     value={evidencePending.length}                   tone="accent" />
-        <Kpi Icon={Briefcase}      label={t('audwsKpiEngagements')}  value={myEngagements.length}                     tone="success" />
-        <Kpi Icon={Flame}          label={t('audwsKpiEscalated')}    value={aging.escalated + aging.overdue}          tone="danger" />
+        <Kpi Icon={BookCopy}       label={t('audwsKpiPolicies')}     value={policyQueue.length}                       to="/policy-management" tone="info" />
+        <Kpi Icon={FileCheck2}     label={t('audwsKpiEvidence')}     value={evidencePending.length}                   to="/evidence" tone="accent" />
+        <Kpi Icon={Briefcase}      label={t('audwsKpiEngagements')}  value={myEngagements.length}                     to="/audit/ia/plans" tone="success" />
+        <Kpi Icon={Flame}          label={t('audwsKpiEscalated')}    value={aging.escalated + aging.overdue}          to="/issues" tone="danger" />
       </div>
 
       {/* Aging donut + Engagements row */}
@@ -384,11 +385,11 @@ function PlanAndUniverseTab({ t, lang }: { t: (k: string) => string; lang: 'en' 
               </div>
             )}
             <div className="kpi-grid audws-plan-kpis">
-              <Kpi Icon={ClipboardCheck} label={t('audwsPlanCompleted')} value={cov.completed} tone="success" />
-              <Kpi Icon={Activity}       label={t('audwsPlanInFlight')}  value={cov.inFlight}  tone="warning" />
-              <Kpi Icon={Clock}          label={t('audwsPlanPlanned')}   value={cov.planned}   tone="info" />
-              <Kpi Icon={Layers}         label={t('audwsPlanTotal')}     value={cov.total}     tone="primary" />
-              <Kpi Icon={ShieldCheck}    label={`${t('audwsPlanCompletePct')}`}  value={`${cov.completedPct}%`} tone="success" />
+              <Kpi Icon={ClipboardCheck} label={t('audwsPlanCompleted')} value={cov.completed} to="/audit/ia/plans" tone="success" />
+              <Kpi Icon={Activity}       label={t('audwsPlanInFlight')}  value={cov.inFlight}  to="/audit/ia/plans" tone="warning" />
+              <Kpi Icon={Clock}          label={t('audwsPlanPlanned')}   value={cov.planned}   to="/audit/ia/plans" tone="info" />
+              <Kpi Icon={Layers}         label={t('audwsPlanTotal')}     value={cov.total}     to="/audit/ia/plans" tone="primary" />
+              <Kpi Icon={ShieldCheck}    label={`${t('audwsPlanCompletePct')}`}  value={`${cov.completedPct}%`} to="/audit/ia/plans" tone="success" />
             </div>
           </div>
           <Donut
@@ -724,11 +725,11 @@ function CommitteeTab({ t, lang }: { t: (k: string) => string; lang: 'en' | 'ar'
     <div className="audws-tab-stack">
       {/* KPI strip */}
       <div className="kpi-grid audws-kpi-5">
-        <Kpi Icon={Users}        label={t('audwsCteMembers')}      value={AUDIT_COMMITTEE_MEMBERS.filter(m => m.role !== 'SECRETARY').length} tone="primary" />
-        <Kpi Icon={Scale}        label={t('audwsCteIndependent')}  value={AUDIT_COMMITTEE_MEMBERS.filter(m => m.role === 'CHAIR' || m.role === 'INDEPENDENT_MEMBER').length} tone="info" />
-        <Kpi Icon={ShieldCheck}  label={t('audwsCteCompliance')}   value={compliance.compliant ? '✓' : '✗'} tone={compliance.compliant ? 'success' : 'danger'} />
-        <Kpi Icon={CalendarDays} label={t('audwsCteMeetingsHeld')} value={meetingsThisYear} tone="success" />
-        <Kpi Icon={Clock}        label={t('audwsCteMeetingsUpcoming')} value={upcoming} tone="warning" />
+        <Kpi Icon={Users}        label={t('audwsCteMembers')}      value={AUDIT_COMMITTEE_MEMBERS.filter(m => m.role !== 'SECRETARY').length} to="/audit-committee/dashboard" tone="primary" />
+        <Kpi Icon={Scale}        label={t('audwsCteIndependent')}  value={AUDIT_COMMITTEE_MEMBERS.filter(m => m.role === 'CHAIR' || m.role === 'INDEPENDENT_MEMBER').length} to="/audit-committee/dashboard" tone="info" />
+        <Kpi Icon={ShieldCheck}  label={t('audwsCteCompliance')}   value={compliance.compliant ? '✓' : '✗'} to="/audit-committee/dashboard" tone={compliance.compliant ? 'success' : 'danger'} />
+        <Kpi Icon={CalendarDays} label={t('audwsCteMeetingsHeld')} value={meetingsThisYear} to="/audit-committee/dashboard" tone="success" />
+        <Kpi Icon={Clock}        label={t('audwsCteMeetingsUpcoming')} value={upcoming} to="/audit-committee/dashboard" tone="warning" />
       </div>
 
       {/* Composition */}

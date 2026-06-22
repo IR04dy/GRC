@@ -123,8 +123,8 @@ export function CyberPdplBridgePage() {
 
       <div className="kpi-grid">
         <Kpi Icon={Workflow}     label={t('cpbKpiTotal')}   value={stats.total}   tone="primary" />
-        <Kpi Icon={CheckCircle2} label={t('cpbKpiCreated')} value={stats.created} tone="success" />
-        <Kpi Icon={ArrowRight}   label={t('cpbKpiLinked')}  value={stats.linked}  tone="primary" />
+        <Kpi Icon={CheckCircle2} label={t('cpbKpiCreated')} value={stats.created} tone="success" to="/data-officer/breaches" />
+        <Kpi Icon={ArrowRight}   label={t('cpbKpiLinked')}  value={stats.linked}  tone="primary" to="/data-officer/breaches" />
         <Kpi Icon={AlertOctagon} label={t('cpbKpiError')}   value={stats.error}   tone="danger" />
       </div>
 

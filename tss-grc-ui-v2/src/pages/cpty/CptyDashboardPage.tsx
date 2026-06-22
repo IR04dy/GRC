@@ -189,15 +189,18 @@ export function CptyDashboardPage() {
           to="/cpty/counterparties" />
         <Kpi Icon={AlertTriangle} tone="warning"
           label={lang === 'ar' ? 'قائمة المراقبة' : 'Watchlist'}
-          value={data?.watchlistCount ?? 0} />
+          value={data?.watchlistCount ?? 0}
+          to="/cpty/counterparties" />
         <Kpi Icon={ShieldAlert} tone="danger"
           label={lang === 'ar' ? 'متعثّرة / تجاوز' : 'Default / Breach'}
-          value={(data?.defaultCount ?? 0) + (data?.limitsBreach ?? 0)} />
+          value={(data?.defaultCount ?? 0) + (data?.limitsBreach ?? 0)}
+          to="/cpty/counterparties" />
         <Kpi Icon={Banknote} tone="info"
           label={lang === 'ar' ? 'إجمالي التعرّض' : 'Total exposure'}
           value={(data?.totalExposureSarM ?? 0).toLocaleString(
             lang === 'ar' ? 'ar-SA' : 'en-US') + ' ' +
-            (lang === 'ar' ? 'م.ر' : 'SAR M')} />
+            (lang === 'ar' ? 'م.ر' : 'SAR M')}
+          to="/cpty/counterparties" />
       </div>
 
       <div style={{

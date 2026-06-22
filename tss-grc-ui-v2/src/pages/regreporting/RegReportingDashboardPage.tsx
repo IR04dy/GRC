@@ -182,7 +182,8 @@ export function RegReportingDashboardPage() {
           to="/regreporting/filings" />
         <Kpi Icon={CheckCircle2} tone="success"
           label={lang === 'ar' ? 'مُقدَّمة هذا الربع' : 'Submitted this quarter'}
-          value={data?.submittedThisQuarterCount ?? 0} />
+          value={data?.submittedThisQuarterCount ?? 0}
+          to="/regreporting/filings" />
       </div>
 
       {/* In-flight by regulator + status */}

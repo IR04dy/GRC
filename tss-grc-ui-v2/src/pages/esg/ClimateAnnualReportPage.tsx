@@ -107,24 +107,28 @@ export function ClimateAnnualReportPage() {
               label={isAr ? 'السيناريوهات المُعتمَدة' : 'Approved scenarios'}
               value={String(report.scenarios.length)}
               tone="success"
+              to="/esg/tcfd-scenarios"
             />
             <Kpi
               Icon={Factory}
               label={isAr ? 'إجمالي الانبعاثات' : 'Total emissions'}
               value={fmtTco2e(report.financedEmissionsTotal.totalFinancedEmissionsTco2e)}
               tone="info"
+              to="/esg/financed-emissions"
             />
             <Kpi
               Icon={AlertTriangle}
               label={isAr ? 'الخسارة المتوقّعة المرجَّحة' : 'Weighted EL'}
               value={fmtSarMillions(report.weightedExpectedLoss.weightedExpectedLossSarMillions, isAr)}
               tone={report.weightedExpectedLoss.warning ? 'warning' : 'info'}
+              to="/esg/tcfd-scenarios"
             />
             <Kpi
               Icon={TargetIcon}
               label={isAr ? 'الأهداف المسجَّلة' : 'Targets'}
               value={String(report.targetProgress.length)}
               tone="primary"
+              to="/esg/financed-emissions"
             />
           </div>
 

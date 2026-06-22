@@ -175,7 +175,7 @@ export function SubprocessorsPage() {
              value={kpis.approved} />
         <Kpi Icon={Globe2} tone="info"
              label={lang === 'ar' ? 'خارج المملكة (مُعتَمد)' : 'Cross-border (approved)'}
-             value={kpis.crossBorder} />
+             value={kpis.crossBorder} to="/privacy/data-flow" />
         <Kpi Icon={Clock} tone={kpis.overdue > 0 ? 'danger' : 'neutral'}
              label={lang === 'ar' ? 'مراجعات متأخّرة' : 'Overdue reviews'}
              value={kpis.overdue} />

@@ -157,12 +157,12 @@ export function DataclassDashboardPage() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
-        <Kpi label={lang === 'ar' ? 'إجمالي الأصول' : 'Total assets'} value={data?.assetsTotal ?? 0} Icon={Database} />
-        <Kpi label={lang === 'ar' ? 'سرّي للغاية' : 'Top secret'} value={data?.assetsTopSecret ?? 0} tone="danger" Icon={Lock} />
-        <Kpi label={lang === 'ar' ? 'سرّي' : 'Confidential'} value={data?.assetsConfidential ?? 0} tone="warning" Icon={Lock} />
-        <Kpi label={lang === 'ar' ? 'فئة حسّاسة (المادة ٤)' : 'Special category (Art.4)'} value={data?.assetsSpecialCategory ?? 0} tone="danger" Icon={ShieldAlert} />
-        <Kpi label={lang === 'ar' ? 'تدفقات نشطة' : 'Active flows'} value={data?.flowsActive ?? 0} tone="success" Icon={Globe} />
-        <Kpi label={lang === 'ar' ? 'تدفقات عبر الحدود' : 'Cross-border flows'} value={data?.flowsCrossBorder ?? 0} tone="warning" Icon={Globe} />
+        <Kpi label={lang === 'ar' ? 'إجمالي الأصول' : 'Total assets'} value={data?.assetsTotal ?? 0} Icon={Database} to="/dataclass/assets" />
+        <Kpi label={lang === 'ar' ? 'سرّي للغاية' : 'Top secret'} value={data?.assetsTopSecret ?? 0} tone="danger" Icon={Lock} to="/dataclass/assets" />
+        <Kpi label={lang === 'ar' ? 'سرّي' : 'Confidential'} value={data?.assetsConfidential ?? 0} tone="warning" Icon={Lock} to="/dataclass/assets" />
+        <Kpi label={lang === 'ar' ? 'فئة حسّاسة (المادة ٤)' : 'Special category (Art.4)'} value={data?.assetsSpecialCategory ?? 0} tone="danger" Icon={ShieldAlert} to="/dataclass/assets" />
+        <Kpi label={lang === 'ar' ? 'تدفقات نشطة' : 'Active flows'} value={data?.flowsActive ?? 0} tone="success" Icon={Globe} to="/dataclass/flows" />
+        <Kpi label={lang === 'ar' ? 'تدفقات عبر الحدود' : 'Cross-border flows'} value={data?.flowsCrossBorder ?? 0} tone="warning" Icon={Globe} to="/dataclass/flows" />
         <Kpi label={lang === 'ar' ? 'استثناءات نشطة' : 'Active exceptions'} value={data?.exceptionsActive ?? 0} tone="info" Icon={FileWarning} />
         <Kpi label={lang === 'ar' ? 'تنتهي خلال ٣٠ يوماً' : 'Expiring ≤30d'} value={data?.exceptionsExpiringNext30d ?? 0} tone={data && data.exceptionsExpiringNext30d > 0 ? 'warning' : 'neutral'} Icon={BadgeAlert} />
       </div>

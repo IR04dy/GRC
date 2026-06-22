@@ -116,10 +116,10 @@ export function RegulatoryHorizonPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Layers}      label={isAr ? 'تغييرات نشطة' : 'Active changes'} value={loading ? '—' : total} tone="primary" />
-        <Kpi Icon={AlertOctagon} label={isAr ? 'متأخّرة' : 'Past due'} value={loading ? '—' : pastDue} tone="danger" />
-        <Kpi Icon={Clock}       label={isAr ? 'وشيكة (≤30 يوم)' : 'Imminent (≤30d)'} value={loading ? '—' : imminent} tone="warning" />
-        <Kpi Icon={ShieldAlert} label={isAr ? 'أثر حرج' : 'Critical impact'} value={loading ? '—' : critical} tone="danger" />
+        <Kpi Icon={Layers}      label={isAr ? 'تغييرات نشطة' : 'Active changes'} value={loading ? '—' : total} tone="primary" to="/regulatory-change" />
+        <Kpi Icon={AlertOctagon} label={isAr ? 'متأخّرة' : 'Past due'} value={loading ? '—' : pastDue} tone="danger" to="/regulatory-change" />
+        <Kpi Icon={Clock}       label={isAr ? 'وشيكة (≤30 يوم)' : 'Imminent (≤30d)'} value={loading ? '—' : imminent} tone="warning" to="/regulatory-change" />
+        <Kpi Icon={ShieldAlert} label={isAr ? 'أثر حرج' : 'Critical impact'} value={loading ? '—' : critical} tone="danger" to="/regulatory-change" />
       </div>
 
       <Card title={isAr ? 'التوزيع حسب تاريخ النفاذ' : 'Distribution by effective date'} Icon={CalendarClock}

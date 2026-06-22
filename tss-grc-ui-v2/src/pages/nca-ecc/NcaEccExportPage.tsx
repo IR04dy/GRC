@@ -91,12 +91,12 @@ export function NcaEccExportPage() {
         <section className="nca-section">
           <h2 className="nca-section-title"><Landmark size={18} /> {t('ncaCoverageTitle')}</h2>
           <div className="kpi-grid" style={{ marginBottom: 16 }}>
-            <Kpi Icon={FileText} label={t('ncaKpiTotal')}        value={String(coverage.total)}        tone="primary" />
-            <Kpi Icon={FileText} label={t('ncaKpiImplemented')}   value={String(coverage.implemented)}  tone="success" />
-            <Kpi Icon={FileText} label={t('ncaKpiPartial')}       value={String(coverage.partial)}      tone="warning" />
-            <Kpi Icon={FileText} label={t('ncaKpiNotImpl')}       value={String(coverage.notImplemented)} tone={coverage.notImplemented > 0 ? 'danger' : 'success'} />
-            <Kpi Icon={FileText} label={t('ncaKpiScore')}         value={`${coverage.scorePct}%`}        tone={coverage.scorePct >= 80 ? 'success' : 'warning'} />
-            <Kpi Icon={FileText} label={t('ncaKpiMaturity')}      value={String(coverage.avgMaturity)}   tone="info" />
+            <Kpi Icon={FileText} label={t('ncaKpiTotal')}        value={String(coverage.total)}        tone="primary" to="/nca-ecc/filings" />
+            <Kpi Icon={FileText} label={t('ncaKpiImplemented')}   value={String(coverage.implemented)}  tone="success" to="/nca-ecc/filings" />
+            <Kpi Icon={FileText} label={t('ncaKpiPartial')}       value={String(coverage.partial)}      tone="warning" to="/nca-ecc/filings" />
+            <Kpi Icon={FileText} label={t('ncaKpiNotImpl')}       value={String(coverage.notImplemented)} tone={coverage.notImplemented > 0 ? 'danger' : 'success'} to="/nca-ecc/filings" />
+            <Kpi Icon={FileText} label={t('ncaKpiScore')}         value={`${coverage.scorePct}%`}        tone={coverage.scorePct >= 80 ? 'success' : 'warning'} to="/nca-ecc/filings" />
+            <Kpi Icon={FileText} label={t('ncaKpiMaturity')}      value={String(coverage.avgMaturity)}   tone="info" to="/nca-ecc/filings" />
           </div>
         </section>
 

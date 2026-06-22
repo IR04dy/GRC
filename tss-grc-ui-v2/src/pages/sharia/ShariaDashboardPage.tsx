@@ -208,7 +208,8 @@ export function ShariaDashboardPage() {
         <Kpi Icon={Banknote} tone="warning"
           label={lang === 'ar' ? 'دخل غير شرعي معلَّق (ر.س)' : 'SNCI outstanding (SAR)'}
           value={(data?.snciOutstandingSar ?? 0).toLocaleString(
-            lang === 'ar' ? 'ar-SA' : 'en-US')} />
+            lang === 'ar' ? 'ar-SA' : 'en-US')}
+          to="/sharia/nc-events" />
         <Kpi Icon={Package} tone="info"
           label={lang === 'ar' ? 'منتجات قيد الاعتماد' : 'Products in review'}
           value={data?.productsInReview ?? 0}

@@ -62,7 +62,7 @@ export function ApprovalChainTemplatesPage() {
         <Kpi Icon={ListChecks}  label={t('approvalChainKpiTotalSteps', 'Total steps')}          value={String(totalSteps)}          tone="info" />
         <Kpi Icon={Layers}      label={t('approvalChainKpiParallel',   'Parallel-rung chains')} value={String(parallelTemplates)}   tone="accent" />
         <Kpi Icon={Star}        label={t('approvalChainKpiDefaults',   'Default per module')}   value={String(defaults)}            tone="warning" />
-        <Kpi Icon={ShieldCheck} label={t('approvalChainKpiInflight',   'In-flight')}            value={String(inflight.length)}     tone="success" />
+        <Kpi Icon={ShieldCheck} label={t('approvalChainKpiInflight',   'In-flight')}            value={String(inflight.length)}     tone="success" to="/workflows/chains/pending" />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

@@ -98,19 +98,19 @@ export function TprmConsolidatedOverview() {
         <p style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 12 }}>{t('tpoSub')}</p>
 
         <div className="kpi-grid" style={{ marginBottom: 16 }}>
-          <Kpi Icon={Network}       label={t('tpoKpiFp')}        value={loading ? '…' : fp.length}   tone="primary" />
-          <Kpi Icon={Bug}            label={t('tpoKpiTpc')}       value={loading ? '…' : tpc.length}  tone="primary" />
-          <Kpi Icon={ClipboardCheck} label={t('tpoKpiProc')}      value={loading ? '…' : proc.length} tone="primary" />
-          <Kpi Icon={Activity}       label={t('tpoKpiSrt')}       value={loading ? '…' : srt.length}  tone="primary" />
-          <Kpi Icon={Share2}         label={t('tpoKpiDsa')}       value={loading ? '…' : dsa.length}  tone="primary" />
+          <Kpi Icon={Network}       label={t('tpoKpiFp')}        value={loading ? '…' : fp.length}   tone="primary" to="/fourth-party" />
+          <Kpi Icon={Bug}            label={t('tpoKpiTpc')}       value={loading ? '…' : tpc.length}  tone="primary" to="/third-party-cyber" />
+          <Kpi Icon={ClipboardCheck} label={t('tpoKpiProc')}      value={loading ? '…' : proc.length} tone="primary" to="/processor-assessments" />
+          <Kpi Icon={Activity}       label={t('tpoKpiSrt')}       value={loading ? '…' : srt.length}  tone="primary" to="/resilience-tests" />
+          <Kpi Icon={Share2}         label={t('tpoKpiDsa')}       value={loading ? '…' : dsa.length}  tone="primary" to="/data-sharing" />
         </div>
 
         <div className="kpi-grid" style={{ marginBottom: 16 }}>
           <Kpi Icon={AlertTriangle} label={t('tpoKpiHighRisk')}    value={loading ? '…' : fpHighConc + tpcHigh + procFail + srtFail} tone="danger" />
-          <Kpi Icon={ShieldCheck}   label={t('tpoKpiHealthy')}     value={loading ? '…' : tpcOk}     tone="success" />
-          <Kpi Icon={Stamp}         label={t('tpoKpiDsaActive')}   value={loading ? '…' : dsaActive} tone="info" />
-          <Kpi Icon={FileText}      label={t('tpoKpiCrossBorder')} value={loading ? '…' : dsaCross}  tone="warning" />
-          <Kpi Icon={Activity}      label={t('tpoKpiNextTests')}   value={loading ? '…' : srtUpcoming} tone="warning" />
+          <Kpi Icon={ShieldCheck}   label={t('tpoKpiHealthy')}     value={loading ? '…' : tpcOk}     tone="success" to="/third-party-cyber" />
+          <Kpi Icon={Stamp}         label={t('tpoKpiDsaActive')}   value={loading ? '…' : dsaActive} tone="info" to="/data-sharing" />
+          <Kpi Icon={FileText}      label={t('tpoKpiCrossBorder')} value={loading ? '…' : dsaCross}  tone="warning" to="/data-sharing" />
+          <Kpi Icon={Activity}      label={t('tpoKpiNextTests')}   value={loading ? '…' : srtUpcoming} tone="warning" to="/resilience-tests" />
         </div>
 
         {/* Vendor heat strip */}

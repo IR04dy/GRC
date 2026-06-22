@@ -120,10 +120,10 @@ export function BcmComplianceMappingPage() {
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12, marginBottom: 14 }}>
-        <Kpi Icon={BookOpen}    label={isAr ? 'إجمالي البنود'   : 'Total requirements'} value={items.length}             tone="info" />
-        <Kpi Icon={FileCheck2}  label={isAr ? 'ممتثل'           : 'Compliant'}          value={stats.compliant ?? 0}      tone="success" />
-        <Kpi Icon={ShieldCheck} label={isAr ? 'جزئي'            : 'Partial'}            value={stats.partial ?? 0}        tone="warning" />
-        <Kpi Icon={AlertOctagon} label={isAr ? 'غير ممتثل'      : 'Non-compliant'}      value={stats.non_compliant ?? 0}  tone="danger" />
+        <Kpi Icon={BookOpen}    label={isAr ? 'إجمالي البنود'   : 'Total requirements'} value={items.length}             tone="info" to="/compliance/obligations" />
+        <Kpi Icon={FileCheck2}  label={isAr ? 'ممتثل'           : 'Compliant'}          value={stats.compliant ?? 0}      tone="success" to="/compliance/posture" />
+        <Kpi Icon={ShieldCheck} label={isAr ? 'جزئي'            : 'Partial'}            value={stats.partial ?? 0}        tone="warning" to="/compliance/posture" />
+        <Kpi Icon={AlertOctagon} label={isAr ? 'غير ممتثل'      : 'Non-compliant'}      value={stats.non_compliant ?? 0}  tone="danger" to="/compliance/posture" />
       </div>
 
       {hasPlaceholders && (

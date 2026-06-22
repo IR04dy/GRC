@@ -143,13 +143,16 @@ export function FraudDashboardPage() {
           to="/fraud/cases" />
         <Kpi Icon={AlertTriangle} tone="danger"
           label={lang === 'ar' ? 'قضايا مؤكَّدة (السنة الجارية)' : 'Confirmed (YTD)'}
-          value={data?.confirmedCount ?? 0} />
+          value={data?.confirmedCount ?? 0}
+          to="/fraud/cases" />
         <Kpi Icon={CheckCircle2} tone="neutral"
           label={lang === 'ar' ? 'قضايا مغلقة (السنة الجارية)' : 'Closed (YTD)'}
-          value={data?.closedCount ?? 0} />
+          value={data?.closedCount ?? 0}
+          to="/fraud/cases" />
         <Kpi Icon={Wallet} tone="danger"
           label={lang === 'ar' ? 'الخسائر المؤكَّدة (السنة الجارية)' : 'YTD Confirmed Loss'}
-          value={sarFmt.format(data?.confirmedLossYtdSar ?? 0)} />
+          value={sarFmt.format(data?.confirmedLossYtdSar ?? 0)}
+          to="/fraud/cases" />
       </div>
 
       {/* Recent cases */}

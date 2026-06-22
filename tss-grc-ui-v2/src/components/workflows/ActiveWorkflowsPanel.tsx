@@ -40,11 +40,11 @@ export function ActiveWorkflowsPanel({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))' }}>
-        <Kpi Icon={Activity}       label={t('workflowsKpiTotal') ?? 'In flight'}      value={total}     tone="primary" />
-        <Kpi Icon={CheckCheck}     label={t('workflowsKpiOnTrack') ?? 'On track'}     value={onTrack}   tone="success" />
-        <Kpi Icon={Clock}          label={t('workflowsKpiDueSoon') ?? 'Due soon'}     value={dueSoon}   tone="info" />
-        <Kpi Icon={AlertTriangle}  label={t('workflowsKpiOverdue') ?? 'Overdue'}      value={overdue}   tone="warning" />
-        <Kpi Icon={Flame}          label={t('workflowsKpiEscalated') ?? 'Escalated'}  value={escalated} tone="danger" />
+        <Kpi Icon={Activity}       label={t('workflowsKpiTotal') ?? 'In flight'}      value={total}     tone="primary" to="/workflows" />
+        <Kpi Icon={CheckCheck}     label={t('workflowsKpiOnTrack') ?? 'On track'}     value={onTrack}   tone="success" to="/workflows" />
+        <Kpi Icon={Clock}          label={t('workflowsKpiDueSoon') ?? 'Due soon'}     value={dueSoon}   tone="info" to="/workflows" />
+        <Kpi Icon={AlertTriangle}  label={t('workflowsKpiOverdue') ?? 'Overdue'}      value={overdue}   tone="warning" to="/workflows/chains/pending" />
+        <Kpi Icon={Flame}          label={t('workflowsKpiEscalated') ?? 'Escalated'}  value={escalated} tone="danger" to="/workflows/chains/pending" />
       </div>
 
       {workflows.length === 0

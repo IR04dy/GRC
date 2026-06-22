@@ -103,11 +103,11 @@ export function NotificationDispatchPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Send}     label={t('ndKpiTotal24h')}    value={String(totalDelivered24h + totalFailed24h)} tone="primary" />
-        <Kpi Icon={Bell}     label={t('ndKpiDelivered')}    value={String(totalDelivered24h)} tone="success" />
-        <Kpi Icon={AlertTriangle} label={t('ndKpiFailed')}   value={String(totalFailed24h)} tone={totalFailed24h > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Send}     label={t('ndKpiInFlight')}     value={String(inFlight)} tone="info" />
-        <Kpi Icon={Bell}     label={t('ndKpiSuccess')}      value={`${successRate}%`} tone={successRate >= 95 ? 'success' : 'warning'} />
+        <Kpi Icon={Send}     label={t('ndKpiTotal24h')}    value={String(totalDelivered24h + totalFailed24h)} tone="primary" to="/notifications/outbox" />
+        <Kpi Icon={Bell}     label={t('ndKpiDelivered')}    value={String(totalDelivered24h)} tone="success" to="/notifications/outbox" />
+        <Kpi Icon={AlertTriangle} label={t('ndKpiFailed')}   value={String(totalFailed24h)} tone={totalFailed24h > 0 ? 'danger' : 'success'} to="/notifications/outbox" />
+        <Kpi Icon={Send}     label={t('ndKpiInFlight')}     value={String(inFlight)} tone="info" to="/notifications/outbox" />
+        <Kpi Icon={Bell}     label={t('ndKpiSuccess')}      value={`${successRate}%`} tone={successRate >= 95 ? 'success' : 'warning'} to="/notifications/outbox" />
       </div>
 
       {/* ── Channel grid ──────────────────────────────────────── */}

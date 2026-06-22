@@ -162,13 +162,16 @@ export function RegInspectDashboardPage() {
           to="/reginspect/inspections" />
         <Kpi Icon={FileText} tone="warning"
           label={lang === 'ar' ? 'طلبات وثائق مفتوحة' : 'Open DRs'}
-          value={data?.openDrCount ?? 0} />
+          value={data?.openDrCount ?? 0}
+          to="/reginspect/inspections" />
         <Kpi Icon={AlertTriangle} tone="danger"
           label={lang === 'ar' ? 'طلبات متأخّرة' : 'Overdue DRs'}
-          value={data?.overdueDrCount ?? 0} />
+          value={data?.overdueDrCount ?? 0}
+          to="/reginspect/inspections" />
         <Kpi Icon={CheckCircle2} tone="success"
           label={lang === 'ar' ? 'تفتيش مغلق' : 'Closed inspections'}
-          value={data?.closedCount ?? 0} />
+          value={data?.closedCount ?? 0}
+          to="/reginspect/inspections" />
       </div>
 
       {/* Recent inspections */}

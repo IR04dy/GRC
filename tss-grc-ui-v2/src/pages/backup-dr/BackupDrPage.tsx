@@ -41,8 +41,8 @@ export function BackupDrPage() {
         <Kpi Icon={Database}     label={t('drKpiBackupJobs')}    value={String(stats.totalJobs)} tone="primary" />
         <Kpi Icon={ShieldCheck}   label={t('drKpiBackupOk')}      value={String(stats.okJobs)} tone={stats.failedJobs > 0 ? 'warning' : 'success'} />
         <Kpi Icon={Cloud}          label={t('drKpiReplication')}   value={`${stats.inSyncLinks} / ${stats.totalReplLinks}`} tone={stats.laggingLinks > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Calendar}       label={t('drKpiDrills')}        value={String(stats.drillsCompleted)} tone="info" />
-        <Kpi Icon={Clock}          label={t('drKpiLastRto')}       value={stats.lastDrillRtoMin ? `${stats.lastDrillRtoMin}m` : '—'} tone="success" />
+        <Kpi Icon={Calendar}       label={t('drKpiDrills')}        value={String(stats.drillsCompleted)} tone="info" to="/dr-plans" />
+        <Kpi Icon={Clock}          label={t('drKpiLastRto')}       value={stats.lastDrillRtoMin ? `${stats.lastDrillRtoMin}m` : '—'} tone="success" to="/dr-plans" />
       </div>
 
       {/* Backup jobs */}

@@ -190,7 +190,8 @@ export function ObDashboardPage() {
           to="/openbanking/tpps" />
         <Kpi Icon={ShieldAlert} tone="warning"
           label={lang === 'ar' ? 'موقوفون' : 'Suspended'}
-          value={data?.suspendedTpps ?? 0} />
+          value={data?.suspendedTpps ?? 0}
+          to="/openbanking/tpps" />
         <Kpi Icon={FileCheck2} tone="info"
           label={lang === 'ar' ? 'موافقات نشطة' : 'Active consents'}
           value={data?.activeConsents ?? 0}
@@ -201,10 +202,12 @@ export function ObDashboardPage() {
           to="/openbanking/incidents" />
         <Kpi Icon={AlertOctagon} tone="danger"
           label={lang === 'ar' ? 'بلاغ ساما مفتوح' : 'SAMA-reportable open'}
-          value={data?.samaReportableOpen ?? 0} />
+          value={data?.samaReportableOpen ?? 0}
+          to="/openbanking/incidents" />
         <Kpi Icon={KeyRound} tone="warning"
           label={lang === 'ar' ? 'شهادات تنتهي < ٣٠ ي' : 'Certs expiring < 30d'}
-          value={data?.certExpiring30d ?? 0} />
+          value={data?.certExpiring30d ?? 0}
+          to="/openbanking/tpps" />
       </div>
 
       <div style={{

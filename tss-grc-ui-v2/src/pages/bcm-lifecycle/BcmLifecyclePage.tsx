@@ -114,14 +114,14 @@ export function BcmLifecyclePage() {
       />}
 
       <div className="kpi-grid bcl-kpi-strip">
-        <Kpi Icon={Activity}        label={t('bclKpiProcesses')}     value={String(stats.bcmProcessTotal)}             tone="primary" />
-        <Kpi Icon={ShieldCheck}     label={t('bclKpiBiaApproved')}   value={`${stats.biaApproved} / ${bias.length}`} tone="success" />
-        <Kpi Icon={Clock}            label={t('bclKpiBiaExpiring')}    value={String(stats.biaExpiringSoon)}             tone={stats.biaExpiringSoon > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={AlertTriangle}    label={t('bclKpiTier1')}          value={String(stats.tier1Count)}                  tone="danger" />
-        <Kpi Icon={Calendar}         label={t('bclKpiDrillsPlanned')}   value={String(stats.drillsPlanned)}              tone="info" />
-        <Kpi Icon={CheckCircle2}     label={t('bclKpiRtoCompl')}        value={`${stats.rtoComplianceRate}%`}             tone={stats.rtoComplianceRate >= 80 ? 'success' : 'warning'} />
-        <Kpi Icon={Siren}             label={t('bclKpiInvocations')}    value={String(stats.invocationsThisYear)}         tone={stats.invocationsThisYear > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={MapPin}            label={t('bclKpiSpend')}            value={`${(stats.totalAnnualStrategySpendK / 1000).toFixed(1)}M SAR`} tone="info" />
+        <Kpi Icon={Activity}        label={t('bclKpiProcesses')}     value={String(stats.bcmProcessTotal)}             tone="primary" to="/bcm/bia" />
+        <Kpi Icon={ShieldCheck}     label={t('bclKpiBiaApproved')}   value={`${stats.biaApproved} / ${bias.length}`} tone="success" to="/bcm/bia" />
+        <Kpi Icon={Clock}            label={t('bclKpiBiaExpiring')}    value={String(stats.biaExpiringSoon)}             tone={stats.biaExpiringSoon > 0 ? 'warning' : 'success'} to="/bcm/bia" />
+        <Kpi Icon={AlertTriangle}    label={t('bclKpiTier1')}          value={String(stats.tier1Count)}                  tone="danger" to="/bcm/bia" />
+        <Kpi Icon={Calendar}         label={t('bclKpiDrillsPlanned')}   value={String(stats.drillsPlanned)}              tone="info" to="/resilience-tests" />
+        <Kpi Icon={CheckCircle2}     label={t('bclKpiRtoCompl')}        value={`${stats.rtoComplianceRate}%`}             tone={stats.rtoComplianceRate >= 80 ? 'success' : 'warning'} to="/bcm/readiness" />
+        <Kpi Icon={Siren}             label={t('bclKpiInvocations')}    value={String(stats.invocationsThisYear)}         tone={stats.invocationsThisYear > 0 ? 'warning' : 'success'} to="/bcm/crisis-room" />
+        <Kpi Icon={MapPin}            label={t('bclKpiSpend')}            value={`${(stats.totalAnnualStrategySpendK / 1000).toFixed(1)}M SAR`} tone="info" to="/bcm/strategy-roi" />
       </div>
 
       {/* Tabs */}

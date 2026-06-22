@@ -202,10 +202,10 @@ export function ReportSchedulesPage() {
       />
 
       <div className="kpi-grid">
-        <Kpi Icon={Calendar}     label={t('rsKpiTotal')}   value={items.length} tone="primary" />
-        <Kpi Icon={Clock}        label={t('rsKpiActive')}  value={totalActive}  tone="success" />
-        <Kpi Icon={CheckCheck}   label={t('rsKpiSent7d')}  value={sentLast7d}   tone="info" />
-        <Kpi Icon={AlertTriangle} label={t('rsKpiFailedToday')} value={failedToday} tone={failedToday > 0 ? 'danger' : 'success'} />
+        <Kpi Icon={Calendar}     label={t('rsKpiTotal')}   value={items.length} tone="primary" to="/reports/centre" />
+        <Kpi Icon={Clock}        label={t('rsKpiActive')}  value={totalActive}  tone="success" to="/reports/centre" />
+        <Kpi Icon={CheckCheck}   label={t('rsKpiSent7d')}  value={sentLast7d}   tone="info" to="/reports/centre" />
+        <Kpi Icon={AlertTriangle} label={t('rsKpiFailedToday')} value={failedToday} tone={failedToday > 0 ? 'danger' : 'success'} to="/reports/centre" />
       </div>
 
       <Card padded={false}>

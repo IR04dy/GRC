@@ -103,10 +103,10 @@ export function FrameworkControlsPage() {
       <PageHeader eyebrow={t('navCyber')} title={t('fwcPageTitle')} sub={t('fwcPageSub')} />
 
       <div className="kpi-grid">
-        <Kpi Icon={BookOpen}      label={t('fwcKpiTotal')}       value={stats.total} tone="primary" />
-        <Kpi Icon={CheckCircle2}  label={t('fwcKpiImplemented')} value={stats.implemented} tone="success" />
-        <Kpi Icon={AlertTriangle} label={t('fwcKpiPartial')}     value={stats.partial} tone="warning" />
-        <Kpi Icon={Globe}         label={t('fwcKpiExpected')}    value={stats.expected ?? '—'} tone="info" />
+        <Kpi Icon={BookOpen}      label={t('fwcKpiTotal')}       value={stats.total} tone="primary" to="/controls/library" />
+        <Kpi Icon={CheckCircle2}  label={t('fwcKpiImplemented')} value={stats.implemented} tone="success" to="/controls/library" />
+        <Kpi Icon={AlertTriangle} label={t('fwcKpiPartial')}     value={stats.partial} tone="warning" to="/controls/library" />
+        <Kpi Icon={Globe}         label={t('fwcKpiExpected')}    value={stats.expected ?? '—'} tone="info" to="/regulatory/library" />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

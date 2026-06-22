@@ -601,11 +601,11 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
         </div>
       )}
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', marginBottom: 12 }}>
-        <Kpi Icon={Activity}      label={t('kriKpiTotal')}        value={stats?.totalKris ?? 0}    tone="primary" />
-        <Kpi Icon={ShieldCheck}   label={t('kriKpiGreen')}        value={stats?.green ?? 0}        tone="success" />
-        <Kpi Icon={AlertTriangle} label={t('kriKpiAmber')}        value={stats?.amber ?? 0}        tone="warning" />
-        <Kpi Icon={Flame}         label={t('kriKpiRed')}          value={stats?.red ?? 0}          tone="danger" />
-        <Kpi Icon={ClipboardCheck} label={t('kriKpiOpenBreaches')} value={stats?.openBreaches ?? 0} tone="accent" />
+        <Kpi Icon={Activity}      label={t('kriKpiTotal')}        value={stats?.totalKris ?? 0}    tone="primary" to="/risk/kri/dashboard" />
+        <Kpi Icon={ShieldCheck}   label={t('kriKpiGreen')}        value={stats?.green ?? 0}        tone="success" to="/risk/kri/dashboard" />
+        <Kpi Icon={AlertTriangle} label={t('kriKpiAmber')}        value={stats?.amber ?? 0}        tone="warning" to="/risk/kri/dashboard" />
+        <Kpi Icon={Flame}         label={t('kriKpiRed')}          value={stats?.red ?? 0}          tone="danger" to="/risk/kri/dashboard" />
+        <Kpi Icon={ClipboardCheck} label={t('kriKpiOpenBreaches')} value={stats?.openBreaches ?? 0} tone="accent" to="/risk/kri/dashboard" />
       </div>
       {loading
         ? <InlineEmpty>Loading…</InlineEmpty>

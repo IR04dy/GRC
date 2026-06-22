@@ -90,12 +90,12 @@ export function PosturePage() {
 
       {/* KPIs */}
       <div className="kpi-strip-4">
-        <Kpi Icon={BookOpen}   label={isAr ? 'المرجعيات' : 'Authority documents'} value={totals.docCount} />
+        <Kpi Icon={BookOpen}   label={isAr ? 'المرجعيات' : 'Authority documents'} value={totals.docCount} to="/regulatory/library" />
         <Kpi Icon={Shield}     label={isAr ? 'البنود المغطّاة' : 'Citations covered'}
-             value={`${totals.mapped} / ${totals.cits}`} />
+             value={`${totals.mapped} / ${totals.cits}`} to="/regulatory/library" />
         <Kpi Icon={Activity}   label={isAr ? 'متوسط التغطية' : 'Avg coverage'}
              value={`${totals.avg}%`} tone={coverageBandTone(totals.avg)} />
-        <Kpi Icon={FileWarning} label={isAr ? 'مجالات الضوابط' : 'Control domains'} value={domains.length} />
+        <Kpi Icon={FileWarning} label={isAr ? 'مجالات الضوابط' : 'Control domains'} value={domains.length} to="/controls/library" />
       </div>
 
       {/* Family filter chips — the "audience selector" */}

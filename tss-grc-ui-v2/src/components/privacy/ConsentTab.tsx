@@ -244,13 +244,14 @@ export function ConsentTab() {
 
       {/* ── Lifecycle KPIs ──────────────────────────────────────────── */}
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))' }}>
-        <Kpi Icon={Users}          label={isAr ? 'إجمالي السجلات' : 'Ledger size'}   value={ledgerSize} tone="primary" />
-        <Kpi Icon={CheckCheck}     label={isAr ? 'نشطة' : 'Active'}                  value={active}     tone="success" />
-        <Kpi Icon={XIcon}          label={isAr ? 'مسحوبة' : 'Withdrawn'}             value={withdrawn}  tone="danger" />
-        <Kpi Icon={Clock}          label={isAr ? 'منتهية' : 'Expired'}               value={expired}    tone="warning" />
+        <Kpi Icon={Users}          label={isAr ? 'إجمالي السجلات' : 'Ledger size'}   value={ledgerSize} tone="primary" to="/data-officer/consents" />
+        <Kpi Icon={CheckCheck}     label={isAr ? 'نشطة' : 'Active'}                  value={active}     tone="success" to="/data-officer/consents" />
+        <Kpi Icon={XIcon}          label={isAr ? 'مسحوبة' : 'Withdrawn'}             value={withdrawn}  tone="danger" to="/data-officer/consents" />
+        <Kpi Icon={Clock}          label={isAr ? 'منتهية' : 'Expired'}               value={expired}    tone="warning" to="/data-officer/consents" />
         <Kpi Icon={TrendingDown}
              label={isAr ? 'معدل السحب' : 'Withdrawal rate'}
              value={`${withdrawalRatePct}%`}
+             to="/data-officer/consents"
              tone={withdrawalRatePct >= 10 ? 'danger' : withdrawalRatePct >= 5 ? 'warning' : 'success'} />
       </div>
 

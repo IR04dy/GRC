@@ -56,13 +56,13 @@ export function PrivacyLifecyclePage() {
       />
 
       <div className="kpi-grid mb-lg">
-        <Kpi Icon={Files}          label={t('prcKpiRopa')}          value={`${stats.ropaApproved} / ${stats.ropaTotal}`} tone="primary" />
-        <Kpi Icon={ShieldAlert}    label={t('prcKpiDpiaHighRisk')}  value={String(stats.dpiaHighRisk)} tone={stats.dpiaHighRisk > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Globe}          label={t('prcKpiCbt')}            value={`${stats.cbtAdequate} / ${stats.cbtTotal}`} tone="info" />
-        <Kpi Icon={Globe}          label={t('prcKpiCbtBlocked')}     value={String(stats.cbtBlocked)} tone={stats.cbtBlocked > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={UserCheck}       label={t('prcKpiDsrOpen')}        value={String(stats.dsrOpen)} tone={stats.dsrOpen > 0 ? 'info' : 'success'} />
-        <Kpi Icon={AlertTriangle}  label={t('prcKpiDsrOverdue')}     value={String(stats.dsrOverdue)} tone={stats.dsrOverdue > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Clock}          label={t('prcKpiAvgDays')}        value={`${stats.dsrCloseAvgDays}d`} tone="info" />
+        <Kpi Icon={Files}          label={t('prcKpiRopa')}          value={`${stats.ropaApproved} / ${stats.ropaTotal}`} tone="primary" to="/ropa" />
+        <Kpi Icon={ShieldAlert}    label={t('prcKpiDpiaHighRisk')}  value={String(stats.dpiaHighRisk)} tone={stats.dpiaHighRisk > 0 ? 'warning' : 'success'} to="/data-officer/dpia" />
+        <Kpi Icon={Globe}          label={t('prcKpiCbt')}            value={`${stats.cbtAdequate} / ${stats.cbtTotal}`} tone="info" to="/privacy/data-flow" />
+        <Kpi Icon={Globe}          label={t('prcKpiCbtBlocked')}     value={String(stats.cbtBlocked)} tone={stats.cbtBlocked > 0 ? 'danger' : 'success'} to="/privacy/data-flow" />
+        <Kpi Icon={UserCheck}       label={t('prcKpiDsrOpen')}        value={String(stats.dsrOpen)} tone={stats.dsrOpen > 0 ? 'info' : 'success'} to="/data-officer/dsr" />
+        <Kpi Icon={AlertTriangle}  label={t('prcKpiDsrOverdue')}     value={String(stats.dsrOverdue)} tone={stats.dsrOverdue > 0 ? 'danger' : 'success'} to="/data-officer/dsr" />
+        <Kpi Icon={Clock}          label={t('prcKpiAvgDays')}        value={`${stats.dsrCloseAvgDays}d`} tone="info" to="/data-officer/dsr" />
       </div>
 
       <div className="prc-tab-row">

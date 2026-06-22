@@ -108,14 +108,14 @@ export function CyberLifecyclePage() {
       />
 
       <div className="kpi-grid cyc-kpi-strip">
-        <Kpi Icon={ShieldCheck}    label={t('cycKpiMaturity')}      value={`${stats.filingMaturity}/5`} tone={stats.filingMaturity >= 4 ? 'success' : 'warning'} />
-        <Kpi Icon={AlertOctagon}    label={t('cycKpiCritical')}       value={String(stats.vulnsCritical)} tone={stats.vulnsCritical > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Clock}            label={t('cycKpiOverdue')}        value={String(stats.vulnsOverdue)} tone={stats.vulnsOverdue > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={CheckCircle2}     label={t('cycKpiClosedMonth')}    value={String(stats.vulnsClosedThisMonth)} tone="success" />
-        <Kpi Icon={Radio}            label={t('cycKpiThreats')}        value={`${stats.threatsAcknowledged} / ${stats.threatsTotal}`} tone={stats.threatsAcknowledged === stats.threatsTotal ? 'success' : 'warning'} />
-        <Kpi Icon={AlertTriangle}    label={t('cycKpiSocP1')}          value={String(stats.socOpenP1)} tone={stats.socOpenP1 > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Clock}             label={t('cycKpiMttr')}            value={`${stats.socAvgMttrHours}h`} tone="info" />
-        <Kpi Icon={Server}            label={t('cycKpiAssetsTier1')}    value={String(stats.assetsTier1)} tone="primary" />
+        <Kpi Icon={ShieldCheck}    label={t('cycKpiMaturity')}      value={`${stats.filingMaturity}/5`} tone={stats.filingMaturity >= 4 ? 'success' : 'warning'} to="/nca-ecc/filings" />
+        <Kpi Icon={AlertOctagon}    label={t('cycKpiCritical')}       value={String(stats.vulnsCritical)} tone={stats.vulnsCritical > 0 ? 'danger' : 'success'} to="/cyber/vuln-sla/dashboard" />
+        <Kpi Icon={Clock}            label={t('cycKpiOverdue')}        value={String(stats.vulnsOverdue)} tone={stats.vulnsOverdue > 0 ? 'danger' : 'success'} to="/cyber/vuln-sla/dashboard" />
+        <Kpi Icon={CheckCircle2}     label={t('cycKpiClosedMonth')}    value={String(stats.vulnsClosedThisMonth)} tone="success" to="/cyber/vuln-sla/dashboard" />
+        <Kpi Icon={Radio}            label={t('cycKpiThreats')}        value={`${stats.threatsAcknowledged} / ${stats.threatsTotal}`} tone={stats.threatsAcknowledged === stats.threatsTotal ? 'success' : 'warning'} to="/cyber/threat-intel" />
+        <Kpi Icon={AlertTriangle}    label={t('cycKpiSocP1')}          value={String(stats.socOpenP1)} tone={stats.socOpenP1 > 0 ? 'danger' : 'success'} to="/socops/events" />
+        <Kpi Icon={Clock}             label={t('cycKpiMttr')}            value={`${stats.socAvgMttrHours}h`} tone="info" to="/socops/dashboard" />
+        <Kpi Icon={Server}            label={t('cycKpiAssetsTier1')}    value={String(stats.assetsTier1)} tone="primary" to="/assets" />
       </div>
 
       {/* Tabs */}

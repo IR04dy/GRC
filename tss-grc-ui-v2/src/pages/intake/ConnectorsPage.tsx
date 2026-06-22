@@ -84,7 +84,7 @@ export function ConnectorsPage() {
         <Kpi Icon={Activity} label={t('connectorsKpiActive')}     value={active.length}     tone="success" />
         <Kpi Icon={Plug}     label={t('connectorsKpiConfigured')} value={configured.length} tone="info" />
         <Kpi Icon={Database} label={t('connectorsKpiTotal')}      value={connectors.length} tone="primary" />
-        <Kpi Icon={Zap}      label={t('connectorsKpiIntake30d')}  value={intake30d}         tone="accent" />
+        <Kpi Icon={Zap}      label={t('connectorsKpiIntake30d')}  value={intake30d}         tone="accent" to="/intake-inbox" />
       </div>
 
       {/* L3 — Live integration: the real CCM engine (/api/v1/ccm). Lists the
@@ -406,10 +406,10 @@ function LiveControlTests() {
 
       {dash && (
         <div className="kpi-grid" style={{ marginBottom: 14 }}>
-          <Kpi Icon={Database}   label={isAr ? 'إجمالي الفحوصات' : 'Total tests'}   value={dash.totalTests}   tone="primary" />
-          <Kpi Icon={Activity}   label={isAr ? 'المُفعَّلة' : 'Enabled'}            value={dash.enabledTests} tone="success" />
-          <Kpi Icon={PlayCircle} label={isAr ? 'ناجحة (24س)' : 'Passing (24h)'}     value={dash.passingLast24h} tone="info" />
-          <Kpi Icon={Zap}        label={isAr ? 'نسبة النجاح (24س)' : 'Pass rate (24h)'} value={`${passRate}%`} tone="accent" />
+          <Kpi Icon={Database}   label={isAr ? 'إجمالي الفحوصات' : 'Total tests'}   value={dash.totalTests}   tone="primary" to="/ccm/tests" />
+          <Kpi Icon={Activity}   label={isAr ? 'المُفعَّلة' : 'Enabled'}            value={dash.enabledTests} tone="success" to="/ccm/tests" />
+          <Kpi Icon={PlayCircle} label={isAr ? 'ناجحة (24س)' : 'Passing (24h)'}     value={dash.passingLast24h} tone="info" to="/ccm/dashboard" />
+          <Kpi Icon={Zap}        label={isAr ? 'نسبة النجاح (24س)' : 'Pass rate (24h)'} value={`${passRate}%`} tone="accent" to="/ccm/dashboard" />
         </div>
       )}
 

@@ -118,7 +118,7 @@ export function BcmSiemEventsPage() {
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={Radio}       label={isAr ? 'إجمالي الأحداث' : 'Total events'} value={counts.total} tone="primary" />
-        <Kpi Icon={Siren}       label={isAr ? 'مُصعَّدة لأزمة' : 'Escalated to crisis'} value={counts.escalated} tone={counts.escalated > 0 ? 'danger' : 'neutral'} />
+        <Kpi Icon={Siren}       label={isAr ? 'مُصعَّدة لأزمة' : 'Escalated to crisis'} value={counts.escalated} tone={counts.escalated > 0 ? 'danger' : 'neutral'} to="/bcm/crisis-room" />
         <Kpi Icon={ShieldAlert} label={isAr ? 'خطورة ≥٣' : 'High severity (≥3)'} value={counts.highSev} tone={counts.highSev > 0 ? 'warning' : 'success'} />
         <Kpi Icon={Activity}    label={isAr ? 'مُتجاهَلة' : 'Ignored'} value={counts.ignored} tone="info" />
       </div>

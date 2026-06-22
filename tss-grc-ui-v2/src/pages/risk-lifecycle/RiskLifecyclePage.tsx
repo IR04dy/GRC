@@ -82,11 +82,11 @@ export function RiskLifecyclePage() {
       />
 
       <div className="kpi-grid rlc-kpi-strip">
-        <Kpi Icon={AlertTriangle}    label={t('rlcKpiTotal')}        value={String(stats.risksTotal)}                tone="primary" />
-        <Kpi Icon={AlertOctagon}     label={t('rlcKpiOpenBreach')}   value={String(stats.risksWithOpenBreach)}      tone={stats.risksWithOpenBreach > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={ShieldCheck}      label={t('rlcKpiTreated')}      value={String(stats.risksWithApprovedTreatment)} tone="success" />
-        <Kpi Icon={ThumbsUp}         label={t('rlcKpiAwaitAccept')}  value={String(stats.risksAwaitingAcceptance)}  tone="warning" />
-        <Kpi Icon={RefreshCw}        label={t('rlcKpiExpiring')}     value={String(stats.acceptedExpiringSoon)}     tone={stats.acceptedExpiringSoon > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={AlertTriangle}    label={t('rlcKpiTotal')}        value={String(stats.risksTotal)}                tone="primary" to="/risk" />
+        <Kpi Icon={AlertOctagon}     label={t('rlcKpiOpenBreach')}   value={String(stats.risksWithOpenBreach)}      tone={stats.risksWithOpenBreach > 0 ? 'danger' : 'success'} to="/risk/kri/dashboard" />
+        <Kpi Icon={ShieldCheck}      label={t('rlcKpiTreated')}      value={String(stats.risksWithApprovedTreatment)} tone="success" to="/risk" />
+        <Kpi Icon={ThumbsUp}         label={t('rlcKpiAwaitAccept')}  value={String(stats.risksAwaitingAcceptance)}  tone="warning" to="/approvals" />
+        <Kpi Icon={RefreshCw}        label={t('rlcKpiExpiring')}     value={String(stats.acceptedExpiringSoon)}     tone={stats.acceptedExpiringSoon > 0 ? 'warning' : 'success'} to="/attestations" />
         <Kpi Icon={TrendingUp}       label={t('rlcKpiSpend')}        value={`${(stats.totalTreatmentSpendK / 1000).toFixed(1)}M SAR`} tone="info" />
       </div>
 

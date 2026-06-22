@@ -502,10 +502,10 @@ export function BcmPage() {
         }
       />
       <div className="kpi-grid">
-        <Kpi Icon={RefreshCw}  label={t('bcmKpiPlans')}     value={plans.data.length} tone="primary" />
+        <Kpi Icon={RefreshCw}  label={t('bcmKpiPlans')}     value={plans.data.length} tone="primary" to="/bcm/plans" />
         <Kpi Icon={Activity}   label={t('bcmKpiProcesses')} value={procs.data.length || 38} tone="info" />
         <Kpi Icon={Gauge}      label={t('bcmKpiExercises')} value="92%" trend={{ dir: 'up', value: '+5%' }} tone="success" />
-        <Kpi Icon={TimerReset} label={t('bcmKpiRto')}       value="76%" trend={{ dir: 'down', value: '−2%' }} tone="warning" />
+        <Kpi Icon={TimerReset} label={t('bcmKpiRto')}       value="76%" trend={{ dir: 'down', value: '−2%' }} tone="warning" to="/bcm/bia" />
       </div>
 
       <OverviewStrip

@@ -62,8 +62,8 @@ export function SbomPage() {
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={Package}      label={isAr ? 'الإجمالي' : 'Total components'} value={String(counts.total)}    tone="info" />
-        <Kpi Icon={AlertOctagon} label={isAr ? 'بثغرات معروفة' : 'With known CVEs'} value={String(counts.withCves)} tone={counts.withCves > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={AlertOctagon} label={isAr ? 'بحرج' : 'CRITICAL CVE'}          value={String(counts.criticalCve)} tone={counts.criticalCve > 0 ? 'danger' : 'success'} />
+        <Kpi Icon={AlertOctagon} label={isAr ? 'بثغرات معروفة' : 'With known CVEs'} value={String(counts.withCves)} tone={counts.withCves > 0 ? 'danger' : 'success'} to="/cyber/vuln-sla/dashboard" />
+        <Kpi Icon={AlertOctagon} label={isAr ? 'بحرج' : 'CRITICAL CVE'}          value={String(counts.criticalCve)} tone={counts.criticalCve > 0 ? 'danger' : 'success'} to="/cyber/vuln-sla/dashboard" />
         <Kpi Icon={ArrowUpCircle} label={isAr ? 'ترقية متاحة' : 'Upgrade available'} value={String(counts.upgrade)} tone={counts.upgrade > 0 ? 'warning' : 'success'} />
       </div>
 

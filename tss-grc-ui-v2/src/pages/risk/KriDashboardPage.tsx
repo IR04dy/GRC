@@ -96,21 +96,21 @@ export function KriDashboardPage() {
       <div className="kpi-grid-sm">
         <Kpi Icon={ClipboardList}
              label={lang === 'ar' ? 'إجمالي المؤشّرات' : 'Total KRIs'}
-             value={snap?.totalKris ?? 0} tone="primary" />
+             value={snap?.totalKris ?? 0} tone="primary" to="/risk/kri/admin" />
         <Kpi Icon={ShieldCheck}
              label={lang === 'ar' ? 'النشطة' : 'Active'}
-             value={snap?.activeKris ?? 0} tone="info" />
+             value={snap?.activeKris ?? 0} tone="info" to="/risk/kri/admin" />
         <Kpi Icon={Activity}
              label={lang === 'ar' ? 'ضمن الهدف' : 'Within target'}
-             value={snap?.greenCount ?? 0} tone="success" />
+             value={snap?.greenCount ?? 0} tone="success" to="/risk/kri/admin" />
         <Kpi Icon={AlertTriangle}
              label={lang === 'ar' ? 'تحت المراقبة' : 'Watch'}
              value={snap?.amberCount ?? 0}
-             tone={(snap?.amberCount ?? 0) > 0 ? 'warning' : 'success'} />
+             tone={(snap?.amberCount ?? 0) > 0 ? 'warning' : 'success'} to="/risk/kri/admin" />
         <Kpi Icon={AlertOctagon}
              label={lang === 'ar' ? 'خرق المؤشر' : 'Breach'}
              value={snap?.redCount ?? 0}
-             tone={(snap?.redCount ?? 0) > 0 ? 'danger' : 'success'} />
+             tone={(snap?.redCount ?? 0) > 0 ? 'danger' : 'success'} to="/risk/kri/admin" />
         <Kpi Icon={BarChart3}
              label={lang === 'ar' ? 'خروقات مفتوحة' : 'Open breaches'}
              value={(snap?.openBreachAmber ?? 0) + (snap?.openBreachRed ?? 0)}

@@ -108,10 +108,10 @@ export function AuditLifecyclePage() {
         <Kpi Icon={ClipboardCheck}     label={t('alcKpiInFlight')}        value={String(stats.engagementsInFlight)}  tone="info" />
         <Kpi Icon={FileText}           label={t('alcKpiWps')}             value={String(stats.workingPapersTotal)}   tone="info" />
         <Kpi Icon={Eye}                 label={t('alcKpiWpsReview')}        value={String(stats.workingPapersInReview)} tone="warning" />
-        <Kpi Icon={AlertTriangle}      label={t('alcKpiFindings')}        value={String(stats.findingsOpen)}          tone={stats.findingsOpen > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={AlertTriangle}      label={t('alcKpiCritical')}        value={String(stats.findingsCritical)}      tone={stats.findingsCritical > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Wrench}              label={t('alcKpiCapaClosed')}      value={`${stats.capaClosed} / ${stats.capaTotal}`} tone="info" />
-        <Kpi Icon={CheckCircle2}        label={t('alcKpiClosure')}         value={`${stats.closureRate}%`}              tone={stats.closureRate >= 80 ? 'success' : 'warning'} />
+        <Kpi Icon={AlertTriangle}      label={t('alcKpiFindings')}        value={String(stats.findingsOpen)}          tone={stats.findingsOpen > 0 ? 'warning' : 'success'} to="/issues" />
+        <Kpi Icon={AlertTriangle}      label={t('alcKpiCritical')}        value={String(stats.findingsCritical)}      tone={stats.findingsCritical > 0 ? 'danger' : 'success'} to="/issues" />
+        <Kpi Icon={Wrench}              label={t('alcKpiCapaClosed')}      value={`${stats.capaClosed} / ${stats.capaTotal}`} tone="info" to="/capa" />
+        <Kpi Icon={CheckCircle2}        label={t('alcKpiClosure')}         value={`${stats.closureRate}%`}              tone={stats.closureRate >= 80 ? 'success' : 'warning'} to="/capa" />
       </div>
 
       {/* Tabs */}

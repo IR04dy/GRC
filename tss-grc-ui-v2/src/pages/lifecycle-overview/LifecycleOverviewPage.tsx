@@ -64,13 +64,13 @@ export function LifecycleOverviewPage() {
       {/* Top-level KPIs */}
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={AlertOctagon}     label={t('loKpiAtRisk')}        value={String(totalAtRisk)}                tone={totalAtRisk > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={TrendingUp}        label={t('loKpiRiskBreach')}    value={String(riskStats.risksWithOpenBreach)} tone={riskStats.risksWithOpenBreach > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Stamp}              label={t('loKpiAuditCritical')} value={String(auditStats.findingsCritical)} tone={auditStats.findingsCritical > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Fingerprint}        label={t('loKpiDsrOverdue')}    value={String(privacyStats.dsrOverdue)}     tone={privacyStats.dsrOverdue > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Activity}            label={t('loKpiBcmActive')}     value={String(bcmStats.invocationsThisYear)} tone={bcmStats.activeInvocation ? 'danger' : 'success'} />
-        <Kpi Icon={AlertTriangle}      label={t('loKpiCyberCritical')} value={String(cyberStats.vulnsCritical)}    tone={cyberStats.vulnsCritical > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Clock}               label={t('loKpiBiaExpiring')}   value={String(bcmStats.biaExpiringSoon)}    tone={bcmStats.biaExpiringSoon > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Wrench}              label={t('loKpiCapaClosure')}   value={`${auditStats.closureRate}%`}        tone={auditStats.closureRate >= 80 ? 'success' : 'warning'} />
+        <Kpi Icon={TrendingUp}        label={t('loKpiRiskBreach')}    value={String(riskStats.risksWithOpenBreach)} tone={riskStats.risksWithOpenBreach > 0 ? 'danger' : 'success'} to="/risk-lifecycle" />
+        <Kpi Icon={Stamp}              label={t('loKpiAuditCritical')} value={String(auditStats.findingsCritical)} tone={auditStats.findingsCritical > 0 ? 'danger' : 'success'} to="/audit-lifecycle" />
+        <Kpi Icon={Fingerprint}        label={t('loKpiDsrOverdue')}    value={String(privacyStats.dsrOverdue)}     tone={privacyStats.dsrOverdue > 0 ? 'danger' : 'success'} to="/privacy-lifecycle" />
+        <Kpi Icon={Activity}            label={t('loKpiBcmActive')}     value={String(bcmStats.invocationsThisYear)} tone={bcmStats.activeInvocation ? 'danger' : 'success'} to="/bcm-lifecycle" />
+        <Kpi Icon={AlertTriangle}      label={t('loKpiCyberCritical')} value={String(cyberStats.vulnsCritical)}    tone={cyberStats.vulnsCritical > 0 ? 'danger' : 'success'} to="/cyber-lifecycle" />
+        <Kpi Icon={Clock}               label={t('loKpiBiaExpiring')}   value={String(bcmStats.biaExpiringSoon)}    tone={bcmStats.biaExpiringSoon > 0 ? 'warning' : 'success'} to="/bcm-lifecycle" />
+        <Kpi Icon={Wrench}              label={t('loKpiCapaClosure')}   value={`${auditStats.closureRate}%`}        tone={auditStats.closureRate >= 80 ? 'success' : 'warning'} to="/audit-lifecycle" />
       </div>
 
       {/* Risk pipeline */}

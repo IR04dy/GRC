@@ -150,12 +150,14 @@ export function OpResDashboardPage() {
           label={lang === 'ar' ? 'متوسّط النضج الحالي' : 'Avg Current Maturity'}
           value={latest?.avgCurrentScore != null
             ? Number(latest.avgCurrentScore).toFixed(1)
-            : '—'} />
+            : '—'}
+          to="/opres/assessments" />
         <Kpi Icon={BookText} tone="info"
           label={lang === 'ar' ? 'متوسّط النضج المستهدف' : 'Avg Target Maturity'}
           value={latest?.avgTargetScore != null
             ? Number(latest.avgTargetScore).toFixed(1)
-            : '—'} />
+            : '—'}
+          to="/opres/assessments" />
       </div>
 
       {/* Latest assessment heatmap */}

@@ -64,8 +64,8 @@ export function ScannerRunsPage() {
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={Scan}         label={isAr ? 'قيد التشغيل' : 'Running / queued'} value={String(counts.running)}      tone={counts.running > 0 ? 'info' : 'neutral'} />
-        <Kpi Icon={AlertOctagon} label={isAr ? 'بثغرات حرجة' : 'With CRITICAL'}    value={String(counts.withCritical)} tone={counts.withCritical > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Activity}     label={isAr ? 'إجمالي الحرج' : 'Total CRITICAL'}  value={String(counts.totalCritical)} tone={counts.totalCritical > 0 ? 'danger' : 'success'} />
+        <Kpi Icon={AlertOctagon} label={isAr ? 'بثغرات حرجة' : 'With CRITICAL'}    value={String(counts.withCritical)} tone={counts.withCritical > 0 ? 'danger' : 'success'} to="/cyber/vuln-sla/dashboard" />
+        <Kpi Icon={Activity}     label={isAr ? 'إجمالي الحرج' : 'Total CRITICAL'}  value={String(counts.totalCritical)} tone={counts.totalCritical > 0 ? 'danger' : 'success'} to="/cyber/vuln-sla/dashboard" />
         <Kpi Icon={Scan}         label={isAr ? 'مكتملة' : 'Completed'}             value={String(counts.completed)}     tone="info" />
       </div>
 

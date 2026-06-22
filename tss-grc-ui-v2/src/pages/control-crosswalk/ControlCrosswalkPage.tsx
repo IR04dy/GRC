@@ -52,11 +52,11 @@ export function ControlCrosswalkPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Layers}   label={t('cwKpiMasters')}      value={String(stats.totalMasters)}      tone="primary" />
-        <Kpi Icon={Link2}     label={t('cwKpiRefs')}         value={String(stats.totalRefs)}         tone="info" />
-        <Kpi Icon={Globe}     label={t('cwKpiFrameworks')}   value={String(stats.uniqueFrameworks)}  tone="accent" />
+        <Kpi Icon={Layers}   label={t('cwKpiMasters')}      value={String(stats.totalMasters)}      tone="primary" to="/controls/library" />
+        <Kpi Icon={Link2}     label={t('cwKpiRefs')}         value={String(stats.totalRefs)}         tone="info" to="/regulatory/library" />
+        <Kpi Icon={Globe}     label={t('cwKpiFrameworks')}   value={String(stats.uniqueFrameworks)}  tone="accent" to="/regulatory/library" />
         <Kpi Icon={Link2}     label={t('cwKpiAvgRefs')}      value={String(stats.avgRefsPerMaster)}  tone="primary" />
-        <Kpi Icon={Landmark}  label={t('cwKpiImplemented')}  value={`${stats.implementedPct}%`}      tone={stats.implementedPct >= 80 ? 'success' : 'warning'} />
+        <Kpi Icon={Landmark}  label={t('cwKpiImplemented')}  value={`${stats.implementedPct}%`}      tone={stats.implementedPct >= 80 ? 'success' : 'warning'} to="/controls/library" />
       </div>
 
       {/* ── Framework reach summary ───────────────────────── */}

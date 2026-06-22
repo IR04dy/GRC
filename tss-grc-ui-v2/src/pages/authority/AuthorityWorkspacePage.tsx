@@ -155,11 +155,11 @@ export function AuthorityWorkspacePage() {
 
       {/* KPI strip */}
       <div className="kpi-grid">
-        <Kpi Icon={BookCopy}        label={t('authKpiFrameworks')}  value={authority.frameworkCodes.length}                          tone="primary" />
-        <Kpi Icon={ClipboardCheck}  label={t('authKpiCited')}       value={myAnchors.length}                                         tone="info" />
-        <Kpi Icon={FileText}        label={t('authKpiEvidence')}    value={evidenceForMe.length}                                     tone="success" />
+        <Kpi Icon={BookCopy}        label={t('authKpiFrameworks')}  value={authority.frameworkCodes.length}                          tone="primary" to="/regulatory/library" />
+        <Kpi Icon={ClipboardCheck}  label={t('authKpiCited')}       value={myAnchors.length}                                         tone="info" to="/controls/library" />
+        <Kpi Icon={FileText}        label={t('authKpiEvidence')}    value={evidenceForMe.length}                                     tone="success" to="/evidence" />
         <Kpi Icon={AlertTriangle}   label={t('authKpiFindings')}    value={findingsForMe.filter(f => f.status !== 'CLOSED').length}  tone="danger" />
-        <Kpi Icon={Briefcase}       label={t('authKpiEngagements')} value={engagementsForMe.length}                                  tone="accent" />
+        <Kpi Icon={Briefcase}       label={t('authKpiEngagements')} value={engagementsForMe.length}                                  tone="accent" to="/audit-workspace" />
       </div>
 
       {/* DD-83 + DD-88: HRSD-specific surface — process-initiation tiles

@@ -185,14 +185,17 @@ export function AuditCommitteeDashboardPage() {
               <Kpi Icon={AlertTriangle}
                    label={t('Open risks', 'المخاطر المفتوحة')}
                    value={fmtNumber(live.risk.totalRisks, lang)}
+                   to="/risk"
                    tone="primary" />
               <Kpi Icon={AlertOctagon}
                    label={t('Above appetite', 'تتجاوز الشهية')}
                    value={fmtNumber(live.risk.aboveAppetiteCount, lang)}
+                   to="/risk"
                    tone={live.risk.aboveAppetiteCount > 0 ? 'danger' : 'success'} />
               <Kpi Icon={ShieldCheck}
                    label={t('Critical', 'حرجة')}
                    value={fmtNumber(live.risk.criticalCount, lang)}
+                   to="/risk"
                    tone={live.risk.criticalCount > 0 ? 'danger' : 'success'} />
             </div>
             {live.risk.topAboveAppetite.length > 0 && (
@@ -222,15 +225,18 @@ export function AuditCommitteeDashboardPage() {
               <Kpi Icon={ShieldCheck}
                    label={t('Total controls', 'إجمالي الضوابط')}
                    value={fmtNumber(live.controls.totalControls, lang)}
+                   to="/controls/library"
                    tone="primary" />
               <Kpi Icon={BarChart3}
                    label={t('Effectiveness', 'الفعالية')}
                    value={`${Math.round(live.controls.effectivenessPct)}%`}
+                   to="/controls/library"
                    tone={live.controls.effectivenessPct >= 80 ? 'success' :
                          live.controls.effectivenessPct >= 50 ? 'warning' : 'danger'} />
               <Kpi Icon={ClipboardCheck}
                    label={t('CCM pass rate (24h)', 'نسبة نجاح المراقبة (24س)')}
                    value={`${ccmPassPct}%`}
+                   to="/ccm/tests"
                    tone={ccmPassPct >= 95 ? 'success' : ccmPassPct >= 80 ? 'warning' : 'danger'} />
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
@@ -247,14 +253,16 @@ export function AuditCommitteeDashboardPage() {
             <div className="kpi-grid-sm">
               <Kpi Icon={Microscope}
                    label={t('Open findings', 'الملاحظات المفتوحة')}
-                   value={fmtNumber(live.findings.totalOpen, lang)} tone="primary" />
+                   value={fmtNumber(live.findings.totalOpen, lang)} to="/audit-workspace" tone="primary" />
               <Kpi Icon={AlertOctagon}
                    label={t('Critical', 'حرجة')}
                    value={fmtNumber(live.findings.criticalOpen, lang)}
+                   to="/audit-workspace"
                    tone={live.findings.criticalOpen > 0 ? 'danger' : 'success'} />
               <Kpi Icon={BarChart3}
                    label={t('Closure rate (Q)', 'نسبة الإغلاق (الربع)')}
                    value={`${Math.round(live.findings.closureRateLastQuarterPct)}%`}
+                   to="/audit-workspace"
                    tone={live.findings.closureRateLastQuarterPct >= 70 ? 'success' : 'warning'} />
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
@@ -275,14 +283,16 @@ export function AuditCommitteeDashboardPage() {
             <div className="kpi-grid-sm">
               <Kpi Icon={ClipboardCheck}
                    label={t('Open CAPA', 'الإجراءات المفتوحة')}
-                   value={fmtNumber(live.capa.totalOpen, lang)} tone="primary" />
+                   value={fmtNumber(live.capa.totalOpen, lang)} to="/capa" tone="primary" />
               <Kpi Icon={AlertOctagon}
                    label={t('Overdue', 'متأخّرة')}
                    value={fmtNumber(live.capa.overdueCount, lang)}
+                   to="/capa"
                    tone={live.capa.overdueCount > 0 ? 'danger' : 'success'} />
               <Kpi Icon={BarChart3}
                    label={t('On-track ratio', 'النسبة على المسار')}
                    value={`${Math.round(live.capa.onTrackRatioPct)}%`}
+                   to="/capa"
                    tone={live.capa.onTrackRatioPct >= 80 ? 'success' : 'warning'} />
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
@@ -298,14 +308,16 @@ export function AuditCommitteeDashboardPage() {
             <div className="kpi-grid-sm">
               <Kpi Icon={Layers}
                    label={t('Total models', 'إجمالي النماذج')}
-                   value={fmtNumber(live.ai.totalModels, lang)} tone="primary" />
+                   value={fmtNumber(live.ai.totalModels, lang)} to="/ai/models" tone="primary" />
               <Kpi Icon={AlertTriangle}
                    label={t('Critical / High', 'حرجة / مرتفعة')}
                    value={fmtNumber(live.ai.criticalCount + live.ai.highCount, lang)}
+                   to="/ai/models"
                    tone="warning" />
               <Kpi Icon={AlertOctagon}
                    label={t('Missing fairness audit', 'بدون تدقيق إنصاف')}
                    value={fmtNumber(live.ai.missingFairnessAuditCount, lang)}
+                   to="/ai/models"
                    tone={live.ai.missingFairnessAuditCount > 0 ? 'danger' : 'success'} />
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
@@ -325,15 +337,17 @@ export function AuditCommitteeDashboardPage() {
             <div className="kpi-grid-sm">
               <Kpi Icon={Leaf}
                    label={t('Climate items', 'بنود المناخ')}
-                   value={fmtNumber(live.climate.totalScenarios, lang)} tone="primary" />
+                   value={fmtNumber(live.climate.totalScenarios, lang)} to="/esg/tcfd-scenarios" tone="primary" />
               <Kpi Icon={BarChart3}
                    label={t('Expected loss (PW)', 'الخسارة المتوقّعة (مرجَّحة)')}
                    value={fmtSar(live.climate.probabilityWeightedExpectedLossSar, lang)}
+                   to="/esg/tcfd-scenarios"
                    tone="info" />
               <Kpi Icon={AlertTriangle}
                    label={t('YoY emissions', 'الانبعاثات سنوياً')}
                    value={live.climate.financedEmissionsYoyChangePct == null ? '—'
                           : `${Math.round(live.climate.financedEmissionsYoyChangePct)}%`}
+                   to="/esg/financed-emissions"
                    tone={(live.climate.financedEmissionsYoyChangePct ?? 0) <= 0
                          ? 'success' : 'warning'} />
             </div>
@@ -352,14 +366,16 @@ export function AuditCommitteeDashboardPage() {
             <div className="kpi-grid-sm">
               <Kpi Icon={Newspaper}
                    label={t('Active obligations', 'الالتزامات النشطة')}
-                   value={fmtNumber(live.obligations.totalActive, lang)} tone="primary" />
+                   value={fmtNumber(live.obligations.totalActive, lang)} to="/compliance/obligations" tone="primary" />
               <Kpi Icon={AlertOctagon}
                    label={t('Overdue', 'متأخّرة')}
                    value={fmtNumber(live.obligations.overdueCount, lang)}
+                   to="/compliance/obligations"
                    tone={live.obligations.overdueCount > 0 ? 'danger' : 'success'} />
               <Kpi Icon={BarChart3}
                    label={t('Attested', 'مُقَرّ بها')}
                    value={`${Math.round(live.obligations.attestedThisCyclePct)}%`}
+                   to="/compliance/obligation-campaigns"
                    tone={live.obligations.attestedThisCyclePct >= 80 ? 'success' : 'warning'} />
             </div>
             {Object.keys(live.obligations.regulatorBreakdown).length > 0 && (
@@ -381,18 +397,20 @@ export function AuditCommitteeDashboardPage() {
             <div className="kpi-grid-sm">
               <Kpi Icon={AlertOctagon}
                    label={t('Last quarter', 'الربع الأخير')}
-                   value={fmtNumber(live.incidents.lastQuarterTotal, lang)} tone="primary" />
+                   value={fmtNumber(live.incidents.lastQuarterTotal, lang)} to="/incidents" tone="primary" />
               <Kpi Icon={AlertTriangle}
                    label={t('Critical / High', 'حرجة / مرتفعة')}
                    value={fmtNumber(
                        live.incidents.lastQuarterCritical + live.incidents.lastQuarterHigh,
                        lang)}
+                   to="/incidents"
                    tone={(live.incidents.lastQuarterCritical + live.incidents.lastQuarterHigh) > 0
                          ? 'danger' : 'success'} />
               <Kpi Icon={BarChart3}
                    label={t('Avg MTTR (h)', 'متوسط MTTR (س)')}
                    value={live.incidents.mttrAverageHours == null ? '—'
                           : `${Math.round(live.incidents.mttrAverageHours)}`}
+                   to="/incidents"
                    tone="info" />
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
@@ -411,14 +429,16 @@ export function AuditCommitteeDashboardPage() {
             <div className="kpi-grid-sm">
               <Kpi Icon={Truck}
                    label={t('Invited', 'المدعوون')}
-                   value={fmtNumber(live.vendorBcp.latestCampaignInvited, lang)} tone="primary" />
+                   value={fmtNumber(live.vendorBcp.latestCampaignInvited, lang)} to="/tprm/bcp-campaigns" tone="primary" />
               <Kpi Icon={BarChart3}
                    label={t('Response rate', 'نسبة الاستجابة')}
                    value={`${Math.round(live.vendorBcp.latestCampaignResponseRatePct)}%`}
+                   to="/tprm/bcp-campaigns"
                    tone={live.vendorBcp.latestCampaignResponseRatePct >= 80 ? 'success' : 'warning'} />
               <Kpi Icon={AlertOctagon}
                    label={t('Below RTO', 'تحت RTO')}
                    value={fmtNumber(live.vendorBcp.belowRtoThresholdCount, lang)}
+                   to="/supplier-resilience"
                    tone={live.vendorBcp.belowRtoThresholdCount > 0 ? 'danger' : 'success'} />
             </div>
             {live.vendorBcp.latestCampaignCode && (
@@ -436,13 +456,13 @@ export function AuditCommitteeDashboardPage() {
             <div className="kpi-grid-sm">
               <Kpi Icon={Users}
                    label={t('Line 1', 'الخط الأول')}
-                   value={fmtNumber(live.threeLines.line1Count, lang)} tone="primary" />
+                   value={fmtNumber(live.threeLines.line1Count, lang)} to="/governance/three-lines" tone="primary" />
               <Kpi Icon={Users}
                    label={t('Line 2', 'الخط الثاني')}
-                   value={fmtNumber(live.threeLines.line2Count, lang)} tone="info" />
+                   value={fmtNumber(live.threeLines.line2Count, lang)} to="/governance/three-lines" tone="info" />
               <Kpi Icon={Users}
                    label={t('Line 3', 'الخط الثالث')}
-                   value={fmtNumber(live.threeLines.line3Count, lang)} tone="accent" />
+                   value={fmtNumber(live.threeLines.line3Count, lang)} to="/governance/three-lines" tone="accent" />
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
               {t('Board escalations:', 'إحالات للمجلس:')}{' '}

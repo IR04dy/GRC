@@ -39,13 +39,13 @@ export function AiGovernancePage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Bot}            label={t('aiKpiTotal')}        value={String(stats.total)} tone="primary" />
-        <Kpi Icon={ShieldAlert}     label={t('aiKpiHigh')}          value={String(stats.byTier.HIGH)} tone="warning" />
-        <Kpi Icon={AlertOctagon}    label={t('aiKpiBlocked')}        value={String(stats.byTier.UNACCEPTABLE)} tone={stats.byTier.UNACCEPTABLE > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={Cpu}              label={t('aiKpiProduction')}    value={String(stats.inProduction)} tone="info" />
-        <Kpi Icon={CheckCheck}       label={t('aiKpiAia')}            value={String(stats.aiaSignedOff)} tone="success" />
-        <Kpi Icon={Shield}           label={t('aiKpiFairness')}        value={String(stats.avgFairness)} tone={stats.avgFairness >= 0.85 ? 'success' : 'warning'} />
-        <Kpi Icon={ShieldAlert}      label={t('aiKpiNeedsAudit')}     value={String(stats.needsAudit)} tone={stats.needsAudit > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={Bot}            label={t('aiKpiTotal')}        value={String(stats.total)} tone="primary" to="/ai/models" />
+        <Kpi Icon={ShieldAlert}     label={t('aiKpiHigh')}          value={String(stats.byTier.HIGH)} tone="warning" to="/ai/models" />
+        <Kpi Icon={AlertOctagon}    label={t('aiKpiBlocked')}        value={String(stats.byTier.UNACCEPTABLE)} tone={stats.byTier.UNACCEPTABLE > 0 ? 'danger' : 'success'} to="/ai/models" />
+        <Kpi Icon={Cpu}              label={t('aiKpiProduction')}    value={String(stats.inProduction)} tone="info" to="/ai/models" />
+        <Kpi Icon={CheckCheck}       label={t('aiKpiAia')}            value={String(stats.aiaSignedOff)} tone="success" to="/ai/models" />
+        <Kpi Icon={Shield}           label={t('aiKpiFairness')}        value={String(stats.avgFairness)} tone={stats.avgFairness >= 0.85 ? 'success' : 'warning'} to="/ai/models" />
+        <Kpi Icon={ShieldAlert}      label={t('aiKpiNeedsAudit')}     value={String(stats.needsAudit)} tone={stats.needsAudit > 0 ? 'warning' : 'success'} to="/ai/models" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 16 }}>

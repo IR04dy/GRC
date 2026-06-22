@@ -140,14 +140,14 @@ export function AiLifecycleDashboardPage() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
-        <Kpi label={lang === 'ar' ? 'تحقق مجدول' : 'Validations scheduled'} value={data?.validationsScheduled ?? 0} Icon={Clock} />
-        <Kpi label={lang === 'ar' ? 'تحقق قيد التنفيذ' : 'Validations in progress'} value={data?.validationsInProgress ?? 0} tone="info" Icon={Activity} />
-        <Kpi label={lang === 'ar' ? 'تحقق فاشل/مشروط' : 'Failed / conditional'} value={data?.validationsFailedOrConditions ?? 0} tone="warning" Icon={ShieldAlert} />
-        <Kpi label={lang === 'ar' ? 'إعادة تدريب قيد التنفيذ' : 'Retrainings in progress'} value={data?.retrainingsInProgress ?? 0} tone="info" Icon={RefreshCw} />
-        <Kpi label={lang === 'ar' ? 'منشورة هذا الربع' : 'Deployed this Q'} value={data?.retrainingsDeployedThisQuarter ?? 0} tone="success" Icon={ShieldCheck} />
-        <Kpi label={lang === 'ar' ? 'تراجعات' : 'Rollbacks'} value={data?.retrainingsRolledBack ?? 0} tone="danger" Icon={ShieldAlert} />
-        <Kpi label={lang === 'ar' ? 'إعادة اعتماد متأخرة' : 'Recerts overdue'} value={data?.recertificationsOverdue ?? 0} tone={data && data.recertificationsOverdue > 0 ? 'danger' : 'neutral'} Icon={ShieldAlert} />
-        <Kpi label={lang === 'ar' ? 'إعادة اعتماد ٩٠ يوماً' : 'Recerts due 90d'} value={data?.recertificationsDueNext90d ?? 0} tone="warning" Icon={Bot} />
+        <Kpi label={lang === 'ar' ? 'تحقق مجدول' : 'Validations scheduled'} value={data?.validationsScheduled ?? 0} Icon={Clock} to="/ai-lifecycle/validations" />
+        <Kpi label={lang === 'ar' ? 'تحقق قيد التنفيذ' : 'Validations in progress'} value={data?.validationsInProgress ?? 0} tone="info" Icon={Activity} to="/ai-lifecycle/validations" />
+        <Kpi label={lang === 'ar' ? 'تحقق فاشل/مشروط' : 'Failed / conditional'} value={data?.validationsFailedOrConditions ?? 0} tone="warning" Icon={ShieldAlert} to="/ai-lifecycle/validations" />
+        <Kpi label={lang === 'ar' ? 'إعادة تدريب قيد التنفيذ' : 'Retrainings in progress'} value={data?.retrainingsInProgress ?? 0} tone="info" Icon={RefreshCw} to="/ai-lifecycle/retrainings" />
+        <Kpi label={lang === 'ar' ? 'منشورة هذا الربع' : 'Deployed this Q'} value={data?.retrainingsDeployedThisQuarter ?? 0} tone="success" Icon={ShieldCheck} to="/ai-lifecycle/retrainings" />
+        <Kpi label={lang === 'ar' ? 'تراجعات' : 'Rollbacks'} value={data?.retrainingsRolledBack ?? 0} tone="danger" Icon={ShieldAlert} to="/ai-lifecycle/retrainings" />
+        <Kpi label={lang === 'ar' ? 'إعادة اعتماد متأخرة' : 'Recerts overdue'} value={data?.recertificationsOverdue ?? 0} tone={data && data.recertificationsOverdue > 0 ? 'danger' : 'neutral'} Icon={ShieldAlert} to="/ai-lifecycle/recertifications" />
+        <Kpi label={lang === 'ar' ? 'إعادة اعتماد ٩٠ يوماً' : 'Recerts due 90d'} value={data?.recertificationsDueNext90d ?? 0} tone="warning" Icon={Bot} to="/ai-lifecycle/recertifications" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, marginBottom: 16 }}>

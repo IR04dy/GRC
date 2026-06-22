@@ -778,11 +778,11 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
     <>
       {analytics && (
         <div className="ethics-kpi-5">
-          <Kpi Icon={Activity}    label={t('amlKpiTotal')}     value={analytics.total}      tone="primary" />
-          <Kpi Icon={AlertTriangle} label={t('amlKpiOpen')}    value={analytics.openAlerts} tone="warning" />
-          <Kpi Icon={Flame}       label={t('amlKpiCritical')}  value={analytics.bySeverity?.CRITICAL ?? 0} tone="danger" />
-          <Kpi Icon={Stamp}       label={t('amlKpiStrFiled')}  value={analytics.strFiled}   tone="danger" />
-          <Kpi Icon={CheckCheck}  label={t('amlKpiCleared')}   value={analytics.byStatus?.CLEARED ?? 0} tone="success" />
+          <Kpi Icon={Activity}    label={t('amlKpiTotal')}     value={analytics.total}      tone="primary" to="/aml/sanctions/dashboard" />
+          <Kpi Icon={AlertTriangle} label={t('amlKpiOpen')}    value={analytics.openAlerts} tone="warning" to="/aml/sanctions/checks" />
+          <Kpi Icon={Flame}       label={t('amlKpiCritical')}  value={analytics.bySeverity?.CRITICAL ?? 0} tone="danger" to="/aml/sanctions/dashboard" />
+          <Kpi Icon={Stamp}       label={t('amlKpiStrFiled')}  value={analytics.strFiled}   tone="danger" to="/aml/sanctions/dashboard" />
+          <Kpi Icon={CheckCheck}  label={t('amlKpiCleared')}   value={analytics.byStatus?.CLEARED ?? 0} tone="success" to="/aml/sanctions/dashboard" />
         </div>
       )}
       <div className="ethics-toolbar">
@@ -1045,11 +1045,11 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
     <>
       {analytics && (
         <div className="ethics-kpi-5">
-          <Kpi Icon={Activity}    label={t('kycKpiTotal')}      value={analytics.total}      tone="primary" />
-          <Kpi Icon={CheckCheck}  label={t('kycKpiApproved')}   value={analytics.approved}   tone="success" />
-          <Kpi Icon={Stamp}       label={t('kycKpiPep')}        value={analytics.peps}       tone="accent" />
-          <Kpi Icon={ShieldAlert} label={t('kycKpiSanctioned')} value={analytics.sanctioned} tone="danger" />
-          <Kpi Icon={Lock}        label={t('kycKpiProhibited')} value={analytics.prohibited} tone="danger" />
+          <Kpi Icon={Activity}    label={t('kycKpiTotal')}      value={analytics.total}      tone="primary" to="/aml/sanctions/dashboard" />
+          <Kpi Icon={CheckCheck}  label={t('kycKpiApproved')}   value={analytics.approved}   tone="success" to="/aml/sanctions/dashboard" />
+          <Kpi Icon={Stamp}       label={t('kycKpiPep')}        value={analytics.peps}       tone="accent" to="/aml/sanctions/screen" />
+          <Kpi Icon={ShieldAlert} label={t('kycKpiSanctioned')} value={analytics.sanctioned} tone="danger" to="/aml/sanctions/screen" />
+          <Kpi Icon={Lock}        label={t('kycKpiProhibited')} value={analytics.prohibited} tone="danger" to="/aml/sanctions/lists" />
         </div>
       )}
       <div className="ethics-toolbar">
