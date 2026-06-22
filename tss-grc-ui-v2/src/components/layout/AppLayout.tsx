@@ -59,7 +59,7 @@ function PageFallback() {
 
 export function AppLayout() {
   const { lang } = useI18n();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -84,8 +84,12 @@ export function AppLayout() {
     };
   }, [drawerOpen]);
 
-  // Close the mobile drawer on every navigation.
-  useEffect(() => { setDrawerOpen(false); }, [pathname]);
+  // Close the mobile drawer on every navigation. Keyed on the full location
+  // (path + query) — not just pathname — so query-only sub-links like the NDI
+  // tabs (/ndi?tab=…) also dismiss the overlay drawer on mobile. Otherwise the
+  // page changed underneath while the drawer stayed open covering it, which
+  // read as "I clicked the sub-link and nothing happened".
+  useEffect(() => { setDrawerOpen(false); }, [pathname, search]);
 
   const drawer = useMemo<SidebarDrawerCtx>(() => ({
     open: drawerOpen,
