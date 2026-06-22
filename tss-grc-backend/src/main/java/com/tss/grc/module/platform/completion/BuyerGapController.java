@@ -1,15 +1,14 @@
 package com.tss.grc.module.platform.completion;
 
 import com.tss.grc.module.evidence.entity.EvidenceConnector;
-import com.tss.grc.module.evidence.entity.EvidenceItem;
-import com.tss.grc.module.platform.completion.BuyerGapService.AppetiteVariance;
-import com.tss.grc.module.platform.completion.BuyerGapService.AtRiskTransfer;
-import com.tss.grc.module.platform.completion.BuyerGapService.AttestBody;
-import com.tss.grc.module.platform.completion.BuyerGapService.AttestationSweepResult;
-import com.tss.grc.module.platform.completion.BuyerGapService.ConnectorPatch;
-import com.tss.grc.module.platform.completion.BuyerGapService.DsrSlaSweepResult;
-import com.tss.grc.module.platform.completion.BuyerGapService.FreshnessSweepResult;
-import com.tss.grc.module.platform.completion.BuyerGapService.Pdpl72hSweepResult;
+import com.tss.grc.module.platform.completion.ErmGapService.AppetiteVariance;
+import com.tss.grc.module.platform.completion.ErmGapService.AttestBody;
+import com.tss.grc.module.platform.completion.ErmGapService.AttestationSweepResult;
+import com.tss.grc.module.platform.completion.EvidenceGapService.ConnectorPatch;
+import com.tss.grc.module.platform.completion.EvidenceGapService.FreshnessSweepResult;
+import com.tss.grc.module.platform.completion.PrivacyGapService.AtRiskTransfer;
+import com.tss.grc.module.platform.completion.PrivacyGapService.DsrSlaSweepResult;
+import com.tss.grc.module.platform.completion.PrivacyGapService.Pdpl72hSweepResult;
 import com.tss.grc.module.privacy.entity.ProcessingActivity;
 import com.tss.grc.module.risk.entity.RiskAttestation;
 import com.tss.grc.module.risk.entity.RiskControl;
@@ -44,7 +43,9 @@ import java.util.List;
 @Tag(name = "Buyer-assessment completion (§5.1 + §5.9 + §5.4)")
 public class BuyerGapController {
 
-    private final BuyerGapService service;
+    private final ErmGapService      ermService;
+    private final EvidenceGapService evidenceService;
+    private final PrivacyGapService  privacyService;
 
     // ── ERM record ─────────────────────────────────────────────
     //
@@ -61,54 +62,54 @@ public class BuyerGapController {
     @GetMapping("/api/v1/risk/risks/{id}/controls")
     @PreAuthorize("hasPermission('RISK','READ')")
     public List<RiskControl> listRiskControls(@PathVariable Long id) {
-        return service.listRiskControls(id);
+        return ermService.listRiskControls(id);
     }
 
     @PostMapping("/api/v1/risk/risks/{id}/controls")
     @PreAuthorize("hasPermission('RISK','WRITE')")
     public RiskControl linkRiskControl(@PathVariable Long id, @RequestBody LinkControlBody body) {
-        return service.linkRiskControl(id, body.controlId(), body.effectiveness(),
+        return ermService.linkRiskControl(id, body.controlId(), body.effectiveness(),
             body.contributionPct(), body.notes());
     }
 
     @GetMapping("/api/v1/risk/appetite/variance")
     @PreAuthorize("hasPermission('RISK','READ')")
-    public AppetiteVariance appetiteVariance() { return service.appetiteVariance(); }
+    public AppetiteVariance appetiteVariance() { return ermService.appetiteVariance(); }
 
     // ── Evidence freshness ─────────────────────────────────────
 
     @PostMapping("/api/v1/evidence/items/freshness/sweep")
     @PreAuthorize("hasPermission('EVIDENCE','WRITE')")
-    public FreshnessSweepResult freshnessSweep() { return service.evidenceFreshnessSweep(); }
+    public FreshnessSweepResult freshnessSweep() { return evidenceService.evidenceFreshnessSweep(); }
 
     // ── Privacy: at-risk transfers + special-category ──────────
 
     @GetMapping("/api/v1/privacy/processing-activities/at-risk-transfers")
     @PreAuthorize("hasPermission('PRIVACY','READ')")
-    public List<AtRiskTransfer> atRiskTransfers() { return service.atRiskTransfers(); }
+    public List<AtRiskTransfer> atRiskTransfers() { return privacyService.atRiskTransfers(); }
 
     @GetMapping("/api/v1/privacy/processing-activities/special-category")
     @PreAuthorize("hasPermission('PRIVACY','READ')")
-    public List<ProcessingActivity> specialCategory() { return service.specialCategoryActivities(); }
+    public List<ProcessingActivity> specialCategory() { return privacyService.specialCategoryActivities(); }
 
     // ── §5.1 #6 — Risk owner attestation cycle (V115) ─────────────────
 
     @PostMapping("/api/v1/risk/risks/{id}/attestations")
     @PreAuthorize("hasPermission('RISK','WRITE')")
     public RiskAttestation attestRisk(@PathVariable Long id, @RequestBody AttestBody body) {
-        return service.attestRisk(id, body);
+        return ermService.attestRisk(id, body);
     }
 
     @GetMapping("/api/v1/risk/risks/{id}/attestations")
     @PreAuthorize("hasPermission('RISK','READ')")
     public List<RiskAttestation> listRiskAttestations(@PathVariable Long id) {
-        return service.listRiskAttestations(id);
+        return ermService.listRiskAttestations(id);
     }
 
     @PostMapping("/api/v1/risk/attestations/sweep")
     @PreAuthorize("hasPermission('RISK','WRITE')")
     public AttestationSweepResult riskAttestationSweep() {
-        return service.riskAttestationSweep();
+        return ermService.riskAttestationSweep();
     }
 
     // ── §5.4 #1 — DSR 30-day SLA sweep (V115) ─────────────────────────
@@ -116,7 +117,7 @@ public class BuyerGapController {
     @PostMapping("/api/v1/privacy/dsr/sla/sweep")
     @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public DsrSlaSweepResult dsrSlaSweep() {
-        return service.dsrSlaSweep();
+        return privacyService.dsrSlaSweep();
     }
 
     // ── §5.4 #2 — PDPL 72-hour breach deadline sweep (V115) ───────────
@@ -124,7 +125,7 @@ public class BuyerGapController {
     @PostMapping("/api/v1/privacy/breach/pdpl-72h/sweep")
     @PreAuthorize("hasPermission('PRIVACY','WRITE')")
     public Pdpl72hSweepResult pdpl72hSweep() {
-        return service.pdpl72hSweep();
+        return privacyService.pdpl72hSweep();
     }
 
     // ── §5.9 #2 — Evidence connector registry (V115) ──────────────────
@@ -135,13 +136,13 @@ public class BuyerGapController {
     @GetMapping("/api/v1/evidence/connector-registry")
     @PreAuthorize("hasPermission('EVIDENCE','READ')")
     public List<EvidenceConnector> listConnectors() {
-        return service.listConnectors();
+        return evidenceService.listConnectors();
     }
 
     @PatchMapping("/api/v1/evidence/connector-registry/{code}")
     @PreAuthorize("hasPermission('EVIDENCE','WRITE')")
     public EvidenceConnector updateConnector(@PathVariable String code,
                                              @RequestBody ConnectorPatch body) {
-        return service.updateConnectorStatus(code, body);
+        return evidenceService.updateConnectorStatus(code, body);
     }
 }
