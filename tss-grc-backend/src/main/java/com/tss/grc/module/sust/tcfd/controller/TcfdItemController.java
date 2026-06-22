@@ -30,7 +30,7 @@ public class TcfdItemController {
             @RequestParam(required = false) String pillar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        var p = PageRequest.of(page, size);
+        var p = PageRequest.of(page, Math.min(size, 200));
         if (pillar != null) return service.listByYearAndPillar(year, pillar, p);
         return service.listByYear(year, p);
     }

@@ -22,7 +22,7 @@ public class CommitteeResolutionController {
     public Page<CommitteeResolution> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return service.list(PageRequest.of(page, size));
+        return service.list(PageRequest.of(page, Math.min(size, 200)));
     }
 
     @GetMapping("/{id}")

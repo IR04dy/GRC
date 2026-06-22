@@ -49,7 +49,7 @@ public class NdiFrameworkItemController {
             @RequestParam(required = false) String domain,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
-        var p = PageRequest.of(page, size);
+        var p = PageRequest.of(page, Math.min(size, 200));
         if (component != null) return service.listByComponent(component, p);
         if (domain != null)    return service.listByDomain(domain, p);
         return service.list(p);

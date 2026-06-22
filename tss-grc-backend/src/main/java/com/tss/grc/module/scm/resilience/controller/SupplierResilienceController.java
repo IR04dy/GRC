@@ -44,7 +44,7 @@ public class SupplierResilienceController {
     public Page<AltResponse> listAlts(@RequestParam(required = false) String status,
                                       @RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "100") int size) {
-        var pageable = PageRequest.of(page, size);
+        var pageable = PageRequest.of(page, Math.min(size, 200));
         return (status == null
                 ? altService.list(pageable)
                 : altService.listByStatus(status, pageable)).map(AltResponse::from);
@@ -92,7 +92,7 @@ public class SupplierResilienceController {
     public Page<PlanResponse> listPlans(@RequestParam(required = false) String status,
                                         @RequestParam(defaultValue = "0") int page,
                                         @RequestParam(defaultValue = "100") int size) {
-        var pageable = PageRequest.of(page, size);
+        var pageable = PageRequest.of(page, Math.min(size, 200));
         return (status == null
                 ? planService.list(pageable)
                 : planService.listByStatus(status, pageable)).map(PlanResponse::from);

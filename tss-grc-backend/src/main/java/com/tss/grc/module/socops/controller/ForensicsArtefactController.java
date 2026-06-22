@@ -26,7 +26,7 @@ public class ForensicsArtefactController {
     @PreAuthorize("hasAnyRole('CISO','FORENSICS_LEAD','IR_LEAD','PLATFORM_ADMIN','LEGAL_COUNSEL','AUDITOR')")
     public Page<ForensicsArtefact> list(@RequestParam(defaultValue = "0") int page,
                                         @RequestParam(defaultValue = "50") int size) {
-        return svc.list(PageRequest.of(page, size));
+        return svc.list(PageRequest.of(page, Math.min(size, 200)));
     }
 
     @GetMapping("/{id}")

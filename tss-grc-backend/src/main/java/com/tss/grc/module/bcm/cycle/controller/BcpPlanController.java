@@ -61,7 +61,7 @@ public class BcpPlanController {
     public Page<BcpPlan> list(@RequestParam(required = false) String planType,
                               @RequestParam(defaultValue = "0") int page,
                               @RequestParam(defaultValue = "50") int size) {
-        return service.list(planType, page, size);
+        return service.list(planType, page, Math.min(size, 200));
     }
 
     @GetMapping("/section-catalogue/{type}")

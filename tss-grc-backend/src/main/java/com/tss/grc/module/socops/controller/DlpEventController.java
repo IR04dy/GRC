@@ -25,7 +25,7 @@ public class DlpEventController {
     @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','DLP_REVIEWER','PLATFORM_ADMIN','AUDITOR')")
     public Page<DlpEvent> list(@RequestParam(defaultValue = "0") int page,
                                @RequestParam(defaultValue = "50") int size) {
-        return svc.list(PageRequest.of(page, size));
+        return svc.list(PageRequest.of(page, Math.min(size, 200)));
     }
 
     @GetMapping("/{id}")

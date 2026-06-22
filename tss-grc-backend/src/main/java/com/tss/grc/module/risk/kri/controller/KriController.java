@@ -128,7 +128,7 @@ public class KriController {
     @Operation(summary = "List recent measurements for a KRI (most-recent first).")
     public List<KriMeasurementResponse> listMeasurements(@PathVariable UUID externalId,
                                                         @RequestParam(defaultValue = "90") int limit) {
-        return measurementService.recent(externalId, limit);
+        return measurementService.recent(externalId, Math.min(limit, 200));
     }
 
     @GetMapping("/{externalId}/history")

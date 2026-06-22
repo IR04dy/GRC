@@ -26,7 +26,7 @@ public class MaDueDiligenceController {
     @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','MA_LEAD','PLATFORM_ADMIN','AUDITOR','LEGAL_COUNSEL','CFO')")
     public Page<MaDueDiligence> list(@RequestParam(defaultValue = "0") int page,
                                      @RequestParam(defaultValue = "50") int size) {
-        return svc.list(PageRequest.of(page, size));
+        return svc.list(PageRequest.of(page, Math.min(size, 200)));
     }
 
     @GetMapping("/{id}")

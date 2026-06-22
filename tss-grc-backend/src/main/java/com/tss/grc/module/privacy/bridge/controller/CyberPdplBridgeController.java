@@ -30,7 +30,7 @@ public class CyberPdplBridgeController {
     public Page<Response> list(@RequestParam(required = false) String outcome,
                                @RequestParam(defaultValue = "0") int page,
                                @RequestParam(defaultValue = "200") int size) {
-        return service.list(outcome, PageRequest.of(page, size)).map(Response::from);
+        return service.list(outcome, PageRequest.of(page, Math.min(size, 200))).map(Response::from);
     }
 
     @GetMapping("/log/by-incident/{cyberIncidentId}")

@@ -24,7 +24,7 @@ public class OtAssetController {
     @PreAuthorize("hasAnyRole('CISO','OT_LEAD','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
     public Page<OtAsset> list(@RequestParam(defaultValue = "0") int page,
                               @RequestParam(defaultValue = "50") int size) {
-        return svc.list(PageRequest.of(page, size));
+        return svc.list(PageRequest.of(page, Math.min(size, 200)));
     }
 
     @GetMapping("/{id}")

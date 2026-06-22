@@ -53,7 +53,7 @@ public class NdiGapController {
                                  @RequestParam(required = false) String severity,
                                  @RequestParam(defaultValue = "0")   int page,
                                  @RequestParam(defaultValue = "200") int size) {
-        return service.listGaps(cycleId, status, severity, PageRequest.of(page, size));
+        return service.listGaps(cycleId, status, severity, PageRequest.of(page, Math.min(size, 200)));
     }
 
     @GetMapping("/aggregate")

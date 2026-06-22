@@ -27,7 +27,7 @@ public class NdiAuditController {
                                       @RequestParam(required = false) String severity,
                                       @RequestParam(defaultValue = "0")   int page,
                                       @RequestParam(defaultValue = "200") int size) {
-        return service.search(cycleId, entityType, action, severity, PageRequest.of(page, size));
+        return service.search(cycleId, entityType, action, severity, PageRequest.of(page, Math.min(size, 200)));
     }
 
     @GetMapping("/aggregate")

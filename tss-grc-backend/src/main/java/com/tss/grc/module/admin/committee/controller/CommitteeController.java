@@ -32,7 +32,7 @@ public class CommitteeController {
     public Page<CommitteeResponse> listCommittees(@RequestParam(required = false) String status,
                                                   @RequestParam(defaultValue = "0") int page,
                                                   @RequestParam(defaultValue = "100") int size) {
-        return service.listCommittees(status, PageRequest.of(page, size)).map(CommitteeResponse::from);
+        return service.listCommittees(status, PageRequest.of(page, Math.min(size, 200))).map(CommitteeResponse::from);
     }
 
     @GetMapping("/{id}")
@@ -67,7 +67,7 @@ public class CommitteeController {
     public Page<MeetingResponse> listMeetings(@RequestParam(required = false) String status,
                                               @RequestParam(defaultValue = "0") int page,
                                               @RequestParam(defaultValue = "100") int size) {
-        return service.listMeetings(status, PageRequest.of(page, size)).map(MeetingResponse::from);
+        return service.listMeetings(status, PageRequest.of(page, Math.min(size, 200))).map(MeetingResponse::from);
     }
 
     @GetMapping("/{committeeId}/meetings")

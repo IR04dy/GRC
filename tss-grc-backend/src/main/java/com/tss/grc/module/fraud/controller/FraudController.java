@@ -81,7 +81,7 @@ public class FraudController {
     @Operation(summary = "Paginated list of fraud cases for the current tenant.")
     public Page<CaseResponse> listCases(@RequestParam(defaultValue = "0") int page,
                                          @RequestParam(defaultValue = "25") int size) {
-        return service.listCases(page, size);
+        return service.listCases(page, Math.min(size, 200));
     }
 
     @GetMapping("/cases/{id}")

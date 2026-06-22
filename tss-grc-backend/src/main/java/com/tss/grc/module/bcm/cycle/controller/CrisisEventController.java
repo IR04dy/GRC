@@ -58,7 +58,7 @@ public class CrisisEventController {
     @PreAuthorize("hasPermission('BCM', 'READ')")
     public Page<CrisisEvent> list(@RequestParam(defaultValue = "0") int page,
                                   @RequestParam(defaultValue = "50") int size) {
-        return service.list(page, size);
+        return service.list(page, Math.min(size, 200));
     }
 
     @GetMapping("/active")

@@ -103,14 +103,14 @@ public class CcmController {
     @Operation(summary = "Get the most-recent N runs for one CCM test.")
     public List<TestRunResponse> getRuns(@PathVariable UUID externalId,
                                          @RequestParam(defaultValue = "50") int limit) {
-        return service.getRunsForTest(externalId, limit);
+        return service.getRunsForTest(externalId, Math.min(limit, 200));
     }
 
     @GetMapping("/runs/recent")
     @PreAuthorize(READ_GUARD)
     @Operation(summary = "Get the most-recent runs across all CCM tests for the tenant.")
     public List<TestRunResponse> recent(@RequestParam(defaultValue = "50") int limit) {
-        return service.listLatestRuns(limit);
+        return service.listLatestRuns(Math.min(limit, 200));
     }
 
     // ─── Dashboard ────────────────────────────────────────────────

@@ -51,7 +51,7 @@ public class NdiMaturityAssessmentController {
             @RequestParam(required = false) String domain,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "200") int size) {
-        var p = PageRequest.of(page, size);
+        var p = PageRequest.of(page, Math.min(size, 200));
         if (status != null) return service.listByCycleAndStatus(cycleId, status, p);
         if (domain != null) return service.listByCycleAndDomain(cycleId, domain, p);
         return service.listByCycle(cycleId, p);

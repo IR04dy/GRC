@@ -29,7 +29,7 @@ public class ContractClauseController {
                                @RequestParam(required = false) String category,
                                @RequestParam(defaultValue = "0") int page,
                                @RequestParam(defaultValue = "200") int size) {
-        return service.list(status, category, PageRequest.of(page, size)).map(Response::from);
+        return service.list(status, category, PageRequest.of(page, Math.min(size, 200))).map(Response::from);
     }
 
     @GetMapping("/{id}")

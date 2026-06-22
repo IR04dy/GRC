@@ -34,7 +34,7 @@ public class SustainabilityEvidenceController {
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
-        var p = PageRequest.of(page, size);
+        var p = PageRequest.of(page, Math.min(size, 200));
         if (moduleArea != null) return service.listByModule(moduleArea, p);
         if (status != null)     return service.listByStatus(status, p);
         return service.list(p);

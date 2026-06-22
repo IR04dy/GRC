@@ -71,7 +71,7 @@ public class ObController {
     public Page<TppResponse> listTpps(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return service.listTpps(page, size);
+        return service.listTpps(page, Math.min(size, 200));
     }
 
     @GetMapping("/tpps/{id}")
@@ -119,7 +119,7 @@ public class ObController {
     public Page<ConsentResponse> listConsents(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return service.listConsents(page, size);
+        return service.listConsents(page, Math.min(size, 200));
     }
 
     @PostMapping("/consents/{id}/revoke")
@@ -144,7 +144,7 @@ public class ObController {
     public Page<ApiCallResponse> listApiCalls(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
-        return service.listApiCalls(page, size);
+        return service.listApiCalls(page, Math.min(size, 200));
     }
 
     // ─── Incidents ─────────────────────────────────────────────────
@@ -161,7 +161,7 @@ public class ObController {
     public Page<IncidentResponse> listIncidents(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return service.listIncidents(page, size);
+        return service.listIncidents(page, Math.min(size, 200));
     }
 
     @GetMapping("/incidents/{id}")

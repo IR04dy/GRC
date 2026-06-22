@@ -26,7 +26,7 @@ public class IamJmlEventController {
     @PreAuthorize("hasAnyRole('CISO','IAM_LEAD','PLATFORM_ADMIN','AUDITOR','HR_LEAD')")
     public Page<IamJmlEvent> list(@RequestParam(defaultValue = "0") int page,
                                   @RequestParam(defaultValue = "50") int size) {
-        return svc.list(PageRequest.of(page, size));
+        return svc.list(PageRequest.of(page, Math.min(size, 200)));
     }
 
     @GetMapping("/{id}")

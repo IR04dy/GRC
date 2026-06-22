@@ -29,7 +29,7 @@ public class DrPlanController {
     public Page<Response> list(@RequestParam(required = false) String status,
                                @RequestParam(defaultValue = "0") int page,
                                @RequestParam(defaultValue = "100") int size) {
-        return service.list(status, PageRequest.of(page, size)).map(Response::from);
+        return service.list(status, PageRequest.of(page, Math.min(size, 200))).map(Response::from);
     }
 
     @GetMapping("/{id}")

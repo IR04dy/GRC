@@ -72,7 +72,7 @@ public class OpResController {
     @Operation(summary = "Paginated list of assessments for the current tenant, newest first.")
     public Page<AssessmentResponse> listAssessments(@RequestParam(defaultValue = "0") int page,
                                                      @RequestParam(defaultValue = "25") int size) {
-        return service.listAssessments(page, size);
+        return service.listAssessments(page, Math.min(size, 200));
     }
 
     @GetMapping("/assessments/{id}")

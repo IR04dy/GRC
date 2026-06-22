@@ -49,7 +49,7 @@ public class NdiOperationalExcellenceKpiController {
             @RequestParam(required = false) String category,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "200") int size) {
-        var p = PageRequest.of(page, size);
+        var p = PageRequest.of(page, Math.min(size, 200));
         if (status != null)   return service.listByCycleAndStatus(cycleId, status, p);
         if (category != null) return service.listByCycleAndCategory(cycleId, category, p);
         return service.listByCycle(cycleId, p);

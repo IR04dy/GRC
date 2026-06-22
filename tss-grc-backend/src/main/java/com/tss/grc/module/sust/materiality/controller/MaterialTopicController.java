@@ -32,7 +32,7 @@ public class MaterialTopicController {
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        var p = PageRequest.of(page, size);
+        var p = PageRequest.of(page, Math.min(size, 200));
         if (category != null) return service.listByYearAndCategory(year, category, p);
         if (status   != null) return service.listByYearAndStatus(year, status, p);
         return service.listByYear(year, p);

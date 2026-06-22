@@ -68,7 +68,7 @@ public class RegInspectController {
     public Page<InspectionResponse> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size) {
-        return service.listInspections(page, size);
+        return service.listInspections(page, Math.min(size, 200));
     }
 
     @GetMapping("/inspections/{id}")

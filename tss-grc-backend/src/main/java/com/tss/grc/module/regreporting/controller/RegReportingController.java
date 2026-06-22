@@ -83,7 +83,7 @@ public class RegReportingController {
     public Page<ObligationResponse> listObligations(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return service.listObligations(page, size);
+        return service.listObligations(page, Math.min(size, 200));
     }
 
     @GetMapping("/obligations/{id}")
@@ -118,7 +118,7 @@ public class RegReportingController {
     public Page<FilingResponse> listFilings(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size) {
-        return service.listFilings(page, size);
+        return service.listFilings(page, Math.min(size, 200));
     }
 
     @GetMapping("/filings/{id}")

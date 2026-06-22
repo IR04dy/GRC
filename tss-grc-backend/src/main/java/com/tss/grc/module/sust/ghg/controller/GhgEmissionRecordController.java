@@ -44,7 +44,7 @@ public class GhgEmissionRecordController {
             @RequestParam(required = false) Short scope,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
-        var p = PageRequest.of(page, size);
+        var p = PageRequest.of(page, Math.min(size, 200));
         if (year  != null) return service.listByYear(year, p);
         if (scope != null) return service.listByScope(scope, p);
         return service.list(p);

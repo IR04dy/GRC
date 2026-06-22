@@ -70,7 +70,7 @@ public class CptyController {
     public Page<CounterpartyResponse> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return service.listCounterparties(page, size);
+        return service.listCounterparties(page, Math.min(size, 200));
     }
 
     @GetMapping("/counterparties/{id}")

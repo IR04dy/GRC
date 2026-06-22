@@ -66,7 +66,7 @@ public class ExerciseScenarioLibraryController {
             @RequestParam(value = "q", required = false) String query,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size) {
-        return service.search(scenarioType, complexity, framework, query, page, size);
+        return service.search(scenarioType, complexity, framework, query, page, Math.min(size, 200));
     }
 
     @GetMapping("/{id}")
@@ -88,7 +88,7 @@ public class ExerciseScenarioLibraryController {
     @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','RISK_MANAGER','AUDITOR','PLATFORM_ADMIN')")
     public List<ScenarioSummary> popular(
             @RequestParam(value = "limit", defaultValue = "5") int limit) {
-        return service.popular(limit);
+        return service.popular(Math.min(limit, 200));
     }
 
     @GetMapping("/recommended")

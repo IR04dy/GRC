@@ -61,7 +61,7 @@ public class SustainabilityAnnexController {
     public Page<SustainabilityReport> listReports(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return service.listReports(page, size);
+        return service.listReports(page, Math.min(size, 200));
     }
 
     @GetMapping("/api/sustainability/reporting-years/{ryId}/reports")

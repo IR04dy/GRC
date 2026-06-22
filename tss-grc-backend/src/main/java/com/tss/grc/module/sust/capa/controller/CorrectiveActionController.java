@@ -50,7 +50,7 @@ public class CorrectiveActionController {
             @RequestParam(required = false) String priority,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
-        var p = PageRequest.of(page, size);
+        var p = PageRequest.of(page, Math.min(size, 200));
         if (status     != null) return service.listByStatus(status, p);
         if (sourceType != null) return service.listBySource(sourceType, p);
         if (priority   != null) return service.listByPriority(priority, p);

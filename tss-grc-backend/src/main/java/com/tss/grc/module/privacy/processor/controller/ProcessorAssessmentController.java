@@ -25,7 +25,7 @@ public class ProcessorAssessmentController {
     public Page<ProcessorAssessment> list(@RequestParam(required = false) String status,
                                           @RequestParam(defaultValue = "0") int page,
                                           @RequestParam(defaultValue = "100") int size) {
-        var p = PageRequest.of(page, size);
+        var p = PageRequest.of(page, Math.min(size, 200));
         return status == null ? service.list(p) : service.listByStatus(status, p);
     }
     @GetMapping("/{id}")

@@ -23,7 +23,7 @@ public class SbomComponentController {
     @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','PLATFORM_ADMIN','AUDITOR')")
     public Page<SbomComponent> list(@RequestParam(defaultValue = "0") int page,
                                     @RequestParam(defaultValue = "100") int size) {
-        return svc.list(PageRequest.of(page, size));
+        return svc.list(PageRequest.of(page, Math.min(size, 200)));
     }
 
     @PostMapping

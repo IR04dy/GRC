@@ -38,7 +38,7 @@ public class FourthPartyExposureController {
     public Page<FourthPartyExposure> list(@RequestParam(required = false) String status,
                                           @RequestParam(defaultValue = "0") int page,
                                           @RequestParam(defaultValue = "100") int size) {
-        var pg = PageRequest.of(page, size);
+        var pg = PageRequest.of(page, Math.min(size, 200));
         return status == null ? service.list(pg) : service.listByStatus(status, pg);
     }
 

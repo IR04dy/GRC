@@ -28,7 +28,7 @@ public class ConsentRecordController {
     @PreAuthorize("hasPermission('PRIVACY','READ')")
     public Page<ConsentRecord> list(@RequestParam(defaultValue = "0") int page,
                                     @RequestParam(defaultValue = "50") int size) {
-        return service.list(page, size);
+        return service.list(page, Math.min(size, 200));
     }
 
     @GetMapping("/{id}")

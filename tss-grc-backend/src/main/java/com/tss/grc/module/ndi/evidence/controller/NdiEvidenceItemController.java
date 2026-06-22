@@ -34,7 +34,7 @@ public class NdiEvidenceItemController {
                                       @RequestParam(required = false) String status,
                                       @RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "100") int size) {
-        return service.list(cycleId, type, status, PageRequest.of(page, size));
+        return service.list(cycleId, type, status, PageRequest.of(page, Math.min(size, 200)));
     }
 
     @GetMapping("/aggregate")

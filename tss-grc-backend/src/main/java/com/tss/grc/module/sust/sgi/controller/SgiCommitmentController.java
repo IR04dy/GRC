@@ -44,7 +44,7 @@ public class SgiCommitmentController {
             @RequestParam(required = false) String sector,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
-        var p = PageRequest.of(page, size);
+        var p = PageRequest.of(page, Math.min(size, 200));
         if (status != null) return service.listByStatus(status, p);
         if (sector != null) return service.listBySector(sector, p);
         return service.list(p);

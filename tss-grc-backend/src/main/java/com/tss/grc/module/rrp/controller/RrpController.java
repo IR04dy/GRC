@@ -80,7 +80,7 @@ public class RrpController {
     public Page<CycleResponse> listCycles(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size) {
-        return service.listCycles(page, size);
+        return service.listCycles(page, Math.min(size, 200));
     }
 
     @GetMapping("/cycles/{id}")

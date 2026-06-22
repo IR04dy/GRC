@@ -62,7 +62,7 @@ public class CyberController {
     }
 
     private Pageable pageOf(int page, int size) {
-        return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return PageRequest.of(page, Math.min(size, 200), Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
     // =========================================================================

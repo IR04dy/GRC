@@ -77,7 +77,7 @@ public class ShariaController {
     public Page<ScholarResponse> listScholars(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return service.listScholars(page, size);
+        return service.listScholars(page, Math.min(size, 200));
     }
 
     @GetMapping("/scholars/{id}")
@@ -114,7 +114,7 @@ public class ShariaController {
     public Page<ResolutionResponse> listResolutions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return service.listResolutions(page, size);
+        return service.listResolutions(page, Math.min(size, 200));
     }
 
     @GetMapping("/resolutions/{id}")
@@ -151,7 +151,7 @@ public class ShariaController {
     public Page<AuditFindingResponse> listFindings(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return service.listFindings(page, size);
+        return service.listFindings(page, Math.min(size, 200));
     }
 
     @PostMapping("/audit-findings/{id}/transition")
@@ -175,7 +175,7 @@ public class ShariaController {
     public Page<NcEventResponse> listNcEvents(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return service.listNcEvents(page, size);
+        return service.listNcEvents(page, Math.min(size, 200));
     }
 
     @PostMapping("/nc-events/{id}/transition")
@@ -207,7 +207,7 @@ public class ShariaController {
     public Page<ProductResponse> listProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return service.listProducts(page, size);
+        return service.listProducts(page, Math.min(size, 200));
     }
 
     @PostMapping("/product-approvals/{id}/transition")

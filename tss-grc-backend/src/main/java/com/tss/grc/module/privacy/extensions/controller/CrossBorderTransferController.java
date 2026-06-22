@@ -30,7 +30,7 @@ public class CrossBorderTransferController {
     @PreAuthorize("hasPermission('PRIVACY','READ')")
     public Page<CrossBorderResponse> list(@RequestParam(defaultValue = "0") int page,
                                           @RequestParam(defaultValue = "50") int size) {
-        return service.list(PageRequest.of(page, size)).map(CrossBorderResponse::from);
+        return service.list(PageRequest.of(page, Math.min(size, 200))).map(CrossBorderResponse::from);
     }
 
     @GetMapping("/{id}")
