@@ -288,6 +288,12 @@ textarea.input { resize: vertical; min-height: 80px; line-height: var(--leading-
 .kpi-clickable:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 [dir="rtl"] .kpi-arrow { transform: scaleX(-1); }
 [dir="rtl"] .kpi-clickable:hover .kpi-arrow { transform: scaleX(-1) translateX(2px); }
+/* Selected/active KPI — when a clickable tile drives an in-page filter and that
+   filter is currently applied. A clear primary border + tinted ground so the
+   chosen facet stands out from its siblings. Token-based, RTL-safe. */
+.kpi-active { border-color: var(--primary); background: var(--primary-50); }
+.kpi-active:hover { border-color: var(--primary); }
+.kpi-active .kpi-arrow { color: var(--primary); }
 .kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 /* Icon chip — 36px (down from 40) so it feels like a marker, not a logo.
  * Border radius drops to r-sm for a tighter UI-system look. */

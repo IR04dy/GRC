@@ -46,6 +46,13 @@ interface KpiProps {
    * drill that opens a slide-out panel rather than a route).
    */
   onClick?: () => void;
+  /**
+   * Selected/active state. When a tile drives an in-page filter and that
+   * filter is currently applied, set true to render the standard "selected"
+   * ring (`.kpi-active`) so the active stat reads as the chosen facet —
+   * the market-leader pattern where the KPI strip doubles as the filter bar.
+   */
+  active?: boolean;
 }
 
 // Icon-chip palette. `bg` is the tinted square behind the icon glyph.
@@ -71,7 +78,7 @@ function autoTrend(spark?: number[]): { dir: 'up' | 'down'; value: string } | un
   return { dir: delta >= 0 ? 'up' : 'down', value: (pct >= 0 ? '+' : '') + pct + '%' };
 }
 
-export function Kpi({ Icon, label, value, emptyHint, zeroConfirm, trend, tone = 'primary', spark, to, onClick }: KpiProps) {
+export function Kpi({ Icon, label, value, emptyHint, zeroConfirm, trend, tone = 'primary', spark, to, onClick, active }: KpiProps) {
   const { bg, fg, line } = TONES[tone];
   const effectiveTrend = trend ?? autoTrend(spark);
   const isInteractive = !!(to || onClick);
@@ -166,7 +173,8 @@ export function Kpi({ Icon, label, value, emptyHint, zeroConfirm, trend, tone = 
   // the semantic palette (a "1 مرفوضة" tile renders the number in danger-fg,
   // not in ink-1, so the count carries the meaning on its own).
   const toneClass = tone !== 'primary' ? `kpi-tone-${tone}` : '';
-  const baseClass = ['kpi', flashClass, toneClass].filter(Boolean).join(' ');
+  const activeClass = active ? 'kpi-active' : '';
+  const baseClass = ['kpi', flashClass, toneClass, activeClass].filter(Boolean).join(' ');
   const linkClass = baseClass + ' kpi-clickable';
 
   if (to) {
