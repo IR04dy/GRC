@@ -1,5 +1,6 @@
 package com.tss.grc.module.ai.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ai.entity.AiSuggestion;
 import com.tss.grc.module.ai.repository.AiSuggestionRepository;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -43,6 +45,9 @@ class AiSuggestionServiceTest {
 
     @Mock private AiSuggestionRepository repo;
     @Mock private AuditLogService audit;
+    // QUAL-ESG-008: service now injects the shared ObjectMapper; use a real one
+    // (via @Spy) so writeValueAsString still produces genuine JSON.
+    @Spy private ObjectMapper mapper = new ObjectMapper();
     @InjectMocks private AiSuggestionService service;
 
     @BeforeEach void setUp() {

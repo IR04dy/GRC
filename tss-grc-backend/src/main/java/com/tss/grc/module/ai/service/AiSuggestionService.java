@@ -32,7 +32,10 @@ public class AiSuggestionService {
 
     private final AiSuggestionRepository repo;
     private final AuditLogService        audit;
-    private final ObjectMapper           mapper = new ObjectMapper();
+    // QUAL-ESG-008: inject the shared, fully-configured Spring ObjectMapper bean
+    // (JavaTime module etc.) rather than a per-instance vanilla `new ObjectMapper()`,
+    // which would throw on Java-8 date payloads.
+    private final ObjectMapper           mapper;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
