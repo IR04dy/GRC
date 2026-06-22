@@ -50,10 +50,14 @@
 }
 /* Pinned group (Workspace) — no chevron, no hover, not clickable */
 .sb-section[disabled] { cursor: default; opacity: 1; }
-/* Collapsible group — show chevron + hover hint */
+/* Collapsible group — show chevron + hover hint. A subtle hairline above
+ * each domain pillar (market-leader pattern) separates the ~14 sections so
+ * the eye can chunk the nav; the pinned My Work group has none (it's first). */
 .sb-section-toggle {
   cursor: pointer;
   transition: color var(--dur-fast);
+  margin-top: 6px;
+  border-top: 1px solid var(--sb-border);
 }
 .sb-section-toggle:hover { color: var(--sb-active-fg, #fff); }
 .sb-chevron {
