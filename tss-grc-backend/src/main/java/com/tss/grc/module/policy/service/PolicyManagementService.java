@@ -35,10 +35,12 @@ import java.util.*;
  *       when the underlying policy is superseded.</li>
  * </ul>
  */
-/** Bean qualified ({@code policyManagementService}) because {@code module.compliance} ships another {@code PolicyService}. */
-@Service("policyManagementService")
+// QUAL-RC-001: renamed from PolicyService → PolicyManagementService so the bean
+// name is the natural class-derived "policyManagementService" and it no longer
+// collides with module.compliance's PolicyService (which stays "policyService").
+@Service
 @RequiredArgsConstructor
-public class PolicyService {
+public class PolicyManagementService {
 
     private static final Set<String> POLICY_STATUSES = Set.of(
         "DRAFT", "REVIEW", "APPROVED", "PUBLISHED", "EXPIRED", "ARCHIVED");

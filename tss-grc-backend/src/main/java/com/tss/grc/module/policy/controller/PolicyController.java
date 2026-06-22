@@ -3,8 +3,8 @@ package com.tss.grc.module.policy.controller;
 import com.tss.grc.module.policy.entity.PolicyAttestation;
 import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.entity.PolicyException;
-import com.tss.grc.module.policy.service.PolicyService;
-import com.tss.grc.module.policy.service.PolicyService.PolicyAggregate;
+import com.tss.grc.module.policy.service.PolicyManagementService;
+import com.tss.grc.module.policy.service.PolicyManagementService.PolicyAggregate;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +36,7 @@ import java.util.Map;
 @Tag(name = "Policy Management")
 public class PolicyController {
 
-    private final PolicyService service;
+    private final PolicyManagementService service;
 
     private static String actor(Authentication auth) {
         return auth == null ? null : auth.getName();

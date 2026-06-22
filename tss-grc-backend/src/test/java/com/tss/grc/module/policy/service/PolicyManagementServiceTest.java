@@ -35,7 +35,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * PolicyService (module.policy) — V79 lifecycle rule lock.
+ * PolicyManagementService (module.policy) — V79 lifecycle rule lock.
  *
  * <p>Covers:
  * <ul>
@@ -54,7 +54,7 @@ import static org.mockito.Mockito.when;
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
-class PolicyServiceTest {
+class PolicyManagementServiceTest {
 
     private static final Long ORG_ID = 7L;
 
@@ -64,7 +64,7 @@ class PolicyServiceTest {
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
 
-    @InjectMocks private PolicyService service;
+    @InjectMocks private PolicyManagementService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
     @AfterEach  void tearDown() { TenantContext.clear(); }
