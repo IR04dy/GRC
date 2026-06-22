@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          Fingerprint, ClipboardCheck, Workflow, AlertOctagon, Files, UserCog, Truck,
          GitBranch, ShieldAlert, Calendar, Settings, Landmark, Stamp, Send, Wrench,
@@ -508,7 +508,6 @@ function useInboxCounts(): InboxCounts {
 
 const STORAGE_COLLAPSED = 'sb.collapsedGroups.v2';
 const STORAGE_EXPANDED  = 'sb.expandedItems.v2';
-const STORAGE_SCROLL    = 'sb.scrollTop.v2';
 
 function readSet(key: string): Set<string> {
   try {
@@ -575,39 +574,14 @@ export function Sidebar({ open = false }: { open?: boolean }) {
   useEffect(() => { writeSet(STORAGE_COLLAPSED, collapsedGroups); }, [collapsedGroups]);
   useEffect(() => { writeSet(STORAGE_EXPANDED,  expandedItems);   }, [expandedItems]);
 
-  // Sidebar scroll memory. Continuously save scrollTop as the user
-  // scrolls; restore it on every navigation so the sidebar never snaps
-  // back to the top — the "click slice and exit returns to upper"
-  // complaint. We also restore on full mount (cold reload).
-  useEffect(() => {
-    const el = asideRef.current;
-    if (!el) return;
-    const save = () => {
-      try { sessionStorage.setItem(STORAGE_SCROLL, String(el.scrollTop)); } catch {}
-    };
-    el.addEventListener('scroll', save, { passive: true });
-    return () => { save(); el.removeEventListener('scroll', save); };
-  }, []);
-
-  // Restore scroll on every route change / mount. Because each page
-  // renders its own <Shell>, the Sidebar is a *fresh* instance on every
-  // navigation — it always mounts at scrollTop 0. We MUST re-apply the
-  // saved position synchronously, before the browser paints, or the user
-  // sees the nav flash to the top and then jump back down (the "click a
-  // slice and exit returns to upper" complaint). useLayoutEffect runs
-  // after the DOM is laid out (active-class + auto-expand already applied)
-  // but before paint, so there is no visible top-flash. A post-paint
-  // useEffect + microtask — the previous approach — paints at the top
-  // first and is exactly what made the reset visible.
-  useLayoutEffect(() => {
-    const el = asideRef.current;
-    if (!el) return;
-    const saved = sessionStorage.getItem(STORAGE_SCROLL);
-    if (!saved) return;
-    const n = Number(saved);
-    if (Number.isNaN(n)) return;
-    el.scrollTop = n;
-  }, [pathname]);
+  // Sidebar scroll position persists natively now: AppLayout mounts this
+  // component ONCE and keeps it mounted across navigation, so the scroll
+  // container is the same DOM node every time and retains its scrollTop on
+  // its own. The previous sessionStorage save/restore existed only to paper
+  // over the per-page-<Shell> remount; with the persistent shell it became
+  // unnecessary AND harmful — restoring on every route change overrode the
+  // native scroll (and, because the save half stuck at 0, snapped the nav to
+  // the top) — so it has been removed.
 
   function toggleGroup(id: string) {
     setCollapsedGroups(prev => {
