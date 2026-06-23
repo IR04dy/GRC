@@ -391,10 +391,10 @@ export function CrisisCommsDispatchWizard() {
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16,
           }}>
-            <Kpi label={isAr ? 'القنوات' : 'Channels'} value={String(result.cascades.length)} />
-            <Kpi label={isAr ? 'المستلمون' : 'Recipients'} value={String(result.totalRecipients)} />
-            <Kpi label={isAr ? 'نجح' : 'Success'} value={String(result.totalSuccess)} tone="success" />
-            <Kpi label={isAr ? 'الزمن' : 'Elapsed'} value={`${result.elapsedMillis} ms`} />
+            <Kpi label={isAr ? 'القنوات' : 'Channels'} value={String(result.cascades.length)} to="/notifications/channels" />
+            <Kpi label={isAr ? 'المستلمون' : 'Recipients'} value={String(result.totalRecipients)} to="/notifications/outbox" />
+            <Kpi label={isAr ? 'نجح' : 'Success'} value={String(result.totalSuccess)} tone="success" to="/notifications/outbox" />
+            <Kpi label={isAr ? 'الزمن' : 'Elapsed'} value={`${result.elapsedMillis} ms`} to="/bcm/comms/dispatch" />
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -482,18 +482,33 @@ function Field(props: { label: string; children: React.ReactNode }) {
   );
 }
 
-function Kpi(props: { label: string; value: string; tone?: 'success' | 'warning' | 'danger' }) {
+function Kpi(props: { label: string; value: string; tone?: 'success' | 'warning' | 'danger'; to?: string }) {
   const color = props.tone === 'success' ? 'var(--success)'
     : props.tone === 'warning' ? 'var(--warning)'
     : props.tone === 'danger' ? 'var(--danger)'
     : 'var(--ink-1)';
-  return (
+  const inner = (
+    <>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{props.label}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, color }}>{props.value}</div>
+    </>
+  );
+  return props.to ? (
+    <a href={props.to} style={{
+      display: 'block', padding: 12, border: '1px solid var(--border)', borderRadius: 6,
+      background: 'var(--surface)', textDecoration: 'none', cursor: 'pointer',
+      transition: 'border-color 0.15s',
+    }}
+    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
+    onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
+      {inner}
+    </a>
+  ) : (
     <div style={{
       padding: 12, border: '1px solid var(--border)', borderRadius: 6,
       background: 'var(--surface)',
     }}>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{props.label}</div>
-      <div style={{ fontSize: 24, fontWeight: 700, color }}>{props.value}</div>
+      {inner}
     </div>
   );
 }
