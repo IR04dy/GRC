@@ -36,35 +36,49 @@
 .sb-sub   { color: var(--sb-text-3); font: 500 10px var(--font-mono); letter-spacing: .08em; margin-top: 2px; }
 
 .sb-section {
-  font-weight: 800; font-size: 9px;
-  color: var(--sb-text-3);
-  letter-spacing: .14em;
+  font-weight: 700; font-size: 10.5px;
+  color: var(--sb-text-2, var(--sb-text));
+  letter-spacing: .09em;
   text-transform: uppercase;
-  padding: 18px 18px 6px;
-  display: flex; align-items: center; gap: 6px;
+  /* Extra top padding for visual breathing room between sections;
+     bottom padding tightens the gap to the first child item. */
+  padding: 16px 14px 6px 12px;
+  display: flex; align-items: center; gap: 7px;
   width: 100%;
+  /* border shorthand first, then the logical side property so it wins. */
   background: transparent;
   border: 0;
+  border-inline-start: 2px solid transparent;
   text-align: inherit;
   font-family: inherit;
+  transition: color var(--dur-fast), background var(--dur-fast), border-color var(--dur-fast);
 }
-/* Pinned group (Workspace) — no chevron, no hover, not clickable */
+/* Pinned group ("My Work") — always visible, not a toggle; no hover cue */
 .sb-section[disabled] { cursor: default; opacity: 1; }
-/* Collapsible group — show chevron + hover hint. A subtle hairline above
- * each domain pillar (market-leader pattern) separates the ~14 sections so
- * the eye can chunk the nav; the pinned My Work group has none (it's first). */
+/* Collapsible pillars — hairline divider between sections for scannability */
 .sb-section-toggle {
   cursor: pointer;
-  transition: color var(--dur-fast);
-  margin-top: 6px;
+  margin-top: 4px;
   border-top: 1px solid var(--sb-border);
 }
-.sb-section-toggle:hover { color: var(--sb-active-fg, #fff); }
-.sb-chevron {
-  transition: transform var(--dur-fast);
-  flex-shrink: 0;
-  opacity: 0.7;
+/* Hover: lighten text toward accent + very subtle surface tint */
+.sb-section-toggle:hover {
+  color: var(--accent-300);
+  background: var(--sb-hover-bg);
 }
+/* Expanded (open) collapsible pillar: accent color + leading stripe */
+.sb-section-toggle.sb-section-open {
+  color: var(--accent-300);
+  border-inline-start-color: var(--accent-300);
+  background: var(--sb-hover-bg);
+}
+.sb-chevron {
+  transition: transform var(--dur-fast), opacity var(--dur-fast);
+  flex-shrink: 0;
+  opacity: 0.55;
+}
+.sb-section-toggle.sb-section-open .sb-chevron { opacity: 1; }
+.sb-section-toggle:hover .sb-chevron { opacity: 1; }
 .sb-chevron-open { transform: rotate(90deg); }
 [dir="rtl"] .sb-chevron { transform: rotate(180deg); }
 [dir="rtl"] .sb-chevron-open { transform: rotate(90deg); }
