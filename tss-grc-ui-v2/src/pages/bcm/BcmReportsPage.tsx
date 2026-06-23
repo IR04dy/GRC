@@ -145,6 +145,33 @@ export function BcmReportsPage() {
 
 // ─── Generic payload renderer ─────────────────────────────────────
 
+/** camelCase / snake_case JSON key → human-readable Title Case label */
+function humanLabel(key: string): string {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/** Format a raw JSON value into something readable for end-users */
+function formatValue(val: unknown): string {
+  if (val == null) return '—';
+  if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+  if (typeof val === 'number') {
+    // Percentage heuristic: field names like "Rate", "Percent", "Score" often carry 0–1 fractions
+    return Number.isInteger(val) ? val.toLocaleString() : val.toFixed(2);
+  }
+  if (typeof val === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(val)) {
+      return new Date(val).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      return new Date(val).toLocaleDateString(undefined, { dateStyle: 'medium' });
+    }
+  }
+  return String(val);
+}
+
 function ReportRenderer({ body, isAr }: { body: Record<string, unknown>; isAr: boolean }) {
   const entries = Object.entries(body).filter(([k]) => k !== 'reportCode' && k !== 'generatedAt');
   const generatedAt = body.generatedAt as string | undefined;
@@ -158,7 +185,8 @@ function ReportRenderer({ body, isAr }: { body: Record<string, unknown>; isAr: b
     <div style={{ display: 'grid', gap: 16 }}>
       {generatedAt && (
         <div className="text-muted" style={{ fontSize: 11 }}>
-          {isAr ? 'تم التوليد في' : 'Generated at'}: <span className="mono">{generatedAt}</span>
+          {isAr ? 'تم التوليد في' : 'Generated at'}:{' '}
+          <span className="mono">{formatValue(generatedAt)}</span>
         </div>
       )}
 
@@ -169,8 +197,8 @@ function ReportRenderer({ body, isAr }: { body: Record<string, unknown>; isAr: b
               border: '1px solid var(--border)', borderRadius: 6, padding: '10px 12px',
               display: 'grid', gap: 4,
             }}>
-              <div className="text-muted" style={{ fontSize: 11, textTransform: 'uppercase' }}>{k}</div>
-              <div style={{ fontSize: 18, fontWeight: 600 }}>{String(v ?? '—')}</div>
+              <div className="text-muted" style={{ fontSize: 11 }}>{humanLabel(k)}</div>
+              <div style={{ fontSize: 18, fontWeight: 600 }}>{formatValue(v)}</div>
             </div>
           ))}
         </div>
@@ -178,13 +206,13 @@ function ReportRenderer({ body, isAr }: { body: Record<string, unknown>; isAr: b
 
       {objects.map(([k, v]) => (
         <div key={k}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{k}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{humanLabel(k)}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 6 }}>
             {Object.entries(v as Record<string, unknown>).map(([sk, sv]) => (
               <div key={sk} style={{ display: 'flex', justifyContent: 'space-between',
                   border: '1px solid var(--border)', borderRadius: 4, padding: '6px 10px', fontSize: 12 }}>
-                <span className="text-muted">{sk}</span>
-                <strong>{String(sv ?? '—')}</strong>
+                <span className="text-muted">{humanLabel(sk)}</span>
+                <strong>{formatValue(sv)}</strong>
               </div>
             ))}
           </div>
@@ -194,23 +222,25 @@ function ReportRenderer({ body, isAr }: { body: Record<string, unknown>; isAr: b
       {arrays.map(([k, v]) => {
         const rows = v as Record<string, unknown>[];
         if (rows.length === 0) {
-          return <div key={k}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{k}</div>
-            <Badge tone="neutral">{isAr ? 'لا توجد بيانات' : 'No rows'}</Badge>
-          </div>;
+          return (
+            <div key={k}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{humanLabel(k)}</div>
+              <Badge tone="neutral">{isAr ? 'لا توجد بيانات' : 'No rows'}</Badge>
+            </div>
+          );
         }
         const cols = Object.keys(rows[0]);
         return (
           <div key={k}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{k}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{humanLabel(k)}</div>
             <div style={{ overflowX: 'auto' }}>
               <table className="data-table" style={{ width: '100%', fontSize: 12 }}>
                 <thead>
-                  <tr>{cols.map(c => <th key={c} style={{ textAlign: 'start' }}>{c}</th>)}</tr>
+                  <tr>{cols.map(c => <th key={c} style={{ textAlign: 'start' }}>{humanLabel(c)}</th>)}</tr>
                 </thead>
                 <tbody>
                   {rows.slice(0, 100).map((row, i) => (
-                    <tr key={i}>{cols.map(c => <td key={c}>{String(row[c] ?? '—')}</td>)}</tr>
+                    <tr key={i}>{cols.map(c => <td key={c}>{formatValue(row[c])}</td>)}</tr>
                   ))}
                 </tbody>
               </table>
