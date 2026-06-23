@@ -104,10 +104,10 @@ export function SessionsPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={MonitorSmartphone} label={isAr ? 'جلسات نشطة' : 'Active sessions'} value={loading ? '—' : stats.total} tone="primary" />
-        <Kpi Icon={Laptop} label={isAr ? 'أجهزة مميّزة' : 'Distinct devices'} value={loading ? '—' : stats.devices} tone="info" />
-        <Kpi Icon={Globe}  label={isAr ? 'عناوين IP' : 'IP addresses'} value={loading ? '—' : stats.ips} tone="neutral" />
-        <Kpi Icon={Clock}  label={isAr ? 'أقدم جلسة (يوم)' : 'Oldest (days)'} value={loading ? '—' : stats.oldest} tone="warning" />
+        <Kpi Icon={MonitorSmartphone} label={isAr ? 'جلسات نشطة' : 'Active sessions'} value={loading ? '—' : stats.total} tone="primary" to="/account/sessions" />
+        <Kpi Icon={Laptop} label={isAr ? 'أجهزة مميّزة' : 'Distinct devices'} value={loading ? '—' : stats.devices} tone="info" to="/account/sessions" />
+        <Kpi Icon={Globe}  label={isAr ? 'عناوين IP' : 'IP addresses'} value={loading ? '—' : stats.ips} tone="neutral" to="/account/sessions" />
+        <Kpi Icon={Clock}  label={isAr ? 'أقدم جلسة (يوم)' : 'Oldest (days)'} value={loading ? '—' : stats.oldest} tone="warning" to="/account/sessions" />
       </div>
 
       <Card title={isAr ? 'الأجهزة المسجّلة الدخول' : 'Signed-in devices'} Icon={MonitorSmartphone}

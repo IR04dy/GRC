@@ -120,8 +120,8 @@ export function IrPlaybooksPage() {
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={BookOpen}  label={isAr ? 'أدلة نشطة' : 'Active playbooks'}    value={String(counts.active)}      tone="info" onClick={() => setTab('active')} active={tab === 'active'} />
-        <Kpi Icon={Play}      label={isAr ? 'مرات التفعيل' : 'Total invocations'} value={String(counts.invocations)} tone="info" />
-        <Kpi Icon={AlertCircle} label={isAr ? 'لأحداث حرجة' : 'For CRITICAL'}     value={String(counts.critical)}    tone={counts.critical > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={Play}      label={isAr ? 'مرات التفعيل' : 'Total invocations'} value={String(counts.invocations)} tone="info" to="/socops" />
+        <Kpi Icon={AlertCircle} label={isAr ? 'لأحداث حرجة' : 'For CRITICAL'}     value={String(counts.critical)}    tone={counts.critical > 0 ? 'warning' : 'success'} to="/incidents" />
         <Kpi Icon={Copy}      label={isAr ? 'قوالب جاهزة' : 'System templates'}   value={String(counts.templates)}   tone="neutral" onClick={() => setTab('templates')} active={tab === 'templates'} />
       </div>
 

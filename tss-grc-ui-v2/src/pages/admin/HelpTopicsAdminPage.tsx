@@ -146,10 +146,10 @@ export function HelpTopicsAdminPage() {
 
       {/* KPIs */}
       <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginBottom: 16 }}>
-        <Kpi Icon={BookOpen}      label={t('helpAdminKpiTopics', 'Total topics')}      value={topics.length} />
-        <Kpi Icon={CheckCircle2}  label={t('helpAdminKpiCovered', 'Routes covered')}   value={coverage.covered.length}   tone="success" />
-        <Kpi Icon={AlertTriangle} label={t('helpAdminKpiGaps', 'Coverage gaps')}       value={coverage.uncovered.length} tone={coverage.uncovered.length > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Globe}         label={t('helpAdminKpiKnownRoutes', 'Known routes')} value={KNOWN_ROUTES.length} />
+        <Kpi Icon={BookOpen}      label={t('helpAdminKpiTopics', 'Total topics')}      value={topics.length} to="/admin" />
+        <Kpi Icon={CheckCircle2}  label={t('helpAdminKpiCovered', 'Routes covered')}   value={coverage.covered.length}   tone="success" to="/admin" />
+        <Kpi Icon={AlertTriangle} label={t('helpAdminKpiGaps', 'Coverage gaps')}       value={coverage.uncovered.length} tone={coverage.uncovered.length > 0 ? 'warning' : 'success'} to="/admin" />
+        <Kpi Icon={Globe}         label={t('helpAdminKpiKnownRoutes', 'Known routes')} value={KNOWN_ROUTES.length} to="/admin" />
       </div>
 
       {/* Coverage-gap widget */}

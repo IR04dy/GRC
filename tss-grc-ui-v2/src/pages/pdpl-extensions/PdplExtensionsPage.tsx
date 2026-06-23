@@ -249,10 +249,10 @@ function CbtTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, setCreat
   return (
     <>
       <div className="kpi-grid">
-        <Kpi Icon={Send}         label={t('pdplExtCbtKpiRequested')} value={stats.REQUESTED || 0} tone="warning" />
-        <Kpi Icon={ShieldCheck}  label={t('pdplExtCbtKpiAssessed')}  value={stats.ASSESSED || 0}  tone="primary" />
-        <Kpi Icon={CheckCircle2} label={t('pdplExtCbtKpiApproved')}  value={stats.APPROVED || 0}  tone="success" />
-        <Kpi Icon={XCircle}      label={t('pdplExtCbtKpiRejected')}  value={stats.REJECTED || 0}  tone="danger" />
+        <Kpi Icon={Send}         label={t('pdplExtCbtKpiRequested')} value={stats.REQUESTED || 0} tone="warning" to="/pdpl-extensions" />
+        <Kpi Icon={ShieldCheck}  label={t('pdplExtCbtKpiAssessed')}  value={stats.ASSESSED || 0}  tone="primary" to="/pdpl-extensions" />
+        <Kpi Icon={CheckCircle2} label={t('pdplExtCbtKpiApproved')}  value={stats.APPROVED || 0}  tone="success" to="/pdpl-extensions" />
+        <Kpi Icon={XCircle}      label={t('pdplExtCbtKpiRejected')}  value={stats.REJECTED || 0}  tone="danger"  to="/pdpl-extensions" />
       </div>
 
       <Card title={t('pdplExtCbtTitle')} Icon={Globe2}
@@ -374,10 +374,10 @@ function DisposalTab({ rows, busy, setBusy, t, toast, onChanged, createOpen, set
   return (
     <>
       <div className="kpi-grid">
-        <Kpi Icon={Clock}        label={t('pdplExtDspKpiScheduled')}   value={stats.SCHEDULED || 0}   tone="warning" />
-        <Kpi Icon={Play}         label={t('pdplExtDspKpiInProgress')}  value={stats.IN_PROGRESS || 0} tone="primary" />
-        <Kpi Icon={CheckCircle2} label={t('pdplExtDspKpiCompleted')}   value={stats.COMPLETED || 0}   tone="primary" />
-        <Kpi Icon={ShieldCheck}  label={t('pdplExtDspKpiVerified')}    value={stats.VERIFIED || 0}    tone="success" />
+        <Kpi Icon={Clock}        label={t('pdplExtDspKpiScheduled')}   value={stats.SCHEDULED || 0}   tone="warning" to="/pdpl-extensions" />
+        <Kpi Icon={Play}         label={t('pdplExtDspKpiInProgress')}  value={stats.IN_PROGRESS || 0} tone="primary" to="/pdpl-extensions" />
+        <Kpi Icon={CheckCircle2} label={t('pdplExtDspKpiCompleted')}   value={stats.COMPLETED || 0}   tone="primary" to="/pdpl-extensions" />
+        <Kpi Icon={ShieldCheck}  label={t('pdplExtDspKpiVerified')}    value={stats.VERIFIED || 0}    tone="success" to="/pdpl-extensions" />
       </div>
 
       <Card title={t('pdplExtDspTitle')} Icon={Trash2}
@@ -514,9 +514,9 @@ function NoticeTab({ rows, busy, setBusy, lang, t, toast, onChanged, createOpen,
   return (
     <>
       <div className="kpi-grid">
-        <Kpi Icon={FileText}     label={t('pdplExtPnKpiDraft')}     value={stats.DRAFT || 0}     tone="warning" />
-        <Kpi Icon={CheckCircle2} label={t('pdplExtPnKpiPublished')} value={stats.PUBLISHED || 0} tone="success" />
-        <Kpi Icon={AlertOctagon} label={t('pdplExtPnKpiArchived')}  value={stats.ARCHIVED || 0}  tone="primary" />
+        <Kpi Icon={FileText}     label={t('pdplExtPnKpiDraft')}     value={stats.DRAFT || 0}     tone="warning" to="/pdpl-extensions" />
+        <Kpi Icon={CheckCircle2} label={t('pdplExtPnKpiPublished')} value={stats.PUBLISHED || 0} tone="success" to="/pdpl-extensions" />
+        <Kpi Icon={AlertOctagon} label={t('pdplExtPnKpiArchived')}  value={stats.ARCHIVED || 0}  tone="primary" to="/pdpl-extensions" />
       </div>
 
       <Card title={t('pdplExtPnTitle')} Icon={FileText}

@@ -231,17 +231,17 @@ export function ObligationCampaignsPage() {
       <div className="kpi-grid-sm" style={{ marginBottom: 'var(--sp-6)' }}>
         <Kpi Icon={Briefcase}
           label={isAr ? 'إجمالي الحملات' : 'Total campaigns'}
-          value={String(items.length)} />
+          value={String(items.length)} to="/compliance" />
         <Kpi Icon={Send}
           label={isAr ? 'حملات نشطة' : 'Active'}
-          value={String(activeCount)} tone="info" />
+          value={String(activeCount)} tone="info" to="/compliance" />
         <Kpi Icon={AlertTriangle}
           label={isAr ? 'متأخرات مفتوحة' : 'Open overdue'}
           value={String(overdueCount)}
-          tone={overdueCount > 0 ? 'danger' : 'neutral'} />
+          tone={overdueCount > 0 ? 'danger' : 'neutral'} to="/compliance" />
         <Kpi Icon={CheckCircle2}
           label={isAr ? 'دورات مُغلَقة' : 'Closed cycles'}
-          value={String(closedCount)} tone="success" />
+          value={String(closedCount)} tone="success" to="/compliance" />
       </div>
 
       <Card title={isAr ? 'سجل الحملات' : 'Campaign register'} Icon={Briefcase}>

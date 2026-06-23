@@ -471,7 +471,7 @@ export function ControlLibraryPage() {
         <Kpi Icon={Layers} label={isAr ? 'مرجعيات تنظيمية' : 'Authority documents'} value={docs.length} to="/regulatory/library" />
         <Kpi Icon={Wrench} label={isAr ? 'مرجعيات مؤقتة' : 'Placeholder docs'} value={placeholderDocs}
              tone={placeholderDocs > 0 ? 'warning' : 'success'} to="/regulatory/library" />
-        <Kpi Icon={Shield} label={isAr ? 'العائلات النشطة' : 'Active domains'} value={byDomain.size} />
+        <Kpi Icon={Shield} label={isAr ? 'العائلات النشطة' : 'Active domains'} value={byDomain.size} to="/controls/library" />
       </div>
 
       {/* Domain filter — one shared pill control */}

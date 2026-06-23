@@ -185,30 +185,35 @@ export function MtpdInheritanceDetailPage() {
             Icon={GitBranch}
             label={isAr ? 'العمليات المفحوصة' : 'Processes scanned'}
             value={String(assessment.totalProcesses)}
+            to="/bcm"
           />
           <Kpi
             Icon={AlertOctagon}
             label={isAr ? 'خروقات' : 'Breaches'}
             value={String(assessment.totalBreaches)}
             tone="danger"
+            onClick={() => setTypeFilter(new Set<FindingType>(['BREACH']))}
           />
           <Kpi
             Icon={AlertTriangle}
             label={isAr ? 'تحذيرات' : 'Warnings'}
             value={String(assessment.totalWarnings)}
             tone="warning"
+            onClick={() => setTypeFilter(new Set<FindingType>(['WARNING']))}
           />
           <Kpi
             Icon={FileQuestion}
             label={isAr ? 'فجوات إقرار' : 'No-attestation gaps'}
             value={String(assessment.totalNoAttestation)}
             tone="neutral"
+            onClick={() => setTypeFilter(new Set<FindingType>(['NO_ATTESTATION']))}
           />
           <Kpi
             Icon={CheckCircle2}
             label={isAr ? 'سليمة' : 'OK'}
             value={String(assessment.totalOk)}
             tone="success"
+            onClick={() => setTypeFilter(new Set<FindingType>(['OK']))}
           />
         </div>
       )}

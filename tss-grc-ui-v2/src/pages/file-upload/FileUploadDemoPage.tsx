@@ -39,11 +39,11 @@ export function FileUploadDemoPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Database}      label={t('fuKpiTotal')}       value={String(stats.total)} tone="primary" />
-        <Kpi Icon={ShieldCheck}    label={t('fuKpiClean')}        value={String(stats.cleanCount)} tone="success" />
-        <Kpi Icon={AlertOctagon}   label={t('fuKpiSuspicious')}    value={String(stats.suspiciousCount)} tone={stats.suspiciousCount > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={Upload}          label={t('fuKpiSize')}          value={formatBytes(stats.totalBytes)} tone="info" />
-        <Kpi Icon={FileCheck2}     label={t('fuKpiAttachments')}   value={String(stats.uniqueAttachments)} tone="info" />
+        <Kpi Icon={Database}      label={t('fuKpiTotal')}       value={String(stats.total)} tone="primary" to="/file-upload" />
+        <Kpi Icon={ShieldCheck}    label={t('fuKpiClean')}        value={String(stats.cleanCount)} tone="success" to="/file-upload" />
+        <Kpi Icon={AlertOctagon}   label={t('fuKpiSuspicious')}    value={String(stats.suspiciousCount)} tone={stats.suspiciousCount > 0 ? 'warning' : 'success'} to="/file-upload" />
+        <Kpi Icon={Upload}          label={t('fuKpiSize')}          value={formatBytes(stats.totalBytes)} tone="info" to="/file-upload" />
+        <Kpi Icon={FileCheck2}     label={t('fuKpiAttachments')}   value={String(stats.uniqueAttachments)} tone="info" to="/evidence" />
       </div>
 
       <Card title={t('fuTryTitle')} Icon={Upload}>

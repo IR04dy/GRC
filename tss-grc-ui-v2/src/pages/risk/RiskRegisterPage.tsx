@@ -757,11 +757,11 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
         <AppetiteBreachFeed />
       </div>
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', marginBottom: 12 }}>
-        <Kpi Icon={Target}         label={t('appKpiStatements')} value={stats?.total ?? 0}            tone="primary" />
-        <Kpi Icon={ShieldCheck}    label={t('appKpiWithin')}     value={stats?.withinTolerance ?? 0} tone="success" />
-        <Kpi Icon={AlertTriangle}  label={t('appKpiExceeded')}   value={stats?.exceeded ?? 0}        tone="warning" />
-        <Kpi Icon={Flame}          label={t('appKpiCritical')}   value={stats?.critical ?? 0}        tone="danger" />
-        <Kpi Icon={ClipboardCheck} label={t('appKpiNoData')}     value={stats?.noExposure ?? 0}      tone="info" />
+        <Kpi Icon={Target}         label={t('appKpiStatements')} value={stats?.total ?? 0}            tone="primary" to="/risk?tab=appetite" />
+        <Kpi Icon={ShieldCheck}    label={t('appKpiWithin')}     value={stats?.withinTolerance ?? 0} tone="success" to="/risk?tab=appetite" />
+        <Kpi Icon={AlertTriangle}  label={t('appKpiExceeded')}   value={stats?.exceeded ?? 0}        tone="warning" to="/risk?tab=appetite" />
+        <Kpi Icon={Flame}          label={t('appKpiCritical')}   value={stats?.critical ?? 0}        tone="danger"  to="/risk?tab=appetite" />
+        <Kpi Icon={ClipboardCheck} label={t('appKpiNoData')}     value={stats?.noExposure ?? 0}      tone="info"    to="/risk?tab=appetite" />
       </div>
       {loading
         ? <InlineEmpty>Loading…</InlineEmpty>

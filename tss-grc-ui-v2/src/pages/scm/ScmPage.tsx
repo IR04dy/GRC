@@ -789,12 +789,12 @@ export function ScmPage() {
       <WorkflowQuickLaunch modules="SCM" />
       <ModuleSubmissionsPanel module="SCM" />
       <div className="kpi-grid">
-        <Kpi Icon={Truck}         label={t('scmKpiSuppliers')}        value={stats?.totalVendors ?? vendors.data.length} tone="primary" />
-        <Kpi Icon={AlertTriangle} label={t('scmKpiHighRisk')}         value={stats?.criticalVendors ?? high} tone="danger" />
-        <Kpi Icon={ListChecks}    label={t('scmKpiPending')}          value={stats?.pendingOnboarding ?? inProgress} tone="warning" />
-        <Kpi Icon={ShieldAlert}   label={t('scmKpiOpenDisruptions')}  value={stats?.openIncidents ?? openInc} tone="danger" />
-        <Kpi Icon={FileSignature} label={t('scmKpiExpiringContracts')} value={expiringContracts} tone="info" />
-        <Kpi Icon={Star}          label={t('scmKpiAvgScore')}          value={String(avgAssessmentScore(assessments.data))} tone="success" />
+        <Kpi Icon={Truck}         label={t('scmKpiSuppliers')}        value={stats?.totalVendors ?? vendors.data.length} tone="primary" onClick={() => setTab('suppliers')} />
+        <Kpi Icon={AlertTriangle} label={t('scmKpiHighRisk')}         value={stats?.criticalVendors ?? high} tone="danger" onClick={() => setTab('suppliers')} />
+        <Kpi Icon={ListChecks}    label={t('scmKpiPending')}          value={stats?.pendingOnboarding ?? inProgress} tone="warning" onClick={() => setTab('onboarding')} />
+        <Kpi Icon={ShieldAlert}   label={t('scmKpiOpenDisruptions')}  value={stats?.openIncidents ?? openInc} tone="danger" onClick={() => setTab('disruptions')} />
+        <Kpi Icon={FileSignature} label={t('scmKpiExpiringContracts')} value={expiringContracts} tone="info" onClick={() => setTab('contracts')} />
+        <Kpi Icon={Star}          label={t('scmKpiAvgScore')}          value={String(avgAssessmentScore(assessments.data))} tone="success" onClick={() => setTab('assessments')} />
       </div>
       <OverviewStrip
         storageKey="overview.scm"

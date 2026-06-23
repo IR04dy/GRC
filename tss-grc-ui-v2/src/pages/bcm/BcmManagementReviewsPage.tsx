@@ -125,10 +125,10 @@ export function BcmManagementReviewsPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={ClipboardList} label={isAr ? 'إجمالي المراجعات' : 'Total reviews'} value={counts.total} tone="primary" />
-        <Kpi Icon={Activity}      label={isAr ? 'مفتوحة' : 'Open'}                   value={counts.open} tone={counts.open > 0 ? 'warning' : 'neutral'} />
-        <Kpi Icon={CheckCircle2}  label={isAr ? 'معتمدة' : 'Approved'}               value={counts.approved} tone="success" />
-        <Kpi Icon={Archive}       label={isAr ? 'مؤرشفة' : 'Archived'}               value={counts.archived} tone="info" />
+        <Kpi Icon={ClipboardList} label={isAr ? 'إجمالي المراجعات' : 'Total reviews'} value={counts.total} tone="primary" to="/bcm" />
+        <Kpi Icon={Activity}      label={isAr ? 'مفتوحة' : 'Open'}                   value={counts.open} tone={counts.open > 0 ? 'warning' : 'neutral'} to="/bcm" />
+        <Kpi Icon={CheckCircle2}  label={isAr ? 'معتمدة' : 'Approved'}               value={counts.approved} tone="success" to="/bcm" />
+        <Kpi Icon={Archive}       label={isAr ? 'مؤرشفة' : 'Archived'}               value={counts.archived} tone="info" to="/bcm" />
       </div>
 
       <Card title={isAr ? 'السجل' : 'Register'} Icon={ClipboardList}>

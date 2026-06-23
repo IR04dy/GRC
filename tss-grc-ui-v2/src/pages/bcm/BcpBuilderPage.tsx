@@ -516,15 +516,15 @@ export function BcpBuilderPage() {
                onClick={() => setPlanTypeFilter(planTypeFilter === 'BCP' ? '' : 'BCP')} active={planTypeFilter === 'BCP'} />
           <Kpi Icon={FileText} label={isAr ? 'DRP'      : 'DRP plans'}   value={items.filter(p => p.planType === 'DRP').length} tone="info"
                onClick={() => setPlanTypeFilter(planTypeFilter === 'DRP' ? '' : 'DRP')} active={planTypeFilter === 'DRP'} />
-          <Kpi Icon={Wrench}   label={isAr ? 'منشورة'   : 'Published'}   value={stats.status_published ?? 0}                   tone="success" />
-          <Kpi Icon={History}  label={isAr ? 'في التحرير' : 'Draft'}     value={stats.status_draft ?? 0}                       tone="warning" />
+          <Kpi Icon={Wrench}   label={isAr ? 'منشورة'   : 'Published'}   value={stats.status_published ?? 0}                   tone="success" to="/bcm" />
+          <Kpi Icon={History}  label={isAr ? 'في التحرير' : 'Draft'}     value={stats.status_draft ?? 0}                       tone="warning" to="/bcm" />
           {/* Tier-2 #10 review-state KPIs sit alongside the lifecycle KPIs so
               the page tells the owner both "what's still in flight" and
               "what's about to need re-attestation" in one glance. */}
           <Kpi Icon={History}  label={isAr ? 'مراجعة قريبة' : 'Review due ≤30d'}
-               value={items.filter(p => p.reviewState === 'DUE_SOON').length} tone="warning" />
+               value={items.filter(p => p.reviewState === 'DUE_SOON').length} tone="warning" to="/bcm" />
           <Kpi Icon={History}  label={isAr ? 'مراجعة متأخرة' : 'Review overdue'}
-               value={items.filter(p => p.reviewState === 'OVERDUE').length} tone="danger" />
+               value={items.filter(p => p.reviewState === 'OVERDUE').length} tone="danger" to="/bcm" />
         </div>
 
         <Card title={isAr ? 'الخطط' : 'Plans'} action={
@@ -747,12 +747,12 @@ export function BcpBuilderPage() {
                 </Button>}>
             {distStats && (
               <div className="bcp-builder-dist-kpis">
-                <Kpi Icon={Send}    label={isAr ? 'إجمالي'    : 'Total'}        value={distStats.total}                          tone="info" />
-                <Kpi Icon={History} label={isAr ? 'بالانتظار' : 'Pending'}      value={distStats.pending}                        tone="warning" />
-                <Kpi Icon={History} label={isAr ? 'مُقَر'      : 'Acknowledged'} value={distStats.acknowledged}                   tone="success" />
-                <Kpi Icon={History} label={isAr ? 'مرفوضة'   : 'Declined'}     value={distStats.declined}                       tone="danger" />
-                <Kpi Icon={History} label={isAr ? 'متقادمة'   : 'Stale'}        value={distStats.stale}                          tone="neutral" />
-                <Kpi Icon={History} label={isAr ? 'نسبة الإقرار' : 'Ack %'}     value={`${distStats.acknowledgedPercent.toFixed(1)}%`} tone={distStats.acknowledgedPercent >= 80 ? 'success' : distStats.acknowledgedPercent >= 50 ? 'warning' : 'danger'} />
+                <Kpi Icon={Send}    label={isAr ? 'إجمالي'    : 'Total'}        value={distStats.total}                          tone="info" to="/bcm" />
+                <Kpi Icon={History} label={isAr ? 'بالانتظار' : 'Pending'}      value={distStats.pending}                        tone="warning" to="/bcm" />
+                <Kpi Icon={History} label={isAr ? 'مُقَر'      : 'Acknowledged'} value={distStats.acknowledged}                   tone="success" to="/bcm" />
+                <Kpi Icon={History} label={isAr ? 'مرفوضة'   : 'Declined'}     value={distStats.declined}                       tone="danger" to="/bcm" />
+                <Kpi Icon={History} label={isAr ? 'متقادمة'   : 'Stale'}        value={distStats.stale}                          tone="neutral" to="/bcm" />
+                <Kpi Icon={History} label={isAr ? 'نسبة الإقرار' : 'Ack %'}     value={`${distStats.acknowledgedPercent.toFixed(1)}%`} tone={distStats.acknowledgedPercent >= 80 ? 'success' : distStats.acknowledgedPercent >= 50 ? 'warning' : 'danger'} to="/bcm" />
               </div>
             )}
             {acks.length === 0

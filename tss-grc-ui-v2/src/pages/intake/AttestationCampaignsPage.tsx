@@ -89,7 +89,7 @@ export function AttestationCampaignsPage() {
         <Kpi Icon={CheckCircle2} label={t('campaignsKpiCompleted')}  value={completed.length}    tone="success" onClick={() => setTab('completed')} active={tab === 'completed'} />
         <Kpi Icon={Clock}      label={t('campaignsKpiClosing')}      value={closing.length}      tone="warning" onClick={() => setTab('closing')}   active={tab === 'closing'} />
         <Kpi Icon={ListChecks} label={t('campaignsKpiTotalRespondents')}
-          value={campaigns.reduce((acc, c) => acc + c.respondents.length, 0)} tone="primary" />
+          value={campaigns.reduce((acc, c) => acc + c.respondents.length, 0)} tone="primary" onClick={() => setTab('all')} active={tab === 'all'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

@@ -158,10 +158,10 @@ export function IssuesPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={CircleDot}     label={isAr ? 'مفتوحة' : 'Open'} value={stats?.status_open ?? '—'} tone="info" />
-        <Kpi Icon={Loader}        label={isAr ? 'قيد المعالجة' : 'In progress'} value={stats?.status_in_progress ?? '—'} tone="primary" />
-        <Kpi Icon={Ban}           label={isAr ? 'مُعطَّلة' : 'Blocked'} value={stats?.status_blocked ?? '—'} tone="warning" />
-        <Kpi Icon={AlertOctagon}  label={isAr ? 'حرجة' : 'Critical'} value={stats?.severity_critical ?? '—'} tone="danger" />
+        <Kpi Icon={CircleDot}     label={isAr ? 'مفتوحة' : 'Open'} value={stats?.status_open ?? '—'} tone="info" to="/admin" />
+        <Kpi Icon={Loader}        label={isAr ? 'قيد المعالجة' : 'In progress'} value={stats?.status_in_progress ?? '—'} tone="primary" to="/admin" />
+        <Kpi Icon={Ban}           label={isAr ? 'مُعطَّلة' : 'Blocked'} value={stats?.status_blocked ?? '—'} tone="warning" to="/admin" />
+        <Kpi Icon={AlertOctagon}  label={isAr ? 'حرجة' : 'Critical'} value={stats?.severity_critical ?? '—'} tone="danger" to="/admin" />
       </div>
 
       <Card title={isAr ? 'سجل القضايا' : 'Issue register'} Icon={ClipboardList}

@@ -104,7 +104,7 @@ export function IamJmlPage() {
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={ShieldAlert} label={isAr ? 'مخالفات SoD' : 'SoD violations'}        value={String(counts.sod)}        tone={counts.sod > 0 ? 'danger' : 'success'} onClick={() => setFilter('sod_violations')} active={filter === 'sod_violations'} />
         <Kpi Icon={Users}       label={isAr ? 'صلاحيات حرجة' : 'Privileged events'}    value={String(counts.privileged)} tone={counts.privileged > 0 ? 'warning' : 'neutral'} onClick={() => setFilter('privileged')} active={filter === 'privileged'} />
-        <Kpi Icon={KeyRound}    label={isAr ? `مراجعات مستحقة (${reviewWindow}ي)` : `Reviews due (${reviewWindow}d)`} value={String(reviewsDue.length)} tone={reviewsDue.length > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={KeyRound}    label={isAr ? `مراجعات مستحقة (${reviewWindow}ي)` : `Reviews due (${reviewWindow}d)`} value={String(reviewsDue.length)} tone={reviewsDue.length > 0 ? 'warning' : 'success'} to="/socops" />
         <Kpi Icon={UserCheck}   label={isAr ? 'قيد الانتظار' : 'Pending'}              value={String(counts.pending)}    tone={counts.pending > 0 ? 'warning' : 'success'} onClick={() => setFilter('pending')} active={filter === 'pending'} />
         <Kpi Icon={UserX}       label={isAr ? 'مكتمل' : 'Completed'}                    value={String(counts.completed)}  tone="info" onClick={() => setFilter('completed')} active={filter === 'completed'} />
       </div>

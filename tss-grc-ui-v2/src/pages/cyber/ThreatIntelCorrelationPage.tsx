@@ -299,12 +299,12 @@ export function ThreatIntelCorrelationPage() {
       {result && (
         <>
           <div className="kpi-grid" style={{ marginBottom: 16 }}>
-            <Kpi Icon={Target}    label={isAr ? 'إجمالي التطابقات' : 'Total matches'} value={result.matchCount} tone={result.matchCount > 0 ? 'primary' : 'neutral'} />
-            <Kpi Icon={Crosshair} label={isAr ? 'مؤشّرات مطابِقة' : 'IOCs matched'} value={`${result.distinctIocsMatched} / ${submitted.length}`} tone="info" />
-            <Kpi Icon={Server}    label={isAr ? 'كيانات مصابة' : 'Entities hit'} value={result.distinctEntitiesMatched} tone="warning" />
+            <Kpi Icon={Target}    label={isAr ? 'إجمالي التطابقات' : 'Total matches'} value={result.matchCount} tone={result.matchCount > 0 ? 'primary' : 'neutral'} to="/cyber" />
+            <Kpi Icon={Crosshair} label={isAr ? 'مؤشّرات مطابِقة' : 'IOCs matched'} value={`${result.distinctIocsMatched} / ${submitted.length}`} tone="info" to="/cyber/threat-intel" />
+            <Kpi Icon={Server}    label={isAr ? 'كيانات مصابة' : 'Entities hit'} value={result.distinctEntitiesMatched} tone="warning" to="/assets" />
             <Kpi Icon={Siren}     label={isAr ? 'تصعيد ساما' : 'SAMA escalation'}
               value={result.regulatorEscalation ? (isAr ? 'نعم' : 'YES') : (isAr ? 'لا' : 'No')}
-              tone={result.regulatorEscalation ? 'danger' : 'success'} />
+              tone={result.regulatorEscalation ? 'danger' : 'success'} to="/socops" />
           </div>
 
           <Card

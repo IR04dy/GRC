@@ -195,7 +195,8 @@ export function DrPlansPage() {
       <PageHeader eyebrow={t('navBcm')} title={t('drpPageTitle')} sub={t('drpPageSub')} />
 
       <div className="kpi-grid">
-        <Kpi Icon={Server}       label={t('drpKpiApproved')}   value={stats.APPROVED + stats.ACTIVATED} tone="success" />
+        <Kpi Icon={Server}       label={t('drpKpiApproved')}   value={stats.APPROVED + stats.ACTIVATED} tone="success"
+             onClick={() => setTab('approved')} active={tab === 'approved'} />
         <Kpi Icon={Play}          label={t('drpKpiActivated')}  value={stats.ACTIVATED} tone="primary"
              onClick={() => setTab('activated')} active={tab === 'activated'} />
         <Kpi Icon={FlaskConical}  label={t('drpKpiPassed')}     value={stats.testedPassed} tone="success" to="/resilience-tests" />

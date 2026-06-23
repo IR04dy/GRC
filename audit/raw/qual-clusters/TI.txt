@@ -1,0 +1,24 @@
+================================================================================
+QUAL-TI-003 [Medium] DomainEvent emit() + org() + currentUserId() tenant/event plumbing copy-pasted across services (4 in scope, 13 codebase-wide)
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java:635-652
+RESOLUTION: Introduce a shared `DomainEventPublisher` (@Component) exposing `emit(...)`, and a `SecurityHelpers.currentUserId()` / reuse `TenantContext.requireOrganisationId()` directly. Inject the publisher into services instead of re-declaring the helper.
+================================================================================
+QUAL-TI-004 [Medium] CCM runners copy-paste JSON helper cluster (parseJson/strOr/intOr/millisSince) despite an existing shared StubRunnerSupport
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/ccm/runner/CustomSqlRunner.java:158-184
+RESOLUTION: Move parseJson/strOr/intOr/millisSince into StubRunnerSupport (or a `RunnerSupport` util) and have every runner call the shared versions; delete the per-runner copies.
+================================================================================
+QUAL-TI-005 [Medium] Dead scaffolding methods kept only to silence unused-import warnings (__keepIfNeeded, _silenceUnused) and a no-op currentUserIdOrNull()
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/controller/OutsourcingController.java:253-272
+RESOLUTION: Delete `_silenceUnused` and `__keepIfNeeded` and remove the now-unused imports. Either wire `currentUserIdOrNull()` to the real principal (GrcUserDetails.getUserId(), as ObService/CptyService do) or remove it and the line-139 call if user attribution is genuinely not needed here.
+================================================================================
+QUAL-TI-006 [Medium] QuestionnaireService hand-parses SELECT-option points from JSON with indexOf/substring instead of Jackson, swallowing parse errors
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/QuestionnaireService.java:359-371
+RESOLUTION: Deserialize options_json with Jackson into Map<String,Number> (or a small DTO) once, look up the option value, and surface a clear validation error (as the SCALE_1_5/BOOLEAN branches already do) instead of returning null on parse failure.
+================================================================================
+QUAL-TI-007 [Medium] Integration adapters duplicate config/properties (Retry, enabled/mode/baseUrl/timeout) and the StubInvocation/StatusDto DTOs across 4 vendors
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/config/CrowdStrikeProperties.java:1-127
+RESOLUTION: Create `integrations/common` holding a shared `RetryProperties` (composed via @NestedConfigurationProperty), a base config helper for the RestClient, and shared `StubInvocation` / `IntegrationStatus` records. Vendor properties extend/compose the shared pieces.
+================================================================================
+QUAL-TI-008 [Medium] Dashboard read methods scan large paged result sets in memory with magic page sizes (ObService.dashboard, OutsourcingService.dashboard)
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java:511-579
+RESOLUTION: Replace in-memory scans with repository COUNT/aggregate queries (e.g. countByOrganisationIdAndStatusAndRevokedAtAfter, group-by counts). Extract page sizes / windows into named constants. Consider splitting dashboard() into smaller private aggregators.

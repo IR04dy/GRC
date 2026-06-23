@@ -226,10 +226,10 @@ export function VulnSlaDashboardPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
         <Kpi Icon={Activity} tone="primary"
              label={lang === 'ar' ? 'إجمالي النتائج' : 'Total findings'}
-             value={kpis.total} />
+             value={kpis.total} to="/cyber/vulns" />
         <Kpi Icon={Clock} tone="info"
              label={lang === 'ar' ? 'مفتوحة' : 'Open'}
-             value={kpis.open} />
+             value={kpis.open} to="/cyber/vulns" />
         <Kpi Icon={TimerReset} tone="warning"
              label={lang === 'ar' ? 'تنبيه قبل الإخلال' : 'Warning'}
              value={kpis.warning}
@@ -240,7 +240,7 @@ export function VulnSlaDashboardPage() {
              onClick={() => document.getElementById('vuln-sla-breached')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         <Kpi Icon={ShieldCheck} tone="success"
              label={lang === 'ar' ? 'مُعالَجة' : 'Remediated'}
-             value={kpis.remediated} />
+             value={kpis.remediated} to="/cyber/vulns" />
       </div>
 
       {/* Default policy callout */}

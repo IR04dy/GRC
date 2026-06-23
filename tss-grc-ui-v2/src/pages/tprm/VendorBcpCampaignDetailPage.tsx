@@ -271,24 +271,29 @@ export function VendorBcpCampaignDetailPage() {
           label={isAr ? 'الحالة' : 'Status'}
           value={tlabel(CAMPAIGN_STATUS_LABELS, campaign.status, isAr)}
           tone={campaignStatusTone(campaign.status) === 'danger' ? 'danger' : 'primary'}
+          to="/tprm"
         />
         <Kpi
           Icon={Mail}
           label={isAr ? 'نسبة الاستجابة' : 'Response rate'}
           value={`${stats?.responseRatePercent ?? 0}%`}
           tone={(stats?.responseRatePercent ?? 0) >= 80 ? 'success' : 'info'}
+          to="/tprm/bcp-campaigns"
         />
         <Kpi
           Icon={Calendar}
           label={isAr ? 'أيام متبقية' : 'Days remaining'}
           value={String(stats?.daysUntilClose ?? 0)}
           tone={(stats?.daysUntilClose ?? 0) < 7 ? 'warning' : 'neutral'}
+          to="/tprm/bcp-campaigns"
         />
         <Kpi
           Icon={AlertTriangle}
           label={isAr ? 'متأخرات' : 'Overdue'}
           value={String(stats?.overdue ?? 0)}
           tone={(stats?.overdue ?? 0) > 0 ? 'danger' : 'neutral'}
+          onClick={() => setActiveTab('OVERDUE')}
+          active={activeTab === 'OVERDUE'}
         />
       </div>
 

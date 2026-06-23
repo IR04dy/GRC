@@ -163,10 +163,10 @@ export function ComplaintsRegisterPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={MessageSquare} label={t('complaints.kpiTotal')} value={kpis.total} tone="primary" />
-        <Kpi Icon={ListChecks} label={t('complaints.kpiOpen')} value={kpis.open} tone="info" />
-        <Kpi Icon={AlertTriangle} label={t('complaints.kpiAckBreach')} value={kpis.ackBreach} tone="warning" />
-        <Kpi Icon={AlertOctagon} label={t('complaints.kpiResolutionBreach')} value={kpis.resolutionBreach} tone="danger" />
+        <Kpi Icon={MessageSquare} label={t('complaints.kpiTotal')} value={kpis.total} tone="primary" onClick={() => setFilterStatus('ALL')} active={filterStatus === 'ALL'} />
+        <Kpi Icon={ListChecks} label={t('complaints.kpiOpen')} value={kpis.open} tone="info" to="/complaints" />
+        <Kpi Icon={AlertTriangle} label={t('complaints.kpiAckBreach')} value={kpis.ackBreach} tone="warning" to="/complaints" />
+        <Kpi Icon={AlertOctagon} label={t('complaints.kpiResolutionBreach')} value={kpis.resolutionBreach} tone="danger" to="/complaints" />
         <Kpi Icon={Send} label={t('complaints.kpiSamaEscalated')} value={kpis.sama} tone="accent"
           onClick={() => setFilterStatus('ESCALATED_TO_SAMA')} active={filterStatus === 'ESCALATED_TO_SAMA'} />
       </div>

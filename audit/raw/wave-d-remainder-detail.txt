@@ -1,0 +1,104 @@
+==========================================================================================
+PERF-IX-004  [Medium]  status / workflow_status columns are queried as filters but lack supporting indexes on several cyber tables
+FILE: setup_cyber_db.py LINES: 202-320
+EFFORT: S
+-- description --
+Of the tables that carry a workflow_status column, several have no index on workflow_status or status: cyber.cyber_action_plans, cyber.cyber_incidents, cyber.vuln_exceptions, cyber.vulnerabilities. These tables are filtered by status in the service layer (workflow state machines) and via repository finders. The cyber.* tables are created by setup_cyber_db.py with only an IDENTITY clustered PK and no secondary indexes at all (the script contains 0 CREATE INDEX), so a query like 'open vulnerabilities for org N' scans the whole table and filters status as a residual predicate. Even the migration-defined cyber.incidents (V1 line 781) only adds IX_cyber_inc_nist on nist_phase, not on (organisatio
+-- resolution --
+Add composite indexes leading with organisation_id and including status/workflow_status for the affected cyber tables, mirroring the design already present in db/sqlserver/indexes/02-module-indexes.sql (IX_vulnerabilities_org_status etc.). Apply via Flyway and update setup_cyber_db.py so the dev DB matches.
+==========================================================================================
+PERF-IX-005  [Medium]  Foreign-key columns are not indexed — SQL Server does not auto-index FKs, so child-table joins and parent delete/update integrity checks scan
+FILE: tss-grc-backend/src/main/resources/db/migration/sqlserver/V3__compliance_module.sql LINES: 103-105
+EFFORT: M
+-- description --
+Across the applied migrations there are 92 FOREIGN KEY declarations on 55 distinct FK column names. Of those, 23 FK column names are never used as the leading key of any index anywhere in the schema — including assessment_id, asset_id, engagement_id, playbook_id, subprocessor_id, parent_processor_id, parent_audit_id, step_id, snapshot_id, primary_vendor_id, reporting_year_id and others. Because SQL Server does not auto-create an index to back a FOREIGN KEY constraint, every join from parent to child on these columns (and every cascade/integrity check when the parent is modified) performs a scan of the child table. compliance.findings.assessment_id (FK_findings_assessment, V3 lines 103-105) a
+-- resolution --
+Create a nonclustered index on each FK column (leading with organisation_id where the child is tenant-scoped, otherwise leading with the FK column). Add to the schema-standard checklist alongside the org-index rule from PERF-IX-001.
+==========================================================================================
+PERF-IX-006  [Medium]  Curated index files (db/sqlserver/indexes/*.sql) are orphaned — never wired into the Flyway chain or the dev Python bootstrap, so ~40 designed indexes never get created
+FILE: tss-grc-backend/db/sqlserver/indexes/01-shared-indexes.sql LINES: 1-209
+EFFORT: M
+-- description --
+The repository contains two hand-authored index files: 01-shared-indexes.sql (~25 indexes: organizations, business_units, iam.users, user_roles, controls, workflow_instances, attachments, notifications, audit_logs, licenses) and 02-module-indexes.sql (~15 indexes: risk.risks, risk_assessments, cyber.assets, vulnerabilities, incidents, bcm.*, privacy.*, compliance.*, reporting.*). These define exactly the organisation_id/status/FK composite indexes the other findings call for. However: (a) prod Flyway is configured with `locations: classpath:db/migration/sqlserver` (application-prod.yml:28) — i.e. only the V*.sql files under src/main/resources, NOT tss-grc-backend/db/sqlserver/indexes/; (b) t
+-- resolution --
+Convert 01-shared-indexes.sql and 02-module-indexes.sql into a properly versioned Flyway migration under src/main/resources/db/migration/sqlserver/ (e.g. V225__shared_and_module_indexes.sql) so they apply in prod, and update the dev bootstrap to run them (or run the same SQL from a setup_indexes.py). Reconcile the index set against PERF-IX-001's gap list before applying. Delete or clearly deprecate the stale migrations/README.md layout.
+==========================================================================================
+PERF-PG-002  [Medium]  TPRM /assessments loads ALL vendors via Pageable.unpaged() then runs an unbounded IN-clause over every vendor id
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/TprmService.java LINES: 83-92
+EFFORT: M
+-- description --
+GET /api/v1/tprm/assessments (no vendorId param) calls TprmService.listAssessments(null). The implementation first fetches EVERY vendor for the tenant using vendorRepo.findByOrganisationId(orgId, Pageable.unpaged()) — explicitly disabling pagination — maps them to a List<Long> of ids, then calls assessmentRepo.findByVendorIdIn(vendorIds), which has no Pageable and emits a SQL IN (?, ?, ... ) with one bind parameter per vendor. The result List<VendorAssessment> contains every assessment for the org. So a single request does a full vendor table scan plus a full assessment fetch, with the IN-list growing with vendor count. SQL Server has a practical/parser ceiling on IN-list and parameter count
+-- resolution --
+Add organisation_id (or a join) to VendorAssessment and a paged org-scoped finder: Page<VendorAssessment> findByOrganisationId(Long orgId, Pageable pageable). Change the controller to return Page<VendorAssessment> with @PageableDefault and the service to delegate directly to the paged finder, eliminating both the Pageable.unpaged() vendor scan and the IN-list. For the vendorId-scoped branch, accept a Pageable and return a Page instead of .getContent().
+==========================================================================================
+PERF-PG-004  [Low]  Cyber & SCM expose explicit '/all' register dumps (assets, controls, vendors) that bypass the module's own pagination
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/cyber/controller/CyberController.java LINES: 79-83
+EFFORT: M
+-- description --
+Several modules pair a properly-paginated register endpoint with an explicit '/all' (or root) variant that returns the entire org-scoped set, for populating UI dropdowns. CyberController exposes GET /api/v1/cyber/controls (Page<CyberControl>) alongside GET /api/v1/cyber/controls/all (List<CyberControl>), and GET /api/v1/cyber/assets (Page) alongside GET /api/v1/cyber/assets/all (List), plus GET /api/v1/cyber/frameworks (List). Each '/all' calls cyberService.getAllControls/getAllAssets/getFrameworks which delegate to controlRepo/assetRepo/frameworkRepo.findAllByOrganisationId(orgId) — repository finders that return List with no Pageable. ScmController.allVendors() is documented '/vendors/all 
+-- resolution --
+Cap the '/all' endpoints server-side. Prefer returning a lightweight projection (id + label only) for dropdowns and hard-limit the row count (e.g. PageRequest.of(0, 500)); if a register legitimately exceeds the cap, the UI should switch to a server-side type-ahead search endpoint instead of a full dump. At minimum add an explicit limit so the query can never fetch the entire table.
+==========================================================================================
+PERF-NQ-004  [High]  RiskControlFindingPivotService: compounding per-row queries across controls, findings, CAPA and CCM runs
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java LINES: 140-389
+EFFORT: L
+-- description --
+Multiple loops issue per-row queries: (1) buildRiskPivot loops over risk-control links calling controlRepo.findByIdAndOrganisationId per link (148-154). (2) buildControlPivot loops links calling riskRepo.findById per link (190-194). (3) buildFindingPivot nests a per-control loop with an inner per-link riskRepo.findById (245-257). (4) capasForFindings runs TWO repository queries (auditLcCapaRepo + capaRepo) per finding (334-349). (5) ccmCoverageForControls calls ccmRunRepo.findRecentForTest once per test definition (365-377). Worst of all, toControlPivot (574-607) calls latestAssessmentEffectiveness (which queries control assessments, 381-389) AND re-loads ALL org CCM test definitions via ccm
+-- resolution --
+Batch-load by id sets: collect controlIds/riskIds and use findAllById / a single findByOrganisationIdAndIdIn finder; load CCM test definitions for the org ONCE before the control loop and pass the map into toControlPivot; load latest control assessments for all controlIds in one query (e.g. findByOrganisationIdAndControlIdIn ordered, then reduce in memory); fetch CAPA for all finding externalIds in one IN query per source repo; and push the control_crosswalk code filter into the findings query (or maintain a normalized control_code -> finding link table) instead of scanning + JSON-parsing every org finding in Java.
+==========================================================================================
+PERF-NQ-007  [Medium]  TreatmentPlan @OneToMany actions is EAGER, causing per-plan child query on list views (and a count that loads all children)
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/risk_lc/entity/TreatmentPlan.java LINES: 77-79
+EFFORT: M
+-- description --
+TreatmentPlan.actions is annotated @OneToMany(..., fetch = FetchType.EAGER) (TreatmentPlan.java:77). TreatmentPlanService.listForOrg() (94-99) and listForRisk() (101-106) load all plans for the tenant/risk and map each via TreatmentPlanDto.from, which dereferences e.getActions() (TreatmentPlanDto.java:43). Because the collection is EAGER and the finder returns a list (not a fetch-join), Hibernate issues one actions SELECT per plan. Separately, generateExternalId() (197-201) does repo.findByOrganisationIdOrderByCreatedAtDesc(orgId).size() - loading every plan (and, due to EAGER, every plan's actions) merely to compute count+1 for the next external id.
+-- resolution --
+Change actions to FetchType.LAZY. For list views that need actions, add a JOIN FETCH / @EntityGraph finder so the collection is fetched in one query; for list views that do not need actions, the DTO simply omits them. Replace generateExternalId's list().size() with a repository count query (e.g. countByOrganisationId) - the repository already exposes countByOrganisationIdAndStatus, so add countByOrganisationId.
+==========================================================================================
+PERF-IO-001  [High]  Outbound integration HTTP calls execute inside @Transactional methods, holding a Hikari DB connection across the remote round-trip
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/integrations/servicenow/service/ServiceNowOutboundService.java LINES: 83-114
+EFFORT: M
+-- description --
+All four outbound integration services declare their public entry-point methods @Transactional and then invoke a synchronous, blocking remote HTTP client from inside that transaction. Spring opens (or borrows) a JDBC connection for the transaction at method entry and does not release it until the method returns. Because the remote HTTP call sits inside that boundary, the borrowed Hikari connection stays checked out for the ENTIRE network round-trip plus all in-thread retry sleeps. ServiceNowOutboundService.push() (line 83 @Transactional) calls client.createIncident() at line 109; SplunkOutboundService.push() (line 164 @Transactional) calls client.pushEvent() at line 176; CrowdStrikeOutboundS
+-- resolution --
+Decouple the remote call from the transaction. Perform the blocking HTTP call OUTSIDE any @Transactional scope, then open a short, separate transaction only to persist the audit/external-link row. Concretely: remove @Transactional from the public push/poll methods; do the client.* call with no connection borrowed; then call a small @Transactional helper (e.g. an injected self-proxy method or a dedicated *PersistenceService.recordOutcome(...)) that writes the row and returns immediately. Better still, move the entire push off the request thread via @Async (the app already declares @EnableAsync on GrcApplication) or an outbox table drained by a worker, so request threads never block on third-party latency at all.
+==========================================================================================
+PERF-IO-002  [High]  Scheduled and manual integration polls hold one DB connection across the remote poll PLUS the entire per-finding ingest loop
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/integrations/tenable/service/TenableInboundService.java LINES: 144-185
+EFFORT: M
+-- description --
+TenableInboundService.pollFindings() (line 144 @Transactional) calls the blocking client.pollFindings() at line 158 BEFORE writing anything, then loops the returned batch calling ingestOne() (line 176) which performs three saves (vulnerabilities.save, findingLogRepo.save, linkRepo.save) plus audit.log and publisher.publishEvent per finding. The same shape is in CrowdStrikeInboundService.pollDetections() (line 142 @Transactional, blocking client.pollDetections() at line 156, ingestOne() per detection at line 172). CrowdStrike's poll is doubly expensive on I/O: LiveCrowdStrikeClient.pollDetections() (lines 79-115) makes TWO sequential remote calls — the ids query (line 82) then the bulk summar
+-- resolution --
+Fetch the remote batch with NO transaction open (move client.poll*() out of the @Transactional method), then persist findings in short, per-finding (or small-chunk) transactions so each borrows and returns a connection quickly. This caps connection-hold time at a single DB write, lets other work interleave, and keeps SQL Server transactions small. Pattern: pollOnce() (no @Transactional) -> List<Dto> = client.poll(); for (dto : batch) persistence.ingestOne(orgId, dto) where ingestOne is @Transactional(propagation=REQUIRES_NEW) on a separate bean.
+==========================================================================================
+PERF-IO-003  [Medium]  In-thread Thread.sleep retry/backoff inside transactional integration calls extends DB-connection hold time to as much as ~75s-2min
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/integrations/splunk/client/LiveSplunkClient.java LINES: 69-107
+EFFORT: M
+-- description --
+Every LIVE client retries 5xx/connection failures with an in-thread exponential backoff that calls Thread.sleep on the calling thread. Splunk and CrowdStrike cap the per-attempt backoff at BACKOFF_CAP_MS = 30_000L (LiveSplunkClient.java:49, LiveCrowdStrikeClient.java:54) over up to 3 attempts. ServiceNow's withRetry (LiveServiceNowClient.java:194-216) sleeps starting at 250ms, doubling, capped at 5000ms, with max-retries=3 (so up to 4 attempts) and a read timeout of 30s per attempt (ServiceNowProperties timeout-seconds=30, application.yml:183). Because these clients are called from inside @Transactional service methods, the entire sleep+timeout budget is added to the DB-connection-hold time.
+-- resolution --
+First and primarily, remove the remote call from the transaction (PERF-IO-001) so retry sleeps no longer occupy a connection. Additionally, prefer non-blocking retry (Resilience4j / Spring Retry with a separate scheduler, or async + outbox) over Thread.sleep, and lower the ServiceNow read timeout from 30s toward the 5s the other adapters use unless a specific SLA requires longer. Cap total retry budget (sum of timeouts + backoffs) well under the 60s leak-detection threshold and the 30s connection-timeout to avoid cascading symptoms.
+==========================================================================================
+PERF-IO-004  [Medium]  OAuth token refresh performs a synchronized blocking HTTP fetch while a transaction holds a DB connection, serialising all callers
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/integrations/servicenow/oauth/ServiceNowOAuthTokenManager.java LINES: 53-94
+EFFORT: S
+-- description --
+ServiceNowOAuthTokenManager.getAccessToken() (line 53) and refresh() (line 61) are both 'synchronized' on the manager instance. refresh() performs a blocking restClient.post() to the token URL (lines 76-81). getAccessToken() is invoked from LiveServiceNowClient.authHeader() (lines 137-147), which runs while building every outbound request — i.e. inside the @Transactional push()/update() flow. When the cached token is within the 60s expiry skew (line 33 EXPIRY_SKEW) or after a 401, the next caller triggers a blocking remote fetch while holding the monitor; all other threads calling getAccessToken() queue behind that lock. Combined with PERF-IO-001, the refreshing thread also holds its pooled 
+-- resolution --
+Narrow the lock so the blocking HTTP fetch happens outside the monitor (double-checked refresh, or single-flight via AtomicReference + a separate guarded fetch), and ensure token acquisition does not occur inside an open DB transaction (fixed transitively by PERF-IO-001 moving the whole client call out of @Transactional). Optionally refresh tokens proactively on a background scheduler before expiry so the request path never pays refresh latency.
+==========================================================================================
+PERF-FE-002  [High]  Both full translation dictionaries (Arabic 418 KB + English 325 KB source) are statically imported on the critical path; only one language is ever active
+FILE: tss-grc-ui-v2/src/lib/i18n.tsx LINES: 2-3
+EFFORT: M
+-- description --
+lib/i18n.tsx statically imports both dictionaries at module top: `import { en } from '../translations/en'` and `import { ar } from '../translations/ar'` (lines 2-3), then builds a static map `const dictionaries: Record<Lang, Dictionary> = { en, ar }` (line 24). en.ts is 6,081 lines / 325,194 bytes of source and ar.ts is 6,061 lines / 417,903 bytes of source. Because i18n.tsx is imported by App.tsx (line 3) and by LoginPage (line 4), both dictionaries are pulled into the initial bundle regardless of which language the user has selected. The default language is Arabic (i18n.tsx selects 'ar' unless localStorage says 'en'), so an Arabic user still downloads the entire English dictionary, and vic
+-- resolution --
+Lazy-load the active dictionary with dynamic import keyed on the selected language, so only one locale ships initially and the other is fetched on language switch. Replace the static map with `await import(`../translations/${lang}.ts`)` inside an effect (or a loader that suspends), keeping the current dictionary in state. This roughly halves the i18n payload on first load and removes ~325-418 KB from the entry bundle.
+==========================================================================================
+PERF-FE-003  [Medium]  @tanstack/react-virtual is a dependency but used by only 1 of 73 tables; 72 pages render every row via an un-virtualized, un-paginated DataTable
+FILE: tss-grc-ui-v2/src/components/ui/DataTable.tsx LINES: 40-94
+EFFORT: L
+-- description --
+package.json declares `@tanstack/react-virtual: ^3.13.24` (line 16). A grep for its usage finds it imported in exactly one file: components/ui/data-table/DataTableV2.tsx. DataTableV2 (the virtualized table) is referenced by only 1 page. The non-virtualized components/ui/DataTable.tsx is imported by 72 pages, and its render body does `{rows.map(row => ... )}` (line 53) — it materialises one <tr> per row with no windowing, no `rows.slice(...)`, no pagination and no use of react-virtual (the file imports nothing from @tanstack/react-virtual). So the virtualization library that was added to the dependency tree is effectively shelf-ware: the overwhelming majority of GRC registers (risk register, 
+-- resolution --
+Either (a) migrate the high-volume registers to the existing DataTableV2 so react-virtual actually windows the rows, or (b) if a full migration is out of scope, add row virtualization (or at minimum client-side pagination / a row cap) directly to the shared DataTable so all 72 consumers benefit. If neither table will use react-virtual broadly, remove the dependency to stop shipping it. Pick virtualization for the registers known to grow large (risk, vulnerabilities, vendors, findings, obligations).

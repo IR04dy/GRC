@@ -233,17 +233,24 @@ export function AiModelRegisterPage() {
 
       <div className="kpi-grid-sm">
         <Kpi Icon={Bot}          label={lang === 'ar' ? 'إجمالي النماذج' : 'Total models'}
-             value={stats.total} tone="primary" />
+             value={stats.total} tone="primary"
+             to="/ai" />
         <Kpi Icon={Activity}     label={lang === 'ar' ? 'في الإنتاج' : 'In production'}
-             value={stats.inProduction} tone="success" />
+             value={stats.inProduction} tone="success"
+             onClick={() => setFilterStage(prev => (prev === 'IN_PRODUCTION' ? 'ALL' : 'IN_PRODUCTION'))}
+             active={filterStage === 'IN_PRODUCTION'} />
         <Kpi Icon={ShieldAlert}  label={lang === 'ar' ? 'حرج/مرتفع' : 'Critical / High'}
-             value={stats.highOrCritical} tone="warning" />
+             value={stats.highOrCritical} tone="warning"
+             onClick={() => setFilterTier(prev => (prev === 'CRITICAL' ? 'ALL' : 'CRITICAL'))}
+             active={filterTier === 'CRITICAL'} />
         <Kpi Icon={AlertTriangle} label={lang === 'ar' ? 'بدون تدقيق عدالة' : 'No fairness audit'}
              value={stats.missingFairnessAudit}
-             tone={stats.missingFairnessAudit > 0 ? 'danger' : 'success'} />
+             tone={stats.missingFairnessAudit > 0 ? 'danger' : 'success'}
+             to="/ai" />
         <Kpi Icon={BadgeAlert}   label={lang === 'ar' ? 'انحراف غير مُقَرّ' : 'Unacknowledged drift'}
              value={stats.unacknowledgedDrift}
-             tone={stats.unacknowledgedDrift > 0 ? 'warning' : 'success'} />
+             tone={stats.unacknowledgedDrift > 0 ? 'warning' : 'success'}
+             to="/ai" />
         <Kpi Icon={Cpu}          label={lang === 'ar' ? 'EU AI Act عالي الخطورة' : 'EU AI Act high-risk'}
              value={stats.euAiActHighRisk} tone="accent"
              onClick={() => setFilterEuAi(prev => (prev === 'YES' ? 'ALL' : 'YES'))}
@@ -253,7 +260,9 @@ export function AiModelRegisterPage() {
              onClick={() => setFilterSdaia(prev => (prev === 'COMPLIANT' ? 'ALL' : 'COMPLIANT'))}
              active={filterSdaia === 'COMPLIANT'} />
         <Kpi Icon={Shield}       label={lang === 'ar' ? 'مُمتثل للبنك المركزي' : 'SAMA compliant'}
-             value={stats.samaCompliant} tone="success" />
+             value={stats.samaCompliant} tone="success"
+             onClick={() => setFilterSdaia(prev => (prev === 'COMPLIANT' ? 'ALL' : 'COMPLIANT'))}
+             active={filterSdaia === 'COMPLIANT'} />
         {/* ─── Governance-posture gaps (clickable filters) ─── */}
         <Kpi Icon={UserCheck}    label={lang === 'ar' ? 'بدون إشراف بشري' : 'No human oversight'}
              value={stats.missingHumanOversight}

@@ -224,11 +224,11 @@ export function WhistleblowerRetaliationPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Inbox}       label={isAr ? 'إجمالي البلاغات' : 'Total claims'} value={kpis.total} tone="primary" />
-        <Kpi Icon={ShieldAlert} label={isAr ? 'بانتظار القبول' : 'Awaiting validation'} value={kpis.received} tone={kpis.received > 0 ? 'info' : 'neutral'} />
-        <Kpi Icon={Gavel}       label={isAr ? 'قيد المراجعة' : 'Under review'} value={kpis.validated} tone={kpis.validated > 0 ? 'warning' : 'neutral'} />
-        <Kpi Icon={ShieldCheck} label={isAr ? 'مُثبَتة' : 'Upheld'} value={kpis.upheld} tone={kpis.upheld > 0 ? 'danger' : 'neutral'} />
-        <Kpi Icon={UserX}       label={isAr ? 'مرفوضة' : 'Dismissed'} value={kpis.dismissed} tone="neutral" />
+        <Kpi Icon={Inbox}       label={isAr ? 'إجمالي البلاغات' : 'Total claims'} value={kpis.total} tone="primary" to="/ethics" />
+        <Kpi Icon={ShieldAlert} label={isAr ? 'بانتظار القبول' : 'Awaiting validation'} value={kpis.received} tone={kpis.received > 0 ? 'info' : 'neutral'} to="/ethics" />
+        <Kpi Icon={Gavel}       label={isAr ? 'قيد المراجعة' : 'Under review'} value={kpis.validated} tone={kpis.validated > 0 ? 'warning' : 'neutral'} to="/ethics" />
+        <Kpi Icon={ShieldCheck} label={isAr ? 'مُثبَتة' : 'Upheld'} value={kpis.upheld} tone={kpis.upheld > 0 ? 'danger' : 'neutral'} to="/ethics" />
+        <Kpi Icon={UserX}       label={isAr ? 'مرفوضة' : 'Dismissed'} value={kpis.dismissed} tone="neutral" to="/ethics" />
       </div>
 
       {showForm && (

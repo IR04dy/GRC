@@ -856,10 +856,10 @@ export function CompliancePage() {
               at 180px min — matches the Risk page's 4-tile strip and the
               rest of the app's KPI rows. */}
           <div className="kpi-grid" style={{ marginBottom: 12 }}>
-            <Kpi Icon={ClipboardCheck} label={t('agingKpiOnTrack')}        value={aging.filter(f => f.escalationTier === 'ON_TRACK').length} tone="success" />
-            <Kpi Icon={Flag}           label={t('agingKpiManager')}        value={aging.filter(f => f.escalationTier === 'MANAGER_ESCALATED').length} tone="info" />
-            <Kpi Icon={AlertTriangle}  label={t('agingKpiDirector')}       value={aging.filter(f => f.escalationTier === 'DIRECTOR_ESCALATED').length} tone="accent" />
-            <Kpi Icon={AlertTriangle}  label={t('agingKpiExec')}           value={aging.filter(f => f.escalationTier === 'EXEC_ESCALATED').length} tone="danger" />
+            <Kpi Icon={ClipboardCheck} label={t('agingKpiOnTrack')}        value={aging.filter(f => f.escalationTier === 'ON_TRACK').length} tone="success" to="/compliance" />
+            <Kpi Icon={Flag}           label={t('agingKpiManager')}        value={aging.filter(f => f.escalationTier === 'MANAGER_ESCALATED').length} tone="info" to="/compliance" />
+            <Kpi Icon={AlertTriangle}  label={t('agingKpiDirector')}       value={aging.filter(f => f.escalationTier === 'DIRECTOR_ESCALATED').length} tone="accent" to="/compliance" />
+            <Kpi Icon={AlertTriangle}  label={t('agingKpiExec')}           value={aging.filter(f => f.escalationTier === 'EXEC_ESCALATED').length} tone="danger" to="/compliance" />
           </div>
           <Card padded={false}>
             {!agingLoaded ? <LoadingRow /> :
@@ -1138,10 +1138,10 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
             <div className="kpi-grid">
               <Kpi Icon={ClipboardCheck} label={t('frameworkKpiControls')}     value={activeCov?.controlCount ?? 0} tone="primary" to="/controls/library" />
               <Kpi Icon={CheckCheck}     label={t('frameworkKpiImplemented')} value={activeCov?.implementedControls ?? 0} tone="success" to="/controls/library" />
-              <Kpi Icon={Award}          label={t('frameworkKpiMaturity')}     value={typeof activeCov?.avgMaturity === 'number' ? `L${activeCov.avgMaturity}` : '—'} tone="accent" />
+              <Kpi Icon={Award}          label={t('frameworkKpiMaturity')}     value={typeof activeCov?.avgMaturity === 'number' ? `L${activeCov.avgMaturity}` : '—'} tone="accent" to="/controls/library" />
               <Kpi Icon={BookCopy}       label={t('frameworkKpiPolicies')}     value={total}                                   tone="info" to="/policy-management" />
               <Kpi Icon={Flag}           label={t('frameworkKpiCoverage')}     value={`${fullPct}%`}                            tone={fullPct >= 80 ? 'success' : fullPct >= 50 ? 'primary' : 'warning'} to="/compliance/posture" />
-              <Kpi Icon={AlertTriangle}  label={t('frameworkKpiOpenFindings')} value={activeCov?.openFindings ?? 0} tone="danger" />
+              <Kpi Icon={AlertTriangle}  label={t('frameworkKpiOpenFindings')} value={activeCov?.openFindings ?? 0} tone="danger" to="/evidence" />
             </div>
           </Card>
         )}

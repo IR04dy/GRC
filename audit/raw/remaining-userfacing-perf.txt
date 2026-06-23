@@ -1,0 +1,50 @@
+=== A11Y / UX / COPY / Lighthouse (24) ===
+High    COPY-01       LoginPage.tsx                      Login form ships with pre-filled admin / Admin@12345 credentia
+High    LH-01         App.tsx                            Critical-path module pages eagerly imported in App.tsx defeat 
+High    LH-02         i18n.tsx                           Both full-language translation dictionaries (ar.ts ~1.05 MiB +
+Info    A11Y-007      axe-summary.json                   WCAG 2.1 AA conformance summary — per-criterion pass/fail view
+Low     COPY-04       en.ts                              Generic, non-actionable load-failure messages across modules (
+Low     COPY-05       en.ts                              Inconsistent error voice across modules — "Failed to load" vs 
+Low     LH-05         lighthouse-login.report.json       Insecure (HTTP) requests and render-blocking script from local
+Low     LH-06         index.html                         Console error on /login: favicon.ico returns 404 (errors-in-co
+Low     LH-07         index.html                         Missing meta description on /login (SEO audit fails; SEO categ
+Low     UX-006        risk-register.png                  Workflow "start" stage rail and action chip rows are dense und
+Low     UX-007        settings.png                       Settings customizer applies theme/color changes immediately wi
+Low     UX-008        bcm.png                            Recent-records list and KPI strip have no visible empty/zero-s
+Medium  A11Y-004      tokens.css                         Accent / warning numerals fall just under contrast on cream su
+Medium  A11Y-005      components.css                     Heatmap score numerals fail contrast on medium/high risk cells
+Medium  A11Y-006      axe-summary.json                   Manual-only WCAG criteria not covered by automated axe scan — 
+Medium  COPY-02       LoginPage.tsx                      "Continue without backend (demo mode)" CTA silently bounces th
+Medium  COPY-03       en.ts                              loginNetworkError exposes developer jargon and a localhost URL
+Medium  LH-03         lighthouse-login.report.json       Catastrophic Core Web Vitals on /login: FCP 37.4 s, LCP 72.3 s
+Medium  LH-04         lighthouse-login.report.json       Cumulative Layout Shift 0.344 on /login — 6 layout shifts duri
+Medium  UX-001        shell.css                          Topbar page title is crushed to 2–3 glyphs because the search 
+Medium  UX-002        components.css                     Risk Register KPI tiles show a number and a stray arrow but no
+Medium  UX-003        login.png                          Login error/feedback states are not visible; the only guidance
+Medium  UX-004        risk-register.png                  Mobile Risk Register page title wraps to one word per line, co
+Medium  UX-005        dashboard.png                      Mobile dashboard renders the gauge above its own title, leavin
+
+=== PERF residual (23) ===
+High    PERF-FE-002   i18n.tsx                           Both full translation dictionaries (Arabic 418 KB + English 32
+High    PERF-IO-001   ServiceNowOutboundService.java     Outbound integration HTTP calls execute inside @Transactional 
+High    PERF-IO-002   TenableInboundService.java         Scheduled and manual integration polls hold one DB connection 
+High    PERF-IX-001   V3__compliance_module.sql          74 multi-tenant tables carry organisation_id but have no suppo
+High    PERF-IX-003   V1__core_schemas.sql               iam.users has no index beyond the clustered PK — username/emai
+High    PERF-NQ-004   RiskControlFindingPivotService.jav RiskControlFindingPivotService: compounding per-row queries ac
+High    PERF-PG-001   ObligationController.java          204 register/list endpoints return entire result set with no p
+Info    PERF-FE-006   lighthouse-login.report.json       Lighthouse /login (Performance 38) was captured against the Vi
+Low     PERF-IO-005   application.yml                    Hikari pool sizing (base=20 / dev=10) is undersized for blocki
+Low     PERF-NQ-006   BcmDependencyGraphService.java     BcmDependencyGraphService re-queries BIA per plan despite alre
+Low     PERF-PG-004   CyberController.java               Cyber & SCM expose explicit '/all' register dumps (assets, con
+Medium  PERF-FE-003   DataTable.tsx                      @tanstack/react-virtual is a dependency but used by only 1 of 
+Medium  PERF-FE-004   vite.config.ts                     vite.config.ts has no manualChunks / vendor-splitting; React, 
+Medium  PERF-FE-005   index.html                         Layout-direction flip after hydration (index.html dir=ltr vs i
+Medium  PERF-IO-003   LiveSplunkClient.java              In-thread Thread.sleep retry/backoff inside transactional inte
+Medium  PERF-IO-004   ServiceNowOAuthTokenManager.java   OAuth token refresh performs a synchronized blocking HTTP fetc
+Medium  PERF-IX-004   setup_cyber_db.py                  status / workflow_status columns are queried as filters but la
+Medium  PERF-IX-005   V3__compliance_module.sql          Foreign-key columns are not indexed — SQL Server does not auto
+Medium  PERF-IX-006   01-shared-indexes.sql              Curated index files (db/sqlserver/indexes/*.sql) are orphaned 
+Medium  PERF-NQ-005   ControlMapService.java             ControlMapService resolves each mapping with 3 findById querie
+Medium  PERF-NQ-007   TreatmentPlan.java                 TreatmentPlan @OneToMany actions is EAGER, causing per-plan ch
+Medium  PERF-PG-002   TprmService.java                   TPRM /assessments loads ALL vendors via Pageable.unpaged() the
+Medium  PERF-PG-003   application.yml                    No global maximum page size — paginated Page<> endpoints accep

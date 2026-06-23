@@ -129,10 +129,10 @@ export function SanctionsListDetailPage() {
       )}
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Database}    label={isAr ? 'الإدخالات المُحمّلة' : 'Loaded entries'} value={counts.total} tone="primary" />
-        <Kpi Icon={Users}       label={isAr ? 'أفراد' : 'Individuals'} value={counts.individuals} tone="info" />
-        <Kpi Icon={ShieldAlert} label={isAr ? 'تطابق قوي مطلوب' : 'Strong-match req.'} value={counts.strong} tone={counts.strong > 0 ? 'danger' : 'neutral'} />
-        <Kpi Icon={Globe}       label={isAr ? 'دول' : 'Countries'} value={counts.countries} tone="neutral" />
+        <Kpi Icon={Database}    label={isAr ? 'الإدخالات المُحمّلة' : 'Loaded entries'} value={counts.total} tone="primary" to="/aml/sanctions/dashboard" />
+        <Kpi Icon={Users}       label={isAr ? 'أفراد' : 'Individuals'} value={counts.individuals} tone="info" to="/aml/sanctions/dashboard" />
+        <Kpi Icon={ShieldAlert} label={isAr ? 'تطابق قوي مطلوب' : 'Strong-match req.'} value={counts.strong} tone={counts.strong > 0 ? 'danger' : 'neutral'} to="/aml/sanctions/dashboard" />
+        <Kpi Icon={Globe}       label={isAr ? 'دول' : 'Countries'} value={counts.countries} tone="neutral" to="/aml/sanctions/dashboard" />
       </div>
 
       <Card title={isAr ? 'الإدخالات' : 'Entries'} Icon={Database}>

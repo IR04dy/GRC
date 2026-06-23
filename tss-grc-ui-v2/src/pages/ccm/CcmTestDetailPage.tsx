@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   ClipboardCheck, Play, Pencil, ToggleLeft, ToggleRight, Fingerprint,
   Activity,
@@ -287,17 +287,23 @@ export function CcmTestDetailPage() {
 
       <div className="kpi-grid-sm">
         <Kpi label={lang === 'ar' ? 'النوع' : 'Type'}
-             value={CCM_TEST_TYPE_LABEL[test.testType][lang === 'ar' ? 'ar' : 'en']} />
+             value={CCM_TEST_TYPE_LABEL[test.testType][lang === 'ar' ? 'ar' : 'en']}
+             to="/ccm/dashboard" />
         <Kpi label={lang === 'ar' ? 'النظام' : 'Target system'}
-             value={CCM_TARGET_SYSTEM_LABEL[test.targetSystemType][lang === 'ar' ? 'ar' : 'en']} />
+             value={CCM_TARGET_SYSTEM_LABEL[test.targetSystemType][lang === 'ar' ? 'ar' : 'en']}
+             to="/ccm/dashboard" />
         <Kpi label={lang === 'ar' ? 'الجدول' : 'Schedule (cron)'}
-             value={<code style={{ fontSize: 12 }}>{test.frequencyCron}</code>} />
+             value={<code style={{ fontSize: 12 }}>{test.frequencyCron}</code>}
+             to="/ccm/dashboard" />
         <Kpi label={lang === 'ar' ? 'مهلة التنفيذ' : 'Timeout'}
-             value={`${test.timeoutSeconds}s`} />
+             value={`${test.timeoutSeconds}s`}
+             to="/ccm/dashboard" />
         <Kpi label={lang === 'ar' ? 'إخفاقات متتالية' : 'Consecutive failures'}
-             value={test.consecutiveFailures} />
+             value={test.consecutiveFailures}
+             to="/ccm/dashboard" />
         <Kpi label={lang === 'ar' ? 'مُفعَّل' : 'Enabled'}
-             value={test.isEnabled ? (lang === 'ar' ? 'نعم' : 'Yes') : (lang === 'ar' ? 'لا' : 'No')} />
+             value={test.isEnabled ? (lang === 'ar' ? 'نعم' : 'Yes') : (lang === 'ar' ? 'لا' : 'No')}
+             onClick={toggle} />
       </div>
 
       <Card padded>
@@ -459,11 +465,26 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-interface KpiProps { label: string; value: React.ReactNode }
-function Kpi({ label, value }: KpiProps) {
+interface KpiProps { label: string; value: React.ReactNode; to?: string; onClick?: () => void }
+function Kpi({ label, value, to, onClick }: KpiProps) {
+  const navigate = useNavigate();
+  const handleClick = to ? () => navigate(to) : onClick;
+  const isInteractive = !!(to || onClick);
   return (
-    <div style={{ padding: 12, border: '1px solid var(--border)', borderRadius: 6,
-                  background: 'var(--surface)' }}>
+    <div
+      role={isInteractive ? 'button' : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      onClick={handleClick}
+      onKeyDown={isInteractive ? e => { if (e.key === 'Enter' || e.key === ' ') handleClick?.(); } : undefined}
+      style={{
+        padding: 12, border: '1px solid var(--border)', borderRadius: 6,
+        background: 'var(--surface)',
+        cursor: isInteractive ? 'pointer' : 'default',
+        transition: isInteractive ? 'box-shadow 0.15s' : undefined,
+      }}
+      onMouseEnter={isInteractive ? e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 0 0 2px var(--primary, #2563eb)'; } : undefined}
+      onMouseLeave={isInteractive ? e => { (e.currentTarget as HTMLDivElement).style.boxShadow = ''; } : undefined}
+    >
       <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
         {label}
       </div>

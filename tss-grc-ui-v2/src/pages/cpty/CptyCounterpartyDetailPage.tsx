@@ -336,22 +336,27 @@ export function CptyCounterpartyDetailPage() {
       }}>
         <Kpi Icon={Activity} tone="info"
           label={lang === 'ar' ? 'التصنيف الداخلي' : 'Internal grade'}
-          value={cpty.currentInternalGrade ?? '—'} />
+          value={cpty.currentInternalGrade ?? '—'}
+          to="/risk/counterparty" />
         <Kpi Icon={Activity} tone="neutral"
           label={lang === 'ar' ? 'التصنيف الخارجي' : 'External rating'}
           value={cpty.currentExternalRating
             ? `${cpty.currentExternalRating} (${cpty.currentExternalAgency ?? ''})`
-            : '—'} />
+            : '—'}
+          to="/risk/counterparty" />
         <Kpi Icon={Banknote} tone="info"
           label={lang === 'ar' ? 'إجمالي التعرّض' : 'Total exposure'}
           value={Number(cpty.totalExposureSarM ?? 0).toLocaleString(
             lang === 'ar' ? 'ar-SA' : 'en-US') + ' ' +
-            (lang === 'ar' ? 'م.ر' : 'SAR M')} />
+            (lang === 'ar' ? 'م.ر' : 'SAR M')}
+          to="/risk/counterparty" />
         <Kpi Icon={AlertTriangle} tone={limits.some(l => l.band === 'BREACH') ? 'danger'
             : limits.some(l => l.band === 'RED') ? 'danger'
             : limits.some(l => l.band === 'AMBER') ? 'warning' : 'success'}
           label={lang === 'ar' ? 'حدود الطرف' : 'Limits'}
-          value={limits.length} />
+          value={limits.length}
+          onClick={() => setTab('limits')}
+          active={tab === 'limits'} />
       </div>
 
       {/* Tabs */}

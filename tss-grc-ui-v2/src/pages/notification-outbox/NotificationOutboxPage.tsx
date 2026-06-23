@@ -48,7 +48,7 @@ export function NotificationOutboxPage() {
         <Kpi Icon={Clock}         label={t('noxKpiPending')}    value={String(stats.pending)}   tone={stats.pending > 0 ? 'warning' : 'success'} onClick={() => setTab('pending')} active={tab === 'pending'} />
         <Kpi Icon={CheckCircle2}  label={t('noxKpiSent')}        value={String(stats.sentToday)} tone="success" onClick={() => setTab('sent')} active={tab === 'sent'} />
         <Kpi Icon={XCircle}        label={t('noxKpiFailed')}      value={String(stats.failed)}    tone={stats.failed > 0 ? 'danger' : 'success'} onClick={() => setTab('failed')} active={tab === 'failed'} />
-        <Kpi Icon={AlertOctagon}   label={t('noxKpiSlaAtRisk')}   value={String(stats.pending)}   tone={stats.pending > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={AlertOctagon}   label={t('noxKpiSlaAtRisk')}   value={String(stats.pending)}   tone={stats.pending > 0 ? 'warning' : 'success'} onClick={() => setTab('pending')} active={tab === 'pending'} />
       </div>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>

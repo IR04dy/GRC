@@ -133,10 +133,10 @@ export function ResilienceTestsPage() {
         actions={<Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('srtNew')}</Button>} />
 
       <div className="kpi-grid">
-        <Kpi Icon={CheckCircle2}  label={t('srtKpiPass')}      value={stats.pass} tone="success" to="/supplier-resilience" />
-        <Kpi Icon={XCircle}       label={t('srtKpiFail')}      value={stats.fail} tone="danger" to="/supplier-resilience" />
-        <Kpi Icon={Clock}         label={t('srtKpiScheduled')} value={stats.SCHEDULED + stats.IN_PROGRESS} tone="warning" to="/supplier-resilience" />
-        <Kpi Icon={AlertTriangle} label={t('srtKpiApproved')}  value={stats.APPROVED} tone="info" to="/supplier-resilience" />
+        <Kpi Icon={CheckCircle2}  label={t('srtKpiPass')}      value={stats.pass} tone="success" to="/resilience-tests" />
+        <Kpi Icon={XCircle}       label={t('srtKpiFail')}      value={stats.fail} tone="danger" to="/resilience-tests" />
+        <Kpi Icon={Clock}         label={t('srtKpiScheduled')} value={stats.SCHEDULED + stats.IN_PROGRESS} tone="warning" onClick={() => setTab('SCHEDULED')} active={tab === 'SCHEDULED'} />
+        <Kpi Icon={AlertTriangle} label={t('srtKpiApproved')}  value={stats.APPROVED} tone="info" onClick={() => setTab('APPROVED')} active={tab === 'APPROVED'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} hideEmpty />

@@ -144,10 +144,10 @@ export function RiskBowTiePage() {
       />
 
       <div className="kpi-grid-sm">
-        <Kpi Icon={GitMerge}       label={lang === 'ar' ? 'إجمالي' : 'Total'}        value={rows.length} tone="primary" />
-        <Kpi Icon={ShieldCheck}    label={lang === 'ar' ? 'معتمدة' : 'Approved'}     value={approved}    tone="success" />
-        <Kpi Icon={ClipboardCheck} label={lang === 'ar' ? 'مسودات' : 'In progress'}  value={draft}       tone="warning" />
-        <Kpi Icon={AlertTriangle}  label={lang === 'ar' ? 'متبقّي مرتفع' : 'High residual'} value={critical} tone="danger" />
+        <Kpi Icon={GitMerge}       label={lang === 'ar' ? 'إجمالي' : 'Total'}        value={rows.length} tone="primary"  to="/risk/bowtie" />
+        <Kpi Icon={ShieldCheck}    label={lang === 'ar' ? 'معتمدة' : 'Approved'}     value={approved}    tone="success"  to="/risk/bowtie" />
+        <Kpi Icon={ClipboardCheck} label={lang === 'ar' ? 'مسودات' : 'In progress'}  value={draft}       tone="warning"  to="/risk/bowtie" />
+        <Kpi Icon={AlertTriangle}  label={lang === 'ar' ? 'متبقّي مرتفع' : 'High residual'} value={critical} tone="danger" to="/risk/bowtie" />
       </div>
 
       <Card padded={false}>

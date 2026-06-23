@@ -150,8 +150,8 @@ export function FourthPartyPage() {
       <div className="kpi-grid">
         <Kpi Icon={Network}       label={t('f4pKpiTotal')}       value={rows.length} tone="primary" onClick={() => setTab('all')} active={tab === 'all'} />
         <Kpi Icon={CheckCircle2}  label={t('f4pKpiValidated')}   value={stats.VALIDATED} tone="success" onClick={() => setTab('VALIDATED')} active={tab === 'VALIDATED'} />
-        <Kpi Icon={AlertTriangle} label={t('f4pKpiHighConc')}    value={stats.highConc} tone="danger" />
-        <Kpi Icon={Shield}        label={t('f4pKpiCritical')}    value={stats.critical} tone="warning" />
+        <Kpi Icon={AlertTriangle} label={t('f4pKpiHighConc')}    value={stats.highConc} tone="danger" onClick={() => setTab('concentration')} active={tab === 'concentration'} />
+        <Kpi Icon={Shield}        label={t('f4pKpiCritical')}    value={stats.critical} tone="warning" to="/fourth-party" />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} hideEmpty />

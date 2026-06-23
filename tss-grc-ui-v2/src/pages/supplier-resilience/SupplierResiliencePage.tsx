@@ -301,12 +301,12 @@ export function SupplierResiliencePage() {
       />
 
       <div className="kpi-grid">
-        <Kpi Icon={Layers}        label={t('srpKpiAltApproved')}    value={stats.altApproved}    tone="success" />
-        <Kpi Icon={ShieldCheck}   label={t('srpKpiAltReady')}       value={stats.altReady}       tone="primary" />
-        <Kpi Icon={AlertTriangle} label={t('srpKpiAltGap')}         value={stats.altGap}         tone="warning" />
-        <Kpi Icon={Wrench}        label={t('srpKpiPlansApproved')}  value={stats.plansApproved} tone="success" />
-        <Kpi Icon={Play}          label={t('srpKpiPlansActivated')} value={stats.plansActivated} tone="primary" />
-        <Kpi Icon={FlaskConical}  label={t('srpKpiTestOverdue')}    value={stats.plansOverdueTest} tone="danger" />
+        <Kpi Icon={Layers}        label={t('srpKpiAltApproved')}    value={stats.altApproved}    tone="success" onClick={() => setTab('alternates')} active={tab === 'alternates'} />
+        <Kpi Icon={ShieldCheck}   label={t('srpKpiAltReady')}       value={stats.altReady}       tone="primary" onClick={() => setTab('alternates')} active={tab === 'alternates'} />
+        <Kpi Icon={AlertTriangle} label={t('srpKpiAltGap')}         value={stats.altGap}         tone="warning" onClick={() => setTab('alternates')} active={tab === 'alternates'} />
+        <Kpi Icon={Wrench}        label={t('srpKpiPlansApproved')}  value={stats.plansApproved} tone="success" onClick={() => setTab('exit-plans')} active={tab === 'exit-plans'} />
+        <Kpi Icon={Play}          label={t('srpKpiPlansActivated')} value={stats.plansActivated} tone="primary" onClick={() => setTab('exit-plans')} active={tab === 'exit-plans'} />
+        <Kpi Icon={FlaskConical}  label={t('srpKpiTestOverdue')}    value={stats.plansOverdueTest} tone="danger" onClick={() => setTab('exit-plans')} active={tab === 'exit-plans'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

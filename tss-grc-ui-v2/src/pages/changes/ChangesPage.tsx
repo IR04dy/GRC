@@ -237,10 +237,10 @@ export function ChangesPage() {
       />
 
       <div className="kpi-grid">
-        <Kpi Icon={GitBranch}    label={t('changeKpiTotal')}   value={total}     tone="primary" />
-        <Kpi Icon={Clock}        label={t('changeKpiInFlight')} value={inFlight}  tone="info" />
-        <Kpi Icon={AlertTriangle} label={t('changeKpiOverdue')} value={overdue}  tone="danger" />
-        <Kpi Icon={ShieldCheck}  label={t('changeKpiSuccess')} value={`${successPct}%`} tone="success" />
+        <Kpi Icon={GitBranch}    label={t('changeKpiTotal')}   value={total}     tone="primary" to="/changes" />
+        <Kpi Icon={Clock}        label={t('changeKpiInFlight')} value={inFlight}  tone="info" onClick={() => setTab('register')} />
+        <Kpi Icon={AlertTriangle} label={t('changeKpiOverdue')} value={overdue}  tone="danger" onClick={() => setTab('register')} />
+        <Kpi Icon={ShieldCheck}  label={t('changeKpiSuccess')} value={`${successPct}%`} tone="success" onClick={() => setTab('analytics')} />
       </div>
 
       <OverviewStrip

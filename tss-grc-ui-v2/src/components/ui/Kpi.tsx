@@ -187,7 +187,7 @@ export function Kpi({ Icon, label, value, emptyHint, zeroConfirm, trend, tone = 
   if (onClick) {
     return (
       <button onClick={onClick} className={linkClass}
-        style={{ background: 'inherit', border: 'none', textAlign: 'inherit', padding: 'inherit', font: 'inherit', cursor: 'pointer', color: 'inherit', width: '100%' }}>
+        style={{ textAlign: 'inherit', font: 'inherit', cursor: 'pointer', color: 'inherit', width: '100%', display: 'block' }}>
         {body}
       </button>
     );

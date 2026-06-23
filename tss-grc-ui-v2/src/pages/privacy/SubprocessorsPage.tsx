@@ -182,10 +182,10 @@ export function SubprocessorsPage() {
              value={kpis.crossBorder} to="/privacy/data-flow" />
         <Kpi Icon={Clock} tone={kpis.overdue > 0 ? 'danger' : 'neutral'}
              label={lang === 'ar' ? 'مراجعات متأخّرة' : 'Overdue reviews'}
-             value={kpis.overdue} />
+             value={kpis.overdue} to="/privacy" />
         <Kpi Icon={ShieldAlert} tone={kpis.noDpa > 0 ? 'warning' : 'neutral'}
              label={lang === 'ar' ? 'مُعتَمد بلا اتفاقية معالجة بيانات' : 'Approved without DPA'}
-             value={kpis.noDpa} />
+             value={kpis.noDpa} to="/privacy" />
       </div>
 
       <Card padded>

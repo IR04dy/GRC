@@ -1,0 +1,1473 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.71.1"
+  },
+  "ReportID": "019eea0a-a975-74ee-8253-403f74b04c59",
+  "CreatedAt": "2026-06-21T14:57:07.8293231+03:00",
+  "ArtifactName": "tss-grc-backend/target/tss-grc-platform-0.1.0-SNAPSHOT.jar",
+  "ArtifactType": "filesystem",
+  "Results": [
+    {
+      "Target": "Java",
+      "Class": "lang-pkgs",
+      "Type": "jar",
+      "Packages": [
+        {
+          "Name": "ch.qos.logback:logback-classic",
+          "Identifier": {
+            "PURL": "pkg:maven/ch.qos.logback/logback-classic@1.5.32",
+            "UID": "dd9354d5c4a8b789"
+          },
+          "Version": "1.5.32",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/logback-classic-1.5.32.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "ch.qos.logback:logback-core",
+          "Identifier": {
+            "PURL": "pkg:maven/ch.qos.logback/logback-core@1.5.32",
+            "UID": "686275d2f6c10e3b"
+          },
+          "Version": "1.5.32",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/logback-core-1.5.32.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.beust:jcommander",
+          "Identifier": {
+            "PURL": "pkg:maven/com.beust/jcommander@1.72",
+            "UID": "2c57267d315624db"
+          },
+          "Version": "1.72",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jcommander-1.72.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.fasterxml.jackson.core:jackson-annotations",
+          "Identifier": {
+            "PURL": "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21",
+            "UID": "3e26961ba53ce226"
+          },
+          "Version": "2.21",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jackson-annotations-2.21.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.fasterxml.jackson.core:jackson-core",
+          "Identifier": {
+            "PURL": "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.2",
+            "UID": "3d4287b304b99f1"
+          },
+          "Version": "2.21.2",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jackson-core-2.21.2.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.fasterxml.jackson.core:jackson-databind",
+          "Identifier": {
+            "PURL": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.2",
+            "UID": "720d06d3f3b6ec56"
+          },
+          "Version": "2.21.2",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jackson-databind-2.21.2.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.fasterxml.jackson.dataformat:jackson-dataformat-toml",
+          "Identifier": {
+            "PURL": "pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-toml@2.21.2",
+            "UID": "bbe6352f0dd24b9d"
+          },
+          "Version": "2.21.2",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jackson-dataformat-toml-2.21.2.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml",
+          "Identifier": {
+            "PURL": "pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.21.2",
+            "UID": "c4b4ed4b98144aef"
+          },
+          "Version": "2.21.2",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jackson-dataformat-yaml-2.21.2.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.fasterxml.jackson.datatype:jackson-datatype-jdk8",
+          "Identifier": {
+            "PURL": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jdk8@2.21.2",
+            "UID": "c96556d3c4a6a2d3"
+          },
+          "Version": "2.21.2",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jackson-datatype-jdk8-2.21.2.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.fasterxml.jackson.datatype:jackson-datatype-jsr310",
+          "Identifier": {
+            "PURL": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.2",
+            "UID": "5c0a29f13ae118c"
+          },
+          "Version": "2.21.2",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jackson-datatype-jsr310-2.21.2.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.fasterxml.jackson.module:jackson-module-parameter-names",
+          "Identifier": {
+            "PURL": "pkg:maven/com.fasterxml.jackson.module/jackson-module-parameter-names@2.21.2",
+            "UID": "44d42c35d5fde9f7"
+          },
+          "Version": "2.21.2",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jackson-module-parameter-names-2.21.2.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.fasterxml:classmate",
+          "Identifier": {
+            "PURL": "pkg:maven/com.fasterxml/classmate@1.7.3",
+            "UID": "7bb6bc667008da29"
+          },
+          "Version": "1.7.3",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/classmate-1.7.3.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.github.ben-manes.caffeine:caffeine",
+          "Identifier": {
+            "PURL": "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.0",
+            "UID": "e976b0bb63b7a46a"
+          },
+          "Version": "3.2.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/caffeine-3.2.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.github.jai-imageio:jai-imageio-core",
+          "Identifier": {
+            "PURL": "pkg:maven/com.github.jai-imageio/jai-imageio-core@1.4.0",
+            "UID": "1453fd377388db60"
+          },
+          "Version": "1.4.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jai-imageio-core-1.4.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.github.librepdf:openpdf",
+          "Identifier": {
+            "PURL": "pkg:maven/com.github.librepdf/openpdf@1.3.34",
+            "UID": "2d25aeb72dd118a9"
+          },
+          "Version": "1.3.34",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/openpdf-1.3.34.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.github.virtuald:curvesapi",
+          "Identifier": {
+            "PURL": "pkg:maven/com.github.virtuald/curvesapi@1.08",
+            "UID": "d50c2acfa402bb1c"
+          },
+          "Version": "1.08",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/curvesapi-1.08.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.google.code.gson:gson",
+          "Identifier": {
+            "PURL": "pkg:maven/com.google.code.gson/gson@2.13.2",
+            "UID": "5038946fedb99405"
+          },
+          "Version": "2.13.2",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/gson-2.13.2.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.google.errorprone:error_prone_annotations",
+          "Identifier": {
+            "PURL": "pkg:maven/com.google.errorprone/error_prone_annotations@2.36.0",
+            "UID": "42414d5992fba59a"
+          },
+          "Version": "2.36.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/error_prone_annotations-2.36.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.google.zxing:core",
+          "Identifier": {
+            "PURL": "pkg:maven/com.google.zxing/core@3.4.0",
+            "UID": "e1f12605e4b4851c"
+          },
+          "Version": "3.4.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/core-3.4.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.google.zxing:javase",
+          "Identifier": {
+            "PURL": "pkg:maven/com.google.zxing/javase@3.4.0",
+            "UID": "8b6389cf12030e02"
+          },
+          "Version": "3.4.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/javase-3.4.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.microsoft.sqlserver:mssql-jdbc",
+          "Identifier": {
+            "PURL": "pkg:maven/com.microsoft.sqlserver/mssql-jdbc@12.8.1",
+            "UID": "91c8389a60fc187b"
+          },
+          "Version": "12.8.1",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/mssql-jdbc-12.8.1.jre11.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.microsoft.sqlserver:mssql-jdbc",
+          "Identifier": {
+            "PURL": "pkg:maven/com.microsoft.sqlserver/mssql-jdbc@12.8.1.jre11",
+            "UID": "6656ed16a9027a1c"
+          },
+          "Version": "12.8.1.jre11",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/mssql-jdbc-12.8.1.jre11.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.sun.istack:istack-commons-runtime",
+          "Identifier": {
+            "PURL": "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.2",
+            "UID": "6d9e9669e372bd2d"
+          },
+          "Version": "4.1.2",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/istack-commons-runtime-4.1.2.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.tss.grc:tss-grc-platform",
+          "Identifier": {
+            "PURL": "pkg:maven/com.tss.grc/tss-grc-platform@0.1.0-SNAPSHOT",
+            "UID": "da194f75d75240f9"
+          },
+          "Version": "0.1.0-SNAPSHOT",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.zaxxer:HikariCP",
+          "Identifier": {
+            "PURL": "pkg:maven/com.zaxxer/HikariCP@6.3.3",
+            "UID": "a25b5ad4d44720ed"
+          },
+          "Version": "6.3.3",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/HikariCP-6.3.3.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "com.zaxxer:SparseBitSet",
+          "Identifier": {
+            "PURL": "pkg:maven/com.zaxxer/SparseBitSet@1.3",
+            "UID": "d5b26e4e0494d81a"
+          },
+          "Version": "1.3",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/SparseBitSet-1.3.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "commons-codec:commons-codec",
+          "Identifier": {
+            "PURL": "pkg:maven/commons-codec/commons-codec@1.18.0",
+            "UID": "50b336110498f5d"
+          },
+          "Version": "1.18.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/commons-codec-1.18.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "commons-io:commons-io",
+          "Identifier": {
+            "PURL": "pkg:maven/commons-io/commons-io@2.15.0",
+            "UID": "6e430fa2b26a5e37"
+          },
+          "Version": "2.15.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/commons-io-2.15.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "dev.samstevens.totp:totp",
+          "Identifier": {
+            "PURL": "pkg:maven/dev.samstevens.totp/totp@1.7.1",
+            "UID": "6b7d01ddfb828660"
+          },
+          "Version": "1.7.1",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/totp-1.7.1.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.jsonwebtoken:jjwt-api",
+          "Identifier": {
+            "PURL": "pkg:maven/io.jsonwebtoken/jjwt-api@0.12.6",
+            "UID": "f1ecbefbb3b97c00"
+          },
+          "Version": "0.12.6",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jjwt-api-0.12.6.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.jsonwebtoken:jjwt-impl",
+          "Identifier": {
+            "PURL": "pkg:maven/io.jsonwebtoken/jjwt-impl@0.12.6",
+            "UID": "6f7205ee5013caec"
+          },
+          "Version": "0.12.6",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jjwt-impl-0.12.6.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.jsonwebtoken:jjwt-jackson",
+          "Identifier": {
+            "PURL": "pkg:maven/io.jsonwebtoken/jjwt-jackson@0.12.6",
+            "UID": "18c911c047487c92"
+          },
+          "Version": "0.12.6",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jjwt-jackson-0.12.6.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.micrometer:micrometer-commons",
+          "Identifier": {
+            "PURL": "pkg:maven/io.micrometer/micrometer-commons@1.15.11",
+            "UID": "1269098ac26eafd6"
+          },
+          "Version": "1.15.11",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/micrometer-commons-1.15.11.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.micrometer:micrometer-core",
+          "Identifier": {
+            "PURL": "pkg:maven/io.micrometer/micrometer-core@1.15.11",
+            "UID": "8d753a38301be4ac"
+          },
+          "Version": "1.15.11",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/micrometer-core-1.15.11.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.micrometer:micrometer-jakarta9",
+          "Identifier": {
+            "PURL": "pkg:maven/io.micrometer/micrometer-jakarta9@1.15.11",
+            "UID": "8514bc997261e770"
+          },
+          "Version": "1.15.11",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/micrometer-jakarta9-1.15.11.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.micrometer:micrometer-observation",
+          "Identifier": {
+            "PURL": "pkg:maven/io.micrometer/micrometer-observation@1.15.11",
+            "UID": "6a76912ea51ff275"
+          },
+          "Version": "1.15.11",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/micrometer-observation-1.15.11.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.micrometer:micrometer-registry-prometheus",
+          "Identifier": {
+            "PURL": "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.15.11",
+            "UID": "4540fd22d7619d50"
+          },
+          "Version": "1.15.11",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/micrometer-registry-prometheus-1.15.11.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.prometheus:prometheus-metrics-config",
+          "Identifier": {
+            "PURL": "pkg:maven/io.prometheus/prometheus-metrics-config@1.3.10",
+            "UID": "7ef77a3fbe31fa9e"
+          },
+          "Version": "1.3.10",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/prometheus-metrics-config-1.3.10.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.prometheus:prometheus-metrics-core",
+          "Identifier": {
+            "PURL": "pkg:maven/io.prometheus/prometheus-metrics-core@1.3.10",
+            "UID": "3d49a767fc58853e"
+          },
+          "Version": "1.3.10",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/prometheus-metrics-core-1.3.10.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.prometheus:prometheus-metrics-exposition-formats",
+          "Identifier": {
+            "PURL": "pkg:maven/io.prometheus/prometheus-metrics-exposition-formats@1.3.10",
+            "UID": "b13899214b70b4ce"
+          },
+          "Version": "1.3.10",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/prometheus-metrics-exposition-formats-1.3.10.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.prometheus:prometheus-metrics-exposition-textformats",
+          "Identifier": {
+            "PURL": "pkg:maven/io.prometheus/prometheus-metrics-exposition-textformats@1.3.10",
+            "UID": "6009ab7185f05d98"
+          },
+          "Version": "1.3.10",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/prometheus-metrics-exposition-textformats-1.3.10.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.prometheus:prometheus-metrics-model",
+          "Identifier": {
+            "PURL": "pkg:maven/io.prometheus/prometheus-metrics-model@1.3.10",
+            "UID": "2e69996750d2b224"
+          },
+          "Version": "1.3.10",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/prometheus-metrics-model-1.3.10.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.prometheus:prometheus-metrics-tracer-common",
+          "Identifier": {
+            "PURL": "pkg:maven/io.prometheus/prometheus-metrics-tracer-common@1.3.10",
+            "UID": "dc1f403f7fb82f77"
+          },
+          "Version": "1.3.10",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/prometheus-metrics-tracer-common-1.3.10.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.sentry:sentry",
+          "Identifier": {
+            "PURL": "pkg:maven/io.sentry/sentry@7.18.0",
+            "UID": "918efc4906e4bc43"
+          },
+          "Version": "7.18.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/sentry-7.18.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.sentry:sentry-spring-boot-jakarta",
+          "Identifier": {
+            "PURL": "pkg:maven/io.sentry/sentry-spring-boot-jakarta@7.18.0",
+            "UID": "5c82645687b1eda9"
+          },
+          "Version": "7.18.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/sentry-spring-boot-jakarta-7.18.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.sentry:sentry-spring-boot-starter-jakarta",
+          "Identifier": {
+            "PURL": "pkg:maven/io.sentry/sentry-spring-boot-starter-jakarta@7.18.0",
+            "UID": "1adb555256a42ec5"
+          },
+          "Version": "7.18.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/sentry-spring-boot-starter-jakarta-7.18.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.sentry:sentry-spring-jakarta",
+          "Identifier": {
+            "PURL": "pkg:maven/io.sentry/sentry-spring-jakarta@7.18.0",
+            "UID": "fc113bf15fdbf005"
+          },
+          "Version": "7.18.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/sentry-spring-jakarta-7.18.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.smallrye:jandex",
+          "Identifier": {
+            "PURL": "pkg:maven/io.smallrye/jandex@3.2.0",
+            "UID": "768a3882d8b5f7df"
+          },
+          "Version": "3.2.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jandex-3.2.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.swagger.core.v3:swagger-annotations-jakarta",
+          "Identifier": {
+            "PURL": "pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.29",
+            "UID": "5085ed250bbadd24"
+          },
+          "Version": "2.2.29",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/swagger-annotations-jakarta-2.2.29.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.swagger.core.v3:swagger-core-jakarta",
+          "Identifier": {
+            "PURL": "pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.29",
+            "UID": "464795a501d424dc"
+          },
+          "Version": "2.2.29",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/swagger-core-jakarta-2.2.29.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "io.swagger.core.v3:swagger-models-jakarta",
+          "Identifier": {
+            "PURL": "pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.29",
+            "UID": "6bcb22dee1f7c59b"
+          },
+          "Version": "2.2.29",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/swagger-models-jakarta-2.2.29.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "jakarta.activation:jakarta.activation-api",
+          "Identifier": {
+            "PURL": "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4",
+            "UID": "2c4ae997f3062e52"
+          },
+          "Version": "2.1.4",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.activation-api-2.1.4.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "jakarta.annotation:jakarta.annotation-api",
+          "Identifier": {
+            "PURL": "pkg:maven/jakarta.annotation/jakarta.annotation-api@2.1.1",
+            "UID": "e255787cd77a4b6"
+          },
+          "Version": "2.1.1",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.annotation-api-2.1.1.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "jakarta.inject:jakarta.inject-api",
+          "Identifier": {
+            "PURL": "pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1",
+            "UID": "1276ab96ac9d2512"
+          },
+          "Version": "2.0.1",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.inject-api-2.0.1.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "jakarta.mail:jakarta.mail-api",
+          "Identifier": {
+            "PURL": "pkg:maven/jakarta.mail/jakarta.mail-api@2.1.5",
+            "UID": "464fb83dd8870537"
+          },
+          "Version": "2.1.5",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.mail-2.0.5.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "jakarta.persistence:jakarta.persistence-api",
+          "Identifier": {
+            "PURL": "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.1.0",
+            "UID": "509d91415198d703"
+          },
+          "Version": "3.1.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.persistence-api-3.1.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "jakarta.transaction:jakarta.transaction-api",
+          "Identifier": {
+            "PURL": "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1",
+            "UID": "d1ccaf2c3d8e85cd"
+          },
+          "Version": "2.0.1",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.transaction-api-2.0.1.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "jakarta.validation:jakarta.validation-api",
+          "Identifier": {
+            "PURL": "pkg:maven/jakarta.validation/jakarta.validation-api@3.0.2",
+            "UID": "e14c123865f4eadc"
+          },
+          "Version": "3.0.2",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.validation-api-3.0.2.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "jakarta.xml.bind:jakarta.xml.bind-api",
+          "Identifier": {
+            "PURL": "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.4",
+            "UID": "aa364d49a1562853"
+          },
+          "Version": "4.0.4",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.xml.bind-api-4.0.4.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "net.bytebuddy:byte-buddy",
+          "Identifier": {
+            "PURL": "pkg:maven/net.bytebuddy/byte-buddy@1.17.8",
+            "UID": "1d59010ac4154719"
+          },
+          "Version": "1.17.8",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/byte-buddy-1.17.8.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "net.logstash.logback:logstash-logback-encoder",
+          "Identifier": {
+            "PURL": "pkg:maven/net.logstash.logback/logstash-logback-encoder@8.0",
+            "UID": "5ca215ba5326307"
+          },
+          "Version": "8.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/logstash-logback-encoder-8.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.antlr:antlr4-runtime",
+          "Identifier": {
+            "PURL": "pkg:maven/org.antlr/antlr4-runtime@4.13.0",
+            "UID": "354edad043a51255"
+          },
+          "Version": "4.13.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/antlr4-runtime-4.13.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.commons:commons-collections4",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.commons/commons-collections4@4.4",
+            "UID": "12030022c4a7e805"
+          },
+          "Version": "4.4",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/commons-collections4-4.4.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.commons:commons-compress",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.commons/commons-compress@1.27.1",
+            "UID": "1b465ed0469a2d8d"
+          },
+          "Version": "1.27.1",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/commons-compress-1.27.1.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.commons:commons-lang3",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.commons/commons-lang3@3.17.0",
+            "UID": "646aa0331f308754"
+          },
+          "Version": "3.17.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/commons-lang3-3.17.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.commons:commons-math3",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.commons/commons-math3@3.6.1",
+            "UID": "3ce46e6e7663107d"
+          },
+          "Version": "3.6.1",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/commons-math3-3.6.1.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.logging.log4j:log4j-api",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.logging.log4j/log4j-api@2.24.3",
+            "UID": "30c37c0354732ead"
+          },
+          "Version": "2.24.3",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/log4j-api-2.24.3.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.logging.log4j:log4j-to-slf4j",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.logging.log4j/log4j-to-slf4j@2.24.3",
+            "UID": "1b955df6a3042ac5"
+          },
+          "Version": "2.24.3",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/log4j-to-slf4j-2.24.3.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.poi:poi",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.poi/poi@5.2.5",
+            "UID": "4acc8e43511c0ea7"
+          },
+          "Version": "5.2.5",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/poi-5.2.5.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.poi:poi-ooxml",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.poi/poi-ooxml@5.2.5",
+            "UID": "16a16a65afdcaab6"
+          },
+          "Version": "5.2.5",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/poi-ooxml-5.2.5.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.poi:poi-ooxml-lite",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.poi/poi-ooxml-lite@5.2.5",
+            "UID": "90041fb0e2f99fb2"
+          },
+          "Version": "5.2.5",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/poi-ooxml-lite-5.2.5.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.tomcat.embed:tomcat-embed-core",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.55",
+            "UID": "748d99cbda611f7f"
+          },
+          "Version": "10.1.55",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/tomcat-embed-core-10.1.55.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.tomcat.embed:tomcat-embed-el",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@10.1.55",
+            "UID": "e025da41263c9aa8"
+          },
+          "Version": "10.1.55",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/tomcat-embed-el-10.1.55.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.tomcat.embed:tomcat-embed-websocket",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@10.1.55",
+            "UID": "5d48e24298bd357e"
+          },
+          "Version": "10.1.55",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/tomcat-embed-websocket-10.1.55.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.apache.xmlbeans:xmlbeans",
+          "Identifier": {
+            "PURL": "pkg:maven/org.apache.xmlbeans/xmlbeans@5.2.0",
+            "UID": "11a2909cf66b9470"
+          },
+          "Version": "5.2.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/xmlbeans-5.2.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.aspectj:aspectjweaver",
+          "Identifier": {
+            "PURL": "pkg:maven/org.aspectj/aspectjweaver@1.9.25.1",
+            "UID": "2f07243c73a51d1d"
+          },
+          "Version": "1.9.25.1",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/aspectjweaver-1.9.25.1.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.eclipse.angus:angus-activation",
+          "Identifier": {
+            "PURL": "pkg:maven/org.eclipse.angus/angus-activation@2.0.3",
+            "UID": "c646cb31eca2b8f6"
+          },
+          "Version": "2.0.3",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/angus-activation-2.0.3.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.eclipse.angus:angus-core",
+          "Identifier": {
+            "PURL": "pkg:maven/org.eclipse.angus/angus-core@2.0.5",
+            "UID": "5e6277e808eda48a"
+          },
+          "Version": "2.0.5",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.mail-2.0.5.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.eclipse.angus:angus-mail",
+          "Identifier": {
+            "PURL": "pkg:maven/org.eclipse.angus/angus-mail@2.0.5",
+            "UID": "8d4da0eafe59ce9e"
+          },
+          "Version": "2.0.5",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.mail-2.0.5.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.eclipse.angus:imap",
+          "Identifier": {
+            "PURL": "pkg:maven/org.eclipse.angus/imap@2.0.5",
+            "UID": "d28869b82f9fc46"
+          },
+          "Version": "2.0.5",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.mail-2.0.5.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.eclipse.angus:jakarta.mail",
+          "Identifier": {
+            "PURL": "pkg:maven/org.eclipse.angus/jakarta.mail@2.0.5",
+            "UID": "771f78a5a81b5d31"
+          },
+          "Version": "2.0.5",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.mail-2.0.5.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.eclipse.angus:logging-mailhandler",
+          "Identifier": {
+            "PURL": "pkg:maven/org.eclipse.angus/logging-mailhandler@2.0.5",
+            "UID": "fb92131496df5d03"
+          },
+          "Version": "2.0.5",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.mail-2.0.5.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.eclipse.angus:pop3",
+          "Identifier": {
+            "PURL": "pkg:maven/org.eclipse.angus/pop3@2.0.5",
+            "UID": "3b562ee07020c921"
+          },
+          "Version": "2.0.5",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.mail-2.0.5.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.eclipse.angus:smtp",
+          "Identifier": {
+            "PURL": "pkg:maven/org.eclipse.angus/smtp@2.0.5",
+            "UID": "2c05978513f73bed"
+          },
+          "Version": "2.0.5",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jakarta.mail-2.0.5.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.flywaydb:flyway-core",
+          "Identifier": {
+            "PURL": "pkg:maven/org.flywaydb/flyway-core@10.15.0",
+            "UID": "b11124ba5cb90fc7"
+          },
+          "Version": "10.15.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/flyway-core-10.15.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.flywaydb:flyway-sqlserver",
+          "Identifier": {
+            "PURL": "pkg:maven/org.flywaydb/flyway-sqlserver@10.15.0",
+            "UID": "ae66285ee5c60ac3"
+          },
+          "Version": "10.15.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/flyway-sqlserver-10.15.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.glassfish.jaxb:jaxb-core",
+          "Identifier": {
+            "PURL": "pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.6",
+            "UID": "b56448d54f52d006"
+          },
+          "Version": "4.0.6",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jaxb-core-4.0.6.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.glassfish.jaxb:jaxb-runtime",
+          "Identifier": {
+            "PURL": "pkg:maven/org.glassfish.jaxb/jaxb-runtime@4.0.6",
+            "UID": "d56027d082a84ec1"
+          },
+          "Version": "4.0.6",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jaxb-runtime-4.0.6.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.glassfish.jaxb:txw2",
+          "Identifier": {
+            "PURL": "pkg:maven/org.glassfish.jaxb/txw2@4.0.6",
+            "UID": "6debf7bb28b71f1"
+          },
+          "Version": "4.0.6",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/txw2-4.0.6.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.hdrhistogram:HdrHistogram",
+          "Identifier": {
+            "PURL": "pkg:maven/org.hdrhistogram/HdrHistogram@2.2.2",
+            "UID": "c7608abe5cc68e59"
+          },
+          "Version": "2.2.2",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/HdrHistogram-2.2.2.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.hibernate.common:hibernate-commons-annotations",
+          "Identifier": {
+            "PURL": "pkg:maven/org.hibernate.common/hibernate-commons-annotations@7.0.3.Final",
+            "UID": "584d858f9a1b7735"
+          },
+          "Version": "7.0.3.Final",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/hibernate-commons-annotations-7.0.3.Final.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.hibernate.validator:hibernate-validator",
+          "Identifier": {
+            "PURL": "pkg:maven/org.hibernate.validator/hibernate-validator@8.0.3.Final",
+            "UID": "4cc8f89845ad9dec"
+          },
+          "Version": "8.0.3.Final",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/hibernate-validator-8.0.3.Final.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.hibernate:hibernate-core",
+          "Identifier": {
+            "PURL": "pkg:maven/org.hibernate/hibernate-core@6.6.49.Final",
+            "UID": "5dcb7b6fc8918d1f"
+          },
+          "Version": "6.6.49.Final",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/hibernate-core-6.6.49.Final.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.jboss.logging:jboss-logging",
+          "Identifier": {
+            "PURL": "pkg:maven/org.jboss.logging/jboss-logging@3.6.3.Final",
+            "UID": "55f7094d8ccd6bf"
+          },
+          "Version": "3.6.3.Final",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jboss-logging-3.6.3.Final.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.jspecify:jspecify",
+          "Identifier": {
+            "PURL": "pkg:maven/org.jspecify/jspecify@1.0.0",
+            "UID": "11a32cc017bc4432"
+          },
+          "Version": "1.0.0",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jspecify-1.0.0.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.latencyutils:LatencyUtils",
+          "Identifier": {
+            "PURL": "pkg:maven/org.latencyutils/LatencyUtils@2.0.3",
+            "UID": "e02f20cc136ec50c"
+          },
+          "Version": "2.0.3",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/LatencyUtils-2.0.3.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.mapstruct:mapstruct",
+          "Identifier": {
+            "PURL": "pkg:maven/org.mapstruct/mapstruct@1.5.5.Final",
+            "UID": "51ccc63bb23453c5"
+          },
+          "Version": "1.5.5.Final",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/mapstruct-1.5.5.Final.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.slf4j:jul-to-slf4j",
+          "Identifier": {
+            "PURL": "pkg:maven/org.slf4j/jul-to-slf4j@2.0.17",
+            "UID": "781678b63443f82e"
+          },
+          "Version": "2.0.17",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/jul-to-slf4j-2.0.17.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.slf4j:slf4j-api",
+          "Identifier": {
+            "PURL": "pkg:maven/org.slf4j/slf4j-api@2.0.17",
+            "UID": "37d14b25d68fa845"
+          },
+          "Version": "2.0.17",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/slf4j-api-2.0.17.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springdoc:springdoc-openapi-starter-common",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springdoc/springdoc-openapi-starter-common@2.8.6",
+            "UID": "61fa2365fb4811e8"
+          },
+          "Version": "2.8.6",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/springdoc-openapi-starter-common-2.8.6.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springdoc:springdoc-openapi-starter-webmvc-api",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@2.8.6",
+            "UID": "b84c0c4eb4e7fb98"
+          },
+          "Version": "2.8.6",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/springdoc-openapi-starter-webmvc-api-2.8.6.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springdoc:springdoc-openapi-starter-webmvc-ui",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-ui@2.8.6",
+            "UID": "e5b88e2ce6977a7c"
+          },
+          "Version": "2.8.6",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/springdoc-openapi-starter-webmvc-ui-2.8.6.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.boot:spring-boot",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.boot/spring-boot@3.5.14",
+            "UID": "8be33a76de30b173"
+          },
+          "Version": "3.5.14",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-boot-3.5.14.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.boot:spring-boot-actuator",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.boot/spring-boot-actuator@3.5.14",
+            "UID": "339dcfc07d59292a"
+          },
+          "Version": "3.5.14",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-boot-actuator-3.5.14.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.boot:spring-boot-actuator-autoconfigure",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.boot/spring-boot-actuator-autoconfigure@3.5.14",
+            "UID": "e5f69979ebceda9e"
+          },
+          "Version": "3.5.14",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-boot-actuator-autoconfigure-3.5.14.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.boot:spring-boot-autoconfigure",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.boot/spring-boot-autoconfigure@3.5.14",
+            "UID": "44ec103d104fd47f"
+          },
+          "Version": "3.5.14",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-boot-autoconfigure-3.5.14.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.boot:spring-boot-jarmode-tools",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.boot/spring-boot-jarmode-tools@3.5.14",
+            "UID": "7e374e5c5c211cc6"
+          },
+          "Version": "3.5.14",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-boot-jarmode-tools-3.5.14.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.data:spring-data-commons",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.data/spring-data-commons@3.5.11",
+            "UID": "b748fd3e9b080888"
+          },
+          "Version": "3.5.11",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-data-commons-3.5.11.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.data:spring-data-jpa",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.data/spring-data-jpa@3.5.11",
+            "UID": "d7e28473800449f1"
+          },
+          "Version": "3.5.11",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-data-jpa-3.5.11.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.data:spring-data-ldap",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.data/spring-data-ldap@3.5.11",
+            "UID": "ed72ec54f3e7a6cb"
+          },
+          "Version": "3.5.11",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-data-ldap-3.5.11.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.ldap:spring-ldap-core",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.ldap/spring-ldap-core@3.3.7",
+            "UID": "8a3557b3ab4ba7e1"
+          },
+          "Version": "3.3.7",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-ldap-core-3.3.7.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.security:spring-security-config",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.security/spring-security-config@6.5.10",
+            "UID": "d9a5739a78a81e28"
+          },
+          "Version": "6.5.10",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-security-config-6.5.10.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.security:spring-security-core",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.security/spring-security-core@6.5.10",
+            "UID": "da0a8b0f6fe1ba83"
+          },
+          "Version": "6.5.10",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-security-core-6.5.10.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.security:spring-security-crypto",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.security/spring-security-crypto@6.5.10",
+            "UID": "75a1539f5297a840"
+          },
+          "Version": "6.5.10",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-security-crypto-6.5.10.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework.security:spring-security-web",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework.security/spring-security-web@6.5.10",
+            "UID": "40141807446723af"
+          },
+          "Version": "6.5.10",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-security-web-6.5.10.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-aop",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-aop@6.2.18",
+            "UID": "17526f6e9b47467"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-aop-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-aspects",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-aspects@6.2.18",
+            "UID": "d1e0815b97eeed89"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-aspects-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-beans",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-beans@6.2.18",
+            "UID": "4d044e4ee7db236c"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-beans-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-context",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-context@6.2.18",
+            "UID": "b76f7b8c632e547a"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-context-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-context-support",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-context-support@6.2.18",
+            "UID": "e73c181de76a7806"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-context-support-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-core",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-core@6.2.18",
+            "UID": "40e32e974623960"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-core-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-expression",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-expression@6.2.18",
+            "UID": "e80ef17b6893f34d"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-expression-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-jcl",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-jcl@6.2.18",
+            "UID": "68461aa8dfb87cc3"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-jcl-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-jdbc",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-jdbc@6.2.18",
+            "UID": "c565d032bafca5c0"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-jdbc-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-messaging",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-messaging@6.2.18",
+            "UID": "575cee5d01ead989"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-messaging-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-orm",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-orm@6.2.18",
+            "UID": "57631ecb7147369a"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-orm-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-tx",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-tx@6.2.18",
+            "UID": "4dd7c7538e05d9"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-tx-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-web",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-web@6.2.18",
+            "UID": "956bb738cf946a8e"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-web-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-webmvc",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-webmvc@6.2.18",
+            "UID": "773b9f8f7a28efad"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-webmvc-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.springframework:spring-websocket",
+          "Identifier": {
+            "PURL": "pkg:maven/org.springframework/spring-websocket@6.2.18",
+            "UID": "cd3b1bb4da96ff15"
+          },
+          "Version": "6.2.18",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/spring-websocket-6.2.18.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.webjars:swagger-ui",
+          "Identifier": {
+            "PURL": "pkg:maven/org.webjars/swagger-ui@5.20.1",
+            "UID": "849ecdfda1aa5710"
+          },
+          "Version": "5.20.1",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/swagger-ui-5.20.1.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.webjars:webjars-locator-lite",
+          "Identifier": {
+            "PURL": "pkg:maven/org.webjars/webjars-locator-lite@1.1.3",
+            "UID": "974b9cf8de22a1e0"
+          },
+          "Version": "1.1.3",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/webjars-locator-lite-1.1.3.jar",
+          "AnalyzedBy": "jar"
+        },
+        {
+          "Name": "org.yaml:snakeyaml",
+          "Identifier": {
+            "PURL": "pkg:maven/org.yaml/snakeyaml@2.4",
+            "UID": "185d98826b6b1d0a"
+          },
+          "Version": "2.4",
+          "FilePath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/snakeyaml-2.4.jar",
+          "AnalyzedBy": "jar"
+        }
+      ],
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2025-48924",
+          "VendorIDs": [
+            "GHSA-j288-q9x7-2f5v"
+          ],
+          "PkgName": "org.apache.commons:commons-lang3",
+          "PkgPath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/commons-lang3-3.17.0.jar",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.apache.commons/commons-lang3@3.17.0",
+            "UID": "646aa0331f308754"
+          },
+          "InstalledVersion": "3.17.0",
+          "FixedVersion": "3.18.0",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-48924",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:f108973692a7eeb24ec967125d998618c465b499a749e9a339485ad79bb6cc0d",
+          "Title": "commons-lang/commons-lang: org.apache.commons/commons-lang3: Uncontrolled Recursion vulnerability in Apache Commons Lang",
+          "Description": "Uncontrolled Recursion vulnerability in Apache Commons Lang.\n\nThis issue affects Apache Commons Lang: Starting with commons-lang:commons-lang 2.0 to 2.6, and, from org.apache.commons:commons-lang3 3.0 before 3.18.0.\n\nThe methods ClassUtils.getClass(...) can throw StackOverflowError on very long inputs. Because an Error is usually not handled by applications and libraries, a \nStackOverflowError could cause an application to stop.\n\nUsers are recommended to upgrade to version 3.18.0, which fixes the issue.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-674"
+          ],
+          "VendorSeverity": {
+            "amazon": 1,
+            "azure": 2,
+            "cbl-mariner": 2,
+            "ghsa": 2,
+            "redhat": 1,
+            "ubuntu": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N",
+              "V3Score": 6.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.7
+            }
+          },
+          "References": [
+            "http://www.openwall.com/lists/oss-security/2025/07/11/1",
+            "https://access.redhat.com/security/cve/CVE-2025-48924",
+            "https://github.com/apache/commons-lang",
+            "https://github.com/apache/commons-lang/commit/b424803abdb2bec818e4fbcb251ce031c22aca53",
+            "https://lists.apache.org/thread/bgv0lpswokgol11tloxnjfzdl7yrc1g1",
+            "https://lists.debian.org/debian-lts-announce/2025/08/msg00000.html",
+            "https://lists.debian.org/debian-lts-announce/2025/08/msg00026.html",
+            "https://lists.debian.org/debian-lts-announce/2025/09/msg00032.html",
+            "https://lists.debian.org/debian-lts-announce/2025/09/msg00036.html",
+            "https://nvd.nist.gov/vuln/detail/CVE-2025-48924",
+            "https://ubuntu.com/security/notices/USN-8364-1",
+            "https://www.cve.org/CVERecord?id=CVE-2025-48924",
+            "https://www.openwall.com/lists/oss-security/2025/07/11/1"
+          ],
+          "PublishedDate": "2025-07-11T15:15:24.347Z",
+          "LastModifiedDate": "2025-11-04T22:16:17.823Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2025-31672",
+          "VendorIDs": [
+            "GHSA-gmg8-593g-7mv3"
+          ],
+          "PkgName": "org.apache.poi:poi-ooxml",
+          "PkgPath": "tss-grc-platform-0.1.0-SNAPSHOT.jar/BOOT-INF/lib/poi-ooxml-5.2.5.jar",
+          "PkgIdentifier": {
+            "PURL": "pkg:maven/org.apache.poi/poi-ooxml@5.2.5",
+            "UID": "16a16a65afdcaab6"
+          },
+          "InstalledVersion": "5.2.5",
+          "FixedVersion": "5.4.0",
+          "Status": "fixed",
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-31672",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Maven",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Amaven"
+          },
+          "Fingerprint": "sha256:ff46d9493892097d6675508c458c166900f5233d1b19b5106a117e6a44882418",
+          "Title": "org.apache.poi/poi-ooxml: Apache POI: parsing OOXML based files (xlsx, docx, etc.), poi-ooxml could read unexpected data if underlying zip has duplicate zip entry names",
+          "Description": "Improper Input Validation vulnerability in Apache POI. The issue affects the parsing of OOXML format files like xlsx, docx and pptx. These file formats are basically zip files and it is possible for malicious users to add zip entries with duplicate names (including the path) in the zip. In this case, products reading the affected file could read different data because 1 of the zip entries with the duplicate name is selected over another but different products may choose a different zip entry.\nThis issue affects Apache POI poi-ooxml before 5.4.0. poi-ooxml 5.4.0 has a check that throws an exception if zip entries with duplicate file names are found in the input file.\nUsers are recommended to upgrade to version poi-ooxml 5.4.0, which fixes the issue. Please read  https://poi.apache.org/security.html  for recommendations about how to use the POI libraries securely.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-20"
+          ],
+          "VendorSeverity": {
+            "ghsa": 2,
+            "redhat": 2
+          },
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+              "V40Vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:L/VA:N/SC:N/SI:N/SA:N",
+              "V3Score": 5.3,
+              "V40Score": 6.9
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:L/I:L/A:N",
+              "V3Score": 4.4
+            }
+          },
+          "References": [
+            "http://www.openwall.com/lists/oss-security/2025/04/08/2",
+            "https://access.redhat.com/security/cve/CVE-2025-31672",
+            "https://bz.apache.org/bugzilla/show_bug.cgi?id=69620",
+            "https://github.com/apache/poi",
+            "https://lists.apache.org/thread/k14w8vcjqy4h34hh5kzldko78kpylkq5",
+            "https://nvd.nist.gov/vuln/detail/CVE-2025-31672",
+            "https://security.netapp.com/advisory/ntap-20250523-0004",
+            "https://security.netapp.com/advisory/ntap-20250523-0004/",
+            "https://www.cve.org/CVERecord?id=CVE-2025-31672"
+          ],
+          "PublishedDate": "2025-04-09T12:15:15.563Z",
+          "LastModifiedDate": "2025-07-15T19:08:21.7Z"
+        }
+      ]
+    }
+  ]
+}

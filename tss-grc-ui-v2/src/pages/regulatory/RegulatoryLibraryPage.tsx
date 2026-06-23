@@ -395,11 +395,11 @@ export function RegulatoryLibraryPage() {
 
       {/* KPI strip */}
       <div className="kpi-strip-4">
-        <Kpi Icon={BookOpen} label={isAr ? 'عدد الوثائق' : 'Documents'} value={documents.length} />
-        <Kpi Icon={Landmark} label={isAr ? 'العائلات' : 'Families'} value={families.length} />
+        <Kpi Icon={BookOpen} label={isAr ? 'عدد الوثائق' : 'Documents'} value={documents.length} to="/regulatory/library" />
+        <Kpi Icon={Landmark} label={isAr ? 'العائلات' : 'Families'} value={families.length} to="/regulatory/library" />
         <Kpi Icon={AlertTriangle} label={isAr ? 'عناصر مؤقتة' : 'Placeholders'} value={placeholderCount}
-             tone={placeholderCount > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={BookOpen} label={isAr ? 'نص عربي رسمي' : 'AR official'} value={arOfficialCount} />
+             tone={placeholderCount > 0 ? 'warning' : 'success'} to="/regulatory/library" />
+        <Kpi Icon={BookOpen} label={isAr ? 'نص عربي رسمي' : 'AR official'} value={arOfficialCount} to="/regulatory/library" />
       </div>
 
       {/* Family filter — one shared pill control */}

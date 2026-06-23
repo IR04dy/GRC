@@ -406,11 +406,11 @@ function CyclesTab() {
   return (
     <div className="ndi-stack">
       <div className="kpi-grid">
-        <Kpi Icon={Database}      label={isAr ? 'إجمالي الدورات' : 'Total cycles'}      value={agg?.total ?? 0}  tone="primary" />
-        <Kpi Icon={ArrowRight}    label={isAr ? 'دورات نشطة'    : 'Active cycles'}     value={agg?.active ?? 0} tone="info" />
-        <Kpi Icon={CheckCircle2}  label={isAr ? 'مُعتمَدة'        : 'Approved'}          value={agg?.byStatus.APPROVED ?? 0}  tone="success" />
-        <Kpi Icon={CheckCircle2}  label={isAr ? 'مُقدَّمة'         : 'Submitted'}         value={agg?.byStatus.SUBMITTED ?? 0} tone="success" />
-        <Kpi Icon={AlertCircle}   label={isAr ? 'معالجة فجوات' : 'Gap remediation'}   value={agg?.byStatus.GAP_REMEDIATION ?? 0}  tone="warning" />
+        <Kpi Icon={Database}      label={isAr ? 'إجمالي الدورات' : 'Total cycles'}      value={agg?.total ?? 0}  tone="primary" to="/ndi" />
+        <Kpi Icon={ArrowRight}    label={isAr ? 'دورات نشطة'    : 'Active cycles'}     value={agg?.active ?? 0} tone="info" to="/ndi" />
+        <Kpi Icon={CheckCircle2}  label={isAr ? 'مُعتمَدة'        : 'Approved'}          value={agg?.byStatus.APPROVED ?? 0}  tone="success" to="/ndi" />
+        <Kpi Icon={CheckCircle2}  label={isAr ? 'مُقدَّمة'         : 'Submitted'}         value={agg?.byStatus.SUBMITTED ?? 0} tone="success" to="/ndi" />
+        <Kpi Icon={AlertCircle}   label={isAr ? 'معالجة فجوات' : 'Gap remediation'}   value={agg?.byStatus.GAP_REMEDIATION ?? 0}  tone="warning" to="/ndi" />
       </div>
 
       <Card title={isAr ? 'دورات تقييم نضيء' : 'NDI assessment cycles'} Icon={Database}
@@ -878,9 +878,9 @@ function FrameworkTab() {
       <div className="kpi-grid">
         <Kpi Icon={FileText}     label={isAr ? 'إجمالي البنود' : 'Total items'}   value={agg?.total ?? 0}            tone="primary"
              onClick={() => setFilterComponent('ALL')} active={filterComponent === 'ALL'} />
-        <Kpi Icon={CheckCircle2} label={isAr ? 'بنود رسمية'   : 'Official'}      value={agg?.officialCount ?? 0}    tone="success" />
-        <Kpi Icon={AlertCircle}  label={isAr ? 'بنود مؤقتة'   : 'Placeholder'}   value={agg?.placeholderCount ?? 0} tone="warning" />
-        <Kpi Icon={Target}       label={isAr ? 'إلزامية'      : 'Mandatory'}     value={agg?.mandatoryCount ?? 0}   tone="danger" />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'بنود رسمية'   : 'Official'}      value={agg?.officialCount ?? 0}    tone="success" to="/ndi" />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'بنود مؤقتة'   : 'Placeholder'}   value={agg?.placeholderCount ?? 0} tone="warning" to="/ndi" />
+        <Kpi Icon={Target}       label={isAr ? 'إلزامية'      : 'Mandatory'}     value={agg?.mandatoryCount ?? 0}   tone="danger" to="/ndi" />
         <Kpi Icon={CheckCircle2} label={isAr ? 'الامتثال'    : 'Compliance'}    value={agg?.byComponent.COMPLIANCE ?? 0}             tone="info"
              onClick={() => setFilterComponent('COMPLIANCE')} active={filterComponent === 'COMPLIANCE'} />
         <Kpi Icon={Target}       label={isAr ? 'النضج'        : 'Maturity'}      value={agg?.byComponent.MATURITY ?? 0}               tone="primary"
@@ -1191,12 +1191,12 @@ function MaturityTab() {
         {agg && (
           <div className="kpi-grid">
             <Kpi Icon={Target}       label={isAr ? 'نقاط النضج' : 'Maturity score'} value={`${Number(agg.maturityScorePct).toFixed(0)}%`}
-                 tone={agg.maturityScorePct >= 60 ? 'success' : agg.maturityScorePct >= 40 ? 'warning' : 'danger'} />
-            <Kpi Icon={FileText}     label={isAr ? 'إجمالي البنود' : 'Total items'}    value={agg.total}            tone="primary" />
-            <Kpi Icon={AlertCircle}  label={isAr ? 'بلا رد'        : 'Unresponded'}    value={agg.unresponded}      tone="warning" />
-            <Kpi Icon={CheckCircle2} label={isAr ? 'مُعتمَد'        : 'Approved'}      value={agg.byStatus.APPROVED ?? 0}  tone="success" />
-            <Kpi Icon={ArrowRight}   label={isAr ? 'تحسين مقترح'  : 'Improv. suggested'} value={agg.improvementSuggestedCount} tone="info" />
-            <Kpi Icon={AlertCircle}  label={isAr ? 'مخالفة القاعدة 2' : 'Rule 2 violations'} value={agg.rule2ViolationCount} tone={agg.rule2ViolationCount > 0 ? 'danger' : 'success'} />
+                 tone={agg.maturityScorePct >= 60 ? 'success' : agg.maturityScorePct >= 40 ? 'warning' : 'danger'} to="/ndi" />
+            <Kpi Icon={FileText}     label={isAr ? 'إجمالي البنود' : 'Total items'}    value={agg.total}            tone="primary" to="/ndi" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'بلا رد'        : 'Unresponded'}    value={agg.unresponded}      tone="warning" to="/ndi" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'مُعتمَد'        : 'Approved'}      value={agg.byStatus.APPROVED ?? 0}  tone="success" to="/ndi" />
+            <Kpi Icon={ArrowRight}   label={isAr ? 'تحسين مقترح'  : 'Improv. suggested'} value={agg.improvementSuggestedCount} tone="info" to="/ndi" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'مخالفة القاعدة 2' : 'Rule 2 violations'} value={agg.rule2ViolationCount} tone={agg.rule2ViolationCount > 0 ? 'danger' : 'success'} to="/ndi" />
           </div>
         )}
       </Card>
@@ -1574,13 +1574,13 @@ function ComplianceTab() {
         {agg && (
           <div className="kpi-grid">
             <Kpi Icon={CheckCircle2} label={isAr ? 'نقاط الامتثال' : 'Compliance score'} value={`${Number(agg.compliancePct).toFixed(0)}%`}
-                 tone={agg.compliancePct >= 80 ? 'success' : agg.compliancePct >= 50 ? 'warning' : 'danger'} />
-            <Kpi Icon={FileText}     label={isAr ? 'إجمالي البنود' : 'Total items'}     value={agg.total}                                  tone="primary" />
-            <Kpi Icon={CheckCircle2} label={isAr ? 'ملتزم' : 'Compliant'}              value={agg.byCompliance.COMPLIANT ?? 0}             tone="success" />
-            <Kpi Icon={AlertCircle}  label={isAr ? 'جزئي' : 'Partial'}                 value={agg.byCompliance.PARTIAL ?? 0}               tone="warning" />
-            <Kpi Icon={AlertCircle}  label={isAr ? 'غير ملتزم' : 'Non-compliant'}      value={agg.byCompliance.NON_COMPLIANT ?? 0}         tone="danger" />
-            <Kpi Icon={AlertCircle}  label={isAr ? 'يتطلب دليلاً' : 'Evidence req.'}    value={agg.evidenceRequiredCount}                  tone="warning" />
-            <Kpi Icon={AlertCircle}  label={isAr ? 'تحتاج فجوة' : 'Need gap'}          value={agg.needsGapCount}                          tone={agg.needsGapCount > 0 ? 'danger' : 'success'} />
+                 tone={agg.compliancePct >= 80 ? 'success' : agg.compliancePct >= 50 ? 'warning' : 'danger'} to="/ndi" />
+            <Kpi Icon={FileText}     label={isAr ? 'إجمالي البنود' : 'Total items'}     value={agg.total}                                  tone="primary" to="/ndi" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'ملتزم' : 'Compliant'}              value={agg.byCompliance.COMPLIANT ?? 0}             tone="success" to="/ndi" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'جزئي' : 'Partial'}                 value={agg.byCompliance.PARTIAL ?? 0}               tone="warning" to="/ndi" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'غير ملتزم' : 'Non-compliant'}      value={agg.byCompliance.NON_COMPLIANT ?? 0}         tone="danger" to="/ndi" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'يتطلب دليلاً' : 'Evidence req.'}    value={agg.evidenceRequiredCount}                  tone="warning" to="/ndi" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'تحتاج فجوة' : 'Need gap'}          value={agg.needsGapCount}                          tone={agg.needsGapCount > 0 ? 'danger' : 'success'} to="/ndi" />
           </div>
         )}
       </Card>
@@ -2007,12 +2007,12 @@ function OpexTab() {
         {agg && (
           <div className="kpi-grid">
             <Kpi Icon={Target}       label={isAr ? 'نقاط التميز التشغيلي' : 'OpEx score'} value={`${Number(agg.opexScorePct).toFixed(0)}%`}
-                 tone={agg.opexScorePct >= 80 ? 'success' : agg.opexScorePct >= 50 ? 'warning' : 'danger'} />
-            <Kpi Icon={FileText}     label={isAr ? 'إجمالي المؤشّرات' : 'Total KPIs'}    value={agg.total}                              tone="primary" />
-            <Kpi Icon={CheckCircle2} label={isAr ? 'مُحقَّق'         : 'Achieved'}      value={agg.achievedCount}                      tone="success" />
-            <Kpi Icon={CheckCircle2} label={isAr ? 'على المسار'    : 'On track'}      value={agg.byStatus.ON_TRACK ?? 0}             tone="success" />
-            <Kpi Icon={AlertCircle}  label={isAr ? 'مُعرَّض'         : 'At risk'}       value={agg.atRiskCount}                        tone="warning" />
-            <Kpi Icon={AlertCircle}  label={isAr ? 'متأخّر'         : 'Behind plan'}   value={agg.behindPlanCount}                    tone={agg.behindPlanCount > 0 ? 'danger' : 'success'} />
+                 tone={agg.opexScorePct >= 80 ? 'success' : agg.opexScorePct >= 50 ? 'warning' : 'danger'} to="/ndi" />
+            <Kpi Icon={FileText}     label={isAr ? 'إجمالي المؤشّرات' : 'Total KPIs'}    value={agg.total}                              tone="primary" to="/ndi" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'مُحقَّق'         : 'Achieved'}      value={agg.achievedCount}                      tone="success" to="/ndi" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'على المسار'    : 'On track'}      value={agg.byStatus.ON_TRACK ?? 0}             tone="success" to="/ndi" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'مُعرَّض'         : 'At risk'}       value={agg.atRiskCount}                        tone="warning" to="/ndi" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'متأخّر'         : 'Behind plan'}   value={agg.behindPlanCount}                    tone={agg.behindPlanCount > 0 ? 'danger' : 'success'} to="/ndi" />
           </div>
         )}
       </Card>
@@ -2376,12 +2376,12 @@ function DomainsTab() {
             <Kpi Icon={Database}     label={isAr ? 'مؤشّر نضيء الإجمالي' : 'Overall NDI score'}
                  value={`${Number(rollup.overallNdiPct).toFixed(0)}% · ${ndiScoreLabel(rollup.overallNdiPct, isAr ? 'ar' : 'en')}`}
                  tone={overallTone === 'success' ? 'success' : overallTone === 'info' ? 'primary'
-                       : overallTone === 'warning' ? 'warning' : overallTone === 'danger' ? 'danger' : 'primary'} />
-            <Kpi Icon={FileText}     label={isAr ? 'عدد المجالات' : 'Domains'}        value={domains.length}                    tone="primary" />
-            <Kpi Icon={CheckCircle2} label={isAr ? 'مجالات مفعّلة' : 'Active'}        value={domains.filter(d => d.isActive).length} tone="success" />
-            <Kpi Icon={AlertCircle}  label={isAr ? 'مكتبة مؤقتة' : 'Placeholder'}     value={placeholderCount}                  tone={placeholderCount > 0 ? 'warning' : 'success'} />
-            <Kpi Icon={FileText}     label={isAr ? 'إجمالي الوزن' : 'Total weight'}   value={`${Number(rollup.totalWeight).toFixed(1)}`} tone="primary" />
-            <Kpi Icon={AlertCircle}  label={isAr ? 'سلاسل غير مطابقة' : 'Unmatched strings'} value={unmatched.length}            tone={unmatched.length > 0 ? 'warning' : 'success'} />
+                       : overallTone === 'warning' ? 'warning' : overallTone === 'danger' ? 'danger' : 'primary'} to="/ndi" />
+            <Kpi Icon={FileText}     label={isAr ? 'عدد المجالات' : 'Domains'}        value={domains.length}                    tone="primary" to="/ndi" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'مجالات مفعّلة' : 'Active'}        value={domains.filter(d => d.isActive).length} tone="success" to="/ndi" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'مكتبة مؤقتة' : 'Placeholder'}     value={placeholderCount}                  tone={placeholderCount > 0 ? 'warning' : 'success'} to="/ndi" />
+            <Kpi Icon={FileText}     label={isAr ? 'إجمالي الوزن' : 'Total weight'}   value={`${Number(rollup.totalWeight).toFixed(1)}`} tone="primary" to="/ndi" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'سلاسل غير مطابقة' : 'Unmatched strings'} value={unmatched.length}            tone={unmatched.length > 0 ? 'warning' : 'success'} to="/ndi" />
           </div>
         )}
       </Card>
@@ -2729,7 +2729,7 @@ function EvidenceTab() {
         }>
         {agg && (
           <div className="kpi-grid">
-            <Kpi Icon={Paperclip}    label={isAr ? 'إجمالي الأدلة' : 'Total'}        value={agg.total}            tone="primary" />
+            <Kpi Icon={Paperclip}    label={isAr ? 'إجمالي الأدلة' : 'Total'}        value={agg.total}            tone="primary" to="/ndi" />
             <Kpi Icon={CheckCircle2} label={isAr ? 'سارٍ'         : 'Active'}       value={agg.activeCount}      tone="success"
                  onClick={() => setStatusFilter('ACTIVE')} active={statusFilter === 'ACTIVE'} />
             <Kpi Icon={FileText}     label={isAr ? 'قيد المراجعة' : 'Pending'}      value={agg.pendingCount}     tone="primary"
@@ -2737,7 +2737,7 @@ function EvidenceTab() {
             <Kpi Icon={AlertCircle}  label={isAr ? 'منتهي'        : 'Expired'}      value={agg.expiredCount}     tone={agg.expiredCount > 0 ? 'danger' : 'success'}
                  onClick={() => setStatusFilter('EXPIRED')} active={statusFilter === 'EXPIRED'} />
             <Kpi Icon={AlertCircle}  label={isAr ? 'قريب الانتهاء' : 'Expiring soon'} value={agg.expiringSoonCount}
-                 tone={agg.expiringSoonCount > 0 ? 'warning' : 'success'} />
+                 tone={agg.expiringSoonCount > 0 ? 'warning' : 'success'} to="/ndi" />
             <Kpi Icon={Trash2}       label={isAr ? 'مرفوض'        : 'Rejected'}     value={agg.rejectedCount}    tone={agg.rejectedCount > 0 ? 'danger' : 'success'}
                  onClick={() => setStatusFilter('REJECTED')} active={statusFilter === 'REJECTED'} />
           </div>
@@ -3105,16 +3105,17 @@ function GapsTab() {
         }>
         {agg && (
           <div className="kpi-grid">
-            <Kpi Icon={AlertCircle}  label={isAr ? 'إجمالي الفجوات' : 'Total gaps'} value={agg.total}              tone="primary" />
+            <Kpi Icon={AlertCircle}  label={isAr ? 'إجمالي الفجوات' : 'Total gaps'} value={agg.total}              tone="primary" to="/ndi" />
             <Kpi Icon={AlertCircle}  label={isAr ? 'حرجة مفتوحة'   : 'Critical open'} value={agg.criticalOpenCount}
-                 tone={agg.criticalOpenCount > 0 ? 'danger' : 'success'} />
+                 tone={agg.criticalOpenCount > 0 ? 'danger' : 'success'} to="/ndi" />
             <Kpi Icon={ArrowRight}   label={isAr ? 'قيد المعالجة'   : 'In progress'} value={agg.inProgressCount}   tone="warning"
                  onClick={() => setStatusFilter('IN_PROGRESS')} active={statusFilter === 'IN_PROGRESS'} />
-            <Kpi Icon={CheckCircle2} label={isAr ? 'محلولة/مغلقة'   : 'Resolved'}    value={agg.resolvedOrClosedCount} tone="success" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'محلولة/مغلقة'   : 'Resolved'}    value={agg.resolvedOrClosedCount} tone="success"
+                 onClick={() => setStatusFilter('RESOLVED')} active={statusFilter === 'RESOLVED'} />
             <Kpi Icon={AlertCircle}  label={isAr ? 'إجراءات متأخرة' : 'Overdue CAPAs'} value={agg.overdueCount}
-                 tone={agg.overdueCount > 0 ? 'danger' : 'success'} />
+                 tone={agg.overdueCount > 0 ? 'danger' : 'success'} to="/ndi" />
             <Kpi Icon={Target}       label={isAr ? 'متوسط التقدّم' : 'Avg progress'} value={`${agg.avgRollupProgress}%`}
-                 tone={agg.avgRollupProgress >= 70 ? 'success' : agg.avgRollupProgress >= 40 ? 'warning' : 'danger'} />
+                 tone={agg.avgRollupProgress >= 70 ? 'success' : agg.avgRollupProgress >= 40 ? 'warning' : 'danger'} to="/ndi" />
           </div>
         )}
       </Card>
@@ -3527,14 +3528,14 @@ function ImprovementTab() {
                  tone={planStatusTone(currentPlan.status) === 'primary' ? 'primary'
                        : planStatusTone(currentPlan.status) === 'success' ? 'success'
                        : planStatusTone(currentPlan.status) === 'warning' ? 'warning'
-                       : planStatusTone(currentPlan.status) === 'info' ? 'info' : 'primary'} />
-            <Kpi Icon={FileText}     label={isAr ? 'البنود' : 'Items'}         value={`${currentPlan.completedItems}/${currentPlan.totalItems}`} tone="primary" />
+                       : planStatusTone(currentPlan.status) === 'info' ? 'info' : 'primary'} to="/ndi" />
+            <Kpi Icon={FileText}     label={isAr ? 'البنود' : 'Items'}         value={`${currentPlan.completedItems}/${currentPlan.totalItems}`} tone="primary" to="/ndi" />
             <Kpi Icon={ArrowRight}   label={isAr ? 'متوسط التقدّم' : 'Progress'} value={`${currentPlan.progressPct}%`}
-                 tone={currentPlan.progressPct >= 70 ? 'success' : currentPlan.progressPct >= 40 ? 'warning' : 'danger'} />
-            <Kpi Icon={Database}     label={isAr ? 'إجمالي الميزانية' : 'Budget'}   value={totalBudget ? totalBudget.toLocaleString() : '—'} tone="primary" />
-            <Kpi Icon={CheckCircle2} label={isAr ? 'مُخصَّص' : 'Allocated'}    value={allocated.toLocaleString()} tone="info" />
+                 tone={currentPlan.progressPct >= 70 ? 'success' : currentPlan.progressPct >= 40 ? 'warning' : 'danger'} to="/ndi" />
+            <Kpi Icon={Database}     label={isAr ? 'إجمالي الميزانية' : 'Budget'}   value={totalBudget ? totalBudget.toLocaleString() : '—'} tone="primary" to="/ndi" />
+            <Kpi Icon={CheckCircle2} label={isAr ? 'مُخصَّص' : 'Allocated'}    value={allocated.toLocaleString()} tone="info" to="/ndi" />
             <Kpi Icon={CheckCircle2} label={isAr ? 'مُسلَّم' : 'Delivered'}    value={completedBudget.toLocaleString()}
-                 tone={completedBudget > 0 ? 'success' : 'primary'} />
+                 tone={completedBudget > 0 ? 'success' : 'primary'} to="/ndi" />
           </div>
         )}
 
@@ -3839,19 +3840,19 @@ function SubmissionTab() {
           <div className="kpi-grid">
             <Kpi Icon={CheckCircle2} label={isAr ? 'جاهز للتجهيز' : 'Can finalize'}
                  value={pf.canFinalize ? (isAr ? 'نعم' : 'Yes') : (isAr ? 'لا' : 'No')}
-                 tone={pf.canFinalize ? 'success' : 'danger'} />
+                 tone={pf.canFinalize ? 'success' : 'danger'} to="/ndi" />
             <Kpi Icon={AlertCircle}  label={isAr ? 'فجوات حرجة بلا إجراءات' : 'Critical w/o CAPA'}
                  value={pf.criticalGapsWithoutCapa}
-                 tone={pf.criticalGapsWithoutCapa > 0 ? 'danger' : 'success'} />
+                 tone={pf.criticalGapsWithoutCapa > 0 ? 'danger' : 'success'} to="/ndi" />
             <Kpi Icon={AlertCircle}  label={isAr ? 'فجوات حرجة مفتوحة' : 'Critical open'}
                  value={pf.openCriticalGaps}
-                 tone={pf.openCriticalGaps > 0 ? 'warning' : 'success'} />
+                 tone={pf.openCriticalGaps > 0 ? 'warning' : 'success'} to="/ndi" />
             <Kpi Icon={FileText}     label={isAr ? 'التزام غير معتمد' : 'Compliance unapproved'} value={pf.complianceNotApproved}
-                 tone={pf.complianceNotApproved > 0 ? 'warning' : 'success'} />
+                 tone={pf.complianceNotApproved > 0 ? 'warning' : 'success'} to="/ndi" />
             <Kpi Icon={FileText}     label={isAr ? 'نضج غير معتمد' : 'Maturity unapproved'} value={pf.maturityNotApproved}
-                 tone={pf.maturityNotApproved > 0 ? 'warning' : 'success'} />
+                 tone={pf.maturityNotApproved > 0 ? 'warning' : 'success'} to="/ndi" />
             <Kpi Icon={AlertCircle}  label={isAr ? 'أدلة منتهية' : 'Expired evidence'} value={pf.expiredEvidence}
-                 tone={pf.expiredEvidence > 0 ? 'danger' : 'success'} />
+                 tone={pf.expiredEvidence > 0 ? 'danger' : 'success'} to="/ndi" />
           </div>
         )}
         {pf && pf.blockers.length > 0 && (
@@ -3894,17 +3895,17 @@ function SubmissionTab() {
                        : submissionStatusTone(current.status) === 'danger' ? 'danger'
                        : submissionStatusTone(current.status) === 'warning' ? 'warning'
                        : submissionStatusTone(current.status) === 'primary' ? 'primary'
-                       : submissionStatusTone(current.status) === 'info' ? 'info' : 'primary'} />
+                       : submissionStatusTone(current.status) === 'info' ? 'info' : 'primary'} to="/ndi" />
             <Kpi Icon={Database}    label={isAr ? 'مؤشّر نضيء' : 'NDI score'}
                  value={current.overallNdiPct != null ? `${Number(current.overallNdiPct).toFixed(0)}%` : '—'}
                  tone={current.overallNdiPct != null && current.overallNdiPct >= 70 ? 'success'
-                       : current.overallNdiPct != null && current.overallNdiPct >= 40 ? 'warning' : 'danger'} />
-            <Kpi Icon={Paperclip}   label={isAr ? 'أدلة' : 'Evidence'}    value={current.totalEvidence}   tone="primary" />
+                       : current.overallNdiPct != null && current.overallNdiPct >= 40 ? 'warning' : 'danger'} to="/ndi" />
+            <Kpi Icon={Paperclip}   label={isAr ? 'أدلة' : 'Evidence'}    value={current.totalEvidence}   tone="primary" to="/ndi" />
             <Kpi Icon={AlertCircle} label={isAr ? 'فجوات' : 'Gaps'}       value={`${current.criticalGaps}/${current.totalGaps}`}
-                 tone={current.criticalGaps > 0 ? 'warning' : 'primary'} />
-            <Kpi Icon={Target}      label={isAr ? 'إجراءات' : 'Actions'}  value={`${current.completedActions}/${current.totalActions}`} tone="primary" />
+                 tone={current.criticalGaps > 0 ? 'warning' : 'primary'} to="/ndi" />
+            <Kpi Icon={Target}      label={isAr ? 'إجراءات' : 'Actions'}  value={`${current.completedActions}/${current.totalActions}`} tone="primary" to="/ndi" />
             <Kpi Icon={FileText}    label={isAr ? 'بصمة' : 'Checksum'}    value={current.manifestChecksum ? current.manifestChecksum.substring(0, 12) + '…' : '—'}
-                 tone="primary" />
+                 tone="primary" to="/ndi" />
           </div>
 
           {current.isPlaceholder && (
@@ -4452,33 +4453,33 @@ function DashboardTab() {
         }>
         <div className="kpi-grid">
           <Kpi Icon={Database}     label={isAr ? 'مؤشّر نضيء' : 'NDI score'}
-               value={ndi != null ? `${Number(ndi).toFixed(0)}%` : '—'} tone={ndiTone} />
+               value={ndi != null ? `${Number(ndi).toFixed(0)}%` : '—'} tone={ndiTone} to="/ndi" />
           <Kpi Icon={Target}       label={isAr ? 'نضج' : 'Maturity'}
-               value={snap.maturityScorePct != null ? `${Number(snap.maturityScorePct).toFixed(0)}%` : '—'} tone="primary" />
+               value={snap.maturityScorePct != null ? `${Number(snap.maturityScorePct).toFixed(0)}%` : '—'} tone="primary" to="/ndi" />
           <Kpi Icon={Check}        label={isAr ? 'التزام' : 'Compliance'}
-               value={snap.compliancePct != null ? `${Number(snap.compliancePct).toFixed(0)}%` : '—'} tone="info" />
+               value={snap.compliancePct != null ? `${Number(snap.compliancePct).toFixed(0)}%` : '—'} tone="info" to="/ndi" />
           <Kpi Icon={Target}       label={isAr ? 'تميز تشغيلي' : 'OpEx'}
-               value={snap.opexScorePct != null ? `${Number(snap.opexScorePct).toFixed(0)}%` : '—'} tone="primary" />
+               value={snap.opexScorePct != null ? `${Number(snap.opexScorePct).toFixed(0)}%` : '—'} tone="primary" to="/ndi" />
           <Kpi Icon={AlertCircle}  label={isAr ? 'فجوات حرجة' : 'Critical open'} value={snap.criticalOpen}
-               tone={snap.criticalOpen > 0 ? 'danger' : 'success'} />
-          <Kpi Icon={Paperclip}    label={isAr ? 'أدلة سارية' : 'Active evidence'} value={snap.evidenceActive} tone="success" />
+               tone={snap.criticalOpen > 0 ? 'danger' : 'success'} to="/ndi" />
+          <Kpi Icon={Paperclip}    label={isAr ? 'أدلة سارية' : 'Active evidence'} value={snap.evidenceActive} tone="success" to="/ndi" />
         </div>
       </Card>
 
       <Card title={isAr ? 'تقدّم العمل' : 'Work in flight'} Icon={ArrowRight}>
         <div className="kpi-grid">
-          <Kpi Icon={FileText}     label={isAr ? 'نضج مُعتمَد' : 'Maturity approved'} value={`${snap.maturityApproved}/${snap.totalMaturity}`} tone="primary" />
-          <Kpi Icon={FileText}     label={isAr ? 'التزام مُعتمَد' : 'Compliance approved'} value={`${snap.complianceApproved}/${snap.totalCompliance}`} tone="primary" />
-          <Kpi Icon={Target}       label={isAr ? 'مؤشّرات مُحقَّقة' : 'KPIs achieved'} value={`${snap.opexAchieved}/${snap.totalOpex}`} tone="success" />
+          <Kpi Icon={FileText}     label={isAr ? 'نضج مُعتمَد' : 'Maturity approved'} value={`${snap.maturityApproved}/${snap.totalMaturity}`} tone="primary" to="/ndi" />
+          <Kpi Icon={FileText}     label={isAr ? 'التزام مُعتمَد' : 'Compliance approved'} value={`${snap.complianceApproved}/${snap.totalCompliance}`} tone="primary" to="/ndi" />
+          <Kpi Icon={Target}       label={isAr ? 'مؤشّرات مُحقَّقة' : 'KPIs achieved'} value={`${snap.opexAchieved}/${snap.totalOpex}`} tone="success" to="/ndi" />
           <Kpi Icon={AlertCircle}  label={isAr ? 'مؤشّرات متأخّرة' : 'KPIs behind plan'} value={snap.opexBehindPlan}
-               tone={snap.opexBehindPlan > 0 ? 'danger' : 'success'} />
-          <Kpi Icon={AlertCircle}  label={isAr ? 'فجوات محلولة' : 'Gaps resolved'} value={`${snap.gapsResolved}/${snap.totalGaps}`} tone="success" />
+               tone={snap.opexBehindPlan > 0 ? 'danger' : 'success'} to="/ndi" />
+          <Kpi Icon={AlertCircle}  label={isAr ? 'فجوات محلولة' : 'Gaps resolved'} value={`${snap.gapsResolved}/${snap.totalGaps}`} tone="success" to="/ndi" />
           <Kpi Icon={AlertCircle}  label={isAr ? 'إجراءات متأخّرة' : 'CAPAs overdue'} value={snap.capasOverdue}
-               tone={snap.capasOverdue > 0 ? 'danger' : 'success'} />
-          <Kpi Icon={Target}       label={isAr ? 'إجراءات مكتملة' : 'CAPAs completed'} value={`${snap.capasCompleted}/${snap.totalCapas}`} tone="primary" />
+               tone={snap.capasOverdue > 0 ? 'danger' : 'success'} to="/ndi" />
+          <Kpi Icon={Target}       label={isAr ? 'إجراءات مكتملة' : 'CAPAs completed'} value={`${snap.capasCompleted}/${snap.totalCapas}`} tone="primary" to="/ndi" />
           <Kpi Icon={AlertCircle}  label={isAr ? 'أدلة قريبة الانتهاء' : 'Evidence expiring'} value={snap.evidenceExpiringSoon}
-               tone={snap.evidenceExpiringSoon > 0 ? 'warning' : 'success'} />
-          <Kpi Icon={Upload}       label={isAr ? 'حزم مُعتمَدة من سدايا' : 'SDAIA acknowledged'} value={`${snap.submissionsAcknowledged}/${snap.submissionsTotal}`} tone="primary" />
+               tone={snap.evidenceExpiringSoon > 0 ? 'warning' : 'success'} to="/ndi" />
+          <Kpi Icon={Upload}       label={isAr ? 'حزم مُعتمَدة من سدايا' : 'SDAIA acknowledged'} value={`${snap.submissionsAcknowledged}/${snap.submissionsTotal}`} tone="primary" to="/ndi" />
         </div>
       </Card>
 
@@ -4849,7 +4850,7 @@ function AuditTab() {
       <Card title={isAr ? 'مسار التدقيق' : 'Audit trail'} Icon={FileText}>
         {agg && (
           <div className="kpi-grid">
-            <Kpi Icon={FileText}    label={isAr ? 'إجمالي الأحداث' : 'Total events'} value={agg.total} tone="primary" />
+            <Kpi Icon={FileText}    label={isAr ? 'إجمالي الأحداث' : 'Total events'} value={agg.total} tone="primary" to="/ndi" />
             <Kpi Icon={AlertCircle} label={isAr ? 'تحذيرات' : 'Warnings'} value={agg.bySeverity.WARN ?? 0}
                  tone={(agg.bySeverity.WARN ?? 0) > 0 ? 'warning' : 'success'}
                  onClick={() => setSeverityFilter('WARN')} active={severityFilter === 'WARN'} />

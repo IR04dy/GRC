@@ -80,10 +80,10 @@ export function AuditLogPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Activity}      label={isAr ? 'أحداث (24س)' : 'Events (24h)'} value={stats?.events ?? '—'} tone="primary" />
-        <Kpi Icon={AlertTriangle} label={isAr ? 'تحذيرات (24س)' : 'Warnings (24h)'} value={stats?.warns ?? '—'} tone="warning" />
-        <Kpi Icon={AlertOctagon}  label={isAr ? 'أخطاء (24س)' : 'Errors (24h)'} value={stats?.errors ?? '—'} tone="danger" />
-        <Kpi Icon={ScrollText}    label={isAr ? 'إجمالي السجلّات' : 'Total entries'} value={total} tone="info" />
+        <Kpi Icon={Activity}      label={isAr ? 'أحداث (24س)' : 'Events (24h)'} value={stats?.events ?? '—'} tone="primary" onClick={() => { setDraft({ severity: '', sourceModule: '', actionType: '' }); setFilters({ severity: '', sourceModule: '', actionType: '' }); setPage(0); }} />
+        <Kpi Icon={AlertTriangle} label={isAr ? 'تحذيرات (24س)' : 'Warnings (24h)'} value={stats?.warns ?? '—'} tone="warning" onClick={() => { setDraft(d => ({ ...d, severity: 'WARN' })); setFilters(f => ({ ...f, severity: 'WARN' })); setPage(0); }} active={filters.severity === 'WARN'} />
+        <Kpi Icon={AlertOctagon}  label={isAr ? 'أخطاء (24س)' : 'Errors (24h)'} value={stats?.errors ?? '—'} tone="danger" onClick={() => { setDraft(d => ({ ...d, severity: 'ERROR' })); setFilters(f => ({ ...f, severity: 'ERROR' })); setPage(0); }} active={filters.severity === 'ERROR'} />
+        <Kpi Icon={ScrollText}    label={isAr ? 'إجمالي السجلّات' : 'Total entries'} value={total} tone="info" onClick={() => { setDraft({ severity: '', sourceModule: '', actionType: '' }); setFilters({ severity: '', sourceModule: '', actionType: '' }); setPage(0); }} />
       </div>
 
       <Card title={isAr ? 'النشاط' : 'Activity'} Icon={ScrollText}

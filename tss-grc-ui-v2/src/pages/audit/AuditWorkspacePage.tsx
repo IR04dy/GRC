@@ -535,11 +535,11 @@ function AuditorsAndCalendarTab({ t, lang }: { t: (k: string) => string; lang: '
     <div className="audws-tab-stack">
       {/* KPI strip */}
       <div className="kpi-grid audws-kpi-5">
-        <Kpi Icon={Users}        label={t('audwsAuditorsTotal')}    value={AUDITORS.length} tone="primary" />
-        <Kpi Icon={ShieldCheck}  label={t('audwsAuditorsExternal')} value={external}        tone="info" />
-        <Kpi Icon={AlertOctagon} label={t('audwsAuditorsRotOverdue')} value={overdue.length} tone="danger" />
-        <Kpi Icon={Clock}        label={t('audwsAuditorsRotDueSoon')} value={dueSoon.length} tone="warning" />
-        <Kpi Icon={Flame}        label={t('audwsAuditorsBreaches')} value={breaches.length} tone="danger" />
+        <Kpi Icon={Users}        label={t('audwsAuditorsTotal')}    value={AUDITORS.length} to="/audit/ia/universe" tone="primary" />
+        <Kpi Icon={ShieldCheck}  label={t('audwsAuditorsExternal')} value={external}        to="/audit/ia/universe" tone="info" />
+        <Kpi Icon={AlertOctagon} label={t('audwsAuditorsRotOverdue')} value={overdue.length} to="/audit/ia/universe" tone="danger" />
+        <Kpi Icon={Clock}        label={t('audwsAuditorsRotDueSoon')} value={dueSoon.length} to="/audit/ia/universe" tone="warning" />
+        <Kpi Icon={Flame}        label={t('audwsAuditorsBreaches')} value={breaches.length} to="/audit/ia/universe" tone="danger" />
       </div>
 
       {/* Auditor register */}
@@ -635,11 +635,11 @@ function AppointmentsAndFeesTab({ t, lang }: { t: (k: string) => string; lang: '
   return (
     <div className="audws-tab-stack">
       <div className="kpi-grid audws-kpi-5">
-        <Kpi Icon={FileSignature} label={t('audwsAppActive')}     value={active}                     tone="success" />
-        <Kpi Icon={Clock}         label={t('audwsAppInFlight')}   value={inFlight}                   tone="warning" />
-        <Kpi Icon={Banknote}      label={t('audwsAppFeeTotal')}   value={`${(total2026 / 1_000_000).toFixed(2)}M`} tone="primary" />
-        <Kpi Icon={ShieldCheck}   label={t('audwsAppFeeAudit')}   value={`${(audit2026 / 1_000_000).toFixed(2)}M`} tone="info" />
-        <Kpi Icon={AlertOctagon}  label={t('audwsAppFeeNonAuditRatio')} value={`${ratioPct}%`}        tone={ratioPct > 30 ? 'danger' : ratioPct > 15 ? 'warning' : 'success'} />
+        <Kpi Icon={FileSignature} label={t('audwsAppActive')}     value={active}                     to="/audit/ia/universe" tone="success" />
+        <Kpi Icon={Clock}         label={t('audwsAppInFlight')}   value={inFlight}                   to="/audit/ia/universe" tone="warning" />
+        <Kpi Icon={Banknote}      label={t('audwsAppFeeTotal')}   value={`${(total2026 / 1_000_000).toFixed(2)}M`} to="/audit/ia/universe" tone="primary" />
+        <Kpi Icon={ShieldCheck}   label={t('audwsAppFeeAudit')}   value={`${(audit2026 / 1_000_000).toFixed(2)}M`} to="/audit/ia/universe" tone="info" />
+        <Kpi Icon={AlertOctagon}  label={t('audwsAppFeeNonAuditRatio')} value={`${ratioPct}%`}        to="/audit/ia/universe" tone={ratioPct > 30 ? 'danger' : ratioPct > 15 ? 'warning' : 'success'} />
       </div>
 
       <Card title={`${t('audwsAppTitle')} (${AUDIT_APPOINTMENTS.length})`} Icon={FileSignature}>

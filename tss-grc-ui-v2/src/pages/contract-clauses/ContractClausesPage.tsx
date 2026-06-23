@@ -189,11 +189,11 @@ export function ContractClausesPage() {
       <PageHeader eyebrow={t('navThirdParty')} title={t('cclPageTitle')} sub={t('cclPageSub')} />
 
       <div className="kpi-grid">
-        <Kpi Icon={BookOpen}      label={t('cclKpiApproved')}   value={stats.approved} tone="success" />
+        <Kpi Icon={BookOpen}      label={t('cclKpiApproved')}   value={stats.approved} tone="success" to="/contract-clauses" />
         <Kpi Icon={Files}         label={t('cclKpiDraft')}      value={stats.draft}    tone="warning"
           onClick={() => setTab('draft')} active={tab === 'draft'} />
-        <Kpi Icon={AlertTriangle} label={t('cclKpiCritical')}   value={stats.critical} tone="danger" />
-        <Kpi Icon={Stamp}         label={t('cclKpiFixed')}      value={stats.fixed}    tone="primary" />
+        <Kpi Icon={AlertTriangle} label={t('cclKpiCritical')}   value={stats.critical} tone="danger"  to="/contract-clauses" />
+        <Kpi Icon={Stamp}         label={t('cclKpiFixed')}      value={stats.fixed}    tone="primary" to="/contract-clauses" />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

@@ -116,8 +116,8 @@ export function BcmDependencyGraphPage() {
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12, marginBottom: 12 }}>
-        <Kpi Icon={Network}       label={isAr ? 'العقد'        : 'Nodes'}                value={graph?.summary.nodeCount ?? 0}              tone="info" />
-        <Kpi Icon={Network}       label={isAr ? 'الروابط'      : 'Edges'}                value={graph?.summary.edgeCount ?? 0}              tone="info" />
+        <Kpi Icon={Network}       label={isAr ? 'العقد'        : 'Nodes'}                value={graph?.summary.nodeCount ?? 0}              tone="info" to="/bcm" />
+        <Kpi Icon={Network}       label={isAr ? 'الروابط'      : 'Edges'}                value={graph?.summary.edgeCount ?? 0}              tone="info" onClick={() => setTab('table')} active={tab === 'table'} />
         <Kpi Icon={Eye}           label={isAr ? 'حرجة/سيادية'  : 'Critical / Sovereign'} value={graph?.summary.criticalServicesCount ?? 0}  tone="warning" to="/bcm/bia" />
         <Kpi Icon={AlertTriangle} label={isAr ? 'عدم تطابق RTO' : 'RTO mismatches'}       value={graph?.summary.rtoMismatchesCount ?? 0}     tone="danger" to="/bcm/bia" />
       </div>

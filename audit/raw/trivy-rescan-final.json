@@ -1,0 +1,10 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.71.1"
+  },
+  "ReportID": "019eea17-17b9-7232-98e1-6a8b38096663",
+  "CreatedAt": "2026-06-21T15:10:42.4891439+03:00",
+  "ArtifactName": "D:/AYMAN/GRC/tss-grc-backend/target/tss-grc-platform-0.1.0-SNAPSHOT.jar",
+  "ArtifactType": "filesystem"
+}

@@ -121,9 +121,9 @@ export function ThirdPartyCyberPage() {
 
       <div className="kpi-grid">
         <Kpi Icon={CheckCircle2}   label={t('tpcKpiApproved')} value={stats.APPROVED} tone="success" onClick={() => setTab('APPROVED')} active={tab === 'APPROVED'} />
-        <Kpi Icon={AlertTriangle}  label={t('tpcKpiHigh')}     value={stats.high}     tone="warning" />
-        <Kpi Icon={Bug}            label={t('tpcKpiCritical')} value={stats.critical} tone="danger" />
-        <Kpi Icon={Lock}           label={t('tpcKpiReview')}   value={stats.IN_REVIEW + stats.DRAFT} tone="primary" />
+        <Kpi Icon={AlertTriangle}  label={t('tpcKpiHigh')}     value={stats.high}     tone="warning" onClick={() => setTab('high-risk')} active={tab === 'high-risk'} />
+        <Kpi Icon={Bug}            label={t('tpcKpiCritical')} value={stats.critical} tone="danger"  onClick={() => setTab('high-risk')} active={tab === 'high-risk'} />
+        <Kpi Icon={Lock}           label={t('tpcKpiReview')}   value={stats.IN_REVIEW + stats.DRAFT} tone="primary" onClick={() => setTab('IN_REVIEW')} active={tab === 'IN_REVIEW'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} hideEmpty />

@@ -337,24 +337,28 @@ export function FinancedEmissionsPage() {
           label={isAr ? 'إجمالي الانبعاثات المُموَّلة' : 'Total financed emissions'}
           value={fmtTco2e(total?.totalFinancedEmissionsTco2e)}
           tone="info"
+          to="/esg"
         />
         <Kpi
           Icon={Target}
           label={isAr ? 'الأهداف المسجَّلة' : 'Targets registered'}
           value={String(targets.length)}
           tone="success"
+          onClick={() => setTab('targets')}
         />
         <Kpi
           Icon={CheckCircle2}
           label={isAr ? 'السجلّات المنشورة' : 'Records published'}
           value={String(totalPublished)}
           tone="success"
+          onClick={() => setTab('records')}
         />
         <Kpi
           Icon={BarChart3}
           label={isAr ? 'متوسّط جودة البيانات (PCAF)' : 'Average PCAF data quality'}
           value={total ? Number(total.weightedAverageDataQuality).toFixed(1) : '—'}
           tone={total && Number(total.weightedAverageDataQuality) <= 2.5 ? 'success' : 'warning'}
+          to="/esg"
         />
       </div>
 

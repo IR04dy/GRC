@@ -214,10 +214,10 @@ export function TprmPage() {
         }
       />
       <div className="kpi-grid">
-        <Kpi Icon={Building2}     label={t('tprmKpiVendors')}    value={vendors.data.length} tone="primary" />
-        <Kpi Icon={Workflow}      label={t('tprmKpiCritical')}   value={critical} tone="danger" />
-        <Kpi Icon={AlertTriangle} label={t('tprmKpiOpenRisks')}  value={vendors.data.filter(v => v.status === 'UNDER_REVIEW').length} tone="warning" />
-        <Kpi Icon={CalendarClock} label={t('tprmKpiReviews')}    value={expiringContracts.filter(c => c.days <= 90).length} tone="info" />
+        <Kpi Icon={Building2}     label={t('tprmKpiVendors')}    value={vendors.data.length} tone="primary" onClick={() => setTab('vendors')} />
+        <Kpi Icon={Workflow}      label={t('tprmKpiCritical')}   value={critical} tone="danger" onClick={() => setTab('vendors')} />
+        <Kpi Icon={AlertTriangle} label={t('tprmKpiOpenRisks')}  value={vendors.data.filter(v => v.status === 'UNDER_REVIEW').length} tone="warning" onClick={() => setTab('vendors')} />
+        <Kpi Icon={CalendarClock} label={t('tprmKpiReviews')}    value={expiringContracts.filter(c => c.days <= 90).length} tone="info" onClick={() => setTab('contracts')} />
       </div>
 
       <OverviewStrip

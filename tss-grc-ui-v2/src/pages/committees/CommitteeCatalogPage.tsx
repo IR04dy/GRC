@@ -114,10 +114,10 @@ export function CommitteeCatalogPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Landmark}      label={isAr ? 'قوالب اللجان'      : 'Committee templates'} value={String(stats.templates)} tone="info" />
+        <Kpi Icon={Landmark}      label={isAr ? 'قوالب اللجان'      : 'Committee templates'} value={String(stats.templates)} tone="info" to="/committees" />
         <Kpi Icon={FileText}      label={isAr ? 'النماذج المتاحة'    : 'Forms available'}      value={String(stats.forms)}     tone="success" onClick={() => document.getElementById('forms-library-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
-        <Kpi Icon={BookOpen}      label={isAr ? 'النطاقات التنظيمية' : 'Regulatory domains'}    value={String(stats.domains)}   tone="neutral" />
-        <Kpi Icon={AlertTriangle} label={isAr ? 'تتطلب الاستقلالية'   : 'Independence required'} value={String(stats.independenceRequired)} tone="warning" />
+        <Kpi Icon={BookOpen}      label={isAr ? 'النطاقات التنظيمية' : 'Regulatory domains'}    value={String(stats.domains)}   tone="neutral" to="/committees" />
+        <Kpi Icon={AlertTriangle} label={isAr ? 'تتطلب الاستقلالية'   : 'Independence required'} value={String(stats.independenceRequired)} tone="warning" to="/committees" />
       </div>
 
       {loading && <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</div>}

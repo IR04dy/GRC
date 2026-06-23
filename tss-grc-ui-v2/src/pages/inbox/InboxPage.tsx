@@ -137,19 +137,23 @@ export function InboxPage() {
 
       {/* Interactive summary strip — the platform-standard `kpi-grid` + `Kpi`
           tiles (same component/markup as every other module page). Each tile is
-          a clickable drill that filters the list; click the active one to clear. */}
-      <div className="kpi-grid">
+          a clickable drill that filters the list; the `active` prop shows the
+          `.kpi-active` selection ring matching the rest of the platform. */}
+      <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={InboxIcon} tone="primary"
           label={isAr ? 'الإجمالي' : 'Total'} value={page?.totalElements ?? null}
           emptyHint={isAr ? 'لم يُحمّل بعد' : 'Not loaded yet'}
+          active={filter === 'all'}
           onClick={() => setFilter('all')} />
         <Kpi Icon={Bell} tone="warning"
           label={isAr ? 'غير المقروءة' : 'Unread'} value={headlineUnread} zeroConfirm
           emptyHint={isAr ? 'لم يُحتسب بعد' : 'Not computed yet'}
+          active={filter === 'unread'}
           onClick={() => setFilter(filter === 'unread' ? 'all' : 'unread')} />
         <Kpi Icon={AlertTriangle} tone="danger"
           label={isAr ? 'التصعيدات' : 'Escalations'} value={page ? pageEscalations : null} zeroConfirm
           emptyHint={isAr ? 'لا تصعيدات' : 'No escalations'}
+          active={filter === 'escalation'}
           onClick={() => setFilter(filter === 'escalation' ? 'all' : 'escalation')} />
       </div>
 
@@ -192,23 +196,24 @@ export function InboxPage() {
                   {isAr ? 'لا عناصر مطابقة للتصفية في هذه الصفحة.' : 'No items match this filter on the current page.'}
                 </InlineEmpty>
               </Card>
-            : <Card padded={false}>
-                {grouped.map((g, gi) => (
-                  <div key={g.bucket}>
-                    <div style={{
-                      fontSize: 11, fontWeight: 700, color: 'var(--ink-3)',
-                      textTransform: 'uppercase', letterSpacing: '.06em',
-                      padding: '12px 14px 6px',
-                      background: 'var(--surface-2)',
-                      borderTop: gi === 0 ? 'none' : '1px solid var(--border)',
-                    }}>{g.bucket}</div>
-                    {g.items.map((n, i) => (
-                      <NotificationRow key={n.id} n={n} isAr={isAr}
-                        last={gi === grouped.length - 1 && i === g.items.length - 1}
-                        onOpen={() => openRow(n)} />
-                    ))}
-                  </div>
-                ))}
+            : <Card>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {grouped.map(g => (
+                    <div key={g.bucket}>
+                      <div style={{
+                        fontSize: 11, fontWeight: 700, color: 'var(--ink-3)',
+                        textTransform: 'uppercase', letterSpacing: '.06em',
+                        marginBottom: 6,
+                      }}>{g.bucket}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {g.items.map(n => (
+                          <NotificationRow key={n.id} n={n} isAr={isAr}
+                            onOpen={() => openRow(n)} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </Card>
       }
 
@@ -238,39 +243,31 @@ export function InboxPage() {
   );
 }
 
-function NotificationRow({ n, isAr, last, onOpen }: {
-  n: NotificationDto; isAr: boolean; last: boolean; onOpen: () => void;
+function NotificationRow({ n, isAr, onOpen }: {
+  n: NotificationDto; isAr: boolean; onOpen: () => void;
 }) {
   const title = isAr && n.titleAr ? n.titleAr : n.titleEn;
   const message = isAr && n.messageAr ? n.messageAr : n.messageEn;
   const isEscalation = n.notificationType === 'ESCALATION';
   const hasLink = !!(n.link && n.link.startsWith('/'));
+  const accentColor = isEscalation ? 'var(--danger)' : 'var(--primary)';
 
   return (
     <button onClick={onOpen}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = n.isRead ? 'transparent' : 'var(--primary-50, var(--surface-2))'; }}
       style={{
-        position: 'relative',
         width: '100%',
         display: 'grid',
         gridTemplateColumns: '34px 1fr auto',
         gap: 12, padding: '12px 14px',
         textAlign: 'start',
-        background: n.isRead ? 'transparent' : 'var(--primary-50, var(--surface-2))',
-        border: 'none',
-        borderBottom: last ? 'none' : '1px solid var(--border)',
+        background: n.isRead ? 'var(--surface-2)' : 'var(--primary-50)',
+        border: '1px solid var(--border)',
+        borderInlineStart: n.isRead ? '1px solid var(--border)' : `3px solid ${accentColor}`,
+        borderRadius: 'var(--r-md)',
         cursor: 'pointer',
         fontFamily: 'inherit',
-        transition: 'background var(--dur-fast) var(--ease-standard)',
+        transition: 'box-shadow var(--dur-fast) var(--ease-standard)',
       }}>
-      {/* Unread accent bar on the inline-start edge */}
-      {!n.isRead && (
-        <span aria-hidden style={{
-          position: 'absolute', insetInlineStart: 0, top: 0, bottom: 0, width: 3,
-          background: isEscalation ? 'var(--danger)' : 'var(--primary)',
-        }} />
-      )}
 
       {/* Type-icon chip */}
       <span aria-hidden style={{

@@ -1,0 +1,14 @@
+attack_surface_finding|status
+attack_surface_shadow_it|status
+cloud_services|status
+control_assessments|status
+cyber_action_plans|workflow_status
+cyber_assets|status
+cyber_controls|status
+cyber_evidence|status
+cyber_incidents|workflow_status
+incidents|status
+root_cause_analyses|status
+vuln_exceptions|workflow_status
+vulnerabilities|workflow_status
+vulnerability_sla_finding|status

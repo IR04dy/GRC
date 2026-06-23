@@ -150,24 +150,28 @@ export function SanctionsDashboardPage() {
               value={String(snap.checksLast24h)}
               label={isAr ? 'فحوصات خلال ٢٤ ساعة' : 'Checks (24 h)'}
               tone="info"
+              to="/aml/sanctions/checks"
             />
             <KpiTile
               icon={AlertTriangle}
               value={String(snap.hitsPendingReview)}
               label={isAr ? 'تطابقات في انتظار المراجعة' : 'Hits pending review'}
               tone={snap.hitsPendingReview > 0 ? 'warning' : 'neutral'}
+              to="/aml/sanctions/checks"
             />
             <KpiTile
               icon={Clock}
               value={String(snap.hitsSlaBreached)}
               label={isAr ? 'تجاوز المهلة (٢٤ س)' : 'SLA breached'}
               tone={snap.hitsSlaBreached > 0 ? 'danger' : 'success'}
+              to="/aml/sanctions/checks"
             />
             <KpiTile
               icon={ShieldAlert}
               value={String(snap.hitsTruePositive)}
               label={isAr ? 'تطابقات مُؤكّدة' : 'Confirmed positives'}
               tone={snap.hitsTruePositive > 0 ? 'danger' : 'neutral'}
+              to="/aml/sanctions/checks"
             />
             <KpiTile
               icon={TrendingUp}
@@ -176,12 +180,14 @@ export function SanctionsDashboardPage() {
                 : `${(snap.falsePositiveRate * 100).toFixed(1)}%`}
               label={isAr ? 'نسبة الإيجابيات الخاطئة' : 'False-positive rate'}
               tone="accent"
+              to="/aml/sanctions/checks"
             />
             <KpiTile
               icon={CheckCircle2}
               value={String(snap.totalChecks)}
               label={isAr ? 'إجمالي الفحوصات' : 'Total checks'}
               tone="neutral"
+              to="/aml/sanctions/dashboard"
             />
           </div>
 
@@ -281,19 +287,26 @@ function hitCols(
   ];
 }
 
-function KpiTile({ icon: Icon, value, label, tone }:
-  { icon: typeof Activity; value: string; label: string; tone: BadgeTone }) {
+function KpiTile({ icon: Icon, value, label, tone, to }:
+  { icon: typeof Activity; value: string; label: string; tone: BadgeTone; to?: string }) {
+  const inner = (
+    <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)' }}>
+        <Icon size={14} />
+        <span style={{ fontSize: 11 }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 700 }}>
+        <Badge tone={tone}>{value}</Badge>
+      </div>
+    </div>
+  );
   return (
     <Card>
-      <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)' }}>
-          <Icon size={14} />
-          <span style={{ fontSize: 11 }}>{label}</span>
-        </div>
-        <div style={{ fontSize: 24, fontWeight: 700 }}>
-          <Badge tone={tone}>{value}</Badge>
-        </div>
-      </div>
+      {to ? (
+        <Link to={to} style={{ textDecoration: 'none', color: 'inherit', display: 'block', cursor: 'pointer' }}>
+          {inner}
+        </Link>
+      ) : inner}
     </Card>
   );
 }

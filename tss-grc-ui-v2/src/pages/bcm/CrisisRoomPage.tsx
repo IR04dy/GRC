@@ -320,10 +320,10 @@ export function CrisisRoomPage() {
       />
 
       <div className="kpi-grid-sm">
-        <Kpi Icon={Siren}        label={isAr ? 'أزمات نشطة'    : 'Active events'}       value={stats.active ?? 0}        tone="danger" />
-        <Kpi Icon={ShieldAlert}  label={isAr ? 'شدة عالية'     : 'High severity (≥4)'}  value={stats.high_severity ?? 0} tone="danger" />
-        <Kpi Icon={AlertTriangle} label={isAr ? 'قيد التقييم'  : 'Assessing'}           value={stats.assessing ?? 0}     tone="warning" />
-        <Kpi Icon={MessageSquare} label={isAr ? 'مغلقة'        : 'Closed'}              value={stats.closed ?? 0}        tone="success" />
+        <Kpi Icon={Siren}        label={isAr ? 'أزمات نشطة'    : 'Active events'}       value={stats.active ?? 0}        tone="danger"   to="/bcm/crisis-room" />
+        <Kpi Icon={ShieldAlert}  label={isAr ? 'شدة عالية'     : 'High severity (≥4)'}  value={stats.high_severity ?? 0} tone="danger"   to="/bcm/crisis-room" />
+        <Kpi Icon={AlertTriangle} label={isAr ? 'قيد التقييم'  : 'Assessing'}           value={stats.assessing ?? 0}     tone="warning"  to="/bcm/crisis-room" />
+        <Kpi Icon={MessageSquare} label={isAr ? 'مغلقة'        : 'Closed'}              value={stats.closed ?? 0}        tone="success"  to="/bcm/crisis-room" />
       </div>
 
       {active.length > 0 && (

@@ -372,24 +372,28 @@ export function StrategyRoiPage() {
           Icon={Sigma}
           label={isAr ? 'إجمالي التحليلات' : 'Total analyses'}
           value={String(items.length)}
+          to="/bcm"
         />
         <Kpi
           Icon={CheckCircle2}
           label={isAr ? 'مُعتمَدة' : 'Approved'}
           value={String(approvedCount)}
           tone="success"
+          to="/bcm"
         />
         <Kpi
           Icon={Clock}
           label={isAr ? 'بانتظار المراجعة' : 'Pending review'}
           value={String(pendingCount)}
           tone="info"
+          to="/bcm"
         />
         <Kpi
           Icon={AlertTriangle}
           label={isAr ? 'مُؤجَّلة' : 'Deferred'}
           value={String(deferredCount)}
           tone="warning"
+          to="/bcm"
         />
       </div>
 

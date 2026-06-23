@@ -63,7 +63,7 @@ export function LifecycleOverviewPage() {
 
       {/* Top-level KPIs */}
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={AlertOctagon}     label={t('loKpiAtRisk')}        value={String(totalAtRisk)}                tone={totalAtRisk > 0 ? 'danger' : 'success'} />
+        <Kpi Icon={AlertOctagon}     label={t('loKpiAtRisk')}        value={String(totalAtRisk)}                tone={totalAtRisk > 0 ? 'danger' : 'success'} to="/lifecycle" />
         <Kpi Icon={TrendingUp}        label={t('loKpiRiskBreach')}    value={String(riskStats.risksWithOpenBreach)} tone={riskStats.risksWithOpenBreach > 0 ? 'danger' : 'success'} to="/risk-lifecycle" />
         <Kpi Icon={Stamp}              label={t('loKpiAuditCritical')} value={String(auditStats.findingsCritical)} tone={auditStats.findingsCritical > 0 ? 'danger' : 'success'} to="/audit-lifecycle" />
         <Kpi Icon={Fingerprint}        label={t('loKpiDsrOverdue')}    value={String(privacyStats.dsrOverdue)}     tone={privacyStats.dsrOverdue > 0 ? 'danger' : 'success'} to="/privacy-lifecycle" />

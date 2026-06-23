@@ -47,11 +47,11 @@ export function RopaPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Database}      label={t('ropaKpiTotal')}    value={String(stats.total)} tone="primary" />
-        <Kpi Icon={Fingerprint}    label={t('ropaKpiConsent')}   value={String(stats.consentBased)} tone="info" />
-        <Kpi Icon={Globe}          label={t('ropaKpiCrossBorder')} value={String(stats.crossBorder)} tone={stats.crossBorder > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={ShieldCheck}    label={t('ropaKpiReviewed')}    value={String(stats.reviewedLast90Days)} tone="success" />
-        <Kpi Icon={AlertTriangle}  label={t('ropaKpiNeedsReview')} value={String(stats.needsReview)} tone={stats.needsReview > 0 ? 'danger' : 'success'} />
+        <Kpi Icon={Database}      label={t('ropaKpiTotal')}    value={String(stats.total)} tone="primary" to="/ropa" />
+        <Kpi Icon={Fingerprint}    label={t('ropaKpiConsent')}   value={String(stats.consentBased)} tone="info" to="/ropa" />
+        <Kpi Icon={Globe}          label={t('ropaKpiCrossBorder')} value={String(stats.crossBorder)} tone={stats.crossBorder > 0 ? 'warning' : 'success'} to="/privacy/pdpl-extensions" />
+        <Kpi Icon={ShieldCheck}    label={t('ropaKpiReviewed')}    value={String(stats.reviewedLast90Days)} tone="success" to="/ropa" />
+        <Kpi Icon={AlertTriangle}  label={t('ropaKpiNeedsReview')} value={String(stats.needsReview)} tone={stats.needsReview > 0 ? 'danger' : 'success'} to="/ropa" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: 16 }}>

@@ -113,12 +113,14 @@ export function ObligationsPage() {
           label={isAr ? 'متأخرات' : 'Overdue'}
           value={String(kpis?.overdueCount ?? '—')}
           tone={(kpis?.overdueCount ?? 0) > 0 ? 'danger' : 'neutral'}
+          to="/compliance"
         />
         <Kpi
           Icon={Clock3}
           label={isAr ? 'مستحقة هذا الشهر' : 'Due this month'}
           value={String(kpis?.dueThisMonthCount ?? '—')}
           tone={(kpis?.dueThisMonthCount ?? 0) > 0 ? 'warning' : 'neutral'}
+          to="/compliance"
         />
         <Kpi
           Icon={CheckCircle2}

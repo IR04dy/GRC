@@ -244,10 +244,10 @@ export function BiaWizardPage() {
         />
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12, marginBottom: 14 }}>
-          <Kpi Icon={ClipboardCheck} label={isAr ? 'إجمالي' : 'Total BIA'} value={items.length} tone="info" />
-          <Kpi Icon={FileCheck2}     label={isAr ? 'معتمد' : 'Approved'}    value={stats.status_approved ?? 0} tone="success" />
-          <Kpi Icon={AlertOctagon}   label={isAr ? 'سيادي'   : 'Sovereign'}  value={stats.crit_sovereign ?? 0} tone="danger" />
-          <Kpi Icon={AlertOctagon}   label={isAr ? 'حرج'     : 'Critical'}   value={stats.crit_critical ?? 0}  tone="danger" />
+          <Kpi Icon={ClipboardCheck} label={isAr ? 'إجمالي' : 'Total BIA'} value={items.length} tone="info" to="/bcm" />
+          <Kpi Icon={FileCheck2}     label={isAr ? 'معتمد' : 'Approved'}    value={stats.status_approved ?? 0} tone="success" to="/bcm" />
+          <Kpi Icon={AlertOctagon}   label={isAr ? 'سيادي'   : 'Sovereign'}  value={stats.crit_sovereign ?? 0} tone="danger" to="/bcm" />
+          <Kpi Icon={AlertOctagon}   label={isAr ? 'حرج'     : 'Critical'}   value={stats.crit_critical ?? 0}  tone="danger" to="/bcm" />
         </div>
 
         <Card title={isAr ? 'سجل تحليل الأثر' : 'BIA register'}>

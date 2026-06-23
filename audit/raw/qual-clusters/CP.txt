@@ -1,0 +1,16 @@
+================================================================================
+QUAL-CP-001 [Medium] CyberService is a God class: 613 LOC, 10 repositories, 8 unrelated entity domains in one service
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/cyber/service/CyberService.java:23-613
+RESOLUTION: Split CyberService into per-aggregate services (CyberControlService, CyberVulnerabilityService, CyberIncidentService, CyberAssetService, CyberEvidenceService, CyberActionPlanService, CyberAssessmentService) mirroring the asm/ and vuln_sla/ sub-package convention. Keep a thin CyberDashboardService for the cross-cutting getDashboard aggregation. The controller can fan out to the new services without API changes.
+================================================================================
+QUAL-CP-003 [Medium] PrivacyService swallows audit and event-bus exceptions with empty catch(Exception ignored) — no logging at all
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/privacy/service/PrivacyService.java:157-185
+RESOLUTION: Add @Slf4j to the class and log at WARN with the exception inside both catch blocks: `log.warn("SDAIA audit write failed for breach {} — continuing", id, ex);`. Catch a narrower type if feasible. Keep the non-fatal behaviour but make the failure observable.
+================================================================================
+QUAL-CP-004 [Medium] VulnerabilitySlaController does business logic, injects a repository, and reads the user id by reflection with a swallowed exception
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/cyber/vuln_sla/controller/VulnerabilitySlaController.java:52-193
+RESOLUTION: Move the dashboard aggregation into VulnerabilitySlaComputeService (or a dedicated VulnSlaDashboardService) and drop the repository from the controller. Replace the reflective principal access with a typed cast to the security module's user-details type (add the dependency — it is the platform's own security package, not an external one) or inject an existing helper; on failure log at WARN instead of silently returning null.
+================================================================================
+QUAL-CP-005 [Medium] SocOpsScheduledSweep: 10 near-identical sweep methods and a broad catch that logs only getMessage(), losing the stack trace
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/socops/service/SocOpsScheduledSweep.java:110-404
+RESOLUTION: (1) Change the catch to log.error with the exception object: `log.error("[socops sweep] org={} scan failed", orgId, ex);`. (2) Extract a generic helper, e.g. `<E> int sweep(String entityType, List<E> rows, Function<E,Long> idOf, Function<E,String> triggerOf, Function<E,Map<String,Object>> payloadOf)` that owns the loop/alreadyFired/publish/markFired, so each sweepX becomes one call.

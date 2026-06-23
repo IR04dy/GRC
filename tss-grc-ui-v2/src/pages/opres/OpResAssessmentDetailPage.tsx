@@ -247,23 +247,27 @@ export function OpResAssessmentDetailPage() {
       }}>
         <Kpi Icon={Shield} tone="info"
           label={lang === 'ar' ? 'الاكتمال' : 'Completeness'}
-          value={assessment.completeness ?? '0/5'} />
+          value={assessment.completeness ?? '0/5'}
+          to="/bcm/opres" />
         <Kpi Icon={Gauge}
           tone={assessment.avgCurrentScore != null && Number(assessment.avgCurrentScore) >= 3
             ? 'success' : 'warning'}
           label={lang === 'ar' ? 'متوسّط النضج الحالي' : 'Avg Current'}
           value={assessment.avgCurrentScore != null
-            ? Number(assessment.avgCurrentScore).toFixed(1) : '—'} />
+            ? Number(assessment.avgCurrentScore).toFixed(1) : '—'}
+          to="/bcm/opres" />
         <Kpi Icon={Repeat} tone="info"
           label={lang === 'ar' ? 'متوسّط النضج المستهدف' : 'Avg Target'}
           value={assessment.avgTargetScore != null
-            ? Number(assessment.avgTargetScore).toFixed(1) : '—'} />
+            ? Number(assessment.avgTargetScore).toFixed(1) : '—'}
+          to="/bcm/opres" />
         <Kpi Icon={BookText} tone="neutral"
           label={lang === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}
           value={assessment.dueDate
             ? new Date(assessment.dueDate)
                 .toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-GB')
-            : '—'} />
+            : '—'}
+          to="/bcm/opres" />
       </div>
 
       {/* Pillar cells */}

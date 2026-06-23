@@ -158,10 +158,10 @@ export function BcmRemediationPage() {
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12, marginBottom: 14 }}>
-        <Kpi Icon={AlertOctagon}  label={isAr ? 'فجوات مفتوحة'   : 'Open gaps'}      value={stats?.openGaps ?? 0}     tone="warning" />
-        <Kpi Icon={AlertTriangle} label={isAr ? 'فجوات حرجة'     : 'Critical gaps'}  value={stats?.criticalGaps ?? 0} tone="danger" />
-        <Kpi Icon={Wrench}        label={isAr ? 'إجراءات مفتوحة' : 'Open CAPAs'}     value={stats?.openCapas ?? 0}    tone="info" />
-        <Kpi Icon={RefreshCw}     label={isAr ? 'متأخرة'         : 'Overdue CAPAs'}  value={stats?.overdueCapas ?? 0} tone="danger" />
+        <Kpi Icon={AlertOctagon}  label={isAr ? 'فجوات مفتوحة'   : 'Open gaps'}      value={stats?.openGaps ?? 0}     tone="warning" onClick={() => setTab('gaps')} active={tab === 'gaps'} />
+        <Kpi Icon={AlertTriangle} label={isAr ? 'فجوات حرجة'     : 'Critical gaps'}  value={stats?.criticalGaps ?? 0} tone="danger"  onClick={() => setTab('gaps')} active={tab === 'gaps'} />
+        <Kpi Icon={Wrench}        label={isAr ? 'إجراءات مفتوحة' : 'Open CAPAs'}     value={stats?.openCapas ?? 0}    tone="info"    onClick={() => setTab('capas')} active={tab === 'capas'} />
+        <Kpi Icon={RefreshCw}     label={isAr ? 'متأخرة'         : 'Overdue CAPAs'}  value={stats?.overdueCapas ?? 0} tone="danger"  onClick={() => setTab('capas')} active={tab === 'capas'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

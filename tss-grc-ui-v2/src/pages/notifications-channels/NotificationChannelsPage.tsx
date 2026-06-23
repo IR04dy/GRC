@@ -75,10 +75,10 @@ export function NotificationChannelsPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Send}        label={t('ncKpiTotal')}      value={String(stats.total)} tone="primary" />
-        <Kpi Icon={CheckCheck}  label={t('ncKpiConfigured')}  value={String(stats.configured)} tone="success" />
-        <Kpi Icon={ShieldCheck} label={t('ncKpiSaudi')}        value={`${stats.saudiMandatoryConfigured} / ${stats.saudiMandatoryTotal}`} tone={stats.saudiReady ? 'success' : 'warning'} />
-        <Kpi Icon={AlertOctagon} label={t('ncKpiPending')}     value={String(stats.total - stats.configured)} tone={stats.total === stats.configured ? 'success' : 'warning'} />
+        <Kpi Icon={Send}        label={t('ncKpiTotal')}      value={String(stats.total)} tone="primary" to="/notifications/channels" />
+        <Kpi Icon={CheckCheck}  label={t('ncKpiConfigured')}  value={String(stats.configured)} tone="success" to="/notifications/dispatch" />
+        <Kpi Icon={ShieldCheck} label={t('ncKpiSaudi')}        value={`${stats.saudiMandatoryConfigured} / ${stats.saudiMandatoryTotal}`} tone={stats.saudiReady ? 'success' : 'warning'} to="/admin" />
+        <Kpi Icon={AlertOctagon} label={t('ncKpiPending')}     value={String(stats.total - stats.configured)} tone={stats.total === stats.configured ? 'success' : 'warning'} to="/notifications/outbox" />
       </div>
 
       {/* Saudi-mandatory channels */}

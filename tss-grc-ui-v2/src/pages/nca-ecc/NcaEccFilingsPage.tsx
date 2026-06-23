@@ -144,10 +144,10 @@ export function NcaEccFilingsPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={FileText}     label={isAr ? 'إجمالي البلاغات' : 'Total filings'} value={counts.total} tone="primary" />
-        <Kpi Icon={Gauge}        label={isAr ? 'أحدث نضج' : 'Latest maturity'}      value={counts.latestScore != null ? `${counts.latestScore.toFixed(2)}/5` : '—'} tone="info" />
-        <Kpi Icon={Send}         label={isAr ? 'مُقدَّمة' : 'Filed'}                value={counts.filed} tone="success" />
-        <Kpi Icon={CalendarClock} label={isAr ? 'قيد الإعداد' : 'In progress'}      value={counts.open} tone={counts.open > 0 ? 'warning' : 'neutral'} />
+        <Kpi Icon={FileText}     label={isAr ? 'إجمالي البلاغات' : 'Total filings'} value={counts.total} tone="primary" to="/nca-ecc/filings" />
+        <Kpi Icon={Gauge}        label={isAr ? 'أحدث نضج' : 'Latest maturity'}      value={counts.latestScore != null ? `${counts.latestScore.toFixed(2)}/5` : '—'} tone="info" to="/nca-ecc/filings" />
+        <Kpi Icon={Send}         label={isAr ? 'مُقدَّمة' : 'Filed'}                value={counts.filed} tone="success" to="/nca-ecc/filings" />
+        <Kpi Icon={CalendarClock} label={isAr ? 'قيد الإعداد' : 'In progress'}      value={counts.open} tone={counts.open > 0 ? 'warning' : 'neutral'} to="/nca-ecc/filings" />
       </div>
 
       <Card title={isAr ? 'السجل' : 'Register'} Icon={ShieldCheck}>

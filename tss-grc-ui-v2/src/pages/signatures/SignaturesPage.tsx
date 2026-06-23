@@ -197,10 +197,10 @@ export function SignaturesPage() {
       />
 
       <div className="kpi-grid">
-        <Kpi Icon={Inbox}         label={t('sigKpiInbox')}     value={inbox.length} tone="warning" />
-        <Kpi Icon={CheckCircle2}  label={t('sigKpiSigned')}    value={stats.SIGNED} tone="success" />
-        <Kpi Icon={XCircle}       label={t('sigKpiRejected')}  value={stats.REJECTED} tone="danger" />
-        <Kpi Icon={AlertOctagon}  label={t('sigKpiExpired')}   value={stats.EXPIRED} tone="primary" />
+        <Kpi Icon={Inbox}         label={t('sigKpiInbox')}     value={inbox.length} tone="warning" onClick={() => setTab('inbox')} active={tab === 'inbox'} />
+        <Kpi Icon={CheckCircle2}  label={t('sigKpiSigned')}    value={stats.SIGNED} tone="success" onClick={() => setTab('all')} active={tab === 'all'} />
+        <Kpi Icon={XCircle}       label={t('sigKpiRejected')}  value={stats.REJECTED} tone="danger" onClick={() => setTab('all')} active={tab === 'all'} />
+        <Kpi Icon={AlertOctagon}  label={t('sigKpiExpired')}   value={stats.EXPIRED} tone="primary" onClick={() => setTab('all')} active={tab === 'all'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

@@ -158,7 +158,9 @@ export function WhistleblowerCasesPage() {
           active={filterStatus === 'ALL' && filterSeverity === 'ALL' && filterCategory === 'ALL'} />
         <Kpi Icon={AlertOctagon} tone="info"
           label={lang === 'ar' ? 'وارد / فرز' : 'New / triage'}
-          value={kpis.newOnes} />
+          value={kpis.newOnes}
+          onClick={() => setFilterStatus('TRIAGE')}
+          active={filterStatus === 'TRIAGE'} />
         <Kpi Icon={UserCheck} tone="warning"
           label={lang === 'ar' ? 'قيد التحقيق' : 'Under investigation'}
           value={kpis.investigating}
@@ -166,13 +168,17 @@ export function WhistleblowerCasesPage() {
           active={filterStatus === 'UNDER_INVESTIGATION'} />
         <Kpi Icon={ShieldAlert} tone="danger"
           label={lang === 'ar' ? 'تورّط مسؤول تنفيذي' : 'Senior exec flagged'}
-          value={kpis.seniorExec} />
+          value={kpis.seniorExec}
+          to="/ethics" />
         <Kpi Icon={AlertOctagon} tone="danger"
           label={lang === 'ar' ? 'أهمّية حرجة' : 'Critical severity'}
-          value={kpis.critical} />
+          value={kpis.critical}
+          onClick={() => setFilterSeverity('CRITICAL')}
+          active={filterSeverity === 'CRITICAL'} />
         <Kpi Icon={UserX} tone="neutral"
           label={lang === 'ar' ? 'بلاغات مجهولة الهوية' : 'Anonymous reports'}
-          value={kpis.anon} />
+          value={kpis.anon}
+          to="/ethics" />
       </div>
 
       {/* Filters */}

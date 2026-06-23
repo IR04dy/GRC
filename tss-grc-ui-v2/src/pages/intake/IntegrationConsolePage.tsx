@@ -219,12 +219,12 @@ export function IntegrationConsolePage() {
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={HeartPulse} label={isAr ? 'الحالة' : 'Health'}
           value={!reachable ? '—' : status?.healthy ? (isAr ? 'سليم' : 'Healthy') : (isAr ? 'غير سليم' : 'Down')}
-          tone={!reachable ? 'neutral' : status?.healthy ? 'success' : 'danger'} />
+          tone={!reachable ? 'neutral' : status?.healthy ? 'success' : 'danger'} to="/cyber" />
         <Kpi Icon={Activity} label={isAr ? 'الوضع' : 'Mode'} value={status?.mode ?? '—'}
-          tone={(status?.mode ?? '').toUpperCase() === 'LIVE' ? 'success' : 'info'} />
-        <Kpi Icon={History} label={isAr ? 'مكالمات مُسجَّلة' : 'Recorded calls'} value={calls.length} tone="primary" />
+          tone={(status?.mode ?? '').toUpperCase() === 'LIVE' ? 'success' : 'info'} to="/intake-inbox" />
+        <Kpi Icon={History} label={isAr ? 'مكالمات مُسجَّلة' : 'Recorded calls'} value={calls.length} tone="primary" to="/intake-inbox" />
         <Kpi Icon={SlidersHorizontal} label={isAr ? 'آخر نشاط' : 'Last activity'}
-          value={lastActivity ? fmtTime(lastActivity) : '—'} tone="accent" />
+          value={lastActivity ? fmtTime(lastActivity) : '—'} tone="accent" to="/intake-inbox" />
       </div>
 
       {/* ─── Outbound actions ─────────────────────────────────────── */}

@@ -194,8 +194,8 @@ export function RiskScenariosPage() {
       <div className="kpi-grid">
         <Kpi Icon={FileText}     label={t('scnKpiDraft')}      value={stats.DRAFT}     tone="warning" onClick={() => setTab('draft')} active={tab === 'draft'} />
         <Kpi Icon={CheckCircle2} label={t('scnKpiApproved')}   value={stats.APPROVED}  tone="success" onClick={() => setTab('approved')} active={tab === 'approved'} />
-        <Kpi Icon={TrendingUp}   label={t('scnKpiAvgExpected')} value={fmtSar(stats.avgExpected || undefined)} tone="primary" />
-        <Kpi Icon={AlertTriangle} label={t('scnKpiSumP95')}    value={fmtSar(stats.sumP95 || undefined)} tone="danger" />
+        <Kpi Icon={TrendingUp}   label={t('scnKpiAvgExpected')} value={fmtSar(stats.avgExpected || undefined)} tone="primary" to="/risk-scenarios" />
+        <Kpi Icon={AlertTriangle} label={t('scnKpiSumP95')}    value={fmtSar(stats.sumP95 || undefined)} tone="danger" to="/risk-scenarios" />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
@@ -203,9 +203,9 @@ export function RiskScenariosPage() {
       {tab === 'stats' ? (
         <Card title={t('scnStatsTitle')} Icon={BarChart3}>
           <div className="kpi-grid">
-            <Kpi Icon={BarChart3} label={t('scnTypeMonteCarlo')} value={stats.mc}     tone="primary" />
-            <Kpi Icon={BarChart3} label={t('scnTypeStress')}     value={stats.stress} tone="warning" />
-            <Kpi Icon={BarChart3} label={t('scnTypeWhatIf')}     value={stats.whatIf} tone="info" />
+            <Kpi Icon={BarChart3} label={t('scnTypeMonteCarlo')} value={stats.mc}     tone="primary" to="/risk-scenarios" />
+            <Kpi Icon={BarChart3} label={t('scnTypeStress')}     value={stats.stress} tone="warning" to="/risk-scenarios" />
+            <Kpi Icon={BarChart3} label={t('scnTypeWhatIf')}     value={stats.whatIf} tone="info" to="/risk-scenarios" />
           </div>
           <div style={{ marginTop: 12, fontSize: 13, color: 'var(--ink-3)' }}>
             {t('scnStatsExpectedHint')}{' '}

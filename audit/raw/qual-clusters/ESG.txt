@@ -1,0 +1,16 @@
+================================================================================
+QUAL-ESG-002 [Medium] Copy-pasted tenant/event helpers (currentUserId, emit, validate, org) duplicated verbatim across services
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/data_officer/service/DataOfficerService.java:896-912
+RESOLUTION: Introduce a shared component (e.g. TenantActor / DomainEventEmitter) exposing org(), currentUserId(), emit(...) and validate(...); inject it into each service. Keep only the entity-specific timeline() row construction local.
+================================================================================
+QUAL-ESG-003 [Medium] Swallowed exceptions: NdiAuditPublisher catches Exception and discards it with no logging
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/ndi/audit/service/NdiAuditPublisher.java:40-60
+RESOLUTION: Add a SLF4J Logger and log at WARN with the full exception (cause) in each catch, matching the Javadoc's stated contract; keep the swallow so the parent op is unaffected.
+================================================================================
+QUAL-ESG-004 [Medium] Hand-rolled JSON serializer and Markdown→HTML converter in ReportComposerService reinvent Jackson
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/sust/annex/service/ReportComposerService.java:409-487
+RESOLUTION: Inject the existing ObjectMapper bean and call writeValueAsString for the JSON branch; for markdownToHtml track header-state in a local boolean (firstRowOfTable) instead of scanning out.toString(). Optionally replace with a maintained Markdown library.
+================================================================================
+QUAL-ESG-005 [Medium] Long high-branching method: suggestWorkflowSubmissionReview spans 120 LOC with a 7-way if/else ladder
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/ai/service/AiSuggestionService.java:291-411
+RESOLUTION: Move the per-wizard content into a static Map<String, ReviewTemplate> (or a small enum/record table) keyed by workflowId-prefix/module; the method then becomes a lookup + a default, dropping branch complexity to ~2.

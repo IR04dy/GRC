@@ -1,0 +1,81 @@
+QUAL-DUP-001	High	Code Duplication / Maintainability	tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/entity/ObligationAttestationCampaign.java:36-142
+QUAL-DUP-002	High	Code Duplication / Maintainability	tss-grc-ui-v2/src/pages/compliance/ObligationCampaignsPage.tsx:344-365
+QUAL-ESG-001	High	God class / SRP violation	tss-grc-backend/src/main/java/com/tss/grc/module/data_officer/service/DataOfficerService.java:48-1054
+QUAL-IE-001	High	Performance / Cyclomatic complexity	tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java:57-143
+QUAL-IE-002	High	Performance	tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java:386-422
+QUAL-RC-001	High	SOLID / Naming / Duplication	tss-grc-backend/src/main/java/com/tss/grc/module/policy/service/PolicyService.java:37-176
+QUAL-RC-003	High	SOLID / Layering	tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java:52-339
+QUAL-TI-001	High	Duplication / Layering (SOLID, DRY, bounded-context overlap)	tss-grc-backend/src/main/java/com/tss/grc/module/outsourcing/service/OutsourcingService.java:1-612
+QUAL-TI-002	High	Duplication (copy-paste of resilience logic)	tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/client/LiveCrowdStrikeClient.java:151-230
+QUAL-BCMP-001	Medium	Dead Code	tss-grc-backend/src/main/java/com/tss/grc/module/bcm/service/StrategyRoiService.java:535-536
+QUAL-BCMP-002	Medium	Code Duplication	tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/runtime/observer/service/ExerciseObserverService.java:575-639
+QUAL-BCMP-003	Medium	SOLID / Layering	tss-grc-backend/src/main/java/com/tss/grc/module/platform/completion/BuyerGapService.java:56-548
+QUAL-BCMP-004	Medium	Cyclomatic Complexity / Long Method	tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/CrisisEventService.java:125-238
+QUAL-BCMP-005	Medium	Correctness Smell / Magic Number	tss-grc-backend/src/main/java/com/tss/grc/module/dashboard/service/DashboardService.java:46-76
+QUAL-BCMP-006	Medium	Performance / Inefficient Code	tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/BoardPackService.java:294-330
+QUAL-CP-001	Medium	God class / Single Responsibility	tss-grc-backend/src/main/java/com/tss/grc/module/cyber/service/CyberService.java:23-613
+QUAL-CP-003	Medium	Error handling / swallowed exception	tss-grc-backend/src/main/java/com/tss/grc/module/privacy/service/PrivacyService.java:157-185
+QUAL-CP-004	Medium	Layering violation / SOLID	tss-grc-backend/src/main/java/com/tss/grc/module/cyber/vuln_sla/controller/VulnerabilitySlaController.java:52-193
+QUAL-CP-005	Medium	Code duplication + error handling	tss-grc-backend/src/main/java/com/tss/grc/module/socops/service/SocOpsScheduledSweep.java:110-404
+QUAL-DUP-003	Medium	Code Duplication / Maintainability	tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java:635-644
+QUAL-ESG-002	Medium	Code duplication	tss-grc-backend/src/main/java/com/tss/grc/module/data_officer/service/DataOfficerService.java:896-912
+QUAL-ESG-003	Medium	Error handling (swallowed exception)	tss-grc-backend/src/main/java/com/tss/grc/module/ndi/audit/service/NdiAuditPublisher.java:40-60
+QUAL-ESG-004	Medium	Reinventing library / fragile parsing	tss-grc-backend/src/main/java/com/tss/grc/module/sust/annex/service/ReportComposerService.java:409-487
+QUAL-ESG-005	Medium	Cyclomatic complexity / long method	tss-grc-backend/src/main/java/com/tss/grc/module/ai/service/AiSuggestionService.java:291-411
+QUAL-FA-001	Medium	Code Duplication	tss-grc-backend/src/main/java/com/tss/grc/module/sharia/service/ShariaService.java:682-699
+QUAL-FA-005	Medium	Error Handling	tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java:656-668
+QUAL-FA-006	Medium	SOLID / Layering	tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java:92-130
+QUAL-FA-007	Medium	Error Handling	tss-grc-backend/src/main/java/com/tss/grc/module/scm/service/ScmService.java:39-42
+QUAL-IE-003	Medium	Code duplication / DRY	tss-grc-backend/src/main/java/com/tss/grc/module/attachment/service/AttachmentStorageService.java:26-113
+QUAL-IE-004	Medium	Cyclomatic complexity / Long method	tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/service/ApprovalChainInstanceService.java:203-308
+QUAL-IE-008	Medium	Error handling	tss-grc-backend/src/main/java/com/tss/grc/module/auth/AuthController.java:94-100
+QUAL-RC-002	Medium	Dead code / Correctness	tss-grc-backend/src/main/java/com/tss/grc/module/compliance/service/ComplianceService.java:232-248
+QUAL-RC-004	Medium	Duplication	tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java:629-660
+QUAL-RC-005	Medium	Duplication	tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/service/ObligationCampaignService.java:56-453
+QUAL-RC-006	Medium	Duplication / Efficiency	tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java:153-339
+QUAL-RC-007	Medium	Cyclomatic complexity / Long method	tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java:457-532
+QUAL-TI-003	Medium	Duplication (cross-module copy-paste of infrastructure helpers)	tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java:635-652
+QUAL-TI-004	Medium	Duplication (copy-paste of helper methods)	tss-grc-backend/src/main/java/com/tss/grc/module/ccm/runner/CustomSqlRunner.java:158-184
+QUAL-TI-005	Medium	Dead code	tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/controller/OutsourcingController.java:253-272
+QUAL-TI-006	Medium	Error handling / Reinventing-the-wheel / Brittleness	tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/QuestionnaireService.java:359-371
+QUAL-TI-007	Medium	Duplication (configuration & DTO boilerplate)	tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/config/CrowdStrikeProperties.java:1-127
+QUAL-TI-008	Medium	Long method / Magic numbers / Inefficient read pattern	tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java:511-579
+QUAL-BCMP-007	Low	Error Handling	tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/runtime/service/ExerciseRuntimeService.java:280-286
+QUAL-BCMP-008	Low	Error Handling	tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java:307-467
+QUAL-BCMP-009	Low	Code Duplication	tss-grc-backend/src/main/java/com/tss/grc/module/bcm/service/StrategyRoiService.java:401-422
+QUAL-BCMP-010	Low	Code Duplication	tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/BoardPackService.java:478
+QUAL-BCMP-011	Low	Magic Numbers	tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/ExportService.java:162-176
+QUAL-BCMP-012	Low	Error Handling / Layering	tss-grc-backend/src/main/java/com/tss/grc/module/bcm/binder/service/BcpBinderService.java:290-310
+QUAL-BCMP-013	Low	Layering	tss-grc-backend/src/main/java/com/tss/grc/module/bcm/controller/BcmController.java:66-205
+QUAL-CP-002	Low	Code duplication / copy-paste	tss-grc-backend/src/main/java/com/tss/grc/module/cyber/service/CyberService.java:198-612
+QUAL-CP-006	Low	Complexity / inefficient algorithm	tss-grc-backend/src/main/java/com/tss/grc/module/socops/service/SocOpsScheduledSweep.java:391-399
+QUAL-CP-007	Low	Long method / duplication	tss-grc-backend/src/main/java/com/tss/grc/module/cyber/threatintel/ThreatIntelCorrelationService.java:56-170
+QUAL-CP-009	Low	Long method / complexity	tss-grc-backend/src/main/java/com/tss/grc/module/consumer/complaints/service/ComplaintService.java:350-430
+QUAL-CP-010	Low	Long method / inefficiency	tss-grc-backend/src/main/java/com/tss/grc/module/cyber/service/CyberService.java:53-126
+QUAL-DUP-004	Low	Code Duplication / Maintainability	tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/controller/CommitteeController.java:5-39
+QUAL-ESG-006	Low	Code duplication / boilerplate	tss-grc-backend/src/main/java/com/tss/grc/module/ndi/reports/service/NdiReportService.java:184-436
+QUAL-ESG-007	Low	Dead code / unused field	tss-grc-backend/src/main/java/com/tss/grc/module/ndi/reports/service/NdiReportService.java:58
+QUAL-ESG-008	Low	Resource handling / consistency	tss-grc-backend/src/main/java/com/tss/grc/module/ai/service/AiSuggestionService.java:35
+QUAL-ESG-009	Low	Layering / multi-tenancy smell	tss-grc-backend/src/main/java/com/tss/grc/module/ndi/scheduler/NdiScheduler.java:82-127
+QUAL-FA-002	Low	Code Duplication	tss-grc-backend/src/main/java/com/tss/grc/module/rrp/service/RrpService.java:621-712
+QUAL-FA-003	Low	Dead Code	tss-grc-backend/src/main/java/com/tss/grc/module/fraud/service/FraudService.java:333
+QUAL-FA-004	Low	Dead Code	tss-grc-backend/src/main/java/com/tss/grc/module/rrp/service/RrpService.java:144-152
+QUAL-FA-008	Low	Cyclomatic Complexity / Long Method	tss-grc-backend/src/main/java/com/tss/grc/module/sharia/service/ShariaService.java:561-633
+QUAL-FA-009	Low	Error Handling	tss-grc-backend/src/main/java/com/tss/grc/module/audit_lc/service/AuditLifecycleService.java:94-104
+QUAL-FA-010	Low	Naming / Maintainability	tss-grc-backend/src/main/java/com/tss/grc/module/fraud/service/FraudService.java:295-301
+QUAL-IE-005	Low	Dead code / Unused fields	tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/service/ApprovalChainInstanceService.java:24-25,79
+QUAL-IE-006	Low	Misconfiguration / Layering	tss-grc-backend/src/main/java/com/tss/grc/module/iam/ldap/LdapRoleMapper.java:52-55
+QUAL-IE-007	Low	Code duplication / DRY	tss-grc-backend/src/main/java/com/tss/grc/module/attachment/service/AttachmentService.java:37-132
+QUAL-IE-009	Low	Code duplication / DRY	tss-grc-backend/src/main/java/com/tss/grc/module/approvals/service/ApprovalRequestService.java:66-90
+QUAL-IE-010	Low	Naming / Magic constants	tss-grc-backend/src/main/java/com/tss/grc/module/approvals/service/ApprovalRequestService.java:144-211
+QUAL-IE-011	Low	Error handling / Duplication	tss-grc-backend/src/main/java/com/tss/grc/module/admin/committee/service/CommitteeActionItemService.java:43-106
+QUAL-IE-012	Low	Dead code / Long method	tss-grc-backend/src/main/java/com/tss/grc/module/approvals/service/ApprovalRequestService.java:144-211
+QUAL-RC-008	Low	Dead code / Duplication	tss-grc-backend/src/main/java/com/tss/grc/module/risk/bowtie/service/BowTieAnalysisService.java:536-537
+QUAL-RC-009	Low	Dead code / Misleading metric	tss-grc-backend/src/main/java/com/tss/grc/module/risk/kri/service/KriMeasurementService.java:175-192
+QUAL-RC-010	Low	Duplication / Magic numbers	tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java:564-627
+QUAL-TI-009	Low	Error handling (lost root cause / no stacktrace)	tss-grc-backend/src/main/java/com/tss/grc/module/tprm/automation/TprmAutomationService.java:60-62
+QUAL-TI-010	Low	Naming clarity (variable shadowing)	tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/client/LiveCrowdStrikeClient.java:173-177
+QUAL-TI-011	Low	Duplication (DTO field repetition)	tss-grc-backend/src/main/java/com/tss/grc/module/tprm/outsourcing/dto/OutsourcingDtos.java:26-90
+QUAL-BCMP-014	Info	Maintainability / Layering	tss-grc-backend/src/main/java/com/tss/grc/module/dashboard/service/DashboardService.java:133-205
+QUAL-CP-008	Info	Naming clarity / style consistency	tss-grc-backend/src/main/java/com/tss/grc/module/privacy/service/PrivacyService.java:34-203
+QUAL-ESG-010	Info	Naming / style	tss-grc-backend/src/main/java/com/tss/grc/module/ai/governance/service/MlModelService.java:80

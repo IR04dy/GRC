@@ -1,0 +1,52 @@
+======================================================================
+COPY-02 [Medium] "Continue without backend (demo mode)" CTA silently bounces the user back to /login
+FILE: tss-grc-ui-v2/src/pages/LoginPage.tsx 53-55, 106-108
+RES : Either (a) remove the CTA until a real offline/mock data mode exists, or (b) make the label honest about what happens and add feedback. If the button is meant only to preview the shell, relabel it to set the right expectation and show a toast explaining that live data needs the backend. Do not present a destination the global 401 handler will instantly reject.
+======================================================================
+COPY-04 [Low] Generic, non-actionable load-failure messages across modules ("Failed to load X" with no recovery path)
+FILE: tss-grc-ui-v2/src/translations/en.ts 455, 1656, 1681, 1734, 4977, 5049, 5141, 5220, 5322, 5374, 5403, 5459, 5489, 5556, 5603, 5649, 5692, 5734
+RES : Add a recovery clause to the load-failure copy and pair it with a Retry affordance in the shared error component. Standardise on one template ('We couldn’t load <thing>. Try again, or contact your administrator if it persists.') and reuse it across the *LoadFailed keys.
+======================================================================
+COPY-05 [Low] Inconsistent error voice across modules — "Failed to load" vs "Could not load" vs "Could not save"
+FILE: tss-grc-ui-v2/src/translations/en.ts 100, 198, 455, 485, 877, 1656
+RES : Adopt one failure template and apply it everywhere: choose a single verb ('We couldn’t …' / 'Could not …'), consistent sentence case, and consistent terminal punctuation; document it in the UI style guide and sweep the existing keys. Keep EN and AR phrasing aligned to the chosen template.
+======================================================================
+A11Y-004 [Medium] Accent / warning numerals fall just under contrast on cream surfaces (--accent-700 ~3.9:1 rendered, --warning 2.58:1 large)
+FILE: tss-grc-ui-v2/src/styles/tokens.css 58,74
+RES : (a) For data figures, never use --warning/--accent-500 as a TEXT colour on light surfaces; use --warning-fg / --accent-700 (the dedicated readable foreground tones). Change the BCM hero number from color: var(--warning) to color: var(--warning-fg) (#876019, 5.33:1, clears the 3:1 large-text bar with margin). (b) To stop axe sampling transition frames AND to remove the marginal accent-700 failures, exclude `color` from the global transition on text, or shorten it: the audit color should be the settled value. Consider tightening --accent-700 to #73520F (6.73:1) for extra headroom so even a transition frame stays safe. Re-run axe on /bcm and /dashboard.
+======================================================================
+UX-002 [Medium] Risk Register KPI tiles show a number and a stray arrow but no visible metric label
+FILE: tss-grc-ui-v2/src/styles/components.css 248-347
+RES : Lift the label to the top of the tile in --ink-2 (eyebrow style) and keep the number as the value, so the reading order is label → number, not number → caption. Only render the .kpi-arrow on tiles that genuinely navigate (and give them a tooltip/aria-label naming the destination, e.g. "View 2 critical risks"); make the rest non-clickable. Apply .kpi-tone-danger to the critical-risks tile so the number reads red.
+======================================================================
+UX-003 [Medium] Login error/feedback states are not visible; the only guidance is a literal credentials hint baked into the page
+FILE: audit/artifacts/e2e/results/shots/login.png n/a
+RES : Gate the demo-credentials block and the offline-mode link behind import.meta.env.DEV (or a feature flag) so they never ship to staging/prod. Add a persistent inline error region with role="alert"/aria-live="assertive" above the form that renders auth failures (wrong credentials, lockout, network) in --danger styling, and add aria-invalid + a field-level message on the offending input.
+======================================================================
+UX-004 [Medium] Mobile Risk Register page title wraps to one word per line, consuming most of the first screen
+FILE: audit/artifacts/e2e/results/shots/mobile/risk-register.png 257-262
+RES : Add a mobile rule that stacks the header (flex-direction:column), moves actions to their own row, clamps the title to two lines and hides or collapses the long .page-sub behind a tap-to-expand on small screens, so the records list rises toward the fold.
+======================================================================
+UX-005 [Medium] Mobile dashboard renders the gauge above its own title, leaving the headline number labelled by overlapping clipped text
+FILE: audit/artifacts/e2e/results/shots/mobile/dashboard.png 270-281
+RES : Give the hero score card a mobile layout: stack greeting → gauge → caption vertically with explicit gaps (no overlap), shrink the gauge to fit one column, and move the export buttons into a single collapsed "تصدير" menu on small screens instead of three stacked full-width buttons. Reserve the first mobile screen for the score + top KPIs, not export chrome.
+======================================================================
+UX-006 [Low] Workflow "start" stage rail and action chip rows are dense undifferentiated chains with no clear primary next step
+FILE: audit/artifacts/e2e/results/shots/risk-register.png n/a
+RES : Promote one chip as the primary next action (filled --primary, larger), demote the rest to secondary outline chips, and give the red "!" attention badges a distinct shape/icon (e.g. a triangle warning glyph) plus an aria-label like "4 items need attention" so they are not confused with neutral counts. Cap the rail to the active stage plus next, with a "+N" overflow, rather than rendering all stages as equal pills.
+======================================================================
+UX-007 [Low] Settings customizer applies theme/color changes immediately with no preview boundary or confirmation copy
+FILE: audit/artifacts/e2e/results/shots/settings.png n/a
+RES : Add an inline contrast check on the page-background / identity color pickers that warns when the chosen color fails AA against --ink-1 (e.g. a small "تباين منخفض" badge), and add a lightweight per-change Undo (toast with "تراجع") alongside the existing restore-defaults so users can revert the last action without losing all customisation. Clarify the persistence copy to name where it is saved (this browser/device).
+======================================================================
+UX-008 [Low] Recent-records list and KPI strip have no visible empty/zero-state treatment distinct from low real values
+FILE: audit/artifacts/e2e/results/shots/bcm.png 972-985
+RES : When a metric is genuinely zero, render the number with a subtle confirming cue (e.g. a small "✓ لا توجد" tone or success tint) and when a metric is unavailable/uninitialised render the existing .empty-inline-compact "—" treatment with a tooltip ("لم يُحتسب بعد"), so zero-good and no-data are unambiguous.
+======================================================================
+LH-06 [Low] Console error on /login: favicon.ico returns 404 (errors-in-console audit fails)
+FILE: tss-grc-ui-v2/index.html 1-22
+RES : Add a favicon asset (e.g. public/favicon.ico or an SVG from the existing public/brand/ set) and declare it in index.html with <link rel="icon">. This removes the 404 and the console error.
+======================================================================
+LH-07 [Low] Missing meta description on /login (SEO audit fails; SEO category 0.82)
+FILE: tss-grc-ui-v2/index.html 3-9
+RES : Add a concise <meta name="description"> to index.html describing the platform.

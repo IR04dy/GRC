@@ -1,0 +1,60 @@
+======================================================================
+PERF-IX-001 [High] 74 multi-tenant tables carry organisation_id but have no supporting index — every org-scoped query is a full clustered-index scan
+FILE: tss-grc-backend/src/main/resources/db/migration/sqlserver/V3__compliance_module.sql 15-108
+RES : Adopt a schema-wide standard: every tenant table gets a nonclustered index with organisation_id as the leading key, extended with is_deleted (filtered `WHERE is_deleted = 0`) and the columns most queries sort/filter on (status, created_at). Backfill the 74 missing tables in a new Flyway migration so it applies in prod. For tables soft-deleted via @Where, use a filtered index to keep it small. Prioritise by row growth: risk.*, cyber.*, compliance.*, privacy.*, tprm.vendors, iam.users, platform.notifications.
+
+======================================================================
+PERF-IX-003 [High] iam.users has no index beyond the clustered PK — username/email login lookups and per-request principal resolution scan the user table; no unique constraint on username/email
+FILE: tss-grc-backend/src/main/resources/db/migration/sqlserver/V1__core_schemas.sql 1178-1209
+RES : Add a unique index on (organisation_id, username) and a unique index on email (filtered on is_deleted=0), which simultaneously fixes the lookup performance and enforces uniqueness. Add a covering index for the login path including password_hash/is_active/is_locked.
+
+======================================================================
+PERF-IX-005 [Medium] Foreign-key columns are not indexed — SQL Server does not auto-index FKs, so child-table joins and parent delete/update integrity checks scan
+FILE: tss-grc-backend/src/main/resources/db/migration/sqlserver/V3__compliance_module.sql 103-105
+RES : Create a nonclustered index on each FK column (leading with organisation_id where the child is tenant-scoped, otherwise leading with the FK column). Add to the schema-standard checklist alongside the org-index rule from PERF-IX-001.
+
+======================================================================
+PERF-IX-006 [Medium] Curated index files (db/sqlserver/indexes/*.sql) are orphaned — never wired into the Flyway chain or the dev Python bootstrap, so ~40 designed indexes never get created
+FILE: tss-grc-backend/db/sqlserver/indexes/01-shared-indexes.sql 1-209
+RES : Convert 01-shared-indexes.sql and 02-module-indexes.sql into a properly versioned Flyway migration under src/main/resources/db/migration/sqlserver/ (e.g. V225__shared_and_module_indexes.sql) so they apply in prod, and update the dev bootstrap to run them (or run the same SQL from a setup_indexes.py). Reconcile the index set against PERF-IX-001's gap list before applying. Delete or clearly deprecate the stale migrations/README.md layout.
+
+======================================================================
+PERF-NQ-004 [High] RiskControlFindingPivotService: compounding per-row queries across controls, findings, CAPA and CCM runs
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java 140-389
+RES : Batch-load by id sets: collect controlIds/riskIds and use findAllById / a single findByOrganisationIdAndIdIn finder; load CCM test definitions for the org ONCE before the control loop and pass the map into toControlPivot; load latest control assessments for all controlIds in one query (e.g. findByOrganisationIdAndControlIdIn ordered, then reduce in memory); fetch CAPA for all finding externalIds in one IN query per source repo; and push the control_crosswalk code filter into the findings query (or maintain a normalized control_code -> finding link table) instead of scanning + JSON-parsing every org finding in Java.
+
+======================================================================
+PERF-NQ-005 [Medium] ControlMapService resolves each mapping with 3 findById queries (sub-control + control + framework) per row
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/controlmap/service/ControlMapService.java 48-181
+RES : Batch-resolve: collect the distinct subControlIds from the links, load them with findAllById, collect their controlIds and load with findAllById, collect frameworkIds and load with findAllById, then resolve from in-memory maps. Alternatively, since framework/control/sub-control are a static shared catalog, cache the lookup maps with the existing Caffeine cache (@Cacheable) and resolve from cache.
+
+======================================================================
+PERF-NQ-006 [Low] BcmDependencyGraphService re-queries BIA per plan despite already holding all BIAs in memory
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/BcmDependencyGraphService.java 61-142
+RES : Build a Map<Long, BcmBiaAssessment> from biaRows once, and resolve the source BIA from that map inside the plan loop instead of calling bias.findByIdAndOrganisationId. This removes the per-plan query entirely and reuses data already in the persistence context.
+
+======================================================================
+PERF-NQ-007 [Medium] TreatmentPlan @OneToMany actions is EAGER, causing per-plan child query on list views (and a count that loads all children)
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/risk_lc/entity/TreatmentPlan.java 77-79
+RES : Change actions to FetchType.LAZY. For list views that need actions, add a JOIN FETCH / @EntityGraph finder so the collection is fetched in one query; for list views that do not need actions, the DTO simply omits them. Replace generateExternalId's list().size() with a repository count query (e.g. countByOrganisationId) - the repository already exposes countByOrganisationIdAndStatus, so add countByOrganisationId.
+
+======================================================================
+PERF-PG-002 [Medium] TPRM /assessments loads ALL vendors via Pageable.unpaged() then runs an unbounded IN-clause over every vendor id
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/tprm/service/TprmService.java 83-92
+RES : Add organisation_id (or a join) to VendorAssessment and a paged org-scoped finder: Page<VendorAssessment> findByOrganisationId(Long orgId, Pageable pageable). Change the controller to return Page<VendorAssessment> with @PageableDefault and the service to delegate directly to the paged finder, eliminating both the Pageable.unpaged() vendor scan and the IN-list. For the vendorId-scoped branch, accept a Pageable and return a Page instead of .getContent().
+
+======================================================================
+PERF-PG-003 [Medium] No global maximum page size — paginated Page<> endpoints accept arbitrary ?size= and can be coerced to return all rows
+FILE: tss-grc-backend/src/main/resources/application.yml 1-1
+RES : Set a global maximum page size via configuration (spring.data.web.pageable.max-page-size: 100) so the resolver clamps any oversized ?size=. For hand-rolled size params (AuditLogController, CyberController pageOf, etc.), clamp explicitly with Math.min(size, MAX). Optionally also set spring.data.web.pageable.default-page-size to centralise the default. Combine with PERF-PG-001 so that both the missing pagination and the missing cap are closed together.
+
+======================================================================
+PERF-PG-004 [Low] Cyber & SCM expose explicit '/all' register dumps (assets, controls, vendors) that bypass the module's own pagination
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/cyber/controller/CyberController.java 79-83
+RES : Cap the '/all' endpoints server-side. Prefer returning a lightweight projection (id + label only) for dropdowns and hard-limit the row count (e.g. PageRequest.of(0, 500)); if a register legitimately exceeds the cap, the UI should switch to a server-side type-ahead search endpoint instead of a full dump. At minimum add an explicit limit so the query can never fetch the entire table.
+
+======================================================================
+PERF-IO-005 [Low] Hikari pool sizing (base=20 / dev=10) is undersized for blocking-integration workloads and dev overrides drop leak-detection visibility
+FILE: tss-grc-backend/src/main/resources/application.yml 19-26
+RES : Primary fix is PERF-IO-001..004 (stop holding connections across remote I/O). Independently: (a) make the integration HTTP work run on a bounded, separate executor/outbox so it cannot consume the primary DB pool at all; (b) once remote calls are out of transactions, keep maximum-pool-size=20 for base but add a dedicated, smaller bounded thread pool for outbound integration work; (c) raise leak-detection-threshold above the realistic worst-case hold OR (preferably) reduce the worst-case hold below 60s so the existing threshold stays meaningful; (d) extend the k6 suite with a scenario that drives the integration endpoints (test-push / poll) to characterise the actually-at-risk path.
+

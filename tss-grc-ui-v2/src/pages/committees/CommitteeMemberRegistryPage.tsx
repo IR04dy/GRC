@@ -317,14 +317,18 @@ export function CommitteeMemberRegistryPage() {
 
       <div className="kpi-grid">
         <Kpi Icon={Users}        label={isAr ? 'أعضاء نشطون' : 'Active members'}
-             value={indep?.activeMembers ?? activeTerms.length} tone="primary" />
+             value={indep?.activeMembers ?? activeTerms.length} tone="primary"
+             to="/committees" />
         <Kpi Icon={BadgeCheck}   label={isAr ? 'أعضاء مستقلون' : 'Independent members'}
-             value={indep?.independentMembers ?? 0} tone="success" />
+             value={indep?.independentMembers ?? 0} tone="success"
+             to="/committees" />
         <Kpi Icon={ShieldCheck}  label={isAr ? 'نسبة الاستقلالية' : 'Independence ratio'}
              value={`${indep?.independenceRatioPct ?? 0}%`}
-             tone={(indep?.independenceRatioPct ?? 0) >= 50 ? 'success' : 'warning'} />
+             tone={(indep?.independenceRatioPct ?? 0) >= 50 ? 'success' : 'warning'}
+             to="/committees" />
         <Kpi Icon={AlertCircle}  label={isAr ? 'انتهاء قريب (90 يوم)' : 'Expiring soon (90d)'}
-             value={expiringSoon} tone={expiringSoon > 0 ? 'warning' : 'neutral'} />
+             value={expiringSoon} tone={expiringSoon > 0 ? 'warning' : 'neutral'}
+             to="/committees" />
       </div>
 
       {/* Active members panel */}

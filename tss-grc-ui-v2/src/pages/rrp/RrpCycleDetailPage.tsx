@@ -357,22 +357,26 @@ export function RrpCycleDetailPage() {
           label={lang === 'ar' ? 'طاقة الاستعادة' : 'Recovery capacity'}
           value={(cycle.totalRecoveryCapacitySarM ?? 0).toLocaleString(
             lang === 'ar' ? 'ar-SA' : 'en-US') + ' ' +
-            (lang === 'ar' ? 'م.ر.' : 'SAR M')} />
+            (lang === 'ar' ? 'م.ر.' : 'SAR M')}
+          to="/regulatory/rrp" />
         <Kpi Icon={Shield} tone="info"
           label={lang === 'ar' ? 'الوظائف الحيوية' : 'Critical functions'}
-          value={cycle.criticalFunctionCount ?? 0} />
+          value={cycle.criticalFunctionCount ?? 0}
+          onClick={() => setTab('critical')} />
         <Kpi Icon={AlertTriangle} tone={
           (cycle.indicatorsRed ?? 0) > 0 ? 'danger'
             : (cycle.indicatorsAmber ?? 0) > 0 ? 'warning' : 'success'}
           label={lang === 'ar' ? 'مؤشّرات أحمر/كهرماني' : 'Amber/Red'}
-          value={(cycle.indicatorsRed ?? 0) + (cycle.indicatorsAmber ?? 0)} />
+          value={(cycle.indicatorsRed ?? 0) + (cycle.indicatorsAmber ?? 0)}
+          onClick={() => setTab('indicators')} />
         <Kpi Icon={CheckCircle2} tone={
           cycle.submittedAt ? 'success' : 'neutral'}
           label={lang === 'ar' ? 'تاريخ التقديم' : 'Submitted'}
           value={cycle.submittedAt
             ? new Date(cycle.submittedAt).toLocaleDateString(
                 lang === 'ar' ? 'ar-SA' : 'en-GB')
-            : '—'} />
+            : '—'}
+          to="/regulatory/rrp" />
       </div>
 
       {/* Action panel */}

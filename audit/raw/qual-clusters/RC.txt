@@ -1,0 +1,16 @@
+================================================================================
+QUAL-RC-004 [Medium] Copy-pasted tenant/actor/event helper block (org(), currentUserId(), emit(), timeline()) duplicated across services
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java:629-660
+RESOLUTION: Introduce a shared collaborator (e.g. DomainEventPublisher component wrapping emit() + currentUserId(), and reuse TenantContext.requireOrganisationId() directly) or an abstract TenantAuditedService base. Inject it instead of re-declaring the helpers per service.
+================================================================================
+QUAL-RC-005 [Medium] Campaign attestation services near-duplicated between ObligationCampaignService and VendorBcpCampaignService
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/service/ObligationCampaignService.java:56-453
+RESOLUTION: Extract a generic AttestationCampaignEngine<TSubject> (state machine + rollups + reminder/escalate) and have both obligation and BCP campaigns supply a target-resolver + rollup-mapper strategy. Share the rollup-counter columns via a @MappedSuperclass on the campaign entities.
+================================================================================
+QUAL-RC-006 [Medium] Inefficient findByOrganisationId(PageRequest.of(0,1000)) + in-memory framework filter copy-pasted 4×
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java:153-339
+RESOLUTION: Add derived repository finders that filter/count by framework_id and status in SQL (e.g. countByOrganisationIdAndFrameworkIdAndStatus, findByOrganisationIdAndFrameworkId). Replace the four fetch-1000 sites; eliminate the magic page size.
+================================================================================
+QUAL-RC-007 [Medium] RegReportingService.dashboard() is a 75-LOC high-branching method mixing 6 query strategies and 3 in-method caches
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/regreporting/service/RegReportingService.java:457-532
+RESOLUTION: Decompose into private helpers (e.g. long countOverdue(), Map<String,Long> inflightByRegulator(List), List<FilingResponse> upcoming(...)) and extract the quarter-start math to a named helper (quarterStart(LocalDate)). Consider repository-level count projections for the scalar tiles.

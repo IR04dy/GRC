@@ -239,19 +239,19 @@ export function CoiCampaignDetailPage() {
       }}>
         <Kpi Icon={ShieldCheck} tone="primary"
           label={lang === 'ar' ? 'إجمالي الإقرارات' : 'Total declarations'}
-          value={kpis.total} />
+          value={kpis.total} to="/ethics" />
         <Kpi Icon={ShieldCheck} tone="success"
           label={lang === 'ar' ? 'خالٍ من التضارب' : 'Cleared'}
-          value={kpis.cleared} />
+          value={kpis.cleared} to="/ethics" />
         <Kpi Icon={AlertTriangle} tone="warning"
           label={lang === 'ar' ? 'مطلوب تخفيف' : 'Mitigation required'}
-          value={kpis.mitigation} />
+          value={kpis.mitigation} to="/ethics" />
         <Kpi Icon={UserMinus} tone="danger"
           label={lang === 'ar' ? 'يستوجب التنحّي' : 'Recusal required'}
-          value={kpis.recusal} />
+          value={kpis.recusal} to="/ethics" />
         <Kpi Icon={AlertTriangle} tone="neutral"
           label={lang === 'ar' ? 'مُحالة للإدارة العليا' : 'Escalated'}
-          value={kpis.escalated} />
+          value={kpis.escalated} to="/ethics" />
       </div>
 
       <div style={{ marginTop: 16 }}>

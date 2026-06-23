@@ -109,7 +109,7 @@ export function RegulatorExamsPage() {
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={Landmark}      label={isAr ? 'مفتوحة' : 'Open'}                value={String(counts.open)}         tone={counts.open > 0 ? 'warning' : 'success'} onClick={() => setFilter('open')} active={filter === 'open'} />
         <Kpi Icon={Clock}         label={isAr ? 'ردود قادمة ≤١٤ يوم' : 'Response due ≤14d'} value={String(counts.responseDue)}  tone={counts.responseDue > 0 ? 'warning' : 'success'} onClick={() => setFilter('response_due')} active={filter === 'response_due'} />
-        <Kpi Icon={AlertTriangle} label={isAr ? 'ملاحظات حرجة مفتوحة' : 'Open CRITICAL findings'} value={String(counts.criticalOpen)} tone={counts.criticalOpen > 0 ? 'danger' : 'success'} />
+        <Kpi Icon={AlertTriangle} label={isAr ? 'ملاحظات حرجة مفتوحة' : 'Open CRITICAL findings'} value={String(counts.criticalOpen)} tone={counts.criticalOpen > 0 ? 'danger' : 'success'} to="/socops" />
         <Kpi Icon={CheckCircle2}  label={isAr ? 'مغلقة' : 'Closed'}                value={String(counts.closed)}       tone="info" onClick={() => setFilter('closed')} active={filter === 'closed'} />
       </div>
 

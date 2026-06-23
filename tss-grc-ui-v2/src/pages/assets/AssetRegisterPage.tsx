@@ -75,10 +75,10 @@ export function AssetRegisterPage() {
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={Server}       label={t('assetsKpiTotal')}        value={String(kpiTotal)}        tone="primary" onClick={() => { setTypeFilter('ALL'); setCritFilter('ALL'); }} active={typeFilter === 'ALL' && critFilter === 'ALL'} />
         <Kpi Icon={AlertOctagon} label={t('assetsKpiCritical')}      value={String(kpiCritical)}     tone="danger" onClick={() => setCritFilter(critFilter === 'CRITICAL' ? 'ALL' : 'CRITICAL')} active={critFilter === 'CRITICAL'} />
-        <Kpi Icon={Cloud}         label={t('assetsKpiKsa')}          value={String(kpiKsa)}          tone="success" />
-        <Kpi Icon={Cloud}         label={t('assetsKpiCrossBorder')}  value={String(kpiCrossBorder)}  tone="warning" />
-        <Kpi Icon={Landmark}      label={t('assetsKpiSama')}         value={String(kpiSama)}         tone="info" />
-        <Kpi Icon={Landmark}      label={t('assetsKpiPdpl')}         value={String(kpiPdpl)}         tone="info" />
+        <Kpi Icon={Cloud}         label={t('assetsKpiKsa')}          value={String(kpiKsa)}          tone="success" to="/assets" />
+        <Kpi Icon={Cloud}         label={t('assetsKpiCrossBorder')}  value={String(kpiCrossBorder)}  tone="warning" to="/assets" />
+        <Kpi Icon={Landmark}      label={t('assetsKpiSama')}         value={String(kpiSama)}         tone="info" to="/nca-ecc/filings" />
+        <Kpi Icon={Landmark}      label={t('assetsKpiPdpl')}         value={String(kpiPdpl)}         tone="info" to="/privacy" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
@@ -190,11 +190,11 @@ function BlastRadiusPane({ asset, t, lang }: { asset: Asset; t: (k: string) => s
 
       {/* ── Blast radius KPIs ────────────────────────────────── */}
       <div className="kpi-grid">
-        <Kpi Icon={GitBranch}    label={t('assetsBlastUpstream')}    value={String(upstream.length)}   tone="info" />
-        <Kpi Icon={GitBranch}    label={t('assetsBlastDownstream')}  value={String(downstream.length)} tone={downstream.length > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={AlertOctagon} label={t('assetsBlastTransitive')}  value={String(transitive.size)}    tone={transitive.size > 0 ? 'danger' : 'success'} />
-        <Kpi Icon={FileCheck2}   label={t('assetsBlastCcm')}         value={String(ccm.length)}         tone="primary" />
-        <Kpi Icon={Activity}     label={t('assetsBlastApprovals')}   value={String(approvals.length)}   tone={approvals.length > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={GitBranch}    label={t('assetsBlastUpstream')}    value={String(upstream.length)}   tone="info" to="/assets" />
+        <Kpi Icon={GitBranch}    label={t('assetsBlastDownstream')}  value={String(downstream.length)} tone={downstream.length > 0 ? 'warning' : 'success'} to="/assets" />
+        <Kpi Icon={AlertOctagon} label={t('assetsBlastTransitive')}  value={String(transitive.size)}    tone={transitive.size > 0 ? 'danger' : 'success'} to="/assets" />
+        <Kpi Icon={FileCheck2}   label={t('assetsBlastCcm')}         value={String(ccm.length)}         tone="primary" to="/ccm/dashboard" />
+        <Kpi Icon={Activity}     label={t('assetsBlastApprovals')}   value={String(approvals.length)}   tone={approvals.length > 0 ? 'warning' : 'success'} to="/approvals" />
       </div>
 
       {/* ── What depends on this (downstream) ─────────────── */}

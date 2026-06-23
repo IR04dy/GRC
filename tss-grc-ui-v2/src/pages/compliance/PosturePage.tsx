@@ -94,7 +94,7 @@ export function PosturePage() {
         <Kpi Icon={Shield}     label={isAr ? 'البنود المغطّاة' : 'Citations covered'}
              value={`${totals.mapped} / ${totals.cits}`} to="/regulatory/library" />
         <Kpi Icon={Activity}   label={isAr ? 'متوسط التغطية' : 'Avg coverage'}
-             value={`${totals.avg}%`} tone={coverageBandTone(totals.avg)} />
+             value={`${totals.avg}%`} tone={coverageBandTone(totals.avg)} to="/controls/library" />
         <Kpi Icon={FileWarning} label={isAr ? 'مجالات الضوابط' : 'Control domains'} value={domains.length} to="/controls/library" />
       </div>
 

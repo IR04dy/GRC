@@ -56,10 +56,10 @@ export function ZtMaturityPage() {
         actions={<Button variant="ghost" size="sm" onClick={() => void load()}><RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}</Button>} />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Target}     label={isAr ? 'تقييمات' : 'Assessments'}      value={String(counts.total)}   tone="info" />
-        <Kpi Icon={TrendingUp} label={isAr ? 'في مستوى مثالي' : 'At OPTIMAL'} value={String(counts.optimal)} tone={counts.optimal > 0 ? 'success' : 'warning'} />
-        <Kpi Icon={Target}     label={isAr ? 'فجوة عن الهدف' : 'Below target'} value={String(counts.gap)}     tone={counts.gap > 0 ? 'warning' : 'success'} />
-        <Kpi Icon={TrendingUp} label={isAr ? 'متوسط النقاط' : 'Avg score'}     value={counts.avgScore == null ? '—' : `${counts.avgScore}`} tone="info" />
+        <Kpi Icon={Target}     label={isAr ? 'تقييمات' : 'Assessments'}      value={String(counts.total)}   tone="info" to="/socops" />
+        <Kpi Icon={TrendingUp} label={isAr ? 'في مستوى مثالي' : 'At OPTIMAL'} value={String(counts.optimal)} tone={counts.optimal > 0 ? 'success' : 'warning'} to="/socops" />
+        <Kpi Icon={Target}     label={isAr ? 'فجوة عن الهدف' : 'Below target'} value={String(counts.gap)}     tone={counts.gap > 0 ? 'warning' : 'success'} to="/socops" />
+        <Kpi Icon={TrendingUp} label={isAr ? 'متوسط النقاط' : 'Avg score'}     value={counts.avgScore == null ? '—' : `${counts.avgScore}`} tone="info" to="/socops" />
       </div>
 
       <Card>

@@ -219,24 +219,28 @@ export function VendorBcpCampaignsPage() {
           Icon={ClipboardCheck}
           label={isAr ? 'إجمالي الحملات' : 'Total campaigns'}
           value={String(items.length)}
+          to="/tprm"
         />
         <Kpi
           Icon={Send}
           label={isAr ? 'حملات نشطة' : 'Active campaigns'}
           value={String(activeCount)}
           tone="info"
+          to="/tprm"
         />
         <Kpi
           Icon={AlertTriangle}
           label={isAr ? 'متأخرات مفتوحة' : 'Open overdue'}
           value={String(overdueCount)}
           tone={overdueCount > 0 ? 'danger' : 'neutral'}
+          to="/tprm"
         />
         <Kpi
           Icon={CheckCircle2}
           label={isAr ? 'حملات مُغلَقة' : 'Closed cycles'}
           value={String(closedCount)}
           tone="success"
+          to="/tprm"
         />
       </div>
 

@@ -99,10 +99,10 @@ export function ApprovalChainPendingPage() {
       </Card>
 
       <div className="kpi-grid" style={{ marginTop: 16, marginBottom: 16 }}>
-        <Kpi Icon={Inbox} label={t('approvalChainPendingKpiTotal',    'Waiting on me')}   value={String(totalPending)}  tone="primary" />
-        <Kpi Icon={Clock} label={t('approvalChainPendingKpiNearSla',  'Near SLA breach')} value={String(nearSla)}       tone="warning" />
-        <Kpi Icon={Users} label={t('approvalChainPendingKpiSerial',   'Serial rungs')}    value={String(serialRows)}    tone="info" />
-        <Kpi Icon={Users} label={t('approvalChainPendingKpiParallel', 'Parallel rungs')}  value={String(parallelRows)}  tone="accent" />
+        <Kpi Icon={Inbox} label={t('approvalChainPendingKpiTotal',    'Waiting on me')}   value={String(totalPending)}  tone="primary" to="/workflows" />
+        <Kpi Icon={Clock} label={t('approvalChainPendingKpiNearSla',  'Near SLA breach')} value={String(nearSla)}       tone="warning" to="/workflows" />
+        <Kpi Icon={Users} label={t('approvalChainPendingKpiSerial',   'Serial rungs')}    value={String(serialRows)}    tone="info"    to="/workflows" />
+        <Kpi Icon={Users} label={t('approvalChainPendingKpiParallel', 'Parallel rungs')}  value={String(parallelRows)}  tone="accent"  to="/workflows" />
       </div>
 
       <Card title={t('approvalChainPendingListTitle', 'Pending rungs')} Icon={Inbox}>

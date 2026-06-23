@@ -160,11 +160,11 @@ export function ApprovalInboxPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Inbox}        label={t('approvalsKpiPending')}    value={String(pending.length)}    tone="primary" />
-        <Kpi Icon={Clock}         label={t('approvalsKpiDueSoon')}    value={String(dueSoon)}            tone="info" />
-        <Kpi Icon={AlertTriangle} label={t('approvalsKpiOverdue')}    value={String(overdue)}            tone="warning" />
-        <Kpi Icon={Flame}         label={t('approvalsKpiEscalated')}  value={String(escalated)}          tone="danger" />
-        <Kpi Icon={ShieldCheck}   label={t('approvalsKpiDecided')}    value={String(requests.length - pending.length)} tone="success" />
+        <Kpi Icon={Inbox}        label={t('approvalsKpiPending')}    value={String(pending.length)}    tone="primary"  to="/approvals" />
+        <Kpi Icon={Clock}         label={t('approvalsKpiDueSoon')}    value={String(dueSoon)}            tone="info"     to="/approvals" />
+        <Kpi Icon={AlertTriangle} label={t('approvalsKpiOverdue')}    value={String(overdue)}            tone="warning"  to="/approvals" />
+        <Kpi Icon={Flame}         label={t('approvalsKpiEscalated')}  value={String(escalated)}          tone="danger"   to="/approvals" />
+        <Kpi Icon={ShieldCheck}   label={t('approvalsKpiDecided')}    value={String(requests.length - pending.length)} tone="success" to="/approvals" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>

@@ -570,7 +570,8 @@ export function CommitteesPage() {
       <PageHeader eyebrow={t('navAdministration')} title={t('comPageTitle')} sub={t('comPageSub')} />
 
       <div className="kpi-grid">
-        <Kpi Icon={Landmark}    label={t('comKpiActive')}     value={stats.activeCommittees} tone="success" />
+        <Kpi Icon={Landmark}    label={t('comKpiActive')}     value={stats.activeCommittees} tone="success"
+             onClick={() => setTab('committees')} active={tab === 'committees'} />
         <Kpi Icon={Calendar}    label={t('comKpiUpcoming')}   value={stats.upcoming}         tone="primary"
              onClick={() => setTab('scheduled')} active={tab === 'scheduled'} />
         <Kpi Icon={Gavel}       label={t('comTabResolutions')} value={resolutions.length}    tone="info"

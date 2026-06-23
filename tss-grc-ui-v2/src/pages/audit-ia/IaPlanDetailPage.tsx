@@ -232,12 +232,12 @@ export function IaPlanDetailPage() {
             gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
             gap: 12, marginBottom: 16,
           }}>
-            <KpiTile icon={CalendarRange} value={dashboard.engagementsPlanned} label={isAr ? 'مُجدوَل' : 'Planned'} tone="neutral" />
-            <KpiTile icon={ClipboardList} value={dashboard.engagementsInPlanning} label={isAr ? 'مرحلة التخطيط' : 'Planning'} tone="info" />
-            <KpiTile icon={Activity}      value={dashboard.engagementsInFieldwork} label={isAr ? 'العمل الميداني' : 'Fieldwork'} tone="warning" />
-            <KpiTile icon={TrendingUp}    value={dashboard.engagementsInReporting} label={isAr ? 'كتابة التقرير' : 'Reporting'} tone="warning" />
-            <KpiTile icon={CheckCircle2}  value={dashboard.engagementsReportIssued} label={isAr ? 'صدر التقرير' : 'Report issued'} tone="accent" />
-            <KpiTile icon={CheckCircle2}  value={dashboard.engagementsClosed}      label={isAr ? 'مُغلَق' : 'Closed'} tone="success" />
+            <KpiTile icon={CalendarRange} value={dashboard.engagementsPlanned} label={isAr ? 'مُجدوَل' : 'Planned'} tone="neutral" to="/audit/ia/plans" />
+            <KpiTile icon={ClipboardList} value={dashboard.engagementsInPlanning} label={isAr ? 'مرحلة التخطيط' : 'Planning'} tone="info" to="/audit-workspace" />
+            <KpiTile icon={Activity}      value={dashboard.engagementsInFieldwork} label={isAr ? 'العمل الميداني' : 'Fieldwork'} tone="warning" to="/audit-workspace" />
+            <KpiTile icon={TrendingUp}    value={dashboard.engagementsInReporting} label={isAr ? 'كتابة التقرير' : 'Reporting'} tone="warning" to="/audit-workspace" />
+            <KpiTile icon={CheckCircle2}  value={dashboard.engagementsReportIssued} label={isAr ? 'صدر التقرير' : 'Report issued'} tone="accent" to="/audit-workspace" />
+            <KpiTile icon={CheckCircle2}  value={dashboard.engagementsClosed}      label={isAr ? 'مُغلَق' : 'Closed'} tone="success" to="/audit-workspace" />
           </div>
 
           {/* Engagements list */}
@@ -455,19 +455,26 @@ function FormField({ label, children }: { label: string; children: ReactNode }) 
   );
 }
 
-function KpiTile({ icon: Icon, value, label, tone }:
-  { icon: typeof CalendarRange; value: number; label: string; tone: BadgeTone }) {
+function KpiTile({ icon: Icon, value, label, tone, to }:
+  { icon: typeof CalendarRange; value: number; label: string; tone: BadgeTone; to?: string }) {
+  const inner = (
+    <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)' }}>
+        <Icon size={14} />
+        <span style={{ fontSize: 11 }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 28, fontWeight: 700 }}>
+        <Badge tone={Number(value) > 0 ? tone : 'neutral'}>{value}</Badge>
+      </div>
+    </div>
+  );
   return (
     <Card>
-      <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)' }}>
-          <Icon size={14} />
-          <span style={{ fontSize: 11 }}>{label}</span>
-        </div>
-        <div style={{ fontSize: 28, fontWeight: 700 }}>
-          <Badge tone={Number(value) > 0 ? tone : 'neutral'}>{value}</Badge>
-        </div>
-      </div>
+      {to ? (
+        <Link to={to} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+          {inner}
+        </Link>
+      ) : inner}
     </Card>
   );
 }

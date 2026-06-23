@@ -265,10 +265,10 @@ export function EthicsPage() {
       />
 
       <div className="kpi-grid">
-        <Kpi Icon={ShieldAlert}    label={t('ethicsKpiTotal')}        value={total}     tone="primary" />
-        <Kpi Icon={Activity}       label={t('ethicsKpiOpen')}         value={open}      tone="info" />
-        <Kpi Icon={Flame}          label={t('ethicsKpiCritical')}     value={critical}  tone="danger" />
-        <Kpi Icon={Stamp}          label={t('ethicsKpiSubstantiated')} value={`${substantPct}%`} tone="accent" />
+        <Kpi Icon={ShieldAlert}    label={t('ethicsKpiTotal')}        value={total}     tone="primary" to="/ethics" />
+        <Kpi Icon={Activity}       label={t('ethicsKpiOpen')}         value={open}      tone="info" onClick={() => setTab('register')} />
+        <Kpi Icon={Flame}          label={t('ethicsKpiCritical')}     value={critical}  tone="danger" onClick={() => setTab('register')} />
+        <Kpi Icon={Stamp}          label={t('ethicsKpiSubstantiated')} value={`${substantPct}%`} tone="accent" onClick={() => setTab('analytics')} />
       </div>
 
       <OverviewStrip

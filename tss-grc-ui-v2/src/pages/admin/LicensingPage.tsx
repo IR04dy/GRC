@@ -123,10 +123,10 @@ export function LicensingPage() {
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12, marginBottom: 16 }}>
-        <Kpi Icon={KeyRound}    label={isAr ? 'وحدات معروفة' : 'Known modules'}   value={catalog.length}    tone="info" />
-        <Kpi Icon={ShieldCheck} label={isAr ? 'مفعّلة'         : 'Enabled'}        value={enabledCount}      tone="success" />
-        <Kpi Icon={ShieldX}     label={isAr ? 'معطّلة'         : 'Disabled'}       value={disabledCount}     tone="warning" />
-        <Kpi Icon={BadgeDollarSign} label={isAr ? 'بدون ترخيص' : 'Not yet purchased'} value={uncatalogued}  tone="info" />
+        <Kpi Icon={KeyRound}    label={isAr ? 'وحدات معروفة' : 'Known modules'}   value={catalog.length}    tone="info"     to="/admin" />
+        <Kpi Icon={ShieldCheck} label={isAr ? 'مفعّلة'         : 'Enabled'}        value={enabledCount}      tone="success"  to="/admin" />
+        <Kpi Icon={ShieldX}     label={isAr ? 'معطّلة'         : 'Disabled'}       value={disabledCount}     tone="warning"  to="/admin" />
+        <Kpi Icon={BadgeDollarSign} label={isAr ? 'بدون ترخيص' : 'Not yet purchased'} value={uncatalogued}  tone="info"     to="/admin" />
       </div>
 
       <Card title={isAr ? 'الوحدات' : 'Modules'}>

@@ -417,10 +417,10 @@ export function QuantitativeBiaPage() {
         />
 
         <div className="kpi-grid-sm mb-md">
-          <Kpi Icon={ListChecks}    label={isAr ? 'إجمالي' : 'Total'}            value={items.length}        tone="info" />
-          <Kpi Icon={CheckCircle2}  label={isAr ? 'معتمد'  : 'Approved'}         value={approved}            tone="success" />
-          <Kpi Icon={ShieldAlert}   label={isAr ? 'تجاوز سقف MTPD' : 'MTPD breach'} value={breached}        tone="danger" />
-          <Kpi Icon={Banknote}      label={isAr ? 'العملة' : 'Currency'}         value="SAR"                 tone="neutral" />
+          <Kpi Icon={ListChecks}    label={isAr ? 'إجمالي' : 'Total'}            value={items.length}        tone="info"     to="/bcm" />
+          <Kpi Icon={CheckCircle2}  label={isAr ? 'معتمد'  : 'Approved'}         value={approved}            tone="success"  to="/bcm" />
+          <Kpi Icon={ShieldAlert}   label={isAr ? 'تجاوز سقف MTPD' : 'MTPD breach'} value={breached}        tone="danger"   to="/bcm" />
+          <Kpi Icon={Banknote}      label={isAr ? 'العملة' : 'Currency'}         value="SAR"                 tone="neutral"  to="/bcm" />
         </div>
 
         <Card title={isAr ? 'سجل التحليل الكمي' : 'Quantitative BIA register'}>

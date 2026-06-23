@@ -184,9 +184,9 @@ export function ReportsCentrePage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Library}  label={t('rcKpiReports')}   value={REPORTS.length} tone="primary" />
-        <Kpi Icon={FileDown} label={t('rcKpiFormats')}   value={formatCount}    tone="info" />
-        <Kpi Icon={Globe}    label={t('rcKpiLanguages')} value={2}              tone="success" />
+        <Kpi Icon={Library}  label={t('rcKpiReports')}   value={REPORTS.length} tone="primary" to="/reports/centre" />
+        <Kpi Icon={FileDown} label={t('rcKpiFormats')}   value={formatCount}    tone="info"    to="/reports/centre" />
+        <Kpi Icon={Globe}    label={t('rcKpiLanguages')} value={2}              tone="success" to="/reports/centre" />
       </div>
 
       <div style={{

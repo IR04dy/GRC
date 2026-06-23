@@ -170,10 +170,10 @@ export function FairCalculatorPage() {
       {result && (
         <>
           <div className="kpi-grid" style={{ marginBottom: 16 }}>
-            <Kpi Icon={Sigma}      label={isAr ? 'الوسيط ALE (p50)' : 'Median ALE (p50)'} value={sar(result.aleP50)} tone="primary" />
-            <Kpi Icon={TrendingUp} label={isAr ? 'p90 ALE (الحالة السيئة)' : 'p90 ALE (worst-case)'} value={sar(result.aleP90)} tone="danger" />
-            <Kpi Icon={Activity}   label={isAr ? 'المتوسط ALE' : 'Mean ALE'} value={sar(result.aleMean)} tone="warning" />
-            <Kpi Icon={BarChart3}  label={isAr ? 'الأقصى ALE' : 'Max ALE'} value={sar(result.aleMax)} tone="neutral" />
+            <Kpi Icon={Sigma}      label={isAr ? 'الوسيط ALE (p50)' : 'Median ALE (p50)'} value={sar(result.aleP50)} tone="primary" to="/risk" />
+            <Kpi Icon={TrendingUp} label={isAr ? 'p90 ALE (الحالة السيئة)' : 'p90 ALE (worst-case)'} value={sar(result.aleP90)} tone="danger" to="/risk" />
+            <Kpi Icon={Activity}   label={isAr ? 'المتوسط ALE' : 'Mean ALE'} value={sar(result.aleMean)} tone="warning" to="/risk" />
+            <Kpi Icon={BarChart3}  label={isAr ? 'الأقصى ALE' : 'Max ALE'} value={sar(result.aleMax)} tone="neutral" to="/risk" />
           </div>
 
           <Card title={isAr ? 'توزيع التعرّض السنوي للخسارة' : 'Annualised loss-exposure distribution'} Icon={BarChart3}

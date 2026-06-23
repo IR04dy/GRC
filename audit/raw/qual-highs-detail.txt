@@ -1,0 +1,36 @@
+==========================================================================================
+QUAL-DUP-001 [High] 188 of 368 JPA entities re-declare the full audit/soft-delete/versioning column block instead of extending the existing BaseEntity mapped superclass
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/compliance/obligation/entity/ObligationAttestationCampaign.java:36-142  EFFORT:L
+RESOLUTION: Migrate the 188 standalone entities to `extends BaseEntity`: delete the inline id and the nine audit columns from each entity, add the extends clause, and drop the now-redundant @Id/@GeneratedValue. Where an entity used `createdByUserId` distinctly from BaseEntity's `createdBy`, reconcile to a single field. Do this module-by-module behind tests. Add an ArchUnit (or simple reflection) test asserting that every class annotated @Entity (excluding pure join/lookup tables) is assignable from BaseEntity, to prevent regression. Because @Where(clause = "is_deleted = 0") is still declared per-entity, k
+==========================================================================================
+QUAL-DUP-002 [High] TSX pages duplicate whole presentational components and helpers (ProgressBar, card components, bilingual pickers) across modules — 609 clones / 8,602 lines
+FILE: tss-grc-ui-v2/src/pages/compliance/ObligationCampaignsPage.tsx:344-365  EFFORT:L
+RESOLUTION: Extract the recurring presentational components into a shared module (e.g. src/components/ui/ProgressBar.tsx, StatCard.tsx, StatusPill.tsx, CampaignTable.tsx) and the bilingual selection into a single helper (e.g. src/lib/i18n.ts exporting `pick(isAr, ar, en)` and `tlabel(map, key, isAr)`), then replace the inline copies with imports. Co-locate the BCM crisis-exercise cards (ActiveInjectCard/ResponseCard) in one shared file imported by both the facilitator and observer pages. Prioritize the highest-clone files (NdiPage, EsgPage, the campaigns pages) first.
+==========================================================================================
+QUAL-ESG-001 [High] God class: DataOfficerService implements 10 sub-modules in 1054 LOC with 14 injected repositories
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/data_officer/service/DataOfficerService.java:48-1054  EFFORT:L
+RESOLUTION: Extract one @Service per sub-module (DsrService, ConsentService, DpiaService, ...), each injecting only its own repository. Hoist the shared timeline/emit/validate/org/currentUserId helpers into a single injectable collaborator (e.g. DataOfficerTimeline / a common base), and keep the dashboard aggregation in a thin DashboardService that fans out to the sub-services.
+==========================================================================================
+QUAL-IE-001 [High] EvidenceMatrixService.matrix() is a triple-nested N+1 query loop (86 LOC, queries scale with the whole framework catalog)
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceMatrixService.java:57-143  EFFORT:M
+RESOLUTION: Replace the per-sub-control itemRepo.findBySubControl call with batch aggregation queries keyed by sub-control id (mirroring GrcExpertService.aggregate*BySubControl), fetch all controls/sub-controls for the active frameworks with findBy...In finders, then assemble the matrix in memory from the pre-fetched maps. Extract the sub-control block builder into a private helper to reduce the method below ~30 LOC.
+==========================================================================================
+QUAL-IE-002 [High] EvidenceItemService.toResponse() issues up to 4 lookup queries per item, causing N+1 on every list/page endpoint
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/evidence/service/EvidenceItemService.java:386-422  EFFORT:M
+RESOLUTION: Either (a) project the joined sub-control/control/framework codes and owner name directly in the EvidenceItemRepository query (DTO projection / JOIN FETCH), or (b) pre-fetch the referenced sub-controls/controls/frameworks/owners in bulk for the page and pass lookup maps into toResponse.
+==========================================================================================
+QUAL-RC-001 [High] Two unrelated PolicyService classes with conflicting state machines split policy logic across modules
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/policy/service/PolicyService.java:37-176  EFFORT:L
+RESOLUTION: Pick one canonical policy entity + service. Migrate the compliance Policy lifecycle onto the policy module's PolicyDocument (or vice-versa), deprecate the redundant class, and remove the bean-name qualifier hack. If both must coexist short-term, rename them to disambiguate (e.g. PolicyDocumentService vs LegacyCompliancePolicyService).
+==========================================================================================
+QUAL-RC-003 [High] FrameworkAnchorController is a fat controller: 8 injected repositories across 4 modules, business logic in the web layer
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/compliance/controller/FrameworkAnchorController.java:52-339  EFFORT:L
+RESOLUTION: Extract a FrameworkAnchorService that owns coverage()/policiesForFramework()/etc. Have it call the owning modules' read services (or expose dedicated repository methods) rather than wiring foreign repositories into the web layer. Return typed DTOs instead of List<Map<String,Object>>.
+==========================================================================================
+QUAL-TI-001 [High] Two parallel SAMA-outsourcing implementations (module/outsourcing vs module/tprm/outsourcing) duplicate the same regulatory bounded context
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/outsourcing/service/OutsourcingService.java:1-612  EFFORT:L
+RESOLUTION: Pick one canonical module for SAMA outsourcing. Migrate the second module's data/endpoints onto it (or formally split responsibilities: e.g. `module/outsourcing` = cloud-service governance, `module/tprm/outsourcing` = vendor-arrangement governance) and document the boundary. At minimum, extract the shared lifecycle/materiality rules into one place so they cannot diverge.
+==========================================================================================
+QUAL-TI-002 [High] Integration LIVE clients duplicate the retry / exponential-backoff / sleep / url harness across CrowdStrike, Tenable and Splunk
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/integrations/crowdstrike/client/LiveCrowdStrikeClient.java:151-230  EFFORT:M
+RESOLUTION: Extract a shared retry utility (e.g. `RestRetrySupport.withRetry(RetryConfig, Supplier<T>)`) or a Spring Retry / Resilience4j policy bean, and a shared `baseUrl(path)` helper. Each client supplies only the call and the vendor-specific 401 handling.

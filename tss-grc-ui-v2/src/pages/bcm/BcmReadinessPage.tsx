@@ -738,11 +738,11 @@ export function BcmReadinessPage() {
         <div className="dash-grid">
           {contactStats && (
             <div style={{ gridColumn: '1/-1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-              <Kpi Icon={Activity} label={isAr ? 'نجاح' : 'Passed'} value={contactStats.passed} tone="success" />
+              <Kpi Icon={Activity} label={isAr ? 'نجاح' : 'Passed'} value={contactStats.passed} tone="success" to="/bcm" />
               <Kpi Icon={FileWarning} label={isAr ? 'فشل' : 'Failed'} value={contactStats.failed}
-                   tone={contactStats.failed > 0 ? 'danger' : 'success'} />
+                   tone={contactStats.failed > 0 ? 'danger' : 'success'} to="/bcm" />
               <Kpi Icon={Workflow} label={isAr ? 'لم يُجَب' : 'Not reached'} value={contactStats.notReached}
-                   tone={contactStats.notReached > 0 ? 'warning' : 'info'} />
+                   tone={contactStats.notReached > 0 ? 'warning' : 'info'} to="/bcm" />
             </div>
           )}
           <Card title={isAr ? 'جهات الاتصال' : 'Contacts'}

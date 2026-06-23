@@ -387,13 +387,16 @@ export function AttackSurfacePage() {
              onClick={() => setTab('assets')} active={tab === 'assets'} />
         <Kpi Icon={Globe} tone="danger"
              label={lang === 'ar' ? 'أصول عامة حرجة' : 'Public + critical'}
-             value={kpis.criticalExposure} />
+             value={kpis.criticalExposure}
+             onClick={() => setTab('assets')} active={tab === 'assets'} />
         <Kpi Icon={Bug} tone="warning"
              label={lang === 'ar' ? 'نتائج مفتوحة' : 'Open findings'}
-             value={kpis.openFindings} />
+             value={kpis.openFindings}
+             onClick={() => setTab('findings')} active={tab === 'findings'} />
         <Kpi Icon={Cloud} tone="info"
              label={lang === 'ar' ? 'تقنية الظل قيد المراجعة' : 'Shadow IT pending'}
-             value={kpis.pendingShadow} />
+             value={kpis.pendingShadow}
+             onClick={() => setTab('shadowIt')} active={tab === 'shadowIt'} />
       </div>
 
       {/* Tabs */}

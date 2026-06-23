@@ -208,7 +208,8 @@ export function RegReportingFilingDetailPage() {
       }}>
         <Kpi Icon={CalendarDays} tone="info"
           label={lang === 'ar' ? 'الفترة' : 'Period'}
-          value={`${filing.periodStart} → ${filing.periodEnd}`} />
+          value={`${filing.periodStart} → ${filing.periodEnd}`}
+          to="/regulatory/reg-reporting" />
         <Kpi Icon={Clock} tone={
           filing.overdue ? 'danger'
             : (filing.daysUntilDue != null && filing.daysUntilDue <= 7
@@ -223,14 +224,16 @@ export function RegReportingFilingDetailPage() {
                     : ''
                 }`
               : '—'
-          } />
+          }
+          to="/regulatory/reg-reporting" />
         <Kpi Icon={Shield} tone="neutral"
           label={lang === 'ar' ? 'الدورية' : 'Frequency'}
           value={
             filing.frequency
               ? FREQUENCY_LABEL[filing.frequency][lang === 'ar' ? 'ar' : 'en']
               : '—'
-          } />
+          }
+          to="/regulatory/reg-reporting" />
         <Kpi Icon={CheckCircle2} tone={
           filing.submittedAt ? 'success' : 'neutral'}
           label={lang === 'ar' ? 'مُقدَّم في' : 'Submitted at'}
@@ -238,7 +241,8 @@ export function RegReportingFilingDetailPage() {
             filing.submittedAt
               ? new Date(filing.submittedAt).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-GB')
               : '—'
-          } />
+          }
+          to="/regulatory/reg-reporting" />
       </div>
 
       {/* Action panel */}

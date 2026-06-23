@@ -232,24 +232,28 @@ export function TcfdScenariosPage() {
           Icon={CloudLightning}
           label={isAr ? 'إجمالي السيناريوهات' : 'Total scenarios'}
           value={String(items.length)}
+          to="/esg"
         />
         <Kpi
           Icon={CheckCircle2}
           label={isAr ? 'مُعتمَد من المجلس' : 'Board approved'}
           value={String(approvedCount)}
           tone="success"
+          to="/esg"
         />
         <Kpi
           Icon={FileSearch}
           label={isAr ? 'في الإعداد / المراجعة' : 'Draft / In review'}
           value={String(draftCount)}
           tone="warning"
+          to="/esg"
         />
         <Kpi
           Icon={Globe2}
           label={isAr ? 'الخسارة المتوقّعة المرجَّحة' : 'Probability-weighted EL'}
           value={fmtSarMillions(weighted?.weightedExpectedLossSarMillions, isAr)}
           tone={weighted?.warning ? 'warning' : 'info'}
+          to="/esg"
         />
       </div>
 

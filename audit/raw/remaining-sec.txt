@@ -1,0 +1,55 @@
+=== CODE-LEVEL SEC High/Medium (35) ===
+Medium  SEC-AUTH-002  module/iam/dto/UserRequest.java                      M      Weak password policy — minimum length 8, no complexity, no b
+Medium  SEC-BCM-002   module/bcm/cycle/controller/CrisisEventController.ja M      Function-level authorization too broad: ~30 BCM cycle/DRP en
+Medium  SEC-BCM-003   module/bcm/controller/BiaQuantitativeController.java S      Read-only AUDITOR role granted write/approve/delete on BIA, 
+Medium  SEC-CFG-001   common/exception/GlobalExceptionHandler.java         S      Global exception handler leaks exception class name and root
+Medium  SEC-CFG-006   config/SecurityConfig.java                           M      Token-as-credential public portal endpoints are permitAll wi
+Medium  SEC-CFG-009   config/TenantWriteGuardConfig.java                   S      TenantWriteGuard mass-assignment / cross-tenant write interc
+Medium  SEC-CMP-002   module/controlmap/controller/ControlMapController.ja S      Control-mapping endpoints have no @PreAuthorize — any authen
+Medium  SEC-CMP-004   module/policy/service/PolicyService.java             S      Policy attestation can be completed (attest/decline) by any 
+Medium  SEC-ESG-002   module/sust/capa/service/CorrectiveActionService.jav M      Separation-of-duties controls (CAPA verifier ≠ owner, eviden
+Medium  SEC-ESG-003   module/sust/evidence/controller/SustainabilityEviden L      Sustainability write endpoints bind raw JPA @Entity request 
+Medium  SEC-EVD-002   module/evidence/service/EvidenceItemService.java     S      Evidence item create accepts arbitrary client-supplied statu
+Medium  SEC-EVD-003   module/evidence/chain/controller/EvidenceChainContro S      Evidence chain-of-custody endpoints guarded only by isAuthen
+Medium  SEC-EVD-004   module/board_pack/controller/BoardPackController.jav S      Board pack read endpoints guarded only by isAuthenticated() 
+Medium  SEC-FE-002    ui-v2/src/lib/auth.ts                                M      JWT access token stored in sessionStorage (JS-readable) in b
+Medium  SEC-FE-003    ui/login.html                                        S      Open redirect via unvalidated `redirect` parameter on legacy
+Medium  SEC-FIN-003   module/aml/sanctions/service/SanctionsListService.ja S      Tenant AML officer can inject/poison platform-global sanctio
+Medium  SEC-FIN-004   module/scm/fourthparty/service/FourthPartyExposureSe M      Mass assignment via raw JPA-entity request bodies on create 
+Medium  SEC-IAM-004   module/workflow_submission/controller/WorkflowSubmis M      Workflow-submission review (APPROVE/REJECT/CLOSE) allowed fo
+Medium  SEC-IAM-005   module/admin/committee/controller/CommitteeControlle S      Committee lifecycle mutations (create/dissolve/approve-minut
+Medium  SEC-INT-003   module/integrations/crowdstrike/service/CrowdStrikeO M      Outbound EDR/VM actions accept arbitrary host/asset IDs with
+Medium  SEC-INT-004   module/integrations/tenable/client/LiveTenableClient M      Tenable plugin/asset id interpolated into outbound API URL p
+Medium  SEC-INT-005   module/integrations/splunk/webhook/SplunkWebhookCont M      Splunk webhook HMAC verification has a body-mismatch fallbac
+Medium  SEC-NDI-003   module/ndi/submission/controller/NdiSubmissionPackag M      Workflow approval / submission state changes have no segrega
+Medium  SEC-NDI-004   module/data_officer/service/DataOfficerService.java  M      Cross-tenant soft-FK references stored without ownership val
+Medium  SEC-PLAT-003  module/platform/controls/controller/ControlLibraryCo M      Control Library and Authority-Document write operations gate
+Medium  SEC-PLAT-004  module/platform/auditlog/controller/AuditLogControll S      Platform-wide audit log readable by any authenticated user
+Medium  SEC-PLAT-005  module/platform/persistence/controller/PersistenceCo S      Generic persistence append endpoint has no authorization gua
+Medium  SEC-PLAT-006  module/platform/files/controller/FileUploadControlle M      File upload/list/get endpoints lack authorization annotation
+Medium  SEC-PLAT-007  module/platform/completion/BuyerGapController.java   M      Cross-module write endpoints (departments, issues, calendar,
+Medium  SEC-PRIV-003  module/privacy/subprocessor/controller/SubprocessorC M      Unauthenticated public sub-processor list allows cross-tenan
+Medium  SEC-RISK-002  module/risk/controller/RiskAdvancedController.java   M      Raw JPA entities bound as @RequestBody on assessment/treatme
+Medium  SEC-RISK-003  module/risk/emerging/controller/EmergingRiskControll S      Unbounded client-controlled page size on Emerging-Risk and S
+Medium  SEC-RISK-004  module/risk/emerging/controller/EmergingRiskControll S      Function-level authorization too coarse: write operations ga
+Medium  SEC-SEC-001   seed_real_data.py                                    M      Hardcoded SQL Server 'sa' credential (sa/tss.123) committed 
+Medium  SEC-TPRM-003  module/tprm/cyber/controller/ThirdPartyCyberAssessme S      Missing function-level authorization on third-party cyber-as
+
+=== DEPENDENCY SEC High/Medium (17) — re-scan needed ===
+High    SEC-CVE-001   backend/pom.xml                                      M      Apache Tomcat embedded (tomcat-embed-core 10.1.46) — multipl
+Medium  SEC-CVE-002   backend/pom.xml                                      M      Spring Security Web 6.5.5 — HTTP response headers may not be
+Medium  SEC-CVE-003   backend/pom.xml                                      S      Microsoft SQL Server JDBC Driver 12.8.1.jre11 — improper inp
+Medium  SEC-CVE-006   backend/pom.xml                                      S      Apache POI OOXML 5.2.5 — duplicate zip-entry parsing reads u
+Medium  SEC-CVE-007   backend/pom.xml                                      M      Jackson Core 2.19.2 — async parser bypasses maxNumberLength 
+Medium  SEC-CVE-008   backend/pom.xml                                      S      Apache Commons Compress 1.25.0 — unbounded resource allocati
+Medium  SEC-CVE-009   backend/pom.xml                                      S      Apache Commons Lang3 3.17.0 — uncontrolled recursion StackOv
+Medium  SEC-CVE-010   backend/pom.xml                                      M      Spring Framework WebMVC 6.2.11 — path traversal in script te
+Medium  SEC-CVE-011   backend/pom.xml                                      M      Spring Framework WebSocket 6.2.11 — STOMP-over-WebSocket CSR
+Medium  SEC-CVE-012   backend/pom.xml                                      M      Logback Core 1.5.18 — conditional arbitrary code execution &
+Medium  SEC-CVE-013   backend/pom.xml                                      M      Spring Security Core 6.5.5 — One-Time-Token TOCTOU race & ti
+Medium  SEC-CVE-014   ui-v2/package-lock.json                              S      react-router 6.30.3 — open redirect via protocol-relative UR
+Medium  SEC-NPM-001   ui-v2/package.json                                   M      Vite dev server — server.fs.deny bypass + path traversal + L
+Medium  SEC-NPM-002   ui-v2/package-lock.json                              M      esbuild dev server allows any website to read dev-server res
+Medium  SEC-NPM-003   ui-v2/package.json                                   S      react-router open redirect via protocol-relative (//) URL re
+Medium  SEC-NPM-004   ui-v2/package.json                                   S      react-router-dom inherits open redirect from react-router (d
+Medium  SEC-PY-002    seed_real_data.py                                    M      Hardcoded database credentials and plaintext user passwords 

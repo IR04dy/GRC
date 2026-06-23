@@ -39,12 +39,12 @@ export function WorkflowVersionsPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Workflow}      label={t('wvKpiFamilies')}     value={String(stats.totalFamilies)} tone="primary" />
-        <Kpi Icon={Layers}         label={t('wvKpiVersions')}     value={String(stats.totalVersions)} tone="info" />
-        <Kpi Icon={GitBranch}      label={t('wvKpiPublished')}    value={String(stats.publishedCount)} tone="success" />
-        <Kpi Icon={FileText}       label={t('wvKpiDraft')}        value={String(stats.draftCount)} tone="info" />
-        <Kpi Icon={AlertOctagon}   label={t('wvKpiDeprecated')}   value={String(stats.deprecatedCount)} tone="warning" />
-        <Kpi Icon={Layers}         label={t('wvKpiLegacy')}        value={String(stats.legacyInflight)} tone={stats.legacyInflight > 0 ? 'warning' : 'success'} />
+        <Kpi Icon={Workflow}      label={t('wvKpiFamilies')}     value={String(stats.totalFamilies)} tone="primary" to="/workflow-versions" />
+        <Kpi Icon={Layers}         label={t('wvKpiVersions')}     value={String(stats.totalVersions)} tone="info" to="/workflow-versions" />
+        <Kpi Icon={GitBranch}      label={t('wvKpiPublished')}    value={String(stats.publishedCount)} tone="success" to="/workflow-versions" />
+        <Kpi Icon={FileText}       label={t('wvKpiDraft')}        value={String(stats.draftCount)} tone="info" to="/workflow-versions" />
+        <Kpi Icon={AlertOctagon}   label={t('wvKpiDeprecated')}   value={String(stats.deprecatedCount)} tone="warning" to="/workflow-versions" />
+        <Kpi Icon={Layers}         label={t('wvKpiLegacy')}        value={String(stats.legacyInflight)} tone={stats.legacyInflight > 0 ? 'warning' : 'success'} to="/workflows" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>

@@ -121,9 +121,9 @@ export function ProcessorAssessmentsPage() {
       <div className="kpi-grid">
         <Kpi Icon={ClipboardCheck} label={t('procKpiApproved')} value={stats.APPROVED} tone="success"
           onClick={() => setTab('APPROVED')} active={tab === 'APPROVED'} />
-        <Kpi Icon={AlertTriangle}  label={t('procKpiPwc')}      value={stats.pwc}      tone="warning" />
-        <Kpi Icon={XCircle}        label={t('procKpiFailed')}   value={stats.fail}     tone="danger" />
-        <Kpi Icon={Shield}         label={t('procKpiInProgress')} value={stats.IN_PROGRESS + stats.COMPLETED} tone="primary" />
+        <Kpi Icon={AlertTriangle}  label={t('procKpiPwc')}      value={stats.pwc}      tone="warning" to="/processor-assessments" />
+        <Kpi Icon={XCircle}        label={t('procKpiFailed')}   value={stats.fail}     tone="danger"  to="/processor-assessments" />
+        <Kpi Icon={Shield}         label={t('procKpiInProgress')} value={stats.IN_PROGRESS + stats.COMPLETED} tone="primary" to="/processor-assessments" />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} hideEmpty />

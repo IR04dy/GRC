@@ -172,12 +172,13 @@ function VendorDashboard({
 
       {/* ── KPIs ─────────────────────────────────────────────── */}
       <div className="kpi-grid" style={{ marginTop: 16 }}>
-        <Kpi Icon={CheckCircle2}  label={t('vpKpiProgress')}        value={`${pct}%`} tone={pct >= 80 ? 'success' : pct >= 40 ? 'info' : 'warning'} />
+        <Kpi Icon={CheckCircle2}  label={t('vpKpiProgress')}        value={`${pct}%`} tone={pct >= 80 ? 'success' : pct >= 40 ? 'info' : 'warning'}
+          onClick={() => document.getElementById('vp-attestations')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         <Kpi Icon={Clock}          label={t('vpKpiOpenActions')}     value={String(openActions.length)} tone={openActions.length > 0 ? 'warning' : 'success'}
           onClick={() => document.getElementById('vp-actions')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         <Kpi Icon={FileCheck2}     label={t('vpKpiAttestations')}    value={`${uploadedCount}/${mandatoryAttestations.length}`} tone={uploadedCount === mandatoryAttestations.length ? 'success' : 'warning'}
           onClick={() => document.getElementById('vp-attestations')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
-        <Kpi Icon={Building2}      label={t('vpKpiNextReview')}      value={profile.nextReviewDate ?? '—'} tone="info" />
+        <Kpi Icon={Building2}      label={t('vpKpiNextReview')}      value={profile.nextReviewDate ?? '—'} tone="info" to="/tprm" />
       </div>
 
       {/* ── Stage progress strip ──────────────────────────── */}

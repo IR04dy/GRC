@@ -87,7 +87,7 @@ export function RiskLifecyclePage() {
         <Kpi Icon={ShieldCheck}      label={t('rlcKpiTreated')}      value={String(stats.risksWithApprovedTreatment)} tone="success" to="/risk" />
         <Kpi Icon={ThumbsUp}         label={t('rlcKpiAwaitAccept')}  value={String(stats.risksAwaitingAcceptance)}  tone="warning" to="/approvals" />
         <Kpi Icon={RefreshCw}        label={t('rlcKpiExpiring')}     value={String(stats.acceptedExpiringSoon)}     tone={stats.acceptedExpiringSoon > 0 ? 'warning' : 'success'} to="/attestations" />
-        <Kpi Icon={TrendingUp}       label={t('rlcKpiSpend')}        value={`${(stats.totalTreatmentSpendK / 1000).toFixed(1)}M SAR`} tone="info" />
+        <Kpi Icon={TrendingUp}       label={t('rlcKpiSpend')}        value={`${(stats.totalTreatmentSpendK / 1000).toFixed(1)}M SAR`} tone="info" to="/risk" />
       </div>
 
       {/* Treatment plan pipeline (interactive kanban) */}

@@ -180,8 +180,8 @@ export function AiControlMapperPage() {
         <>
           <div className="kpi-grid" style={{ marginBottom: 16 }}>
             <Kpi Icon={Target} label={isAr ? 'ضوابط مطابقة' : 'Controls matched'} value={result.totalScored} tone={result.totalScored > 0 ? 'primary' : 'neutral'} to="/controls/library" />
-            <Kpi Icon={Gauge}  label={isAr ? 'أعلى ثقة' : 'Top confidence'} value={topConf > 0 ? pctRaw(topConf) : '—'} tone={topConf >= 0.35 ? 'success' : topConf >= 0.15 ? 'info' : 'neutral'} />
-            <Kpi Icon={Layers} label={isAr ? 'معروضة' : 'Shown'} value={suggestions.length} tone="info" />
+            <Kpi Icon={Gauge}  label={isAr ? 'أعلى ثقة' : 'Top confidence'} value={topConf > 0 ? pctRaw(topConf) : '—'} tone={topConf >= 0.35 ? 'success' : topConf >= 0.15 ? 'info' : 'neutral'} to="/controls/library" />
+            <Kpi Icon={Layers} label={isAr ? 'معروضة' : 'Shown'} value={suggestions.length} tone="info" to="/controls/library" />
           </div>
 
           <Card

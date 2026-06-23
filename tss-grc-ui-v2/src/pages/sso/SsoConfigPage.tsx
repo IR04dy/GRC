@@ -83,10 +83,10 @@ export function SsoConfigPage() {
       />
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Lock}            label={t('ssoKpiProviders')}    value={String(stats.totalProviders)} tone="primary" />
-        <Kpi Icon={ShieldCheck}      label={t('ssoKpiConfigured')}    value={String(stats.configuredProviders)} tone={stats.ssoReady ? 'success' : 'warning'} />
-        <Kpi Icon={Smartphone}       label={t('ssoKpiNafath')}        value={stats.nafathReady ? t('ssoReady') : t('ssoNotReady')} tone={stats.nafathReady ? 'success' : 'warning'} />
-        <Kpi Icon={AlertOctagon}      label={t('ssoKpiTransactions')}  value={String(stats.recentTransactions)} tone="info" />
+        <Kpi Icon={Lock}            label={t('ssoKpiProviders')}    value={String(stats.totalProviders)} tone="primary" to="/sso" />
+        <Kpi Icon={ShieldCheck}      label={t('ssoKpiConfigured')}    value={String(stats.configuredProviders)} tone={stats.ssoReady ? 'success' : 'warning'} to="/sso" />
+        <Kpi Icon={Smartphone}       label={t('ssoKpiNafath')}        value={stats.nafathReady ? t('ssoReady') : t('ssoNotReady')} tone={stats.nafathReady ? 'success' : 'warning'} to="/admin" />
+        <Kpi Icon={AlertOctagon}      label={t('ssoKpiTransactions')}  value={String(stats.recentTransactions)} tone="info" to="/sso" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>

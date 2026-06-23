@@ -135,9 +135,9 @@ export function DataSharingPage() {
 
       <div className="kpi-grid">
         <Kpi Icon={Share2}      label={t('dsaKpiActive')}     value={stats.ACTIVE} tone="success" onClick={() => setTab('ACTIVE')} active={tab === 'ACTIVE'} />
-        <Kpi Icon={FileText}    label={t('dsaKpiDraft')}      value={stats.DRAFT + stats.IN_REVIEW} tone="warning" />
-        <Kpi Icon={Globe}       label={t('dsaKpiCrossBorder')} value={stats.crossBorder} tone="info" />
-        <Kpi Icon={AlertOctagon} label={t('dsaKpiRegulator')}  value={stats.regulator} tone="primary" />
+        <Kpi Icon={FileText}    label={t('dsaKpiDraft')}      value={stats.DRAFT + stats.IN_REVIEW} tone="warning" onClick={() => setTab('DRAFT')} active={tab === 'DRAFT'} />
+        <Kpi Icon={Globe}       label={t('dsaKpiCrossBorder')} value={stats.crossBorder} tone="info" to="/data-sharing" />
+        <Kpi Icon={AlertOctagon} label={t('dsaKpiRegulator')}  value={stats.regulator} tone="primary" to="/data-sharing" />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} hideEmpty />

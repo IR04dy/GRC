@@ -202,7 +202,7 @@ export function EmergingRiskPage() {
           onClick={() => setTab('monitoring')} active={tab === 'monitoring'} />
         <Kpi Icon={ArrowUpRight}   label={t('emrKpiEscalated')}  value={stats.ESCALATED}  tone="warning"
           onClick={() => setTab('escalated')}  active={tab === 'escalated'} />
-        <Kpi Icon={AlertTriangle}  label={t('emrKpiConfirmed')}  value={stats.confirmed}  tone="danger" />
+        <Kpi Icon={AlertTriangle}  label={t('emrKpiConfirmed')}  value={stats.confirmed}  tone="danger" to="/emerging-risk" />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

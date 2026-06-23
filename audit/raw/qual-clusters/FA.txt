@@ -1,0 +1,12 @@
+================================================================================
+QUAL-FA-001 [Medium] Tenant/actor/event boilerplate triad (org(), currentUserId(), emit()) copy-pasted across financial-crime & audit services
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/sharia/service/ShariaService.java:682-699
+RESOLUTION: Extract a `protected abstract` base class (e.g. `EventEmittingService`) or a `@Component DomainEventPublisher` plus a `SecurityHelper.currentUserId()` and `TenantContext.requireOrganisationId()` wrapper, and have these services delegate. Removes ~17 LOC * 13 services of duplication and forces a single definition of actor resolution.
+================================================================================
+QUAL-FA-005 [Medium] RiskControlFindingPivotService swallows all RuntimeExceptions silently via safeList/safeOpt across 8 foreign-module repositories
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java:656-668
+RESOLUTION: At minimum log at WARN with the supplier context inside safeList/safeOpt (the class already has an Slf4j logger). Better: catch only the specific 'not visible to tenant' case and let infrastructure exceptions propagate to the controller's 500 handler.
+================================================================================
+QUAL-FA-006 [Medium] Governance pivot/3LoD services reach directly into 8+ other modules' repositories (cross-module layering violation)
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/governance/pivot/service/RiskControlFindingPivotService.java:92-130
+RESOLUTION: Introduce read-only query facades per source module (e.g. RiskQueryService.openRisksForOrg(orgId), CcmQueryService.coverageForControls(...)) and have governance depend on those interfaces instead of foreign repositories. This restores the one-repository-layer-per-module boundary and lets each module own its query/N+1 strategy.

@@ -1,0 +1,4 @@
+================================================================================
+QUAL-DUP-003 [Medium] Service classes copy-paste the org()/currentUserId()/emit() tenant-and-actor helper trio instead of sharing a base service or utility
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/openbanking/service/ObService.java:635-644
+RESOLUTION: Introduce a shared, package-visible utility (e.g. common/security/CurrentActor.java with `static Long userId()` and `static Long organisationId()`), or an `AbstractTenantService` base class exposing protected `org()`/`currentUserId()`/`emit(...)`. Replace the per-service private statics with calls to the shared helper. Centralising currentUserId() also gives one place to fix any future principal-type or null-handling change. Keep TenantContext as the source of truth; the utility just wraps it.

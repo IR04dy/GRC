@@ -205,18 +205,22 @@ export function RegInspectWorkspaceDetailPage() {
       }}>
         <Kpi Icon={FileText} tone="warning"
           label={lang === 'ar' ? 'طلبات مفتوحة' : 'Open DRs'}
-          value={insp.openDrCount ?? 0} />
+          value={insp.openDrCount ?? 0}
+          to="/regulatory/reg-inspections" />
         <Kpi Icon={AlertTriangle} tone="danger"
           label={lang === 'ar' ? 'طلبات متأخّرة' : 'Overdue'}
-          value={insp.overdueDrCount ?? 0} />
+          value={insp.overdueDrCount ?? 0}
+          to="/regulatory/reg-inspections" />
         <Kpi Icon={CheckCircle2} tone="success"
           label={lang === 'ar' ? 'طلبات مُقدَّمة' : 'Submitted'}
-          value={insp.submittedDrCount ?? 0} />
+          value={insp.submittedDrCount ?? 0}
+          to="/regulatory/reg-inspections" />
         <Kpi Icon={Clock} tone="info"
           label={lang === 'ar' ? 'تاريخ الإغلاق' : 'Exit date'}
           value={insp.exitDate
             ? new Date(insp.exitDate).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-GB')
-            : '—'} />
+            : '—'}
+          to="/regulatory/reg-inspections" />
       </div>
 
       {/* Document Requests */}

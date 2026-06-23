@@ -119,7 +119,7 @@ export function IntakeInboxPage() {
         </div>}>
         {visible.length === 0
           ? <EmptyState Icon={Inbox} title={t('inboxEmpty')} sub={t('inboxEmptyBody')} />
-          : <div style={{ display: 'flex', flexDirection: 'column' }}>
+          : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {visible.map(r => <InboxRow key={r.id} rec={r} onTriage={() => setTriageTarget(r)} t={t} lang={lang} />)}
             </div>
         }
@@ -181,8 +181,10 @@ function InboxRow({ rec, onTriage, t, lang }: {
       display: 'grid',
       gridTemplateColumns: '110px 150px 1fr 110px 130px 130px 120px',
       gap: 10,
-      padding: '12px 0',
-      borderBottom: '1px dashed var(--border)',
+      padding: '12px 14px',
+      background: 'var(--surface-2)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--r-md)',
       alignItems: 'center',
     }}>
       <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-2)' }}>{rec.referenceCode}</span>

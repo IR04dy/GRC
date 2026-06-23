@@ -55,7 +55,7 @@ export function ControlCrosswalkPage() {
         <Kpi Icon={Layers}   label={t('cwKpiMasters')}      value={String(stats.totalMasters)}      tone="primary" to="/controls/library" />
         <Kpi Icon={Link2}     label={t('cwKpiRefs')}         value={String(stats.totalRefs)}         tone="info" to="/regulatory/library" />
         <Kpi Icon={Globe}     label={t('cwKpiFrameworks')}   value={String(stats.uniqueFrameworks)}  tone="accent" to="/regulatory/library" />
-        <Kpi Icon={Link2}     label={t('cwKpiAvgRefs')}      value={String(stats.avgRefsPerMaster)}  tone="primary" />
+        <Kpi Icon={Link2}     label={t('cwKpiAvgRefs')}      value={String(stats.avgRefsPerMaster)}  tone="primary" to="/control-crosswalk" />
         <Kpi Icon={Landmark}  label={t('cwKpiImplemented')}  value={`${stats.implementedPct}%`}      tone={stats.implementedPct >= 80 ? 'success' : 'warning'} to="/controls/library" />
       </div>
 
@@ -164,9 +164,9 @@ function CrosswalkDetail({ control, t, lang }: { control: MasterControl; t: (k: 
 
       {/* ── Headline reach ────────────────────────── */}
       <div className="kpi-grid">
-        <Kpi Icon={Link2}    label={t('cwReachTotal')}     value={String(control.frameworkRefs.length)} tone="primary" />
-        <Kpi Icon={Landmark}  label={t('cwReachSaudi')}     value={String(saudiCount)} tone="success" />
-        <Kpi Icon={Globe}      label={t('cwReachIntl')}      value={String(intlCount)} tone="info" />
+        <Kpi Icon={Link2}    label={t('cwReachTotal')}     value={String(control.frameworkRefs.length)} tone="primary" to="/control-crosswalk" />
+        <Kpi Icon={Landmark}  label={t('cwReachSaudi')}     value={String(saudiCount)} tone="success" to="/regulatory/library" />
+        <Kpi Icon={Globe}      label={t('cwReachIntl')}      value={String(intlCount)} tone="info" to="/regulatory/library" />
       </div>
 
       {/* ── Crosswalk table ───────────────────────── */}

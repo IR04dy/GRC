@@ -83,7 +83,7 @@ export function RegulatoryChangePage() {
         <Kpi Icon={Filter}       label={t('regChangeKpiTriaged')}      value={String(stats.triagedCount)}     tone="warning" onClick={() => setStatusFilter('TRIAGED')} active={statusFilter === 'TRIAGED'} />
         <Kpi Icon={AlertOctagon} label={t('regChangeKpiApplicable')}    value={String(stats.applicableCount)}  tone="danger" onClick={() => setStatusFilter('APPLICABLE')} active={statusFilter === 'APPLICABLE'} />
         <Kpi Icon={FileText}     label={t('regChangeKpiImplemented')}   value={String(stats.implementedCount)} tone="success" onClick={() => setStatusFilter('IMPLEMENTED')} active={statusFilter === 'IMPLEMENTED'} />
-        <Kpi Icon={Calendar}     label={t('regChangeKpiOverdue')}       value={String(stats.overdueCount)}     tone={stats.overdueCount > 0 ? 'danger' : 'success'} />
+        <Kpi Icon={Calendar}     label={t('regChangeKpiOverdue')}       value={String(stats.overdueCount)}     tone={stats.overdueCount > 0 ? 'danger' : 'success'} to="/regulatory-change" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 16 }}>

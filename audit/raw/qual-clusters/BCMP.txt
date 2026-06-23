@@ -1,0 +1,24 @@
+================================================================================
+QUAL-BCMP-001 [Medium] Systemic dead-code: no-op _touch() methods and KEEP_* dummy fields used to suppress unused-import warnings across 11 classes
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/bcm/service/StrategyRoiService.java:535-536
+RESOLUTION: Delete each `_touch()` method and each `KEEP*`/`OBJECTS_KEEP_IMPORT` field, then remove the now-genuinely-unused imports, loggers, and fields they were shielding. If a logger field (e.g. `log` in StrategyRoiService) has no real call site, drop the field and its slf4j imports. Configure the build (e.g. error-prone / checkstyle RedundantImport) to fail on unused imports so the workaround cannot reappear.
+================================================================================
+QUAL-BCMP-002 [Medium] Duplicated runtime-projection helpers between ExerciseObserverService and ExerciseRuntimeService (summarise / toInjectView / toResponseView / nullSafe / truncate)
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/runtime/observer/service/ExerciseObserverService.java:575-639
+RESOLUTION: Extract a package-private `ExerciseRunProjections` (or a `@Component RuntimeViewMapper`) under `bcm/cycle/runtime` exposing `summarise`, `toInjectView`, `toResponseView`, plus the shared `nullSafe`/`truncate`. Inject it into both services. Consolidating also fixes the count-query fan-out in one place.
+================================================================================
+QUAL-BCMP-003 [Medium] God service: BuyerGapService bundles 7 unrelated concerns and reaches into 6 other modules' repositories
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/platform/completion/BuyerGapService.java:56-548
+RESOLUTION: Split into domain-aligned services living in their owning modules: move risk-control linkage + appetite variance + attestation sweep into the risk module, the evidence freshness sweep + connector registry into the evidence module, and the DSR/PDPL sweeps into privacy/bcm respectively. If a thin orchestration facade is still wanted for the scheduler, have it delegate to those services rather than owning their repositories.
+================================================================================
+QUAL-BCMP-004 [Medium] Long, high-complexity method: CrisisEventService.getActiveCrisisSummary() (114 LOC) embeds the entire multi-regulator deadline engine inline
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/bcm/cycle/service/CrisisEventService.java:125-238
+RESOLUTION: Extract a `RegulatoryDeadlineCalculator` returning `record Deadline(String regulator, LocalDateTime at)` from a `CrisisEvent`, with one unit test per regulator window. Extract `escalationTier(sev)` and `nextActionLabel(status)` helpers. Reduce getActiveCrisisSummary() to: load -> map(row) -> sort, delegating to the calculator and a named `Comparator`.
+================================================================================
+QUAL-BCMP-005 [Medium] DashboardStats 'open critical' / 'open high' tiles are fed total counts, and pendingTasks is hardcoded 0L
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/dashboard/service/DashboardService.java:46-76
+RESOLUTION: Either compute the real open-by-level counts (add countByOrganisationIdAndRiskLevelAndStatus finders and pass them) or remove the redundant alias fields and have the UI derive them. Replace the wide positional constructor with a builder or named-component construction so position-mismatch bugs are impossible. If pendingTasks is genuinely not yet implemented, document it as such or drop the field.
+================================================================================
+QUAL-BCMP-006 [Medium] N+1 query pattern in KRI rendering (BoardPackService, ExportService) and 5-query fan-out in run summarise()
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/reporting/service/BoardPackService.java:294-330
+RESOLUTION: Add a repository query that returns each KRI's latest band in one shot (e.g. a JPQL projection grouped by kriId, or a window-function native query) and build a Map<Long,band> once. Replace the double findByOrganisationId with countByOrganisationId + countByOrganisationIdAndStatus. Replace the 5 per-status counts in summarise with a single GROUP BY status query mapped into a Map.

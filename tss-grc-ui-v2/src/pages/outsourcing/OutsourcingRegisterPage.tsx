@@ -108,18 +108,22 @@ export function OutsourcingRegisterPage() {
           label={isAr ? 'إسناد جوهري نشط' : 'Active material'}
           value={dashboard?.activeMaterial ?? 0}
           tone="info"
+          onClick={() => setMaterialFilter('material')}
+          active={materialFilter === 'material'}
         />
         <Kpi
           Icon={AlertTriangle}
           label={isAr ? 'بانتظار عدم ممانعة ساما' : 'Awaiting SAMA'}
           value={dashboard?.awaitingSama ?? 0}
           tone={(dashboard?.awaitingSama ?? 0) > 0 ? 'warning' : 'neutral'}
+          to="/tprm/outsourcing/admin/sama-pending"
         />
         <Kpi
           Icon={CalendarClock}
           label={isAr ? 'مراجعات متأخرة' : 'Overdue reviews'}
           value={dashboard?.overdueReviews ?? 0}
           tone={(dashboard?.overdueReviews ?? 0) > 0 ? 'warning' : 'neutral'}
+          to="/tprm/outsourcing"
         />
       </div>
 

@@ -260,30 +260,35 @@ export function MtpdInheritancePage() {
               Icon={GitBranch}
               label={isAr ? 'إجمالي التقييمات' : 'Total assessments'}
               value={String(assessments.length)}
+              to="/bcm"
             />
             <Kpi
               Icon={AlertOctagon}
               label={isAr ? 'مجموع الخروقات' : 'Cumulative breaches'}
               value={String(totalBreaches)}
               tone="danger"
+              to="/bcm"
             />
             <Kpi
               Icon={AlertTriangle}
               label={isAr ? 'مجموع التحذيرات' : 'Cumulative warnings'}
               value={String(totalWarnings)}
               tone="warning"
+              to="/bcm"
             />
             <Kpi
               Icon={FileQuestion}
               label={isAr ? 'فجوات إقرار' : 'Attestation gaps'}
               value={String(totalNoAtt)}
               tone="neutral"
+              to="/bcm"
             />
             <Kpi
               Icon={CheckCircle2}
               label={isAr ? 'مَنشورة للمراجعة' : 'Published for audit'}
               value={String(publishedCount)}
               tone="info"
+              to="/bcm"
             />
           </div>
 

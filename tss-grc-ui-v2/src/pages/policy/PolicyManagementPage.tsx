@@ -116,24 +116,24 @@ function OverviewTab() {
           {isAr ? 'تحقق من الانتهاء' : 'Run expiry sweep'}
         </Button>}>
         <div className="kpi-grid">
-          <Kpi Icon={FileText}     label={isAr ? 'إجمالي السياسات' : 'Total policies'} value={agg.total} tone="primary" />
-          <Kpi Icon={CheckCircle2} label={isAr ? 'منشورة' : 'Published'}                value={agg.published} tone="success" />
-          <Kpi Icon={FileText}     label={isAr ? 'قيد المراجعة' : 'In review'}          value={agg.inReview} tone="info" />
-          <Kpi Icon={FileText}     label={isAr ? 'مسوّدة' : 'Draft'}                    value={agg.draft} tone="primary" />
+          <Kpi Icon={FileText}     label={isAr ? 'إجمالي السياسات' : 'Total policies'} value={agg.total} tone="primary" to="/policy-management" />
+          <Kpi Icon={CheckCircle2} label={isAr ? 'منشورة' : 'Published'}                value={agg.published} tone="success" to="/policy-management" />
+          <Kpi Icon={FileText}     label={isAr ? 'قيد المراجعة' : 'In review'}          value={agg.inReview} tone="info" to="/policy-management" />
+          <Kpi Icon={FileText}     label={isAr ? 'مسوّدة' : 'Draft'}                    value={agg.draft} tone="primary" to="/policy-management" />
           <Kpi Icon={AlertCircle}  label={isAr ? 'منتهية' : 'Expired'}                  value={agg.expired}
-               tone={agg.expired > 0 ? 'warning' : 'success'} />
+               tone={agg.expired > 0 ? 'warning' : 'success'} to="/policy-management" />
           <Kpi Icon={AlertCircle}  label={isAr ? 'تنتهي قريباً' : 'Expiring soon'}      value={agg.expiringSoon}
-               tone={agg.expiringSoon > 0 ? 'warning' : 'success'} />
+               tone={agg.expiringSoon > 0 ? 'warning' : 'success'} to="/policy-management" />
         </div>
       </Card>
 
       <Card title={isAr ? 'الاستثناءات والإقرارات' : 'Exceptions & attestations'} Icon={AlertCircle}>
         <div className="kpi-grid">
           <Kpi Icon={AlertCircle}  label={isAr ? 'استثناءات مفتوحة' : 'Open exceptions'}  value={agg.openExceptions}
-               tone={agg.openExceptions > 0 ? 'warning' : 'success'} />
-          <Kpi Icon={CheckCircle2} label={isAr ? 'استثناءات مُعتمَدة' : 'Approved exceptions'} value={agg.approvedExceptions} tone="info" />
+               tone={agg.openExceptions > 0 ? 'warning' : 'success'} to="/policy-management" />
+          <Kpi Icon={CheckCircle2} label={isAr ? 'استثناءات مُعتمَدة' : 'Approved exceptions'} value={agg.approvedExceptions} tone="info" to="/policy-management" />
           <Kpi Icon={AlertCircle}  label={isAr ? 'إقرارات معلقة' : 'Pending attestations'}    value={agg.pendingAttestations}
-               tone={agg.pendingAttestations > 0 ? 'warning' : 'success'} />
+               tone={agg.pendingAttestations > 0 ? 'warning' : 'success'} to="/policy-management" />
         </div>
       </Card>
 

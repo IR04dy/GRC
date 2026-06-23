@@ -1,0 +1,12 @@
+================================================================================
+QUAL-IE-003 [Medium] EvidenceStorageService and AttachmentStorageService are ~90% duplicated (allow-list, size cap, store(), extensionOf, sha256Hex)
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/attachment/service/AttachmentStorageService.java:26-113
+RESOLUTION: Extract an abstract LocalFileStorage base (or a FileStorageSupport utility) holding ALLOWED_EXTENSIONS, the size cap, validate(), extensionOf(), the path-traversal guard, and sha256Hex(); have both services subclass/delegate. Move sha256Hex to a shared HashUtil so EvidenceChainService reuses it too.
+================================================================================
+QUAL-IE-004 [Medium] ApprovalChainInstanceService.recordAction() is a 104-LOC method with the entire state machine inlined
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/workflow/approval_chains/service/ApprovalChainInstanceService.java:203-308
+RESOLUTION: Extract: (1) a guard method validating terminal status + step order + delegation, (2) a recordActionRow(...) for persistence+audit, (3) an applyApproval(...) for the advance/finalise logic. Collapse the repeated setUpdatedAt+save into a single touch-and-save call at the end.
+================================================================================
+QUAL-IE-008 [Medium] AuthController.refresh()/login() swallow the cause in broad catch(Exception) — no log, 500 with cause lost
+FILE: tss-grc-backend/src/main/java/com/tss/grc/module/auth/AuthController.java:94-100
+RESOLUTION: Add a class Logger and `log.error("refresh-token issuance/rotation failed for user {}", userId, ex);` inside both catch blocks before returning the 500. Keep the fail-closed 500 behaviour.
