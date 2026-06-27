@@ -258,16 +258,16 @@ export function BcmReportsPage() {
     <Shell>
       <PageHeader
         eyebrow={isAr ? 'إدارة استمرارية الأعمال' : 'Business Continuity'}
-        title={isAr ? 'استوديو تقارير الاستمرارية' : 'BCM reporting studio'}
+        title={isAr ? 'مركز تقارير الاستمرارية' : 'BCM reporting studio'}
         sub={isAr
           ? 'تقارير جاهزة للمجلس والجهات التنظيمية تغطي الجاهزية والمخاطر والمعالجة والحوكمة والاتصالات.'
           : 'Board- and regulator-ready reports across readiness, risk, remediation, governance and communications.'}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 16, alignItems: 'start' }}
+      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16, alignItems: 'start' }}
         className="bcm-reports-layout">
         {/* ── Catalogue (left) ── */}
-        <Card title={isAr ? 'كتالوج التقارير' : 'Report catalog'} Icon={FileBarChart}>
+        <Card title={isAr ? 'قائمة التقارير' : 'Report catalog'} Icon={FileBarChart}>
           <div style={{ position: 'relative', marginBottom: 10 }}>
             <Search size={14} style={{
               position: 'absolute', insetInlineStart: 9, top: '50%', transform: 'translateY(-50%)',
@@ -319,7 +319,7 @@ export function BcmReportsPage() {
                               fontWeight: active ? 600 : 400,
                             }}>
                             <m.Icon size={15} style={{ flexShrink: 0, color: active ? 'var(--primary)' : 'var(--ink-3)' }} />
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ lineHeight: 1.35 }}>
                               {isAr ? def.titleAr : def.titleEn}
                             </span>
                           </button>
@@ -336,7 +336,7 @@ export function BcmReportsPage() {
         {/* ── Report document (right) ── */}
         <Card padded>
           {!selected || !meta ? (
-            <InlineEmpty text={isAr ? 'اختر تقريراً من الكتالوج' : 'Select a report from the catalog'} />
+            <InlineEmpty text={isAr ? 'اختر تقريراً من القائمة' : 'Select a report from the catalog'} />
           ) : (
             <>
               {/* Export toolbar */}
