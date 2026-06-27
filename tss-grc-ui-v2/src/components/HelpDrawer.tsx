@@ -99,12 +99,17 @@ export function HelpDrawer({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
-
+  // NOTE: every hook must run on every render in the same order. `useMemo`
+  // therefore has to sit ABOVE the `!open` early-return — putting it below
+  // meant the closed drawer ran one fewer hook than the open one, so opening
+  // it threw "Rendered more hooks than during the previous render" and the
+  // app-root ErrorBoundary swallowed the whole page. (React Rules of Hooks.)
   const visible = useMemo(
     () => query.trim().length >= 2 ? searchHits : topics,
     [query, searchHits, topics],
   );
+
+  if (!open) return null;
 
   return (
     <div

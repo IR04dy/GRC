@@ -46,8 +46,14 @@ export function HelpButton() {
         aria-label={t('helpButtonAriaLabel', 'Open contextual help')}
         title={t('helpButtonTitle', 'Contextual help (Shift+?)')}
         style={{
-          // RTL-aware logical positioning — flips automatically with
-          // <html dir="rtl">.
+          // RTL-aware logical positioning. `inset-inline-end` resolves
+          // against the element's OWN direction, so we must NOT force
+          // `direction: ltr` here — doing so pins the button to the right
+          // edge even in Arabic, where the sidebar is on the right, so the
+          // button lands on top of the bottom sidebar links and swallows
+          // their clicks. Letting it inherit the page dir flips it to the
+          // bottom-left in RTL (away from the sidebar). The icon is an SVG,
+          // not a '?' glyph, so it renders correctly in either direction.
           position: 'fixed',
           insetInlineEnd: 24,
           insetBlockEnd: 24,
@@ -61,9 +67,6 @@ export function HelpButton() {
           alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer',
           zIndex: 900,
-          // Preserve LTR for the icon so the '?' character renders
-          // correctly even on RTL pages.
-          direction: 'ltr',
         }}
       >
         <HelpCircle size={22} aria-hidden="true" />
