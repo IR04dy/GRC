@@ -4,8 +4,11 @@ import { api, downloadFile } from './api';
 
 export type CommitteeStatus = 'ACTIVE' | 'INACTIVE' | 'DISSOLVED';
 export type MeetingStatus   = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'MINUTES_APPROVED' | 'CANCELLED';
-export type CommitteeType   = 'BOARD' | 'EXEC_COMMITTEE' | 'RISK_COMMITTEE' | 'AUDIT_COMMITTEE'
-                            | 'BCM_COMMITTEE' | 'COMPLIANCE_COMMITTEE' | 'TECH_COMMITTEE' | 'OTHER';
+// A committee instance may carry any of the catalogue's committee types: the
+// admin.committees CK_com_type constraint was widened to the full
+// ExtendedCommitteeType set, and the create form now offers all of them. Kept
+// as an alias so the many existing `CommitteeType` references stay valid.
+export type CommitteeType   = ExtendedCommitteeType;
 export type MeetingCadence  = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'AD_HOC';
 
 export interface Committee {

@@ -33,18 +33,37 @@ import {
 /** Committee type -> registry-code stem, mirroring the seeded set (COM-RISK, COM-AUDIT, …). */
 const TYPE_CODE_STEM: Record<CommitteeType, string> = {
   BOARD: 'BOARD', EXEC_COMMITTEE: 'EXEC', RISK_COMMITTEE: 'RISK', AUDIT_COMMITTEE: 'AUDIT',
-  BCM_COMMITTEE: 'BCM', COMPLIANCE_COMMITTEE: 'COMPLIANCE', TECH_COMMITTEE: 'TECH', OTHER: 'COMMITTEE',
+  BCM_COMMITTEE: 'BCM', COMPLIANCE_COMMITTEE: 'COMPLIANCE', TECH_COMMITTEE: 'TECH',
+  NOMINATION_REMUNERATION: 'NOMREM', CYBER_SECURITY: 'CYBER', DATA_GOVERNANCE: 'DATAGOV',
+  PRIVACY_DPO: 'PRIVACY', CRISIS_MANAGEMENT: 'CRISIS', AML: 'AML', IT_STEERING: 'IT',
+  ALCO: 'ALCO', INVESTMENT: 'INVEST', AI_ETHICS: 'AIETHICS', ANTI_FRAUD: 'ANTIFRAUD',
+  INTERNAL_CONTROL: 'INTCTRL', ESG_SUSTAINABILITY: 'ESG', ARCH_REVIEW: 'ARB', OTHER: 'COMMITTEE',
 };
 const COMMITTEE_TYPES = Object.keys(TYPE_CODE_STEM) as CommitteeType[];
 const TYPE_LABEL_EN: Record<CommitteeType, string> = {
-  BOARD: 'Board of Directors', EXEC_COMMITTEE: 'Executive Committee', RISK_COMMITTEE: 'Risk Committee',
-  AUDIT_COMMITTEE: 'Audit Committee', BCM_COMMITTEE: 'BCM Committee', COMPLIANCE_COMMITTEE: 'Compliance Committee',
-  TECH_COMMITTEE: 'Technology Committee', OTHER: 'Other',
+  BOARD: 'Board of Directors', EXEC_COMMITTEE: 'Executive Committee',
+  RISK_COMMITTEE: 'Risk Management Committee', AUDIT_COMMITTEE: 'Audit Committee',
+  BCM_COMMITTEE: 'BCM Steering Committee', COMPLIANCE_COMMITTEE: 'Compliance Committee',
+  TECH_COMMITTEE: 'Technology Committee', NOMINATION_REMUNERATION: 'Nomination & Remuneration Committee',
+  CYBER_SECURITY: 'Cybersecurity Committee', DATA_GOVERNANCE: 'Data Governance Committee',
+  PRIVACY_DPO: 'Personal Data Protection Committee', CRISIS_MANAGEMENT: 'Crisis Management Committee',
+  AML: 'Anti-Money-Laundering Committee', IT_STEERING: 'IT Steering Committee',
+  ALCO: 'Asset & Liability Committee (ALCO)', INVESTMENT: 'Investment Committee',
+  AI_ETHICS: 'AI Ethics Committee', ANTI_FRAUD: 'Anti-Fraud Committee',
+  INTERNAL_CONTROL: 'Internal Control Committee', ESG_SUSTAINABILITY: 'Sustainability Committee',
+  ARCH_REVIEW: 'Architecture Review Board', OTHER: 'Other',
 };
 const TYPE_LABEL_AR: Record<CommitteeType, string> = {
-  BOARD: 'مجلس الإدارة', EXEC_COMMITTEE: 'اللجنة التنفيذية', RISK_COMMITTEE: 'لجنة المخاطر',
-  AUDIT_COMMITTEE: 'لجنة المراجعة', BCM_COMMITTEE: 'لجنة استمرارية الأعمال', COMPLIANCE_COMMITTEE: 'لجنة الالتزام',
-  TECH_COMMITTEE: 'لجنة التقنية', OTHER: 'أخرى',
+  BOARD: 'مجلس الإدارة', EXEC_COMMITTEE: 'اللجنة التنفيذية', RISK_COMMITTEE: 'لجنة إدارة المخاطر',
+  AUDIT_COMMITTEE: 'لجنة المراجعة', BCM_COMMITTEE: 'لجنة استمرارية الأعمال',
+  COMPLIANCE_COMMITTEE: 'لجنة الالتزام', TECH_COMMITTEE: 'لجنة التقنية',
+  NOMINATION_REMUNERATION: 'لجنة الترشيحات والمكافآت', CYBER_SECURITY: 'لجنة الأمن السيبراني',
+  DATA_GOVERNANCE: 'لجنة حوكمة البيانات', PRIVACY_DPO: 'لجنة حماية البيانات الشخصية',
+  CRISIS_MANAGEMENT: 'لجنة إدارة الأزمات', AML: 'لجنة مكافحة غسل الأموال',
+  IT_STEERING: 'لجنة توجيه تقنية المعلومات', ALCO: 'لجنة الأصول والخصوم',
+  INVESTMENT: 'لجنة الاستثمار', AI_ETHICS: 'لجنة أخلاقيات الذكاء الاصطناعي',
+  ANTI_FRAUD: 'لجنة مكافحة الاحتيال', INTERNAL_CONTROL: 'لجنة الرقابة الداخلية',
+  ESG_SUSTAINABILITY: 'لجنة الاستدامة', ARCH_REVIEW: 'مجلس مراجعة المعمارية', OTHER: 'أخرى',
 };
 const CADENCES: MeetingCadence[] = ['WEEKLY', 'BIWEEKLY', 'MONTHLY', 'QUARTERLY', 'AD_HOC'];
 const CADENCE_LABEL_EN: Record<MeetingCadence, string> = {
