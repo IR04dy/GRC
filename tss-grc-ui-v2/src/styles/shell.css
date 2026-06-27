@@ -55,16 +55,22 @@
 }
 /* Pinned group ("My Work") — always visible, not a toggle; no hover cue */
 .sb-section[disabled] { cursor: default; opacity: 1; }
-/* Collapsible pillars — hairline divider between sections for scannability */
+/* Collapsible pillars — clear visual zone break between sections.
+ * margin-top creates a gap below the last item of the prior section;
+ * border-top is the divider; background tint + faint stripe signal
+ * "this is a section header, not a nav item". */
 .sb-section-toggle {
   cursor: pointer;
-  margin-top: 4px;
-  border-top: 1px solid var(--sb-border);
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, .13);
+  background: rgba(255, 255, 255, .045);
+  border-inline-start-color: rgba(255, 255, 255, .15);
 }
 /* Hover: lighten text toward accent + very subtle surface tint */
 .sb-section-toggle:hover {
   color: var(--accent-300);
   background: var(--sb-hover-bg);
+  border-inline-start-color: rgba(255, 255, 255, .25);
 }
 /* Expanded (open) collapsible pillar: accent color + leading stripe */
 .sb-section-toggle.sb-section-open {
