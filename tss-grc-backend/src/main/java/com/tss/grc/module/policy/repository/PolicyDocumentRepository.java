@@ -41,4 +41,19 @@ public interface PolicyDocumentRepository extends JpaRepository<PolicyDocument, 
           and p.expiryDate < :today
     """)
     List<PolicyDocument> findExpiredPublished(Long orgId, LocalDate today);
+
+    /** Distinct tenant ids that own at least one policy — drives the scheduler's per-tenant loop. */
+    @Query("select distinct p.organisationId from PolicyDocument p")
+    List<Long> findDistinctOrganisationIds();
+
+    /** PUBLISHED policies whose next review falls within [from, to] — drives review-due reminders. */
+    @Query("""
+        select p from PolicyDocument p
+        where p.organisationId = :orgId
+          and p.status = 'PUBLISHED'
+          and p.nextReviewDate is not null
+          and p.nextReviewDate >= :from
+          and p.nextReviewDate <= :to
+    """)
+    List<PolicyDocument> findReviewDue(Long orgId, LocalDate from, LocalDate to);
 }
