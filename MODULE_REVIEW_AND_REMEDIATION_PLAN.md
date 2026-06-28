@@ -10,7 +10,7 @@
 
 ## 0. Remediation Progress (live — branch `feat/compliance-policy-remediation`)
 
-> Implementation done 2026-06-28 via an autonomous `/loop`, in §22 order. Frontend changes verified with `tsc --noEmit`; backend changes `mvn compile`/`mvn test`-verified + live API smoke tests. **Not merged to `master`** — 15 commits on `feat/compliance-policy-remediation`, **pushed to origin (PR pending), backend rebuilt + restarted** so the schedulers / SoD / RBAC are active (this also fixed the stale-jar policy-transition 404).
+> Implementation done 2026-06-28 via an autonomous `/loop`, in §22 order. Frontend changes verified with `tsc --noEmit`; backend changes `mvn compile`/`mvn test`-verified + live API smoke tests. **Not merged to `master`** — 19 commits on `feat/compliance-policy-remediation`, **pushed to origin (PR pending), backend rebuilt + restarted** so the schedulers / SoD / RBAC / evidence-package endpoints are active (this also fixed the stale-jar policy-transition 404).
 
 | Gap | Fix | Status | Commit |
 |---|---|---|---|
@@ -26,10 +26,10 @@
 | **C-3** | **Scheduler suite — policy expiry/review + obligation-overdue + CAPA-due reminders** | ✅ Shipped | `4acf1bf1` / `923d8887` |
 | **C-6** | **Policy approver segregation-of-duty (+ unit tests)** | ✅ Shipped | `90bbe478` / `8f925ec1` |
 | C-4 | Consolidate the two policy systems into one register | ⏳ Backend — larger | — |
-| C-11 | Evidence-package builder (policy + controls + evidence bundle) | ⏳ Pending | — |
+| **C-11** | **Audit evidence-package builder — policy (doc + attachments + controls/framework) AND obligation (obligation + attachments + per-attestation evidence); one-call JSON manifest + UI "Evidence pack" export. Both live-verified end-to-end.** | ✅ Shipped | `b553bbfe` / `93b2d8d3` / `4984b4ac` |
 | C-12 | Replace free-text cross-links with FK links | ⏳ Pending | — |
 
-**Net:** every Critical finding (C-1, C-2, C-3, C-5, C-6, C-7, C-8, C-9, C-10) plus #7-RBAC is resolved, verified, pushed, and — for the backend — activated by a rebuild + restart. Remaining are large structural items only: **C-4** (merge the two policy systems — needs a data-migration decision), **C-11** (evidence-package builder), **C-12** (replace remaining free-text cross-links with FK links).
+**Net:** every Critical finding (C-1, C-2, C-3, C-5, C-6, C-7, C-8, C-9, C-10, **C-11**) plus #7-RBAC is resolved, verified, pushed, and — for the backend — activated by a rebuild + restart. The policy *and* obligation evidence-package endpoints are live-verified end-to-end (upload → one-call manifest with sha256 + download links → UI export). Remaining are the two large structural items only: **C-4** (merge the two policy systems — needs a data-migration decision; deliberately NOT done autonomously) and **C-12** (replace remaining free-text cross-links with FK links).
 
 ---
 
