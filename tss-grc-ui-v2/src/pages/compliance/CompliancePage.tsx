@@ -41,6 +41,7 @@ import {
 } from '../../lib/api';
 import { ExportMenu } from '../../components/ui/ExportMenu';
 import { useToast } from '../../lib/toast';
+import { useDialog } from '../../lib/dialog';
 import {
   COMPLIANCE_CONTROLS, COMPLIANCE_ASSESSMENTS, COMPLIANCE_FINDINGS,
   REGULATORY_CHANGES, POLICIES, AUDIT_ENGAGEMENTS,
@@ -298,6 +299,7 @@ function isTabId(s: string | null): s is TabId {
 export function CompliancePage() {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const dialog = useDialog();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab');
@@ -484,22 +486,42 @@ export function CompliancePage() {
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
   }
   async function assessApplicability(c: RegulatoryChangeDto) {
-    const v = window.prompt('Applicability — APPLICABLE / PARTIAL / NOT_APPLICABLE', 'APPLICABLE');
+    const v = await dialog.prompt({
+      title: lang === 'ar' ? 'تقييم الانطباق' : 'Assess applicability',
+      label: 'APPLICABLE / PARTIAL / NOT_APPLICABLE',
+      initial: 'APPLICABLE', required: true,
+      validate: x => ['APPLICABLE', 'PARTIAL', 'NOT_APPLICABLE'].includes(x.trim().toUpperCase())
+        ? null : (lang === 'ar' ? 'يجب أن تكون APPLICABLE أو PARTIAL أو NOT_APPLICABLE' : 'Must be APPLICABLE, PARTIAL or NOT_APPLICABLE'),
+    });
     if (!v) return;
-    try { await complianceApi.assessApplicability(c.id, v.trim().toUpperCase()); toast.success('Applicability recorded'); changes.reload(); }
+    try { await complianceApi.assessApplicability(c.id, v.trim().toUpperCase()); toast.success(lang === 'ar' ? 'تم تسجيل الانطباق' : 'Applicability recorded'); changes.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function assessImpact(c: RegulatoryChangeDto) {
-    const lvl = window.prompt('Impact level — CRITICAL / HIGH / MEDIUM / LOW', 'MEDIUM');
+    const lvl = await dialog.prompt({
+      title: lang === 'ar' ? 'تقييم الأثر' : 'Assess impact',
+      label: 'CRITICAL / HIGH / MEDIUM / LOW',
+      initial: 'MEDIUM', required: true,
+      validate: x => ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(x.trim().toUpperCase())
+        ? null : (lang === 'ar' ? 'يجب أن تكون CRITICAL أو HIGH أو MEDIUM أو LOW' : 'Must be CRITICAL, HIGH, MEDIUM or LOW'),
+    });
     if (!lvl) return;
-    const summ = window.prompt('Impact summary (1-2 sentences)?', '') ?? '';
-    try { await complianceApi.assessImpact(c.id, lvl.trim().toUpperCase(), summ); toast.success('Impact assessed'); changes.reload(); }
+    const summ = (await dialog.prompt({
+      title: lang === 'ar' ? 'ملخص الأثر' : 'Impact summary',
+      label: lang === 'ar' ? 'جملة أو جملتان (اختياري)' : 'One or two sentences (optional)',
+      type: 'textarea',
+    })) ?? '';
+    try { await complianceApi.assessImpact(c.id, lvl.trim().toUpperCase(), summ); toast.success(lang === 'ar' ? 'تم تقييم الأثر' : 'Impact assessed'); changes.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function markControlsUpdated(c: RegulatoryChangeDto) {
-    const n = window.prompt('How many controls were updated?', '1');
+    const n = await dialog.prompt({
+      title: lang === 'ar' ? 'تحديث الضوابط' : 'Controls updated',
+      label: lang === 'ar' ? 'كم عدد الضوابط التي تم تحديثها؟' : 'How many controls were updated?',
+      type: 'number', initial: '1', min: 0,
+    });
     if (n === null) return;
-    try { await complianceApi.markControlsUpdated(c.id, Number(n) || 0); toast.success('Controls update recorded'); changes.reload(); }
+    try { await complianceApi.markControlsUpdated(c.id, Number(n) || 0); toast.success(lang === 'ar' ? 'تم تسجيل تحديث الضوابط' : 'Controls update recorded'); changes.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function closeChangeAction(c: RegulatoryChangeDto) {
@@ -515,8 +537,15 @@ export function CompliancePage() {
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function execApprove(p: PolicyDto) {
-    if (!window.confirm(`Publish policy "${p.titleEn}" via executive approval? This sets effective_from = today and nextReviewDate = +12 months if blank.`)) return;
-    try { await complianceApi.execApprovePolicy(p.id); toast.success('Policy published'); policies.reload(); }
+    const ok = await dialog.confirm({
+      title: lang === 'ar' ? 'اعتماد تنفيذي ونشر' : 'Executive approval & publish',
+      body: lang === 'ar'
+        ? `نشر السياسة "${p.titleEn}" عبر الاعتماد التنفيذي؟ سيُضبط تاريخ السريان = اليوم وتاريخ المراجعة القادمة = +12 شهراً إن كان فارغاً.`
+        : `Publish policy "${p.titleEn}" via executive approval? This sets effective_from = today and nextReviewDate = +12 months if blank.`,
+      submitLabel: lang === 'ar' ? 'نشر' : 'Publish',
+    });
+    if (!ok) return;
+    try { await complianceApi.execApprovePolicy(p.id); toast.success(lang === 'ar' ? 'تم نشر السياسة' : 'Policy published'); policies.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function markReviewDue(p: PolicyDto) {
@@ -524,14 +553,23 @@ export function CompliancePage() {
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function retire(p: PolicyDto) {
-    if (!window.confirm(`Retire policy "${p.titleEn}"? It will no longer be enforceable.`)) return;
-    try { await complianceApi.retirePolicy(p.id); toast.success('Policy retired'); policies.reload(); }
+    const ok = await dialog.confirm({
+      title: lang === 'ar' ? 'إيقاف السياسة' : 'Retire policy',
+      body: lang === 'ar' ? `إيقاف السياسة "${p.titleEn}"؟ لن تعود سارية المفعول.` : `Retire policy "${p.titleEn}"? It will no longer be enforceable.`,
+      destructive: true, submitLabel: lang === 'ar' ? 'إيقاف' : 'Retire',
+    });
+    if (!ok) return;
+    try { await complianceApi.retirePolicy(p.id); toast.success(lang === 'ar' ? 'تم إيقاف السياسة' : 'Policy retired'); policies.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function rejectPolicy(p: PolicyDto) {
-    const reason = window.prompt('Rejection reason?', '') ?? '';
-    if (!reason.trim()) return;
-    try { await complianceApi.rejectPolicy(p.id, reason); toast.success('Policy rejected'); policies.reload(); }
+    const reason = await dialog.prompt({
+      title: lang === 'ar' ? 'سبب الرفض' : 'Rejection reason',
+      label: lang === 'ar' ? 'سبب رفض السياسة' : 'Reason for rejecting the policy',
+      type: 'textarea', required: true,
+    });
+    if (!reason) return;
+    try { await complianceApi.rejectPolicy(p.id, reason); toast.success(lang === 'ar' ? 'تم رفض السياسة' : 'Policy rejected'); policies.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   // ── External audit engagement workflow (assessment §5.3 #3) ──────────────
@@ -550,15 +588,24 @@ export function CompliancePage() {
   }
   async function advanceEngagement(e: AuditEngagementDto) {
     const nx = nextStatus(e.status);
-    if (!nx) { toast.danger('Engagement already at terminal status'); return; }
-    if (!window.confirm(`Advance "${e.titleEn}" → ${nx.replace(/_/g, ' ')}?`)) return;
+    if (!nx) { toast.danger(lang === 'ar' ? 'الارتباط في الحالة النهائية' : 'Engagement already at terminal status'); return; }
+    const ok = await dialog.confirm({
+      title: lang === 'ar' ? 'تقديم الارتباط' : 'Advance engagement',
+      body: lang === 'ar' ? `تقديم "${e.titleEn}" إلى ${nx.replace(/_/g, ' ')}؟` : `Advance "${e.titleEn}" → ${nx.replace(/_/g, ' ')}?`,
+    });
+    if (!ok) return;
     try { await complianceApi.advanceAuditEngagement(e.id, nx); toast.success(`Status → ${nx}`); engagements.reload(); }
     catch (err) { toast.danger(err instanceof ApiError ? err.message : 'Advance failed'); }
   }
   async function scheduleFollowUp(e: AuditEngagementDto) {
-    const d = window.prompt('Follow-up date (YYYY-MM-DD)?', '');
-    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
-    try { await complianceApi.scheduleAuditFollowup(e.id, d); toast.success('Follow-up scheduled'); engagements.reload(); }
+    const d = await dialog.prompt({
+      title: lang === 'ar' ? 'جدولة المتابعة' : 'Schedule follow-up',
+      label: lang === 'ar' ? 'تاريخ المتابعة (YYYY-MM-DD)' : 'Follow-up date (YYYY-MM-DD)',
+      required: true,
+      validate: x => /^\d{4}-\d{2}-\d{2}$/.test(x.trim()) ? null : (lang === 'ar' ? 'التنسيق يجب أن يكون YYYY-MM-DD' : 'Date must be YYYY-MM-DD'),
+    });
+    if (!d) return;
+    try { await complianceApi.scheduleAuditFollowup(e.id, d); toast.success(lang === 'ar' ? 'تمت جدولة المتابعة' : 'Follow-up scheduled'); engagements.reload(); }
     catch (err) { toast.danger(err instanceof ApiError ? err.message : 'Action failed'); }
   }
 
@@ -568,27 +615,40 @@ export function CompliancePage() {
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function capaOwnerTest(f: AgingFinding) {
-    const r = window.prompt('Owner test result — PASS / FAIL / PARTIAL', 'PASS');
+    const r = await dialog.prompt({
+      title: lang === 'ar' ? 'اختبار المالك' : 'Owner test',
+      label: 'PASS / FAIL / PARTIAL', initial: 'PASS', required: true,
+      validate: x => ['PASS', 'FAIL', 'PARTIAL'].includes(x.trim().toUpperCase()) ? null : (lang === 'ar' ? 'يجب أن تكون PASS أو FAIL أو PARTIAL' : 'Must be PASS, FAIL or PARTIAL'),
+    });
     if (!r) return;
-    const notes = window.prompt('Owner test notes (optional)?', '') ?? '';
-    try { await complianceApi.capaOwnerTest(f.id, { result: r.trim().toUpperCase() as 'PASS' | 'FAIL' | 'PARTIAL', notes }); toast.success('Owner test recorded'); reloadAging(); findings.reload(); }
+    const notes = (await dialog.prompt({ title: lang === 'ar' ? 'ملاحظات اختبار المالك' : 'Owner test notes', label: lang === 'ar' ? 'اختياري' : 'Optional', type: 'textarea' })) ?? '';
+    try { await complianceApi.capaOwnerTest(f.id, { result: r.trim().toUpperCase() as 'PASS' | 'FAIL' | 'PARTIAL', notes }); toast.success(lang === 'ar' ? 'تم تسجيل اختبار المالك' : 'Owner test recorded'); reloadAging(); findings.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function capaIndepTest(f: AgingFinding) {
-    const r = window.prompt('Independent test result — PASS / FAIL / PARTIAL', 'PASS');
+    const r = await dialog.prompt({
+      title: lang === 'ar' ? 'الاختبار المستقل' : 'Independent test',
+      label: 'PASS / FAIL / PARTIAL', initial: 'PASS', required: true,
+      validate: x => ['PASS', 'FAIL', 'PARTIAL'].includes(x.trim().toUpperCase()) ? null : (lang === 'ar' ? 'يجب أن تكون PASS أو FAIL أو PARTIAL' : 'Must be PASS, FAIL or PARTIAL'),
+    });
     if (!r) return;
-    const notes = window.prompt('Independent test notes (optional)?', '') ?? '';
-    try { await complianceApi.capaIndependentTest(f.id, { result: r.trim().toUpperCase() as 'PASS' | 'FAIL' | 'PARTIAL', notes }); toast.success('Independent test recorded'); reloadAging(); findings.reload(); }
+    const notes = (await dialog.prompt({ title: lang === 'ar' ? 'ملاحظات الاختبار المستقل' : 'Independent test notes', label: lang === 'ar' ? 'اختياري' : 'Optional', type: 'textarea' })) ?? '';
+    try { await complianceApi.capaIndependentTest(f.id, { result: r.trim().toUpperCase() as 'PASS' | 'FAIL' | 'PARTIAL', notes }); toast.success(lang === 'ar' ? 'تم تسجيل الاختبار المستقل' : 'Independent test recorded'); reloadAging(); findings.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function capaSignoff(f: AgingFinding) {
-    const notes = window.prompt('Audit sign-off notes (optional)?', '') ?? '';
-    try { await complianceApi.capaAuditSignoff(f.id, { notes }); toast.success('Audit signed off'); reloadAging(); findings.reload(); }
+    const notes = (await dialog.prompt({ title: lang === 'ar' ? 'اعتماد التدقيق' : 'Audit sign-off', label: lang === 'ar' ? 'ملاحظات (اختياري)' : 'Notes (optional)', type: 'textarea' })) ?? '';
+    try { await complianceApi.capaAuditSignoff(f.id, { notes }); toast.success(lang === 'ar' ? 'تم اعتماد التدقيق' : 'Audit signed off'); reloadAging(); findings.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function capaCloseFinding(f: AgingFinding) {
-    if (!window.confirm(`Close finding "${f.title}"? CAPA stage will become CLOSED.`)) return;
-    try { await complianceApi.capaClose(f.id); toast.success('Finding closed'); reloadAging(); findings.reload(); }
+    const ok = await dialog.confirm({
+      title: lang === 'ar' ? 'إغلاق الملاحظة' : 'Close finding',
+      body: lang === 'ar' ? `إغلاق الملاحظة "${f.title}"؟ ستصبح مرحلة المعالجة CLOSED.` : `Close finding "${f.title}"? CAPA stage will become CLOSED.`,
+      submitLabel: lang === 'ar' ? 'إغلاق' : 'Close',
+    });
+    if (!ok) return;
+    try { await complianceApi.capaClose(f.id); toast.success(lang === 'ar' ? 'تم إغلاق الملاحظة' : 'Finding closed'); reloadAging(); findings.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
 
@@ -1010,6 +1070,7 @@ function sheetTabStyle(active: boolean): React.CSSProperties {
 
 function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: ReturnType<typeof useToast> }) {
   const { lang } = useI18n();
+  const dialog = useDialog();
   const [frameworks, setFrameworks] = useState<FrameworkDto[]>([]);
   const [coverage, setCoverage] = useState<Record<number, FrameworkCoverageDto>>({});
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -1053,7 +1114,7 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
   }, [activeId]);
 
   async function deleteMapping(mappingId: number) {
-    if (!window.confirm(t('frameworkConfirmRemoveMapping'))) return;
+    if (!(await dialog.confirm({ title: t('frameworkConfirmRemoveMapping'), destructive: true }))) return;
     try {
       await frameworkApi.deleteMapping(mappingId);
       toast.success(t('frameworkMappingRemoved'));
