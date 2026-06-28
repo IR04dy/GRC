@@ -11,18 +11,27 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
+import { getUser } from '../../lib/auth';
 import {
   listObligations,
   getObligationKpis,
+  createObligation,
   type Obligation,
   type ObligationKpis,
   type Regulator,
+  type ObligationType,
+  type Frequency,
+  type Severity,
   type LifecycleStage,
   REGULATORS,
+  TYPES,
+  FREQUENCIES,
+  SEVERITIES,
   LIFECYCLE_STAGES,
   REGULATOR_LABELS,
   TYPE_LABELS,
@@ -53,6 +62,7 @@ export function ObligationsPage() {
   const [loading, setLoading] = useState(false);
   const [regulatorFilter, setRegulatorFilter] = useState<Regulator | ''>('');
   const [stageFilter, setStageFilter] = useState<LifecycleStage | ''>('');
+  const [showCreate, setShowCreate] = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -78,6 +88,60 @@ export function ObligationsPage() {
   const fmtDate = (d?: string) =>
     d ? new Date(d).toLocaleDateString(isAr ? 'ar-SA' : 'en-GB') : '—';
 
+  const createFields: FieldDef[] = useMemo(() => [
+    { kind: 'text', key: 'obligationCode', span: 4, label: isAr ? 'الرمز' : 'Code', placeholder: 'OBL-...' },
+    { kind: 'select', key: 'regulator', required: true, span: 4, label: isAr ? 'الجهة *' : 'Regulator *',
+      options: REGULATORS.map(r => ({ value: r, label: tlabel(REGULATOR_LABELS, r, isAr) })) },
+    { kind: 'select', key: 'obligationType', required: true, span: 4, label: isAr ? 'النوع *' : 'Type *',
+      options: TYPES.map(x => ({ value: x, label: tlabel(TYPE_LABELS, x, isAr) })) },
+    { kind: 'text', key: 'titleEn', required: true, span: 6, label: isAr ? 'العنوان (إنجليزي) *' : 'Title (EN) *' },
+    { kind: 'text', key: 'titleAr', required: true, span: 6, label: isAr ? 'العنوان (عربي) *' : 'Title (AR) *' },
+    { kind: 'select', key: 'frequency', required: true, span: 4, label: isAr ? 'التكرار *' : 'Frequency *',
+      options: FREQUENCIES.map(x => ({ value: x, label: tlabel(FREQUENCY_LABELS, x, isAr) })) },
+    { kind: 'select', key: 'severityIfMissed', span: 4, label: isAr ? 'الخطورة عند الإخلال' : 'Severity if missed',
+      options: SEVERITIES.map(x => ({ value: x, label: tlabel(SEVERITY_LABELS, x, isAr) })) },
+    { kind: 'number', key: 'leadTimeDays', span: 4, min: 0, label: isAr ? 'مهلة التذكير (أيام)' : 'Lead time (days)' },
+    { kind: 'date', key: 'nextDueDate', required: true, span: 6, label: isAr ? 'تاريخ الاستحقاق *' : 'Next due date *' },
+    { kind: 'date', key: 'firstDueDate', span: 6, label: isAr ? 'أول استحقاق' : 'First due date' },
+    { kind: 'text', key: 'regulationReference', span: 6, label: isAr ? 'المرجع النظامي' : 'Regulation reference' },
+    { kind: 'text', key: 'businessUnitEn', span: 6, label: isAr ? 'الوحدة التنظيمية' : 'Business unit' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2, label: isAr ? 'الوصف' : 'Description' },
+  ], [isAr]);
+
+  async function onCreate(v: Record<string, unknown>) {
+    const titleEn = String(v.titleEn ?? '').trim();
+    const titleAr = String(v.titleAr ?? '').trim();
+    const nextDueDate = String(v.nextDueDate ?? '').trim();
+    if (!titleEn)     { toast.danger(isAr ? 'العنوان (إنجليزي) مطلوب' : 'Title (EN) is required'); return; }
+    if (!titleAr)     { toast.danger(isAr ? 'العنوان (عربي) مطلوب' : 'Title (AR) is required'); return; }
+    if (!nextDueDate) { toast.danger(isAr ? 'تاريخ الاستحقاق مطلوب' : 'Next due date is required'); return; }
+    const opt = (s: unknown) => { const x = String(s ?? '').trim(); return x ? x : undefined; };
+    const num = (s: unknown) => { const x = String(s ?? '').trim(); return x ? Number(x) : undefined; };
+    try {
+      await createObligation({
+        obligationCode: opt(v.obligationCode),
+        titleEn, titleAr,
+        descriptionEn: opt(v.descriptionEn),
+        regulator: (v.regulator as Regulator) || 'SAMA',
+        regulationReference: opt(v.regulationReference),
+        obligationType: (v.obligationType as ObligationType) || 'REPORTING',
+        frequency: (v.frequency as Frequency) || 'MONTHLY',
+        severityIfMissed: ((opt(v.severityIfMissed) as Severity) ?? 'MEDIUM'),
+        nextDueDate,
+        firstDueDate: opt(v.firstDueDate),
+        leadTimeDays: num(v.leadTimeDays) ?? 0,
+        // Registrar owns it by default; reassignable via edit later.
+        ownerUserId: getUser()?.userId ?? 1,
+        businessUnitEn: opt(v.businessUnitEn),
+      });
+      toast.success(isAr ? 'تم إنشاء الالتزام' : 'Obligation created');
+      setShowCreate(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل إنشاء الالتزام' : 'Create failed'));
+    }
+  }
+
   return (
     <Shell>
       <PageHeader
@@ -92,7 +156,7 @@ export function ObligationsPage() {
               <Briefcase size={14} style={{ marginInlineEnd: 4 }} />
               {isAr ? 'حملات الإقرار' : 'Attestation campaigns'}
             </Link>
-            <Button Icon={Plus} disabled>
+            <Button Icon={Plus} onClick={() => setShowCreate(true)}>
               {isAr ? 'التزام جديد' : 'New obligation'}
             </Button>
           </div>
@@ -242,6 +306,17 @@ export function ObligationsPage() {
           </div>
         )}
       </Card>
+
+      <FormModal
+        open={showCreate}
+        title={isAr ? 'التزام رقابي جديد' : 'New regulatory obligation'}
+        fields={createFields}
+        initial={{ regulator: 'SAMA', obligationType: 'REPORTING', frequency: 'MONTHLY', severityIfMissed: 'MEDIUM', leadTimeDays: '14' }}
+        size="lg"
+        submitLabel={isAr ? 'إنشاء' : 'Create'}
+        onClose={() => setShowCreate(false)}
+        onSubmit={onCreate}
+      />
     </Shell>
   );
 }
