@@ -112,6 +112,46 @@ class PolicyManagementServiceTest {
             .isInstanceOf(IllegalTransitionException.class);
     }
 
+    // ── C-6 segregation of duty on approval ──────────────────────────────────
+
+    @Test void policy_approvalBlockedForAuthor_segregationOfDuty() {
+        PolicyDocument p = draft();
+        p.setStatus("REVIEW");
+        p.setCreatedBy("alice");
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
+
+        // alice authored it → she may not approve it (no admin override).
+        assertThatThrownBy(() -> service.transition(1L, "APPROVED", "alice", false))
+            .isInstanceOf(AccessDeniedException.class)
+            .hasMessageContaining("Segregation of duty");
+    }
+
+    @Test void policy_approvalAllowedForAdminOverride() {
+        PolicyDocument p = draft();
+        p.setStatus("REVIEW");
+        p.setCreatedBy("alice");
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
+        when(docs.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // A compliance/platform admin may approve on the author's behalf.
+        PolicyDocument out = service.transition(1L, "APPROVED", "alice", true);
+        assertThat(out.getStatus()).isEqualTo("APPROVED");
+        assertThat(out.getApproverName()).isEqualTo("alice");
+    }
+
+    @Test void policy_approvalAllowedForDifferentReviewer() {
+        PolicyDocument p = draft();
+        p.setStatus("REVIEW");
+        p.setCreatedBy("alice");
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
+        when(docs.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // bob is not the author/owner → approval allowed without override.
+        PolicyDocument out = service.transition(1L, "APPROVED", "bob", false);
+        assertThat(out.getStatus()).isEqualTo("APPROVED");
+        assertThat(out.getApproverName()).isEqualTo("bob");
+    }
+
     @Test void policy_deletePublishedRefused() {
         PolicyDocument p = draft();
         p.setStatus("PUBLISHED");
