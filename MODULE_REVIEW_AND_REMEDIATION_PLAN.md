@@ -31,6 +31,25 @@
 
 **Net:** every Critical finding (C-1, C-2, C-3, C-5, C-6, C-7, C-8, C-9, C-10, **C-11**) plus #7-RBAC is resolved, verified, pushed, and — for the backend — activated by a rebuild + restart. The policy *and* obligation evidence-package endpoints are live-verified end-to-end (upload → one-call manifest with sha256 + download links → UI export). C-12's read-side resolver is shipped + live-verified (free-text control codes resolved against the real library, matched/unmatched flagged, in the evidence-package). Remaining is one large structural item plus one deferred migration: **C-4** (merge the two policy systems — needs a data-migration decision; deliberately NOT done autonomously) and the **C-12 destructive column migration** (free-text columns → FK, deferred pending the same data-migration decision).
 
+### C-4 Decision Brief (data-backed — live dev DB, 2026-06-28)
+
+Both policy systems hold **real org-1 data**, so C-4 is a genuine migration, not a drop:
+
+| System | Live rows | Lifecycle | Capabilities | DB FK dependents |
+|---|---:|---|---|---|
+| **`policy.documents`** (newer · `/policy-management`) | 18 | DRAFT→REVIEW→APPROVED→PUBLISHED→EXPIRED→ARCHIVED | exceptions · attestations · versioning · **file upload · evidence-package · control resolver** (all C-1…C-12 work) | none (policyId held as plain columns) |
+| **`compliance.policies`** (legacy · Compliance ▸ "Policies" tab) | 17 (9 PUBLISHED · 3 EXEC_APPROVAL · 2 LEGAL_REVIEW · 3 DRAFT) | DRAFT→LEGAL_REVIEW→EXEC_APPROVAL→PUBLISHED→REVIEW_DUE | none of the above | 1 → `compliance.policy_framework_mappings` |
+
+**Recommendation: make `policy.documents` canonical and retire the legacy table** — it carries every capability built in this remediation; the legacy register has none.
+
+**Status mapping** (legacy → canonical): `DRAFT→DRAFT` · `LEGAL_REVIEW→REVIEW` · `EXEC_APPROVAL→APPROVED` · `PUBLISHED→PUBLISHED` · `REVIEW_DUE→PUBLISHED` (+ set `nextReviewDate`).
+
+**Two options — your call:**
+- **A — Migrate + retire (recommended).** Copy the 17 legacy rows into `policy.documents` (field+status mapped: `code→policyCode`, title/content/version/category direct, `author_id/approver_id→ownerName/approverName`, dates direct), snapshot/repoint the 1 `policy_framework_mappings` dependency onto `relatedFramework` + the C-12 resolver, hide the legacy "Policies" tab, and keep `compliance.policies` as a **read-only archive (not dropped → reversible)**. No data loss; one register going forward.
+- **B — Archive in place (zero migration).** Don't move data; relabel the Compliance "Policies" tab "Legacy policies (archive, read-only)" and route new policy work to `/policy-management`. Lowest risk, but the 17 (incl. 9 PUBLISHED) legacy policies stay in the old lifecycle.
+
+On a go-ahead for **A**, I can execute it as a guarded, idempotent migration script (dry-run + row-count reconciliation, legacy table preserved). Once the canonical register is settled, the **C-12 destructive column migration** follows the same decision.
+
 ---
 
 ## 1. Executive Summary
