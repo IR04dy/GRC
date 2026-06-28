@@ -32,7 +32,7 @@ import { useApiList } from '../../lib/useApiResource';
 import { useLiveRefresh } from '../../lib/useLiveRefresh';
 import { LivePulse } from '../../components/ui/LivePulse';
 import {
-  complianceApi, frameworkApi, reportingApi, ApiError,
+  complianceApi, frameworkApi, reportingApi, evidenceApi, departmentsApi, ApiError,
   type ComplianceControlDto, type ComplianceControlRequest,
   type ComplianceAssessmentDto, type ComplianceFindingDto,
   type RegulatoryChangeDto, type RegulatoryChangeRequest,
@@ -40,6 +40,7 @@ import {
   type AuditEngagementDto, type AuditEngagementRequest,
   type FrameworkDto, type FrameworkPolicyRowDto, type FrameworkCoverageDto, type FrameworkFindingRowDto, type FrameworkControlRowDto, type FrameworkDpiaRowDto,
   type FrameworkKriRowDto, type FrameworkRiskRowDto,
+  type DepartmentDto,
 } from '../../lib/api';
 import { ExportMenu } from '../../components/ui/ExportMenu';
 import { useToast } from '../../lib/toast';
@@ -317,6 +318,9 @@ export function CompliancePage() {
   const [confirmDel, setConfirmDel] = useState<ComplianceControlDto | null>(null);
   const [busy, setBusy] = useState(false);
   const [docsTarget, setDocsTarget] = useState<{ entityType: string; entityId: number; label: string } | null>(null);
+  const [departments, setDepartments] = useState<DepartmentDto[]>([]);
+  const [reqFor, setReqFor] = useState<ComplianceControlDto | null>(null);
+  useEffect(() => { departmentsApi.list().then(setDepartments).catch(() => setDepartments([])); }, []);
 
   const controls    = useApiList<ComplianceControlDto>(()    => complianceApi.controls(0, 100),    COMPLIANCE_CONTROLS);
   const assessments = useApiList<ComplianceAssessmentDto>(() => complianceApi.assessments(0, 100), COMPLIANCE_ASSESSMENTS);
@@ -754,9 +758,12 @@ export function CompliancePage() {
     { header: t('colMaturity'),   cell: r => <span className="mono">L{r.maturityLevel ?? 0}</span> },
     { header: t('colOwner'),      cell: r => r.owner ?? '—' },
     { header: t('colStatus'),     cell: r => <Badge tone={STATUS_TONE_MAP[r.status] ?? 'neutral'} dot>{(r.status ?? '').replace(/_/g, ' ')}</Badge> },
-    { header: '',                 align: 'end', width: '120px',
+    { header: '',                 align: 'end', width: '160px',
       cell: r => <RowActions
-        extras={[{ Icon: Paperclip, onClick: () => setDocsTarget({ entityType: 'ComplianceControl', entityId: r.id, label: lang === 'ar' ? 'أدلة الضابط والمرفقات' : 'Control evidence & attachments' }), title: lang === 'ar' ? 'الأدلة' : 'Evidence' }]}
+        extras={[
+          { Icon: Paperclip, onClick: () => setDocsTarget({ entityType: 'ComplianceControl', entityId: r.id, label: lang === 'ar' ? 'أدلة الضابط والمرفقات' : 'Control evidence & attachments' }), title: lang === 'ar' ? 'الأدلة' : 'Evidence' },
+          { Icon: Send, onClick: () => setReqFor(r), title: lang === 'ar' ? 'طلب دليل من إدارة' : 'Request evidence from a department' },
+        ]}
         onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
   ];
 
@@ -797,6 +804,47 @@ export function CompliancePage() {
     try { await complianceApi.deleteControl(confirmDel.id); toast.success('Control deleted'); controls.reload(); }
     catch (err) { toast.danger(err instanceof ApiError ? err.message : 'Delete failed'); }
     finally { setBusy(false); setConfirmDel(null); }
+  }
+
+  // ── Request evidence from a department (C-2) ─────────────────────────────
+  // Raises a real EvidenceRequest (departmentId + dueDate) that the backend
+  // EvidenceRequestSlaScheduler then chases with overdue reminders.
+  const reqInitial = useMemo<Record<string, string>>(() => ({
+    titleEn: reqFor ? `Evidence for control ${reqFor.code} — ${reqFor.nameEn}` : '',
+    priority: 'MEDIUM',
+  }), [reqFor]);
+  const reqFields: FieldDef[] = [
+    { kind: 'text', key: 'titleEn', required: true, span: 12,
+      label: lang === 'ar' ? 'عنوان طلب الدليل *' : 'Evidence request title *' },
+    { kind: 'select', key: 'departmentId', span: 6,
+      label: lang === 'ar' ? 'الإدارة المسؤولة' : 'Owning department',
+      options: departments.map(d => ({ value: String(d.id), label: lang === 'ar' ? (d.nameAr ?? d.nameEn) : d.nameEn })) },
+    { kind: 'date', key: 'dueDate', span: 6, label: lang === 'ar' ? 'تاريخ الاستحقاق' : 'Due date' },
+    { kind: 'select', key: 'priority', span: 6, label: lang === 'ar' ? 'الأولوية' : 'Priority',
+      options: [
+        { value: 'LOW', label: lang === 'ar' ? 'منخفضة' : 'Low' },
+        { value: 'MEDIUM', label: lang === 'ar' ? 'متوسطة' : 'Medium' },
+        { value: 'HIGH', label: lang === 'ar' ? 'عالية' : 'High' },
+      ] },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
+      label: lang === 'ar' ? 'الوصف / ما هو الدليل المطلوب' : 'Description / what evidence is needed' },
+  ];
+  async function submitEvidenceRequest(v: Record<string, unknown>) {
+    const titleEn = String(v.titleEn ?? '').trim();
+    if (!titleEn) { toast.danger(lang === 'ar' ? 'العنوان مطلوب' : 'Title is required'); return; }
+    const num = (x: unknown) => { const n = Number(x); return Number.isFinite(n) && n > 0 ? n : undefined; };
+    const opt = (x: unknown) => { const s = String(x ?? '').trim(); return s || undefined; };
+    try {
+      await evidenceApi.createRequest({
+        titleEn,
+        descriptionEn: opt(v.descriptionEn),
+        departmentId: num(v.departmentId),
+        dueDate: opt(v.dueDate),
+        priority: opt(v.priority) ?? 'MEDIUM',
+      });
+      toast.success(lang === 'ar' ? 'تم إنشاء طلب الدليل' : 'Evidence request created');
+      setReqFor(null);
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed'); }
   }
 
   const frameworkScore = (fw: string) => {
@@ -1048,6 +1096,17 @@ export function CompliancePage() {
           <AttachmentsField entityType={docsTarget.entityType} entityId={docsTarget.entityId} label={docsTarget.label} />
         </Modal>
       )}
+
+      <FormModal
+        open={!!reqFor}
+        title={lang === 'ar' ? 'طلب دليل من إدارة' : 'Request evidence from a department'}
+        fields={reqFields}
+        initial={reqInitial}
+        size="lg"
+        submitLabel={lang === 'ar' ? 'إرسال الطلب' : 'Send request'}
+        onClose={() => setReqFor(null)}
+        onSubmit={submitEvidenceRequest}
+      />
     </Shell>
   );
 }
