@@ -3,7 +3,11 @@ package com.tss.grc.module.compliance.obligation.controller;
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.ObligationCreateRequest;
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.ObligationKpis;
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.ObligationResponse;
+import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.AttestationResponse;
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.ObligationTransitionRequest;
+import com.tss.grc.module.attachment.dto.AttachmentResponse;
+import com.tss.grc.module.attachment.service.AttachmentService;
+import com.tss.grc.module.compliance.obligation.service.ObligationAttestationService;
 import com.tss.grc.module.compliance.obligation.service.ObligationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +38,8 @@ import static org.mockito.Mockito.when;
 class ObligationControllerTest {
 
     @Mock private ObligationService service;
+    @Mock private AttachmentService attachments;
+    @Mock private ObligationAttestationService attestationService;
     @InjectMocks private ObligationController controller;
 
     private static ObligationResponse stub(String stage) {
@@ -104,5 +110,73 @@ class ObligationControllerTest {
         List<ObligationResponse> out = controller.byRegulator("SAMA");
         assertThat(out).hasSize(1);
         verify(service).listByRegulator("SAMA");
+    }
+
+    // ─── C-11 (TC-20): audit evidence-package assembly ───────────────
+    // The obligation, its own attachments, and the per-attestation-cycle
+    // evidence fan-out — the structure an auditor pulls in one call.
+
+    @Test void evidencePackage_assemblesObligationAndPerAttestationEvidence() {
+        long oid = 101L;
+        when(service.get(oid)).thenReturn(stub("ACTIVE"));
+        when(attachments.list("Obligation", oid)).thenReturn(List.of(
+            attach(11L, "obligation-charter.pdf", "Obligation", oid)));
+
+        AttestationResponse a1 = att(501L, "Q1-2026", "ATTESTED");
+        AttestationResponse a2 = att(502L, "Q2-2026", "DUE");
+        when(attestationService.listForObligation(oid)).thenReturn(List.of(a1, a2));
+        // a1 carries two evidence files; a2 has none yet.
+        when(attachments.list("ObligationAttestation", 501L)).thenReturn(List.of(
+            attach(21L, "q1-filing-receipt.pdf", "ObligationAttestation", 501L),
+            attach(22L, "q1-signoff.pdf", "ObligationAttestation", 501L)));
+        when(attachments.list("ObligationAttestation", 502L)).thenReturn(List.of());
+
+        ObligationController.ObligationEvidencePackage pkg = controller.evidencePackage(oid);
+
+        assertThat(pkg.obligation().obligationCode()).isEqualTo("OBL-SAMA-2026-001");
+        assertThat(pkg.obligationAttachments()).hasSize(1);
+        assertThat(pkg.obligationAttachments().get(0).fileName()).isEqualTo("obligation-charter.pdf");
+        assertThat(pkg.obligationAttachments().get(0).sha256()).isNotBlank();
+        assertThat(pkg.obligationAttachments().get(0).downloadUrl()).contains("/download");
+
+        assertThat(pkg.attestations()).hasSize(2);
+        ObligationController.AttestationEvidence e1 = pkg.attestations().get(0);
+        assertThat(e1.attestationId()).isEqualTo(501L);
+        assertThat(e1.periodLabel()).isEqualTo("Q1-2026");
+        assertThat(e1.status()).isEqualTo("ATTESTED");
+        assertThat(e1.attachments()).hasSize(2);
+        ObligationController.AttestationEvidence e2 = pkg.attestations().get(1);
+        assertThat(e2.attestationId()).isEqualTo(502L);
+        assertThat(e2.attachments()).isEmpty();
+
+        assertThat(pkg.generatedAt()).isNotBlank();
+    }
+
+    @Test void evidencePackage_emptyWhenNoAttachmentsOrAttestations() {
+        long oid = 101L;
+        when(service.get(oid)).thenReturn(stub("ACTIVE"));
+        when(attachments.list("Obligation", oid)).thenReturn(List.of());
+        when(attestationService.listForObligation(oid)).thenReturn(List.of());
+
+        ObligationController.ObligationEvidencePackage pkg = controller.evidencePackage(oid);
+
+        assertThat(pkg.obligationAttachments()).isEmpty();
+        assertThat(pkg.attestations()).isEmpty();
+        assertThat(pkg.generatedAt()).isNotBlank();
+    }
+
+    private static AttestationResponse att(long id, String period, String status) {
+        return new AttestationResponse(
+            id, UUID.randomUUID(), 7L, 101L, null,
+            period, null, null, LocalDate.of(2026, 7, 15), status,
+            null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null);
+    }
+
+    private static AttachmentResponse attach(long id, String fileName, String entityType, long entityId) {
+        return new AttachmentResponse(
+            id, entityType, entityId, "EVIDENCE", fileName, fileName,
+            1024L, "application/pdf", "abc123sha256", null,
+            99L, null, 1, null, "/api/v1/attachments/" + id + "/download");
     }
 }
