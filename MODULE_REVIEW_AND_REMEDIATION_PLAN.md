@@ -23,7 +23,7 @@
 | **C-1** | **Real document/file upload + versioning on policies** | ✅ Shipped | `b3415151` |
 | **C-2** | **Evidence attachments on policies / obligations / attestations / findings / controls** | ✅ Shipped | `dd9dbc8b` / `08588ad0` |
 | **C-2** | **"Request evidence from a department" → real EvidenceRequest + SLA chase** | ✅ Shipped | `b0076392` |
-| **C-3** | **Scheduler suite — policy expiry/review + obligation-overdue + CAPA-due reminders** | ✅ Shipped | `4acf1bf1` / `923d8887` |
+| **C-3** | **Scheduler suite — policy expiry/review + obligation-overdue + CAPA-due reminders.** Live 01:55 fire confirmed the daily crons execute; it also surfaced + fixed a latent **app-wide** bug — audit writes from scheduler threads threw `No thread-bound request found` (request-scoped `HttpServletRequest` resolved off-request), aborting the finding sweep. Now guarded; regression-tested. | ✅ Shipped | `4acf1bf1` / `923d8887` / `bab3fbdb` |
 | **C-6** | **Policy approver segregation-of-duty (+ unit tests)** | ✅ Shipped | `90bbe478` / `8f925ec1` |
 | C-4 | Consolidate the two policy systems into one register | ⏳ Backend — larger | — |
 | **C-11** | **Audit evidence-package builder — policy (doc + attachments + controls/framework) AND obligation (obligation + attachments + per-attestation evidence); one-call JSON manifest + UI "Evidence pack" export. Both live-verified end-to-end.** | ✅ Shipped | `b553bbfe` / `93b2d8d3` / `4984b4ac` |
