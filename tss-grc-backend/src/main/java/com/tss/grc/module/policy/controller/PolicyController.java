@@ -5,6 +5,8 @@ import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.entity.PolicyException;
 import com.tss.grc.module.policy.service.PolicyManagementService;
 import com.tss.grc.module.policy.service.PolicyManagementService.PolicyAggregate;
+import com.tss.grc.module.attachment.dto.AttachmentResponse;
+import com.tss.grc.module.attachment.service.AttachmentService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +15,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -37,6 +40,7 @@ import java.util.Map;
 public class PolicyController {
 
     private final PolicyManagementService service;
+    private final AttachmentService attachments;
 
     private static String actor(Authentication auth) {
         return auth == null ? null : auth.getName();
@@ -100,6 +104,31 @@ public class PolicyController {
     @GetMapping("/aggregate")
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public PolicyAggregate aggregate() { return service.aggregate(); }
+
+    /**
+     * C-11 — audit evidence-package manifest for one policy: the policy plus its
+     * uploaded attachments (with sha256 + download links) and its control /
+     * framework links, assembled into a single artefact an auditor can pull in
+     * one call (the basis for an exportable evidence pack).
+     */
+    @GetMapping("/documents/{id}/evidence-package")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
+    public EvidencePackage evidencePackage(@PathVariable Long id) {
+        PolicyDocument p = service.get(id);
+        List<AttachmentResponse> atts = attachments.list("PolicyDocument", id);
+        return new EvidencePackage(p, atts.size(), atts,
+            p.getRelatedFramework(), p.getRelatedControls(), LocalDateTime.now().toString());
+    }
+
+    /** Assembled audit evidence package for a policy (C-11). */
+    public record EvidencePackage(
+        PolicyDocument policy,
+        int attachmentCount,
+        List<AttachmentResponse> attachments,
+        String relatedFramework,
+        String relatedControls,
+        String generatedAt
+    ) {}
 
     // ─── Exceptions ────────────────────────────────────────────────
 
