@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ShieldCheck, FileText, AlertCircle, CheckCircle2, ArrowRight, Plus, Trash2, Wrench,
+  ShieldCheck, FileText, AlertCircle, CheckCircle2, ArrowRight, Plus, Trash2, Wrench, Paperclip,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -10,6 +10,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { Modal } from '../../components/ui/Modal';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -172,6 +174,7 @@ function DocumentsTab() {
   const [latestOnly, setLatestOnly] = useState(true);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [docsFor, setDocsFor] = useState<PolicyDocument | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -358,6 +361,8 @@ function DocumentsTab() {
                       )}
                       <Button size="sm" variant="ghost" Icon={Plus} onClick={() => onNewVersion(p)}
                         title={isAr ? 'إصدار جديد' : 'New version'} />
+                      <Button size="sm" variant="ghost" Icon={Paperclip} onClick={() => setDocsFor(p)}
+                        title={isAr ? 'المستندات والمرفقات' : 'Documents & attachments'} />
                       <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDelete(p)}
                         title={isAr ? 'حذف' : 'Delete'} />
                     </div>
@@ -379,6 +384,21 @@ function DocumentsTab() {
         onClose={() => setShowCreate(false)}
         onSubmit={onCreate}
       />
+
+      {docsFor && (
+        <Modal
+          open
+          size="lg"
+          title={isAr ? `مستندات السياسة ${docsFor.policyCode} v${docsFor.version}` : `Documents — ${docsFor.policyCode} v${docsFor.version}`}
+          onClose={() => setDocsFor(null)}
+        >
+          <AttachmentsField
+            entityType="PolicyDocument"
+            entityId={docsFor.id!}
+            label={isAr ? 'مستند السياسة والمرفقات' : 'Policy document & attachments'}
+          />
+        </Modal>
+      )}
     </div>
   );
 }
