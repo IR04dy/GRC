@@ -89,7 +89,7 @@ The operational lifecycle a Saudi compliance + policy function must support end-
 | T-20 | Run CAPA closure (owner→independent→audit sign-off→close) | Owner/Auditor | Remediation | test evidence | IDENTIFIED→…→CLOSED | aging tier (display only) | **Works** (state machine real; no reminder delivery) |
 | T-21 | External audit engagement lifecycle | Audit lead | Audit booked | — | PLANNED→…→CLOSED→FOLLOW_UP | follow-up date | **Works** (advance flow real) |
 | T-22 | Generate / export report (board pack, framework coverage) | Compliance lead | Reporting period | source data | — | — | **Partial** (exports exist; coverage from real controls; board-pack linkage partial) |
-| T-23 | Build audit evidence package | Auditor | External audit | linked evidence | — | — | **Missing** (no package builder tying policy+control+evidence) |
+| T-23 | Build audit evidence package | Auditor | External audit | linked evidence | — | — | ✅ **Shipped (C-11)** — one-call manifest for policy (doc+attachments+controls/framework) and obligation (obligation+attachments+per-attestation evidence); live-verified + unit-tested |
 | T-24 | Reopen / archive item | Owner | Post-closure change | — | →ARCHIVED | — | **Partial** (policy archive yes; finding reopen limited) |
 | T-25 | Link item across modules (control↔risk↔evidence↔policy) | Any | Mapping | — | — | — | **Partial** (mostly free-text refs, not FKs) |
 | T-26 | Switch AR/EN + RTL | Any | Locale toggle | — | — | — | **Works** |
@@ -228,7 +228,7 @@ The operational lifecycle a Saudi compliance + policy function must support end-
 | 12 | **Notify before review due** | ✗ | no scheduler |
 | 13 | **Escalate overdue review** | ✗ | none |
 | 14 | Link policy to controls/requirements | ◑ | `relatedControls` free text, not FK |
-| 15 | Include policy in evidence package | ✗ | no package builder |
+| 15 | Include policy in evidence package | ✅ | C-11 evidence-package builder (policy + obligation) |
 
 Plus **C-4 duplication**: the legacy compliance policy register (LEGAL_REVIEW→EXEC_APPROVAL) actually has a *richer approval chain* than the newer `/policy-management` one — the two should be merged into one register that keeps the named legal/exec approval **and** adds versioning/exceptions/attestations/file-upload.
 
@@ -490,7 +490,7 @@ The backend state-machines, persistence, audit trail, domain-event automation, a
 | TC-17 | Close corrective action | Auditor | signed off | CAPA close | CLOSED | ✅ | — |
 | TC-18 | Reopen item | Owner | closed | reopen | status reopened | ✗ limited | Medium |
 | TC-19 | Export report | Lead | data | export | file w/ real data | ◑ (mock fallback risk) | Medium |
-| TC-20 | Generate evidence package | Auditor | linked evidence | build package | bundle | ✗ missing | High |
+| TC-20 | Generate evidence package | Auditor | linked evidence | build package | bundle | ✅ **shipped + tested (C-11)** | High |
 | TC-21 | Dashboard drill-down | Any | KPIs | click KPI | filtered register | ✗ self-link | Medium |
 | TC-22 | Arabic language | Any | locale=ar | toggle | AR labels | ✅ | — |
 | TC-23 | RTL layout | Any | ar | view | mirrored | ✅ | — |
