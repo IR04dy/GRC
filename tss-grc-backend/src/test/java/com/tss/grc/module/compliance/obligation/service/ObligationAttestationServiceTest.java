@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -261,5 +262,26 @@ class ObligationAttestationServiceTest {
         int flipped = service.markOverdueForCampaign(201L, LocalDate.now());
 
         assertThat(flipped).isEqualTo(2);
+    }
+
+    // ─── C-3 org-wide overdue sweep (compliance-deadline scheduler) ───
+
+    @Test void sweepOverdueForOrg_flipsAllStaleRowsAndEmits() {
+        ObligationAttestation a1 = existing("DUE");
+        ObligationAttestation a2 = existing("IN_PROGRESS");
+        a2.setId(502L);
+        when(repo.findByOrganisationIdAndAttestationStatusInAndDueDateBeforeAndIsDeletedFalse(
+                eq(ORG_ID), any(), any())).thenReturn(List.of(a1, a2));
+        when(repo.save(any(ObligationAttestation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        int flipped = service.sweepOverdueForOrg(LocalDate.now());
+
+        assertThat(flipped).isEqualTo(2);
+        assertThat(a1.getAttestationStatus()).isEqualTo("OVERDUE");
+        assertThat(a2.getAttestationStatus()).isEqualTo("OVERDUE");
+        // One OBLIGATION_OVERDUE F8 event per flipped row.
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher, times(2)).publishEvent(captor.capture());
+        assertThat(captor.getAllValues()).allMatch(e -> "OBLIGATION_OVERDUE".equals(e.triggerEvent()));
     }
 }
