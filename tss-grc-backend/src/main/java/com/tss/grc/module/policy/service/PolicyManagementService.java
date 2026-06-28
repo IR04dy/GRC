@@ -4,6 +4,8 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
+import com.tss.grc.module.compliance.entity.Control;
+import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.policy.entity.PolicyAttestation;
 import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.entity.PolicyException;
@@ -54,8 +56,48 @@ public class PolicyManagementService {
     private final PolicyAttestationRepository attestations;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
+    private final ControlRepository controls;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
+
+    // ── C-12: read-side resolution of free-text control cross-links ────────────
+    //
+    // Policies store their mapped controls as a free-text field (relatedControls,
+    // e.g. "1-1-1, 2-3-1"). Rather than a destructive migration, this resolves
+    // those codes against the real compliance control library at read time:
+    // every code is returned flagged matched/unmatched (+ the control's id,
+    // bilingual name and framework when matched), so stale or typo'd references
+    // surface to the auditor and the UI can render verified links. The stored
+    // free-text is never altered.
+
+    /** Resolve a free-text control-code list to real controls (read-only, additive). */
+    public List<ResolvedControl> resolveControls(String relatedControls) {
+        if (relatedControls == null || relatedControls.isBlank()) return List.of();
+        // split on comma / semicolon / whitespace; trim; dedupe; preserve order
+        LinkedHashSet<String> codes = new LinkedHashSet<>();
+        for (String tok : relatedControls.split("[,;\\s]+")) {
+            String c = tok.trim();
+            if (!c.isEmpty()) codes.add(c);
+        }
+        if (codes.isEmpty()) return List.of();
+        Map<String, Control> byCode = new HashMap<>();
+        for (Control ctl : controls.findByOrganisationIdAndCodeIn(org(), codes)) {
+            byCode.putIfAbsent(ctl.getCode(), ctl);
+        }
+        List<ResolvedControl> out = new ArrayList<>(codes.size());
+        for (String code : codes) {
+            Control c = byCode.get(code);
+            out.add(c != null
+                ? new ResolvedControl(code, true, c.getId(), c.getNameEn(), c.getNameAr(), c.getFramework())
+                : new ResolvedControl(code, false, null, null, null, null));
+        }
+        return out;
+    }
+
+    /** One resolved (or unresolved) control cross-link (C-12). */
+    public record ResolvedControl(
+        String code, boolean matched, Long controlId,
+        String nameEn, String nameAr, String framework) {}
 
     // ── F8 payload + emit helpers ─────────────────────────────────────────────
     //

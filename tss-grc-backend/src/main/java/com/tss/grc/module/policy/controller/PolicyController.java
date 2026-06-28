@@ -117,16 +117,19 @@ public class PolicyController {
         PolicyDocument p = service.get(id);
         List<AttachmentResponse> atts = attachments.list("PolicyDocument", id);
         return new EvidencePackage(p, atts.size(), atts,
-            p.getRelatedFramework(), p.getRelatedControls(), LocalDateTime.now().toString());
+            p.getRelatedFramework(), p.getRelatedControls(),
+            service.resolveControls(p.getRelatedControls()),
+            LocalDateTime.now().toString());
     }
 
-    /** Assembled audit evidence package for a policy (C-11). */
+    /** Assembled audit evidence package for a policy (C-11 + C-12 resolved controls). */
     public record EvidencePackage(
         PolicyDocument policy,
         int attachmentCount,
         List<AttachmentResponse> attachments,
         String relatedFramework,
         String relatedControls,
+        List<PolicyManagementService.ResolvedControl> resolvedControls,
         String generatedAt
     ) {}
 

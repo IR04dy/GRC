@@ -4,6 +4,8 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
+import com.tss.grc.module.compliance.entity.Control;
+import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.policy.entity.PolicyAttestation;
 import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.entity.PolicyException;
@@ -63,6 +65,7 @@ class PolicyManagementServiceTest {
     @Mock private PolicyAttestationRepository attestations;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
+    @Mock private ControlRepository controls;
 
     @InjectMocks private PolicyManagementService service;
 
@@ -395,5 +398,45 @@ class PolicyManagementServiceTest {
             assertThat(e.payload()).containsEntry("previousStatus", "PUBLISHED");
         });
         verify(audit, atLeastOnce()).log(eq("EXPIRY_SWEEP"), eq("PolicyDocument"), any(), any(String.class));
+    }
+
+    // ── C-12: free-text control cross-link resolution ──────────────────────────
+
+    @Test void resolveControls_matchesKnownCodesAndFlagsUnknown() {
+        Control c1 = ctl(11L, "1-1-1", "Governance", "الحوكمة", "NCA ECC v2.0");
+        Control c2 = ctl(12L, "2-3-1", "Asset management", "إدارة الأصول", "NCA ECC v2.0");
+        when(controls.findByOrganisationIdAndCodeIn(eq(ORG_ID), any())).thenReturn(List.of(c1, c2));
+
+        List<PolicyManagementService.ResolvedControl> out =
+            service.resolveControls("1-1-1, 2-3-1 , 9-9-9");
+
+        assertThat(out).hasSize(3);
+        assertThat(out.get(0).code()).isEqualTo("1-1-1");
+        assertThat(out.get(0).matched()).isTrue();
+        assertThat(out.get(0).controlId()).isEqualTo(11L);
+        assertThat(out.get(0).nameEn()).isEqualTo("Governance");
+        assertThat(out.get(0).framework()).isEqualTo("NCA ECC v2.0");
+        assertThat(out.get(1).code()).isEqualTo("2-3-1");
+        assertThat(out.get(1).matched()).isTrue();
+        // unknown code surfaces as unmatched (stale/typo reference)
+        assertThat(out.get(2).code()).isEqualTo("9-9-9");
+        assertThat(out.get(2).matched()).isFalse();
+        assertThat(out.get(2).controlId()).isNull();
+    }
+
+    @Test void resolveControls_blankReturnsEmpty() {
+        assertThat(service.resolveControls(null)).isEmpty();
+        assertThat(service.resolveControls("   ")).isEmpty();
+    }
+
+    private static Control ctl(Long id, String code, String nameEn, String nameAr, String framework) {
+        Control c = new Control();
+        c.setId(id);
+        c.setOrganisationId(ORG_ID);
+        c.setCode(code);
+        c.setNameEn(nameEn);
+        c.setNameAr(nameAr);
+        c.setFramework(framework);
+        return c;
     }
 }

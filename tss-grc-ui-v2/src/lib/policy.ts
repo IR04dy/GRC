@@ -122,12 +122,22 @@ export interface PolicyAttachment {
   id: number; docType: string; titleEn?: string; fileName: string; fileSize?: number;
   mimeType?: string; sha256?: string; validTo?: string; version?: number; downloadUrl?: string;
 }
+// C-12: each free-text control code resolved against the real control library.
+export interface ResolvedControl {
+  code: string;
+  matched: boolean;
+  controlId?: number;
+  nameEn?: string;
+  nameAr?: string;
+  framework?: string;
+}
 export interface PolicyEvidencePackage {
   policy: PolicyDocument;
   attachmentCount: number;
   attachments: PolicyAttachment[];
   relatedFramework?: string;
   relatedControls?: string;
+  resolvedControls: ResolvedControl[];
   generatedAt: string;
 }
 export function getPolicyEvidencePackage(id: number) {
