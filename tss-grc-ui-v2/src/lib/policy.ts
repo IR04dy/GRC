@@ -117,6 +117,23 @@ export function deletePolicy(id: number)               { return api.delete<void>
 export function runPolicyExpirySweep()                 { return api.post<{flippedCount: number; flippedIds: number[]}>(`${BASE}/documents/expiry-sweep`); }
 export function policyAggregate()                      { return api.get<PolicyAggregate>(`${BASE}/aggregate`); }
 
+// ─── Evidence package (C-11) ─────────────────────────────────────────
+export interface PolicyAttachment {
+  id: number; docType: string; titleEn?: string; fileName: string; fileSize?: number;
+  mimeType?: string; sha256?: string; validTo?: string; version?: number; downloadUrl?: string;
+}
+export interface PolicyEvidencePackage {
+  policy: PolicyDocument;
+  attachmentCount: number;
+  attachments: PolicyAttachment[];
+  relatedFramework?: string;
+  relatedControls?: string;
+  generatedAt: string;
+}
+export function getPolicyEvidencePackage(id: number) {
+  return api.get<PolicyEvidencePackage>(`${BASE}/documents/${id}/evidence-package`);
+}
+
 // ─── Exceptions ──────────────────────────────────────────────────────
 
 export function listExceptions(opts: { policyId?: number; status?: ExceptionStatus } = {}) {

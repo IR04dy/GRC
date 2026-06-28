@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ShieldCheck, FileText, AlertCircle, CheckCircle2, ArrowRight, Plus, Trash2, Wrench, Paperclip,
+  ShieldCheck, FileText, AlertCircle, CheckCircle2, ArrowRight, Plus, Trash2, Wrench, Paperclip, Download,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -18,7 +18,7 @@ import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import {
   listPolicies, createPolicy, transitionPolicy, deletePolicy,
-  newPolicyVersion, updatePolicy, runPolicyExpirySweep, policyAggregate,
+  newPolicyVersion, updatePolicy, runPolicyExpirySweep, policyAggregate, getPolicyEvidencePackage,
   listExceptions, createException, transitionException, runExceptionExpirySweep,
   listAttestations, attestPolicy, declineAttestation, createAttestation,
   policyStatusTone, policyStatusLabel, nextPolicyStatuses,
@@ -263,6 +263,23 @@ function DocumentsTab() {
     }
   }
 
+  // C-11: export the policy's audit evidence-package manifest as a JSON artefact.
+  async function onExportPack(p: PolicyDocument) {
+    try {
+      const pkg = await getPolicyEvidencePackage(p.id!);
+      const blob = new Blob([JSON.stringify(pkg, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `evidence-pack-${p.policyCode}-v${p.version}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(isAr ? `تم تصدير حزمة الأدلة (${pkg.attachmentCount} مرفق)` : `Evidence pack exported (${pkg.attachmentCount} attachments)`);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل التصدير' : 'Export failed'));
+    }
+  }
+
   const createFields: FieldDef[] = useMemo(() => [
     { kind: 'text', key: 'policyCode', required: true, span: 4, label: isAr ? 'كود السياسة *' : 'Policy code *' },
     { kind: 'text', key: 'version',    required: true, span: 4, label: isAr ? 'الإصدار *' : 'Version *' },
@@ -363,6 +380,8 @@ function DocumentsTab() {
                         title={isAr ? 'إصدار جديد' : 'New version'} />
                       <Button size="sm" variant="ghost" Icon={Paperclip} onClick={() => setDocsFor(p)}
                         title={isAr ? 'المستندات والمرفقات' : 'Documents & attachments'} />
+                      <Button size="sm" variant="ghost" Icon={Download} onClick={() => onExportPack(p)}
+                        title={isAr ? 'تصدير حزمة الأدلة' : 'Export evidence pack'} />
                       <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDelete(p)}
                         title={isAr ? 'حذف' : 'Delete'} />
                     </div>
