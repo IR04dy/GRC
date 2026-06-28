@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   FileCheck2, ArrowLeft, ShieldCheck, AlertTriangle,
-  Stamp, Edit3, ClipboardCheck, CheckCircle2, XCircle, RotateCcw, Pencil, Paperclip,
+  Stamp, Edit3, ClipboardCheck, CheckCircle2, XCircle, RotateCcw, Pencil, Paperclip, Download,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -20,6 +20,7 @@ import { useDialog } from '../../lib/dialog';
 import { ApiError } from '../../lib/api';
 import {
   getObligation,
+  getObligationEvidencePackage,
   listAttestationsForObligation,
   recordAttestation,
   reviewAttestation,
@@ -95,6 +96,28 @@ export function ObligationDetailPage() {
     d ? new Date(d).toLocaleDateString(isAr ? 'ar-SA' : 'en-GB') : '—';
 
   // ─── Actions ────────────────────────────────────────────────────
+
+  // C-11: export this obligation's audit evidence-package manifest as a JSON
+  // artefact — the obligation, its attachments, and every attestation cycle's
+  // uploaded evidence (sha256 + download links).
+  async function onExportPack() {
+    if (!obligation) return;
+    try {
+      const pkg = await getObligationEvidencePackage(obligation.id);
+      const blob = new Blob([JSON.stringify(pkg, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `evidence-pack-${obligation.obligationCode}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      const n = pkg.obligationAttachments.length
+        + pkg.attestations.reduce((s, x) => s + x.attachments.length, 0);
+      toast.success(isAr ? `تم تصدير حزمة الأدلة (${n} مرفق)` : `Evidence pack exported (${n} attachments)`);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل التصدير' : 'Export failed'));
+    }
+  }
 
   async function onRecord() {
     if (!obligation) return;
@@ -317,6 +340,9 @@ export function ObligationDetailPage() {
             <Button variant="secondary" Icon={Paperclip}
               onClick={() => setDocsTarget({ entityType: 'Obligation', entityId: obligation.id, label: isAr ? 'وثائق الالتزام والأدلة' : 'Obligation documents & evidence' })}>
               {isAr ? 'الوثائق' : 'Documents'}
+            </Button>
+            <Button variant="secondary" Icon={Download} onClick={onExportPack}>
+              {isAr ? 'حزمة الأدلة' : 'Evidence pack'}
             </Button>
             <Button Icon={Stamp} onClick={onRecord}>
               {isAr ? 'تسجيل إقرار' : 'Record attestation'}

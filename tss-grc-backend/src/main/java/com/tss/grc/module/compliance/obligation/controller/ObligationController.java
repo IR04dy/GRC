@@ -5,7 +5,11 @@ import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.ObligationKpi
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.ObligationResponse;
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.ObligationTransitionRequest;
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.ObligationUpdateRequest;
+import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.AttestationResponse;
 import com.tss.grc.module.compliance.obligation.service.ObligationService;
+import com.tss.grc.module.compliance.obligation.service.ObligationAttestationService;
+import com.tss.grc.module.attachment.dto.AttachmentResponse;
+import com.tss.grc.module.attachment.service.AttachmentService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -14,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -44,6 +49,8 @@ import java.util.List;
 public class ObligationController {
 
     private final ObligationService service;
+    private final AttachmentService attachments;
+    private final ObligationAttestationService attestationService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('COMPLIANCE_OFFICER','RISK_MANAGER','AUDITOR','CISO','PLATFORM_ADMIN','BCM_MANAGER')")
@@ -108,4 +115,33 @@ public class ObligationController {
     public void delete(@PathVariable Long id) {
         service.softDelete(id);
     }
+
+    /**
+     * C-11 — audit evidence-package manifest for an obligation: the obligation,
+     * its own attachments, and every attestation cycle with that cycle's uploaded
+     * evidence (sha256 + download links). One call an auditor can pull as the
+     * basis for a regulatory-obligation evidence pack.
+     */
+    @GetMapping("/{id}/evidence-package")
+    @PreAuthorize("hasAnyRole('COMPLIANCE_OFFICER','RISK_MANAGER','AUDITOR','CISO','PLATFORM_ADMIN','BCM_MANAGER')")
+    public ObligationEvidencePackage evidencePackage(@PathVariable Long id) {
+        ObligationResponse o = service.get(id);
+        List<AttachmentResponse> oblAtts = attachments.list("Obligation", id);
+        List<AttestationEvidence> atts = attestationService.listForObligation(id).stream()
+            .map(a -> new AttestationEvidence(a.id(), a.periodLabel(), a.attestationStatus(),
+                attachments.list("ObligationAttestation", a.id())))
+            .toList();
+        return new ObligationEvidencePackage(o, oblAtts, atts, LocalDateTime.now().toString());
+    }
+
+    /** Per-attestation evidence within an obligation package (C-11). */
+    public record AttestationEvidence(
+        Long attestationId, String periodLabel, String status, List<AttachmentResponse> attachments) {}
+
+    /** Assembled audit evidence package for an obligation (C-11). */
+    public record ObligationEvidencePackage(
+        ObligationResponse obligation,
+        List<AttachmentResponse> obligationAttachments,
+        List<AttestationEvidence> attestations,
+        String generatedAt) {}
 }

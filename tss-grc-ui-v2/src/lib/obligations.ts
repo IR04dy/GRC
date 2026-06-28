@@ -448,6 +448,43 @@ export function deleteObligation(id: number): Promise<void> {
   return api.delete<void>(`${OBL_BASE}/${id}`);
 }
 
+// ─── Evidence package (C-11) ──────────────────────────────────────────
+// One-call audit manifest: the obligation, its own attachments, and every
+// attestation cycle with that cycle's uploaded evidence (sha256 + links).
+
+export interface ObligationAttachment {
+  id: number;
+  entityType: string;
+  entityId: number;
+  docType: string;
+  titleEn?: string;
+  fileName: string;
+  fileSize?: number;
+  mimeType?: string;
+  sha256?: string;
+  validTo?: string;
+  version?: number;
+  downloadUrl?: string;
+}
+
+export interface AttestationEvidence {
+  attestationId: number;
+  periodLabel?: string;
+  status?: string;
+  attachments: ObligationAttachment[];
+}
+
+export interface ObligationEvidencePackage {
+  obligation: Obligation;
+  obligationAttachments: ObligationAttachment[];
+  attestations: AttestationEvidence[];
+  generatedAt: string;
+}
+
+export function getObligationEvidencePackage(id: number): Promise<ObligationEvidencePackage> {
+  return api.get<ObligationEvidencePackage>(`${OBL_BASE}/${id}/evidence-package`);
+}
+
 // ─── API: attestations ────────────────────────────────────────────────
 
 const ATT_BASE = '/api/v1/compliance/obligation-attestations';
