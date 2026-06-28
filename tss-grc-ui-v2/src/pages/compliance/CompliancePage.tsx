@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ClipboardCheck, BookOpenCheck, FileCheck2, Award, Filter, Plus, BarChart3, Building2, AlertTriangle,
   ScrollText, BookCopy, Send, CheckCheck, Archive, RotateCcw, X as XIcon, Wrench, Flag, Search,
-  Briefcase, ShieldCheck, Stamp, ChevronRight, Lock,
+  Briefcase, ShieldCheck, Stamp, ChevronRight, Lock, Paperclip,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -21,6 +21,8 @@ import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Progress } from '../../components/ui/Progress';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { Modal } from '../../components/ui/Modal';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
@@ -314,6 +316,7 @@ export function CompliancePage() {
   const [editing, setEditing] = useState<ComplianceControlDto | null>(null);
   const [confirmDel, setConfirmDel] = useState<ComplianceControlDto | null>(null);
   const [busy, setBusy] = useState(false);
+  const [docsTarget, setDocsTarget] = useState<{ entityType: string; entityId: number; label: string } | null>(null);
 
   const controls    = useApiList<ComplianceControlDto>(()    => complianceApi.controls(0, 100),    COMPLIANCE_CONTROLS);
   const assessments = useApiList<ComplianceAssessmentDto>(() => complianceApi.assessments(0, 100), COMPLIANCE_ASSESSMENTS);
@@ -735,6 +738,7 @@ export function CompliancePage() {
       cell: r => {
         const stage = r.capaStage ?? 'IDENTIFIED';
         const extras: Array<{ Icon: typeof Wrench; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
+        extras.push({ Icon: Paperclip, onClick: () => setDocsTarget({ entityType: 'ComplianceFinding', entityId: r.id, label: lang === 'ar' ? 'أدلة الملاحظة والمرفقات' : 'Finding evidence & attachments' }), title: lang === 'ar' ? 'الأدلة' : 'Evidence' });
         if (stage === 'IDENTIFIED')         extras.push({ Icon: Wrench,      onClick: () => capaStartImpl(r),    title: t('capaActStart'),      tone: 'primary' });
         if (stage === 'IMPLEMENTING')       extras.push({ Icon: ShieldCheck, onClick: () => capaOwnerTest(r),    title: t('capaActOwnerTest'),  tone: 'primary' });
         if (stage === 'OWNER_TESTED')       extras.push({ Icon: Briefcase,   onClick: () => capaIndepTest(r),    title: t('capaActIndepTest'),  tone: 'accent' });
@@ -750,8 +754,10 @@ export function CompliancePage() {
     { header: t('colMaturity'),   cell: r => <span className="mono">L{r.maturityLevel ?? 0}</span> },
     { header: t('colOwner'),      cell: r => r.owner ?? '—' },
     { header: t('colStatus'),     cell: r => <Badge tone={STATUS_TONE_MAP[r.status] ?? 'neutral'} dot>{(r.status ?? '').replace(/_/g, ' ')}</Badge> },
-    { header: '',                 align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
+    { header: '',                 align: 'end', width: '120px',
+      cell: r => <RowActions
+        extras={[{ Icon: Paperclip, onClick: () => setDocsTarget({ entityType: 'ComplianceControl', entityId: r.id, label: lang === 'ar' ? 'أدلة الضابط والمرفقات' : 'Control evidence & attachments' }), title: lang === 'ar' ? 'الأدلة' : 'Evidence' }]}
+        onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
   ];
 
   const assessCols: Column<ComplianceAssessmentDto>[] = [
@@ -1036,6 +1042,12 @@ export function CompliancePage() {
         confirmLabel={t('deleteBtn')}
         onCancel={engageS.closeConfirm}
         onConfirm={() => execDelete(engageS.confirmDel, complianceApi.deleteAuditEngagement, engageS.closeConfirm, engagements.reload, 'Engagement')} />
+
+      {docsTarget && (
+        <Modal open size="lg" title={docsTarget.label} onClose={() => setDocsTarget(null)}>
+          <AttachmentsField entityType={docsTarget.entityType} entityId={docsTarget.entityId} label={docsTarget.label} />
+        </Modal>
+      )}
     </Shell>
   );
 }
