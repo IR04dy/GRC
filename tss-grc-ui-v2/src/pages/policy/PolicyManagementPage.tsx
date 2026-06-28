@@ -18,14 +18,14 @@ import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import {
   listPolicies, createPolicy, transitionPolicy, deletePolicy,
-  newPolicyVersion, updatePolicy, runPolicyExpirySweep, policyAggregate, getPolicyEvidencePackage,
+  newPolicyVersion, updatePolicy, runPolicyExpirySweep, policyAggregate, getPolicyEvidencePackage, getPolicyResolvedControls,
   listExceptions, createException, transitionException, runExceptionExpirySweep,
   listAttestations, attestPolicy, declineAttestation, createAttestation,
   policyStatusTone, policyStatusLabel, nextPolicyStatuses,
   exceptionStatusTone, exceptionStatusLabel, nextExceptionStatuses,
   attestationStatusTone, attestationStatusLabel,
   type PolicyDocument, type PolicyException, type PolicyAttestation,
-  type PolicyAggregate, type PolicyStatus, type ExceptionStatus,
+  type PolicyAggregate, type PolicyStatus, type ExceptionStatus, type ResolvedControl,
 } from '../../lib/policy';
 
 type PolicyTab = 'overview' | 'documents' | 'exceptions' | 'attestations';
@@ -175,6 +175,7 @@ function DocumentsTab() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [docsFor, setDocsFor] = useState<PolicyDocument | null>(null);
+  const [controlsFor, setControlsFor] = useState<PolicyDocument | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -382,6 +383,10 @@ function DocumentsTab() {
                         title={isAr ? 'المستندات والمرفقات' : 'Documents & attachments'} />
                       <Button size="sm" variant="ghost" Icon={Download} onClick={() => onExportPack(p)}
                         title={isAr ? 'تصدير حزمة الأدلة' : 'Export evidence pack'} />
+                      {p.relatedControls && (
+                        <Button size="sm" variant="ghost" Icon={ShieldCheck} onClick={() => setControlsFor(p)}
+                          title={isAr ? 'الضوابط المرتبطة' : 'Mapped controls'} />
+                      )}
                       <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDelete(p)}
                         title={isAr ? 'حذف' : 'Delete'} />
                     </div>
@@ -418,7 +423,72 @@ function DocumentsTab() {
           />
         </Modal>
       )}
+
+      {controlsFor && (
+        <ControlsModal policy={controlsFor} onClose={() => setControlsFor(null)} />
+      )}
     </div>
+  );
+}
+
+// C-12: read-side panel showing a policy's free-text control codes resolved
+// against the real control library, each flagged verified / not-found.
+function ControlsModal({ policy, onClose }: { policy: PolicyDocument; onClose: () => void }) {
+  const { lang } = useI18n();
+  const isAr = lang === 'ar';
+  const toast = useToast();
+  const [items, setItems] = useState<ResolvedControl[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    getPolicyResolvedControls(policy.id!)
+      .then(r => { if (alive) setItems(r); })
+      .catch(e => { if (alive) { setItems([]); toast.danger(e instanceof ApiError ? e.message : 'Failed to load controls'); } });
+    return () => { alive = false; };
+  }, [policy.id]);
+
+  const matched = items?.filter(c => c.matched).length ?? 0;
+
+  return (
+    <Modal open size="md"
+      title={isAr ? `الضوابط المرتبطة — ${policy.policyCode} v${policy.version}` : `Mapped controls — ${policy.policyCode} v${policy.version}`}
+      onClose={onClose}>
+      {items === null ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+       : items.length === 0 ? <InlineEmpty>{isAr ? 'لا توجد ضوابط مرتبطة بهذه السياسة' : 'No control links on this policy'}</InlineEmpty>
+       : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="text-xs text-muted">
+            {isAr
+              ? `${matched} من ${items.length} مُطابَق في مكتبة الضوابط`
+              : `${matched} of ${items.length} matched in the control library`}
+          </div>
+          <table className="grc-table">
+            <thead><tr>
+              <th>{isAr ? 'الكود' : 'Code'}</th>
+              <th>{isAr ? 'الضابط' : 'Control'}</th>
+              <th>{isAr ? 'الإطار' : 'Framework'}</th>
+              <th style={{ textAlign: 'end' }}>{isAr ? 'الحالة' : 'Status'}</th>
+            </tr></thead>
+            <tbody>
+              {items.map((c, i) => (
+                <tr key={`${c.code}-${i}`}>
+                  <td className="mono text-2xs">{c.code}</td>
+                  <td className="text-xs">
+                    {c.matched ? (isAr && c.nameAr ? c.nameAr : c.nameEn) : <span className="text-muted">—</span>}
+                  </td>
+                  <td className="text-2xs text-muted">{c.framework ?? '—'}</td>
+                  <td style={{ textAlign: 'end' }}>
+                    {c.matched
+                      ? <Badge tone="success">{isAr ? 'مُطابَق' : 'Verified'}</Badge>
+                      : <Badge tone="warning">{isAr ? 'غير موجود' : 'Not found'}</Badge>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Modal>
   );
 }
 

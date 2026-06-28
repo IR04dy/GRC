@@ -143,6 +143,9 @@ export interface PolicyEvidencePackage {
 export function getPolicyEvidencePackage(id: number) {
   return api.get<PolicyEvidencePackage>(`${BASE}/documents/${id}/evidence-package`);
 }
+export function getPolicyResolvedControls(id: number) {
+  return api.get<ResolvedControl[]>(`${BASE}/documents/${id}/resolved-controls`);
+}
 
 // ─── Exceptions ──────────────────────────────────────────────────────
 

@@ -133,6 +133,14 @@ public class PolicyController {
         String generatedAt
     ) {}
 
+    /** C-12 — resolved control cross-links for one policy (read-side; powers the
+     *  "mapped controls" UI panel without pulling the full evidence package). */
+    @GetMapping("/documents/{id}/resolved-controls")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
+    public List<PolicyManagementService.ResolvedControl> resolvedControls(@PathVariable Long id) {
+        return service.resolveControls(service.get(id).getRelatedControls());
+    }
+
     // ─── Exceptions ────────────────────────────────────────────────
 
     @GetMapping("/exceptions")
