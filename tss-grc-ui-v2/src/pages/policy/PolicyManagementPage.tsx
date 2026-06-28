@@ -70,7 +70,7 @@ export function PolicyManagementPage() {
         ))}
       </div>
 
-      {tab === 'overview'     && <OverviewTab />}
+      {tab === 'overview'     && <OverviewTab onNavigate={setTab} />}
       {tab === 'documents'    && <DocumentsTab />}
       {tab === 'exceptions'   && <ExceptionsTab />}
       {tab === 'attestations' && <AttestationsTab />}
@@ -80,7 +80,7 @@ export function PolicyManagementPage() {
 
 // ─── Overview tab ────────────────────────────────────────────────────
 
-function OverviewTab() {
+function OverviewTab({ onNavigate }: { onNavigate: (t: PolicyTab) => void }) {
   const { lang } = useI18n();
   const toast = useToast();
   const isAr = lang === 'ar';
@@ -116,24 +116,24 @@ function OverviewTab() {
           {isAr ? 'تحقق من الانتهاء' : 'Run expiry sweep'}
         </Button>}>
         <div className="kpi-grid">
-          <Kpi Icon={FileText}     label={isAr ? 'إجمالي السياسات' : 'Total policies'} value={agg.total} tone="primary" to="/policy-management" />
-          <Kpi Icon={CheckCircle2} label={isAr ? 'منشورة' : 'Published'}                value={agg.published} tone="success" to="/policy-management" />
-          <Kpi Icon={FileText}     label={isAr ? 'قيد المراجعة' : 'In review'}          value={agg.inReview} tone="info" to="/policy-management" />
-          <Kpi Icon={FileText}     label={isAr ? 'مسوّدة' : 'Draft'}                    value={agg.draft} tone="primary" to="/policy-management" />
+          <Kpi Icon={FileText}     label={isAr ? 'إجمالي السياسات' : 'Total policies'} value={agg.total} tone="primary" onClick={() => onNavigate('documents')} />
+          <Kpi Icon={CheckCircle2} label={isAr ? 'منشورة' : 'Published'}                value={agg.published} tone="success" onClick={() => onNavigate('documents')} />
+          <Kpi Icon={FileText}     label={isAr ? 'قيد المراجعة' : 'In review'}          value={agg.inReview} tone="info" onClick={() => onNavigate('documents')} />
+          <Kpi Icon={FileText}     label={isAr ? 'مسوّدة' : 'Draft'}                    value={agg.draft} tone="primary" onClick={() => onNavigate('documents')} />
           <Kpi Icon={AlertCircle}  label={isAr ? 'منتهية' : 'Expired'}                  value={agg.expired}
-               tone={agg.expired > 0 ? 'warning' : 'success'} to="/policy-management" />
+               tone={agg.expired > 0 ? 'warning' : 'success'} onClick={() => onNavigate('documents')} />
           <Kpi Icon={AlertCircle}  label={isAr ? 'تنتهي قريباً' : 'Expiring soon'}      value={agg.expiringSoon}
-               tone={agg.expiringSoon > 0 ? 'warning' : 'success'} to="/policy-management" />
+               tone={agg.expiringSoon > 0 ? 'warning' : 'success'} onClick={() => onNavigate('documents')} />
         </div>
       </Card>
 
       <Card title={isAr ? 'الاستثناءات والإقرارات' : 'Exceptions & attestations'} Icon={AlertCircle}>
         <div className="kpi-grid">
           <Kpi Icon={AlertCircle}  label={isAr ? 'استثناءات مفتوحة' : 'Open exceptions'}  value={agg.openExceptions}
-               tone={agg.openExceptions > 0 ? 'warning' : 'success'} to="/policy-management" />
-          <Kpi Icon={CheckCircle2} label={isAr ? 'استثناءات مُعتمَدة' : 'Approved exceptions'} value={agg.approvedExceptions} tone="info" to="/policy-management" />
+               tone={agg.openExceptions > 0 ? 'warning' : 'success'} onClick={() => onNavigate('exceptions')} />
+          <Kpi Icon={CheckCircle2} label={isAr ? 'استثناءات مُعتمَدة' : 'Approved exceptions'} value={agg.approvedExceptions} tone="info" onClick={() => onNavigate('exceptions')} />
           <Kpi Icon={AlertCircle}  label={isAr ? 'إقرارات معلقة' : 'Pending attestations'}    value={agg.pendingAttestations}
-               tone={agg.pendingAttestations > 0 ? 'warning' : 'success'} to="/policy-management" />
+               tone={agg.pendingAttestations > 0 ? 'warning' : 'success'} onClick={() => onNavigate('attestations')} />
         </div>
       </Card>
 

@@ -800,7 +800,11 @@ export function CompliancePage() {
     return Math.round((total / (cs.length * 5)) * 100);
   };
 
-  const isDemo = controls.isDemo;
+  // C-7 — demo/sample-data transparency: true when ANY register fell back to
+  // mock data (no auth, API error, or empty backend), not just controls — so a
+  // single live register can no longer mask sample data shown on other tabs.
+  const isDemo = controls.isDemo || assessments.isDemo || findings.isDemo
+    || changes.isDemo || policies.isDemo || engagements.isDemo;
 
   // Sprint 4 §2.7 — live compliance dashboard
   const { pulse } = useLiveRefresh({
