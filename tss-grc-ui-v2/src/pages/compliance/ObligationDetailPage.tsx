@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   FileCheck2, ArrowLeft, ShieldCheck, AlertTriangle,
-  Stamp, Edit3, ClipboardCheck, CheckCircle2, XCircle, RotateCcw, Pencil,
+  Stamp, Edit3, ClipboardCheck, CheckCircle2, XCircle, RotateCcw, Pencil, Paperclip,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -11,6 +11,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { Modal } from '../../components/ui/Modal';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
@@ -66,6 +68,7 @@ export function ObligationDetailPage() {
   const [attestations, setAttestations] = useState<ObligationAttestation[]>([]);
   const [loading, setLoading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [docsTarget, setDocsTarget] = useState<{ entityType: string; entityId: number; label: string } | null>(null);
 
   async function reload() {
     if (!id) return;
@@ -311,6 +314,10 @@ export function ObligationDetailPage() {
             <Button variant="secondary" Icon={Pencil} onClick={() => setEditOpen(true)}>
               {isAr ? 'تعديل' : 'Edit'}
             </Button>
+            <Button variant="secondary" Icon={Paperclip}
+              onClick={() => setDocsTarget({ entityType: 'Obligation', entityId: obligation.id, label: isAr ? 'وثائق الالتزام والأدلة' : 'Obligation documents & evidence' })}>
+              {isAr ? 'الوثائق' : 'Documents'}
+            </Button>
             <Button Icon={Stamp} onClick={onRecord}>
               {isAr ? 'تسجيل إقرار' : 'Record attestation'}
             </Button>
@@ -427,19 +434,24 @@ export function ObligationDetailPage() {
                       )}
                     </td>
                     <td>
-                      {(a.attestationStatus === 'ATTESTED' || a.attestationStatus === 'ATTESTED_WITH_EXCEPTIONS') && (
-                        <div className="cluster" style={{ gap: 6 }}>
-                          <Button size="sm" Icon={CheckCircle2} onClick={() => onReview(a, 'ACCEPTED')}>
-                            {isAr ? 'قبول' : 'Accept'}
-                          </Button>
-                          <Button size="sm" variant="danger" Icon={XCircle} onClick={() => onReview(a, 'REJECTED')}>
-                            {isAr ? 'رفض' : 'Reject'}
-                          </Button>
-                          <Button size="sm" variant="secondary" Icon={RotateCcw} onClick={() => onReview(a, 'REQUEST_CHANGES')}>
-                            {isAr ? 'تعديل' : 'Changes'}
-                          </Button>
-                        </div>
-                      )}
+                      <div className="cluster" style={{ gap: 6 }}>
+                        <Button size="sm" variant="ghost" Icon={Paperclip}
+                          onClick={() => setDocsTarget({ entityType: 'ObligationAttestation', entityId: a.id, label: isAr ? `أدلة الإقرار · ${a.periodLabel ?? a.id}` : `Attestation evidence · ${a.periodLabel ?? a.id}` })}
+                          title={isAr ? 'الأدلة والمرفقات' : 'Evidence & attachments'} />
+                        {(a.attestationStatus === 'ATTESTED' || a.attestationStatus === 'ATTESTED_WITH_EXCEPTIONS') && (
+                          <>
+                            <Button size="sm" Icon={CheckCircle2} onClick={() => onReview(a, 'ACCEPTED')}>
+                              {isAr ? 'قبول' : 'Accept'}
+                            </Button>
+                            <Button size="sm" variant="danger" Icon={XCircle} onClick={() => onReview(a, 'REJECTED')}>
+                              {isAr ? 'رفض' : 'Reject'}
+                            </Button>
+                            <Button size="sm" variant="secondary" Icon={RotateCcw} onClick={() => onReview(a, 'REQUEST_CHANGES')}>
+                              {isAr ? 'تعديل' : 'Changes'}
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -459,6 +471,12 @@ export function ObligationDetailPage() {
         onClose={() => setEditOpen(false)}
         onSubmit={submitEdit}
       />
+
+      {docsTarget && (
+        <Modal open size="lg" title={docsTarget.label} onClose={() => setDocsTarget(null)}>
+          <AttachmentsField entityType={docsTarget.entityType} entityId={docsTarget.entityId} label={docsTarget.label} />
+        </Modal>
+      )}
     </Shell>
   );
 }
