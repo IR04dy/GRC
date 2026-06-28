@@ -219,8 +219,21 @@ public class PolicyManagementService {
         return docs.save(p);
     }
 
+    /** Backward-compatible entry point — no admin override, so SoD is enforced. */
     @Transactional
     public PolicyDocument transition(Long id, String to, String actor) {
+        return transition(id, to, actor, false);
+    }
+
+    /**
+     * Status transition with C-6 segregation-of-duty on approval.
+     *
+     * @param callerIsAdmin when true (compliance/platform admin) the SoD guard is
+     *                      waived for proxy approval; otherwise the policy author /
+     *                      owner may not approve their own policy.
+     */
+    @Transactional
+    public PolicyDocument transition(Long id, String to, String actor, boolean callerIsAdmin) {
         PolicyDocument p = get(id);
         String from = p.getStatus();
         boolean ok = switch (from) {
@@ -232,6 +245,15 @@ public class PolicyManagementService {
             default           -> false;
         };
         if (!ok) throw new IllegalTransitionException(from, to, Set.of());
+        // C-6 segregation of duty: the author / owner cannot approve their own
+        // policy. A compliance/platform admin may override (proxy approval).
+        if ("APPROVED".equals(to) && !callerIsAdmin && actor != null
+                && (actor.equalsIgnoreCase(p.getCreatedBy())
+                    || actor.equalsIgnoreCase(p.getOwnerName())
+                    || actor.equalsIgnoreCase(p.getOwnerEmail()))) {
+            throw new AccessDeniedException(
+                "Segregation of duty: the policy author/owner cannot approve their own policy");
+        }
         if ("PUBLISHED".equals(to) && p.getEffectiveDate() == null)
             throw new IllegalArgumentException("effective_date is required before publishing");
         p.setStatus(to);

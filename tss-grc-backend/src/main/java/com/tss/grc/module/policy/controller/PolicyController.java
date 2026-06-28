@@ -73,7 +73,7 @@ public class PolicyController {
     public PolicyDocument transition(@PathVariable Long id,
                                      @RequestBody Map<String, String> body,
                                      Authentication auth) {
-        return service.transition(id, body.get("to"), actor(auth));
+        return service.transition(id, body.get("to"), actor(auth), isComplianceAdmin(auth));
     }
 
     @PostMapping("/documents/{policyCode}/new-version")
