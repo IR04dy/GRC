@@ -27,9 +27,9 @@
 | **C-6** | **Policy approver segregation-of-duty (+ unit tests)** | ✅ Shipped | `90bbe478` / `8f925ec1` |
 | C-4 | Consolidate the two policy systems into one register | ⏳ Backend — larger | — |
 | **C-11** | **Audit evidence-package builder — policy (doc + attachments + controls/framework) AND obligation (obligation + attachments + per-attestation evidence); one-call JSON manifest + UI "Evidence pack" export. Both live-verified end-to-end.** | ✅ Shipped | `b553bbfe` / `93b2d8d3` / `4984b4ac` |
-| C-12 | Replace free-text cross-links with FK links | ⏳ Pending | — |
+| C-12 | Free-text → FK control cross-links — **read-side resolver shipped**: a policy's `relatedControls` free-text is resolved against the real control library (matched/unmatched + id + bilingual name + framework), surfaced in the evidence-package. Additive/reversible, live-verified. Destructive column migration deferred (data decision). | 🟡 Partial | `38d2c9f5` |
 
-**Net:** every Critical finding (C-1, C-2, C-3, C-5, C-6, C-7, C-8, C-9, C-10, **C-11**) plus #7-RBAC is resolved, verified, pushed, and — for the backend — activated by a rebuild + restart. The policy *and* obligation evidence-package endpoints are live-verified end-to-end (upload → one-call manifest with sha256 + download links → UI export). Remaining are the two large structural items only: **C-4** (merge the two policy systems — needs a data-migration decision; deliberately NOT done autonomously) and **C-12** (replace remaining free-text cross-links with FK links).
+**Net:** every Critical finding (C-1, C-2, C-3, C-5, C-6, C-7, C-8, C-9, C-10, **C-11**) plus #7-RBAC is resolved, verified, pushed, and — for the backend — activated by a rebuild + restart. The policy *and* obligation evidence-package endpoints are live-verified end-to-end (upload → one-call manifest with sha256 + download links → UI export). C-12's read-side resolver is shipped + live-verified (free-text control codes resolved against the real library, matched/unmatched flagged, in the evidence-package). Remaining is one large structural item plus one deferred migration: **C-4** (merge the two policy systems — needs a data-migration decision; deliberately NOT done autonomously) and the **C-12 destructive column migration** (free-text columns → FK, deferred pending the same data-migration decision).
 
 ---
 
