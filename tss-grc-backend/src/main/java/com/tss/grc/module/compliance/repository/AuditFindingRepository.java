@@ -7,6 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
+import java.util.List;
+
 public interface AuditFindingRepository extends JpaRepository<AuditFinding, Long> {
 
     Page<AuditFinding> findByOrganisationId(Long organisationId, Pageable pageable);
@@ -74,4 +77,18 @@ public interface AuditFindingRepository extends JpaRepository<AuditFinding, Long
         GROUP BY f.frameworkId, f.status
         """)
     java.util.List<Object[]> countByFrameworkAndStatusGrouped(@Param("orgId") Long orgId);
+
+    /** Distinct tenants with at least one finding — drives the deadline scheduler's per-tenant loop. */
+    @Query("SELECT DISTINCT f.organisationId FROM AuditFinding f")
+    List<Long> findDistinctOrganisationIds();
+
+    /** Open (not-CLOSED) findings past their due date — CAPA overdue reminders. */
+    @Query("""
+        SELECT f FROM AuditFinding f
+        WHERE f.organisationId = :orgId
+          AND f.dueDate IS NOT NULL
+          AND f.dueDate < :today
+          AND (f.status IS NULL OR f.status <> 'CLOSED')
+        """)
+    List<AuditFinding> findOverdueOpen(@Param("orgId") Long orgId, @Param("today") LocalDate today);
 }

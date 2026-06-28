@@ -2,6 +2,7 @@ package com.tss.grc.module.compliance.obligation.repository;
 
 import com.tss.grc.module.compliance.obligation.entity.ObligationAttestation;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -46,4 +47,12 @@ public interface ObligationAttestationRepository extends JpaRepository<Obligatio
         Long organisationId, Long campaignId, List<String> statuses);
 
     long countByOrganisationIdAndAttestationStatusAndIsDeletedFalse(Long organisationId, String status);
+
+    /** Distinct tenants with at least one attestation — drives the deadline scheduler's per-tenant loop. */
+    @Query("select distinct a.organisationId from ObligationAttestation a")
+    List<Long> findDistinctOrganisationIds();
+
+    /** Org-wide overdue sweep: DUE / IN_PROGRESS cycles whose due_date is before the cutoff. */
+    List<ObligationAttestation> findByOrganisationIdAndAttestationStatusInAndDueDateBeforeAndIsDeletedFalse(
+        Long organisationId, List<String> statuses, LocalDate dueDateCutoff);
 }

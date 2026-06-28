@@ -218,6 +218,27 @@ public class ObligationAttestationService {
         return due.size();
     }
 
+    /**
+     * Org-wide overdue sweep — flips every DUE / IN_PROGRESS cycle past the
+     * cutoff to OVERDUE and emits OBLIGATION_OVERDUE. Called daily by the
+     * compliance-deadline scheduler (the campaign-scoped variant only covers
+     * campaign-materialised rows; this also catches ad-hoc / no-campaign cycles).
+     */
+    @Transactional
+    public int sweepOverdueForOrg(java.time.LocalDate cutoff) {
+        List<ObligationAttestation> due = repo
+            .findByOrganisationIdAndAttestationStatusInAndDueDateBeforeAndIsDeletedFalse(
+                org(), List.of("DUE", "IN_PROGRESS"), cutoff);
+        LocalDateTime now = LocalDateTime.now();
+        for (ObligationAttestation a : due) {
+            a.setAttestationStatus("OVERDUE");
+            a.setUpdatedAt(now);
+            repo.save(a);
+            emit("OBLIGATION_OVERDUE", a, "DUE");
+        }
+        return due.size();
+    }
+
     // ─── Guards ─────────────────────────────────────────────────────
 
     static void guardAttest(String from, String to) {
