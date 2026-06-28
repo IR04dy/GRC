@@ -94,4 +94,27 @@ class AuditLogServiceTest {
         assertThat(a).isNotBlank().hasSize(36);   // UUID format
         assertThat(b).isNotEqualTo(a);
     }
+
+    /**
+     * C-3 regression: from a scheduler / async thread there is no bound HTTP
+     * request, so the request-scoped {@code HttpServletRequest} provider throws
+     * "No thread-bound request found" rather than returning null. The audit write
+     * must still succeed (no request metadata captured) — previously this aborted
+     * every scheduled deadline-sweep audit write.
+     */
+    @Test void recordEvent_survivesWhenNoRequestBound_schedulerThread() {
+        when(requestProvider.getIfAvailable())
+            .thenThrow(new IllegalStateException("No thread-bound request found"));
+        when(repo.save(any())).thenAnswer(inv -> {
+            AuditLogEntry e = inv.getArgument(0); e.setId(7L); return e;
+        });
+
+        AuditLogEntry saved = service.log("CDL_FIRE:FINDING_OVERDUE", "AuditFinding", 55L,
+            "Deadline scheduler fired FINDING_OVERDUE");
+
+        assertThat(saved.getId()).isEqualTo(7L);
+        assertThat(saved.getActionType()).isEqualTo("CDL_FIRE:FINDING_OVERDUE");
+        assertThat(saved.getIpAddress()).isNull();
+        assertThat(saved.getSourceEndpoint()).isNull();
+    }
 }

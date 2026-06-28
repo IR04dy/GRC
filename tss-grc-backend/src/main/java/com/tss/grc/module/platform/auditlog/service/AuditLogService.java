@@ -98,7 +98,7 @@ public class AuditLogService {
             if (!auth.getAuthorities().isEmpty())
                 e.setUserRole(auth.getAuthorities().iterator().next().getAuthority());
         }
-        HttpServletRequest req = requestProvider.getIfAvailable();
+        HttpServletRequest req = currentRequestOrNull();
         if (req != null) {
             e.setIpAddress(extractIp(req));
             e.setUserAgent(truncate(req.getHeader("User-Agent"), 500));
@@ -110,6 +110,23 @@ public class AuditLogService {
             saved.getOrganisationId(), saved.getActionType(),
             saved.getEntityType(), saved.getEntityId(), saved.getSeverity());
         return saved;
+    }
+
+    /**
+     * The current HTTP request, or {@code null} when none is bound to this thread
+     * (scheduled / async execution). {@code ObjectProvider.getIfAvailable()} only
+     * swallows a missing bean <em>definition</em> — for the request-scoped
+     * {@code HttpServletRequest} it still propagates the "No thread-bound request
+     * found" {@link IllegalStateException} when no request scope is active, which
+     * previously aborted every audit write from a scheduler thread (C-3 deadline
+     * sweeps). Catch it and treat "no request" as "no request metadata to capture".
+     */
+    private HttpServletRequest currentRequestOrNull() {
+        try {
+            return requestProvider.getIfAvailable();
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 
     // ─── Queries ──────────────────────────────────────────────────
