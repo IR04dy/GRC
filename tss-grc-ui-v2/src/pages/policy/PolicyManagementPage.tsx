@@ -17,7 +17,7 @@ import { useDialog } from '../../lib/dialog';
 import {
   listPolicies, createPolicy, transitionPolicy, deletePolicy,
   newPolicyVersion, updatePolicy, runPolicyExpirySweep, policyAggregate,
-  listExceptions, transitionException, runExceptionExpirySweep,
+  listExceptions, createException, transitionException, runExceptionExpirySweep,
   listAttestations, attestPolicy, declineAttestation, createAttestation,
   policyStatusTone, policyStatusLabel, nextPolicyStatuses,
   exceptionStatusTone, exceptionStatusLabel, nextExceptionStatuses,
@@ -349,7 +349,7 @@ function DocumentsTab() {
                         <Button key={next} size="sm" variant="ghost" Icon={ArrowRight}
                           onClick={() => onTransition(p, next)}
                           title={policyStatusLabel(next, isAr ? 'ar' : 'en')}>
-                          {next}
+                          {policyStatusLabel(next, isAr ? 'ar' : 'en')}
                         </Button>
                       ))}
                       {p.status === 'APPROVED' && !p.effectiveDate && (
@@ -394,6 +394,8 @@ function ExceptionsTab() {
   const [items, setItems] = useState<PolicyException[]>([]);
   const [statusFilter, setStatusFilter] = useState<ExceptionStatus | ''>('');
   const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [policies, setPolicies] = useState<PolicyDocument[]>([]);
 
   async function reload() {
     setLoading(true);
@@ -402,6 +404,54 @@ function ExceptionsTab() {
     finally { setLoading(false); }
   }
   useEffect(() => { void reload(); }, [statusFilter]);
+
+  // Parent-policy picker options (latest version of each policy).
+  useEffect(() => {
+    listPolicies({ latestOnly: true }).then(setPolicies).catch(() => setPolicies([]));
+  }, []);
+
+  const createFields: FieldDef[] = useMemo(() => [
+    { kind: 'select', key: 'policyId', required: true, span: 12, label: isAr ? 'السياسة *' : 'Policy *',
+      options: policies.map(p => ({ value: String(p.id), label: `${p.policyCode} v${p.version} — ${isAr && p.titleAr ? p.titleAr : p.titleEn}` })) },
+    { kind: 'text', key: 'titleEn', required: true, span: 6, label: isAr ? 'العنوان (إنجليزي) *' : 'Title (EN) *' },
+    { kind: 'text', key: 'titleAr', span: 6, label: isAr ? 'العنوان (عربي)' : 'Title (AR)' },
+    { kind: 'select', key: 'riskLevel', span: 6, label: isAr ? 'مستوى الخطر' : 'Risk level',
+      options: [
+        { value: 'CRITICAL', label: isAr ? 'حرج' : 'Critical' },
+        { value: 'HIGH',     label: isAr ? 'عالٍ' : 'High' },
+        { value: 'MEDIUM',   label: isAr ? 'متوسط' : 'Medium' },
+        { value: 'LOW',      label: isAr ? 'منخفض' : 'Low' },
+      ] },
+    { kind: 'text', key: 'requestorName', span: 6, label: isAr ? 'مقدّم الطلب' : 'Requestor' },
+    { kind: 'date', key: 'expiryDate', span: 6, label: isAr ? 'تاريخ الانتهاء' : 'Expiry date' },
+    { kind: 'textarea', key: 'justificationEn', required: true, span: 12, rows: 2, label: isAr ? 'المبرر (إنجليزي) *' : 'Justification (EN) *' },
+    { kind: 'textarea', key: 'compensatingControlsEn', span: 12, rows: 2, label: isAr ? 'الضوابط التعويضية' : 'Compensating controls' },
+  ], [isAr, policies]);
+
+  async function onCreate(v: Record<string, unknown>) {
+    const policyId = Number(v.policyId);
+    if (!Number.isFinite(policyId) || policyId <= 0) { toast.danger(isAr ? 'السياسة مطلوبة' : 'Policy is required'); return; }
+    if (!String(v.titleEn ?? '').trim())        { toast.danger(isAr ? 'العنوان (إنجليزي) مطلوب' : 'Title (EN) is required'); return; }
+    if (!String(v.justificationEn ?? '').trim()) { toast.danger(isAr ? 'المبرر مطلوب' : 'Justification (EN) is required'); return; }
+    const opt = (s: unknown) => { const x = String(s ?? '').trim(); return x ? x : undefined; };
+    try {
+      await createException({
+        policyId,
+        titleEn: String(v.titleEn).trim(), titleAr: opt(v.titleAr),
+        justificationEn: String(v.justificationEn).trim(),
+        compensatingControlsEn: opt(v.compensatingControlsEn),
+        riskLevel: (opt(v.riskLevel) as PolicyException['riskLevel']) ?? 'MEDIUM',
+        requestorName: opt(v.requestorName),
+        expiryDate: opt(v.expiryDate),
+        status: 'REQUESTED',
+      });
+      toast.success(isAr ? 'تم إنشاء الاستثناء' : 'Exception created');
+      setShowCreate(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل إنشاء الاستثناء' : 'Create failed'));
+    }
+  }
 
   async function onSweep() {
     try {
@@ -434,9 +484,13 @@ function ExceptionsTab() {
   }
 
   return (
+    <>
     <Card title={isAr ? 'الاستثناءات' : 'Policy exceptions'} Icon={AlertCircle}
       action={
         <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+          <Button size="sm" variant="primary" Icon={Plus} onClick={() => setShowCreate(true)}>
+            {isAr ? 'استثناء جديد' : 'New exception'}
+          </Button>
           <Button size="sm" variant="ghost" Icon={Wrench} onClick={onSweep}>
             {isAr ? 'تحقق من انتهاء الاستثناءات' : 'Run exception expiry sweep'}
           </Button>
@@ -485,7 +539,7 @@ function ExceptionsTab() {
                     {nextExceptionStatuses(e.status).map(next => (
                       <Button key={next} size="sm" variant="ghost" Icon={ArrowRight}
                         onClick={() => onTransition(e, next)}>
-                        {next}
+                        {exceptionStatusLabel(next, isAr ? 'ar' : 'en')}
                       </Button>
                     ))}
                   </div>
@@ -496,6 +550,18 @@ function ExceptionsTab() {
         </table>
       )}
     </Card>
+
+    <FormModal
+      open={showCreate}
+      title={isAr ? 'استثناء سياسة جديد' : 'New policy exception'}
+      fields={createFields}
+      initial={{ riskLevel: 'MEDIUM' }}
+      size="lg"
+      submitLabel={isAr ? 'إنشاء' : 'Create'}
+      onClose={() => setShowCreate(false)}
+      onSubmit={onCreate}
+    />
+    </>
   );
 }
 
