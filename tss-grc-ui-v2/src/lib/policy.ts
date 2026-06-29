@@ -147,6 +147,23 @@ export function getPolicyResolvedControls(id: number) {
   return api.get<ResolvedControl[]>(`${BASE}/documents/${id}/resolved-controls`);
 }
 
+// C-12: control library for the picker + setting a policy's FK control links.
+export interface ControlCatalogItem {
+  id: number;
+  code: string;
+  nameEn: string;
+  nameAr?: string;
+  framework?: string;
+}
+export function listControlCatalog() {
+  return api
+    .get<{ content: ControlCatalogItem[] }>('/api/v1/compliance/controls?page=0&size=500')
+    .then(r => r.content ?? []);
+}
+export function setPolicyControlLinks(id: number, controlIds: number[]) {
+  return api.put<ResolvedControl[]>(`${BASE}/documents/${id}/controls`, { controlIds });
+}
+
 // ─── Exceptions ──────────────────────────────────────────────────────
 
 export function listExceptions(opts: { policyId?: number; status?: ExceptionStatus } = {}) {

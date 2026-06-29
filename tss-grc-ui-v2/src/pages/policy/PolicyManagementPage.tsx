@@ -19,13 +19,14 @@ import { useDialog } from '../../lib/dialog';
 import {
   listPolicies, createPolicy, transitionPolicy, deletePolicy,
   newPolicyVersion, updatePolicy, runPolicyExpirySweep, policyAggregate, getPolicyEvidencePackage, getPolicyResolvedControls,
+  setPolicyControlLinks, listControlCatalog,
   listExceptions, createException, transitionException, runExceptionExpirySweep,
   listAttestations, attestPolicy, declineAttestation, createAttestation,
   policyStatusTone, policyStatusLabel, nextPolicyStatuses,
   exceptionStatusTone, exceptionStatusLabel, nextExceptionStatuses,
   attestationStatusTone, attestationStatusLabel,
   type PolicyDocument, type PolicyException, type PolicyAttestation,
-  type PolicyAggregate, type PolicyStatus, type ExceptionStatus, type ResolvedControl,
+  type PolicyAggregate, type PolicyStatus, type ExceptionStatus, type ResolvedControl, type ControlCatalogItem,
 } from '../../lib/policy';
 
 type PolicyTab = 'overview' | 'documents' | 'exceptions' | 'attestations';
@@ -433,59 +434,90 @@ function DocumentsTab() {
 
 // C-12: read-side panel showing a policy's free-text control codes resolved
 // against the real control library, each flagged verified / not-found.
+// C-12: editable control picker. Pick controls from the real library (creating
+// FK links via PUT /documents/{id}/controls); legacy free-text codes that aren't
+// in the library are shown read-only so nothing is hidden during the transition.
 function ControlsModal({ policy, onClose }: { policy: PolicyDocument; onClose: () => void }) {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
   const toast = useToast();
-  const [items, setItems] = useState<ResolvedControl[] | null>(null);
+  const [linked, setLinked] = useState<ResolvedControl[] | null>(null);
+  const [catalog, setCatalog] = useState<ControlCatalogItem[]>([]);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    getPolicyResolvedControls(policy.id!)
-      .then(r => { if (alive) setItems(r); })
-      .catch(e => { if (alive) { setItems([]); toast.danger(e instanceof ApiError ? e.message : 'Failed to load controls'); } });
+    Promise.all([getPolicyResolvedControls(policy.id!), listControlCatalog()])
+      .then(([res, cat]) => {
+        if (!alive) return;
+        setLinked(res);
+        setCatalog(cat);
+        setSelected(new Set(res.filter(r => r.matched && r.controlId != null).map(r => r.controlId!)));
+      })
+      .catch(e => { if (alive) { setLinked([]); toast.danger(e instanceof ApiError ? e.message : 'Failed to load controls'); } });
     return () => { alive = false; };
   }, [policy.id]);
 
-  const matched = items?.filter(c => c.matched).length ?? 0;
+  const legacyRefs = (linked ?? []).filter(r => !r.matched);
+
+  function toggle(id: number) {
+    setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+  async function save() {
+    setSaving(true);
+    try {
+      const res = await setPolicyControlLinks(policy.id!, [...selected]);
+      setLinked(res);
+      toast.success(isAr ? `تم حفظ ${selected.size} ضابط` : `Saved ${selected.size} control link(s)`);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل الحفظ' : 'Save failed'));
+    } finally { setSaving(false); }
+  }
 
   return (
-    <Modal open size="md"
+    <Modal open size="lg"
       title={isAr ? `الضوابط المرتبطة — ${policy.policyCode} v${policy.version}` : `Mapped controls — ${policy.policyCode} v${policy.version}`}
       onClose={onClose}>
-      {items === null ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
-       : items.length === 0 ? <InlineEmpty>{isAr ? 'لا توجد ضوابط مرتبطة بهذه السياسة' : 'No control links on this policy'}</InlineEmpty>
-       : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {linked === null ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty> : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="text-xs text-muted">
-            {isAr
-              ? `${matched} من ${items.length} مُطابَق في مكتبة الضوابط`
-              : `${matched} of ${items.length} matched in the control library`}
+            {isAr ? `اختر الضوابط من المكتبة (${selected.size} محدّد)` : `Pick controls from the library (${selected.size} selected)`}
           </div>
-          <table className="grc-table">
-            <thead><tr>
-              <th>{isAr ? 'الكود' : 'Code'}</th>
-              <th>{isAr ? 'الضابط' : 'Control'}</th>
-              <th>{isAr ? 'الإطار' : 'Framework'}</th>
-              <th style={{ textAlign: 'end' }}>{isAr ? 'الحالة' : 'Status'}</th>
-            </tr></thead>
-            <tbody>
-              {items.map((c, i) => (
-                <tr key={`${c.code}-${i}`}>
-                  <td className="mono text-2xs">{c.code}</td>
-                  <td className="text-xs">
-                    {c.matched ? (isAr && c.nameAr ? c.nameAr : c.nameEn) : <span className="text-muted">—</span>}
-                  </td>
-                  <td className="text-2xs text-muted">{c.framework ?? '—'}</td>
-                  <td style={{ textAlign: 'end' }}>
-                    {c.matched
-                      ? <Badge tone="success">{isAr ? 'مُطابَق' : 'Verified'}</Badge>
-                      : <Badge tone="warning">{isAr ? 'غير موجود' : 'Not found'}</Badge>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)' }}>
+            <table className="grc-table">
+              <thead><tr>
+                <th style={{ width: 36 }} />
+                <th>{isAr ? 'الكود' : 'Code'}</th>
+                <th>{isAr ? 'الضابط' : 'Control'}</th>
+                <th>{isAr ? 'الإطار' : 'Framework'}</th>
+              </tr></thead>
+              <tbody>
+                {catalog.length === 0 ? (
+                  <tr><td colSpan={4}><InlineEmpty>{isAr ? 'لا توجد ضوابط في المكتبة' : 'No controls in the library'}</InlineEmpty></td></tr>
+                ) : catalog.map(c => (
+                  <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => toggle(c.id)}>
+                    <td><input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} onClick={e => e.stopPropagation()} /></td>
+                    <td className="mono text-2xs">{c.code}</td>
+                    <td className="text-xs">{isAr && c.nameAr ? c.nameAr : c.nameEn}</td>
+                    <td className="text-2xs text-muted">{c.framework ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {legacyRefs.length > 0 && (
+            <div className="text-2xs text-muted">
+              {isAr ? 'مراجع نصّية قديمة (غير موجودة في المكتبة): ' : 'Legacy free-text references (not in library): '}
+              <span className="mono">{legacyRefs.map(r => r.code).join(', ')}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <Button variant="secondary" onClick={onClose}>{isAr ? 'إغلاق' : 'Close'}</Button>
+            <Button onClick={save} disabled={saving}>
+              {saving ? (isAr ? 'جارٍ الحفظ…' : 'Saving…') : (isAr ? 'حفظ الروابط' : 'Save links')}
+            </Button>
+          </div>
         </div>
       )}
     </Modal>
