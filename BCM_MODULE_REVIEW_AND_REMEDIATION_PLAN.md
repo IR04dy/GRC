@@ -20,8 +20,8 @@
 | **B-A** | BIA→BCP/DRP generator seeds real section content (objectives, MBCO, resources, workaround, suppliers, dependencies) from the BIA | ✅ Shipped | `93a2792c` |
 | **B-D** | Evidence lifecycle: rejected request → auto-opens a BCM gap (F8 event + `BcmGapRecordCreator`, deduped); review/resubmit/attachment-expiry already worked | ✅ Shipped | `f895befc` |
 | **B-E** | Exercise→gap→CAPA closure: promote an exercise observation to a tracked BCM gap (idempotent, severity-mapped, linked); gap→CAPA already existed | ✅ Shipped | `fc83772a` |
-| B-F/B-G | DRP / BIA depth | ⏳ Next | — |
-| B-H | `exercise-runs` list endpoint | ⏳ Pending | — |
+| **B-F/B-G** | DRP depth: post-failover validation checklist (`validation_steps_json`) added end-to-end + rendered; BIA depth (MBCO, min-resources) verified already captured in the wizard | ✅ Shipped | `10c9d76e` |
+| B-H | `exercise-runs` list endpoint | ⏳ Next | — |
 | B-I | Arabic/RTL walk + role-permission ratchet | ⏳ Pending | — |
 
 **Order (§27):** B-C → B-B → B-A → B-D → B-E → B-F/G → B-H → B-I.
@@ -82,9 +82,9 @@ The 70 lifecycle tasks the module must support, with current status (✅ impleme
 | 15 | Define MTPD | ✅ | `mtpd_hours`; MTPD inheritance module |
 | 16 | Define RTO | ✅ | `rto_hours` |
 | 17 | Define RPO | ✅ | `rpo_hours` |
-| 18 | Define MBCO | ◑ | present in model; verify capture in UI |
+| 18 | Define MBCO | ✅ | B-F: captured in BIA wizard Step 2 (`mbcoDescription`); seeded into generated plan overview |
 | 19 | Add dependencies | ✅ | dependency cascade + graph |
-| 20 | Add minimum resources | ◑ | partial; verify completeness |
+| 20 | Add minimum resources | ✅ | B-F: BIA wizard Step 4 (min staff/tech/facility/supplier); seeded into plan resources section |
 | 21 | Submit BIA for review | ✅ | status lifecycle |
 | 22 | Approve BIA | ✅ | gated: `mtpd>0` & `rto ≤ mtpd` |
 | 23 | Create BCM risk assessment | ✅ | `BcmRisk` |
@@ -102,7 +102,7 @@ The 70 lifecycle tasks the module must support, with current status (✅ impleme
 | 35 | Approve & publish BCP | ✅ | `BCM_PLAN_APPROVED`/`PUBLISHED` |
 | 36 | **Generate DRP from BIA** | ✅ | B-A: seeds business_linkage/recovery_objectives/dependencies from BIA `93a2792c` |
 | 37 | Add DRP recovery sequence | ✅ | `DrPlanService` |
-| 38 | Add failover & validation steps | ◑ | partial; verify checklist/rollback |
+| 38 | Add failover & validation steps | ✅ | B-G: failover + failback (rollback) existed; added post-failover validation checklist `10c9d76e` |
 | 39 | Add backup evidence | ✅ | B-C: DR-plan backup & test evidence upload (DR_PLAN) `40bef8d4` |
 | 40 | Submit DRP for approval | ✅ | plan lifecycle |
 | 41 | Approve DRP | ✅ | |
