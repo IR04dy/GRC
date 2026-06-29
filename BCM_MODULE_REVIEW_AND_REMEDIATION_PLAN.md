@@ -13,8 +13,9 @@
 | **B-C** | File upload on BCP plans (Documents tab → generic `AttachmentService`) | ✅ Shipped | `4d74345a` |
 | **B-C** | File upload on DR plans (backup & test evidence) | ✅ Shipped | `40bef8d4` |
 | **B-C** | File upload on crisis events | ✅ Shipped | `c5f34dea` |
-| B-C | File upload on BIA / CAPA / governance | ⏳ In progress | — |
-| B-B | Evidence-request workflow (reuse `EvidenceRequest` + SLA scheduler) | ⏳ Pending | — |
+| **B-C** | File upload on BIA (review step) + governance policy file | ✅ Shipped | `40dbb1bf` |
+| **B-C** | File upload on CAPA register (closure evidence) — **B-C complete** | ✅ Shipped | `e84efa24` |
+| B-B | Evidence-request workflow (reuse `EvidenceRequest` + SLA scheduler) | ⏳ Next | — |
 | B-A | Real BIA→BCP/DRP generator | ⏳ Pending | — |
 | B-D | Evidence lifecycle (review / reject→gap / resubmit / expiry) | ⏳ Pending | — |
 | B-E | Exercise→gap→CAPA closure | ⏳ Pending | — |
@@ -66,7 +67,7 @@ The 70 lifecycle tasks the module must support, with current status (✅ impleme
 | 1 | Create BCM cycle | ✅ | `BcmCycleController` POST /cycles; lifecycle + events |
 | 2 | Define BCM scope | ✅ | cycle/governance fields |
 | 3 | Create BCM policy/governance record | ✅ | `/governance`, status lifecycle |
-| 4 | Upload BCM policy file | ✗ | no file upload (no MultipartFile) |
+| 4 | Upload BCM policy file | ✅ | B-C: governance docs drawer → `AttachmentsField` (BCM_GOVERNANCE) `40dbb1bf` |
 | 5 | Submit policy/governance for review | ✅ | governance transitions (UNDER_REVIEW) |
 | 6 | Approve policy/governance | ✅ | `BCM_GOVERNANCE_APPROVED` |
 | 7 | Assign BCM manager | ◑ | owner fields; committee model present |
@@ -101,7 +102,7 @@ The 70 lifecycle tasks the module must support, with current status (✅ impleme
 | 36 | **Generate DRP from BIA** | ✗ | **STUB — stamps id only** |
 | 37 | Add DRP recovery sequence | ✅ | `DrPlanService` |
 | 38 | Add failover & validation steps | ◑ | partial; verify checklist/rollback |
-| 39 | Add backup evidence | ✗ | no file upload for DR evidence |
+| 39 | Add backup evidence | ✅ | B-C: DR-plan backup & test evidence upload (DR_PLAN) `40bef8d4` |
 | 40 | Submit DRP for approval | ✅ | plan lifecycle |
 | 41 | Approve DRP | ✅ | |
 | 42 | Create exercise | ✅ | scenario library + runtime |
