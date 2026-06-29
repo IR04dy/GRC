@@ -306,7 +306,10 @@ export function CompliancePage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab');
-  const [tab, setTabState] = useState<TabId>(isTabId(initialTab) ? initialTab : 'overview');
+  // C-4: 'policies' is retired (canonical register moved to /policy-management);
+  // a stale deep link to ?tab=policies falls back to the overview.
+  const [tab, setTabState] = useState<TabId>(
+    isTabId(initialTab) && initialTab !== 'policies' ? initialTab : 'overview');
   function setTab(next: TabId) {
     setTabState(next);
     const qs = new URLSearchParams(searchParams);
@@ -388,7 +391,10 @@ export function CompliancePage() {
     { id: 'overview',    label: t('tabOverview') },
     { id: 'controls',    label: t('complianceTabControls') },
     { id: 'changes',     label: t('complianceTabChanges') },
-    { id: 'policies',    label: t('complianceTabPolicies') },
+    // C-4: the legacy "Policies" tab is retired. The policy register is now
+    // canonical at /policy-management (legacy rows migrated in V232); this tab
+    // is removed from the nav and a deep link to ?tab=policies redirects to the
+    // overview (see the initial-tab guard above).
     { id: 'frameworks',  label: t('complianceTabFrameworks') },
     { id: 'nitaqat',     label: t('complianceTabNitaqat') },
     { id: 'engagements', label: t('complianceTabEngagements') },
