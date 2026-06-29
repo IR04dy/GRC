@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { BookOpen, AlertOctagon, Wrench, RefreshCw, Plus, AlertTriangle } from 'lucide-react';
+import { Fragment, useEffect, useState, type FormEvent } from 'react';
+import { BookOpen, AlertOctagon, Wrench, RefreshCw, Plus, AlertTriangle, Paperclip } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
@@ -260,6 +261,9 @@ function CapasTab({ capas, onMove, isAr }: {
   capas: BcmCorrectiveAction[]; onMove: (c: BcmCorrectiveAction, to: CapaStatus) => void; isAr: boolean;
 }) {
   const lang = isAr ? 'ar' : 'en';
+  // Which CAPA's evidence drawer is expanded. Closure requires evidence, so a
+  // place to upload the proof file (entityType BCM_CAPA) belongs on every row.
+  const [docsId, setDocsId] = useState<number | null>(null);
   if (capas.length === 0) return <Card title={isAr ? 'الإجراءات التصحيحية' : 'CAPAs'}>
     <InlineEmpty text={isAr ? 'لا توجد إجراءات تصحيحية' : 'No CAPAs yet'} />
   </Card>;
@@ -277,18 +281,38 @@ function CapasTab({ capas, onMove, isAr }: {
           </tr></thead>
           <tbody>
             {capas.map(c => (
-              <tr key={c.id}>
+              <Fragment key={c.id}>
+              <tr>
                 <td>{c.titleEn}</td>
                 <td><Badge tone={severityTone(c.priority)}>{c.priority}</Badge></td>
                 <td className="mono">{c.progressPercent}%</td>
                 <td><Badge tone={capaStatusTone(c.status)}>{statusLabel(c.status, lang)}</Badge></td>
                 <td className="mono">{c.dueDate ?? '—'}</td>
-                <td style={{ textAlign: 'end' }}>
+                <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
+                  <Button variant={docsId === c.id ? 'secondary' : 'ghost'}
+                          title={isAr ? 'أدلة الإغلاق' : 'Closure evidence'}
+                          onClick={() => setDocsId(docsId === c.id ? null : c.id)}>
+                    <Paperclip size={13} />
+                  </Button>
                   {CAPA_NEXT[c.status].map(s => (
                     <Button key={s} variant="ghost" onClick={() => onMove(c, s)}>{s}</Button>
                   ))}
                 </td>
               </tr>
+              {docsId === c.id && (
+                <tr>
+                  <td colSpan={6} style={{ background: 'var(--surface-2)' }}>
+                    <div style={{ padding: '4px 2px' }}>
+                      <div className="text-muted" style={{ fontSize: 11, marginBottom: 6 }}>
+                        {isAr ? 'أدلة تنفيذ وإغلاق الإجراء التصحيحي (ملفات، لقطات، تقارير اختبار).'
+                              : 'Implementation & closure evidence for this corrective action (files, screenshots, test reports).'}
+                      </div>
+                      <AttachmentsField entityType="BCM_CAPA" entityId={c.id} />
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>
