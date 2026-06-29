@@ -4,6 +4,26 @@
 
 ---
 
+## 0. Remediation Progress (live — branch `feat/bcm-remediation`)
+
+> Implementation started 2026-06-29 via an autonomous `/loop`, in §27 order. Frontend `tsc`-verified; backend `mvn`-verified; key paths live-smoked against :8084. **Not merged to `master`.**
+
+| Epic | Item | Status | Commit |
+|---|---|---|---|
+| **B-C** | File upload on BCP plans (Documents tab → generic `AttachmentService`) | ✅ Shipped | `4d74345a` |
+| B-C | File upload on DRP / DR-test / BIA / CAPA / crisis / governance | ⏳ In progress | — |
+| B-B | Evidence-request workflow (reuse `EvidenceRequest` + SLA scheduler) | ⏳ Pending | — |
+| B-A | Real BIA→BCP/DRP generator | ⏳ Pending | — |
+| B-D | Evidence lifecycle (review / reject→gap / resubmit / expiry) | ⏳ Pending | — |
+| B-E | Exercise→gap→CAPA closure | ⏳ Pending | — |
+| B-F/B-G | DRP / BIA depth | ⏳ Pending | — |
+| B-H | `exercise-runs` list endpoint | ⏳ Pending | — |
+| B-I | Arabic/RTL walk + role-permission ratchet | ⏳ Pending | — |
+
+**Order (§27):** B-C → B-B → B-A → B-D → B-E → B-F/G → B-H → B-I.
+
+---
+
 ## 1. Executive Summary
 
 **The BCM module is NOT a demo. It is the most built-out module in the platform** — substantially deeper than the Compliance/Policy module reviewed earlier. The review found real persisted registers, enforced domain validation, status state-machines, ~40 automation (F8) event triggers, a daily scheduler, real ERM/control FK links, and advanced features well beyond an ISO 22301 baseline (quantitative BIA, MTPD inheritance, dependency cascade, continuity-strategy ROI, an exercise runtime with facilitator/observer/participant consoles, crisis comms dispatch with call trees, AAR generation, board-pack + audit evidence-package export).
