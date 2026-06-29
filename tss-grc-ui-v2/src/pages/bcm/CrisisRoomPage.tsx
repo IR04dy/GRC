@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
@@ -462,6 +463,11 @@ export function CrisisRoomPage() {
                     {selected.relatedDrpIdsJson && <>DRPs: <span className="mono">{selected.relatedDrpIdsJson}</span></>}
                   </div>
                 )}
+              </Card>
+
+              {/* B-C: crisis evidence (decision logs, comms, regulator filings) via generic AttachmentService */}
+              <Card title={isAr ? 'الأدلة والوثائق' : 'Evidence & documents'}>
+                <AttachmentsField entityType="CRISIS_EVENT" entityId={selected.id} />
               </Card>
 
               {/* SitReps */}
