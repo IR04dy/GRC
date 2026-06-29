@@ -15,7 +15,8 @@
 | **B-C** | File upload on crisis events | ✅ Shipped | `c5f34dea` |
 | **B-C** | File upload on BIA (review step) + governance policy file | ✅ Shipped | `40dbb1bf` |
 | **B-C** | File upload on CAPA register (closure evidence) — **B-C complete** | ✅ Shipped | `e84efa24` |
-| B-B | Evidence-request workflow (reuse `EvidenceRequest` + SLA scheduler) | ⏳ Next | — |
+| **B-B** | Evidence-request **backend**: generic `entity_type`/`entity_id` on `EvidenceRequest` + `by-entity` endpoint (reuses SLA scheduler/reminders/escalation) | ✅ Shipped | `3bf2663e` |
+| B-B | Evidence-request **frontend**: reusable `EvidenceRequestsField` + wire into BCM surfaces | ⏳ Next | — |
 | B-A | Real BIA→BCP/DRP generator | ⏳ Pending | — |
 | B-D | Evidence lifecycle (review / reject→gap / resubmit / expiry) | ⏳ Pending | — |
 | B-E | Exercise→gap→CAPA closure | ⏳ Pending | — |
