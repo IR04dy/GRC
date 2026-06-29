@@ -147,7 +147,7 @@ export interface BcmCommunicationContact {
 export interface BcmGap {
   id: number;
   cycleId?: number;
-  source: 'BIA' | 'BCP' | 'DRP' | 'EXERCISE' | 'CALL_TREE' | 'AUDIT' | 'RISK' | 'MANUAL';
+  source: 'BIA' | 'BCP' | 'DRP' | 'EXERCISE' | 'CALL_TREE' | 'AUDIT' | 'RISK' | 'EVIDENCE' | 'MANUAL';
   titleEn: string;
   titleAr?: string;
   description?: string;

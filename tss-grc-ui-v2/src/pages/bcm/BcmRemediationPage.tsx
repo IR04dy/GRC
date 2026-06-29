@@ -38,7 +38,7 @@ import {
 type TabId = 'lessons' | 'gaps' | 'capas';
 
 const LESSON_SOURCES: LessonSource[] = ['INCIDENT', 'CRISIS', 'EXERCISE', 'AUDIT', 'MANUAL'];
-const GAP_SOURCES = ['BIA', 'BCP', 'DRP', 'EXERCISE', 'CALL_TREE', 'AUDIT', 'RISK', 'MANUAL'] as const;
+const GAP_SOURCES = ['BIA', 'BCP', 'DRP', 'EXERCISE', 'CALL_TREE', 'AUDIT', 'RISK', 'EVIDENCE', 'MANUAL'] as const;
 const SEVERITIES: BcmGap['severity'][] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 const PRIORITIES: BcmCorrectiveAction['priority'][] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 

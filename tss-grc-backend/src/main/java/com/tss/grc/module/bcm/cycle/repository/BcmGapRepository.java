@@ -13,6 +13,9 @@ public interface BcmGapRepository extends JpaRepository<BcmGap, Long> {
     List<BcmGap> findByOrganisationIdAndSeverityOrderByIdDesc(Long organisationId, String severity);
     List<BcmGap> findByOrganisationIdAndCycleIdOrderByIdDesc(Long organisationId, Long cycleId);
     Optional<BcmGap> findByIdAndOrganisationId(Long id, Long organisationId);
+    /** For automation dedup — gaps already linked to a given source record. */
+    List<BcmGap> findByOrganisationIdAndRelatedRecordTypeAndRelatedRecordId(
+        Long organisationId, String relatedRecordType, Long relatedRecordId);
     long countByOrganisationIdAndStatus(Long organisationId, String status);
     long countByOrganisationIdAndSeverity(Long organisationId, String severity);
     List<BcmGap> findByOrganisationIdAndDueDateBeforeAndStatusNotIn(

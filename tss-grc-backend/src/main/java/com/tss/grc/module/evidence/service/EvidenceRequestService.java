@@ -16,14 +16,17 @@ import com.tss.grc.module.iam.entity.User;
 import com.tss.grc.module.iam.repository.UserRepository;
 import com.tss.grc.module.platform.entity.Department;
 import com.tss.grc.module.platform.repository.DepartmentRepository;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -38,6 +41,7 @@ public class EvidenceRequestService {
     private final EvidenceFrameworkRepository frameworkRepository;
     private final UserRepository userRepository;
     private final DepartmentRepository departmentRepository;
+    private final ApplicationEventPublisher events;
 
     // ── Request lifecycle state machine ───────────────────────────────────────
     private static final Set<String> REQUEST_STATUSES =
@@ -112,6 +116,21 @@ public class EvidenceRequestService {
             req.setFulfilledAt(LocalDateTime.now());
         }
         req = requestRepository.save(req);
+
+        // A rejected evidence request is a remediation signal. Publish a generic
+        // F8 event carrying the request's anchor (entityType/entityId) so any
+        // module can react — e.g. BcmGapRecordCreator opens a BCM gap when the
+        // request was anchored to a BCM record. Kept module-agnostic here.
+        if ("REJECTED".equals(newStatus) && req.getEntityType() != null) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("anchorType", req.getEntityType());
+            payload.put("anchorId", req.getEntityId());
+            payload.put("requestCode", "REQ-" + String.format("%05d", req.getId()));
+            payload.put("title", req.getTitleEn());
+            events.publishEvent(new DomainEvent(
+                req.getOrganisationId(), "EVIDENCE_REQUEST_REJECTED",
+                "EvidenceRequest", req.getId(), "evreq:" + req.getId(), payload));
+        }
         return toResponse(req);
     }
 

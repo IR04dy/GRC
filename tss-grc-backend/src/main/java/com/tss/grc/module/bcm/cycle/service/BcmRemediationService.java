@@ -47,7 +47,7 @@ public class BcmRemediationService {
         "OPEN", "ASSIGNED", "IN_PROGRESS", "UNDER_REVIEW", "CLOSED", "ACCEPTED_RISK", "REOPENED");
     private static final Set<String> GAP_SEVERITIES = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
     private static final Set<String> GAP_SOURCES = Set.of(
-        "BIA", "BCP", "DRP", "EXERCISE", "CALL_TREE", "AUDIT", "RISK", "MANUAL");
+        "BIA", "BCP", "DRP", "EXERCISE", "CALL_TREE", "AUDIT", "RISK", "MANUAL", "EVIDENCE");
     // ── CAPA statuses ──
     private static final Set<String> CAPA_STATUSES = Set.of(
         "OPEN", "ASSIGNED", "IN_PROGRESS", "EVIDENCE_SUBMITTED", "UNDER_REVIEW",
