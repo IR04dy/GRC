@@ -13,6 +13,8 @@ import com.tss.grc.module.bcm.cycle.runtime.observer.entity.ExerciseObserverAssi
 import com.tss.grc.module.bcm.cycle.runtime.observer.repository.ExerciseObservationRepository;
 import com.tss.grc.module.bcm.cycle.runtime.observer.repository.ExerciseObserverAssignmentRepository;
 import com.tss.grc.module.bcm.cycle.runtime.observer.service.ExerciseObserverService;
+import com.tss.grc.module.bcm.cycle.repository.BcmGapRepository;
+import com.tss.grc.module.bcm.cycle.service.BcmRemediationService;
 import com.tss.grc.module.bcm.cycle.runtime.repository.ExerciseRunInjectRepository;
 import com.tss.grc.module.bcm.cycle.runtime.repository.ExerciseRunRepository;
 import com.tss.grc.module.bcm.cycle.runtime.repository.ExerciseRunResponseRepository;
@@ -68,6 +70,8 @@ class ExerciseObserverControllerTest {
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
     @Mock private RealtimeBroadcaster realtime;
+    @Mock private BcmRemediationService remediation;
+    @Mock private BcmGapRepository gaps;
 
     private ExerciseObserverService service;
     private ExerciseObserverController controller;
@@ -83,7 +87,7 @@ class ExerciseObserverControllerTest {
 
         service = new ExerciseObserverService(
             assignmentRepo, observationRepo, runRepo, runInjectRepo, responseRepo,
-            audit, publisher, realtime);
+            audit, publisher, realtime, remediation, gaps);
         controller = new ExerciseObserverController(service);
 
         // Standard run lookup — tenant-matched
