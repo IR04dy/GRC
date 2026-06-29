@@ -10,6 +10,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { EvidenceRequestsField } from '../../components/ui/EvidenceRequestsField';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
@@ -665,6 +666,10 @@ export function BcpBuilderPage() {
           <Card title={isAr ? 'الوثائق والأدلة — خطة استمرارية الأعمال' : 'Documents & evidence — BCP'}>
             {/* B-C: real file upload via the generic AttachmentService (entityType BCP_PLAN). */}
             <AttachmentsField entityType="BCP_PLAN" entityId={plan.id} />
+            {/* B-B: request evidence from a department with due date + SLA chase. */}
+            <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+              <EvidenceRequestsField entityType="BCP_PLAN" entityId={plan.id} />
+            </div>
           </Card>
         )}
         {builderTab === 'sections' && (

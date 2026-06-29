@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { EvidenceRequestsField } from '../../components/ui/EvidenceRequestsField';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
@@ -644,6 +645,9 @@ export function BcmReadinessPage() {
                                     : 'Approved BCM policy file, approval minutes, and supporting evidence.'}
                             </div>
                             <AttachmentsField entityType="BCM_GOVERNANCE" entityId={g.id} />
+                            <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                              <EvidenceRequestsField entityType="BCM_GOVERNANCE" entityId={g.id} />
+                            </div>
                           </div>
                         </td>
                       </tr>

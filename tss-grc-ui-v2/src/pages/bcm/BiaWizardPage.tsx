@@ -9,6 +9,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { EvidenceRequestsField } from '../../components/ui/EvidenceRequestsField';
 import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
@@ -355,6 +356,10 @@ export function BiaWizardPage() {
         {step === 4 && editing.id > 0 && (
           <Card title={isAr ? 'الأدلة والوثائق الداعمة' : 'Supporting evidence & documents'}>
             <AttachmentsField entityType="BIA_ASSESSMENT" entityId={editing.id} />
+            {/* B-B: request supporting evidence from a department (interview notes, dependency data). */}
+            <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+              <EvidenceRequestsField entityType="BIA_ASSESSMENT" entityId={editing.id} />
+            </div>
           </Card>
         )}
 

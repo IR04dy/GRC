@@ -8,6 +8,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { EvidenceRequestsField } from '../../components/ui/EvidenceRequestsField';
 import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
@@ -468,6 +469,10 @@ export function CrisisRoomPage() {
               {/* B-C: crisis evidence (decision logs, comms, regulator filings) via generic AttachmentService */}
               <Card title={isAr ? 'الأدلة والوثائق' : 'Evidence & documents'}>
                 <AttachmentsField entityType="CRISIS_EVENT" entityId={selected.id} />
+                {/* B-B: request evidence from a department (post-incident logs, regulator filings). */}
+                <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                  <EvidenceRequestsField entityType="CRISIS_EVENT" entityId={selected.id} />
+                </div>
               </Card>
 
               {/* SitReps */}

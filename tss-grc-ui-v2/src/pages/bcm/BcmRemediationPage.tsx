@@ -9,6 +9,7 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { EvidenceRequestsField } from '../../components/ui/EvidenceRequestsField';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
@@ -308,6 +309,9 @@ function CapasTab({ capas, onMove, isAr }: {
                               : 'Implementation & closure evidence for this corrective action (files, screenshots, test reports).'}
                       </div>
                       <AttachmentsField entityType="BCM_CAPA" entityId={c.id} />
+                      <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                        <EvidenceRequestsField entityType="BCM_CAPA" entityId={c.id} />
+                      </div>
                     </div>
                   </td>
                 </tr>

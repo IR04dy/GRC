@@ -2008,8 +2008,15 @@ export interface EvidenceItemRequest {
 export interface EvidenceRequestDto {
   id: number; requestCode: string;
   subControlCode?: string; frameworkCode?: string;
-  titleEn: string; titleAr?: string;
-  status?: string; requestedAt?: string; dueDate?: string;
+  /** Generic entity anchor (BCM plan / BIA / governance / crisis / CAPA, …). */
+  entityType?: string; entityId?: number;
+  titleEn: string; titleAr?: string; descriptionEn?: string;
+  status?: string; priority?: string; requestedAt?: string; dueDate?: string;
+  requestedById?: number; requestedByName?: string;
+  assignedToId?: number; assignedToName?: string;
+  departmentId?: number; departmentName?: string;
+  notes?: string; createdAt?: string; updatedAt?: string;
+  /** @deprecated legacy field — backend now returns assignedToName/requestedByName. */
   ownerName?: string;
 }
 export interface EvidenceReviewDto {
@@ -2075,13 +2082,18 @@ export const evidenceApi = {
   stats:        () => api.get<unknown>('/api/v1/evidence/items/stats'),
   expired:      () => api.get<PageResponse<EvidenceItemDto>>('/api/v1/evidence/items/expired'),
   requests:     (page = 0, size = 50) => api.get<PageResponse<EvidenceRequestDto>>(`/api/v1/evidence/requests${pageQ(page, size)}`),
+  /** All requests anchored to one generic aggregate (newest first). */
+  requestsByEntity: (entityType: string, entityId: number) =>
+    api.get<EvidenceRequestDto[]>(`/api/v1/evidence/requests/by-entity?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`),
   // Raise an evidence request against a department/owner with a due date; the
   // EvidenceRequestSlaScheduler then chases it (overdue reminders). subControlId
-  // is optional — a request can be standalone (e.g. "evidence for control X").
-  createRequest: (body: { titleEn: string; titleAr?: string; descriptionEn?: string; subControlId?: number; assignedToId?: number; departmentId?: number; dueDate?: string; priority?: string; notes?: string }) =>
+  // is optional — a request can be standalone, or anchored to any aggregate via
+  // entityType/entityId (e.g. a BCM plan, BIA, governance policy, CAPA).
+  createRequest: (body: { titleEn: string; titleAr?: string; descriptionEn?: string; subControlId?: number; entityType?: string; entityId?: number; assignedToId?: number; departmentId?: number; dueDate?: string; priority?: string; notes?: string }) =>
     api.post<EvidenceRequestDto>('/api/v1/evidence/requests', body),
   updateRequestStatus: (id: number, status: string) =>
     api.post<EvidenceRequestDto>(`/api/v1/evidence/requests/${id}/status?status=${encodeURIComponent(status)}`),
+  deleteRequest: (id: number) => api.delete<void>(`/api/v1/evidence/requests/${id}`),
   reviews:      (page = 0, size = 50) => api.get<PageResponse<EvidenceReviewDto>>(`/api/v1/evidence/reviews${pageQ(page, size)}`),
   // Cross-framework matrix + version history + connectors (assessment §5.9)
   matrix:       () => api.get<FrameworkBlock[]>('/api/v1/evidence/matrix'),
