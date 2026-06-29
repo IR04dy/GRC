@@ -12,6 +12,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
@@ -326,6 +327,12 @@ export function DrPlansPage() {
                                       <span style={{ color: 'var(--ink-3)' }}>{r.lastTestNotesEn}</span>
                                     )}
                                   </div>
+                                </div>
+
+                                {/* B-C: DR backup / test evidence — real file upload via the generic AttachmentService. */}
+                                <div style={{ marginTop: 10 }}>
+                                  <strong>{lang === 'ar' ? 'أدلة النسخ الاحتياطي والاختبار' : 'Backup & test evidence'}</strong>
+                                  <AttachmentsField entityType="DR_PLAN" entityId={r.id} />
                                 </div>
 
                                 {r.recoveryStrategyEn && (
