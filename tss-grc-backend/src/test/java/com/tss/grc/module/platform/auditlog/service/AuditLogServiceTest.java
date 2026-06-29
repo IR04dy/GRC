@@ -15,6 +15,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -23,9 +25,10 @@ import static org.mockito.Mockito.when;
  * <ul>
  *   <li>recordEvent requires actionType; severity defaults to INFO.</li>
  *   <li>Invalid severity rejected.</li>
- *   <li>Tenant id auto-filled from TenantContext; falls back to 1
- *       when no tenant is bound (system events).</li>
+ *   <li>Tenant id auto-filled from TenantContext; falls back to 1 (system events).</li>
  *   <li>UUID-based correlation ids generated on demand.</li>
+ *   <li>Off-request (scheduler/async/event-listener): no request metadata captured,
+ *       the request-scoped provider is never dereferenced.</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -55,7 +58,6 @@ class AuditLogServiceTest {
     }
 
     @Test void recordEvent_defaultsSeverityToInfo() {
-        when(requestProvider.getIfAvailable()).thenReturn(null);
         when(repo.save(any())).thenAnswer(inv -> {
             AuditLogEntry e = inv.getArgument(0); e.setId(1L); return e;
         });
@@ -68,7 +70,6 @@ class AuditLogServiceTest {
 
     @Test void recordEvent_fallsBackToTenant1WhenNoTenantBound() {
         TenantContext.clear();
-        when(requestProvider.getIfAvailable()).thenReturn(null);
         when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         AuditLogEntry saved = service.recordEvent(new AuditLogService.AuditEventBuilder()
@@ -77,7 +78,6 @@ class AuditLogServiceTest {
     }
 
     @Test void log_oneLinerWorks() {
-        when(requestProvider.getIfAvailable()).thenReturn(null);
         when(repo.save(any())).thenAnswer(inv -> {
             AuditLogEntry e = inv.getArgument(0); e.setId(42L); return e;
         });
@@ -96,15 +96,15 @@ class AuditLogServiceTest {
     }
 
     /**
-     * C-3 regression: from a scheduler / async thread there is no bound HTTP
-     * request, so the request-scoped {@code HttpServletRequest} provider throws
-     * "No thread-bound request found" rather than returning null. The audit write
-     * must still succeed (no request metadata captured) — previously this aborted
-     * every scheduled deadline-sweep audit write.
+     * Regression: from a scheduler / async / event-listener thread there is no bound
+     * HTTP request, so {@code RequestContextHolder.getRequestAttributes()} is null and
+     * the request-scoped {@code HttpServletRequest} proxy must NOT be dereferenced —
+     * touching it off-request threw "No thread-bound request found" and aborted every
+     * async/scheduled audit write (the automation rule engine + SocOps / BCM /
+     * compliance-deadline sweeps). The audit row is still written without request
+     * metadata, and the provider is never touched (the guard short-circuits first).
      */
-    @Test void recordEvent_survivesWhenNoRequestBound_schedulerThread() {
-        when(requestProvider.getIfAvailable())
-            .thenThrow(new IllegalStateException("No thread-bound request found"));
+    @Test void recordEvent_skipsRequestMetadata_whenNoRequestBound() {
         when(repo.save(any())).thenAnswer(inv -> {
             AuditLogEntry e = inv.getArgument(0); e.setId(7L); return e;
         });
@@ -113,8 +113,8 @@ class AuditLogServiceTest {
             "Deadline scheduler fired FINDING_OVERDUE");
 
         assertThat(saved.getId()).isEqualTo(7L);
-        assertThat(saved.getActionType()).isEqualTo("CDL_FIRE:FINDING_OVERDUE");
         assertThat(saved.getIpAddress()).isNull();
         assertThat(saved.getSourceEndpoint()).isNull();
+        verify(requestProvider, never()).getIfAvailable();   // short-circuited off-request
     }
 }

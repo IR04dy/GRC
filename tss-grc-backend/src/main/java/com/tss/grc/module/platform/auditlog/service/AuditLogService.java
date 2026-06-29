@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -114,14 +115,22 @@ public class AuditLogService {
 
     /**
      * The current HTTP request, or {@code null} when none is bound to this thread
-     * (scheduled / async execution). {@code ObjectProvider.getIfAvailable()} only
-     * swallows a missing bean <em>definition</em> — for the request-scoped
-     * {@code HttpServletRequest} it still propagates the "No thread-bound request
-     * found" {@link IllegalStateException} when no request scope is active, which
-     * previously aborted every audit write from a scheduler thread (C-3 deadline
-     * sweeps). Catch it and treat "no request" as "no request metadata to capture".
+     * (scheduler / async / event-listener execution).
+     *
+     * <p>The guard MUST be {@link RequestContextHolder#getRequestAttributes()}
+     * (which returns {@code null} off-request, never throwing) — checked
+     * <em>before</em> touching the request-scoped {@code HttpServletRequest}.
+     * {@code ObjectProvider.getIfAvailable()} returns the request-scoped
+     * <em>proxy</em> (non-null, no exception) even off-request; the "No
+     * thread-bound request found" {@link IllegalStateException} only fires later
+     * when a method is invoked on that proxy (e.g. in {@code extractIp}). A
+     * try/catch around {@code getIfAvailable()} therefore never triggers — which
+     * is why every async/scheduled audit write (automation rule engine, SocOps /
+     * BCM / compliance-deadline sweeps) was still aborting. Returning {@code null}
+     * here skips request-metadata capture entirely off-request.
      */
     private HttpServletRequest currentRequestOrNull() {
+        if (RequestContextHolder.getRequestAttributes() == null) return null;
         try {
             return requestProvider.getIfAvailable();
         } catch (RuntimeException ex) {
