@@ -52,8 +52,15 @@ public class PolicyDocument {
     @Column(name = "published_at")                                    private LocalDateTime publishedAt;
     @Column(name = "retired_reason", columnDefinition = "NVARCHAR(MAX)") private String retiredReason;
 
+    // C-12: free-text cross-links are deprecated in favour of FK references —
+    // framework_id (below) and the policy.document_control_links table. They are
+    // retained during the expand-contract window so legacy references whose codes
+    // are not in the control library are preserved.
     @Column(name = "related_framework", length = 120)                   private String relatedFramework;
     @Column(name = "related_controls",  columnDefinition = "NVARCHAR(MAX)") private String relatedControls;
+
+    /** C-12 — FK to {@code compliance.frameworks}; supersedes the free-text relatedFramework. */
+    @Column(name = "framework_id") private Long frameworkId;
 
     @Column(columnDefinition = "NVARCHAR(MAX)") private String notes;
 

@@ -7,6 +7,8 @@ import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.compliance.entity.Control;
 import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.policy.entity.PolicyAttestation;
+import com.tss.grc.module.policy.entity.PolicyDocumentControlLink;
+import com.tss.grc.module.policy.repository.PolicyDocumentControlLinkRepository;
 import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.entity.PolicyException;
 import com.tss.grc.module.policy.repository.PolicyAttestationRepository;
@@ -57,6 +59,7 @@ public class PolicyManagementService {
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
     private final ControlRepository controls;
+    private final PolicyDocumentControlLinkRepository controlLinks;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -75,7 +78,7 @@ public class PolicyManagementService {
         if (relatedControls == null || relatedControls.isBlank()) return List.of();
         // split on comma / semicolon / whitespace; trim; dedupe; preserve order
         LinkedHashSet<String> codes = new LinkedHashSet<>();
-        for (String tok : relatedControls.split("[,;\\s]+")) {
+        for (String tok : relatedControls.split("[,;|\\s]+")) {
             String c = tok.trim();
             if (!c.isEmpty()) codes.add(c);
         }
@@ -98,6 +101,65 @@ public class PolicyManagementService {
     public record ResolvedControl(
         String code, boolean matched, Long controlId,
         String nameEn, String nameAr, String framework) {}
+
+    // ── C-12 (expand phase): real FK control links ────────────────────────────
+    //
+    // policy.document_control_links holds verified policy↔control FK references.
+    // resolveControlsForPolicy prefers those links (all matched, from the real
+    // control library); when a policy has no FK links yet it falls back to the
+    // legacy free-text resolution above so nothing is lost during the
+    // expand-contract window.
+
+    /** Resolve a policy's controls, preferring FK links over legacy free-text. */
+    @Transactional(readOnly = true)
+    public List<ResolvedControl> resolveControlsForPolicy(Long policyId) {
+        PolicyDocument p = get(policyId);   // validates existence + tenant scope
+        List<PolicyDocumentControlLink> links =
+            controlLinks.findByOrganisationIdAndPolicyDocumentId(org(), policyId);
+        if (!links.isEmpty()) {
+            List<Long> ids = new ArrayList<>();
+            for (PolicyDocumentControlLink l : links) ids.add(l.getControlId());
+            Map<Long, Control> byId = new HashMap<>();
+            for (Control c : controls.findAllById(ids)) byId.put(c.getId(), c);
+            List<ResolvedControl> out = new ArrayList<>(links.size());
+            for (PolicyDocumentControlLink l : links) {
+                Control c = byId.get(l.getControlId());
+                if (c != null) out.add(new ResolvedControl(
+                    c.getCode(), true, c.getId(), c.getNameEn(), c.getNameAr(), c.getFramework()));
+            }
+            return out;
+        }
+        return resolveControls(p.getRelatedControls());   // legacy fallback
+    }
+
+    /** Replace a policy's control links with the given control ids (org-validated). */
+    @Transactional
+    public List<ResolvedControl> setControlLinks(Long policyId, List<Long> controlIds) {
+        PolicyDocument p = get(policyId);
+        Long orgId = p.getOrganisationId();
+        Set<Long> desired = new LinkedHashSet<>();
+        if (controlIds != null) {
+            for (Control c : controls.findAllById(controlIds)) {
+                if (orgId.equals(c.getOrganisationId())) desired.add(c.getId());
+            }
+        }
+        List<PolicyDocumentControlLink> existing =
+            controlLinks.findByOrganisationIdAndPolicyDocumentId(orgId, policyId);
+        Set<Long> existingIds = new HashSet<>();
+        for (PolicyDocumentControlLink l : existing) existingIds.add(l.getControlId());
+
+        List<PolicyDocumentControlLink> toRemove = new ArrayList<>();
+        for (PolicyDocumentControlLink l : existing) if (!desired.contains(l.getControlId())) toRemove.add(l);
+        if (!toRemove.isEmpty()) controlLinks.deleteAll(toRemove);
+
+        List<PolicyDocumentControlLink> toAdd = new ArrayList<>();
+        for (Long cid : desired) if (!existingIds.contains(cid)) toAdd.add(new PolicyDocumentControlLink(orgId, policyId, cid));
+        if (!toAdd.isEmpty()) controlLinks.saveAll(toAdd);
+
+        audit.log("POLICY_CONTROLS_SET", "PolicyDocument", policyId,
+            "Set " + desired.size() + " control link(s)");
+        return resolveControlsForPolicy(policyId);
+    }
 
     // ── F8 payload + emit helpers ─────────────────────────────────────────────
     //

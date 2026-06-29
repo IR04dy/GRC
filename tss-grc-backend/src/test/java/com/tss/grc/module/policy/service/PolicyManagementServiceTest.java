@@ -7,6 +7,8 @@ import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.compliance.entity.Control;
 import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.policy.entity.PolicyAttestation;
+import com.tss.grc.module.policy.entity.PolicyDocumentControlLink;
+import com.tss.grc.module.policy.repository.PolicyDocumentControlLinkRepository;
 import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.entity.PolicyException;
 import com.tss.grc.module.policy.repository.PolicyAttestationRepository;
@@ -33,6 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -66,6 +69,7 @@ class PolicyManagementServiceTest {
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
     @Mock private ControlRepository controls;
+    @Mock private PolicyDocumentControlLinkRepository controlLinks;
 
     @InjectMocks private PolicyManagementService service;
 
@@ -427,6 +431,69 @@ class PolicyManagementServiceTest {
     @Test void resolveControls_blankReturnsEmpty() {
         assertThat(service.resolveControls(null)).isEmpty();
         assertThat(service.resolveControls("   ")).isEmpty();
+    }
+
+    // ── C-12 (expand phase): FK control links ─────────────────────────────────
+
+    @Test void resolveControlsForPolicy_prefersFkLinksOverFreeText() {
+        PolicyDocument p = draft();
+        p.setOrganisationId(ORG_ID);
+        p.setRelatedControls("LEGACY-1, LEGACY-2");   // legacy free-text (would be unmatched)
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
+        when(controlLinks.findByOrganisationIdAndPolicyDocumentId(ORG_ID, 1L))
+            .thenReturn(List.of(new PolicyDocumentControlLink(ORG_ID, 1L, 11L)));
+        when(controls.findAllById(List.of(11L)))
+            .thenReturn(List.of(ctl(11L, "NCA-2-12-3", "Network security", "أمن الشبكة", "NCA ECC")));
+
+        List<PolicyManagementService.ResolvedControl> out = service.resolveControlsForPolicy(1L);
+
+        assertThat(out).hasSize(1);
+        assertThat(out.get(0).code()).isEqualTo("NCA-2-12-3");
+        assertThat(out.get(0).matched()).isTrue();
+        assertThat(out.get(0).controlId()).isEqualTo(11L);
+        // FK links win — the legacy free-text path is not consulted
+        verify(controls, never()).findByOrganisationIdAndCodeIn(anyLong(), any());
+    }
+
+    @Test void resolveControlsForPolicy_fallsBackToFreeTextWhenNoLinks() {
+        PolicyDocument p = draft();
+        p.setOrganisationId(ORG_ID);
+        p.setRelatedControls("NCA-2-12-3, BOGUS-1");
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
+        when(controlLinks.findByOrganisationIdAndPolicyDocumentId(ORG_ID, 1L)).thenReturn(List.of());
+        when(controls.findByOrganisationIdAndCodeIn(eq(ORG_ID), any()))
+            .thenReturn(List.of(ctl(50L, "NCA-2-12-3", "Network security", "أمن", "NCA ECC")));
+
+        List<PolicyManagementService.ResolvedControl> out = service.resolveControlsForPolicy(1L);
+
+        assertThat(out).hasSize(2);
+        assertThat(out).anySatisfy(r -> { assertThat(r.code()).isEqualTo("NCA-2-12-3"); assertThat(r.matched()).isTrue(); });
+        assertThat(out).anySatisfy(r -> { assertThat(r.code()).isEqualTo("BOGUS-1");   assertThat(r.matched()).isFalse(); });
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test void setControlLinks_addsValidRemovesStaleIgnoresForeignOrg() {
+        PolicyDocument p = draft();
+        p.setOrganisationId(ORG_ID);
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
+        Control c11 = ctl(11L, "C-11", "x", "س", "F");                 // valid — same org
+        Control cForeign = new Control();
+        cForeign.setId(99L); cForeign.setOrganisationId(999L); cForeign.setCode("C-99");  // foreign org — ignored
+        when(controls.findAllById(List.of(11L, 99L))).thenReturn(List.of(c11, cForeign));
+        when(controlLinks.findByOrganisationIdAndPolicyDocumentId(ORG_ID, 1L))
+            .thenReturn(List.of(new PolicyDocumentControlLink(ORG_ID, 1L, 22L)))            // pre-sync (22 stale)
+            .thenReturn(List.of(new PolicyDocumentControlLink(ORG_ID, 1L, 11L)));           // post-sync (for resolve)
+        when(controls.findAllById(List.of(11L))).thenReturn(List.of(c11));
+
+        service.setControlLinks(1L, List.of(11L, 99L));
+
+        ArgumentCaptor<List<PolicyDocumentControlLink>> del = ArgumentCaptor.forClass(List.class);
+        verify(controlLinks).deleteAll(del.capture());
+        assertThat(del.getValue()).extracting(PolicyDocumentControlLink::getControlId).containsExactly(22L);
+
+        ArgumentCaptor<List<PolicyDocumentControlLink>> add = ArgumentCaptor.forClass(List.class);
+        verify(controlLinks).saveAll(add.capture());
+        assertThat(add.getValue()).extracting(PolicyDocumentControlLink::getControlId).containsExactly(11L);
     }
 
     private static Control ctl(Long id, String code, String nameEn, String nameAr, String framework) {

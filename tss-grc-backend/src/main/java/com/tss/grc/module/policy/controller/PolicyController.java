@@ -118,7 +118,7 @@ public class PolicyController {
         List<AttachmentResponse> atts = attachments.list("PolicyDocument", id);
         return new EvidencePackage(p, atts.size(), atts,
             p.getRelatedFramework(), p.getRelatedControls(),
-            service.resolveControls(p.getRelatedControls()),
+            service.resolveControlsForPolicy(id),
             LocalDateTime.now().toString());
     }
 
@@ -138,7 +138,15 @@ public class PolicyController {
     @GetMapping("/documents/{id}/resolved-controls")
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public List<PolicyManagementService.ResolvedControl> resolvedControls(@PathVariable Long id) {
-        return service.resolveControls(service.get(id).getRelatedControls());
+        return service.resolveControlsForPolicy(id);
+    }
+
+    /** C-12 — set/replace a policy's control FK links. Body: {"controlIds":[1,2,3]}. */
+    @PutMapping("/documents/{id}/controls")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
+    public List<PolicyManagementService.ResolvedControl> setControls(
+            @PathVariable Long id, @RequestBody Map<String, List<Long>> body) {
+        return service.setControlLinks(id, body.get("controlIds"));
     }
 
     // ─── Exceptions ────────────────────────────────────────────────
