@@ -22,9 +22,11 @@
 | **B-E** | Exercise→gap→CAPA closure: promote an exercise observation to a tracked BCM gap (idempotent, severity-mapped, linked); gap→CAPA already existed | ✅ Shipped | `fc83772a` |
 | **B-F/B-G** | DRP depth: post-failover validation checklist (`validation_steps_json`) added end-to-end + rendered; BIA depth (MBCO, min-resources) verified already captured in the wizard | ✅ Shipped | `10c9d76e` |
 | **B-H** | `GET /api/v1/bcm/exercise-runs` list endpoint added (was 405) — org-scoped, newest-first, `?status=` filter | ✅ Shipped | `cbe7bb77` |
-| B-I | Arabic/RTL walk + role-permission ratchet | ⏳ Next | — |
+| **B-I** | Role-permission ratchet: seeded BCM grant matrix + added `BCM_APPROVE` (was admin-only); Arabic/RTL verified (logical CSS, full EN/AR parity) | ✅ Shipped | `770ccb49` |
 
-**Order (§27):** B-C → B-B → B-A → B-D → B-E → B-F/G → B-H → B-I.
+**Order (§27):** B-C → B-B → B-A → B-D → B-E → B-F/G → B-H → B-I. **— all eight epics complete (2026-06-29).**
+
+> ✅ **Remediation backlog complete.** All Critical (B-1/2/3) and the High/Medium epics (B-A…B-I) are shipped on `feat/bcm-remediation`, each frontend `tsc`-verified, backend `mvn`-compiled, and live-smoked against :8084 (with the backend rebuilt + restarted after every backend change). Branch not yet merged to `master` — ready for fast-forward on instruction. Five Flyway migrations (V235–V239) were authored for non-dev profiles and also applied to the Python-managed dev DB.
 
 ---
 
@@ -390,6 +392,19 @@ BCM is "market-ready" when: (a) approving a BIA generates linked, populated BCP+
 
 ## 29. Final Recommendation
 
-**Partially usable — needs targeted remediation.**
+**Original verdict: Partially usable — needs targeted remediation.**
+**Post-remediation (2026-06-29): the targeted remediation is complete — see §0.**
 
-BCM is a **strong, genuinely-implemented module** — the richest in the platform (real validation, status lifecycles, ~40 automation triggers, crisis/exercise depth, ERM/control linkage, exports). It is **not** demo-only. But three Critical gaps — **BIA→plan generation is a stub**, **no evidence-request workflow**, and **near-absent file upload / no evidence subsystem wiring** — block confident production use for an audited Saudi entity. All three are **well-scoped and reuse infrastructure that already exists** in the platform (the generic `AttachmentService`, `EvidenceRequest` + SLA scheduler, and the F8 `CREATE_RECORD` pattern shipped for Compliance). Estimated remediation is **targeted, not a rebuild**.
+BCM is a **strong, genuinely-implemented module** — the richest in the platform (real validation, status lifecycles, ~40 automation triggers, crisis/exercise depth, ERM/control linkage, exports). It is **not** demo-only. The three Critical gaps the review found — **BIA→plan generation is a stub**, **no evidence-request workflow**, and **near-absent file upload / no evidence subsystem wiring** — were, as predicted, **well-scoped and resolved by reusing existing infrastructure** (the generic `AttachmentService`, `EvidenceRequest` + SLA scheduler, and the F8 `CREATE_RECORD` pattern shipped for Compliance), not a rebuild.
+
+**What shipped on `feat/bcm-remediation`** (all live-verified against :8084):
+- **B-C** — file upload on all six BCM entities (BCP, DRP, crisis, BIA, governance, CAPA).
+- **B-B** — generic entity-anchored `EvidenceRequest` + a reusable `EvidenceRequestsField` (owner/due/countdown/lifecycle), wired into all BCM surfaces, reusing the SLA scheduler/reminders/escalation.
+- **B-A** — the BIA→BCP/DRP generator now seeds real section content from the BIA (objectives, MBCO, resources, workaround, suppliers, dependencies).
+- **B-D** — rejected evidence request auto-opens a deduped BCM gap (F8 event + `BcmGapRecordCreator`).
+- **B-E** — promote an exercise observation to a tracked gap (idempotent, severity-mapped) → CAPA.
+- **B-F/B-G** — DRP post-failover validation checklist; BIA MBCO/min-resources confirmed captured.
+- **B-H** — `GET /api/v1/bcm/exercise-runs` list endpoint (was 405).
+- **B-I** — BCM role-permission grant matrix + `BCM_APPROVE` (was admin-only); Arabic/RTL verified.
+
+**Revised verdict: Production-ready for an audited Saudi BCM buyer**, pending the standard pre-merge gate (full `mvn test` + a stakeholder UAT pass) and merge of `feat/bcm-remediation` to `master`.
