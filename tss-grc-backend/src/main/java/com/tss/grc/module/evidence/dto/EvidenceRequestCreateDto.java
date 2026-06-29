@@ -10,6 +10,8 @@ public record EvidenceRequestCreateDto(
     @Size(max = 300) String titleAr,
     String descriptionEn,
     Long subControlId,
+    @Size(max = 60) String entityType,
+    Long entityId,
     Long assignedToId,
     Long departmentId,
     LocalDate dueDate,

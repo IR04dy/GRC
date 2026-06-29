@@ -36,6 +36,16 @@ public class EvidenceRequestController {
         return requestService.list(status, pageable);
     }
 
+    @GetMapping("/by-entity")
+    @PreAuthorize("hasPermission('EVIDENCE', 'READ')")
+    @Operation(summary = "List evidence requests anchored to a generic entity (entityType + entityId)")
+    public java.util.List<EvidenceRequestResponse> listByEntity(
+            @RequestParam String entityType,
+            @RequestParam Long entityId
+    ) {
+        return requestService.listByEntity(entityType, entityId);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasPermission('EVIDENCE', 'READ')")
     public EvidenceRequestResponse get(@PathVariable Long id) {

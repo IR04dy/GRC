@@ -61,6 +61,14 @@ public class EvidenceRequestService {
         return page.map(this::toResponse);
     }
 
+    /** All requests anchored to one aggregate (e.g. a BCM plan / BIA / CAPA). */
+    @Transactional(readOnly = true)
+    public java.util.List<EvidenceRequestResponse> listByEntity(String entityType, Long entityId) {
+        Long orgId = TenantContext.getCurrentTenant();
+        return requestRepository.findByOrgAndEntity(orgId, entityType, entityId)
+                .stream().map(this::toResponse).toList();
+    }
+
     @Transactional(readOnly = true)
     public EvidenceRequestResponse get(Long id) {
         Long orgId = TenantContext.getCurrentTenant();
@@ -135,6 +143,8 @@ public class EvidenceRequestService {
         req.setTitleAr(dto.titleAr());
         req.setDescriptionEn(dto.descriptionEn());
         req.setSubControlId(dto.subControlId());
+        req.setEntityType(dto.entityType());
+        req.setEntityId(dto.entityId());
         req.setAssignedToId(dto.assignedToId());
         req.setDepartmentId(dto.departmentId());
         req.setDueDate(dto.dueDate());
@@ -170,6 +180,7 @@ public class EvidenceRequestService {
                 r.getId(), r.getExternalId(),
                 "REQ-" + String.format("%05d", r.getId()),
                 r.getSubControlId(), subControlCode, subControlNameEn, frameworkCode,
+                r.getEntityType(), r.getEntityId(),
                 r.getTitleEn(), r.getTitleAr(), r.getDescriptionEn(),
                 r.getRequestedById(), requestedByName,
                 r.getAssignedToId(), assignedToName,

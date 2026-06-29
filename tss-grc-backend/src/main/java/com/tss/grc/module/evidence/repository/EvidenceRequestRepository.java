@@ -29,5 +29,13 @@ public interface EvidenceRequestRepository extends JpaRepository<EvidenceRequest
                                               @Param("status") String status,
                                               Pageable pageable);
 
+    /** All requests anchored to one generic aggregate, newest first. */
+    @Query("SELECT r FROM EvidenceRequest r WHERE r.organisationId = :orgId " +
+           "AND r.entityType = :entityType AND r.entityId = :entityId " +
+           "ORDER BY r.createdAt DESC")
+    List<EvidenceRequest> findByOrgAndEntity(@Param("orgId") Long orgId,
+                                             @Param("entityType") String entityType,
+                                             @Param("entityId") Long entityId);
+
     long countByOrganisationIdAndStatus(Long orgId, String status);
 }

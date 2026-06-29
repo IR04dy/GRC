@@ -12,6 +12,8 @@ public record EvidenceRequestResponse(
     String subControlCode,
     String subControlNameEn,
     String frameworkCode,
+    String entityType,
+    Long entityId,
     String titleEn,
     String titleAr,
     String descriptionEn,

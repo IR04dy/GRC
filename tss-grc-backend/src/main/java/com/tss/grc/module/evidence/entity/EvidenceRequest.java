@@ -26,6 +26,18 @@ public class EvidenceRequest extends BaseEntity {
     @Column(name = "sub_control_id")
     private Long subControlId;
 
+    /**
+     * Generic entity anchor — lets a request target any aggregate (a BCM plan,
+     * BIA, governance policy, crisis event, CAPA, …) instead of only a
+     * compliance sub-control. Free-form, mirroring the generic attachments
+     * table. Null for legacy compliance requests that use {@link #subControlId}.
+     */
+    @Column(name = "entity_type", length = 60)
+    private String entityType;
+
+    @Column(name = "entity_id")
+    private Long entityId;
+
     @Column(name = "title_en", nullable = false, length = 300)
     private String titleEn;
 
