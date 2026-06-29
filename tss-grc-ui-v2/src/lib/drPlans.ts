@@ -15,7 +15,7 @@ export interface DrPlan {
   drSiteType: DrSiteType;
   drSiteLocation?: string; drSiteProvider?: string;
   recoveryStrategyEn?: string; recoveryStrategyAr?: string;
-  dependenciesJson?: string; failoverStepsJson?: string; failbackStepsJson?: string;
+  dependenciesJson?: string; failoverStepsJson?: string; failbackStepsJson?: string; validationStepsJson?: string;
   dataBackupStrategyEn?: string; dataBackupStrategyAr?: string;
   lastTestedAt?: string; lastTestedOutcome?: DrTestOutcome; lastTestNotesEn?: string;
   nextTestDue?: string;
@@ -37,7 +37,7 @@ export interface DrCreateRequest {
   drSiteType: DrSiteType;
   drSiteLocation?: string; drSiteProvider?: string;
   recoveryStrategyEn?: string; recoveryStrategyAr?: string;
-  dependenciesJson?: string; failoverStepsJson?: string; failbackStepsJson?: string;
+  dependenciesJson?: string; failoverStepsJson?: string; failbackStepsJson?: string; validationStepsJson?: string;
   dataBackupStrategyEn?: string; dataBackupStrategyAr?: string;
 }
 

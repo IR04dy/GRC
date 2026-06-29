@@ -24,7 +24,7 @@ public final class DrPlanDtos {
             String drSiteLocation, String drSiteProvider,
             String recoveryStrategyEn, String recoveryStrategyAr,
             String dependenciesJson,
-            String failoverStepsJson, String failbackStepsJson,
+            String failoverStepsJson, String failbackStepsJson, String validationStepsJson,
             String dataBackupStrategyEn, String dataBackupStrategyAr
     ) {}
 
@@ -36,6 +36,7 @@ public final class DrPlanDtos {
             String drSiteType, String drSiteLocation, String drSiteProvider,
             String recoveryStrategyEn, String recoveryStrategyAr,
             String dependenciesJson, String failoverStepsJson, String failbackStepsJson,
+            String validationStepsJson,
             String dataBackupStrategyEn, String dataBackupStrategyAr,
             LocalDate nextTestDue
     ) {}
@@ -57,6 +58,7 @@ public final class DrPlanDtos {
             String drSiteType, String drSiteLocation, String drSiteProvider,
             String recoveryStrategyEn, String recoveryStrategyAr,
             String dependenciesJson, String failoverStepsJson, String failbackStepsJson,
+            String validationStepsJson,
             String dataBackupStrategyEn, String dataBackupStrategyAr,
             LocalDateTime lastTestedAt, String lastTestedOutcome, String lastTestNotesEn,
             LocalDate nextTestDue,
@@ -77,6 +79,7 @@ public final class DrPlanDtos {
                     p.getDrSiteType(), p.getDrSiteLocation(), p.getDrSiteProvider(),
                     p.getRecoveryStrategyEn(), p.getRecoveryStrategyAr(),
                     p.getDependenciesJson(), p.getFailoverStepsJson(), p.getFailbackStepsJson(),
+                    p.getValidationStepsJson(),
                     p.getDataBackupStrategyEn(), p.getDataBackupStrategyAr(),
                     p.getLastTestedAt(), p.getLastTestedOutcome(), p.getLastTestNotesEn(),
                     p.getNextTestDue(),

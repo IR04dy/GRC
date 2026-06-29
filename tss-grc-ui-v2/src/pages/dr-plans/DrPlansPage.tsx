@@ -238,6 +238,7 @@ export function DrPlansPage() {
                     const open = expanded.has(r.id);
                     const failover = parseDrSteps(r.failoverStepsJson);
                     const failback = parseDrSteps(r.failbackStepsJson);
+                    const validation = parseDrSteps(r.validationStepsJson);
                     const deps = parseDrDependencies(r.dependenciesJson);
                     return (
                       <Fragment key={r.id}>
@@ -383,6 +384,21 @@ export function DrPlansPage() {
                                           {lang === 'ar' && s.actionAr ? s.actionAr : s.actionEn}
                                           {s.owner && <span style={{ color:'var(--ink-3)' }}> — {s.owner}</span>}
                                           {s.minutesAllocated != null && <span className="mono"> ({s.minutesAllocated}m)</span>}
+                                        </li>
+                                      ))}
+                                    </ol>
+                                  </div>
+                                )}
+
+                                {validation.length > 0 && (
+                                  <div style={{ marginTop: 8 }}>
+                                    <strong>{t('drpValidationSteps')}</strong>
+                                    <ol style={{ paddingInlineStart: 18, marginTop: 4 }}>
+                                      {validation.map(s => (
+                                        <li key={s.seq}>
+                                          {lang === 'ar' && s.actionAr ? s.actionAr : s.actionEn}
+                                          {s.owner && <span style={{ color:'var(--ink-3)' }}> — {s.owner}</span>}
+                                          {s.doneAt && <span style={{ color: 'var(--success)' }}> ✓</span>}
                                         </li>
                                       ))}
                                     </ol>

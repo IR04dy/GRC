@@ -5374,6 +5374,7 @@ export const en = {
   drpDependencies:             'Dependencies',
   drpFailoverSteps:            'Failover steps',
   drpFailbackSteps:            'Failback steps',
+  drpValidationSteps:          'Validation checklist',
   drpBackup:                   'Backup strategy',
   drpActivationReason:         'Activation reason',
   drpEmpty:                    'No DR plans yet',

@@ -5354,6 +5354,7 @@ export const ar = {
   drpDependencies:             'الاعتماديات',
   drpFailoverSteps:            'خطوات التحويل',
   drpFailbackSteps:            'خطوات الاستعادة',
+  drpValidationSteps:          'قائمة التحقّق من التعافي',
   drpBackup:                   'استراتيجية النسخ الاحتياطي',
   drpActivationReason:         'سبب التفعيل',
   drpEmpty:                    'لا توجد خطط تعافي بعد',

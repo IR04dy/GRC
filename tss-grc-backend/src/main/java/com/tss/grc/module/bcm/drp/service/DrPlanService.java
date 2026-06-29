@@ -68,6 +68,7 @@ public class DrPlanService {
         p.setDependenciesJson(req.dependenciesJson());
         p.setFailoverStepsJson(req.failoverStepsJson());
         p.setFailbackStepsJson(req.failbackStepsJson());
+        p.setValidationStepsJson(req.validationStepsJson());
         p.setDataBackupStrategyEn(req.dataBackupStrategyEn());
         p.setDataBackupStrategyAr(req.dataBackupStrategyAr());
         p.setStatus("DRAFT");
@@ -98,6 +99,7 @@ public class DrPlanService {
         if (req.dependenciesJson() != null) p.setDependenciesJson(req.dependenciesJson());
         if (req.failoverStepsJson() != null) p.setFailoverStepsJson(req.failoverStepsJson());
         if (req.failbackStepsJson() != null) p.setFailbackStepsJson(req.failbackStepsJson());
+        if (req.validationStepsJson() != null) p.setValidationStepsJson(req.validationStepsJson());
         if (req.dataBackupStrategyEn() != null) p.setDataBackupStrategyEn(req.dataBackupStrategyEn());
         if (req.dataBackupStrategyAr() != null) p.setDataBackupStrategyAr(req.dataBackupStrategyAr());
         if (req.nextTestDue() != null) p.setNextTestDue(req.nextTestDue());

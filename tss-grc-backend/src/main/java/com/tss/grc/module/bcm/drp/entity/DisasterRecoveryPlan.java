@@ -45,6 +45,8 @@ public class DisasterRecoveryPlan {
     @Column(name = "dependencies_json",   columnDefinition = "NVARCHAR(MAX)") private String dependenciesJson;
     @Column(name = "failover_steps_json", columnDefinition = "NVARCHAR(MAX)") private String failoverStepsJson;
     @Column(name = "failback_steps_json", columnDefinition = "NVARCHAR(MAX)") private String failbackStepsJson;
+    /** Post-failover validation checklist (verify recovery succeeded) — B-F/B-G. */
+    @Column(name = "validation_steps_json", columnDefinition = "NVARCHAR(MAX)") private String validationStepsJson;
 
     @Column(name = "data_backup_strategy_en", columnDefinition = "NVARCHAR(MAX)") private String dataBackupStrategyEn;
     @Column(name = "data_backup_strategy_ar", columnDefinition = "NVARCHAR(MAX)") private String dataBackupStrategyAr;
