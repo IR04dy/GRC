@@ -1699,13 +1699,6 @@ export interface PolicyDto {
   nextReviewDate?: string; retiredAt?: string;
   rejectionReason?: string;
 }
-export interface PolicyRequest {
-  code: string;
-  titleEn: string; titleAr?: string;
-  version?: string; category?: string;
-  contentEn?: string; contentAr?: string;
-  effectiveFrom?: string; nextReviewDate?: string;
-}
 
 export const complianceApi = {
   controls:           (page = 0, size = 50) => api.get<PageResponse<ComplianceControlDto>>(`/api/v1/compliance/controls${pageQ(page, size)}`),
@@ -1729,17 +1722,9 @@ export const complianceApi = {
   markControlsUpdated:(id: number, controlsUpdatedCount: number) => api.post<RegulatoryChangeDto>(`/api/v1/compliance/regulatory-changes/${id}/mark-controls-updated`, { controlsUpdatedCount }),
   closeChange:        (id: number) => api.post<RegulatoryChangeDto>(`/api/v1/compliance/regulatory-changes/${id}/close`),
   changeStats:        () => api.get<unknown>('/api/v1/compliance/regulatory-changes/stats'),
-  // Policy lifecycle — §5.3 critical #2
+  // Policy register — legacy read-only archive (write lifecycle retired in C-4;
+  // canonical register is policy.documents at /policy-management).
   policies:           (page = 0, size = 50) => api.get<PageResponse<PolicyDto>>(`/api/v1/compliance/policies${pageQ(page, size)}`),
-  createPolicy:       (body: PolicyRequest) => api.post<PolicyDto>('/api/v1/compliance/policies', body),
-  updatePolicy:       (id: number, body: PolicyRequest) => api.put<PolicyDto>(`/api/v1/compliance/policies/${id}`, body),
-  deletePolicy:       (id: number) => api.delete<void>(`/api/v1/compliance/policies/${id}`),
-  submitForLegalReview: (id: number) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/submit-for-legal-review`),
-  legalApprovePolicy: (id: number) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/legal-approve`),
-  execApprovePolicy:  (id: number) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/exec-approve`),
-  markPolicyReviewDue:(id: number) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/mark-review-due`),
-  retirePolicy:       (id: number) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/retire`),
-  rejectPolicy:       (id: number, reason: string) => api.post<PolicyDto>(`/api/v1/compliance/policies/${id}/reject`, { reason }),
   policyStats:        () => api.get<unknown>('/api/v1/compliance/policies/stats'),
   // Findings aging engine — §5.3 recommendation #4
   findingsAging:      () => api.get<Array<ComplianceFindingDto & { daysOpen: number; escalationTier: string; createdAt?: string; capaStage?: string }>>('/api/v1/compliance/findings/aging'),

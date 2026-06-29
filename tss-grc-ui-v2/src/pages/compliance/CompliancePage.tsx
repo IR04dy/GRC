@@ -36,7 +36,6 @@ import {
   type ComplianceControlDto, type ComplianceControlRequest,
   type ComplianceAssessmentDto, type ComplianceFindingDto,
   type RegulatoryChangeDto, type RegulatoryChangeRequest,
-  type PolicyDto, type PolicyRequest,
   type AuditEngagementDto, type AuditEngagementRequest,
   type FrameworkDto, type FrameworkPolicyRowDto, type FrameworkCoverageDto, type FrameworkFindingRowDto, type FrameworkControlRowDto, type FrameworkDpiaRowDto,
   type FrameworkKriRowDto, type FrameworkRiskRowDto,
@@ -47,7 +46,7 @@ import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import {
   COMPLIANCE_CONTROLS, COMPLIANCE_ASSESSMENTS, COMPLIANCE_FINDINGS,
-  REGULATORY_CHANGES, POLICIES, AUDIT_ENGAGEMENTS,
+  REGULATORY_CHANGES, AUDIT_ENGAGEMENTS,
   FRAMEWORKS, FRAMEWORK_COVERAGE,
   FRAMEWORK_POLICIES_BY_ID, FRAMEWORK_FINDINGS_BY_ID, FRAMEWORK_CONTROLS_BY_ID,
   FRAMEWORK_DPIAS_BY_ID, FRAMEWORK_KRIS_BY_ID, FRAMEWORK_RISKS_BY_ID,
@@ -57,11 +56,11 @@ import { COMPLIANCE_WORKFLOWS } from '../../lib/mockWorkflows';
 import { COMPLIANCE_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { usePromoted } from '../../lib/promotedRecords';
-import { toFindingDto, toEngagementDto, toPolicyDto } from '../../lib/promotedAdapters';
+import { toFindingDto, toEngagementDto } from '../../lib/promotedAdapters';
 import { NitaqatPanel } from '../../components/compliance/NitaqatPanel';
 import { COMPLIANCE_ANCHORS } from '../../lib/moduleAnchors';
 
-type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'policies' | 'engagements' | 'frameworks' | 'nitaqat' | 'workflows';
+type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'engagements' | 'frameworks' | 'nitaqat' | 'workflows';
 
 // External audit lifecycle stages — assessment §5.3 #3
 const AUDIT_TYPE_OPTIONS = [
@@ -191,53 +190,10 @@ const IMPACT_LEVEL_OPTIONS = [
   { value: 'MEDIUM',   label: 'Medium' },
   { value: 'LOW',      label: 'Low' },
 ];
-// Policy taxonomy — expanded from the original 8 to cover the policy
-// families a Saudi-regulated entity (SAMA/NCA/SDAIA/CMA) actually maintains.
-// Anchored to NCA ECC + ISO 27001 + ISO 22301 + COSO ERM domains so a
-// compliance lead can map any policy 1-to-1.
-const POLICY_CATEGORY_OPTIONS = [
-  { value: 'INFORMATION_SECURITY', label: 'Information Security' },
-  { value: 'ACCESS_CONTROL',       label: 'Identity & Access Management' },
-  { value: 'CRYPTOGRAPHY',         label: 'Cryptography & Key Management' },
-  { value: 'NETWORK_SECURITY',     label: 'Network Security' },
-  { value: 'CLOUD_SECURITY',       label: 'Cloud Security' },
-  { value: 'ENDPOINT_SECURITY',    label: 'Endpoint & Device Security' },
-  { value: 'APPLICATION_SECURITY', label: 'Secure Software Development' },
-  { value: 'PRIVACY',              label: 'Privacy / PDPL' },
-  { value: 'DATA_GOVERNANCE',      label: 'Data Governance & Classification' },
-  { value: 'DATA_RETENTION',       label: 'Data Retention & Disposal' },
-  { value: 'RISK_MANAGEMENT',      label: 'Risk Management (ERM)' },
-  { value: 'BUSINESS_CONTINUITY',  label: 'Business Continuity' },
-  { value: 'DISASTER_RECOVERY',    label: 'Disaster Recovery (IT-DRP)' },
-  { value: 'INCIDENT_RESPONSE',    label: 'Incident Response' },
-  { value: 'VULNERABILITY_MGMT',   label: 'Vulnerability Management' },
-  { value: 'THIRD_PARTY',          label: 'Third-Party & Vendor Management' },
-  { value: 'CHANGE_MANAGEMENT',    label: 'Change Management' },
-  { value: 'ASSET_MANAGEMENT',     label: 'Asset Management (CMDB)' },
-  { value: 'PHYSICAL_SECURITY',    label: 'Physical & Environmental Security' },
-  { value: 'ACCEPTABLE_USE',       label: 'Acceptable Use' },
-  { value: 'REMOTE_WORK',          label: 'Remote Work / BYOD' },
-  { value: 'AML_KYC',              label: 'AML / KYC / Sanctions' },
-  { value: 'CODE_OF_CONDUCT',      label: 'Code of Conduct & Ethics' },
-  { value: 'WHISTLEBLOWING',       label: 'Whistleblowing' },
-  { value: 'ANTI_BRIBERY',         label: 'Anti-Bribery & Anti-Corruption' },
-  { value: 'CONFLICT_OF_INTEREST', label: 'Conflict of Interest' },
-  { value: 'HR',                   label: 'Human Resources' },
-  { value: 'SAUDIZATION',          label: 'Saudization (Nitaqat)' },
-  { value: 'FINANCE',              label: 'Finance & Treasury' },
-  { value: 'PROCUREMENT',          label: 'Procurement' },
-  { value: 'TRAINING_AWARENESS',   label: 'Training & Awareness' },
-  { value: 'AUDIT_ASSURANCE',      label: 'Audit & Assurance' },
-];
 const CHANGE_EMPTY: RegulatoryChangeRequest = {
   sourceAuthority: 'NCA', titleEn: '', titleAr: '', citation: '',
   summaryEn: '', summaryAr: '', publishedDate: '', effectiveDate: '',
   applicability: 'UNKNOWN', impactLevel: 'UNKNOWN', impactSummary: '',
-};
-const POLICY_EMPTY: PolicyRequest = {
-  code: '', titleEn: '', titleAr: '',
-  version: '1.0', category: 'INFORMATION_SECURITY',
-  contentEn: '', effectiveFrom: '', nextReviewDate: '',
 };
 
 const RISK_TONE_BADGE: Record<string, 'danger' | 'warning' | 'info' | 'success' | 'neutral'> = {
@@ -267,13 +223,6 @@ function changeToReq(c: RegulatoryChangeDto): RegulatoryChangeRequest {
     applicability: c.applicability, impactLevel: c.impactLevel, impactSummary: c.impactSummary,
   };
 }
-function policyToReq(p: PolicyDto): PolicyRequest {
-  return {
-    code: p.code, titleEn: p.titleEn, titleAr: p.titleAr,
-    version: p.version, category: p.category, contentEn: p.contentEn, contentAr: p.contentAr,
-    effectiveFrom: p.effectiveFrom, nextReviewDate: p.nextReviewDate,
-  };
-}
 // FIELDS now built inside the component via t()
 const EMPTY: ComplianceControlRequest = {
   code: '', nameEn: '', nameAr: '', framework: 'ISO_27001',
@@ -294,7 +243,7 @@ function ctrlToReq(c: ComplianceControlDto): ComplianceControlRequest {
   };
 }
 
-const TAB_IDS = ['overview', 'controls', 'internal', 'external', 'findings', 'scorecard', 'changes', 'policies', 'engagements', 'frameworks', 'nitaqat', 'workflows'] as const;
+const TAB_IDS = ['overview', 'controls', 'internal', 'external', 'findings', 'scorecard', 'changes', 'engagements', 'frameworks', 'nitaqat', 'workflows'] as const;
 function isTabId(s: string | null): s is TabId {
   return s != null && (TAB_IDS as readonly string[]).includes(s);
 }
@@ -306,10 +255,11 @@ export function CompliancePage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab');
-  // C-4: 'policies' is retired (canonical register moved to /policy-management);
-  // a stale deep link to ?tab=policies falls back to the overview.
+  // C-4: the legacy "Policies" tab is retired (canonical register moved to
+  // /policy-management). 'policies' is no longer a known TabId, so a stale
+  // ?tab=policies deep link fails isTabId() and falls back to the overview.
   const [tab, setTabState] = useState<TabId>(
-    isTabId(initialTab) && initialTab !== 'policies' ? initialTab : 'overview');
+    isTabId(initialTab) ? initialTab : 'overview');
   function setTab(next: TabId) {
     setTabState(next);
     const qs = new URLSearchParams(searchParams);
@@ -329,13 +279,11 @@ export function CompliancePage() {
   const assessments = useApiList<ComplianceAssessmentDto>(() => complianceApi.assessments(0, 100), COMPLIANCE_ASSESSMENTS);
   const findings    = useApiList<ComplianceFindingDto>(()    => complianceApi.findings(0, 100),    COMPLIANCE_FINDINGS);
   const changes     = useApiList<RegulatoryChangeDto>(()     => complianceApi.regulatoryChanges(0, 100), REGULATORY_CHANGES);
-  const policies    = useApiList<PolicyDto>(()               => complianceApi.policies(0, 100),    POLICIES);
   const engagements = useApiList<AuditEngagementDto>(()      => complianceApi.auditEngagements(0, 100), AUDIT_ENGAGEMENTS);
 
-  // DD-75: merge intake-promoted rows into findings, engagements, and policies.
+  // DD-75: merge intake-promoted rows into findings and engagements.
   const promotedFindings    = usePromoted('FINDING').map(toFindingDto);
   const promotedEngagements = usePromoted('ENGAGEMENT').map(toEngagementDto);
-  const promotedPolicies    = usePromoted('POLICY').map(toPolicyDto);
   const allFindings    = useMemo(() => [...promotedFindings, ...findings.data],       [promotedFindings, findings.data]);
   const allEngagements = useMemo(() => [...promotedEngagements, ...engagements.data], [promotedEngagements, engagements.data]);
 
@@ -357,10 +305,8 @@ export function CompliancePage() {
       .sort((a, b) => b.total - a.total)
       .slice(0, 6);
   }, [controls.data]);
-  const allPolicies    = useMemo(() => [...promotedPolicies, ...policies.data],       [promotedPolicies, policies.data]);
 
   const changeS = useEntityState<RegulatoryChangeDto>();
-  const policyS = useEntityState<PolicyDto>();
   const engageS = useEntityState<AuditEngagementDto>();
 
   // Findings aging — pulled separately so daysOpen + escalationTier + capaStage are present
@@ -405,7 +351,7 @@ export function CompliancePage() {
     { id: 'workflows',   label: t('complianceTabWorkflows') ?? 'Workflows' },
   ];
 
-  // ── Field defs for Regulatory Changes + Policies (built per-render so labels translate) ──
+  // ── Field defs for Regulatory Changes (built per-render so labels translate) ──
   // Localize the regulator dropdown so the AR name renders natively in
   // RTL. The enum value stays the same on the wire.
   const authorityOptionsLocalized = AUTHORITY_OPTIONS.map(a => ({
@@ -428,21 +374,8 @@ export function CompliancePage() {
     { kind: 'textarea', key: 'summaryEn',       label: t('complianceFldSummary'), rows: 3, span: 12 },
     { kind: 'textarea', key: 'impactSummary',   label: t('complianceFldImpactSummary'), rows: 2, span: 12 },
   ];
-  const POLICY_FIELDS: FieldDef[] = [
-    { kind: 'text',     key: 'code',     label: t('fldCode') + ' *', required: true, maxLength: 50, placeholder: 'POL-INFO-001', span: 4 },
-    { kind: 'text',     key: 'version',  label: t('fldVersion'), placeholder: '1.0', span: 4 },
-    // 32 policy categories — typeahead is mandatory at this length.
-    { kind: 'select-searchable', key: 'category', label: t('fldCategory'),
-      options: POLICY_CATEGORY_OPTIONS, span: 4,
-      placeholder: lang === 'ar' ? 'ابحث عن الفئة…' : 'Search category…' },
-    { kind: 'text',     key: 'titleEn',  label: t('fldTitleEnLbl') + ' *', required: true, maxLength: 500, span: 6 },
-    { kind: 'text',     key: 'titleAr',  label: t('fldTitleArLbl'), maxLength: 500, span: 6 },
-    { kind: 'date',     key: 'effectiveFrom',   label: t('complianceFldEffectiveFrom'), span: 6 },
-    { kind: 'date',     key: 'nextReviewDate',  label: t('fldNextReviewDate'), span: 6 },
-    { kind: 'textarea', key: 'contentEn',       label: t('complianceFldPolicyContent'), rows: 4, span: 12 },
-  ];
 
-  // ── Columns for Regulatory Changes + Policies ──
+  // ── Columns for Regulatory Changes ──
   const changeCols: Column<RegulatoryChangeDto>[] = [
     { header: t('complianceFldAuthority'), cell: r => <Badge tone="primary">{r.sourceAuthority}</Badge> },
     { header: t('colTitle'),               cell: r => <div><div style={{ fontWeight: 600 }}>{r.titleEn}</div>{r.citation && <div style={{ fontSize: 11, color: 'var(--ink-3)' }} className="mono">{r.citation}</div>}</div> },
@@ -461,41 +394,13 @@ export function CompliancePage() {
       } },
   ];
 
-  const policyCols: Column<PolicyDto>[] = [
-    { header: t('fldCode'),     cell: r => <span className="mono" style={{ fontWeight: 600 }}>{r.code}</span> },
-    { header: t('colTitle'),    cell: r => <div><div style={{ fontWeight: 600 }}>{r.titleEn}</div>{r.category && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{r.category.replace(/_/g, ' ')}</div>}</div> },
-    { header: t('fldVersion'),  cell: r => r.version, mono: true },
-    { header: t('complianceFldEffectiveFrom'), cell: r => r.effectiveFrom ?? '—', mono: true },
-    { header: t('fldNextReviewDate'),          cell: r => r.nextReviewDate ?? '—', mono: true },
-    { header: t('colStatus'),   cell: r => <Badge tone={STATUS_TONE_MAP[r.status] ?? 'info'} dot>{r.status.replace(/_/g, ' ')}</Badge> },
-    { header: '', align: 'end', width: '230px',
-      cell: r => {
-        const extras: Array<{ Icon: typeof Send; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
-        if (r.status === 'DRAFT' || r.status === 'REJECTED') extras.push({ Icon: Send,        onClick: () => submitForLegal(r),   title: t('complianceActSubmitLegal'),  tone: 'primary' });
-        if (r.status === 'LEGAL_REVIEW')                     extras.push({ Icon: CheckCheck,  onClick: () => legalApprove(r),     title: t('complianceActLegalApprove'), tone: 'accent' });
-        if (r.status === 'EXEC_APPROVAL')                    extras.push({ Icon: CheckCheck,  onClick: () => execApprove(r),      title: t('complianceActExecApprove'),  tone: 'success' });
-        if (r.status === 'PUBLISHED')                        extras.push({ Icon: RotateCcw,   onClick: () => markReviewDue(r),    title: t('complianceActMarkReview'),   tone: 'accent' });
-        if (r.status === 'PUBLISHED' || r.status === 'REVIEW_DUE') extras.push({ Icon: Archive, onClick: () => retire(r),         title: t('complianceActRetire'),       tone: 'primary' });
-        if (r.status === 'LEGAL_REVIEW' || r.status === 'EXEC_APPROVAL') extras.push({ Icon: XIcon, onClick: () => rejectPolicy(r), title: t('complianceActReject') });
-        return <RowActions extras={extras} onEdit={() => policyS.startEdit(r)} onDelete={() => policyS.askDelete(r)} />;
-      } },
-  ];
-
-  // ── Submit + workflow handlers (Regulatory Changes + Policies) ──
+  // ── Submit + workflow handlers (Regulatory Changes) ──
   async function submitChange(values: RegulatoryChangeRequest) {
     try {
       if (changeS.editing) await complianceApi.updateChange(changeS.editing.id, values);
       else await complianceApi.createChange(values);
       toast.success(changeS.editing ? 'Change updated' : 'Change added');
       changeS.closeModal(); changes.reload();
-    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
-  }
-  async function submitPolicy(values: PolicyRequest) {
-    try {
-      if (policyS.editing) await complianceApi.updatePolicy(policyS.editing.id, values);
-      else await complianceApi.createPolicy(values);
-      toast.success(policyS.editing ? 'Policy updated' : 'Policy added');
-      policyS.closeModal(); policies.reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
   }
   async function assessApplicability(c: RegulatoryChangeDto) {
@@ -541,50 +446,7 @@ export function CompliancePage() {
     try { await complianceApi.closeChange(c.id); toast.success('Change closed'); changes.reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
-  async function submitForLegal(p: PolicyDto) {
-    try { await complianceApi.submitForLegalReview(p.id); toast.success('Submitted for legal review'); policies.reload(); }
-    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
-  }
-  async function legalApprove(p: PolicyDto) {
-    try { await complianceApi.legalApprovePolicy(p.id); toast.success('Legal review approved'); policies.reload(); }
-    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
-  }
-  async function execApprove(p: PolicyDto) {
-    const ok = await dialog.confirm({
-      title: lang === 'ar' ? 'اعتماد تنفيذي ونشر' : 'Executive approval & publish',
-      body: lang === 'ar'
-        ? `نشر السياسة "${p.titleEn}" عبر الاعتماد التنفيذي؟ سيُضبط تاريخ السريان = اليوم وتاريخ المراجعة القادمة = +12 شهراً إن كان فارغاً.`
-        : `Publish policy "${p.titleEn}" via executive approval? This sets effective_from = today and nextReviewDate = +12 months if blank.`,
-      submitLabel: lang === 'ar' ? 'نشر' : 'Publish',
-    });
-    if (!ok) return;
-    try { await complianceApi.execApprovePolicy(p.id); toast.success(lang === 'ar' ? 'تم نشر السياسة' : 'Policy published'); policies.reload(); }
-    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
-  }
-  async function markReviewDue(p: PolicyDto) {
-    try { await complianceApi.markPolicyReviewDue(p.id); toast.success('Marked review-due'); policies.reload(); }
-    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
-  }
-  async function retire(p: PolicyDto) {
-    const ok = await dialog.confirm({
-      title: lang === 'ar' ? 'إيقاف السياسة' : 'Retire policy',
-      body: lang === 'ar' ? `إيقاف السياسة "${p.titleEn}"؟ لن تعود سارية المفعول.` : `Retire policy "${p.titleEn}"? It will no longer be enforceable.`,
-      destructive: true, submitLabel: lang === 'ar' ? 'إيقاف' : 'Retire',
-    });
-    if (!ok) return;
-    try { await complianceApi.retirePolicy(p.id); toast.success(lang === 'ar' ? 'تم إيقاف السياسة' : 'Policy retired'); policies.reload(); }
-    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
-  }
-  async function rejectPolicy(p: PolicyDto) {
-    const reason = await dialog.prompt({
-      title: lang === 'ar' ? 'سبب الرفض' : 'Rejection reason',
-      label: lang === 'ar' ? 'سبب رفض السياسة' : 'Reason for rejecting the policy',
-      type: 'textarea', required: true,
-    });
-    if (!reason) return;
-    try { await complianceApi.rejectPolicy(p.id, reason); toast.success(lang === 'ar' ? 'تم رفض السياسة' : 'Policy rejected'); policies.reload(); }
-    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
-  }
+
   // ── External audit engagement workflow (assessment §5.3 #3) ──────────────
   async function submitEngagement(values: AuditEngagementRequest) {
     try {
@@ -681,14 +543,13 @@ export function CompliancePage() {
 
   // Tab-aware "New" dispatcher.
   // DD-79: route audit-engagement creation through the Services Center
-  // so it gets a reference code + DPO/Audit-Lead triage. Policies and
-  // regulatory changes are admin-managed here; controls remain legacy.
+  // so it gets a reference code + DPO/Audit-Lead triage. Regulatory
+  // changes are admin-managed here; controls remain legacy.
   function newAction() {
     return () => {
       switch (tab) {
         case 'engagements': return navigate('/intake/audit_request');
         case 'changes':     return changeS.startCreate();
-        case 'policies':    return policyS.startCreate();
         default:            return setOpen(true);  // Controls modal (legacy)
       }
     };
@@ -864,12 +725,12 @@ export function CompliancePage() {
   // mock data (no auth, API error, or empty backend), not just controls — so a
   // single live register can no longer mask sample data shown on other tabs.
   const isDemo = controls.isDemo || assessments.isDemo || findings.isDemo
-    || changes.isDemo || policies.isDemo || engagements.isDemo;
+    || changes.isDemo || engagements.isDemo;
 
   // Sprint 4 §2.7 — live compliance dashboard
   const { pulse } = useLiveRefresh({
-    kinds: ['changed.compliance_assessment', 'changed.audit_finding', 'changed.policy', 'changed.regulatory_change', 'changed.audit_engagement'],
-    onRefresh: () => { findings.reload(); assessments.reload(); policies.reload(); changes.reload(); engagements.reload(); },
+    kinds: ['changed.compliance_assessment', 'changed.audit_finding', 'changed.regulatory_change', 'changed.audit_engagement'],
+    onRefresh: () => { findings.reload(); assessments.reload(); changes.reload(); engagements.reload(); },
     waitMs: 600,
     enabled: !isDemo,
   });
@@ -956,12 +817,6 @@ export function CompliancePage() {
         <Card padded={false}>
           {changes.loading ? <LoadingRow /> : <DataTable columns={changeCols} rows={changes.data}
             empty={<EmptyState Icon={ScrollText} title="No regulatory changes tracked" sub="New laws, amendments and guidance from NCA, SDAIA, SAMA, CMA, ZATCA, CITC, NCEMA flow through here." />} />}
-        </Card>
-      )}
-      {tab === 'policies' && (
-        <Card padded={false}>
-          {policies.loading ? <LoadingRow /> : <DataTable columns={policyCols} rows={allPolicies} rowHref={r => `/policies/${r.id}`}
-            empty={<EmptyState Icon={BookCopy} title="No policies on file" sub="Author, review, approve and publish enterprise policies through the lifecycle." />} />}
         </Card>
       )}
       {tab === 'internal' && (
@@ -1068,20 +923,6 @@ export function CompliancePage() {
         confirmLabel={t('deleteBtn')}
         onCancel={changeS.closeConfirm}
         onConfirm={() => execDelete(changeS.confirmDel, complianceApi.deleteChange, changeS.closeConfirm, changes.reload, 'Change')} />
-
-      {/* Policy modal + confirm */}
-      <FormModal<PolicyRequest> open={policyS.open}
-        title={policyS.editing ? `${t('editPrefix')} · ${policyS.editing.code}` : t('newPolicyTitle')}
-        fields={POLICY_FIELDS}
-        initial={policyS.editing ? policyToReq(policyS.editing) : POLICY_EMPTY}
-        onClose={policyS.closeModal} onSubmit={submitPolicy} />
-      <ConfirmDialog
-        open={!!policyS.confirmDel} destructive busy={busy}
-        title={t('complianceConfirmDeletePolicy')}
-        message={policyS.confirmDel ? `Policy "${policyS.confirmDel.code} · ${policyS.confirmDel.titleEn}" ${t('confirmDeleteSuffix')}` : ''}
-        confirmLabel={t('deleteBtn')}
-        onCancel={policyS.closeConfirm}
-        onConfirm={() => execDelete(policyS.confirmDel, complianceApi.deletePolicy, policyS.closeConfirm, policies.reload, 'Policy')} />
 
       {/* External audit engagement modal + confirm — §5.3 #3 */}
       <FormModal<AuditEngagementRequest> open={engageS.open}
