@@ -19,14 +19,14 @@ import { useDialog } from '../../lib/dialog';
 import {
   listPolicies, createPolicy, transitionPolicy, deletePolicy,
   newPolicyVersion, updatePolicy, runPolicyExpirySweep, policyAggregate, getPolicyEvidencePackage, getPolicyResolvedControls,
-  setPolicyControlLinks, listControlCatalog,
+  setPolicyControlLinks, listControlCatalog, listFrameworks,
   listExceptions, createException, transitionException, runExceptionExpirySweep,
   listAttestations, attestPolicy, declineAttestation, createAttestation,
   policyStatusTone, policyStatusLabel, nextPolicyStatuses,
   exceptionStatusTone, exceptionStatusLabel, nextExceptionStatuses,
   attestationStatusTone, attestationStatusLabel,
   type PolicyDocument, type PolicyException, type PolicyAttestation,
-  type PolicyAggregate, type PolicyStatus, type ExceptionStatus, type ResolvedControl, type ControlCatalogItem,
+  type PolicyAggregate, type PolicyStatus, type ExceptionStatus, type ResolvedControl, type ControlCatalogItem, type FrameworkOption,
 } from '../../lib/policy';
 
 type PolicyTab = 'overview' | 'documents' | 'exceptions' | 'attestations';
@@ -177,6 +177,8 @@ function DocumentsTab() {
   const [showCreate, setShowCreate] = useState(false);
   const [docsFor, setDocsFor] = useState<PolicyDocument | null>(null);
   const [controlsFor, setControlsFor] = useState<PolicyDocument | null>(null);
+  const [frameworks, setFrameworks] = useState<FrameworkOption[]>([]);
+  useEffect(() => { listFrameworks().then(setFrameworks).catch(() => setFrameworks([])); }, []);
 
   async function reload() {
     setLoading(true);
@@ -194,7 +196,12 @@ function DocumentsTab() {
 
   async function onCreate(body: Record<string, unknown>) {
     try {
-      await createPolicy(body as unknown as Partial<PolicyDocument>);
+      // C-12: the framework field is a real FK picker — derive framework_id and
+      // the display name from the chosen framework.
+      const fwId = body.frameworkId ? Number(body.frameworkId) : undefined;
+      const fw = frameworks.find(f => f.id === fwId);
+      const payload = { ...body, frameworkId: fwId, relatedFramework: fw?.nameEn };
+      await createPolicy(payload as unknown as Partial<PolicyDocument>);
       toast.success(isAr ? 'تم إنشاء السياسة' : 'Policy created');
       setShowCreate(false);
       await reload();
@@ -306,7 +313,8 @@ function DocumentsTab() {
         { value: 'TRIENNIAL', label: isAr ? 'كل 3 سنوات' : 'Triennial' },
         { value: 'AD_HOC', label: isAr ? 'حسب الحاجة' : 'Ad hoc' },
       ] },
-    { kind: 'text',     key: 'relatedFramework', span: 4, label: isAr ? 'الإطار المرتبط' : 'Related framework' },
+    { kind: 'select',   key: 'frameworkId', span: 4, label: isAr ? 'الإطار المرتبط' : 'Related framework',
+      options: frameworks.map(f => ({ value: String(f.id), label: isAr && f.nameAr ? f.nameAr : f.nameEn })) },
     { kind: 'textarea', key: 'summaryEn', span: 12, rows: 2, label: isAr ? 'الملخص (إنجليزي)' : 'Summary (EN)' },
     { kind: 'textarea', key: 'summaryAr', span: 12, rows: 2, label: isAr ? 'الملخص (عربي)' : 'Summary (AR)' },
   ], [isAr]);

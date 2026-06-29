@@ -32,6 +32,7 @@ export interface PolicyDocument {
   retiredReason?: string;
   relatedFramework?: string;
   relatedControls?: string;
+  frameworkId?: number;
   notes?: string;
 }
 
@@ -162,6 +163,12 @@ export function listControlCatalog() {
 }
 export function setPolicyControlLinks(id: number, controlIds: number[]) {
   return api.put<ResolvedControl[]>(`${BASE}/documents/${id}/controls`, { controlIds });
+}
+
+// C-12: framework library for the create-form picker (sets framework_id + name).
+export interface FrameworkOption { id: number; nameEn: string; nameAr?: string; }
+export function listFrameworks() {
+  return api.get<FrameworkOption[]>('/api/v1/compliance/frameworks');
 }
 
 // ─── Exceptions ──────────────────────────────────────────────────────
