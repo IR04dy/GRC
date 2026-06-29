@@ -17,8 +17,8 @@
 | **B-C** | File upload on CAPA register (closure evidence) — **B-C complete** | ✅ Shipped | `e84efa24` |
 | **B-B** | Evidence-request **backend**: generic `entity_type`/`entity_id` on `EvidenceRequest` + `by-entity` endpoint (reuses SLA scheduler/reminders/escalation) | ✅ Shipped | `3bf2663e` |
 | **B-B** | Evidence-request **frontend**: `EvidenceRequestsField` (dept/assignee/due/priority + countdown + lifecycle) wired into all 5 BCM surfaces — **B-B complete** | ✅ Shipped | `64e1c1d1` |
-| B-A | Real BIA→BCP/DRP generator | ⏳ Next | — |
-| B-D | Evidence lifecycle (review / reject→gap / resubmit / expiry) | ⏳ Pending | — |
+| **B-A** | BIA→BCP/DRP generator seeds real section content (objectives, MBCO, resources, workaround, suppliers, dependencies) from the BIA | ✅ Shipped | `93a2792c` |
+| B-D | Evidence lifecycle (review / reject→gap / resubmit / expiry) | ⏳ Next | — |
 | B-E | Exercise→gap→CAPA closure | ⏳ Pending | — |
 | B-F/B-G | DRP / BIA depth | ⏳ Pending | — |
 | B-H | `exercise-runs` list endpoint | ⏳ Pending | — |
@@ -36,7 +36,7 @@ Live evidence (this review): `cycles` 2, `governance` 1, `bia-assessments` 6, `d
 
 **However, it is not yet fully market-ready for a Saudi BCM buyer**, for a small number of *specific, high-impact* reasons:
 
-1. **"Generate BCP/DRP from BIA" is a stub.** `BcmBiaAssessmentService.generateBcpStub`/`generateDrpStub` + `markBcpGenerated(biaId,bcpId)` only **stamp the BIA with a `generatedBcpId`/`generatedDrpId` placeholder and write an audit line** — they do *not* materialise a populated plan from the BIA. The single most important BCM lifecycle linkage (BIA drives the plan) is cosmetic.
+1. ~~**"Generate BCP/DRP from BIA" is a stub.**~~ **✅ RESOLVED (B-A, `93a2792c`).** The legacy `generateBcpStub`/`generateDrpStub` path only stamped an id, but the wizard already used the structured `BcpPlanService.generateFromBia` (which copied RTO/RPO/MTPD + the section catalogue). That generator now also **seeds the section bodies from the BIA** — recovery objectives, MBCO, minimum resources, manual workaround, critical suppliers, dependencies — so the generated plan starts with real content. The BIA→plan linkage is now substantive, not cosmetic.
 2. **No real evidence-request workflow, and file upload is almost absent.** There is **no `MultipartFile` anywhere in `module/bcm`** and **no use of the generic evidence subsystem** (`EvidenceRequest` / `EvidenceLink` / `AttachmentService`). BCM "evidence" is: a reference-by-id (`BcmComplianceMapping.attachEvidence(evidenceId)`), a CAPA status flag (`EVIDENCE_SUBMITTED`), and a read-side audit **export** package (`BcmEvidencePackageService`). Real file upload appears in only **2** of ~33 BCM pages (`AarDetailPage`, `ExerciseScenarioDetailPage`) via the generic attachment controller. There is **no "request evidence from a department"** flow — no owner, due date, countdown, SLA, reminders, or escalation — anywhere in BCM. Plans, DR-test results, BIAs, and CAPAs cannot carry an uploaded evidence file.
 3. **Evidence lifecycle (expiry / rejection→gap / resubmission) is absent** in BCM (a consequence of #2).
 
@@ -93,14 +93,14 @@ The 70 lifecycle tasks the module must support, with current status (✅ impleme
 | 26 | Create continuity strategy | ✅ | strategy + ROI (`/roi/analyses`) |
 | 27 | Compare continuity strategies | ✅ | StrategyRoi |
 | 28 | Approve selected strategy | ✅ | strategy approval |
-| 29 | **Generate BCP from BIA** | ✗ | **STUB — stamps id only, no plan generated** |
+| 29 | **Generate BCP from BIA** | ✅ | B-A: `generateFromBia` copies RTO/RPO/MTPD + seeds 6 sections from BIA `93a2792c` |
 | 30 | Add BCP activation criteria | ✅ | BCP builder (V107) |
 | 31 | Add BCP response team | ✅ | BCP builder |
 | 32 | Add BCP recovery steps | ✅ | BCP builder |
 | 33 | Add communication tree | ✅ | comms + communication-contacts |
 | 34 | Submit BCP for approval | ✅ | plan lifecycle |
 | 35 | Approve & publish BCP | ✅ | `BCM_PLAN_APPROVED`/`PUBLISHED` |
-| 36 | **Generate DRP from BIA** | ✗ | **STUB — stamps id only** |
+| 36 | **Generate DRP from BIA** | ✅ | B-A: seeds business_linkage/recovery_objectives/dependencies from BIA `93a2792c` |
 | 37 | Add DRP recovery sequence | ✅ | `DrPlanService` |
 | 38 | Add failover & validation steps | ◑ | partial; verify checklist/rollback |
 | 39 | Add backup evidence | ✅ | B-C: DR-plan backup & test evidence upload (DR_PLAN) `40bef8d4` |
