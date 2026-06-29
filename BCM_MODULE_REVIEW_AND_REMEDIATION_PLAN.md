@@ -19,8 +19,8 @@
 | **B-B** | Evidence-request **frontend**: `EvidenceRequestsField` (dept/assignee/due/priority + countdown + lifecycle) wired into all 5 BCM surfaces — **B-B complete** | ✅ Shipped | `64e1c1d1` |
 | **B-A** | BIA→BCP/DRP generator seeds real section content (objectives, MBCO, resources, workaround, suppliers, dependencies) from the BIA | ✅ Shipped | `93a2792c` |
 | **B-D** | Evidence lifecycle: rejected request → auto-opens a BCM gap (F8 event + `BcmGapRecordCreator`, deduped); review/resubmit/attachment-expiry already worked | ✅ Shipped | `f895befc` |
-| B-E | Exercise→gap→CAPA closure | ⏳ Next | — |
-| B-F/B-G | DRP / BIA depth | ⏳ Pending | — |
+| **B-E** | Exercise→gap→CAPA closure: promote an exercise observation to a tracked BCM gap (idempotent, severity-mapped, linked); gap→CAPA already existed | ✅ Shipped | `fc83772a` |
+| B-F/B-G | DRP / BIA depth | ⏳ Next | — |
 | B-H | `exercise-runs` list endpoint | ⏳ Pending | — |
 | B-I | Arabic/RTL walk + role-permission ratchet | ⏳ Pending | — |
 
@@ -109,7 +109,7 @@ The 70 lifecycle tasks the module must support, with current status (✅ impleme
 | 42 | Create exercise | ✅ | scenario library + runtime |
 | 43 | Execute exercise | ✅ | `ExerciseRuntimeService` + consoles |
 | 44 | Record exercise result | ✅ | runtime + observer |
-| 45 | Create gap from failed exercise | ◑ | AAR draft on completion; gap link partial |
+| 45 | Create gap from failed exercise | ✅ | B-E: promote observation → BcmGap (source EXERCISE), idempotent + linked `fc83772a` |
 | 46 | Create corrective action | ✅ | CAPA + F8 auto-create on DR fail |
 | 47 | Close corrective action | ✅ | CAPA transitions |
 | 48 | Create crisis event | ✅ | `CrisisEventController` |
