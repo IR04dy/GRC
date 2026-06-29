@@ -14,6 +14,9 @@ public interface AuditFindingRepository extends JpaRepository<AuditFinding, Long
 
     Page<AuditFinding> findByOrganisationId(Long organisationId, Pageable pageable);
 
+    /** C-12/item-20 — dedup auto-created gaps by their source marker (clause_ref). */
+    List<AuditFinding> findByOrganisationIdAndClauseRef(Long organisationId, String clauseRef);
+
     @Query("""
         SELECT f FROM AuditFinding f
         WHERE f.organisationId = :orgId
