@@ -91,4 +91,8 @@ public class ExerciseObservation extends BaseEntity {
 
     @Column(name = "is_flagged_for_aar", nullable = false)
     private Boolean isFlaggedForAar = false;
+
+    /** Set once this observation has been promoted to a tracked BCM gap (B-E). */
+    @Column(name = "gap_id")
+    private Long gapId;
 }

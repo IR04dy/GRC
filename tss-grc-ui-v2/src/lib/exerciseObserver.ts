@@ -61,6 +61,8 @@ export interface ObservationView {
   recordedAt: string;
   timeOffsetMinutes: number;
   isFlaggedForAar: boolean;
+  /** Set once promoted to a tracked BCM gap (B-E); null/undefined otherwise. */
+  gapId?: number | null;
 }
 
 export interface ObserverDashboard {
@@ -206,6 +208,14 @@ export function flagObservation(
 
 export function listObservations(runId: number): Promise<ObservationView[]> {
   return api.get<ObservationView[]>(`${BASE}/${runId}/observations`);
+}
+
+/** Created/returned BCM gap shape (subset) from promote-to-gap. */
+export interface PromotedGap { id: number; titleEn: string; status: string; severity: string; source: string; }
+
+/** Promote an observation to a tracked BCM gap (B-E). Idempotent server-side. */
+export function promoteObservationToGap(runId: number, observationId: number): Promise<PromotedGap> {
+  return api.post<PromotedGap>(`${BASE}/${runId}/observations/${observationId}/promote-to-gap`, {});
 }
 
 export function observationsByType(runId: number): Promise<ObservationsByType> {

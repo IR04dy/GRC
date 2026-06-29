@@ -16,6 +16,9 @@ import com.tss.grc.module.bcm.cycle.runtime.observer.dto.ObserverDtos.Observatio
 import com.tss.grc.module.bcm.cycle.runtime.observer.dto.ObserverDtos.ObservationsByType;
 import com.tss.grc.module.bcm.cycle.runtime.observer.dto.ObserverDtos.ObserverDashboard;
 import com.tss.grc.module.bcm.cycle.runtime.observer.entity.ExerciseObservation;
+import com.tss.grc.module.bcm.cycle.entity.BcmGap;
+import com.tss.grc.module.bcm.cycle.repository.BcmGapRepository;
+import com.tss.grc.module.bcm.cycle.service.BcmRemediationService;
 import com.tss.grc.module.bcm.cycle.runtime.observer.entity.ExerciseObserverAssignment;
 import com.tss.grc.module.bcm.cycle.runtime.observer.repository.ExerciseObservationRepository;
 import com.tss.grc.module.bcm.cycle.runtime.observer.repository.ExerciseObserverAssignmentRepository;
@@ -108,6 +111,8 @@ public class ExerciseObserverService {
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
     private final RealtimeBroadcaster realtime;
+    private final BcmRemediationService remediation;
+    private final BcmGapRepository gaps;
 
     private static Long org() {
         return TenantContext.requireOrganisationId();
@@ -404,6 +409,68 @@ public class ExerciseObserverService {
         return toObservationView(saved);
     }
 
+    /**
+     * Promote an exercise observation to a tracked BCM gap (epic B-E —
+     * exercise → gap → CAPA closure). Idempotent: if the observation already
+     * links to an open gap, that gap is returned rather than a duplicate
+     * created. The gap carries {@code source=EXERCISE} and links back via
+     * {@code relatedRecordType="ExerciseObservation"} so the closure loop is
+     * traceable; from the gap a CAPA is raised in the remediation workspace.
+     */
+    @Transactional
+    public BcmGap promoteObservationToGap(Long runId, Long observationId) {
+        Long orgId = org();
+        ExerciseRun run = loadRun(runId, orgId);
+        ExerciseObservation o = observationRepo.findByIdAndOrganisationId(observationId, orgId)
+            .filter(x -> Objects.equals(x.getExerciseRunId(), runId))
+            .orElseThrow(() -> new EntityNotFoundException(
+                "Observation " + observationId + " not found on run " + runId));
+
+        // Idempotent — reuse the existing gap unless it was closed.
+        if (o.getGapId() != null) {
+            BcmGap existing = gaps.findByIdAndOrganisationId(o.getGapId(), orgId).orElse(null);
+            if (existing != null && !"CLOSED".equalsIgnoreCase(existing.getStatus())) {
+                return existing;
+            }
+        }
+
+        BcmGap gap = new BcmGap();
+        gap.setSource("EXERCISE");
+        gap.setSeverity(mapSeverity(o.getSeverity()));
+        gap.setStatus("OPEN");
+        gap.setRelatedRecordType("ExerciseObservation");
+        gap.setRelatedRecordId(o.getId());
+        String text = o.getObservationTextEn() != null ? o.getObservationTextEn() : o.getObservationTextAr();
+        gap.setTitleEn("Exercise finding (" + run.getRunCode() + "): " + truncate(text, 180));
+        gap.setTitleAr(o.getObservationTextAr() != null
+            ? "ملاحظة تمرين (" + run.getRunCode() + "): " + truncate(o.getObservationTextAr(), 180) : null);
+        gap.setDescription(text);
+        gap.setRootCause(o.getRecommendationEn() != null
+            ? "Observer recommendation: " + o.getRecommendationEn() : null);
+
+        BcmGap saved = remediation.createGap(gap);
+        o.setGapId(saved.getId());
+        observationRepo.save(o);
+
+        audit.log("CREATE", "BcmGap", saved.getId(),
+            "Gap opened from exercise observation " + o.getId() + " on run " + run.getRunCode());
+        log.info("[exercise] observation #{} promoted to BcmGap #{} (run {})",
+            o.getId(), saved.getId(), run.getRunCode());
+        return saved;
+    }
+
+    /** Exercise observation severity → BCM gap severity. */
+    private static String mapSeverity(String obs) {
+        if (obs == null) return "MEDIUM";
+        return switch (obs.toUpperCase()) {
+            case "CRITICAL"        -> "CRITICAL";
+            case "MAJOR"           -> "HIGH";
+            case "MODERATE"        -> "MEDIUM";
+            case "MINOR", "INFO"   -> "LOW";
+            default                 -> "MEDIUM";
+        };
+    }
+
     @Transactional(readOnly = true)
     public List<ObservationView> listObservations(Long runId) {
         Long orgId = org();
@@ -606,7 +673,8 @@ public class ExerciseObserverService {
             o.getObservationType(), o.getSeverity(),
             o.getRecommendationEn(), o.getRecommendationAr(),
             o.getRecordedAt(), o.getTimeOffsetMinutes(),
-            Boolean.TRUE.equals(o.getIsFlaggedForAar())
+            Boolean.TRUE.equals(o.getIsFlaggedForAar()),
+            o.getGapId()
         );
     }
 

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Eye, Clock, Send, Flag, AlertTriangle, MessageSquare, ListChecks,
   Users, Activity, FileText, Landmark, Megaphone, Info, Sparkles,
-  ShieldCheck, CheckCircle2,
+  ShieldCheck, CheckCircle2, AlertOctagon,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -22,7 +22,7 @@ import {
   type InjectView, type ResponseView,
 } from '../../lib/exerciseRuntime';
 import {
-  getObserverDashboard, recordObservation, flagObservation,
+  getObserverDashboard, recordObservation, flagObservation, promoteObservationToGap,
   OBSERVER_CONSOLE_TITLE, OBSERVATION_TYPE_LABELS, OBSERVATION_TYPE_ORDER,
   SEVERITY_LABELS, SEVERITY_ORDER, OBSERVER_ROLE_LABELS,
   observationTypeBadgeTone, severityBadgeTone,
@@ -211,6 +211,21 @@ export function ObserverDashboardPage() {
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
         : (isAr ? 'تعذّر تغيير العلامة' : 'Flag change failed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Promote an observation to a tracked BCM gap (B-E). Idempotent server-side.
+  async function onPromote(obs: ObservationView) {
+    setBusy(true);
+    try {
+      const gap = await promoteObservationToGap(runId, obs.id);
+      toast.success(isAr ? `تم إنشاء فجوة #${gap.id}` : `Gap #${gap.id} created`);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر إنشاء الفجوة' : 'Could not create gap'));
     } finally {
       setBusy(false);
     }
@@ -507,7 +522,8 @@ export function ObserverDashboardPage() {
                     isAr={isAr}
                     isMine={o.observerUserId === myUserId}
                     busy={busy}
-                    onToggleFlag={() => onToggleFlag(o)} />
+                    onToggleFlag={() => onToggleFlag(o)}
+                    onPromote={() => onPromote(o)} />
                 ))}
               </div>
             )}
@@ -644,13 +660,14 @@ function ReadOnlyResponseCard({ r, isAr }: { r: ResponseView; isAr: boolean }) {
 }
 
 function ObservationCard({
-  o, isAr, isMine, busy, onToggleFlag,
+  o, isAr, isMine, busy, onToggleFlag, onPromote,
 }: {
   o: ObservationView;
   isAr: boolean;
   isMine: boolean;
   busy: boolean;
   onToggleFlag: () => void;
+  onPromote: () => void;
 }) {
   const txt = isAr && o.observationTextAr ? o.observationTextAr : o.observationTextEn;
   const rec = isAr && o.recommendationAr ? o.recommendationAr : o.recommendationEn;
@@ -694,17 +711,29 @@ function ObservationCard({
             {' '}
             #{isAr ? toArabicDigits(o.observerUserId) : o.observerUserId}
           </span>
-          {isMine && (
-            <Button size="sm"
-              variant={o.isFlaggedForAar ? 'secondary' : 'primary'}
-              Icon={Flag}
-              disabled={busy}
-              onClick={onToggleFlag}>
-              {o.isFlaggedForAar
-                ? (isAr ? 'إزالة العلامة' : 'Unflag')
-                : (isAr ? 'وضع علامة للتقرير' : 'Flag for AAR')}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* B-E: promote a finding to a tracked BCM gap (drives a CAPA). */}
+            {o.gapId
+              ? <Badge tone="warning">
+                  <AlertOctagon size={10} className="inline" />{' '}
+                  {isAr ? `فجوة #${o.gapId}` : `Gap #${o.gapId}`}
+                </Badge>
+              : <Button size="sm" variant="ghost" Icon={AlertOctagon}
+                  disabled={busy} onClick={onPromote}>
+                  {isAr ? 'إنشاء فجوة' : 'Create gap'}
+                </Button>}
+            {isMine && (
+              <Button size="sm"
+                variant={o.isFlaggedForAar ? 'secondary' : 'primary'}
+                Icon={Flag}
+                disabled={busy}
+                onClick={onToggleFlag}>
+                {o.isFlaggedForAar
+                  ? (isAr ? 'إزالة العلامة' : 'Unflag')
+                  : (isAr ? 'وضع علامة للتقرير' : 'Flag for AAR')}
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
     </div>

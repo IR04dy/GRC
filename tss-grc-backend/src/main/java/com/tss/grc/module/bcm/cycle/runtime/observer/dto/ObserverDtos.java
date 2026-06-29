@@ -92,7 +92,9 @@ public final class ObserverDtos {
         String recommendationAr,
         LocalDateTime recordedAt,
         Integer timeOffsetMinutes,
-        Boolean isFlaggedForAar
+        Boolean isFlaggedForAar,
+        /** Set once promoted to a tracked BCM gap (B-E); null otherwise. */
+        Long gapId
     ) {}
 
     /**

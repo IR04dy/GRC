@@ -8,6 +8,8 @@ import com.tss.grc.module.bcm.cycle.runtime.observer.dto.ObserverDtos.Observatio
 import com.tss.grc.module.bcm.cycle.runtime.observer.dto.ObserverDtos.ObservationsByType;
 import com.tss.grc.module.bcm.cycle.runtime.observer.dto.ObserverDtos.ObserverDashboard;
 import com.tss.grc.module.bcm.cycle.runtime.observer.service.ExerciseObserverService;
+import com.tss.grc.module.bcm.cycle.entity.BcmGap;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -130,6 +132,15 @@ public class ExerciseObserverController {
         @PathVariable Long obsId,
         @RequestBody @Valid FlagRequest req) {
         return service.flagObservationForAar(runId, obsId, req);
+    }
+
+    @PostMapping("/{runId}/observations/{obsId}/promote-to-gap")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR',"
+                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    @Operation(summary = "Promote an exercise observation to a tracked BCM gap (B-E)")
+    public BcmGap promoteObservationToGap(@PathVariable Long runId, @PathVariable Long obsId) {
+        return service.promoteObservationToGap(runId, obsId);
     }
 
     @GetMapping("/{runId}/observations")
