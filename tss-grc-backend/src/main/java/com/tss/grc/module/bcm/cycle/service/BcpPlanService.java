@@ -352,16 +352,12 @@ public class BcpPlanService {
         plan.setTitleAr(titleAr);
         BcpPlan saved = create(plan);
 
-        // Seed the overview section with the BIA's MBCO narrative
-        if (bia.getMbcoDescription() != null && !bia.getMbcoDescription().isBlank()) {
-            sections.findByOrganisationIdAndPlanIdAndSectionKey(
-                    saved.getOrganisationId(), saved.getId(), "overview")
-                .ifPresent(sec -> {
-                    sec.setBodyEn("MBCO (from BIA " + bia.getBiaCode() + "):\n\n"
-                        + bia.getMbcoDescription());
-                    sections.save(sec);
-                });
-        }
+        // Pre-populate the section bodies from the BIA's captured data so the
+        // generated plan starts with real content (recovery objectives, MBCO,
+        // minimum resources, manual workaround, suppliers, peak periods) rather
+        // than an empty catalogue.
+        seedSectionsFromBia(saved, bia);
+
         // Also update the BIA's generatedBcpId / generatedDrpId so the BIA register reflects linkage
         if ("BCP".equals(planType)) bia.setGeneratedBcpId(saved.getId());
         else                        bia.setGeneratedDrpId(saved.getId());
@@ -418,6 +414,81 @@ public class BcpPlanService {
             || "ARCHIVED".equals(status) || "SUPERSEDED".equals(status)
             || "CANCELLED".equals(status);
     }
+
+    /**
+     * Populate section bodies from a source BIA. Each BIA datum is routed to the
+     * section where a plan author would expect it; sections with no BIA source
+     * are left blank for the author. Bilingual scaffolding (EN + AR) is written
+     * for the structured/numeric data; free-text fields keep the author's
+     * original language in {@code bodyEn} and leave {@code bodyAr} for them.
+     */
+    private void seedSectionsFromBia(BcpPlan plan, BcmBiaAssessment bia) {
+        final String code = bia.getBiaCode();
+        final boolean drp = "DRP".equals(plan.getPlanType());
+
+        // Recovery objectives — RTO/RPO/MTPD + criticality inherited from the BIA.
+        StringBuilder en = new StringBuilder("Recovery targets inherited from BIA ").append(code).append(":\n");
+        StringBuilder ar = new StringBuilder("أهداف التعافي الموروثة من تحليل الأثر ").append(code).append(":\n");
+        if (bia.getMtpdHours() != null) { en.append("- MTPD: ").append(bia.getMtpdHours()).append(" h\n");
+                                          ar.append("- أقصى فترة تعطل مقبولة (MTPD): ").append(bia.getMtpdHours()).append(" ساعة\n"); }
+        if (bia.getRtoHours() != null)  { en.append("- RTO: ").append(bia.getRtoHours()).append(" h\n");
+                                          ar.append("- زمن التعافي المستهدف (RTO): ").append(bia.getRtoHours()).append(" ساعة\n"); }
+        if (bia.getRpoHours() != null)  { en.append("- RPO: ").append(bia.getRpoHours()).append(" h\n");
+                                          ar.append("- نقطة الاسترجاع المستهدفة (RPO): ").append(bia.getRpoHours()).append(" ساعة\n"); }
+        if (notBlank(bia.getOverallCriticality())) { en.append("- Criticality: ").append(bia.getOverallCriticality()).append("\n");
+                                          ar.append("- مستوى الأهمية: ").append(bia.getOverallCriticality()).append("\n"); }
+        writeSection(plan, drp ? "recovery_objectives" : "recovery_priorities", en.toString(), ar.toString());
+
+        // MBCO narrative → BCP overview / DRP business-service linkage.
+        if (notBlank(bia.getMbcoDescription())) {
+            writeSection(plan, drp ? "business_linkage" : "overview",
+                "MBCO (from BIA " + code + "):\n\n" + bia.getMbcoDescription(),
+                "الحد الأدنى لاستمرارية الأعمال (من تحليل الأثر " + code + "):\n\n" + bia.getMbcoDescription());
+        }
+
+        // Minimum resource requirements → BCP resources / DRP dependencies.
+        StringBuilder res = new StringBuilder();
+        if (bia.getMinStaff() != null)            res.append("- Minimum staff: ").append(bia.getMinStaff()).append("\n");
+        if (notBlank(bia.getMinTechText()))       res.append("- Minimum technology: ").append(bia.getMinTechText()).append("\n");
+        if (notBlank(bia.getMinFacilityText()))   res.append("- Minimum facility: ").append(bia.getMinFacilityText()).append("\n");
+        if (notBlank(bia.getMinSupplierText()))   res.append("- Minimum suppliers: ").append(bia.getMinSupplierText()).append("\n");
+        if (res.length() > 0) {
+            writeSection(plan, drp ? "dependencies" : "resources",
+                "Minimum resource requirements (from BIA " + code + "):\n" + res, null);
+        }
+
+        // BCP-only sections.
+        if (!drp) {
+            String mw = Boolean.TRUE.equals(bia.getManualWorkaroundAvailable())
+                ? (notBlank(bia.getManualWorkaroundDescription())
+                    ? bia.getManualWorkaroundDescription()
+                    : "Manual workaround available — see BIA " + code + ".")
+                : "No manual workaround available (per BIA " + code + ").";
+            writeSection(plan, "manual_workaround", mw, null);
+
+            if (notBlank(bia.getMinSupplierText()))
+                writeSection(plan, "supplier_escalation",
+                    "Critical suppliers (from BIA " + code + "):\n" + bia.getMinSupplierText(), null);
+
+            if (notBlank(bia.getPeakPeriodsText()))
+                writeSection(plan, "scope",
+                    "Peak / blackout periods (from BIA " + code + "): " + bia.getPeakPeriodsText(), null);
+        }
+    }
+
+    /** Set a section's body by key, if that section exists on the plan. */
+    private void writeSection(BcpPlan plan, String key, String bodyEn, String bodyAr) {
+        sections.findByOrganisationIdAndPlanIdAndSectionKey(plan.getOrganisationId(), plan.getId(), key)
+            .ifPresent(sec -> {
+                sec.setBodyEn(bodyEn);
+                if (bodyAr != null) sec.setBodyAr(bodyAr);
+                sec.setLastEditedBy("BIA generator");
+                sec.setLastEditedAt(LocalDateTime.now());
+                sections.save(sec);
+            });
+    }
+
+    private static boolean notBlank(String s) { return s != null && !s.isBlank(); }
 
     private void createDefaultSections(BcpPlan plan) {
         List<SectionDef> catalogue = "DRP".equals(plan.getPlanType()) ? DRP_SECTIONS : BCP_SECTIONS;
