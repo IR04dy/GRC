@@ -10,6 +10,15 @@ spring:
   application:
     name: tss-grc-platform
 
+  # Multipart upload limits. These MUST live under spring.servlet.multipart —
+  # Spring Boot ignores server.servlet.multipart, so the previous override there
+  # silently left the 1MB default in force (real policy/evidence uploads >1MB
+  # failed with a size error). Frontend AttachmentsField caps at 50MB to match.
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
+
   # PERF-PG-003 — global pagination guard. Spring's PageableHandlerMethodArgument
   # Resolver clamps any client-supplied ?size= to max-page-size, so a paginated
   # Page<> endpoint can no longer be coerced into materialising the whole table
@@ -100,11 +109,6 @@ server:
       charset: UTF-8
       enabled: true
       force: true
-    multipart:
-      # Evidence-item binary uploads (POST /api/v1/evidence/items/{id}/file).
-      # Default is 1MB which is too small for real evidence documents.
-      max-file-size: 50MB
-      max-request-size: 55MB
   error:
     include-message: on_param
     include-binding-errors: on_param
