@@ -11,7 +11,8 @@
 | Epic | Item | Status | Commit |
 |---|---|---|---|
 | **B-C** | File upload on BCP plans (Documents tab → generic `AttachmentService`) | ✅ Shipped | `4d74345a` |
-| B-C | File upload on DRP / DR-test / BIA / CAPA / crisis / governance | ⏳ In progress | — |
+| **B-C** | File upload on DR plans (backup & test evidence) | ✅ Shipped | `40bef8d4` |
+| B-C | File upload on BIA / CAPA / crisis / governance | ⏳ In progress | — |
 | B-B | Evidence-request workflow (reuse `EvidenceRequest` + SLA scheduler) | ⏳ Pending | — |
 | B-A | Real BIA→BCP/DRP generator | ⏳ Pending | — |
 | B-D | Evidence lifecycle (review / reject→gap / resubmit / expiry) | ⏳ Pending | — |
