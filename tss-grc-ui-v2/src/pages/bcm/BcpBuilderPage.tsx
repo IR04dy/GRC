@@ -9,6 +9,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
@@ -58,7 +59,7 @@ import '../../styles/pages/bcp-builder.css';
  * SUPERSEDED / CANCELLED — the backend enforces; the UI greys out controls.
  */
 type Mode = 'register' | 'builder';
-type BuilderTab = 'sections' | 'versions' | 'diff' | 'distribution' | 'binder';
+type BuilderTab = 'sections' | 'versions' | 'diff' | 'distribution' | 'binder' | 'documents';
 
 const NEXT_STATUS: Record<BcpPlanStatus, BcpPlanStatus[]> = {
   DRAFT:        ['UNDER_REVIEW', 'CANCELLED'],
@@ -611,6 +612,7 @@ export function BcpBuilderPage() {
     { id: 'diff',         label: isAr ? 'المقارنة'                     : 'Diff',                            Icon: GitCompare },
     { id: 'distribution', label: isAr ? `التوزيع (${acks.length})`     : `Distribution (${acks.length})`,   Icon: Send },
     { id: 'binder',       label: isAr ? `الكتيّب (${binders.length})`   : `Binder (${binders.length})`,      Icon: BookOpen },
+    { id: 'documents',    label: isAr ? 'الوثائق والأدلة'               : 'Documents & evidence',            Icon: FileText },
   ];
 
   return (
@@ -659,6 +661,12 @@ export function BcpBuilderPage() {
       <Tabs items={tabs} active={builderTab} onChange={setBuilderTab} />
 
       <div className="bcp-builder-content">
+        {builderTab === 'documents' && plan && (
+          <Card title={isAr ? 'الوثائق والأدلة — خطة استمرارية الأعمال' : 'Documents & evidence — BCP'}>
+            {/* B-C: real file upload via the generic AttachmentService (entityType BCP_PLAN). */}
+            <AttachmentsField entityType="BCP_PLAN" entityId={plan.id} />
+          </Card>
+        )}
         {builderTab === 'sections' && (
           <div className="bcp-builder-sections-grid">
             <Card title={isAr ? 'الأقسام' : 'Sections'}
