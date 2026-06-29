@@ -10,6 +10,7 @@ import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos.RunTimeline;
 import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos.StartRunRequest;
 import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos.TransitionRequest;
 import com.tss.grc.module.bcm.cycle.runtime.service.ExerciseRuntimeService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -70,6 +71,13 @@ public class ExerciseRuntimeController {
     @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','PLATFORM_ADMIN')")
     public RunSummary start(@RequestBody @Valid StartRunRequest req) {
         return service.startRun(req);
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    @Operation(summary = "List all exercise runs for the org (optional status filter)")
+    public List<RunSummary> list(@RequestParam(required = false) String status) {
+        return service.listAll(status);
     }
 
     @GetMapping("/{id}")

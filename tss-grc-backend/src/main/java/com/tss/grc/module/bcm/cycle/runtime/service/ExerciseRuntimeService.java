@@ -35,6 +35,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -216,6 +217,20 @@ public class ExerciseRuntimeService {
         Long orgId = org();
         return runRepo.findByOrganisationIdAndExerciseIdOrderByCreatedAtDesc(orgId, exerciseId)
             .stream().map(this::summarise).toList();
+    }
+
+    /**
+     * All runs for the org (newest first), optionally filtered by status — the
+     * cross-exercise run history. Backs {@code GET /api/v1/bcm/exercise-runs}
+     * (previously unmapped → 405). Capped at 200 to keep the response bounded.
+     */
+    @Transactional(readOnly = true)
+    public List<RunSummary> listAll(String status) {
+        Long orgId = org();
+        List<ExerciseRun> runs = (status != null && !status.isBlank())
+            ? runRepo.findByOrganisationIdAndStatusOrderByCreatedAtDesc(orgId, status)
+            : runRepo.findByOrganisationIdOrderByCreatedAtDesc(orgId, PageRequest.of(0, 200)).getContent();
+        return runs.stream().map(this::summarise).toList();
     }
 
     // (summarise / toInjectView / toResponseView / nullSafe / truncate are
