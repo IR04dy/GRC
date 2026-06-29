@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, Shield, AlertTriangle, Activity, Phone, FileWarning, Workflow, Plus, Pencil } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { CalendarClock, Shield, AlertTriangle, Activity, Phone, FileWarning, Workflow, Plus, Pencil, Paperclip } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
@@ -125,6 +126,9 @@ export function BcmReadinessPage() {
   const [editRisk, setEditRisk] = useState<BcmRisk | null>(null);
   const [openGov, setOpenGov] = useState(false);
   const [editGov, setEditGov] = useState<BcmGovernanceRecord | null>(null);
+  // Which governance policy's evidence/document drawer is expanded (the BCM
+  // policy file — task #4 "Upload BCM policy file"). One open at a time.
+  const [govDocsId, setGovDocsId] = useState<number | null>(null);
   const [openContact, setOpenContact] = useState(false);
 
   // ── Loaders ────
@@ -610,7 +614,8 @@ export function BcmReadinessPage() {
                 </tr></thead>
                 <tbody>
                   {governance.map(g => (
-                    <tr key={g.id}>
+                    <Fragment key={g.id}>
+                    <tr>
                       <td>
                         <div style={{ fontWeight: 600 }}>{isAr && g.policyTitleAr ? g.policyTitleAr : g.policyTitleEn}</div>
                         {g.objective && <div className="text-2xs text-muted">{g.objective.substring(0, 80)}</div>}
@@ -620,6 +625,9 @@ export function BcmReadinessPage() {
                       <td className="text-xs">{g.reviewFrequency ? reviewFrequencyLabel(g.reviewFrequency, lang) : '—'}</td>
                       <td className="mono text-2xs">{g.nextReviewDate ?? '—'}</td>
                       <td style={{ textAlign: 'end' }}>
+                        <Button size="sm" variant={govDocsId === g.id ? 'secondary' : 'ghost'} Icon={Paperclip}
+                          title={isAr ? 'الوثائق والأدلة' : 'Documents & evidence'}
+                          onClick={() => setGovDocsId(govDocsId === g.id ? null : g.id)} />
                         {g.approvalStatus !== 'APPROVED' && g.approvalStatus !== 'ACTIVE' && (
                           <Button size="sm" variant="ghost" Icon={Pencil}
                             title={isAr ? 'تعديل' : 'Edit'} onClick={() => setEditGov(g)} />
@@ -627,6 +635,20 @@ export function BcmReadinessPage() {
                         <GovernanceActions g={g} onMove={moveGovernance} isAr={isAr} />
                       </td>
                     </tr>
+                    {govDocsId === g.id && (
+                      <tr>
+                        <td colSpan={6} style={{ background: 'var(--surface-2)' }}>
+                          <div style={{ padding: '4px 2px' }}>
+                            <div className="text-xs text-muted" style={{ marginBottom: 6 }}>
+                              {isAr ? 'ملف سياسة BCM المعتمد، محاضر الاعتماد، والأدلة الداعمة.'
+                                    : 'Approved BCM policy file, approval minutes, and supporting evidence.'}
+                            </div>
+                            <AttachmentsField entityType="BCM_GOVERNANCE" entityId={g.id} />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>}

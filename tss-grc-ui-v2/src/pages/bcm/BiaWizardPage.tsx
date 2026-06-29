@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
@@ -348,6 +349,14 @@ export function BiaWizardPage() {
         {step === 3 && <Step3ImpactMatrix matrix={matrix} setMatrix={setMatrix}
                                           catalog={catalog} isAr={isAr} locked={locked} />}
         {step === 4 && <Step4Resources editing={editing} onChange={setEditing} isAr={isAr} locked={locked} />}
+
+        {/* Evidence on the review step — interview notes, signed BIA, dependency
+            maps, etc. Available once the BIA has been saved (has an id). */}
+        {step === 4 && editing.id > 0 && (
+          <Card title={isAr ? 'الأدلة والوثائق الداعمة' : 'Supporting evidence & documents'}>
+            <AttachmentsField entityType="BIA_ASSESSMENT" entityId={editing.id} />
+          </Card>
+        )}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <Button variant="ghost" disabled={step === 1} onClick={() => setStep(step - 1)}>
