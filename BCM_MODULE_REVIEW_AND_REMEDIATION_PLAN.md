@@ -21,8 +21,8 @@
 | **B-D** | Evidence lifecycle: rejected request → auto-opens a BCM gap (F8 event + `BcmGapRecordCreator`, deduped); review/resubmit/attachment-expiry already worked | ✅ Shipped | `f895befc` |
 | **B-E** | Exercise→gap→CAPA closure: promote an exercise observation to a tracked BCM gap (idempotent, severity-mapped, linked); gap→CAPA already existed | ✅ Shipped | `fc83772a` |
 | **B-F/B-G** | DRP depth: post-failover validation checklist (`validation_steps_json`) added end-to-end + rendered; BIA depth (MBCO, min-resources) verified already captured in the wizard | ✅ Shipped | `10c9d76e` |
-| B-H | `exercise-runs` list endpoint | ⏳ Next | — |
-| B-I | Arabic/RTL walk + role-permission ratchet | ⏳ Pending | — |
+| **B-H** | `GET /api/v1/bcm/exercise-runs` list endpoint added (was 405) — org-scoped, newest-first, `?status=` filter | ✅ Shipped | `cbe7bb77` |
+| B-I | Arabic/RTL walk + role-permission ratchet | ⏳ Next | — |
 
 **Order (§27):** B-C → B-B → B-A → B-D → B-E → B-F/G → B-H → B-I.
 
