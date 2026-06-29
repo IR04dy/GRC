@@ -18,8 +18,8 @@
 | **B-B** | Evidence-request **backend**: generic `entity_type`/`entity_id` on `EvidenceRequest` + `by-entity` endpoint (reuses SLA scheduler/reminders/escalation) | ✅ Shipped | `3bf2663e` |
 | **B-B** | Evidence-request **frontend**: `EvidenceRequestsField` (dept/assignee/due/priority + countdown + lifecycle) wired into all 5 BCM surfaces — **B-B complete** | ✅ Shipped | `64e1c1d1` |
 | **B-A** | BIA→BCP/DRP generator seeds real section content (objectives, MBCO, resources, workaround, suppliers, dependencies) from the BIA | ✅ Shipped | `93a2792c` |
-| B-D | Evidence lifecycle (review / reject→gap / resubmit / expiry) | ⏳ Next | — |
-| B-E | Exercise→gap→CAPA closure | ⏳ Pending | — |
+| **B-D** | Evidence lifecycle: rejected request → auto-opens a BCM gap (F8 event + `BcmGapRecordCreator`, deduped); review/resubmit/attachment-expiry already worked | ✅ Shipped | `f895befc` |
+| B-E | Exercise→gap→CAPA closure | ⏳ Next | — |
 | B-F/B-G | DRP / BIA depth | ⏳ Pending | — |
 | B-H | `exercise-runs` list endpoint | ⏳ Pending | — |
 | B-I | Arabic/RTL walk + role-permission ratchet | ⏳ Pending | — |
@@ -38,7 +38,7 @@ Live evidence (this review): `cycles` 2, `governance` 1, `bia-assessments` 6, `d
 
 1. ~~**"Generate BCP/DRP from BIA" is a stub.**~~ **✅ RESOLVED (B-A, `93a2792c`).** The legacy `generateBcpStub`/`generateDrpStub` path only stamped an id, but the wizard already used the structured `BcpPlanService.generateFromBia` (which copied RTO/RPO/MTPD + the section catalogue). That generator now also **seeds the section bodies from the BIA** — recovery objectives, MBCO, minimum resources, manual workaround, critical suppliers, dependencies — so the generated plan starts with real content. The BIA→plan linkage is now substantive, not cosmetic.
 2. **No real evidence-request workflow, and file upload is almost absent.** There is **no `MultipartFile` anywhere in `module/bcm`** and **no use of the generic evidence subsystem** (`EvidenceRequest` / `EvidenceLink` / `AttachmentService`). BCM "evidence" is: a reference-by-id (`BcmComplianceMapping.attachEvidence(evidenceId)`), a CAPA status flag (`EVIDENCE_SUBMITTED`), and a read-side audit **export** package (`BcmEvidencePackageService`). Real file upload appears in only **2** of ~33 BCM pages (`AarDetailPage`, `ExerciseScenarioDetailPage`) via the generic attachment controller. There is **no "request evidence from a department"** flow — no owner, due date, countdown, SLA, reminders, or escalation — anywhere in BCM. Plans, DR-test results, BIAs, and CAPAs cannot carry an uploaded evidence file.
-3. **Evidence lifecycle (expiry / rejection→gap / resubmission) is absent** in BCM (a consequence of #2).
+3. ~~**Evidence lifecycle (expiry / rejection→gap / resubmission) is absent** in BCM (a consequence of #2).~~ **✅ RESOLVED (B-D, `f895befc`).** Rejecting a BCM-anchored evidence request now publishes an F8 event that auto-opens a deduped BCM gap (source `EVIDENCE`); resubmission (REJECTED→OPEN/IN_PROGRESS) and attachment expiry/re-collect already worked.
 
 Everything else — governance, BIA capture, crisis, exercises, comms, CAPA, reporting, automation, ERM linkage — is genuinely implemented and mostly realistic. The module needs **targeted remediation of the BIA→plan generator and the evidence/file-upload workflow**, not a rebuild.
 
