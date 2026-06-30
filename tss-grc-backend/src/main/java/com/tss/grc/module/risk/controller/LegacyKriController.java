@@ -1,14 +1,10 @@
 package com.tss.grc.module.risk.controller;
 
 import com.tss.grc.module.risk.dto.KriDefinitionRequest;
-import com.tss.grc.module.risk.dto.RiskAppetiteRequest;
-import com.tss.grc.module.risk.entity.AppetiteBreachEvent;
 import com.tss.grc.module.risk.entity.KriBreachEvent;
 import com.tss.grc.module.risk.entity.KriDefinition;
 import com.tss.grc.module.risk.entity.KriReading;
-import com.tss.grc.module.risk.entity.RiskAppetiteStatement;
 import com.tss.grc.module.risk.service.KriEngineService;
-import com.tss.grc.module.risk.service.RiskAppetiteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,17 +22,36 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * KRI threshold engine + Risk appetite endpoints — assessment §5.1 ERM #5 + #6.
+ * Legacy KRI threshold engine REST surface — assessment §5.1 ERM #5.
+ *
+ * <p><b>Deprecated (ERM epic E-E).</b> This is the numeric-id, single-table
+ * ({@code risk.kri_definitions}/{@code kri_readings}/{@code kri_breach_events})
+ * KRI engine. The <em>canonical</em> KRI engine is the richer Sprint-13
+ * {@code risk/kri/*} stack — UUID external ids, a full AMBER/RED breach
+ * lifecycle (open / escalate / de-escalate / close), F8 domain events,
+ * sustained-RED auto-CAPA, and a scheduler — exposed at
+ * {@code /api/v1/risk/kri/*} ({@link com.tss.grc.module.risk.kri.controller.KriController}).
+ *
+ * <p>This controller (split out of the former {@code KriAppetiteController})
+ * is retained <em>only</em> to keep the existing frontend KRI surface
+ * ({@code riskApi.kris*}) working until it is repointed to the canonical
+ * endpoints. The remaining E-E work — migrating the legacy rows into the
+ * canonical tables, repointing the frontend + the reporting/board-pack/
+ * framework-anchor consumers, then deleting this controller and
+ * {@link KriEngineService} — is tracked in the remediation plan (§20 E-E).
+ *
+ * @deprecated superseded by {@link com.tss.grc.module.risk.kri.controller.KriController};
+ *             scheduled for removal once KRI is consolidated onto {@code risk/kri/*}.
  */
+@Deprecated
 @RestController
 @RequestMapping("/api/v1/risk")
 @RequiredArgsConstructor
-@Tag(name = "ERM — KRI engine & Risk appetite")
+@Tag(name = "ERM — KRI engine (legacy, superseded by /api/v1/risk/kri/*)")
 @SecurityRequirement(name = "bearerAuth")
-public class KriAppetiteController {
+public class LegacyKriController {
 
     private final KriEngineService kriService;
-    private final RiskAppetiteService appetiteService;
 
     // ── KRI definitions ─────────────────────────────────────────────────────
 
@@ -115,84 +130,5 @@ public class KriAppetiteController {
     @PreAuthorize("hasPermission('RISK','READ')")
     public Map<String, Object> kriDashboard() {
         return kriService.dashboard();
-    }
-
-    // ── Risk appetite ───────────────────────────────────────────────────────
-
-    @GetMapping("/appetite")
-    @PreAuthorize("hasPermission('RISK','READ')")
-    public Page<RiskAppetiteStatement> listAppetites(@PageableDefault(size = 50) Pageable pageable) {
-        return appetiteService.list(pageable);
-    }
-
-    @GetMapping("/appetite/{id}")
-    @PreAuthorize("hasPermission('RISK','READ')")
-    public RiskAppetiteStatement getAppetite(@PathVariable Long id) {
-        return appetiteService.get(id);
-    }
-
-    @PostMapping("/appetite")
-    @PreAuthorize("hasPermission('RISK','WRITE')")
-    @ResponseStatus(HttpStatus.CREATED)
-    public RiskAppetiteStatement createAppetite(@Valid @RequestBody RiskAppetiteRequest body) {
-        return appetiteService.create(body);
-    }
-
-    @PutMapping("/appetite/{id}")
-    @PreAuthorize("hasPermission('RISK','WRITE')")
-    public RiskAppetiteStatement updateAppetite(@PathVariable Long id, @Valid @RequestBody RiskAppetiteRequest body) {
-        return appetiteService.update(id, body);
-    }
-
-    @DeleteMapping("/appetite/{id}")
-    @PreAuthorize("hasPermission('RISK','DELETE')")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteAppetite(@PathVariable Long id) {
-        appetiteService.delete(id);
-    }
-
-    @PostMapping("/appetite/{id}/approve")
-    @PreAuthorize("hasPermission('RISK','WRITE')")
-    public RiskAppetiteStatement approveAppetite(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        String approver = body.get("approvedBy") != null ? body.get("approvedBy").toString() : null;
-        return appetiteService.approve(id, approver);
-    }
-
-    @PostMapping("/appetite/{id}/retire")
-    @PreAuthorize("hasPermission('RISK','WRITE')")
-    public RiskAppetiteStatement retireAppetite(@PathVariable Long id) {
-        return appetiteService.retire(id);
-    }
-
-    @PostMapping("/appetite/{id}/exposure")
-    @PreAuthorize("hasPermission('RISK','WRITE')")
-    @Operation(summary = "Update current exposure. Auto-generates appetite breach event if exposure exceeds tolerance band.")
-    public RiskAppetiteStatement updateExposure(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        BigDecimal value = body.get("value") instanceof Number n
-            ? new BigDecimal(n.toString())
-            : new BigDecimal(body.get("value").toString());
-        String notes = body.get("notes") != null ? body.get("notes").toString() : null;
-        return appetiteService.updateExposure(id, value, notes);
-    }
-
-    @GetMapping("/appetite/{id}/breaches")
-    @PreAuthorize("hasPermission('RISK','READ')")
-    public List<AppetiteBreachEvent> listAppetiteBreaches(@PathVariable Long id) {
-        return appetiteService.listBreaches(id);
-    }
-
-    @GetMapping("/appetite/dashboard")
-    @PreAuthorize("hasPermission('RISK','READ')")
-    public Map<String, Object> appetiteDashboard() {
-        return appetiteService.dashboard();
-    }
-
-    // ── E-H — register → appetite exposure aggregation + breach escalation ──
-    @PostMapping("/appetite/recompute-exposure")
-    @PreAuthorize("hasPermission('RISK','WRITE')")
-    @Operation(summary = "Aggregate live residual exposure from the register into each approved "
-        + "appetite statement (worst residual per category) and escalate any breach via F8.")
-    public RiskAppetiteService.ExposureRecompute recomputeAppetiteExposure() {
-        return appetiteService.recomputeExposureFromRegister();
     }
 }

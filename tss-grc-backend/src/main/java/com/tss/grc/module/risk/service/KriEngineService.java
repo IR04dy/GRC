@@ -22,13 +22,27 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * KRI threshold engine — assessment §5.1 ERM #5.
+ * Legacy KRI threshold engine — assessment §5.1 ERM #5.
  *
  * On every reading we evaluate the band (GREEN/AMBER/RED) using direction +
  * green_max + amber_max, persist the band on the reading, and auto-generate
  * a kri_breach_event whenever the new band is AMBER or RED **and** worse than
  * the previous reading's band.
+ *
+ * <p><b>Deprecated (ERM epic E-E).</b> Superseded by the canonical Sprint-13
+ * KRI engine under {@code com.tss.grc.module.risk.kri} (UUID external ids,
+ * full breach open/escalate/de-escalate/close lifecycle, F8 domain events,
+ * sustained-RED auto-CAPA, scheduler). This numeric-id engine and its tables
+ * ({@code risk.kri_definitions}/{@code kri_readings}/{@code kri_breach_events})
+ * are retained only until the frontend + reporting/board-pack/framework-anchor
+ * consumers are repointed to canonical and the legacy rows are migrated; see
+ * the remediation plan §20 E-E for the remaining work.
+ *
+ * @deprecated use {@link com.tss.grc.module.risk.kri.service.KriDefinitionService},
+ *             {@link com.tss.grc.module.risk.kri.service.KriMeasurementService} and
+ *             {@link com.tss.grc.module.risk.kri.service.KriBreachService} instead.
  */
+@Deprecated
 @Service
 @RequiredArgsConstructor
 public class KriEngineService {
