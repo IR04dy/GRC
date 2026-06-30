@@ -29,6 +29,13 @@
 > ✅ **Remediation backlog complete.** All Critical (B-1/2/3) and the High/Medium epics (B-A…B-I) are shipped on `feat/bcm-remediation`, each frontend `tsc`-verified, backend `mvn`-compiled, and live-smoked against :8084 (with the backend rebuilt + restarted after every backend change). **Full backend suite green: 1970 tests, 0 failures.** Opened as **PR #487** (CI: Backend ✅ + Frontend ✅); not yet merged to `master`. Five Flyway migrations (V235–V239) were authored for non-dev profiles and also applied to the Python-managed dev DB.
 >
 > 🔁 **Re-verified 2026-06-30:** all 13 epic commits present on the branch (none on `master`); migrations V235–V239 on disk; `BcmGapRecordCreator` + `EvidenceRequestsField` present; `BCM_APPROVE` in V239; `GET /api/v1/bcm/exercise-runs` live-confirmed **HTTP 200** (was 405).
+>
+> 🧩 **Residual-partials pass (2026-06-30, branch `feat/bcm-residual-partials` → its own PR):** the remaining ◑ task-list items were closed end-to-end (backend unit-tested + live-smoked against :8084; frontend `tsc --noEmit` clean):
+> - **P-70 (task 70)** — approval-gated reopen for gaps & CAPAs: dedicated `POST /capas|gaps/{id}/reopen` requiring `BCM_APPROVE` + a mandatory reason (audited); the generic `BCM_WRITE` transition no longer allows `CLOSED→REOPENED`; +6 unit tests; UI **Reopen** button. *(Live: empty reason → 400.)*
+> - **P-8 (task 8)** — governance `committeeId` validated against the `admin.committee` register on create/update (+1 test); committee field added to the governance form.
+> - **P-7 (task 7)** — BCM manager / executive sponsor / oversight committee fields on the governance create+edit form (persisted on cycle & governance).
+> - **§12.9** — evidence-request **comment thread**: `evidence.evidence_request_comments` (**V240**, applied to dev DB), `GET/POST /api/v1/evidence/requests/{id}/comments`, comment UI in `EvidenceRequestsField`. *(Live: POST→201, author resolved, GET→1.)*
+> - **§12.16** — BCM evidence-request **posture tile** (active/overdue/rejected) folded into `BcmBoardPackService` → rendered on the BCM dashboard. *(Live: board-pack returns the `evidence` snapshot.)*
 
 ---
 
@@ -75,8 +82,8 @@ The 70 lifecycle tasks the module must support, with current status (✅ impleme
 | 4 | Upload BCM policy file | ✅ | B-C: governance docs drawer → `AttachmentsField` (BCM_GOVERNANCE) `40dbb1bf` |
 | 5 | Submit policy/governance for review | ✅ | governance transitions (UNDER_REVIEW) |
 | 6 | Approve policy/governance | ✅ | `BCM_GOVERNANCE_APPROVED` |
-| 7 | Assign BCM manager | ◑ | owner fields; committee model present |
-| 8 | Define BCM committee | ◑ | governance/committee data |
+| 7 | Assign BCM manager | ✅ | P-7: `bcmManagerId` + `executiveSponsorId` on cycle & governance, assigned via the governance form |
+| 8 | Define BCM committee | ✅ | P-8: governance `committeeId` validated against the committee register; committee field on the governance form |
 | 9 | Add critical service | ✅ | register present |
 | 10 | Classify service criticality | ✅ | criticality + `BIA_CRITICALITY_SOVEREIGN` |
 | 11 | Add critical process | ✅ | process register |
@@ -138,9 +145,9 @@ The 70 lifecycle tasks the module must support, with current status (✅ impleme
 | 67 | Switch Arabic/English | ✅ | B-I: bilingual labels + logical-property RTL; EN/AR parity verified |
 | 68 | Test role permissions | ✅ | B-I: BCM grant matrix + `BCM_APPROVE` seeded; verified live (BCM_MANAGER 200 on BCM / 403 on CYBER) |
 | 69 | Archive closed cycle | ✅ | `BCM_CYCLE_ARCHIVED` |
-| 70 | Reopen item with approval | ◑ | CAPA reopen status; verify approval gate |
+| 70 | Reopen item with approval | ✅ | P-70: `BCM_APPROVE`-gated reopen endpoints for gaps & CAPAs + mandatory reason (audited); generic transition no longer allows CLOSED→REOPENED; UI Reopen button |
 
-**Totals:** ~55 ✅ · ~11 ◑ · ~4 ✗ *(post-remediation; was ~46 / ~14 / ~10 at review time)*. The former ✗ cluster — **BIA→plan generation** and **evidence request/upload/lifecycle** — is now ✅ via **B-A** and **B-B/B-C/B-D**. Residual ◑ are owner/committee assignment (7, 8) and reopen-with-approval gate (70).
+**Totals:** ~58 ✅ · ~8 ◑ · ~4 ✗ *(post-remediation; was ~46 / ~14 / ~10 at review time)*. The former ✗ cluster — **BIA→plan generation** and **evidence request/upload/lifecycle** — is now ✅ via **B-A** and **B-B/B-C/B-D**; the **residual-partials pass** (P-7/P-8/P-70 + §12.9/§12.16, see §0) then closed manager/committee assignment (7, 8) and the reopen-with-approval gate (70). Remaining ◑ are softer depth items (committee-model richness, per-endpoint role-coverage breadth, archive/reopen edge gates).
 
 ---
 
@@ -248,20 +255,20 @@ Each workflow below states the realistic target; §5–§13 compare against curr
 | 6 | Reminders before due | ✗ |
 | 7 | Escalate after overdue | ✗ (CAPA/plan/cycle overdue exists, but not evidence) |
 | 8 | File upload | ◑ (only AAR + exercise scenario) |
-| 9 | Comments | ◑ |
+| 9 | Comments | ✅ (request comment thread — V240) |
 | 10 | Reviewer approve/reject | ✗ |
 | 11 | Rejection reason | ✗ |
 | 12 | Resubmission | ✗ |
 | 13 | Versions | ✗ |
 | 14 | Audit trail | ✅ (general) |
 | 15 | Link evidence to BIA/BCP/DRP/exercise/control | ◑ (by-id on compliance mapping only) |
-| 16 | Show in dashboard | ◑ |
+| 16 | Show in dashboard | ✅ (BCM dashboard evidence tile) |
 | 17 | Include in reports | ✅ (evidence-package export) |
 | 18 | Expire when validity ends | ✗ |
 | 19 | Notify before expiry | ✗ |
 | 20 | Create gap if missing/rejected | ✗ |
 
-**This was the weakest area and the primary remediation target — now resolved.** ✅ **Post-remediation (B-B/B-C/B-D — see §0):** points 1–8, 10–13, 15, 17–20 are now ✅ (request/owner/due/countdown/SLA/reminders/escalation/upload, review/reject/reason/resubmit, entity links, reports, expiry/notify/gap-on-reject); comments (9) and dashboard surfacing (16) remain partial. The generic evidence subsystem (`EvidenceRequest`/`EvidenceLink`/`AttachmentService` + the SLA scheduler) already existed platform-wide — BCM is now wired to it.
+**This was the weakest area and the primary remediation target — now resolved.** ✅ **Post-remediation (B-B/B-C/B-D — see §0):** points 1–8, 10–13, 15, 17–20 were closed by B-B/B-C/B-D; comments (9, a real request comment thread via **V240**) and dashboard surfacing (16, an evidence posture tile) were then closed in the **residual-partials pass** — **all 20 points now ✅**. The generic evidence subsystem (`EvidenceRequest`/`EvidenceLink`/`AttachmentService` + the SLA scheduler) already existed platform-wide — BCM is now wired to it.
 
 ## 13. Policy/Document Workflow Gaps
 - Governance/policy records + lifecycle + review-due automation exist; **but no file upload** (B-3), no reviewer/approver field capture on the document itself, no version/archive of an uploaded file. Mirrors the Compliance policy gap before its remediation.
