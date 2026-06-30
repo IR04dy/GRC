@@ -50,6 +50,7 @@ public class BcmRemediationController {
     }
 
     public record TransitionBody(String to) {}
+    public record ReopenBody(String reason) {}
 
     // ── Lessons ────────────────────────────────────────────────────
 
@@ -101,6 +102,13 @@ public class BcmRemediationController {
         return service.transitionGap(id, body.to(), actor());
     }
 
+    /** Reopen a CLOSED gap — privileged (BCM_APPROVE) action; reason mandatory + audited. */
+    @PostMapping("/gaps/{id}/reopen")
+    @PreAuthorize("hasPermission('BCM', 'APPROVE')")
+    public BcmGap reopenGap(@PathVariable Long id, @RequestBody ReopenBody body) {
+        return service.reopenGap(id, body.reason(), actor());
+    }
+
     // ── CAPAs ──────────────────────────────────────────────────────
 
     @GetMapping("/capas")
@@ -130,6 +138,13 @@ public class BcmRemediationController {
     @PreAuthorize("hasPermission('BCM', 'WRITE')")
     public BcmCorrectiveAction transitionCapa(@PathVariable Long id, @RequestBody TransitionBody body) {
         return service.transitionCapa(id, body.to(), actor());
+    }
+
+    /** Reopen a CLOSED corrective action — privileged (BCM_APPROVE) action; reason mandatory + audited. */
+    @PostMapping("/capas/{id}/reopen")
+    @PreAuthorize("hasPermission('BCM', 'APPROVE')")
+    public BcmCorrectiveAction reopenCapa(@PathVariable Long id, @RequestBody ReopenBody body) {
+        return service.reopenCapa(id, body.reason(), actor());
     }
 
     @PostMapping("/capas/flag-overdue")

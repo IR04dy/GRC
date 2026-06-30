@@ -141,6 +141,26 @@ class BcmRemediationServiceTest {
         assertThat(out.getStatus()).isEqualTo("CLOSED");
     }
 
+    @Test void reopenGap_fromClosed_setsReopened() {
+        BcmGap g = gap("CLOSED", "MEDIUM");
+        when(gaps.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(g));
+        when(gaps.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        BcmGap out = service.reopenGap(1L, "auditor follow-up", "alice");
+        assertThat(out.getStatus()).isEqualTo("REOPENED");
+    }
+
+    @Test void reopenGap_requiresReason() {
+        assertThatThrownBy(() -> service.reopenGap(1L, "  ", "alice"))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("reason");
+    }
+
+    @Test void transitionGap_closedToReopened_nowRejected() {
+        BcmGap g = gap("CLOSED", "MEDIUM");
+        when(gaps.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(g));
+        assertThatThrownBy(() -> service.transitionGap(1L, "REOPENED", null))
+            .isInstanceOf(IllegalTransitionException.class);
+    }
+
     // ── CAPAs ──────────────────────────────────────────────────────
 
     @Test void createCapa_invalidPriorityRejected() {
@@ -178,6 +198,35 @@ class BcmRemediationServiceTest {
         BcmCorrectiveAction patch = new BcmCorrectiveAction(); patch.setTitleEn("change");
         assertThatThrownBy(() -> service.updateCapa(1L, patch))
             .isInstanceOf(IllegalStateException.class).hasMessageContaining("CLOSED");
+    }
+
+    @Test void reopenCapa_fromClosed_setsReopened_clearsClosure() {
+        BcmCorrectiveAction a = capa("CLOSED", 42L);
+        a.setClosureDate(LocalDate.now());
+        when(capas.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(a));
+        when(capas.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        BcmCorrectiveAction out = service.reopenCapa(1L, "regulator reopened the finding", "alice");
+        assertThat(out.getStatus()).isEqualTo("REOPENED");
+        assertThat(out.getClosureDate()).isNull();
+    }
+
+    @Test void reopenCapa_requiresReason() {
+        assertThatThrownBy(() -> service.reopenCapa(1L, null, "alice"))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("reason");
+    }
+
+    @Test void reopenCapa_nonClosedRejected() {
+        BcmCorrectiveAction a = capa("IN_PROGRESS", 42L);
+        when(capas.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(a));
+        assertThatThrownBy(() -> service.reopenCapa(1L, "reason", "alice"))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("CLOSED");
+    }
+
+    @Test void transitionCapa_closedToReopened_nowRejected() {
+        BcmCorrectiveAction a = capa("CLOSED", 42L);
+        when(capas.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(a));
+        assertThatThrownBy(() -> service.transitionCapa(1L, "REOPENED", null))
+            .isInstanceOf(IllegalTransitionException.class);
     }
 
     @Test void flagOverdueCapas_flipsAndPublishesEvent() {

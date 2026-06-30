@@ -171,7 +171,9 @@ public class BcmRemediationService {
             case "ASSIGNED"        -> "IN_PROGRESS".equals(to) || "OPEN".equals(to);
             case "IN_PROGRESS"     -> "UNDER_REVIEW".equals(to) || "ASSIGNED".equals(to);
             case "UNDER_REVIEW"    -> "CLOSED".equals(to) || "IN_PROGRESS".equals(to);
-            case "CLOSED"          -> "REOPENED".equals(to);
+            // CLOSED is terminal via the generic (BCM_WRITE) path — reopening
+            // a closed gap is a privileged action, only via reopenGap() below.
+            case "CLOSED"          -> false;
             case "REOPENED"        -> "IN_PROGRESS".equals(to);
             case "ACCEPTED_RISK"   -> "OPEN".equals(to);
             default                -> false;
@@ -190,6 +192,28 @@ public class BcmRemediationService {
         audit("BcmGap", saved.getId(), saved.getTitleEn(), "TRANSITION", from, to,
             "Gap " + saved.getId() + " " + from + " → " + to
             + (actor == null || actor.isBlank() ? "" : " by " + actor));
+        return saved;
+    }
+
+    /**
+     * Reopen a CLOSED gap. Gated at the controller by {@code BCM_APPROVE};
+     * a justification reason is mandatory and recorded in the audit trail.
+     */
+    @Transactional
+    public BcmGap reopenGap(Long id, String reason, String approver) {
+        if (reason == null || reason.isBlank())
+            throw new IllegalArgumentException("A reopen reason is required");
+        BcmGap g = getGap(id);
+        if (!"CLOSED".equals(g.getStatus()))
+            throw new IllegalStateException(
+                "Only a CLOSED gap can be reopened (current: " + g.getStatus() + ")");
+        String from = g.getStatus();
+        g.setStatus("REOPENED");
+        g.setUpdatedAt(LocalDateTime.now());
+        BcmGap saved = gaps.save(g);
+        audit("BcmGap", saved.getId(), saved.getTitleEn(), "REOPEN", from, "REOPENED",
+            "Gap " + saved.getId() + " reopened with approval by "
+            + (approver == null || approver.isBlank() ? "?" : approver) + " — reason: " + reason);
         return saved;
     }
 
@@ -269,7 +293,9 @@ public class BcmRemediationService {
             case "IN_PROGRESS"        -> "EVIDENCE_SUBMITTED".equals(to);
             case "EVIDENCE_SUBMITTED" -> "UNDER_REVIEW".equals(to);
             case "UNDER_REVIEW"       -> "CLOSED".equals(to) || "IN_PROGRESS".equals(to);
-            case "CLOSED"             -> "REOPENED".equals(to);
+            // CLOSED is terminal via the generic (BCM_WRITE) path — reopening
+            // a closed CAPA is a privileged action, only via reopenCapa() below.
+            case "CLOSED"             -> false;
             case "REOPENED"           -> "IN_PROGRESS".equals(to);
             case "OVERDUE"            -> "IN_PROGRESS".equals(to) || "EVIDENCE_SUBMITTED".equals(to);
             default                   -> false;
@@ -287,6 +313,29 @@ public class BcmRemediationService {
         audit("BcmCorrectiveAction", saved.getId(), saved.getTitleEn(), "TRANSITION", from, to,
             "CAPA " + saved.getId() + " " + from + " → " + to
             + (actor == null || actor.isBlank() ? "" : " by " + actor));
+        return saved;
+    }
+
+    /**
+     * Reopen a CLOSED corrective action. Gated at the controller by
+     * {@code BCM_APPROVE}; a justification reason is mandatory and recorded
+     * in the audit trail. Clears the closure date so the CAPA is live again.
+     */
+    @Transactional
+    public BcmCorrectiveAction reopenCapa(Long id, String reason, String approver) {
+        if (reason == null || reason.isBlank())
+            throw new IllegalArgumentException("A reopen reason is required");
+        BcmCorrectiveAction a = getCapa(id);
+        if (!"CLOSED".equals(a.getStatus()))
+            throw new IllegalStateException(
+                "Only a CLOSED corrective action can be reopened (current: " + a.getStatus() + ")");
+        a.setStatus("REOPENED");
+        a.setClosureDate(null);
+        a.setUpdatedAt(LocalDateTime.now());
+        BcmCorrectiveAction saved = capas.save(a);
+        audit("BcmCorrectiveAction", saved.getId(), saved.getTitleEn(), "REOPEN", "CLOSED", "REOPENED",
+            "CAPA " + saved.getId() + " reopened with approval by "
+            + (approver == null || approver.isBlank() ? "?" : approver) + " — reason: " + reason);
         return saved;
     }
 
