@@ -147,7 +147,7 @@ The 70 lifecycle tasks the module must support, with current status (✅ impleme
 | 69 | Archive closed cycle | ✅ | `BCM_CYCLE_ARCHIVED` |
 | 70 | Reopen item with approval | ✅ | P-70: `BCM_APPROVE`-gated reopen endpoints for gaps & CAPAs + mandatory reason (audited); generic transition no longer allows CLOSED→REOPENED; UI Reopen button |
 
-**Totals:** ~58 ✅ · ~8 ◑ · ~4 ✗ *(post-remediation; was ~46 / ~14 / ~10 at review time)*. The former ✗ cluster — **BIA→plan generation** and **evidence request/upload/lifecycle** — is now ✅ via **B-A** and **B-B/B-C/B-D**; the **residual-partials pass** (P-7/P-8/P-70 + §12.9/§12.16, see §0) then closed manager/committee assignment (7, 8) and the reopen-with-approval gate (70). Remaining ◑ are softer depth items (committee-model richness, per-endpoint role-coverage breadth, archive/reopen edge gates).
+**Totals:** **70 ✅ · 0 ◑ · 0 ✗** — every lifecycle task is now implemented *(was ~46 / ~14 / ~10 at review time)*. The former ✗ cluster — **BIA→plan generation** and **evidence request/upload/lifecycle** — was closed by **B-A** and **B-B/B-C/B-D**; the **residual-partials pass** (P-7/P-8/P-70 + §12.9/§12.16, see §0) closed the last partials (manager/committee assignment 7/8, reopen-with-approval 70). Finer-grained depth items (a dedicated rejection-reason field, per-request version history, a pre-expiry notice) remain as **3 ◑ in the §12 evidence checklist** — none block the 70 lifecycle tasks.
 
 ---
 
@@ -186,20 +186,20 @@ Each workflow below states the realistic target; §5–§13 compare against curr
 | Dashboard / readiness / board-pack | ✅ | real source data (BcmBoardPackService aggregates CAPA by status etc.) |
 | Governance / cycle | ✅ | full lifecycle, transitions, events, scheduler-driven review-due |
 | Critical services / processes | ✅ | registers + criticality + dependency cascade/graph |
-| BIA (qual + quant) | ✅ (validation) / ✗ (generation) | real RTO≤MTPD gate; **plan generation is a stub** |
+| BIA (qual + quant) | ✅ | real RTO≤MTPD gate; **B-A: plan generation now seeds real content from the BIA** |
 | Continuity strategy + ROI | ✅ | compare + approve + ROI |
-| BCP builder | ✅ | activation/team/steps/comms/version; not auto-generated from BIA |
-| DRP | ✅ (plan) / ✗ (backup evidence) | recovery sequence + DR test (PASSED/GAP/FAILED) → F8 CAPA; no evidence file |
+| BCP builder | ✅ | activation/team/steps/comms/version; **B-A: generated + seeded from the approved BIA** |
+| DRP | ✅ | recovery sequence + DR test (PASSED/GAP/FAILED) → F8 CAPA; **B-C: backup/test evidence upload + B-G validation checklist** |
 | Crisis | ✅ | events, severity, sitreps, decisions, regulatory notifications, BCP/DRP activation, AAR, comms dispatch v2, cross-module signals |
 | Exercises | ✅ | scenario library + runtime + observer/facilitator/participant consoles + AAR draft |
 | CAPA / corrective actions | ✅ | transitions; F8 auto-create on DR-test fail |
-| Compliance mapping | ◑ | maps clause→control + attach-evidence-by-id; evidence side weak |
-| Evidence | ✗ | no request workflow, no upload (except 2 pages), no review/expiry — **headline gap** |
+| Compliance mapping | ◑ | maps clause→control + attach-evidence-by-id; generic evidence requests now available (B-B), but mapping-level evidence depth stays light |
+| Evidence | ✅ | **resolved (B-B/B-C/B-D + §12.9/§12.16)**: request workflow, upload on all 6 entities, review/reject→gap/resubmit/expiry, comment thread, dashboard tile (3 fine-grained ◑ in §12) |
 | Reporting / export | ✅ | PDF exports + evidence-package manifest |
 | Audit trail | ✅ | events + audit.log throughout (benefits from `ae3433f9` off-request fix) |
 | Automation (F8) | ✅ | ~40 triggers + scheduler + RecordCreator |
 | ERM / control linkage | ✅ | FK columns: `linked_risk_id`, `related_erm_risk_id`, `related_control_id` |
-| Arabic / RTL | ◑ | bilingual labels present; per-page RTL needs a walk (not exhaustively verified) |
+| Arabic / RTL | ✅ | B-I: bilingual labels + logical-property RTL; EN/AR parity verified (incl. browser walk) |
 
 ---
 
@@ -211,7 +211,7 @@ Each workflow below states the realistic target; §5–§13 compare against curr
 | **B-2** | **No evidence-request workflow** (request from dept, owner, due date, countdown, SLA, reminders, escalation) anywhere in BCM | **Critical** | no `EvidenceRequest`/`EvidenceLink` usage in `module/bcm`; no SLA/countdown in BCM services |
 | **B-3** | **No real file upload** for BIA / BCP / DRP / DR-test / CAPA / policy; not wired to `AttachmentService` | **Critical** | zero `MultipartFile` in `module/bcm`; AttachmentsField only on `AarDetailPage` + `ExerciseScenarioDetailPage` |
 | **B-4** | **No evidence lifecycle** — review, rejection→gap, resubmission, expiry, pre-expiry notice | **High** | absent in BCM (consequence of B-2/B-3); CAPA has only an `EVIDENCE_SUBMITTED` flag |
-| **B-5** | BIA→strategy / min-resources / MBCO capture is partial vs. ISO 22301 depth | **Medium** | tasks 18/20 ◑ |
+| **B-5** | BIA→strategy / min-resources / MBCO capture (was partial vs. ISO 22301 depth) — **resolved B-F/B-G** | Medium | tasks 18/20 → ✅ |
 | **B-6** | `exercise-runs` root GET returns **405** (no list endpoint) — exercises only reachable via sub-paths | **Medium** | live smoke `GET /api/v1/bcm/exercise-runs → 405` |
 | **B-7** | Arabic/RTL not exhaustively verified across ~33 pages | **Low** | needs a live bilingual walk |
 
@@ -225,16 +225,16 @@ Each workflow below states the realistic target; §5–§13 compare against curr
 - **Validation is real and good:** approval blocked unless `mtpd_hours > 0` and `rto_hours ≤ mtpd_hours` (`BcmBiaAssessmentService.validateRtoMtpd`). Quantitative BIA (V162) adds financial impact + `BIA_QUANT_APPROVED`.
 - **Downstream generation is the core defect (B-1):** approving a BIA does **not** produce a populated BCP/DRP. `markBcpGenerated/markDrpGenerated` only stamp an id; `generate*Stub` only audit. ISO 22301's central "BIA drives the plan" linkage is cosmetic.
 - **Evidence:** BIA has no attached evidence/file (B-3).
-- **Partial:** MBCO + minimum-resource + manual-workaround + peak-period capture should be confirmed end-to-end in the wizard (tasks 18/20).
+- ~~**Partial:**~~ **✅ Resolved (B-F):** MBCO + minimum-resource + manual-workaround + peak-period capture are confirmed end-to-end in the BIA wizard (tasks 18/20) and seeded into the generated plan.
 - **Good:** ERM link (`linked_risk_id`), criticality (incl. sovereign), versioning via cycle.
 
 ## 8. BCP Gaps
 - **Strong:** activation criteria, response team, recovery steps, comms/call tree, approve→publish→attest lifecycle, plan-review-overdue automation (`BCM_PLAN_REVIEW_OVERDUE`), version/distribution (V109/V110).
-- **Gaps:** not auto-generated from an approved BIA (B-1); no uploaded plan file / signed-PDF attachment (B-3); exercise/test-history linkage to the plan should be tightened (task 45 ◑).
+- ~~**Gaps:**~~ **✅ Resolved (see §0):** auto-generated + seeded from the approved BIA (B-A) and signed-plan / evidence upload (B-C) are shipped. *Residual:* exercise/test-history linkage to the plan could be tightened.
 
 ## 9. DRP Gaps
 - **Strong:** recovery sequence, DR test outcomes `PASSED/GAP/FAILED`, and **failed/GAP test → `BCM_DR_TEST_FAILED` → F8 → auto-CAPA** (`DrPlanService:173-181` + `BcmCorrectiveActionRecordCreator`). DR-test trend reporting.
-- **Gaps:** **no backup-evidence file upload** (B-3, task 39); failover/validation-checklist/rollback capture is partial (task 38); not auto-generated from BIA (B-1); link to application/system register should be verified as a real FK.
+- ~~**Gaps:**~~ **✅ Resolved (see §0):** backup/test-evidence upload (B-C), post-failover validation checklist (B-G), and BIA→DRP generation (B-A) are shipped. *Residual:* the application/system-register FK depth could be tightened.
 
 ## 10. Crisis & Emergency Gaps
 - **Strong (near-complete):** crisis events, severity, situation reports, decisions, actions, regulatory notifications, **BCP/DRP activation**, closure, AAR (V124/V131), comms dispatch v2 + call-tree failure escalation (`BCM_CALL_TREE_FAILED`), and **cross-module signals** (`BCM_CRISIS_PDPL_BREACH`, `_CYBER_LINKED`, `_SUPPLIER_LINKED`). This is the strongest sub-area.
@@ -242,33 +242,33 @@ Each workflow below states the realistic target; §5–§13 compare against curr
 
 ## 11. Exercise & Testing Gaps
 - **Strong:** scenario library, exercise runtime, **observer/facilitator/participant** consoles, AAR draft auto-created on completion.
-- **Gaps:** failed exercise → gap → CAPA chain is **partial** (AAR draft is created, but the gap/CAPA auto-link is weaker than the DR-test path; task 45 ◑); no list endpoint for `exercise-runs` (B-6); evidence/observation file upload limited.
+- ~~**Gaps:**~~ **✅ Resolved (see §0):** exercise observation → tracked gap → CAPA (B-E), and `GET /api/v1/bcm/exercise-runs` list (B-H, was 405). Observation evidence upload uses the generic attachment field.
 
 ## 12. Evidence Workflow Gaps (the 20-point checklist)
 | # | Capability | BCM status |
 |---|---|---|
-| 1 | Request evidence from dept/user | ✗ missing |
-| 2 | Assign evidence owner | ✗ |
-| 3 | Due date | ✗ |
-| 4 | Countdown timer | ✗ |
-| 5 | SLA status | ✗ |
-| 6 | Reminders before due | ✗ |
-| 7 | Escalate after overdue | ✗ (CAPA/plan/cycle overdue exists, but not evidence) |
-| 8 | File upload | ◑ (only AAR + exercise scenario) |
+| 1 | Request evidence from dept/user | ✅ (B-B) |
+| 2 | Assign evidence owner | ✅ (B-B: department + assignee) |
+| 3 | Due date | ✅ (B-B) |
+| 4 | Countdown timer | ✅ (B-B) |
+| 5 | SLA status | ✅ (B-B) |
+| 6 | Reminders before due | ✅ (B-B: `EvidenceRequestSlaScheduler`) |
+| 7 | Escalate after overdue | ✅ (B-B: SLA scheduler escalation) |
+| 8 | File upload | ✅ (B-C: `AttachmentService` on all 6 BCM entities) |
 | 9 | Comments | ✅ (request comment thread — V240) |
-| 10 | Reviewer approve/reject | ✗ |
-| 11 | Rejection reason | ✗ |
-| 12 | Resubmission | ✗ |
-| 13 | Versions | ✗ |
+| 10 | Reviewer approve/reject | ✅ (B-B/B-D: APPROVED/REJECTED transitions) |
+| 11 | Rejection reason | ◑ (captured via the comment thread §12.9; no dedicated reason field on the reject action) |
+| 12 | Resubmission | ✅ (B-D: REJECTED → OPEN/IN_PROGRESS) |
+| 13 | Versions | ◑ (attachments carry sha256 + version, and evidence-items are versioned, platform-wide; no per-request version history) |
 | 14 | Audit trail | ✅ (general) |
-| 15 | Link evidence to BIA/BCP/DRP/exercise/control | ◑ (by-id on compliance mapping only) |
+| 15 | Link evidence to BIA/BCP/DRP/exercise/control | ✅ (B-B: generic `entity_type`/`entity_id` anchor) |
 | 16 | Show in dashboard | ✅ (BCM dashboard evidence tile) |
 | 17 | Include in reports | ✅ (evidence-package export) |
-| 18 | Expire when validity ends | ✗ |
-| 19 | Notify before expiry | ✗ |
-| 20 | Create gap if missing/rejected | ✗ |
+| 18 | Expire when validity ends | ✅ (B-D: attachment expiry / re-collect) |
+| 19 | Notify before expiry | ◑ (overdue-request reminders exist; a dedicated pre-expiry notice is not confirmed) |
+| 20 | Create gap if missing/rejected | ✅ (B-D: rejected → deduped BCM gap via `BcmGapRecordCreator`) |
 
-**This was the weakest area and the primary remediation target — now resolved.** ✅ **Post-remediation (B-B/B-C/B-D — see §0):** points 1–8, 10–13, 15, 17–20 were closed by B-B/B-C/B-D; comments (9, a real request comment thread via **V240**) and dashboard surfacing (16, an evidence posture tile) were then closed in the **residual-partials pass** — **all 20 points now ✅**. The generic evidence subsystem (`EvidenceRequest`/`EvidenceLink`/`AttachmentService` + the SLA scheduler) already existed platform-wide — BCM is now wired to it.
+**This was the weakest area and the primary remediation target — now substantially resolved.** ✅ **Post-remediation (B-B/B-C/B-D + residual §12.9/§12.16, see §0): 17 of 20 points are ✅** — request/owner/due/countdown/SLA/reminders/escalation/upload (1–8), review-reject/resubmit (10, 12), comments (9), entity links (15), dashboard (16), reports (17), expiry (18), gap-on-reject (20). **3 residual ◑** are depth items: a dedicated **rejection-reason field** (11 — today via the comment thread), per-request **version history** (13 — attachments are already versioned), and a **pre-expiry notice** (19 — overdue-request reminders exist). The generic evidence subsystem (`EvidenceRequest`/`EvidenceLink`/`AttachmentService` + the SLA scheduler) already existed platform-wide — BCM is now wired to it.
 
 ## 13. Policy/Document Workflow Gaps
 - Governance/policy records + lifecycle + review-due automation exist; **but no file upload** (B-3), no reviewer/approver field capture on the document itself, no version/archive of an uploaded file. Mirrors the Compliance policy gap before its remediation.
@@ -303,11 +303,11 @@ Live + code-grounded. Full per-button sweep is part of the remediation test plan
 - **Present + good:** `linked_risk_id`, `related_erm_risk_id`, `related_control_id`, criticality, MTPD/RTO/RPO/MBCO, plan/cycle/crisis status columns.
 
 ## 16. API Gaps
-- **Missing:** `POST` evidence-request endpoints for BCM entities; multipart upload endpoints for BIA/BCP/DRP/DR-test/policy/CAPA (or adopt the generic `/api/v1/attachments/{entityType}/{entityId}`); a real `generate-bcp`/`generate-drp` that materialises a plan from the BIA; `GET /api/v1/bcm/exercise-runs` list (currently 405).
+- ~~**Missing:**~~ **✅ Resolved (B-A/B-B/B-C/B-H + §12.9; see §0):** evidence-request endpoints (incl. `/by-entity` and `/{id}/comments`), multipart upload via the generic `/api/v1/attachments/...`, the real `generateFromBia` plan generator, and `GET /api/v1/bcm/exercise-runs` (was 405 → 200).
 - **Present:** comprehensive CRUD + transitions + exports across all registers.
 
 ## 17. UI/UX Gaps
-- Well-wired (22 distinct API fns in BCM pages; minimal stub markers). Gaps: no upload UI on BIA/BCP/DRP/policy/DR-test pages (only AAR + exercise scenario); no evidence-request UI; no countdown/SLA chips; Arabic/RTL needs a per-page walk (not exhaustively verified this pass).
+- Well-wired (22 distinct API fns in BCM pages; minimal stub markers). **Former gaps now resolved (see §0):** upload UI on all 6 BCM entities (`AttachmentsField`), evidence-request UI with countdown/SLA chips + comment thread (`EvidenceRequestsField`), and a dashboard evidence tile; Arabic/RTL verified via a browser walk.
 
 ## 18. Integration Gaps
 | Integration | Status |
@@ -315,16 +315,16 @@ Live + code-grounded. Full per-button sweep is part of the remediation test plan
 | ERM risk register | ✅ FK (`related_erm_risk_id`, `linked_risk_id`) |
 | Control library | ✅ FK (`related_control_id`) |
 | Compliance requirements | ◑ mapping by clause/control + attach-evidence-by-id |
-| **Evidence subsystem** (EvidenceRequest/Link/AttachmentService) | ✗ **not wired** |
+| **Evidence subsystem** (EvidenceRequest/Link/AttachmentService) | ✅ **wired (B-B/B-C/B-D + §12.9/§12.16)** |
 | Corrective-action register | ✅ (BCM has its own CAPA + F8 auto-create) |
 | Incident / cyber / PDPL / supplier | ✅ crisis cross-module signals |
 | Audit log | ✅ (benefits from `ae3433f9`) |
 | F8 automation engine | ✅ ~40 triggers + RecordCreator + rule seeds |
 | Reports / dashboard | ✅ live source data |
-| Notifications / reminders / escalation | ✅ for cycle/plan/CAPA overdue · ✗ for evidence |
+| Notifications / reminders / escalation | ✅ cycle/plan/CAPA overdue · ✅ evidence (B-B: SLA scheduler) |
 | Approval workflow | ✅ governance/plan/BIA/CAPA |
-| Role permissions | ◑ `@PreAuthorize` present; coverage varies |
-| Arabic/English i18n + RTL | ◑ |
+| Role permissions | ✅ B-I: BCM grant matrix + `BCM_APPROVE` seeded (verified live BCM_MANAGER 200 / CYBER 403) |
+| Arabic/English i18n + RTL | ✅ B-I: full EN/AR parity + logical-property RTL (browser-walked) |
 
 ---
 
