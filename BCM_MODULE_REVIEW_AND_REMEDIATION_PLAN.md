@@ -6,7 +6,7 @@
 
 ## 0. Remediation Progress (live — branch `feat/bcm-remediation`)
 
-> Implementation started 2026-06-29 via an autonomous `/loop`, in §27 order. Frontend `tsc`-verified; backend `mvn`-verified; key paths live-smoked against :8084. **Not merged to `master`.**
+> Implementation started 2026-06-29 via an autonomous `/loop`, in §27 order. Frontend `tsc`-verified; backend `mvn`-verified; key paths live-smoked against :8084. **On `feat/bcm-remediation` — 29 commits ahead of `master`, 0 behind; open as PR #487 (CI green), not yet merged.**
 
 | Epic | Item | Status | Commit |
 |---|---|---|---|
@@ -26,7 +26,9 @@
 
 **Order (§27):** B-C → B-B → B-A → B-D → B-E → B-F/G → B-H → B-I. **— all eight epics complete (2026-06-29).**
 
-> ✅ **Remediation backlog complete.** All Critical (B-1/2/3) and the High/Medium epics (B-A…B-I) are shipped on `feat/bcm-remediation`, each frontend `tsc`-verified, backend `mvn`-compiled, and live-smoked against :8084 (with the backend rebuilt + restarted after every backend change). Branch not yet merged to `master` — ready for fast-forward on instruction. Five Flyway migrations (V235–V239) were authored for non-dev profiles and also applied to the Python-managed dev DB.
+> ✅ **Remediation backlog complete.** All Critical (B-1/2/3) and the High/Medium epics (B-A…B-I) are shipped on `feat/bcm-remediation`, each frontend `tsc`-verified, backend `mvn`-compiled, and live-smoked against :8084 (with the backend rebuilt + restarted after every backend change). **Full backend suite green: 1970 tests, 0 failures.** Opened as **PR #487** (CI: Backend ✅ + Frontend ✅); not yet merged to `master`. Five Flyway migrations (V235–V239) were authored for non-dev profiles and also applied to the Python-managed dev DB.
+>
+> 🔁 **Re-verified 2026-06-30:** all 13 epic commits present on the branch (none on `master`); migrations V235–V239 on disk; `BcmGapRecordCreator` + `EvidenceRequestsField` present; `BCM_APPROVE` in V239; `GET /api/v1/bcm/exercise-runs` live-confirmed **HTTP 200** (was 405).
 
 ---
 
@@ -123,22 +125,22 @@ The 70 lifecycle tasks the module must support, with current status (✅ impleme
 | 54 | Add crisis action | ✅ | crisis actions |
 | 55 | Close crisis event | ✅ | `BCM_CRISIS_CLOSED` |
 | 56 | Create lessons learned | ✅ | `BcmLessonLearned` (+risk/control link) |
-| 57 | **Request evidence from a dept** | ✗ | **MISSING — no request workflow** |
-| 58 | Upload evidence | ✗ | only AAR + exercise-scenario (generic) |
-| 59 | Review evidence | ✗ | no review loop in BCM |
-| 60 | Reject evidence | ✗ | missing |
-| 61 | Resubmit evidence | ✗ | missing |
-| 62 | Approve evidence | ◑ | CAPA `EVIDENCE_SUBMITTED` flag only |
-| 63 | Track evidence expiry | ✗ | missing |
+| 57 | Request evidence from a dept | ✅ | B-B: `EvidenceRequestsField` (dept/owner/due/priority + countdown) + `by-entity` endpoint, wired to all BCM surfaces `64e1c1d1` |
+| 58 | Upload evidence | ✅ | B-C: real file upload on all 6 BCM entities via `AttachmentService` |
+| 59 | Review evidence | ✅ | B-B/B-D: generic `EvidenceRequest` review loop, now wired to BCM |
+| 60 | Reject evidence | ✅ | B-D: REJECTED → auto-opens a deduped BCM gap (F8 + `BcmGapRecordCreator`) `f895befc` |
+| 61 | Resubmit evidence | ✅ | B-D: REJECTED → OPEN/IN_PROGRESS resubmission |
+| 62 | Approve evidence | ✅ | B-B: `EvidenceRequest` approve transition (not just the CAPA flag) |
+| 63 | Track evidence expiry | ✅ | B-D: attachment expiry / re-collect via the SLA scheduler |
 | 64 | Generate BCM readiness report | ✅ | `BcmReadinessPage` + report service |
 | 65 | Export BCP/DRP/BIA/report | ✅ | PDF export (Content-Disposition) |
 | 66 | Generate audit evidence package | ✅ | `BcmEvidencePackageService` (manifest) |
-| 67 | Switch Arabic/English | ◑ | bilingual labels; RTL — verify per page |
-| 68 | Test role permissions | ◑ | `@PreAuthorize` present; coverage varies |
+| 67 | Switch Arabic/English | ✅ | B-I: bilingual labels + logical-property RTL; EN/AR parity verified |
+| 68 | Test role permissions | ✅ | B-I: BCM grant matrix + `BCM_APPROVE` seeded; verified live (BCM_MANAGER 200 on BCM / 403 on CYBER) |
 | 69 | Archive closed cycle | ✅ | `BCM_CYCLE_ARCHIVED` |
 | 70 | Reopen item with approval | ◑ | CAPA reopen status; verify approval gate |
 
-**Totals:** ~46 ✅ · ~14 ◑ · ~10 ✗ (the ✗ cluster heavily in **BIA→plan generation** and **evidence request/upload/lifecycle**).
+**Totals:** ~55 ✅ · ~11 ◑ · ~4 ✗ *(post-remediation; was ~46 / ~14 / ~10 at review time)*. The former ✗ cluster — **BIA→plan generation** and **evidence request/upload/lifecycle** — is now ✅ via **B-A** and **B-B/B-C/B-D**. Residual ◑ are owner/committee assignment (7, 8) and reopen-with-approval gate (70).
 
 ---
 
@@ -407,4 +409,4 @@ BCM is a **strong, genuinely-implemented module** — the richest in the platfor
 - **B-H** — `GET /api/v1/bcm/exercise-runs` list endpoint (was 405).
 - **B-I** — BCM role-permission grant matrix + `BCM_APPROVE` (was admin-only); Arabic/RTL verified.
 
-**Revised verdict: Production-ready for an audited Saudi BCM buyer**, pending the standard pre-merge gate (full `mvn test` + a stakeholder UAT pass) and merge of `feat/bcm-remediation` to `master`.
+**Revised verdict: Production-ready for an audited Saudi BCM buyer.** The full `mvn test` gate is satisfied (**1970 tests, 0 failures**); the work is open as **PR #487** with CI green (Backend ✅ + Frontend ✅). Remaining before it ships: a stakeholder **UAT** pass and **merge of `feat/bcm-remediation` → `master`**.
