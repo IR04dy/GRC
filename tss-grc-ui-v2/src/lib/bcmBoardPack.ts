@@ -37,6 +37,12 @@ export interface CapaSnapshot {
   byStatus: Record<string, number>;
 }
 
+export interface EvidenceSnapshot {
+  activeOpenCount: number;
+  overdueCount: number;
+  rejectedCount: number;
+}
+
 export interface AarSummary {
   id: number;
   reportCode: string;
@@ -96,6 +102,7 @@ export interface BoardPackSection {
   lastAar?: AarSummary;
   activeCrises: ActiveCrisisSnapshot;
   regulatorNotifications: RegulatorNotificationRow[];
+  evidence: EvidenceSnapshot;
   readiness: ReadinessHeadline;
 }
 

@@ -7,7 +7,7 @@
 // Mirrors AttachmentsField: same {entityType, entityId, label?} contract, same
 // bare (Card-less) layout so it can sit inside a host Card.
 import { useCallback, useEffect, useState } from 'react';
-import { ClipboardList, Plus, Send, Trash2, X, AlarmClock } from 'lucide-react';
+import { ClipboardList, Plus, Send, Trash2, X, AlarmClock, MessageSquare } from 'lucide-react';
 import { Button } from './Button';
 import { Badge, type BadgeTone } from './Badge';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -15,7 +15,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
   evidenceApi, departmentsApi, ApiError,
-  type EvidenceRequestDto, type DepartmentDto,
+  type EvidenceRequestDto, type DepartmentDto, type EvidenceRequestCommentDto,
 } from '../../lib/api';
 
 // Mirror of the backend request state machine (EvidenceRequestService).
@@ -251,6 +251,7 @@ export function EvidenceRequestsField({ entityType, entityId, label }: EvidenceR
                             title={isAr ? 'حذف' : 'Delete'} onClick={() => setConfirmDel(r)} />
                   </span>
                 </div>
+                <RequestComments requestId={r.id} />
               </div>
             );
           })}
@@ -267,6 +268,77 @@ export function EvidenceRequestsField({ entityType, entityId, label }: EvidenceR
           onConfirm={() => void remove()}
           onCancel={() => setConfirmDel(null)}
         />
+      )}
+    </div>
+  );
+}
+
+/** Inline comment thread for one evidence request (plan task §12.9). */
+function RequestComments({ requestId }: { requestId: number }) {
+  const { lang } = useI18n();
+  const isAr = lang === 'ar';
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [comments, setComments] = useState<EvidenceRequestCommentDto[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    evidenceApi.requestComments(requestId)
+      .then(c => { setComments(c); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }, [requestId]);
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && !loaded) load();
+  }
+
+  async function add() {
+    if (!text.trim()) return;
+    setBusy(true);
+    try {
+      await evidenceApi.addRequestComment(requestId, text.trim());
+      setText('');
+      load();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل' : 'Failed'));
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div style={{ marginTop: 2 }}>
+      <button type="button" onClick={toggle}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                       display: 'inline-flex', alignItems: 'center', gap: 4,
+                       fontSize: 11, color: 'var(--ink-2)' }}>
+        <MessageSquare size={11} />
+        {isAr ? 'التعليقات' : 'Comments'}{loaded && comments.length ? ` (${comments.length})` : ''}
+      </button>
+      {open && (
+        <div style={{ marginTop: 4, display: 'grid', gap: 6, paddingInlineStart: 8,
+                      borderInlineStart: '2px solid var(--border)' }}>
+          {comments.map(c => (
+            <div key={c.id} className="text-2xs">
+              <span style={{ fontWeight: 600 }}>{c.authorName ?? (isAr ? 'مستخدم' : 'User')}</span>
+              <span className="text-muted"> · {c.createdAt ? new Date(c.createdAt).toLocaleString() : ''}</span>
+              <div style={{ whiteSpace: 'pre-wrap' }}>{c.body}</div>
+            </div>
+          ))}
+          {loaded && comments.length === 0 && (
+            <div className="text-2xs text-muted">{isAr ? 'لا توجد تعليقات بعد.' : 'No comments yet.'}</div>
+          )}
+          <div style={{ display: 'flex', gap: 4 }}>
+            <input style={inputStyle} value={text} onChange={e => setText(e.target.value)}
+                   placeholder={isAr ? 'أضف تعليقًا…' : 'Add a comment…'}
+                   onKeyDown={e => { if (e.key === 'Enter' && !busy) void add(); }} />
+            <Button size="sm" variant="secondary" disabled={busy} onClick={() => void add()}>
+              {isAr ? 'إرسال' : 'Post'}
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );

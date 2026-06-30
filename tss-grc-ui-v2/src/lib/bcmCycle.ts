@@ -404,6 +404,14 @@ export function updateCapa(id: number, b: Partial<BcmCorrectiveAction>)   { retu
 export function transitionCapa(id: number, to: CapaStatus, evidenceId?: number) {
   return api.post<BcmCorrectiveAction>(`${BASE}/capas/${id}/transition`, { to, evidenceId });
 }
+/** Approval-gated reopen of a CLOSED CAPA (plan task 70) — requires BCM_APPROVE + a reason. */
+export function reopenCapa(id: number, reason: string) {
+  return api.post<BcmCorrectiveAction>(`${BASE}/capas/${id}/reopen`, { reason });
+}
+/** Approval-gated reopen of a CLOSED gap (plan task 70) — requires BCM_APPROVE + a reason. */
+export function reopenGap(id: number, reason: string) {
+  return api.post<BcmGap>(`${BASE}/gaps/${id}/reopen`, { reason });
+}
 /**
  * Backend returns `{flippedToOverdue: n}` per BcmRemediationController;
  * the earlier client typed it as `flagged` and the page consumer read

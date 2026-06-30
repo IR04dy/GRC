@@ -2019,6 +2019,11 @@ export interface EvidenceRequestDto {
   /** @deprecated legacy field — backend now returns assignedToName/requestedByName. */
   ownerName?: string;
 }
+export interface EvidenceRequestCommentDto {
+  id: number; requestId: number;
+  authorId?: number; authorName?: string;
+  body: string; createdAt?: string;
+}
 export interface EvidenceReviewDto {
   id: number; evidenceId: number;
   evidenceTitleEn?: string;
@@ -2094,6 +2099,11 @@ export const evidenceApi = {
   updateRequestStatus: (id: number, status: string) =>
     api.post<EvidenceRequestDto>(`/api/v1/evidence/requests/${id}/status?status=${encodeURIComponent(status)}`),
   deleteRequest: (id: number) => api.delete<void>(`/api/v1/evidence/requests/${id}`),
+  /** Comment thread on an evidence request (plan task §12.9). */
+  requestComments: (id: number) =>
+    api.get<EvidenceRequestCommentDto[]>(`/api/v1/evidence/requests/${id}/comments`),
+  addRequestComment: (id: number, body: string) =>
+    api.post<EvidenceRequestCommentDto>(`/api/v1/evidence/requests/${id}/comments`, { body }),
   reviews:      (page = 0, size = 50) => api.get<PageResponse<EvidenceReviewDto>>(`/api/v1/evidence/reviews${pageQ(page, size)}`),
   // Cross-framework matrix + version history + connectors (assessment §5.9)
   matrix:       () => api.get<FrameworkBlock[]>('/api/v1/evidence/matrix'),

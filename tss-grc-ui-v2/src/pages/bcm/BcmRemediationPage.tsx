@@ -16,8 +16,8 @@ import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
   listLessons, createLesson, transitionLesson,
-  listGaps, createGap, transitionGap,
-  listCapas, createCapa, transitionCapa, flagOverdueCapas, remediationStats,
+  listGaps, createGap, transitionGap, reopenGap,
+  listCapas, createCapa, transitionCapa, reopenCapa, flagOverdueCapas, remediationStats,
   gapStatusTone, severityTone, capaStatusTone,
   type BcmLessonLearned, type BcmGap, type BcmCorrectiveAction,
   type LessonStatus, type GapStatus, type CapaStatus, type LessonSource,
@@ -54,7 +54,7 @@ const GAP_NEXT: Record<GapStatus, GapStatus[]> = {
   ASSIGNED:      ['IN_PROGRESS', 'OPEN'],
   IN_PROGRESS:   ['UNDER_REVIEW'],
   UNDER_REVIEW:  ['CLOSED', 'IN_PROGRESS'],
-  CLOSED:        ['REOPENED'],
+  CLOSED:        [],          // reopen is a separate BCM_APPROVE-gated action
   ACCEPTED_RISK: ['OPEN'],
   REOPENED:      ['IN_PROGRESS'],
 };
@@ -64,7 +64,7 @@ const CAPA_NEXT: Record<CapaStatus, CapaStatus[]> = {
   IN_PROGRESS:        ['EVIDENCE_SUBMITTED', 'OVERDUE'],
   EVIDENCE_SUBMITTED: ['UNDER_REVIEW'],
   UNDER_REVIEW:       ['CLOSED', 'IN_PROGRESS'],
-  CLOSED:             ['REOPENED'],
+  CLOSED:             [],          // reopen is a separate BCM_APPROVE-gated action
   OVERDUE:            ['IN_PROGRESS', 'EVIDENCE_SUBMITTED'],
   REOPENED:           ['IN_PROGRESS'],
 };
@@ -125,6 +125,21 @@ export function BcmRemediationPage() {
     try { await transitionCapa(c.id, to, evidenceId); toast.success(isAr ? `الإجراء → ${to}` : `CAPA → ${to}`); await reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed'); }
   }
+  // Reopen is a privileged (BCM_APPROVE) action with a mandatory reason — a
+  // separate path from the generic transition (which no longer allows
+  // CLOSED → REOPENED). Non-approvers get a 403 surfaced as a toast.
+  async function onReopenGap(g: BcmGap) {
+    const reason = window.prompt(isAr ? 'سبب إعادة الفتح (مطلوب)' : 'Reopen reason (required)');
+    if (!reason || !reason.trim()) return;
+    try { await reopenGap(g.id, reason.trim()); toast.success(isAr ? 'أُعيد فتح الفجوة' : 'Gap reopened'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed'); }
+  }
+  async function onReopenCapa(c: BcmCorrectiveAction) {
+    const reason = window.prompt(isAr ? 'سبب إعادة الفتح (مطلوب)' : 'Reopen reason (required)');
+    if (!reason || !reason.trim()) return;
+    try { await reopenCapa(c.id, reason.trim()); toast.success(isAr ? 'أُعيد فتح الإجراء' : 'CAPA reopened'); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed'); }
+  }
 
   async function runFlagOverdue() {
     try {
@@ -170,8 +185,8 @@ export function BcmRemediationPage() {
 
       <div style={{ marginTop: 12 }}>
         {tab === 'lessons' && <LessonsTab lessons={lessons} onMove={moveLesson} isAr={isAr} />}
-        {tab === 'gaps'    && <GapsTab gaps={gaps} onMove={moveGap} isAr={isAr} />}
-        {tab === 'capas'   && <CapasTab capas={capas} onMove={moveCapa} isAr={isAr} />}
+        {tab === 'gaps'    && <GapsTab gaps={gaps} onMove={moveGap} onReopen={onReopenGap} isAr={isAr} />}
+        {tab === 'capas'   && <CapasTab capas={capas} onMove={moveCapa} onReopen={onReopenCapa} isAr={isAr} />}
       </div>
 
       {showCreate && <CreateModal tab={tab} onClose={() => setShowCreate(false)}
@@ -218,8 +233,8 @@ function LessonsTab({ lessons, onMove, isAr }: {
   );
 }
 
-function GapsTab({ gaps, onMove, isAr }: {
-  gaps: BcmGap[]; onMove: (g: BcmGap, to: GapStatus) => void; isAr: boolean;
+function GapsTab({ gaps, onMove, onReopen, isAr }: {
+  gaps: BcmGap[]; onMove: (g: BcmGap, to: GapStatus) => void; onReopen: (g: BcmGap) => void; isAr: boolean;
 }) {
   if (gaps.length === 0) return <Card title={isAr ? 'الفجوات' : 'Gaps'}>
     <InlineEmpty text={isAr ? 'لا توجد فجوات' : 'No gaps yet'} />
@@ -248,6 +263,9 @@ function GapsTab({ gaps, onMove, isAr }: {
                   {GAP_NEXT[g.status].map(s => (
                     <Button key={s} variant="ghost" onClick={() => onMove(g, s)}>{s}</Button>
                   ))}
+                  {g.status === 'CLOSED' && (
+                    <Button variant="ghost" onClick={() => onReopen(g)}>{isAr ? 'إعادة فتح' : 'Reopen'}</Button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -258,8 +276,8 @@ function GapsTab({ gaps, onMove, isAr }: {
   );
 }
 
-function CapasTab({ capas, onMove, isAr }: {
-  capas: BcmCorrectiveAction[]; onMove: (c: BcmCorrectiveAction, to: CapaStatus) => void; isAr: boolean;
+function CapasTab({ capas, onMove, onReopen, isAr }: {
+  capas: BcmCorrectiveAction[]; onMove: (c: BcmCorrectiveAction, to: CapaStatus) => void; onReopen: (c: BcmCorrectiveAction) => void; isAr: boolean;
 }) {
   const lang = isAr ? 'ar' : 'en';
   // Which CAPA's evidence drawer is expanded. Closure requires evidence, so a
@@ -298,6 +316,9 @@ function CapasTab({ capas, onMove, isAr }: {
                   {CAPA_NEXT[c.status].map(s => (
                     <Button key={s} variant="ghost" onClick={() => onMove(c, s)}>{s}</Button>
                   ))}
+                  {c.status === 'CLOSED' && (
+                    <Button variant="ghost" onClick={() => onReopen(c)}>{isAr ? 'إعادة فتح' : 'Reopen'}</Button>
+                  )}
                 </td>
               </tr>
               {docsId === c.id && (

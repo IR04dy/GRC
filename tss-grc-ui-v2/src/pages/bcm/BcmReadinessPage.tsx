@@ -337,6 +337,7 @@ export function BcmReadinessPage() {
     policyVersion: '1.0',
     reviewFrequency: 'ANNUAL',
     nextReviewDate: '',
+    committeeId: '', bcmManagerId: '', executiveSponsorId: '',
     scope: '', objective: '',
   }), []);
 
@@ -352,6 +353,12 @@ export function BcmReadinessPage() {
       options: REVIEW_FREQUENCIES.map(f => ({ value: f.value, label: isAr ? f.ar : f.en })) },
     { key: 'nextReviewDate', kind: 'date', span: 4,
       label: isAr ? 'تاريخ المراجعة القادمة' : 'Next review date' },
+    { key: 'committeeId', kind: 'text', span: 4, maxLength: 12,
+      label: isAr ? 'رقم اللجنة المشرفة' : 'Oversight committee ID' },
+    { key: 'bcmManagerId', kind: 'text', span: 4, maxLength: 12,
+      label: isAr ? 'مدير الاستمرارية (رقم المستخدم)' : 'BCM manager (user ID)' },
+    { key: 'executiveSponsorId', kind: 'text', span: 4, maxLength: 12,
+      label: isAr ? 'الراعي التنفيذي (رقم المستخدم)' : 'Executive sponsor (user ID)' },
     { key: 'scope', kind: 'textarea', span: 12, rows: 2,
       label: isAr ? 'النطاق' : 'Scope' },
     { key: 'objective', kind: 'textarea', span: 12, rows: 3,
@@ -376,6 +383,9 @@ export function BcmReadinessPage() {
         nextReviewDate: nextReviewDate || undefined,
         scope: scope || undefined,
         objective: objective || undefined,
+        committeeId: Number(String(v.committeeId ?? '').trim()) || undefined,
+        bcmManagerId: Number(String(v.bcmManagerId ?? '').trim()) || undefined,
+        executiveSponsorId: Number(String(v.executiveSponsorId ?? '').trim()) || undefined,
         approvalStatus: 'DRAFT',
       });
       toast.success(isAr ? 'أُضيفت السياسة' : 'Policy added');
@@ -415,6 +425,9 @@ export function BcmReadinessPage() {
         nextReviewDate: String(v.nextReviewDate ?? '').trim() || undefined,
         scope: String(v.scope ?? '').trim() || undefined,
         objective: String(v.objective ?? '').trim() || undefined,
+        committeeId: Number(String(v.committeeId ?? '').trim()) || undefined,
+        bcmManagerId: Number(String(v.bcmManagerId ?? '').trim()) || undefined,
+        executiveSponsorId: Number(String(v.executiveSponsorId ?? '').trim()) || undefined,
       });
       toast.success(isAr ? 'حُدِّثت السياسة' : 'Policy updated');
       setEditGov(null);

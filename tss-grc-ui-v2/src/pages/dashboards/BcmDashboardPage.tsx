@@ -195,6 +195,16 @@ export function BcmDashboardPage() {
                 : ''}
             </Badge>
           </div>
+          {boardPack.evidence && (
+            <div>
+              {isAr ? 'طلبات الأدلة' : 'Evidence requests'}:{' '}
+              <Badge tone={boardPack.evidence.overdueCount > 0 || boardPack.evidence.rejectedCount > 0 ? 'danger' : 'info'}>
+                {boardPack.evidence.activeOpenCount}
+                {boardPack.evidence.overdueCount > 0 ? ` (${boardPack.evidence.overdueCount} ${isAr ? 'متأخر' : 'overdue'})` : ''}
+                {boardPack.evidence.rejectedCount > 0 ? ` · ${boardPack.evidence.rejectedCount} ${isAr ? 'مرفوض' : 'rejected'}` : ''}
+              </Badge>
+            </div>
+          )}
           {boardPack.lastAar && (
             <div>
               {isAr ? 'آخر AAR' : 'Last AAR'}:{' '}
