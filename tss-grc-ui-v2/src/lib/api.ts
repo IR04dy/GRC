@@ -1866,6 +1866,8 @@ export const complianceApi = {
   capaAuditSignoff:      (id: number, body: { notes?: string; byUserId?: number }) =>
                             api.post<ComplianceFindingDto>(`/api/v1/compliance/findings/${id}/capa/audit-signoff`, body),
   capaClose:             (id: number) => api.post<ComplianceFindingDto>(`/api/v1/compliance/findings/${id}/capa/close`),
+  capaReopen:            (id: number, body: { reason: string }) =>
+                            api.post<ComplianceFindingDto>(`/api/v1/compliance/findings/${id}/capa/reopen`, body),
 
   // External audit engagements — §5.3 recommendation #3
   auditEngagements:      (page = 0, size = 50) => api.get<PageResponse<AuditEngagementDto>>(`/api/v1/compliance/audit-engagements${pageQ(page, size)}`),

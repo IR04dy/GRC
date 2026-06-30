@@ -124,4 +124,10 @@ public class AuditEngagementController {
     public AuditFinding closeFinding(@PathVariable Long id) {
         return capaService.close(id);
     }
+
+    @PostMapping("/findings/{id}/capa/reopen")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
+    public AuditFinding reopenFinding(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        return capaService.reopen(id, body);
+    }
 }

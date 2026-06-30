@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useParams } from 'react-router-dom';
-import { AlertTriangle, ListChecks, ArrowRight, ShieldCheck, Stamp, Lock, Wrench, Briefcase, Link2 } from 'lucide-react';
+import { AlertTriangle, ListChecks, ArrowRight, ShieldCheck, Stamp, Lock, Wrench, Briefcase, Link2, RotateCcw } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { DetailLayout } from '../../components/layout/DetailLayout';
@@ -101,6 +101,11 @@ export function FindingDetailPage() {
           }}>{t('capaActIndepTest')}</Button>}
           {stage === 'INDEPENDENT_TESTED' && <Button variant="primary" Icon={Stamp}       onClick={() => capaAction((id) => complianceApi.capaAuditSignoff(id, {}), t('capaActSignoff'))}>{t('capaActSignoff')}</Button>}
           {stage === 'AUDIT_SIGNED_OFF'   && <Button variant="primary" Icon={Lock}        onClick={() => capaAction((id) => complianceApi.capaClose(id), t('capaActClose'))}>{t('capaActClose')}</Button>}
+          {stage === 'CLOSED'             && <Button variant="secondary" Icon={RotateCcw} onClick={async () => {
+            const reason = window.prompt(lang === 'ar' ? 'سبب إعادة فتح الملاحظة' : 'Reason for reopening this finding');
+            if (!reason || !reason.trim()) return;
+            await capaAction((id) => complianceApi.capaReopen(id, { reason: reason.trim() }), t('capaActReopen'));
+          }}>{t('capaActReopen')}</Button>}
         </>}
       />
 

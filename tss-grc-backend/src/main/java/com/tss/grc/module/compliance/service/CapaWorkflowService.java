@@ -168,6 +168,45 @@ public class CapaWorkflowService {
         return saved;
     }
 
+    /**
+     * Reopen a CLOSED finding — the one transition out of the terminal stage.
+     *
+     * <p>Premature closure or a recurrence reactivates remediation: the finding
+     * returns to {@code IDENTIFIED} / status {@code OPEN} and the prior cycle's
+     * verification fields are cleared so the owner re-walks the lifecycle and
+     * gathers fresh test evidence (the closed-out results stay in
+     * {@code platform.audit_log}, not the live row). A reason is mandatory —
+     * auditors must record why a signed-off finding was re-opened. Publishes
+     * {@code FINDING_CAPA_STAGE_CHANGED} with {@code result="REOPENED"} so F8
+     * rules can route reopen escalations (e.g. notify the audit committee when a
+     * CLOSED finding recurs).
+     */
+    @Transactional
+    public AuditFinding reopen(Long findingId, Map<String, Object> body) {
+        AuditFinding f = require(findingId);
+        // Only a CLOSED finding can be reopened (mirror of the forward guards).
+        requireStage(f, "CLOSED");
+        String reason = str(body.get("reason"));
+        if (reason == null || reason.isBlank())
+            throw new IllegalArgumentException("reason is required to reopen a finding");
+        String previousStage = stageOf(f);
+        f.setCapaStage("IDENTIFIED");
+        f.setStatus("OPEN");
+        // Fresh CAPA cycle — clear the prior cycle's verification fields so a
+        // reopened finding doesn't display a stale "signed-off / PASS".
+        f.setOwnerTestAt(null);         f.setOwnerTestResult(null);
+        f.setOwnerTestEvidenceId(null); f.setOwnerTestNotes(null);
+        f.setIndependentTestAt(null);   f.setIndependentTestResult(null);
+        f.setIndependentTestById(null); f.setIndependentTestNotes(null);
+        f.setAuditSignoffAt(null);      f.setAuditSignoffById(null);
+        f.setAuditSignoffNotes(null);
+        AuditFinding saved = findingRepo.save(f);
+        audit.log("REOPENED", "AuditFinding", saved.getId(),
+            "Finding #" + saved.getId() + " CAPA " + previousStage + " → IDENTIFIED · finding reopened · reason: " + reason);
+        publishStageEvent(saved, previousStage, "REOPENED", null, reason);
+        return saved;
+    }
+
     private AuditFinding require(Long id) {
         Long org = TenantContext.getCurrentTenant();
         return findingRepo.findById(id)

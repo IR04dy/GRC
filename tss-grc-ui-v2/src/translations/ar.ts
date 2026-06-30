@@ -3257,6 +3257,7 @@ export const ar = {
   capaActIndepTest: 'اختبار مستقل',
   capaActSignoff:   'موافقة التدقيق',
   capaActClose:     'إغلاق الملاحظة',
+  capaActReopen:    'إعادة فتح الملاحظة',
 
   // حقول التغيرات التنظيمية والسياسات
   complianceFldAuthority:        'الجهة المُصدرة',

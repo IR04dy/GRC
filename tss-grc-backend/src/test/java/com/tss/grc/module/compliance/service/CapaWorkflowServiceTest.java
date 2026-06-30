@@ -261,6 +261,71 @@ class CapaWorkflowServiceTest {
         assertThat(ev.payload()).containsEntry("notes", "rollback failed");
     }
 
+    // ── Reopen (CLOSED → IDENTIFIED) ────────────────────────────────────
+    // Reopen is the only transition out of the terminal CLOSED stage. It
+    // restarts the CAPA cycle (status OPEN), clears the prior cycle's
+    // verification fields, demands a reason, and audits as "REOPENED".
+
+    @Test void reopen_fromClosed_restartsLifecycle_clearsPriorCycle_andAudits() {
+        AuditFinding f = finding("CLOSED");
+        f.setStatus("CLOSED");
+        f.setOwnerTestResult("PASS");
+        f.setAuditSignoffAt(java.time.LocalDateTime.now());
+        when(findingRepo.findById(FID)).thenReturn(Optional.of(f));
+
+        AuditFinding out = service.reopen(FID, Map.of("reason", "Control failed again in Q3 review"));
+
+        assertThat(out.getCapaStage()).isEqualTo("IDENTIFIED");
+        assertThat(out.getStatus()).isEqualTo("OPEN");
+        // Prior cycle cleared so the reopened finding starts fresh.
+        assertThat(out.getOwnerTestResult()).isNull();
+        assertThat(out.getAuditSignoffAt()).isNull();
+        ArgumentCaptor<String> msg = ArgumentCaptor.forClass(String.class);
+        verify(audit).log(eq("REOPENED"), eq("AuditFinding"), eq(FID), msg.capture());
+        assertThat(msg.getValue()).contains("CLOSED → IDENTIFIED");
+        assertThat(msg.getValue()).contains("Control failed again in Q3 review");
+    }
+
+    @Test void reopen_requiresReason_noAudit() {
+        AuditFinding f = finding("CLOSED");
+        when(findingRepo.findById(FID)).thenReturn(Optional.of(f));
+
+        assertThatThrownBy(() -> service.reopen(FID, Map.of("reason", "   ")))
+            .isInstanceOf(IllegalArgumentException.class);
+
+        verify(audit, never()).log(anyString(), anyString(), anyLong(), anyString());
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
+    }
+
+    @Test void reopen_nonClosedFinding_rejected_noAudit() {
+        // Only CLOSED is reopenable — reopening an in-flight finding is a
+        // guard violation (use the forward transitions instead).
+        AuditFinding f = finding("AUDIT_SIGNED_OFF");
+        when(findingRepo.findById(FID)).thenReturn(Optional.of(f));
+
+        assertThatThrownBy(() -> service.reopen(FID, Map.of("reason", "x")))
+            .isInstanceOf(IllegalArgumentException.class);
+
+        verify(audit, never()).log(anyString(), anyString(), anyLong(), anyString());
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
+    }
+
+    @Test void reopen_publishesStageChangedEvent_withReopenResult() {
+        AuditFinding f = finding("CLOSED");
+        when(findingRepo.findById(FID)).thenReturn(Optional.of(f));
+
+        service.reopen(FID, Map.of("reason", "recurrence"));
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        DomainEvent ev = captor.getValue();
+        assertThat(ev.triggerEvent()).isEqualTo("FINDING_CAPA_STAGE_CHANGED");
+        assertThat(ev.payload()).containsEntry("newStage", "IDENTIFIED");
+        assertThat(ev.payload()).containsEntry("previousStage", "CLOSED");
+        assertThat(ev.payload()).containsEntry("result", "REOPENED");
+        assertThat(ev.payload()).containsEntry("notes", "recurrence");
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────
 
     private static AuditFinding finding(String stage) {

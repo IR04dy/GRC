@@ -3273,6 +3273,7 @@ export const en = {
   capaActIndepTest: 'Independent Test',
   capaActSignoff:   'Audit Sign-off',
   capaActClose:     'Close Finding',
+  capaActReopen:    'Reopen Finding',
 
   // Regulatory change + Policy field labels
   complianceFldAuthority:        'Issuing Authority',
