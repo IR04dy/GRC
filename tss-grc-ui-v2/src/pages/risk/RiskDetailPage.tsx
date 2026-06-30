@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { AlertTriangle, Activity, ListChecks, MessageSquare, Link2, Edit, Send, CheckCheck, ShieldOff, Archive, RotateCcw, Calculator } from 'lucide-react';
+import { AlertTriangle, Activity, ListChecks, MessageSquare, Edit, Send, CheckCheck, ShieldOff, Archive, RotateCcw, Calculator } from 'lucide-react';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
@@ -26,7 +26,7 @@ import { RISK_ANCHORS_BY_ID } from '../../lib/entityAnchors';
 import {
   MOCK_RISKS,
   RISK_ASSESSMENTS_BY_ID, RISK_TREATMENTS_BY_ID,
-  RISK_KRIS_BY_ID, RISK_HISTORY_BY_ID, RISK_LINKS_BY_ID,
+  RISK_KRIS_BY_ID, RISK_HISTORY_BY_ID,
 } from './mockRisks';
 import {
   listAssessments, recordAssessment, correctAssessment,
@@ -35,6 +35,7 @@ import {
   type RiskAssessment, type RiskTreatment, type RiskTreatmentType, type RiskTreatmentStatus,
 } from '../../lib/riskAdvanced';
 import { ermGap } from '../../lib/buyerGap';
+import { RiskLinksPanel } from '../../components/risk/RiskLinksPanel';
 import { EmptyState } from '../../components/ui/EmptyState';
 import '../../styles/pages/risk-detail.css';
 
@@ -603,25 +604,7 @@ export function RiskDetailPage() {
         </Card>
       )}
 
-      {tab === 'links' && (
-        <Card title={t('detailTabLinks')} Icon={Link2}
-          action={<Badge tone="primary">{(RISK_LINKS_BY_ID[risk.id] ?? []).length}</Badge>}>
-          {(RISK_LINKS_BY_ID[risk.id] ?? []).length === 0
-            ? <EmptyState Icon={Link2} title="No links" sub={t('detailLinksHint')} />
-            : <div className="risk-detail-rows">
-                {(RISK_LINKS_BY_ID[risk.id] ?? []).map(lk => (
-                  <Link key={lk.id} to={lk.href} className="risk-detail-row-link">
-                    <div className="risk-detail-link-group">
-                      <Badge tone="info">{lk.type}</Badge>
-                      <span className="mono risk-detail-cell-id">{lk.ref}</span>
-                      <span className="risk-detail-cell-title--bold">{lk.title}</span>
-                    </div>
-                    {lk.status && <Badge tone={lk.status === 'IMPLEMENTED' ? 'success' : lk.status === 'AMBER' ? 'warning' : lk.status === 'RED' ? 'danger' : 'neutral'}>{lk.status}</Badge>}
-                  </Link>
-                ))}
-              </div>}
-        </Card>
-      )}
+      {tab === 'links' && <RiskLinksPanel riskId={risk.id} />}
 
       {tab === 'history' && (
         <div className="risk-detail-history-stack">

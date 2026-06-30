@@ -779,6 +779,24 @@ export const treatmentPlanApi = {
   }) => api.post<TreatmentPlanDto>('/api/risk-lc/treatment-plans', body),
 };
 
+// ─── Typed register linkage — ERM epic E-G ──────────────────────────────────
+export interface RiskLinkDto {
+  id: number; riskId: number; linkType: string; targetRef: string;
+  targetId?: number | null; descriptionEn?: string | null; createdAt?: string;
+}
+export const RISK_LINK_TYPES = [
+  'OBJECTIVE', 'PROCESS', 'SERVICE', 'ASSET', 'SUPPLIER',
+  'PROJECT', 'INCIDENT', 'CONTROL', 'OBLIGATION', 'OTHER',
+] as const;
+export const riskLinkApi = {
+  listForRisk: (riskId: number) =>
+    api.get<RiskLinkDto[]>(`/api/v1/risk/risks/${riskId}/links`),
+  create: (riskId: number, body: {
+    linkType: string; targetRef: string; targetId?: number | null; descriptionEn?: string;
+  }) => api.post<RiskLinkDto>(`/api/v1/risk/risks/${riskId}/links`, body),
+  remove: (id: number) => api.delete<void>(`/api/v1/risk/links/${id}`),
+};
+
 // ─── Platform — Organisations / Tenant switcher (P1) ────────────────────────
 export interface OrganisationView {
   id: number;
