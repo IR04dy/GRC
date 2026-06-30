@@ -734,6 +734,32 @@ export const riskApi = {
   incidentBump:    (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/incident-bump`),
 };
 
+// ─── Risk acceptance (structured, time-boxed, approval-gated) — ERM epic E-A ─
+export interface RiskAcceptanceDto {
+  id: number; externalId: string; riskId: number;
+  justificationEn: string; justificationAr?: string;
+  compensatingControlsEn?: string; compensatingControlsAr?: string;
+  residualScoreAtAcceptance?: number; appetiteCeiling?: number; requiresBoard?: boolean;
+  expiresAt: string; status: string;
+  croSignedBy?: string; boardSignedBy?: string;
+  approvedBy?: string; approvedAt?: string; rejectionReason?: string; createdAt?: string;
+}
+export const riskAcceptanceApi = {
+  listForRisk: (riskId: number) =>
+    api.get<RiskAcceptanceDto[]>(`/api/v1/risk/risks/${riskId}/acceptances`),
+  create: (riskId: number, body: {
+    justificationEn: string; justificationAr?: string;
+    compensatingControlsEn?: string; compensatingControlsAr?: string;
+    appetiteCeiling?: number; expiresAt: string; croSignedBy?: string; boardSignedBy?: string;
+  }) => api.post<RiskAcceptanceDto>(`/api/v1/risk/risks/${riskId}/acceptances`, body),
+  approve: (id: number, boardSignedBy?: string) =>
+    api.post<RiskAcceptanceDto>(`/api/v1/risk/acceptances/${id}/approve`, { boardSignedBy }),
+  reject: (id: number, reason: string) =>
+    api.post<RiskAcceptanceDto>(`/api/v1/risk/acceptances/${id}/reject`, { reason }),
+  revoke: (id: number, reason: string) =>
+    api.post<RiskAcceptanceDto>(`/api/v1/risk/acceptances/${id}/revoke`, { reason }),
+};
+
 // ─── Platform — Organisations / Tenant switcher (P1) ────────────────────────
 export interface OrganisationView {
   id: number;

@@ -1,6 +1,22 @@
 # ERM / Risk Management Module Review and Remediation Plan
 
-> Enterprise Risk Management / إدارة المخاطر المؤسسية — deep reality review per the ERM Command-Loop brief. **Review only — no fixes implemented.** Performed 2026-06-30 against `master` @ `050786e1` (repo `D:\AYMAN\GRC`), backend live on :8084, frontend on :5173.
+> Enterprise Risk Management / إدارة المخاطر المؤسسية — deep reality review per the ERM Command-Loop brief. Original audit performed 2026-06-30 against `master` @ `050786e1` (repo `D:\AYMAN\GRC`), backend live on :8084, frontend on :5173. **Remediation in progress** on branch `feat/erm-remediation` — see §0.
+
+---
+
+## 0. Remediation Progress (live — branch `feat/erm-remediation`)
+
+> Implementation started 2026-06-30 in §28 order. Frontend `tsc`-verified; backend `mvn`-tested; key paths live-smoked against :8084. **Not merged to `master`.** Dev DB has migrations applied by hand (Flyway off in dev).
+
+| Epic | Item | Status |
+|---|---|---|
+| **E-A** | **Risk Acceptance workflow** — new `RiskAcceptance` entity (migration **V241**) + `RISK_APPROVE` permission/grants; `request` snapshots residual server-side + flags Board sign-off when above appetite; `approve` (gated `RISK_APPROVE`) flips the risk → **ACCEPTED**; `revoke` + `expireSweep` reopen the risk (UNDER_REVIEW); `RiskAcceptanceWizard` now calls the real API (was the generic submission inbox). **+5 unit tests; live-smoked** (board-gate → 400, approve → risk ACCEPTED, past-expiry → 400, expire-sweep OK). | ✅ Shipped |
+| **E-B** | Control-effectiveness → residual derivation (`RiskExposureService`) | ⏳ Pending |
+| **E-C** | Evidence-request + file-upload for ERM | ⏳ Pending |
+| **E-D** | Consolidate the two treatment subsystems + mandatory-treatment gate | ⏳ Pending |
+| **E-E…E-K** | KRI consolidation, multi-dim impact, linkage, appetite↔register, review, policy/committee, reporting | ⏳ Pending |
+
+**Order (§28):** E-A → E-B → E-C → E-D → E-H → E-G → E-F → E-E → E-J → E-I → E-K.
 
 ---
 

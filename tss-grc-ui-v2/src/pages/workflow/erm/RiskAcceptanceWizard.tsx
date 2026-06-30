@@ -8,6 +8,7 @@ import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
 import { submitWizard } from '../../../lib/submitWizard';
+import { riskAcceptanceApi } from '../../../lib/api';
 
 /**
  * Saudi-GRC §7.3 #6 — Risk Acceptance wizard (time-boxed, exec sign-off).
@@ -50,23 +51,41 @@ export function RiskAcceptanceWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      const aboveAppetite = draft.residualScore != null && draft.appetiteUpper != null
-        && draft.residualScore > draft.appetiteUpper;
-      const created = await submitWizard({
-        workflowId: 'erm-risk-acceptance',
-        workflowModule: 'ERM',
-        titleEn: draft.rationaleEn?.slice(0, 80) || 'Risk acceptance',
-        summaryEn: `Residual=${draft.residualScore ?? '?'} appetite=${draft.appetiteUpper ?? '?'}`
-                 + (aboveAppetite ? ' · BOARD-required (above appetite)' : '')
-                 + (draft.expiresAt ? ` · expires ${draft.expiresAt}` : '')
-                 + (draft.croSignedByName ? ` · CRO=${draft.croSignedByName}` : ''),
-        status: draft.croSignedByName && draft.boardSignedByName ? 'APPROVED' : 'SUBMITTED',
-        draft: { ...draft, riskId: riskId ?? null, aboveAppetite },
-      });
-      toast.success(isAr
-        ? `تم تسجيل قبول الخطر (#${created.id})`
-        : `Risk acceptance #${created.id} recorded`);
-      navigate('/risk');
+      if (riskId) {
+        // ERM epic E-A: persist a real, structured, time-boxed acceptance against
+        // the risk. The server snapshots residual, flags Board sign-off above
+        // appetite, and APPROVE (RISK_APPROVE) flips the risk to ACCEPTED — no
+        // longer a generic-inbox draft.
+        const created = await riskAcceptanceApi.create(Number(riskId), {
+          justificationEn: draft.rationaleEn,
+          justificationAr: draft.rationaleAr,
+          compensatingControlsEn: draft.conditionsEn,
+          compensatingControlsAr: draft.conditionsAr,
+          appetiteCeiling: draft.appetiteUpper,
+          expiresAt: draft.expiresAt!,
+          croSignedBy: draft.croSignedByName,
+          boardSignedBy: draft.boardSignedByName,
+        });
+        toast.success(isAr
+          ? `تم رفع طلب قبول الخطر (#${created.id}) — بانتظار اعتماد رئيس المخاطر`
+          : `Risk acceptance #${created.id} submitted — pending CRO approval`);
+        navigate(`/risk/${riskId}`);
+      } else {
+        // Standalone entry (no risk bound): keep a generic draft and steer the
+        // user to open the wizard from a specific risk to record it for real.
+        const created = await submitWizard({
+          workflowId: 'erm-risk-acceptance',
+          workflowModule: 'ERM',
+          titleEn: draft.rationaleEn?.slice(0, 80) || 'Risk acceptance',
+          summaryEn: 'Standalone acceptance draft — open from a specific risk to record it.',
+          status: 'SUBMITTED',
+          draft: { ...draft },
+        });
+        toast.success(isAr
+          ? `حُفظت مسودة القبول (#${created.id}) — افتحها من خطر محدّد للتسجيل`
+          : `Acceptance draft #${created.id} saved — open from a risk to record it`);
+        navigate('/risk');
+      }
     } catch (e) {
       toast.danger((e as Error).message);
     } finally { setSubmitting(false); }
