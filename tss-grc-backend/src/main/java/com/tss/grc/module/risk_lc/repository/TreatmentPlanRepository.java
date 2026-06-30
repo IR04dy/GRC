@@ -35,6 +35,10 @@ public interface TreatmentPlanRepository extends JpaRepository<TreatmentPlan, Lo
 
     long countByOrganisationIdAndStatus(Long organisationId, String status);
 
+    /** E-D mandatory-treatment gate: does this risk carry a live, non-rejected
+     *  treatment plan? (@Where filters out soft-deleted rows.) */
+    boolean existsByOrganisationIdAndRiskIdAndStatusNot(Long organisationId, Long riskId, String status);
+
     /** PERF-NQ-007: count for the next-external-id generator — replaces loading
      *  every plan (and, when actions was EAGER, every plan's actions) just to size(). */
     long countByOrganisationId(Long organisationId);

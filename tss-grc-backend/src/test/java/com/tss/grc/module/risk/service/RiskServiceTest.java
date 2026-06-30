@@ -11,6 +11,7 @@ import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.entity.RiskCategory;
 import com.tss.grc.module.risk.repository.RiskCategoryRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
+import com.tss.grc.module.risk_lc.repository.TreatmentPlanRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -67,6 +68,7 @@ class RiskServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private TreatmentPlanRepository treatmentPlanRepository;
     @InjectMocks private RiskService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -163,6 +165,55 @@ class RiskServiceTest {
         Risk b = risk("ACCEPTED");
         when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(b));
         assertThat(service.close(RISK_ID).status()).isEqualTo("CLOSED");
+    }
+
+    // ─── E-D mandatory-treatment gate ────────────────────────────────
+
+    @Test
+    void close_highRisk_withoutTreatmentPlan_isBlocked() {
+        Risk r = risk("MITIGATING"); r.setRiskLevel("HIGH");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(treatmentPlanRepository.existsByOrganisationIdAndRiskIdAndStatusNot(ORG_ID, RISK_ID, "REJECTED"))
+            .thenReturn(false);
+
+        assertThatThrownBy(() -> service.close(RISK_ID))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("treatment plan");
+        verify(riskRepository, never()).save(any());   // transition must not happen
+    }
+
+    @Test
+    void close_highRisk_withTreatmentPlan_succeeds() {
+        Risk r = risk("MITIGATING"); r.setRiskLevel("CRITICAL");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(treatmentPlanRepository.existsByOrganisationIdAndRiskIdAndStatusNot(ORG_ID, RISK_ID, "REJECTED"))
+            .thenReturn(true);
+        when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.close(RISK_ID).status()).isEqualTo("CLOSED");
+    }
+
+    @Test
+    void close_highRisk_whenAccepted_isExempt_fromTreatmentGate() {
+        // ACCEPTED is the formal documented decision (E-A) — no plan required.
+        Risk r = risk("ACCEPTED"); r.setRiskLevel("HIGH");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.close(RISK_ID).status()).isEqualTo("CLOSED");
+        verify(treatmentPlanRepository, never())
+            .existsByOrganisationIdAndRiskIdAndStatusNot(anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void close_lowRisk_hasNoTreatmentGate() {
+        Risk r = risk("MITIGATING"); r.setRiskLevel("LOW");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.close(RISK_ID).status()).isEqualTo("CLOSED");
+        verify(treatmentPlanRepository, never())
+            .existsByOrganisationIdAndRiskIdAndStatusNot(anyLong(), anyLong(), anyString());
     }
 
     @Test

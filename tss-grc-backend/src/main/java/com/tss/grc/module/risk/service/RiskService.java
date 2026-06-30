@@ -11,6 +11,7 @@ import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.entity.RiskCategory;
 import com.tss.grc.module.risk.repository.RiskCategoryRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
+import com.tss.grc.module.risk_lc.repository.TreatmentPlanRepository;
 import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
@@ -39,6 +40,8 @@ public class RiskService {
     private final UserRepository userRepository;
     private final AuditLogService audit;
     private final ApplicationEventPublisher eventPublisher;
+    /** E-D — canonical treatment-plan store (risk_lc), used by the mandatory-treatment gate. */
+    private final TreatmentPlanRepository treatmentPlanRepository;
 
     /** Re-reads DB-computed columns after save — null in unit tests, set at runtime. */
     @PersistenceContext
@@ -163,7 +166,28 @@ public class RiskService {
     public RiskResponse accept(Long id) { return doTransition(id, "ACCEPTED", new String[]{"OPEN", "UNDER_REVIEW"}); }
 
     @Transactional
-    public RiskResponse close(Long id) { return doTransition(id, "CLOSED", new String[]{"MITIGATING", "ACCEPTED"}); }
+    public RiskResponse close(Long id) {
+        Risk r = mustGet(id);
+        require(r, "MITIGATING", "ACCEPTED");
+        // E-D — mandatory-treatment gate. A HIGH/VERY_HIGH/CRITICAL risk may only
+        // be CLOSED once it carries a live (non-rejected) treatment plan. An
+        // ACCEPTED risk is exempt: the formal acceptance (E-A) is itself the
+        // documented, approval-gated decision to retain the risk. Lower-rated
+        // risks close freely. ("over-appetite" gating follows in E-H once the
+        // appetite↔register link is wired.)
+        if (!"ACCEPTED".equals(r.getStatus()) && isHighLevel(r.getRiskLevel())
+                && !treatmentPlanRepository.existsByOrganisationIdAndRiskIdAndStatusNot(
+                        r.getOrganisationId(), id, "REJECTED")) {
+            throw new IllegalStateException(
+                "A treatment plan is required before closing a " + r.getRiskLevel()
+                + " risk — draft a treatment plan, or formally accept the risk first.");
+        }
+        return doTransition(id, "CLOSED", new String[]{"MITIGATING", "ACCEPTED"});
+    }
+
+    private static boolean isHighLevel(String level) {
+        return "HIGH".equals(level) || "VERY_HIGH".equals(level) || "CRITICAL".equals(level);
+    }
 
     @Transactional
     public RiskResponse reopen(Long id) { return doTransition(id, "OPEN", new String[]{"CLOSED"}); }

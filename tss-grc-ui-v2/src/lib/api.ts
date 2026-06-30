@@ -760,6 +760,25 @@ export const riskAcceptanceApi = {
     api.post<RiskAcceptanceDto>(`/api/v1/risk/acceptances/${id}/revoke`, { reason }),
 };
 
+// ─── Treatment plans (canonical rich risk_lc model) — ERM epic E-D ──────────
+// The single canonical treatment model (actions + approval + cost-benefit),
+// superseding the legacy simple risk.risk_treatments rows.
+export interface TreatmentPlanDto {
+  id: string; riskId: number; strategy: string;
+  rationaleEn: string; rationaleAr: string; status: string;
+  costSarK: number; costBenefitEn?: string | null; costBenefitAr?: string | null;
+  createdAt?: string; submittedAt?: string;
+  approvedBy?: string | null; approvedAt?: string | null; rejectedReason?: string | null;
+}
+export const treatmentPlanApi = {
+  listForRisk: (riskId: number) =>
+    api.get<TreatmentPlanDto[]>(`/api/risk-lc/treatment-plans?riskId=${riskId}`),
+  create: (body: {
+    riskId: number; strategy: string; rationaleEn: string; rationaleAr: string;
+    costSarK: number; costBenefitEn?: string; costBenefitAr?: string;
+  }) => api.post<TreatmentPlanDto>('/api/risk-lc/treatment-plans', body),
+};
+
 // ─── Platform — Organisations / Tenant switcher (P1) ────────────────────────
 export interface OrganisationView {
   id: number;

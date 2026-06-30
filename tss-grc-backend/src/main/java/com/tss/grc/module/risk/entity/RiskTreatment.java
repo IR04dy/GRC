@@ -8,6 +8,20 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Legacy <strong>simple</strong> treatment model (type + description + status +
+ * dates). ERM epic E-D designates {@code risk_lc.TreatmentPlan} (strategy +
+ * actions + approval state-machine + cost-benefit) as the <strong>single
+ * canonical</strong> treatment model; new creation flows ({@code
+ * RiskTreatmentWizard}) now write canonical plans, and the mandatory-treatment
+ * gate ({@code RiskService.close}) reads them.
+ *
+ * <p>This entity + {@code RiskTreatmentService} + the {@code
+ * /api/v1/risk/risks/{id}/treatments} endpoints are retained for back-compat
+ * (the RiskDetailPage "treatments" tab still reads them). Full retirement —
+ * migrating those rows into {@code treatment_plans} and routing the tab to the
+ * canonical API — is a documented E-D follow-on; do not add new write paths here.
+ */
 @Entity
 @Table(schema = "risk", name = "risk_treatments")
 @Where(clause = "is_deleted = 0")

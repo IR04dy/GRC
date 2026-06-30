@@ -8,6 +8,7 @@ import { Badge } from '../../../components/ui/Badge';
 import { useI18n } from '../../../lib/i18n';
 import { useToast } from '../../../lib/toast';
 import { submitWizard } from '../../../lib/submitWizard';
+import { treatmentPlanApi } from '../../../lib/api';
 
 /**
  * Saudi-GRC §7.3 #5 — Risk Treatment Plan wizard (ISO 31000 §6.5).
@@ -52,24 +53,51 @@ export function RiskTreatmentWizard() {
   async function submit() {
     setSubmitting(true);
     try {
-      const created = await submitWizard({
-        workflowId: 'erm-risk-treatment',
-        workflowModule: 'ERM',
-        titleEn: draft.rationaleEn?.slice(0, 80)
-              || `${draft.strategy} treatment plan`,
-        regulatoryAnchor: 'ISO 31000 §6.5',
-        summaryEn: `${draft.strategy}`
-                 + (draft.expectedResidualScore != null
-                    ? ` · residual=${draft.expectedResidualScore}` : '')
-                 + (draft.costSarK != null
-                    ? ` · cost SAR ${draft.costSarK}k` : '')
-                 + (draft.ownerRole ? ` · owner=${draft.ownerRole}` : ''),
-        draft: { ...draft, riskId: riskId ?? null },
-      });
-      toast.success(isAr
-        ? `تم تسجيل خطة المعالجة (#${created.id})`
-        : `Treatment plan #${created.id} recorded`);
-      navigate('/risk');
+      if (riskId) {
+        // ERM epic E-D: persist a REAL canonical treatment plan (risk_lc) instead
+        // of the generic submission inbox. The plan opens in DRAFT and feeds the
+        // mandatory-treatment gate — a HIGH/over-appetite risk can't be closed
+        // until it carries a (non-rejected) treatment plan. The create endpoint
+        // stores the plan header; the wizard's free-text actions + owner/target
+        // are folded into the rationale so nothing the user entered is lost.
+        const actionsBlock = draft.actionsEn?.trim()
+          ? `\n\nPlanned actions:\n${draft.actionsEn.trim()}` : '';
+        const ownerBlock = draft.ownerRole ? `\nOwner role: ${draft.ownerRole}` : '';
+        const targetBlock = draft.targetDate ? `\nTarget date: ${draft.targetDate}` : '';
+        const created = await treatmentPlanApi.create({
+          riskId: Number(riskId),
+          strategy: draft.strategy,
+          rationaleEn: `${draft.rationaleEn}${actionsBlock}${ownerBlock}${targetBlock}`,
+          rationaleAr: draft.rationaleAr?.trim() || draft.rationaleEn,
+          costSarK: draft.costSarK ?? 0,
+          costBenefitEn: draft.costBenefitEn,
+        });
+        toast.success(isAr
+          ? `أُنشئت خطة المعالجة (${created.id}) — مسودّة بانتظار الاعتماد`
+          : `Treatment plan ${created.id} created — DRAFT, pending approval`);
+        navigate(`/risk/${riskId}`);
+      } else {
+        // Standalone (no risk bound): keep a generic draft and steer the user to
+        // open the wizard from a specific risk to record a real plan.
+        const created = await submitWizard({
+          workflowId: 'erm-risk-treatment',
+          workflowModule: 'ERM',
+          titleEn: draft.rationaleEn?.slice(0, 80)
+                || `${draft.strategy} treatment plan`,
+          regulatoryAnchor: 'ISO 31000 §6.5',
+          summaryEn: `${draft.strategy}`
+                   + (draft.expectedResidualScore != null
+                      ? ` · residual=${draft.expectedResidualScore}` : '')
+                   + (draft.costSarK != null
+                      ? ` · cost SAR ${draft.costSarK}k` : '')
+                   + (draft.ownerRole ? ` · owner=${draft.ownerRole}` : ''),
+          draft: { ...draft, riskId: null },
+        });
+        toast.success(isAr
+          ? `حُفظت مسودة المعالجة (#${created.id}) — افتحها من خطر محدّد للتسجيل`
+          : `Treatment draft #${created.id} saved — open from a risk to record it`);
+        navigate('/risk');
+      }
     } catch (e) {
       toast.danger((e as Error).message);
     } finally { setSubmitting(false); }
