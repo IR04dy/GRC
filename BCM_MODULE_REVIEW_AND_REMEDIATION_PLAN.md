@@ -4,9 +4,9 @@
 
 ---
 
-## 0. Remediation Progress (live — branch `feat/bcm-remediation`)
+## 0. Remediation Progress (complete — merged to `master`)
 
-> Implementation started 2026-06-29 via an autonomous `/loop`, in §27 order. Frontend `tsc`-verified; backend `mvn`-verified; key paths live-smoked against :8084. **On `feat/bcm-remediation` — 29 commits ahead of `master`, 0 behind; open as PR #487 (CI green), not yet merged.**
+> Implementation started 2026-06-29 via an autonomous `/loop`, in §27 order. Frontend `tsc`-verified; backend `mvn`-verified; key paths live-smoked against :8084. **Merged to `master`** (HEAD `9df5c265`): the B-A…B-I backlog via **PR #487** and the residual-partials pass via **PR #488**, both fast-forward; **0 open PRs**; master CI green incl. Docker.
 
 | Epic | Item | Status | Commit |
 |---|---|---|---|
@@ -26,11 +26,11 @@
 
 **Order (§27):** B-C → B-B → B-A → B-D → B-E → B-F/G → B-H → B-I. **— all eight epics complete (2026-06-29).**
 
-> ✅ **Remediation backlog complete.** All Critical (B-1/2/3) and the High/Medium epics (B-A…B-I) are shipped on `feat/bcm-remediation`, each frontend `tsc`-verified, backend `mvn`-compiled, and live-smoked against :8084 (with the backend rebuilt + restarted after every backend change). **Full backend suite green: 1970 tests, 0 failures.** Opened as **PR #487** (CI: Backend ✅ + Frontend ✅); not yet merged to `master`. Five Flyway migrations (V235–V239) were authored for non-dev profiles and also applied to the Python-managed dev DB.
+> ✅ **Remediation backlog complete.** All Critical (B-1/2/3) and the High/Medium epics (B-A…B-I) are shipped on `feat/bcm-remediation`, each frontend `tsc`-verified, backend `mvn`-compiled, and live-smoked against :8084 (with the backend rebuilt + restarted after every backend change). **Full backend suite green: 1970 tests, 0 failures.** **Merged to `master` via PR #487** (fast-forward; CI green: Backend ✅ + Frontend ✅ + Docker ✅). Five Flyway migrations (V235–V239) were authored for non-dev profiles and also applied to the Python-managed dev DB.
 >
 > 🔁 **Re-verified 2026-06-30:** all 13 epic commits present on the branch (none on `master`); migrations V235–V239 on disk; `BcmGapRecordCreator` + `EvidenceRequestsField` present; `BCM_APPROVE` in V239; `GET /api/v1/bcm/exercise-runs` live-confirmed **HTTP 200** (was 405).
 >
-> 🧩 **Residual-partials pass (2026-06-30, branch `feat/bcm-residual-partials` → its own PR):** the remaining ◑ task-list items were closed end-to-end (backend unit-tested + live-smoked against :8084; frontend `tsc --noEmit` clean):
+> 🧩 **Residual-partials pass (2026-06-30 — merged to `master` via PR #488, fast-forward):** the remaining ◑ task-list items were closed end-to-end (backend unit-tested + live-smoked against :8084; frontend `tsc --noEmit` clean; **all four new UI surfaces browser-walked on :5173, 0 console errors**):
 > - **P-70 (task 70)** — approval-gated reopen for gaps & CAPAs: dedicated `POST /capas|gaps/{id}/reopen` requiring `BCM_APPROVE` + a mandatory reason (audited); the generic `BCM_WRITE` transition no longer allows `CLOSED→REOPENED`; +6 unit tests; UI **Reopen** button. *(Live: empty reason → 400.)*
 > - **P-8 (task 8)** — governance `committeeId` validated against the `admin.committee` register on create/update (+1 test); committee field added to the governance form.
 > - **P-7 (task 7)** — BCM manager / executive sponsor / oversight committee fields on the governance create+edit form (persisted on cycle & governance).
@@ -418,4 +418,4 @@ BCM is a **strong, genuinely-implemented module** — the richest in the platfor
 - **B-H** — `GET /api/v1/bcm/exercise-runs` list endpoint (was 405).
 - **B-I** — BCM role-permission grant matrix + `BCM_APPROVE` (was admin-only); Arabic/RTL verified.
 
-**Revised verdict: Production-ready for an audited Saudi BCM buyer.** The full `mvn test` gate is satisfied (**1970 tests, 0 failures**); the work is open as **PR #487** with CI green (Backend ✅ + Frontend ✅). Remaining before it ships: a stakeholder **UAT** pass and **merge of `feat/bcm-remediation` → `master`**.
+**Revised verdict: Production-ready for an audited Saudi BCM buyer.** The full `mvn test` gate is satisfied (**1970 tests, 0 failures**); all work — the B-A…B-I backlog **and** the residual-partials pass — is **merged to `master`** (PR #487 + PR #488, fast-forward; master CI green incl. Docker; the new UI browser-walked). The only remaining gate before production is a stakeholder **UAT** pass.
