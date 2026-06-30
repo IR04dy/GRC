@@ -103,4 +103,19 @@ public class Risk extends BaseEntity {
 
     @Column(name = "next_attestation_date")
     private LocalDate nextAttestationDate;
+
+    // ── E-J — Scheduled review / reassessment cycle (V244) ────────────
+    // Distinct from attestation: a structured re-evaluation (re-score) of the
+    // risk on a cadence, with a stale flag when overdue. The next-review-due
+    // date is carried by {@link #reviewDate} above.
+    /** Days between scheduled reviews. 365 = annual (ISO 31000 default). */
+    @Column(name = "review_cadence_days", nullable = false)
+    private Integer reviewCadenceDays = 365;
+
+    @Column(name = "last_reviewed_at")
+    private LocalDateTime lastReviewedAt;
+
+    /** CURRENT | OVERDUE — set OVERDUE by the daily stale sweep, reset on reassess. */
+    @Column(name = "review_status", nullable = false, length = 20)
+    private String reviewStatus = "CURRENT";
 }

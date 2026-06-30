@@ -160,7 +160,8 @@ public class RiskService {
     // State machine:
     //   OPEN → UNDER_REVIEW → MITIGATING → CLOSED
     //   OPEN | UNDER_REVIEW → ACCEPTED (formal risk acceptance)
-    //   CLOSED → OPEN (reopen on recurrence)
+    //   CLOSED → ARCHIVED (E-J — retire from the active register; approval-gated)
+    //   CLOSED | ARCHIVED → OPEN (reopen on recurrence; approval-gated — E-J)
 
     @Transactional
     public RiskResponse submitForReview(Long id) { return doTransition(id, "UNDER_REVIEW", new String[]{"OPEN"}); }
@@ -208,7 +209,11 @@ public class RiskService {
     }
 
     @Transactional
-    public RiskResponse reopen(Long id) { return doTransition(id, "OPEN", new String[]{"CLOSED"}); }
+    public RiskResponse reopen(Long id) { return doTransition(id, "OPEN", new String[]{"CLOSED", "ARCHIVED"}); }
+
+    /** E-J — retire a closed risk from the active register. Approval-gated at the controller. */
+    @Transactional
+    public RiskResponse archive(Long id) { return doTransition(id, "ARCHIVED", new String[]{"CLOSED"}); }
 
     /**
      * Shared transition path — five state-machine methods used to repeat

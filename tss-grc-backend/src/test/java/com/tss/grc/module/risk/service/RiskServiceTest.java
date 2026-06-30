@@ -172,6 +172,36 @@ class RiskServiceTest {
         assertThat(service.close(RISK_ID).status()).isEqualTo("CLOSED");
     }
 
+    // ─── E-J archive / reopen lifecycle ──────────────────────────────
+
+    @Test
+    void archive_CLOSED_to_ARCHIVED() {
+        Risk r = risk("CLOSED");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.archive(RISK_ID).status()).isEqualTo("ARCHIVED");
+    }
+
+    @Test
+    void archive_fromOpen_isRejected() {
+        Risk r = risk("OPEN");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+
+        assertThatThrownBy(() -> service.archive(RISK_ID))
+            .isInstanceOf(IllegalArgumentException.class);
+        verify(riskRepository, never()).save(any());
+    }
+
+    @Test
+    void reopen_from_ARCHIVED_to_OPEN() {
+        Risk r = risk("ARCHIVED");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.reopen(RISK_ID).status()).isEqualTo("OPEN");
+    }
+
     // ─── E-D mandatory-treatment gate ────────────────────────────────
 
     @Test

@@ -731,6 +731,7 @@ export const riskApi = {
   acceptRisk:      (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/accept`),
   closeRisk:       (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/close`),
   reopenRisk:      (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/reopen`),
+  archiveRisk:     (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/archive`),
   incidentBump:    (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/incident-bump`),
 };
 
@@ -815,6 +816,32 @@ export const riskImpactApi = {
     api.get<ImpactRatingsResponse>(`/api/v1/risk/risks/${riskId}/impact-dimensions`),
   setDimensions: (riskId: number, dimensions: { dimension: string; score: number }[]) =>
     api.put<ImpactRatingsResponse>(`/api/v1/risk/risks/${riskId}/impact-dimensions`, { dimensions }),
+};
+
+// ─── Scheduled review / reassessment — ERM epic E-J ─────────────────────────
+export interface RiskReviewDto {
+  id: number; riskId: number; reviewedAt: string;
+  reviewedBy?: number | null; reviewedByName?: string | null;
+  decision: string;
+  residualLikelihoodBefore?: number | null; residualImpactBefore?: number | null;
+  residualLikelihoodAfter?: number | null; residualImpactAfter?: number | null;
+  residualScoreSnapshot?: number | null; riskLevelSnapshot?: string | null;
+  nextReviewDate?: string | null; noteEn?: string | null; noteAr?: string | null;
+}
+export interface RiskReviewOverdueRow {
+  riskId: number; riskCode: string; titleEn: string; titleAr?: string | null;
+  status: string; riskLevel?: string | null; residualScore?: number | null;
+  reviewDate?: string | null; reviewStatus: string; daysOverdue: number;
+}
+export const REVIEW_DECISIONS = ['CONFIRMED', 'RESCORED', 'ESCALATE', 'RETIRE_SUGGESTED'] as const;
+export const riskReviewApi = {
+  reassess: (riskId: number, body: {
+    residualLikelihood?: number | null; residualImpact?: number | null;
+    cadenceDays?: number | null; decision?: string; noteEn?: string; noteAr?: string;
+  }) => api.post<RiskReviewDto>(`/api/v1/risk/risks/${riskId}/reassess`, body),
+  history: (riskId: number) => api.get<RiskReviewDto[]>(`/api/v1/risk/risks/${riskId}/reviews`),
+  overdue: () => api.get<RiskReviewOverdueRow[]>('/api/v1/risk/reviews/overdue'),
+  runSweep: () => api.post<{ flagged: number }>('/api/v1/risk/reviews/run-overdue-sweep'),
 };
 
 // ─── Platform — Organisations / Tenant switcher (P1) ────────────────────────

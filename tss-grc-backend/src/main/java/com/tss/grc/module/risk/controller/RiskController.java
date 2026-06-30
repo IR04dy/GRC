@@ -86,9 +86,17 @@ public class RiskController {
     }
 
     @PostMapping("/{id}/reopen")
-    @PreAuthorize("hasPermission('RISK', 'WRITE')")
+    @PreAuthorize("hasPermission('RISK', 'APPROVE')")
+    @Operation(summary = "Reopen a CLOSED/ARCHIVED risk on recurrence — approval-gated (E-J)")
     public RiskResponse reopen(@PathVariable Long id) {
         return riskService.reopen(id);
+    }
+
+    @PostMapping("/{id}/archive")
+    @PreAuthorize("hasPermission('RISK', 'APPROVE')")
+    @Operation(summary = "Archive a CLOSED risk — retire from the active register; approval-gated (E-J)")
+    public RiskResponse archive(@PathVariable Long id) {
+        return riskService.archive(id);
     }
 
     @PostMapping("/{id}/incident-bump")

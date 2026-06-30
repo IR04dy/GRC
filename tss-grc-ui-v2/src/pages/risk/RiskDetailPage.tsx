@@ -37,6 +37,7 @@ import {
 import { ermGap } from '../../lib/buyerGap';
 import { RiskLinksPanel } from '../../components/risk/RiskLinksPanel';
 import { ImpactDimensionsPanel } from '../../components/risk/ImpactDimensionsPanel';
+import { RiskReviewPanel } from '../../components/risk/RiskReviewPanel';
 import { EmptyState } from '../../components/ui/EmptyState';
 import '../../styles/pages/risk-detail.css';
 
@@ -441,6 +442,8 @@ export function RiskDetailPage() {
               </Card>
               {/* E-F — multi-dimensional impact; worst dimension drives inherent impact. */}
               <ImpactDimensionsPanel riskId={risk.id} onSaved={() => void load()} />
+              {/* E-J — scheduled review / reassessment (re-score + reset clock + audit trail). */}
+              <RiskReviewPanel riskId={risk.id} reviewDate={risk.reviewDate} onSaved={() => void load()} />
             </>
           )}
 

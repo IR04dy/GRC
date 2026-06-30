@@ -40,6 +40,22 @@ public interface RiskRepository extends JpaRepository<Risk, Long> {
     List<Risk> findAttestationOverdue(@Param("orgId") Long orgId,
                                       @Param("today") java.time.LocalDate today);
 
+    /** E-J — risks past their scheduled review date and still active (tenant-scoped). */
+    @Query("SELECT r FROM Risk r WHERE r.organisationId = :orgId "
+         + "AND r.status NOT IN ('CLOSED','CANCELLED','ARCHIVED') "
+         + "AND r.reviewDate IS NOT NULL "
+         + "AND r.reviewDate < :today "
+         + "ORDER BY r.reviewDate ASC")
+    List<Risk> findReviewOverdue(@Param("orgId") Long orgId,
+                                 @Param("today") java.time.LocalDate today);
+
+    /** E-J — system-wide stale sweep across all tenants (scheduler). */
+    @Query("SELECT r FROM Risk r WHERE r.status NOT IN ('CLOSED','CANCELLED','ARCHIVED') "
+         + "AND r.reviewDate IS NOT NULL "
+         + "AND r.reviewDate < :today "
+         + "ORDER BY r.organisationId ASC, r.reviewDate ASC")
+    List<Risk> findReviewOverdueAllOrgs(@Param("today") java.time.LocalDate today);
+
     /** E-B — "uncontrolled exposure": open risks with no linked control, worst residual first. */
     @Query("SELECT r FROM Risk r WHERE r.organisationId = :orgId "
          + "AND r.status NOT IN ('CLOSED','CANCELLED') "
