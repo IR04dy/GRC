@@ -25,10 +25,10 @@ jobs:
     name: Backend (Spring Boot, JDK 17)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -43,7 +43,7 @@ jobs:
         # Artifact upload is a convenience (diagnostic reports) — never let a
         # full Actions storage quota fail an otherwise-passing build.
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-test-reports
           path: tss-grc-backend/target/surefire-reports/
@@ -57,10 +57,10 @@ jobs:
       run:
         working-directory: tss-grc-ui-v2
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: npm
@@ -78,7 +78,7 @@ jobs:
         if: always()
         # Don't fail the build when Actions artifact storage is full.
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: tss-grc-ui-v2/dist/
@@ -91,15 +91,15 @@ jobs:
     needs: [backend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Build only — no push. A separate `build-image.yml` workflow handles
       # tagging and pushing to the registry on release tags.
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
