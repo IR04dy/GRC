@@ -787,7 +787,7 @@ export interface RiskLinkDto {
 }
 export const RISK_LINK_TYPES = [
   'OBJECTIVE', 'PROCESS', 'SERVICE', 'ASSET', 'SUPPLIER',
-  'PROJECT', 'INCIDENT', 'CONTROL', 'OBLIGATION', 'OTHER',
+  'PROJECT', 'INCIDENT', 'CONTROL', 'OBLIGATION', 'COMMITTEE', 'POLICY', 'OTHER',
 ] as const;
 export const riskLinkApi = {
   listForRisk: (riskId: number) =>

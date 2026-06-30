@@ -10,9 +10,12 @@ import java.time.LocalDateTime;
 public final class RiskLinkDtos {
     private RiskLinkDtos() {}
 
+    // targetRef is optional at the wire layer: for a COMMITTEE/POLICY link with a
+    // valid targetId the service auto-fills it from the register (E-I). The service
+    // still enforces that every persisted link ends up with a non-blank targetRef.
     public record CreateDto(
         @NotBlank @Size(max = 30)  String linkType,
-        @NotBlank @Size(max = 300) String targetRef,
+        @Size(max = 300) String targetRef,
         Long targetId,
         @Size(max = 1000) String descriptionEn
     ) {}

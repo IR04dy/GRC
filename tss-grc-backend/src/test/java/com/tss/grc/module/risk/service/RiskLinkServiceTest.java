@@ -1,6 +1,10 @@
 package com.tss.grc.module.risk.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.admin.committee.entity.Committee;
+import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
+import com.tss.grc.module.policy.entity.PolicyDocument;
+import com.tss.grc.module.policy.repository.PolicyDocumentRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.risk.dto.RiskLinkDtos.CreateDto;
 import com.tss.grc.module.risk.entity.Risk;
@@ -33,6 +37,8 @@ class RiskLinkServiceTest {
     @Mock RiskLinkRepository links;
     @Mock RiskRepository risks;
     @Mock AuditLogService audit;
+    @Mock CommitteeRepository committees;
+    @Mock PolicyDocumentRepository policies;
     @InjectMocks RiskLinkService service;
 
     @BeforeEach void setUp() { TenantContext.setCurrentTenant(ORG); }
@@ -58,6 +64,60 @@ class RiskLinkServiceTest {
         when(risks.findById(RID)).thenReturn(Optional.of(risk(ORG)));
         assertThatThrownBy(() -> service.create(RID, new CreateDto("WIDGET", "x", null, null)))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("link type");
+        verify(links, never()).save(any());
+    }
+
+    @Test void create_committeeLink_validatesRegister_andAutoFillsRef() {
+        Committee c = new Committee();
+        c.setId(7L); c.setOrganisationId(ORG); c.setNameEn("Board Risk Committee");
+        when(risks.findById(RID)).thenReturn(Optional.of(risk(ORG)));
+        when(committees.findByIdAndOrganisationId(7L, ORG)).thenReturn(Optional.of(c));
+        when(links.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        // blank targetRef → auto-filled from the committee name
+        RiskLink out = service.create(RID, new CreateDto("committee", null, 7L, "governing committee"));
+
+        assertThat(out.getLinkType()).isEqualTo("COMMITTEE");
+        assertThat(out.getTargetId()).isEqualTo(7L);
+        assertThat(out.getTargetRef()).isEqualTo("Board Risk Committee");
+    }
+
+    @Test void create_committeeLink_unknownCommittee_throws() {
+        when(risks.findById(RID)).thenReturn(Optional.of(risk(ORG)));
+        when(committees.findByIdAndOrganisationId(999L, ORG)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.create(RID, new CreateDto("COMMITTEE", "X", 999L, null)))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("governance register");
+        verify(links, never()).save(any());
+    }
+
+    @Test void create_policyLink_validatesRegister_andAutoFillsRef() {
+        PolicyDocument p = new PolicyDocument();
+        p.setId(11L); p.setOrganisationId(ORG); p.setTitleEn("Enterprise Risk Management Policy");
+        when(risks.findById(RID)).thenReturn(Optional.of(risk(ORG)));
+        when(policies.findByIdAndOrganisationId(11L, ORG)).thenReturn(Optional.of(p));
+        when(links.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        RiskLink out = service.create(RID, new CreateDto("policy", null, 11L, "governing policy"));
+
+        assertThat(out.getLinkType()).isEqualTo("POLICY");
+        assertThat(out.getTargetRef()).isEqualTo("Enterprise Risk Management Policy");
+    }
+
+    @Test void create_policyLink_unknownPolicy_throws() {
+        when(risks.findById(RID)).thenReturn(Optional.of(risk(ORG)));
+        when(policies.findByIdAndOrganisationId(404L, ORG)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.create(RID, new CreateDto("POLICY", "X", 404L, null)))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("policy register");
+        verify(links, never()).save(any());
+    }
+
+    @Test void create_blankRef_nonRegisterType_throws() {
+        when(risks.findById(RID)).thenReturn(Optional.of(risk(ORG)));
+        // PROCESS has no register to auto-fill from → a blank ref must be rejected.
+        assertThatThrownBy(() -> service.create(RID, new CreateDto("PROCESS", "  ", null, null)))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("targetRef is required");
         verify(links, never()).save(any());
     }
 
