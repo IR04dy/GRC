@@ -10,6 +10,7 @@ import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Field } from '../../components/ui/Field';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { EvidenceRequestsField } from '../../components/ui/EvidenceRequestsField';
 import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -413,6 +414,12 @@ export function RiskDetailPage() {
           <LinkedChangesPanel entityType="RISK" entityId={risk.id} />
           <Card>
             <AttachmentsField entityType="RISK" entityId={risk.id} />
+          </Card>
+          <Card>
+            {/* E-C: real evidence-request workflow (request-from-department,
+                SLA reminders/escalation, review/reject, comments) — same generic
+                backend as BCM/compliance, anchored on entityType="Risk". */}
+            <EvidenceRequestsField entityType="Risk" entityId={risk.id} />
           </Card>
           <Card>
             <ControlMappingPicker entityType="RISK" entityId={risk.id} />

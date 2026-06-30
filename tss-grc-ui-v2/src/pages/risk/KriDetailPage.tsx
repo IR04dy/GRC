@@ -5,6 +5,8 @@ import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
+import { EvidenceRequestsField } from '../../components/ui/EvidenceRequestsField';
 import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
@@ -275,6 +277,21 @@ export function KriDetailPage() {
             />
         }
       </Card>
+
+      {/* E-C: evidence-request + file-upload for the KRI (generic backend,
+          entityType="Kri") — request supporting data from a department with
+          SLA chasing, and attach the measurement source files. */}
+      {def && (
+        <Card padded>
+          <h3 style={{ marginTop: 0 }}>
+            {lang === 'ar' ? 'الأدلة والمرفقات' : 'Evidence & attachments'}
+          </h3>
+          <div style={{ display: 'grid', gap: 16 }}>
+            <EvidenceRequestsField entityType="Kri" entityId={def.id} />
+            <AttachmentsField entityType="Kri" entityId={def.id} />
+          </div>
+        </Card>
+      )}
     </Shell>
   );
 }
