@@ -4,13 +4,16 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.evidence.dto.EvidenceRequestCreateDto;
 import com.tss.grc.module.evidence.dto.EvidenceRequestResponse;
+import com.tss.grc.module.evidence.dto.EvidenceRequestCommentDtos.CommentResponse;
 import com.tss.grc.module.evidence.entity.EvidenceRequest;
+import com.tss.grc.module.evidence.entity.EvidenceRequestComment;
 import com.tss.grc.module.evidence.entity.EvidenceSubControl;
 import com.tss.grc.module.evidence.entity.EvidenceControl;
 import com.tss.grc.module.evidence.entity.EvidenceFramework;
 import com.tss.grc.module.evidence.repository.EvidenceControlRepository;
 import com.tss.grc.module.evidence.repository.EvidenceFrameworkRepository;
 import com.tss.grc.module.evidence.repository.EvidenceRequestRepository;
+import com.tss.grc.module.evidence.repository.EvidenceRequestCommentRepository;
 import com.tss.grc.module.evidence.repository.EvidenceSubControlRepository;
 import com.tss.grc.module.iam.entity.User;
 import com.tss.grc.module.iam.repository.UserRepository;
@@ -27,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -42,6 +46,7 @@ public class EvidenceRequestService {
     private final UserRepository userRepository;
     private final DepartmentRepository departmentRepository;
     private final ApplicationEventPublisher events;
+    private final EvidenceRequestCommentRepository commentRepository;
 
     // ── Request lifecycle state machine ───────────────────────────────────────
     private static final Set<String> REQUEST_STATUSES =
@@ -207,5 +212,43 @@ public class EvidenceRequestService {
                 r.getDueDate(), r.getPriority(), r.getStatus(), r.getNotes(),
                 r.getCreatedAt(), r.getUpdatedAt()
         );
+    }
+
+    // ── Comment thread (plan task §12.9) ──────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<CommentResponse> listComments(Long requestId) {
+        Long orgId = TenantContext.getCurrentTenant();
+        requireRequest(requestId, orgId);
+        return commentRepository.findByOrganisationIdAndRequestIdOrderByCreatedAtAsc(orgId, requestId)
+                .stream().map(this::toCommentResponse).toList();
+    }
+
+    @Transactional
+    public CommentResponse addComment(Long requestId, String body, Long authorId) {
+        if (body == null || body.isBlank())
+            throw new IllegalArgumentException("Comment body is required");
+        Long orgId = TenantContext.getCurrentTenant();
+        requireRequest(requestId, orgId);
+        EvidenceRequestComment c = new EvidenceRequestComment();
+        c.setOrganisationId(orgId);
+        c.setRequestId(requestId);
+        c.setAuthorId(authorId);
+        c.setBody(body.trim());
+        return toCommentResponse(commentRepository.save(c));
+    }
+
+    private EvidenceRequest requireRequest(Long requestId, Long orgId) {
+        return requestRepository.findById(requestId)
+                .filter(r -> r.getOrganisationId().equals(orgId))
+                .orElseThrow(() -> new EntityNotFoundException("Evidence request not found: " + requestId));
+    }
+
+    private CommentResponse toCommentResponse(EvidenceRequestComment c) {
+        String authorName = c.getAuthorId() != null
+                ? userRepository.findById(c.getAuthorId()).map(User::getFullNameEn).orElse(null)
+                : null;
+        return new CommentResponse(c.getId(), c.getRequestId(), c.getAuthorId(), authorName,
+                c.getBody(), c.getCreatedAt());
     }
 }

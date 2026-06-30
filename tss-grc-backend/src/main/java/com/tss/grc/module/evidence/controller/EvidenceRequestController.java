@@ -2,6 +2,8 @@ package com.tss.grc.module.evidence.controller;
 
 import com.tss.grc.module.evidence.dto.EvidenceRequestCreateDto;
 import com.tss.grc.module.evidence.dto.EvidenceRequestResponse;
+import com.tss.grc.module.evidence.dto.EvidenceRequestCommentDtos.CreateCommentDto;
+import com.tss.grc.module.evidence.dto.EvidenceRequestCommentDtos.CommentResponse;
 import com.tss.grc.module.evidence.service.EvidenceRequestService;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -81,5 +83,24 @@ public class EvidenceRequestController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         requestService.delete(id);
+    }
+
+    // ── Comment thread (plan task §12.9) ──────────────────────────────────────
+
+    @GetMapping("/{id}/comments")
+    @PreAuthorize("hasPermission('EVIDENCE', 'READ')")
+    @Operation(summary = "List the comment thread on an evidence request")
+    public java.util.List<CommentResponse> listComments(@PathVariable Long id) {
+        return requestService.listComments(id);
+    }
+
+    @PostMapping("/{id}/comments")
+    @PreAuthorize("hasPermission('EVIDENCE', 'WRITE')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Add a comment to an evidence request")
+    public CommentResponse addComment(@PathVariable Long id,
+                                      @Valid @RequestBody CreateCommentDto dto,
+                                      @AuthenticationPrincipal GrcUserDetails me) {
+        return requestService.addComment(id, dto.body(), me != null ? me.getUserId() : null);
     }
 }
