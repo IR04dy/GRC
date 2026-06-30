@@ -22,6 +22,20 @@ export interface RiskControl {
   notes?: string | null;
 }
 
+/** E-B — outcome of a control-effectiveness → residual re-derivation. */
+export interface ExposureResult {
+  riskId: number;
+  linkedControls: number;
+  uncontrolled: boolean;
+  aggregateMitigation: number;      // 0.00 .. 0.75
+  inherentScore?: number | null;
+  previousResidualScore?: number | null;
+  newResidualScore?: number | null;
+  residualLikelihood?: number | null;
+  residualImpact?: number | null;
+  applied: boolean;
+}
+
 export interface AppetiteVariance {
   totalRisks: number;
   risksAboveAppetite: number;
@@ -109,6 +123,17 @@ export const ermGap = {
     contributionPct?: number | null; notes?: string | null;
   }) =>
     api.post<RiskControl>(`/api/v1/risk/risks/${riskId}/controls`, body),
+
+  // E-B — control-effectiveness → residual derivation. Linking a control
+  // already auto-recomputes; this forces a re-derivation on demand.
+  recomputeResidual: (riskId: number) =>
+    api.post<ExposureResult>(`/api/v1/risk/risks/${riskId}/recompute-residual`),
+
+  // Open risks with no linked control — uncontrolled exposure, worst residual first.
+  uncontrolledRisks: () =>
+    api.get<Array<{ id: number; titleEn: string; titleAr?: string | null;
+      residualScore?: number | null; riskLevel?: string | null; status?: string | null }>>(
+      '/api/v1/risk/exposure/uncontrolled'),
 
   appetiteVariance: () =>
     api.get<AppetiteVariance>('/api/v1/risk/appetite/variance'),

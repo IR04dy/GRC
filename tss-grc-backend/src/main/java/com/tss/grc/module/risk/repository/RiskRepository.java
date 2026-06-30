@@ -40,6 +40,14 @@ public interface RiskRepository extends JpaRepository<Risk, Long> {
     List<Risk> findAttestationOverdue(@Param("orgId") Long orgId,
                                       @Param("today") java.time.LocalDate today);
 
+    /** E-B — "uncontrolled exposure": open risks with no linked control, worst residual first. */
+    @Query("SELECT r FROM Risk r WHERE r.organisationId = :orgId "
+         + "AND r.status NOT IN ('CLOSED','CANCELLED') "
+         + "AND NOT EXISTS (SELECT 1 FROM RiskControl rc "
+         + "                WHERE rc.riskId = r.id AND rc.organisationId = r.organisationId) "
+         + "ORDER BY r.residualScore DESC")
+    List<Risk> findUncontrolled(@Param("orgId") Long orgId);
+
     // Framework anchor (IA-5)
     List<Risk> findByOrganisationIdAndRiskFrameworkId(Long organisationId, Long riskFrameworkId);
     List<Risk> findByOrganisationIdAndComplianceFrameworkId(Long organisationId, Long complianceFrameworkId);

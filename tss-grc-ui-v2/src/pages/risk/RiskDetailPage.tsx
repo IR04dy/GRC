@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { AlertTriangle, Activity, ListChecks, MessageSquare, Link2, Edit, Send, CheckCheck, ShieldOff, Archive, RotateCcw } from 'lucide-react';
+import { AlertTriangle, Activity, ListChecks, MessageSquare, Link2, Edit, Send, CheckCheck, ShieldOff, Archive, RotateCcw, Calculator } from 'lucide-react';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
@@ -33,6 +33,7 @@ import {
   treatmentTypeTone, treatmentStatusTone, nextTreatmentStatuses,
   type RiskAssessment, type RiskTreatment, type RiskTreatmentType, type RiskTreatmentStatus,
 } from '../../lib/riskAdvanced';
+import { ermGap } from '../../lib/buyerGap';
 import { EmptyState } from '../../components/ui/EmptyState';
 import '../../styles/pages/risk-detail.css';
 
@@ -131,6 +132,29 @@ export function RiskDetailPage() {
       try { setRisk(await riskApi.get(risk.id)); } catch { /* ignore */ }
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Failed to record assessment');
+    }
+  }
+
+  // E-B — re-derive residual from the aggregate control posture (effectiveness
+  // weighted by contribution). Complements the auto-recompute on control link.
+  async function onRecomputeResidual() {
+    if (!risk) return;
+    const ar = lang === 'ar';
+    try {
+      const r = await ermGap.recomputeResidual(risk.id);
+      if (!r.applied) {
+        toast.warning(ar
+          ? 'تعذّر إعادة الاحتساب — لا توجد درجة كامنة أو المخاطرة في حالة نهائية'
+          : 'Not recomputed — no inherent baseline, or risk is in a terminal state');
+      } else {
+        const pct = Math.round(r.aggregateMitigation * 100);
+        toast.success(ar
+          ? `أُعيد احتساب المتبقّي من ${r.linkedControls} ضابط — تخفيف ${pct}٪ — ${r.previousResidualScore ?? '—'} ← ${r.newResidualScore ?? '—'}${r.uncontrolled ? ' (بدون ضوابط)' : ''}`
+          : `Residual re-derived from ${r.linkedControls} control(s) — ${pct}% mitigation — ${r.previousResidualScore ?? '—'} → ${r.newResidualScore ?? '—'}${r.uncontrolled ? ' · uncontrolled' : ''}`);
+      }
+      try { setRisk(await riskApi.get(risk.id)); } catch { /* ignore */ }
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Failed to recompute residual');
     }
   }
 
@@ -334,6 +358,14 @@ export function RiskDetailPage() {
                 : 'Bump residual likelihood +1 (capped at 5) when an incident is realised for this risk'}
               onClick={() => workflow(riskApi.incidentBump, lang === 'ar' ? 'تم رفع الاحتمالية المتبقية لتحقّق حادثة' : 'Residual likelihood bumped — incident realised')}>
               {lang === 'ar' ? 'تحقّق حادثة' : 'Incident realised'}
+            </Button>}
+          {risk.status !== 'CLOSED' &&
+            <Button variant="secondary" Icon={Calculator}
+              title={lang === 'ar'
+                ? 'إعادة احتساب الدرجة المتبقية من فعالية الضوابط المرتبطة (مرجّحة بنسبة المساهمة)'
+                : 'Re-derive residual from linked control effectiveness (weighted by contribution)'}
+              onClick={onRecomputeResidual}>
+              {lang === 'ar' ? 'احتساب المتبقّي من الضوابط' : 'Recompute from controls'}
             </Button>}
         </>}
       />

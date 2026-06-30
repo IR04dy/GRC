@@ -10,8 +10,11 @@ import com.tss.grc.module.platform.completion.PrivacyGapService.AtRiskTransfer;
 import com.tss.grc.module.platform.completion.PrivacyGapService.DsrSlaSweepResult;
 import com.tss.grc.module.platform.completion.PrivacyGapService.Pdpl72hSweepResult;
 import com.tss.grc.module.privacy.entity.ProcessingActivity;
+import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.entity.RiskAttestation;
 import com.tss.grc.module.risk.entity.RiskControl;
+import com.tss.grc.module.risk.service.RiskExposureService;
+import com.tss.grc.module.risk.service.RiskExposureService.ExposureResult;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -46,6 +49,7 @@ public class BuyerGapController {
     private final ErmGapService      ermService;
     private final EvidenceGapService evidenceService;
     private final PrivacyGapService  privacyService;
+    private final RiskExposureService exposureService;
 
     // ── ERM record ─────────────────────────────────────────────
     //
@@ -75,6 +79,22 @@ public class BuyerGapController {
     @GetMapping("/api/v1/risk/appetite/variance")
     @PreAuthorize("hasPermission('RISK','READ')")
     public AppetiteVariance appetiteVariance() { return ermService.appetiteVariance(); }
+
+    // ── §5.1 #2 — Control-effectiveness → residual derivation (E-B) ──
+    // Linking a control already auto-recomputes; this endpoint lets a user
+    // force a re-derivation (e.g. after a bulk effectiveness update).
+    @PostMapping("/api/v1/risk/risks/{id}/recompute-residual")
+    @PreAuthorize("hasPermission('RISK','WRITE')")
+    public ExposureResult recomputeResidual(@PathVariable Long id) {
+        return exposureService.recomputeResidual(id);
+    }
+
+    /** Open risks with no linked control — uncontrolled exposure, worst residual first. */
+    @GetMapping("/api/v1/risk/exposure/uncontrolled")
+    @PreAuthorize("hasPermission('RISK','READ')")
+    public List<Risk> uncontrolledRisks() {
+        return exposureService.listUncontrolledRisks();
+    }
 
     // ── Evidence freshness ─────────────────────────────────────
 

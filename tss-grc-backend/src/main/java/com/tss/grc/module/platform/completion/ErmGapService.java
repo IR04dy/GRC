@@ -9,6 +9,7 @@ import com.tss.grc.module.risk.entity.RiskControl;
 import com.tss.grc.module.risk.repository.RiskAttestationRepository;
 import com.tss.grc.module.risk.repository.RiskControlRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
+import com.tss.grc.module.risk.service.RiskExposureService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
@@ -46,6 +47,7 @@ public class ErmGapService {
     private final RiskRepository            risks;
     private final RiskAttestationRepository riskAttestations;
     private final AuditLogService           audit;
+    private final RiskExposureService       exposure;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @PersistenceContext
@@ -87,6 +89,9 @@ public class ErmGapService {
         RiskControl saved = riskControls.save(row);
         audit.log("LINK", "RiskControl", saved.getId(),
             "Risk #" + riskId + " ↔ Control #" + controlId + " effectiveness=" + saved.getEffectiveness());
+        // E-B: a control link / effectiveness change re-derives the risk's residual
+        // from the aggregate control posture (manual re-assessments still override).
+        exposure.recomputeResidual(riskId);
         return saved;
     }
 
