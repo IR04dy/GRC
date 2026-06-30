@@ -16,7 +16,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/risk/emerging")
+// E-K — versioning normalisation: /api/v1/risk/emerging is canonical; the
+// unversioned /api/risk/emerging stays as a deprecated back-compat alias.
+@RequestMapping({"/api/v1/risk/emerging", "/api/risk/emerging"})
 @RequiredArgsConstructor
 @Tag(name = "Emerging Risks")
 @SecurityRequirement(name = "bearerAuth")

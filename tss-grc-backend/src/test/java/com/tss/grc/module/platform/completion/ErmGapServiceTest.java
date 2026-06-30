@@ -8,6 +8,7 @@ import com.tss.grc.module.risk.entity.RiskControl;
 import com.tss.grc.module.risk.repository.RiskAttestationRepository;
 import com.tss.grc.module.risk.repository.RiskControlRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
+import com.tss.grc.module.risk.service.RiskExposureService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
@@ -58,6 +59,8 @@ class ErmGapServiceTest {
     @Mock private AuditLogService           audit;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private EntityManager             em;
+    /** E-B — ErmGapService.linkRiskControl now triggers a residual recompute; must be mocked. */
+    @Mock private RiskExposureService       exposure;
 
     @InjectMocks private ErmGapService service;
 

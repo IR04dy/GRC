@@ -844,6 +844,33 @@ export const riskReviewApi = {
   runSweep: () => api.post<{ flagged: number }>('/api/v1/risk/reviews/run-overdue-sweep'),
 };
 
+// ─── Reporting + audit evidence package — ERM epic E-K ──────────────────────
+export interface TopRiskRow {
+  riskId: number; riskCode: string; titleEn: string; titleAr?: string | null;
+  status: string; riskLevel?: string | null; residualScore?: number | null;
+  inherentScore?: number | null; ownerId?: number | null; categoryId?: number | null;
+}
+export interface AppetiteBreachRow {
+  breachId: number; appetiteId: number; appetiteTitleEn?: string | null; categoryId?: number | null;
+  severity?: string | null; observedValue?: number | null; toleranceUpper?: number | null;
+  currentExposure?: number | null; status?: string | null; breachedAt?: string | null; acknowledgedAt?: string | null;
+}
+export interface RiskRegisterStats {
+  totalRisks: number; byLevel: Record<string, number>; byStatus: Record<string, number>;
+  reviewOverdue: number; activeAcceptances: number; openAppetiteBreaches: number;
+}
+export interface RiskAuditPackage {
+  organisationId: number; generatedAt: string; stats: RiskRegisterStats;
+  topRisks: TopRiskRow[]; openAppetiteBreaches: AppetiteBreachRow[];
+}
+export const riskReportApi = {
+  topRisks: (limit = 10) => api.get<TopRiskRow[]>(`/api/v1/risk/reports/top-risks?limit=${limit}`),
+  appetiteBreaches: (openOnly = false) =>
+    api.get<AppetiteBreachRow[]>(`/api/v1/risk/reports/appetite-breaches?openOnly=${openOnly}`),
+  registerStats: () => api.get<RiskRegisterStats>('/api/v1/risk/reports/register-stats'),
+  auditPackage: () => api.get<RiskAuditPackage>('/api/v1/risk/reports/audit-package'),
+};
+
 // ─── Platform — Organisations / Tenant switcher (P1) ────────────────────────
 export interface OrganisationView {
   id: number;

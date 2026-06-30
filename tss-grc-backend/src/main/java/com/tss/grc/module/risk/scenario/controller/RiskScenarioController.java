@@ -38,7 +38,9 @@ import java.util.List;
  * </ul>
  */
 @RestController
-@RequestMapping("/api/risk/scenarios")
+// E-K — versioning normalisation: /api/v1/risk/scenarios is canonical; the
+// unversioned /api/risk/scenarios stays as a deprecated back-compat alias.
+@RequestMapping({"/api/v1/risk/scenarios", "/api/risk/scenarios"})
 @RequiredArgsConstructor
 @Tag(name = "Risk Scenarios")
 @SecurityRequirement(name = "bearerAuth")

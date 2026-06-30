@@ -56,6 +56,20 @@ public interface RiskRepository extends JpaRepository<Risk, Long> {
          + "ORDER BY r.organisationId ASC, r.reviewDate ASC")
     List<Risk> findReviewOverdueAllOrgs(@Param("today") java.time.LocalDate today);
 
+    /** E-K — top active risks by residual (board / committee / audit-package report). */
+    @Query("SELECT r FROM Risk r WHERE r.organisationId = :orgId "
+         + "AND r.status NOT IN ('CLOSED','CANCELLED','ARCHIVED') "
+         + "ORDER BY r.residualScore DESC, r.id ASC")
+    List<Risk> findTopActiveByResidual(@Param("orgId") Long orgId, Pageable pageable);
+
+    /** E-K — register stats: live count grouped by risk_level. */
+    @Query("SELECT COALESCE(r.riskLevel,'UNSCORED'), COUNT(r) FROM Risk r WHERE r.organisationId = :orgId GROUP BY r.riskLevel")
+    List<Object[]> countGroupedByLevel(@Param("orgId") Long orgId);
+
+    /** E-K — register stats: live count grouped by workflow status. */
+    @Query("SELECT r.status, COUNT(r) FROM Risk r WHERE r.organisationId = :orgId GROUP BY r.status")
+    List<Object[]> countGroupedByStatus(@Param("orgId") Long orgId);
+
     /** E-B — "uncontrolled exposure": open risks with no linked control, worst residual first. */
     @Query("SELECT r FROM Risk r WHERE r.organisationId = :orgId "
          + "AND r.status NOT IN ('CLOSED','CANCELLED') "

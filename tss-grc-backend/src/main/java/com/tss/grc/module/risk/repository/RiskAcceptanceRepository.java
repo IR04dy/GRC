@@ -15,4 +15,7 @@ public interface RiskAcceptanceRepository extends JpaRepository<RiskAcceptance, 
 
     /** Expiry sweep (system-wide, all tenants) — acceptances in a status past their expiry. */
     List<RiskAcceptance> findByStatusAndExpiresAtLessThan(String status, LocalDate date);
+
+    /** E-K — audit-package posture: count of acceptances in a given status for the tenant. */
+    long countByOrganisationIdAndStatus(Long organisationId, String status);
 }
