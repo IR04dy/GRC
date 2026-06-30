@@ -40,12 +40,15 @@ jobs:
 
       - name: Upload test reports
         if: always()
+        # Artifact upload is a convenience (diagnostic reports) — never let a
+        # full Actions storage quota fail an otherwise-passing build.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: backend-test-reports
           path: tss-grc-backend/target/surefire-reports/
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 3
 
   frontend:
     name: Frontend (React + Vite)
@@ -73,12 +76,14 @@ jobs:
 
       - name: Upload build artifact
         if: always()
+        # Don't fail the build when Actions artifact storage is full.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
           path: tss-grc-ui-v2/dist/
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 3
 
   docker:
     name: Docker image build (smoke)
