@@ -797,6 +797,26 @@ export const riskLinkApi = {
   remove: (id: number) => api.delete<void>(`/api/v1/risk/links/${id}`),
 };
 
+// ─── Methodology + multi-dimensional impact — ERM epic E-F ──────────────────
+export interface MethodologyConfigDto {
+  impactDimensions: string[]; likelihoodScaleMax: number; impactScaleMax: number;
+}
+export interface ImpactDimensionEntry { dimension: string; score: number | null; }
+export interface ImpactRatingsResponse {
+  dimensions: ImpactDimensionEntry[]; overallImpact: number | null; impactScaleMax: number;
+}
+export const methodologyApi = {
+  get: () => api.get<MethodologyConfigDto>('/api/v1/risk/methodology'),
+  update: (body: Partial<{ impactDimensions: string[]; likelihoodScaleMax: number; impactScaleMax: number }>) =>
+    api.put<MethodologyConfigDto>('/api/v1/risk/methodology', body),
+};
+export const riskImpactApi = {
+  getDimensions: (riskId: number) =>
+    api.get<ImpactRatingsResponse>(`/api/v1/risk/risks/${riskId}/impact-dimensions`),
+  setDimensions: (riskId: number, dimensions: { dimension: string; score: number }[]) =>
+    api.put<ImpactRatingsResponse>(`/api/v1/risk/risks/${riskId}/impact-dimensions`, { dimensions }),
+};
+
 // ─── Platform — Organisations / Tenant switcher (P1) ────────────────────────
 export interface OrganisationView {
   id: number;

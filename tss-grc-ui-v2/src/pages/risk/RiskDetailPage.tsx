@@ -36,6 +36,7 @@ import {
 } from '../../lib/riskAdvanced';
 import { ermGap } from '../../lib/buyerGap';
 import { RiskLinksPanel } from '../../components/risk/RiskLinksPanel';
+import { ImpactDimensionsPanel } from '../../components/risk/ImpactDimensionsPanel';
 import { EmptyState } from '../../components/ui/EmptyState';
 import '../../styles/pages/risk-detail.css';
 
@@ -433,10 +434,14 @@ export function RiskDetailPage() {
           <Tabs items={tabs} active={tab} onChange={setTab} />
 
           {tab === 'overview' && (
-            <Card title={t('detailTabOverview')} Icon={AlertTriangle}>
-              <Field label={t('riskColName')} value={title} bold />
-              <Field label={t('detailDescription')} value={(lang === 'ar' && risk.descriptionAr ? risk.descriptionAr : risk.descriptionEn) ?? '—'} multiline />
-            </Card>
+            <>
+              <Card title={t('detailTabOverview')} Icon={AlertTriangle}>
+                <Field label={t('riskColName')} value={title} bold />
+                <Field label={t('detailDescription')} value={(lang === 'ar' && risk.descriptionAr ? risk.descriptionAr : risk.descriptionEn) ?? '—'} multiline />
+              </Card>
+              {/* E-F — multi-dimensional impact; worst dimension drives inherent impact. */}
+              <ImpactDimensionsPanel riskId={risk.id} onSaved={() => void load()} />
+            </>
           )}
 
       {tab === 'assessments' && (() => {
