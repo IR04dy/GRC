@@ -41,7 +41,7 @@ Live evidence (this review): `cycles` 2, `governance` 1, `bia-assessments` 6, `d
 **However, it is not yet fully market-ready for a Saudi BCM buyer**, for a small number of *specific, high-impact* reasons:
 
 1. ~~**"Generate BCP/DRP from BIA" is a stub.**~~ **✅ RESOLVED (B-A, `93a2792c`).** The legacy `generateBcpStub`/`generateDrpStub` path only stamped an id, but the wizard already used the structured `BcpPlanService.generateFromBia` (which copied RTO/RPO/MTPD + the section catalogue). That generator now also **seeds the section bodies from the BIA** — recovery objectives, MBCO, minimum resources, manual workaround, critical suppliers, dependencies — so the generated plan starts with real content. The BIA→plan linkage is now substantive, not cosmetic.
-2. **No real evidence-request workflow, and file upload is almost absent.** There is **no `MultipartFile` anywhere in `module/bcm`** and **no use of the generic evidence subsystem** (`EvidenceRequest` / `EvidenceLink` / `AttachmentService`). BCM "evidence" is: a reference-by-id (`BcmComplianceMapping.attachEvidence(evidenceId)`), a CAPA status flag (`EVIDENCE_SUBMITTED`), and a read-side audit **export** package (`BcmEvidencePackageService`). Real file upload appears in only **2** of ~33 BCM pages (`AarDetailPage`, `ExerciseScenarioDetailPage`) via the generic attachment controller. There is **no "request evidence from a department"** flow — no owner, due date, countdown, SLA, reminders, or escalation — anywhere in BCM. Plans, DR-test results, BIAs, and CAPAs cannot carry an uploaded evidence file.
+2. ~~**No real evidence-request workflow, and file upload is almost absent.**~~ **✅ RESOLVED (B-B `64e1c1d1` + B-C).** BCM is now wired to the generic evidence subsystem: real file upload on all six BCM entities via `AttachmentService`, plus a reusable `EvidenceRequestsField` (owner/dept/due/countdown/SLA/lifecycle) backed by `EvidenceRequest` + the `by-entity` endpoint + the existing SLA scheduler/reminders/escalation. *Original finding:* there was **no `MultipartFile` anywhere in `module/bcm`** and **no use of the generic evidence subsystem** (`EvidenceRequest` / `EvidenceLink` / `AttachmentService`). BCM "evidence" is: a reference-by-id (`BcmComplianceMapping.attachEvidence(evidenceId)`), a CAPA status flag (`EVIDENCE_SUBMITTED`), and a read-side audit **export** package (`BcmEvidencePackageService`). Real file upload appears in only **2** of ~33 BCM pages (`AarDetailPage`, `ExerciseScenarioDetailPage`) via the generic attachment controller. There is **no "request evidence from a department"** flow — no owner, due date, countdown, SLA, reminders, or escalation — anywhere in BCM. Plans, DR-test results, BIAs, and CAPAs cannot carry an uploaded evidence file.
 3. ~~**Evidence lifecycle (expiry / rejection→gap / resubmission) is absent** in BCM (a consequence of #2).~~ **✅ RESOLVED (B-D, `f895befc`).** Rejecting a BCM-anchored evidence request now publishes an F8 event that auto-opens a deduped BCM gap (source `EVIDENCE`); resubmission (REJECTED→OPEN/IN_PROGRESS) and attachment expiry/re-collect already worked.
 
 Everything else — governance, BIA capture, crisis, exercises, comms, CAPA, reporting, automation, ERM linkage — is genuinely implemented and mostly realistic. The module needs **targeted remediation of the BIA→plan generator and the evidence/file-upload workflow**, not a rebuild.
@@ -208,7 +208,9 @@ Each workflow below states the realistic target; §5–§13 compare against curr
 | **B-6** | `exercise-runs` root GET returns **405** (no list endpoint) — exercises only reachable via sub-paths | **Medium** | live smoke `GET /api/v1/bcm/exercise-runs → 405` |
 | **B-7** | Arabic/RTL not exhaustively verified across ~33 pages | **Low** | needs a live bilingual walk |
 
-> Note: gaps B-2/B-3/B-4 are the **same class** the Compliance module had (C-1/C-2) and that were remediated there; BCM was never wired to the evidence subsystem, so it carries the full gap.
+> ✅ **Resolution (post-remediation — see §0):** every gap above is now fixed — **B-1 → B-A**, **B-2 → B-B**, **B-3 → B-C**, **B-4 → B-D**, **B-5 → B-G**, **B-6 → B-H** (live-confirmed HTTP 200), **B-7 → B-I**.
+>
+> Note (original): gaps B-2/B-3/B-4 are the **same class** the Compliance module had (C-1/C-2) and that were remediated there; BCM was never wired to the evidence subsystem, so it carried the full gap.
 
 ---
 
@@ -259,7 +261,7 @@ Each workflow below states the realistic target; §5–§13 compare against curr
 | 19 | Notify before expiry | ✗ |
 | 20 | Create gap if missing/rejected | ✗ |
 
-**This is the weakest area and the primary remediation target.** Note the generic evidence subsystem (`EvidenceRequest`/`EvidenceLink`/`AttachmentService` + the SLA scheduler) already exists platform-wide — BCM simply does not call it.
+**This was the weakest area and the primary remediation target — now resolved.** ✅ **Post-remediation (B-B/B-C/B-D — see §0):** points 1–8, 10–13, 15, 17–20 are now ✅ (request/owner/due/countdown/SLA/reminders/escalation/upload, review/reject/reason/resubmit, entity links, reports, expiry/notify/gap-on-reject); comments (9) and dashboard surfacing (16) remain partial. The generic evidence subsystem (`EvidenceRequest`/`EvidenceLink`/`AttachmentService` + the SLA scheduler) already existed platform-wide — BCM is now wired to it.
 
 ## 13. Policy/Document Workflow Gaps
 - Governance/policy records + lifecycle + review-due automation exist; **but no file upload** (B-3), no reviewer/approver field capture on the document itself, no version/archive of an uploaded file. Mirrors the Compliance policy gap before its remediation.
