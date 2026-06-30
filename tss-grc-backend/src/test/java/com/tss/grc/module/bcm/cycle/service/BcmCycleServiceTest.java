@@ -6,6 +6,7 @@ import com.tss.grc.module.bcm.cycle.entity.BcmAssessmentCycle;
 import com.tss.grc.module.bcm.cycle.entity.BcmGovernanceRecord;
 import com.tss.grc.module.bcm.cycle.repository.BcmAssessmentCycleRepository;
 import com.tss.grc.module.bcm.cycle.repository.BcmGovernanceRecordRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,7 @@ class BcmCycleServiceTest {
 
     @Mock private BcmAssessmentCycleRepository cycles;
     @Mock private BcmGovernanceRecordRepository governance;
+    @Mock private CommitteeRepository committees;
     @Mock private AuditLogService audit;
     @Mock private org.springframework.context.ApplicationEventPublisher publisher;
     @InjectMocks private BcmCycleService service;
@@ -67,6 +69,14 @@ class BcmCycleServiceTest {
         body.setReportingYear((short) 2025);
         assertThatThrownBy(() -> service.createCycle(body))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cycleNameEn");
+    }
+
+    @Test void governance_createRejectsUnknownCommittee() {
+        BcmGovernanceRecord body = gov("DRAFT");
+        body.setCommitteeId(999L);
+        when(committees.findByIdAndOrganisationId(999L, ORG_ID)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.createGovernance(body))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("committee");
     }
 
     @Test void cycle_createDuplicateYearRejected() {

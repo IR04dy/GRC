@@ -6,6 +6,7 @@ import com.tss.grc.module.bcm.cycle.entity.BcmAssessmentCycle;
 import com.tss.grc.module.bcm.cycle.entity.BcmGovernanceRecord;
 import com.tss.grc.module.bcm.cycle.repository.BcmAssessmentCycleRepository;
 import com.tss.grc.module.bcm.cycle.repository.BcmGovernanceRecordRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
@@ -51,6 +52,7 @@ public class BcmCycleService {
 
     private final BcmAssessmentCycleRepository cycles;
     private final BcmGovernanceRecordRepository governance;
+    private final CommitteeRepository committees;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
 
@@ -211,6 +213,7 @@ public class BcmCycleService {
             throw new IllegalArgumentException("policyTitleEn is required");
         if (body.getReviewFrequency() != null && !REVIEW_FREQS.contains(body.getReviewFrequency()))
             throw new IllegalArgumentException("Invalid review frequency: " + body.getReviewFrequency());
+        validateCommittee(body.getCommitteeId());
         body.setId(null);
         body.setOrganisationId(org());
         if (body.getPolicyVersion() == null) body.setPolicyVersion("1.0");
@@ -237,7 +240,7 @@ public class BcmCycleService {
         if (body.getObjective() != null)     r.setObjective(body.getObjective());
         if (body.getBcmManagerId() != null)        r.setBcmManagerId(body.getBcmManagerId());
         if (body.getExecutiveSponsorId() != null)  r.setExecutiveSponsorId(body.getExecutiveSponsorId());
-        if (body.getCommitteeId() != null)         r.setCommitteeId(body.getCommitteeId());
+        if (body.getCommitteeId() != null)         { validateCommittee(body.getCommitteeId()); r.setCommitteeId(body.getCommitteeId()); }
         if (body.getReviewFrequency() != null) {
             if (!REVIEW_FREQS.contains(body.getReviewFrequency()))
                 throw new IllegalArgumentException("Invalid review frequency");
@@ -290,6 +293,14 @@ public class BcmCycleService {
     }
 
     // ─── Helpers ───────────────────────────────────────────────────
+
+    /** A non-null committee link must reference a real committee in this org. */
+    private void validateCommittee(Long committeeId) {
+        if (committeeId == null) return;
+        committees.findByIdAndOrganisationId(committeeId, org()).orElseThrow(() ->
+            new IllegalArgumentException("committeeId " + committeeId
+                + " does not reference a committee in this organisation"));
+    }
 
     private void auditCycle(BcmAssessmentCycle c, String action, String before, String after, String message) {
         audit.recordEvent(new AuditLogService.AuditEventBuilder()
