@@ -186,4 +186,13 @@ public class KriAppetiteController {
     public Map<String, Object> appetiteDashboard() {
         return appetiteService.dashboard();
     }
+
+    // ── E-H — register → appetite exposure aggregation + breach escalation ──
+    @PostMapping("/appetite/recompute-exposure")
+    @PreAuthorize("hasPermission('RISK','WRITE')")
+    @Operation(summary = "Aggregate live residual exposure from the register into each approved "
+        + "appetite statement (worst residual per category) and escalate any breach via F8.")
+    public RiskAppetiteService.ExposureRecompute recomputeAppetiteExposure() {
+        return appetiteService.recomputeExposureFromRegister();
+    }
 }

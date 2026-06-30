@@ -9,10 +9,14 @@ import com.tss.grc.module.risk.dto.RiskRequest;
 import com.tss.grc.module.risk.dto.RiskResponse;
 import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.entity.RiskCategory;
+import com.tss.grc.module.risk.entity.RiskAppetiteStatement;
+import com.tss.grc.module.risk.repository.RiskAppetiteStatementRepository;
 import com.tss.grc.module.risk.repository.RiskCategoryRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import com.tss.grc.module.risk_lc.repository.TreatmentPlanRepository;
 import jakarta.persistence.EntityNotFoundException;
+
+import java.math.BigDecimal;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -69,6 +73,7 @@ class RiskServiceTest {
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private TreatmentPlanRepository treatmentPlanRepository;
+    @Mock private RiskAppetiteStatementRepository appetiteRepository;
     @InjectMocks private RiskService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -214,6 +219,25 @@ class RiskServiceTest {
         assertThat(service.close(RISK_ID).status()).isEqualTo("CLOSED");
         verify(treatmentPlanRepository, never())
             .existsByOrganisationIdAndRiskIdAndStatusNot(anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void close_overAppetiteRisk_withoutPlan_isBlocked() {
+        // E-H — not HIGH by level, but residual (10) breaches its category's
+        // approved appetite ceiling (8) → still gated.
+        Risk r = risk("MITIGATING"); r.setRiskLevel("MEDIUM"); r.setCategoryId(5L); r.setResidualScore(10);
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        RiskAppetiteStatement a = new RiskAppetiteStatement();
+        a.setOrganisationId(ORG_ID); a.setCategoryId(5L); a.setStatus("APPROVED");
+        a.setToleranceUpper(BigDecimal.valueOf(8));
+        when(appetiteRepository.findByOrganisationIdAndStatus(ORG_ID, "APPROVED")).thenReturn(List.of(a));
+        when(treatmentPlanRepository.existsByOrganisationIdAndRiskIdAndStatusNot(ORG_ID, RISK_ID, "REJECTED"))
+            .thenReturn(false);
+
+        assertThatThrownBy(() -> service.close(RISK_ID))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("appetite");
+        verify(riskRepository, never()).save(any());
     }
 
     @Test

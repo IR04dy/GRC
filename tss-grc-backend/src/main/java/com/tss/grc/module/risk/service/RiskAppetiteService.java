@@ -1,13 +1,16 @@
 package com.tss.grc.module.risk.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.risk.dto.RiskAppetiteRequest;
 import com.tss.grc.module.risk.entity.AppetiteBreachEvent;
 import com.tss.grc.module.risk.entity.RiskAppetiteStatement;
 import com.tss.grc.module.risk.repository.AppetiteBreachEventRepository;
 import com.tss.grc.module.risk.repository.RiskAppetiteStatementRepository;
+import com.tss.grc.module.risk.repository.RiskRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,9 @@ public class RiskAppetiteService {
 
     private final RiskAppetiteStatementRepository repo;
     private final AppetiteBreachEventRepository breachRepo;
+    /** E-H — live register exposure aggregation + F8 breach escalation. */
+    private final RiskRepository risks;
+    private final ApplicationEventPublisher events;
 
     @Transactional(readOnly = true)
     public Page<RiskAppetiteStatement> list(Pageable pageable) {
@@ -96,6 +102,34 @@ public class RiskAppetiteService {
         return repo.save(s);
     }
 
+    /** E-H — outcome of a register→appetite exposure recompute. */
+    public record ExposureRecompute(int statementsProcessed, int breachesRaised) {}
+
+    /**
+     * E-H — aggregate live residual exposure from the risk register into each
+     * APPROVED appetite statement. The exposure of a statement is the worst
+     * (max) residual score among the open risks in its category — directly
+     * comparable to {@code toleranceUpper} on the 1..25 scale. Updating the
+     * exposure re-evaluates the tolerance band, raising (and escalating) an
+     * {@link AppetiteBreachEvent} when the category breaches appetite. Callable
+     * on demand via the endpoint or from a scheduled sweep.
+     */
+    @Transactional
+    public ExposureRecompute recomputeExposureFromRegister() {
+        Long org = TenantContext.getCurrentTenant();
+        List<RiskAppetiteStatement> approved = repo.findByOrganisationIdAndStatus(org, "APPROVED");
+        int processed = 0, breaches = 0;
+        for (RiskAppetiteStatement s : approved) {
+            if (s.getCategoryId() == null) continue;   // category-anchored statements only
+            Integer maxRes = risks.findMaxResidualScoreByCategory(org, s.getCategoryId());
+            s.setCurrentExposure(maxRes == null ? BigDecimal.ZERO : BigDecimal.valueOf(maxRes));
+            repo.save(s);
+            processed++;
+            if (evaluateExposure(s, "Auto-aggregated from live register exposure") != null) breaches++;
+        }
+        return new ExposureRecompute(processed, breaches);
+    }
+
     @Transactional(readOnly = true)
     public List<AppetiteBreachEvent> listBreaches(Long appetiteId) {
         require(appetiteId);
@@ -147,9 +181,15 @@ public class RiskAppetiteService {
         evaluateExposure(s, null);
     }
 
-    private void evaluateExposure(RiskAppetiteStatement s, String notes) {
+    /** Creates + escalates a breach when exposure leaves the tolerance band.
+     *  Returns the breach (or null if within tolerance / no exposure). */
+    private AppetiteBreachEvent evaluateExposure(RiskAppetiteStatement s, String notes) {
         String severity = computeSeverity(s);
-        if (severity == null || "WITHIN_TOLERANCE".equals(severity)) return;
+        if (severity == null || "WITHIN_TOLERANCE".equals(severity)) return null;
+        // E-H dedup: if an unacknowledged breach is already on file for this
+        // statement, don't raise a duplicate (keeps a scheduled/repeated recompute
+        // idempotent — no breach-list spam, no repeated F8 escalation).
+        if (breachRepo.existsByAppetiteIdAndStatus(s.getId(), "OPEN")) return null;
         AppetiteBreachEvent ev = new AppetiteBreachEvent();
         ev.setAppetiteId(s.getId());
         ev.setObservedValue(s.getCurrentExposure());
@@ -157,7 +197,20 @@ public class RiskAppetiteService {
         ev.setBreachedAt(LocalDateTime.now());
         ev.setNotes(notes);
         ev.setStatus("OPEN");
-        breachRepo.save(ev);
+        AppetiteBreachEvent saved = breachRepo.save(ev);
+        // E-H — fan out to F8 so a rule can escalate (notify the CRO / raise a
+        // board review task). Previously the breach was recorded but silent.
+        events.publishEvent(new DomainEvent(
+            s.getOrganisationId(), "APPETITE_BREACHED",
+            "RiskAppetiteStatement", s.getId(),
+            s.getExternalId() == null ? null : s.getExternalId().toString(),
+            Map.of("appetiteId",     String.valueOf(s.getId()),
+                   "titleEn",        s.getTitleEn() == null ? "" : s.getTitleEn(),
+                   "severity",       severity,
+                   "observedValue",  String.valueOf(s.getCurrentExposure()),
+                   "toleranceUpper", String.valueOf(s.getToleranceUpper()),
+                   "categoryId",     s.getCategoryId() == null ? "" : String.valueOf(s.getCategoryId()))));
+        return saved;
     }
 
     /** Returns null if exposure is missing; otherwise WITHIN_TOLERANCE | EXCEEDED | CRITICAL. */

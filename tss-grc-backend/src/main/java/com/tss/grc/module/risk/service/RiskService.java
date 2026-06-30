@@ -9,10 +9,14 @@ import com.tss.grc.module.risk.dto.RiskRequest;
 import com.tss.grc.module.risk.dto.RiskResponse;
 import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.entity.RiskCategory;
+import com.tss.grc.module.risk.entity.RiskAppetiteStatement;
+import com.tss.grc.module.risk.repository.RiskAppetiteStatementRepository;
 import com.tss.grc.module.risk.repository.RiskCategoryRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import com.tss.grc.module.risk_lc.repository.TreatmentPlanRepository;
 import com.tss.grc.platform.realtime.BroadcastHelper;
+
+import java.math.BigDecimal;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
@@ -42,6 +46,8 @@ public class RiskService {
     private final ApplicationEventPublisher eventPublisher;
     /** E-D — canonical treatment-plan store (risk_lc), used by the mandatory-treatment gate. */
     private final TreatmentPlanRepository treatmentPlanRepository;
+    /** E-H — approved appetite ceilings, used to extend the close-gate to over-appetite risks. */
+    private final RiskAppetiteStatementRepository appetiteRepository;
 
     /** Re-reads DB-computed columns after save — null in unit tests, set at runtime. */
     @PersistenceContext
@@ -169,24 +175,36 @@ public class RiskService {
     public RiskResponse close(Long id) {
         Risk r = mustGet(id);
         require(r, "MITIGATING", "ACCEPTED");
-        // E-D — mandatory-treatment gate. A HIGH/VERY_HIGH/CRITICAL risk may only
-        // be CLOSED once it carries a live (non-rejected) treatment plan. An
-        // ACCEPTED risk is exempt: the formal acceptance (E-A) is itself the
-        // documented, approval-gated decision to retain the risk. Lower-rated
-        // risks close freely. ("over-appetite" gating follows in E-H once the
-        // appetite↔register link is wired.)
-        if (!"ACCEPTED".equals(r.getStatus()) && isHighLevel(r.getRiskLevel())
+        // E-D + E-H — mandatory-treatment gate. A risk that is either HIGH/
+        // VERY_HIGH/CRITICAL by level OR over its category's approved appetite
+        // ceiling may only be CLOSED once it carries a live (non-rejected)
+        // treatment plan. An ACCEPTED risk is exempt: the formal acceptance
+        // (E-A) is itself the documented, approval-gated decision to retain the
+        // risk. Lower-rated, within-appetite risks close freely.
+        if (!"ACCEPTED".equals(r.getStatus()) && (isHighLevel(r.getRiskLevel()) || isOverAppetite(r))
                 && !treatmentPlanRepository.existsByOrganisationIdAndRiskIdAndStatusNot(
                         r.getOrganisationId(), id, "REJECTED")) {
+            String why = isHighLevel(r.getRiskLevel()) ? r.getRiskLevel() + " risk" : "risk over its appetite ceiling";
             throw new IllegalStateException(
-                "A treatment plan is required before closing a " + r.getRiskLevel()
-                + " risk — draft a treatment plan, or formally accept the risk first.");
+                "A treatment plan is required before closing a " + why
+                + " — draft a treatment plan, or formally accept the risk first.");
         }
         return doTransition(id, "CLOSED", new String[]{"MITIGATING", "ACCEPTED"});
     }
 
     private static boolean isHighLevel(String level) {
         return "HIGH".equals(level) || "VERY_HIGH".equals(level) || "CRITICAL".equals(level);
+    }
+
+    /** E-H — true when the risk's residual breaches its category's approved
+     *  appetite ceiling (tolerance_upper). No category / no approved appetite
+     *  / no residual → not over appetite. */
+    private boolean isOverAppetite(Risk r) {
+        if (r.getCategoryId() == null || r.getResidualScore() == null) return false;
+        BigDecimal residual = BigDecimal.valueOf(r.getResidualScore());
+        return appetiteRepository.findByOrganisationIdAndStatus(r.getOrganisationId(), "APPROVED").stream()
+            .filter(a -> r.getCategoryId().equals(a.getCategoryId()))
+            .anyMatch(a -> a.getToleranceUpper() != null && residual.compareTo(a.getToleranceUpper()) > 0);
     }
 
     @Transactional

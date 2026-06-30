@@ -48,6 +48,12 @@ public interface RiskRepository extends JpaRepository<Risk, Long> {
          + "ORDER BY r.residualScore DESC")
     List<Risk> findUncontrolled(@Param("orgId") Long orgId);
 
+    /** E-H — live register exposure for an appetite statement: the worst open
+     *  residual score in a category (null if the category has no open risks). */
+    @Query("SELECT MAX(r.residualScore) FROM Risk r WHERE r.organisationId = :orgId "
+         + "AND r.categoryId = :catId AND r.status NOT IN ('CLOSED','CANCELLED')")
+    Integer findMaxResidualScoreByCategory(@Param("orgId") Long orgId, @Param("catId") Long catId);
+
     // Framework anchor (IA-5)
     List<Risk> findByOrganisationIdAndRiskFrameworkId(Long organisationId, Long riskFrameworkId);
     List<Risk> findByOrganisationIdAndComplianceFrameworkId(Long organisationId, Long complianceFrameworkId);
