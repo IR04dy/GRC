@@ -30,7 +30,6 @@ import type {
   BcmBiaDto,
   AuditEngagementDto,
   ComplianceFindingDto,
-  PolicyDto,
   CyberExceptionDto,
 } from './api';
 import type { Capa } from './capa';
@@ -238,19 +237,6 @@ export function toExceptionDto(p: PromotedRecord): CyberExceptionDto {
     ownerName: submitterOf(p),
     compensatingControls: pickStr(p, 'compensatingControls'),
     expiryDate: pickStr(p, 'sunsetDate'),
-  };
-}
-
-/** CONTROL_ATTESTATION → PolicyDto (the platform models policy attestations
- *  through the Policy register since attesters confirm policy adherence). */
-export function toPolicyDto(p: PromotedRecord): PolicyDto {
-  return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
-    code: `POL-${p.sourceReferenceCode}`,
-    titleEn: pickStr(p, 'controlReference') || pickStr(p, 'policyTitle') || `Promoted from ${p.sourceReferenceCode}`,
-    version: '1.0',
-    status: 'ATTESTATION_RECEIVED',
-    effectiveFrom: p.promotedAt.slice(0, 10),
   };
 }
 
