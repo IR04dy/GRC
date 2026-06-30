@@ -38,4 +38,22 @@ public interface EvidenceRequestRepository extends JpaRepository<EvidenceRequest
                                              @Param("entityId") Long entityId);
 
     long countByOrganisationIdAndStatus(Long orgId, String status);
+
+    /** Count requests anchored to any of the given entity types in a specific status. */
+    long countByOrganisationIdAndEntityTypeInAndStatus(Long orgId, List<String> entityTypes, String status);
+
+    /** Active (non-terminal) requests anchored to any of the given entity types. */
+    @Query("SELECT COUNT(r) FROM EvidenceRequest r WHERE r.organisationId = :orgId " +
+           "AND r.entityType IN :types " +
+           "AND r.status NOT IN ('FULFILLED','SATISFIED','CLOSED','CANCELLED')")
+    long countActiveByOrgAndEntityTypes(@Param("orgId") Long orgId, @Param("types") List<String> types);
+
+    /** Overdue (past-due, unfulfilled, non-terminal) requests anchored to any of the given entity types. */
+    @Query("SELECT COUNT(r) FROM EvidenceRequest r WHERE r.organisationId = :orgId " +
+           "AND r.entityType IN :types AND r.dueDate IS NOT NULL AND r.dueDate < :today " +
+           "AND r.fulfilledAt IS NULL " +
+           "AND r.status NOT IN ('FULFILLED','SATISFIED','CLOSED','CANCELLED')")
+    long countOverdueByOrgAndEntityTypes(@Param("orgId") Long orgId,
+                                         @Param("types") List<String> types,
+                                         @Param("today") LocalDate today);
 }

@@ -14,6 +14,7 @@ import com.tss.grc.module.bcm.entity.CriticalProcess;
 import com.tss.grc.module.bcm.repository.BcmExerciseRepository;
 import com.tss.grc.module.bcm.repository.BiaRecordRepository;
 import com.tss.grc.module.bcm.repository.CriticalProcessRepository;
+import com.tss.grc.module.evidence.repository.EvidenceRequestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -60,6 +61,11 @@ public class BcmBoardPackService {
     private final CrisisEventRepository crises;
     private final CrisisRegulatoryNotificationRepository regNotifs;
     private final BcmReadinessScoreService readiness;
+    private final EvidenceRequestRepository evidenceRequests;
+
+    /** Entity types under which BCM raises evidence requests (mirrors the BCM UI surfaces). */
+    private static final List<String> BCM_EVIDENCE_TYPES = List.of(
+        "BCP_PLAN", "DR_PLAN", "CRISIS_EVENT", "BIA_ASSESSMENT", "BCM_GOVERNANCE", "BCM_CAPA");
 
     // ─── Public surface ──────────────────────────────────────────────
 
@@ -77,6 +83,7 @@ public class BcmBoardPackService {
             lastAar(org),
             activeCrises(org),
             recentRegulatorNotifications(org),
+            evidenceSnapshot(org),
             readinessHeadline()
         );
     }
@@ -244,6 +251,14 @@ public class BcmBoardPackService {
             .collect(Collectors.toList());
     }
 
+    /** Evidence-request posture for BCM-anchored entities — feeds task §12.16 dashboard tile. */
+    private EvidenceSnapshot evidenceSnapshot(Long org) {
+        long active   = evidenceRequests.countActiveByOrgAndEntityTypes(org, BCM_EVIDENCE_TYPES);
+        long overdue  = evidenceRequests.countOverdueByOrgAndEntityTypes(org, BCM_EVIDENCE_TYPES, LocalDate.now());
+        long rejected = evidenceRequests.countByOrganisationIdAndEntityTypeInAndStatus(org, BCM_EVIDENCE_TYPES, "REJECTED");
+        return new EvidenceSnapshot(active, overdue, rejected);
+    }
+
     private ReadinessHeadline readinessHeadline() {
         BcmReadinessScoreService.TenantScore s = readiness.tenantOverall();
         return new ReadinessHeadline(s.averageScore(), s.biaCount(), s.biasByCriticality());
@@ -269,6 +284,7 @@ public class BcmBoardPackService {
         AarSummary lastAar,                              // nullable
         ActiveCrisisSnapshot activeCrises,
         List<RegulatorNotificationRow> regulatorNotifications,
+        EvidenceSnapshot evidence,
         ReadinessHeadline readiness
     ) {}
 
@@ -300,6 +316,12 @@ public class BcmBoardPackService {
         long overdueCount,            // dueDate < today AND status != CLOSED
         long closedCount,
         Map<String, Long> byStatus    // full breakdown
+    ) {}
+
+    public record EvidenceSnapshot(
+        long activeOpenCount,         // non-terminal evidence requests on BCM entities
+        long overdueCount,            // past due + unfulfilled
+        long rejectedCount            // currently REJECTED — needs resubmission
     ) {}
 
     public record AarSummary(
