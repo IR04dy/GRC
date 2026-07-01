@@ -58,4 +58,18 @@ public interface KriMeasurementRepository extends JpaRepository<KriMeasurement, 
 
     long countByOrganisationIdAndStatusAndMeasuredAtAfterAndIsDeletedFalse(
             Long organisationId, String status, LocalDateTime since);
+
+    /**
+     * E-E consolidation: latest measurement per KRI for a set of KRI ids —
+     * {@code [kriId, status, value]} rows. One query instead of a per-KRI N+1,
+     * replacing the legacy {@code KriReadingRepository.findLatestReadingByKriIdIn}
+     * used by the board-pack / KRI-dashboard exporters.
+     */
+    @Query("""
+        SELECT m.kriId, m.status, m.value FROM KriMeasurement m
+        WHERE m.kriId IN :kriIds AND m.isDeleted = false
+          AND m.measuredAt = (SELECT MAX(m2.measuredAt) FROM KriMeasurement m2
+                              WHERE m2.kriId = m.kriId AND m2.isDeleted = false)
+        """)
+    List<Object[]> findLatestPerKriIn(@Param("kriIds") java.util.Collection<Long> kriIds);
 }

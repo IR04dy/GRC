@@ -15,10 +15,10 @@ import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
-import com.tss.grc.module.risk.entity.KriDefinition;
+import com.tss.grc.module.risk.kri.entity.KriDefinition;
 import com.tss.grc.module.risk.entity.Risk;
-import com.tss.grc.module.risk.repository.KriDefinitionRepository;
-import com.tss.grc.module.risk.repository.KriReadingRepository;
+import com.tss.grc.module.risk.kri.repository.KriDefinitionRepository;
+import com.tss.grc.module.risk.kri.repository.KriMeasurementRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
@@ -67,7 +67,7 @@ public class ExportService {
     private final RiskRepository riskRepo;
     private final AuditFindingRepository findingRepo;
     private final KriDefinitionRepository kriRepo;
-    private final KriReadingRepository readingRepo;
+    private final KriMeasurementRepository measRepo;
 
     // ── Risk Register ──────────────────────────────────────────────────────
 
@@ -184,7 +184,7 @@ public class ExportService {
         Organisation o = orgRepo.findById(org).orElse(null);
         boolean ar = "ar".equalsIgnoreCase(lang);
 
-        List<KriDefinition> kris = kriRepo.findByOrganisationIdOrderByCodeAsc(org, PageRequest.of(0, 200)).getContent();
+        List<KriDefinition> kris = kriRepo.findByOrganisationIdAndIsDeletedFalseOrderByKriCodeAsc(org);
 
         // QUAL-BCMP-006: one query for each KRI's latest reading instead of a
         // per-KRI N+1 loop. Key present ⇒ a reading exists; value [0]=band (may
@@ -223,14 +223,14 @@ public class ExportService {
 
                 for (KriDefinition k : kris) {
                     Object[] latest = latestByKri.get(k.getId());
-                    String name = ar && k.getNameAr() != null ? k.getNameAr() : k.getNameEn();
-                    cell(t, safe(k.getCode()));
+                    String name = ar && k.getTitleAr() != null ? k.getTitleAr() : k.getTitleEn();
+                    cell(t, safe(k.getKriCode()));
                     cell(t, safe(name));
                     cell(t, latest != null ? safe((String) latest[0]) : "—");
                     cell(t, latest != null ? ((BigDecimal) latest[1]).toPlainString() : "—");
-                    cell(t, k.getGreenMax() != null ? k.getGreenMax().toPlainString() : "—");
-                    cell(t, k.getAmberMax() != null ? k.getAmberMax().toPlainString() : "—");
-                    cell(t, safe(k.getOwner()));
+                    cell(t, k.getGreenThreshold() != null ? k.getGreenThreshold().toPlainString() : "—");
+                    cell(t, k.getAmberThreshold() != null ? k.getAmberThreshold().toPlainString() : "—");
+                    cell(t, k.getOwnerUserId() != null ? String.valueOf(k.getOwnerUserId()) : "—");
                 }
                 doc.add(t);
             });
@@ -317,7 +317,7 @@ public class ExportService {
         Map<Long, Object[]> out = new HashMap<>();
         List<Long> kriIds = kris.stream().map(KriDefinition::getId).toList();
         if (kriIds.isEmpty()) return out;
-        for (Object[] row : readingRepo.findLatestReadingByKriIdIn(kriIds)) {
+        for (Object[] row : measRepo.findLatestPerKriIn(kriIds)) {
             out.put((Long) row[0], new Object[]{ row[1], row[2] });
         }
         return out;
@@ -433,7 +433,7 @@ public class ExportService {
     @Transactional(readOnly = true)
     public byte[] kriDashboardXlsx() {
         Long org = TenantContext.getCurrentTenant();
-        List<KriDefinition> kris = kriRepo.findByOrganisationIdOrderByCodeAsc(org, PageRequest.of(0, 200)).getContent();
+        List<KriDefinition> kris = kriRepo.findByOrganisationIdAndIsDeletedFalseOrderByKriCodeAsc(org);
         // QUAL-BCMP-006: one query for each KRI's latest reading instead of a
         // per-KRI N+1 loop. Key present ⇒ a reading exists; value [0]=band (may
         // be null), [1]=readingValue.
@@ -454,19 +454,19 @@ public class ExportService {
             int rowIdx = 1;
             for (KriDefinition k : kris) {
                 Row row = sheet.createRow(rowIdx++);
-                row.createCell(0).setCellValue(safe(k.getCode()));
-                row.createCell(1).setCellValue(safe(k.getNameEn()));
-                row.createCell(2).setCellValue(safe(k.getDirection()));
-                if (k.getGreenMax() != null) row.createCell(3).setCellValue(k.getGreenMax().doubleValue());
-                if (k.getAmberMax() != null) row.createCell(4).setCellValue(k.getAmberMax().doubleValue());
+                row.createCell(0).setCellValue(safe(k.getKriCode()));
+                row.createCell(1).setCellValue(safe(k.getTitleEn()));
+                row.createCell(2).setCellValue(safe(k.getValueDirection()));
+                if (k.getGreenThreshold() != null) row.createCell(3).setCellValue(k.getGreenThreshold().doubleValue());
+                if (k.getAmberThreshold() != null) row.createCell(4).setCellValue(k.getAmberThreshold().doubleValue());
                 Object[] latest = latestByKri.get(k.getId());
                 if (latest != null) {
                     row.createCell(5).setCellValue(((BigDecimal) latest[1]).doubleValue());
                     row.createCell(6).setCellValue(safe((String) latest[0]));
                 }
                 row.createCell(7).setCellValue(safe(k.getFrequency()));
-                row.createCell(8).setCellValue(safe(k.getOwner()));
-                row.createCell(9).setCellValue(safe(k.getFramework()));
+                row.createCell(8).setCellValue(k.getOwnerUserId() != null ? String.valueOf(k.getOwnerUserId()) : "—");
+                row.createCell(9).setCellValue(safe(k.getClauseRef()));
             }
             // ── Sheet 2: Summary with formulas ───────────────
             Sheet summary = wb.createSheet("Summary");

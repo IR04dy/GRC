@@ -16,10 +16,10 @@ import com.tss.grc.module.ethics.repository.AmlAlertRepository;
 import com.tss.grc.module.ethics.repository.EthicsCaseRepository;
 import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
-import com.tss.grc.module.risk.entity.KriDefinition;
+import com.tss.grc.module.risk.kri.entity.KriDefinition;
 import com.tss.grc.module.risk.entity.Risk;
-import com.tss.grc.module.risk.repository.KriDefinitionRepository;
-import com.tss.grc.module.risk.repository.KriReadingRepository;
+import com.tss.grc.module.risk.kri.repository.KriDefinitionRepository;
+import com.tss.grc.module.risk.kri.repository.KriMeasurementRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -64,7 +64,7 @@ public class BoardPackService {
     private final RiskRepository riskRepo;
     private final AuditFindingRepository findingRepo;
     private final KriDefinitionRepository kriRepo;
-    private final KriReadingRepository readingRepo;
+    private final KriMeasurementRepository measRepo;
     private final FrameworkRepository frameworkRepo;
     private final PolicyFrameworkMappingRepository mappingRepo;
     private final ControlRepository controlRepo;
@@ -176,7 +176,7 @@ public class BoardPackService {
         long openFindings  = findingRepo.countOpenByOrganisationId(org);
         long totalFindings = findingRepo.countByOrganisationId(org);
 
-        long totalKris = kriRepo.countByOrganisationId(org);
+        long totalKris = kriRepo.countByOrganisationIdAndIsDeletedFalse(org);
         long totalControls = controlRepo.countByOrganisationId(org);
         long totalCases = caseRepo.countByOrganisationId(org);
 
@@ -298,15 +298,14 @@ public class BoardPackService {
 
     // ── Section: KRIs ───────────────────────────────────────────────────────
     private void renderKris(Document doc, Long org, boolean ar) throws DocumentException {
-        List<KriDefinition> kris = kriRepo.findByOrganisationIdOrderByCodeAsc(org, PageRequest.of(0, 200)).getContent();
+        List<KriDefinition> kris = kriRepo.findByOrganisationIdAndIsDeletedFalseOrderByKriCodeAsc(org);
 
-        // QUAL-BCMP-006: one query for each KRI's latest reading instead of a
-        // per-KRI N+1 loop. Key present ⇒ a reading exists; value [0]=band (may
-        // be null), [1]=readingValue. Mirrors findFirstByKriIdOrderByReadingAtDesc.
+        // one query for each KRI's latest measurement instead of a per-KRI N+1
+        // loop. Key present ⇒ a measurement exists; value [0]=status, [1]=value.
         Map<Long, Object[]> latestByKri = new HashMap<>();
         List<Long> kriIds = kris.stream().map(KriDefinition::getId).toList();
         if (!kriIds.isEmpty()) {
-            for (Object[] row : readingRepo.findLatestReadingByKriIdIn(kriIds)) {
+            for (Object[] row : measRepo.findLatestPerKriIn(kriIds)) {
                 latestByKri.put((Long) row[0], new Object[]{ row[1], row[2] });
             }
         }
@@ -336,13 +335,13 @@ public class BoardPackService {
         for (String h : hdr) t.addCell(headerCell(h, ar));
         for (KriDefinition k : kris) {
             Object[] latest = latestByKri.get(k.getId());
-            String name = ar && k.getNameAr() != null ? k.getNameAr() : k.getNameEn();
-            t.addCell(bodyCell(safe(k.getCode()), false));
+            String name = ar && k.getTitleAr() != null ? k.getTitleAr() : k.getTitleEn();
+            t.addCell(bodyCell(safe(k.getKriCode()), false));
             t.addCell(bodyCell(safe(name), ar));
             t.addCell(bodyCell(latest != null ? safe((String) latest[0]) : "—", false));
             t.addCell(bodyCell(latest != null ? ((BigDecimal) latest[1]).toPlainString() : "—", false));
-            t.addCell(bodyCell(k.getGreenMax() != null ? k.getGreenMax().toPlainString() : "—", false));
-            t.addCell(bodyCell(k.getAmberMax() != null ? k.getAmberMax().toPlainString() : "—", false));
+            t.addCell(bodyCell(k.getGreenThreshold() != null ? k.getGreenThreshold().toPlainString() : "—", false));
+            t.addCell(bodyCell(k.getAmberThreshold() != null ? k.getAmberThreshold().toPlainString() : "—", false));
         }
         doc.add(t);
     }

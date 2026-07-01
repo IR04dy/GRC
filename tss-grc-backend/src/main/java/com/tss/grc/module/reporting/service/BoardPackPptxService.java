@@ -9,11 +9,11 @@ import com.tss.grc.module.ethics.repository.AmlAlertRepository;
 import com.tss.grc.module.ethics.repository.EthicsCaseRepository;
 import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
-import com.tss.grc.module.risk.entity.KriDefinition;
-import com.tss.grc.module.risk.entity.KriReading;
+import com.tss.grc.module.risk.kri.entity.KriDefinition;
+import com.tss.grc.module.risk.kri.entity.KriMeasurement;
 import com.tss.grc.module.risk.entity.Risk;
-import com.tss.grc.module.risk.repository.KriDefinitionRepository;
-import com.tss.grc.module.risk.repository.KriReadingRepository;
+import com.tss.grc.module.risk.kri.repository.KriDefinitionRepository;
+import com.tss.grc.module.risk.kri.repository.KriMeasurementRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.sl.usermodel.TextParagraph;
@@ -61,7 +61,7 @@ public class BoardPackPptxService {
     private final RiskRepository riskRepo;
     private final AuditFindingRepository findingRepo;
     private final KriDefinitionRepository kriRepo;
-    private final KriReadingRepository readingRepo;
+    private final KriMeasurementRepository measRepo;
     private final ChangeRequestRepository changeRepo;
     private final EthicsCaseRepository caseRepo;
     private final AmlAlertRepository amlRepo;
@@ -124,7 +124,7 @@ public class BoardPackPptxService {
         long criticalRisks = riskRepo.countByOrganisationIdAndRiskLevel(org, "CRITICAL");
         long openFindings  = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent()
             .stream().filter(f -> !"CLOSED".equals(f.getStatus())).count();
-        long totalKris     = kriRepo.countByOrganisationId(org);
+        long totalKris     = kriRepo.countByOrganisationIdAndIsDeletedFalse(org);
         long totalCases    = caseRepo.countByOrganisationId(org);
         long strs          = amlRepo.countByOrganisationIdAndStrFiled(org, true);
 
@@ -211,11 +211,11 @@ public class BoardPackPptxService {
         XSLFSlide s = ppt.createSlide();
         slideHeader(s, ar ? "مؤشرات المخاطر" : "Key Risk Indicators", ar);
 
-        List<KriDefinition> kris = kriRepo.findByOrganisationIdOrderByCodeAsc(org, PageRequest.of(0, 200)).getContent();
+        List<KriDefinition> kris = kriRepo.findByOrganisationIdAndIsDeletedFalseOrderByKriCodeAsc(org);
         long green = 0, amber = 0, red = 0, noData = 0;
         for (KriDefinition k : kris) {
-            String latestBand = readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId())
-                .map(KriReading::getBand).orElse(null);
+            String latestBand = measRepo.findFirstByOrganisationIdAndKriIdAndIsDeletedFalseOrderByMeasuredAtDesc(org, k.getId())
+                .map(KriMeasurement::getStatus).orElse(null);
             if (latestBand == null) noData++;
             else if ("GREEN".equals(latestBand)) green++;
             else if ("AMBER".equals(latestBand)) amber++;
@@ -251,12 +251,12 @@ public class BoardPackPptxService {
             : new String[]{ "Code", "KRI",    "Band",   "Latest" };
         for (int i = 0; i < rowCount; i++) {
             KriDefinition k = kris.get(i);
-            KriReading latest = readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId()).orElse(null);
+            KriMeasurement latest = measRepo.findFirstByOrganisationIdAndKriIdAndIsDeletedFalseOrderByMeasuredAtDesc(org, k.getId()).orElse(null);
             rows[i + 1] = new String[]{
-                safe(k.getCode()),
-                ar && k.getNameAr() != null ? k.getNameAr() : k.getNameEn(),
-                latest != null ? safe(latest.getBand()) : "—",
-                latest != null ? latest.getReadingValue().toPlainString() : "—",
+                safe(k.getKriCode()),
+                ar && k.getTitleAr() != null ? k.getTitleAr() : k.getTitleEn(),
+                latest != null ? safe(latest.getStatus()) : "—",
+                latest != null ? latest.getValue().toPlainString() : "—",
             };
         }
         addTable(s, rows, new double[]{ 0.15, 0.55, 0.15, 0.15 }, new Rectangle(60, 240, 840, 250));

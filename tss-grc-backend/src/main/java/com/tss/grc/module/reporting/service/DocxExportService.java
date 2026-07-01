@@ -6,11 +6,11 @@ import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
-import com.tss.grc.module.risk.entity.KriDefinition;
-import com.tss.grc.module.risk.entity.KriReading;
+import com.tss.grc.module.risk.kri.entity.KriDefinition;
+import com.tss.grc.module.risk.kri.entity.KriMeasurement;
 import com.tss.grc.module.risk.entity.Risk;
-import com.tss.grc.module.risk.repository.KriDefinitionRepository;
-import com.tss.grc.module.risk.repository.KriReadingRepository;
+import com.tss.grc.module.risk.kri.repository.KriDefinitionRepository;
+import com.tss.grc.module.risk.kri.repository.KriMeasurementRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.xwpf.usermodel.*;
@@ -46,7 +46,7 @@ public class DocxExportService {
     private final RiskRepository riskRepo;
     private final AuditFindingRepository findingRepo;
     private final KriDefinitionRepository kriRepo;
-    private final KriReadingRepository readingRepo;
+    private final KriMeasurementRepository measRepo;
 
     // ── Risk Register ──────────────────────────────────────────────────────
 
@@ -160,11 +160,11 @@ public class DocxExportService {
         Organisation o = orgRepo.findById(org).orElse(null);
         boolean ar = "ar".equalsIgnoreCase(lang);
 
-        List<KriDefinition> kris = kriRepo.findByOrganisationIdOrderByCodeAsc(org, PageRequest.of(0, 200)).getContent();
+        List<KriDefinition> kris = kriRepo.findByOrganisationIdAndIsDeletedFalseOrderByKriCodeAsc(org);
         long green = 0, amber = 0, red = 0, noData = 0;
         for (KriDefinition k : kris) {
-            String band = readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId())
-                .map(KriReading::getBand).orElse(null);
+            String band = measRepo.findFirstByOrganisationIdAndKriIdAndIsDeletedFalseOrderByMeasuredAtDesc(org, k.getId())
+                .map(KriMeasurement::getStatus).orElse(null);
             if (band == null) noData++;
             else if ("GREEN".equalsIgnoreCase(band)) green++;
             else if ("AMBER".equalsIgnoreCase(band)) amber++;
@@ -189,16 +189,16 @@ public class DocxExportService {
             XWPFTable t = newTable(doc, hdr, ar);
 
             for (KriDefinition k : kris) {
-                KriReading latest = readingRepo.findFirstByKriIdOrderByReadingAtDesc(k.getId()).orElse(null);
-                String name = ar && k.getNameAr() != null ? k.getNameAr() : k.getNameEn();
+                KriMeasurement latest = measRepo.findFirstByOrganisationIdAndKriIdAndIsDeletedFalseOrderByMeasuredAtDesc(org, k.getId()).orElse(null);
+                String name = ar && k.getTitleAr() != null ? k.getTitleAr() : k.getTitleEn();
                 XWPFTableRow row = t.createRow();
-                setCell(row, 0, safe(k.getCode()), ar);
+                setCell(row, 0, safe(k.getKriCode()), ar);
                 setCell(row, 1, safe(name), ar);
-                setCell(row, 2, latest != null ? safe(latest.getBand()) : "—", ar);
-                setCell(row, 3, latest != null ? latest.getReadingValue().toPlainString() : "—", ar);
-                setCell(row, 4, k.getGreenMax() != null ? k.getGreenMax().toPlainString() : "—", ar);
-                setCell(row, 5, k.getAmberMax() != null ? k.getAmberMax().toPlainString() : "—", ar);
-                setCell(row, 6, safe(k.getOwner()), ar);
+                setCell(row, 2, latest != null ? safe(latest.getStatus()) : "—", ar);
+                setCell(row, 3, latest != null ? latest.getValue().toPlainString() : "—", ar);
+                setCell(row, 4, k.getGreenThreshold() != null ? k.getGreenThreshold().toPlainString() : "—", ar);
+                setCell(row, 5, k.getAmberThreshold() != null ? k.getAmberThreshold().toPlainString() : "—", ar);
+                setCell(row, 6, k.getOwnerUserId() != null ? String.valueOf(k.getOwnerUserId()) : "—", ar);
             }
             return bytes(doc);
         } catch (Exception e) {
