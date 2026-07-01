@@ -42,4 +42,15 @@ public interface KriDefinitionRepository extends JpaRepository<KriDefinition, Lo
 
     List<KriDefinition> findByOrganisationIdAndCategoryAndIsDeletedFalseOrderByKriCodeAsc(
             Long organisationId, String category);
+
+    // ── E-E consolidation: compliance ↔ KRI crosswalk (replaces the legacy
+    //    engine's framework_id finders used by FrameworkAnchorService). ──
+    long countByOrganisationIdAndLinkedFrameworkIdAndIsDeletedFalse(
+            Long organisationId, Long linkedFrameworkId);
+
+    List<KriDefinition> findByOrganisationIdAndLinkedFrameworkIdAndIsDeletedFalseOrderByKriCodeAsc(
+            Long organisationId, Long linkedFrameworkId);
+
+    /** Board-pack / export totals (replaces legacy countByOrganisationId). */
+    long countByOrganisationIdAndIsDeletedFalse(Long organisationId);
 }

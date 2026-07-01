@@ -13,9 +13,9 @@ import com.tss.grc.module.compliance.repository.PolicyFrameworkMappingRepository
 import com.tss.grc.module.compliance.repository.PolicyRepository;
 import com.tss.grc.module.privacy.entity.Dpia;
 import com.tss.grc.module.privacy.repository.DpiaRepository;
-import com.tss.grc.module.risk.entity.KriDefinition;
+import com.tss.grc.module.risk.kri.entity.KriDefinition;
 import com.tss.grc.module.risk.entity.Risk;
-import com.tss.grc.module.risk.repository.KriDefinitionRepository;
+import com.tss.grc.module.risk.kri.repository.KriDefinitionRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -177,7 +177,7 @@ public class FrameworkAnchorService {
             r.put("implementedControls", implemented);
             r.put("avgMaturity",    avgMaturity);
             r.put("dpiaCount",      dpiaRepo.countByOrganisationIdAndFrameworkId(org, f.getId()));
-            r.put("kriCount",       kriRepo.countByOrganisationIdAndFrameworkId(org, f.getId()));
+            r.put("kriCount",       kriRepo.countByOrganisationIdAndLinkedFrameworkIdAndIsDeletedFalse(org, f.getId()));
             // Risk count = union of risks tagged on either dimension
             long riskAsRiskFw = riskRepo.countByOrganisationIdAndRiskFrameworkId(org, f.getId());
             long riskAsCompFw = riskRepo.countByOrganisationIdAndComplianceFrameworkId(org, f.getId());
@@ -211,20 +211,21 @@ public class FrameworkAnchorService {
 
     public List<Map<String, Object>> krisForFramework(Long id) {
         Long org = TenantContext.getCurrentTenant();
-        List<KriDefinition> kris = kriRepo.findByOrganisationIdAndFrameworkId(org, id);
+        List<KriDefinition> kris = kriRepo.findByOrganisationIdAndLinkedFrameworkIdAndIsDeletedFalseOrderByKriCodeAsc(org, id);
         List<Map<String, Object>> out = new ArrayList<>();
         for (KriDefinition k : kris) {
             Map<String, Object> row = new HashMap<>();
+            // Keys preserved for the frontend; values mapped to canonical KRI fields.
             row.put("id",          k.getId());
-            row.put("code",        k.getCode());
-            row.put("nameEn",      k.getNameEn());
-            row.put("nameAr",      k.getNameAr());
-            row.put("unit",        k.getUnit());
-            row.put("direction",   k.getDirection());
-            row.put("greenMax",    k.getGreenMax());
-            row.put("amberMax",    k.getAmberMax());
+            row.put("code",        k.getKriCode());
+            row.put("nameEn",      k.getTitleEn());
+            row.put("nameAr",      k.getTitleAr());
+            row.put("unit",        k.getMeasurementUnit());
+            row.put("direction",   k.getValueDirection());
+            row.put("greenMax",    k.getGreenThreshold());
+            row.put("amberMax",    k.getAmberThreshold());
             row.put("frequency",   k.getFrequency());
-            row.put("owner",       k.getOwner());
+            row.put("owner",       k.getOwnerUserId());
             row.put("clauseRef",   k.getClauseRef());
             out.add(row);
         }
