@@ -35,9 +35,9 @@ import java.util.Objects;
  * change to one no longer pulls the others' repos into scope. Behaviour is
  * unchanged.
  *
- * <p>§5.1 #5 KRI band engine is ALREADY DONE by the legacy KriEngineService +
- * KriAppetiteController; this service stays focused on the genuinely missing
- * pieces.
+ * <p>§5.1 #5 KRI band engine is ALREADY DONE by the canonical KRI engine
+ * (module.risk.kri — KriController at /api/v1/risk/kri/*); this service stays
+ * focused on the genuinely missing pieces.
  */
 @Service
 @RequiredArgsConstructor

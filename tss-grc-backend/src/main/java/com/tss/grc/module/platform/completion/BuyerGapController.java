@@ -53,10 +53,10 @@ public class BuyerGapController {
 
     // ── ERM record ─────────────────────────────────────────────
     //
-    // POST /api/v1/risk/kris/{id}/readings is already served by the existing
-    // KriAppetiteController + KriEngineService (which also creates breach
-    // events). The buyer doc's §5.1 #2 KRI engine ask is therefore already
-    // closed by the legacy path — we don't redeclare it here. The new
+    // KRI measurement recording is served by the canonical KRI engine
+    // (KriController — POST /api/v1/risk/kri/{externalId}/measurements, which
+    // also opens/escalates breach rows). The buyer doc's §5.1 #2 KRI engine ask
+    // is therefore already closed — we don't redeclare it here. The new
     // bundle keeps risk-control linkage + appetite variance + evidence
     // freshness + privacy at-risk transfers.
 
