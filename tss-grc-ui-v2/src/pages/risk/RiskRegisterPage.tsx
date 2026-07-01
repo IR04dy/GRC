@@ -21,7 +21,8 @@ import { FilterModal, distinctValues, type FilterField } from '../../components/
 import { SavedViewSelector } from '../../components/ui/SavedViewSelector';
 import { defaultViewForPage, type SavedView } from '../../lib/savedViews';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
-import { riskApi, ermAdvancedApi, reportingApi, ApiError, type RiskResponse, type KriDefinitionDto, type KriBreachEventDto, type RiskAppetiteStatementDto, type AppetiteBreachEventDto } from '../../lib/api';
+import { riskApi, ermAdvancedApi, reportingApi, ApiError, type RiskResponse, type KriDefinitionDto, type RiskAppetiteStatementDto, type AppetiteBreachEventDto } from '../../lib/api';
+import { kriApi } from '../../lib/kriEngine';
 import { usePromoted } from '../../lib/promotedRecords';
 import { toRiskResponse, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
@@ -535,44 +536,47 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
   const { t } = useI18n();
   const [kris, setKris] = useState<KriDefinitionDto[]>([]);
   const [latest, setLatest] = useState<Record<number, string>>({});
-  const [breaches, setBreaches] = useState<Record<number, KriBreachEventDto[]>>({});
+  // open-breach COUNT per KRI id (render only uses the count)
+  const [breaches, setBreaches] = useState<Record<number, number>>({});
+  const [extIdById, setExtIdById] = useState<Record<number, string>>({});
   const [stats, setStats] = useState<{ totalKris: number; green: number; amber: number; red: number; noData: number; openBreaches: number } | null>(null);
   const [loading, setLoading] = useState(false);
 
   function applyMock() {
     setKris(KRIS); setStats(KRI_DASHBOARD_STATS);
-    setLatest(KRI_LATEST_BANDS); setBreaches(KRI_BREACHES);
+    setLatest(KRI_LATEST_BANDS);
+    setBreaches(Object.fromEntries(Object.entries(KRI_BREACHES)
+      .map(([id, arr]) => [Number(id), arr.filter(b => b.status !== 'RESOLVED').length])));
   }
 
   async function loadAll() {
     if (demoMode) { applyMock(); return; }
     setLoading(true);
     try {
-      const [page, dash] = await Promise.all([
-        ermAdvancedApi.kris(0, 100),
-        ermAdvancedApi.kriDashboard(),
+      // E-E: read the canonical KRI engine (/api/v1/risk/kri/*). The definition
+      // list already carries latestStatus/latestValue, so no per-KRI reading call.
+      const [defs, dash] = await Promise.all([
+        kriApi.listDefinitions(),
+        kriApi.dashboard(),
       ]);
-      const list = page.content ?? [];
       // Backend has no KRIs yet — fall back to the demo catalogue so the
       // dashboard never reads zeros on a fresh tenant.
-      if (list.length === 0) { applyMock(); return; }
-      setKris(list);
-      setStats(dash);
-      // Pull latest reading per KRI in parallel
-      const bandMap: Record<number, string> = {};
-      const breachMap: Record<number, KriBreachEventDto[]> = {};
-      await Promise.all(list.map(async k => {
-        try {
-          const [r, b] = await Promise.all([
-            ermAdvancedApi.readings(k.id),
-            ermAdvancedApi.breaches(k.id),
-          ]);
-          bandMap[k.id] = r[0]?.band ?? 'NO_DATA';
-          breachMap[k.id] = b.filter(x => x.status !== 'RESOLVED');
-        } catch { /* ignore per-KRI failure */ }
-      }));
-      setLatest(bandMap);
-      setBreaches(breachMap);
+      if (defs.length === 0) { applyMock(); return; }
+      // Map canonical → this panel's (legacy-shaped) view model.
+      setKris(defs.map(d => ({
+        id: d.id, code: d.kriCode, nameEn: d.titleEn, nameAr: d.titleAr,
+        unit: d.measurementUnit, direction: d.valueDirection,
+        greenMax: d.greenThreshold, amberMax: d.amberThreshold, targetValue: d.targetValue,
+        frequency: d.frequency, owner: d.ownerUserId != null ? String(d.ownerUserId) : undefined,
+        framework: d.clauseRef ?? undefined, isActive: d.isActive,
+      })));
+      setExtIdById(Object.fromEntries(defs.map(d => [d.id, d.externalId])));
+      setLatest(Object.fromEntries(defs.map(d => [d.id, d.latestStatus ?? 'NO_DATA'])));
+      setStats({ totalKris: dash.totalKris, green: dash.greenCount, amber: dash.amberCount,
+        red: dash.redCount, noData: dash.naCount, openBreaches: dash.openBreachAmber + dash.openBreachRed });
+      const bc: Record<number, number> = {};
+      dash.openBreaches.forEach(b => { bc[b.kriId] = (bc[b.kriId] ?? 0) + 1; });
+      setBreaches(bc);
     } catch { applyMock(); }
     finally { setLoading(false); }
   }
@@ -581,14 +585,16 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
 
   const toast = useToast();
   async function recordReading(k: KriDefinitionDto) {
+    const ext = extIdById[k.id];
+    if (!ext) { toast.danger('KRI not found'); return; }
     const v = window.prompt(`Enter reading for "${k.nameEn}" (${k.unit ?? ''}):`, '');
     if (v === null) return;
     const num = Number(v);
     if (Number.isNaN(num)) { toast.danger('Invalid number'); return; }
     const notes = window.prompt('Notes (optional)?', '') ?? '';
     try {
-      const out = await ermAdvancedApi.recordReading(k.id, num, notes);
-      toast.success(`Reading recorded — band ${out.band}` + (out.breachCreated ? ' (breach raised)' : ''));
+      const out = await kriApi.recordMeasurement(ext, { value: num, notesEn: notes || undefined });
+      toast.success(`Reading recorded — status ${out.status}`);
       void loadAll();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
   }
@@ -616,7 +622,7 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
               {kris.map(k => {
                 const band = latest[k.id] ?? 'NO_DATA';
                 const tone = BAND_TONE[band] ?? 'neutral';
-                const openBreaches = (breaches[k.id] ?? []).length;
+                const openBreaches = breaches[k.id] ?? 0;
                 return (
                   <Card key={k.id} title={k.code ? `${k.code} · ${k.nameEn}` : k.nameEn} Icon={Activity}
                     action={<Badge tone={tone} dot>{band.replace('NO_DATA', 'No data')}</Badge>}>

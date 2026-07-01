@@ -13,6 +13,7 @@ import { LineChart } from '../../components/charts/LineChart';
 import { RiskMatrix5x5, type RiskMovement } from '../../components/viz/RiskMatrix5x5';
 import { useI18n } from '../../lib/i18n';
 import { dashboardApi, ermAdvancedApi, riskApi, type DashboardStats, ApiError } from '../../lib/api';
+import { kriApi } from '../../lib/kriEngine';
 import { isAuthenticated } from '../../lib/auth';
 
 /**
@@ -57,7 +58,8 @@ export function ErmDashboardPage() {
         dashboardApi.stats(),
         dashboardApi.heatmap() as Promise<{ cells: HeatmapCell[] }>,
         dashboardApi.riskByCategory() as Promise<CategoryBucket>,
-        ermAdvancedApi.kriDashboard(),
+        kriApi.dashboard().then(d => ({ totalKris: d.totalKris, green: d.greenCount, amber: d.amberCount,
+          red: d.redCount, noData: d.naCount, openBreaches: d.openBreachAmber + d.openBreachRed })),
         ermAdvancedApi.appetiteDashboard().catch(() => null),
         dashboardApi.kpiTrend('risks', 12).catch(() => []),
         dashboardApi.kpiTrend('critical_risks', 12).catch(() => []),

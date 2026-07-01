@@ -69,6 +69,8 @@ export interface KriDefinitionResponse {
   sourceQuery?: string;
   ownerUserId?: number;
   linkedRiskId?: number;
+  linkedFrameworkId?: number;
+  clauseRef?: string;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;

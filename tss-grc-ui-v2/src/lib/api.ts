@@ -952,19 +952,8 @@ export interface AppetiteBreachEventDto {
 }
 
 export const ermAdvancedApi = {
-  // KRIs
-  kris:        (page = 0, size = 50) => api.get<PageResponse<KriDefinitionDto>>(`/api/v1/risk/kris${pageQ(page, size)}`),
-  getKri:      (id: number) => api.get<KriDefinitionDto>(`/api/v1/risk/kris/${id}`),
-  createKri:   (body: Partial<KriDefinitionDto>) => api.post<KriDefinitionDto>('/api/v1/risk/kris', body),
-  updateKri:   (id: number, body: Partial<KriDefinitionDto>) => api.put<KriDefinitionDto>(`/api/v1/risk/kris/${id}`, body),
-  deleteKri:   (id: number) => api.delete<void>(`/api/v1/risk/kris/${id}`),
-  recordReading: (id: number, value: number, notes?: string) =>
-                 api.post<{ readingId: number; band: string; previousBand: string; breachCreated: boolean; breachId?: number }>(`/api/v1/risk/kris/${id}/readings`, { value, notes }),
-  readings:    (id: number) => api.get<KriReadingDto[]>(`/api/v1/risk/kris/${id}/readings`),
-  breaches:    (id: number) => api.get<KriBreachEventDto[]>(`/api/v1/risk/kris/${id}/breaches`),
-  ackBreach:   (breachId: number, userId?: number) => api.post<KriBreachEventDto>(`/api/v1/risk/kris/breaches/${breachId}/acknowledge`, { userId }),
-  resolveBreach: (breachId: number, notes?: string) => api.post<KriBreachEventDto>(`/api/v1/risk/kris/breaches/${breachId}/resolve`, { notes }),
-  kriDashboard: () => api.get<{ totalKris: number; green: number; amber: number; red: number; noData: number; openBreaches: number }>('/api/v1/risk/kris/dashboard'),
+  // KRIs — retired (ERM epic E-E). The canonical KRI engine is the single
+  // source of truth: use `kriApi` in lib/kriEngine.ts (/api/v1/risk/kri/*).
   // Appetite
   appetites:   (page = 0, size = 50) => api.get<PageResponse<RiskAppetiteStatementDto>>(`/api/v1/risk/appetite${pageQ(page, size)}`),
   getAppetite: (id: number) => api.get<RiskAppetiteStatementDto>(`/api/v1/risk/appetite/${id}`),
