@@ -42,4 +42,17 @@ public interface TreatmentPlanRepository extends JpaRepository<TreatmentPlan, Lo
     /** PERF-NQ-007: count for the next-external-id generator — replaces loading
      *  every plan (and, when actions was EAGER, every plan's actions) just to size(). */
     long countByOrganisationId(Long organisationId);
+
+    /**
+     * Highest external-id sequence for an org within a year-prefix, across ALL
+     * rows (including soft-deleted). Native + no {@code @Where} filter on purpose:
+     * the {@code uk_tp_external (organisation_id, external_id)} unique index also
+     * counts soft-deleted rows, so a count-of-live-rows generator collides after
+     * any delete. Deriving the next number from MAX(suffix) here is collision-safe.
+     */
+    @Query(value = "SELECT MAX(TRY_CAST(RIGHT(external_id, 3) AS INT)) "
+                 + "FROM risk_lc.treatment_plans "
+                 + "WHERE organisation_id = :orgId AND external_id LIKE :prefix",
+           nativeQuery = true)
+    Integer findMaxExternalIdSeq(@Param("orgId") Long orgId, @Param("prefix") String prefix);
 }

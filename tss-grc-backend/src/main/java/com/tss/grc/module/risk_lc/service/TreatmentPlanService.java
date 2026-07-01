@@ -194,11 +194,17 @@ public class TreatmentPlanService {
             "Treatment plan soft-deleted: " + nullSafeMsg(p.getExternalId()));
     }
 
-    /** TP-2026-001 generator. */
+    /** TP-2026-001 generator.
+     *
+     * <p>Collision-safe: derives the next sequence from the MAX existing suffix
+     * for the org+year across ALL rows (incl. soft-deleted), not a count of live
+     * rows. A count-based generator ({@code count(live)+1}) collides after any
+     * soft-delete, because the {@code uk_tp_external} unique index still counts
+     * the deleted row's external_id — which was surfacing as a 500 on create. */
     private String generateExternalId(Long orgId) {
-        // PERF-NQ-007: count via the DB instead of loading every plan (and its
-        // actions) just to call size().
-        long count = repo.countByOrganisationId(orgId);
-        return String.format("TP-%d-%03d", LocalDateTime.now().getYear(), count + 1);
+        int year = LocalDateTime.now().getYear();
+        Integer maxSeq = repo.findMaxExternalIdSeq(orgId, "TP-" + year + "-%");
+        long next = (maxSeq == null ? 0 : maxSeq) + 1;
+        return String.format("TP-%d-%03d", year, next);
     }
 }
