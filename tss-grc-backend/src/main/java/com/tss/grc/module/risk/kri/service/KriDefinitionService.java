@@ -229,6 +229,8 @@ public class KriDefinitionService {
         if (req.sourceQuery() != null)     d.setSourceQuery(req.sourceQuery());
         if (req.ownerUserId() != null)     d.setOwnerUserId(req.ownerUserId());
         if (req.linkedRiskId() != null)    d.setLinkedRiskId(req.linkedRiskId());
+        if (req.linkedFrameworkId() != null) d.setLinkedFrameworkId(req.linkedFrameworkId());
+        if (req.clauseRef() != null)       d.setClauseRef(req.clauseRef());
     }
 
     private String generateCode(Long orgId, String category) {

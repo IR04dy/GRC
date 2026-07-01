@@ -108,6 +108,16 @@ public class KriDefinition extends BaseEntity {
     @Column(name = "linked_risk_id")
     private Long linkedRiskId;
 
+    /** Soft FK to compliance.frameworks — IA-5 anchor (migrated from the legacy
+     *  KRI engine's framework_id during E-E consolidation; drives the
+     *  compliance ↔ KRI crosswalk on FrameworkAnchorService). */
+    @Column(name = "linked_framework_id")
+    private Long linkedFrameworkId;
+
+    /** Framework clause reference (e.g. "ECC-1-3-1") — display anchor for the crosswalk. */
+    @Column(name = "clause_ref", length = 100)
+    private String clauseRef;
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = Boolean.TRUE;
 }

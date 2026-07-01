@@ -52,6 +52,7 @@ class KriControllerTest {
                 new BigDecimal("200"), new BigDecimal("200"),
                 "DAILY", "SQL", null,
                 null, null,
+                null, null,
                 Boolean.TRUE,
                 LocalDateTime.now(), null,
                 null, null, null);
@@ -85,7 +86,7 @@ class KriControllerTest {
                 new BigDecimal("50"), new BigDecimal("50"),
                 new BigDecimal("200"), new BigDecimal("200"),
                 "DAILY", "SQL", null,
-                null, null, Boolean.TRUE);
+                null, null, null, null, Boolean.TRUE);
         ResponseEntity<KriDefinitionResponse> resp = controller.createDefinition(req);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(resp.getBody()).isNotNull();

@@ -40,6 +40,8 @@ public final class KriDtos {
             String sourceQuery,
             Long ownerUserId,
             Long linkedRiskId,
+            Long linkedFrameworkId,
+            String clauseRef,
             Boolean isActive
     ) {}
 
@@ -64,6 +66,8 @@ public final class KriDtos {
             String sourceQuery,
             Long ownerUserId,
             Long linkedRiskId,
+            Long linkedFrameworkId,
+            String clauseRef,
             Boolean isActive,
             LocalDateTime createdAt,
             LocalDateTime updatedAt,
@@ -83,6 +87,7 @@ public final class KriDtos {
                     d.getRedThreshold(),
                     d.getFrequency(), d.getSourceQueryType(), d.getSourceQuery(),
                     d.getOwnerUserId(), d.getLinkedRiskId(),
+                    d.getLinkedFrameworkId(), d.getClauseRef(),
                     d.getIsActive(),
                     d.getCreatedAt(), d.getUpdatedAt(),
                     latest == null ? null : latest.getValue(),
