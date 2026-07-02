@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Leaf, TrendingDown, TrendingUp, Target, Calculator, FileText, Truck,
   Download, Trash2, CheckCircle2, AlertCircle, Building2,
@@ -98,22 +99,28 @@ import {
   type OrganisationSettings as SustSettings,
 } from '../../lib/sustainabilitySettings';
 import {
-  EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
-  aggregateEsg,
+  EMISSION_FACTORS,
   loadCalcEntries, appendCalcEntry, deleteCalcEntry,
   subscribeEsg, buildEsgAnnex,
-  type CalculatorEntry,
+  type CalculatorEntry, type EsgStats,
 } from '../../lib/esg';
 // S-O — Vendor ESG surveillance reads the real backend (was VENDOR_SURVEYS mock).
 import {
   vendorEsgApi, SURVEY_TONE, SURVEY_LABEL,
   type VendorEsgSurvey,
 } from '../../lib/vendorEsg';
+// S-P — Overview KPIs + trend chart read the live dashboard/trajectory API
+// (was the aggregateEsg / EMISSIONS_TIMESERIES mock).
+import {
+  esgDashboardApi, mapDashboardToStats, EMPTY_ESG_STATS,
+  esgTrajectoryApi, mapTrajectory, isEsgTab,
+  type EsgTab, type EsgTrajectoryPoint,
+} from '../../lib/esgDashboard';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import { formatSarCompact, formatSarFull } from '../../lib/format';
 import '../../styles/pages/esg.css';
 
-type EsgTab = 'overview' | 'annex' | 'capa' | 'calculator' | 'cma' | 'tcfd' | 'materiality' | 'metrics' | 'evidence' | 'sgi' | 'ghg' | 'climate' | 'survey' | 'settings';
+// EsgTab + isEsgTab are imported from lib/esgDashboard (single source of truth for the tab ids).
 
 /**
  * EsgPage — Sprint 6 (C2) + production hardening.
@@ -130,13 +137,28 @@ type EsgTab = 'overview' | 'annex' | 'capa' | 'calculator' | 'cma' | 'tcfd' | 'm
 export function EsgPage() {
   const { t } = useI18n();
   const toast = useToast();
-  const [tab, setTab] = useState<EsgTab>('overview');
+  // S-P — deep-linkable tabs: initial tab from ?tab=, written back on change.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab');
+  const [tab, setTabState] = useState<EsgTab>(isEsgTab(initialTab) ? initialTab : 'overview');
+  const setTab = (next: EsgTab) => {
+    setTabState(next);
+    const sp = new URLSearchParams(searchParams);
+    sp.set('tab', next);
+    setSearchParams(sp, { replace: true });
+  };
 
   // Reactive state
-  const [stats, setStats] = useState(() => aggregateEsg());
+  // S-P — Overview KPIs from the live dashboard aggregate (kills the aggregateEsg mock).
+  const REPORT_YEAR = 2025;
+  const [stats, setStats] = useState<EsgStats>(EMPTY_ESG_STATS);
+  useEffect(() => {
+    esgDashboardApi.get(REPORT_YEAR)
+      .then(d => setStats(mapDashboardToStats(d)))
+      .catch(() => { /* keep the zeroed placeholder on failure — no mock fallback */ });
+  }, []);
   const [calcEntries, setCalcEntries] = useState<CalculatorEntry[]>(() => loadCalcEntries());
   useEffect(() => subscribeEsg(() => {
-    setStats(aggregateEsg());
     setCalcEntries(loadCalcEntries());
   }), []);
 
@@ -149,7 +171,7 @@ export function EsgPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ESG-Annex-${CURRENT_YEAR_RECORD.year}.txt`;
+    a.download = `ESG-Annex-${REPORT_YEAR}.txt`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast.success(t('esgAnnexDownloadedToast'));
@@ -1313,17 +1335,31 @@ function MaterialityMatrixWidget({ data, isAr }: { data: DashboardPayload; isAr:
 }
 
 function EmissionsTrendChart({ isAr }: { isAr: boolean }) {
-  // Preserve the existing visual chart from EMISSIONS_TIMESERIES so the
-  // multi-year trend story is retained even though the rest of the
-  // dashboard pulls from live aggregates.
-  const maxTotal = Math.max(...EMISSIONS_TIMESERIES.map(r => r.scope1 + r.scope2 + r.scope3));
+  // S-P — live multi-year trajectory from /ghg/trajectory (was the
+  // EMISSIONS_TIMESERIES mock). Only years with real records are plotted.
+  const [series, setSeries] = useState<EsgTrajectoryPoint[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    esgTrajectoryApi.get(2020, 2025)
+      .then(r => setSeries(mapTrajectory(r).filter(p => p.scope1 + p.scope2 + p.scope3 > 0)))
+      .catch(() => setSeries([]))
+      .finally(() => setLoaded(true));
+  }, []);
+  if (loaded && series.length === 0) {
+    return (
+      <div className="esg-text-eyebrow-sm">
+        {isAr ? 'لا توجد بيانات انبعاثات مسجّلة بعد.' : 'No emissions data recorded yet.'}
+      </div>
+    );
+  }
+  const maxTotal = Math.max(1, ...series.map(r => r.scope1 + r.scope2 + r.scope3));
   return (
     <>
       <div className="esg-text-eyebrow-sm">
         {isAr ? 'الانبعاثات الإجمالية مكدّسة بالنطاقات عبر السنوات.' : 'Total emissions stacked by scope across years.'}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${EMISSIONS_TIMESERIES.length}, 1fr)`, gap: 12, alignItems: 'end', height: 220 }}>
-        {EMISSIONS_TIMESERIES.map(r => {
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, series.length)}, 1fr)`, gap: 12, alignItems: 'end', height: 220 }}>
+        {series.map(r => {
           const total = r.scope1 + r.scope2 + r.scope3;
           const heightPct = (total / maxTotal) * 100;
           const s1Pct = (r.scope1 / total) * 100;

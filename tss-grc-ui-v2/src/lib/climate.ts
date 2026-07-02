@@ -14,7 +14,7 @@
 // stages. The page reads these directly — no on-screen string lives in
 // just one language.
 
-import { api } from './api';
+import { api, downloadFile } from './api';
 import type { BadgeTone } from '../components/ui/Badge';
 
 // ─── TCFD scenarios ────────────────────────────────────────────────
@@ -430,4 +430,19 @@ export function getTargetProgress(): Promise<TargetProgress[]> {
 // Annual report.
 export function getAnnualReport(year: number): Promise<AnnualClimateReport> {
   return api.get<AnnualClimateReport>(`${REPORT}/annual?year=${year}`);
+}
+
+// S-P — real PDF export: persist a DRAFT snapshot of the pack (S-G), then
+// download its Arabic-capable OpenPDF export. Replaces the client-side stub.
+export interface PersistedClimateReport {
+  id: number;
+  reportCode?: string;
+  status?: string;
+  reportingYear?: number;
+}
+export function generateClimateReport(year: number): Promise<PersistedClimateReport> {
+  return api.post<PersistedClimateReport>(`${REPORT}/generate?year=${year}`);
+}
+export function exportClimateReportPdf(id: number, isAr: boolean): Promise<void> {
+  return downloadFile(`${REPORT}/${id}/export.pdf?lang=${isAr ? 'ar' : 'en'}`, `climate-report-${id}.pdf`);
 }

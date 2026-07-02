@@ -15,7 +15,7 @@ import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
-  getAnnualReport,
+  getAnnualReport, generateClimateReport, exportClimateReportPdf,
   SCENARIO_TYPE_LABELS, FRAMEWORK_LABELS,
   ASSET_CLASS_LABELS, ALIGNMENT_LABELS,
   scenarioTypeTone,
@@ -37,8 +37,8 @@ import {
  *
  * <p>Saudi-native title throughout: "التقرير المناخي السنوي".
  *
- * <p>Export-to-PDF stub: the OpenPDF infrastructure exists for other
- * annexes but not yet wired for this view — emits a TODO toast for now.
+ * <p>Export-to-PDF (S-P): persists a DRAFT snapshot of the pack (S-G
+ * ClimateReport) and downloads its Arabic-capable OpenPDF export.
  */
 export function ClimateAnnualReportPage() {
   const { lang } = useI18n();
@@ -48,6 +48,7 @@ export function ClimateAnnualReportPage() {
   const [year, setYear] = useState<number>(2026);
   const [report, setReport] = useState<AnnualClimateReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   async function loadReport(y: number) {
     setLoading(true);
@@ -63,12 +64,20 @@ export function ClimateAnnualReportPage() {
   }
   useEffect(() => { void loadReport(year); }, [year]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function exportToPdf() {
-    // TODO Sprint 12 — wire to OpenPDF (Arabic RTL infrastructure already
-    // used for board-pack and sustainability annex). Stubbed today.
-    toast.info(isAr
-      ? 'تصدير PDF — قيد التنفيذ (Sprint 12). يُعتمَد بنية OpenPDF القائمة.'
-      : 'PDF export — Sprint 12 (will reuse the existing OpenPDF infrastructure).');
+  async function exportToPdf() {
+    // S-P — persist a DRAFT snapshot (S-G) then download its Arabic-capable
+    // OpenPDF export. Replaces the Sprint-12 stub.
+    setExporting(true);
+    try {
+      const persisted = await generateClimateReport(year);
+      await exportClimateReportPdf(persisted.id, isAr);
+      toast.success(isAr ? 'تم تصدير التقرير المناخي (PDF).' : 'Climate report exported (PDF).');
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'فشل تصدير PDF' : 'PDF export failed'));
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -86,8 +95,8 @@ export function ClimateAnnualReportPage() {
                 {[2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </label>
-            <Button variant="primary" Icon={Download} onClick={exportToPdf}>
-              {isAr ? 'تصدير PDF' : 'Export PDF'}
+            <Button variant="primary" Icon={Download} onClick={exportToPdf} disabled={exporting || loading}>
+              {exporting ? (isAr ? 'جارٍ التصدير…' : 'Exporting…') : (isAr ? 'تصدير PDF' : 'Export PDF')}
             </Button>
           </div>
         }
