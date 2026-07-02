@@ -48,9 +48,14 @@ public class GhgEmissionRecord {
     @Column(name = "activity_unit",        length = 40)              private String activityUnit;
     @Column(name = "emission_factor",      precision = 20, scale = 6) private BigDecimal emissionFactor;
     @Column(name = "emission_factor_unit", length = 40)              private String emissionFactorUnit;
+    /** S-J — optional FK to a versioned library factor (sust.emission_factor); when set the calculator pulls value+unit from it. */
+    @Column(name = "emission_factor_id") private Long emissionFactorId;
 
     @Column(name = "emission_value_tco2e", nullable = false, precision = 18, scale = 2)
     private BigDecimal emissionValueTco2e;
+
+    /** S-J — COMPUTED (derived from activity × factor) vs ASSERTED (caller-supplied total). */
+    @Column(name = "value_source", nullable = false, length = 20) private String valueSource = "ASSERTED";
 
     @Column(name = "coverage_percent", nullable = false, precision = 5, scale = 2)
     private BigDecimal coveragePercent = new BigDecimal("100.00");

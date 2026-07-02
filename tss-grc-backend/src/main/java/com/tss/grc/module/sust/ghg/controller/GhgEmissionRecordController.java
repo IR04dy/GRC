@@ -62,6 +62,20 @@ public class GhgEmissionRecordController {
         return service.yoy(year);
     }
 
+    /** S-J — multi-year emissions trajectory (per-year scope totals) for the trend chart. */
+    @GetMapping("/trajectory")
+    @PreAuthorize("hasPermission('SUST','READ')")
+    public Map<String, Object> trajectory(@RequestParam Short fromYear, @RequestParam Short toYear) {
+        return service.trajectory(fromYear, toYear);
+    }
+
+    /** S-J — bulk CSV import (T-06). Raw CSV body; returns per-row created/failed summary. */
+    @PostMapping(value = "/import", consumes = { "text/csv", "text/plain" })
+    @PreAuthorize("hasPermission('SUST','WRITE')")
+    public Map<String, Object> importCsv(@RequestBody String csv) {
+        return service.importCsv(csv);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasPermission('SUST','READ')")
     public GhgEmissionRecord get(@PathVariable Long id) { return service.get(id); }
@@ -93,6 +107,11 @@ public class GhgEmissionRecordController {
     @PostMapping("/{id}/archive")
     @PreAuthorize("hasPermission('SUST','WRITE')")
     public GhgEmissionRecord archive(@PathVariable Long id) { return service.transition(id, "ARCHIVED"); }
+
+    /** S-J — reopen an APPROVED (edit-locked) record for editing; forces re-verification. */
+    @PostMapping("/{id}/reopen")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
+    public GhgEmissionRecord reopen(@PathVariable Long id) { return service.reopen(id); }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasPermission('SUST','DELETE')")
