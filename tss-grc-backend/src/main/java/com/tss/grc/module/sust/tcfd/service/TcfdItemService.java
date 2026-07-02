@@ -6,6 +6,7 @@ import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.tcfd.entity.TcfdItem;
 import com.tss.grc.module.sust.tcfd.repository.TcfdItemRepository;
+import com.tss.grc.security.GrcUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -74,6 +75,7 @@ public class TcfdItemService {
     @Transactional
     public TcfdItem update(Long id, TcfdItem req) {
         TcfdItem cur = get(id);
+        assertNotApproved(cur);
         if (req.getTitleEn() != null)              cur.setTitleEn(req.getTitleEn());
         if (req.getTitleAr() != null)              cur.setTitleAr(req.getTitleAr());
         if (req.getRecommendationEn() != null)     cur.setRecommendationEn(req.getRecommendationEn());
@@ -102,6 +104,7 @@ public class TcfdItemService {
     @Transactional
     public TcfdItem transition(Long id, String to) {
         TcfdItem cur = get(id);
+        assertNotApproved(cur);
         if (!STATUSES.contains(to))
             throw new IllegalArgumentException("Unknown disclosure_status: " + to);
         cur.setDisclosureStatus(to);
@@ -114,11 +117,60 @@ public class TcfdItemService {
         return saved;
     }
 
+    /**
+     * S-K — approve a TCFD item. Approver identity is the authenticated
+     * principal (never a request-body string) so attribution cannot be forged
+     * (SEC-ESG-002); separation of duties rejects self-approval by the item's
+     * owner or reviewer. Approval is terminal: an APPROVED item is
+     * content-locked (see {@link #assertNotApproved}).
+     */
+    @Transactional
+    public TcfdItem approve(Long id, GrcUserDetails approver) {
+        TcfdItem cur = get(id);
+        if (approver == null || approver.getUsername() == null || approver.getUsername().isBlank())
+            throw new IllegalArgumentException("Approval requires an authenticated approver.");
+        if ("APPROVED".equals(cur.getApprovalStatus()))
+            throw new IllegalStateException("TCFD item is already approved and locked.");
+        if (!"DISCLOSED".equals(cur.getDisclosureStatus())
+            && !"PARTIAL".equals(cur.getDisclosureStatus())
+            && !"NOT_APPLICABLE".equals(cur.getDisclosureStatus()))
+            throw new IllegalStateException(
+                "Cannot approve a TCFD item in state " + cur.getDisclosureStatus());
+        String approvedBy = approver.getUsername();
+        // Separation of duties — approver must not be the item's owner or reviewer.
+        if (sameActor(approvedBy, cur.getOwnerName()) || sameActor(approvedBy, cur.getOwnerEmail())
+            || sameActor(approvedBy, cur.getReviewerName()))
+            throw new IllegalArgumentException(
+                "Approver must differ from the item owner/reviewer (separation of duties).");
+        cur.setApprovalStatus("APPROVED");
+        cur.setApprovedBy(approvedBy);
+        cur.setApprovedAt(LocalDateTime.now());
+        TcfdItem saved = repo.save(cur);
+        audit.log("APPROVE", "TcfdItem", saved.getId(), "TCFD item approved by " + approvedBy);
+        return saved;
+    }
+
+    /** Trim-aware, case-insensitive identity compare used by the SoD check. */
+    private static boolean sameActor(String a, String b) {
+        return a != null && b != null && a.trim().equalsIgnoreCase(b.trim());
+    }
+
+    /**
+     * S-K — an APPROVED TCFD item is content-locked (filed): no edits,
+     * transitions, evidence swaps, gap rewrites, or re-links. Soft-delete only.
+     */
+    private static void assertNotApproved(TcfdItem t) {
+        if ("APPROVED".equals(t.getApprovalStatus()))
+            throw new IllegalStateException(
+                "TCFD item is APPROVED and locked — approved items cannot be modified.");
+    }
+
     @Transactional
     public TcfdItem recordGap(Long id, String gapEn, String gapAr) {
         if ((gapEn == null || gapEn.isBlank()) && (gapAr == null || gapAr.isBlank()))
             throw new IllegalArgumentException("Gap description required (en or ar).");
         TcfdItem cur = get(id);
+        assertNotApproved(cur);
         if (gapEn != null) cur.setGapDescriptionEn(gapEn);
         if (gapAr != null) cur.setGapDescriptionAr(gapAr);
         cur.setLastReviewedAt(LocalDateTime.now());
@@ -130,6 +182,7 @@ public class TcfdItemService {
         if (evidenceRef == null || evidenceRef.isBlank())
             throw new IllegalArgumentException("evidence_ref required.");
         TcfdItem cur = get(id);
+        assertNotApproved(cur);
         cur.setEvidenceRef(evidenceRef);
         if (owner != null) cur.setEvidenceOwner(owner);
         if ("EVIDENCE_REQUIRED".equals(cur.getDisclosureStatus())) {
@@ -142,6 +195,7 @@ public class TcfdItemService {
     @Transactional
     public TcfdItem linkClimateRisk(Long id, Long climateRiskId) {
         TcfdItem cur = get(id);
+        assertNotApproved(cur);
         cur.setRelatedClimateRiskId(climateRiskId);
         return repo.save(cur);
     }
@@ -153,6 +207,94 @@ public class TcfdItemService {
         repo.save(cur);
         audit.log("DELETE", "TcfdItem", id,
                 "TCFD item deleted");
+    }
+
+    // ── S-K — official TCFD 11-recommendation library ────────────────
+
+    /**
+     * The official TCFD 11-recommendation checklist across the four pillars:
+     * {@code {pillar, recommendationCode, titleEn, titleAr, recommendationEn,
+     * recommendationAr}}. Seeded fresh (UNDER_REVIEW) into each new reporting
+     * year so a tenant assesses against the full TCFD framework, not a blank
+     * matrix.
+     */
+    private static final String[][] OFFICIAL_LIBRARY = {
+        {"GOVERNANCE", "a", "Board oversight of climate risks",
+         "إشراف المجلس على المخاطر المناخية",
+         "Describe the board's oversight of climate-related risks and opportunities.",
+         "وصف إشراف المجلس على المخاطر والفرص المتعلّقة بالمناخ."},
+        {"GOVERNANCE", "b", "Management role in assessing climate risks",
+         "دور الإدارة في تقييم المخاطر المناخية",
+         "Describe management's role in assessing and managing climate-related risks and opportunities.",
+         "وصف دور الإدارة في تقييم وإدارة المخاطر والفرص المتعلّقة بالمناخ."},
+        {"STRATEGY", "a", "Climate-related risks + opportunities (short / medium / long term)",
+         "المخاطر والفرص المناخية (قصير / متوسط / طويل الأمد)",
+         "Describe the climate-related risks and opportunities identified over short, medium, and long-term horizons.",
+         "وصف المخاطر والفرص المتعلّقة بالمناخ المحدّدة على المدى القصير والمتوسط والطويل."},
+        {"STRATEGY", "b", "Impact on business, strategy, financial planning",
+         "الأثر على الأعمال والاستراتيجية والتخطيط المالي",
+         "Describe the impact of climate-related risks and opportunities on the business, strategy, and financial planning.",
+         "وصف أثر المخاطر والفرص المناخية على الأعمال والاستراتيجية والتخطيط المالي."},
+        {"STRATEGY", "c", "Resilience under different climate scenarios (incl. 2°C)",
+         "الصمود تحت سيناريوهات مناخية مختلفة (بما في ذلك 2°م)",
+         "Describe the resilience of the organisation's strategy, taking into consideration different climate-related scenarios including a 2°C-or-lower scenario.",
+         "وصف صمود استراتيجية المنشأة آخذاً في الاعتبار سيناريوهات مناخية مختلفة بما في ذلك سيناريو 2°م أو أقل."},
+        {"RISK_MGMT", "a", "Process for identifying climate risks",
+         "إجراء تحديد المخاطر المناخية",
+         "Describe the organisation's processes for identifying and assessing climate-related risks.",
+         "وصف إجراءات المنشأة لتحديد وتقييم المخاطر المتعلّقة بالمناخ."},
+        {"RISK_MGMT", "b", "Process for managing climate risks",
+         "إجراء إدارة المخاطر المناخية",
+         "Describe the organisation's processes for managing climate-related risks.",
+         "وصف إجراءات المنشأة لإدارة المخاطر المتعلّقة بالمناخ."},
+        {"RISK_MGMT", "c", "Integration into overall risk management",
+         "التكامل مع إدارة المخاطر الشاملة",
+         "Describe how processes for identifying, assessing, and managing climate-related risks are integrated into the overall risk-management framework.",
+         "وصف كيفية دمج إجراءات تحديد وتقييم وإدارة المخاطر المتعلّقة بالمناخ ضمن إطار إدارة المخاطر الشامل."},
+        {"METRICS_TARGETS", "a", "Metrics for climate risks + opportunities",
+         "مقاييس المخاطر والفرص المناخية",
+         "Disclose the metrics used to assess climate-related risks and opportunities in line with the strategy and risk-management process.",
+         "الإفصاح عن المقاييس المستخدمة لتقييم المخاطر والفرص المناخية بما يتوافق مع الاستراتيجية وإجراء إدارة المخاطر."},
+        {"METRICS_TARGETS", "b", "Scope 1, 2, 3 emissions disclosure",
+         "الإفصاح عن انبعاثات النطاقات 1 و 2 و 3",
+         "Disclose Scope 1, Scope 2, and (if appropriate) Scope 3 greenhouse-gas (GHG) emissions and the related risks.",
+         "الإفصاح عن انبعاثات النطاقين 1 و 2، وإن كان ملائماً النطاق 3، من غازات الدفيئة والمخاطر المرتبطة."},
+        {"METRICS_TARGETS", "c", "Targets to manage climate risks + performance",
+         "الأهداف لإدارة المخاطر المناخية والأداء",
+         "Describe the targets used by the organisation to manage climate-related risks and opportunities and performance against targets.",
+         "وصف الأهداف التي تستخدمها المنشأة لإدارة المخاطر والفرص المناخية والأداء مقارنةً بها."},
+    };
+
+    /**
+     * S-K — seed the official TCFD 11-recommendation library into {@code year}.
+     * Idempotent per (org, year): if any TCFD item already exists for the year,
+     * do nothing. Invoked on reporting-year open (see
+     * {@code SustainabilityReportService.createYear}).
+     *
+     * @return rows inserted (0 if the year was already seeded).
+     */
+    @Transactional
+    public int seedOfficialLibrary(short year) {
+        Long org = org();
+        if (!repo.findByOrganisationIdAndReportingYear(org, year).isEmpty()) return 0;
+        int n = 0;
+        for (String[] r : OFFICIAL_LIBRARY) {
+            TcfdItem t = new TcfdItem();
+            t.setOrganisationId(org);
+            t.setReportingYear(year);
+            t.setPillar(r[0]);
+            t.setRecommendationCode(r[1]);
+            t.setTitleEn(r[2]);
+            t.setTitleAr(r[3]);
+            t.setRecommendationEn(r[4]);
+            t.setRecommendationAr(r[5]);
+            t.setDisclosureStatus("UNDER_REVIEW");
+            repo.save(t);
+            n++;
+        }
+        audit.log("SEED", "TcfdItem", null,
+            "Seeded official TCFD 11-recommendation library for year " + year);
+        return n;
     }
 
     /**

@@ -6,6 +6,7 @@ import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.cma.entity.CmaDisclosure;
 import com.tss.grc.module.sust.cma.repository.CmaDisclosureRepository;
+import com.tss.grc.security.GrcUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -94,6 +95,7 @@ public class CmaDisclosureService {
     @Transactional
     public CmaDisclosure update(Long id, CmaDisclosure req) {
         CmaDisclosure cur = get(id);
+        assertNotApproved(cur);
         if (req.getTitleEn() != null)              cur.setTitleEn(req.getTitleEn());
         if (req.getTitleAr() != null)              cur.setTitleAr(req.getTitleAr());
         if (req.getRequirementEn() != null)        cur.setRequirementEn(req.getRequirementEn());
@@ -125,6 +127,7 @@ public class CmaDisclosureService {
     @Transactional
     public CmaDisclosure transition(Long id, String to) {
         CmaDisclosure cur = get(id);
+        assertNotApproved(cur);
         if (!STATUSES.contains(to))
             throw new IllegalArgumentException("Unknown disclosure_status: " + to);
         cur.setDisclosureStatus(to);
@@ -147,6 +150,7 @@ public class CmaDisclosureService {
         if ((gapEn == null || gapEn.isBlank()) && (gapAr == null || gapAr.isBlank()))
             throw new IllegalArgumentException("Gap description required (en or ar).");
         CmaDisclosure cur = get(id);
+        assertNotApproved(cur);
         if (gapEn != null) cur.setGapDescriptionEn(gapEn);
         if (gapAr != null) cur.setGapDescriptionAr(gapAr);
         cur.setLastReviewedAt(LocalDateTime.now());
@@ -164,6 +168,7 @@ public class CmaDisclosureService {
         if (evidenceRef == null || evidenceRef.isBlank())
             throw new IllegalArgumentException("evidence_ref required.");
         CmaDisclosure cur = get(id);
+        assertNotApproved(cur);
         cur.setEvidenceRef(evidenceRef);
         if (owner != null) cur.setEvidenceOwner(owner);
         // If it was EVIDENCE_REQUIRED specifically because of Rule 6,
@@ -175,14 +180,33 @@ public class CmaDisclosureService {
         return repo.save(cur);
     }
 
+    /**
+     * S-K — approve a disclosure. The approver identity is the authenticated
+     * principal (never a request-body string) so attribution cannot be forged
+     * (SEC-ESG-002), and separation of duties rejects self-approval by the
+     * disclosure's owner or reviewer. Approval is terminal: an already-APPROVED
+     * disclosure is content-locked (see {@link #assertNotApproved}).
+     *
+     * @param approver the authenticated caller; required.
+     */
     @Transactional
-    public CmaDisclosure approve(Long id, String approvedBy) {
+    public CmaDisclosure approve(Long id, GrcUserDetails approver) {
         CmaDisclosure cur = get(id);
+        if (approver == null || approver.getUsername() == null || approver.getUsername().isBlank())
+            throw new IllegalArgumentException("Approval requires an authenticated approver.");
+        if ("APPROVED".equals(cur.getApprovalStatus()))
+            throw new IllegalStateException("Disclosure is already approved and locked.");
         if (!"DISCLOSED".equals(cur.getDisclosureStatus())
             && !"PARTIAL".equals(cur.getDisclosureStatus())
             && !"NOT_APPLICABLE".equals(cur.getDisclosureStatus()))
             throw new IllegalStateException(
                 "Cannot approve a disclosure in state " + cur.getDisclosureStatus());
+        String approvedBy = approver.getUsername();
+        // Separation of duties — the approver must not be the disclosure's
+        // preparer/owner (evidenceOwner) or its reviewer.
+        if (sameActor(approvedBy, cur.getEvidenceOwner()) || sameActor(approvedBy, cur.getReviewerName()))
+            throw new IllegalArgumentException(
+                "Approver must differ from the disclosure owner/reviewer (separation of duties).");
         cur.setApprovalStatus("APPROVED");
         cur.setApprovedBy(approvedBy);
         cur.setApprovedAt(LocalDateTime.now());
@@ -192,6 +216,21 @@ public class CmaDisclosureService {
         return saved;
     }
 
+    /** Trim-aware, case-insensitive identity compare used by the SoD check. */
+    private static boolean sameActor(String a, String b) {
+        return a != null && b != null && a.trim().equalsIgnoreCase(b.trim());
+    }
+
+    /**
+     * S-K — an APPROVED disclosure is content-locked (it has been filed): no
+     * edits, transitions, evidence swaps, or gap rewrites. Soft-delete only.
+     */
+    private static void assertNotApproved(CmaDisclosure d) {
+        if ("APPROVED".equals(d.getApprovalStatus()))
+            throw new IllegalStateException(
+                "Disclosure is APPROVED and locked — approved disclosures cannot be modified.");
+    }
+
     @Transactional
     public void softDelete(Long id) {
         CmaDisclosure cur = get(id);
@@ -199,6 +238,94 @@ public class CmaDisclosureService {
         repo.save(cur);
         audit.log("DELETE", "CmaDisclosure", id,
                 "CMA disclosure deleted");
+    }
+
+    // ── S-K — official CMA Art. 91–94 disclosure library ─────────────
+
+    /**
+     * The official Saudi CMA Articles 91–94 ESG disclosure checklist — the
+     * canonical 11 disclosures: {@code {article, clause, titleEn, titleAr,
+     * requirementEn, requirementAr}}. Seeded fresh (UNDER_REVIEW) into each new
+     * reporting year so a tenant starts from the regulator's library, not a
+     * blank matrix.
+     */
+    private static final String[][] OFFICIAL_LIBRARY = {
+        {"91", "(a)", "Board oversight of sustainability + ESG",
+         "إشراف المجلس على الاستدامة والحوكمة البيئية والاجتماعية",
+         "Disclose the board's role in setting ESG strategy, approving climate-related targets, and reviewing performance against them.",
+         "الإفصاح عن دور المجلس في وضع استراتيجية الحوكمة البيئية والاجتماعية، واعتماد الأهداف المتعلّقة بالمناخ، ومراجعة الأداء."},
+        {"91", "(b)", "Sustainability committee composition",
+         "تشكيل لجنة الاستدامة",
+         "Disclose the composition and mandate of the sustainability / ESG committee, with at least one independent director.",
+         "الإفصاح عن تشكيل ومهام لجنة الاستدامة / الحوكمة البيئية والاجتماعية، بحضور عضو مستقل واحد على الأقل."},
+        {"92", "(a)", "Material ESG topics — assessment",
+         "تقييم الموضوعات الجوهرية للحوكمة البيئية والاجتماعية",
+         "Conduct and disclose a double-materiality assessment of ESG topics, identifying which are most relevant to the business model.",
+         "إجراء والإفصاح عن تقييم الجوهرية المزدوج لموضوعات الحوكمة البيئية والاجتماعية، وتحديد الأكثر صلة بنموذج الأعمال."},
+        {"92", "(b)", "Climate-related risks + opportunities",
+         "المخاطر والفرص المتعلّقة بالمناخ",
+         "Disclose climate-related risks (transition + physical) and opportunities, mapped to short / medium / long-term horizons per TCFD.",
+         "الإفصاح عن المخاطر المتعلّقة بالمناخ (الانتقال والمادية) والفرص، بحسب الآفاق القصيرة والمتوسطة والطويلة وفق TCFD."},
+        {"93", "(a)", "GHG emissions — Scope 1 + 2",
+         "انبعاثات الغازات الدفيئة — النطاقان 1 و 2",
+         "Disclose Scope 1 and Scope 2 emissions in tCO2e, with year-over-year comparison and target trajectory to 2030.",
+         "الإفصاح عن انبعاثات النطاقين 1 و 2 بالطن المكافئ ثاني أكسيد الكربون، مع المقارنة السنوية والمسار حتى 2030."},
+        {"93", "(b)", "GHG emissions — Scope 3",
+         "انبعاثات النطاق 3",
+         "Disclose Scope 3 emissions for the most material categories. Where coverage is limited, disclose the % of operations covered.",
+         "الإفصاح عن انبعاثات النطاق 3 للفئات الأكثر جوهرية. إن كانت التغطية محدودة، الإفصاح عن النسبة المُشمَلة."},
+        {"93", "(c)", "Energy intensity + renewable share",
+         "كثافة الطاقة وحصة المتجدّدة",
+         "Disclose energy consumption (MWh) and the share of renewable energy in the mix, aligned to the SGI 2030 50% target.",
+         "الإفصاح عن استهلاك الطاقة (ميغاواط ساعة) وحصة الطاقة المتجدّدة، بمحاذاة هدف SGI 2030 (50%)."},
+        {"93", "(d)", "Water + waste metrics",
+         "مؤشرات المياه والنفايات",
+         "Disclose water withdrawal, waste generated, and waste-diversion rate (recycle + reuse) where material.",
+         "الإفصاح عن سحب المياه والنفايات المُولَّدة ونسبة التحويل (إعادة التدوير + الاستخدام) عند الجوهرية."},
+        {"94", "(a)", "Saudization (Nitaqat) compliance",
+         "الالتزام بالسعودة (نطاقات)",
+         "Disclose Nitaqat tier (Platinum / Green / Yellow), Saudization rate, and improvements vs prior year.",
+         "الإفصاح عن فئة نطاقات (بلاتيني / أخضر / أصفر) ونسبة السعودة والتحسّن مقارنة بالعام السابق."},
+        {"94", "(b)", "Female workforce participation",
+         "مشاركة المرأة في القوى العاملة",
+         "Disclose female workforce participation %, leadership representation %, and gender pay-gap analysis.",
+         "الإفصاح عن نسبة مشاركة المرأة في العاملين، ونسبة التمثيل القيادي، وتحليل فجوة الأجور بين الجنسين."},
+        {"94", "(c)", "Health, safety + LTIFR",
+         "الصحة والسلامة وLTIFR",
+         "Disclose lost-time injury frequency rate (LTIFR), fatalities, and total recordable incidents.",
+         "الإفصاح عن معدّل تكرار الإصابات المُفقِدة للوقت (LTIFR) والوفيات وإجمالي الحوادث."},
+    };
+
+    /**
+     * S-K — seed the official CMA Art. 91–94 library into {@code year}.
+     * Idempotent per (org, year): if any CMA disclosure already exists for the
+     * year, do nothing. Invoked on reporting-year open (see
+     * {@code SustainabilityReportService.createYear}).
+     *
+     * @return rows inserted (0 if the year was already seeded).
+     */
+    @Transactional
+    public int seedOfficialLibrary(short year) {
+        Long org = org();
+        if (!repo.findByOrganisationIdAndReportingYear(org, year).isEmpty()) return 0;
+        int n = 0;
+        for (String[] r : OFFICIAL_LIBRARY) {
+            CmaDisclosure d = new CmaDisclosure();
+            d.setOrganisationId(org);
+            d.setReportingYear(year);
+            d.setArticle(r[0]);
+            d.setClause(r[1]);
+            d.setTitleEn(r[2]);
+            d.setTitleAr(r[3]);
+            d.setRequirementEn(r[4]);
+            d.setRequirementAr(r[5]);
+            d.setDisclosureStatus("UNDER_REVIEW");
+            repo.save(d);
+            n++;
+        }
+        audit.log("SEED", "CmaDisclosure", null,
+            "Seeded official CMA Art.91-94 library (" + n + " disclosures) for year " + year);
+        return n;
     }
 
     // ── Aggregation / Readiness ──────────────────────────────────────

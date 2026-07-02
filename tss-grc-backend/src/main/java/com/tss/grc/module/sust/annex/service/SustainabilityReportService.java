@@ -7,6 +7,8 @@ import com.tss.grc.module.sust.annex.entity.ReportingYear;
 import com.tss.grc.module.sust.annex.entity.SustainabilityReport;
 import com.tss.grc.module.sust.annex.repository.ReportingYearRepository;
 import com.tss.grc.module.sust.annex.repository.SustainabilityReportRepository;
+import com.tss.grc.module.sust.cma.service.CmaDisclosureService;
+import com.tss.grc.module.sust.tcfd.service.TcfdItemService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -51,6 +53,8 @@ public class SustainabilityReportService {
     private final AnnexGeneratorService             generator;
     private final ReportComposerService             composer;
     private final AuditLogService                   audit;
+    private final CmaDisclosureService              cmaService;
+    private final TcfdItemService                   tcfdService;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -71,6 +75,14 @@ public class SustainabilityReportService {
         if (req.getStatus() == null) req.setStatus("ACTIVE");
         ReportingYear saved = yearRepo.save(req);
         audit.log("CREATE", "ReportingYear", saved.getId(), "Reporting year created: " + saved.getYear());
+        // S-K — a fresh reporting year opens pre-loaded with the official CMA
+        // Art.91–94 + TCFD 11-recommendation disclosure checklists (both
+        // idempotent per org+year) so the tenant assesses against the
+        // regulator's library rather than a blank matrix.
+        if (saved.getYear() != null) {
+            cmaService.seedOfficialLibrary(saved.getYear());
+            tcfdService.seedOfficialLibrary(saved.getYear());
+        }
         return saved;
     }
 

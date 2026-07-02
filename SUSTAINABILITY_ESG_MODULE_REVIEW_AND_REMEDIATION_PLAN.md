@@ -22,7 +22,7 @@
 | S-H | Audit logging across the 11 unlogged sust services (GHG, SGI, CMA, TCFD-item, Materiality, Metrics, Evidence, CAPA, ClimateRisk, Report/Year, Settings) via `AuditLogService` — CREATE/UPDATE/TRANSITION/APPROVE/REJECT/ARCHIVE/DELETE; live-proven traceable history | 🟠 High | ✅ Shipped | 11 svcs + audit.log |
 | S-I | Annex from live data + content lock/version + CSV/PDF | 🟠 High | ⬜ | — |
 | S-J | GHG hardening (edit-lock, real YoY, unit/EF library, coverage label) | 🟠 High | ⬜ | — |
-| S-K | CMA/TCFD approval SoD + item lock + official library import | 🟠 High | ⬜ | — |
+| S-K | CMA/TCFD approval SoD + item lock + official library import: `approve()` binds `@AuthenticationPrincipal` (non-forgeable `approvedBy`) + SoD (approver ≠ owner/reviewer); TCFD gains its first-ever `approve()` + `/{id}/approve`; APPROVED disclosures/items are content-locked (update/transition/attach/gap → 409); official CMA Art.91–94 (11) + TCFD 11-recommendation library auto-seeded per-tenant on reporting-year open (idempotent) | 🟠 High | ✅ Shipped | CMA/TCFD svc+ctrl + report-year seed |
 | S-L | DTO + Jakarta validation layer (kill mass-assignment / 500-on-bad-enum) | 🟡 Medium | ⬜ | — |
 | S-M | API namespace + auth-model unification | 🟡 Medium | ⬜ | — |
 | S-N | Reporting-engine + notifications integration | 🟡 Medium | ⬜ | — |

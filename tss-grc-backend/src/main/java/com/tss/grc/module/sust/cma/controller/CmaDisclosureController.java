@@ -2,12 +2,14 @@ package com.tss.grc.module.sust.cma.controller;
 
 import com.tss.grc.module.sust.cma.entity.CmaDisclosure;
 import com.tss.grc.module.sust.cma.service.CmaDisclosureService;
+import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -109,11 +111,15 @@ public class CmaDisclosureController {
         return service.recordGap(id, body.get("gapEn"), body.get("gapAr"));
     }
 
-    /** Body: {@code { "approvedBy": "Name" } }. */
+    /**
+     * S-K — approve a disclosure. The approver is the authenticated principal
+     * (no request body), enforcing non-forgeable attribution + separation of
+     * duties in the service. An approved disclosure is content-locked.
+     */
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public CmaDisclosure approve(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return service.approve(id, body == null ? null : body.get("approvedBy"));
+    public CmaDisclosure approve(@PathVariable Long id, @AuthenticationPrincipal GrcUserDetails me) {
+        return service.approve(id, me);
     }
 
     @DeleteMapping("/{id}")

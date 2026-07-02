@@ -2,12 +2,14 @@ package com.tss.grc.module.sust.tcfd.controller;
 
 import com.tss.grc.module.sust.tcfd.entity.TcfdItem;
 import com.tss.grc.module.sust.tcfd.service.TcfdItemService;
+import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -55,6 +57,17 @@ public class TcfdItemController {
     @PreAuthorize("hasPermission('SUST','WRITE')")
     public TcfdItem update(@PathVariable Long id, @RequestBody TcfdItem req) {
         return service.update(id, req);
+    }
+
+    /**
+     * S-K — approve a TCFD item. The approver is the authenticated principal
+     * (no request body), enforcing non-forgeable attribution + separation of
+     * duties in the service. An approved item is content-locked.
+     */
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
+    public TcfdItem approve(@PathVariable Long id, @AuthenticationPrincipal GrcUserDetails me) {
+        return service.approve(id, me);
     }
 
     @PostMapping("/{id}/mark-disclosed")

@@ -6,6 +6,7 @@ import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.cma.entity.CmaDisclosure;
 import com.tss.grc.module.sust.cma.repository.CmaDisclosureRepository;
+import com.tss.grc.security.GrcUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,12 +15,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -196,6 +200,99 @@ class CmaDisclosureServiceTest {
         assertThat(out).containsEntry("total", 5);
         assertThat(out).containsEntry("applicable", 4);
         assertThat(out).containsEntry("readinessPct", 50);
+    }
+
+    // ── S-K — principal-bound approval + SoD + approved-lock ────────
+
+    @Test
+    void approve_refusesSelfApprovalByOwner() {
+        CmaDisclosure d = baseDisclosure();
+        d.setDisclosureStatus("DISCLOSED");
+        d.setEvidenceOwner("Sara Al-Zahrani");
+        when(repo.findByIdAndOrganisationId(5L, ORG_ID)).thenReturn(Optional.of(d));
+
+        // The owner cannot approve their own disclosure (separation of duties).
+        assertThatThrownBy(() -> service.approve(5L, user("Sara Al-Zahrani")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("separation of duties");
+    }
+
+    @Test
+    void approve_stampsApprovedByFromPrincipal_notBody() {
+        CmaDisclosure d = baseDisclosure();
+        d.setDisclosureStatus("DISCLOSED");
+        d.setEvidenceOwner("Sara Al-Zahrani");
+        when(repo.findByIdAndOrganisationId(5L, ORG_ID)).thenReturn(Optional.of(d));
+        when(repo.save(any(CmaDisclosure.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CmaDisclosure after = service.approve(5L, user("Khalid Al-Otaibi"));
+
+        assertThat(after.getApprovalStatus()).isEqualTo("APPROVED");
+        assertThat(after.getApprovedBy()).isEqualTo("Khalid Al-Otaibi");   // from principal
+        assertThat(after.getApprovedAt()).isNotNull();
+    }
+
+    @Test
+    void approve_isTerminal_cannotReapprove() {
+        CmaDisclosure d = baseDisclosure();
+        d.setDisclosureStatus("DISCLOSED");
+        d.setApprovalStatus("APPROVED");
+        when(repo.findByIdAndOrganisationId(5L, ORG_ID)).thenReturn(Optional.of(d));
+
+        assertThatThrownBy(() -> service.approve(5L, user("Khalid")))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("already approved");
+    }
+
+    @Test
+    void update_onApprovedDisclosure_isLocked() {
+        CmaDisclosure d = baseDisclosure();
+        d.setApprovalStatus("APPROVED");
+        when(repo.findByIdAndOrganisationId(5L, ORG_ID)).thenReturn(Optional.of(d));
+
+        CmaDisclosure patch = new CmaDisclosure();
+        patch.setTitleEn("tampered");
+        assertThatThrownBy(() -> service.update(5L, patch))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("locked");
+    }
+
+    @Test
+    void transition_onApprovedDisclosure_isLocked() {
+        CmaDisclosure d = baseDisclosure();
+        d.setApprovalStatus("APPROVED");
+        when(repo.findByIdAndOrganisationId(5L, ORG_ID)).thenReturn(Optional.of(d));
+
+        assertThatThrownBy(() -> service.transition(5L, "PARTIAL"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("locked");
+    }
+
+    // ── S-K — official CMA Art.91–94 library seed ───────────────────
+
+    @Test
+    void seedOfficialLibrary_seeds11_whenYearEmpty() {
+        when(repo.findByOrganisationIdAndReportingYear(ORG_ID, (short) 2099)).thenReturn(List.of());
+        when(repo.save(any(CmaDisclosure.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        int n = service.seedOfficialLibrary((short) 2099);
+
+        assertThat(n).isEqualTo(11);                                  // the canonical 11 disclosures
+        verify(repo, times(11)).save(any(CmaDisclosure.class));
+    }
+
+    @Test
+    void seedOfficialLibrary_isIdempotent_whenYearAlreadySeeded() {
+        when(repo.findByOrganisationIdAndReportingYear(ORG_ID, (short) 2025))
+            .thenReturn(List.of(baseDisclosure()));
+
+        assertThat(service.seedOfficialLibrary((short) 2025)).isEqualTo(0);
+        verify(repo, never()).save(any());
+    }
+
+    /** An authenticated principal whose username is the approver identity. */
+    private static GrcUserDetails user(String username) {
+        return new GrcUserDetails(7L, ORG_ID, username, "x", true, true, List.of());
     }
 
     // ── Helpers ─────────────────────────────────────────────────────
