@@ -47,10 +47,10 @@ public class TcfdSectorImpact extends BaseEntity {
     @Column(name = "exposure_sar_millions", nullable = false, precision = 18, scale = 2)
     private BigDecimal exposureSarMillions;
 
-    @Column(name = "transition_risk_score", nullable = false, precision = 4, scale = 2)
+    @Column(name = "transition_risk_score", nullable = false, precision = 5, scale = 2)
     private BigDecimal transitionRiskScore;
 
-    @Column(name = "physical_risk_score", nullable = false, precision = 4, scale = 2)
+    @Column(name = "physical_risk_score", nullable = false, precision = 5, scale = 2)
     private BigDecimal physicalRiskScore;
 
     @Column(name = "expected_pd_uplift_bps", nullable = false)

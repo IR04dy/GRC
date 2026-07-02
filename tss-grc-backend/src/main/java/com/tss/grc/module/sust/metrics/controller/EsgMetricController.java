@@ -77,6 +77,13 @@ public class EsgMetricController {
         return service.recordReading(id, BigDecimal.valueOf(n.doubleValue()), asOf);
     }
 
+    /** Full reading time-series for a metric (newest first) — S-R history. */
+    @GetMapping("/{id}/readings")
+    @PreAuthorize("hasPermission('SUST','READ')")
+    public java.util.List<com.tss.grc.module.sust.metrics.entity.EsgMetricReading> readings(@PathVariable Long id) {
+        return service.listReadings(id);
+    }
+
     @PostMapping("/{id}/archive")
     @PreAuthorize("hasPermission('SUST','WRITE')")
     public EsgMetric archive(@PathVariable Long id) { return service.archive(id); }

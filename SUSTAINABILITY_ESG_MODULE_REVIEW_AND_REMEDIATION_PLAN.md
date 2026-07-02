@@ -29,7 +29,7 @@
 | S-O | Vendor ESG surveillance — real backend + TPRM/SCM link | 🟠 High | ⬜ | — |
 | S-P | Frontend: live KPIs (kill mock), routable tabs, PDF export, tests | 🟠 High | ⬜ | — |
 | S-Q | Materiality: true double-materiality (impact vs financial axes) | 🟡 Medium | ⬜ | — |
-| S-R | Data-model fixes (DECIMAL(4,2)→(5,2) score bug, unique codes, history) | 🟠 High | ⬜ | — |
+| S-R | Data-model fixes: score `DECIMAL(4,2)`→`(5,2)`; unique `topic_code`/`metric_code`; `esg_metric_reading` history + endpoint; sector-impact FK `ON DELETE CASCADE` (V249) | 🟠 High | ✅ Shipped | V249 + metrics/climate |
 
 ---
 

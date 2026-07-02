@@ -2,7 +2,9 @@ package com.tss.grc.module.sust.metrics.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.sust.metrics.entity.EsgMetric;
+import com.tss.grc.module.sust.metrics.entity.EsgMetricReading;
 import com.tss.grc.module.sust.metrics.repository.EsgMetricRepository;
+import com.tss.grc.module.sust.metrics.repository.EsgMetricReadingRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -42,6 +44,7 @@ public class EsgMetricService {
     private static final Set<String> STATUSES   = Set.of("ACTIVE", "AT_TARGET", "OFF_TRACK", "ARCHIVED");
 
     private final EsgMetricRepository repo;
+    private final EsgMetricReadingRepository readingRepo;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -95,14 +98,29 @@ public class EsgMetricService {
         return repo.save(cur);
     }
 
-    /** Convenience: just update the current_value + as_of date. */
+    /** Record a reading: update the metric's current_value + as_of AND append an
+     *  immutable row to the reading history (S-R), so the time-series is retained. */
     @Transactional
     public EsgMetric recordReading(Long id, BigDecimal currentValue, java.time.LocalDate asOf) {
         EsgMetric cur = get(id);
+        java.time.LocalDate effectiveAsOf = asOf != null ? asOf : java.time.LocalDate.now();
         cur.setCurrentValue(currentValue);
-        if (asOf != null) cur.setCurrentValueAsOf(asOf);
+        cur.setCurrentValueAsOf(effectiveAsOf);
         refreshStatusSnapshot(cur);
-        return repo.save(cur);
+        EsgMetric saved = repo.save(cur);
+        EsgMetricReading r = new EsgMetricReading();
+        r.setOrganisationId(org());
+        r.setMetricId(saved.getId());
+        r.setReadingValue(currentValue);
+        r.setAsOf(effectiveAsOf);
+        readingRepo.save(r);
+        return saved;
+    }
+
+    /** Full reading time-series for a metric (newest first). */
+    public List<EsgMetricReading> listReadings(Long id) {
+        get(id); // org-scope + existence guard
+        return readingRepo.findByOrganisationIdAndMetricIdOrderByAsOfDescIdDesc(org(), id);
     }
 
     @Transactional
