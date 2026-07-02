@@ -49,7 +49,12 @@ public class CorrectiveActionService {
 
     private static final Set<String> SOURCE_TYPES =
         Set.of("CLIMATE_RISK", "GHG_RECORD", "ANNEX_GAP", "CMA_DISCLOSURE",
-               "TCFD_ITEM", "SGI_COMMITMENT", "MANUAL");
+               "TCFD_ITEM", "SGI_COMMITMENT", "EVIDENCE", "MANUAL");
+
+    /** A CAPA in one of these states no longer "covers" its source gap, so a
+     *  freshly-surfaced gap on that source opens a new CAPA (mirrors the
+     *  compliance F8 AR-EVD-GAP dedup, which skips only NON-closed findings). */
+    private static final Set<String> TERMINAL_STATUSES = Set.of("CLOSED", "CANCELLED");
 
     private final CorrectiveActionRepository repo;
     private final OrganisationSettingsService settingsService;
@@ -99,6 +104,57 @@ public class CorrectiveActionService {
         validate(req);
         CorrectiveAction saved = repo.save(req);
         audit.log("CREATE", "CorrectiveAction", saved.getId(), "Corrective action created");
+        return saved;
+    }
+
+    /**
+     * S-D — idempotently open an auto-CAPA for a gap surfaced elsewhere in the
+     * sustainability domain (SGI behind plan, CMA/TCFD PARTIAL|NOT_DISCLOSED,
+     * rejected evidence). Mirrors the compliance F8 {@code AR-EVD-GAP} rule:
+     * the source is identified by its ({@code sourceType}, {@code sourceRef})
+     * marker, and if a NON-terminal CAPA already tracks that source this is a
+     * no-op returning the existing one — so a re-triggered gap (a repeated
+     * transition, a re-run sweep) never doubles up. A CLOSED/CANCELLED CAPA does
+     * not block a fresh one, so a gap that re-opens after closure is re-raised.
+     *
+     * <p>Runs in the caller's transaction (PROPAGATION_REQUIRED): the CAPA is
+     * atomic with the disclosure/commitment/evidence change that surfaced it.
+     *
+     * @return the existing or newly-created CAPA; never {@code null}.
+     */
+    @Transactional
+    public CorrectiveAction autoOpen(String sourceType, String sourceRef,
+                                     String titleEn, String titleAr,
+                                     String descriptionEn, String priority) {
+        if (sourceType == null || !SOURCE_TYPES.contains(sourceType))
+            throw new IllegalArgumentException("sourceType must be one of " + SOURCE_TYPES);
+        if (sourceRef == null || sourceRef.isBlank())
+            throw new IllegalArgumentException("sourceRef required for an auto-CAPA");
+        Long org = org();
+
+        // Dedup by source marker — skip if a non-terminal CAPA already tracks it.
+        for (CorrectiveAction existing : repo.findByOrganisationIdAndSourceTypeAndSourceRef(org, sourceType, sourceRef)) {
+            if (!TERMINAL_STATUSES.contains(existing.getStatus())) {
+                return existing;
+            }
+        }
+
+        CorrectiveAction ca = new CorrectiveAction();
+        ca.setOrganisationId(org);
+        ca.setSourceType(sourceType);
+        ca.setSourceRef(sourceRef);
+        ca.setTitleEn(titleEn);
+        ca.setTitleAr(titleAr);
+        ca.setDescriptionEn(descriptionEn);
+        ca.setStatus("OPEN");
+        ca.setPriority(priority == null || priority.isBlank() ? "MEDIUM" : priority);
+        // Give the auto-CAPA a due date so it surfaces in the overdue / due-soon
+        // rollups: today + the tenant's executive-escalation window (S-B setting).
+        ca.setTargetDate(LocalDate.now().plusDays(settingsService.getOrCreate().getCapaExecutiveEscalationDays()));
+        validate(ca);
+        CorrectiveAction saved = repo.save(ca);
+        audit.log("AUTO_CREATE", "CorrectiveAction", saved.getId(),
+            "Auto-CAPA opened for " + sourceType + " " + sourceRef);
         return saved;
     }
 

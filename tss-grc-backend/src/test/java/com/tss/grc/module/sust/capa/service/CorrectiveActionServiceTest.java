@@ -25,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -241,6 +243,71 @@ class CorrectiveActionServiceTest {
         CorrectiveAction a = action("OPEN", "Sara");
         a.setTargetDate(target);
         return a;
+    }
+
+    // ── S-D — auto-CAPA idempotency + dedup (mirrors AR-EVD-GAP) ────
+
+    @Test
+    void autoOpen_createsOpenCapa_whenNoneExists() {
+        when(repo.findByOrganisationIdAndSourceTypeAndSourceRef(ORG_ID, "CMA_DISCLOSURE", "5"))
+            .thenReturn(List.of());
+        when(repo.save(any(CorrectiveAction.class))).thenAnswer(inv -> {
+            CorrectiveAction c = inv.getArgument(0);
+            c.setId(42L);
+            return c;
+        });
+        stubCapaWindows(7, 30);   // executive-escalation window drives the due date
+
+        CorrectiveAction ca = service.autoOpen("CMA_DISCLOSURE", "5",
+            "CMA Art. 91 disclosure gap (PARTIAL)", "عربي", "desc", "HIGH");
+
+        assertThat(ca.getStatus()).isEqualTo("OPEN");
+        assertThat(ca.getSourceType()).isEqualTo("CMA_DISCLOSURE");
+        assertThat(ca.getSourceRef()).isEqualTo("5");
+        assertThat(ca.getPriority()).isEqualTo("HIGH");
+        assertThat(ca.getTargetDate()).isEqualTo(LocalDate.now().plusDays(30));
+        verify(audit).log(eq("AUTO_CREATE"), eq("CorrectiveAction"), any(), any());
+    }
+
+    @Test
+    void autoOpen_isIdempotent_whenNonTerminalCapaAlreadyTracksTheSource() {
+        CorrectiveAction existing = action("IN_PROGRESS", "owner");
+        existing.setSourceType("CMA_DISCLOSURE");
+        existing.setSourceRef("5");
+        when(repo.findByOrganisationIdAndSourceTypeAndSourceRef(ORG_ID, "CMA_DISCLOSURE", "5"))
+            .thenReturn(List.of(existing));
+
+        CorrectiveAction ca = service.autoOpen("CMA_DISCLOSURE", "5", "t", null, "d", "HIGH");
+
+        // Returns the existing CAPA and never creates a duplicate.
+        assertThat(ca).isSameAs(existing);
+        verify(repo, never()).save(any());
+    }
+
+    @Test
+    void autoOpen_createsFresh_whenPriorCapaForSourceIsClosed() {
+        // A CLOSED/CANCELLED CAPA no longer "covers" the gap — a re-surfaced gap
+        // re-opens a fresh one (uses the new EVIDENCE source type from V251).
+        CorrectiveAction closed = action("CLOSED", "owner");
+        closed.setSourceType("EVIDENCE");
+        closed.setSourceRef("12");
+        when(repo.findByOrganisationIdAndSourceTypeAndSourceRef(ORG_ID, "EVIDENCE", "12"))
+            .thenReturn(List.of(closed));
+        when(repo.save(any(CorrectiveAction.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubCapaWindows(7, 30);
+
+        CorrectiveAction ca = service.autoOpen("EVIDENCE", "12", "Rejected evidence", null, "d", "HIGH");
+
+        assertThat(ca.getStatus()).isEqualTo("OPEN");
+        assertThat(ca).isNotSameAs(closed);
+        verify(repo).save(any(CorrectiveAction.class));
+    }
+
+    @Test
+    void autoOpen_rejectsUnknownSourceType() {
+        assertThatThrownBy(() -> service.autoOpen("WIDGET", "1", "t", null, "d", "HIGH"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("sourceType");
     }
 
     // ── Helper ──────────────────────────────────────────────────────

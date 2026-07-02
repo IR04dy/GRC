@@ -3,6 +3,7 @@ package com.tss.grc.module.sust.sgi.service;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.sgi.entity.SgiCommitment;
 import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
@@ -53,6 +54,7 @@ public class SgiCommitmentService {
     private final SgiCommitmentRepository repo;
     private final OrganisationSettingsService settingsService;
     private final AuditLogService audit;
+    private final CorrectiveActionService capaService;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -95,6 +97,7 @@ public class SgiCommitmentService {
         validate(req);
         SgiCommitment saved = repo.save(req);
         audit.log("CREATE", "SgiCommitment", saved.getId(), "Created SGI commitment: " + saved.getCommitmentCode());
+        maybeAutoCapaBehindPlan(saved);
         return saved;
     }
 
@@ -130,6 +133,7 @@ public class SgiCommitmentService {
         validate(cur);
         SgiCommitment saved = repo.save(cur);
         audit.log("UPDATE", "SgiCommitment", saved.getId(), "Updated SGI commitment");
+        maybeAutoCapaBehindPlan(saved);
         return saved;
     }
 
@@ -297,6 +301,29 @@ public class SgiCommitmentService {
         out.put("byTier", byTier);
         out.put("bySector", bySector);
         return out;
+    }
+
+    // ── S-D — auto-CAPA when behind plan ─────────────────────────────
+
+    /**
+     * A commitment tracking DELAYED against its linear baseline→target plan is
+     * a genuine slippage; idempotently open a corrective action so it is driven
+     * to closure (mirrors the compliance F8 {@code AR-EVD-GAP} rule). Deduped by
+     * ({@code SGI_COMMITMENT}, id) in {@link CorrectiveActionService#autoOpen}.
+     * Only DELAYED triggers — ON_TRACK is fine and AT_RISK is a warning, not an
+     * actionable miss. Evaluated on create / update (a write that refreshes
+     * {@code current_value}); ACHIEVED / RETIRED commitments never reach here.
+     */
+    private void maybeAutoCapaBehindPlan(SgiCommitment c) {
+        if (c.getId() == null || !"ACTIVE".equals(c.getStatus())) return;
+        if (!"DELAYED".equals(progress(c).get("tier"))) return;
+        capaService.autoOpen(
+            "SGI_COMMITMENT", String.valueOf(c.getId()),
+            "SGI commitment behind plan: " + c.getCommitmentCode(),
+            "التزام المبادرة الخضراء متأخر عن الخطة: " + c.getCommitmentCode(),
+            "Auto-opened by S-D: SGI commitment " + c.getCommitmentCode()
+                + " (#" + c.getId() + ") is tracking DELAYED against its linear plan.",
+            "HIGH");
     }
 
     // ── Helpers ──────────────────────────────────────────────────────

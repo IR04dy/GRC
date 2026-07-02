@@ -2,6 +2,7 @@ package com.tss.grc.module.sust.evidence.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.evidence.entity.SustainabilityEvidence;
 import com.tss.grc.module.sust.evidence.repository.SustainabilityEvidenceRepository;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
@@ -47,6 +48,7 @@ public class SustainabilityEvidenceService {
     private final SustainabilityEvidenceRepository repo;
     private final OrganisationSettingsService settingsService;
     private final AuditLogService audit;
+    private final CorrectiveActionService capaService;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -166,6 +168,16 @@ public class SustainabilityEvidenceService {
         cur.setRejectionReason(reason);
         SustainabilityEvidence saved = repo.save(cur);
         audit.log("REJECT", "SustainabilityEvidence", saved.getId(), "Sustainability evidence rejected");
+        // S-D — a rejected evidence item is a gap: idempotently open a CAPA so
+        // the rejection is tracked to resubmission (mirrors the compliance F8
+        // AR-EVD-GAP rule). Deduped by (EVIDENCE, id) in autoOpen.
+        capaService.autoOpen(
+            "EVIDENCE", String.valueOf(saved.getId()),
+            "Sustainability evidence rejected — remediate & resubmit (#" + saved.getId() + ")",
+            "تم رفض دليل الاستدامة — المعالجة وإعادة التقديم (#" + saved.getId() + ")",
+            "Auto-opened by S-D: sustainability evidence #" + saved.getId()
+                + " was rejected. Reason: " + reason,
+            "HIGH");
         return saved;
     }
 

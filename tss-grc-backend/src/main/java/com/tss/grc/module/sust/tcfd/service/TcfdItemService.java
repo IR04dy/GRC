@@ -2,6 +2,8 @@ package com.tss.grc.module.sust.tcfd.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
+import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.tcfd.entity.TcfdItem;
 import com.tss.grc.module.sust.tcfd.repository.TcfdItemRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -39,6 +41,7 @@ public class TcfdItemService {
 
     private final TcfdItemRepository repo;
     private final AuditLogService audit;
+    private final CorrectiveActionService capaService;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -64,6 +67,7 @@ public class TcfdItemService {
         TcfdItem saved = repo.save(req);
         audit.log("CREATE", "TcfdItem", saved.getId(),
                 "TCFD item created");
+        maybeAutoCapa(saved);
         return saved;
     }
 
@@ -91,6 +95,7 @@ public class TcfdItemService {
         TcfdItem saved = repo.save(cur);
         audit.log("UPDATE", "TcfdItem", saved.getId(),
                 "TCFD item updated");
+        maybeAutoCapa(saved);
         return saved;
     }
 
@@ -105,6 +110,7 @@ public class TcfdItemService {
         TcfdItem saved = repo.save(cur);
         audit.log("TRANSITION", "TcfdItem", saved.getId(),
                 "TCFD item -> " + to);
+        maybeAutoCapa(saved);
         return saved;
     }
 
@@ -207,6 +213,33 @@ public class TcfdItemService {
         out.put("strategyResilienceGap", strategyResilienceGap);
         out.put("strategyResilienceItemId", strategyResilienceItemId);
         return out;
+    }
+
+    // ── S-D — auto-CAPA on disclosure gap ────────────────────────────
+
+    /**
+     * A TCFD item that settles in PARTIAL or NOT_DISCLOSED is a disclosure gap;
+     * idempotently open a corrective action (mirrors the compliance F8
+     * {@code AR-EVD-GAP} rule). Deduped by ({@code TCFD_ITEM}, id) in
+     * {@link CorrectiveActionService#autoOpen} so create / update / transition
+     * can all call it without doubling up; the first CAPA is back-linked.
+     */
+    private void maybeAutoCapa(TcfdItem t) {
+        String s = t.getDisclosureStatus();
+        if (!"PARTIAL".equals(s) && !"NOT_DISCLOSED".equals(s)) return;
+        String gap = t.getGapDescriptionEn() != null ? t.getGapDescriptionEn()
+                   : (t.getGapDescriptionAr() != null ? t.getGapDescriptionAr() : "");
+        CorrectiveAction ca = capaService.autoOpen(
+            "TCFD_ITEM", String.valueOf(t.getId()),
+            "TCFD " + t.getPillar() + "/" + t.getRecommendationCode() + " disclosure gap (" + s + ")",
+            "فجوة إفصاح TCFD — " + t.getPillar(),
+            "Auto-opened by S-D: TCFD item #" + t.getId() + " is " + s
+                + (gap.isBlank() ? "." : ". Gap: " + gap),
+            "HIGH");
+        if (ca != null && t.getLinkedCapaId() == null) {
+            t.setLinkedCapaId(ca.getId());
+            repo.save(t);
+        }
     }
 
     private void applyRules(TcfdItem t) {

@@ -2,6 +2,7 @@ package com.tss.grc.module.sust.sgi.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.sgi.entity.SgiCommitment;
 import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
 import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
@@ -21,6 +22,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -43,6 +46,7 @@ class SgiCommitmentServiceTest {
     @Mock private SgiCommitmentRepository repo;
     @Mock private OrganisationSettingsService settingsService;
     @Mock private AuditLogService audit;
+    @Mock private CorrectiveActionService capaService;
     @InjectMocks private SgiCommitmentService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -123,6 +127,33 @@ class SgiCommitmentServiceTest {
         // Stricter factor 0.80 → warning floor 80 → 75 < 80 → DELAYED.
         stubAtRiskFactor("0.80");
         assertThat(service.progress(c)).containsEntry("tier", "DELAYED");
+    }
+
+    // ── S-D — a behind-plan (DELAYED) commitment auto-opens a CAPA ──
+
+    @Test
+    void update_whenBehindPlan_opensAutoCapa() {
+        // DELAYED: progress 40%, expected 100% (target year already past),
+        // strict factor 0.80 → warning floor 80 → 40 < 80 → DELAYED.
+        SgiCommitment cur = commitment(new BigDecimal("0"), new BigDecimal("40"), new BigDecimal("100"));
+        cur.setId(7L);
+        cur.setStatus("ACTIVE");
+        cur.setCommitmentCode("SGI-RENEW-2030");
+        cur.setTitleEn("Renewable energy share");
+        cur.setSector("ENERGY");
+        cur.setUnit("%");
+        cur.setBaselineYear((short) 2019);
+        cur.setTargetYear((short) 2020);
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(cur));
+        when(repo.save(any(SgiCommitment.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubAtRiskFactor("0.80");
+
+        SgiCommitment patch = new SgiCommitment();
+        patch.setCurrentValue(new BigDecimal("40"));   // refresh that leaves it behind plan
+        service.update(7L, patch);
+
+        // Behind plan (DELAYED) → auto-CAPA opened for (SGI_COMMITMENT, id 7).
+        verify(capaService).autoOpen(eq("SGI_COMMITMENT"), eq("7"), any(), any(), any(), eq("HIGH"));
     }
 
     // ── Rule A — Achieve requires target met within direction ───────

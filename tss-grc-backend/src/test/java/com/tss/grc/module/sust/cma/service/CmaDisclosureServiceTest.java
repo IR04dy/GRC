@@ -2,6 +2,8 @@ package com.tss.grc.module.sust.cma.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
+import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.cma.entity.CmaDisclosure;
 import com.tss.grc.module.sust.cma.repository.CmaDisclosureRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -17,6 +19,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -36,6 +40,7 @@ class CmaDisclosureServiceTest {
 
     @Mock private CmaDisclosureRepository repo;
     @Mock private AuditLogService audit;
+    @Mock private CorrectiveActionService capaService;
     @InjectMocks private CmaDisclosureService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -94,6 +99,30 @@ class CmaDisclosureServiceTest {
         CmaDisclosure after = service.transition(5L, "PARTIAL");
 
         assertThat(after.getDisclosureStatus()).isEqualTo("PARTIAL");
+    }
+
+    // ── S-D — PARTIAL / NOT_DISCLOSED auto-opens a corrective action ──
+
+    @Test
+    void transitionToPartial_opensAutoCapa_andBackLinks() {
+        CmaDisclosure d = baseDisclosure();
+        d.setEvidenceRef("ev");                        // has evidence → stays PARTIAL (not Rule 6)
+        d.setGapDescriptionEn("Scope 3 coverage at 67%");
+        when(repo.findByIdAndOrganisationId(5L, ORG_ID)).thenReturn(Optional.of(d));
+        when(repo.save(any(CmaDisclosure.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CorrectiveAction capa = new CorrectiveAction();
+        capa.setId(99L);
+        when(capaService.autoOpen(eq("CMA_DISCLOSURE"), eq("5"), any(), any(), any(), eq("HIGH")))
+            .thenReturn(capa);
+
+        CmaDisclosure after = service.transition(5L, "PARTIAL");
+
+        assertThat(after.getDisclosureStatus()).isEqualTo("PARTIAL");
+        // A disclosure gap fires the auto-CAPA (source CMA_DISCLOSURE / id 5) …
+        verify(capaService).autoOpen(eq("CMA_DISCLOSURE"), eq("5"), any(), any(), any(), eq("HIGH"));
+        // … and the disclosure is back-linked to it for the matrix UI.
+        assertThat(after.getLinkedCapaId()).isEqualTo(99L);
     }
 
     // ── Rule 6 — DISCLOSED/PARTIAL with no evidence → EVIDENCE_REQUIRED

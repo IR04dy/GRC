@@ -2,6 +2,8 @@ package com.tss.grc.module.sust.cma.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
+import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.cma.entity.CmaDisclosure;
 import com.tss.grc.module.sust.cma.repository.CmaDisclosureRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -45,6 +47,7 @@ public class CmaDisclosureService {
 
     private final CmaDisclosureRepository repo;
     private final AuditLogService audit;
+    private final CorrectiveActionService capaService;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -84,6 +87,7 @@ public class CmaDisclosureService {
         CmaDisclosure saved = repo.save(req);
         audit.log("CREATE", "CmaDisclosure", saved.getId(),
                 "CMA disclosure created");
+        maybeAutoCapa(saved);
         return saved;
     }
 
@@ -110,6 +114,7 @@ public class CmaDisclosureService {
         CmaDisclosure saved = repo.save(cur);
         audit.log("UPDATE", "CmaDisclosure", saved.getId(),
                 "CMA disclosure updated");
+        maybeAutoCapa(saved);
         return saved;
     }
 
@@ -129,6 +134,7 @@ public class CmaDisclosureService {
         CmaDisclosure saved = repo.save(cur);
         audit.log("TRANSITION", "CmaDisclosure", saved.getId(),
                 "CMA disclosure -> " + to);
+        maybeAutoCapa(saved);
         return saved;
     }
 
@@ -229,6 +235,36 @@ public class CmaDisclosureService {
         out.put("withGap", withGap);
         out.put("readinessPct", readinessPct);
         return out;
+    }
+
+    // ── S-D — auto-CAPA on disclosure gap ────────────────────────────
+
+    /**
+     * A disclosure that settles in PARTIAL or NOT_DISCLOSED is a genuine
+     * disclosure gap; idempotently open a corrective action for it (mirrors the
+     * compliance F8 {@code AR-EVD-GAP} rule). Deduped by
+     * ({@code CMA_DISCLOSURE}, id) inside {@link CorrectiveActionService#autoOpen},
+     * so create / update / transition can all call this without doubling up.
+     * The first CAPA is back-linked ({@code linkedCapaId}) for the matrix UI.
+     * EVIDENCE_REQUIRED (Rule 6) is intentionally NOT a trigger — it is an
+     * evidence-collection state, not a disclosure gap.
+     */
+    private void maybeAutoCapa(CmaDisclosure d) {
+        String s = d.getDisclosureStatus();
+        if (!"PARTIAL".equals(s) && !"NOT_DISCLOSED".equals(s)) return;
+        String gap = d.getGapDescriptionEn() != null ? d.getGapDescriptionEn()
+                   : (d.getGapDescriptionAr() != null ? d.getGapDescriptionAr() : "");
+        CorrectiveAction ca = capaService.autoOpen(
+            "CMA_DISCLOSURE", String.valueOf(d.getId()),
+            "CMA Art. " + d.getArticle() + " disclosure gap (" + s + ")",
+            "فجوة إفصاح — المادة " + d.getArticle() + " (هيئة السوق المالية)",
+            "Auto-opened by S-D: CMA disclosure #" + d.getId() + " is " + s
+                + (gap.isBlank() ? "." : ". Gap: " + gap),
+            "HIGH");
+        if (ca != null && d.getLinkedCapaId() == null) {
+            d.setLinkedCapaId(ca.getId());
+            repo.save(d);
+        }
     }
 
     // ── Rule enforcement helpers ─────────────────────────────────────
