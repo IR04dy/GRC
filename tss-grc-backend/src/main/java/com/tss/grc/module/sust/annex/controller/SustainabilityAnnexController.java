@@ -2,7 +2,9 @@ package com.tss.grc.module.sust.annex.controller;
 
 import com.tss.grc.module.sust.annex.entity.ReportingYear;
 import com.tss.grc.module.sust.annex.entity.SustainabilityReport;
+import com.tss.grc.module.sust.annex.service.AnnexExportService;
 import com.tss.grc.module.sust.annex.service.SustainabilityReportService;
+import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -10,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,6 +36,7 @@ import java.util.List;
 public class SustainabilityAnnexController {
 
     private final SustainabilityReportService service;
+    private final AnnexExportService exportService;
 
     // ── Reporting years ──────────────────────────────────────────────
     @GetMapping("/api/sustainability/reporting-years")
@@ -103,15 +107,21 @@ public class SustainabilityAnnexController {
 
     @PostMapping("/api/sustainability/reports/{id}/submit")
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public SustainabilityReport submit(@PathVariable Long id) { return service.transitionReport(id, "SUBMITTED"); }
+    public SustainabilityReport submit(@PathVariable Long id, @AuthenticationPrincipal GrcUserDetails me) {
+        return service.transitionReport(id, "SUBMITTED", me);
+    }
 
     @PostMapping("/api/sustainability/reports/{id}/approve")
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public SustainabilityReport approve(@PathVariable Long id) { return service.transitionReport(id, "APPROVED"); }
+    public SustainabilityReport approve(@PathVariable Long id, @AuthenticationPrincipal GrcUserDetails me) {
+        return service.transitionReport(id, "APPROVED", me);   // stamps approver + SHA-256 lock
+    }
 
     @PostMapping("/api/sustainability/reports/{id}/publish")
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public SustainabilityReport publish(@PathVariable Long id) { return service.transitionReport(id, "PUBLISHED"); }
+    public SustainabilityReport publish(@PathVariable Long id, @AuthenticationPrincipal GrcUserDetails me) {
+        return service.transitionReport(id, "PUBLISHED", me);
+    }
 
     /**
      * Export endpoint — streams the chosen content snapshot with an
@@ -127,6 +137,7 @@ public class SustainabilityAnnexController {
             case "md", "markdown" -> { body = r.getContentMarkdown(); mt = MediaType.TEXT_PLAIN;   ext = "md";   }
             case "html"           -> { body = r.getContentHtml();     mt = MediaType.TEXT_HTML;    ext = "html"; }
             case "json"           -> { body = r.getContentJson();     mt = MediaType.APPLICATION_JSON; ext = "json"; }
+            case "csv"            -> { body = exportService.csv(r);   mt = MediaType.parseMediaType("text/csv"); ext = "csv"; }
             default -> throw new IllegalArgumentException("Unsupported format: " + format);
         }
         if (body == null || body.isEmpty()) body = "(empty)";
@@ -135,5 +146,18 @@ public class SustainabilityAnnexController {
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
             .contentType(mt)
             .body(body);
+    }
+
+    /** S-I — Arabic-capable PDF export (OpenPDF) of the frozen annex snapshot. */
+    @GetMapping("/api/sustainability/reports/{id}/export.pdf")
+    @PreAuthorize("hasPermission('SUST','READ')")
+    public ResponseEntity<byte[]> exportPdf(@PathVariable Long id) {
+        SustainabilityReport r = service.getReport(id);
+        byte[] pdf = exportService.pdf(r);
+        String fn = (r.getReportCode() == null ? ("report-" + r.getId()) : r.getReportCode()) + ".pdf";
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fn + "\"")
+            .body(pdf);
     }
 }

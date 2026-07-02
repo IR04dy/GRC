@@ -9,6 +9,7 @@ import com.tss.grc.module.sust.annex.repository.ReportingYearRepository;
 import com.tss.grc.module.sust.annex.repository.SustainabilityReportRepository;
 import com.tss.grc.module.sust.cma.service.CmaDisclosureService;
 import com.tss.grc.module.sust.tcfd.service.TcfdItemService;
+import com.tss.grc.security.GrcUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,6 +18,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -227,7 +230,7 @@ public class SustainabilityReportService {
     }
 
     @Transactional
-    public SustainabilityReport transitionReport(Long id, String to) {
+    public SustainabilityReport transitionReport(Long id, String to, GrcUserDetails me) {
         SustainabilityReport cur = getReport(id);
         if (!REPORT_STATUSES.contains(to))
             throw new IllegalArgumentException("Unknown report status: " + to);
@@ -239,7 +242,16 @@ public class SustainabilityReportService {
         if (!ok) throw new IllegalTransitionException(from, to, Set.of("SUBMITTED","APPROVED","PUBLISHED"));
         cur.setStatus(to);
         LocalDateTime now = LocalDateTime.now();
-        if ("APPROVED".equals(to))  cur.setApprovedAt(now);
+        if ("APPROVED".equals(to)) {
+            cur.setApprovedAt(now);
+            cur.setApprovedBy(me == null ? null : me.getUsername());   // S-I / T-43 — stamp the approver
+            // S-I — freeze + hash the content and lock the row (immutable on approval).
+            cur.setContentHash(sha256(
+                  (cur.getContentMarkdown() == null ? "" : cur.getContentMarkdown())
+                + (cur.getContentHtml() == null ? "" : cur.getContentHtml())
+                + (cur.getContentJson() == null ? "" : cur.getContentJson())));
+            cur.setIsLocked(true);
+        }
         if ("PUBLISHED".equals(to)) {
             cur.setPublishedAt(now);
             // Supersede earlier PUBLISHED rows of the same type/year.
@@ -255,7 +267,20 @@ public class SustainabilityReportService {
             }
         }
         SustainabilityReport saved = reportRepo.save(cur);
-        audit.log("TRANSITION", "SustainabilityReport", saved.getId(), "Report -> " + to);
+        audit.log("TRANSITION", "SustainabilityReport", saved.getId(),
+            "Report -> " + to + ("APPROVED".equals(to) ? " (locked; sha256=" + saved.getContentHash() + ")" : ""));
         return saved;
+    }
+
+    /** SHA-256 hex of the frozen content — S-I content lock. */
+    static String sha256(String s) {
+        try {
+            byte[] d = MessageDigest.getInstance("SHA-256").digest(s.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(d.length * 2);
+            for (byte b : d) sb.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));
+            return sb.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
     }
 }

@@ -51,6 +51,11 @@ public class SustainabilityReport {
     @Column(name = "content_html",     columnDefinition = "NVARCHAR(MAX)") private String contentHtml;
     @Column(name = "content_json",     columnDefinition = "NVARCHAR(MAX)") private String contentJson;
 
+    /** S-I — SHA-256 of the frozen content, stamped on APPROVE. */
+    @Column(name = "content_hash", length = 64) private String contentHash;
+    /** S-I — set on APPROVE; the approved content is immutable (re-gen makes a new version). */
+    @Column(name = "is_locked", nullable = false) private Boolean isLocked = false;
+
     @Column(name = "is_deleted", nullable = false) private Boolean isDeleted = false;
     @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     @Column(name = "created_by", length = 100) private String createdBy;
