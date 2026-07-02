@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Leaf, TrendingDown, TrendingUp, Target, Calculator, FileText, Truck,
   Download, Trash2, CheckCircle2, AlertCircle, Building2,
   CloudLightning, Plus, ArrowRight, Link2, Wrench, Clock,
-  Paperclip, Coins, Hourglass, X as XIcon, Pencil,
+  Paperclip, Coins, Hourglass, X as XIcon, Pencil, Upload,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -81,14 +81,14 @@ import {
   type EsgMetric as EsgM, type MetricAggregate, type MetricCategory,
 } from '../../lib/sustainabilityMetrics';
 import {
-  listEvidence, evidenceAggregate, approveEvidence, rejectEvidence,
-  sweepExpiredEvidence,
-  evidenceStatusTone, evidenceStatusLabel,
-  evidenceConfidentialityTone, evidenceConfidentialityLabel,
-  evidenceModuleLabel, daysUntilExpiry,
-  type SustainabilityEvidence as SE, type EvidenceAggregate as EvidenceAgg,
-  type EvidenceApprovalStatus,
-} from '../../lib/sustainabilityEvidence';
+  listEvidenceItems, createEvidenceItem, uploadEvidenceItemFile,
+  submitEvidenceItem, approveEvidenceItem, rejectEvidenceItem, deleteEvidenceItem,
+  evidenceItemStatusTone, evidenceItemStatusLabel, canSubmitEvidence,
+  type EvidenceItem, type EvidenceItemStatus,
+} from '../../lib/evidenceItems';
+import {
+  linkSustEvidence, SUST_EVIDENCE_ENTITY_TYPES, type SustEvidenceEntityType,
+} from '../../lib/sustEvidenceLinks';
 import {
   getDashboard, esgBandTone, esgBandLabel, esgBandColor, topGapLabel,
   type DashboardPayload,
@@ -3252,100 +3252,150 @@ function EvidenceTab() {
   const toast = useToast();
   const isAr = lang === 'ar';
 
-  const [items, setItems] = useState<SE[]>([]);
-  const [agg, setAgg]     = useState<EvidenceAgg | null>(null);
+  const [items, setItems] = useState<EvidenceItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<EvidenceApprovalStatus | 'ALL'>('ALL');
-  const [approvingId, setApprovingId]   = useState<number | null>(null);
-  const [rejectingId, setRejectingId]   = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<EvidenceItemStatus | 'ALL'>('ALL');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [linkTarget, setLinkTarget] = useState<EvidenceItem | null>(null);
+  const [uploadTargetId, setUploadTargetId] = useState<number | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   async function reload() {
     setLoading(true);
-    // Per-call .catch() — evidence list and aggregate are independent.
-    const [pg, a] = await Promise.all([
-      listEvidence({ size: 200 }).catch(() => ({ content: [] as SE[], totalElements: 0 })),
-      evidenceAggregate().catch(() => null as EvidenceAgg | null),
-    ]);
+    const pg = await listEvidenceItems({ size: 200 })
+      .catch(() => ({ content: [] as EvidenceItem[], totalElements: 0, totalPages: 0, number: 0, size: 0 }));
     setItems(pg.content);
-    setAgg(a);
     setLoading(false);
   }
   useEffect(() => { void reload(); }, []);
 
-  const filtered = statusFilter === 'ALL'
-    ? items
-    : items.filter(e => e.approvalStatus === statusFilter);
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {
+      total: items.length, DRAFT: 0, PENDING_REVIEW: 0, APPROVED: 0, REJECTED: 0, NEEDS_REVISION: 0, EXPIRED: 0,
+    };
+    for (const e of items) c[e.status] = (c[e.status] ?? 0) + 1;
+    return c;
+  }, [items]);
 
-  async function submitApprove(values: Record<string, unknown>) {
-    if (approvingId == null) return;
-    const by = String(values.approvedBy ?? '').trim();
-    if (!by) { toast.danger(isAr ? 'الاسم مطلوب' : 'Name required'); return; }
-    try { await approveEvidence(approvingId, by); toast.success(isAr ? 'تم الاعتماد' : 'Approved'); setApprovingId(null); await reload(); }
-    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
-  }
+  const filtered = statusFilter === 'ALL' ? items : items.filter(e => e.status === statusFilter);
 
-  async function submitReject(values: Record<string, unknown>) {
-    if (rejectingId == null) return;
-    const reviewerName = String(values.reviewerName ?? '').trim();
-    const reason       = String(values.reason ?? '').trim();
-    if (!reviewerName || !reason) {
-      toast.danger(isAr ? 'الاسم والسبب مطلوبان' : 'Name and reason required'); return;
-    }
-    try { await rejectEvidence(rejectingId, reviewerName, reason); toast.info(isAr ? 'تم الرفض' : 'Rejected'); setRejectingId(null); await reload(); }
-    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
-  }
-
-  async function onSweep() {
-    if (!window.confirm(isAr ? 'فحص الأدلة المنتهية وتعليمها كـ EXPIRED؟' : 'Sweep expired evidence and mark them EXPIRED?')) return;
+  // ── Create (real EvidenceItem, starts DRAFT) ─────────────────────
+  async function submitCreate(values: Record<string, unknown>) {
+    const titleEn = String(values.titleEn ?? '').trim();
+    if (!titleEn) { toast.danger(isAr ? 'العنوان مطلوب' : 'Title is required'); return; }
     try {
-      const expired = await sweepExpiredEvidence();
-      toast.success(isAr ? `تم تحديث ${expired.length} دليل` : `Marked ${expired.length} evidence row(s) expired`);
+      await createEvidenceItem({
+        titleEn,
+        titleAr: String(values.titleAr ?? '').trim() || undefined,
+        descriptionEn: String(values.descriptionEn ?? '').trim() || undefined,
+        evidenceType: String(values.evidenceType ?? 'DOCUMENT'),
+        version: String(values.version ?? '').trim() || undefined,
+        validFrom: String(values.validFrom ?? '').trim() || undefined,
+        validTo: String(values.validTo ?? '').trim() || undefined,
+        sourceModule: 'SUSTAINABILITY',
+      });
+      toast.success(isAr ? 'تم إنشاء الدليل (مسودة) — ارفع ملفاً ثم أرسله للمراجعة'
+                         : 'Evidence created (Draft) — upload a file, then submit for review');
+      setCreateOpen(false);
       await reload();
-    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Create failed'); }
   }
 
-  const approveFields: FieldDef[] = [
-    { kind: 'text', key: 'approvedBy', required: true, span: 12,
-      label: isAr ? 'اسم المعتَمِد' : 'Approver name' },
+  // ── Real file upload → server computes SHA-256 ───────────────────
+  function triggerUpload(id: number) { setUploadTargetId(id); fileRef.current?.click(); }
+  async function uploadPicked(file: File | null) {
+    if (!file || uploadTargetId == null) { setUploadTargetId(null); return; }
+    try {
+      await uploadEvidenceItemFile(uploadTargetId, file);
+      toast.success(isAr ? 'تم رفع الملف واحتساب بصمة SHA-256' : 'File uploaded — SHA-256 computed server-side');
+      await reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Upload failed'); }
+    finally { setUploadTargetId(null); }
+  }
+
+  // ── Lifecycle transitions ────────────────────────────────────────
+  async function act(fn: () => Promise<unknown>, ok: string) {
+    try { await fn(); toast.success(ok); await reload(); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+  }
+  const doSubmit  = (id: number) => act(() => submitEvidenceItem(id),  isAr ? 'أُرسل للمراجعة' : 'Submitted for review');
+  const doApprove = (id: number) => act(() => approveEvidenceItem(id), isAr ? 'تم الاعتماد' : 'Approved');
+  const doReject  = (id: number) => act(() => rejectEvidenceItem(id),  isAr ? 'تم الرفض' : 'Rejected');
+  function doDelete(id: number) {
+    if (!window.confirm(isAr ? 'حذف هذا الدليل؟' : 'Delete this evidence item?')) return;
+    void act(() => deleteEvidenceItem(id), isAr ? 'تم الحذف' : 'Deleted');
+  }
+
+  // ── Link a real evidence item to an ESG entity (S-C bridge) ──────
+  async function submitLink(values: Record<string, unknown>) {
+    if (!linkTarget) return;
+    const entityType = String(values.entityType ?? '') as SustEvidenceEntityType;
+    const entityId = Number(values.entityId ?? 0);
+    if (!entityType || !Number.isFinite(entityId) || entityId <= 0) {
+      toast.danger(isAr ? 'النوع والمعرّف مطلوبان' : 'Entity type and id are required'); return;
+    }
+    try {
+      await linkSustEvidence(entityType, entityId, linkTarget.id, String(values.notes ?? '').trim() || undefined);
+      toast.success(isAr ? 'تم ربط الدليل بالكيان' : 'Linked to ESG entity');
+      setLinkTarget(null);
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Link failed'); }
+  }
+
+  const createFields: FieldDef[] = [
+    { kind: 'text',     key: 'titleEn', required: true, span: 12, label: isAr ? 'العنوان (إنجليزي)' : 'Title (English)' },
+    { kind: 'text',     key: 'titleAr', span: 12, label: isAr ? 'العنوان (عربي)' : 'Title (Arabic)' },
+    { kind: 'select',   key: 'evidenceType', required: true, span: 6, label: isAr ? 'النوع' : 'Type', options: [
+        { value: 'DOCUMENT', label: 'Document' }, { value: 'REPORT', label: 'Report' },
+        { value: 'CERTIFICATE', label: 'Certificate' }, { value: 'SPREADSHEET', label: 'Spreadsheet' },
+        { value: 'SCREENSHOT', label: 'Screenshot' }, { value: 'POLICY', label: 'Policy' },
+        { value: 'ATTESTATION', label: 'Attestation' }, { value: 'OTHER', label: 'Other' } ] },
+    { kind: 'text',     key: 'version', span: 6, label: isAr ? 'الإصدار' : 'Version', placeholder: 'v1.0' },
+    { kind: 'date',     key: 'validFrom', span: 6, label: isAr ? 'صالح من' : 'Valid from' },
+    { kind: 'date',     key: 'validTo', span: 6, label: isAr ? 'صالح حتى' : 'Valid to' },
+    { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2, label: isAr ? 'الوصف' : 'Description' },
   ];
-  const rejectFields: FieldDef[] = [
-    { kind: 'text', key: 'reviewerName', required: true, span: 12,
-      label: isAr ? 'اسم المراجِع' : 'Reviewer name' },
-    { kind: 'textarea', key: 'reason', span: 12, rows: 3,
-      label: isAr ? 'سبب الرفض' : 'Rejection reason' },
+  const linkFields: FieldDef[] = [
+    { kind: 'select', key: 'entityType', required: true, span: 12, label: isAr ? 'نوع الكيان' : 'ESG entity type',
+      options: SUST_EVIDENCE_ENTITY_TYPES.map(t => ({ value: t.value, label: isAr ? t.ar : t.en })) },
+    { kind: 'number', key: 'entityId', required: true, span: 6, min: 1, label: isAr ? 'معرّف الكيان' : 'Entity id' },
+    { kind: 'textarea', key: 'notes', span: 12, rows: 2, label: isAr ? 'ملاحظات' : 'Notes' },
   ];
 
   return (
     <div className="esg-stack">
+      {/* Hidden picker — one per tab; the row's Upload button drives it. */}
+      <input ref={fileRef} type="file" hidden
+             onChange={ev => { const f = ev.target.files?.[0] ?? null; ev.target.value = ''; void uploadPicked(f); }} />
+
       {/* KPI strip */}
       <div className="kpi-grid">
-        <Kpi Icon={Paperclip}    label={isAr ? 'إجمالي الأدلة' : 'Total evidence'}            value={agg?.total ?? 0} tone="primary" onClick={() => setStatusFilter('ALL')} active={statusFilter === 'ALL'} />
-        <Kpi Icon={CheckCircle2} label={isAr ? 'معتمدة' : 'Approved'}                          value={agg?.byStatus.APPROVED ?? 0}       tone="success" onClick={() => setStatusFilter('APPROVED')} active={statusFilter === 'APPROVED'} />
-        <Kpi Icon={ArrowRight}   label={isAr ? 'قيد المراجعة' : 'Pending review'}              value={agg?.byStatus.PENDING_REVIEW ?? 0} tone="info" onClick={() => setStatusFilter('PENDING_REVIEW')} active={statusFilter === 'PENDING_REVIEW'} />
-        <Kpi Icon={AlertCircle}  label={isAr ? 'مرفوضة' : 'Rejected'}                          value={agg?.byStatus.REJECTED ?? 0}       tone="danger" onClick={() => setStatusFilter('REJECTED')} active={statusFilter === 'REJECTED'} />
-        <Kpi Icon={Clock}        label={isAr ? 'تنتهي خلال 30 يوماً' : 'Expiring within 30d'}  value={agg?.expiringSoon30d ?? 0}         tone={(agg?.expiringSoon30d ?? 0) > 0 ? 'warning' : 'success'} to="/esg" />
-        <Kpi Icon={AlertCircle}  label={isAr ? 'منتهية' : 'Expired'}                           value={agg?.byStatus.EXPIRED ?? 0}        tone={(agg?.byStatus.EXPIRED ?? 0) > 0 ? 'danger' : 'success'} onClick={() => setStatusFilter('EXPIRED')} active={statusFilter === 'EXPIRED'} />
+        <Kpi Icon={Paperclip}    label={isAr ? 'إجمالي الأدلة' : 'Total evidence'} value={counts.total}          tone="primary" onClick={() => setStatusFilter('ALL')}            active={statusFilter === 'ALL'} />
+        <Kpi Icon={CheckCircle2} label={isAr ? 'معتمدة' : 'Approved'}              value={counts.APPROVED}       tone="success" onClick={() => setStatusFilter('APPROVED')}       active={statusFilter === 'APPROVED'} />
+        <Kpi Icon={Clock}        label={isAr ? 'قيد المراجعة' : 'Pending review'}  value={counts.PENDING_REVIEW} tone="info"    onClick={() => setStatusFilter('PENDING_REVIEW')} active={statusFilter === 'PENDING_REVIEW'} />
+        <Kpi Icon={Pencil}       label={isAr ? 'مسودة' : 'Draft'}                  value={counts.DRAFT}          tone="neutral" onClick={() => setStatusFilter('DRAFT')}          active={statusFilter === 'DRAFT'} />
+        <Kpi Icon={Trash2}       label={isAr ? 'مرفوضة' : 'Rejected'}              value={counts.REJECTED}       tone="danger"  onClick={() => setStatusFilter('REJECTED')}       active={statusFilter === 'REJECTED'} />
+        <Kpi Icon={AlertCircle}  label={isAr ? 'منتهية' : 'Expired'}               value={counts.EXPIRED}        tone={counts.EXPIRED > 0 ? 'danger' : 'success'} onClick={() => setStatusFilter('EXPIRED')} active={statusFilter === 'EXPIRED'} />
       </div>
 
       <Card title={isAr ? 'مستودع أدلة الاستدامة' : 'Sustainability Evidence Repository'}
             Icon={Paperclip}
             action={
-              <Button size="sm" variant="secondary" Icon={Clock} onClick={onSweep}>
-                {isAr ? 'فحص الانتهاء (القاعدة 9)' : 'Sweep expired (Rule 9)'}
+              <Button size="sm" variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>
+                {isAr ? 'إضافة دليل' : 'Add evidence'}
               </Button>
             }>
         <div className="esg-text-eyebrow-sm">
           {isAr
-            ? 'مستودع موحَّد للأدلة الداعمة لجميع كيانات الاستدامة. كل دليل له فترة صلاحية، ومراجعة، وحالة اعتماد. عند انتهاء valid_to يتم وسم الإفصاحات المرتبطة بـ EVIDENCE_REQUIRED (القاعدة 9).'
-            : 'Unified repository for evidence supporting every sustainability entity. Each row has a validity window, reviewer, and approval state. When valid_to passes, linked disclosures are auto-flagged EVIDENCE_REQUIRED (Rule 9).'}
+            ? 'أدلة حقيقية عبر محرّك الأدلة الموحّد (module/evidence): أنشئ عنصراً، ارفع ملفاً حقيقياً (تُحتسب بصمة SHA-256 في الخادم)، ثم أرسله للمراجعة → اعتماد/رفض → إعادة تقديم. اربط أي دليل بكيان استدامة عبر جسر S-C.'
+            : 'Real evidence via the unified engine (module/evidence): create an item, upload a real file (SHA-256 computed server-side), then Submit → Approve/Reject → resubmit. Link any item to an ESG entity via the S-C bridge.'}
         </div>
 
         {/* Status filter chips */}
         <div className="esg-filter-row">
-          {(['ALL', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'EXPIRED', 'SUPERSEDED'] as const).map(s => (
+          {(['ALL', 'DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'NEEDS_REVISION', 'EXPIRED'] as const).map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
               className={`esg-filter-btn${statusFilter === s ? ' is-active' : ''}`}>
-              {s === 'ALL' ? (isAr ? 'الكل' : 'All') : evidenceStatusLabel(s as EvidenceApprovalStatus, isAr ? 'ar' : 'en')}
+              {s === 'ALL' ? (isAr ? 'الكل' : 'All') : evidenceItemStatusLabel(s as EvidenceItemStatus, isAr ? 'ar' : 'en')}
             </button>
           ))}
           <span className="text-2xs text-muted esg-filter-row__count">
@@ -3356,102 +3406,89 @@ function EvidenceTab() {
         {loading
           ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
           : filtered.length === 0
-            ? <InlineEmpty>{isAr ? 'لا توجد أدلة مطابقة' : 'No matching evidence'}</InlineEmpty>
+            ? <InlineEmpty>{isAr ? 'لا توجد أدلة — أضف أول دليل' : 'No evidence yet — add your first item'}</InlineEmpty>
             : (
               <table className="grc-table">
                 <thead>
                   <tr>
                     <th>{isAr ? 'الكود' : 'Code'}</th>
                     <th>{isAr ? 'العنوان' : 'Title'}</th>
-                    <th>{isAr ? 'الوحدة' : 'Module'}</th>
                     <th>{isAr ? 'النوع' : 'Type'}</th>
                     <th>{isAr ? 'الإصدار' : 'Version'}</th>
                     <th>{isAr ? 'انتهاء الصلاحية' : 'Valid to'}</th>
-                    <th>{isAr ? 'سرّية' : 'Confidentiality'}</th>
                     <th>{isAr ? 'الحالة' : 'Status'}</th>
                     <th className="esg-text-end">{isAr ? 'الإجراءات' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(e => {
-                    const days = daysUntilExpiry(e);
-                    const expiringSoon = days != null && days >= 0 && days <= 30
-                      && e.approvalStatus === 'APPROVED';
-                    return (
-                      <tr key={e.id}>
-                        <td className="mono text-2xs">{e.evidenceCode ?? `#${e.id}`}</td>
-                        <td>
-                          <div className="esg-cell-title">
-                            {isAr && e.titleAr ? e.titleAr : e.titleEn}
-                          </div>
-                          {e.fileName && (
-                            <div className="text-2xs text-muted mono esg-cell-sub">
+                  {filtered.map(e => (
+                    <tr key={e.id}>
+                      <td className="mono text-2xs">{e.evidenceCode ?? `#${e.id}`}</td>
+                      <td>
+                        <div className="esg-cell-title">{isAr && e.titleAr ? e.titleAr : e.titleEn}</div>
+                        {e.fileName
+                          ? <div className="text-2xs text-muted mono esg-cell-sub">
                               <Paperclip size={9} className="esg-icon-inline" />
-                              {e.fileName}
+                              {e.fileName}{e.fileSize ? ` · ${Math.round(e.fileSize / 1024)} KB` : ''} · {isAr ? 'مجزّأ SHA-256' : 'SHA-256 ✓'}
                             </div>
+                          : <div className="text-2xs esg-date-due-soon esg-cell-sub">{isAr ? 'لا ملف بعد' : 'no file yet'}</div>}
+                      </td>
+                      <td className="text-xs">{e.evidenceType ?? '—'}</td>
+                      <td className="mono text-2xs">{e.version ?? '—'}</td>
+                      <td className="mono text-2xs">{e.validTo ?? '—'}</td>
+                      <td><Badge tone={evidenceItemStatusTone(e.status)}>{evidenceItemStatusLabel(e.status, isAr ? 'ar' : 'en')}</Badge></td>
+                      <td className="esg-text-end">
+                        <div className="esg-actions-row">
+                          {canSubmitEvidence(e.status) && (
+                            <>
+                              <Button size="sm" variant="ghost" Icon={Upload}
+                                title={isAr ? 'رفع ملف' : 'Upload file'} onClick={() => triggerUpload(e.id)} />
+                              <Button size="sm" variant="secondary" Icon={ArrowRight} onClick={() => doSubmit(e.id)}>
+                                {isAr ? 'إرسال' : 'Submit'}
+                              </Button>
+                            </>
                           )}
-                          {e.verificationStatus === 'EXTERNAL_VERIFIED' && e.verificationProvider && (
-                            <div className="text-2xs esg-cell-sub esg-score-hero__yoy-positive">
-                              ✓ {isAr ? 'تحقّق خارجي:' : 'External verification:'} {e.verificationProvider}
-                            </div>
+                          {e.status === 'PENDING_REVIEW' && (
+                            <>
+                              <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => doApprove(e.id)}>
+                                {isAr ? 'اعتماد' : 'Approve'}
+                              </Button>
+                              <Button size="sm" variant="ghost" Icon={AlertCircle}
+                                title={isAr ? 'رفض' : 'Reject'} onClick={() => doReject(e.id)} />
+                            </>
                           )}
-                        </td>
-                        <td>{e.moduleArea && <Badge tone="neutral">{evidenceModuleLabel(e.moduleArea, isAr ? 'ar' : 'en')}</Badge>}</td>
-                        <td className="text-xs">{e.evidenceType ?? '—'}</td>
-                        <td className="mono text-2xs">{e.version ?? '—'}</td>
-                        <td className="mono text-2xs">
-                          {e.validTo ?? '—'}
-                          {days != null && e.approvalStatus === 'APPROVED' && (
-                            <div className={`text-2xs ${days < 0 ? 'esg-date-overdue' : expiringSoon ? 'esg-date-due-soon' : ''}`}>
-                              {days < 0
-                                ? (isAr ? `منتهي قبل ${Math.abs(days)} يوماً` : `${Math.abs(days)}d expired`)
-                                : (isAr ? `${days} يوماً متبقّياً` : `${days}d left`)}
-                            </div>
-                          )}
-                        </td>
-                        <td><Badge tone={evidenceConfidentialityTone(e.confidentiality)}>{evidenceConfidentialityLabel(e.confidentiality, isAr ? 'ar' : 'en')}</Badge></td>
-                        <td><Badge tone={evidenceStatusTone(e.approvalStatus)}>{evidenceStatusLabel(e.approvalStatus, isAr ? 'ar' : 'en')}</Badge></td>
-                        <td className="esg-text-end">
-                          <div className="esg-actions-row">
-                            {e.approvalStatus === 'PENDING_REVIEW' && (
-                              <>
-                                <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => setApprovingId(e.id!)}>
-                                  {isAr ? 'اعتماد' : 'Approve'}
-                                </Button>
-                                <Button size="sm" variant="ghost" Icon={Trash2}
-                                  title={isAr ? 'رفض' : 'Reject'}
-                                  onClick={() => setRejectingId(e.id!)} />
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          <Button size="sm" variant="ghost" Icon={Link2}
+                            title={isAr ? 'ربط بكيان ESG' : 'Link to ESG entity'} onClick={() => setLinkTarget(e)} />
+                          <Button size="sm" variant="ghost" Icon={Trash2}
+                            title={isAr ? 'حذف' : 'Delete'} onClick={() => doDelete(e.id)} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}
       </Card>
 
       <FormModal
-        open={approvingId !== null}
-        title={isAr ? 'اعتماد الدليل' : 'Approve evidence'}
-        fields={approveFields}
-        initial={{ approvedBy: '' }}
-        size="md"
-        submitLabel={isAr ? 'اعتماد' : 'Approve'}
-        onClose={() => setApprovingId(null)}
-        onSubmit={submitApprove}
+        open={createOpen}
+        title={isAr ? 'إضافة دليل جديد' : 'Add new evidence'}
+        fields={createFields}
+        initial={{ titleEn: '', titleAr: '', evidenceType: 'DOCUMENT', version: '', validFrom: '', validTo: '', descriptionEn: '' }}
+        size="lg"
+        submitLabel={isAr ? 'إنشاء' : 'Create'}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={submitCreate}
       />
       <FormModal
-        open={rejectingId !== null}
-        title={isAr ? 'رفض الدليل' : 'Reject evidence'}
-        fields={rejectFields}
-        initial={{ reviewerName: '', reason: '' }}
+        open={linkTarget !== null}
+        title={isAr ? 'ربط الدليل بكيان استدامة' : 'Link evidence to an ESG entity'}
+        fields={linkFields}
+        initial={{ entityType: 'CmaDisclosure', entityId: '', notes: '' }}
         size="md"
-        submitLabel={isAr ? 'رفض' : 'Reject'}
-        onClose={() => setRejectingId(null)}
-        onSubmit={submitReject}
+        submitLabel={isAr ? 'ربط' : 'Link'}
+        onClose={() => setLinkTarget(null)}
+        onSubmit={submitLink}
       />
     </div>
   );
