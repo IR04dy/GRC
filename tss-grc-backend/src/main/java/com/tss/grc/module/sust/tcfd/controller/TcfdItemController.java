@@ -1,7 +1,9 @@
 package com.tss.grc.module.sust.tcfd.controller;
 
+import com.tss.grc.module.sust.tcfd.dto.TcfdItemCreateRequest;
 import com.tss.grc.module.sust.tcfd.entity.TcfdItem;
 import com.tss.grc.module.sust.tcfd.service.TcfdItemService;
+import jakarta.validation.Valid;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -50,8 +52,8 @@ public class TcfdItemController {
 
     @PostMapping
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public ResponseEntity<TcfdItem> create(@RequestBody TcfdItem req) {
-        return ResponseEntity.status(201).body(service.create(req));
+    public ResponseEntity<TcfdItem> create(@Valid @RequestBody TcfdItemCreateRequest req) {
+        return ResponseEntity.status(201).body(service.create(req.toEntity()));
     }
 
     @PutMapping("/{id}")

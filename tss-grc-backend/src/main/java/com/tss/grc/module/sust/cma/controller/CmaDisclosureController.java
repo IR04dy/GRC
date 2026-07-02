@@ -1,7 +1,9 @@
 package com.tss.grc.module.sust.cma.controller;
 
+import com.tss.grc.module.sust.cma.dto.CmaCreateRequest;
 import com.tss.grc.module.sust.cma.entity.CmaDisclosure;
 import com.tss.grc.module.sust.cma.service.CmaDisclosureService;
+import jakarta.validation.Valid;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -67,8 +69,8 @@ public class CmaDisclosureController {
 
     @PostMapping
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public ResponseEntity<CmaDisclosure> create(@RequestBody CmaDisclosure req) {
-        return ResponseEntity.status(201).body(service.create(req));
+    public ResponseEntity<CmaDisclosure> create(@Valid @RequestBody CmaCreateRequest req) {
+        return ResponseEntity.status(201).body(service.create(req.toEntity()));
     }
 
     @PutMapping("/{id}")

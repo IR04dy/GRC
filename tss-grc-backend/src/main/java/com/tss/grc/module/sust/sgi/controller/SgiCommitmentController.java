@@ -1,7 +1,9 @@
 package com.tss.grc.module.sust.sgi.controller;
 
+import com.tss.grc.module.sust.sgi.dto.SgiCreateRequest;
 import com.tss.grc.module.sust.sgi.entity.SgiCommitment;
 import com.tss.grc.module.sust.sgi.service.SgiCommitmentService;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -70,8 +72,8 @@ public class SgiCommitmentController {
 
     @PostMapping
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public ResponseEntity<SgiCommitment> create(@RequestBody SgiCommitment req) {
-        return ResponseEntity.status(201).body(service.create(req));
+    public ResponseEntity<SgiCommitment> create(@Valid @RequestBody SgiCreateRequest req) {
+        return ResponseEntity.status(201).body(service.create(req.toEntity()));
     }
 
     @PutMapping("/{id}")

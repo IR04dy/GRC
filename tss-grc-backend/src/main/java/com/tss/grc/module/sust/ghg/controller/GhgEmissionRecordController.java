@@ -1,7 +1,9 @@
 package com.tss.grc.module.sust.ghg.controller;
 
+import com.tss.grc.module.sust.ghg.dto.GhgCreateRequest;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
 import com.tss.grc.module.sust.ghg.service.GhgEmissionRecordService;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -82,8 +84,8 @@ public class GhgEmissionRecordController {
 
     @PostMapping
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public ResponseEntity<GhgEmissionRecord> create(@RequestBody GhgEmissionRecord req) {
-        return ResponseEntity.status(201).body(service.create(req));
+    public ResponseEntity<GhgEmissionRecord> create(@Valid @RequestBody GhgCreateRequest req) {
+        return ResponseEntity.status(201).body(service.create(req.toEntity()));
     }
 
     @PutMapping("/{id}")

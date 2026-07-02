@@ -1,7 +1,9 @@
 package com.tss.grc.module.sust.capa.controller;
 
+import com.tss.grc.module.sust.capa.dto.CorrectiveActionCreateRequest;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
+import jakarta.validation.Valid;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -75,8 +77,8 @@ public class CorrectiveActionController {
 
     @PostMapping
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public ResponseEntity<CorrectiveAction> create(@RequestBody CorrectiveAction req) {
-        return ResponseEntity.status(201).body(service.create(req));
+    public ResponseEntity<CorrectiveAction> create(@Valid @RequestBody CorrectiveActionCreateRequest req) {
+        return ResponseEntity.status(201).body(service.create(req.toEntity()));
     }
 
     @PutMapping("/{id}")

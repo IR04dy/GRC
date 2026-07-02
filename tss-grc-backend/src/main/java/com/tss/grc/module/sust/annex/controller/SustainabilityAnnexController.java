@@ -1,10 +1,12 @@
 package com.tss.grc.module.sust.annex.controller;
 
+import com.tss.grc.module.sust.annex.dto.ReportingYearCreateRequest;
 import com.tss.grc.module.sust.annex.entity.ReportingYear;
 import com.tss.grc.module.sust.annex.entity.SustainabilityReport;
 import com.tss.grc.module.sust.annex.service.AnnexExportService;
 import com.tss.grc.module.sust.annex.service.SustainabilityReportService;
 import com.tss.grc.security.GrcUserDetails;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -49,8 +51,8 @@ public class SustainabilityAnnexController {
 
     @PostMapping("/api/sustainability/reporting-years")
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public ResponseEntity<ReportingYear> createYear(@RequestBody ReportingYear req) {
-        return ResponseEntity.status(201).body(service.createYear(req));
+    public ResponseEntity<ReportingYear> createYear(@Valid @RequestBody ReportingYearCreateRequest req) {
+        return ResponseEntity.status(201).body(service.createYear(req.toEntity()));
     }
 
     @PostMapping("/api/sustainability/reporting-years/{id}/advance")

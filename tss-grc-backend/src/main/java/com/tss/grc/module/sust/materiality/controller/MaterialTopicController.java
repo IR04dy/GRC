@@ -1,7 +1,9 @@
 package com.tss.grc.module.sust.materiality.controller;
 
+import com.tss.grc.module.sust.materiality.dto.MaterialTopicCreateRequest;
 import com.tss.grc.module.sust.materiality.entity.MaterialTopic;
 import com.tss.grc.module.sust.materiality.service.MaterialTopicService;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -50,8 +52,8 @@ public class MaterialTopicController {
 
     @PostMapping
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public ResponseEntity<MaterialTopic> create(@RequestBody MaterialTopic req) {
-        return ResponseEntity.status(201).body(service.create(req));
+    public ResponseEntity<MaterialTopic> create(@Valid @RequestBody MaterialTopicCreateRequest req) {
+        return ResponseEntity.status(201).body(service.create(req.toEntity()));
     }
 
     @PutMapping("/{id}")

@@ -1,7 +1,9 @@
 package com.tss.grc.module.sust.climate.controller;
 
+import com.tss.grc.module.sust.climate.dto.ClimateRiskCreateRequest;
 import com.tss.grc.module.sust.climate.entity.ClimateRiskOpportunity;
 import com.tss.grc.module.sust.climate.service.ClimateRiskOpportunityService;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -60,8 +62,8 @@ public class ClimateRiskOpportunityController {
 
     @PostMapping
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public ResponseEntity<ClimateRiskOpportunity> create(@RequestBody ClimateRiskOpportunity req) {
-        return ResponseEntity.status(201).body(service.create(req));
+    public ResponseEntity<ClimateRiskOpportunity> create(@Valid @RequestBody ClimateRiskCreateRequest req) {
+        return ResponseEntity.status(201).body(service.create(req.toEntity()));
     }
 
     @PutMapping("/{id}")

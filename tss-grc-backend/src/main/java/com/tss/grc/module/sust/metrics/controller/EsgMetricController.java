@@ -1,7 +1,9 @@
 package com.tss.grc.module.sust.metrics.controller;
 
+import com.tss.grc.module.sust.metrics.dto.EsgMetricCreateRequest;
 import com.tss.grc.module.sust.metrics.entity.EsgMetric;
 import com.tss.grc.module.sust.metrics.service.EsgMetricService;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -55,8 +57,8 @@ public class EsgMetricController {
 
     @PostMapping
     @PreAuthorize("hasPermission('SUST','WRITE')")
-    public ResponseEntity<EsgMetric> create(@RequestBody EsgMetric req) {
-        return ResponseEntity.status(201).body(service.create(req));
+    public ResponseEntity<EsgMetric> create(@Valid @RequestBody EsgMetricCreateRequest req) {
+        return ResponseEntity.status(201).body(service.create(req.toEntity()));
     }
 
     @PutMapping("/{id}")
