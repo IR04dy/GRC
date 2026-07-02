@@ -3280,11 +3280,15 @@ function EvidenceTab() {
   const filtered = statusFilter === 'ALL' ? items : items.filter(e => e.status === statusFilter);
 
   // ── Create (real EvidenceItem, starts DRAFT) ─────────────────────
+  // The optional file staged in the form is uploaded straight after create, so
+  // the user attaches evidence in one step (server computes the SHA-256). A
+  // metadata-only draft is still allowed — upload later via the row's button.
   async function submitCreate(values: Record<string, unknown>) {
     const titleEn = String(values.titleEn ?? '').trim();
     if (!titleEn) { toast.danger(isAr ? 'العنوان مطلوب' : 'Title is required'); return; }
+    const file = values.file instanceof File ? values.file : null;
     try {
-      await createEvidenceItem({
+      const created = await createEvidenceItem({
         titleEn,
         titleAr: String(values.titleAr ?? '').trim() || undefined,
         descriptionEn: String(values.descriptionEn ?? '').trim() || undefined,
@@ -3294,8 +3298,19 @@ function EvidenceTab() {
         validTo: String(values.validTo ?? '').trim() || undefined,
         sourceModule: 'SUSTAINABILITY',
       });
-      toast.success(isAr ? 'تم إنشاء الدليل (مسودة) — ارفع ملفاً ثم أرسله للمراجعة'
-                         : 'Evidence created (Draft) — upload a file, then submit for review');
+      if (file) {
+        try {
+          await uploadEvidenceItemFile(created.id, file);
+          toast.success(isAr ? 'تم إنشاء الدليل ورفع الملف (بصمة SHA-256) — جاهز للإرسال'
+                             : 'Evidence created and file uploaded (SHA-256) — ready to submit');
+        } catch (upErr) {
+          toast.danger(isAr ? 'أُنشئ الدليل لكن فشل رفع الملف — ارفعه من الجدول'
+                            : (upErr instanceof ApiError ? upErr.message : 'Evidence created, but the file upload failed — upload it from the table'));
+        }
+      } else {
+        toast.success(isAr ? 'تم إنشاء الدليل (مسودة) — ارفع ملفاً ثم أرسله للمراجعة'
+                           : 'Evidence created (Draft) — upload a file, then submit for review');
+      }
       setCreateOpen(false);
       await reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Create failed'); }
@@ -3353,6 +3368,10 @@ function EvidenceTab() {
     { kind: 'date',     key: 'validFrom', span: 6, label: isAr ? 'صالح من' : 'Valid from' },
     { kind: 'date',     key: 'validTo', span: 6, label: isAr ? 'صالح حتى' : 'Valid to' },
     { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2, label: isAr ? 'الوصف' : 'Description' },
+    { kind: 'file',     key: 'file', span: 12, label: isAr ? 'المرفق (اختياري)' : 'Attachment (optional)',
+      accept: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.txt,.csv,.json,.xml,.zip',
+      hint: isAr ? 'ارفع الملف الآن (تُحتسب بصمة SHA-256) أو لاحقاً من الجدول'
+                 : 'Upload now (SHA-256 computed server-side) or later from the table' },
   ];
   const linkFields: FieldDef[] = [
     { kind: 'select', key: 'entityType', required: true, span: 12, label: isAr ? 'نوع الكيان' : 'ESG entity type',
@@ -3474,7 +3493,7 @@ function EvidenceTab() {
         open={createOpen}
         title={isAr ? 'إضافة دليل جديد' : 'Add new evidence'}
         fields={createFields}
-        initial={{ titleEn: '', titleAr: '', evidenceType: 'DOCUMENT', version: '', validFrom: '', validTo: '', descriptionEn: '' }}
+        initial={{ titleEn: '', titleAr: '', evidenceType: 'DOCUMENT', version: '', validFrom: '', validTo: '', descriptionEn: '', file: null }}
         size="lg"
         submitLabel={isAr ? 'إنشاء' : 'Create'}
         onClose={() => setCreateOpen(false)}

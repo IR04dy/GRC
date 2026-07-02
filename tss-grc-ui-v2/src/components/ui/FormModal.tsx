@@ -55,7 +55,15 @@ export type FieldDef =
    *     uploaded after onSubmit resolves with the new record's id. Requires
    *     onSubmit to return `{ entityId }`.
    */
-  | (FieldCommon & { kind: 'attachments'; entityType: string; entityId?: number });
+  | (FieldCommon & { kind: 'attachments'; entityType: string; entityId?: number })
+  /**
+   * A single staged file. Unlike `attachments`, this does NOT auto-upload
+   * anywhere: it just parks one `File` (or null) in `values[key]`. The consumer
+   * reads it in onSubmit and uploads it wherever it belongs — e.g. the evidence
+   * engine's own `/file` endpoint that computes a SHA-256. Use when the target
+   * store is not the generic attachments API.
+   */
+  | (FieldCommon & { kind: 'file'; accept?: string; required?: boolean; hint?: string });
 
 /** onSubmit may return the created record's id so staged attachments can link to it. */
 export type FormSubmitResult = void | { entityId?: number };
@@ -241,6 +249,13 @@ export function FormModal<T>({
                       files={(v as StagedFile[] | undefined) ?? []}
                       onChange={(next) => setV(next)} />
               );
+            case 'file':
+              return wrap(
+                <SingleFileField id={f.key} label={f.label} accept={f.accept} hint={f.hint}
+                  required={f.required} error={fieldErr}
+                  file={(v as File | null) ?? null}
+                  onChange={(next) => setV(next)} />
+              );
           }
         })}
       </form>
@@ -329,6 +344,77 @@ function PendingFilesField({ label, files, onChange }: {
       )}
       <input ref={ref} type="file" multiple hidden onChange={add}
         accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.txt,.csv,.json,.xml,.zip" />
+    </div>
+  );
+}
+
+/**
+ * CREATE-mode single-file staging (the `file` field kind). Parks one `File` in
+ * form state and does NOT upload — the consumer uploads it in onSubmit. Drag-drop
+ * and the picker both run through `isAllowedFile` (type + 50 MB cap).
+ */
+function SingleFileField({ id, label, accept, hint, required, error, file, onChange }: {
+  id: string; label: string; accept?: string; hint?: string; required?: boolean;
+  error?: string; file: File | null; onChange: (f: File | null) => void;
+}) {
+  const { lang } = useI18n();
+  const ar = lang === 'ar';
+  const toast = useToast();
+  const ref = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  function take(picked: File[]) {
+    const f = picked[0];
+    if (!f) return;
+    if (!isAllowedFile(f)) {
+      toast.danger(ar ? 'نوع الملف غير مسموح أو يتجاوز 50 ميجابايت.' : 'File type not allowed, or exceeds the 50 MB limit.');
+      return;
+    }
+    onChange(f);
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+        <Paperclip size={13} /> {label}
+        {required && <span style={{ color: 'var(--danger, #dc2626)' }}> *</span>}
+      </div>
+      <div
+        onDragOver={e => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={e => { if (e.currentTarget === e.target) setDragging(false); }}
+        onDrop={e => { e.preventDefault(); setDragging(false); take(Array.from(e.dataTransfer.files ?? [])); }}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8,
+          background: 'var(--surface-2)',
+          border: `1px ${dragging ? 'dashed' : 'solid'} ${error ? 'var(--danger, #dc2626)' : dragging ? 'var(--primary, #2563eb)' : 'var(--border)'}`,
+        }}
+      >
+        <Button size="sm" variant="secondary" Icon={Upload} onClick={() => ref.current?.click()}>
+          {ar ? 'اختيار ملف' : 'Choose file'}
+        </Button>
+        {file ? (
+          <>
+            <Paperclip size={12} style={{ color: 'var(--ink-3)' }} />
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>
+              {file.name}
+              <span className="mono" style={{ color: 'var(--ink-3)' }}> · {Math.round(file.size / 1024)} KB</span>
+            </span>
+            <button type="button" aria-label={ar ? 'إزالة' : 'remove'} onClick={() => onChange(null)}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--ink-3)', display: 'inline-flex' }}>
+              <X size={14} />
+            </button>
+          </>
+        ) : (
+          <span style={{ flex: 1, fontSize: 12, color: 'var(--ink-3)' }}>{ar ? 'لم يتم اختيار ملف' : 'No file chosen'}</span>
+        )}
+      </div>
+      {(error || hint) && (
+        <div role={error ? 'alert' : undefined} style={{ marginTop: 4, fontSize: 11, color: error ? 'var(--danger, #dc2626)' : 'var(--ink-3)' }}>
+          {error || hint}
+        </div>
+      )}
+      <input ref={ref} id={id} type="file" hidden accept={accept}
+        onChange={e => { const picked = Array.from(e.target.files ?? []); e.target.value = ''; take(picked); }} />
     </div>
   );
 }
