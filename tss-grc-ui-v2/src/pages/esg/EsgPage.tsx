@@ -99,13 +99,16 @@ import {
 } from '../../lib/sustainabilitySettings';
 import {
   EMISSIONS_TIMESERIES, CURRENT_YEAR_RECORD, EMISSION_FACTORS,
-  SURVEY_TONE, SURVEY_LABEL,
   aggregateEsg,
   loadCalcEntries, appendCalcEntry, deleteCalcEntry,
-  effectiveSurveys, saveSurveyOverride,
   subscribeEsg, buildEsgAnnex,
-  type CalculatorEntry, type VendorEsgSurvey,
+  type CalculatorEntry,
 } from '../../lib/esg';
+// S-O — Vendor ESG surveillance reads the real backend (was VENDOR_SURVEYS mock).
+import {
+  vendorEsgApi, SURVEY_TONE, SURVEY_LABEL,
+  type VendorEsgSurvey,
+} from '../../lib/vendorEsg';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import { formatSarCompact, formatSarFull } from '../../lib/format';
 import '../../styles/pages/esg.css';
@@ -132,11 +135,9 @@ export function EsgPage() {
   // Reactive state
   const [stats, setStats] = useState(() => aggregateEsg());
   const [calcEntries, setCalcEntries] = useState<CalculatorEntry[]>(() => loadCalcEntries());
-  const [surveys, setSurveys] = useState<VendorEsgSurvey[]>(() => effectiveSurveys());
   useEffect(() => subscribeEsg(() => {
     setStats(aggregateEsg());
     setCalcEntries(loadCalcEntries());
-    setSurveys(effectiveSurveys());
   }), []);
 
   const [brand, setBrand] = useState(() => loadWhiteLabel());
@@ -219,8 +220,7 @@ export function EsgPage() {
       {tab === 'ghg'        && <GhgInventoryTab />}
       {tab === 'climate'    && <ClimateTab />}
       {tab === 'settings'   && <SettingsTab />}
-      {tab === 'survey'     && <SurveyTab surveys={surveys}
-        onSubmit={(id, patch) => { saveSurveyOverride(id, patch); toast.success(t('esgSurveySavedToast')); }} />}
+      {tab === 'survey'     && <SurveyTab />}
     </Shell>
   );
 }
@@ -4851,17 +4851,39 @@ function SettingsTab() {
 
 // ─── Survey tab ─────────────────────────────────────────────────────────────
 
-function SurveyTab({ surveys, onSubmit }: {
-  surveys: VendorEsgSurvey[];
-  onSubmit: (id: string, patch: Partial<VendorEsgSurvey>) => void;
-}) {
+function SurveyTab() {
   const { t, lang } = useI18n();
-  const [editId, setEditId] = useState<string | null>(null);
+  const toast = useToast();
+  const [surveys, setSurveys] = useState<VendorEsgSurvey[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const [editId, setEditId] = useState<number | null>(null);
   const [draftScope12, setDraftScope12] = useState<string>('');
   const [draftRenewable, setDraftRenewable] = useState<string>('');
   const [draftSaudization, setDraftSaudization] = useState<string>('');
   const [draftIso, setDraftIso] = useState(false);
   const [draftNetZero, setDraftNetZero] = useState(false);
+
+  // S-O — the Survey tab now reads the REAL backend (kills the VENDOR_SURVEYS
+  // mock). reloadKey bumps re-run the fetch after any write.
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    vendorEsgApi.list()
+      .then(page => { if (alive) { setSurveys(page.content); setError(false); } })
+      .catch(() => { if (alive) setError(true); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [reloadKey]);
+  const reload = () => setReloadKey(k => k + 1);
+
+  const numOrUndef = (s: string): number | undefined => {
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : undefined;
+  };
 
   function startEdit(s: VendorEsgSurvey) {
     setEditId(s.id);
@@ -4872,35 +4894,53 @@ function SurveyTab({ surveys, onSubmit }: {
     setDraftNetZero(!!s.hasNetZeroTarget);
   }
 
-  function submit(id: string) {
-    onSubmit(id, {
-      reportedScope12: parseFloat(draftScope12) || undefined,
-      renewablePct: parseFloat(draftRenewable) || undefined,
-      saudizationPct: parseFloat(draftSaudization) || undefined,
-      iso14001: draftIso,
-      hasNetZeroTarget: draftNetZero,
-      status: 'SUBMITTED',
-      updatedAt: new Date().toISOString().slice(0, 10),
-    });
-    setEditId(null);
+  async function saveResponse(id: number) {
+    setBusyId(id);
+    try {
+      await vendorEsgApi.recordResponse(id, {
+        reportedScope12: numOrUndef(draftScope12),
+        renewablePct: numOrUndef(draftRenewable),
+        saudizationPct: numOrUndef(draftSaudization),
+        iso14001: draftIso,
+        hasNetZeroTarget: draftNetZero,
+      });
+      toast.success(t('esgSurveySavedToast'));
+      setEditId(null);
+      reload();
+    } catch { toast.danger(t('esgSurveyErrorToast')); }
+    finally { setBusyId(null); }
   }
 
+  async function act(id: number, fn: () => Promise<unknown>, okKey: string) {
+    setBusyId(id);
+    try { await fn(); toast.success(t(okKey)); reload(); }
+    catch { toast.danger(t('esgSurveyErrorToast')); }
+    finally { setBusyId(null); }
+  }
+
+  const isResponded = (s: VendorEsgSurvey) =>
+    s.status === 'RESPONDED' || s.status === 'ACCEPTED' || s.status === 'REJECTED';
   const totalReportedScope12 = surveys.reduce((acc, s) => acc + (s.reportedScope12 ?? 0), 0);
-  const submittedSpend = surveys
-    .filter(s => s.status === 'SUBMITTED')
-    .reduce((acc, s) => acc + s.spendSarK, 0);
-  const totalSpend = surveys.reduce((acc, s) => acc + s.spendSarK, 0);
-  const spendCoveragePct = totalSpend > 0 ? Math.round((submittedSpend / totalSpend) * 100) : 0;
+  const respondedSpend = surveys.filter(isResponded).reduce((acc, s) => acc + (s.spendSarK ?? 0), 0);
+  const totalSpend = surveys.reduce((acc, s) => acc + (s.spendSarK ?? 0), 0);
+  const spendCoveragePct = totalSpend > 0 ? Math.round((respondedSpend / totalSpend) * 100) : 0;
+  const respondedCount = surveys.filter(isResponded).length;
 
   return (
     <Card title={t('esgSurveyTitle')} Icon={Truck}>
       <div className="esg-text-eyebrow-sm">
         {t('esgSurveySub')}
       </div>
+      {loading && <div className="esg-text-eyebrow-sm">{t('esgSurveyLoading')}</div>}
+      {error && <div className="esg-text-eyebrow-sm">{t('esgSurveyLoadError')}</div>}
+      {!loading && !error && surveys.length === 0 && (
+        <div className="esg-text-eyebrow-sm">{t('esgSurveyEmpty')}</div>
+      )}
+      {!loading && !error && surveys.length > 0 && (<>
       <div className="esg-survey-stats">
         <Stat label={t('esgSurveyKpiSpendCov')} value={`${spendCoveragePct}%`} />
         <Stat label={t('esgSurveyKpiReportedScope12')} value={`${(totalReportedScope12 / 1000).toFixed(1)}k tCO2e`} />
-        <Stat label={t('esgSurveyKpiVendors')} value={`${surveys.filter(s => s.status === 'SUBMITTED').length} / ${surveys.length}`} />
+        <Stat label={t('esgSurveyKpiVendors')} value={`${respondedCount} / ${surveys.length}`} />
       </div>
       <table className="tbl esg-calc-tbl">
         <thead>
@@ -4908,6 +4948,7 @@ function SurveyTab({ surveys, onSubmit }: {
             <th>{t('esgSurveyVendor')}</th>
             <th>{t('esgSurveySpend')}</th>
             <th>{t('esgSurveyStatus')}</th>
+            <th>{t('esgSurveyScore')}</th>
             <th>{t('esgSurveyScope12')}</th>
             <th>{t('esgSurveyRenewable')}</th>
             <th>{t('esgSurveySaudization')}</th>
@@ -4919,15 +4960,16 @@ function SurveyTab({ surveys, onSubmit }: {
           {surveys.map(s => (
             <tr key={s.id}>
               <td>
-                <div style={{ fontWeight: 600 }}>{lang === 'ar' ? s.vendorNameAr : s.vendorNameEn}</div>
-                <div className="mono esg-survey-row-id">{s.id}</div>
+                <div style={{ fontWeight: 600 }}>{lang === 'ar' ? (s.vendorNameAr || s.vendorNameEn) : s.vendorNameEn}</div>
+                <div className="mono esg-survey-row-id">{s.externalId ?? `#${s.id}`}</div>
               </td>
-              <td className="mono">{s.spendSarK.toLocaleString()}k SAR</td>
+              <td className="mono">{s.spendSarK != null ? `${s.spendSarK.toLocaleString()}k SAR` : '—'}</td>
               <td>
                 <Badge tone={SURVEY_TONE[s.status]}>{SURVEY_LABEL[s.status][lang]}</Badge>
               </td>
               {editId === s.id ? (
                 <>
+                  <td className="mono">—</td>
                   <td>
                     <input value={draftScope12} onChange={e => setDraftScope12(e.target.value)}
                       type="number" placeholder="tCO2e" className="mono esg-survey-input-90" style={inputStyle} />
@@ -4951,11 +4993,12 @@ function SurveyTab({ surveys, onSubmit }: {
                     </label>
                   </td>
                   <td>
-                    <Button size="sm" variant="primary" onClick={() => submit(s.id)}>{t('esgSurveySave')}</Button>
+                    <Button size="sm" variant="primary" disabled={busyId === s.id} onClick={() => saveResponse(s.id)}>{t('esgSurveySave')}</Button>
                   </td>
                 </>
               ) : (
                 <>
+                  <td className="mono">{s.esgScore != null ? Number(s.esgScore).toFixed(0) : '—'}</td>
                   <td className="mono">{s.reportedScope12 != null ? s.reportedScope12.toLocaleString() : '—'}</td>
                   <td className="mono">{s.renewablePct != null ? `${s.renewablePct}%` : '—'}</td>
                   <td className="mono">{s.saudizationPct != null ? `${s.saudizationPct}%` : '—'}</td>
@@ -4966,7 +5009,21 @@ function SurveyTab({ surveys, onSubmit }: {
                     </div>
                   </td>
                   <td>
-                    <Button size="sm" variant="secondary" onClick={() => startEdit(s)}>{t('esgSurveyEdit')}</Button>
+                    <div className="row-tight">
+                      {s.status === 'DRAFT' && (
+                        <Button size="sm" variant="primary" disabled={busyId === s.id}
+                          onClick={() => act(s.id, () => vendorEsgApi.send(s.id), 'esgSurveySentToast')}>{t('esgSurveySend')}</Button>
+                      )}
+                      {(s.status === 'SENT' || s.status === 'ESCALATED') && (
+                        <Button size="sm" variant="secondary" onClick={() => startEdit(s)}>{t('esgSurveyRespond')}</Button>
+                      )}
+                      {s.status === 'RESPONDED' && (<>
+                        <Button size="sm" variant="primary" disabled={busyId === s.id}
+                          onClick={() => act(s.id, () => vendorEsgApi.accept(s.id), 'esgSurveyAcceptedToast')}>{t('esgSurveyAccept')}</Button>
+                        <Button size="sm" variant="secondary" disabled={busyId === s.id}
+                          onClick={() => { const r = window.prompt(t('esgSurveyRejectPrompt')); if (r !== null) act(s.id, () => vendorEsgApi.reject(s.id, r), 'esgSurveyRejectedToast'); }}>{t('esgSurveyReject')}</Button>
+                      </>)}
+                    </div>
                   </td>
                 </>
               )}
@@ -4974,6 +5031,7 @@ function SurveyTab({ surveys, onSubmit }: {
           ))}
         </tbody>
       </table>
+      </>)}
     </Card>
   );
 }

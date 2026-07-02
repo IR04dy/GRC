@@ -12,6 +12,7 @@ import com.tss.grc.module.sust.ghg.repository.GhgEmissionRecordRepository;
 import com.tss.grc.module.sust.metrics.repository.EsgMetricRepository;
 import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
 import com.tss.grc.module.sust.tcfd.repository.TcfdItemRepository;
+import com.tss.grc.module.sust.vendor.repository.VendorEsgSurveyRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -37,10 +38,10 @@ public class SustEvidenceLinkService {
 
     public static final String MODULE = "SUSTAINABILITY";
 
-    /** The sustainability entity types that carry an {@code evidence_item_id} FK (V250). */
+    /** The sustainability entity types that carry an {@code evidence_item_id} FK (V250, +V256 vendor survey). */
     private static final Set<String> ENTITY_TYPES = Set.of(
         "GhgEmissionRecord", "CmaDisclosure", "TcfdItem",
-        "SgiCommitment", "ClimateRiskOpportunity", "EsgMetric");
+        "SgiCommitment", "ClimateRiskOpportunity", "EsgMetric", "VendorEsgSurvey");
 
     private final EvidenceItemRepository evidenceItemRepo;
     private final EvidenceLinkRepository evidenceLinkRepo;
@@ -52,6 +53,7 @@ public class SustEvidenceLinkService {
     private final SgiCommitmentRepository           sgiRepo;
     private final ClimateRiskOpportunityRepository  climateRepo;
     private final EsgMetricRepository               metricRepo;
+    private final VendorEsgSurveyRepository          vendorSurveyRepo;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -120,6 +122,10 @@ public class SustEvidenceLinkService {
             case "EsgMetric" -> {
                 var e = metricRepo.findByIdAndOrganisationId(entityId, orgId).orElseThrow(() -> nf(entityType, entityId));
                 e.setEvidenceItemId(evidenceItemId); metricRepo.save(e);
+            }
+            case "VendorEsgSurvey" -> {
+                var e = vendorSurveyRepo.findByIdAndOrganisationId(entityId, orgId).orElseThrow(() -> nf(entityType, entityId));
+                e.setEvidenceItemId(evidenceItemId); vendorSurveyRepo.save(e);
             }
             default -> throw new IllegalArgumentException("entityType must be one of " + ENTITY_TYPES);
         }

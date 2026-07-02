@@ -49,7 +49,7 @@ public class CorrectiveActionService {
 
     private static final Set<String> SOURCE_TYPES =
         Set.of("CLIMATE_RISK", "GHG_RECORD", "ANNEX_GAP", "CMA_DISCLOSURE",
-               "TCFD_ITEM", "SGI_COMMITMENT", "EVIDENCE", "MANUAL");
+               "TCFD_ITEM", "SGI_COMMITMENT", "EVIDENCE", "VENDOR_ESG", "MANUAL");
 
     /** A CAPA in one of these states no longer "covers" its source gap, so a
      *  freshly-surfaced gap on that source opens a new CAPA (mirrors the
