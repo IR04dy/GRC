@@ -2,6 +2,7 @@ package com.tss.grc.module.sust.ghg.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
 import com.tss.grc.module.sust.ghg.repository.GhgEmissionRecordRepository;
 import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
@@ -40,6 +41,7 @@ class GhgEmissionRecordServiceTest {
 
     @Mock private GhgEmissionRecordRepository repo;
     @Mock private OrganisationSettingsService settingsService;
+    @Mock private AuditLogService audit;
     @InjectMocks private GhgEmissionRecordService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }

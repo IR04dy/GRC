@@ -2,6 +2,7 @@ package com.tss.grc.module.sust.ghg.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
 import com.tss.grc.module.sust.ghg.repository.GhgEmissionRecordRepository;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
@@ -37,6 +38,7 @@ public class GhgEmissionRecordService {
 
     private final GhgEmissionRecordRepository repo;
     private final OrganisationSettingsService settingsService;
+    private final AuditLogService audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -77,7 +79,9 @@ public class GhgEmissionRecordService {
         if (req.getActivityData() != null && req.getEmissionFactor() != null) {
             req.setEmissionValueTco2e(deriveTco2e(req.getActivityData(), req.getEmissionFactor(), req.getEmissionFactorUnit()));
         }
-        return repo.save(req);
+        GhgEmissionRecord saved = repo.save(req);
+        audit.log("CREATE", "GhgEmissionRecord", saved.getId(), "Created GHG record: " + saved.getSourceNameEn());
+        return saved;
     }
 
     @Transactional
@@ -104,7 +108,9 @@ public class GhgEmissionRecordService {
             cur.setEmissionValueTco2e(deriveTco2e(cur.getActivityData(), cur.getEmissionFactor(), cur.getEmissionFactorUnit()));
         }
         validate(cur);
-        return repo.save(cur);
+        GhgEmissionRecord saved = repo.save(cur);
+        audit.log("UPDATE", "GhgEmissionRecord", saved.getId(), "Updated GHG record");
+        return saved;
     }
 
     @Transactional
@@ -131,7 +137,9 @@ public class GhgEmissionRecordService {
             case "APPROVED"  -> cur.setApprovedAt(now);
             default -> { /* ARCHIVED */ }
         }
-        return repo.save(cur);
+        GhgEmissionRecord saved = repo.save(cur);
+        audit.log("TRANSITION", "GhgEmissionRecord", saved.getId(), "GHG record -> " + to);
+        return saved;
     }
 
     @Transactional
@@ -139,6 +147,7 @@ public class GhgEmissionRecordService {
         GhgEmissionRecord cur = get(id);
         cur.setIsDeleted(true);
         repo.save(cur);
+        audit.log("DELETE", "GhgEmissionRecord", id, "Soft-deleted GHG record");
     }
 
     // ── Aggregations / Rule 1 ────────────────────────────────────────

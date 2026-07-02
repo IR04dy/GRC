@@ -1,6 +1,7 @@
 package com.tss.grc.module.sust.climate.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.climate.entity.ClimateRiskOpportunity;
 import com.tss.grc.module.sust.climate.repository.ClimateRiskOpportunityRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -42,6 +43,7 @@ class ClimateRiskOpportunityServiceTest {
     private static final Long ID = 5L;
 
     @Mock private ClimateRiskOpportunityRepository repo;
+    @Mock private AuditLogService audit;
     @InjectMocks private ClimateRiskOpportunityService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }

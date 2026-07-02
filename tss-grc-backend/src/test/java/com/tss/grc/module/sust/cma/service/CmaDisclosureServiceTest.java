@@ -1,6 +1,7 @@
 package com.tss.grc.module.sust.cma.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.cma.entity.CmaDisclosure;
 import com.tss.grc.module.sust.cma.repository.CmaDisclosureRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -34,6 +35,7 @@ class CmaDisclosureServiceTest {
     private static final Long ORG_ID = 1L;
 
     @Mock private CmaDisclosureRepository repo;
+    @Mock private AuditLogService audit;
     @InjectMocks private CmaDisclosureService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }

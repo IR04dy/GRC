@@ -1,6 +1,7 @@
 package com.tss.grc.module.sust.cma.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.cma.entity.CmaDisclosure;
 import com.tss.grc.module.sust.cma.repository.CmaDisclosureRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -43,6 +44,7 @@ public class CmaDisclosureService {
     private static final Set<String> APPROVAL_STATUSES = Set.of("PENDING", "APPROVED", "REJECTED");
 
     private final CmaDisclosureRepository repo;
+    private final AuditLogService audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -79,7 +81,10 @@ public class CmaDisclosureService {
         req.setUpdatedBy(null);
         validate(req);
         applyRules(req);
-        return repo.save(req);
+        CmaDisclosure saved = repo.save(req);
+        audit.log("CREATE", "CmaDisclosure", saved.getId(),
+                "CMA disclosure created");
+        return saved;
     }
 
     @Transactional
@@ -102,7 +107,10 @@ public class CmaDisclosureService {
         if (req.getDisclosureStatus() != null)     cur.setDisclosureStatus(req.getDisclosureStatus());
         validate(cur);
         applyRules(cur);
-        return repo.save(cur);
+        CmaDisclosure saved = repo.save(cur);
+        audit.log("UPDATE", "CmaDisclosure", saved.getId(),
+                "CMA disclosure updated");
+        return saved;
     }
 
     /**
@@ -118,7 +126,10 @@ public class CmaDisclosureService {
         cur.setLastReviewedAt(LocalDateTime.now());
         validate(cur);
         applyRules(cur);
-        return repo.save(cur);
+        CmaDisclosure saved = repo.save(cur);
+        audit.log("TRANSITION", "CmaDisclosure", saved.getId(),
+                "CMA disclosure -> " + to);
+        return saved;
     }
 
     /**
@@ -169,7 +180,10 @@ public class CmaDisclosureService {
         cur.setApprovalStatus("APPROVED");
         cur.setApprovedBy(approvedBy);
         cur.setApprovedAt(LocalDateTime.now());
-        return repo.save(cur);
+        CmaDisclosure saved = repo.save(cur);
+        audit.log("APPROVE", "CmaDisclosure", saved.getId(),
+                "CMA disclosure approved by " + approvedBy);
+        return saved;
     }
 
     @Transactional
@@ -177,6 +191,8 @@ public class CmaDisclosureService {
         CmaDisclosure cur = get(id);
         cur.setIsDeleted(true);
         repo.save(cur);
+        audit.log("DELETE", "CmaDisclosure", id,
+                "CMA disclosure deleted");
     }
 
     // ── Aggregation / Readiness ──────────────────────────────────────

@@ -2,6 +2,7 @@ package com.tss.grc.module.sust.capa.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
@@ -52,6 +53,7 @@ public class CorrectiveActionService {
 
     private final CorrectiveActionRepository repo;
     private final OrganisationSettingsService settingsService;
+    private final AuditLogService audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -95,7 +97,9 @@ public class CorrectiveActionService {
         req.setUpdatedBy(null);
         if (req.getPriority() == null || req.getPriority().isBlank()) req.setPriority("MEDIUM");
         validate(req);
-        return repo.save(req);
+        CorrectiveAction saved = repo.save(req);
+        audit.log("CREATE", "CorrectiveAction", saved.getId(), "Corrective action created");
+        return saved;
     }
 
     @Transactional
@@ -128,7 +132,9 @@ public class CorrectiveActionService {
         if (req.getLinkedRiskId() != null)      cur.setLinkedRiskId(req.getLinkedRiskId());
         if (req.getNotes() != null)             cur.setNotes(req.getNotes());
         validate(cur);
-        return repo.save(cur);
+        CorrectiveAction saved = repo.save(cur);
+        audit.log("UPDATE", "CorrectiveAction", saved.getId(), "Corrective action updated");
+        return saved;
     }
 
     @Transactional
@@ -187,7 +193,9 @@ public class CorrectiveActionService {
             default -> { /* OPEN — no timestamp */ }
         }
         cur.setStatus(to);
-        return repo.save(cur);
+        CorrectiveAction saved = repo.save(cur);
+        audit.log("TRANSITION", "CorrectiveAction", saved.getId(), "CAPA -> " + to);
+        return saved;
     }
 
     /** Trim-aware, case-insensitive identity compare used by Rule A. */
@@ -215,6 +223,7 @@ public class CorrectiveActionService {
         CorrectiveAction cur = get(id);
         cur.setIsDeleted(true);
         repo.save(cur);
+        audit.log("DELETE", "CorrectiveAction", id, "Corrective action deleted");
     }
 
     // ── Aggregations ─────────────────────────────────────────────────

@@ -19,7 +19,7 @@
 | S-E | Climate scenario loss engine (compute, don't free-type) | 🔴 Critical | ⬜ | — |
 | S-F | ClimateRisk ↔ ERM real, validated, bidirectional link | 🔴 Critical | ⬜ | — |
 | S-G | Complete IFRS S2 / TCFD annual report (+ persist/approve/lock/export) | 🟠 High | ⬜ | — |
-| S-H | Audit logging across the 11 unlogged sust services | 🟠 High | ⬜ | — |
+| S-H | Audit logging across the 11 unlogged sust services (GHG, SGI, CMA, TCFD-item, Materiality, Metrics, Evidence, CAPA, ClimateRisk, Report/Year, Settings) via `AuditLogService` — CREATE/UPDATE/TRANSITION/APPROVE/REJECT/ARCHIVE/DELETE; live-proven traceable history | 🟠 High | ✅ Shipped | 11 svcs + audit.log |
 | S-I | Annex from live data + content lock/version + CSV/PDF | 🟠 High | ⬜ | — |
 | S-J | GHG hardening (edit-lock, real YoY, unit/EF library, coverage label) | 🟠 High | ⬜ | — |
 | S-K | CMA/TCFD approval SoD + item lock + official library import | 🟠 High | ⬜ | — |

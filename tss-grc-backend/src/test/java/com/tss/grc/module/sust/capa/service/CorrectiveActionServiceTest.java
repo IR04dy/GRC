@@ -2,6 +2,7 @@ package com.tss.grc.module.sust.capa.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
 import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
@@ -48,6 +49,7 @@ class CorrectiveActionServiceTest {
 
     @Mock private CorrectiveActionRepository repo;
     @Mock private OrganisationSettingsService settingsService;
+    @Mock private AuditLogService audit;
     @InjectMocks private CorrectiveActionService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }

@@ -2,6 +2,7 @@ package com.tss.grc.module.sust.sgi.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.sgi.entity.SgiCommitment;
 import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
@@ -51,6 +52,7 @@ public class SgiCommitmentService {
 
     private final SgiCommitmentRepository repo;
     private final OrganisationSettingsService settingsService;
+    private final AuditLogService audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -91,7 +93,9 @@ public class SgiCommitmentService {
         req.setCreatedBy(null);
         req.setUpdatedBy(null);
         validate(req);
-        return repo.save(req);
+        SgiCommitment saved = repo.save(req);
+        audit.log("CREATE", "SgiCommitment", saved.getId(), "Created SGI commitment: " + saved.getCommitmentCode());
+        return saved;
     }
 
     @Transactional
@@ -124,7 +128,9 @@ public class SgiCommitmentService {
         if (req.getNotesAr() != null)            cur.setNotesAr(req.getNotesAr());
         if (req.getEvidenceRef() != null)        cur.setEvidenceRef(req.getEvidenceRef());
         validate(cur);
-        return repo.save(cur);
+        SgiCommitment saved = repo.save(cur);
+        audit.log("UPDATE", "SgiCommitment", saved.getId(), "Updated SGI commitment");
+        return saved;
     }
 
     /**
@@ -153,7 +159,9 @@ public class SgiCommitmentService {
         cur.setStatus("ACHIEVED");
         cur.setAchievedAt(LocalDateTime.now());
         cur.setAchievedBy(achievedBy);
-        return repo.save(cur);
+        SgiCommitment saved = repo.save(cur);
+        audit.log("TRANSITION", "SgiCommitment", saved.getId(), "SGI commitment ACHIEVED by " + achievedBy);
+        return saved;
     }
 
     /**
@@ -173,7 +181,9 @@ public class SgiCommitmentService {
         cur.setRetiredAt(LocalDateTime.now());
         cur.setRetiredBy(retiredBy);
         cur.setRetiredReason(reason);
-        return repo.save(cur);
+        SgiCommitment saved = repo.save(cur);
+        audit.log("TRANSITION", "SgiCommitment", saved.getId(), "SGI commitment RETIRED by " + retiredBy);
+        return saved;
     }
 
     @Transactional
@@ -181,6 +191,7 @@ public class SgiCommitmentService {
         SgiCommitment cur = get(id);
         cur.setIsDeleted(true);
         repo.save(cur);
+        audit.log("DELETE", "SgiCommitment", id, "Soft-deleted SGI commitment");
     }
 
     // ── Progress computation ─────────────────────────────────────────

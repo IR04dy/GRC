@@ -1,6 +1,7 @@
 package com.tss.grc.module.sust.settings.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
 import com.tss.grc.module.sust.settings.repository.OrganisationSettingsRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import java.math.BigDecimal;
 public class OrganisationSettingsService {
 
     private final OrganisationSettingsRepository repo;
+    private final AuditLogService audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -64,7 +66,9 @@ public class OrganisationSettingsService {
         if (req.getNotes() != null) cur.setNotes(req.getNotes());
 
         validate(cur);
-        return repo.save(cur);
+        OrganisationSettings saved = repo.save(cur);
+        audit.log("UPDATE", "OrganisationSettings", saved.getId(), "Sustainability settings updated");
+        return saved;
     }
 
     /**
@@ -82,7 +86,9 @@ public class OrganisationSettingsService {
         cur.setCapaOverdueWarningDays(7);
         cur.setCapaExecutiveEscalationDays(30);
         cur.setSgiAtRiskProgressFactor(new BigDecimal("0.70"));
-        return repo.save(cur);
+        OrganisationSettings saved = repo.save(cur);
+        audit.log("UPDATE", "OrganisationSettings", saved.getId(), "Sustainability settings reset to defaults");
+        return saved;
     }
 
     // ── Validation — mirrors the SQL CHECK constraints ─────────────

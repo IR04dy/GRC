@@ -1,6 +1,7 @@
 package com.tss.grc.module.sust.tcfd.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.tcfd.entity.TcfdItem;
 import com.tss.grc.module.sust.tcfd.repository.TcfdItemRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -37,6 +38,7 @@ public class TcfdItemService {
     private static final Set<String> APPROVAL_STATUSES = Set.of("PENDING", "APPROVED", "REJECTED");
 
     private final TcfdItemRepository repo;
+    private final AuditLogService audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -59,7 +61,10 @@ public class TcfdItemService {
             req.setDisclosureStatus("UNDER_REVIEW");
         validate(req);
         applyRules(req);
-        return repo.save(req);
+        TcfdItem saved = repo.save(req);
+        audit.log("CREATE", "TcfdItem", saved.getId(),
+                "TCFD item created");
+        return saved;
     }
 
     @Transactional
@@ -83,7 +88,10 @@ public class TcfdItemService {
         if (req.getDisclosureStatus() != null)     cur.setDisclosureStatus(req.getDisclosureStatus());
         validate(cur);
         applyRules(cur);
-        return repo.save(cur);
+        TcfdItem saved = repo.save(cur);
+        audit.log("UPDATE", "TcfdItem", saved.getId(),
+                "TCFD item updated");
+        return saved;
     }
 
     @Transactional
@@ -94,7 +102,10 @@ public class TcfdItemService {
         cur.setDisclosureStatus(to);
         cur.setLastReviewedAt(LocalDateTime.now());
         applyRules(cur);
-        return repo.save(cur);
+        TcfdItem saved = repo.save(cur);
+        audit.log("TRANSITION", "TcfdItem", saved.getId(),
+                "TCFD item -> " + to);
+        return saved;
     }
 
     @Transactional
@@ -134,6 +145,8 @@ public class TcfdItemService {
         TcfdItem cur = get(id);
         cur.setIsDeleted(true);
         repo.save(cur);
+        audit.log("DELETE", "TcfdItem", id,
+                "TCFD item deleted");
     }
 
     /**

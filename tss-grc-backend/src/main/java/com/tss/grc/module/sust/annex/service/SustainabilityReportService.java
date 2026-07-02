@@ -2,6 +2,7 @@ package com.tss.grc.module.sust.annex.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.annex.entity.ReportingYear;
 import com.tss.grc.module.sust.annex.entity.SustainabilityReport;
 import com.tss.grc.module.sust.annex.repository.ReportingYearRepository;
@@ -49,6 +50,7 @@ public class SustainabilityReportService {
     private final SustainabilityReportRepository    reportRepo;
     private final AnnexGeneratorService             generator;
     private final ReportComposerService             composer;
+    private final AuditLogService                   audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -67,7 +69,9 @@ public class SustainabilityReportService {
         req.setId(null);
         req.setOrganisationId(org());
         if (req.getStatus() == null) req.setStatus("ACTIVE");
-        return yearRepo.save(req);
+        ReportingYear saved = yearRepo.save(req);
+        audit.log("CREATE", "ReportingYear", saved.getId(), "Reporting year created: " + saved.getYear());
+        return saved;
     }
 
     @Transactional
@@ -88,7 +92,9 @@ public class SustainabilityReportService {
         LocalDateTime now = LocalDateTime.now();
         if ("APPROVED".equals(to))  cur.setApprovedAt(now);
         if ("PUBLISHED".equals(to)) cur.setPublishedAt(now);
-        return yearRepo.save(cur);
+        ReportingYear saved = yearRepo.save(cur);
+        audit.log("TRANSITION", "ReportingYear", saved.getId(), "Reporting year -> " + to);
+        return saved;
     }
 
     // ── Reports ──────────────────────────────────────────────────────
@@ -152,7 +158,10 @@ public class SustainabilityReportService {
         r.setContentMarkdown(content.markdown());
         r.setContentHtml(content.html());
         r.setContentJson(content.json());
-        return reportRepo.save(r);
+        SustainabilityReport saved = reportRepo.save(r);
+        audit.log("CREATE", "SustainabilityReport", saved.getId(),
+            "Generated " + reportType + " report " + saved.getReportCode());
+        return saved;
     }
 
     private static String reportTitleEn(String type, short year, String org) {
@@ -233,6 +242,8 @@ public class SustainabilityReportService {
                 }
             }
         }
-        return reportRepo.save(cur);
+        SustainabilityReport saved = reportRepo.save(cur);
+        audit.log("TRANSITION", "SustainabilityReport", saved.getId(), "Report -> " + to);
+        return saved;
     }
 }

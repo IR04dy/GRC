@@ -1,6 +1,7 @@
 package com.tss.grc.module.sust.evidence.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.evidence.entity.SustainabilityEvidence;
 import com.tss.grc.module.sust.evidence.repository.SustainabilityEvidenceRepository;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
@@ -45,6 +46,7 @@ public class SustainabilityEvidenceService {
 
     private final SustainabilityEvidenceRepository repo;
     private final OrganisationSettingsService settingsService;
+    private final AuditLogService audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -81,7 +83,9 @@ public class SustainabilityEvidenceService {
         if (req.getConfidentiality() == null || req.getConfidentiality().isBlank())
             req.setConfidentiality("INTERNAL");
         validate(req);
-        return repo.save(req);
+        SustainabilityEvidence saved = repo.save(req);
+        audit.log("CREATE", "SustainabilityEvidence", saved.getId(), "Sustainability evidence created");
+        return saved;
     }
 
     @Transactional
@@ -112,7 +116,9 @@ public class SustainabilityEvidenceService {
         if (req.getOwnerEmail() != null)           cur.setOwnerEmail(req.getOwnerEmail());
         if (req.getNotes() != null)                cur.setNotes(req.getNotes());
         validate(cur);
-        return repo.save(cur);
+        SustainabilityEvidence saved = repo.save(cur);
+        audit.log("UPDATE", "SustainabilityEvidence", saved.getId(), "Sustainability evidence updated");
+        return saved;
     }
 
     @Transactional
@@ -133,7 +139,9 @@ public class SustainabilityEvidenceService {
         cur.setApprovalStatus("APPROVED");
         cur.setApprovedBy(approvedBy);
         cur.setApprovedAt(LocalDateTime.now());
-        return repo.save(cur);
+        SustainabilityEvidence saved = repo.save(cur);
+        audit.log("APPROVE", "SustainabilityEvidence", saved.getId(), "Sustainability evidence approved");
+        return saved;
     }
 
     /** Trim-aware, case-insensitive identity compare used by the SoD check. */
@@ -156,7 +164,9 @@ public class SustainabilityEvidenceService {
         cur.setReviewerName(reviewer.getUsername());
         cur.setReviewedAt(LocalDateTime.now());
         cur.setRejectionReason(reason);
-        return repo.save(cur);
+        SustainabilityEvidence saved = repo.save(cur);
+        audit.log("REJECT", "SustainabilityEvidence", saved.getId(), "Sustainability evidence rejected");
+        return saved;
     }
 
     /**
@@ -172,6 +182,8 @@ public class SustainabilityEvidenceService {
         SustainabilityEvidence created = create(newReq);
         old.setApprovalStatus("SUPERSEDED");
         repo.save(old);
+        audit.log("SUPERSEDE", "SustainabilityEvidence", created.getId(),
+                "Sustainability evidence superseded (replaces " + oldId + ")");
         return created;
     }
 
@@ -180,6 +192,7 @@ public class SustainabilityEvidenceService {
         SustainabilityEvidence cur = get(id);
         cur.setIsDeleted(true);
         repo.save(cur);
+        audit.log("DELETE", "SustainabilityEvidence", id, "Sustainability evidence deleted");
     }
 
     // ── Rule 9 — expiry sweep ──────────────────────────────────────

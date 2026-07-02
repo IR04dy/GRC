@@ -1,6 +1,7 @@
 package com.tss.grc.module.sust.sgi.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.sgi.entity.SgiCommitment;
 import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
 import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
@@ -41,6 +42,7 @@ class SgiCommitmentServiceTest {
 
     @Mock private SgiCommitmentRepository repo;
     @Mock private OrganisationSettingsService settingsService;
+    @Mock private AuditLogService audit;
     @InjectMocks private SgiCommitmentService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }

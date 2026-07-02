@@ -1,6 +1,7 @@
 package com.tss.grc.module.sust.settings.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
 import com.tss.grc.module.sust.settings.repository.OrganisationSettingsRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -36,6 +37,7 @@ class OrganisationSettingsServiceTest {
     private static final Long ORG_ID = 1L;
 
     @Mock private OrganisationSettingsRepository repo;
+    @Mock private AuditLogService audit;
     @InjectMocks private OrganisationSettingsService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }

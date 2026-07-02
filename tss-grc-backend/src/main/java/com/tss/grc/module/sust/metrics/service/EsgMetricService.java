@@ -1,6 +1,7 @@
 package com.tss.grc.module.sust.metrics.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.metrics.entity.EsgMetric;
 import com.tss.grc.module.sust.metrics.entity.EsgMetricReading;
 import com.tss.grc.module.sust.metrics.repository.EsgMetricRepository;
@@ -45,6 +46,7 @@ public class EsgMetricService {
 
     private final EsgMetricRepository repo;
     private final EsgMetricReadingRepository readingRepo;
+    private final AuditLogService audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -66,7 +68,9 @@ public class EsgMetricService {
         if (req.getStatus() == null || req.getStatus().isBlank()) req.setStatus("ACTIVE");
         validate(req);
         refreshStatusSnapshot(req);
-        return repo.save(req);
+        EsgMetric saved = repo.save(req);
+        audit.log("CREATE", "EsgMetric", saved.getId(), "ESG metric created");
+        return saved;
     }
 
     @Transactional
@@ -95,7 +99,9 @@ public class EsgMetricService {
         if (req.getNotes() != null)                  cur.setNotes(req.getNotes());
         validate(cur);
         refreshStatusSnapshot(cur);
-        return repo.save(cur);
+        EsgMetric saved = repo.save(cur);
+        audit.log("UPDATE", "EsgMetric", saved.getId(), "ESG metric updated");
+        return saved;
     }
 
     /** Record a reading: update the metric's current_value + as_of AND append an
@@ -114,6 +120,7 @@ public class EsgMetricService {
         r.setReadingValue(currentValue);
         r.setAsOf(effectiveAsOf);
         readingRepo.save(r);
+        audit.log("UPDATE", "EsgMetric", saved.getId(), "Recorded ESG metric reading");
         return saved;
     }
 
@@ -127,7 +134,9 @@ public class EsgMetricService {
     public EsgMetric archive(Long id) {
         EsgMetric cur = get(id);
         cur.setStatus("ARCHIVED");
-        return repo.save(cur);
+        EsgMetric saved = repo.save(cur);
+        audit.log("ARCHIVE", "EsgMetric", saved.getId(), "ESG metric archived");
+        return saved;
     }
 
     @Transactional
@@ -135,6 +144,7 @@ public class EsgMetricService {
         EsgMetric cur = get(id);
         cur.setIsDeleted(true);
         repo.save(cur);
+        audit.log("DELETE", "EsgMetric", id, "ESG metric deleted");
     }
 
     /**

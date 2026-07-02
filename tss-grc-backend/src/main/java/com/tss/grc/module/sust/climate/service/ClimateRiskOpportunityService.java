@@ -3,6 +3,7 @@ package com.tss.grc.module.sust.climate.service;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import jakarta.persistence.EntityNotFoundException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.climate.entity.ClimateRiskOpportunity;
 import com.tss.grc.module.sust.climate.repository.ClimateRiskOpportunityRepository;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class ClimateRiskOpportunityService {
         "RESOURCE_EFFICIENCY","ENERGY_SOURCE","PRODUCT_SERVICE","MARKETS","RESILIENCE");
 
     private final ClimateRiskOpportunityRepository repo;
+    private final AuditLogService audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -133,7 +135,10 @@ public class ClimateRiskOpportunityService {
         recomputeScore(req);
         if (req.getStatus() == null || req.getStatus().isBlank()) req.setStatus("IDENTIFIED");
         if (req.getIdentifiedAt() == null) req.setIdentifiedAt(LocalDateTime.now());
-        return repo.save(req);
+        ClimateRiskOpportunity saved = repo.save(req);
+        audit.log("CREATE", "ClimateRiskOpportunity", saved.getId(),
+            "Created climate " + saved.getKind() + ": " + saved.getTitleEn());
+        return saved;
     }
 
     @Transactional
@@ -170,7 +175,9 @@ public class ClimateRiskOpportunityService {
         if (req.getReviewDate() != null)            cur.setReviewDate(req.getReviewDate());
         validateAxes(cur);
         recomputeScore(cur);
-        return repo.save(cur);
+        ClimateRiskOpportunity saved = repo.save(cur);
+        audit.log("UPDATE", "ClimateRiskOpportunity", saved.getId(), "Updated climate risk/opportunity");
+        return saved;
     }
 
     @Transactional
@@ -193,7 +200,9 @@ public class ClimateRiskOpportunityService {
             case "CLOSED"   -> cur.setClosedAt(now);
             default -> { /* RETIRED — no timestamp field */ }
         }
-        return repo.save(cur);
+        ClimateRiskOpportunity saved = repo.save(cur);
+        audit.log("TRANSITION", "ClimateRiskOpportunity", saved.getId(), "Climate risk/opportunity -> " + to);
+        return saved;
     }
 
     /**
@@ -206,7 +215,10 @@ public class ClimateRiskOpportunityService {
         ClimateRiskOpportunity cur = get(id);
         Object v = body.get("ermRiskId");
         cur.setRelatedErmRiskId(v == null ? null : Long.valueOf(v.toString()));
-        return repo.save(cur);
+        ClimateRiskOpportunity saved = repo.save(cur);
+        audit.log("UPDATE", "ClimateRiskOpportunity", saved.getId(),
+            "Linked climate item to ERM risk " + saved.getRelatedErmRiskId());
+        return saved;
     }
 
     @Transactional
@@ -214,6 +226,7 @@ public class ClimateRiskOpportunityService {
         ClimateRiskOpportunity cur = get(id);
         cur.setIsDeleted(true);
         repo.save(cur);
+        audit.log("DELETE", "ClimateRiskOpportunity", id, "Soft-deleted climate risk/opportunity");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────

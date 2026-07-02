@@ -2,6 +2,7 @@ package com.tss.grc.module.sust.materiality.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.materiality.entity.MaterialTopic;
 import com.tss.grc.module.sust.materiality.repository.MaterialTopicRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -49,6 +50,7 @@ public class MaterialTopicService {
     private static final Set<String> CATEGORIES = Set.of("ENVIRONMENTAL", "SOCIAL", "GOVERNANCE");
 
     private final MaterialTopicRepository repo;
+    private final AuditLogService audit;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -81,7 +83,10 @@ public class MaterialTopicService {
         req.setUpdatedBy(null);
         validate(req);
         recomputeScore(req);
-        return repo.save(req);
+        MaterialTopic saved = repo.save(req);
+        audit.log("CREATE", "MaterialTopic", saved.getId(),
+                "Material topic created");
+        return saved;
     }
 
     @Transactional
@@ -107,7 +112,10 @@ public class MaterialTopicService {
         if (req.getNotes() != null)                  cur.setNotes(req.getNotes());
         validate(cur);
         recomputeScore(cur);
-        return repo.save(cur);
+        MaterialTopic saved = repo.save(cur);
+        audit.log("UPDATE", "MaterialTopic", saved.getId(),
+                "Material topic updated");
+        return saved;
     }
 
     /**
@@ -140,14 +148,20 @@ public class MaterialTopicService {
         cur.setStatus("APPROVED");
         cur.setApprovedAt(LocalDateTime.now());
         cur.setApprovedBy(approvedBy);
-        return repo.save(cur);
+        MaterialTopic saved = repo.save(cur);
+        audit.log("APPROVE", "MaterialTopic", saved.getId(),
+                "Material topic approved by " + approvedBy);
+        return saved;
     }
 
     @Transactional
     public MaterialTopic archive(Long id) {
         MaterialTopic cur = get(id);
         cur.setStatus("ARCHIVED");
-        return repo.save(cur);
+        MaterialTopic saved = repo.save(cur);
+        audit.log("ARCHIVE", "MaterialTopic", saved.getId(),
+                "Material topic archived");
+        return saved;
     }
 
     @Transactional
@@ -155,6 +169,8 @@ public class MaterialTopicService {
         MaterialTopic cur = get(id);
         cur.setIsDeleted(true);
         repo.save(cur);
+        audit.log("DELETE", "MaterialTopic", id,
+                "Material topic deleted");
     }
 
     /**
