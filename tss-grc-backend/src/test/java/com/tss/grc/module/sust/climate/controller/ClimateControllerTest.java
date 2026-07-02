@@ -95,7 +95,7 @@ class ClimateControllerTest {
         TcfdScenarioRequest req = new TcfdScenarioRequest(
                 null, "Orderly", "منظَّم", null, null,
                 "ORDERLY", "NGFS", 30, new BigDecimal("1.50"),
-                null, null, null, new BigDecimal("0.5"));
+                null, new BigDecimal("0.5"));
         ResponseEntity<TcfdScenarioResponse> resp = c.create(req);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);

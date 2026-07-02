@@ -63,8 +63,9 @@ export interface TcfdScenarioRequest {
   timeHorizonYears: number;
   globalWarmingCelsius: number | string;
   assumptionsJson?: string;
-  portfolioAtRiskSarBillions?: number | string;
-  expectedLossSarMillions?: number | string;
+  // S-E: portfolioAtRisk + expectedLoss are DERIVED server-side from the
+  // scenario's sector impacts (Σ exposure × PD-uplift × scenario factor) and
+  // returned read-only on TcfdScenario — they are no longer request inputs.
   probabilityWeight?: number | string;
 }
 

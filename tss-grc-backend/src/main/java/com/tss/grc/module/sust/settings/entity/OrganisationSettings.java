@@ -48,6 +48,15 @@ public class OrganisationSettings {
     @Column(name = "sgi_at_risk_progress_factor", nullable = false, precision = 3, scale = 2)
     private BigDecimal sgiAtRiskProgressFactor;
 
+    /**
+     * S-E — strict probability-weight validation on scenario approval.
+     * false (default): over-allocation is a soft warning on the weighted-EL read.
+     * true: approving a scenario that pushes total board-approved weight &gt; 1.0
+     * is rejected (400).
+     */
+    @Column(name = "climate_scenario_weights_strict", nullable = false)
+    private Boolean climateScenarioWeightsStrict = false;
+
     @Column(columnDefinition = "NVARCHAR(MAX)") private String notes;
 
     @Column(name = "is_deleted", nullable = false) private Boolean isDeleted = false;

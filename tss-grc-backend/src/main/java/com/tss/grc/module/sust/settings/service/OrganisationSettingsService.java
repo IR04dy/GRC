@@ -63,6 +63,8 @@ public class OrganisationSettingsService {
             cur.setCapaExecutiveEscalationDays(req.getCapaExecutiveEscalationDays());
         if (req.getSgiAtRiskProgressFactor() != null)
             cur.setSgiAtRiskProgressFactor(req.getSgiAtRiskProgressFactor());
+        if (req.getClimateScenarioWeightsStrict() != null)
+            cur.setClimateScenarioWeightsStrict(req.getClimateScenarioWeightsStrict());
         if (req.getNotes() != null) cur.setNotes(req.getNotes());
 
         validate(cur);
@@ -86,6 +88,7 @@ public class OrganisationSettingsService {
         cur.setCapaOverdueWarningDays(7);
         cur.setCapaExecutiveEscalationDays(30);
         cur.setSgiAtRiskProgressFactor(new BigDecimal("0.70"));
+        cur.setClimateScenarioWeightsStrict(false);
         OrganisationSettings saved = repo.save(cur);
         audit.log("UPDATE", "OrganisationSettings", saved.getId(), "Sustainability settings reset to defaults");
         return saved;

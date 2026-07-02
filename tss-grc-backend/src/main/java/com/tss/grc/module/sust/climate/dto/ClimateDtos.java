@@ -28,6 +28,10 @@ public final class ClimateDtos {
 
     // ─── TCFD scenario ────────────────────────────────────────────
 
+    // S-E: portfolioAtRiskSarBillions + expectedLossSarMillions are NO LONGER
+    // request inputs. They are DERIVED server-side from the scenario's sector
+    // impacts (Σ exposure × PD-uplift × scenario factor) and returned read-only
+    // in the response. probabilityWeight stays an input (the board allocation).
     public record TcfdScenarioRequest(
             String scenarioCode,
             @NotBlank @Size(max = 255) String titleEn,
@@ -39,8 +43,6 @@ public final class ClimateDtos {
             @NotNull @Positive Integer timeHorizonYears,
             @NotNull @PositiveOrZero BigDecimal globalWarmingCelsius,
             String assumptionsJson,
-            BigDecimal portfolioAtRiskSarBillions,
-            BigDecimal expectedLossSarMillions,
             @DecimalMin("0.0") @DecimalMax("1.0") BigDecimal probabilityWeight
     ) {}
 

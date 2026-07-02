@@ -8,9 +8,14 @@ import com.tss.grc.module.sust.climate.dto.ClimateDtos.ProbabilityWeightedExpect
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.TcfdLifecycleTransitionRequest;
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.TcfdScenarioRequest;
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.TcfdScenarioResponse;
+import com.tss.grc.module.sust.climate.dto.ClimateDtos.TcfdSectorImpactRequest;
+import com.tss.grc.module.sust.climate.dto.ClimateDtos.TcfdSectorImpactResponse;
 import com.tss.grc.module.sust.climate.entity.TcfdClimateScenario;
+import com.tss.grc.module.sust.climate.entity.TcfdSectorImpact;
 import com.tss.grc.module.sust.climate.repository.TcfdClimateScenarioRepository;
 import com.tss.grc.module.sust.climate.repository.TcfdSectorImpactRepository;
+import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
+import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,6 +62,7 @@ class TcfdScenarioServiceTest {
     @Mock private TcfdSectorImpactRepository sectorRepo;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private OrganisationSettingsService settingsService;
 
     @InjectMocks private TcfdScenarioService service;
 
@@ -86,15 +92,41 @@ class TcfdScenarioServiceTest {
     }
 
     private static TcfdScenarioRequest req() {
+        // S-E: portfolioAtRisk + expectedLoss are no longer request inputs.
         return new TcfdScenarioRequest(
                 null, "Orderly net-zero by 2050",
                 "انتقال منظَّم نحو الحياد الكربوني بحلول 2050",
                 "NGFS Orderly", "سيناريو NGFS المنظَّم",
                 "ORDERLY", "NGFS", 30, new BigDecimal("1.50"),
                 "{\"carbon_price_2030\": 200}",
-                new BigDecimal("142.50"), new BigDecimal("1850.00"),
                 new BigDecimal("0.500")
         );
+    }
+
+    private static OrganisationSettings settings(boolean strict) {
+        OrganisationSettings s = new OrganisationSettings();
+        s.setClimateScenarioWeightsStrict(strict);
+        return s;
+    }
+
+    private static TcfdSectorImpact sector(BigDecimal exposureSarM, int pdUpliftBps) {
+        TcfdSectorImpact si = new TcfdSectorImpact();
+        si.setId(500L);
+        si.setOrganisationId(ORG_ID);
+        si.setScenarioId(SCN_ID);
+        si.setSectorCode("ENERGY");
+        si.setSectorNameEn("Energy");
+        si.setExposureSarMillions(exposureSarM);
+        si.setTransitionRiskScore(new BigDecimal("60.00"));
+        si.setPhysicalRiskScore(new BigDecimal("40.00"));
+        si.setExpectedPdUpliftBps(pdUpliftBps);
+        return si;
+    }
+
+    private static TcfdSectorImpactRequest sectorReq(BigDecimal exposureSarM, int pdUpliftBps) {
+        return new TcfdSectorImpactRequest("ENERGY", "Energy", "الطاقة",
+                exposureSarM, new BigDecimal("60.00"), new BigDecimal("40.00"),
+                pdUpliftBps, null, null);
     }
 
     @SuppressWarnings("unchecked")
@@ -202,6 +234,7 @@ class TcfdScenarioServiceTest {
                 new BigDecimal("1850"), new BigDecimal("0.500"));
         when(scenarioRepo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, SCN_EX))
                 .thenReturn(Optional.of(s));
+        when(settingsService.getOrCreate()).thenReturn(settings(false));
         when(scenarioRepo.save(any(TcfdClimateScenario.class))).thenAnswer(inv -> inv.getArgument(0));
 
         TcfdScenarioResponse out = service.transition(SCN_EX,
@@ -347,5 +380,114 @@ class TcfdScenarioServiceTest {
 
         assertThat(service.list()).isEmpty();
         verify(scenarioRepo).findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(OTHER_ORG);
+    }
+
+    // ─── S-E: derived loss engine ─────────────────────────────────
+
+    @Test
+    void create_derivesZeroFiguresWhenNoSectors() {
+        AtomicLong seq = new AtomicLong(100);
+        when(scenarioRepo.save(any(TcfdClimateScenario.class))).thenAnswer(assignId(seq));
+
+        TcfdScenarioResponse out = service.create(req());
+
+        // No sector impacts yet → both derived figures start at zero (not free-typed).
+        assertThat(out.expectedLossSarMillions()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(out.portfolioAtRiskSarBillions()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void addSectorImpact_recomputesExpectedLossAndPortfolioAtRisk() {
+        // DISORDERLY factor = 1.5. Sector: exposure 5,000 M SAR, PD uplift 150 bps (0.015).
+        //   expected loss     = 5000 × 0.015 × 1.5 = 112.50 M SAR
+        //   portfolio-at-risk = 5000 / 1000        =   5.00 B SAR
+        TcfdClimateScenario s = scenario("DRAFT", "DISORDERLY",
+                BigDecimal.ZERO, new BigDecimal("0.400"));
+        when(scenarioRepo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, SCN_EX))
+                .thenReturn(Optional.of(s));
+        when(sectorRepo.save(any(TcfdSectorImpact.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(sectorRepo.findByOrganisationIdAndScenarioIdAndIsDeletedFalseOrderBySectorCodeAsc(ORG_ID, SCN_ID))
+                .thenReturn(List.of(sector(new BigDecimal("5000.00"), 150)));
+        when(scenarioRepo.save(any(TcfdClimateScenario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TcfdSectorImpactResponse out = service.addSectorImpact(SCN_EX, sectorReq(new BigDecimal("5000.00"), 150));
+        assertThat(out.sectorCode()).isEqualTo("ENERGY");
+
+        ArgumentCaptor<TcfdClimateScenario> cap = ArgumentCaptor.forClass(TcfdClimateScenario.class);
+        verify(scenarioRepo).save(cap.capture());
+        assertThat(cap.getValue().getExpectedLossSarMillions()).isEqualByComparingTo(new BigDecimal("112.50"));
+        assertThat(cap.getValue().getPortfolioAtRiskSarBillions()).isEqualByComparingTo(new BigDecimal("5.00"));
+    }
+
+    @Test
+    void addSectorImpact_rejectsWhenBoardApproved() {
+        // Figures are locked once approved — adding a sector would silently move them.
+        TcfdClimateScenario s = scenario("BOARD_APPROVED", "ORDERLY",
+                new BigDecimal("112.50"), new BigDecimal("0.400"));
+        when(scenarioRepo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, SCN_EX))
+                .thenReturn(Optional.of(s));
+
+        assertThatThrownBy(() -> service.addSectorImpact(SCN_EX, sectorReq(new BigDecimal("100.00"), 50)))
+                .isInstanceOf(IllegalStateException.class);
+        verify(sectorRepo, never()).save(any(TcfdSectorImpact.class));
+    }
+
+    // ─── S-E: probability-weight budget guard ─────────────────────
+
+    @Test
+    void approve_strictMode_rejectsOverAllocation() {
+        // Existing approved 0.600 + this 0.600 = 1.200 > 1.0 → reject (strict).
+        TcfdClimateScenario approving = scenario("IN_REVIEW", "ORDERLY",
+                new BigDecimal("112.50"), new BigDecimal("0.600"));
+        TcfdClimateScenario existing = scenario("BOARD_APPROVED", "DISORDERLY",
+                new BigDecimal("300.00"), new BigDecimal("0.600"));
+        existing.setId(43L);
+        when(scenarioRepo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, SCN_EX))
+                .thenReturn(Optional.of(approving));
+        when(settingsService.getOrCreate()).thenReturn(settings(true));
+        when(scenarioRepo.findByOrganisationIdAndLifecycleStageAndIsDeletedFalseOrderByCreatedAtDesc(
+                ORG_ID, "BOARD_APPROVED")).thenReturn(List.of(existing));
+
+        assertThatThrownBy(() -> service.transition(SCN_EX,
+                new TcfdLifecycleTransitionRequest("BOARD_APPROVED"), 9L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("1.200");
+        verify(scenarioRepo, never()).save(any(TcfdClimateScenario.class));
+        verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
+    }
+
+    @Test
+    void approve_strictMode_allowsWithinBudget() {
+        // Existing 0.500 + this 0.400 = 0.900 ≤ 1.0 → allowed.
+        TcfdClimateScenario approving = scenario("IN_REVIEW", "ORDERLY",
+                new BigDecimal("112.50"), new BigDecimal("0.400"));
+        TcfdClimateScenario existing = scenario("BOARD_APPROVED", "DISORDERLY",
+                new BigDecimal("300.00"), new BigDecimal("0.500"));
+        existing.setId(43L);
+        when(scenarioRepo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, SCN_EX))
+                .thenReturn(Optional.of(approving));
+        when(settingsService.getOrCreate()).thenReturn(settings(true));
+        when(scenarioRepo.findByOrganisationIdAndLifecycleStageAndIsDeletedFalseOrderByCreatedAtDesc(
+                ORG_ID, "BOARD_APPROVED")).thenReturn(List.of(existing));
+        when(scenarioRepo.save(any(TcfdClimateScenario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TcfdScenarioResponse out = service.transition(SCN_EX,
+                new TcfdLifecycleTransitionRequest("BOARD_APPROVED"), 9L);
+        assertThat(out.lifecycleStage()).isEqualTo("BOARD_APPROVED");
+    }
+
+    @Test
+    void approve_nonStrictMode_allowsOverAllocation() {
+        // Same over-allocation, but strict=false → allowed (weighted-EL read warns instead).
+        TcfdClimateScenario approving = scenario("IN_REVIEW", "ORDERLY",
+                new BigDecimal("112.50"), new BigDecimal("0.600"));
+        when(scenarioRepo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, SCN_EX))
+                .thenReturn(Optional.of(approving));
+        when(settingsService.getOrCreate()).thenReturn(settings(false));
+        when(scenarioRepo.save(any(TcfdClimateScenario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TcfdScenarioResponse out = service.transition(SCN_EX,
+                new TcfdLifecycleTransitionRequest("BOARD_APPROVED"), 9L);
+        assertThat(out.lifecycleStage()).isEqualTo("BOARD_APPROVED");
     }
 }

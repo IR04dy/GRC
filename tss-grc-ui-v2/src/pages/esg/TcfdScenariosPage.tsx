@@ -118,8 +118,8 @@ export function TcfdScenariosPage() {
     { key: 'timeHorizonYears', kind: 'number', required: true, min: 1, max: 100, span: 4, label: isAr ? 'الأفق الزمني (سنوات)' : 'Time horizon (yrs)' },
     { key: 'globalWarmingCelsius', kind: 'number', required: true, min: 0, max: 10, span: 4, label: isAr ? 'الاحترار (°م)' : 'Warming (°C)' },
     { key: 'probabilityWeight', kind: 'number', min: 0, max: 1, span: 4, label: isAr ? 'وزن الاحتمال (0-1)' : 'Probability weight (0-1)' },
-    { key: 'portfolioAtRiskSarBillions', kind: 'number', min: 0, span: 6, label: isAr ? 'المحفظة المعرّضة (مليار ر.س)' : 'Portfolio at risk (SAR bn)' },
-    { key: 'expectedLossSarMillions', kind: 'number', min: 0, span: 6, label: isAr ? 'الخسارة المتوقّعة (مليون ر.س)' : 'Expected loss (SAR mn)' },
+    // S-E: portfolio-at-risk + expected loss are derived from sector impacts —
+    // no longer editable here (they are computed server-side, shown read-only).
   ], [isAr]);
   const editInitial = useMemo(() => editScenario ? {
     titleEn: editScenario.titleEn,
@@ -131,8 +131,6 @@ export function TcfdScenariosPage() {
     timeHorizonYears: editScenario.timeHorizonYears,
     globalWarmingCelsius: Number(editScenario.globalWarmingCelsius),
     probabilityWeight: Number(editScenario.probabilityWeight),
-    portfolioAtRiskSarBillions: editScenario.portfolioAtRiskSarBillions != null ? Number(editScenario.portfolioAtRiskSarBillions) : '',
-    expectedLossSarMillions: editScenario.expectedLossSarMillions != null ? Number(editScenario.expectedLossSarMillions) : '',
   } : {}, [editScenario]);
   async function onUpdateScenario(values: Record<string, unknown>) {
     if (!editScenario) return;
@@ -149,8 +147,6 @@ export function TcfdScenariosPage() {
         timeHorizonYears: Number(values.timeHorizonYears),
         globalWarmingCelsius: Number(values.globalWarmingCelsius),
         probabilityWeight: num(values.probabilityWeight),
-        portfolioAtRiskSarBillions: num(values.portfolioAtRiskSarBillions),
-        expectedLossSarMillions: num(values.expectedLossSarMillions),
       });
       toast.success(isAr ? 'تم تحديث السيناريو' : 'Scenario updated');
       setEditScenario(null);
@@ -411,14 +407,9 @@ export function TcfdScenariosPage() {
               <p>{isAr
                 ? 'سيتم إنشاء السيناريو بدون تأثيرات قطاعية؛ يمكنك إضافتها مباشرة بعد الحفظ.'
                 : 'The scenario will be created without sector impacts; you can add them right after saving.'}</p>
-              <label>{isAr ? 'المحفظة المعرَّضة (مليار ر.س)' : 'Portfolio at risk (B SAR)'}
-                <input type="number" step="0.1" value={String(draft.portfolioAtRiskSarBillions ?? '')}
-                       onChange={e => setDraft({...draft, portfolioAtRiskSarBillions: Number(e.target.value)})} />
-              </label>
-              <label>{isAr ? 'الخسارة المتوقّعة (مليون ر.س)' : 'Expected loss (M SAR)'}
-                <input type="number" step="0.1" value={String(draft.expectedLossSarMillions ?? '')}
-                       onChange={e => setDraft({...draft, expectedLossSarMillions: Number(e.target.value)})} />
-              </label>
+              <p style={{ fontSize: 12, color: 'var(--ink-3)' }}>{isAr
+                ? 'تُحتسب المحفظة المعرَّضة والخسارة المتوقّعة تلقائياً من التأثيرات القطاعية (التعرّض × ارتفاع احتمال التعثّر × عامل السيناريو) — لا تُدخَل يدوياً.'
+                : 'Portfolio-at-risk and expected loss are computed automatically from the sector impacts (exposure × PD-uplift × scenario factor) — not entered by hand.'}</p>
               <label>{isAr ? 'وزن الاحتمال (0-1)' : 'Probability weight (0-1)'}
                 <input type="number" step="0.05" min="0" max="1" value={String(draft.probabilityWeight ?? '')}
                        onChange={e => setDraft({...draft, probabilityWeight: Number(e.target.value)})} />

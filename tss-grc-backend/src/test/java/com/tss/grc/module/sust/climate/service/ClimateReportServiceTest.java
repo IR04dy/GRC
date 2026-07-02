@@ -11,6 +11,7 @@ import com.tss.grc.module.sust.climate.repository.FinancedEmissionsRecordReposit
 import com.tss.grc.module.sust.climate.repository.FinancedEmissionsTargetRepository;
 import com.tss.grc.module.sust.climate.repository.TcfdClimateScenarioRepository;
 import com.tss.grc.module.sust.climate.repository.TcfdSectorImpactRepository;
+import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,7 @@ class ClimateReportServiceTest {
     @Mock private FinancedEmissionsTargetRepository targetRepo;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private OrganisationSettingsService settingsService;
 
     private TcfdScenarioService scenarioService;
     private FinancedEmissionsService emissionsService;
@@ -56,7 +58,7 @@ class ClimateReportServiceTest {
         // Build the two collaborator services with real instances so the
         // report service exercises the same blending math the production
         // path uses. Only the repositories are mocked.
-        scenarioService = new TcfdScenarioService(scenarioRepo, sectorRepo, audit, eventPublisher);
+        scenarioService = new TcfdScenarioService(scenarioRepo, sectorRepo, audit, eventPublisher, settingsService);
         emissionsService = new FinancedEmissionsService(recordRepo, targetRepo, audit, eventPublisher);
         reportService = new TcfdReportService(scenarioRepo, sectorRepo, recordRepo,
                 scenarioService, emissionsService);

@@ -14,6 +14,7 @@ import com.tss.grc.module.sust.climate.entity.TcfdClimateScenario;
 import com.tss.grc.module.sust.climate.entity.TcfdSectorImpact;
 import com.tss.grc.module.sust.climate.repository.TcfdClimateScenarioRepository;
 import com.tss.grc.module.sust.climate.repository.TcfdSectorImpactRepository;
+import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -74,10 +75,17 @@ public class TcfdScenarioService {
             "ARCHIVED",       Set.of()
     );
 
+    /** Tolerance for the board-approved probability-weight budget check. */
+    private static final BigDecimal WEIGHT_TOLERANCE = new BigDecimal("0.005");
+    /** Basis-points → fraction, and SAR-millions → SAR-billions, for the loss engine. */
+    private static final BigDecimal TEN_THOUSAND = new BigDecimal("10000");
+    private static final BigDecimal ONE_THOUSAND = new BigDecimal("1000");
+
     private final TcfdClimateScenarioRepository scenarioRepo;
     private final TcfdSectorImpactRepository sectorRepo;
     private final AuditLogService audit;
     private final ApplicationEventPublisher eventPublisher;
+    private final OrganisationSettingsService settingsService;
 
     // ─── Reads ────────────────────────────────────────────────────
 
@@ -121,6 +129,10 @@ public class TcfdScenarioService {
                 : req.scenarioCode());
         applyFields(s, req);
         s.setLifecycleStage("DRAFT");
+        // S-E: derived figures — a fresh scenario has no sector impacts yet, so
+        // both start at zero and grow as sector rows are added (recomputed there).
+        s.setExpectedLossSarMillions(BigDecimal.ZERO.setScale(2));
+        s.setPortfolioAtRiskSarBillions(BigDecimal.ZERO.setScale(2));
         s = scenarioRepo.save(s);
 
         audit.log("CREATE", "TcfdClimateScenario", s.getId(),
@@ -146,6 +158,9 @@ public class TcfdScenarioService {
                     Set.of("DRAFT", "IN_REVIEW"));
         }
         applyFields(s, req);
+        // S-E: scenarioType may have changed → the scenario factor changes →
+        // re-derive expected loss + portfolio-at-risk from the sector impacts.
+        recomputeDerivedFigures(s);
         s = scenarioRepo.save(s);
         audit.log("UPDATE", "TcfdClimateScenario", s.getId(),
                 "Scenario " + s.getScenarioCode() + " updated");
@@ -162,6 +177,13 @@ public class TcfdScenarioService {
         Set<String> allowed = ALLOWED_NEXT.getOrDefault(from, Set.of());
         if (!allowed.contains(to)) {
             throw new IllegalTransitionException(from, to, allowed);
+        }
+        if ("BOARD_APPROVED".equals(to)) {
+            // S-E: board-approved scenarios should collectively partition the
+            // future (Σ weights ≈ 1.0). In strict mode, reject an approval that
+            // over-allocates the weight budget; otherwise the weighted-EL read
+            // surfaces a soft warning.
+            assertWeightBudgetOnApproval(s);
         }
         s.setLifecycleStage(to);
         if ("BOARD_APPROVED".equals(to)) {
@@ -191,9 +213,14 @@ public class TcfdScenarioService {
     @Transactional
     public TcfdSectorImpactResponse addSectorImpact(UUID scenarioExternalId, TcfdSectorImpactRequest req) {
         TcfdClimateScenario parent = mustGet(scenarioExternalId);
-        if ("ARCHIVED".equals(parent.getLifecycleStage())) {
+        // S-E: expected loss + portfolio-at-risk are derived from the sector
+        // impacts, so once the board has approved (or the scenario is archived)
+        // the figures are locked — adding a sector would silently move them.
+        if ("BOARD_APPROVED".equals(parent.getLifecycleStage())
+                || "ARCHIVED".equals(parent.getLifecycleStage())) {
             throw new IllegalStateException(
-                    "Cannot add sector impact to archived scenario " + parent.getScenarioCode());
+                    "Cannot add a sector impact to " + parent.getLifecycleStage()
+                            + " scenario " + parent.getScenarioCode() + " — its figures are locked.");
         }
         TcfdSectorImpact si = new TcfdSectorImpact();
         si.setOrganisationId(parent.getOrganisationId());
@@ -209,8 +236,14 @@ public class TcfdScenarioService {
         si.setMitigantActionsAr(req.mitigantActionsAr());
         si = sectorRepo.save(si);
 
+        // Re-derive the parent's headline figures now the sector set changed.
+        recomputeDerivedFigures(parent);
+        scenarioRepo.save(parent);
+
         audit.log("CREATE", "TcfdSectorImpact", si.getId(),
-                "Sector " + si.getSectorCode() + " added to " + parent.getScenarioCode());
+                "Sector " + si.getSectorCode() + " added to " + parent.getScenarioCode()
+                        + " — scenario expected loss re-derived to SAR "
+                        + parent.getExpectedLossSarMillions() + "M");
         return TcfdSectorImpactResponse.from(si);
     }
 
@@ -254,6 +287,81 @@ public class TcfdScenarioService {
                 warning);
     }
 
+    // ─── S-E loss engine ──────────────────────────────────────────
+
+    /**
+     * Re-derive the scenario's headline figures from its sector impacts:
+     * <pre>
+     *   expectedLoss (SAR M)     = scenarioFactor × Σ( exposureSarM × pdUpliftBps / 10000 )
+     *   portfolioAtRisk (SAR bn) = Σ( exposureSarM ) / 1000
+     * </pre>
+     * The scenario factor amplifies losses by NGFS severity (an orderly
+     * transition bites less than a hot-house). Called on create (zero — no
+     * sectors yet), on update (the type may change the factor), and whenever a
+     * sector row is added.
+     */
+    private void recomputeDerivedFigures(TcfdClimateScenario s) {
+        List<TcfdSectorImpact> sectors = sectorRepo
+                .findByOrganisationIdAndScenarioIdAndIsDeletedFalseOrderBySectorCodeAsc(
+                        s.getOrganisationId(), s.getId());
+        BigDecimal factor = scenarioFactor(s.getScenarioType());
+        BigDecimal totalExposure = BigDecimal.ZERO;
+        BigDecimal expectedLoss = BigDecimal.ZERO;
+        for (TcfdSectorImpact si : sectors) {
+            BigDecimal exposure = si.getExposureSarMillions() == null ? BigDecimal.ZERO : si.getExposureSarMillions();
+            int bps = si.getExpectedPdUpliftBps() == null ? 0 : si.getExpectedPdUpliftBps();
+            BigDecimal pdUplift = BigDecimal.valueOf(bps).divide(TEN_THOUSAND, 10, RoundingMode.HALF_UP);
+            totalExposure = totalExposure.add(exposure);
+            expectedLoss = expectedLoss.add(exposure.multiply(pdUplift).multiply(factor));
+        }
+        s.setExpectedLossSarMillions(expectedLoss.setScale(2, RoundingMode.HALF_UP));
+        s.setPortfolioAtRiskSarBillions(totalExposure.divide(ONE_THOUSAND, 2, RoundingMode.HALF_UP));
+    }
+
+    /**
+     * NGFS-severity amplification applied on top of the modelled PD uplift.
+     * Orderly = 1.0 (baseline), disorderly = 1.5 (late, abrupt policy),
+     * hot-house = 2.0 (severe physical risk). CUSTOM / unknown default to 1.0 —
+     * the analyst's per-sector PD uplift carries the signal.
+     */
+    private static BigDecimal scenarioFactor(String scenarioType) {
+        if (scenarioType == null) return BigDecimal.ONE;
+        return switch (scenarioType) {
+            case "ORDERLY"    -> new BigDecimal("1.0");
+            case "DISORDERLY" -> new BigDecimal("1.5");
+            case "HOT_HOUSE"  -> new BigDecimal("2.0");
+            default           -> BigDecimal.ONE;
+        };
+    }
+
+    /**
+     * Guard the board-approved probability-weight budget on approval. In strict
+     * mode (per {@code OrganisationSettings.climateScenarioWeightsStrict}),
+     * reject an approval that would push the total board-approved weight above
+     * 1.0 (+ tolerance). Under-allocation is always allowed — the set is still
+     * being assembled. Non-strict → no-op (the weighted-EL read warns instead).
+     */
+    private void assertWeightBudgetOnApproval(TcfdClimateScenario approving) {
+        boolean strict = Boolean.TRUE.equals(
+                settingsService.getOrCreate().getClimateScenarioWeightsStrict());
+        if (!strict) return;
+        BigDecimal projected = approving.getProbabilityWeight() == null
+                ? BigDecimal.ZERO : approving.getProbabilityWeight();
+        for (TcfdClimateScenario s : scenarioRepo
+                .findByOrganisationIdAndLifecycleStageAndIsDeletedFalseOrderByCreatedAtDesc(
+                        approving.getOrganisationId(), "BOARD_APPROVED")) {
+            if (s.getId() != null && s.getId().equals(approving.getId())) continue;
+            projected = projected.add(
+                    s.getProbabilityWeight() == null ? BigDecimal.ZERO : s.getProbabilityWeight());
+        }
+        if (projected.subtract(BigDecimal.ONE).compareTo(WEIGHT_TOLERANCE) > 0) {
+            throw new IllegalArgumentException(
+                    "Approving this scenario pushes the total board-approved probability weight to "
+                            + projected.setScale(3, RoundingMode.HALF_UP)
+                            + " (> 1.000). Strict mode rejects over-allocation — lower a weight or archive a scenario first.");
+        }
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────
 
     public TcfdClimateScenario mustGet(UUID externalId) {
@@ -272,8 +380,8 @@ public class TcfdScenarioService {
         if (r.timeHorizonYears() != null) s.setTimeHorizonYears(r.timeHorizonYears());
         if (r.globalWarmingCelsius() != null) s.setGlobalWarmingCelsius(r.globalWarmingCelsius());
         if (r.assumptionsJson() != null) s.setAssumptionsJson(r.assumptionsJson());
-        if (r.portfolioAtRiskSarBillions() != null) s.setPortfolioAtRiskSarBillions(r.portfolioAtRiskSarBillions());
-        if (r.expectedLossSarMillions() != null) s.setExpectedLossSarMillions(r.expectedLossSarMillions());
+        // S-E: portfolioAtRisk + expectedLoss are NOT taken from the request —
+        // they are derived from the sector impacts (see recomputeDerivedFigures).
         if (r.probabilityWeight() != null) s.setProbabilityWeight(r.probabilityWeight());
     }
 
