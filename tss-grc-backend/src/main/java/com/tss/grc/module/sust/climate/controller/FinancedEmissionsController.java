@@ -26,7 +26,8 @@ import java.util.UUID;
  * net-zero / interim targets — Sprint 11.
  */
 @RestController
-@RequestMapping("/api/v1/climate/financed-emissions")
+// S-M — canonical /api/v1/sustainability/*; legacy /api/v1/climate/* kept as alias.
+@RequestMapping({"/api/v1/sustainability/financed-emissions", "/api/v1/climate/financed-emissions"})
 @RequiredArgsConstructor
 @Tag(name = "Financed Emissions (PCAF)")
 @SecurityRequirement(name = "bearerAuth")

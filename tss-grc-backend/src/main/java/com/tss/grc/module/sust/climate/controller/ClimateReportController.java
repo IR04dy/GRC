@@ -35,7 +35,8 @@ import java.util.List;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/v1/climate/report")
+// S-M — canonical /api/v1/sustainability/*; legacy /api/v1/climate/* kept as alias.
+@RequestMapping({"/api/v1/sustainability/report", "/api/v1/climate/report"})
 @RequiredArgsConstructor
 @Tag(name = "Annual Climate Report (IFRS S2 / TCFD)")
 @SecurityRequirement(name = "bearerAuth")

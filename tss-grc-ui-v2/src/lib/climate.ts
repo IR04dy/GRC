@@ -1,7 +1,7 @@
 // TCFD Climate Scenarios + Scope-3 Financed Emissions API client —
 // Sprint 11 (V186).
 //
-// Wraps /api/v1/climate/* — three endpoint groups:
+// Wraps /api/v1/sustainability/* (climate stack; legacy /api/v1/climate/* aliased) — three endpoint groups:
 //   • /scenarios     — TCFD scenarios + sector impacts + weighted-EL
 //   • /financed-emissions — PCAF records + targets + roll-ups
 //   • /report/annual — IFRS S2 disclosure pack
@@ -359,9 +359,11 @@ export function fmtCelsius(value?: number | string | null): string {
 
 // ─── API calls ─────────────────────────────────────────────────────
 
-const SCENARIOS = '/api/v1/climate/scenarios';
-const EMISSIONS = '/api/v1/climate/financed-emissions';
-const REPORT    = '/api/v1/climate/report';
+// S-M — canonical sustainability namespace. The backend also serves the legacy
+// /api/v1/climate/* paths as aliases, but the client uses the canonical routes.
+const SCENARIOS = '/api/v1/sustainability/scenarios';
+const EMISSIONS = '/api/v1/sustainability/financed-emissions';
+const REPORT    = '/api/v1/sustainability/report';
 
 // Scenarios.
 export function listScenarios(): Promise<TcfdScenario[]> {

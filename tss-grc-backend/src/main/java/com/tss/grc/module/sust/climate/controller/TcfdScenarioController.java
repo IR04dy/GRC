@@ -33,7 +33,9 @@ import java.util.UUID;
  * SUST grant matrix + the SUSTAINABILITY_OFFICER role) — one scheme module-wide.
  */
 @RestController
-@RequestMapping("/api/v1/climate/scenarios")
+// S-M — canonical namespace is /api/v1/sustainability/*; the legacy
+// /api/v1/climate/* path is retained as an alias so existing clients keep working.
+@RequestMapping({"/api/v1/sustainability/scenarios", "/api/v1/climate/scenarios"})
 @RequiredArgsConstructor
 @Tag(name = "TCFD Climate Scenarios")
 @SecurityRequirement(name = "bearerAuth")
