@@ -3,6 +3,7 @@ package com.tss.grc.module.sust.capa.service;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.service.NotificationService;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
@@ -59,6 +60,12 @@ public class CorrectiveActionService {
     private final CorrectiveActionRepository repo;
     private final OrganisationSettingsService settingsService;
     private final AuditLogService audit;
+    // S-N — a freshly auto-opened CAPA notifies the tenant's sustainability
+    // officers. Because evidence-reject (S-C) and vendor-survey non-response
+    // (S-O) both surface their gap THROUGH autoOpen, this single hook delivers
+    // the "evidence / CAPA / SLA fire notifications" requirement (the sourceType
+    // distinguishes them) without double-notifying.
+    private final NotificationService notifications;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -155,6 +162,15 @@ public class CorrectiveActionService {
         CorrectiveAction saved = repo.save(ca);
         audit.log("AUTO_CREATE", "CorrectiveAction", saved.getId(),
             "Auto-CAPA opened for " + sourceType + " " + sourceRef);
+        // S-N — alert the sustainability officers that a new gap needs an owner.
+        // broadcastToRole is a no-op (returns 0) when no user holds the role, and
+        // is safe off-request (scheduler-driven vendor/evidence sweeps) since it
+        // touches no request-scoped state.
+        notifications.broadcastToRole(org, "SUSTAINABILITY_OFFICER",
+            "New sustainability corrective action",
+            "إجراء تصحيحي جديد للاستدامة",
+            "Auto-CAPA opened for " + sourceType + " " + sourceRef + ": " + titleEn,
+            "SUST_CAPA", "CorrectiveAction", saved.getId());
         return saved;
     }
 

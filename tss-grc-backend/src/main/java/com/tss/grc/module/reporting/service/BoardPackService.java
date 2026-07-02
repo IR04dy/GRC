@@ -21,6 +21,7 @@ import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.kri.repository.KriDefinitionRepository;
 import com.tss.grc.module.risk.kri.repository.KriMeasurementRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
+import com.tss.grc.module.sust.dashboard.service.SustainabilityDashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -71,6 +72,8 @@ public class BoardPackService {
     private final ChangeRequestRepository changeRepo;
     private final EthicsCaseRepository caseRepo;
     private final AmlAlertRepository amlRepo;
+    // S-N — the ESG/sustainability executive section pulls the composed dashboard aggregate.
+    private final SustainabilityDashboardService sustDashboard;
 
     @Transactional(readOnly = true)
     public byte[] generatePdf(String lang) {
@@ -130,7 +133,12 @@ public class BoardPackService {
             renderSectionHeader(doc, ar ? "الأخلاقيات والامتثال" : "Ethics & Compliance", ar);
             renderEthics(doc, org, ar);
 
-            // 9. Closing
+            // 9. Sustainability & ESG (S-N)
+            doc.newPage();
+            renderSectionHeader(doc, ar ? "الاستدامة والحوكمة البيئية والاجتماعية" : "Sustainability & ESG", ar);
+            renderSustainability(doc, org, ar);
+
+            // 10. Closing
             doc.newPage();
             renderClosing(doc, ar);
 
@@ -444,6 +452,60 @@ public class BoardPackService {
         p.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
         doc.add(p);
     }
+
+    // ── Section: Sustainability & ESG (S-N) ────────────────────────────────
+    /**
+     * ESG executive snapshot pulled from the composed sustainability dashboard
+     * (overall readiness score + band, GHG inventory, CMA/TCFD disclosure
+     * readiness, SGI on-track, open corrective actions, top gaps). Wrapped
+     * defensively so a sustainability-data hiccup never breaks the board pack.
+     */
+    @SuppressWarnings("unchecked")
+    private void renderSustainability(Document doc, Long org, boolean ar) throws DocumentException {
+        Map<String, Object> d;
+        try {
+            d = sustDashboard.dashboard((short) java.time.Year.now().getValue());
+        } catch (RuntimeException ex) {
+            d = java.util.Collections.emptyMap();
+        }
+        Map<String, Object> overall = asMap(d.get("overall"));
+        Map<String, Object> ghg     = asMap(d.get("ghg"));
+        Map<String, Object> cma     = asMap(d.get("cma"));
+        Map<String, Object> tcfd    = asMap(d.get("tcfd"));
+        Map<String, Object> byTier  = asMap(asMap(d.get("sgi")).get("byTier"));
+        Map<String, Object> capa    = asMap(d.get("capa"));
+        int onTrack  = intOf(byTier.get("ON_TRACK"));
+        int sgiTotal = onTrack + intOf(byTier.get("AT_RISK")) + intOf(byTier.get("DELAYED"));
+        Object gaps  = d.get("topGaps");
+        int gapCount = (gaps instanceof java.util.List<?> l) ? l.size() : 0;
+
+        PdfPTable t = new PdfPTable(4);
+        t.setWidthPercentage(100);
+        t.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
+        kpi(t, ar ? "درجة ESG"        : "ESG Score",         numOf(overall.get("score")),      str(overall.get("band")),                         ar);
+        kpi(t, ar ? "إجمالي الانبعاثات" : "GHG Total (tCO2e)", numOf(ghg.get("grandTotal")),     ar ? "النطاقات 1-3" : "Scopes 1-3",               ar);
+        kpi(t, ar ? "إفصاح CMA"        : "CMA Readiness",     numOf(cma.get("readinessPct")) + "%", ar ? "المواد 91-94" : "Art. 91-94",           ar);
+        kpi(t, ar ? "توافق TCFD"       : "TCFD Alignment",    numOf(tcfd.get("alignmentPct")) + "%", "—",                                          ar);
+        kpi(t, ar ? "المبادرة الخضراء"  : "SGI On-Track",      onTrack + " / " + sgiTotal,       ar ? "التزامات نشطة" : "Active commitments",       ar);
+        kpi(t, ar ? "إجراءات مفتوحة"    : "Open CAPAs",        numOf(capa.get("open")),          "—",                                              ar);
+        kpi(t, ar ? "أعلى الفجوات"      : "Top ESG Gaps",      String.valueOf(gapCount),          "—",                                              ar);
+        kpi(t, ar ? "النطاق 3"          : "Scope 3 (tCO2e)",   numOf(ghg.get("scope3Total")),    "—",                                              ar);
+        doc.add(t);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> asMap(Object o) {
+        return (o instanceof Map<?, ?> m) ? (Map<String, Object>) m : java.util.Collections.emptyMap();
+    }
+    private static int intOf(Object o) { return (o instanceof Number n) ? n.intValue() : 0; }
+    private static String numOf(Object o) {
+        if (o instanceof Number n) {
+            double v = n.doubleValue();
+            return v == Math.floor(v) ? String.valueOf((long) v) : String.valueOf(v);
+        }
+        return o == null ? "—" : o.toString();
+    }
+    private static String str(Object o) { return (o == null || o.toString().isBlank()) ? "—" : o.toString(); }
 
     private void renderClosing(Document doc, boolean ar) throws DocumentException {
         Paragraph p = new Paragraph(

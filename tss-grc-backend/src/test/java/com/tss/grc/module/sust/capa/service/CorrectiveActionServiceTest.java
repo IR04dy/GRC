@@ -3,6 +3,7 @@ package com.tss.grc.module.sust.capa.service;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.service.NotificationService;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
 import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
@@ -52,6 +53,7 @@ class CorrectiveActionServiceTest {
     @Mock private CorrectiveActionRepository repo;
     @Mock private OrganisationSettingsService settingsService;
     @Mock private AuditLogService audit;
+    @Mock private NotificationService notifications;
     @InjectMocks private CorrectiveActionService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -267,6 +269,9 @@ class CorrectiveActionServiceTest {
         assertThat(ca.getPriority()).isEqualTo("HIGH");
         assertThat(ca.getTargetDate()).isEqualTo(LocalDate.now().plusDays(30));
         verify(audit).log(eq("AUTO_CREATE"), eq("CorrectiveAction"), any(), any());
+        // S-N — a fresh auto-CAPA notifies the sustainability officers.
+        verify(notifications).broadcastToRole(eq(ORG_ID), eq("SUSTAINABILITY_OFFICER"),
+            any(), any(), any(), eq("SUST_CAPA"), eq("CorrectiveAction"), any());
     }
 
     @Test
@@ -282,6 +287,8 @@ class CorrectiveActionServiceTest {
         // Returns the existing CAPA and never creates a duplicate.
         assertThat(ca).isSameAs(existing);
         verify(repo, never()).save(any());
+        // No new CAPA → no notification on the dedup no-op path.
+        verify(notifications, never()).broadcastToRole(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
