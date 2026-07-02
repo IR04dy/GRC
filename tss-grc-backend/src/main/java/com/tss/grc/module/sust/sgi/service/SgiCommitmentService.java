@@ -4,6 +4,7 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.sust.sgi.entity.SgiCommitment;
 import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
+import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -49,6 +50,7 @@ public class SgiCommitmentService {
         "ENERGY", "INDUSTRY", "TRANSPORT", "WASTE", "FORESTRY", "WATER", "LAND", "OTHER");
 
     private final SgiCommitmentRepository repo;
+    private final OrganisationSettingsService settingsService;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -188,6 +190,16 @@ public class SgiCommitmentService {
      * {@code { progressPct, expectedPct, tier, direction } }.
      */
     public Map<String, Object> progress(SgiCommitment c) {
+        // S-B — the AT_RISK progress factor is tenant-configurable via
+        // OrganisationSettings (default 0.70 lives in the settings schema).
+        return progress(c, settingsService.getOrCreate().getSgiAtRiskProgressFactor());
+    }
+
+    /**
+     * {@code atRiskFactor} is injected by the caller so a batch rollup
+     * ({@link #aggregate()}) reads settings once rather than once per row.
+     */
+    private Map<String, Object> progress(SgiCommitment c, BigDecimal atRiskFactor) {
         Map<String, Object> out = new LinkedHashMap<>();
         BigDecimal baseline = nz(c.getBaselineValue());
         BigDecimal current  = nz(c.getCurrentValue());
@@ -237,7 +249,7 @@ public class SgiCommitmentService {
         } else if ("RETIRED".equals(c.getStatus())) {
             tier = "RETIRED";
         } else {
-            BigDecimal warningFloor = expectedPct.multiply(new BigDecimal("0.7"));
+            BigDecimal warningFloor = expectedPct.multiply(atRiskFactor);
             if (progressPct.compareTo(expectedPct) >= 0)      tier = "ON_TRACK";
             else if (progressPct.compareTo(warningFloor) >= 0) tier = "AT_RISK";
             else                                                tier = "DELAYED";
@@ -252,12 +264,14 @@ public class SgiCommitmentService {
 
     /** Whole-org rollup — counts per tier + per sector + per status. */
     public Map<String, Object> aggregate() {
+        // S-B — read the configurable AT_RISK factor once for the whole rollup.
+        BigDecimal atRiskFactor = settingsService.getOrCreate().getSgiAtRiskProgressFactor();
         List<SgiCommitment> all = repo.findByOrganisationIdAndStatus(org(), "ACTIVE");
         Map<String, Integer> byTier = new LinkedHashMap<>();
         Map<String, Integer> bySector = new LinkedHashMap<>();
         for (String t : List.of("ON_TRACK", "AT_RISK", "DELAYED")) byTier.put(t, 0);
         for (SgiCommitment c : all) {
-            Map<String, Object> p = progress(c);
+            Map<String, Object> p = progress(c, atRiskFactor);
             String tier = (String) p.get("tier");
             byTier.merge(tier, 1, Integer::sum);
             bySector.merge(c.getSector(), 1, Integer::sum);

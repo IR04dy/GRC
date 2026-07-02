@@ -3,6 +3,7 @@ package com.tss.grc.module.sust.evidence.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.sust.evidence.entity.SustainabilityEvidence;
 import com.tss.grc.module.sust.evidence.repository.SustainabilityEvidenceRepository;
+import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
 import com.tss.grc.security.GrcUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class SustainabilityEvidenceService {
         "INTERNAL", "RESTRICTED", "CONFIDENTIAL", "PUBLIC");
 
     private final SustainabilityEvidenceRepository repo;
+    private final OrganisationSettingsService settingsService;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -190,9 +192,20 @@ public class SustainabilityEvidenceService {
      */
     @Transactional
     public List<SustainabilityEvidence> sweepExpired() {
+        return sweepExpiredForOrg(org());
+    }
+
+    /**
+     * Org-parameterised sweep for the scheduled job (S-B). Takes the org
+     * id explicitly rather than reading {@link TenantContext}, because the
+     * scheduler runs off-request where the thread-local tenant is unset —
+     * the same off-request landmine that bit the audit engine.
+     */
+    @Transactional
+    public List<SustainabilityEvidence> sweepExpiredForOrg(Long orgId) {
         LocalDate today = LocalDate.now();
         List<SustainabilityEvidence> due = repo.findByOrganisationIdAndApprovalStatusAndValidToBefore(
-            org(), "APPROVED", today);
+            orgId, "APPROVED", today);
         for (SustainabilityEvidence e : due) {
             e.setApprovalStatus("EXPIRED");
         }
@@ -210,7 +223,10 @@ public class SustainabilityEvidenceService {
         Map<String, Integer> byModule = new LinkedHashMap<>();
         for (String s : APPROVAL_STATUSES) byStatus.put(s, 0);
         LocalDate today = LocalDate.now();
-        LocalDate soon = today.plusDays(30);
+        // S-B — the "expiring soon" warning window is tenant-configurable
+        // (default 30 days lives in the settings schema, not here).
+        int windowDays = settingsService.getOrCreate().getEvidenceExpiryWarningDays();
+        LocalDate soon = today.plusDays(windowDays);
         int expiringSoon = 0;
         for (SustainabilityEvidence e : all) {
             byStatus.merge(e.getApprovalStatus(), 1, Integer::sum);
@@ -226,7 +242,10 @@ public class SustainabilityEvidenceService {
         out.put("total", all.size());
         out.put("byStatus", byStatus);
         out.put("byModule", byModule);
+        // Key kept as `expiringSoon30d` for frontend back-compat; the value
+        // now honours the configured window, exposed alongside it.
         out.put("expiringSoon30d", expiringSoon);
+        out.put("expiringSoonWindowDays", windowDays);
         return out;
     }
 

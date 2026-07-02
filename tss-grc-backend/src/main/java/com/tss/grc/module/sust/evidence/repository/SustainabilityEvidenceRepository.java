@@ -4,6 +4,7 @@ import com.tss.grc.module.sust.evidence.entity.SustainabilityEvidence;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -33,4 +34,9 @@ public interface SustainabilityEvidenceRepository extends JpaRepository<Sustaina
      *  showing as APPROVED. Used by the periodic expiry job. */
     List<SustainabilityEvidence> findByOrganisationIdAndApprovalStatusAndValidToBefore(
         Long org, String approvalStatus, LocalDate cutoff);
+
+    /** Distinct org ids holding APPROVED evidence — drives the multi-tenant
+     *  expiry sweep so an org is swept even before its settings row exists (S-B). */
+    @Query("select distinct e.organisationId from SustainabilityEvidence e where e.approvalStatus = 'APPROVED'")
+    List<Long> findDistinctOrganisationIdsWithApprovedEvidence();
 }

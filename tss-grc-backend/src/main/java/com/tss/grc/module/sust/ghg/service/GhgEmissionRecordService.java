@@ -4,6 +4,7 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
 import com.tss.grc.module.sust.ghg.repository.GhgEmissionRecordRepository;
+import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -35,6 +36,7 @@ public class GhgEmissionRecordService {
     private static final Set<String> STATUSES = Set.of("DRAFT","SUBMITTED","VERIFIED","APPROVED","ARCHIVED");
 
     private final GhgEmissionRecordRepository repo;
+    private final OrganisationSettingsService settingsService;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -178,7 +180,11 @@ public class GhgEmissionRecordService {
         out.put("scope3Total", s3);
         out.put("grandTotal",  s1.add(s2).add(s3));
         out.put("scope3Coverage", coverage);
-        out.put("scope3PartialFlag", coverage.compareTo(new BigDecimal("70.00")) < 0);
+        // Rule 1 boundary is tenant-configurable via OrganisationSettings
+        // (S-B). Default 70.00 lives in the settings schema, not here.
+        BigDecimal s3Threshold = settingsService.getOrCreate().getScope3PartialCoverageThreshold();
+        out.put("scope3PartialFlag", coverage.compareTo(s3Threshold) < 0);
+        out.put("scope3PartialThreshold", s3Threshold);
         out.put("recordCount", all.size());
         return out;
     }

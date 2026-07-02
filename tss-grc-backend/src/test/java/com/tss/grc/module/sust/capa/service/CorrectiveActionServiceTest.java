@@ -4,6 +4,8 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
+import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
+import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
 import com.tss.grc.security.GrcUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,12 +15,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
@@ -42,6 +47,7 @@ class CorrectiveActionServiceTest {
     private static final Long ORG_ID = 1L;
 
     @Mock private CorrectiveActionRepository repo;
+    @Mock private OrganisationSettingsService settingsService;
     @InjectMocks private CorrectiveActionService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -194,6 +200,45 @@ class CorrectiveActionServiceTest {
 
         assertThat(after.getStatus()).isEqualTo("CLOSED");
         assertThat(after.getClosedAt()).isNotNull();
+    }
+
+    // ── S-B — aggregate due-soon windows read from settings ─────────
+
+    @Test
+    void aggregate_dueSoonWindows_respectConfiguredDays() {
+        LocalDate today = LocalDate.now();
+        when(repo.findByOrganisationIdAndStatusIn(eq(ORG_ID), any())).thenReturn(List.of(
+            dued(today.minusDays(1)),   // overdue
+            dued(today.plusDays(3)),    // within 7d + 30d
+            dued(today.plusDays(15)),   // within 30d, outside 7d
+            dued(today.plusDays(60))));  // outside 30d
+
+        // Defaults — warning 7d, executive-escalation 30d.
+        stubCapaWindows(7, 30);
+        Map<String, Object> agg = service.aggregate();
+        assertThat(agg).containsEntry("overdue", 1);
+        assertThat(agg).containsEntry("dueSoon", 2);         // +3d, +15d
+        assertThat(agg).containsEntry("dueSoonWarning", 1);  // +3d only
+
+        // Widen both windows → both counts grow (the settings drive behaviour).
+        stubCapaWindows(20, 90);
+        Map<String, Object> agg2 = service.aggregate();
+        assertThat(agg2).containsEntry("overdue", 1);
+        assertThat(agg2).containsEntry("dueSoon", 3);         // +3d, +15d, +60d
+        assertThat(agg2).containsEntry("dueSoonWarning", 2);  // +3d, +15d
+    }
+
+    private void stubCapaWindows(int warnDays, int execDays) {
+        OrganisationSettings s = new OrganisationSettings();
+        s.setCapaOverdueWarningDays(warnDays);
+        s.setCapaExecutiveEscalationDays(execDays);
+        when(settingsService.getOrCreate()).thenReturn(s);
+    }
+
+    private static CorrectiveAction dued(LocalDate target) {
+        CorrectiveAction a = action("OPEN", "Sara");
+        a.setTargetDate(target);
+        return a;
     }
 
     // ── Helper ──────────────────────────────────────────────────────

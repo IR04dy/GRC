@@ -7,6 +7,8 @@ import com.tss.grc.module.sust.evidence.service.SustainabilityEvidenceService;
 import com.tss.grc.module.sust.ghg.service.GhgEmissionRecordService;
 import com.tss.grc.module.sust.materiality.service.MaterialTopicService;
 import com.tss.grc.module.sust.metrics.service.EsgMetricService;
+import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
+import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
 import com.tss.grc.module.sust.sgi.service.SgiCommitmentService;
 import com.tss.grc.module.sust.tcfd.service.TcfdItemService;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +61,7 @@ public class SustainabilityDashboardService {
     // Slice 14-D — climate-risk aggregate replaces the previous
     // placeholder constant in climateTreatedRate().
     private final com.tss.grc.module.sust.climate.service.ClimateRiskOpportunityService climateService;
+    private final OrganisationSettingsService settingsService;
 
     /**
      * Build the full dashboard payload. Returned shape is JSON-stable
@@ -100,10 +103,16 @@ public class SustainabilityDashboardService {
             .add(climateTreatPct.multiply(new BigDecimal("0.05")))
             .setScale(0, RoundingMode.HALF_UP);
 
+        // S-B — the ADEQUATE / DEVELOPING band floors are tenant-configurable
+        // via OrganisationSettings (defaults 60 / 40 live in the settings
+        // schema). STRONG stays a fixed 80 ceiling — there is no setting for it.
+        OrganisationSettings st = settingsService.getOrCreate();
+        BigDecimal adequateFloor   = new BigDecimal(st.getEsgReadinessWarningThreshold());
+        BigDecimal developingFloor = new BigDecimal(st.getEsgReadinessCriticalThreshold());
         String band = score.compareTo(new BigDecimal("80")) >= 0 ? "STRONG"
-                   : score.compareTo(new BigDecimal("60")) >= 0 ? "ADEQUATE"
-                   : score.compareTo(new BigDecimal("40")) >= 0 ? "DEVELOPING"
-                   :                                                "CRITICAL";
+                   : score.compareTo(adequateFloor)   >= 0 ? "ADEQUATE"
+                   : score.compareTo(developingFloor) >= 0 ? "DEVELOPING"
+                   :                                          "CRITICAL";
 
         Map<String, Object> scoreBreakdown = new LinkedHashMap<>();
         scoreBreakdown.put("ghgVerification",  ghgVerifPct);

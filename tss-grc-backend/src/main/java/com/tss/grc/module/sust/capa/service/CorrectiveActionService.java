@@ -4,6 +4,7 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
+import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
 import com.tss.grc.security.GrcUserDetails;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,7 @@ public class CorrectiveActionService {
                "TCFD_ITEM", "SGI_COMMITMENT", "MANUAL");
 
     private final CorrectiveActionRepository repo;
+    private final OrganisationSettingsService settingsService;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -223,10 +225,15 @@ public class CorrectiveActionService {
      * KPI strip.
      */
     public Map<String, Object> aggregate() {
+        // S-B — the near-term warning window and the (wider) executive-
+        // escalation window are tenant-configurable via OrganisationSettings
+        // (defaults 7 / 30 days live in the settings schema).
+        var st = settingsService.getOrCreate();
         List<CorrectiveAction> all = repo.findByOrganisationIdAndStatusIn(
             org(), List.of("OPEN", "IN_PROGRESS", "COMPLETED", "VERIFIED"));
-        LocalDate today = LocalDate.now();
-        LocalDate soon  = today.plusDays(30);
+        LocalDate today  = LocalDate.now();
+        LocalDate warnBy = today.plusDays(st.getCapaOverdueWarningDays());       // imminent (warning)
+        LocalDate soon   = today.plusDays(st.getCapaExecutiveEscalationDays());  // executive-escalation window
 
         Map<String, Integer> byStatus   = new LinkedHashMap<>();
         Map<String, Integer> byPriority = new LinkedHashMap<>();
@@ -234,7 +241,7 @@ public class CorrectiveActionService {
         for (String s : List.of("OPEN", "IN_PROGRESS", "COMPLETED", "VERIFIED")) byStatus.put(s, 0);
         for (String p : List.of("CRITICAL", "HIGH", "MEDIUM", "LOW"))            byPriority.put(p, 0);
 
-        int overdue = 0, dueSoon = 0;
+        int overdue = 0, dueSoon = 0, dueSoonWarning = 0;
         for (CorrectiveAction a : all) {
             byStatus.merge(a.getStatus(), 1, Integer::sum);
             byPriority.merge(a.getPriority(), 1, Integer::sum);
@@ -243,8 +250,9 @@ public class CorrectiveActionService {
             if (due == null) continue;
             // VERIFIED items are no longer "overdue" — they're awaiting closure.
             if ("VERIFIED".equals(a.getStatus())) continue;
-            if (due.isBefore(today)) overdue++;
-            else if (!due.isAfter(soon)) dueSoon++;
+            if (due.isBefore(today)) { overdue++; continue; }
+            if (!due.isAfter(soon))   dueSoon++;          // within executive-escalation window
+            if (!due.isAfter(warnBy)) dueSoonWarning++;   // subset — within the warning window
         }
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -252,8 +260,9 @@ public class CorrectiveActionService {
         out.put("inProgress", byStatus.getOrDefault("IN_PROGRESS", 0));
         out.put("completed",  byStatus.getOrDefault("COMPLETED", 0));
         out.put("verified",   byStatus.getOrDefault("VERIFIED", 0));
-        out.put("overdue",    overdue);
-        out.put("dueSoon",    dueSoon);
+        out.put("overdue",        overdue);
+        out.put("dueSoon",        dueSoon);
+        out.put("dueSoonWarning", dueSoonWarning);
         out.put("byPriority", byPriority);
         out.put("bySource",   bySource);
         out.put("activeTotal", all.size());

@@ -4,6 +4,8 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
 import com.tss.grc.module.sust.ghg.repository.GhgEmissionRecordRepository;
+import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
+import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,10 +39,18 @@ class GhgEmissionRecordServiceTest {
     private static final Long ORG_ID = 1L;
 
     @Mock private GhgEmissionRecordRepository repo;
+    @Mock private OrganisationSettingsService settingsService;
     @InjectMocks private GhgEmissionRecordService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
     @AfterEach  void tearDown() { TenantContext.clear(); }
+
+    /** S-B — the Scope-3 partial boundary is now read from settings. */
+    private void stubScope3Threshold(String threshold) {
+        OrganisationSettings s = new OrganisationSettings();
+        s.setScope3PartialCoverageThreshold(new BigDecimal(threshold));
+        when(settingsService.getOrCreate()).thenReturn(s);
+    }
 
     // ── Rule 1 — Scope 3 weighted coverage < 70% → scope3PartialFlag ─
 
@@ -48,6 +58,7 @@ class GhgEmissionRecordServiceTest {
     void aggregate_marksScope3PartialFlag_whenWeightedCoverageBelow70() {
         // Two Scope-3 rows with 60% and 70% coverage; weighted avg falls
         // between them. Picking values whose weighted mean is 65%.
+        stubScope3Threshold("70.00");
         GhgEmissionRecord s3a = scope(3, "100.00", "60.00");  // 60% coverage on 100t
         GhgEmissionRecord s3b = scope(3, "100.00", "70.00");  // 70% coverage on 100t
         // Weighted = (100*60 + 100*70) / (100+100) = 65 → below 70 → partial flag true.
@@ -62,6 +73,7 @@ class GhgEmissionRecordServiceTest {
 
     @Test
     void aggregate_clearsScope3PartialFlag_whenCoverageAtOrAbove70() {
+        stubScope3Threshold("70.00");
         // Single Scope-3 row at 100% coverage — well above the threshold.
         when(repo.findByOrganisationIdAndReportingYear(ORG_ID, (short) 2025))
             .thenReturn(List.of(scope(3, "100.00", "100.00")));
@@ -72,7 +84,29 @@ class GhgEmissionRecordServiceTest {
     }
 
     @Test
+    void aggregate_scope3PartialFlag_respectsConfiguredThreshold() {
+        // Weighted coverage = 65% (two 100t rows at 60% and 70%).
+        when(repo.findByOrganisationIdAndReportingYear(ORG_ID, (short) 2025))
+            .thenReturn(List.of(scope(3, "100.00", "60.00"), scope(3, "100.00", "70.00")));
+
+        // Lower the bar to 60 → 65 ≥ 60 → NOT partial (setting drives behaviour).
+        stubScope3Threshold("60.00");
+        assertThat(service.aggregate((short) 2025)).containsEntry("scope3PartialFlag", Boolean.FALSE);
+    }
+
+    @Test
+    void aggregate_scope3PartialFlag_flipsTrue_whenThresholdRaised() {
+        // Same 65% weighted coverage, but a stricter 90% bar → partial.
+        when(repo.findByOrganisationIdAndReportingYear(ORG_ID, (short) 2025))
+            .thenReturn(List.of(scope(3, "100.00", "60.00"), scope(3, "100.00", "70.00")));
+
+        stubScope3Threshold("90.00");
+        assertThat(service.aggregate((short) 2025)).containsEntry("scope3PartialFlag", Boolean.TRUE);
+    }
+
+    @Test
     void aggregate_sumsScopesIndependently() {
+        stubScope3Threshold("70.00");
         // Scope 1: 50t, Scope 2: 80t, Scope 3: 120t. Total should be 250.
         when(repo.findByOrganisationIdAndReportingYear(ORG_ID, (short) 2025)).thenReturn(List.of(
             scope(1, "50.00",  "100.00"),

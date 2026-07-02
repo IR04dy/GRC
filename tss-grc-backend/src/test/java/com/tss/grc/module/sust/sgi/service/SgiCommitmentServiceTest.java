@@ -3,6 +3,8 @@ package com.tss.grc.module.sust.sgi.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.sust.sgi.entity.SgiCommitment;
 import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
+import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
+import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,10 +40,18 @@ class SgiCommitmentServiceTest {
     private static final Long ORG_ID = 1L;
 
     @Mock private SgiCommitmentRepository repo;
+    @Mock private OrganisationSettingsService settingsService;
     @InjectMocks private SgiCommitmentService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
     @AfterEach  void tearDown() { TenantContext.clear(); }
+
+    /** S-B — the AT_RISK progress factor is now read from settings. */
+    private void stubAtRiskFactor(String factor) {
+        OrganisationSettings s = new OrganisationSettings();
+        s.setSgiAtRiskProgressFactor(new BigDecimal(factor));
+        when(settingsService.getOrCreate()).thenReturn(s);
+    }
 
     // ── Direction-aware progress ────────────────────────────────────
 
@@ -49,6 +59,7 @@ class SgiCommitmentServiceTest {
     void progress_increaseToTarget_computesCorrectly() {
         // Renewable share: 8% baseline → 22% current → 50% target.
         // (22 - 8) / (50 - 8) = 14 / 42 = 33.3%
+        stubAtRiskFactor("0.70");
         SgiCommitment c = commitment(new BigDecimal("8"), new BigDecimal("22"), new BigDecimal("50"));
 
         Map<String, Object> p = service.progress(c);
@@ -62,6 +73,7 @@ class SgiCommitmentServiceTest {
         // Water intensity: 4.2 baseline → 3.7 current → 3.15 target.
         // Decrease-to: (baseline - current) / (baseline - target)
         // = (4.2 - 3.7) / (4.2 - 3.15) = 0.5 / 1.05 = 47.6%
+        stubAtRiskFactor("0.70");
         SgiCommitment c = commitment(new BigDecimal("4.2"), new BigDecimal("3.7"), new BigDecimal("3.15"));
 
         Map<String, Object> p = service.progress(c);
@@ -72,6 +84,7 @@ class SgiCommitmentServiceTest {
 
     @Test
     void progress_targetEqualsBaseline_returnsZero_whenCurrentDoesNotMatch() {
+        stubAtRiskFactor("0.70");
         SgiCommitment c = commitment(new BigDecimal("100"), new BigDecimal("50"), new BigDecimal("100"));
 
         Map<String, Object> p = service.progress(c);
@@ -83,11 +96,31 @@ class SgiCommitmentServiceTest {
     void progress_isCappedAt150_toGuardDashboardRendering() {
         // Massive over-achievement on a small target. Without the cap,
         // the dashboard's progress bar math would break.
+        stubAtRiskFactor("0.70");
         SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("10"), new BigDecimal("1"));
 
         Map<String, Object> p = service.progress(c);
 
         assertThat(((BigDecimal) p.get("progressPct")).intValue()).isEqualTo(150);
+    }
+
+    // ── S-B — AT_RISK tier boundary is settings-driven ──────────────
+
+    @Test
+    void progress_tier_respectsConfiguredAtRiskFactor() {
+        // Fixed, date-robust scenario: progress 75%, expected 100%
+        // (target year already in the past → expectedPct pins to 100).
+        SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("75"), new BigDecimal("100"));
+        c.setBaselineYear((short) 2019);
+        c.setTargetYear((short) 2020);
+
+        // Lenient factor 0.70 → warning floor 70 → 75 ≥ 70 → AT_RISK.
+        stubAtRiskFactor("0.70");
+        assertThat(service.progress(c)).containsEntry("tier", "AT_RISK");
+
+        // Stricter factor 0.80 → warning floor 80 → 75 < 80 → DELAYED.
+        stubAtRiskFactor("0.80");
+        assertThat(service.progress(c)).containsEntry("tier", "DELAYED");
     }
 
     // ── Rule A — Achieve requires target met within direction ───────
