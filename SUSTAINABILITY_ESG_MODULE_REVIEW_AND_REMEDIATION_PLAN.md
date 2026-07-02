@@ -12,7 +12,7 @@
 
 | Epic | Item | Severity | Status | Commit |
 |---|---|---|---|---|
-| S-A | RBAC: seed `SUST` grants + `SUSTAINABILITY_OFFICER` role + unify authz | 🔴 Critical | ⬜ Not started | — |
+| S-A | RBAC: SUST_READ/WRITE/DELETE perms + `SUSTAINABILITY_OFFICER` role + grant matrix (V248) + 3 climate controllers `hasAnyRole`→`hasPermission('SUST',…)` | 🔴 Critical | ✅ Shipped | V248 + climate ctrls |
 | S-B | Wire `OrganisationSettings` to its consumers (dead config) | 🔴 Critical | ⬜ | — |
 | S-C | Real evidence pipeline (upload + request/SLA/reminder + scheduler + FK links) | 🔴 Critical | ⬜ | — |
 | S-D | Auto-CAPA / auto-gap closure loop (SGI/CMA/TCFD/evidence → finding) | 🔴 Critical | ⬜ | — |

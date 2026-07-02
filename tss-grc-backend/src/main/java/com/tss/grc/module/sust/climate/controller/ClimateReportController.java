@@ -26,8 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @SecurityRequirement(name = "bearerAuth")
 public class ClimateReportController {
 
-    private static final String READ_GUARD =
-            "hasAnyRole('SUSTAINABILITY_OFFICER','CFO','CISO','RISK_MANAGER','BOARD_MEMBER','AUDITOR','PLATFORM_ADMIN')";
+    private static final String READ_GUARD = "hasPermission('SUST','READ')";
 
     private final TcfdReportService service;
 

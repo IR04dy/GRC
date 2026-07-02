@@ -29,8 +29,8 @@ import java.util.UUID;
  * board pack). Write is narrow — the Sustainability Officer and CFO
  * own the figures, with Platform Admin for break-glass.
  *
- * <p>Uses {@code hasAnyRole} because Spring authorities are prefixed
- * with {@code ROLE_}.
+ * <p>Guarded by {@code hasPermission('SUST', …)} (see migration V248 for the
+ * SUST grant matrix + the SUSTAINABILITY_OFFICER role) — one scheme module-wide.
  */
 @RestController
 @RequestMapping("/api/v1/climate/scenarios")
@@ -39,10 +39,8 @@ import java.util.UUID;
 @SecurityRequirement(name = "bearerAuth")
 public class TcfdScenarioController {
 
-    private static final String READ_GUARD =
-            "hasAnyRole('SUSTAINABILITY_OFFICER','CFO','CISO','RISK_MANAGER','BOARD_MEMBER','AUDITOR','PLATFORM_ADMIN')";
-    private static final String WRITE_GUARD =
-            "hasAnyRole('SUSTAINABILITY_OFFICER','CFO','PLATFORM_ADMIN')";
+    private static final String READ_GUARD = "hasPermission('SUST','READ')";
+    private static final String WRITE_GUARD = "hasPermission('SUST','WRITE')";
 
     private final TcfdScenarioService service;
 

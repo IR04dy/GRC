@@ -32,10 +32,8 @@ import java.util.UUID;
 @SecurityRequirement(name = "bearerAuth")
 public class FinancedEmissionsController {
 
-    private static final String READ_GUARD =
-            "hasAnyRole('SUSTAINABILITY_OFFICER','CFO','CISO','RISK_MANAGER','BOARD_MEMBER','AUDITOR','PLATFORM_ADMIN')";
-    private static final String WRITE_GUARD =
-            "hasAnyRole('SUSTAINABILITY_OFFICER','CFO','PLATFORM_ADMIN')";
+    private static final String READ_GUARD = "hasPermission('SUST','READ')";
+    private static final String WRITE_GUARD = "hasPermission('SUST','WRITE')";
 
     private final FinancedEmissionsService service;
 
