@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | S-A | RBAC: SUST_READ/WRITE/DELETE perms + `SUSTAINABILITY_OFFICER` role + grant matrix (V248) + 3 climate controllers `hasAnyRole`→`hasPermission('SUST',…)` | 🔴 Critical | ✅ Shipped | V248 + climate ctrls |
 | S-B | Wire `OrganisationSettings` to its consumers (dead config): GHG Scope-3 threshold, SGI at-risk factor, evidence expiry window + dynamic-cron sweep scheduler, dashboard bands, CAPA warning/escalation windows — all read from settings; changing a setting changes behaviour (unit + live-proven) | 🔴 Critical | ✅ Shipped | 5 consumer svcs + expiry scheduler |
-| S-C | Real evidence pipeline (upload + request/SLA/reminder + scheduler + FK links) | 🔴 Critical | ⬜ | — |
+| S-C | Real evidence pipeline: reuse `module/evidence` (upload real file + SHA-256 + review/approve/expire lifecycle) instead of the sust silo; ESG entities gain `evidence_item_id` FK (V250, 6 tables); `SUSTAINABILITY` added to evidence_links whitelist; bridge links real evidence + evidence-package endpoint bundles files+hashes (live-proven) | 🔴 Critical | ✅ Shipped | V250 + evidence bridge |
 | S-D | Auto-CAPA / auto-gap closure loop (SGI/CMA/TCFD/evidence → finding) | 🔴 Critical | ⬜ | — |
 | S-E | Climate scenario loss engine (compute, don't free-type) | 🔴 Critical | ⬜ | — |
 | S-F | ClimateRisk ↔ ERM real, validated, bidirectional link | 🔴 Critical | ⬜ | — |

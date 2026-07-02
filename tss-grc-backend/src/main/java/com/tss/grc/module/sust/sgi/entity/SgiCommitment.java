@@ -61,6 +61,8 @@ public class SgiCommitment {
     @Column(name = "notes_ar", columnDefinition = "NVARCHAR(MAX)") private String notesAr;
 
     @Column(name = "evidence_ref", length = 255) private String evidenceRef;
+    /** S-C — real FK into evidence.evidence_items. */
+    @Column(name = "evidence_item_id") private Long evidenceItemId;
 
     @Column(name = "achieved_at")                private LocalDateTime achievedAt;
     @Column(name = "achieved_by", length = 255)  private String achievedBy;

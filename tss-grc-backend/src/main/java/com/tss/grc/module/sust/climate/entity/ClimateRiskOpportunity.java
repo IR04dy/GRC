@@ -70,6 +70,8 @@ public class ClimateRiskOpportunity {
     @Column(name = "metrics_summary",  columnDefinition = "NVARCHAR(MAX)") private String metricsSummary;
 
     @Column(name = "evidence_ref", length = 255) private String evidenceRef;
+    /** S-C — real FK into evidence.evidence_items. */
+    @Column(name = "evidence_item_id") private Long evidenceItemId;
     @Column(name = "owner_name",   length = 255) private String ownerName;
     @Column(name = "owner_email",  length = 255) private String ownerEmail;
 

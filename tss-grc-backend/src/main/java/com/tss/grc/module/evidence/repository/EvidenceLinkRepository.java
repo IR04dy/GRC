@@ -11,4 +11,8 @@ public interface EvidenceLinkRepository extends JpaRepository<EvidenceLink, Long
 
     List<EvidenceLink> findByOrganisationIdAndLinkedModuleAndLinkedEntityIdAndIsDeletedFalse(
             Long orgId, String linkedModule, Long linkedEntityId);
+
+    /** All live links for a module — drives the sustainability evidence-package bundle (S-C). */
+    List<EvidenceLink> findByOrganisationIdAndLinkedModuleAndIsDeletedFalse(
+            Long orgId, String linkedModule);
 }

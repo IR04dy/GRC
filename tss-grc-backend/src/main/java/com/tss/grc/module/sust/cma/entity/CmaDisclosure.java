@@ -56,6 +56,8 @@ public class CmaDisclosure {
     private String disclosureStatus = "UNDER_REVIEW";
 
     @Column(name = "evidence_ref",        length = 255) private String evidenceRef;
+    /** S-C — real FK into evidence.evidence_items. */
+    @Column(name = "evidence_item_id") private Long evidenceItemId;
     @Column(name = "evidence_owner",      length = 255) private String evidenceOwner;
     @Column(name = "responsible_department", length = 120) private String responsibleDepartment;
 

@@ -44,6 +44,8 @@ public class TcfdItem {
     private String disclosureStatus = "UNDER_REVIEW";
 
     @Column(name = "evidence_ref",   length = 255) private String evidenceRef;
+    /** S-C — real FK into evidence.evidence_items. */
+    @Column(name = "evidence_item_id") private Long evidenceItemId;
     @Column(name = "evidence_owner", length = 255) private String evidenceOwner;
 
     @Column(name = "gap_description_en", columnDefinition = "NVARCHAR(MAX)") private String gapDescriptionEn;

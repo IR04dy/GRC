@@ -63,6 +63,8 @@ public class GhgEmissionRecord {
     @Column(columnDefinition = "NVARCHAR(MAX)")                 private String notes;
 
     @Column(name = "evidence_ref", length = 255) private String evidenceRef;
+    /** S-C — real FK into the generic evidence engine (evidence.evidence_items). */
+    @Column(name = "evidence_item_id") private Long evidenceItemId;
     @Column(name = "owner_name",   length = 255) private String ownerName;
     @Column(name = "owner_email",  length = 255) private String ownerEmail;
 

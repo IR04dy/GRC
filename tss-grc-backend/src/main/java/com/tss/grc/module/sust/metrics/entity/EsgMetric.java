@@ -60,6 +60,8 @@ public class EsgMetric {
 
     @Column(name = "linked_sgi_commitment_id") private Long linkedSgiCommitmentId;
     @Column(name = "evidence_ref", length = 255) private String evidenceRef;
+    /** S-C — real FK into evidence.evidence_items. */
+    @Column(name = "evidence_item_id") private Long evidenceItemId;
 
     @Column(columnDefinition = "NVARCHAR(MAX)") private String notes;
 
