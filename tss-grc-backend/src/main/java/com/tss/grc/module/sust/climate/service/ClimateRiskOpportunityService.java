@@ -4,6 +4,11 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import jakarta.persistence.EntityNotFoundException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.risk.dto.RiskLinkDtos;
+import com.tss.grc.module.risk.entity.RiskLink;
+import com.tss.grc.module.risk.repository.RiskLinkRepository;
+import com.tss.grc.module.risk.repository.RiskRepository;
+import com.tss.grc.module.risk.service.RiskLinkService;
 import com.tss.grc.module.sust.climate.entity.ClimateRiskOpportunity;
 import com.tss.grc.module.sust.climate.repository.ClimateRiskOpportunityRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -41,8 +47,16 @@ public class ClimateRiskOpportunityService {
     private static final Set<String> OPP_CATEGORIES  = Set.of(
         "RESOURCE_EFFICIENCY","ENERGY_SOURCE","PRODUCT_SERVICE","MARKETS","RESILIENCE");
 
+    private static final String CLIMATE_LINK_TYPE = "CLIMATE";
+
     private final ClimateRiskOpportunityRepository repo;
     private final AuditLogService audit;
+    // S-F — ERM bridge: validate the target risk + create the bidirectional
+    // typed RiskLink (reuse the E-G/E-I link surface) so the link is real and
+    // visible from the ERM side, not a dangling id.
+    private final RiskRepository riskRepo;
+    private final RiskLinkService riskLinkService;
+    private final RiskLinkRepository riskLinks;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -206,19 +220,76 @@ public class ClimateRiskOpportunityService {
     }
 
     /**
-     * Workflow Rule 8 — set the ERM-risk link. Service-only validation: we
-     * just store the supplied id; the ERM-side service owns the actual
-     * cross-module relationship + integrity check.
+     * Workflow Rule 8 — link the climate item to an ERM risk (S-F).
+     *
+     * <p>No longer a dangling id: the supplied {@code ermRiskId} is validated to
+     * exist in the caller's tenant (reject 400 otherwise), and a bidirectional
+     * typed {@link RiskLink} of type {@code CLIMATE} is created on the ERM risk
+     * so the risk is readable in its climate context. Idempotent — re-pointing
+     * cleans up the stale link so exactly one canonical CLIMATE link exists per
+     * climate item. Passing a null/blank {@code ermRiskId} unlinks.
      */
     @Transactional
     public ClimateRiskOpportunity linkErm(Long id, Map<String, Object> body) {
         ClimateRiskOpportunity cur = get(id);
-        Object v = body.get("ermRiskId");
-        cur.setRelatedErmRiskId(v == null ? null : Long.valueOf(v.toString()));
+        Long ermRiskId = parseErmRiskId(body == null ? null : body.get("ermRiskId"));
+
+        if (ermRiskId == null) {                       // ── unlink ──
+            Long prev = cur.getRelatedErmRiskId();
+            cur.setRelatedErmRiskId(null);
+            removeClimateLinks(cur.getId(), null);     // drop every CLIMATE bridge link for this item
+            ClimateRiskOpportunity saved = repo.save(cur);
+            audit.log("UNLINK", "ClimateRiskOpportunity", saved.getId(),
+                "Unlinked climate item from ERM risk " + prev);
+            return saved;
+        }
+
+        // Validate the ERM risk exists + same tenant (reject else) — the fix for
+        // the "dangling unvalidated id" finding.
+        Long o = org();
+        riskRepo.findById(ermRiskId)
+            .filter(r -> Objects.equals(r.getOrganisationId(), o))
+            .orElseThrow(() -> new IllegalArgumentException(
+                "ermRiskId " + ermRiskId + " does not exist in this tenant — cannot link."));
+
+        cur.setRelatedErmRiskId(ermRiskId);
         ClimateRiskOpportunity saved = repo.save(cur);
-        audit.log("UPDATE", "ClimateRiskOpportunity", saved.getId(),
-            "Linked climate item to ERM risk " + saved.getRelatedErmRiskId());
+
+        // Bidirectional visibility via the ERM RiskLink surface. Re-point cleanup
+        // + dedup → a single canonical CLIMATE link from the risk to this item.
+        removeClimateLinks(saved.getId(), ermRiskId);
+        boolean linked = riskLinks
+            .findByOrganisationIdAndLinkTypeAndTargetId(o, CLIMATE_LINK_TYPE, saved.getId())
+            .stream().anyMatch(l -> Objects.equals(l.getRiskId(), ermRiskId));
+        if (!linked) {
+            String ref = (saved.getItemCode() != null && !saved.getItemCode().isBlank())
+                ? saved.getItemCode() : ("CLIMATE-" + saved.getId());
+            riskLinkService.create(ermRiskId, new RiskLinkDtos.CreateDto(
+                CLIMATE_LINK_TYPE, ref + " · " + saved.getTitleEn(), saved.getId(),
+                "Climate " + saved.getKind() + " linked from the ESG register"));
+        }
+        audit.log("LINK", "ClimateRiskOpportunity", saved.getId(),
+            "Linked climate item to ERM risk " + ermRiskId + " (bidirectional RiskLink " + CLIMATE_LINK_TYPE + ")");
         return saved;
+    }
+
+    /** Parse an {@code ermRiskId} body value → Long, or null when absent/blank. Rejects non-numeric. */
+    private Long parseErmRiskId(Object v) {
+        if (v == null) return null;
+        String s = v.toString().trim();
+        if (s.isEmpty()) return null;
+        try { return Long.valueOf(s); }
+        catch (NumberFormatException e) {
+            throw new IllegalArgumentException("ermRiskId must be a number, got '" + s + "'");
+        }
+    }
+
+    /** Soft-delete CLIMATE bridge links pointing at this climate item, except (optionally) the one to keep. */
+    private void removeClimateLinks(Long climateId, Long keepRiskId) {
+        for (RiskLink l : riskLinks.findByOrganisationIdAndLinkTypeAndTargetId(org(), CLIMATE_LINK_TYPE, climateId)) {
+            if (keepRiskId != null && Objects.equals(l.getRiskId(), keepRiskId)) continue;
+            riskLinkService.delete(l.getId());
+        }
     }
 
     @Transactional

@@ -2,21 +2,35 @@ package com.tss.grc.module.sust.climate.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.risk.dto.RiskLinkDtos;
+import com.tss.grc.module.risk.entity.Risk;
+import com.tss.grc.module.risk.entity.RiskLink;
+import com.tss.grc.module.risk.repository.RiskLinkRepository;
+import com.tss.grc.module.risk.repository.RiskRepository;
+import com.tss.grc.module.risk.service.RiskLinkService;
 import com.tss.grc.module.sust.climate.entity.ClimateRiskOpportunity;
 import com.tss.grc.module.sust.climate.repository.ClimateRiskOpportunityRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -44,6 +58,9 @@ class ClimateRiskOpportunityServiceTest {
 
     @Mock private ClimateRiskOpportunityRepository repo;
     @Mock private AuditLogService audit;
+    @Mock private RiskRepository riskRepo;
+    @Mock private RiskLinkService riskLinkService;
+    @Mock private RiskLinkRepository riskLinks;
     @InjectMocks private ClimateRiskOpportunityService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -119,5 +136,86 @@ class ClimateRiskOpportunityServiceTest {
         assertThat(saved.getTitleEn()).isEqualTo("Revised opportunity title");
         assertThat(saved.getRiskScore()).isEqualTo((short) 20);
         assertThat(saved.getKind()).isEqualTo("OPPORTUNITY");
+    }
+
+    // ── S-F — validated, bidirectional ERM link ─────────────────────
+
+    private ClimateRiskOpportunity persistedRisk() {
+        ClimateRiskOpportunity r = new ClimateRiskOpportunity();
+        r.setId(ID);
+        r.setOrganisationId(ORG_ID);
+        r.setKind("RISK");
+        r.setCategory("TRANSITION");
+        r.setItemCode("CR-2026-007");
+        r.setTitleEn("Carbon price shock on cement portfolio");
+        r.setTimeHorizon("MEDIUM");
+        r.setLikelihood((short) 4);
+        r.setImpact((short) 5);
+        r.setStatus("ASSESSED");
+        return r;
+    }
+
+    @Test
+    void linkErm_rejectsUnknownErmRisk() {
+        when(repo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(persistedRisk()));
+        when(riskRepo.findById(999L)).thenReturn(Optional.empty());   // no such ERM risk
+
+        assertThatThrownBy(() -> service.linkErm(ID, Map.of("ermRiskId", 999)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("does not exist");
+        verify(riskLinkService, never()).create(anyLong(), any());
+    }
+
+    @Test
+    void linkErm_rejectsCrossTenantErmRisk() {
+        when(repo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(persistedRisk()));
+        Risk other = new Risk();
+        other.setOrganisationId(999L);                                // different tenant
+        when(riskRepo.findById(42L)).thenReturn(Optional.of(other));
+
+        assertThatThrownBy(() -> service.linkErm(ID, Map.of("ermRiskId", 42)))
+            .isInstanceOf(IllegalArgumentException.class);
+        verify(riskLinkService, never()).create(anyLong(), any());
+    }
+
+    @Test
+    void linkErm_validRisk_setsPointerAndCreatesBidirectionalClimateLink() {
+        when(repo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(persistedRisk()));
+        when(repo.save(any(ClimateRiskOpportunity.class))).thenAnswer(inv -> inv.getArgument(0));
+        Risk erm = new Risk();
+        erm.setOrganisationId(ORG_ID);
+        when(riskRepo.findById(42L)).thenReturn(Optional.of(erm));
+        when(riskLinks.findByOrganisationIdAndLinkTypeAndTargetId(ORG_ID, "CLIMATE", ID))
+            .thenReturn(List.of());                                   // none yet → create
+
+        ClimateRiskOpportunity saved = service.linkErm(ID, Map.of("ermRiskId", 42));
+
+        assertThat(saved.getRelatedErmRiskId()).isEqualTo(42L);
+        ArgumentCaptor<RiskLinkDtos.CreateDto> cap = ArgumentCaptor.forClass(RiskLinkDtos.CreateDto.class);
+        verify(riskLinkService).create(eq(42L), cap.capture());
+        assertThat(cap.getValue().linkType()).isEqualTo("CLIMATE");
+        assertThat(cap.getValue().targetId()).isEqualTo(ID);          // points back at this climate item
+    }
+
+    @Test
+    void linkErm_nullId_unlinksAndRemovesBridgeLink() {
+        ClimateRiskOpportunity cur = persistedRisk();
+        cur.setRelatedErmRiskId(42L);
+        when(repo.findByIdAndOrganisationId(ID, ORG_ID)).thenReturn(Optional.of(cur));
+        when(repo.save(any(ClimateRiskOpportunity.class))).thenAnswer(inv -> inv.getArgument(0));
+        RiskLink existing = new RiskLink();
+        existing.setId(77L);
+        existing.setOrganisationId(ORG_ID);
+        existing.setRiskId(42L);
+        existing.setLinkType("CLIMATE");
+        existing.setTargetId(ID);
+        when(riskLinks.findByOrganisationIdAndLinkTypeAndTargetId(ORG_ID, "CLIMATE", ID))
+            .thenReturn(List.of(existing));
+
+        ClimateRiskOpportunity saved = service.linkErm(ID, Map.of());  // no ermRiskId → unlink
+
+        assertThat(saved.getRelatedErmRiskId()).isNull();
+        verify(riskLinkService).delete(77L);
+        verify(riskLinkService, never()).create(anyLong(), any());
     }
 }

@@ -4,6 +4,7 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
+import com.tss.grc.module.sust.climate.repository.ClimateRiskOpportunityRepository;
 import com.tss.grc.module.sust.tcfd.entity.TcfdItem;
 import com.tss.grc.module.sust.tcfd.repository.TcfdItemRepository;
 import com.tss.grc.security.GrcUserDetails;
@@ -43,6 +44,8 @@ public class TcfdItemService {
     private final TcfdItemRepository repo;
     private final AuditLogService audit;
     private final CorrectiveActionService capaService;
+    /** S-F — to validate a TCFD → climate-risk link points at a real, same-tenant climate item. */
+    private final ClimateRiskOpportunityRepository climateRiskRepo;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -64,6 +67,7 @@ public class TcfdItemService {
         if (req.getDisclosureStatus() == null || req.getDisclosureStatus().isBlank())
             req.setDisclosureStatus("UNDER_REVIEW");
         validate(req);
+        validateClimateRiskRef(req.getRelatedClimateRiskId());   // S-F: no dangling climate-risk link
         applyRules(req);
         TcfdItem saved = repo.save(req);
         audit.log("CREATE", "TcfdItem", saved.getId(),
@@ -196,8 +200,28 @@ public class TcfdItemService {
     public TcfdItem linkClimateRisk(Long id, Long climateRiskId) {
         TcfdItem cur = get(id);
         assertNotApproved(cur);
+        // S-F: validate the climate-risk id exists in this tenant (reject a
+        // dangling id); null clears the link.
+        validateClimateRiskRef(climateRiskId);
         cur.setRelatedClimateRiskId(climateRiskId);
-        return repo.save(cur);
+        TcfdItem saved = repo.save(cur);
+        audit.log("LINK", "TcfdItem", saved.getId(),
+                climateRiskId == null ? "TCFD item unlinked from climate risk"
+                                      : "TCFD item linked to climate risk " + climateRiskId);
+        return saved;
+    }
+
+    /** S-F — reverse visibility: the TCFD items linked to a given climate risk/opportunity. */
+    public List<TcfdItem> listByClimateRisk(Long climateRiskId) {
+        return repo.findByOrganisationIdAndRelatedClimateRiskId(org(), climateRiskId);
+    }
+
+    /** S-F — a set {@code relatedClimateRiskId} must resolve to a live climate item in this tenant. */
+    private void validateClimateRiskRef(Long climateRiskId) {
+        if (climateRiskId == null) return;
+        climateRiskRepo.findByIdAndOrganisationId(climateRiskId, org())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "relatedClimateRiskId " + climateRiskId + " does not exist in this tenant."));
     }
 
     @Transactional

@@ -36,10 +36,15 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RiskLinkService {
 
-    /** Accepted typed-link vocabulary (register objects + governance committee + governing policy). */
+    /**
+     * Accepted typed-link vocabulary (register objects + governance committee +
+     * governing policy + climate risk/opportunity). {@code CLIMATE} (S-F) is the
+     * ESG bridge: a Sustainability climate risk/opportunity linked to this ERM
+     * risk, created from the sust side so the ERM risk sees the climate context.
+     */
     static final Set<String> TYPES = Set.of(
         "OBJECTIVE", "PROCESS", "SERVICE", "ASSET", "SUPPLIER",
-        "PROJECT", "INCIDENT", "CONTROL", "OBLIGATION", "COMMITTEE", "POLICY", "OTHER");
+        "PROJECT", "INCIDENT", "CONTROL", "OBLIGATION", "COMMITTEE", "POLICY", "CLIMATE", "OTHER");
 
     private final RiskLinkRepository links;
     private final RiskRepository risks;

@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -100,6 +101,13 @@ public class TcfdItemController {
     @PreAuthorize("hasPermission('SUST','WRITE')")
     public TcfdItem recordGap(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return service.recordGap(id, body.get("gapEn"), body.get("gapAr"));
+    }
+
+    /** S-F — reverse visibility: TCFD items linked to a given climate risk/opportunity. */
+    @GetMapping("/by-climate-risk/{climateRiskId}")
+    @PreAuthorize("hasPermission('SUST','READ')")
+    public List<TcfdItem> byClimateRisk(@PathVariable Long climateRiskId) {
+        return service.listByClimateRisk(climateRiskId);
     }
 
     /** Body: {@code { "climateRiskId": 123 }}. */

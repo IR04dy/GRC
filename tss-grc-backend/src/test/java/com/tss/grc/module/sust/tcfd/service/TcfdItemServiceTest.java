@@ -3,6 +3,8 @@ package com.tss.grc.module.sust.tcfd.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
+import com.tss.grc.module.sust.climate.entity.ClimateRiskOpportunity;
+import com.tss.grc.module.sust.climate.repository.ClimateRiskOpportunityRepository;
 import com.tss.grc.module.sust.tcfd.entity.TcfdItem;
 import com.tss.grc.module.sust.tcfd.repository.TcfdItemRepository;
 import com.tss.grc.security.GrcUserDetails;
@@ -38,6 +40,7 @@ class TcfdItemServiceTest {
     @Mock private TcfdItemRepository repo;
     @Mock private AuditLogService audit;
     @Mock private CorrectiveActionService capaService;
+    @Mock private ClimateRiskOpportunityRepository climateRiskRepo;
     @InjectMocks private TcfdItemService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -130,6 +133,43 @@ class TcfdItemServiceTest {
 
         assertThat(service.seedOfficialLibrary((short) 2025)).isEqualTo(0);
         verify(repo, never()).save(any());
+    }
+
+    // ── S-F — TCFD ↔ climate-risk link validation ───────────────────
+
+    @Test
+    void linkClimateRisk_rejectsUnknownClimateRisk() {
+        when(repo.findByIdAndOrganisationId(9L, ORG_ID)).thenReturn(Optional.of(item()));
+        when(climateRiskRepo.findByIdAndOrganisationId(555L, ORG_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.linkClimateRisk(9L, 555L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("does not exist");
+        verify(repo, never()).save(any());
+    }
+
+    @Test
+    void linkClimateRisk_validClimateRisk_setsPointer() {
+        when(repo.findByIdAndOrganisationId(9L, ORG_ID)).thenReturn(Optional.of(item()));
+        when(climateRiskRepo.findByIdAndOrganisationId(5L, ORG_ID))
+            .thenReturn(Optional.of(new ClimateRiskOpportunity()));
+        when(repo.save(any(TcfdItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TcfdItem after = service.linkClimateRisk(9L, 5L);
+
+        assertThat(after.getRelatedClimateRiskId()).isEqualTo(5L);
+    }
+
+    @Test
+    void linkClimateRisk_null_clearsLinkWithoutLookup() {
+        TcfdItem t = item();
+        t.setRelatedClimateRiskId(5L);
+        when(repo.findByIdAndOrganisationId(9L, ORG_ID)).thenReturn(Optional.of(t));
+        when(repo.save(any(TcfdItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TcfdItem after = service.linkClimateRisk(9L, null);
+
+        assertThat(after.getRelatedClimateRiskId()).isNull();   // link cleared, no validation lookup
     }
 
     // ── Helpers ──────────────────────────────────────────────────────

@@ -19,4 +19,7 @@ public interface TcfdItemRepository extends JpaRepository<TcfdItem, Long> {
     Optional<TcfdItem> findByIdAndOrganisationId(Long id, Long org);
 
     List<TcfdItem> findByOrganisationIdAndReportingYear(Long org, Short year);
+
+    /** S-F — reverse visibility: TCFD items linked to a given climate risk/opportunity. */
+    List<TcfdItem> findByOrganisationIdAndRelatedClimateRiskId(Long org, Long relatedClimateRiskId);
 }
