@@ -16,6 +16,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -291,6 +292,34 @@ public final class ClimateDtos {
             FinancedEmissionsTotal financedEmissionsTotal,
             List<FinancedEmissionsResponse> emissionsRecords,
             List<TargetProgress> targetProgress,
+            // S-G — the four sections the pack previously omitted:
+            List<TcfdChecklistEntry> tcfdChecklist,   // 4-pillar TCFD alignment checklist
+            Map<String, Object> ghgInventory,         // GHG scope totals + Scope-3 coverage
+            Map<String, Object> evidenceIndex,        // linked evidence items + files + hashes
+            List<CapaEntry> gapsCapa,                 // open/in-progress corrective actions
             String generatedAtIso
+    ) {}
+
+    /** S-G — one TCFD 4-pillar checklist row in the report. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record TcfdChecklistEntry(
+            String pillar,
+            String recommendationCode,
+            String disclosureStatus,
+            String titleEn,
+            String titleAr,
+            String gapDescriptionEn
+    ) {}
+
+    /** S-G — one gap / corrective-action row in the report. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record CapaEntry(
+            String actionCode,
+            String titleEn,
+            String status,
+            String priority,
+            String sourceType,
+            String sourceRef,
+            String targetDate
     ) {}
 }

@@ -180,14 +180,18 @@ class ClimateControllerTest {
 
     @Test
     void reportController_annual_dispatches() {
-        ClimateReportController c = new ClimateReportController(reportService);
+        // Only annual() is exercised here — it delegates to the (mocked)
+        // TcfdReportService; the persistence + export collaborators are unused.
+        ClimateReportController c = new ClimateReportController(reportService, null, null);
         AnnualClimateReport stub = new AnnualClimateReport(
                 2026, List.of(), List.of(),
                 new ProbabilityWeightedExpectedLoss(BigDecimal.ZERO, BigDecimal.ZERO, 0, null),
                 new FinancedEmissionsTotal(2026, "ANNUAL",
                         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                         BigDecimal.ZERO, BigDecimal.ZERO, 0),
-                List.of(), List.of(), "2026-05-23T00:00:00Z");
+                List.of(), List.of(),
+                List.of(), java.util.Map.of(), java.util.Map.of(), List.of(),   // S-G sections
+                "2026-05-23T00:00:00Z");
         when(reportService.generateAnnualReportData(2026)).thenReturn(stub);
 
         AnnualClimateReport out = c.annual(2026);

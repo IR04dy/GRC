@@ -9,9 +9,13 @@ import com.tss.grc.module.sust.climate.entity.TcfdClimateScenario;
 import com.tss.grc.module.sust.climate.entity.TcfdSectorImpact;
 import com.tss.grc.module.sust.climate.repository.FinancedEmissionsRecordRepository;
 import com.tss.grc.module.sust.climate.repository.FinancedEmissionsTargetRepository;
+import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
 import com.tss.grc.module.sust.climate.repository.TcfdClimateScenarioRepository;
 import com.tss.grc.module.sust.climate.repository.TcfdSectorImpactRepository;
+import com.tss.grc.module.sust.evidence.service.SustEvidenceLinkService;
+import com.tss.grc.module.sust.ghg.service.GhgEmissionRecordService;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
+import com.tss.grc.module.sust.tcfd.repository.TcfdItemRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,9 +26,12 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -48,6 +55,11 @@ class ClimateReportServiceTest {
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private OrganisationSettingsService settingsService;
+    // S-G — the four new report-section sources.
+    @Mock private TcfdItemRepository tcfdItemRepo;
+    @Mock private GhgEmissionRecordService ghgService;
+    @Mock private CorrectiveActionRepository capaRepo;
+    @Mock private SustEvidenceLinkService sustEvidenceLinkService;
 
     private TcfdScenarioService scenarioService;
     private FinancedEmissionsService emissionsService;
@@ -61,7 +73,14 @@ class ClimateReportServiceTest {
         scenarioService = new TcfdScenarioService(scenarioRepo, sectorRepo, audit, eventPublisher, settingsService);
         emissionsService = new FinancedEmissionsService(recordRepo, targetRepo, audit, eventPublisher);
         reportService = new TcfdReportService(scenarioRepo, sectorRepo, recordRepo,
-                scenarioService, emissionsService);
+                scenarioService, emissionsService,
+                tcfdItemRepo, ghgService, capaRepo, sustEvidenceLinkService);
+        // S-G section sources — empty by default; the pre-existing assertions
+        // only cover the six original sections, so these degrade to empty.
+        when(tcfdItemRepo.findByOrganisationIdAndReportingYear(anyLong(), any())).thenReturn(List.of());
+        when(ghgService.aggregate(any())).thenReturn(Map.of());
+        when(capaRepo.findByOrganisationIdAndStatusIn(anyLong(), any())).thenReturn(List.of());
+        when(sustEvidenceLinkService.buildPackage(any())).thenReturn(Map.of());
     }
     @AfterEach void tearDown() { TenantContext.clear(); }
 
