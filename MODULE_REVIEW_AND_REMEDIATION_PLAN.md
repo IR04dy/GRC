@@ -10,7 +10,7 @@
 
 ## 0. Remediation Progress (live — branch `feat/compliance-policy-remediation`)
 
-> Implementation done 2026-06-28 via an autonomous `/loop`, in §22 order. Frontend changes verified with `tsc --noEmit`; backend changes `mvn compile`/`mvn test`-verified + live API smoke tests. **Not merged to `master`** — 19 commits on `feat/compliance-policy-remediation`, **pushed to origin (PR pending), backend rebuilt + restarted** so the schedulers / SoD / RBAC / evidence-package endpoints are active (this also fixed the stale-jar policy-transition 404).
+> Implementation done 2026-06-28 via an autonomous `/loop`, in §22 order. Frontend changes verified with `tsc --noEmit`; backend changes `mvn compile`/`mvn test`-verified + live API smoke tests. **Merged to `master`** — the compliance/policy remediation (C-1…C-12 + #7-RBAC) plus the trailing **T-24 CAPA-finding reopen path** and a dead-adapter cleanup are all on `master`. The two-commit tail was rebased onto master and fast-forwarded 2026-07-02 (master now @ `eeeb6d41`); T-24 re-verified before merge: `CapaWorkflowServiceTest` green, `tsc --noEmit` clean, live :8084 smoke — non-CLOSED & reason-required guards → 400, happy reopen → 200 (`IDENTIFIED`/`OPEN`, verification fields cleared, `REOPENED` audit row written), test finding restored. The stale `feat/compliance-policy-remediation` branch is now fully subsumed by `master` and can be deleted.
 
 | Gap | Fix | Status | Commit |
 |---|---|---|---|
