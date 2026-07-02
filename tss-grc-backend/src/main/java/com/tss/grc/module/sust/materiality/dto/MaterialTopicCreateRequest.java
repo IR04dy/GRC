@@ -22,6 +22,8 @@ public record MaterialTopicCreateRequest(
         String descriptionAr,
         BigDecimal stakeholderImportance,
         BigDecimal businessImpact,
+        BigDecimal impactMateriality,
+        BigDecimal financialMateriality,
         String stakeholderGroups,
         @Size(max = 255) String ownerName,
         @Size(max = 255) String ownerEmail,
@@ -39,6 +41,12 @@ public record MaterialTopicCreateRequest(
         e.setDescriptionAr(descriptionAr);
         if (stakeholderImportance != null) e.setStakeholderImportance(stakeholderImportance);
         if (businessImpact != null) e.setBusinessImpact(businessImpact);
+        // S-Q double-materiality axes — fall back to the legacy axes so an old
+        // client (stakeholder/business only) still yields a scored topic.
+        BigDecimal impact    = impactMateriality    != null ? impactMateriality    : stakeholderImportance;
+        BigDecimal financial = financialMateriality != null ? financialMateriality : businessImpact;
+        if (impact != null)    e.setImpactMateriality(impact);
+        if (financial != null) e.setFinancialMateriality(financial);
         e.setStakeholderGroups(stakeholderGroups);
         e.setOwnerName(ownerName);
         e.setOwnerEmail(ownerEmail);

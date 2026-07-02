@@ -47,6 +47,16 @@ public class MaterialTopic {
     @Column(name = "business_impact", nullable = false, precision = 3, scale = 1)
     private BigDecimal businessImpact = BigDecimal.ZERO;
 
+    // S-Q — CSRD/ESRS double-materiality axes (0..5). impact = inside-out
+    // (the org's impact on people/environment); financial = outside-in (the
+    // topic's effect on the org's financial position). A topic is material if
+    // material from EITHER axis; materialityScore = max(impact, financial).
+    @Column(name = "impact_materiality", nullable = false, precision = 3, scale = 1)
+    private BigDecimal impactMateriality = BigDecimal.ZERO;
+
+    @Column(name = "financial_materiality", nullable = false, precision = 3, scale = 1)
+    private BigDecimal financialMateriality = BigDecimal.ZERO;
+
     @Column(name = "materiality_score", precision = 3, scale = 1)
     private BigDecimal materialityScore;
 

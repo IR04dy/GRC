@@ -18,13 +18,15 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * ESG materiality service. Implements the double-materiality scoring
- * algorithm:
+ * ESG materiality service. Implements true CSRD/ESRS double-materiality
+ * scoring on two INDEPENDENT axes (S-Q):
  * <pre>
- *   materiality_score = (stakeholder_importance + business_impact) / 2
+ *   impact_materiality    (inside-out)  — the org's impact on people/environment
+ *   financial_materiality (outside-in)  — the topic's effect on the org's finances
+ *   materiality_score = MAX(impact, financial)   // material if material from EITHER axis
  *   priority_tier = bucket(materiality_score):
  *     CRITICAL  ≥ 4.0
- *     HIGH      ≥ 3.0
+ *     HIGH      ≥ 3.0   (= MATERIAL_THRESHOLD: a topic is "material" on an axis ≥ this)
  *     MEDIUM    ≥ 2.0
  *     LOW       < 2.0
  * </pre>
@@ -48,6 +50,8 @@ public class MaterialTopicService {
 
     private static final Set<String> STATUSES = Set.of("DRAFT", "SCORED", "APPROVED", "ARCHIVED");
     private static final Set<String> CATEGORIES = Set.of("ENVIRONMENTAL", "SOCIAL", "GOVERNANCE");
+    /** A topic is material on an axis when that axis scores at/above this (the HIGH-tier floor). */
+    private static final BigDecimal MATERIAL_THRESHOLD = new BigDecimal("3.0");
 
     private final MaterialTopicRepository repo;
     private final AuditLogService audit;
@@ -102,6 +106,8 @@ public class MaterialTopicService {
         if (req.getDescriptionAr() != null)          cur.setDescriptionAr(req.getDescriptionAr());
         if (req.getStakeholderImportance() != null)  cur.setStakeholderImportance(req.getStakeholderImportance());
         if (req.getBusinessImpact() != null)         cur.setBusinessImpact(req.getBusinessImpact());
+        if (req.getImpactMateriality() != null)      cur.setImpactMateriality(req.getImpactMateriality());
+        if (req.getFinancialMateriality() != null)   cur.setFinancialMateriality(req.getFinancialMateriality());
         if (req.getStakeholderGroups() != null)      cur.setStakeholderGroups(req.getStakeholderGroups());
         if (req.getLinkedCmaDisclosureId() != null)  cur.setLinkedCmaDisclosureId(req.getLinkedCmaDisclosureId());
         if (req.getLinkedClimateRiskId() != null)    cur.setLinkedClimateRiskId(req.getLinkedClimateRiskId());
@@ -119,22 +125,33 @@ public class MaterialTopicService {
     }
 
     /**
-     * Score a topic. Transitions DRAFT → SCORED when both axes are
-     * provided and recomputes the materiality score + priority tier.
+     * Score a topic on the two double-materiality axes. Transitions
+     * DRAFT → SCORED and recomputes materiality_score = max(impact, financial)
+     * + priority tier. The legacy stakeholder/business columns are mirrored so
+     * any legacy reader stays consistent.
+     *
+     * @param impact    impact materiality (inside-out), 0..5
+     * @param financial financial materiality (outside-in), 0..5
      */
     @Transactional
-    public MaterialTopic score(Long id, BigDecimal stakeholder, BigDecimal business) {
+    public MaterialTopic score(Long id, BigDecimal impact, BigDecimal financial) {
         MaterialTopic cur = get(id);
-        if (stakeholder == null || business == null)
-            throw new IllegalArgumentException("Both stakeholder and business scores required.");
-        if (stakeholder.signum() < 0 || stakeholder.compareTo(new BigDecimal("5")) > 0
-            || business.signum() < 0   || business.compareTo(new BigDecimal("5")) > 0)
+        if (impact == null || financial == null)
+            throw new IllegalArgumentException("Both impact and financial materiality scores required.");
+        if (impact.signum() < 0 || impact.compareTo(new BigDecimal("5")) > 0
+            || financial.signum() < 0 || financial.compareTo(new BigDecimal("5")) > 0)
             throw new IllegalArgumentException("Scores must be 0..5.");
-        cur.setStakeholderImportance(stakeholder);
-        cur.setBusinessImpact(business);
+        cur.setImpactMateriality(impact);
+        cur.setFinancialMateriality(financial);
+        cur.setStakeholderImportance(impact);   // legacy mirror
+        cur.setBusinessImpact(financial);       // legacy mirror
         recomputeScore(cur);
         if ("DRAFT".equals(cur.getStatus())) cur.setStatus("SCORED");
-        return repo.save(cur);
+        MaterialTopic saved = repo.save(cur);
+        audit.log("SCORE", "MaterialTopic", saved.getId(),
+            "Scored impact=" + impact + " financial=" + financial + " → " + saved.getMaterialityScore()
+                + " (" + saved.getPriorityTier() + ")");
+        return saved;
     }
 
     @Transactional
@@ -187,20 +204,33 @@ public class MaterialTopicService {
         for (String cat  : CATEGORIES) byCategory.put(cat, 0);
 
         List<Map<String, Object>> matrix = new ArrayList<>();
+        int impactMaterialCount = 0, financialMaterialCount = 0, doubleMaterialCount = 0;
         for (MaterialTopic t : all) {
             if (t.getPriorityTier() != null) byTier.merge(t.getPriorityTier(), 1, Integer::sum);
             byCategory.merge(t.getCategory(), 1, Integer::sum);
             if (!"DRAFT".equals(t.getStatus()) && !"ARCHIVED".equals(t.getStatus())) {
+                // Double-materiality classification: material from the impact
+                // axis, the financial axis, or both (the top-right quadrant).
+                boolean fromImpact    = nz(t.getImpactMateriality()).compareTo(MATERIAL_THRESHOLD) >= 0;
+                boolean fromFinancial = nz(t.getFinancialMateriality()).compareTo(MATERIAL_THRESHOLD) >= 0;
+                if (fromImpact)                  impactMaterialCount++;
+                if (fromFinancial)               financialMaterialCount++;
+                if (fromImpact && fromFinancial) doubleMaterialCount++;
                 Map<String, Object> entry = new LinkedHashMap<>();
                 entry.put("id", t.getId());
                 entry.put("topicCode", t.getTopicCode());
                 entry.put("topicEn", t.getTopicEn());
                 entry.put("topicAr", t.getTopicAr());
                 entry.put("category", t.getCategory());
+                entry.put("impactMateriality", t.getImpactMateriality());
+                entry.put("financialMateriality", t.getFinancialMateriality());
                 entry.put("stakeholderImportance", t.getStakeholderImportance());
                 entry.put("businessImpact", t.getBusinessImpact());
                 entry.put("materialityScore", t.getMaterialityScore());
                 entry.put("priorityTier", t.getPriorityTier());
+                entry.put("materialFromImpact", fromImpact);
+                entry.put("materialFromFinancial", fromFinancial);
+                entry.put("doubleMaterial", fromImpact && fromFinancial);
                 entry.put("status", t.getStatus());
                 matrix.add(entry);
             }
@@ -212,6 +242,11 @@ public class MaterialTopicService {
         out.put("byCategory", byCategory);
         out.put("criticalCount", byTier.getOrDefault("CRITICAL", 0));
         out.put("highCount", byTier.getOrDefault("HIGH", 0));
+        // Double-materiality quadrant rollup (over the plotted, non-DRAFT topics).
+        out.put("impactMaterialCount", impactMaterialCount);
+        out.put("financialMaterialCount", financialMaterialCount);
+        out.put("doubleMaterialCount", doubleMaterialCount);
+        out.put("materialThreshold", MATERIAL_THRESHOLD);
         out.put("matrix", matrix);
         return out;
     }
@@ -219,14 +254,15 @@ public class MaterialTopicService {
     // ── Internal helpers ─────────────────────────────────────────────
 
     /**
-     * Compute materiality_score = (stakeholder + business) / 2, then
-     * bucket into priority_tier. Called on every save so the entity
-     * never stores stale derived values.
+     * Double materiality — materiality_score = MAX(impact, financial): a topic
+     * is as material as its stronger perspective (material if material from
+     * EITHER axis), never the average that hid a strong single axis. Bucketed
+     * into priority_tier. Called on every save so derived values never go stale.
      */
     private void recomputeScore(MaterialTopic t) {
-        BigDecimal s = nz(t.getStakeholderImportance());
-        BigDecimal b = nz(t.getBusinessImpact());
-        BigDecimal score = s.add(b).divide(new BigDecimal("2"), 1, RoundingMode.HALF_UP);
+        BigDecimal impact    = nz(t.getImpactMateriality());
+        BigDecimal financial = nz(t.getFinancialMateriality());
+        BigDecimal score = impact.max(financial).setScale(1, RoundingMode.HALF_UP);
         t.setMaterialityScore(score);
 
         if (score.compareTo(new BigDecimal("4.0")) >= 0)       t.setPriorityTier("CRITICAL");

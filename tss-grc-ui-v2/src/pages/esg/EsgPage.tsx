@@ -2473,13 +2473,13 @@ function MaterialityTab() {
 
   async function submitScore(values: Record<string, unknown>) {
     if (!scoringTopic) return;
-    const s = Number(values.stakeholderImportance);
-    const b = Number(values.businessImpact);
-    if (!Number.isFinite(s) || !Number.isFinite(b) || s < 0 || s > 5 || b < 0 || b > 5) {
+    const impact = Number(values.impactMateriality);
+    const financial = Number(values.financialMateriality);
+    if (!Number.isFinite(impact) || !Number.isFinite(financial) || impact < 0 || impact > 5 || financial < 0 || financial > 5) {
       toast.danger(isAr ? 'القيم يجب أن تكون 0..5' : 'Values must be 0..5'); return;
     }
     try {
-      await scoreMaterialTopic(scoringTopic.id!, s, b);
+      await scoreMaterialTopic(scoringTopic.id!, impact, financial);
       toast.success(isAr ? 'تم التقييم' : 'Scored');
       setScoringTopic(null);
       await reload();
@@ -2508,10 +2508,10 @@ function MaterialityTab() {
   }
 
   const scoreFields: FieldDef[] = [
-    { kind: 'number', key: 'stakeholderImportance', required: true, min: 0, max: 5, span: 6,
-      label: isAr ? 'أهمية لأصحاب المصلحة (0–5)' : 'Stakeholder importance (0–5)' },
-    { kind: 'number', key: 'businessImpact', required: true, min: 0, max: 5, span: 6,
-      label: isAr ? 'الأثر على الأعمال (0–5)' : 'Business impact (0–5)' },
+    { kind: 'number', key: 'impactMateriality', required: true, min: 0, max: 5, span: 6,
+      label: isAr ? 'الجوهرية التأثيرية (داخل→خارج) 0–5' : 'Impact materiality (inside-out) 0–5' },
+    { kind: 'number', key: 'financialMateriality', required: true, min: 0, max: 5, span: 6,
+      label: isAr ? 'الجوهرية المالية (خارج→داخل) 0–5' : 'Financial materiality (outside-in) 0–5' },
   ];
   const approveFields: FieldDef[] = [
     { kind: 'text', key: 'approvedBy', required: true, span: 12,
@@ -2531,10 +2531,10 @@ function MaterialityTab() {
       })) },
     { kind: 'number', key: 'reportingYear', required: true, span: 6, min: 2000, max: 2100,
       label: isAr ? 'سنة التقرير' : 'Reporting year' },
-    { kind: 'number', key: 'stakeholderImportance', min: 0, max: 5, span: 6,
-      label: isAr ? 'أهمية لأصحاب المصلحة (0–5)' : 'Stakeholder importance (0–5)' },
-    { kind: 'number', key: 'businessImpact', min: 0, max: 5, span: 6,
-      label: isAr ? 'الأثر على الأعمال (0–5)' : 'Business impact (0–5)' },
+    { kind: 'number', key: 'impactMateriality', min: 0, max: 5, span: 6,
+      label: isAr ? 'الجوهرية التأثيرية (0–5)' : 'Impact materiality (0–5)' },
+    { kind: 'number', key: 'financialMateriality', min: 0, max: 5, span: 6,
+      label: isAr ? 'الجوهرية المالية (0–5)' : 'Financial materiality (0–5)' },
     { kind: 'text', key: 'stakeholderGroups', span: 6,
       label: isAr ? 'مجموعات أصحاب المصلحة' : 'Stakeholder groups' },
     { kind: 'text', key: 'ownerName', span: 6,
@@ -2601,12 +2601,12 @@ function MaterialityTab() {
         ownerName: str(values.ownerName),
         ownerEmail: str(values.ownerEmail),
         notes: str(values.notes),
-        // Preserve the score axes: the entity defaults both to 0 and the
-        // service recomputes materiality_score from them on every save, so
-        // an omitted value would zero out the score + tier. Scoring is owned
-        // by the dedicated "Score" action.
-        stakeholderImportance: editTopic.stakeholderImportance,
-        businessImpact: editTopic.businessImpact,
+        // Preserve the double-materiality axes: the entity defaults both to 0
+        // and the service recomputes materiality_score = max(impact, financial)
+        // on every save, so an omitted value would zero out the score + tier.
+        // Scoring is owned by the dedicated "Score" action.
+        impactMateriality: editTopic.impactMateriality ?? editTopic.stakeholderImportance,
+        financialMateriality: editTopic.financialMateriality ?? editTopic.businessImpact,
       });
       toast.success(isAr ? 'حُدّث الموضوع' : 'Topic updated');
       setEditTopic(null);
@@ -2638,8 +2638,8 @@ function MaterialityTab() {
         topicAr: str(values.topicAr),
         category: category as MaterialCategory,
         reportingYear: year,
-        stakeholderImportance: num(values.stakeholderImportance) ?? 0,
-        businessImpact: num(values.businessImpact) ?? 0,
+        impactMateriality: num(values.impactMateriality) ?? 0,
+        financialMateriality: num(values.financialMateriality) ?? 0,
         stakeholderGroups: str(values.stakeholderGroups),
         ownerName: str(values.ownerName),
         descriptionEn: str(values.descriptionEn),
@@ -2674,8 +2674,8 @@ function MaterialityTab() {
         </Button>}>
         <div className="esg-text-eyebrow-sm">
           {isAr
-            ? 'كل موضوع يحصل على درجتين على مقياس 1-5: الأهمية لأصحاب المصلحة والأثر على الأعمال. درجة الجوهرية = المتوسط. يُحدَّد المستوى تلقائياً عند الحفظ.'
-            : 'Each topic is scored on two axes (1-5): stakeholder importance and business impact. Materiality score = mean. Priority tier is auto-bucketed on save.'}
+            ? 'جوهرية مزدوجة (CSRD): كل موضوع يُقيَّم على محورين مستقلين 0-5 — الجوهرية التأثيرية (داخل→خارج) والجوهرية المالية (خارج→داخل). درجة الجوهرية = الأعلى بين المحورين (جوهري إذا كان جوهرياً من أي منظور).'
+            : 'Double materiality (CSRD): each topic is scored on two INDEPENDENT axes (0-5) — impact materiality (inside-out) and financial materiality (outside-in). Materiality score = max of the two — material if material from either perspective.'}
         </div>
 
         {/* Category filter chips */}
@@ -2699,8 +2699,8 @@ function MaterialityTab() {
                     <th>{isAr ? 'الكود' : 'Code'}</th>
                     <th>{isAr ? 'الموضوع' : 'Topic'}</th>
                     <th>{isAr ? 'الفئة' : 'Category'}</th>
-                    <th>{isAr ? 'أصحاب المصلحة' : 'Stakeholder'}</th>
-                    <th>{isAr ? 'الأعمال' : 'Business'}</th>
+                    <th>{isAr ? 'تأثيرية' : 'Impact'}</th>
+                    <th>{isAr ? 'مالية' : 'Financial'}</th>
                     <th>{isAr ? 'الدرجة' : 'Score'}</th>
                     <th>{isAr ? 'المستوى' : 'Tier'}</th>
                     <th>{isAr ? 'الحالة' : 'Status'}</th>
@@ -2718,10 +2718,13 @@ function MaterialityTab() {
                         {t.ownerName && <div className="text-2xs text-muted esg-cell-sub">{t.ownerName}</div>}
                       </td>
                       <td><Badge tone="neutral">{materialCategoryLabel(t.category, isAr ? 'ar' : 'en')}</Badge></td>
-                      <td className="mono text-xs esg-text-center">{Number(t.stakeholderImportance).toFixed(1)}</td>
-                      <td className="mono text-xs esg-text-center">{Number(t.businessImpact).toFixed(1)}</td>
+                      <td className="mono text-xs esg-text-center">{Number(t.impactMateriality ?? t.stakeholderImportance).toFixed(1)}</td>
+                      <td className="mono text-xs esg-text-center">{Number(t.financialMateriality ?? t.businessImpact).toFixed(1)}</td>
                       <td className="mono text-xs" style={{ textAlign: 'center', fontWeight: 700 }}>
                         {t.materialityScore != null ? Number(t.materialityScore).toFixed(1) : '—'}
+                        {Number(t.impactMateriality ?? t.stakeholderImportance) >= 3 && Number(t.financialMateriality ?? t.businessImpact) >= 3 && (
+                          <span title={isAr ? 'جوهري مزدوج' : 'Double material'}> <Badge tone="danger">2×</Badge></span>
+                        )}
                       </td>
                       <td>
                         {t.priorityTier && <Badge tone={materialTierTone(t.priorityTier)}>{materialTierLabel(t.priorityTier, isAr ? 'ar' : 'en')}</Badge>}
@@ -2764,19 +2767,19 @@ function MaterialityTab() {
           <div style={{ position: 'relative', width: '100%', maxWidth: 520, margin: '0 auto', aspectRatio: '1 / 1', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)' }}>
             {/* Axis labels */}
             <div style={{ position: 'absolute', top: '50%', insetInlineStart: -8, transform: 'translate(-100%, -50%) rotate(-90deg)', fontSize: 10, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
-              {isAr ? '← الأهمية لأصحاب المصلحة' : 'Stakeholder importance →'}
+              {isAr ? '← الجوهرية التأثيرية' : 'Impact materiality →'}
             </div>
             <div style={{ position: 'absolute', bottom: -20, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: 'var(--ink-3)' }}>
-              {isAr ? '← الأثر على الأعمال' : 'Business impact →'}
+              {isAr ? '← الجوهرية المالية' : 'Financial materiality →'}
             </div>
             {/* Quadrant guides at 2.5 / 4.0 */}
             <div style={{ position: 'absolute', insetInlineStart: '50%', top: 0, bottom: 0, width: 1, background: 'var(--border)' }} />
             <div style={{ position: 'absolute', insetBlockStart: '50%', left: 0, right: 0, height: 1, background: 'var(--border)' }} />
             {/* Plot points */}
             {matrix.matrix.map(e => {
-              // X = business_impact / 5 * width; Y = (5 - stakeholder) / 5 * height (invert Y so high = top)
-              const x = (Number(e.businessImpact) / 5) * 100;
-              const y = (1 - Number(e.stakeholderImportance) / 5) * 100;
+              // X = financial materiality; Y = impact materiality (invert Y so high = top).
+              const x = (Number(e.financialMateriality ?? e.businessImpact) / 5) * 100;
+              const y = (1 - Number(e.impactMateriality ?? e.stakeholderImportance) / 5) * 100;
               const bg = e.priorityTier === 'CRITICAL' ? 'var(--danger)'
                        : e.priorityTier === 'HIGH'    ? 'var(--warning)'
                        : e.priorityTier === 'MEDIUM'   ? 'var(--info)' : 'var(--ink-3)';
@@ -2808,8 +2811,8 @@ function MaterialityTab() {
         title={isAr ? `تقييم الموضوع · ${scoringTopic?.topicCode ?? ''}` : `Score topic · ${scoringTopic?.topicCode ?? ''}`}
         fields={scoreFields}
         initial={{
-          stakeholderImportance: scoringTopic?.stakeholderImportance ?? 3,
-          businessImpact: scoringTopic?.businessImpact ?? 3,
+          impactMateriality: scoringTopic?.impactMateriality ?? scoringTopic?.stakeholderImportance ?? 3,
+          financialMateriality: scoringTopic?.financialMateriality ?? scoringTopic?.businessImpact ?? 3,
         }}
         size="md"
         submitLabel={isAr ? 'حفظ التقييم' : 'Save score'}
@@ -2832,7 +2835,7 @@ function MaterialityTab() {
         fields={createFields}
         initial={{
           topicEn: '', topicAr: '', category: 'ENVIRONMENTAL', reportingYear: 2025,
-          stakeholderImportance: 3, businessImpact: 3,
+          impactMateriality: 3, financialMateriality: 3,
           stakeholderGroups: '', ownerName: '', descriptionEn: '',
         }}
         size="lg"

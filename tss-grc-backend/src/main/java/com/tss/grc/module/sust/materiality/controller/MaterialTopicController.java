@@ -62,13 +62,18 @@ public class MaterialTopicController {
         return service.update(id, req);
     }
 
-    /** Body: {@code { "stakeholderImportance": 4.0, "businessImpact": 3.5 }}. */
+    /**
+     * S-Q — score on the double-materiality axes.
+     * Body: {@code { "impactMateriality": 4.0, "financialMateriality": 3.5 }}.
+     * The legacy keys {@code stakeholderImportance}/{@code businessImpact} are
+     * still accepted as a fallback so existing clients keep working.
+     */
     @PostMapping("/{id}/score")
     @PreAuthorize("hasPermission('SUST','WRITE')")
     public MaterialTopic score(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        BigDecimal s = asBd(body.get("stakeholderImportance"));
-        BigDecimal b = asBd(body.get("businessImpact"));
-        return service.score(id, s, b);
+        Object impactRaw    = body.get("impactMateriality")    != null ? body.get("impactMateriality")    : body.get("stakeholderImportance");
+        Object financialRaw = body.get("financialMateriality") != null ? body.get("financialMateriality") : body.get("businessImpact");
+        return service.score(id, asBd(impactRaw), asBd(financialRaw));
     }
 
     /** Body: {@code { "approvedBy": "Name" }}. */

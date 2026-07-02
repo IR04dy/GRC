@@ -1,9 +1,10 @@
 // ESG Materiality API client (Sustainability · V62 · slice 8).
 //
-// Wraps /api/sustainability/materiality/*. Each topic gets a double-
-// materiality score = (stakeholder_importance + business_impact) / 2
-// on a 1-5 scale, computed server-side on every save. Priority tier
-// (CRITICAL/HIGH/MEDIUM/LOW) is bucketed from the score.
+// Wraps /api/sustainability/materiality/*. S-Q: each topic is scored on two
+// INDEPENDENT double-materiality axes — impact (inside-out: the org's impact on
+// people/environment) and financial (outside-in: the topic's effect on the
+// org's finances), 0..5. materialityScore = max(impact, financial) — material
+// if material from EITHER axis — computed server-side; tier bucketed from it.
 
 import { api } from './api';
 
@@ -25,6 +26,9 @@ export interface MaterialTopic {
 
   stakeholderImportance: number;
   businessImpact: number;
+  /** S-Q double-materiality axes (0..5). */
+  impactMateriality?: number;
+  financialMateriality?: number;
   materialityScore?: number;
   priorityTier?: MaterialTier;
   stakeholderGroups?: string;
@@ -50,10 +54,15 @@ export interface MaterialMatrixEntry {
   topicEn: string;
   topicAr?: string;
   category: MaterialCategory;
+  impactMateriality: number;
+  financialMateriality: number;
   stakeholderImportance: number;
   businessImpact: number;
   materialityScore: number;
   priorityTier: MaterialTier;
+  materialFromImpact?: boolean;
+  materialFromFinancial?: boolean;
+  doubleMaterial?: boolean;
   status: MaterialStatus;
 }
 
@@ -64,6 +73,11 @@ export interface MaterialMatrix {
   byCategory: Record<MaterialCategory, number>;
   criticalCount: number;
   highCount: number;
+  /** S-Q double-materiality quadrant rollup. */
+  impactMaterialCount?: number;
+  financialMaterialCount?: number;
+  doubleMaterialCount?: number;
+  materialThreshold?: number;
   matrix: MaterialMatrixEntry[];
 }
 
@@ -96,8 +110,8 @@ export function getMaterialTopic(id: number) { return api.get<MaterialTopic>(`${
 export function createMaterialTopic(b: Partial<MaterialTopic>) { return api.post<MaterialTopic>(BASE, b); }
 export function updateMaterialTopic(id: number, b: Partial<MaterialTopic>) { return api.put<MaterialTopic>(`${BASE}/${id}`, b); }
 
-export function scoreMaterialTopic(id: number, stakeholderImportance: number, businessImpact: number) {
-  return api.post<MaterialTopic>(`${BASE}/${id}/score`, { stakeholderImportance, businessImpact });
+export function scoreMaterialTopic(id: number, impactMateriality: number, financialMateriality: number) {
+  return api.post<MaterialTopic>(`${BASE}/${id}/score`, { impactMateriality, financialMateriality });
 }
 export function approveMaterialTopic(id: number, approvedBy: string) {
   return api.post<MaterialTopic>(`${BASE}/${id}/approve`, { approvedBy });
