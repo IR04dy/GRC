@@ -261,7 +261,7 @@ public class CmaDisclosureService {
         {"92", "(a)", "Material ESG topics — assessment",
          "تقييم الموضوعات الجوهرية للحوكمة البيئية والاجتماعية",
          "Conduct and disclose a double-materiality assessment of ESG topics, identifying which are most relevant to the business model.",
-         "إجراء والإفصاح عن تقييم الجوهرية المزدوج لموضوعات الحوكمة البيئية والاجتماعية، وتحديد الأكثر صلة بنموذج الأعمال."},
+         "إجراء والإفصاح عن تقييم الأهمية النسبية المزدوجة لموضوعات الحوكمة البيئية والاجتماعية، وتحديد الأكثر صلة بنموذج الأعمال."},
         {"92", "(b)", "Climate-related risks + opportunities",
          "المخاطر والفرص المتعلّقة بالمناخ",
          "Disclose climate-related risks (transition + physical) and opportunities, mapped to short / medium / long-term horizons per TCFD.",

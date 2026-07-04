@@ -197,7 +197,7 @@ export const CMA_ARTICLES: CmaArticle[] = [
     titleEn: 'Material ESG topics — assessment',
     titleAr: 'تقييم الموضوعات الجوهرية للحوكمة البيئية والاجتماعية',
     requirementEn: 'Conduct + disclose a double-materiality assessment of ESG topics, identifying which are most relevant to the business model.',
-    requirementAr: 'إجراء والإفصاح عن تقييم الجوهرية المزدوج لموضوعات الحوكمة البيئية والاجتماعية، وتحديد الأكثر صلة بنموذج الأعمال.',
+    requirementAr: 'إجراء والإفصاح عن تقييم الأهمية النسبية المزدوجة لموضوعات الحوكمة البيئية والاجتماعية، وتحديد الأكثر صلة بنموذج الأعمال.',
     status: 'DISCLOSED', evidenceRef: 'Materiality matrix 2025',
   },
   {
