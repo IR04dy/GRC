@@ -17,6 +17,15 @@ public class Incident extends BaseEntity {
     private Long organisationId;
 
     /**
+     * CY-B (C-CRIT-3): when non-null, this register row was created to mirror a
+     * /cyber SOC-workspace incident ({@code cyber.cyber_incidents.id}). Lets the
+     * mirror stay idempotent (one register row per workspace incident) and marks
+     * workspace-origin incidents in the register.
+     */
+    @Column(name = "source_workspace_incident_id")
+    private Long sourceWorkspaceIncidentId;
+
+    /**
      * NIST 800-61r2 phase. State machine:
      *   IDENTIFICATION → ANALYSIS → CONTAINMENT → ERADICATION → RECOVERY → POST_INCIDENT
      * The existing `status` column tracks high-level state (OPEN | INVESTIGATING |

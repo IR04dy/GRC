@@ -3,6 +3,7 @@ package com.tss.grc.module.cyber.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.cyber.entity.CyberIncident;
 import com.tss.grc.module.cyber.repository.CyberIncidentRepository;
+import com.tss.grc.module.incident.service.IncidentService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +39,9 @@ class CyberIncidentServiceTest {
     private static final Long FOREIGN_ID = 999L;
 
     @Mock private CyberIncidentRepository incidentRepo;
+    // CY-B: the workspace service now registers/sync a canonical register row; the
+    // mock's void bridge calls are harmless no-ops for these workflow assertions.
+    @Mock private IncidentService registerService;
     @InjectMocks private CyberIncidentService service;
 
     @BeforeEach void setTenant() { TenantContext.setCurrentTenant(ORG_ID); }

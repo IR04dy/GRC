@@ -3,6 +3,7 @@ package com.tss.grc.module.cyber.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.cyber.entity.CyberIncident;
 import com.tss.grc.module.cyber.repository.CyberIncidentRepository;
+import com.tss.grc.module.incident.service.IncidentService;
 import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,14 @@ public class CyberIncidentService {
 
     private final CyberIncidentRepository incidentRepo;
 
+    /**
+     * CY-B (C-CRIT-3): the canonical incident register. Every SOC-workspace incident
+     * registers a linked {@code cyber.incidents} row through this service so it reaches
+     * the dashboard KPI + PDPL breach bridge. One-way dependency (cyber → incident);
+     * no cycle.
+     */
+    private final IncidentService registerService;
+
     @Autowired(required = false)
     private BroadcastHelper bcast;
 
@@ -33,6 +42,22 @@ public class CyberIncidentService {
     private static final List<String> INCIDENT_WORKFLOW = List.of(
             "DETECTION", "LOGGING", "TRIAGE", "CONTAINMENT",
             "INVESTIGATION", "ERADICATION", "RECOVERY", "CLOSURE", "LESSONS_LEARNED");
+
+    /**
+     * Map the SOC 9-step workflow (and the looser vocabulary present in seed data)
+     * onto the register's strict status set (OPEN|INVESTIGATING|RESOLVED|CLOSED),
+     * so the dashboard open-count reflects where the workspace incident actually is.
+     */
+    private static String workflowToStatus(String wf) {
+        if (wf == null) return "OPEN";
+        return switch (wf.trim().toUpperCase()) {
+            case "CLOSURE", "RESOLVED"            -> "RESOLVED";
+            case "LESSONS_LEARNED", "CLOSED", "DONE" -> "CLOSED";
+            case "CONTAINMENT", "INVESTIGATION", "INVESTIGATING", "ANALYSIS",
+                 "ERADICATION", "RECOVERY", "IN_PROGRESS", "IN_REVIEW" -> "INVESTIGATING";
+            default -> "OPEN";   // DETECTION, LOGGING, TRIAGE, NEW, OPEN, …
+        };
+    }
 
     @Transactional(readOnly = true)
     public Page<CyberIncident> getIncidents(Long orgId, Pageable p) {
@@ -52,7 +77,23 @@ public class CyberIncidentService {
         inc.setId(null);
         inc.setOrganisationId(orgId);
         inc.setIsDeleted(false);
-        return incidentRepo.save(inc);
+        inc.setCanonicalIncidentId(null);            // set below, after the mirror exists
+        CyberIncident saved = incidentRepo.save(inc);
+
+        // CY-B: register a canonical cyber.incidents row so this workspace incident
+        // reaches the dashboard "open incidents" KPI + trend and is PDPL-linkable.
+        String desc = "Registered from /cyber SOC workspace incident #" + saved.getId()
+                + (saved.getIncidentType() != null ? " · type=" + saved.getIncidentType() : "")
+                + (saved.getImpact() != null ? " · impact=" + saved.getImpact() : "");
+        Long canonicalId = registerService.registerFromWorkspace(
+                orgId, saved.getId(),
+                saved.getTitleEn(), saved.getTitleAr(), saved.getSeverity(),
+                saved.getIncidentType(),                 // sanitised to CK_incidents_category in the register
+                workflowToStatus(saved.getWorkflowStatus()),
+                saved.getDetectedAt() != null ? saved.getDetectedAt().toLocalDate() : null,
+                desc);
+        saved.setCanonicalIncidentId(canonicalId);
+        return incidentRepo.save(saved);
     }
 
     @Transactional
@@ -62,8 +103,13 @@ public class CyberIncidentService {
         req.setOrganisationId(existing.getOrganisationId());
         req.setExternalId(existing.getExternalId());
         req.setCreatedAt(existing.getCreatedAt());
+        req.setCanonicalIncidentId(existing.getCanonicalIncidentId());   // CY-B: keep the register link
         req.setIsDeleted(false);
-        return incidentRepo.save(req);
+        CyberIncident saved = incidentRepo.save(req);
+        // CY-B: reflect any workflow/status change onto the canonical register row.
+        registerService.syncStatusFromWorkspace(saved.getOrganisationId(), saved.getId(),
+                workflowToStatus(saved.getWorkflowStatus()));
+        return saved;
     }
 
     @Transactional
@@ -74,6 +120,9 @@ public class CyberIncidentService {
             inc.setWorkflowStatus(INCIDENT_WORKFLOW.get(idx + 1));
         }
         CyberIncident saved = incidentRepo.save(inc);
+        // CY-B: advance the canonical register row's status with the workflow.
+        registerService.syncStatusFromWorkspace(saved.getOrganisationId(), saved.getId(),
+                workflowToStatus(saved.getWorkflowStatus()));
         if (bcast != null) bcast.entity(saved.getOrganisationId(), "cyber_incident", saved.getId(), saved);
         return saved;
     }
@@ -83,5 +132,7 @@ public class CyberIncidentService {
         CyberIncident inc = getIncident(id);
         inc.setIsDeleted(true);
         incidentRepo.save(inc);
+        // CY-B: soft-delete the canonical mirror too, so the dashboard count stays honest.
+        registerService.softDeleteFromWorkspace(inc.getOrganisationId(), inc.getId());
     }
 }

@@ -134,6 +134,104 @@ public class IncidentService {
         broadcast(orgId, id, java.util.Map.of("id", id, "deleted", true));
     }
 
+    // ── CY-B: /cyber SOC workspace ↔ canonical register bridge ────────────────
+    // The /cyber workspace (cyber.cyber_incidents) is the SOC operating view; the
+    // register (cyber.incidents — this entity) is the system of record read by the
+    // dashboard KPI, the KPI trend and the PDPL breach bridge. These methods let a
+    // workspace incident register a linked canonical row and keep it in step, so a
+    // cyber-workspace incident finally reaches the dashboard + can be PDPL-linked.
+
+    private static final java.util.Set<String> LEGAL_SEVERITY =
+        java.util.Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
+    private static final java.util.Set<String> LEGAL_CATEGORY =
+        java.util.Set.of("OTHER", "ACCESS_CONTROL", "INFRASTRUCTURE", "DATA_BREACH", "CYBER");
+
+    /**
+     * Register (or return the existing) canonical {@code cyber.incidents} row that
+     * mirrors a /cyber SOC-workspace incident. Idempotent per workspace incident
+     * (guarded by {@code source_workspace_incident_id} + a unique index). Fires the
+     * same audit + F8 {@code INCIDENT_CREATED} event as a normal incident create, so
+     * the mirror is a first-class incident, not a silent side-table row.
+     *
+     * @return the canonical register row id.
+     */
+    @Transactional
+    public Long registerFromWorkspace(Long orgId, Long workspaceIncidentId,
+                                      String titleEn, String titleAr, String severity,
+                                      String category, String status,
+                                      java.time.LocalDate discoveryDate, String description) {
+        var existing = incidentRepo.findByOrganisationIdAndSourceWorkspaceIncidentId(orgId, workspaceIncidentId);
+        if (existing.isPresent()) return existing.get().getId();
+
+        String sev = severity == null ? "MEDIUM" : severity.trim().toUpperCase();
+        if (!LEGAL_SEVERITY.contains(sev)) sev = "MEDIUM";
+        String cat = category == null ? "CYBER" : category.trim().toUpperCase();
+        if (!LEGAL_CATEGORY.contains(cat)) cat = "CYBER";   // CK_incidents_category is strict
+
+        Incident i = new Incident();
+        i.setOrganisationId(orgId);
+        i.setSourceWorkspaceIncidentId(workspaceIncidentId);
+        i.setTitle(titleEn != null && !titleEn.isBlank() ? titleEn : "Cyber incident #" + workspaceIncidentId);
+        i.setTitleAr(titleAr);
+        i.setSeverity(sev);
+        i.setCategory(cat);
+        i.setStatus(legalStatus(status));
+        i.setNistPhase("IDENTIFICATION");
+        i.setDiscoveryDate(discoveryDate);
+        i.setDescription(description);
+        i = incidentRepo.save(i);
+        audit.log("CREATE", "Incident", i.getId(),
+            "Registered from /cyber workspace incident #" + workspaceIncidentId + " — " + nullSafe(i.getTitle()));
+        emit(orgId, "INCIDENT_CREATED", i, null);
+        broadcast(orgId, i.getId(), toResponse(i));
+        return i.getId();
+    }
+
+    /**
+     * Keep the canonical register row's status in step with the workspace incident's
+     * workflow as it advances/closes, so the dashboard open-count stays live. No-op
+     * if the workspace incident has no registered mirror (e.g. a legacy row).
+     */
+    @Transactional
+    public void syncStatusFromWorkspace(Long orgId, Long workspaceIncidentId, String status) {
+        if (workspaceIncidentId == null) return;
+        incidentRepo.findByOrganisationIdAndSourceWorkspaceIncidentId(orgId, workspaceIncidentId)
+            .ifPresent(i -> {
+                String next = legalStatus(status);
+                if (!next.equals(i.getStatus())) {
+                    String prev = i.getStatus();
+                    i.setStatus(next);
+                    if (("RESOLVED".equals(next) || "CLOSED".equals(next)) && i.getResolutionDate() == null) {
+                        i.setResolutionDate(java.time.LocalDate.now());
+                    }
+                    i = incidentRepo.save(i);
+                    audit.log("STATUS_SYNC", "Incident", i.getId(),
+                        "Status " + nullSafe(prev) + " → " + next + " (from workspace incident #" + workspaceIncidentId + ")");
+                }
+            });
+    }
+
+    /** Soft-delete the canonical mirror when its workspace incident is deleted. */
+    @Transactional
+    public void softDeleteFromWorkspace(Long orgId, Long workspaceIncidentId) {
+        if (workspaceIncidentId == null) return;
+        incidentRepo.findByOrganisationIdAndSourceWorkspaceIncidentId(orgId, workspaceIncidentId)
+            .ifPresent(i -> {
+                i.setIsDeleted(true);
+                incidentRepo.save(i);
+                audit.log("DELETE", "Incident", i.getId(),
+                    "Register mirror soft-deleted with workspace incident #" + workspaceIncidentId);
+            });
+    }
+
+    private static String legalStatus(String s) {
+        String v = s == null ? "OPEN" : s.trim().toUpperCase();
+        return switch (v) {
+            case "OPEN", "INVESTIGATING", "RESOLVED", "CLOSED" -> v;
+            default -> "OPEN";   // CK_incidents_status is strict
+        };
+    }
+
     @Transactional(readOnly = true)
     public IncidentStats getStats() {
         Long orgId = TenantContext.getCurrentTenant();

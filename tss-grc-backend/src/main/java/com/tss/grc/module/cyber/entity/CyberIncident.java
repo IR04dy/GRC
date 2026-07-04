@@ -70,6 +70,14 @@ public class CyberIncident {
     @Column(name = "linked_evidence_count")
     private int linkedEvidenceCount;
 
+    /**
+     * CY-B (C-CRIT-3): the canonical {@code cyber.incidents} register row this SOC
+     * workspace incident is mirrored into, so it reaches the dashboard KPI + PDPL
+     * breach bridge. Set on create; kept in sync as the workflow advances.
+     */
+    @Column(name = "canonical_incident_id")
+    private Long canonicalIncidentId;
+
     @Column(name = "lessons_learned", columnDefinition = "NVARCHAR(MAX)")
     private String lessonsLearned;
 

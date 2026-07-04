@@ -17,7 +17,7 @@ Implement-loop tracker — one epic per fire, §33 order. Each fire: read this t
 |---|---|---|---|---|---|
 | 1 | **SOC-A** seed + grant SOC role model | Crit | ✅ DONE | V259 | so_officer (non-admin) events 403→200, triage 403→200; DELETE appsec still 403 (least-priv); 26/26 socops roles present |
 | 2 | CY-A wire evidence to real subsystem (upload+request+review) | Crit | ✅ DONE | — (FE wiring; endpoints existed) | multipart upload to CYBER_EVIDENCE→201; request OPEN→…→REJECTED→resubmit→APPROVED all 200 w/ dept+due+control link; CyberPage Attachments + Request modals; tsc clean; live Vite serves it |
-| 3 | CY-B consolidate incident model (dashboard/PDPL ↔ cyber workspace) | Crit | [ ] | — | — |
+| 3 | CY-B consolidate incident model (dashboard/PDPL ↔ cyber workspace) | Crit | ✅ DONE | V260 (+V261 backfill, **not yet applied to dev**) | 19/19 live: /cyber incident auto-registers a canonical `cyber.incidents` mirror; dashboard `openIncidents` 9→10 (DB source **+ live `/dashboard/stats`**); PDPL bridge accepted the workspace-origin incident → auto-created `data_breach`; status-sync DETECTION→…→CLOSED; delete→mirror soft-deleted; baselines restored; 20/20 unit tests green |
 | 4 | CY-D fix schedulers (vuln-SLA dormant + socops sweep) | High | [ ] | — | — |
 | 5 | SOC-C event→incident promotion | High | [ ] | — | — |
 | 6 | CY-C incident regulatory timers + auto-CAPA | High | [ ] | — | — |
@@ -31,7 +31,9 @@ Implement-loop tracker — one epic per fire, §33 order. Each fire: read this t
 | 14 | SOC-E threat-intel action + detection library | Med | [ ] | — | — |
 | 15 | CY-J evidence expiry sweep + titleAr | Med | [ ] | — | — |
 
-**Next fire:** CY-B (consolidate incident model — dashboard/PDPL read `cyber.incidents`, workspace reads `cyber_incidents`). **Rebuild rule:** stop :8084 before `mvn package`; DB seeds (like SOC-A) need only a fresh login, no rebuild. **Migration numbering:** next free = V260.
+**Next fire:** CY-D (fix schedulers — vuln-SLA dormant + socops sweep). **⚠ CY-B legacy backfill:** `V261` registers the 24 pre-existing workspace incidents into the register — a **data backfill of real rows**; ready + idempotent but **NOT applied to dev** (awaiting explicit confirmation per the standing destructive-op guard). The forward path (new incidents) is live + validated without it. **Rebuild rule:** stop :8084 before `mvn package`; DB seeds (like SOC-A) need only a fresh login, no rebuild. **Migration numbering:** V260 applied to dev; next free = V262 (V261 reserved for the backfill).
+
+**CY-B direction note:** the plan's parenthetical suggested repointing 3 consumers at the workspace table, but the tables are schema-incompatible and `cyber.incidents` is *already* the system of record (dashboard + KPI trend + PDPL bridge + NCA/PDPL/SAMA/CITC/HRSD regulatory timers + MITRE + RCA all live on it — the very timers CY-C wants). So the lower-risk, non-destructive consolidation is the inverse: keep `cyber.incidents` canonical and make the SOC workspace *register into it* (mirror-on-create + status-sync). CY-C now lands its regulatory clocks on the table workspace incidents already flow to.
 
 ---
 

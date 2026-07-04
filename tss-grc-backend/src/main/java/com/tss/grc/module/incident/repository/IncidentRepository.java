@@ -8,10 +8,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface IncidentRepository extends JpaRepository<Incident, Long> {
 
     Page<Incident> findByOrganisationId(Long organisationId, Pageable pageable);
+
+    /** CY-B: the canonical register row mirroring a given /cyber workspace incident (if any). */
+    Optional<Incident> findByOrganisationIdAndSourceWorkspaceIncidentId(Long organisationId, Long sourceWorkspaceIncidentId);
 
     @Query("""
         SELECT i FROM Incident i
