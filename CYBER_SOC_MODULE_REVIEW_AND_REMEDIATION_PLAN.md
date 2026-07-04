@@ -10,6 +10,31 @@
 
 ---
 
+## §Implementation Status (branch `feat/cyber-soc-remediation`)
+Implement-loop tracker — one epic per fire, §33 order. Each fire: read this table, do the next `[ ]` epic, validate live, tick it, commit on the feature branch. Do **not** merge to master without explicit approval.
+
+| Order | Epic | Sev | Status | Migration | Validated (live) |
+|---|---|---|---|---|---|
+| 1 | **SOC-A** seed + grant SOC role model | Crit | ✅ DONE | V259 | so_officer (non-admin) events 403→200, triage 403→200; DELETE appsec still 403 (least-priv); 26/26 socops roles present |
+| 2 | CY-A wire evidence to real subsystem (upload+request+review) | Crit | [ ] | — | — |
+| 3 | CY-B consolidate incident model (dashboard/PDPL ↔ cyber workspace) | Crit | [ ] | — | — |
+| 4 | CY-D fix schedulers (vuln-SLA dormant + socops sweep) | High | [ ] | — | — |
+| 5 | SOC-C event→incident promotion | High | [ ] | — | — |
+| 6 | CY-C incident regulatory timers + auto-CAPA | High | [ ] | — | — |
+| 7 | SOC-B playbook invoke → runnable tasks | High | [ ] | — | — |
+| 8 | CY-E CAPA routing (owner/due) + reminder/escalation scheduler | High | [ ] | — | — |
+| 9 | CY-G RBAC read-gates + auditor access | High | [ ] | — | — |
+| 10 | CY-H input validation (400 not 500, FK/enum) | Med | [ ] | — | — |
+| 11 | CY-F exports (Excel + Arabic PDF) | High | [ ] | — | — |
+| 12 | CY-I policy lifecycle in cyber | Med | [ ] | — | — |
+| 13 | SOC-D forensics custody ledger | Med | [ ] | — | — |
+| 14 | SOC-E threat-intel action + detection library | Med | [ ] | — | — |
+| 15 | CY-J evidence expiry sweep + titleAr | Med | [ ] | — | — |
+
+**Next fire:** CY-A. **Rebuild rule:** stop :8084 before `mvn package`; DB seeds (like SOC-A) need only a fresh login, no rebuild. **Migration numbering:** next free = V260.
+
+---
+
 ## 1. Executive Summary
 
 The Cybersecurity and SOC Operations modules are **built on real foundations but operate as disconnected islands** — exactly the concern raised. They are **not empty demos**: 186 endpoints (89 cyber + 97 socops), 38 tables, and genuine Saudi-native seed data (154 controls, 529 sub-controls, 24 incidents, real NCA-ECC-aligned SLA policies). Audit logging (F7) and realtime broadcast (F8) fire on transitions, and tenant scoping holds. **But the layer that makes a GRC/SOC platform *operate* — the clock (due→countdown→reminder→escalation), cross-department routing, file-backed evidence, and cross-module continuity — is largely missing or unwired.**
