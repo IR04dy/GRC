@@ -39,6 +39,22 @@ public final class CurrentActor {
     }
 
     /**
+     * Resolves the current user's username (login name) from the Spring Security
+     * context — useful for human-readable "completed by" / "invoked by" columns
+     * where a raw user id would be opaque.
+     *
+     * @return the authenticated principal's username, or {@code null} when there
+     *         is no authentication or the principal is not a {@link GrcUserDetails}.
+     */
+    public static String username() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof GrcUserDetails u)) {
+            return null;
+        }
+        return u.getUsername();
+    }
+
+    /**
      * Resolves the current tenant (organisation) id, failing fast when no tenant
      * is bound to the request thread.
      *

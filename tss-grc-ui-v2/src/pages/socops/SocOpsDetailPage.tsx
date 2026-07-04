@@ -11,6 +11,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
+import { PlaybookRunsPanel } from './PlaybookRunsPanel';
 import { useI18n } from '../../lib/i18n';
 import { socopsApi } from '../../lib/socops';
 
@@ -735,6 +736,11 @@ export function SocOpsDetailPage() {
 
         <EntityActivityTimeline entityType={config.entityType} entityId={Number(row.id ?? id)} />
       </div>
+
+      {/* SOC-B: playbook run execution — invoke spawns a run + clocked tasks here. */}
+      {resource === 'playbooks' && row.id != null && (
+        <PlaybookRunsPanel playbookId={Number(row.id)} />
+      )}
     </Shell>
   );
 }

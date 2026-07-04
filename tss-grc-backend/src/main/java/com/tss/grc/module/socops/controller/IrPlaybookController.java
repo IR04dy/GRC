@@ -1,8 +1,11 @@
 package com.tss.grc.module.socops.controller;
 
 import com.tss.grc.module.platform.licensing.guard.RequireModule;
+import com.tss.grc.module.socops.dto.IrPlaybookRunDetail;
 import com.tss.grc.module.socops.entity.IrPlaybook;
+import com.tss.grc.module.socops.entity.IrPlaybookRun;
 import com.tss.grc.module.socops.entity.IrPlaybookStep;
+import com.tss.grc.module.socops.service.IrPlaybookRunService;
 import com.tss.grc.module.socops.service.IrPlaybookService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +23,8 @@ import java.util.Map;
  *   GET  /api/v1/socops/playbooks/:id/steps
  *   POST /api/v1/socops/playbooks/clone    { "templateCode": "IR-PHISHING-01" }
  *   POST /api/v1/socops/playbooks
- *   POST /api/v1/socops/playbooks/:id/invoke
+ *   POST /api/v1/socops/playbooks/:id/invoke   → instantiates a run + one task per step
+ *   GET  /api/v1/socops/playbooks/:id/runs     → the run history for this playbook
  * </pre>
  */
 @RestController
@@ -30,7 +34,8 @@ import java.util.Map;
 @Tag(name = "SOC Operations — IR Playbooks")
 public class IrPlaybookController {
 
-    private final IrPlaybookService svc;
+    private final IrPlaybookService    svc;
+    private final IrPlaybookRunService runSvc;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
@@ -58,7 +63,28 @@ public class IrPlaybookController {
     @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN')")
     public IrPlaybook save(@RequestBody IrPlaybook body) { return svc.save(body); }
 
+    /** Invoke a playbook — instantiates a run plus one clocked, owner-assigned task
+     *  per step (SOC-B). Optional body: {@code incidentId}, {@code note}. */
     @PostMapping("/{id}/invoke")
     @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
-    public IrPlaybook invoke(@PathVariable Long id) { return svc.recordInvocation(id); }
+    public IrPlaybookRunDetail invoke(@PathVariable Long id,
+                                      @RequestBody(required = false) Map<String, Object> body) {
+        Long incidentId = null;
+        String note = null;
+        if (body != null) {
+            Object inc = body.get("incidentId");
+            if (inc instanceof Number n) incidentId = n.longValue();
+            else if (inc instanceof String s && !s.isBlank()) {
+                try { incidentId = Long.valueOf(s.trim()); } catch (NumberFormatException ignored) { }
+            }
+            Object n = body.get("note");
+            if (n != null) note = String.valueOf(n);
+        }
+        return runSvc.invoke(id, incidentId, note);
+    }
+
+    /** Run history for this playbook (newest first). */
+    @GetMapping("/{id}/runs")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
+    public List<IrPlaybookRun> runs(@PathVariable Long id) { return runSvc.runsOf(id); }
 }

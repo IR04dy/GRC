@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { BookOpen, RefreshCw, Play, Copy, AlertCircle } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -43,6 +43,7 @@ export function IrPlaybooksPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
   const toast = useToast();
+  const navigate = useNavigate();
   const [state, setState] = useState<LoadState>('idle');
   const [active, setActive] = useState<IrPlaybook[]>([]);
   const [templates, setTemplates] = useState<IrPlaybook[]>([]);
@@ -84,9 +85,12 @@ export function IrPlaybooksPage() {
   async function doInvoke(id: number) {
     setBusyId(id);
     try {
-      await socopsApi.invokePlaybook(id);
-      toast.success(isAr ? 'تم تفعيل الدليل — راجع المركز' : 'Playbook invoked — check SOC manager');
+      const detail = await socopsApi.invokePlaybook(id);
+      const n = detail?.tasks?.length ?? 0;
+      toast.success(isAr ? `تم تفعيل الدليل — ${n} مهمة` : `Playbook invoked — ${n} tasks created`);
       void load();
+      // Land on the detail page so the analyst can work the run's tasks.
+      navigate(`/socops/playbooks/${id}`);
     } catch (e) {
       toast.danger((e as Error)?.message ?? 'Invoke failed');
     } finally {

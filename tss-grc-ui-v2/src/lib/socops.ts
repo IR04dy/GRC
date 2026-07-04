@@ -139,6 +139,54 @@ export interface IrPlaybookStep {
   isCritical: boolean;
 }
 
+// ─── IR playbook RUNS (SOC-B) ────────────────────────────────────────
+// Invoking a playbook instantiates a run + one clocked, owner-assigned task
+// per step. Completing tasks advances the run to COMPLETED.
+export interface IrPlaybookRun {
+  id: number;
+  playbookId: number;
+  playbookCode: string | null;
+  titleEn: string | null;
+  titleAr: string | null;
+  status: string;                 // RUNNING | COMPLETED | CANCELLED
+  incidentId: number | null;
+  triggeredByEventId: number | null;
+  invokedBy: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  totalTasks: number;
+  completedTasks: number;
+  targetMttrMinutes: number | null;
+  notes: string | null;
+}
+
+export interface IrPlaybookRunTask {
+  id: number;
+  runId: number;
+  playbookId: number;
+  stepId: number | null;
+  stepOrder: number;
+  phase: string;
+  titleEn: string;
+  titleAr: string | null;
+  instructionsEn: string | null;
+  instructionsAr: string | null;
+  ownerRole: string | null;
+  status: string;                 // PENDING | IN_PROGRESS | DONE | SKIPPED
+  isCritical: boolean;
+  estimatedMinutes: number | null;
+  dueAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  completedBy: string | null;
+  notes: string | null;
+}
+
+export interface IrPlaybookRunDetail {
+  run: IrPlaybookRun;
+  tasks: IrPlaybookRunTask[];
+}
+
 // ─── Pentests ────────────────────────────────────────────────────────
 export interface PentestEngagement {
   id: number;
@@ -552,8 +600,21 @@ export const socopsApi = {
   playbookSteps: (id: number) => api.get<IrPlaybookStep[]>(`/api/v1/socops/playbooks/${id}/steps`),
   cloneTemplate: (templateCode: string) =>
     api.post<IrPlaybook>('/api/v1/socops/playbooks/clone', { templateCode }),
-  invokePlaybook: (id: number) =>
-    api.post<IrPlaybook>(`/api/v1/socops/playbooks/${id}/invoke`),
+  // SOC-B: invoking now instantiates a run + one clocked task per step.
+  invokePlaybook: (id: number, body?: { incidentId?: number; note?: string }) =>
+    api.post<IrPlaybookRunDetail>(`/api/v1/socops/playbooks/${id}/invoke`, body ?? {}),
+  playbookRuns: (id: number) =>
+    api.get<IrPlaybookRun[]>(`/api/v1/socops/playbooks/${id}/runs`),
+
+  // Run execution (SOC-B).
+  runs: () => api.get<IrPlaybookRun[]>('/api/v1/socops/playbook-runs'),
+  runGet: (runId: number) =>
+    api.get<IrPlaybookRunDetail>(`/api/v1/socops/playbook-runs/${runId}`),
+  runStartTask: (runId: number, taskId: number) =>
+    api.post<IrPlaybookRunDetail>(`/api/v1/socops/playbook-runs/${runId}/tasks/${taskId}/start`),
+  runCompleteTask: (runId: number, taskId: number, note?: string) =>
+    api.post<IrPlaybookRunDetail>(`/api/v1/socops/playbook-runs/${runId}/tasks/${taskId}/complete`,
+      note === undefined ? {} : { note }),
 
   pentests:      (page = 0, size = 50) =>
     api.get<PageResp<PentestEngagement>>(`/api/v1/socops/pentests${pageQ(page, size)}`),
