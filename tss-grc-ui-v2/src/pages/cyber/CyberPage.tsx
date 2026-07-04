@@ -879,7 +879,19 @@ export function CyberPage() {
     { header: t('colOwner'),      cell: r => r.ownerName ?? '—' },
     { header: t('colPriority'),   cell: r => <Badge tone={r.priority === 'HIGH' || r.priority === 'CRITICAL' ? 'danger' : r.priority === 'MEDIUM' ? 'warning' : 'info'}>{r.priority ?? '—'}</Badge> },
     { header: t('colSourceType'), cell: r => <Badge tone="info">{r.sourceType ?? '—'}</Badge> },
-    { header: t('colDue'),        cell: r => r.dueDate ?? '—', mono: true },
+    { header: t('colDue'), mono: true, cell: r => {
+        if (!r.dueDate) return '—';
+        const active = r.workflowStatus !== 'COMPLETED' && r.workflowStatus !== 'CANCELLED';
+        const overdue = active && r.dueDate < new Date().toISOString().slice(0, 10);
+        return (
+          <span style={{ color: overdue ? 'var(--danger-fg)' : undefined, fontWeight: overdue ? 600 : undefined }}>
+            {r.dueDate}
+            {r.escalatedAt && (
+              <span style={{ marginInlineStart: 6 }}><Badge tone="danger" size="sm">{t('cyberCapaEscalated')}</Badge></span>
+            )}
+          </span>
+        );
+      } },
     { header: t('colProgress'),   cell: r => <ProgressInline value={r.progressPct ?? r.progressPercent ?? 0} /> },
     { header: t('colStatus'),     cell: r => <Badge tone={STATUS_TONE[r.workflowStatus ?? ''] ?? 'neutral'} dot>{(r.workflowStatus ?? '').replace(/_/g, ' ') || '—'}</Badge> },
     { header: '', align: 'end', width: '120px',

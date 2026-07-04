@@ -122,6 +122,9 @@ grc:
   # so last_escalation_at / breach notifications never fired). 5-min default cadence.
   vuln-sla:
     scheduler-enabled: true
+  # CY-E — cyber CAPA/action-plan reminder + overdue-escalation clock (5-min default cadence).
+  cyber-capa-sla:
+    scheduler-enabled: true
   storage:
     base-path: ${FILE_STORAGE_PATH:/var/data/tss-grc/uploads}
   notifications:

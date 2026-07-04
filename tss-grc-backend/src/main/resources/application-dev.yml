@@ -92,6 +92,11 @@ grc:
   socops:
     sweep-initial-delay-ms: 20000         # first sweep ~20s after boot
     sweep-period-ms: 120000               # 2 min in dev (prod uses the 1-hour default)
+  # CY-E — cyber CAPA/action-plan reminder + overdue-escalation clock. Short dev
+  # cadence so a routed CAPA's escalation is observable end-to-end.
+  cyber-capa-sla:
+    scheduler-enabled: true
+    scheduler-interval-ms: 60000          # 1 min in dev (prod uses the 5-min default)
 
   # Sprint 12 — ServiceNow ITSM integration. In dev we explicitly enable
   # the adapter in STUB mode so smoke tests against /api/v1/integrations/servicenow

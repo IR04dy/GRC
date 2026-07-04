@@ -1495,6 +1495,8 @@ export interface CyberActionPlanDto {
   completionEvidence?: string; validationNotes?: string;
   linkedControlId?: number;
   startDate?: string; completedAt?: string;
+  // CY-E — SLA clock
+  escalatedAt?: string; lastReminderAt?: string; reminderCount?: number;
 }
 export interface CyberActionPlanRequest {
   titleEn: string; titleAr?: string;

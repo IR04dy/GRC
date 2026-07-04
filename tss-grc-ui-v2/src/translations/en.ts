@@ -4328,6 +4328,7 @@ export const en = {
   cyberEmptyAssets:        'No assets',
   cyberEmptyEvidence:      'No evidence',
   cyberEmptyActions:       'No action plans',
+  cyberCapaEscalated:      'escalated',
 
   // Admin page (DD-20)
   adminRolesEmpty:         'No roles loaded',

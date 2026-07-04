@@ -63,6 +63,17 @@ public class CyberActionPlan {
     @Column(name = "linked_control_id")
     private Long linkedControlId;
 
+    // CY-E — reminder/overdue-escalation clock. escalatedAt guards the sweep so an
+    // overdue plan is escalated exactly once; lastReminderAt throttles reminders.
+    @Column(name = "last_reminder_at")
+    private LocalDateTime lastReminderAt;
+
+    @Column(name = "escalated_at")
+    private LocalDateTime escalatedAt;
+
+    @Column(name = "reminder_count", nullable = false)
+    private int reminderCount = 0;
+
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
 

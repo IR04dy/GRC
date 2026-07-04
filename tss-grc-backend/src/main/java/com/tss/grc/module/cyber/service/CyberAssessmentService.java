@@ -14,6 +14,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+
 /**
  * Control assessments + gap → CAPA conversion.
  *
@@ -83,6 +85,11 @@ public class CyberAssessmentService {
         ap.setDescriptionEn(assessment.getGapDescription());
         ap.setLinkedControlId(assessment.getControlId());
         ap.setWorkflowStatus("OPEN");
+        // CY-E — route the CAPA: assign an owner + a risk-weighted due date + priority
+        // so it lands on someone's plate with a clock, and the SLA sweep can chase it.
+        ap.setOwnerName(resolveOwner(assessment));
+        ap.setPriority(normalisePriority(assessment.getRiskLevel()));
+        ap.setDueDate(LocalDate.now().plusDays(dueDaysForRisk(assessment.getRiskLevel())));
         ap.setIsDeleted(false);
         CyberActionPlan saved = actionPlanRepo.save(ap);
         assessment.setCapaId(saved.getId());
@@ -99,5 +106,37 @@ public class CyberAssessmentService {
         ControlAssessment a = getAssessment(id);
         a.setIsDeleted(true);
         assessmentRepo.save(a);
+    }
+
+    // ── CY-E routing helpers ────────────────────────────────────────────────
+
+    /** Owner = the reviewer who signed the gap off, else the assessor who found
+     *  it, else the CISO as the accountable default — never null. */
+    private static String resolveOwner(ControlAssessment a) {
+        if (a.getReviewerName() != null && !a.getReviewerName().isBlank()) return a.getReviewerName();
+        if (a.getAssessorName() != null && !a.getAssessorName().isBlank()) return a.getAssessorName();
+        return "CISO";
+    }
+
+    /** Normalise the assessment risk level onto the CAPA priority scale. */
+    private static String normalisePriority(String riskLevel) {
+        if (riskLevel == null) return "MEDIUM";
+        String r = riskLevel.trim().toUpperCase().replace(' ', '_');
+        return switch (r) {
+            case "CRITICAL", "VERY_HIGH" -> "CRITICAL";
+            case "HIGH"                  -> "HIGH";
+            case "LOW", "VERY_LOW"       -> "LOW";
+            default                       -> "MEDIUM";
+        };
+    }
+
+    /** Risk-weighted remediation window (days) — tighter for higher risk. */
+    private static int dueDaysForRisk(String riskLevel) {
+        return switch (normalisePriority(riskLevel)) {
+            case "CRITICAL" -> 7;
+            case "HIGH"     -> 14;
+            case "LOW"      -> 60;
+            default          -> 30;
+        };
     }
 }

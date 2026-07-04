@@ -4312,6 +4312,7 @@ export const ar = {
   cyberEmptyAssets:        'لا توجد أصول',
   cyberEmptyEvidence:      'لا توجد أدلة',
   cyberEmptyActions:       'لا توجد خطط إجراءات',
+  cyberCapaEscalated:      'تم التصعيد',
 
   // Admin page
   adminRolesEmpty:         'لا توجد أدوار محمَّلة',

@@ -14,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -83,5 +84,54 @@ class CyberAssessmentServiceTest {
 
         ControlAssessment after = service.approveAssessment(ID);
         assertThat(after.getStatus()).isEqualTo("APPROVED");
+    }
+
+    // ── CY-E routing: owner + risk-weighted due date + priority ─────────────
+
+    /** Convert a gap and return the built (echoed) action plan. */
+    private CyberActionPlan convert(Long id, String risk, String reviewer, String assessor) {
+        ControlAssessment a = new ControlAssessment();
+        a.setId(id); a.setControlId(7L); a.setExternalId("CA-" + id);
+        a.setGapDescription("gap"); a.setRiskLevel(risk);
+        a.setReviewerName(reviewer); a.setAssessorName(assessor);
+        when(assessmentRepo.findByIdAndOrganisationId(id, ORG_ID)).thenReturn(Optional.of(a));
+        when(actionPlanRepo.save(any(CyberActionPlan.class))).thenAnswer(inv -> {
+            CyberActionPlan ap = inv.getArgument(0); if (ap.getId() == null) ap.setId(901L); return ap;
+        });
+        when(assessmentRepo.save(any(ControlAssessment.class))).thenAnswer(inv -> inv.getArgument(0));
+        return service.convertGapToCapa(id, ORG_ID);
+    }
+
+    @Test
+    void convertGap_high_routesReviewerOwner_due14_priorityHigh() {
+        CyberActionPlan ap = convert(61L, "HIGH", "Layla Reviewer", "Omar Assessor");
+        assertThat(ap.getOwnerName()).isEqualTo("Layla Reviewer");           // reviewer wins
+        assertThat(ap.getPriority()).isEqualTo("HIGH");
+        assertThat(ap.getDueDate()).isEqualTo(LocalDate.now().plusDays(14));
+        assertThat(ap.getWorkflowStatus()).isEqualTo("OPEN");
+    }
+
+    @Test
+    void convertGap_critical_noReviewer_fallsBackToAssessor_due7() {
+        CyberActionPlan ap = convert(62L, "CRITICAL", null, "Omar Assessor");
+        assertThat(ap.getOwnerName()).isEqualTo("Omar Assessor");            // assessor fallback
+        assertThat(ap.getPriority()).isEqualTo("CRITICAL");
+        assertThat(ap.getDueDate()).isEqualTo(LocalDate.now().plusDays(7));
+    }
+
+    @Test
+    void convertGap_low_noNames_ownerCiso_due60() {
+        CyberActionPlan ap = convert(63L, "LOW", null, null);
+        assertThat(ap.getOwnerName()).isEqualTo("CISO");                     // last-resort default
+        assertThat(ap.getPriority()).isEqualTo("LOW");
+        assertThat(ap.getDueDate()).isEqualTo(LocalDate.now().plusDays(60));
+    }
+
+    @Test
+    void convertGap_unknownRisk_defaultsMedium_due30() {
+        CyberActionPlan ap = convert(64L, null, "Sara Owner", null);
+        assertThat(ap.getOwnerName()).isEqualTo("Sara Owner");
+        assertThat(ap.getPriority()).isEqualTo("MEDIUM");
+        assertThat(ap.getDueDate()).isEqualTo(LocalDate.now().plusDays(30));
     }
 }
