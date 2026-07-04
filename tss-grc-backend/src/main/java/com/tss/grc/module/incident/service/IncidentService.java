@@ -1,6 +1,8 @@
 package com.tss.grc.module.incident.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.capa.dto.CapaTaskDto;
+import com.tss.grc.module.capa.service.CapaTaskService;
 import com.tss.grc.module.incident.dto.*;
 import com.tss.grc.module.incident.entity.Incident;
 import com.tss.grc.module.incident.repository.IncidentRepository;
@@ -50,6 +52,13 @@ public class IncidentService {
     private final IncidentRepository incidentRepo;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
+    /** CY-C: auto-raise a corrective CAPA from an incident's lessons-learned on close. */
+    private final CapaTaskService capaService;
+
+    /** Days to close the auto-raised post-incident CAPA. */
+    private static final int CAPA_DUE_DAYS = 30;
+    /** Fallback owner when the incident has no assignee (CISO role, seeded by SOC-A). */
+    private static final String CAPA_DEFAULT_OWNER = "CISO";
 
     /** Optional — null in unit tests, auto-wired by Spring at runtime. */
     @Autowired(required = false)
@@ -322,9 +331,54 @@ public class IncidentService {
         audit.log("CLOSE", "Incident", i.getId(),
             "Incident closed — resolution date " + i.getResolutionDate());
         emit(orgId, "INCIDENT_CLOSED", i, previousPhase);
+        // CY-C: turn the lessons-learned into a tracked, routed corrective CAPA.
+        String capaId = raiseCapaFromLessons(i);
         java.util.Map<String, Object> snap = phaseSnapshot(i);
+        if (capaId != null) snap.put("capaRaised", capaId);
         broadcast(orgId, id, snap);
         return snap;
+    }
+
+    /**
+     * CY-C: when an incident is closed carrying lessons-learned, auto-open a
+     * CORRECTIVE CAPA routed to an owner with a due date, so post-incident actions
+     * are tracked to closure instead of dying as free text (confirmed gap: reaching
+     * closure previously created 0 action plans). No lessons → no CAPA. Runs in the
+     * close transaction so the incident and its follow-up CAPA commit together.
+     */
+    private String raiseCapaFromLessons(Incident i) {
+        String lessons = i.getLessonsLearned();
+        if (lessons == null || lessons.isBlank()) return null;
+
+        String base = (i.getTitle() != null && !i.getTitle().isBlank()) ? i.getTitle() : ("Incident #" + i.getId());
+        String owner = (i.getAssignee() != null && !i.getAssignee().isBlank()) ? i.getAssignee() : CAPA_DEFAULT_OWNER;
+        String sev   = (i.getSeverity() != null && !i.getSeverity().isBlank()) ? i.getSeverity() : "MEDIUM";
+        String titleEn = clip("Post-incident corrective actions — " + base, 500);
+        String titleAr = clip("إجراءات تصحيحية بعد الحادثة — "
+                + (i.getTitleAr() != null && !i.getTitleAr().isBlank() ? i.getTitleAr() : base), 500);
+
+        CapaTaskDto dto = CapaTaskDto.builder()
+                .originType("incident")          // matches the existing origin_type convention
+                .originId(String.valueOf(i.getId()))
+                .titleEn(titleEn)
+                .titleAr(titleAr)
+                .descriptionEn("Lessons learned from incident \"" + base + "\":\n" + lessons)
+                .descriptionAr(i.getLessonsLearnedAr())
+                .capaType("CORRECTIVE")
+                .severity(sev)
+                .owner(owner)
+                .targetDate(java.time.LocalDate.now().plusDays(CAPA_DUE_DAYS))
+                .build();
+        CapaTaskDto created = capaService.create(dto);
+        audit.log("CAPA_AUTO_RAISED", "Incident", i.getId(),
+            "Auto-raised CAPA " + created.getId() + " from lessons learned (owner=" + owner
+                + ", due=" + dto.getTargetDate() + ")");
+        return created.getId();
+    }
+
+    private static String clip(String s, int max) {
+        if (s == null) return null;
+        return s.length() <= max ? s : s.substring(0, max);
     }
 
     private String mapPhaseToStatus(String phase) {

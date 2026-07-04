@@ -49,6 +49,9 @@ class IncidentServiceTest {
     @Mock private IncidentRepository repo;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
+    // CY-C: closeIncident now auto-raises a CAPA when lessons-learned are present;
+    // these workflow tests don't set lessons, so create() is never called.
+    @Mock private com.tss.grc.module.capa.service.CapaTaskService capaService;
     @InjectMocks private IncidentService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
