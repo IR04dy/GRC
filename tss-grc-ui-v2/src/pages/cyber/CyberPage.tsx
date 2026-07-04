@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ShieldCheck, Bug, Flame, ClipboardCheck, Filter, Download, Plus, Activity, BarChart3,
   Shield, Target, Cpu, FileCheck2, ListTodo, ShieldOff,
-  CheckCheck, TrendingUp, PlayCircle, Check, GitBranchPlus,
+  CheckCheck, TrendingUp, PlayCircle, Check, GitBranchPlus, Paperclip, Send,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -19,6 +19,8 @@ import { BarChart3D } from '../../components/viz/BarChart3D';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { Modal } from '../../components/ui/Modal';
+import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { useI18n } from '../../lib/i18n';
 import { SEVERITY_TONE, severityLabel, STATUS_TONE, statusLabel } from '../../lib/labels';
 import { useApiList } from '../../lib/useApiResource';
@@ -27,7 +29,7 @@ import { LivePulse } from '../../components/ui/LivePulse';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import {
-  cyberApi, ApiError,
+  cyberApi, ApiError, evidenceApi, departmentsApi,
   type CyberControlDto, type CyberControlRequest,
   type CyberSubControlDto, type CyberSubControlRequest,
   type CyberAssessmentDto, type CyberAssessmentRequest,
@@ -37,6 +39,7 @@ import {
   type CyberAssetDto, type CyberAssetRequest,
   type CyberEvidenceDto, type CyberEvidenceRequest,
   type CyberActionPlanDto, type CyberActionPlanRequest,
+  type DepartmentDto,
 } from '../../lib/api';
 import { useToast } from '../../lib/toast';
 import {
@@ -417,6 +420,13 @@ export function CyberPage() {
   const assetS   = useEntityState<CyberAssetDto>();
   const evS      = useEntityState<CyberEvidenceDto>();
   const apS      = useEntityState<CyberActionPlanDto>();
+
+  // CY-A: real evidence lifecycle — file attachments + cross-dept request workflow,
+  // wired to the platform evidence/attachment subsystem (no more file_name-string façade).
+  const [evAttach, setEvAttach] = useState<CyberEvidenceDto | null>(null);
+  const [reqFor, setReqFor]     = useState<CyberEvidenceDto | null>(null);
+  const [depts, setDepts]       = useState<DepartmentDto[]>([]);
+  useEffect(() => { departmentsApi.list().then(setDepts).catch(() => setDepts([])); }, []);
 
   const controls       = useApiList<CyberControlDto>(()    => cyberApi.controls(0, 200),    CONTROLS);
   const subControls    = useApiList<CyberSubControlDto>(() => cyberApi.subControls(0, 200), SUB_CONTROLS);
@@ -818,6 +828,36 @@ export function CyberPage() {
     { header: '', align: 'end', width: '90px',
       cell: r => <RowActions onEdit={() => assetS.startEdit(r)} onDelete={() => assetS.askDelete(r)} /> },
   ];
+  // CY-A: raise an evidence request against another department, with a due date +
+  // priority. The EvidenceRequestSlaScheduler then chases overdue requests. Anchored
+  // to the evidence record (entityType/entityId) so it appears in its by-entity queue.
+  const reqFields: FieldDef[] = [
+    { kind: 'text',     key: 'titleEn',      label: (lang === 'ar' ? 'عنوان الطلب' : 'Request title') + ' *', required: true, span: 12 },
+    { kind: 'select',   key: 'departmentId', label: lang === 'ar' ? 'مطلوب من إدارة' : 'Requested from (department)',
+      options: depts.map(d => ({ value: String(d.id), label: lang === 'ar' ? (d.nameAr || d.nameEn) : d.nameEn })), span: 6 },
+    { kind: 'date',     key: 'dueDate',      label: lang === 'ar' ? 'تاريخ الاستحقاق' : 'Due date', span: 6 },
+    { kind: 'select',   key: 'priority',     label: lang === 'ar' ? 'الأولوية' : 'Priority',
+      options: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map(p => ({ value: p, label: p })), span: 6 },
+    { kind: 'textarea', key: 'descriptionEn', label: lang === 'ar' ? 'الوصف / المطلوب' : 'Description / what is needed', rows: 2, span: 12 },
+  ];
+  async function submitEvReq(values: { titleEn: string; departmentId?: string; dueDate?: string; priority?: string; descriptionEn?: string }) {
+    if (!reqFor) return;
+    setBusy(true);
+    try {
+      await evidenceApi.createRequest({
+        titleEn: values.titleEn,
+        descriptionEn: values.descriptionEn || undefined,
+        entityType: 'CYBER_EVIDENCE', entityId: reqFor.id,
+        departmentId: values.departmentId ? Number(values.departmentId) : undefined,
+        dueDate: values.dueDate || undefined,
+        priority: values.priority || 'MEDIUM',
+      });
+      toast.success(lang === 'ar' ? 'تم رفع طلب الدليل' : 'Evidence request raised');
+      setReqFor(null);
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Request failed'); }
+    finally { setBusy(false); }
+  }
+
   const evidenceCols: Column<CyberEvidenceDto>[] = [
     { header: t('colTitle'),     cell: r => <span style={{ fontWeight: 600 }}>{r.titleEn}</span> },
     { header: t('colType'),      cell: r => <Badge tone="neutral">{(r.evidenceType ?? '').replace(/_/g, ' ')}</Badge> },
@@ -826,8 +866,13 @@ export function CyberPage() {
     { header: t('colVersion'),   cell: r => r.version ?? '—', mono: true },
     { header: t('colExpiry'),    cell: r => r.expiryDate ?? '—', mono: true },
     { header: t('colStatus'),    cell: r => <Badge tone={r.status === 'CURRENT' ? 'success' : r.status === 'EXPIRED' ? 'danger' : 'warning'} dot>{r.status ?? '—'}</Badge> },
-    { header: '', align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => evS.startEdit(r)} onDelete={() => evS.askDelete(r)} /> },
+    { header: '', align: 'end', width: '150px',
+      cell: r => <RowActions
+        extras={[
+          { Icon: Paperclip, onClick: () => setEvAttach(r), title: lang === 'ar' ? 'الملفات / المرفقات' : 'Files / attachments' },
+          { Icon: Send,      onClick: () => setReqFor(r),   title: lang === 'ar' ? 'طلب دليل من إدارة' : 'Request evidence' },
+        ]}
+        onEdit={() => evS.startEdit(r)} onDelete={() => evS.askDelete(r)} /> },
   ];
   const actionCols: Column<CyberActionPlanDto>[] = [
     { header: t('colPlan'),       cell: r => <span style={{ fontWeight: 600 }}>{r.titleEn}</span> },
@@ -1105,6 +1150,23 @@ export function CyberPage() {
         fields={EV_FIELDS}
         initial={evS.editing ? evToReq(evS.editing) : EV_EMPTY}
         onClose={evS.closeModal} onSubmit={submitEv} />
+
+      {/* CY-A: real file upload on a cyber evidence record (was a file_name string only) */}
+      {evAttach && (
+        <Modal open size="md" onClose={() => setEvAttach(null)}
+          title={(lang === 'ar' ? 'مرفقات الدليل · ' : 'Evidence files · ') + evAttach.titleEn}>
+          <AttachmentsField entityType="CYBER_EVIDENCE" entityId={evAttach.id}
+            label={lang === 'ar' ? 'ملفات الدليل' : 'Evidence files'} />
+        </Modal>
+      )}
+
+      {/* CY-A: cross-department evidence request workflow (due date + reminders + status) */}
+      <FormModal<{ titleEn: string; departmentId?: string; dueDate?: string; priority?: string; descriptionEn?: string }>
+        open={!!reqFor}
+        title={(lang === 'ar' ? 'طلب دليل · ' : 'Request evidence · ') + (reqFor?.titleEn ?? '')}
+        fields={reqFields}
+        initial={{ titleEn: reqFor ? (lang === 'ar' ? `دليل مطلوب: ${reqFor.titleEn}` : `Evidence needed: ${reqFor.titleEn}`) : '', departmentId: '', dueDate: '', priority: 'MEDIUM', descriptionEn: '' }}
+        onClose={() => setReqFor(null)} onSubmit={submitEvReq} />
 
       <FormModal<CyberActionPlanRequest> open={apS.open}
         title={apS.editing ? `${t('editPrefix')} · ${apS.editing.titleEn}` : t('newActionPlanTitle')}

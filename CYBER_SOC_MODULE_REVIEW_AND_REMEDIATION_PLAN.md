@@ -16,7 +16,7 @@ Implement-loop tracker — one epic per fire, §33 order. Each fire: read this t
 | Order | Epic | Sev | Status | Migration | Validated (live) |
 |---|---|---|---|---|---|
 | 1 | **SOC-A** seed + grant SOC role model | Crit | ✅ DONE | V259 | so_officer (non-admin) events 403→200, triage 403→200; DELETE appsec still 403 (least-priv); 26/26 socops roles present |
-| 2 | CY-A wire evidence to real subsystem (upload+request+review) | Crit | [ ] | — | — |
+| 2 | CY-A wire evidence to real subsystem (upload+request+review) | Crit | ✅ DONE | — (FE wiring; endpoints existed) | multipart upload to CYBER_EVIDENCE→201; request OPEN→…→REJECTED→resubmit→APPROVED all 200 w/ dept+due+control link; CyberPage Attachments + Request modals; tsc clean; live Vite serves it |
 | 3 | CY-B consolidate incident model (dashboard/PDPL ↔ cyber workspace) | Crit | [ ] | — | — |
 | 4 | CY-D fix schedulers (vuln-SLA dormant + socops sweep) | High | [ ] | — | — |
 | 5 | SOC-C event→incident promotion | High | [ ] | — | — |
@@ -31,7 +31,7 @@ Implement-loop tracker — one epic per fire, §33 order. Each fire: read this t
 | 14 | SOC-E threat-intel action + detection library | Med | [ ] | — | — |
 | 15 | CY-J evidence expiry sweep + titleAr | Med | [ ] | — | — |
 
-**Next fire:** CY-A. **Rebuild rule:** stop :8084 before `mvn package`; DB seeds (like SOC-A) need only a fresh login, no rebuild. **Migration numbering:** next free = V260.
+**Next fire:** CY-B (consolidate incident model — dashboard/PDPL read `cyber.incidents`, workspace reads `cyber_incidents`). **Rebuild rule:** stop :8084 before `mvn package`; DB seeds (like SOC-A) need only a fresh login, no rebuild. **Migration numbering:** next free = V260.
 
 ---
 
