@@ -19,8 +19,9 @@ import java.util.Map;
  * <pre>
  *   GET    /api/v1/socops/events[?page=&size=]
  *   GET    /api/v1/socops/events/:id
- *   POST   /api/v1/socops/events/:id/triage   { "assigneeUserId": 42 }
- *   POST   /api/v1/socops/events/:id/resolve  { "resolution": "...", "falsePositive": false }
+ *   POST   /api/v1/socops/events/:id/triage    { "assigneeUserId": 42 }
+ *   POST   /api/v1/socops/events/:id/escalate  { "note": "..." }   → creates + links a cyber incident
+ *   POST   /api/v1/socops/events/:id/resolve   { "resolution": "...", "falsePositive": false }
  *   DELETE /api/v1/socops/events/:id
  * </pre>
  */
@@ -51,6 +52,13 @@ public class SecurityEventController {
     public SecurityEvent triage(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
         Long assignee = body == null ? null : numericId(body.get("assigneeUserId"));
         return svc.triage(id, assignee);
+    }
+
+    @PostMapping("/{id}/escalate")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
+    public SecurityEvent escalate(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
+        String note = body == null ? null : (String) body.get("note");
+        return svc.escalateToIncident(id, note);
     }
 
     @PostMapping("/{id}/resolve")

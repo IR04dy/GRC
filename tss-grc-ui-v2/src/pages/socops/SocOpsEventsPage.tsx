@@ -33,6 +33,7 @@ const STATUS_TONE: Record<string, 'danger' | 'warning' | 'info' | 'success' | 'n
   NEW: 'danger',
   TRIAGED: 'warning',
   IN_PROGRESS: 'info',
+  ESCALATED: 'info',
   RESOLVED: 'success',
   FALSE_POSITIVE: 'neutral',
   CLOSED: 'neutral',
@@ -104,6 +105,15 @@ export function SocOpsEventsPage() {
       void load();
     } catch (e) {
       toast.danger((e as Error)?.message ?? 'Resolve failed');
+    }
+  }
+  async function doEscalate(id: number) {
+    try {
+      const ev = await socopsApi.eventEscalate(id, isAr ? 'تصعيد من شاشة الأحداث' : 'Escalated from events screen');
+      toast.success(isAr ? `تم التصعيد إلى الحادثة #${ev.incidentId}` : `Escalated to incident #${ev.incidentId}`);
+      void load();
+    } catch (e) {
+      toast.danger((e as Error)?.message ?? 'Escalate failed');
     }
   }
 
@@ -214,11 +224,22 @@ export function SocOpsEventsPage() {
                         {isAr ? 'بدء المعالجة' : 'Triage'}
                       </Button>
                     )}
+                    {!TERMINAL.has(e.status) && !e.incidentId && (
+                      <Button size="sm" variant="ghost" onClick={() => void doEscalate(e.id)}>
+                        {isAr ? 'تصعيد لحادثة' : 'Escalate'}
+                      </Button>
+                    )}
                     {!TERMINAL.has(e.status) && (
                       <Button size="sm" variant="ghost" onClick={() => void doResolve(e.id)}>
                         {isAr ? 'إغلاق' : 'Resolve'}
                       </Button>
                     )}
+                    {e.incidentId ? (
+                      <Link to={`/cyber?tab=incidents`} style={{ fontSize: 11, marginInlineStart: 8 }}
+                            title={isAr ? 'الحادثة المرتبطة' : 'Linked incident'}>
+                        {isAr ? `الحادثة #${e.incidentId}` : `INC #${e.incidentId}`}
+                      </Link>
+                    ) : null}
                     <Link to={`/socops/events/${e.id}`} style={{ fontSize: 11, marginInlineStart: 8 }}>
                       {isAr ? 'تفاصيل' : 'Details'}
                     </Link>

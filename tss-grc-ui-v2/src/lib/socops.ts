@@ -541,6 +541,10 @@ export const socopsApi = {
   eventResolve:  (id: number, resolution: string, falsePositive = false) =>
     api.post<SecurityEvent>(`/api/v1/socops/events/${id}/resolve`,
       { resolution, falsePositive }),
+  // SOC-C: promote a security event to a cyber incident (creates + links it).
+  eventEscalate: (id: number, note?: string) =>
+    api.post<SecurityEvent>(`/api/v1/socops/events/${id}/escalate`,
+      note === undefined ? {} : { note }),
 
   playbooks:     () => api.get<IrPlaybook[]>('/api/v1/socops/playbooks'),
   templates:     () => api.get<IrPlaybook[]>('/api/v1/socops/playbooks/templates'),
