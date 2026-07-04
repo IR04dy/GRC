@@ -117,6 +117,11 @@ grc:
     # SECURITY_BLOCK entries on legitimate flows before relying on it.
     tenant-write-guard:
       enabled: true
+  # CY-D — the risk-based vulnerability-SLA escalation clock MUST run in production
+  # (the scheduler defaults OFF; its Javadoc says prod flips it on but no config did,
+  # so last_escalation_at / breach notifications never fired). 5-min default cadence.
+  vuln-sla:
+    scheduler-enabled: true
   storage:
     base-path: ${FILE_STORAGE_PATH:/var/data/tss-grc/uploads}
   notifications:

@@ -79,6 +79,20 @@ grc:
     max-failed-login-attempts: 99
     lockout-duration-minutes: 1
 
+  # CY-D — make the SLA escalation clock actually tick. The scheduler defaults to
+  # enabled=false (see VulnerabilitySlaScheduler) and NO profile turned it on, so
+  # last_escalation_at never got stamped in any environment. Enable it in dev with
+  # a short interval so the demo clock is responsive and the escalation path is
+  # observable end-to-end.
+  vuln-sla:
+    scheduler-enabled: true
+    scheduler-interval-ms: 60000          # 1 min in dev (prod uses the 5-min default)
+  # The SOC-ops time-based F8 sweep has no enable flag (always runs); shorten its
+  # dev cadence so overdue SLAs / expiring certs / due reviews fire promptly.
+  socops:
+    sweep-initial-delay-ms: 20000         # first sweep ~20s after boot
+    sweep-period-ms: 120000               # 2 min in dev (prod uses the 1-hour default)
+
   # Sprint 12 — ServiceNow ITSM integration. In dev we explicitly enable
   # the adapter in STUB mode so smoke tests against /api/v1/integrations/servicenow
   # work out of the box. Flip mode=LIVE + set SERVICENOW_* env vars to talk
