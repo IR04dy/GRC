@@ -173,7 +173,7 @@ export function evidenceModuleLabel(m: EvidenceModuleArea, lang: 'en' | 'ar'): s
   };
   const ar: Record<EvidenceModuleArea, string> = {
     GHG: 'الانبعاثات', SGI: 'التزامات SGI', CMA: 'إفصاحات CMA',
-    TCFD: 'محاذاة TCFD', MATERIALITY: 'الجوهرية', METRIC: 'المؤشّرات',
+    TCFD: 'محاذاة TCFD', MATERIALITY: 'الأهمية النسبية', METRIC: 'المؤشّرات',
     CLIMATE_RISK: 'المخاطر المناخية', CORRECTIVE_ACTION: 'الإجراءات التصحيحية',
     ANNEX: 'الملحق', OTHER: 'أخرى',
   };

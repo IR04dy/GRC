@@ -1301,7 +1301,7 @@ function AnnexReadinessWidget({ data, isAr }: { data: DashboardPayload; isAr: bo
 function MaterialityMatrixWidget({ data, isAr }: { data: DashboardPayload; isAr: boolean }) {
   const matrix = data.materiality.matrix;
   return (
-    <Card title={isAr ? 'الجوهرية — أهم الموضوعات' : 'Materiality — top topics'} Icon={Target}>
+    <Card title={isAr ? 'الأهمية النسبية — أهم الموضوعات' : 'Materiality — top topics'} Icon={Target}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, fontSize: 11 }}>
         <Badge tone="danger">{data.materiality.criticalCount} {isAr ? 'حرج' : 'Critical'}</Badge>
         <Badge tone="warning">{data.materiality.highCount} {isAr ? 'مرتفع' : 'High'}</Badge>
@@ -1327,7 +1327,7 @@ function MaterialityMatrixWidget({ data, isAr }: { data: DashboardPayload; isAr:
       ))}
       {matrix.length === 0 && (
         <div style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'center', padding: 12 }}>
-          {isAr ? 'لا توجد موضوعات جوهرية مُقيَّمة بعد' : 'No materiality topics scored yet'}
+          {isAr ? 'لا توجد موضوعات ذات أهمية نسبية مُقيَّمة بعد' : 'No materiality topics scored yet'}
         </div>
       )}
     </Card>
@@ -2434,11 +2434,12 @@ function TcfdTab() {
 
 // ─── ESG Materiality tab (V62 — slice 8) ─────────────────────────────────────
 //
-// Double-materiality assessment: each topic gets two scores on a 1-5
-// scale (stakeholder importance × business impact). Service computes
-// materiality_score = (s+b)/2 and bucket into CRITICAL/HIGH/MEDIUM/LOW
-// on every save. Approved topics anchor CMA Article 92(a) and the
-// climate-risk topic register.
+// Double-materiality assessment: each topic is scored on two INDEPENDENT
+// 0-5 axes — impact materiality (inside-out) and financial materiality
+// (outside-in). Service computes materiality_score = max(impact, financial)
+// (material if material from either perspective) and buckets into
+// CRITICAL/HIGH/MEDIUM/LOW on every save. Approved topics anchor CMA
+// Article 92(a) and the climate-risk topic register.
 
 function MaterialityTab() {
   const { lang } = useI18n();
@@ -2509,9 +2510,9 @@ function MaterialityTab() {
 
   const scoreFields: FieldDef[] = [
     { kind: 'number', key: 'impactMateriality', required: true, min: 0, max: 5, span: 6,
-      label: isAr ? 'الجوهرية التأثيرية (داخل→خارج) 0–5' : 'Impact materiality (inside-out) 0–5' },
+      label: isAr ? 'الأهمية النسبية للأثر (من الداخل إلى الخارج) ٠–٥' : 'Impact materiality (inside-out) 0–5' },
     { kind: 'number', key: 'financialMateriality', required: true, min: 0, max: 5, span: 6,
-      label: isAr ? 'الجوهرية المالية (خارج→داخل) 0–5' : 'Financial materiality (outside-in) 0–5' },
+      label: isAr ? 'الأهمية النسبية المالية (من الخارج إلى الداخل) ٠–٥' : 'Financial materiality (outside-in) 0–5' },
   ];
   const approveFields: FieldDef[] = [
     { kind: 'text', key: 'approvedBy', required: true, span: 12,
@@ -2532,9 +2533,9 @@ function MaterialityTab() {
     { kind: 'number', key: 'reportingYear', required: true, span: 6, min: 2000, max: 2100,
       label: isAr ? 'سنة التقرير' : 'Reporting year' },
     { kind: 'number', key: 'impactMateriality', min: 0, max: 5, span: 6,
-      label: isAr ? 'الجوهرية التأثيرية (0–5)' : 'Impact materiality (0–5)' },
+      label: isAr ? 'الأهمية النسبية للأثر (٠–٥)' : 'Impact materiality (0–5)' },
     { kind: 'number', key: 'financialMateriality', min: 0, max: 5, span: 6,
-      label: isAr ? 'الجوهرية المالية (0–5)' : 'Financial materiality (0–5)' },
+      label: isAr ? 'الأهمية النسبية المالية (٠–٥)' : 'Financial materiality (0–5)' },
     { kind: 'text', key: 'stakeholderGroups', span: 6,
       label: isAr ? 'مجموعات أصحاب المصلحة' : 'Stakeholder groups' },
     { kind: 'text', key: 'ownerName', span: 6,
@@ -2668,13 +2669,13 @@ function MaterialityTab() {
         <Kpi Icon={Building2}    label={isAr ? 'الحوكمة' : 'Governance'}                  value={matrix?.byCategory.GOVERNANCE ?? 0}    tone="primary" onClick={() => setCategoryFilter('GOVERNANCE')} active={categoryFilter === 'GOVERNANCE'} />
       </div>
 
-      <Card title={isAr ? 'مصفوفة تقييم الجوهرية المزدوجة' : 'Double-materiality assessment matrix'} Icon={Target}
+      <Card title={isAr ? 'مصفوفة تقييم الأهمية النسبية المزدوجة' : 'Double-materiality assessment matrix'} Icon={Target}
         action={<Button variant="primary" size="sm" Icon={Plus} onClick={() => setOpenNew(true)}>
           {isAr ? 'موضوع جديد' : 'New topic'}
         </Button>}>
         <div className="esg-text-eyebrow-sm">
           {isAr
-            ? 'جوهرية مزدوجة (CSRD): كل موضوع يُقيَّم على محورين مستقلين 0-5 — الجوهرية التأثيرية (داخل→خارج) والجوهرية المالية (خارج→داخل). درجة الجوهرية = الأعلى بين المحورين (جوهري إذا كان جوهرياً من أي منظور).'
+            ? 'الأهمية النسبية المزدوجة (وفق CSRD): يُقيَّم كل موضوع على محورين مستقلين من ٠ إلى ٥ — الأهمية النسبية للأثر (من الداخل إلى الخارج) والأهمية النسبية المالية (من الخارج إلى الداخل). درجة الأهمية النسبية = الأعلى بين المحورين (يُعدّ الموضوع ذا أهمية نسبية إذا كان كذلك من أيٍّ من المنظورين).'
             : 'Double materiality (CSRD): each topic is scored on two INDEPENDENT axes (0-5) — impact materiality (inside-out) and financial materiality (outside-in). Materiality score = max of the two — material if material from either perspective.'}
         </div>
 
@@ -2699,8 +2700,8 @@ function MaterialityTab() {
                     <th>{isAr ? 'الكود' : 'Code'}</th>
                     <th>{isAr ? 'الموضوع' : 'Topic'}</th>
                     <th>{isAr ? 'الفئة' : 'Category'}</th>
-                    <th>{isAr ? 'تأثيرية' : 'Impact'}</th>
-                    <th>{isAr ? 'مالية' : 'Financial'}</th>
+                    <th>{isAr ? 'الأثر' : 'Impact'}</th>
+                    <th>{isAr ? 'المالية' : 'Financial'}</th>
                     <th>{isAr ? 'الدرجة' : 'Score'}</th>
                     <th>{isAr ? 'المستوى' : 'Tier'}</th>
                     <th>{isAr ? 'الحالة' : 'Status'}</th>
@@ -2723,7 +2724,7 @@ function MaterialityTab() {
                       <td className="mono text-xs" style={{ textAlign: 'center', fontWeight: 700 }}>
                         {t.materialityScore != null ? Number(t.materialityScore).toFixed(1) : '—'}
                         {Number(t.impactMateriality ?? t.stakeholderImportance) >= 3 && Number(t.financialMateriality ?? t.businessImpact) >= 3 && (
-                          <span title={isAr ? 'جوهري مزدوج' : 'Double material'}> <Badge tone="danger">2×</Badge></span>
+                          <span title={isAr ? 'ذو أهمية نسبية مزدوجة' : 'Double material'}> <Badge tone="danger">2×</Badge></span>
                         )}
                       </td>
                       <td>
@@ -2767,10 +2768,10 @@ function MaterialityTab() {
           <div style={{ position: 'relative', width: '100%', maxWidth: 520, margin: '0 auto', aspectRatio: '1 / 1', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)' }}>
             {/* Axis labels */}
             <div style={{ position: 'absolute', top: '50%', insetInlineStart: -8, transform: 'translate(-100%, -50%) rotate(-90deg)', fontSize: 10, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
-              {isAr ? '← الجوهرية التأثيرية' : 'Impact materiality →'}
+              {isAr ? '← الأهمية النسبية للأثر' : 'Impact materiality →'}
             </div>
             <div style={{ position: 'absolute', bottom: -20, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: 'var(--ink-3)' }}>
-              {isAr ? '← الجوهرية المالية' : 'Financial materiality →'}
+              {isAr ? '← الأهمية النسبية المالية' : 'Financial materiality →'}
             </div>
             {/* Quadrant guides at 2.5 / 4.0 */}
             <div style={{ position: 'absolute', insetInlineStart: '50%', top: 0, bottom: 0, width: 1, background: 'var(--border)' }} />

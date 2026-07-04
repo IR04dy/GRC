@@ -1643,7 +1643,7 @@ export const ar = {
   esgTabClimate:            'المخاطر والفرص المناخية',
   esgTabAnnex:              'الملحق السنوي',
   esgTabCapa:               'الإجراءات التصحيحية',
-  esgTabMateriality:        'الجوهرية',
+  esgTabMateriality:        'الأهمية النسبية',
   esgTabMetrics:            'مؤشّرات الاستدامة',
   esgTabEvidence:           'مستودع الأدلة',
   esgTabSurvey:             'استبيان المورّدين',
