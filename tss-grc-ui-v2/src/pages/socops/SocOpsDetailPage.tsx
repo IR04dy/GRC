@@ -12,6 +12,7 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { PlaybookRunsPanel } from './PlaybookRunsPanel';
+import { ForensicsCustodyPanel } from './ForensicsCustodyPanel';
 import { useI18n } from '../../lib/i18n';
 import { socopsApi } from '../../lib/socops';
 
@@ -740,6 +741,11 @@ export function SocOpsDetailPage() {
       {/* SOC-B: playbook run execution — invoke spawns a run + clocked tasks here. */}
       {resource === 'playbooks' && row.id != null && (
         <PlaybookRunsPanel playbookId={Number(row.id)} />
+      )}
+
+      {/* SOC-D: append-only chain-of-custody ledger for a forensic artefact. */}
+      {resource === 'forensics' && row.id != null && (
+        <ForensicsCustodyPanel artefactId={Number(row.id)} />
       )}
     </Shell>
   );

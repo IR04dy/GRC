@@ -1,10 +1,13 @@
 package com.tss.grc.module.socops.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.socops.entity.ForensicsArtefact;
+import com.tss.grc.module.socops.entity.ForensicsCustodyEvent;
 import com.tss.grc.module.socops.repository.ForensicsArtefactRepository;
+import com.tss.grc.module.socops.repository.ForensicsCustodyEventRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -22,6 +25,7 @@ import java.util.Map;
 public class ForensicsArtefactService {
 
     private final ForensicsArtefactRepository repo;
+    private final ForensicsCustodyEventRepository ledger;   // SOC-D append-only chain of custody
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
 
@@ -61,6 +65,14 @@ public class ForensicsArtefactService {
             target = existing;
         }
         ForensicsArtefact saved = repo.save(target);
+        // SOC-D: seed the chain-of-custody ledger with the initial CAPTURE row so
+        // the chain is complete from the moment of acquisition.
+        if (isNew) {
+            String firstHolder = saved.getCurrentCustodian() != null && !saved.getCurrentCustodian().isBlank()
+                ? saved.getCurrentCustodian() : saved.getCapturedByHandler();
+            appendCustodyEvent(saved, "CAPTURE", null, firstHolder, null, saved.getCurrentLocation(),
+                saved.getCapturedAt(), "Artefact captured by " + saved.getCapturedByHandler());
+        }
         // Audit chain-of-custody on every save — this is the table whose
         // history might end up in court.
         audit.log(isNew ? "FORENSICS_CREATE" : "FORENSICS_UPDATE",
@@ -104,8 +116,16 @@ public class ForensicsArtefactService {
 
     @Transactional
     public ForensicsArtefact transferCustody(Long id, String newCustodian, String newLocation, String notes) {
+        if (newCustodian == null || newCustodian.isBlank())
+            throw new IllegalArgumentException("newCustodian is required for a custody transfer");
         ForensicsArtefact a = get(id);
         String prior = a.getCurrentCustodian();
+        String priorLoc = a.getCurrentLocation();
+        // SOC-D: APPEND an immutable custody-transfer row to the ledger BEFORE moving
+        // the artefact's current-holder pointer — the chain is only ever extended,
+        // never overwritten. The artefact's current_custodian is a denormalised
+        // pointer to the latest ledger row.
+        appendCustodyEvent(a, "TRANSFER", prior, newCustodian, priorLoc, newLocation, LocalDateTime.now(), notes);
         a.setCurrentCustodian(newCustodian);
         a.setCurrentLocation(newLocation);
         ForensicsArtefact saved = repo.save(a);
@@ -116,6 +136,34 @@ public class ForensicsArtefactService {
                 + " Location=" + newLocation
                 + " Notes=" + (notes == null ? "—" : notes));
         return saved;
+    }
+
+    /** SOC-D — the full ordered chain of custody for an artefact (tenant-scoped). */
+    @Transactional(readOnly = true)
+    public List<ForensicsCustodyEvent> getCustodyChain(Long id) {
+        ForensicsArtefact a = get(id);   // validates existence + tenant scope
+        return ledger.findByOrganisationIdAndArtefactIdOrderBySeqNoAsc(a.getOrganisationId(), a.getId());
+    }
+
+    /** Append one immutable row to an artefact's custody ledger (next seq = max+1). */
+    private ForensicsCustodyEvent appendCustodyEvent(ForensicsArtefact a, String eventType,
+            String fromCustodian, String toCustodian, String fromLocation, String toLocation,
+            LocalDateTime when, String notes) {
+        Long org = a.getOrganisationId();
+        ForensicsCustodyEvent e = new ForensicsCustodyEvent();
+        e.setOrganisationId(org);
+        e.setArtefactId(a.getId());
+        e.setSeqNo(ledger.maxSeqNo(org, a.getId()) + 1);
+        e.setEventType(eventType);
+        e.setFromCustodian(fromCustodian);
+        e.setToCustodian(toCustodian);
+        e.setFromLocation(fromLocation);
+        e.setToLocation(toLocation);
+        e.setArtefactHash(a.getSha256Hash());
+        e.setTransferredAt(when != null ? when : LocalDateTime.now());
+        e.setActor(CurrentActor.username());
+        e.setNotes(notes);
+        return ledger.save(e);
     }
 
     @Transactional

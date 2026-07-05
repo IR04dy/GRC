@@ -530,6 +530,23 @@ export interface ForensicsArtefact {
   notes: string | null;
 }
 
+// SOC-D — one immutable row in a forensic artefact's chain of custody
+// (append-only; CAPTURE then a row per transfer). Mirrors ForensicsCustodyEvent.
+export interface ForensicsCustodyEvent {
+  id: number;
+  artefactId: number;
+  seqNo: number;
+  eventType: string;                  // CAPTURE | TRANSFER | VERIFY | DISPOSE | RELEASE
+  fromCustodian: string | null;
+  toCustodian: string;
+  fromLocation: string | null;
+  toLocation: string | null;
+  artefactHash: string | null;        // sha256 at the handoff
+  transferredAt: string;
+  actor: string | null;
+  notes: string | null;
+}
+
 // M&A cyber due diligence engagement.
 // Field shape mirrors the backend entity (`MaDueDiligence`) verbatim —
 // the previous shape (targetCompanyName / pifAligned / overallVerdict /
@@ -721,6 +738,9 @@ export const socopsApi = {
   forensicsVerify: (id: number, verified = true) =>
     api.post<ForensicsArtefact>(`/api/v1/socops/forensics/${id}/verify-integrity`,
       { verified }),
+  // SOC-D — the append-only chain of custody for an artefact (CAPTURE then transfers).
+  forensicsCustodyChain: (id: number) =>
+    api.get<ForensicsCustodyEvent[]>(`/api/v1/socops/forensics/${id}/custody-chain`),
 
   maDueDiligence: (page = 0, size = 50) =>
     api.get<PageResp<MaDueDiligence>>(`/api/v1/socops/ma-due-diligence${pageQ(page, size)}`),

@@ -2,6 +2,7 @@ package com.tss.grc.module.socops.controller;
 
 import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.socops.entity.ForensicsArtefact;
+import com.tss.grc.module.socops.entity.ForensicsCustodyEvent;
 import com.tss.grc.module.socops.service.ForensicsArtefactService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,14 @@ public class ForensicsArtefactController {
     @GetMapping("/by-case/{caseCode}")
     @PreAuthorize("hasAnyRole('CISO','FORENSICS_LEAD','IR_LEAD','PLATFORM_ADMIN','LEGAL_COUNSEL','AUDITOR')")
     public List<ForensicsArtefact> byCase(@PathVariable String caseCode) { return svc.byCase(caseCode); }
+
+    /** SOC-D — the immutable, ordered chain of custody for one artefact (CAPTURE
+     *  then every transfer). Append-only; cannot be edited or deleted. */
+    @GetMapping("/{id}/custody-chain")
+    @PreAuthorize("hasAnyRole('CISO','FORENSICS_LEAD','IR_LEAD','PLATFORM_ADMIN','LEGAL_COUNSEL','AUDITOR')")
+    public List<ForensicsCustodyEvent> custodyChain(@PathVariable Long id) {
+        return svc.getCustodyChain(id);
+    }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('FORENSICS_LEAD','IR_LEAD','CISO','PLATFORM_ADMIN')")
