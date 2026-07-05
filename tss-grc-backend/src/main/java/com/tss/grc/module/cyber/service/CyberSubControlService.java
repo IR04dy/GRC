@@ -2,6 +2,7 @@ package com.tss.grc.module.cyber.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.cyber.entity.CyberSubControl;
+import com.tss.grc.module.cyber.repository.CyberControlRepository;
 import com.tss.grc.module.cyber.repository.CyberSubControlRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class CyberSubControlService {
 
     private final CyberSubControlRepository subControlRepo;
+    /** CY-H — verify the parent {@code control_id} references a real control in this tenant. */
+    private final CyberControlRepository controlRepo;
 
     @Transactional(readOnly = true)
     public Page<CyberSubControl> getSubControls(Long orgId, Pageable p) {
@@ -34,6 +37,13 @@ public class CyberSubControlService {
 
     @Transactional
     public CyberSubControl saveSubControl(CyberSubControl s, Long orgId) {
+        // CY-H — title + parent control are NOT NULL; reject a bad body with 400.
+        s.setTitleEn(CyberInputValidation.requireText(s.getTitleEn(), "titleEn"));
+        CyberInputValidation.requireId(s.getControlId(), "controlId");
+        if (controlRepo.findByIdAndOrganisationId(s.getControlId(), orgId).isEmpty()) {
+            throw new IllegalArgumentException(
+                    "controlId " + s.getControlId() + " does not reference an existing control");
+        }
         // Mass-assignment defense — see CyberFrameworkService.saveFramework().
         s.setId(null);
         s.setOrganisationId(orgId);

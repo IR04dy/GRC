@@ -43,6 +43,8 @@ public class CyberActionPlanService {
 
     @Transactional
     public CyberActionPlan saveActionPlan(CyberActionPlan ap, Long orgId) {
+        // CY-H — title_en is NOT NULL; reject a blank/empty body with 400 not a DB 500.
+        ap.setTitleEn(CyberInputValidation.requireText(ap.getTitleEn(), "titleEn"));
         ap.setOrganisationId(orgId);
         ap.setIsDeleted(false);
         return actionPlanRepo.save(ap);

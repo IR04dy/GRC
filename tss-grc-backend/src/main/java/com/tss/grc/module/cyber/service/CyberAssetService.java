@@ -41,6 +41,8 @@ public class CyberAssetService {
 
     @Transactional
     public CyberAsset saveAsset(CyberAsset a, Long orgId) {
+        // CY-H — asset_name is NOT NULL; reject a blank/empty body with 400 not a DB 500.
+        a.setAssetName(CyberInputValidation.requireText(a.getAssetName(), "assetName"));
         // Mass-assignment defense — see CyberFrameworkService.saveFramework().
         a.setId(null);
         a.setOrganisationId(orgId);

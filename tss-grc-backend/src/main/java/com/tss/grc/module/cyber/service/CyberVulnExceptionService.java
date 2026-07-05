@@ -36,6 +36,8 @@ public class CyberVulnExceptionService {
 
     @Transactional
     public VulnException saveException(VulnException e, Long orgId) {
+        // CY-H — title_en is NOT NULL; reject a blank/empty body with 400 not a DB 500.
+        e.setTitleEn(CyberInputValidation.requireText(e.getTitleEn(), "titleEn"));
         e.setOrganisationId(orgId);
         e.setIsDeleted(false);
         return exceptionRepo.save(e);

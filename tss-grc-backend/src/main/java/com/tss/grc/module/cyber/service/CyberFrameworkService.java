@@ -33,6 +33,8 @@ public class CyberFrameworkService {
 
     @Transactional
     public CyberFramework saveFramework(CyberFramework f, Long orgId) {
+        // CY-H — name is NOT NULL; reject a blank/empty body with 400 not a DB 500.
+        f.setName(CyberInputValidation.requireText(f.getName(), "name"));
         // Mass-assignment defense — controller accepts the entity directly
         // via @RequestBody. Null id forces save() to INSERT instead of
         // merge() into a potentially cross-tenant row.

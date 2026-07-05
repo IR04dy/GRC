@@ -5,6 +5,7 @@ import com.tss.grc.module.cyber.entity.ControlAssessment;
 import com.tss.grc.module.cyber.entity.CyberActionPlan;
 import com.tss.grc.module.cyber.repository.ControlAssessmentRepository;
 import com.tss.grc.module.cyber.repository.CyberActionPlanRepository;
+import com.tss.grc.module.cyber.repository.CyberControlRepository;
 import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,8 @@ public class CyberAssessmentService {
 
     private final ControlAssessmentRepository assessmentRepo;
     private final CyberActionPlanRepository actionPlanRepo;
+    /** CY-H — verify the assessed {@code control_id} references a real control in this tenant. */
+    private final CyberControlRepository controlRepo;
 
     @Autowired(required = false)
     private BroadcastHelper bcast;
@@ -48,6 +51,17 @@ public class CyberAssessmentService {
 
     @Transactional
     public ControlAssessment saveAssessment(ControlAssessment a, Long orgId) {
+        // CY-H — an assessment must target a real control (control_id is NOT NULL);
+        // reject a missing/phantom id with a 400 instead of a DB-level 500.
+        CyberInputValidation.requireId(a.getControlId(), "controlId");
+        if (controlRepo.findByIdAndOrganisationId(a.getControlId(), orgId).isEmpty()) {
+            throw new IllegalArgumentException(
+                    "controlId " + a.getControlId() + " does not reference an existing control");
+        }
+        // CY-H — gap_identified is NOT NULL (with a DB default); the entity would
+        // otherwise send an explicit NULL for a body that omits it → a 500. Honour
+        // the column default so an incomplete-but-valid body succeeds.
+        if (a.getGapIdentified() == null) a.setGapIdentified(false);
         a.setOrganisationId(orgId);
         a.setIsDeleted(false);
         return assessmentRepo.save(a);

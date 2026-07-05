@@ -73,6 +73,8 @@ public class CyberIncidentService {
 
     @Transactional
     public CyberIncident saveIncident(CyberIncident inc, Long orgId) {
+        // CY-H — title_en is NOT NULL; reject a blank/empty body with 400 not a DB 500.
+        inc.setTitleEn(CyberInputValidation.requireText(inc.getTitleEn(), "titleEn"));
         // Mass-assignment defense — see CyberFrameworkService.saveFramework().
         inc.setId(null);
         inc.setOrganisationId(orgId);

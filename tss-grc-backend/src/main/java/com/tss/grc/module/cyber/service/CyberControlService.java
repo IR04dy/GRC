@@ -48,6 +48,8 @@ public class CyberControlService {
 
     @Transactional
     public CyberControl saveControl(CyberControl c, Long orgId) {
+        // CY-H — title_en is NOT NULL; reject a blank/empty body with 400 not a DB 500.
+        c.setTitleEn(CyberInputValidation.requireText(c.getTitleEn(), "titleEn"));
         // Mass-assignment defense — see CyberFrameworkService.saveFramework().
         c.setId(null);
         c.setOrganisationId(orgId);

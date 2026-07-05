@@ -7,6 +7,7 @@ import com.tss.grc.module.cyber.asm.dto.AsmDtos.ShadowItResponse;
 import com.tss.grc.module.cyber.asm.dto.AsmDtos.ShadowItSanctionRequest;
 import com.tss.grc.module.cyber.asm.entity.AttackSurfaceShadowIt;
 import com.tss.grc.module.cyber.asm.repository.AttackSurfaceShadowItRepository;
+import com.tss.grc.module.cyber.service.CyberInputValidation;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
@@ -61,6 +62,13 @@ public class ShadowItService {
             "NA",                      Set.of()
     );
 
+    /** CY-H — mirror the DB CHECK constraints (CK_asm_shadow_*) so a bad value
+     *  returns a clean 400 instead of a 500 from the constraint violation. */
+    static final Set<String> DISCOVERED_VIA =
+            Set.of("USER_DECLARATION", "NETWORK_TRAFFIC", "EXPENSE_REPORT", "EMAIL_SIGNUPS");
+    static final Set<String> DATA_CLASSIFICATIONS =
+            Set.of("UNKNOWN", "RESTRICTED", "CONFIDENTIAL", "INTERNAL", "PUBLIC");
+
     private final AttackSurfaceShadowItRepository repo;
     private final AuditLogService audit;
     private final ApplicationEventPublisher eventPublisher;
@@ -89,10 +97,13 @@ public class ShadowItService {
         s.setServiceName(req.serviceName());
         s.setServiceNameAr(req.serviceNameAr());
         s.setVendorDomain(req.vendorDomain());
-        s.setDiscoveredVia(req.discoveredVia());
+        // CY-H — validate enum-like fields against the DB CHECK sets → 400 on a bad value.
+        s.setDiscoveredVia(CyberInputValidation.checkEnum(
+                req.discoveredVia(), "discoveredVia", DISCOVERED_VIA, true, null));
         s.setFirstObservedAt(LocalDateTime.now());
         s.setObservedUserCount(req.observedUserCount());
-        s.setDataClassification(req.dataClassification() == null ? "UNKNOWN" : req.dataClassification());
+        s.setDataClassification(CyberInputValidation.checkEnum(
+                req.dataClassification(), "dataClassification", DATA_CLASSIFICATIONS, false, "UNKNOWN"));
         s.setPdplDataProcessed(Boolean.TRUE.equals(req.pdplDataProcessed()));
         s.setStatus("PENDING_REVIEW");
         s.setAssignedToUserId(req.assignedToUserId());

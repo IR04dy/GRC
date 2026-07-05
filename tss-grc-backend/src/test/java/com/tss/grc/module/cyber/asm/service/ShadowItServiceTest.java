@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -131,6 +132,32 @@ class ShadowItServiceTest {
         List<String> triggers = cap.getAllValues().stream().map(DomainEvent::triggerEvent).toList();
         assertThat(triggers).contains("SHADOW_IT_DISCOVERED", "SHADOW_IT_PDPL_FLAG");
         verify(audit).log(eq("SHADOW_IT_PDPL_ESCALATED"), eq("AttackSurfaceShadowIt"), anyLong(), anyString());
+    }
+
+    // ─── CY-H: enum validation (400, not a 500 from the DB CHECK) ──
+
+    @Test
+    void recordDiscovery_badDiscoveredVia_rejectedBeforePersist() {
+        ShadowItRequest req = new ShadowItRequest(
+                "Notion", null, "notion.so",
+                "BOGUS_SRC", 1, "UNKNOWN", Boolean.FALSE,
+                null, null, null, null);
+        assertThatThrownBy(() -> service.recordDiscovery(req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("discoveredVia");
+        verify(repo, never()).save(any());
+    }
+
+    @Test
+    void recordDiscovery_badDataClassification_rejectedBeforePersist() {
+        ShadowItRequest req = new ShadowItRequest(
+                "Notion", null, "notion.so",
+                "EMAIL_SIGNUPS", 1, "TOP_SECRET", Boolean.FALSE,
+                null, null, null, null);
+        assertThatThrownBy(() -> service.recordDiscovery(req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dataClassification");
+        verify(repo, never()).save(any());
     }
 
     // ─── Sanction ─────────────────────────────────────────────────
