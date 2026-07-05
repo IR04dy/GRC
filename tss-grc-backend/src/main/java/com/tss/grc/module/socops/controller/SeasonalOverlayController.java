@@ -24,7 +24,7 @@ public class SeasonalOverlayController {
     public List<SeasonalOverlay> list() { return svc.list(); }
 
     @GetMapping("/active-now")
-    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN','SECURITY_ANALYST','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('CISO','PLATFORM_ADMIN','SECURITY_ANALYST','RISK_MANAGER','AUDITOR')")
     public List<SeasonalOverlay> activeNow() { return svc.activeNow(); }
 
     @GetMapping("/{id}")

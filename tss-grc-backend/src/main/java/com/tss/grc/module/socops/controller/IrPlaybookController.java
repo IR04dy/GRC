@@ -42,7 +42,7 @@ public class IrPlaybookController {
     public List<IrPlaybook> list() { return svc.list(); }
 
     @GetMapping("/templates")
-    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
     public List<IrPlaybook> templates() { return svc.templates(); }
 
     @GetMapping("/{id}")

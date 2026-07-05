@@ -22,14 +22,14 @@ public class BrandMonitoringController {
     private final BrandMonitoringService svc;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','BRAND_MONITORING','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','BRAND_MONITORING','PLATFORM_ADMIN','AUDITOR')")
     public Page<BrandMonitoring> list(@RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, Math.min(size, 200)));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','BRAND_MONITORING','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','SECURITY_ANALYST','BRAND_MONITORING','PLATFORM_ADMIN','AUDITOR')")
     public BrandMonitoring get(@PathVariable Long id) { return svc.get(id); }
 
     @PostMapping("/ingest")

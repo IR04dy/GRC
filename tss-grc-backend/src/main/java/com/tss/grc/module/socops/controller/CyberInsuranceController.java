@@ -29,7 +29,7 @@ public class CyberInsuranceController {
     public CyberInsurance get(@PathVariable Long id) { return svc.get(id); }
 
     @GetMapping("/renewals-due")
-    @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN','AUDITOR','FINANCE_LEAD')")
     public List<CyberInsurance> renewalsDue(@RequestParam(defaultValue = "90") int days) {
         return svc.renewalsDueWithinDays(days);
     }
