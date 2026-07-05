@@ -2,6 +2,7 @@ package com.tss.grc.module.socops.controller;
 
 import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.socops.entity.ThreatIntel;
+import com.tss.grc.module.socops.entity.ThreatIntelAction;
 import com.tss.grc.module.socops.service.ThreatIntelService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -37,13 +39,28 @@ public class ThreatIntelController {
     @PreAuthorize("hasAnyRole('TI_INGEST','SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
     public ThreatIntel save(@RequestBody ThreatIntel body) { return svc.save(body); }
 
+    /**
+     * SOC-E — action an IOC. Body may carry {@code actionType} (BLOCK/SCAN/HUNT/…; defaults to
+     * REVIEWED), and optionally a concrete link target {@code targetType} (ASSET/VULNERABILITY/
+     * DETECTION) + {@code targetId}. Legacy callers that send only {@code {actioned, notes}} still
+     * work — they record a REVIEWED action with no target.
+     */
     @PostMapping("/{id}/action")
     @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN')")
     public ThreatIntel action(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        Long userId = body.get("userId") instanceof Number n ? n.longValue() : null;
-        String notes = body.get("notes") == null ? null : body.get("notes").toString();
-        return svc.markActioned(id, userId, notes);
+        String actionType = body.get("actionType") == null ? null : body.get("actionType").toString();
+        String targetType = body.get("targetType") == null ? null : body.get("targetType").toString();
+        Long targetId = body.get("targetId") instanceof Number n ? n.longValue() : null;
+        // Accept either "notes" (new) or "actionNotes" (legacy FE payload).
+        Object notesRaw = body.getOrDefault("notes", body.get("actionNotes"));
+        String notes = notesRaw == null ? null : notesRaw.toString();
+        return svc.actionIoc(id, actionType, targetType, targetId, notes);
     }
+
+    /** SOC-E — the concrete action history (with target links) for one IOC. */
+    @GetMapping("/{id}/actions")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
+    public List<ThreatIntelAction> actions(@PathVariable Long id) { return svc.listActions(id); }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CISO')")

@@ -4689,6 +4689,7 @@ export const en = {
   cloudServicesSidebar:        'Cloud services',
   fairCalcSidebar:             'FAIR calculator',
   threatIntelSidebar:          'Threat-intel correlation',
+  detectionLibrarySidebar:     'Detection library',
   sessionsTitle:               'Active sessions',
   connectorsSub:               'Automated intake — vulnerability scanners, SIEM, regulator-watch feeds, attestation watchers',
   connectorsPageSub:           'These connectors auto-create register records or intake submissions without a human in the loop. Each is governed by a regulator anchor and a cadence; intake counts are 30-day rolling.',

@@ -193,6 +193,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'assets',      to: '/assets',               Icon: Server,     labelKey: 'assetsSidebar' },
       { id: 'cloud-svc',   to: '/cyber/cloud-services', Icon: Cloud,      labelKey: 'cloudServicesSidebar' },
       { id: 'ti-correlate',to: '/cyber/threat-intel',   Icon: Radar,      labelKey: 'threatIntelSidebar' },
+      { id: 'det-lib',     to: '/socops/detections',    Icon: ScanSearch, labelKey: 'detectionLibrarySidebar' },
       { id: 'fw-ctrls',    to: '/framework-controls',   Icon: BookOpen,   labelKey: 'fwcSidebar' },
       { id: 'cyb-pdpl',    to: '/cyber-pdpl-bridge',    Icon: Workflow,   labelKey: 'cpbSidebar' },
       { id: 'cyber-lc',    to: '/cyber-lifecycle',      Icon: ShieldCheck, labelKey: 'cycSidebar' },

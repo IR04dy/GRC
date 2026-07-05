@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ShieldAlert, BookOpen, ShieldCheck, LockKeyhole, Server, Users,
@@ -13,6 +13,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { PlaybookRunsPanel } from './PlaybookRunsPanel';
 import { ForensicsCustodyPanel } from './ForensicsCustodyPanel';
+import { ThreatIntelActionsPanel } from './ThreatIntelActionsPanel';
 import { useI18n } from '../../lib/i18n';
 import { socopsApi } from '../../lib/socops';
 
@@ -644,17 +645,16 @@ export function SocOpsDetailPage() {
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadRow = useCallback(() => {
     if (!config || !id) { setLoading(false); return; }
-    let cancelled = false;
-    setLoading(true);
     setErr(null);
     config.fetcher(Number(id))
-      .then(r => { if (!cancelled) setRow(r); })
-      .catch(e => { if (!cancelled) setErr((e as Error).message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then(r => setRow(r))
+      .catch(e => setErr((e as Error).message))
+      .finally(() => setLoading(false));
   }, [config, id]);
+
+  useEffect(() => { setLoading(true); loadRow(); }, [loadRow]);
 
   if (!config) {
     return (
@@ -746,6 +746,11 @@ export function SocOpsDetailPage() {
       {/* SOC-D: append-only chain-of-custody ledger for a forensic artefact. */}
       {resource === 'forensics' && row.id != null && (
         <ForensicsCustodyPanel artefactId={Number(row.id)} />
+      )}
+
+      {/* SOC-E: IOC action history — link an IOC to a concrete asset/vuln/detection. */}
+      {resource === 'threat-intel' && row.id != null && (
+        <ThreatIntelActionsPanel threatIntelId={Number(row.id)} onActioned={loadRow} />
       )}
     </Shell>
   );

@@ -74,6 +74,7 @@ const PentestsPage           = lazy(() => import('./pages/socops/PentestsPage').
 const RegulatorExamsPage     = lazy(() => import('./pages/socops/RegulatorExamsPage').then(m => ({ default: m.RegulatorExamsPage })));
 const OtAssetsPage           = lazy(() => import('./pages/socops/OtAssetsPage').then(m => ({ default: m.OtAssetsPage })));
 const ThreatIntelPage        = lazy(() => import('./pages/socops/ThreatIntelPage').then(m => ({ default: m.ThreatIntelPage })));
+const DetectionLibraryPage   = lazy(() => import('./pages/socops/DetectionLibraryPage').then(m => ({ default: m.DetectionLibraryPage })));
 const ScannerRunsPage        = lazy(() => import('./pages/socops/ScannerRunsPage').then(m => ({ default: m.ScannerRunsPage })));
 const CryptoAssetsPage       = lazy(() => import('./pages/socops/CryptoAssetsPage').then(m => ({ default: m.CryptoAssetsPage })));
 const SbomPage               = lazy(() => import('./pages/socops/SbomPage').then(m => ({ default: m.SbomPage })));
@@ -489,6 +490,7 @@ export function App() {
               <Route path="/socops/regulator-exams"                   element={<RegulatorExamsPage />} />
               <Route path="/socops/ot-assets"                         element={<OtAssetsPage />} />
               <Route path="/socops/threat-intel"                      element={<ThreatIntelPage />} />
+              <Route path="/socops/detections"                        element={<DetectionLibraryPage />} />
               <Route path="/socops/scanner-runs"                      element={<ScannerRunsPage />} />
               <Route path="/socops/crypto-assets"                     element={<CryptoAssetsPage />} />
               <Route path="/socops/sbom"                              element={<SbomPage />} />

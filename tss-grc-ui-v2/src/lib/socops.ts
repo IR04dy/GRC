@@ -260,6 +260,42 @@ export interface ThreatIntel {
   actionNotes: string | null;
 }
 
+// SOC-E — one concrete action taken on an IOC, optionally linking it to a target.
+export interface ThreatIntelAction {
+  id: number;
+  threatIntelId: number;
+  actionType: string;            // BLOCK | SCAN | HUNT | MONITOR | PATCH | BRIEF | LINK_DETECTION | REVIEWED | ESCALATE
+  targetType: string | null;     // ASSET | VULNERABILITY | DETECTION
+  targetId: number | null;
+  targetLabel: string | null;
+  notes: string | null;
+  actionedBy: string | null;
+  actionedByUserId: number | null;
+  actionedAt: string;
+}
+
+// SOC-E — a MITRE ATT&CK-mapped detection rule / use-case in the SOC library.
+export interface DetectionRule {
+  id: number;
+  ruleCode: string;
+  titleEn: string;
+  titleAr: string | null;
+  description: string | null;
+  detectionType: string;         // SIEM | EDR | NDR | IDS | IPS | CORRELATION | THREAT_HUNT | UEBA | SOAR | CLOUD | CUSTOM
+  platform: string | null;
+  logSource: string | null;
+  detectionLogic: string | null;
+  mitreTactics: string | null;
+  mitreTechniques: string;       // required — the ATT&CK technique mapping
+  dataSources: string | null;
+  severity: string | null;
+  status: string;                // DRAFT | ACTIVE | TUNING | DISABLED | RETIRED
+  enabled: boolean;
+  falsePositiveRate: string | null;
+  alignedFrameworks: string | null;
+  lastTriggeredAt: string | null;
+}
+
 export interface ScannerRun {
   id: number;
   scanner: string;               // TENABLE | QUALYS | DEFENDER | …
@@ -656,8 +692,26 @@ export const socopsApi = {
     api.get<PageResp<ThreatIntel>>(`/api/v1/socops/threat-intel${pageQ(page, size)}`),
   threatIntelGet: (id: number) =>
     api.get<ThreatIntel>(`/api/v1/socops/threat-intel/${id}`),
-  threatIntelAction: (id: number, body: { actioned: boolean; actionNotes?: string }) =>
-    api.post<ThreatIntel>(`/api/v1/socops/threat-intel/${id}/action`, body),
+  // SOC-E — actioning an IOC can now link it to a concrete target (asset/vuln/detection).
+  threatIntelAction: (id: number, body: {
+    actionType?: string; targetType?: 'ASSET' | 'VULNERABILITY' | 'DETECTION' | 'NONE';
+    targetId?: number; notes?: string; actioned?: boolean; actionNotes?: string;
+  }) => api.post<ThreatIntel>(`/api/v1/socops/threat-intel/${id}/action`, body),
+  threatIntelActions: (id: number) =>
+    api.get<ThreatIntelAction[]>(`/api/v1/socops/threat-intel/${id}/actions`),
+
+  // SOC-E — detection-rule library (MITRE ATT&CK-mapped).
+  detections: (page = 0, size = 50, technique?: string) =>
+    api.get<PageResp<DetectionRule>>(
+      `/api/v1/socops/detections?page=${page}&size=${size}${technique ? `&technique=${encodeURIComponent(technique)}` : ''}`),
+  detectionGet: (id: number) =>
+    api.get<DetectionRule>(`/api/v1/socops/detections/${id}`),
+  detectionCreate: (body: Partial<DetectionRule>) =>
+    api.post<DetectionRule>('/api/v1/socops/detections', body),
+  detectionUpdate: (id: number, body: Partial<DetectionRule>) =>
+    api.put<DetectionRule>(`/api/v1/socops/detections/${id}`, body),
+  detectionDelete: (id: number) =>
+    api.delete<void>(`/api/v1/socops/detections/${id}`),
 
   scannerRuns: (page = 0, size = 50) =>
     api.get<PageResp<ScannerRun>>(`/api/v1/socops/scanner-runs${pageQ(page, size)}`),

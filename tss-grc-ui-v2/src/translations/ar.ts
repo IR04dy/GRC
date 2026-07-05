@@ -4697,6 +4697,7 @@ export const ar = {
   cloudServicesSidebar:        'الخدمات السحابية',
   fairCalcSidebar:             'حاسبة FAIR',
   threatIntelSidebar:          'ارتباط معلومات التهديدات',
+  detectionLibrarySidebar:     'مكتبة الكشف',
   sessionsTitle:               'الجلسات النشطة',
   connectorsSub:               'استلام آلي — فاحصات الثغرات، SIEM، تغذية مراقبي الجهات، مراقبي دورات الإقرار',
   connectorsPageSub:           'تُنشئ هذه التكاملات سجلات أو استلامات تلقائياً دون تدخل بشري. كل تكامل محكوم بمرجع تنظيمي ودوريّة؛ أعداد الاستلام مُتحرِّكة لـ 30 يوماً.',
