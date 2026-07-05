@@ -4627,6 +4627,8 @@ export const ar = {
   // DD-46
   capaExportDone:              'تم تنزيل ملف CSV',
   exportCsvDone:               'تم تنزيل ملف CSV',
+  // CY-F — server-side register export (POI Excel; PDF reuses the existing exportPdf key)
+  exportExcel:                 'إكسل',
 
   // DD-54..58
   // DD-64

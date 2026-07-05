@@ -4643,6 +4643,8 @@ export const en = {
   // DD-46
   capaExportDone:              'CSV downloaded',
   exportCsvDone:               'CSV downloaded',
+  // CY-F — server-side register export (POI Excel; PDF reuses the existing exportPdf key)
+  exportExcel:                 'Excel',
 
   // DD-63: attestation campaigns
   campaignsEyebrow:            'Attestation engine',

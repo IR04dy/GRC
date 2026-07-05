@@ -3,10 +3,13 @@ package com.tss.grc.module.socops.controller;
 import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.socops.entity.SecurityEvent;
 import com.tss.grc.module.socops.service.SecurityEventService;
+import com.tss.grc.module.socops.service.SocOpsExportService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -33,12 +36,29 @@ import java.util.Map;
 public class SecurityEventController {
 
     private final SecurityEventService svc;
+    private final SocOpsExportService exportSvc;
+
+    private static final MediaType XLSX =
+            MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
     public Page<SecurityEvent> list(@RequestParam(defaultValue = "0") int page,
                                     @RequestParam(defaultValue = "50") int size) {
         return svc.list(PageRequest.of(page, Math.min(size, 200)));
+    }
+
+    /** CY-F — export the security-event register as Excel or Arabic-capable PDF. */
+    @GetMapping("/export")
+    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
+    public ResponseEntity<byte[]> export(@RequestParam(defaultValue = "XLSX") String format) {
+        byte[] body = exportSvc.exportSecurityEvents(format);
+        boolean pdf = "PDF".equalsIgnoreCase(format);
+        String filename = "soc-security-events." + (pdf ? "pdf" : "xlsx");
+        return ResponseEntity.ok()
+                .contentType(pdf ? MediaType.APPLICATION_PDF : XLSX)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(body);
     }
 
     @GetMapping("/{id}")

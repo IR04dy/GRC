@@ -1024,6 +1024,14 @@ export function CyberPage() {
     toast.success(t('exportCsvDone'));
   }
 
+  // CY-F — tabs that have a server-side register export (Excel via POI + Arabic
+  // PDF via OpenPDF). The value is the `?register=` the backend expects.
+  const SERVER_EXPORT: Record<string, string> = {
+    controls: 'controls', assessments: 'assessments', vuln: 'vulnerabilities',
+    incidents: 'incidents', evidence: 'evidence', actions: 'action-plans',
+  };
+  const exportReg = SERVER_EXPORT[tab];
+
   return (
     <Shell title={t('modCyber')} sub="NCA ECC · ISO 27001:2022">
       <PageHeader
@@ -1036,6 +1044,8 @@ export function CyberPage() {
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
             </Button>
             <Button variant="secondary" Icon={Download} onClick={() => exportActiveTab()}>{t('actionExport')}</Button>
+            {exportReg && <Button variant="secondary" Icon={Download} onClick={() => cyberApi.exportRegister(exportReg, 'xlsx')}>{t('exportExcel')}</Button>}
+            {exportReg && <Button variant="secondary" Icon={Download} onClick={() => cyberApi.exportRegister(exportReg, 'pdf', lang)}>{t('exportPdf')}</Button>}
             <Button variant="primary"   Icon={Plus} onClick={newAction()}>{t('actionNew')}</Button>
           </>
         }

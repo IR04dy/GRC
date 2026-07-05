@@ -1660,6 +1660,13 @@ export const cyberApi = {
   deleteActionPlan:   (id: number) => api.delete<void>(`/api/v1/cyber/action-plans/${id}`),
   completePlan:       (id: number) => api.post<CyberActionPlanDto>(`/api/v1/cyber/action-plans/${id}/complete`),
 
+  // Exports (CY-F) — server-side Excel (POI) + Arabic-RTL PDF (OpenPDF).
+  // register ∈ controls|vulnerabilities|assessments|incidents|action-plans|evidence.
+  exportRegister:     (register: string, format: 'xlsx' | 'pdf', lang?: string) =>
+    downloadFile(
+      `/api/v1/cyber/export?register=${encodeURIComponent(register)}&format=${format}${lang ? `&lang=${encodeURIComponent(lang)}` : ''}`,
+      `cyber-${register}.${format}`),
+
   // Catalog
   controlsAll:        () => api.get<CyberControlDto[]>('/api/v1/cyber/controls/all'),
   // dashboard:        moved up (typed as CyberDashboardDto)
