@@ -25,6 +25,10 @@ public class CyberEvidence {
     @Column(name = "title_en")
     private String titleEn;
 
+    /** CY-J — bilingual parity (every other cyber aggregate already carries title_ar). */
+    @Column(name = "title_ar")
+    private String titleAr;
+
     @Column(name = "evidence_type")
     private String evidenceType;
 
@@ -47,6 +51,14 @@ public class CyberEvidence {
 
     @Column(name = "expiry_date")
     private LocalDate expiryDate;
+
+    /** CY-J — when the expiry sweep flipped this row to STALE (null while CURRENT). */
+    @Column(name = "stale_since")
+    private LocalDate staleSince;
+
+    /** CY-J — the evidence-request the sweep auto-raised on expiry (traceability). */
+    @Column(name = "re_request_id")
+    private Long reRequestId;
 
     @Column(nullable = false)
     private String status = "CURRENT";

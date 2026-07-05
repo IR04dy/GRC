@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   ShieldCheck, Bug, Flame, ClipboardCheck, Filter, Download, Plus, Activity, BarChart3,
   Shield, Target, Cpu, FileCheck2, ListTodo, ShieldOff,
-  CheckCheck, TrendingUp, PlayCircle, Check, GitBranchPlus, Paperclip, Send,
+  CheckCheck, TrendingUp, PlayCircle, Check, GitBranchPlus, Paperclip, Send, RefreshCw,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -366,11 +366,11 @@ const assetToReq = (a: CyberAssetDto): CyberAssetRequest => ({
 });
 
 const EV_EMPTY: CyberEvidenceRequest = {
-  titleEn: '', evidenceType: '', frameworkRequirement: '', ownerName: '',
+  titleEn: '', titleAr: '', evidenceType: '', frameworkRequirement: '', ownerName: '',
   version: '', status: 'CURRENT', reviewDate: '', expiryDate: '', fileName: '',
 };
 const evToReq = (e: CyberEvidenceDto): CyberEvidenceRequest => ({
-  titleEn: e.titleEn, evidenceType: e.evidenceType, controlId: e.controlId,
+  titleEn: e.titleEn, titleAr: e.titleAr, evidenceType: e.evidenceType, controlId: e.controlId,
   frameworkRequirement: e.frameworkRequirement, ownerName: e.ownerName,
   version: e.version, status: e.status,
   reviewDate: e.reviewDate, expiryDate: e.expiryDate, fileName: e.fileName,
@@ -535,6 +535,7 @@ export function CyberPage() {
   const EV_FIELDS: FieldDef[] = [
     { kind: 'text',   key: 'titleEn',              label: t('cyberFldEvidenceTitle') + ' *', required: true, maxLength: 200, span: 8 },
     { kind: 'select', key: 'evidenceType',         label: t('cyberFldEvidenceType'), options: EVIDENCE_TYPE_OPTIONS, span: 4 },
+    { kind: 'text',   key: 'titleAr',              label: t('fldTitleArLbl'), maxLength: 200, span: 12 },
     { kind: 'select', key: 'controlId',            label: t('cyberFldLinkedCtrl'), options: controlOptions, span: 6 },
     { kind: 'text',   key: 'frameworkRequirement', label: t('cyberFldFwReq'), placeholder: 'e.g. ISO 27001 A.5.1', span: 6 },
     { kind: 'text',   key: 'ownerName',            label: t('fldOwnerLbl'), span: 4 },
@@ -673,6 +674,16 @@ export function CyberPage() {
       else await cyberApi.createEvidence(body);
       toast.success(evS.editing ? 'Evidence updated' : 'Evidence added'); evS.closeModal(); cyberEvidence.reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
+  }
+  // CY-J — run the evidence expiry sweep on demand (the scheduler also runs it on a timer).
+  async function runExpirySweep() {
+    try {
+      const r = await cyberApi.runEvidenceExpirySweep();
+      toast.success(lang === 'ar'
+        ? `تم فحص الانتهاء — ${r.expired} دليل مُنتهٍ`
+        : `Expiry sweep complete — ${r.expired} evidence marked stale + re-requested`);
+      cyberEvidence.reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Sweep failed'); }
   }
   async function submitAp(values: CyberActionPlanRequest) {
     try {
@@ -861,13 +872,22 @@ export function CyberPage() {
   }
 
   const evidenceCols: Column<CyberEvidenceDto>[] = [
-    { header: t('colTitle'),     cell: r => <span style={{ fontWeight: 600 }}>{r.titleEn}</span> },
+    { header: t('colTitle'),     cell: r => (
+      <span style={{ fontWeight: 600 }}>
+        {lang === 'ar' && r.titleAr ? r.titleAr : r.titleEn}
+        {r.reRequestId != null && <Badge tone="info" className="ms-1">{lang === 'ar' ? 'أُعيد طلبه' : 're-requested'}</Badge>}
+      </span>
+    ) },
     { header: t('colType'),      cell: r => <Badge tone="neutral">{(r.evidenceType ?? '').replace(/_/g, ' ')}</Badge> },
     { header: t('colFramework'), cell: r => <Badge tone="primary">{r.frameworkRequirement ?? '—'}</Badge> },
     { header: t('colOwner'),     cell: r => r.ownerName ?? '—' },
     { header: t('colVersion'),   cell: r => r.version ?? '—', mono: true },
     { header: t('colExpiry'),    cell: r => r.expiryDate ?? '—', mono: true },
-    { header: t('colStatus'),    cell: r => <Badge tone={r.status === 'CURRENT' ? 'success' : r.status === 'EXPIRED' ? 'danger' : 'warning'} dot>{r.status ?? '—'}</Badge> },
+    { header: t('colStatus'),    cell: r => (
+      <span title={r.status === 'STALE' && r.staleSince ? (lang === 'ar' ? `منتهٍ منذ ${r.staleSince}` : `stale since ${r.staleSince}`) : undefined}>
+        <Badge tone={r.status === 'CURRENT' ? 'success' : r.status === 'EXPIRED' ? 'danger' : 'warning'} dot>{r.status ?? '—'}</Badge>
+      </span>
+    ) },
     { header: '', align: 'end', width: '150px',
       cell: r => <RowActions
         extras={[
@@ -1048,6 +1068,7 @@ export function CyberPage() {
             <Button variant="secondary" Icon={Download} onClick={() => exportActiveTab()}>{t('actionExport')}</Button>
             {exportReg && <Button variant="secondary" Icon={Download} onClick={() => cyberApi.exportRegister(exportReg, 'xlsx')}>{t('exportExcel')}</Button>}
             {exportReg && <Button variant="secondary" Icon={Download} onClick={() => cyberApi.exportRegister(exportReg, 'pdf', lang)}>{t('exportPdf')}</Button>}
+            {tab === 'evidence' && <Button variant="secondary" Icon={RefreshCw} onClick={() => void runExpirySweep()}>{t('cyberRunExpirySweep')}</Button>}
             <Button variant="primary"   Icon={Plus} onClick={newAction()}>{t('actionNew')}</Button>
           </>
         }

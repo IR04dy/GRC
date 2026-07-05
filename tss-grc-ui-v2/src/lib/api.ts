@@ -1472,9 +1472,10 @@ export interface CyberEvidenceDto {
   reviewDate?: string; expiryDate?: string;
   collectedDate?: string;
   fileName?: string; status?: string;
+  staleSince?: string; reRequestId?: number;   // CY-J — set by the expiry sweep
 }
 export interface CyberEvidenceRequest {
-  titleEn: string;
+  titleEn: string; titleAr?: string;
   evidenceType?: string;
   controlId?: number;
   frameworkRequirement?: string; ownerName?: string;
@@ -1667,6 +1668,7 @@ export const cyberApi = {
   createEvidence:     (body: CyberEvidenceRequest) => api.post<CyberEvidenceDto>('/api/v1/cyber/evidence', body),
   updateEvidence:     (id: number, body: CyberEvidenceRequest) => api.put<CyberEvidenceDto>(`/api/v1/cyber/evidence/${id}`, body),
   deleteEvidence:     (id: number) => api.delete<void>(`/api/v1/cyber/evidence/${id}`),
+  runEvidenceExpirySweep: () => api.post<{ expired: number }>('/api/v1/cyber/evidence/run-expiry-sweep'),
 
   // Action Plans
   actionPlans:        (page = 0, size = 50) => api.get<PageResponse<CyberActionPlanDto>>(`/api/v1/cyber/action-plans${pageQ(page, size)}`),

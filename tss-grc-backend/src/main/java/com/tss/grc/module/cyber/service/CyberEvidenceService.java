@@ -57,6 +57,10 @@ public class CyberEvidenceService {
         req.setOrganisationId(existing.getOrganisationId());
         req.setExternalId(existing.getExternalId());
         req.setCreatedAt(existing.getCreatedAt());
+        // CY-J — staleSince / reRequestId are sweep-managed, never client-editable: carry them over
+        // so a manual edit (the FE round-trips the whole entity) can't wipe the expiry bookkeeping.
+        req.setStaleSince(existing.getStaleSince());
+        req.setReRequestId(existing.getReRequestId());
         req.setIsDeleted(false);
         return evidenceRepo.save(req);
     }

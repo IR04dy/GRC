@@ -6,6 +6,7 @@ import com.tss.grc.module.cyber.entity.*;
 import com.tss.grc.module.cyber.service.CyberActionPlanService;
 import com.tss.grc.module.cyber.service.CyberAssessmentService;
 import com.tss.grc.module.cyber.service.CyberAssetService;
+import com.tss.grc.module.cyber.service.CyberEvidenceExpiryScheduler;
 import com.tss.grc.module.cyber.service.CyberControlService;
 import com.tss.grc.module.cyber.service.CyberDashboardService;
 import com.tss.grc.module.cyber.service.CyberEvidenceService;
@@ -27,6 +28,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Cyber security REST surface.
@@ -53,6 +55,7 @@ public class CyberController {
     private final CyberIncidentService incidentService;
     private final CyberAssetService assetService;
     private final CyberEvidenceService evidenceService;
+    private final CyberEvidenceExpiryScheduler evidenceExpiryScheduler;   // CY-J — manual sweep trigger
     private final CyberActionPlanService actionPlanService;
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -408,6 +411,15 @@ public class CyberController {
     public ResponseEntity<Void> deleteEvidence(@PathVariable Long id) {
         evidenceService.deleteEvidence(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** CY-J — run the evidence expiry sweep on demand (the scheduler also runs it on a timer):
+     *  expired CURRENT/PENDING evidence → STALE + an auto re-request. Returns rows expired. */
+    @PostMapping("/evidence/run-expiry-sweep")
+    @PreAuthorize("hasPermission('CYBER', 'WRITE')")
+    public ResponseEntity<Map<String, Object>> runEvidenceExpirySweep() {
+        int expired = evidenceExpiryScheduler.sweep();
+        return ResponseEntity.ok(Map.of("expired", expired));
     }
 
     // =========================================================================

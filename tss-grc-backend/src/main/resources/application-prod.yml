@@ -125,6 +125,10 @@ grc:
   # CY-E — cyber CAPA/action-plan reminder + overdue-escalation clock (5-min default cadence).
   cyber-capa-sla:
     scheduler-enabled: true
+  # CY-J — cyber evidence expiry sweep MUST run in production so expired evidence is caught +
+  # re-requested for NCA/SAMA reviews (1-hour default cadence).
+  cyber-evidence-expiry:
+    scheduler-enabled: true
   storage:
     base-path: ${FILE_STORAGE_PATH:/var/data/tss-grc/uploads}
   notifications:

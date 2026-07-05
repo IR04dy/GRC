@@ -4311,6 +4311,7 @@ export const ar = {
   cyberEmptyIncidents:     'لا توجد حوادث سيبرانية',
   cyberEmptyAssets:        'لا توجد أصول',
   cyberEmptyEvidence:      'لا توجد أدلة',
+  cyberRunExpirySweep:     'فحص انتهاء الأدلة',
   cyberEmptyActions:       'لا توجد خطط إجراءات',
   cyberCapaEscalated:      'تم التصعيد',
 

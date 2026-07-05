@@ -4327,6 +4327,7 @@ export const en = {
   cyberEmptyIncidents:     'No cyber incidents',
   cyberEmptyAssets:        'No assets',
   cyberEmptyEvidence:      'No evidence',
+  cyberRunExpirySweep:     'Run expiry sweep',
   cyberEmptyActions:       'No action plans',
   cyberCapaEscalated:      'escalated',
 

@@ -97,6 +97,11 @@ grc:
   cyber-capa-sla:
     scheduler-enabled: true
     scheduler-interval-ms: 60000          # 1 min in dev (prod uses the 5-min default)
+  # CY-J — cyber evidence expiry sweep (expired CURRENT/PENDING → STALE + auto re-request).
+  # Short dev cadence so the expiry→stale→re-request path is observable end-to-end.
+  cyber-evidence-expiry:
+    scheduler-enabled: true
+    scheduler-interval-ms: 60000          # 1 min in dev (prod uses the 1-hour default)
 
   # Sprint 12 — ServiceNow ITSM integration. In dev we explicitly enable
   # the adapter in STUB mode so smoke tests against /api/v1/integrations/servicenow
