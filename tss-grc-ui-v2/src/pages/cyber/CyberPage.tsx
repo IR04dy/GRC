@@ -55,8 +55,9 @@ import { ModuleSubmissionsPanel } from '../../components/workflows/ModuleSubmiss
 import { CYBER_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
+import { CyberPoliciesPanel } from './CyberPoliciesPanel';
 
-type TabId = 'overview' | 'controls' | 'subcontrols' | 'assessments' | 'vuln' | 'exceptions' | 'incidents' | 'assets' | 'evidence' | 'actions' | 'workflows' | 'comms' | 'alignment';
+type TabId = 'overview' | 'controls' | 'subcontrols' | 'assessments' | 'vuln' | 'exceptions' | 'incidents' | 'assets' | 'evidence' | 'policies' | 'actions' | 'workflows' | 'comms' | 'alignment';
 
 // ─── Workflow stage steppers (overview tab) ─────────────────────────────────
 const VULN_STAGES = [
@@ -593,6 +594,7 @@ export function CyberPage() {
     { id: 'incidents',   label: t('cyberTabIncidents') },
     { id: 'assets',      label: t('cyberTabAssets') },
     { id: 'evidence',    label: t('cyberTabEvidence') },
+    { id: 'policies',    label: lang === 'ar' ? 'السياسات' : 'Policies' },
     { id: 'actions',     label: t('cyberTabActions') },
     { id: 'workflows',   label: t('cyberTabWorkflows') ?? 'Workflows' },
     { id: 'comms',       label: t('detailTabComms') },
@@ -1115,6 +1117,7 @@ export function CyberPage() {
       )}
       {tab === 'assets'   && <Card padded={false}>{assets.loading        ? <LoadingRow /> : <DataTable columns={assetCols}    rows={filteredCyberData as CyberAssetDto[]}      empty={<EmptyState Icon={Cpu}        title={t('cyberEmptyAssets')} />} />}</Card>}
       {tab === 'evidence' && <Card padded={false}>{cyberEvidence.loading ? <LoadingRow /> : <DataTable columns={evidenceCols} rows={filteredCyberData as CyberEvidenceDto[]}   empty={<EmptyState Icon={FileCheck2} title={t('cyberEmptyEvidence')} />} />}</Card>}
+      {tab === 'policies' && <CyberPoliciesPanel />}
       {tab === 'actions'  && <Card padded={false}>{actionPlans.loading   ? <LoadingRow /> : <DataTable columns={actionCols}   rows={filteredCyberData as CyberActionPlanDto[]} empty={<EmptyState Icon={ListTodo}   title={t('cyberEmptyActions')} />} />}</Card>}
       {tab === 'workflows' && <ActiveWorkflowsPanel
         workflows={CYBER_WORKFLOWS}

@@ -1483,6 +1483,21 @@ export interface CyberEvidenceRequest {
   fileName?: string; status?: string;
 }
 
+// ─── Cyber · Policies (CY-I) — shared policy engine, cyber-scoped ────────────
+export interface CyberPolicyDto {
+  id: number; policyCode: string; version: string;
+  titleEn: string; titleAr?: string; summaryEn?: string; summaryAr?: string;
+  category: string; status: string;
+  ownerName?: string; ownerEmail?: string; approverName?: string;
+  effectiveDate?: string; expiryDate?: string; nextReviewDate?: string; reviewCadence?: string;
+  publishedAt?: string; createdAt?: string;
+}
+export interface CyberPolicyRequest {
+  policyCode: string; titleEn: string; titleAr?: string; summaryEn?: string;
+  category?: string; ownerName?: string; ownerEmail?: string;
+  effectiveDate?: string; nextReviewDate?: string; reviewCadence?: string;
+}
+
 // ─── Cyber · Action Plans ───────────────────────────────────────────────────
 export interface CyberActionPlanDto {
   id: number; titleEn: string; titleAr?: string;
@@ -1666,6 +1681,15 @@ export const cyberApi = {
     downloadFile(
       `/api/v1/cyber/export?register=${encodeURIComponent(register)}&format=${format}${lang ? `&lang=${encodeURIComponent(lang)}` : ''}`,
       `cyber-${register}.${format}`),
+
+  // Policies (CY-I) — cyber policy lifecycle wired to the shared policy engine.
+  policies:           (latestOnly = false, status?: string) =>
+    api.get<CyberPolicyDto[]>(`/api/v1/cyber/policies?latestOnly=${latestOnly}${status ? `&status=${encodeURIComponent(status)}` : ''}`),
+  createPolicy:       (body: CyberPolicyRequest) => api.post<CyberPolicyDto>('/api/v1/cyber/policies', body),
+  updatePolicy:       (id: number, body: Partial<CyberPolicyRequest>) => api.put<CyberPolicyDto>(`/api/v1/cyber/policies/${id}`, body),
+  transitionPolicy:   (id: number, to: string) => api.post<CyberPolicyDto>(`/api/v1/cyber/policies/${id}/transition`, { to }),
+  newPolicyVersion:   (policyCode: string, newVersion: string) => api.post<CyberPolicyDto>(`/api/v1/cyber/policies/${encodeURIComponent(policyCode)}/new-version`, { newVersion }),
+  deletePolicy:       (id: number) => api.delete<void>(`/api/v1/cyber/policies/${id}`),
 
   // Catalog
   controlsAll:        () => api.get<CyberControlDto[]>('/api/v1/cyber/controls/all'),
