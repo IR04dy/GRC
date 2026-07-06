@@ -34,6 +34,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -418,6 +419,88 @@ class WorkflowRequestServiceTest {
         assertThat(resp.escalatedAt()).isNotNull();
         verify(notifications).broadcastToRole(any(), org.mockito.ArgumentMatchers.eq("CISO"),
             any(), any(), any(), any(), any(), any());
+    }
+
+    // ── WF-7 external tokenized public access (§7 #18) ──────────────────────
+
+    private WorkflowRequestRecipient externalRec(Long requestId, String email, String status) {
+        WorkflowRequestRecipient x = new WorkflowRequestRecipient();
+        x.setId(ids.incrementAndGet());
+        x.setOrganisationId(ORG);
+        x.setRequestId(requestId);
+        x.setRecipientType("EXTERNAL");
+        x.setRecipientKey(email);
+        x.setRecipientLabel(email);
+        x.setActorRole("ASSIGNEE");
+        x.setStepNo(1);
+        x.setStatus(status);
+        return x;
+    }
+
+    @Test
+    void send_externalRecipient_mintsAccessTokenAndExpiry() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        WorkflowRequest r = sentRequest(50L, "PARALLEL", "ALL", null);
+        r.setStatus("DRAFT");
+        r.setRequestType("REVIEW");
+        r.setDueDate(LocalDate.now().plusDays(5));
+        WorkflowRequestRecipient ext = externalRec(50L, "auditor@firm.com", "PENDING");
+        when(requestRepo.findByIdAndOrganisationId(50L, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 50L))
+            .thenReturn(List.of(ext));
+
+        svc.send(50L);
+
+        assertThat(ext.getAccessToken()).isNotNull().hasSize(32);   // UUID, dashes stripped
+        assertThat(ext.getTokenExpiresAt()).isNotNull();
+        assertThat(ext.getStatus()).isEqualTo("NOTIFIED");
+    }
+
+    @Test
+    void publicView_wrongToken_404() {
+        when(recipientRepo.findByAccessToken("nope")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> svc.publicView("nope"))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("404");
+    }
+
+    @Test
+    void publicRespondByToken_expiredToken_410() {
+        WorkflowRequestRecipient ext = externalRec(51L, "ext@firm.com", "NOTIFIED");
+        ext.setAccessToken("tok-expired");
+        ext.setTokenExpiresAt(java.time.LocalDateTime.now().minusDays(1));
+        when(recipientRepo.findByAccessToken("tok-expired")).thenReturn(Optional.of(ext));
+        assertThatThrownBy(() -> svc.publicRespondByToken("tok-expired", "late", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("410");
+    }
+
+    @Test
+    void publicRespondByToken_alreadyResponded_409() {
+        WorkflowRequestRecipient ext = externalRec(52L, "ext@firm.com", "RESPONDED");
+        ext.setAccessToken("tok-used");
+        when(recipientRepo.findByAccessToken("tok-used")).thenReturn(Optional.of(ext));
+        assertThatThrownBy(() -> svc.publicRespondByToken("tok-used", "again", null))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("409");
+    }
+
+    @Test
+    void publicRespondByToken_valid_recordsResponse_noPrincipal() {
+        WorkflowRequest r = sentRequest(53L, "PARALLEL", "ANY", null);   // no reviewer → auto-close
+        WorkflowRequestRecipient ext = externalRec(53L, "ext@firm.com", "NOTIFIED");
+        ext.setAccessToken("tok-live");
+        ext.setTokenExpiresAt(LocalDate.now().plusDays(5).atStartOfDay());
+        when(recipientRepo.findByAccessToken("tok-live")).thenReturn(Optional.of(ext));
+        when(requestRepo.findById(53L)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 53L))
+            .thenReturn(List.of(ext));
+
+        WorkflowRequestDtos.PublicRequestView view = svc.publicRespondByToken("tok-live", "acknowledged", null);
+
+        assertThat(ext.getStatus()).isEqualTo("RESPONDED");
+        assertThat(ext.getRespondedBy()).isNull();                  // external — no platform principal
+        assertThat(view.status()).isEqualTo("CLOSED");              // ANY + no gate → auto-close
     }
 
     // ── WF-5 committee recipient fan-out ────────────────────────────────────

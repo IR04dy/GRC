@@ -63,7 +63,8 @@ public class PublicEndpointRateLimitFilter extends OncePerRequestFilter {
         "/api/v1/ethics/whistleblower/public/**",
         "/api/v1/complaints/public/**",
         "/api/v1/intake/track/**",
-        "/api/v1/privacy/subprocessors/public"
+        "/api/v1/privacy/subprocessors/public",
+        "/api/public/workflow-requests/**"
     );
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();

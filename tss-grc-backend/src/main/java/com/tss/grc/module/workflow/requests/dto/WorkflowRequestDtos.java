@@ -62,6 +62,16 @@ public final class WorkflowRequestDtos {
     /** Body for transition endpoints (respond/review/approve/reject/…). */
     public record ActionRequest(String note, String outcome) {}
 
+    /** WF-7 — the MINIMAL public projection an EXTERNAL recipient sees via their token (§7 #18):
+     *  the request's own facts + the external recipient's own status only. Deliberately carries
+     *  NO internal ids, NO other recipients, NO timeline. */
+    public record PublicRequestView(
+        String requestCode, String requestType, String titleEn, String titleAr,
+        String requiredAction, String description,
+        LocalDate dueDate, String status, String countdownStatus, String priority,
+        String requestedBy, String recipientLabel, String recipientStatus, boolean canRespond
+    ) {}
+
     public record RecipientResponse(
         Long id, String recipientType, Long recipientId, String recipientKey, String recipientLabel,
         String actorRole, Integer stepNo, String status,

@@ -122,3 +122,30 @@ export const workflowRequestsApi = {
   runSlaSweep: () => api.post<{ reminders: number; escalations: number }>(
     '/api/v1/workflows/requests/run-sla-sweep'),
 };
+
+// ─── WF-7 — EXTERNAL recipient public tracker (token-credentialed, NO auth) ──
+export interface PublicRequestView {
+  requestCode: string; requestType: string; titleEn: string; titleAr: string | null;
+  requiredAction: string | null; description: string | null;
+  dueDate: string | null; status: string; countdownStatus: string; priority: string;
+  requestedBy: string | null; recipientLabel: string | null; recipientStatus: string; canRespond: boolean;
+}
+
+const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '');
+
+/** Bare fetch — deliberately attaches NO Authorization header; the path token is the credential. */
+async function publicFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init, headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+  });
+  if (!res.ok) { const e = new Error(`HTTP ${res.status}`) as Error & { status?: number }; e.status = res.status; throw e; }
+  return res.json() as Promise<T>;
+}
+
+export const publicWorkflowApi = {
+  view: (token: string) =>
+    publicFetch<PublicRequestView>(`/api/public/workflow-requests/${encodeURIComponent(token)}`),
+  respond: (token: string, note?: string, outcome?: string) =>
+    publicFetch<PublicRequestView>(`/api/public/workflow-requests/${encodeURIComponent(token)}/respond`,
+      { method: 'POST', body: JSON.stringify({ note: note ?? null, outcome: outcome ?? null }) }),
+};

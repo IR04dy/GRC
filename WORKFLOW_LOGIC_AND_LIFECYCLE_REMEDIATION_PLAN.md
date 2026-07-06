@@ -1,10 +1,11 @@
 # Workflow Logic & Lifecycle Remediation Plan — Implementation Tracker
 
-## Executive summary (final — 2026-07-06, loop complete)
+## Executive summary (final — 2026-07-06, loop complete — ALL deferrals closed)
 
 **Verdict: MARKET-READY** for the platform workflow request engine's scope (§5 actor
-selection + §6 request lifecycle), with two explicitly deferred capabilities documented
-below. All five batches (WF-1…WF-5) are implemented, unit-tested, and live-validated:
+selection + §6 request lifecycle). **All 20 §7 mandatory test cases PASS with live receipts,
+and both previously-deferred capabilities are now shipped** (WF-6 conditional routing, WF-7
+external tokenized delivery). Seven batches (WF-1…WF-7) implemented, unit-tested, live-validated:
 
 - **Engine** — `module/workflow/requests`: request object + recipients
   (USER/ROLE/DEPARTMENT/COMMITTEE/EXTERNAL × ASSIGNEE/REVIEWER/APPROVER/OBSERVER/ESCALATION,
@@ -26,14 +27,22 @@ below. All five batches (WF-1…WF-5) are implemented, unit-tested, and live-val
   a recipient responding with a matching outcome overrides default routing, exactly the
   spec's examples ("if rejected → return to submitter; if high risk → executive approval").
   GOTO_STEP is forward-only so the §7 #19 no-cycles guarantee holds.
-- **Still deferred (documented, not blocking):** EXTERNAL recipient *delivery*
-  (portal/e-mail) — external contacts are recorded + §5-validated but receive no outbound
-  delivery; they also have **no** access surface (all APIs authenticated), so no
-  data-exposure risk until the portal lands (queued as WF-7).
+- **WF-7 (2026-07-06) closed the external-delivery deferral:** an EXTERNAL recipient is minted
+  a 122-bit opaque access token on send (V274); a `permitAll`, rate-limited public tracker
+  (`/api/public/workflow-requests/{token}`) serves a MINIMAL projection (title/action/due/status
+  + the recipient's own status — no internal ids, no other recipients, no timeline) and accepts
+  a token-credentialed acknowledgement that feeds the normal routing. Wrong token → 404,
+  expired → 410, replay/closed → 409. The initiator gets the tracking link (timeline event +
+  notification) to relay out-of-band (no in-platform outbound mail yet — the one remaining thin
+  edge, documented below).
+- **Remaining thin edge (non-blocking):** no in-platform outbound EMAIL — the external tracking
+  link is surfaced to the initiator to relay. Wiring it into an SMTP/dispatch outbox is a
+  drop-in when the platform gains one (there is no generic notification-outbox bean today; the
+  `NotificationService` is in-app only).
 
 Migrations: **V269** (engine schema), **V270** (evidence bridge id), **V271** (WORKFLOW
-permission catalogue), **V273** (branch rules) — all applied to dev (V272 = RBAC catalogue,
-on `feat/rbac-catalogue`). Next free = **V274**.
+permission catalogue), **V273** (branch rules), **V274** (external access token) — all applied
+to dev (V272 = RBAC catalogue, on `feat/rbac-catalogue`). Next free = **V275**.
 
 ---
 
@@ -68,9 +77,9 @@ confirmation. Test rows tagged `[REVIEW-TEST]`, cleaned with `CHARINDEX` (never 
 | WF-5 | **Hardening + §7 test matrix completion** — BROADCAST_ACK acknowledgement mode E2E, report-distribution request type, committee member fan-out, external-recipient guard, Arabic/RTL check on FE, full `mvn test` suite | Med | ✅ DONE | V271 | **33/33 live + 29/29 workflow unit + full suite 2193/0/0**: **Committee fan-out implemented** (not deferred — `CommitteeMemberTermRepository.findActiveByCommittee` was trivially reachable): send/reminder notify every ACTIVE member with a linked `member_user_id`; committee members are actionable recipients (`findActiveCommitteeIdsForUser` in `actionableRowFor` + `myInbox`); committee existence org-validated at create (phantom → 400); label resolves to committee `name_en`. Live: member notified + request in member inbox + member respond completes + non-member blocked (400). **BROADCAST_ACK E2E:** 2 recipients each acknowledge → ALL completes → auto-CLOSED (`AUTO_ON_COMPLETION`), both rows RESPONDED. **REPORT_DISTRIBUTION (§7 #13):** ROLE audience + OBSERVER; role holders notified, in role-holder inbox, ANY completion on confirm. **Sequential+reviewer+approver full chain:** step-2 blocked (400) → step-1 baton → step-2 → SUBMITTED → reviewer APPROVE → UNDER_REVIEW → approver → APPROVED. **Unauthorized approve (§7 #17):** non-designated actor → 400 "Only the designated actor"; designated approver → 200. **Arabic:** `titleAr` present in detail AND shallow list projections. **RBAC ratchet fix:** full suite initially failed `ControllerAuthorizationRatchetTest` (the §6 controller's 13 write endpoints were `isAuthenticated()`-only) — endpoints regated `hasPermission('WORKFLOW','WRITE')` (reads `READ`), **V271** seeds WORKFLOW_READ/WRITE + grants to all 55 roles (inbox primitive — service-level actor authz is the real gate); ratchet back at baseline 61; auditor READ 200 / unauth 401 / non-admin sweep 403 receipts. [REVIEW-TEST] rows + member term cleaned (CHARINDEX), residue 0. |
 
 | WF-6 | **Conditional routing** (§7 #5 — the matrix's one DEFER, reopened by the user's second `/loop implement` pass) — per-request branch rules: recipient outcome drives GOTO_STEP / RETURN / CLOSE / ESCALATE | Med | ✅ DONE | V273 | **15/15 live + 25/25 service unit (36/36 workflow) + tsc clean + Vite 200×2**: `branch_rules` JSON on `workflow.requests` + `response_outcome` on recipient rows (V273). §5 gates live: backward GOTO → 400 "circular routing is blocked" (§7 #19 held), GOTO in PARALLEL → 400, unknown action → 400. **Spec example 1** live: respond outcome=`rejected` → branch RETURN → **RETURNED** + initiator notified + `BRANCHED` timeline event + resubmit → UNDER_REVIEW (rework loop). **Spec example 2** live: outcome=`HIGH_RISK` at step 1 of 3 → **GOTO step 3** (executive), step-2 recipient SKIPPED, step-3 notified, executive respond auto-closes. Unmatched outcome → default baton (step 2). **ESCALATE branch**: outcome=`breach` → ESCALATED + `escalatedAt` + CISO role broadcast (shared `notifyEscalationPath` extracted from `/escalate`). Outcome normalized upper-case, recorded on the recipient row, echoed in DTOs; audit rows `WORKFLOW_REQUEST_BRANCHED`. FE: `branchRules` in create/detail types, respond(outcome), detail page shows rules card + outcome input (placeholder lists the rule tokens) + per-recipient outcome badge. [REVIEW-TEST] rows cleaned, residue 0. |
-| WF-7 | **EXTERNAL recipient delivery** — tokenized public access for external contacts (intake-tracker pattern): secure per-recipient token, minimal public projection, public acknowledge/respond; outbound delivery via the platform's notification outbox if reachable | Med | [ ] | V274 expected | — |
+| WF-7 | **EXTERNAL recipient delivery** — tokenized public access for external contacts (intake-tracker pattern): secure per-recipient token, minimal public projection, public acknowledge/respond | Med | ✅ DONE | V274 | **18/18 live + 41/41 workflow unit (5 new) + full suite 2205/0/0 + tsc clean + Vite 200×3**: **V274** adds `access_token` (unique filtered index) + `token_expires_at` on `request_recipients`. On send, each EXTERNAL recipient is minted a 122-bit UUID token (dashes stripped, 32 chars) expiring at due-date +14d (or now +30d); an `EXTERNAL_LINK` timeline event + initiator notification (`WORKFLOW_REQUEST_EXTERNAL_LINK`) surface the relative tracker link to relay out-of-band. New `PublicWorkflowRequestController` (`permitAll`, added to `PublicEndpointRateLimitFilter` + SecurityConfig): `GET /api/public/workflow-requests/{token}` → `PublicRequestView` MINIMAL projection (title EN/AR, action, due, status, countdown, priority, requestedBy, the recipient's OWN label+status, canRespond) — **live leak-check confirms NO internal ids / recipients / timeline / branchRules exposed** (§7 #18); `POST .../{token}/respond` records the acknowledgement with `respondedBy=null` and feeds the SHARED routing (`completeRecipientResponse`, incl. WF-6 branch rules) — ANY-completion auto-closed live. Token misuse receipts: wrong → **404**, expired → **410** (unit), replay/closed/not-your-step → **409**. Rate-limit filter tripped **429 after 30 rapid GETs** live. ROWVERSION upheld — token+NOTIFIED set together, link events fire post-save-loop. FE: `publicWorkflowApi` (bare fetch, NO JWT) + `PublicWorkflowRequestPage` under the existing `/public/*` bare-shell route (PublicShell, bilingual, respond form gated on `canRespond`). Ratchet floor raised 61→62 (documented — the token-credentialed public POST joins the whistleblower/complaints public writes). [REVIEW-TEST] rows cleaned, residue 0. |
 
-**Next fire:** WF-7 — EXTERNAL recipient delivery, the LAST remaining deferral: (a) V274 — `access_token` (crypto-random, unique) + `token_expires_at` on `workflow.request_recipients`, minted for EXTERNAL recipients on send; (b) PUBLIC endpoints (permitAll, rate-limited like the intake tracker): `GET /api/public/workflow-requests/{token}` returning a MINIMAL projection (title EN/AR, required action, due date, status, requester org label — no internal ids/recipients) and `POST .../{token}/respond` recording the external acknowledgement (marks the row RESPONDED, appends timeline, feeds normal routing incl. branch rules); token misuse receipts (wrong token 404, expired 410/404, replay after response 409/404); (c) surface the tracking link — timeline event + initiator notification containing the link (and enqueue into the notification outbox/dispatch subsystem if one is trivially reachable — else document); (d) §7 #18 re-receipt (external sees ONLY the minimal projection); (e) full `mvn test`, tracker sweep, executive-summary final verdict; then STOP and delete cron 6a97db91 per the loop contract.
+**LOOP COMPLETE (2026-07-06) — all 7 batches shipped, all 20 §7 cases PASS, both deferrals closed.** WF-1…WF-6 already committed on `feat/workflow-engine` (WF-1…WF-5 merged to master @ `fbb23244`; WF-6 `8efe6875` + WF-7 committed, unmerged pending an explicit "merge"). Full backend suite **2205/0/0**. The recurring cron (`6a97db91`) is deleted at this terminal condition per the loop contract. Engine verdict: **MARKET-READY** — the "disconnected screens" finding is fully remediated by a real actor/routing/SLA/lifecycle/audit request engine with conditional branching and external tokenized delivery. Only thin edge left: in-platform outbound email (no SMTP/outbox bean exists platform-wide — a drop-in when one lands).
 
 ## §7 mandatory test matrix — final disposition
 
@@ -93,7 +102,7 @@ confirmation. Test rows tagged `[REVIEW-TEST]`, cleaned with `CHARINDEX` (never 
 | 15 | Audit log created for every transition | **PASS** | append-only `request_events` timeline + `platform.audit_log` `WORKFLOW_REQUEST_*` rows on every mutation + F8 events (WF-1/2/4) |
 | 16 | Arabic/RTL preserves routing visualization | **PASS** | FE fully bilingual inline (selector, composer, detail); `titleAr` in list + detail projections verified live (WF-3, WF-5 E) |
 | 17 | Unauthorized user cannot approve | **PASS** | non-designated actor approve → 400; designated approver → 200; non-recipient respond / non-reviewer review → 400 (WF-1, WF-5 D) |
-| 18 | External recipient cannot access unauthorized data | **PASS** (by construction) | EXTERNAL contacts are recorded + email-validated but have **no access surface** — every endpoint authenticated (401 receipt) + V271 permission gate; portal delivery deferred with (b) above (WF-1, WF-5 G) |
+| 18 | External recipient cannot access unauthorized data | **PASS** (WF-7 live) | Tokenized public tracker returns a MINIMAL projection ONLY — live leak-check confirms no internal ids / other recipients / timeline / branch rules; token is the sole credential (wrong → 404, expired → 410, replay → 409), rate-limited (429 after 30 GETs). Internal endpoints stay authenticated + V271-gated (WF-7, harness 18/18). |
 | 19 | Circular routing blocked | **PASS** | SEQUENTIAL steps must be contiguous 1..N (400 otherwise) — no cycles representable (WF-1) |
 | 20 | Workflow preview matches saved routing | **PASS** | composer preview renders the same §5 payload the server persists; detail page re-reads saved recipient rows grouped by step — verified identical live (WF-3) |
 

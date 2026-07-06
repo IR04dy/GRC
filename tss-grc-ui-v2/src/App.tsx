@@ -68,6 +68,7 @@ const WorkflowHubPage        = lazy(() => import('./pages/workflow/WorkflowHubPa
 const WorkflowSubmissionsPage = lazy(() => import('./pages/workflow/WorkflowSubmissionsPage').then(m => ({ default: m.WorkflowSubmissionsPage })));
 const WorkflowRequestsPage   = lazy(() => import('./pages/workflow/WorkflowRequestsPage').then(m => ({ default: m.WorkflowRequestsPage })));
 const WorkflowRequestDetailPage = lazy(() => import('./pages/workflow/WorkflowRequestDetailPage').then(m => ({ default: m.WorkflowRequestDetailPage })));
+const PublicWorkflowRequestPage = lazy(() => import('./pages/workflow/PublicWorkflowRequestPage').then(m => ({ default: m.PublicWorkflowRequestPage })));
 const CalendarPage           = lazy(() => import('./pages/calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
 const SocOpsDashboardPage    = lazy(() => import('./pages/socops/SocOpsDashboardPage').then(m => ({ default: m.SocOpsDashboardPage })));
 const SocOpsEventsPage       = lazy(() => import('./pages/socops/SocOpsEventsPage').then(m => ({ default: m.SocOpsEventsPage })));
@@ -560,6 +561,9 @@ export function App() {
               <Route path="/complaints/:id"                          element={<ComplaintDetailPage />} />
               <Route path="/public/complaint"                        element={<PublicComplaintSubmissionPage />} />
               <Route path="/public/track-complaint"                  element={<PublicComplaintTrackingPage />} />
+              {/* WF-7 — EXTERNAL workflow-request recipient tracker (token-credentialed, no login;
+                  PublicShell, bare fetch with no JWT). /public/* is already a bare prefix. */}
+              <Route path="/public/workflow-requests/:token"         element={<PublicWorkflowRequestPage />} />
 
               {/* Sprint 13 — Sanctions Screening engine. Static segments
                   (/dashboard, /lists, /checks, /screen) registered before

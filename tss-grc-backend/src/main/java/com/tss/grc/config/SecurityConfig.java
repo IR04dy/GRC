@@ -138,6 +138,12 @@ public class SecurityConfig {
                 // PII-stripped view (no phone/email/national-ID).
                 .requestMatchers(HttpMethod.POST, "/api/v1/complaints/public").permitAll()
                 .requestMatchers(HttpMethod.GET,  "/api/v1/complaints/public/track/**").permitAll()
+                // WF-7 — workflow-request EXTERNAL recipient tracker. An external contact has no
+                // login; the per-recipient access token IS the credential. Minimal projection on
+                // GET; POST records their acknowledgement. Throttled per-IP by the filter below;
+                // tokens are 122-bit random UUIDs, expiring at due-date + grace.
+                .requestMatchers(HttpMethod.GET,  "/api/public/workflow-requests/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/public/workflow-requests/**").permitAll()
                 // SEC-FIN-002: belt-and-braces — the SCM sub-controllers
                 // (/api/scm/**: contract-clauses, fourth-party, resilience,
                 // resilience/tests) are gated per-method with

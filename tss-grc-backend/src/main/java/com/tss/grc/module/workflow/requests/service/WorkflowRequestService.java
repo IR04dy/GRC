@@ -21,6 +21,7 @@ import com.tss.grc.module.platform.service.NotificationService;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.BranchRuleDto;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.CreateRequest;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.EventResponse;
+import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.PublicRequestView;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RecipientDto;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RecipientResponse;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RequestResponse;
@@ -39,6 +40,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -50,6 +53,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 
 /**
  * WF-1 — the platform workflow REQUEST engine (§5 actor selection + §6 request lifecycle of the
@@ -75,6 +79,9 @@ public class WorkflowRequestService {
     static final Set<String> BRANCH_ACTIONS  = Set.of("GOTO_STEP", "RETURN", "CLOSE", "ESCALATE");
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    /** WF-7 — external token lives until the due date + this grace window (or a flat default). */
+    private static final int EXTERNAL_TOKEN_GRACE_DAYS = 14;
+    private static final int EXTERNAL_TOKEN_DEFAULT_DAYS = 30;
 
     /** §6 lifecycle — allowed transitions. Unknown target → 400; known-but-illegal → 409. */
     static final Map<String, Set<String>> TRANSITIONS = Map.ofEntries(
@@ -329,11 +336,23 @@ public class WorkflowRequestService {
         List<WorkflowRequestRecipient> all =
             recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(r.getOrganisationId(), r.getId());
         WorkflowRequestRecipient mine = actionableRowFor(r, all);
+        return completeRecipientResponse(r, all, mine, note, outcome, CurrentActor.userId());
+    }
 
+    /**
+     * Shared post-identification response handling: mark the recipient row RESPONDED, apply any
+     * matching WF-6 branch rule, else advance the default routing. Called by the authenticated
+     * {@link #respond} and by the WF-7 token path {@link #publicRespondByToken} (respondedBy is
+     * the authenticated user id, or {@code null} for an external token responder). Follows the
+     * ROWVERSION rule: finalize every request mutation before any flush-triggering query.
+     */
+    private RequestResponse completeRecipientResponse(WorkflowRequest r, List<WorkflowRequestRecipient> all,
+                                                      WorkflowRequestRecipient mine, String note,
+                                                      String outcome, Long respondedBy) {
         String from = r.getStatus();
         mine.setStatus("RESPONDED");
         mine.setRespondedAt(LocalDateTime.now());
-        mine.setRespondedBy(CurrentActor.userId());
+        mine.setRespondedBy(respondedBy);
         mine.setResponse(note);
         mine.setResponseOutcome(outcome == null || outcome.isBlank() ? null : outcome.trim().toUpperCase());
         recipientRepo.save(mine);
@@ -341,9 +360,6 @@ public class WorkflowRequestService {
         BranchRuleDto branch = matchBranchRule(r, mine.getStepNo(), mine.getResponseOutcome());
         if (branch != null) return applyBranch(r, all, mine, branch, from);
 
-        // Finalize EVERY mutation of the request BEFORE any flush-triggering query (the SQL Server
-        // ROWVERSION @Version tolerates exactly one UPDATE per transaction — a second flush after an
-        // intermediate auto-flush fails with a stale-object error). Notifications run last.
         RoutingAdvance adv = advanceRouting(r, all);
         if (adv.nextStep() != null) r.setCurrentStep(adv.nextStep());
         if (adv.complete()) {
@@ -589,6 +605,75 @@ public class WorkflowRequestService {
             .toList();
     }
 
+    // ── WF-7 public (token-credentialed) surface ──────────────────────────────
+
+    /** The EXTERNAL recipient's own minimal view (§7 #18): no internal ids, no other recipients,
+     *  no timeline. Wrong token → 404; expired → 410. */
+    @Transactional(readOnly = true)
+    public PublicRequestView publicView(String token) {
+        WorkflowRequestRecipient rec = requireLiveToken(token);
+        WorkflowRequest r = requestRepo.findById(rec.getRequestId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        boolean open = OPEN_FOR_RESPONSE.contains(r.getStatus());
+        boolean myTurn = !"SEQUENTIAL".equals(r.getRoutingMode()) || rec.getStepNo().equals(r.getCurrentStep());
+        boolean pending = Set.of("PENDING", "NOTIFIED", "IN_PROGRESS").contains(rec.getStatus());
+        return new PublicRequestView(code(r), r.getRequestType(), r.getTitleEn(), r.getTitleAr(),
+            r.getRequiredAction(), r.getDescription(), r.getDueDate(), r.getStatus(),
+            countdownOf(r), r.getPriority(), r.getInitiatedByName(),
+            rec.getRecipientLabel() == null ? rec.getRecipientKey() : rec.getRecipientLabel(),
+            rec.getStatus(), open && myTurn && pending);
+    }
+
+    /** An EXTERNAL recipient acknowledges/responds via their token — feeds the SAME routing
+     *  (incl. WF-6 branch rules) as an internal respond, with no authenticated principal.
+     *  Wrong token → 404; expired → 410; already responded / request closed / not this step → 409. */
+    @Transactional
+    public PublicRequestView publicRespondByToken(String token, String note, String outcome) {
+        WorkflowRequestRecipient rec = requireLiveToken(token);
+        if (!Set.of("PENDING", "NOTIFIED", "IN_PROGRESS").contains(rec.getStatus()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This request has already been answered.");
+        WorkflowRequest r = requestRepo.findById(rec.getRequestId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!OPEN_FOR_RESPONSE.contains(r.getStatus()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This request is no longer accepting responses.");
+        if ("SEQUENTIAL".equals(r.getRoutingMode()) && !rec.getStepNo().equals(r.getCurrentStep()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "It is not yet this recipient's turn to respond.");
+
+        Long previous = TenantContext.getCurrentTenant();
+        try {
+            TenantContext.setCurrentTenant(r.getOrganisationId());   // audit.log reads TenantContext
+            List<WorkflowRequestRecipient> all = recipientRepo
+                .findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(r.getOrganisationId(), r.getId());
+            WorkflowRequestRecipient mine = all.stream()
+                .filter(x -> x.getId().equals(rec.getId())).findFirst().orElse(rec);
+            completeRecipientResponse(r, all, mine, note, outcome, null);   // respondedBy = null (external)
+            return publicView(token);   // re-project the external's own minimal view
+        } finally {
+            if (previous != null) TenantContext.setCurrentTenant(previous); else TenantContext.clear();
+        }
+    }
+
+    /** Resolve a live token or fail with a status the public tracker can show (no info oracle
+     *  beyond present/expired). */
+    private WorkflowRequestRecipient requireLiveToken(String token) {
+        WorkflowRequestRecipient rec = recipientRepo.findByAccessToken(token == null ? "" : token.trim())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (rec.getTokenExpiresAt() != null && rec.getTokenExpiresAt().isBefore(LocalDateTime.now()))
+            throw new ResponseStatusException(HttpStatus.GONE, "This access link has expired.");
+        return rec;
+    }
+
+    /** Statuses in which a recipient may still respond (mirrors the guard in respond()). */
+    private static final Set<String> OPEN_FOR_RESPONSE =
+        Set.of("SENT", "IN_PROGRESS", "REOPENED", "ESCALATED", "OVERDUE");
+
+    private static String countdownOf(WorkflowRequest r) {
+        if (r.getDueDate() == null || Set.of("CLOSED", "ARCHIVED", "APPROVED").contains(r.getStatus())) return "NONE";
+        LocalDate today = LocalDate.now();
+        return r.getDueDate().isBefore(today) ? "OVERDUE"
+            : r.getDueDate().isEqual(today) ? "DUE_TODAY" : "ON_TRACK";
+    }
+
     // ── Routing internals ────────────────────────────────────────────────────
 
     /** WF-6 — first branch rule matching the responder's step + outcome (or null). */
@@ -754,6 +839,9 @@ public class WorkflowRequestService {
         String msg = code(r) + " \"" + r.getTitleEn() + "\" — action: "
             + (r.getRequiredAction() == null ? r.getRequestType() : r.getRequiredAction())
             + (r.getDueDate() != null ? " · due " + r.getDueDate() : "");
+        // WF-7 — externals freshly tokenized this pass; their link events fire AFTER the save loop
+        // so the recipient row is UPDATEd exactly once (token + NOTIFIED together — ROWVERSION rule).
+        List<WorkflowRequestRecipient> freshExternals = new java.util.ArrayList<>();
         for (WorkflowRequestRecipient rec : all) {
             if (step != null && !rec.getStepNo().equals(step)) continue;
             if (!"PENDING".equals(rec.getStatus())) continue;
@@ -771,10 +859,33 @@ public class WorkflowRequestService {
                     .map(CommitteeMemberTerm::getMemberUserId).filter(Objects::nonNull).distinct()
                     .forEach(uid -> notifications.notifyUser(r.getOrganisationId(), uid,
                         title, titleAr, msg, "WORKFLOW_REQUEST_ASSIGNED", "WorkflowRequest", r.getId()));
-                default -> { /* EXTERNAL — recorded + §5-validated; no outbound-mail portal in the platform yet */ }
+                case "EXTERNAL" -> {                             // WF-7 — mint token (pure field-set)
+                    if (rec.getAccessToken() == null) {
+                        rec.setAccessToken(UUID.randomUUID().toString().replace("-", ""));
+                        rec.setTokenExpiresAt(r.getDueDate() != null
+                            ? r.getDueDate().plusDays(EXTERNAL_TOKEN_GRACE_DAYS).atStartOfDay()
+                            : LocalDateTime.now().plusDays(EXTERNAL_TOKEN_DEFAULT_DAYS));
+                        freshExternals.add(rec);
+                    }
+                }
+                default -> { }
             }
             rec.setStatus("NOTIFIED");
-            recipientRepo.save(rec);
+            recipientRepo.save(rec);                             // one UPDATE per row (token + status)
+        }
+        // Surface each external tracking link (timeline + initiator notification) — the initiator
+        // relays it out-of-band; no in-platform outbound mail yet (documented). Runs post-save so
+        // these flushes don't re-UPDATE a recipient row mid-mutation.
+        for (WorkflowRequestRecipient rec : freshExternals) {
+            String link = "/public/workflow-requests/" + rec.getAccessToken();
+            appendEvent(r, "EXTERNAL_LINK", r.getStatus(), r.getStatus(),
+                "External access issued for " + (rec.getRecipientKey() == null ? "external recipient" : rec.getRecipientKey())
+                    + " → " + link + " (expires " + rec.getTokenExpiresAt().toLocalDate() + ")");
+            if (r.getInitiatedBy() != null)
+                notifications.notifyUser(r.getOrganisationId(), r.getInitiatedBy(),
+                    "External recipient tracking link ready", "رابط تتبّع المستلم الخارجي جاهز",
+                    code(r) + " — relay this link to " + rec.getRecipientKey() + ": " + link,
+                    "WORKFLOW_REQUEST_EXTERNAL_LINK", "WorkflowRequest", r.getId());
         }
     }
 

@@ -64,8 +64,17 @@ class ControllerAuthorizationRatchetTest {
      * The eventual floor is the small set of legitimately-public write endpoints
      * (auth login/refresh/logout, the public intake/whistleblower trackers,
      * inbound webhooks); everything else should carry a real permission/role check.
+     *
+     * <p>WF-7 (2026-07-06) raised the floor by exactly ONE — from 61 to 62 — for
+     * {@code PublicWorkflowRequestController#respond}: the tokenized public tracker
+     * where an EXTERNAL workflow-request recipient acknowledges via their opaque
+     * access token (the token IS the credential, mirroring the already-counted
+     * whistleblower {@code publicReply} and complaints {@code publicSubmit} POSTs).
+     * It is {@code permitAll} by design, throttled per-IP by
+     * PublicEndpointRateLimitFilter and gated by a 122-bit random token — a
+     * sanctioned floor member, not a missing guard.
      */
-    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 61;
+    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 62;
 
     @Test
     void noNewUnguardedWriteEndpoints() {

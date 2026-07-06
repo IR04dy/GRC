@@ -47,4 +47,9 @@ public class WorkflowRequestRecipient extends BaseEntity {
     @Column(columnDefinition = "NVARCHAR(MAX)") private String response;
     /** WF-6 — outcome token the responder chose (drives conditional branch rules). */
     @Column(name = "response_outcome", length = 40) private String responseOutcome;
+
+    /** WF-7 — opaque credential minted on send for an EXTERNAL recipient (the ONLY key to the
+     *  public tracker). Null for internal recipients. */
+    @Column(name = "access_token", length = 64) private String accessToken;
+    @Column(name = "token_expires_at") private LocalDateTime tokenExpiresAt;
 }
