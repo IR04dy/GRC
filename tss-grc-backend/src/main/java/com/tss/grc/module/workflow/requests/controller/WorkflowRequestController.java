@@ -19,10 +19,12 @@ import java.util.List;
 /**
  * WF-1 — the §6 API surface of the platform workflow request engine.
  *
- * <p>Gated {@code isAuthenticated()}: any module user can raise or answer a request — the fine
- * actor authorization (who may respond at the current step, who reviews, who approves, initiator-
- * only close/reopen) is enforced in {@link WorkflowRequestService}, because it depends on the
- * request's own recipient rows, not on a module permission.
+ * <p>Gated {@code hasPermission('WORKFLOW','READ'|'WRITE')} — V271 grants both to every role
+ * (the engine is an inbox primitive: any user can be addressed and must be able to answer), so
+ * the module gate satisfies the WS2 authorization ratchet while staying universally available.
+ * The fine actor authorization (who may respond at the current step, who reviews, who approves,
+ * initiator-only close/reopen) is enforced in {@link WorkflowRequestService}, because it depends
+ * on the request's own recipient rows, not on a module permission.
  */
 @RestController
 @RequestMapping("/api/v1/workflows/requests")
@@ -34,11 +36,11 @@ public class WorkflowRequestController {
     private final WorkflowRequestSlaScheduler slaScheduler;   // WF-2 — manual sweep trigger
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse create(@Valid @RequestBody CreateRequest body) { return svc.create(body); }
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','READ')")
     public Page<RequestResponse> list(@RequestParam(required = false) String status,
                                       @RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "50") int size) {
@@ -47,75 +49,75 @@ public class WorkflowRequestController {
 
     /** Inbox — requests addressed to me (directly, via a role I hold, or via my department). */
     @GetMapping("/inbox")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','READ')")
     public List<RequestResponse> inbox() { return svc.myInbox(); }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','READ')")
     public RequestResponse get(@PathVariable Long id) { return svc.getDetail(id); }
 
     @PostMapping("/{id}/send")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse send(@PathVariable Long id) { return svc.send(id); }
 
     @PostMapping("/{id}/respond")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse respond(@PathVariable Long id, @RequestBody(required = false) ActionRequest body) {
         return svc.respond(id, body == null ? null : body.note());
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse submit(@PathVariable Long id, @RequestBody(required = false) ActionRequest body) {
         return svc.submit(id, body == null ? null : body.note());
     }
 
     /** Reviewer gate — body.outcome = APPROVE | RETURN. */
     @PostMapping("/{id}/review")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse review(@PathVariable Long id, @RequestBody ActionRequest body) {
         return svc.review(id, body.outcome(), body.note());
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse approve(@PathVariable Long id, @RequestBody(required = false) ActionRequest body) {
         return svc.approve(id, body == null ? null : body.note());
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse reject(@PathVariable Long id, @RequestBody(required = false) ActionRequest body) {
         return svc.reject(id, body == null ? null : body.note());
     }
 
     @PostMapping("/{id}/resubmit")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse resubmit(@PathVariable Long id, @RequestBody(required = false) ActionRequest body) {
         return svc.resubmit(id, body == null ? null : body.note());
     }
 
     @PostMapping("/{id}/escalate")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse escalate(@PathVariable Long id, @RequestBody(required = false) ActionRequest body) {
         return svc.escalate(id, body == null ? null : body.note());
     }
 
     @PostMapping("/{id}/close")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse close(@PathVariable Long id, @RequestBody(required = false) ActionRequest body) {
         return svc.close(id, body == null ? null : body.note());
     }
 
     @PostMapping("/{id}/reopen")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse reopen(@PathVariable Long id, @RequestBody(required = false) ActionRequest body) {
         return svc.reopen(id, body == null ? null : body.note());
     }
 
     /** The request's append-only audit timeline. */
     @GetMapping("/{id}/audit-log")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','READ')")
     public List<EventResponse> auditLog(@PathVariable Long id) { return svc.auditLog(id); }
 
     /** WF-2 — run the SLA sweep on demand (the scheduler also runs it on a timer):

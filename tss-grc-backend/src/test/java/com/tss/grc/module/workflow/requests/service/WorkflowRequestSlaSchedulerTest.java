@@ -1,5 +1,6 @@
 package com.tss.grc.module.workflow.requests.service;
 
+import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
 import com.tss.grc.module.iam.repository.UserRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -47,6 +48,7 @@ class WorkflowRequestSlaSchedulerTest {
     @Mock private WorkflowRequestRecipientRepository recipientRepo;
     @Mock private WorkflowRequestEventRepository     eventRepo;
     @Mock private UserRepository                     userRepo;
+    @Mock private CommitteeMemberTermRepository      committeeMembers;
     @Mock private NotificationService                notifications;
     @Mock private AuditLogService                    audit;
     @Mock private ApplicationEventPublisher          publisher;

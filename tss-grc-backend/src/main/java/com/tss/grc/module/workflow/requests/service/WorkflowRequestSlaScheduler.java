@@ -1,6 +1,8 @@
 package com.tss.grc.module.workflow.requests.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
+import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
 import com.tss.grc.module.iam.repository.UserRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -68,6 +70,7 @@ public class WorkflowRequestSlaScheduler {
     private final WorkflowRequestRecipientRepository recipientRepo;
     private final WorkflowRequestEventRepository     eventRepo;
     private final UserRepository                     userRepo;
+    private final CommitteeMemberTermRepository      committeeMembers;
     private final NotificationService                notifications;
     private final AuditLogService                    audit;
     private final ApplicationEventPublisher          publisher;
@@ -203,7 +206,12 @@ public class WorkflowRequestSlaScheduler {
                         r.getOrganisationId(), rec.getRecipientId())
                     .forEach(u -> notifications.notifyUser(r.getOrganisationId(), u.getId(),
                         title, titleAr, msg, "WORKFLOW_REQUEST_REMINDER", "WorkflowRequest", r.getId()));
-                default -> { /* COMMITTEE / EXTERNAL delivery lands with WF-3/WF-5 */ }
+                case "COMMITTEE" -> committeeMembers.findActiveByCommittee(
+                        r.getOrganisationId(), rec.getRecipientId()).stream()
+                    .map(CommitteeMemberTerm::getMemberUserId).filter(java.util.Objects::nonNull).distinct()
+                    .forEach(uid -> notifications.notifyUser(r.getOrganisationId(), uid,
+                        title, titleAr, msg, "WORKFLOW_REQUEST_REMINDER", "WorkflowRequest", r.getId()));
+                default -> { /* EXTERNAL — no outbound-mail portal in the platform yet */ }
             }
         }
     }

@@ -40,6 +40,17 @@ public interface CommitteeMemberTermRepository extends JpaRepository<CommitteeMe
     """)
     List<CommitteeMemberTerm> findExpiringBetween(Long organisationId, LocalDate from, LocalDate to);
 
+    /** Committees where this user currently sits (active term with a linked
+     *  platform user) — drives workflow-request COMMITTEE recipient matching
+     *  (inbox + actionable-recipient checks). */
+    @Query("""
+        SELECT DISTINCT t.committeeId FROM CommitteeMemberTerm t
+        WHERE t.organisationId = :organisationId
+          AND t.memberUserId = :userId
+          AND t.renewalStatus = 'ACTIVE'
+    """)
+    List<Long> findActiveCommitteeIdsForUser(Long organisationId, Long userId);
+
     /** Independence ratio numerator — count of independent active members. */
     @Query("""
         SELECT COUNT(t) FROM CommitteeMemberTerm t

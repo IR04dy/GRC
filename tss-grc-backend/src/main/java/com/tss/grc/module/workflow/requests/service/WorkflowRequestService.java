@@ -3,6 +3,10 @@ package com.tss.grc.module.workflow.requests.service;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.admin.committee.entity.Committee;
+import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
+import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
 import com.tss.grc.module.evidence.dto.EvidenceRequestCreateDto;
 import com.tss.grc.module.evidence.dto.EvidenceRequestResponse;
 import com.tss.grc.module.evidence.service.EvidenceRequestService;
@@ -90,6 +94,9 @@ public class WorkflowRequestService {
     private final WorkflowRequestEventRepository     eventRepo;
     private final UserRepository                     userRepo;
     private final DepartmentRepository               departmentRepo;
+    /** WF-5 — COMMITTEE recipients resolve + fan out through the committees module. */
+    private final CommitteeRepository                committeeRepo;
+    private final CommitteeMemberTermRepository      committeeMembers;
     private final NotificationService                notifications;
     private final AuditLogService                    audit;
     private final ApplicationEventPublisher          publisher;
@@ -203,6 +210,9 @@ public class WorkflowRequestService {
                 case "COMMITTEE" -> {
                     if (in.recipientId() == null)
                         throw new IllegalArgumentException("COMMITTEE recipient requires recipientId");
+                    committeeRepo.findByIdAndOrganisationId(in.recipientId(), org)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                            "COMMITTEE recipient " + in.recipientId() + " not found in this organisation"));
                 }
                 case "EXTERNAL" -> {
                     // External recipient must have a valid contact method (§5).
@@ -509,6 +519,9 @@ public class WorkflowRequestService {
             if (deptId != null)
                 recipientRepo.findByOrganisationIdAndRecipientTypeAndRecipientId(org, "DEPARTMENT", deptId)
                     .forEach(x -> requestIds.add(x.getRequestId()));
+            for (Long committeeId : committeeMembers.findActiveCommitteeIdsForUser(org, userId))
+                recipientRepo.findByOrganisationIdAndRecipientTypeAndRecipientId(org, "COMMITTEE", committeeId)
+                    .forEach(x -> requestIds.add(x.getRequestId()));
         }
         return requestIds.stream()
             .map(rid -> requestRepo.findByIdAndOrganisationId(rid, org).orElse(null))
@@ -609,7 +622,12 @@ public class WorkflowRequestService {
                         r.getOrganisationId(), rec.getRecipientId())
                     .forEach(u -> notifications.notifyUser(r.getOrganisationId(), u.getId(),
                         title, titleAr, msg, "WORKFLOW_REQUEST_ASSIGNED", "WorkflowRequest", r.getId()));
-                default -> { /* COMMITTEE / EXTERNAL delivery lands with WF-3/WF-4 (member fan-out, portal) */ }
+                case "COMMITTEE" -> committeeMembers.findActiveByCommittee(
+                        r.getOrganisationId(), rec.getRecipientId()).stream()
+                    .map(CommitteeMemberTerm::getMemberUserId).filter(Objects::nonNull).distinct()
+                    .forEach(uid -> notifications.notifyUser(r.getOrganisationId(), uid,
+                        title, titleAr, msg, "WORKFLOW_REQUEST_ASSIGNED", "WorkflowRequest", r.getId()));
+                default -> { /* EXTERNAL — recorded + §5-validated; no outbound-mail portal in the platform yet */ }
             }
             rec.setStatus("NOTIFIED");
             recipientRepo.save(rec);
@@ -622,6 +640,11 @@ public class WorkflowRequestService {
         List<String> roles = myRoleNames();
         Long deptId = userId == null ? null
             : userRepo.findById(userId).map(User::getDepartmentId).orElse(null);
+        // Committee membership is only looked up when the request actually addresses a committee.
+        List<Long> myCommittees = userId != null
+                && all.stream().anyMatch(x -> "COMMITTEE".equals(x.getRecipientType()))
+            ? committeeMembers.findActiveCommitteeIdsForUser(r.getOrganisationId(), userId)
+            : List.of();
         boolean admin = isPlatformAdmin();
 
         for (WorkflowRequestRecipient rec : all) {
@@ -631,7 +654,8 @@ public class WorkflowRequestService {
             boolean match = admin
                 || ("USER".equals(rec.getRecipientType()) && rec.getRecipientId() != null && rec.getRecipientId().equals(userId))
                 || ("ROLE".equals(rec.getRecipientType()) && rec.getRecipientKey() != null && roles.contains(rec.getRecipientKey()))
-                || ("DEPARTMENT".equals(rec.getRecipientType()) && rec.getRecipientId() != null && rec.getRecipientId().equals(deptId));
+                || ("DEPARTMENT".equals(rec.getRecipientType()) && rec.getRecipientId() != null && rec.getRecipientId().equals(deptId))
+                || ("COMMITTEE".equals(rec.getRecipientType()) && rec.getRecipientId() != null && myCommittees.contains(rec.getRecipientId()));
             if (match) return rec;
         }
         throw new IllegalArgumentException(
@@ -710,6 +734,8 @@ public class WorkflowRequestService {
             case "USER" -> userRepo.findById(in.recipientId()).map(User::getFullNameEn).orElse("user#" + in.recipientId());
             case "DEPARTMENT" -> departmentRepo.findByIdAndOrganisationId(in.recipientId(), org)
                 .map(d -> d.getNameEn()).orElse("dept#" + in.recipientId());
+            case "COMMITTEE" -> committeeRepo.findByIdAndOrganisationId(in.recipientId(), org)
+                .map(Committee::getNameEn).orElse("committee#" + in.recipientId());
             case "ROLE" -> in.recipientKey();
             case "EXTERNAL" -> in.recipientKey();
             default -> in.recipientKey() != null ? in.recipientKey() : "#" + in.recipientId();

@@ -2,6 +2,9 @@ package com.tss.grc.module.workflow.requests.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
+import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
 import com.tss.grc.module.evidence.dto.EvidenceRequestCreateDto;
 import com.tss.grc.module.evidence.dto.EvidenceRequestResponse;
 import com.tss.grc.module.evidence.service.EvidenceRequestService;
@@ -63,6 +66,8 @@ class WorkflowRequestServiceTest {
     @Mock private WorkflowRequestEventRepository     eventRepo;
     @Mock private UserRepository                     userRepo;
     @Mock private DepartmentRepository               departmentRepo;
+    @Mock private CommitteeRepository                committeeRepo;
+    @Mock private CommitteeMemberTermRepository      committeeMembers;
     @Mock private NotificationService                notifications;
     @Mock private AuditLogService                    audit;
     @Mock private ApplicationEventPublisher          publisher;
@@ -286,6 +291,84 @@ class WorkflowRequestServiceTest {
         assertThat(b.getStatus()).isEqualTo("SKIPPED");        // ANY rule skips the rest
         assertThat(resp.status()).isEqualTo("CLOSED");          // no review gate → auto-close
         assertThat(resp.closureCondition()).isEqualTo("AUTO_ON_COMPLETION");
+    }
+
+    // ── WF-5 committee recipient fan-out ────────────────────────────────────
+
+    private static CommitteeMemberTerm term(Long memberUserId) {
+        CommitteeMemberTerm t = new CommitteeMemberTerm();
+        t.setMemberUserId(memberUserId);
+        t.setMemberName(memberUserId == null ? "External Advisor" : "Member " + memberUserId);
+        return t;
+    }
+
+    private WorkflowRequestRecipient committeeRec(Long requestId, Long committeeId, String status) {
+        WorkflowRequestRecipient x = new WorkflowRequestRecipient();
+        x.setId(ids.incrementAndGet());
+        x.setOrganisationId(ORG);
+        x.setRequestId(requestId);
+        x.setRecipientType("COMMITTEE");
+        x.setRecipientId(committeeId);
+        x.setActorRole("ASSIGNEE");
+        x.setStepNo(1);
+        x.setStatus(status);
+        return x;
+    }
+
+    @Test
+    void create_committeeRecipient_mustExistInOrganisation() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        when(committeeRepo.findByIdAndOrganisationId(55L, ORG)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> svc.create(create("PARALLEL", "ALL", "MEDIUM",
+                LocalDate.now().plusDays(7), null,
+                List.of(new RecipientDto("COMMITTEE", 55L, null, null, "ASSIGNEE", 1)), null)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("COMMITTEE recipient 55 not found");
+        verify(requestRepo, never()).save(any());
+    }
+
+    @Test
+    void send_committeeRecipient_fansOutToActiveMembersWithUsers() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        WorkflowRequest r = sentRequest(30L, "PARALLEL", "ALL", null);
+        r.setStatus("DRAFT");
+        r.setRequestType("APPROVAL");
+        when(requestRepo.findByIdAndOrganisationId(30L, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 30L))
+            .thenReturn(List.of(committeeRec(30L, 5L, "PENDING")));
+        // Two linked members + one external advisor without a platform user.
+        when(committeeMembers.findActiveByCommittee(ORG, 5L))
+            .thenReturn(List.of(term(7L), term(8L), term(null)));
+
+        svc.send(30L);
+
+        org.mockito.ArgumentCaptor<Long> uid = org.mockito.ArgumentCaptor.forClass(Long.class);
+        verify(notifications, org.mockito.Mockito.times(2)).notifyUser(
+            org.mockito.ArgumentMatchers.eq(ORG), uid.capture(), any(), any(), any(), any(), any(), any());
+        assertThat(uid.getAllValues()).containsExactlyInAnyOrder(7L, 8L);
+    }
+
+    @Test
+    void respond_activeCommitteeMember_isActionable_nonMemberIsNot() {
+        // The request is addressed to committee 5; user 7 sits on it, user 9 does not.
+        WorkflowRequest r = sentRequest(31L, "PARALLEL", "ALL", null);
+        WorkflowRequestRecipient row = committeeRec(31L, 5L, "NOTIFIED");
+        when(requestRepo.findByIdAndOrganisationId(31L, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 31L))
+            .thenReturn(List.of(row));
+        lenient().when(userRepo.findById(anyLong())).thenAnswer(inv -> Optional.of(orgUser(inv.getArgument(0))));
+
+        authAs(9L, "outsider");
+        when(committeeMembers.findActiveCommitteeIdsForUser(ORG, 9L)).thenReturn(List.of());
+        assertThatThrownBy(() -> svc.respond(31L, "not my committee"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("not an actionable recipient");
+
+        authAs(7L, "boardmember");
+        when(committeeMembers.findActiveCommitteeIdsForUser(ORG, 7L)).thenReturn(List.of(5L));
+        RequestResponse resp = svc.respond(31L, "committee acknowledged");
+        assertThat(row.getStatus()).isEqualTo("RESPONDED");
+        assertThat(resp.status()).isEqualTo("CLOSED");   // no review gate → auto-close
     }
 
     // ── WF-4 evidence bridge (send side) ────────────────────────────────────
