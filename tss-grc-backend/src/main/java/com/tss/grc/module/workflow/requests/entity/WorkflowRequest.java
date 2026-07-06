@@ -79,6 +79,10 @@ public class WorkflowRequest extends BaseEntity {
     /** WF-4 — the real evidence.evidence_requests row this request opened on send (bridge). */
     @Column(name = "evidence_request_id") private Long evidenceRequestId;
 
+    /** WF-6 — conditional-routing rules as a JSON array (§7 #5):
+     *  [{stepNo, onOutcome, action: GOTO_STEP|RETURN|CLOSE|ESCALATE, targetStep}]. */
+    @Column(name = "branch_rules", columnDefinition = "NVARCHAR(MAX)") private String branchRules;
+
     @Column(name = "closed_at") private LocalDateTime closedAt;
     @Column(name = "reopened_at") private LocalDateTime reopenedAt;
 }

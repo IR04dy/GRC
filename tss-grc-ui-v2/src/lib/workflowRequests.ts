@@ -22,6 +22,16 @@ export interface WorkflowRecipientInput {
   stepNo?: number;               // sequential order (1-based)
 }
 
+/** WF-6 — conditional routing (§7 #5): when the recipient completing stepNo responds
+ *  with onOutcome, the branch overrides the default routing. GOTO_STEP is forward-only. */
+export type BranchAction = 'GOTO_STEP' | 'RETURN' | 'CLOSE' | 'ESCALATE';
+export interface WorkflowBranchRule {
+  stepNo: number;
+  onOutcome: string;
+  action: BranchAction;
+  targetStep?: number | null;    // GOTO_STEP only
+}
+
 export interface WorkflowRequestCreate {
   sourceModule: string;
   sourceRecordType?: string;
@@ -46,6 +56,7 @@ export interface WorkflowRequestCreate {
   reviewerId?: number;
   approverId?: number;
   recipients: WorkflowRecipientInput[];
+  branchRules?: WorkflowBranchRule[];   // WF-6
 }
 
 // ─── Responses ───────────────────────────────────────────────────────
@@ -54,6 +65,7 @@ export interface WorkflowRecipientDto {
   recipientKey: string | null; recipientLabel: string | null;
   actorRole: ActorRole; stepNo: number; status: string;
   respondedAt: string | null; respondedBy: number | null; response: string | null;
+  responseOutcome: string | null;   // WF-6
 }
 
 export interface WorkflowEventDto {
@@ -78,6 +90,7 @@ export interface WorkflowRequestDto {
   closedAt: string | null; reopenedAt: string | null;
   createdAt: string; updatedAt: string | null;
   recipients: WorkflowRecipientDto[] | null;
+  branchRules: WorkflowBranchRule[] | null;   // WF-6
 }
 
 const act = (id: number, action: string, note?: string, outcome?: string) =>
@@ -95,7 +108,8 @@ export const workflowRequestsApi = {
   auditLog: (id: number) => api.get<WorkflowEventDto[]>(`/api/v1/workflows/requests/${id}/audit-log`),
 
   send:     (id: number)                => act(id, 'send'),
-  respond:  (id: number, note?: string) => act(id, 'respond', note),
+  /** WF-6 — outcome (optional) can trigger a conditional branch rule. */
+  respond:  (id: number, note?: string, outcome?: string) => act(id, 'respond', note, outcome),
   submit:   (id: number, note?: string) => act(id, 'submit', note),
   review:   (id: number, outcome: 'APPROVE' | 'RETURN', note?: string) => act(id, 'review', note, outcome),
   approve:  (id: number, note?: string) => act(id, 'approve', note),

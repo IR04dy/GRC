@@ -45,4 +45,6 @@ public class WorkflowRequestRecipient extends BaseEntity {
     @Column(name = "responded_at") private LocalDateTime respondedAt;
     @Column(name = "responded_by") private Long respondedBy;
     @Column(columnDefinition = "NVARCHAR(MAX)") private String response;
+    /** WF-6 — outcome token the responder chose (drives conditional branch rules). */
+    @Column(name = "response_outcome", length = 40) private String responseOutcome;
 }

@@ -60,10 +60,11 @@ public class WorkflowRequestController {
     @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse send(@PathVariable Long id) { return svc.send(id); }
 
+    /** WF-6 — body.outcome (optional) can trigger a conditional branch rule (§7 #5). */
     @PostMapping("/{id}/respond")
     @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse respond(@PathVariable Long id, @RequestBody(required = false) ActionRequest body) {
-        return svc.respond(id, body == null ? null : body.note());
+        return svc.respond(id, body == null ? null : body.note(), body == null ? null : body.outcome());
     }
 
     @PostMapping("/{id}/submit")

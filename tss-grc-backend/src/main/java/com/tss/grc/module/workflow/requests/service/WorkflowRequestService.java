@@ -1,5 +1,7 @@
 package com.tss.grc.module.workflow.requests.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
@@ -16,6 +18,7 @@ import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.platform.repository.DepartmentRepository;
 import com.tss.grc.module.platform.service.NotificationService;
+import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.BranchRuleDto;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.CreateRequest;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.EventResponse;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RecipientDto;
@@ -68,6 +71,10 @@ public class WorkflowRequestService {
     static final Set<String> PRIORITIES      = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
     static final Set<String> RECIPIENT_TYPES = Set.of("USER", "ROLE", "DEPARTMENT", "COMMITTEE", "EXTERNAL");
     static final Set<String> ACTOR_ROLES     = Set.of("ASSIGNEE", "REVIEWER", "APPROVER", "OBSERVER", "ESCALATION");
+    /** WF-6 — conditional-routing branch actions (§7 #5). */
+    static final Set<String> BRANCH_ACTIONS  = Set.of("GOTO_STEP", "RETURN", "CLOSE", "ESCALATE");
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /** §6 lifecycle — allowed transitions. Unknown target → 400; known-but-illegal → 409. */
     static final Map<String, Set<String>> TRANSITIONS = Map.ofEntries(
@@ -138,8 +145,10 @@ public class WorkflowRequestService {
         r.setStatus("DRAFT");
 
         List<RecipientDto> recipients = dto.recipients() == null ? List.of() : dto.recipients();
-        validate(r, recipients, org);
+        List<BranchRuleDto> rules = normalizeRules(dto.branchRules());
+        validate(r, recipients, rules, org);
         r.setRecipientCategory(categoryOf(recipients));
+        if (!rules.isEmpty()) r.setBranchRules(writeRules(rules));
         r = requestRepo.save(r);
 
         for (RecipientDto in : recipients) {
@@ -164,7 +173,7 @@ public class WorkflowRequestService {
     }
 
     /** §5 validation — every gate throws IllegalArgumentException → 400. */
-    private void validate(WorkflowRequest r, List<RecipientDto> recipients, Long org) {
+    private void validate(WorkflowRequest r, List<RecipientDto> recipients, List<BranchRuleDto> rules, Long org) {
         if (!ROUTING_MODES.contains(r.getRoutingMode()))
             throw new IllegalArgumentException("routingMode must be one of " + ROUTING_MODES);
         if (!COMPLETION_RULES.contains(r.getCompletionRule()))
@@ -246,6 +255,25 @@ public class WorkflowRequestService {
 
         if (r.getReviewerId() != null) requireOrgUser(org, r.getReviewerId(), "reviewerId");
         if (r.getApproverId() != null) requireOrgUser(org, r.getApproverId(), "approverId");
+
+        // WF-6 — conditional-routing rules (§7 #5). GOTO_STEP is forward-only, which keeps
+        // the §7 #19 no-circular-routing guarantee; RETURN/CLOSE/ESCALATE reuse machine paths.
+        for (BranchRuleDto b : rules) {
+            if (!BRANCH_ACTIONS.contains(b.action()))
+                throw new IllegalArgumentException("branch action must be one of " + BRANCH_ACTIONS);
+            if (b.stepNo() == null || !steps.contains(b.stepNo()))
+                throw new IllegalArgumentException(
+                    "branch rule stepNo " + b.stepNo() + " is not a step of this request");
+            if ("GOTO_STEP".equals(b.action())) {
+                if (!"SEQUENTIAL".equals(r.getRoutingMode()))
+                    throw new IllegalArgumentException("GOTO_STEP branch rules require SEQUENTIAL routing");
+                if (b.targetStep() == null || !steps.contains(b.targetStep()))
+                    throw new IllegalArgumentException("GOTO_STEP requires an existing targetStep");
+                if (b.targetStep() <= b.stepNo())
+                    throw new IllegalArgumentException(
+                        "GOTO_STEP must jump forward (targetStep > stepNo) — circular routing is blocked");
+            }
+        }
     }
 
     // ── Lifecycle transitions (§6 APIs) ──────────────────────────────────────
@@ -286,9 +314,14 @@ public class WorkflowRequestService {
      * (sequential) or any step (parallel). Sequential order is enforced by construction: rows
      * outside the current step are not actionable. Completing the last gate flips the request to
      * SUBMITTED (and auto-closes when no reviewer/approver gate exists).
+     *
+     * <p>WF-6 — if the responder supplies an {@code outcome} that matches one of the request's
+     * branch rules for their step, the branch (GOTO_STEP / RETURN / CLOSE / ESCALATE) overrides
+     * the default routing (§7 #5: "if rejected → return to submitter; if high risk → executive
+     * approval").
      */
     @Transactional
-    public RequestResponse respond(Long id, String note) {
+    public RequestResponse respond(Long id, String note, String outcome) {
         WorkflowRequest r = get(id);
         if (!Set.of("SENT", "IN_PROGRESS", "REOPENED", "ESCALATED", "OVERDUE").contains(r.getStatus()))
             throw new IllegalTransitionException(r.getStatus(), "RESPONDED(recipient)", TRANSITIONS.get(r.getStatus()));
@@ -302,7 +335,11 @@ public class WorkflowRequestService {
         mine.setRespondedAt(LocalDateTime.now());
         mine.setRespondedBy(CurrentActor.userId());
         mine.setResponse(note);
+        mine.setResponseOutcome(outcome == null || outcome.isBlank() ? null : outcome.trim().toUpperCase());
         recipientRepo.save(mine);
+
+        BranchRuleDto branch = matchBranchRule(r, mine.getStepNo(), mine.getResponseOutcome());
+        if (branch != null) return applyBranch(r, all, mine, branch, from);
 
         // Finalize EVERY mutation of the request BEFORE any flush-triggering query (the SQL Server
         // ROWVERSION @Version tolerates exactly one UPDATE per transaction — a second flush after an
@@ -324,6 +361,7 @@ public class WorkflowRequestService {
 
         appendEvent(r, "RESPONDED", from, r.getStatus(),
             (mine.getRecipientLabel() == null ? "recipient" : mine.getRecipientLabel()) + " responded"
+                + (mine.getResponseOutcome() == null ? "" : " [" + mine.getResponseOutcome() + "]")
                 + (note == null || note.isBlank() ? "" : ": " + note));
         if (adv.nextStep() != null)
             appendEvent(r, "STEP_ADVANCED", r.getStatus(), r.getStatus(), "Routing advanced to step " + adv.nextStep());
@@ -445,6 +483,14 @@ public class WorkflowRequestService {
         requestRepo.save(r);
         appendEvent(r, "ESCALATED", from, "ESCALATED", note);
         audit.log("WORKFLOW_REQUEST_ESCALATED", "WorkflowRequest", r.getId(), code(r) + noteSuffix(note));
+        notifyEscalationPath(r, note);
+        return toResponse(r);
+    }
+
+    /** Escalation-path fan-out: escalation user + role broadcast + F8 event. Shared by the
+     *  manual /escalate action and the WF-6 ESCALATE branch rule (WF-2's sweep has its own copy
+     *  with overdue wording). */
+    private void notifyEscalationPath(WorkflowRequest r, String note) {
         if (r.getEscalationUserId() != null)
             notifications.notifyUser(r.getOrganisationId(), r.getEscalationUserId(),
                 "Workflow request escalated", "تم تصعيد طلب سير العمل",
@@ -458,7 +504,6 @@ public class WorkflowRequestService {
         publisher.publishEvent(DomainEvent.of(r.getOrganisationId(), "WORKFLOW_REQUEST_ESCALATED",
             "WorkflowRequest", r.getId(),
             Map.of("priority", r.getPriority(), "requestType", r.getRequestType())));
-        return toResponse(r);
     }
 
     @Transactional
@@ -545,6 +590,105 @@ public class WorkflowRequestService {
     }
 
     // ── Routing internals ────────────────────────────────────────────────────
+
+    /** WF-6 — first branch rule matching the responder's step + outcome (or null). */
+    private static BranchRuleDto matchBranchRule(WorkflowRequest r, Integer stepNo, String outcome) {
+        if (outcome == null || r.getBranchRules() == null || r.getBranchRules().isBlank()) return null;
+        for (BranchRuleDto b : readRules(r.getBranchRules())) {
+            if (stepNo.equals(b.stepNo()) && outcome.equalsIgnoreCase(b.onOutcome())) return b;
+        }
+        return null;
+    }
+
+    /**
+     * WF-6 — apply a matched branch rule instead of the default routing advance. All request
+     * mutations happen before the single save (ROWVERSION rule); notifications run last.
+     */
+    private RequestResponse applyBranch(WorkflowRequest r, List<WorkflowRequestRecipient> all,
+                                        WorkflowRequestRecipient mine, BranchRuleDto rule, String from) {
+        String outcome = mine.getResponseOutcome();
+        String fired = "Branch rule fired: outcome '" + outcome + "' at step " + rule.stepNo();
+        switch (rule.action()) {
+            case "GOTO_STEP" -> {
+                // The jumped-over steps must never block: park their pending assignee gates.
+                for (WorkflowRequestRecipient rec : all) {
+                    if (!"ASSIGNEE".equals(rec.getActorRole())) continue;
+                    if (!Set.of("PENDING", "NOTIFIED", "IN_PROGRESS").contains(rec.getStatus())) continue;
+                    if (rec.getStepNo() > mine.getStepNo() && rec.getStepNo() < rule.targetStep()) {
+                        rec.setStatus("SKIPPED");
+                        recipientRepo.save(rec);
+                    }
+                }
+                r.setCurrentStep(rule.targetStep());
+                if ("SENT".equals(r.getStatus())) transition(r, "IN_PROGRESS");
+                requestRepo.save(r);
+                appendEvent(r, "BRANCHED", from, r.getStatus(),
+                    fired + " → jumped to step " + rule.targetStep());
+                audit.log("WORKFLOW_REQUEST_BRANCHED", "WorkflowRequest", r.getId(),
+                    code(r) + " · " + outcome + " → step " + rule.targetStep());
+                notifyStep(r, rule.targetStep());
+            }
+            case "RETURN" -> {
+                if (!"SUBMITTED".equals(r.getStatus())) transition(r, "SUBMITTED");
+                transition(r, "RETURNED");
+                requestRepo.save(r);
+                appendEvent(r, "BRANCHED", from, "RETURNED", fired + " → returned to initiator");
+                audit.log("WORKFLOW_REQUEST_BRANCHED", "WorkflowRequest", r.getId(),
+                    code(r) + " · " + outcome + " → RETURNED");
+                notifyInitiator(r, "Workflow request returned by branch rule",
+                    "أُعيد طلب سير العمل بقاعدة تفرع",
+                    "was returned to you (branch: " + outcome + ")");
+            }
+            case "CLOSE" -> {
+                if (!"SUBMITTED".equals(r.getStatus())) transition(r, "SUBMITTED");
+                transition(r, "CLOSED");
+                r.setClosedAt(LocalDateTime.now());
+                if (r.getClosureCondition() == null) r.setClosureCondition("BRANCH_RULE");
+                requestRepo.save(r);
+                appendEvent(r, "BRANCHED", from, "CLOSED", fired + " → closed");
+                audit.log("WORKFLOW_REQUEST_BRANCHED", "WorkflowRequest", r.getId(),
+                    code(r) + " · " + outcome + " → CLOSED");
+            }
+            case "ESCALATE" -> {
+                transition(r, "ESCALATED");
+                r.setEscalatedAt(LocalDateTime.now());
+                requestRepo.save(r);
+                appendEvent(r, "BRANCHED", from, "ESCALATED", fired + " → escalated");
+                audit.log("WORKFLOW_REQUEST_BRANCHED", "WorkflowRequest", r.getId(),
+                    code(r) + " · " + outcome + " → ESCALATED");
+                notifyEscalationPath(r, "branch rule on outcome '" + outcome + "'");
+            }
+            default -> throw new IllegalArgumentException("Unknown branch action: " + rule.action());
+        }
+        return toResponse(r);
+    }
+
+    /** WF-6 — normalize rules for storage: upper-case action + outcome tokens. */
+    private static List<BranchRuleDto> normalizeRules(List<BranchRuleDto> rules) {
+        if (rules == null || rules.isEmpty()) return List.of();
+        return rules.stream().map(b -> new BranchRuleDto(
+            b.stepNo(),
+            b.onOutcome() == null ? null : b.onOutcome().trim().toUpperCase(),
+            b.action() == null ? null : b.action().trim().toUpperCase(),
+            b.targetStep())).toList();
+    }
+
+    private static String writeRules(List<BranchRuleDto> rules) {
+        try {
+            return MAPPER.writeValueAsString(rules);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("branchRules could not be serialized: " + e.getMessage());
+        }
+    }
+
+    private static List<BranchRuleDto> readRules(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return MAPPER.readValue(json, new TypeReference<List<BranchRuleDto>>() {});
+        } catch (Exception e) {
+            return List.of();   // rules were validated at create; a parse failure must not break reads
+        }
+    }
 
     /** Routing decision after a response — computed in memory; the caller applies mutations. */
     record RoutingAdvance(boolean complete, Integer nextStep) {}
@@ -781,7 +925,7 @@ public class WorkflowRequestService {
             : recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(r.getOrganisationId(), r.getId())
                 .stream().map(x -> new RecipientResponse(x.getId(), x.getRecipientType(), x.getRecipientId(),
                     x.getRecipientKey(), x.getRecipientLabel(), x.getActorRole(), x.getStepNo(), x.getStatus(),
-                    x.getRespondedAt(), x.getRespondedBy(), x.getResponse()))
+                    x.getRespondedAt(), x.getRespondedBy(), x.getResponse(), x.getResponseOutcome()))
                 .toList();
         return new RequestResponse(r.getId(), code(r),
             r.getSourceModule(), r.getSourceRecordType(), r.getSourceRecordId(),
@@ -797,7 +941,8 @@ public class WorkflowRequestService {
             r.getReviewerId(), r.getApproverId(), r.getEvidenceRequestId(),
             r.getClosedAt(), r.getReopenedAt(),
             r.getCreatedAt(), r.getUpdatedAt(),
-            recipients);
+            recipients,
+            readRules(r.getBranchRules()));
     }
 
     /** WF-1 exposes routing internals to the WF-2 SLA/reminder/escalation sweep. */

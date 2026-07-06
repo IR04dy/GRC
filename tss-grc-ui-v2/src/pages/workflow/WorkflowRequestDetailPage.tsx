@@ -27,7 +27,7 @@ const EVENT_TONE: Record<string, BadgeTone> = {
   CREATED: 'neutral', SENT: 'info', RESPONDED: 'info', STEP_ADVANCED: 'info', REMINDED: 'warning',
   SUBMITTED: 'warning', REVIEWED: 'warning', RETURNED: 'warning', RESUBMITTED: 'warning',
   APPROVED: 'success', REJECTED: 'danger', ESCALATED: 'danger', OVERDUE: 'danger',
-  CLOSED: 'neutral', REOPENED: 'info',
+  CLOSED: 'neutral', REOPENED: 'info', BRANCHED: 'warning', EVIDENCE_BRIDGED: 'info',
 };
 const RECIPIENT_STATUS_TONE: Record<string, BadgeTone> = {
   PENDING: 'neutral', NOTIFIED: 'info', IN_PROGRESS: 'info',
@@ -43,6 +43,7 @@ export function WorkflowRequestDetailPage() {
   const [events, setEvents] = useState<WorkflowEventDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [note, setNote] = useState('');
+  const [outcome, setOutcome] = useState('');   // WF-6 — respond outcome (may trigger a branch rule)
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
@@ -62,6 +63,7 @@ export function WorkflowRequestDetailPage() {
       await action(row.id, note.trim() || undefined);
       toast.success(label);
       setNote('');
+      setOutcome('');
       load();
     } catch (e) {
       toast.danger((e as Error)?.message ?? 'Action failed');
@@ -134,6 +136,7 @@ export function WorkflowRequestDetailPage() {
                     <div style={{ fontSize: 12, minWidth: 0 }}>
                       <strong>{r.recipientLabel ?? r.recipientKey ?? `#${r.recipientId}`}</strong>
                       <span style={{ color: 'var(--ink-3)' }}> · {r.actorRole}</span>
+                      {r.responseOutcome && <Badge tone="warning">{r.responseOutcome}</Badge>}
                       {r.response && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{r.response}</div>}
                     </div>
                     <Badge tone={RECIPIENT_STATUS_TONE[r.status] ?? 'neutral'}>{r.status}</Badge>
@@ -172,6 +175,13 @@ export function WorkflowRequestDetailPage() {
           <Card title={ar ? 'الإجراءات' : 'Actions'} Icon={Send}>
             <Input label={ar ? 'ملاحظة (تُرفق بالإجراء)' : 'Note (attached to the action)'} value={note}
               onChange={e => setNote(e.target.value)} placeholder={ar ? 'اختياري…' : 'optional…'} />
+            {canRespond && (row.branchRules?.length ?? 0) > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <Input label={ar ? 'النتيجة (قد تُفعّل قاعدة تفرع)' : 'Outcome (may trigger a branch rule)'}
+                  value={outcome} onChange={e => setOutcome(e.target.value)}
+                  placeholder={[...new Set((row.branchRules ?? []).map(b => b.onOutcome))].join(' / ')} />
+              </div>
+            )}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
               {s === 'DRAFT' && (
                 <Button size="sm" variant="primary" disabled={busy}
@@ -181,7 +191,8 @@ export function WorkflowRequestDetailPage() {
               )}
               {canRespond && (
                 <Button size="sm" variant="primary" disabled={busy}
-                  onClick={() => void run(workflowRequestsApi.respond, ar ? 'تم الرد' : 'Responded')}>
+                  onClick={() => void run((rid, n) => workflowRequestsApi.respond(rid, n, outcome.trim().toUpperCase() || undefined),
+                    ar ? 'تم الرد' : 'Responded')}>
                   <CheckCircle2 size={13} /> {ar ? 'الرد / إنجاز' : 'Respond / complete'}
                 </Button>
               )}
@@ -233,6 +244,28 @@ export function WorkflowRequestDetailPage() {
                   : 'Authorization is server-enforced: only the actionable recipient may respond; only the designated reviewer/approver may gate.'}
             </div>
           </Card>
+
+          {(row.branchRules?.length ?? 0) > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <Card title={ar ? 'قواعد التفرع الشرطي' : 'Conditional branch rules'}>
+                {(row.branchRules ?? []).map((b, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12,
+                    padding: '6px 0', borderBottom: i < (row.branchRules?.length ?? 0) - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <Badge tone="neutral">{(ar ? 'الخطوة ' : 'step ') + b.stepNo}</Badge>
+                    <span className="mono">{b.onOutcome}</span>
+                    <span style={{ color: 'var(--ink-3)' }}>→</span>
+                    <Badge tone={b.action === 'ESCALATE' ? 'danger' : b.action === 'CLOSE' ? 'neutral' : 'warning'}>
+                      {b.action}{b.action === 'GOTO_STEP' && b.targetStep != null ? ` ${b.targetStep}` : ''}
+                    </Badge>
+                  </div>
+                ))}
+                <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 8 }}>
+                  {ar ? 'ترد بنتيجة مطابقة فيتجاوز التوجيه مساره الافتراضي (القفز للأمام فقط — لا حلقات).'
+                      : 'Responding with a matching outcome overrides the default routing (forward-only jumps — no cycles).'}
+                </div>
+              </Card>
+            </div>
+          )}
 
           <div style={{ marginTop: 16 }}>
             <Card title={ar ? 'التفاصيل' : 'Details'}>

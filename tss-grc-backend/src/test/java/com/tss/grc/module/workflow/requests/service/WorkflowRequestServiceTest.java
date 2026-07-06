@@ -13,6 +13,7 @@ import com.tss.grc.module.iam.repository.UserRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.repository.DepartmentRepository;
 import com.tss.grc.module.platform.service.NotificationService;
+import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.CreateRequest;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RecipientDto;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RequestResponse;
@@ -120,7 +121,7 @@ class WorkflowRequestServiceTest {
                                  Long reviewerId) {
         return new CreateRequest("RISK", "Risk", 5L, "EVIDENCE_REQUEST",
             "Collect evidence", null, null, routing, rule, "UPLOAD", due, 48, priority, null,
-            3, escRole, null, true, true, null, reviewerId, null, recipients);
+            3, escRole, null, true, true, null, reviewerId, null, recipients, null);
     }
 
     // ── §5 validation gates ─────────────────────────────────────────────────
@@ -217,7 +218,7 @@ class WorkflowRequestServiceTest {
         when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 10L))
             .thenReturn(List.of(rec(10L, 2L, 1, "NOTIFIED")));
         lenient().when(userRepo.findById(99L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> svc.respond(10L, "done"))
+        assertThatThrownBy(() -> svc.respond(10L, "done", null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("not an actionable recipient");
     }
@@ -231,7 +232,7 @@ class WorkflowRequestServiceTest {
         when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 11L))
             .thenReturn(List.of(rec(11L, 2L, 1, "NOTIFIED"), rec(11L, 3L, 2, "PENDING")));
         lenient().when(userRepo.findById(3L)).thenReturn(Optional.of(orgUser(3L)));
-        assertThatThrownBy(() -> svc.respond(11L, "me first"))
+        assertThatThrownBy(() -> svc.respond(11L, "me first", null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("not an actionable recipient");
     }
@@ -247,7 +248,7 @@ class WorkflowRequestServiceTest {
             .thenReturn(List.of(r1, r2));
         lenient().when(userRepo.findById(2L)).thenReturn(Optional.of(orgUser(2L)));
 
-        RequestResponse resp = svc.respond(12L, "step 1 done");
+        RequestResponse resp = svc.respond(12L, "step 1 done", null);
 
         assertThat(r1.getStatus()).isEqualTo("RESPONDED");
         assertThat(r.getCurrentStep()).isEqualTo(2);          // baton passed
@@ -267,7 +268,7 @@ class WorkflowRequestServiceTest {
             .thenReturn(List.of(a, b));
         lenient().when(userRepo.findById(3L)).thenReturn(Optional.of(orgUser(3L)));
 
-        RequestResponse resp = svc.respond(13L, "second done");
+        RequestResponse resp = svc.respond(13L, "second done", null);
 
         assertThat(b.getStatus()).isEqualTo("RESPONDED");
         assertThat(resp.status()).isEqualTo("SUBMITTED");      // reviewer gate keeps it open
@@ -285,12 +286,138 @@ class WorkflowRequestServiceTest {
             .thenReturn(List.of(a, b));
         lenient().when(userRepo.findById(2L)).thenReturn(Optional.of(orgUser(2L)));
 
-        RequestResponse resp = svc.respond(14L, "any-one done");
+        RequestResponse resp = svc.respond(14L, "any-one done", null);
 
         assertThat(a.getStatus()).isEqualTo("RESPONDED");
         assertThat(b.getStatus()).isEqualTo("SKIPPED");        // ANY rule skips the rest
         assertThat(resp.status()).isEqualTo("CLOSED");          // no review gate → auto-close
         assertThat(resp.closureCondition()).isEqualTo("AUTO_ON_COMPLETION");
+    }
+
+    // ── WF-6 conditional routing (§7 #5) ────────────────────────────────────
+
+    private CreateRequest createWithRules(String routing, List<RecipientDto> recipients,
+                                          List<WorkflowRequestDtos.BranchRuleDto> rules) {
+        return new CreateRequest("RISK", "Risk", 5L, "REVIEW",
+            "Conditional review", null, null, routing, "ALL", "REVIEW",
+            LocalDate.now().plusDays(7), 48, "MEDIUM", null,
+            3, null, null, true, false, null, null, null, recipients, rules);
+    }
+
+    private static WorkflowRequestDtos.BranchRuleDto rule(Integer step, String outcome, String action, Integer target) {
+        return new WorkflowRequestDtos.BranchRuleDto(step, outcome, action, target);
+    }
+
+    @Test
+    void create_branchRule_backwardGoto_rejected_noCycles() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        when(userRepo.findById(anyLong())).thenAnswer(inv -> Optional.of(orgUser(inv.getArgument(0))));
+        assertThatThrownBy(() -> svc.create(createWithRules("SEQUENTIAL",
+                List.of(user(2L, 1), user(3L, 2)),
+                List.of(rule(2, "REWORK", "GOTO_STEP", 1)))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("circular");
+    }
+
+    @Test
+    void create_branchRule_gotoInParallel_rejected() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        when(userRepo.findById(anyLong())).thenAnswer(inv -> Optional.of(orgUser(inv.getArgument(0))));
+        assertThatThrownBy(() -> svc.create(createWithRules("PARALLEL",
+                List.of(user(2L, 1), user(3L, 1)),
+                List.of(rule(1, "FAST", "GOTO_STEP", 1)))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("SEQUENTIAL");
+    }
+
+    @Test
+    void create_branchRule_unknownAction_rejected() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        when(userRepo.findById(anyLong())).thenAnswer(inv -> Optional.of(orgUser(inv.getArgument(0))));
+        assertThatThrownBy(() -> svc.create(createWithRules("SEQUENTIAL",
+                List.of(user(2L, 1)),
+                List.of(rule(1, "X", "TELEPORT", null))))
+            ).isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("branch action");
+    }
+
+    @Test
+    void respond_branchRule_rejectedOutcome_returnsToInitiator() {
+        authAs(2L, "assignee");
+        WorkflowRequest r = sentRequest(40L, "SEQUENTIAL", "ALL", null);
+        r.setBranchRules("[{\"stepNo\":1,\"onOutcome\":\"REJECTED\",\"action\":\"RETURN\",\"targetStep\":null}]");
+        WorkflowRequestRecipient r1 = rec(40L, 2L, 1, "NOTIFIED");
+        when(requestRepo.findByIdAndOrganisationId(40L, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 40L))
+            .thenReturn(List.of(r1, rec(40L, 3L, 2, "PENDING")));
+        lenient().when(userRepo.findById(2L)).thenReturn(Optional.of(orgUser(2L)));
+
+        RequestResponse resp = svc.respond(40L, "not acceptable", "rejected");
+
+        assertThat(r1.getResponseOutcome()).isEqualTo("REJECTED");
+        assertThat(resp.status()).isEqualTo("RETURNED");                 // §7 #5: rejected → submitter
+        verify(notifications).notifyUser(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void respond_branchRule_gotoStep_skipsIntermediateStep() {
+        authAs(2L, "assignee");
+        WorkflowRequest r = sentRequest(41L, "SEQUENTIAL", "ALL", null);
+        r.setBranchRules("[{\"stepNo\":1,\"onOutcome\":\"HIGH_RISK\",\"action\":\"GOTO_STEP\",\"targetStep\":3}]");
+        WorkflowRequestRecipient s1 = rec(41L, 2L, 1, "NOTIFIED");
+        WorkflowRequestRecipient s2 = rec(41L, 3L, 2, "PENDING");
+        WorkflowRequestRecipient s3 = rec(41L, 4L, 3, "PENDING");
+        when(requestRepo.findByIdAndOrganisationId(41L, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 41L))
+            .thenReturn(List.of(s1, s2, s3));
+        lenient().when(userRepo.findById(2L)).thenReturn(Optional.of(orgUser(2L)));
+
+        RequestResponse resp = svc.respond(41L, "risk too high", "HIGH_RISK");
+
+        assertThat(s2.getStatus()).isEqualTo("SKIPPED");                 // jumped-over step parked
+        assertThat(r.getCurrentStep()).isEqualTo(3);                     // executive-approval step
+        assertThat(resp.status()).isEqualTo("IN_PROGRESS");
+        // step-3 recipient got the baton notification
+        verify(notifications).notifyUser(any(), org.mockito.ArgumentMatchers.eq(4L),
+            any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void respond_branchRule_noMatch_fallsBackToDefaultRouting() {
+        authAs(2L, "assignee");
+        WorkflowRequest r = sentRequest(42L, "SEQUENTIAL", "ALL", null);
+        r.setBranchRules("[{\"stepNo\":1,\"onOutcome\":\"REJECTED\",\"action\":\"RETURN\",\"targetStep\":null}]");
+        WorkflowRequestRecipient s1 = rec(42L, 2L, 1, "NOTIFIED");
+        WorkflowRequestRecipient s2 = rec(42L, 3L, 2, "PENDING");
+        when(requestRepo.findByIdAndOrganisationId(42L, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 42L))
+            .thenReturn(List.of(s1, s2));
+        lenient().when(userRepo.findById(2L)).thenReturn(Optional.of(orgUser(2L)));
+
+        RequestResponse resp = svc.respond(42L, "all good", "APPROVED_OK");
+
+        assertThat(r.getCurrentStep()).isEqualTo(2);                     // default baton pass
+        assertThat(resp.status()).isEqualTo("IN_PROGRESS");
+    }
+
+    @Test
+    void respond_branchRule_escalate_firesEscalationPath() {
+        authAs(2L, "assignee");
+        WorkflowRequest r = sentRequest(43L, "PARALLEL", "ALL", null);
+        r.setEscalationRole("CISO");
+        r.setBranchRules("[{\"stepNo\":1,\"onOutcome\":\"BREACH\",\"action\":\"ESCALATE\",\"targetStep\":null}]");
+        WorkflowRequestRecipient s1 = rec(43L, 2L, 1, "NOTIFIED");
+        when(requestRepo.findByIdAndOrganisationId(43L, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 43L))
+            .thenReturn(List.of(s1));
+        lenient().when(userRepo.findById(2L)).thenReturn(Optional.of(orgUser(2L)));
+
+        RequestResponse resp = svc.respond(43L, "personal data exposed", "breach");
+
+        assertThat(resp.status()).isEqualTo("ESCALATED");
+        assertThat(resp.escalatedAt()).isNotNull();
+        verify(notifications).broadcastToRole(any(), org.mockito.ArgumentMatchers.eq("CISO"),
+            any(), any(), any(), any(), any(), any());
     }
 
     // ── WF-5 committee recipient fan-out ────────────────────────────────────
@@ -360,13 +487,13 @@ class WorkflowRequestServiceTest {
 
         authAs(9L, "outsider");
         when(committeeMembers.findActiveCommitteeIdsForUser(ORG, 9L)).thenReturn(List.of());
-        assertThatThrownBy(() -> svc.respond(31L, "not my committee"))
+        assertThatThrownBy(() -> svc.respond(31L, "not my committee", null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("not an actionable recipient");
 
         authAs(7L, "boardmember");
         when(committeeMembers.findActiveCommitteeIdsForUser(ORG, 7L)).thenReturn(List.of(5L));
-        RequestResponse resp = svc.respond(31L, "committee acknowledged");
+        RequestResponse resp = svc.respond(31L, "committee acknowledged", null);
         assertThat(row.getStatus()).isEqualTo("RESPONDED");
         assertThat(resp.status()).isEqualTo("CLOSED");   // no review gate → auto-close
     }

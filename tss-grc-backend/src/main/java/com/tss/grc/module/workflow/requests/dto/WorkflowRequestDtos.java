@@ -23,6 +23,15 @@ public final class WorkflowRequestDtos {
         Integer stepNo                                     // sequential order; defaults to 1
     ) {}
 
+    /** WF-6 — one conditional-routing rule (§7 #5): when the recipient completing
+     *  {@code stepNo} responds with {@code onOutcome}, the branch overrides default routing. */
+    public record BranchRuleDto(
+        Integer stepNo,
+        @NotBlank @Size(max = 40) String onOutcome,
+        @NotBlank @Size(max = 20) String action,           // GOTO_STEP / RETURN / CLOSE / ESCALATE
+        Integer targetStep                                 // required for GOTO_STEP (forward-only)
+    ) {}
+
     public record CreateRequest(
         @NotBlank @Size(max = 40) String sourceModule,
         @Size(max = 60) String sourceRecordType,
@@ -46,7 +55,8 @@ public final class WorkflowRequestDtos {
         @Size(max = 300) String closureCondition,
         Long reviewerId,
         Long approverId,
-        @Valid List<RecipientDto> recipients
+        @Valid List<RecipientDto> recipients,
+        @Valid List<BranchRuleDto> branchRules             // WF-6 — optional conditional routing
     ) {}
 
     /** Body for transition endpoints (respond/review/approve/reject/…). */
@@ -55,7 +65,7 @@ public final class WorkflowRequestDtos {
     public record RecipientResponse(
         Long id, String recipientType, Long recipientId, String recipientKey, String recipientLabel,
         String actorRole, Integer stepNo, String status,
-        LocalDateTime respondedAt, Long respondedBy, String response
+        LocalDateTime respondedAt, Long respondedBy, String response, String responseOutcome
     ) {}
 
     public record EventResponse(
@@ -78,6 +88,7 @@ public final class WorkflowRequestDtos {
         Long reviewerId, Long approverId, Long evidenceRequestId,
         LocalDateTime closedAt, LocalDateTime reopenedAt,
         LocalDateTime createdAt, LocalDateTime updatedAt,
-        List<RecipientResponse> recipients
+        List<RecipientResponse> recipients,
+        List<BranchRuleDto> branchRules                    // WF-6
     ) {}
 }
