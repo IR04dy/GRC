@@ -3,7 +3,7 @@
 // contextually by status. Actor authorization stays server-side — a 400/403/409 from an action
 // simply surfaces as a toast.
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
   Send, CheckCircle2, XCircle, RotateCcw, Undo2, Flame, Lock, Unlock, History, Users,
 } from 'lucide-react';
@@ -106,6 +106,12 @@ export function WorkflowRequestDetailPage() {
         <Badge tone="neutral">{row.routingMode}{row.routingMode === 'PARALLEL' ? `/${row.completionRule}` : ''}</Badge>
         {row.escalatedAt && <Badge tone="danger">{ar ? 'مُصعَّد' : 'escalated'}</Badge>}
         {row.reminderCount > 0 && <Badge tone="warning">{(ar ? 'تذكيرات: ' : 'reminders: ') + row.reminderCount}</Badge>}
+        {row.evidenceRequestId != null && (
+          <Link to="/evidence" style={{ textDecoration: 'none' }}
+            title={ar ? 'فُتح طلب دليل حقيقي في نظام الأدلة' : 'A real evidence request was opened in the evidence subsystem'}>
+            <Badge tone="info">{(ar ? 'طلب الدليل ' : 'evidence ') + `REQ-${String(row.evidenceRequestId).padStart(5, '0')}`}</Badge>
+          </Link>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)', gap: 16, alignItems: 'start' }}>

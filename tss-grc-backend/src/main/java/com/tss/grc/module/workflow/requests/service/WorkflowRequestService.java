@@ -3,6 +3,9 @@ package com.tss.grc.module.workflow.requests.service;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.evidence.dto.EvidenceRequestCreateDto;
+import com.tss.grc.module.evidence.dto.EvidenceRequestResponse;
+import com.tss.grc.module.evidence.service.EvidenceRequestService;
 import com.tss.grc.module.iam.entity.User;
 import com.tss.grc.module.iam.repository.UserRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
@@ -90,6 +93,8 @@ public class WorkflowRequestService {
     private final NotificationService                notifications;
     private final AuditLogService                    audit;
     private final ApplicationEventPublisher          publisher;
+    /** WF-4 — sending an EVIDENCE_REQUEST opens a real evidence.evidence_requests row. */
+    private final EvidenceRequestService             evidenceRequests;
 
     // ── Create (§5 validation gates) ─────────────────────────────────────────
 
@@ -235,13 +240,27 @@ public class WorkflowRequestService {
 
     // ── Lifecycle transitions (§6 APIs) ──────────────────────────────────────
 
-    /** DRAFT → SENT: snapshot labels, notify every step-1 (sequential) or all (parallel) recipients. */
+    /** DRAFT → SENT: snapshot labels, notify every step-1 (sequential) or all (parallel) recipients.
+     *  An EVIDENCE_REQUEST with evidenceRequired also opens a REAL evidence-subsystem request
+     *  (WF-4 bridge) so the evidence team works their normal queue. */
     @Transactional
     public RequestResponse send(Long id) {
         WorkflowRequest r = get(id);
+        // WF-4 — open the bridged evidence request BEFORE mutating r (its toResponse queries
+        // flush; the ROWVERSION rule allows exactly one UPDATE of r per transaction).
+        Long bridgedEvidenceId = null;
+        if ("DRAFT".equals(r.getStatus()) && "EVIDENCE_REQUEST".equals(r.getRequestType())
+                && Boolean.TRUE.equals(r.getEvidenceRequired())) {
+            bridgedEvidenceId = openBridgedEvidenceRequest(r);
+        }
         transition(r, "SENT");
+        if (bridgedEvidenceId != null) r.setEvidenceRequestId(bridgedEvidenceId);
         notifyStep(r, "SEQUENTIAL".equals(r.getRoutingMode()) ? r.getCurrentStep() : null);
         requestRepo.save(r);
+        if (bridgedEvidenceId != null)
+            appendEvent(r, "EVIDENCE_BRIDGED", "DRAFT", "SENT",
+                "Opened evidence request REQ-" + String.format("%05d", bridgedEvidenceId)
+                    + " in the evidence subsystem");
         appendEvent(r, "SENT", "DRAFT", "SENT", "Request sent to recipients");
         audit.log("WORKFLOW_REQUEST_SENT", "WorkflowRequest", r.getId(), code(r) + " · " + r.getTitleEn());
         publisher.publishEvent(DomainEvent.of(r.getOrganisationId(), "WORKFLOW_REQUEST_SENT",
@@ -545,6 +564,30 @@ public class WorkflowRequestService {
         return new RoutingAdvance(allDone, null);
     }
 
+    /** WF-4 — open the real evidence-subsystem request this workflow request routes (anchored
+     *  entityType=WORKFLOW_REQUEST so the evidence lifecycle can feed status back). Assignee /
+     *  department are taken from the first USER / DEPARTMENT assignee recipient. */
+    private Long openBridgedEvidenceRequest(WorkflowRequest r) {
+        List<WorkflowRequestRecipient> recipients = recipientsOf(r);
+        Long assigneeId = recipients.stream()
+            .filter(x -> "ASSIGNEE".equals(x.getActorRole()) && "USER".equals(x.getRecipientType()))
+            .map(WorkflowRequestRecipient::getRecipientId).filter(Objects::nonNull).findFirst().orElse(null);
+        Long departmentId = recipients.stream()
+            .filter(x -> "ASSIGNEE".equals(x.getActorRole()) && "DEPARTMENT".equals(x.getRecipientType()))
+            .map(WorkflowRequestRecipient::getRecipientId).filter(Objects::nonNull).findFirst().orElse(null);
+        EvidenceRequestCreateDto dto = new EvidenceRequestCreateDto(
+            r.getTitleEn(), r.getTitleAr(),
+            (r.getDescription() == null ? "" : r.getDescription() + "\n\n")
+                + "Opened by workflow request " + code(r) + " (" + r.getSourceModule() + ").",
+            null,                                   // subControlId
+            "WORKFLOW_REQUEST", r.getId(),          // anchor — the feed-back bridge keys on this
+            assigneeId, departmentId,
+            r.getDueDate(), r.getPriority(),
+            "Auto-opened by the workflow request engine (WF-4 bridge).");
+        EvidenceRequestResponse resp = evidenceRequests.create(dto, r.getInitiatedBy());
+        return resp.id();
+    }
+
     /** Notify recipients (of one sequential step, or all when step == null) and mark them NOTIFIED. */
     private void notifyStep(WorkflowRequest r, Integer step) {
         List<WorkflowRequestRecipient> all =
@@ -725,7 +768,7 @@ public class WorkflowRequestService {
             r.getReminderDaysBefore(), r.getLastReminderAt(), r.getReminderCount(),
             r.getEscalationRole(), r.getEscalationUserId(), r.getEscalatedAt(),
             r.getStatus(), r.getResponseRequired(), r.getEvidenceRequired(), r.getClosureCondition(),
-            r.getReviewerId(), r.getApproverId(),
+            r.getReviewerId(), r.getApproverId(), r.getEvidenceRequestId(),
             r.getClosedAt(), r.getReopenedAt(),
             r.getCreatedAt(), r.getUpdatedAt(),
             recipients);

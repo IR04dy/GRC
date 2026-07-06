@@ -136,6 +136,19 @@ public class EvidenceRequestService {
                 req.getOrganisationId(), "EVIDENCE_REQUEST_REJECTED",
                 "EvidenceRequest", req.getId(), "evreq:" + req.getId(), payload));
         }
+        // WF-4 — the approval signal, same anchored shape. Lets the workflow request
+        // engine (and any other anchoring module) close the loop when the evidence
+        // it routed is accepted.
+        if ("APPROVED".equals(newStatus) && req.getEntityType() != null) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("anchorType", req.getEntityType());
+            payload.put("anchorId", req.getEntityId());
+            payload.put("requestCode", "REQ-" + String.format("%05d", req.getId()));
+            payload.put("title", req.getTitleEn());
+            events.publishEvent(new DomainEvent(
+                req.getOrganisationId(), "EVIDENCE_REQUEST_APPROVED",
+                "EvidenceRequest", req.getId(), "evreq:" + req.getId(), payload));
+        }
         return toResponse(req);
     }
 

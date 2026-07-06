@@ -75,7 +75,7 @@ public final class WorkflowRequestDtos {
         Integer reminderDaysBefore, LocalDateTime lastReminderAt, Integer reminderCount,
         String escalationRole, Long escalationUserId, LocalDateTime escalatedAt,
         String status, Boolean responseRequired, Boolean evidenceRequired, String closureCondition,
-        Long reviewerId, Long approverId,
+        Long reviewerId, Long approverId, Long evidenceRequestId,
         LocalDateTime closedAt, LocalDateTime reopenedAt,
         LocalDateTime createdAt, LocalDateTime updatedAt,
         List<RecipientResponse> recipients

@@ -74,6 +74,7 @@ export interface WorkflowRequestDto {
   escalationRole: string | null; escalationUserId: number | null; escalatedAt: string | null;
   status: string; responseRequired: boolean; evidenceRequired: boolean; closureCondition: string | null;
   reviewerId: number | null; approverId: number | null;
+  evidenceRequestId: number | null;   // WF-4 — the bridged evidence.evidence_requests row
   closedAt: string | null; reopenedAt: string | null;
   createdAt: string; updatedAt: string | null;
   recipients: WorkflowRecipientDto[] | null;

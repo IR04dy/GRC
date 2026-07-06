@@ -2,6 +2,9 @@ package com.tss.grc.module.workflow.requests.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.evidence.dto.EvidenceRequestCreateDto;
+import com.tss.grc.module.evidence.dto.EvidenceRequestResponse;
+import com.tss.grc.module.evidence.service.EvidenceRequestService;
 import com.tss.grc.module.iam.entity.User;
 import com.tss.grc.module.iam.repository.UserRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
@@ -63,6 +66,7 @@ class WorkflowRequestServiceTest {
     @Mock private NotificationService                notifications;
     @Mock private AuditLogService                    audit;
     @Mock private ApplicationEventPublisher          publisher;
+    @Mock private EvidenceRequestService             evidenceRequests;
     @InjectMocks private WorkflowRequestService      svc;
 
     private final AtomicLong ids = new AtomicLong(100);
@@ -282,6 +286,53 @@ class WorkflowRequestServiceTest {
         assertThat(b.getStatus()).isEqualTo("SKIPPED");        // ANY rule skips the rest
         assertThat(resp.status()).isEqualTo("CLOSED");          // no review gate → auto-close
         assertThat(resp.closureCondition()).isEqualTo("AUTO_ON_COMPLETION");
+    }
+
+    // ── WF-4 evidence bridge (send side) ────────────────────────────────────
+
+    @Test
+    void send_evidenceRequest_opensBridgedEvidenceRequest_andRecordsId() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        WorkflowRequest r = sentRequest(20L, "PARALLEL", "ALL", null);
+        r.setStatus("DRAFT");
+        r.setEvidenceRequired(true);            // requestType is already EVIDENCE_REQUEST
+        WorkflowRequestRecipient assignee = rec(20L, 2L, 1, "PENDING");
+        when(requestRepo.findByIdAndOrganisationId(20L, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 20L))
+            .thenReturn(List.of(assignee));
+        EvidenceRequestResponse bridged = new EvidenceRequestResponse(99L, java.util.UUID.randomUUID(),
+            "REQ-00099", null, null, null, null, "WORKFLOW_REQUEST", 20L, "t", null, null,
+            null, null, null, null, null, null, null, "MEDIUM", "OPEN", null, null, null);
+        when(evidenceRequests.create(any(), any())).thenReturn(bridged);
+
+        RequestResponse resp = svc.send(20L);
+
+        assertThat(resp.status()).isEqualTo("SENT");
+        assertThat(resp.evidenceRequestId()).isEqualTo(99L);
+        org.mockito.ArgumentCaptor<EvidenceRequestCreateDto> cap =
+            org.mockito.ArgumentCaptor.forClass(EvidenceRequestCreateDto.class);
+        verify(evidenceRequests).create(cap.capture(), any());
+        assertThat(cap.getValue().entityType()).isEqualTo("WORKFLOW_REQUEST");
+        assertThat(cap.getValue().entityId()).isEqualTo(20L);
+        assertThat(cap.getValue().assignedToId()).isEqualTo(2L);   // first USER assignee carried
+    }
+
+    @Test
+    void send_nonEvidenceType_doesNotOpenBridge() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        WorkflowRequest r = sentRequest(21L, "PARALLEL", "ALL", null);
+        r.setStatus("DRAFT");
+        r.setRequestType("APPROVAL");
+        r.setEvidenceRequired(true);
+        when(requestRepo.findByIdAndOrganisationId(21L, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 21L))
+            .thenReturn(List.of(rec(21L, 2L, 1, "PENDING")));
+
+        RequestResponse resp = svc.send(21L);
+
+        assertThat(resp.status()).isEqualTo("SENT");
+        assertThat(resp.evidenceRequestId()).isNull();
+        verify(evidenceRequests, never()).create(any(), any());
     }
 
     // ── Lifecycle machine ───────────────────────────────────────────────────

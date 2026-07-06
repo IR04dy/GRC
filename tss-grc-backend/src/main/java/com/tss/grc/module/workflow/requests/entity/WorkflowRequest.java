@@ -76,6 +76,9 @@ public class WorkflowRequest extends BaseEntity {
     @Column(name = "reviewer_id") private Long reviewerId;
     @Column(name = "approver_id") private Long approverId;
 
+    /** WF-4 — the real evidence.evidence_requests row this request opened on send (bridge). */
+    @Column(name = "evidence_request_id") private Long evidenceRequestId;
+
     @Column(name = "closed_at") private LocalDateTime closedAt;
     @Column(name = "reopened_at") private LocalDateTime reopenedAt;
 }
