@@ -1,0 +1,83 @@
+package com.tss.grc.module.workflow.requests.dto;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+/** WF-1 — request/response DTOs for the workflow request engine (no entity binding, ASM-style). */
+public final class WorkflowRequestDtos {
+
+    private WorkflowRequestDtos() {}
+
+    /** One recipient in the actor-selector payload (§5). */
+    public record RecipientDto(
+        @NotBlank @Size(max = 20) String recipientType,   // USER / ROLE / DEPARTMENT / COMMITTEE / EXTERNAL
+        Long recipientId,                                  // user / department / committee id
+        @Size(max = 120) String recipientKey,              // role name or external contact
+        @Size(max = 200) String recipientLabel,
+        @Size(max = 30) String actorRole,                  // ASSIGNEE (default) / REVIEWER / APPROVER / OBSERVER / ESCALATION
+        Integer stepNo                                     // sequential order; defaults to 1
+    ) {}
+
+    public record CreateRequest(
+        @NotBlank @Size(max = 40) String sourceModule,
+        @Size(max = 60) String sourceRecordType,
+        Long sourceRecordId,
+        @NotBlank @Size(max = 40) String requestType,
+        @NotBlank @Size(max = 300) String titleEn,
+        @Size(max = 300) String titleAr,
+        String description,
+        @Size(max = 20) String routingMode,                // SEQUENTIAL / PARALLEL (default) / BROADCAST_ACK
+        @Size(max = 10) String completionRule,             // ALL (default) / ANY
+        @Size(max = 60) String requiredAction,
+        LocalDate dueDate,
+        Integer slaHours,
+        @Size(max = 20) String priority,                   // LOW / MEDIUM (default) / HIGH / CRITICAL
+        @Size(max = 20) String severity,
+        Integer reminderDaysBefore,
+        @Size(max = 60) String escalationRole,
+        Long escalationUserId,
+        Boolean responseRequired,
+        Boolean evidenceRequired,
+        @Size(max = 300) String closureCondition,
+        Long reviewerId,
+        Long approverId,
+        @Valid List<RecipientDto> recipients
+    ) {}
+
+    /** Body for transition endpoints (respond/review/approve/reject/…). */
+    public record ActionRequest(String note, String outcome) {}
+
+    public record RecipientResponse(
+        Long id, String recipientType, Long recipientId, String recipientKey, String recipientLabel,
+        String actorRole, Integer stepNo, String status,
+        LocalDateTime respondedAt, Long respondedBy, String response
+    ) {}
+
+    public record EventResponse(
+        Long id, String eventType, String fromStatus, String toStatus,
+        String actor, Long actorUserId, String note, LocalDateTime createdAt
+    ) {}
+
+    public record RequestResponse(
+        Long id, String requestCode,
+        String sourceModule, String sourceRecordType, Long sourceRecordId,
+        String requestType, String titleEn, String titleAr, String description,
+        Long initiatedBy, String initiatedByName,
+        String recipientCategory, String routingMode, String completionRule, Integer currentStep,
+        String requiredAction, LocalDate dueDate, Integer slaHours,
+        String countdownStatus, Long hoursRemaining,
+        String priority, String severity,
+        Integer reminderDaysBefore, LocalDateTime lastReminderAt, Integer reminderCount,
+        String escalationRole, Long escalationUserId, LocalDateTime escalatedAt,
+        String status, Boolean responseRequired, Boolean evidenceRequired, String closureCondition,
+        Long reviewerId, Long approverId,
+        LocalDateTime closedAt, LocalDateTime reopenedAt,
+        LocalDateTime createdAt, LocalDateTime updatedAt,
+        List<RecipientResponse> recipients
+    ) {}
+}

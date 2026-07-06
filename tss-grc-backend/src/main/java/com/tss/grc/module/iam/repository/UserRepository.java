@@ -65,4 +65,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
         @Param("orgId") Long orgId,
         @Param("role")  String role
     );
+
+    /** WF-1 — active members of a department, for DEPARTMENT-addressed workflow requests. */
+    List<User> findByOrganisationIdAndDepartmentIdAndIsActiveTrue(Long organisationId, Long departmentId);
 }
