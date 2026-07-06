@@ -2991,6 +2991,7 @@ export const en = {
   // Workflow Hub — catalog of every Saudi-GRC §7 wizard
   wfHubSidebar:           'Workflow Hub',
   wfSubmissionsSidebar:   'Workflow Submissions',
+  wfRequestsSidebar:      'Workflow Requests',
   calendarSidebar:        'Calendar',
   inboxNotifSidebar:      'Notifications',
   inboxNotifTitle:        'Notifications',

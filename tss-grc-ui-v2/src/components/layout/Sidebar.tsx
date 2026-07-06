@@ -79,6 +79,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'dashboard',     to: '/dashboard',             Icon: LayoutDashboard, labelKey: 'itemDashboard' },
       { id: 'workflow-hub',  to: '/workflows',             Icon: Workflow,        labelKey: 'wfHubSidebar' },
       { id: 'wf-submissions',to: '/workflows/submissions', Icon: ClipboardCheck,  labelKey: 'wfSubmissionsSidebar' },
+      { id: 'wf-requests',   to: '/workflows/requests',    Icon: Send,            labelKey: 'wfRequestsSidebar' },
       { id: 'approvals',     to: '/approvals',             Icon: CheckCheck,      labelKey: 'approvalsSidebar' },
       { id: 'signatures',    to: '/signatures',            Icon: PenLine,         labelKey: 'sigSidebar' },
       { id: 'inbox',         to: '/intake-inbox',          Icon: Inbox,           labelKey: 'inboxTitle' },

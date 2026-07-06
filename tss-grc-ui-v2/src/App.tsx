@@ -66,6 +66,8 @@ const PdplDashboardPage      = lazy(() => import('./pages/dashboards/PdplDashboa
 const BuyerGapPage           = lazy(() => import('./pages/buyergap/BuyerGapPage').then(m => ({ default: m.BuyerGapPage })));
 const WorkflowHubPage        = lazy(() => import('./pages/workflow/WorkflowHubPage').then(m => ({ default: m.WorkflowHubPage })));
 const WorkflowSubmissionsPage = lazy(() => import('./pages/workflow/WorkflowSubmissionsPage').then(m => ({ default: m.WorkflowSubmissionsPage })));
+const WorkflowRequestsPage   = lazy(() => import('./pages/workflow/WorkflowRequestsPage').then(m => ({ default: m.WorkflowRequestsPage })));
+const WorkflowRequestDetailPage = lazy(() => import('./pages/workflow/WorkflowRequestDetailPage').then(m => ({ default: m.WorkflowRequestDetailPage })));
 const CalendarPage           = lazy(() => import('./pages/calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
 const SocOpsDashboardPage    = lazy(() => import('./pages/socops/SocOpsDashboardPage').then(m => ({ default: m.SocOpsDashboardPage })));
 const SocOpsEventsPage       = lazy(() => import('./pages/socops/SocOpsEventsPage').then(m => ({ default: m.SocOpsEventsPage })));
@@ -469,6 +471,8 @@ export function App() {
 
               {/* Workflow Hub + per-module wizards (Saudi-GRC §7) */}
               <Route path="/workflows"                              element={<WorkflowHubPage />} />
+              <Route path="/workflows/requests"                      element={<WorkflowRequestsPage />} />
+              <Route path="/workflows/requests/:id"                  element={<WorkflowRequestDetailPage />} />
               <Route path="/workflows/submissions"                   element={<WorkflowSubmissionsPage />} />
               <Route path="/workflows/submissions/:id"               element={<WorkflowSubmissionDetailPage />} />
 

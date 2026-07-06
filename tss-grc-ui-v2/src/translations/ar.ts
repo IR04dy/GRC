@@ -2975,6 +2975,7 @@ export const ar = {
   // Workflow Hub — catalog of every Saudi-GRC §7 wizard
   wfHubSidebar:           'مركز المعالجات',
   wfSubmissionsSidebar:   'سجلات المعالجات',
+  wfRequestsSidebar:      'طلبات سير العمل',
   calendarSidebar:        'التقويم',
   inboxNotifSidebar:      'الإشعارات',
   inboxNotifTitle:        'صندوق الإشعارات',
