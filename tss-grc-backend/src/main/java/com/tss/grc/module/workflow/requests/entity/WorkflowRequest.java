@@ -48,8 +48,10 @@ public class WorkflowRequest extends BaseEntity {
 
     /** SEQUENTIAL / PARALLEL / BROADCAST_ACK. */
     @Column(name = "routing_mode", nullable = false, length = 20) private String routingMode = "PARALLEL";
-    /** Parallel completion rule: ALL recipients must respond, or ANY one suffices. */
+    /** Parallel completion rule: ALL / ANY / QUORUM / MAJORITY of the ASSIGNEE gates. */
     @Column(name = "completion_rule", nullable = false, length = 10) private String completionRule = "ALL";
+    /** WF-9 — QUORUM: minimum number of ASSIGNEE gates that must respond to complete. */
+    @Column(name = "completion_threshold") private Integer completionThreshold;
     /** Sequential routing pointer — the step whose recipients may act now. */
     @Column(name = "current_step", nullable = false) private Integer currentStep = 1;
 

@@ -56,11 +56,42 @@ public final class WorkflowRequestDtos {
         Long reviewerId,
         Long approverId,
         @Valid List<RecipientDto> recipients,
-        @Valid List<BranchRuleDto> branchRules             // WF-6 — optional conditional routing
+        @Valid List<BranchRuleDto> branchRules,            // WF-6 — optional conditional routing
+        Long recipientListId,                              // WF-8 — expand a saved distribution list into recipients
+        Boolean expandCommittees,                          // WF-9 — materialize COMMITTEE recipients into per-member gates
+        Integer completionThreshold                        // WF-9 — QUORUM: min responses required
     ) {}
 
     /** Body for transition endpoints (respond/review/approve/reject/…). */
     public record ActionRequest(String note, String outcome) {}
+
+    // ─── WF-8 reusable recipient lists (distribution lists) ──────────────
+    public record RecipientListMemberDto(
+        Long id,
+        @NotBlank @Size(max = 20) String recipientType,
+        Long recipientId,
+        @Size(max = 120) String recipientKey,
+        @Size(max = 200) String recipientLabel,
+        @Size(max = 30) String actorRole,
+        Integer stepNo
+    ) {}
+
+    public record CreateRecipientList(
+        @NotBlank @Size(max = 150) String name,
+        @Size(max = 500) String description,
+        @Valid List<RecipientListMemberDto> members
+    ) {}
+
+    public record RecipientListResponse(
+        Long id, String name, String description, Boolean isActive,
+        List<RecipientListMemberDto> members
+    ) {}
+
+    /** WF-8 — one suggested recipient for a source record (composer aid, §2.1/§2.2). */
+    public record RecipientSuggestion(
+        String recipientType, Long recipientId, String recipientKey,
+        String recipientLabel, String actorRole, String reason
+    ) {}
 
     /** WF-7 — the MINIMAL public projection an EXTERNAL recipient sees via their token (§7 #18):
      *  the request's own facts + the external recipient's own status only. Deliberately carries
@@ -88,7 +119,7 @@ public final class WorkflowRequestDtos {
         String sourceModule, String sourceRecordType, Long sourceRecordId,
         String requestType, String titleEn, String titleAr, String description,
         Long initiatedBy, String initiatedByName,
-        String recipientCategory, String routingMode, String completionRule, Integer currentStep,
+        String recipientCategory, String routingMode, String completionRule, Integer completionThreshold, Integer currentStep,
         String requiredAction, LocalDate dueDate, Integer slaHours,
         String countdownStatus, Long hoursRemaining,
         String priority, String severity,

@@ -41,7 +41,8 @@ export interface WorkflowRequestCreate {
   titleAr?: string;
   description?: string;
   routingMode?: RoutingMode;
-  completionRule?: 'ALL' | 'ANY';
+  completionRule?: 'ALL' | 'ANY' | 'QUORUM' | 'MAJORITY';   // WF-9
+  completionThreshold?: number;                              // WF-9 — QUORUM: min responses
   requiredAction?: string;
   dueDate?: string;
   slaHours?: number;
@@ -57,6 +58,27 @@ export interface WorkflowRequestCreate {
   approverId?: number;
   recipients: WorkflowRecipientInput[];
   branchRules?: WorkflowBranchRule[];   // WF-6
+  recipientListId?: number;             // WF-8 — expand a saved distribution list
+  expandCommittees?: boolean;           // WF-9 — materialize committees into per-member gates
+}
+
+// ─── WF-8 reusable recipient lists (distribution lists) ──────────────
+export interface RecipientListMemberInput {
+  id?: number;
+  recipientType: RecipientType;
+  recipientId?: number;
+  recipientKey?: string;
+  recipientLabel?: string;
+  actorRole?: ActorRole;
+  stepNo?: number;
+}
+export interface RecipientListDto {
+  id: number; name: string; description: string | null; isActive: boolean;
+  members: RecipientListMemberInput[];
+}
+export interface RecipientSuggestion {
+  recipientType: RecipientType; recipientId: number | null; recipientKey: string | null;
+  recipientLabel: string | null; actorRole: ActorRole; reason: string;
 }
 
 // ─── Responses ───────────────────────────────────────────────────────
@@ -78,7 +100,7 @@ export interface WorkflowRequestDto {
   sourceModule: string; sourceRecordType: string | null; sourceRecordId: number | null;
   requestType: string; titleEn: string; titleAr: string | null; description: string | null;
   initiatedBy: number | null; initiatedByName: string | null;
-  recipientCategory: string | null; routingMode: RoutingMode; completionRule: string; currentStep: number;
+  recipientCategory: string | null; routingMode: RoutingMode; completionRule: string; completionThreshold: number | null; currentStep: number;
   requiredAction: string | null; dueDate: string | null; slaHours: number | null;
   countdownStatus: 'NONE' | 'ON_TRACK' | 'DUE_TODAY' | 'OVERDUE'; hoursRemaining: number | null;
   priority: string; severity: string | null;
@@ -121,6 +143,26 @@ export const workflowRequestsApi = {
 
   runSlaSweep: () => api.post<{ reminders: number; escalations: number }>(
     '/api/v1/workflows/requests/run-sla-sweep'),
+
+  // WF-8 — owner/role/department suggestions for the composer.
+  recipientSuggestions: (sourceModule?: string, sourceRecordType?: string, sourceRecordId?: number) => {
+    const q = new URLSearchParams();
+    if (sourceModule) q.set('sourceModule', sourceModule);
+    if (sourceRecordType) q.set('sourceRecordType', sourceRecordType);
+    if (sourceRecordId != null) q.set('sourceRecordId', String(sourceRecordId));
+    return api.get<RecipientSuggestion[]>(`/api/v1/workflows/requests/recipient-suggestions?${q.toString()}`);
+  },
+};
+
+// WF-8 — reusable recipient lists (distribution lists) CRUD.
+export const recipientListsApi = {
+  list: () => api.get<RecipientListDto[]>('/api/v1/workflows/recipient-lists'),
+  get: (id: number) => api.get<RecipientListDto>(`/api/v1/workflows/recipient-lists/${id}`),
+  create: (name: string, description: string | undefined, members: RecipientListMemberInput[]) =>
+    api.post<RecipientListDto>('/api/v1/workflows/recipient-lists', { name, description, members }),
+  update: (id: number, name: string, description: string | undefined, members: RecipientListMemberInput[]) =>
+    api.put<RecipientListDto>(`/api/v1/workflows/recipient-lists/${id}`, { name, description, members }),
+  remove: (id: number) => api.delete<void>(`/api/v1/workflows/recipient-lists/${id}`),
 };
 
 // ─── WF-7 — EXTERNAL recipient public tracker (token-credentialed, NO auth) ──

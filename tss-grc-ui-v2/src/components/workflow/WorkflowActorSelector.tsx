@@ -11,7 +11,11 @@ import { Select } from '../ui/Select';
 import { Input } from '../ui/Input';
 import { useI18n } from '../../lib/i18n';
 import { adminApi, departmentsApi, type AdminUserDto, type DepartmentDto, type AdminRoleDto } from '../../lib/api';
-import type { RecipientType, ActorRole, RoutingMode, WorkflowRecipientInput } from '../../lib/workflowRequests';
+import {
+  recipientListsApi, workflowRequestsApi,
+  type RecipientType, type ActorRole, type RoutingMode, type WorkflowRecipientInput,
+  type RecipientListDto,
+} from '../../lib/workflowRequests';
 
 const RECIPIENT_TYPES: RecipientType[] = ['USER', 'ROLE', 'DEPARTMENT', 'COMMITTEE', 'EXTERNAL'];
 const ACTOR_ROLES: ActorRole[] = ['ASSIGNEE', 'REVIEWER', 'APPROVER', 'OBSERVER', 'ESCALATION'];
@@ -45,14 +49,17 @@ interface Props {
   recipients: WorkflowRecipientInput[];
   onChange: (next: WorkflowRecipientInput[]) => void;
   routingMode: RoutingMode;
+  /** WF-8 — source module for owner/role suggestions (optional). */
+  sourceModule?: string;
 }
 
-export function WorkflowActorSelector({ recipients, onChange, routingMode }: Props) {
+export function WorkflowActorSelector({ recipients, onChange, routingMode, sourceModule }: Props) {
   const { lang } = useI18n();
   const ar = lang === 'ar';
   const [users, setUsers] = useState<AdminUserDto[]>([]);
   const [departments, setDepartments] = useState<DepartmentDto[]>([]);
   const [roles, setRoles] = useState<string[]>(FALLBACK_ROLES);
+  const [lists, setLists] = useState<RecipientListDto[]>([]);   // WF-8 saved distribution lists
   const sequential = routingMode === 'SEQUENTIAL';
 
   useEffect(() => {
@@ -60,7 +67,39 @@ export function WorkflowActorSelector({ recipients, onChange, routingMode }: Pro
     adminApi.users(0, 200).then(p => setUsers(p.content.filter(u => u.isActive))).catch(() => setUsers([]));
     departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
     adminApi.roles().then((r: AdminRoleDto[]) => setRoles(r.map(x => x.roleName))).catch(() => setRoles(FALLBACK_ROLES));
+    recipientListsApi.list().then(setLists).catch(() => setLists([]));
   }, []);
+
+  // WF-8 — append a saved distribution list's members to the current recipients.
+  function applyList(listId: number) {
+    const list = lists.find(l => l.id === listId);
+    if (!list) return;
+    onChange([...recipients, ...list.members.map(m => ({
+      recipientType: m.recipientType, recipientId: m.recipientId, recipientKey: m.recipientKey,
+      recipientLabel: m.recipientLabel, actorRole: m.actorRole ?? 'ASSIGNEE', stepNo: m.stepNo ?? 1,
+    }))]);
+  }
+
+  // WF-8 — pull owner/role/department suggestions for the source module and append them.
+  function suggest() {
+    workflowRequestsApi.recipientSuggestions(sourceModule).then(s => {
+      onChange([...recipients, ...s.map(x => ({
+        recipientType: x.recipientType, recipientId: x.recipientId ?? undefined,
+        recipientKey: x.recipientKey ?? undefined, recipientLabel: x.recipientLabel ?? undefined,
+        actorRole: x.actorRole, stepNo: 1,
+      }))]);
+    }).catch(() => { /* suggestions are best-effort */ });
+  }
+
+  // WF-8 — save the current recipient set as a reusable distribution list.
+  function saveAsList() {
+    const name = window.prompt(ar ? 'اسم قائمة التوزيع:' : 'Distribution list name:');
+    if (!name || !name.trim()) return;
+    recipientListsApi.create(name.trim(), undefined, recipients.map(r => ({
+      recipientType: r.recipientType, recipientId: r.recipientId, recipientKey: r.recipientKey,
+      recipientLabel: r.recipientLabel, actorRole: r.actorRole, stepNo: r.stepNo,
+    }))).then(l => setLists(prev => [...prev, l])).catch(() => { /* name clash / no perm */ });
+  }
 
   const userOptions = useMemo(() => users.map(u => ({
     value: String(u.id), label: `${u.fullNameEn ?? u.username} (${u.username})`,
@@ -84,10 +123,24 @@ export function WorkflowActorSelector({ recipients, onChange, routingMode }: Pro
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 700, fontSize: 13 }}>{ar ? 'المستلمون' : 'Recipients'}</span>
         <Badge tone="neutral">{recipients.length}</Badge>
-        <span style={{ marginInlineStart: 'auto' }}>
+        <span style={{ marginInlineStart: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {lists.length > 0 && (
+            <Select label="" value=""
+              onChange={e => { if (e.target.value) applyList(Number(e.target.value)); }}
+              options={[{ value: '', label: ar ? '— قائمة توزيع محفوظة —' : '— saved list —' },
+                        ...lists.map(l => ({ value: String(l.id), label: `${l.name} (${l.members.length})` }))]} />
+          )}
+          <Button size="sm" variant="ghost" onClick={suggest} title={ar ? 'اقتراح مستلمين' : 'Suggest recipients'}>
+            {ar ? 'اقتراح' : 'Suggest'}
+          </Button>
+          {recipients.length > 0 && (
+            <Button size="sm" variant="ghost" onClick={saveAsList} title={ar ? 'حفظ كقائمة' : 'Save as list'}>
+              {ar ? 'حفظ كقائمة' : 'Save as list'}
+            </Button>
+          )}
           <Button size="sm" variant="secondary" onClick={add}>
             <Plus size={13} /> {ar ? 'إضافة مستلم' : 'Add recipient'}
           </Button>

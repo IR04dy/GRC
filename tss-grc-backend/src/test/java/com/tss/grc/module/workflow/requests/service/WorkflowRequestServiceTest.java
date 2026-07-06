@@ -70,6 +70,7 @@ class WorkflowRequestServiceTest {
     @Mock private DepartmentRepository               departmentRepo;
     @Mock private CommitteeRepository                committeeRepo;
     @Mock private CommitteeMemberTermRepository      committeeMembers;
+    @Mock private WorkflowRecipientListService       recipientLists;
     @Mock private NotificationService                notifications;
     @Mock private AuditLogService                    audit;
     @Mock private ApplicationEventPublisher          publisher;
@@ -122,7 +123,7 @@ class WorkflowRequestServiceTest {
                                  Long reviewerId) {
         return new CreateRequest("RISK", "Risk", 5L, "EVIDENCE_REQUEST",
             "Collect evidence", null, null, routing, rule, "UPLOAD", due, 48, priority, null,
-            3, escRole, null, true, true, null, reviewerId, null, recipients, null);
+            3, escRole, null, true, true, null, reviewerId, null, recipients, null, null, null, null);
     }
 
     // ── §5 validation gates ─────────────────────────────────────────────────
@@ -302,7 +303,7 @@ class WorkflowRequestServiceTest {
         return new CreateRequest("RISK", "Risk", 5L, "REVIEW",
             "Conditional review", null, null, routing, "ALL", "REVIEW",
             LocalDate.now().plusDays(7), 48, "MEDIUM", null,
-            3, null, null, true, false, null, null, null, recipients, rules);
+            3, null, null, true, false, null, null, null, recipients, rules, null, null, null);
     }
 
     private static WorkflowRequestDtos.BranchRuleDto rule(Integer step, String outcome, String action, Integer target) {
@@ -419,6 +420,98 @@ class WorkflowRequestServiceTest {
         assertThat(resp.escalatedAt()).isNotNull();
         verify(notifications).broadcastToRole(any(), org.mockito.ArgumentMatchers.eq("CISO"),
             any(), any(), any(), any(), any(), any());
+    }
+
+    // ── WF-8 / WF-9 recipient lists, quorum, approval gate ──────────────────
+
+    private CreateRequest createParallel(String rule, Integer threshold, String requestType,
+                                         Long approverId, List<RecipientDto> recipients) {
+        return new CreateRequest("RISK", "Risk", 5L, requestType,
+            "Panel request", null, null, "PARALLEL", rule, "REVIEW",
+            LocalDate.now().plusDays(7), 48, "MEDIUM", null,
+            3, null, null, true, false, null, null, approverId, recipients, null, null, null, threshold);
+    }
+
+    @Test
+    void create_approvalWithoutApprover_rejected() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        when(userRepo.findById(anyLong())).thenAnswer(inv -> Optional.of(orgUser(inv.getArgument(0))));
+        assertThatThrownBy(() -> svc.create(createParallel("ALL", null, "APPROVAL", null,
+                List.of(user(2L, 1)))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("APPROVAL requests require an approver");
+    }
+
+    @Test
+    void create_quorumWithoutThreshold_rejected() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        when(userRepo.findById(anyLong())).thenAnswer(inv -> Optional.of(orgUser(inv.getArgument(0))));
+        assertThatThrownBy(() -> svc.create(createParallel("QUORUM", null, "REVIEW", null,
+                List.of(user(2L, 1), user(3L, 1), user(4L, 1)))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("QUORUM completion requires completionThreshold");
+    }
+
+    @Test
+    void create_quorumThresholdExceedsRecipients_rejected() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        when(userRepo.findById(anyLong())).thenAnswer(inv -> Optional.of(orgUser(inv.getArgument(0))));
+        assertThatThrownBy(() -> svc.create(createParallel("QUORUM", 5, "REVIEW", null,
+                List.of(user(2L, 1), user(3L, 1)))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("exceeds the number of assignee recipients");
+    }
+
+    @Test
+    void respond_majority_completesAtMajority_skipsRest() {
+        // 3 assignee gates, MAJORITY = 2; after the 2nd response the request completes.
+        authAs(3L, "second");
+        WorkflowRequest r = sentRequest(60L, "PARALLEL", "MAJORITY", null);
+        WorkflowRequestRecipient a = rec(60L, 2L, 1, "RESPONDED");   // first already answered
+        WorkflowRequestRecipient b = rec(60L, 3L, 1, "NOTIFIED");
+        WorkflowRequestRecipient c = rec(60L, 4L, 1, "NOTIFIED");
+        when(requestRepo.findByIdAndOrganisationId(60L, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 60L))
+            .thenReturn(List.of(a, b, c));
+        lenient().when(userRepo.findById(3L)).thenReturn(Optional.of(orgUser(3L)));
+
+        RequestResponse resp = svc.respond(60L, "second done", null);
+
+        assertThat(b.getStatus()).isEqualTo("RESPONDED");
+        assertThat(c.getStatus()).isEqualTo("SKIPPED");             // majority met → 3rd no longer needed
+        assertThat(resp.status()).isEqualTo("CLOSED");              // no gate → auto-close
+    }
+
+    @Test
+    void respond_quorum_notCompleteUntilThresholdMet() {
+        // 3 gates, QUORUM threshold 3 — one response is not enough.
+        authAs(2L, "first");
+        WorkflowRequest r = sentRequest(61L, "PARALLEL", "QUORUM", null);
+        r.setCompletionThreshold(3);
+        WorkflowRequestRecipient a = rec(61L, 2L, 1, "NOTIFIED");
+        WorkflowRequestRecipient b = rec(61L, 3L, 1, "NOTIFIED");
+        WorkflowRequestRecipient c = rec(61L, 4L, 1, "NOTIFIED");
+        when(requestRepo.findByIdAndOrganisationId(61L, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 61L))
+            .thenReturn(List.of(a, b, c));
+        lenient().when(userRepo.findById(2L)).thenReturn(Optional.of(orgUser(2L)));
+
+        RequestResponse resp = svc.respond(61L, "one of three", null);
+
+        assertThat(a.getStatus()).isEqualTo("RESPONDED");
+        assertThat(resp.status()).isEqualTo("IN_PROGRESS");         // 1 < 3 → still open
+        assertThat(b.getStatus()).isEqualTo("NOTIFIED");            // others NOT skipped
+    }
+
+    @Test
+    void update_afterSent_conflict() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        WorkflowRequest r = sentRequest(62L, "PARALLEL", "ALL", null);   // status SENT
+        when(requestRepo.findByIdAndOrganisationId(62L, ORG)).thenReturn(Optional.of(r));
+        assertThatThrownBy(() -> svc.update(62L, create("PARALLEL", "ALL", "MEDIUM",
+                LocalDate.now().plusDays(5), null, List.of(user(2L, 1)), null)))
+            .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+            .hasMessageContaining("409");
     }
 
     // ── WF-7 external tokenized public access (§7 #18) ──────────────────────

@@ -23,6 +23,7 @@ import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.CreateReques
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.EventResponse;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.PublicRequestView;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RecipientDto;
+import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RecipientSuggestion;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RecipientResponse;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RequestResponse;
 import com.tss.grc.module.workflow.requests.entity.WorkflowRequest;
@@ -71,7 +72,7 @@ import java.util.UUID;
 public class WorkflowRequestService {
 
     static final Set<String> ROUTING_MODES   = Set.of("SEQUENTIAL", "PARALLEL", "BROADCAST_ACK");
-    static final Set<String> COMPLETION_RULES = Set.of("ALL", "ANY");
+    static final Set<String> COMPLETION_RULES = Set.of("ALL", "ANY", "QUORUM", "MAJORITY");
     static final Set<String> PRIORITIES      = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
     static final Set<String> RECIPIENT_TYPES = Set.of("USER", "ROLE", "DEPARTMENT", "COMMITTEE", "EXTERNAL");
     static final Set<String> ACTOR_ROLES     = Set.of("ASSIGNEE", "REVIEWER", "APPROVER", "OBSERVER", "ESCALATION");
@@ -116,6 +117,8 @@ public class WorkflowRequestService {
     private final ApplicationEventPublisher          publisher;
     /** WF-4 — sending an EVIDENCE_REQUEST opens a real evidence.evidence_requests row. */
     private final EvidenceRequestService             evidenceRequests;
+    /** WF-8 — expand a saved distribution list into a request's recipients. */
+    private final WorkflowRecipientListService       recipientLists;
 
     // ── Create (§5 validation gates) ─────────────────────────────────────────
 
@@ -149,15 +152,28 @@ public class WorkflowRequestService {
         r.setClosureCondition(dto.closureCondition());
         r.setReviewerId(dto.reviewerId());
         r.setApproverId(dto.approverId());
+        r.setCompletionThreshold(dto.completionThreshold());
         r.setStatus("DRAFT");
 
-        List<RecipientDto> recipients = dto.recipients() == null ? List.of() : dto.recipients();
+        // WF-8/WF-9 — the effective recipient set: explicit rows + an expanded saved distribution
+        // list (recipientListId), with COMMITTEE rows optionally materialized into per-member gates.
+        List<RecipientDto> recipients = buildRecipients(dto, org);
         List<BranchRuleDto> rules = normalizeRules(dto.branchRules());
         validate(r, recipients, rules, org);
         r.setRecipientCategory(categoryOf(recipients));
         if (!rules.isEmpty()) r.setBranchRules(writeRules(rules));
         r = requestRepo.save(r);
 
+        saveRecipients(r, recipients, org);
+
+        appendEvent(r, "CREATED", null, "DRAFT", "Request drafted (" + recipients.size() + " recipient(s), "
+            + r.getRoutingMode() + (r.getRoutingMode().equals("PARALLEL") ? "/" + r.getCompletionRule() : "") + ")");
+        audit.log("WORKFLOW_REQUEST_CREATED", "WorkflowRequest", r.getId(),
+            code(r) + " · " + r.getTitleEn() + " · " + r.getRoutingMode());
+        return toResponse(r);
+    }
+
+    private void saveRecipients(WorkflowRequest r, List<RecipientDto> recipients, Long org) {
         for (RecipientDto in : recipients) {
             WorkflowRequestRecipient rec = new WorkflowRequestRecipient();
             rec.setOrganisationId(org);
@@ -171,11 +187,56 @@ public class WorkflowRequestService {
             rec.setStatus("PENDING");
             recipientRepo.save(rec);
         }
+    }
 
-        appendEvent(r, "CREATED", null, "DRAFT", "Request drafted (" + recipients.size() + " recipient(s), "
-            + r.getRoutingMode() + (r.getRoutingMode().equals("PARALLEL") ? "/" + r.getCompletionRule() : "") + ")");
-        audit.log("WORKFLOW_REQUEST_CREATED", "WorkflowRequest", r.getId(),
-            code(r) + " · " + r.getTitleEn() + " · " + r.getRoutingMode());
+    /** WF-9 — edit a request while it is still a DRAFT (the one §6 API missing before). Once sent,
+     *  a request is immutable except via the lifecycle transitions (→ 409). Initiator/admin only. */
+    @Transactional
+    public RequestResponse update(Long id, CreateRequest dto) {
+        WorkflowRequest r = get(id);
+        if (!"DRAFT".equals(r.getStatus()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only a DRAFT request can be edited; use the lifecycle actions instead.");
+        requireInitiatorOrAdmin(r, "edit");
+        Long org = r.getOrganisationId();
+
+        r.setSourceModule(dto.sourceModule().trim().toUpperCase());
+        r.setSourceRecordType(dto.sourceRecordType());
+        r.setSourceRecordId(dto.sourceRecordId());
+        r.setRequestType(dto.requestType().trim().toUpperCase());
+        r.setTitleEn(dto.titleEn());
+        r.setTitleAr(dto.titleAr());
+        r.setDescription(dto.description());
+        r.setRoutingMode(upperOr(dto.routingMode(), "PARALLEL"));
+        r.setCompletionRule(upperOr(dto.completionRule(), "ALL"));
+        r.setCompletionThreshold(dto.completionThreshold());
+        r.setRequiredAction(dto.requiredAction());
+        r.setDueDate(dto.dueDate());
+        r.setSlaHours(dto.slaHours());
+        r.setPriority(upperOr(dto.priority(), "MEDIUM"));
+        r.setSeverity(dto.severity());
+        if (dto.reminderDaysBefore() != null) r.setReminderDaysBefore(dto.reminderDaysBefore());
+        r.setEscalationRole(dto.escalationRole());
+        r.setEscalationUserId(dto.escalationUserId());
+        if (dto.responseRequired() != null) r.setResponseRequired(dto.responseRequired());
+        if (dto.evidenceRequired() != null) r.setEvidenceRequired(dto.evidenceRequired());
+        r.setClosureCondition(dto.closureCondition());
+        r.setReviewerId(dto.reviewerId());
+        r.setApproverId(dto.approverId());
+
+        List<RecipientDto> recipients = buildRecipients(dto, org);
+        List<BranchRuleDto> rules = normalizeRules(dto.branchRules());
+        validate(r, recipients, rules, org);
+        r.setRecipientCategory(categoryOf(recipients));
+        r.setBranchRules(rules.isEmpty() ? null : writeRules(rules));
+        requestRepo.save(r);
+
+        // Replace the recipient set (still DRAFT — none have acted).
+        recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(org, r.getId())
+            .forEach(rec -> { rec.setIsDeleted(true); recipientRepo.save(rec); });
+        saveRecipients(r, recipients, org);
+
+        appendEvent(r, "UPDATED", "DRAFT", "DRAFT", "Draft edited (" + recipients.size() + " recipient(s))");
+        audit.log("WORKFLOW_REQUEST_UPDATED", "WorkflowRequest", r.getId(), code(r) + " · draft edited");
         return toResponse(r);
     }
 
@@ -262,6 +323,27 @@ public class WorkflowRequestService {
 
         if (r.getReviewerId() != null) requireOrgUser(org, r.getReviewerId(), "reviewerId");
         if (r.getApproverId() != null) requireOrgUser(org, r.getApproverId(), "approverId");
+
+        // §5 — an APPROVAL request must have an approval gate (named approver or an APPROVER recipient).
+        if ("APPROVAL".equals(r.getRequestType())
+                && r.getApproverId() == null
+                && recipients.stream().noneMatch(x -> "APPROVER".equals(upperOr(x.actorRole(), "ASSIGNEE"))))
+            throw new IllegalArgumentException(
+                "APPROVAL requests require an approver (approverId or a recipient with the APPROVER actor role)");
+
+        // WF-9 — QUORUM/MAJORITY completion applies to PARALLEL routing; QUORUM needs a valid threshold.
+        if (Set.of("QUORUM", "MAJORITY").contains(r.getCompletionRule())) {
+            if (!"PARALLEL".equals(r.getRoutingMode()))
+                throw new IllegalArgumentException("QUORUM/MAJORITY completion requires PARALLEL routing");
+            long gates = recipients.stream().filter(x -> "ASSIGNEE".equals(upperOr(x.actorRole(), "ASSIGNEE"))).count();
+            if ("QUORUM".equals(r.getCompletionRule())) {
+                if (r.getCompletionThreshold() == null || r.getCompletionThreshold() < 1)
+                    throw new IllegalArgumentException("QUORUM completion requires completionThreshold >= 1");
+                if (r.getCompletionThreshold() > gates)
+                    throw new IllegalArgumentException(
+                        "completionThreshold (" + r.getCompletionThreshold() + ") exceeds the number of assignee recipients (" + gates + ")");
+            }
+        }
 
         // WF-6 — conditional-routing rules (§7 #5). GOTO_STEP is forward-only, which keeps
         // the §7 #19 no-circular-routing guarantee; RETURN/CLOSE/ESCALATE reuse machine paths.
@@ -605,6 +687,47 @@ public class WorkflowRequestService {
             .toList();
     }
 
+    // ── WF-8 recipient suggestions ─────────────────────────────────────────────
+
+    /** Owner/role suggestions for composing a request against a source record (§2.1/§2.2): the
+     *  module's owner roles + the initiator's department + a compliance reviewer — so the composer
+     *  proposes real recipients instead of a blank form. Role-based (portable across tenants);
+     *  record-specific owner resolution is a future refinement. */
+    private static final Map<String, List<String>> MODULE_OWNER_ROLES = Map.ofEntries(
+        Map.entry("RISK",       List.of("RISK_MANAGER", "RISK_OWNER")),
+        Map.entry("COMPLIANCE", List.of("COMPLIANCE_OFFICER", "CONTROL_OWNER")),
+        Map.entry("CYBER",      List.of("CISO", "SECURITY_ANALYST")),
+        Map.entry("SOC",        List.of("SECURITY_ANALYST", "CISO")),
+        Map.entry("PRIVACY",    List.of("DPO", "PRIVACY_MANAGER")),
+        Map.entry("BCM",        List.of("BCM_MANAGER")),
+        Map.entry("SCM",        List.of("SUPPLIER_MANAGER")),
+        Map.entry("TPRM",       List.of("SUPPLIER_MANAGER")),
+        Map.entry("SUST",       List.of("SUSTAINABILITY_OFFICER")),
+        Map.entry("EVIDENCE",   List.of("EVIDENCE_OWNER", "CONTROL_OWNER")),
+        Map.entry("NDI",        List.of("DATA_OWNER")),
+        Map.entry("AUDIT",      List.of("INTERNAL_AUDITOR"))
+    );
+
+    @Transactional(readOnly = true)
+    public List<RecipientSuggestion> recipientSuggestions(String sourceModule, String sourceRecordType, Long sourceRecordId) {
+        Long org = TenantContext.getCurrentTenant();
+        Long userId = CurrentActor.userId();
+        List<RecipientSuggestion> out = new java.util.ArrayList<>();
+        if (userId != null) {
+            Long deptId = userRepo.findById(userId).map(User::getDepartmentId).orElse(null);
+            if (deptId != null) {
+                String label = departmentRepo.findByIdAndOrganisationId(deptId, org)
+                    .map(d -> d.getNameEn()).orElse("dept#" + deptId);
+                out.add(new RecipientSuggestion("DEPARTMENT", deptId, null, label, "ASSIGNEE", "Your department"));
+            }
+        }
+        String mod = sourceModule == null ? "" : sourceModule.trim().toUpperCase();
+        for (String role : MODULE_OWNER_ROLES.getOrDefault(mod, List.of()))
+            out.add(new RecipientSuggestion("ROLE", null, role, role, "ASSIGNEE", mod + " owner role"));
+        out.add(new RecipientSuggestion("ROLE", null, "COMPLIANCE_OFFICER", "COMPLIANCE_OFFICER", "REVIEWER", "Compliance reviewer"));
+        return out;
+    }
+
     // ── WF-7 public (token-credentialed) surface ──────────────────────────────
 
     /** The EXTERNAL recipient's own minimal view (§7 #18): no internal ids, no other recipients,
@@ -795,15 +918,25 @@ public class WorkflowRequestService {
             return new RoutingAdvance(false, next);
         }
         // PARALLEL / BROADCAST_ACK
-        if ("ANY".equals(r.getCompletionRule())) {
-            boolean any = gates.stream().anyMatch(x -> "RESPONDED".equals(x.getStatus()));
-            if (any) gates.stream().filter(x -> Set.of("PENDING", "NOTIFIED", "IN_PROGRESS").contains(x.getStatus()))
-                .forEach(x -> { x.setStatus("SKIPPED"); recipientRepo.save(x); });
-            return new RoutingAdvance(any, null);
+        String rule = r.getCompletionRule();
+        if ("ALL".equals(rule)) {
+            boolean allDone = gates.stream()
+                .allMatch(x -> Set.of("RESPONDED", "SKIPPED", "APPROVED").contains(x.getStatus()));
+            return new RoutingAdvance(allDone, null);
         }
-        boolean allDone = gates.stream()
-            .allMatch(x -> Set.of("RESPONDED", "SKIPPED", "APPROVED").contains(x.getStatus()));
-        return new RoutingAdvance(allDone, null);
+        // ANY / QUORUM / MAJORITY — a threshold on the gates that actually answered (WF-9).
+        long answered = gates.stream().filter(x -> Set.of("RESPONDED", "APPROVED").contains(x.getStatus())).count();
+        int total = gates.size();
+        int need = switch (rule) {
+            case "ANY"      -> 1;
+            case "MAJORITY" -> (total / 2) + 1;
+            case "QUORUM"   -> r.getCompletionThreshold() != null ? r.getCompletionThreshold() : (total / 2) + 1;
+            default         -> total;
+        };
+        boolean complete = answered >= need;
+        if (complete) gates.stream().filter(x -> Set.of("PENDING", "NOTIFIED", "IN_PROGRESS").contains(x.getStatus()))
+            .forEach(x -> { x.setStatus("SKIPPED"); recipientRepo.save(x); });
+        return new RoutingAdvance(complete, null);
     }
 
     /** WF-4 — open the real evidence-subsystem request this workflow request routes (anchored
@@ -997,6 +1130,31 @@ public class WorkflowRequestService {
         };
     }
 
+    /** WF-8/WF-9 — assemble the effective recipient set: explicit rows + an expanded saved
+     *  distribution list, then optionally materialize COMMITTEE rows into per-active-member USER
+     *  gates (so QUORUM/MAJORITY completion counts real members). */
+    private List<RecipientDto> buildRecipients(CreateRequest dto, Long org) {
+        List<RecipientDto> base = new java.util.ArrayList<>();
+        if (dto.recipients() != null) base.addAll(dto.recipients());
+        if (dto.recipientListId() != null) base.addAll(recipientLists.expand(dto.recipientListId(), org));
+        if (!Boolean.TRUE.equals(dto.expandCommittees())) return base;
+
+        List<RecipientDto> out = new java.util.ArrayList<>();
+        for (RecipientDto in : base) {
+            if ("COMMITTEE".equalsIgnoreCase(in.recipientType() == null ? "" : in.recipientType()) && in.recipientId() != null) {
+                List<RecipientDto> members = committeeMembers.findActiveByCommittee(org, in.recipientId()).stream()
+                    .map(CommitteeMemberTerm::getMemberUserId).filter(Objects::nonNull).distinct()
+                    .map(uid -> new RecipientDto("USER", uid, null, null, upperOr(in.actorRole(), "ASSIGNEE"), in.stepNo()))
+                    .toList();
+                if (members.isEmpty()) out.add(in);   // no linked-user members → keep the committee row
+                else out.addAll(members);
+            } else {
+                out.add(in);
+            }
+        }
+        return out;
+    }
+
     private static String categoryOf(List<RecipientDto> recipients) {
         Set<String> types = new LinkedHashSet<>();
         recipients.forEach(x -> types.add(x.recipientType().trim().toUpperCase()));
@@ -1042,7 +1200,7 @@ public class WorkflowRequestService {
             r.getSourceModule(), r.getSourceRecordType(), r.getSourceRecordId(),
             r.getRequestType(), r.getTitleEn(), r.getTitleAr(), r.getDescription(),
             r.getInitiatedBy(), r.getInitiatedByName(),
-            r.getRecipientCategory(), r.getRoutingMode(), r.getCompletionRule(), r.getCurrentStep(),
+            r.getRecipientCategory(), r.getRoutingMode(), r.getCompletionRule(), r.getCompletionThreshold(), r.getCurrentStep(),
             r.getRequiredAction(), r.getDueDate(), r.getSlaHours(),
             countdown, hoursRemaining,
             r.getPriority(), r.getSeverity(),

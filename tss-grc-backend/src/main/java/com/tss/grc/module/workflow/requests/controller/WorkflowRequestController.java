@@ -3,6 +3,7 @@ package com.tss.grc.module.workflow.requests.controller;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.ActionRequest;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.CreateRequest;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.EventResponse;
+import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RecipientSuggestion;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RequestResponse;
 import com.tss.grc.module.workflow.requests.service.WorkflowRequestService;
 import com.tss.grc.module.workflow.requests.service.WorkflowRequestSlaScheduler;
@@ -55,6 +56,23 @@ public class WorkflowRequestController {
     @GetMapping("/{id}")
     @PreAuthorize("hasPermission('WORKFLOW','READ')")
     public RequestResponse get(@PathVariable Long id) { return svc.getDetail(id); }
+
+    /** WF-9 — edit a DRAFT request (the §6 PUT). Once sent, use the lifecycle actions → 409. */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
+    public RequestResponse update(@PathVariable Long id, @Valid @RequestBody CreateRequest body) {
+        return svc.update(id, body);
+    }
+
+    /** WF-8 — owner/role/department suggestions for composing a request against a source record. */
+    @GetMapping("/recipient-suggestions")
+    @PreAuthorize("hasPermission('WORKFLOW','READ')")
+    public List<RecipientSuggestion> recipientSuggestions(
+            @RequestParam(required = false) String sourceModule,
+            @RequestParam(required = false) String sourceRecordType,
+            @RequestParam(required = false) Long sourceRecordId) {
+        return svc.recipientSuggestions(sourceModule, sourceRecordType, sourceRecordId);
+    }
 
     @PostMapping("/{id}/send")
     @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
