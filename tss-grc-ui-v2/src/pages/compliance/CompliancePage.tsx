@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
 import { ModuleSubmissionsPanel } from '../../components/workflows/ModuleSubmissionsPanel';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -741,6 +742,7 @@ export function CompliancePage() {
         eyebrow={t('complianceEyebrow')} title={t('complianceTitle')} sub={t('complianceSub')}
         actions={
           <>
+            <RaiseRequestButton sourceModule="COMPLIANCE" />
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             {!isDemo && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter}

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
@@ -192,7 +193,7 @@ export function EmergingRiskPage() {
         eyebrow={t('navRisk')}
         title={t('emrPageTitle')}
         sub={t('emrPageSub')}
-        actions={<Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('emrNew')}</Button>}
+        actions={<><RaiseRequestButton sourceModule="RISK" sourceRecordType="EmergingRisk" /><Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('emrNew')}</Button></>}
       />
 
       <div className="kpi-grid">
