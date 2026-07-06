@@ -68,6 +68,10 @@ public class WorkflowRequest extends BaseEntity {
     @Column(name = "escalation_role", length = 60) private String escalationRole;
     @Column(name = "escalation_user_id") private Long escalationUserId;
     @Column(name = "escalated_at") private LocalDateTime escalatedAt;
+    /** WF-10 — multi-tier escalation ladder: JSON array [{level, role, userId, afterDays}]. */
+    @Column(name = "escalation_tiers", columnDefinition = "NVARCHAR(MAX)") private String escalationTiers;
+    /** WF-10 — highest ladder tier reached (0 = not escalated). */
+    @Column(name = "escalation_level", nullable = false) private Integer escalationLevel = 0;
 
     @Column(nullable = false, length = 30) private String status = "DRAFT";
 

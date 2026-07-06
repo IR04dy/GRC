@@ -21,7 +21,7 @@ without explicit "merge"; test rows `[REVIEW-TEST]`, cleaned with `CHARINDEX`.
 | 4 | **Committee → member expansion** — expand a COMMITTEE recipient into per-member gates so quorum/majority is real | §2.3 #7 | **ADD** | High | ✅ WF-9 |
 | 5 | **§5 validation hardening** — APPROVAL request requires an approver; approval gate can't be empty | §5 "Approver is required for approval workflows" | **IMPROVE** | Med | ✅ WF-9 |
 | 6 | **`PUT /:id` edit (DRAFT only)** — the one missing §6 API; edit a request before it is sent | §6 API list | **ADD** | Med | ✅ WF-9 |
-| 7 | **Multi-tier escalation** (L1 assignee-manager → L2 escalation-role → L3 executive) | §2.3 #6, §2.5 "Manager / Executive escalation" | **ADD** | Med | ⏳ WF-10 (next) |
+| 7 | **Multi-tier escalation** (L1 → L2 → L3 ladder) | §2.3 #6, §2.5 "Manager / Executive escalation" | **ADD** | Med | ✅ WF-10 |
 | 8 | **Recurring attestation reminders** — periodic re-attest cadence | §2.5 "Recurring attestation reminder" | **DEFER** | Low | ⏳ — belongs with the policy-attestation engine |
 | 9 | **In-platform outbound email** for EXTERNAL links | §2.3 #8 | **DEFER** | Med | ❌ no SMTP/outbox bean exists platform-wide; link is surfaced to the initiator to relay (documented) |
 | 10 | **Migrate all 14 legacy modules' Send/Request/Assign buttons onto the engine** | §3 (all modules) | **DEFER (own program)** | High | ❌ each module was hardened in its own loop; wholesale re-plumbing is a multi-module migration, scoped separately — NOT a single batch |
@@ -60,10 +60,22 @@ without explicit "merge"; test rows `[REVIEW-TEST]`, cleaned with `CHARINDEX`.
 - FE: composer completion-rule dropdown gains QUORUM/MAJORITY (+ threshold input) and an
   "expand committee to members" toggle; detail page shows quorum progress (k of n).
 
+## WF-10 — multi-tier escalation (DONE)
+
+- **V276**: `escalation_tiers` JSON ladder `[{level, role, userId, afterDays}]` + `escalation_level`
+  on `workflow.requests`. Tiers auto-numbered 1..N; validated (each rung needs a role or userId;
+  afterDays ≥ 0 and non-decreasing). A ladder satisfies the §5 HIGH/CRITICAL escalation-path gate.
+- **Manual `/escalate`** steps up exactly one tier per call (no illegal `ESCALATED→ESCALATED`
+  self-transition), notifying that rung (role broadcast + named user) + F8 with the level.
+- **SLA sweep** climbs to the highest tier whose `afterDays` has elapsed past due, notifying each
+  newly-reached rung once, and keeps climbing on later sweeps (the overdue pass now re-scans
+  OVERDUE rows; a no-new-tier re-scan is a no-op). Requests without a ladder keep the original
+  once-only single-path escalation unchanged.
+- FE: `EscalationTier` type + `escalationTiers` in create/detail; detail page renders the ladder
+  with the current tier highlighted. Full suite green, live 13/13, tsc + Vite clean.
+
 ## Deferred (documented, not silently dropped)
 
-- **WF-10 multi-tier escalation** — next batch: escalation *levels* (assignee-manager → escalation
-  role → executive) with per-level delays, replacing today's single-tier escalate.
 - **Outbound email** — no SMTP/dispatch bean exists anywhere in the platform; wiring it is a
   platform-infra task, not a workflow-engine task. External tracking links are surfaced to the
   initiator (WF-7).

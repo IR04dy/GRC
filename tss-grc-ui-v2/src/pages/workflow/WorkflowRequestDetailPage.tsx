@@ -272,7 +272,19 @@ export function WorkflowRequestDetailPage() {
               <dl style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '6px 12px', margin: 0, fontSize: 12 }}>
                 <dt style={{ color: 'var(--ink-3)' }}>{ar ? 'مطلوب' : 'Required action'}</dt><dd style={{ margin: 0 }}>{row.requiredAction ?? row.requestType.replace(/_/g, ' ')}</dd>
                 <dt style={{ color: 'var(--ink-3)' }}>{ar ? 'تذكير قبل' : 'Remind before'}</dt><dd style={{ margin: 0 }}>{row.reminderDaysBefore} {ar ? 'يوم' : 'days'}</dd>
-                <dt style={{ color: 'var(--ink-3)' }}>{ar ? 'مسار التصعيد' : 'Escalation path'}</dt><dd style={{ margin: 0 }}>{row.escalationRole ?? (row.escalationUserId ? `user #${row.escalationUserId}` : '—')}</dd>
+                <dt style={{ color: 'var(--ink-3)' }}>{ar ? 'مسار التصعيد' : 'Escalation path'}</dt>
+                <dd style={{ margin: 0 }}>
+                  {(row.escalationTiers?.length ?? 0) > 0 ? (
+                    <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {(row.escalationTiers ?? []).map((t, i) => (
+                        <Badge key={i} tone={(row.escalationLevel ?? 0) >= (t.level ?? i + 1) ? 'danger' : 'neutral'}>
+                          {`T${t.level ?? i + 1}: ${t.role ?? (t.userId ? `user #${t.userId}` : '?')}${t.afterDays ? ` +${t.afterDays}d` : ''}`}
+                        </Badge>
+                      ))}
+                      {(row.escalationLevel ?? 0) > 0 && <span style={{ color: 'var(--ink-3)' }}>{(ar ? 'المستوى الحالي: ' : 'at tier ') + row.escalationLevel}</span>}
+                    </span>
+                  ) : (row.escalationRole ?? (row.escalationUserId ? `user #${row.escalationUserId}` : '—'))}
+                </dd>
                 <dt style={{ color: 'var(--ink-3)' }}>{ar ? 'شرط الإغلاق' : 'Closure'}</dt><dd style={{ margin: 0 }}>{row.closureCondition ?? '—'}</dd>
                 {row.description && (<><dt style={{ color: 'var(--ink-3)' }}>{ar ? 'الوصف' : 'Description'}</dt><dd style={{ margin: 0 }}>{row.description}</dd></>)}
               </dl>

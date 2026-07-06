@@ -59,7 +59,17 @@ public final class WorkflowRequestDtos {
         @Valid List<BranchRuleDto> branchRules,            // WF-6 — optional conditional routing
         Long recipientListId,                              // WF-8 — expand a saved distribution list into recipients
         Boolean expandCommittees,                          // WF-9 — materialize COMMITTEE recipients into per-member gates
-        Integer completionThreshold                        // WF-9 — QUORUM: min responses required
+        Integer completionThreshold,                       // WF-9 — QUORUM: min responses required
+        @Valid List<EscalationTierDto> escalationTiers     // WF-10 — multi-tier escalation ladder
+    ) {}
+
+    /** WF-10 — one rung of the escalation ladder (§2.3 #6 / §2.5). Reached when {@code afterDays}
+     *  have elapsed past the due date; notifies {@code role} (broadcast) and/or {@code userId}. */
+    public record EscalationTierDto(
+        Integer level,
+        @Size(max = 60) String role,
+        Long userId,
+        Integer afterDays
     ) {}
 
     /** Body for transition endpoints (respond/review/approve/reject/…). */
@@ -125,6 +135,7 @@ public final class WorkflowRequestDtos {
         String priority, String severity,
         Integer reminderDaysBefore, LocalDateTime lastReminderAt, Integer reminderCount,
         String escalationRole, Long escalationUserId, LocalDateTime escalatedAt,
+        Integer escalationLevel, List<EscalationTierDto> escalationTiers,
         String status, Boolean responseRequired, Boolean evidenceRequired, String closureCondition,
         Long reviewerId, Long approverId, Long evidenceRequestId,
         LocalDateTime closedAt, LocalDateTime reopenedAt,

@@ -123,7 +123,7 @@ class WorkflowRequestServiceTest {
                                  Long reviewerId) {
         return new CreateRequest("RISK", "Risk", 5L, "EVIDENCE_REQUEST",
             "Collect evidence", null, null, routing, rule, "UPLOAD", due, 48, priority, null,
-            3, escRole, null, true, true, null, reviewerId, null, recipients, null, null, null, null);
+            3, escRole, null, true, true, null, reviewerId, null, recipients, null, null, null, null, null);
     }
 
     // ── §5 validation gates ─────────────────────────────────────────────────
@@ -303,7 +303,7 @@ class WorkflowRequestServiceTest {
         return new CreateRequest("RISK", "Risk", 5L, "REVIEW",
             "Conditional review", null, null, routing, "ALL", "REVIEW",
             LocalDate.now().plusDays(7), 48, "MEDIUM", null,
-            3, null, null, true, false, null, null, null, recipients, rules, null, null, null);
+            3, null, null, true, false, null, null, null, recipients, rules, null, null, null, null);
     }
 
     private static WorkflowRequestDtos.BranchRuleDto rule(Integer step, String outcome, String action, Integer target) {
@@ -429,7 +429,7 @@ class WorkflowRequestServiceTest {
         return new CreateRequest("RISK", "Risk", 5L, requestType,
             "Panel request", null, null, "PARALLEL", rule, "REVIEW",
             LocalDate.now().plusDays(7), 48, "MEDIUM", null,
-            3, null, null, true, false, null, null, approverId, recipients, null, null, null, threshold);
+            3, null, null, true, false, null, null, approverId, recipients, null, null, null, threshold, null);
     }
 
     @Test
@@ -512,6 +512,66 @@ class WorkflowRequestServiceTest {
                 LocalDate.now().plusDays(5), null, List.of(user(2L, 1)), null)))
             .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
             .hasMessageContaining("409");
+    }
+
+    // ── WF-10 multi-tier escalation ─────────────────────────────────────────
+
+    private CreateRequest createWithTiers(String priority, String escRole,
+                                          List<WorkflowRequestDtos.EscalationTierDto> tiers,
+                                          List<RecipientDto> recipients) {
+        return new CreateRequest("RISK", "Risk", 5L, "REVIEW",
+            "Tiered request", null, null, "PARALLEL", "ALL", "REVIEW",
+            LocalDate.now().plusDays(7), 48, priority, null,
+            3, escRole, null, true, false, null, null, null, recipients, null, null, null, null, tiers);
+    }
+
+    private static WorkflowRequestDtos.EscalationTierDto tier(Integer level, String role, Long userId, Integer afterDays) {
+        return new WorkflowRequestDtos.EscalationTierDto(level, role, userId, afterDays);
+    }
+
+    @Test
+    void create_highPriority_withOnlyTierLadder_passes() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        when(userRepo.findById(anyLong())).thenAnswer(inv -> Optional.of(orgUser(inv.getArgument(0))));
+        // HIGH priority, NO escalationRole/User/ESCALATION recipient — the tier ladder satisfies §5.
+        RequestResponse resp = svc.create(createWithTiers("HIGH", null,
+            List.of(tier(null, "LINE_MANAGER", null, 0), tier(null, "CISO", null, 2)),
+            List.of(user(2L, 1))));
+        assertThat(resp.status()).isEqualTo("DRAFT");
+        assertThat(resp.escalationTiers()).hasSize(2);
+        assertThat(resp.escalationTiers().get(0).level()).isEqualTo(1);   // levels assigned
+    }
+
+    @Test
+    void create_tierWithoutTarget_rejected() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        // validateTiers throws before recipient validation → no userRepo stub needed.
+        assertThatThrownBy(() -> svc.create(createWithTiers("MEDIUM", null,
+                List.of(tier(1, null, null, 0)), List.of(user(2L, 1)))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("role or a userId");
+    }
+
+    @Test
+    void escalate_steps_up_one_tier_each_call() {
+        authAs(1L, "admin", "PLATFORM_ADMIN");
+        WorkflowRequest r = sentRequest(70L, "PARALLEL", "ALL", null);
+        r.setEscalationTiers("[{\"level\":1,\"role\":\"LINE_MANAGER\",\"afterDays\":0},"
+            + "{\"level\":2,\"role\":\"CISO\",\"afterDays\":2}]");
+        r.setEscalationLevel(0);
+        when(requestRepo.findByIdAndOrganisationId(70L, ORG)).thenReturn(Optional.of(r));
+
+        RequestResponse resp1 = svc.escalate(70L, "first");
+        assertThat(resp1.status()).isEqualTo("ESCALATED");
+        assertThat(r.getEscalationLevel()).isEqualTo(1);
+        verify(notifications).broadcastToRole(any(), org.mockito.ArgumentMatchers.eq("LINE_MANAGER"),
+            any(), any(), any(), any(), any(), any());
+
+        // second escalate steps to tier 2 (ESCALATED -> ESCALATED is allowed by the machine)
+        RequestResponse resp2 = svc.escalate(70L, "second");
+        assertThat(r.getEscalationLevel()).isEqualTo(2);
+        verify(notifications).broadcastToRole(any(), org.mockito.ArgumentMatchers.eq("CISO"),
+            any(), any(), any(), any(), any(), any());
     }
 
     // ── WF-7 external tokenized public access (§7 #18) ──────────────────────

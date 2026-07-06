@@ -60,6 +60,7 @@ export interface WorkflowRequestCreate {
   branchRules?: WorkflowBranchRule[];   // WF-6
   recipientListId?: number;             // WF-8 — expand a saved distribution list
   expandCommittees?: boolean;           // WF-9 — materialize committees into per-member gates
+  escalationTiers?: EscalationTier[];   // WF-10 — multi-tier escalation ladder
 }
 
 // ─── WF-8 reusable recipient lists (distribution lists) ──────────────
@@ -79,6 +80,14 @@ export interface RecipientListDto {
 export interface RecipientSuggestion {
   recipientType: RecipientType; recipientId: number | null; recipientKey: string | null;
   recipientLabel: string | null; actorRole: ActorRole; reason: string;
+}
+
+// ─── WF-10 multi-tier escalation ladder ──────────────────────────────
+export interface EscalationTier {
+  level?: number | null;
+  role?: string | null;
+  userId?: number | null;
+  afterDays?: number | null;
 }
 
 // ─── Responses ───────────────────────────────────────────────────────
@@ -106,6 +115,7 @@ export interface WorkflowRequestDto {
   priority: string; severity: string | null;
   reminderDaysBefore: number; lastReminderAt: string | null; reminderCount: number;
   escalationRole: string | null; escalationUserId: number | null; escalatedAt: string | null;
+  escalationLevel: number | null; escalationTiers: EscalationTier[] | null;   // WF-10
   status: string; responseRequired: boolean; evidenceRequired: boolean; closureCondition: string | null;
   reviewerId: number | null; approverId: number | null;
   evidenceRequestId: number | null;   // WF-4 — the bridged evidence.evidence_requests row

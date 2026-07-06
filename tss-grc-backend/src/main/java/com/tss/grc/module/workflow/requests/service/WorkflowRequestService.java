@@ -20,6 +20,7 @@ import com.tss.grc.module.platform.repository.DepartmentRepository;
 import com.tss.grc.module.platform.service.NotificationService;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.BranchRuleDto;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.CreateRequest;
+import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.EscalationTierDto;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.EventResponse;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.PublicRequestView;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RecipientDto;
@@ -155,6 +156,12 @@ public class WorkflowRequestService {
         r.setCompletionThreshold(dto.completionThreshold());
         r.setStatus("DRAFT");
 
+        // WF-10 — multi-tier escalation ladder (set before validate: a ladder satisfies the
+        // HIGH/CRITICAL escalation-path gate).
+        List<EscalationTierDto> tiers = normalizeTiers(dto.escalationTiers());
+        validateTiers(tiers);
+        if (!tiers.isEmpty()) r.setEscalationTiers(writeTiers(tiers));
+
         // WF-8/WF-9 — the effective recipient set: explicit rows + an expanded saved distribution
         // list (recipientListId), with COMMITTEE rows optionally materialized into per-member gates.
         List<RecipientDto> recipients = buildRecipients(dto, org);
@@ -222,6 +229,10 @@ public class WorkflowRequestService {
         r.setClosureCondition(dto.closureCondition());
         r.setReviewerId(dto.reviewerId());
         r.setApproverId(dto.approverId());
+
+        List<EscalationTierDto> tiers = normalizeTiers(dto.escalationTiers());
+        validateTiers(tiers);
+        r.setEscalationTiers(tiers.isEmpty() ? null : writeTiers(tiers));
 
         List<RecipientDto> recipients = buildRecipients(dto, org);
         List<BranchRuleDto> rules = normalizeRules(dto.branchRules());
@@ -305,11 +316,14 @@ public class WorkflowRequestService {
         if (Boolean.TRUE.equals(r.getResponseRequired()) && r.getDueDate() == null)
             throw new IllegalArgumentException("dueDate is required when a response is required");
 
-        // Escalation path is required for high-priority requests (§5).
+        // Escalation path is required for high-priority requests (§5). A multi-tier ladder
+        // (WF-10) also satisfies this.
+        boolean hasTierLadder = r.getEscalationTiers() != null && !r.getEscalationTiers().isBlank();
         if (("HIGH".equals(r.getPriority()) || "CRITICAL".equals(r.getPriority()))
-                && r.getEscalationRole() == null && r.getEscalationUserId() == null && !hasEscalationRecipient)
+                && r.getEscalationRole() == null && r.getEscalationUserId() == null
+                && !hasEscalationRecipient && !hasTierLadder)
             throw new IllegalArgumentException(
-                "HIGH/CRITICAL priority requires an escalation path (escalationRole, escalationUserId, or an ESCALATION recipient)");
+                "HIGH/CRITICAL priority requires an escalation path (escalationRole, escalationUserId, an ESCALATION recipient, or an escalation tier ladder)");
 
         // Sequential workflow must have contiguous step order 1..N (§5 — also blocks circular routing).
         if ("SEQUENTIAL".equals(r.getRoutingMode())) {
@@ -571,18 +585,94 @@ public class WorkflowRequestService {
         return toResponse(r);
     }
 
-    /** Manual escalation (WF-2's sweep escalates overdue requests automatically via the same path). */
+    /** Manual escalation. With a multi-tier ladder (WF-10) each call steps up ONE tier and notifies
+     *  that rung; without tiers it fires the single escalation path (WF-2's sweep auto-escalates the
+     *  same way). All r mutations happen before the single save (ROWVERSION rule); notify last. */
     @Transactional
     public RequestResponse escalate(Long id, String note) {
         WorkflowRequest r = get(id);
         String from = r.getStatus();
-        transition(r, "ESCALATED");
+        if (!"ESCALATED".equals(r.getStatus())) transition(r, "ESCALATED");   // re-escalate steps the tier, not the state
         r.setEscalatedAt(LocalDateTime.now());
+        List<EscalationTierDto> tiers = readTiers(r.getEscalationTiers());
+        EscalationTierDto tier = null;
+        if (!tiers.isEmpty()) {
+            int idx = Math.min(r.getEscalationLevel() == null ? 0 : r.getEscalationLevel(), tiers.size() - 1);
+            r.setEscalationLevel(idx + 1);
+            tier = tiers.get(idx);
+        }
         requestRepo.save(r);
-        appendEvent(r, "ESCALATED", from, "ESCALATED", note);
+        appendEvent(r, "ESCALATED", from, "ESCALATED",
+            (tier != null ? "Escalated to tier " + (tier.level() != null ? tier.level() : r.getEscalationLevel())
+                + (tier.role() != null ? " (" + tier.role() + ")" : "") : "Escalated") + noteSuffix(note));
         audit.log("WORKFLOW_REQUEST_ESCALATED", "WorkflowRequest", r.getId(), code(r) + noteSuffix(note));
-        notifyEscalationPath(r, note);
+        if (tier != null) notifyTier(r, tier, note); else notifyEscalationPath(r, note);
         return toResponse(r);
+    }
+
+    /** WF-10 — notify one escalation tier (role broadcast + named user) + an F8 event carrying the
+     *  reached level. Pure: mutates nothing on the request (call after the save). */
+    private void notifyTier(WorkflowRequest r, EscalationTierDto tier, String note) {
+        String title = "Workflow request escalated"; String titleAr = "تم تصعيد طلب سير العمل";
+        String msg = code(r) + " \"" + r.getTitleEn() + "\" escalated to tier "
+            + (tier.level() != null ? tier.level() : r.getEscalationLevel()) + noteSuffix(note);
+        if (tier.userId() != null)
+            notifications.notifyUser(r.getOrganisationId(), tier.userId(), title, titleAr, msg,
+                "WORKFLOW_REQUEST_ESCALATED", "WorkflowRequest", r.getId());
+        if (tier.role() != null && !tier.role().isBlank())
+            notifications.broadcastToRole(r.getOrganisationId(), tier.role(), title, titleAr, msg,
+                "WORKFLOW_REQUEST_ESCALATED", "WorkflowRequest", r.getId());
+        publisher.publishEvent(DomainEvent.of(r.getOrganisationId(), "WORKFLOW_REQUEST_ESCALATED",
+            "WorkflowRequest", r.getId(),
+            Map.of("priority", r.getPriority() == null ? "" : r.getPriority(),
+                   "requestType", r.getRequestType() == null ? "" : r.getRequestType(),
+                   "escalationLevel", r.getEscalationLevel() == null ? 0 : r.getEscalationLevel())));
+    }
+
+    /** WF-10 — parse the escalation-tier ladder JSON (empty on absent/parse failure). */
+    static List<EscalationTierDto> readTiers(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return MAPPER.readValue(json, new TypeReference<List<EscalationTierDto>>() {});
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    private static String writeTiers(List<EscalationTierDto> tiers) {
+        try {
+            return MAPPER.writeValueAsString(tiers);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("escalationTiers could not be serialized: " + e.getMessage());
+        }
+    }
+
+    /** WF-10 — assign contiguous levels (1..N in list order) + upper-case roles + default afterDays. */
+    private static List<EscalationTierDto> normalizeTiers(List<EscalationTierDto> tiers) {
+        if (tiers == null || tiers.isEmpty()) return List.of();
+        List<EscalationTierDto> out = new java.util.ArrayList<>();
+        int level = 1;
+        for (EscalationTierDto t : tiers) {
+            out.add(new EscalationTierDto(level++,
+                t.role() == null || t.role().isBlank() ? null : t.role().trim().toUpperCase(),
+                t.userId(),
+                t.afterDays() == null ? 0 : t.afterDays()));
+        }
+        return out;
+    }
+
+    /** WF-10 — each rung needs a target; afterDays must be non-negative and non-decreasing. */
+    private static void validateTiers(List<EscalationTierDto> tiers) {
+        int prev = -1;
+        for (EscalationTierDto t : tiers) {
+            if (t.role() == null && t.userId() == null)
+                throw new IllegalArgumentException("each escalation tier requires a role or a userId");
+            if (t.afterDays() < 0)
+                throw new IllegalArgumentException("escalation tier afterDays must be >= 0");
+            if (t.afterDays() < prev)
+                throw new IllegalArgumentException("escalation tiers must have non-decreasing afterDays (a rising ladder)");
+            prev = t.afterDays();
+        }
     }
 
     /** Escalation-path fan-out: escalation user + role broadcast + F8 event. Shared by the
@@ -1206,6 +1296,7 @@ public class WorkflowRequestService {
             r.getPriority(), r.getSeverity(),
             r.getReminderDaysBefore(), r.getLastReminderAt(), r.getReminderCount(),
             r.getEscalationRole(), r.getEscalationUserId(), r.getEscalatedAt(),
+            r.getEscalationLevel(), readTiers(r.getEscalationTiers()),
             r.getStatus(), r.getResponseRequired(), r.getEvidenceRequired(), r.getClosureCondition(),
             r.getReviewerId(), r.getApproverId(), r.getEvidenceRequestId(),
             r.getClosedAt(), r.getReopenedAt(),

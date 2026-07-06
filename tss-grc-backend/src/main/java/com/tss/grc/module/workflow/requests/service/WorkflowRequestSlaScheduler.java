@@ -7,6 +7,7 @@ import com.tss.grc.module.iam.repository.UserRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.platform.service.NotificationService;
+import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.EscalationTierDto;
 import com.tss.grc.module.workflow.requests.entity.WorkflowRequest;
 import com.tss.grc.module.workflow.requests.entity.WorkflowRequestEvent;
 import com.tss.grc.module.workflow.requests.entity.WorkflowRequestRecipient;
@@ -61,6 +62,10 @@ public class WorkflowRequestSlaScheduler {
      *  OVERDUE/ESCALATED are already flagged. */
     private static final List<String> OPEN_STATUSES =
         List.of("SENT", "ASSIGNED", "IN_PROGRESS", "WAITING_RESPONSE", "REOPENED");
+    /** WF-10 — the overdue pass also re-scans already-OVERDUE requests so a multi-tier ladder can
+     *  keep climbing on later sweeps (a plain OVERDUE request with no new tier is a no-op). */
+    private static final List<String> OVERDUE_SCAN_STATUSES =
+        List.of("SENT", "ASSIGNED", "IN_PROGRESS", "WAITING_RESPONSE", "REOPENED", "OVERDUE");
     /** Anti-spam gap between reminders for the same request (~once a day). */
     private static final long REMINDER_THROTTLE_HOURS = 20;
     /** Upper bound for the reminder-window scan; per-request windows are filtered in memory. */
@@ -104,9 +109,8 @@ public class WorkflowRequestSlaScheduler {
         LocalDateTime throttleBefore = now.minusHours(REMINDER_THROTTLE_HOURS);
 
         int escalations = 0;
-        for (WorkflowRequest r : requestRepo.findByStatusInAndDueDateBefore(OPEN_STATUSES, today)) {
-            escalateOverdue(r, today, now);
-            escalations++;
+        for (WorkflowRequest r : requestRepo.findByStatusInAndDueDateBefore(OVERDUE_SCAN_STATUSES, today)) {
+            if (escalateOverdue(r, today, now)) escalations++;
         }
 
         int reminders = 0;
@@ -122,57 +126,109 @@ public class WorkflowRequestSlaScheduler {
         return new SweepResult(reminders, escalations);
     }
 
-    /** Flip an overdue request to OVERDUE and escalate it exactly once. */
-    private void escalateOverdue(WorkflowRequest r, LocalDate today, LocalDateTime now) {
-        // Load recipients BEFORE mutating the request (ROWVERSION single-update rule).
+    /**
+     * Flip an overdue request to OVERDUE and escalate it. Without a tier ladder this is the
+     * original once-only single-path escalation. With a WF-10 ladder, the sweep advances to the
+     * highest tier whose {@code afterDays} threshold has elapsed, notifying each newly-reached
+     * rung once — climbing further on later sweeps as more days pass. Returns true if it acted
+     * (so the sweep counts real escalations, not idle re-scans of already-OVERDUE requests).
+     */
+    private boolean escalateOverdue(WorkflowRequest r, LocalDate today, LocalDateTime now) {
         List<WorkflowRequestRecipient> recipients = recipientRepo
             .findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(r.getOrganisationId(), r.getId());
+        List<EscalationTierDto> tiers = WorkflowRequestService.readTiers(r.getEscalationTiers());
 
         long daysOverdue = ChronoUnit.DAYS.between(r.getDueDate(), today);
-        String from = r.getStatus();
+        boolean alreadyOverdue = "OVERDUE".equals(r.getStatus());
         boolean firstEscalation = r.getEscalatedAt() == null;
+        int curLevel = r.getEscalationLevel() == null ? 0 : r.getEscalationLevel();
+
+        int targetLevel = curLevel;
+        if (!tiers.isEmpty()) {
+            int reached = 0;
+            for (EscalationTierDto t : tiers)
+                if (t.afterDays() == null || t.afterDays() <= daysOverdue) reached++;
+            targetLevel = Math.max(curLevel, Math.min(reached, tiers.size()));
+        }
+        boolean newTier = targetLevel > curLevel;
+
+        // Idle re-scan of an already-OVERDUE request with no new tier reached → nothing to do.
+        if (alreadyOverdue && !newTier) return false;
+
+        String from = r.getStatus();
         r.setStatus("OVERDUE");
         if (firstEscalation) r.setEscalatedAt(now);
         r.setLastReminderAt(now);
         r.setReminderCount(r.getReminderCount() == null ? 1 : r.getReminderCount() + 1);
+        if (newTier) r.setEscalationLevel(targetLevel);
         requestRepo.save(r);
 
-        appendEvent(r, "OVERDUE", from, "OVERDUE",
-            daysOverdue + " day(s) past due (" + r.getDueDate() + ")");
-        if (!firstEscalation) return;   // once-only: flag flipped, path already notified earlier
-
-        appendEvent(r, "ESCALATED", "OVERDUE", "OVERDUE",
-            "Auto-escalated by the SLA sweep to the escalation path");
-        withTenant(r.getOrganisationId(), () ->
-            audit.log("WORKFLOW_REQUEST_OVERDUE", "WorkflowRequest", r.getId(),
-                code(r) + " \"" + r.getTitleEn() + "\" is " + daysOverdue
-                    + " day(s) overdue (due " + r.getDueDate() + ") — escalated"));
+        if (!alreadyOverdue)
+            appendEvent(r, "OVERDUE", from, "OVERDUE", daysOverdue + " day(s) past due (" + r.getDueDate() + ")");
 
         String title = "Workflow request overdue — escalated";
         String titleAr = "طلب سير عمل متأخر — تم التصعيد";
-        String msg = code(r) + " \"" + r.getTitleEn() + "\" is " + daysOverdue
-            + " day(s) overdue (due " + r.getDueDate() + ", priority " + r.getPriority() + ").";
-        if (r.getEscalationUserId() != null)
-            notifications.notifyUser(r.getOrganisationId(), r.getEscalationUserId(),
-                title, titleAr, msg, "WORKFLOW_REQUEST_ESCALATED", "WorkflowRequest", r.getId());
-        if (r.getEscalationRole() != null && !r.getEscalationRole().isBlank())
-            notifications.broadcastToRole(r.getOrganisationId(), r.getEscalationRole(),
-                title, titleAr, msg, "WORKFLOW_REQUEST_ESCALATED", "WorkflowRequest", r.getId());
-        for (WorkflowRequestRecipient rec : recipients) {
-            if (!"ESCALATION".equals(rec.getActorRole())) continue;
-            if ("USER".equals(rec.getRecipientType()) && rec.getRecipientId() != null)
-                notifications.notifyUser(r.getOrganisationId(), rec.getRecipientId(),
+
+        if (tiers.isEmpty()) {
+            // Single-path escalation, once only (unchanged behaviour).
+            if (!firstEscalation) return true;
+            appendEvent(r, "ESCALATED", "OVERDUE", "OVERDUE",
+                "Auto-escalated by the SLA sweep to the escalation path");
+            withTenant(r.getOrganisationId(), () ->
+                audit.log("WORKFLOW_REQUEST_OVERDUE", "WorkflowRequest", r.getId(),
+                    code(r) + " \"" + r.getTitleEn() + "\" is " + daysOverdue
+                        + " day(s) overdue (due " + r.getDueDate() + ") — escalated"));
+            String msg = code(r) + " \"" + r.getTitleEn() + "\" is " + daysOverdue
+                + " day(s) overdue (due " + r.getDueDate() + ", priority " + r.getPriority() + ").";
+            if (r.getEscalationUserId() != null)
+                notifications.notifyUser(r.getOrganisationId(), r.getEscalationUserId(),
                     title, titleAr, msg, "WORKFLOW_REQUEST_ESCALATED", "WorkflowRequest", r.getId());
-            else if ("ROLE".equals(rec.getRecipientType()) && rec.getRecipientKey() != null)
-                notifications.broadcastToRole(r.getOrganisationId(), rec.getRecipientKey(),
+            if (r.getEscalationRole() != null && !r.getEscalationRole().isBlank())
+                notifications.broadcastToRole(r.getOrganisationId(), r.getEscalationRole(),
                     title, titleAr, msg, "WORKFLOW_REQUEST_ESCALATED", "WorkflowRequest", r.getId());
+            for (WorkflowRequestRecipient rec : recipients) {
+                if (!"ESCALATION".equals(rec.getActorRole())) continue;
+                if ("USER".equals(rec.getRecipientType()) && rec.getRecipientId() != null)
+                    notifications.notifyUser(r.getOrganisationId(), rec.getRecipientId(),
+                        title, titleAr, msg, "WORKFLOW_REQUEST_ESCALATED", "WorkflowRequest", r.getId());
+                else if ("ROLE".equals(rec.getRecipientType()) && rec.getRecipientKey() != null)
+                    notifications.broadcastToRole(r.getOrganisationId(), rec.getRecipientKey(),
+                        title, titleAr, msg, "WORKFLOW_REQUEST_ESCALATED", "WorkflowRequest", r.getId());
+            }
+            publisher.publishEvent(DomainEvent.of(r.getOrganisationId(), "WORKFLOW_REQUEST_OVERDUE",
+                "WorkflowRequest", r.getId(),
+                Map.of("priority",    r.getPriority() == null ? "" : r.getPriority(),
+                       "requestType", r.getRequestType() == null ? "" : r.getRequestType(),
+                       "daysOverdue", daysOverdue)));
+            return true;
         }
 
+        // WF-10 — climb the ladder: notify each rung from curLevel up to the newly-reached tier.
+        if (!newTier) return true;
+        final int tgt = targetLevel;
+        withTenant(r.getOrganisationId(), () ->
+            audit.log("WORKFLOW_REQUEST_OVERDUE", "WorkflowRequest", r.getId(),
+                code(r) + " \"" + r.getTitleEn() + "\" is " + daysOverdue + " day(s) overdue — escalated to tier " + tgt));
+        for (int idx = curLevel; idx < targetLevel; idx++) {
+            EscalationTierDto t = tiers.get(idx);
+            appendEvent(r, "ESCALATED", "OVERDUE", "OVERDUE",
+                "Auto-escalated to tier " + (t.level() != null ? t.level() : idx + 1)
+                    + (t.role() != null ? " (" + t.role() + ")" : ""));
+            String msg = code(r) + " \"" + r.getTitleEn() + "\" is " + daysOverdue
+                + " day(s) overdue — escalation tier " + (t.level() != null ? t.level() : idx + 1) + ".";
+            if (t.userId() != null)
+                notifications.notifyUser(r.getOrganisationId(), t.userId(),
+                    title, titleAr, msg, "WORKFLOW_REQUEST_ESCALATED", "WorkflowRequest", r.getId());
+            if (t.role() != null && !t.role().isBlank())
+                notifications.broadcastToRole(r.getOrganisationId(), t.role(),
+                    title, titleAr, msg, "WORKFLOW_REQUEST_ESCALATED", "WorkflowRequest", r.getId());
+        }
         publisher.publishEvent(DomainEvent.of(r.getOrganisationId(), "WORKFLOW_REQUEST_OVERDUE",
             "WorkflowRequest", r.getId(),
             Map.of("priority",    r.getPriority() == null ? "" : r.getPriority(),
                    "requestType", r.getRequestType() == null ? "" : r.getRequestType(),
-                   "daysOverdue", daysOverdue)));
+                   "daysOverdue", daysOverdue, "escalationLevel", targetLevel)));
+        return true;
     }
 
     /** Send a pre-due reminder to the pending assignee recipients of the actionable step. */
