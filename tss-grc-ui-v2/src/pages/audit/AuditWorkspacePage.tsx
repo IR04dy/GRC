@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -131,6 +132,7 @@ export function AuditWorkspacePage() {
         eyebrow={t('audwsEyebrow')}
         title={t('audwsHeader')}
         sub={t('audwsHeaderSub')}
+        actions={<RaiseRequestButton sourceModule="AUDIT" />}
       />
 
       <Tabs items={tabs} active={tab} onChange={setTab} />

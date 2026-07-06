@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Workflow, Building2, AlertTriangle, CalendarClock, Filter, Download, Plus, BarChart3, FileText } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -198,6 +199,7 @@ export function TprmPage() {
         eyebrow={t('tprmEyebrow')} title={t('tprmTitle')} sub={t('tprmSub')}
         actions={
           <>
+            <RaiseRequestButton sourceModule="TPRM" />
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             {!isDemo && <LivePulse pulse={pulse} />}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>

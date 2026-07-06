@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Siren, AlertTriangle, Clock, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -126,9 +127,12 @@ export function SocOpsEventsPage() {
         sub={isAr ? 'ECC-2: الإقرار خلال ساعة للحرج · ٤س للعالي · ٢٤س للمتوسط · ٧٢س للمنخفض'
                   : 'ECC-2 SLAs — 1h CRITICAL · 4h HIGH · 24h MEDIUM · 72h LOW'}
         actions={
-          <Button variant="ghost" size="sm" onClick={() => void load()}>
-            <RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}
-          </Button>
+          <>
+            <RaiseRequestButton sourceModule="SOCOPS" />
+            <Button variant="ghost" size="sm" onClick={() => void load()}>
+              <RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}
+            </Button>
+          </>
         }
       />
 

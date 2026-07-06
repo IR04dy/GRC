@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
@@ -158,6 +159,7 @@ export function ReportsCentrePage() {
         sub={t('reportsCentreSub')}
         actions={
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <RaiseRequestButton sourceModule="REPORTING" defaultRequestType="REPORT_DISTRIBUTION" />
             <Languages size={15} style={{ color: 'var(--ink-3)' }} />
             <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t('rcLangLabel')}</span>
             <div role="group" aria-label={t('rcLangLabel')} style={{

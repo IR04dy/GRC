@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
@@ -187,7 +188,10 @@ export function EsgPage() {
         eyebrow={t('esgEyebrow')}
         title={t('esgTitle')}
         sub={t('esgPageSub')}
-        actions={<Button variant="primary" Icon={Download} onClick={downloadAnnex}>{t('esgDownloadAnnex')}</Button>}
+        actions={<>
+          <RaiseRequestButton sourceModule="ESG" />
+          <Button variant="primary" Icon={Download} onClick={downloadAnnex}>{t('esgDownloadAnnex')}</Button>
+        </>}
       />
 
       <div className="kpi-grid esg-kpi-strip">

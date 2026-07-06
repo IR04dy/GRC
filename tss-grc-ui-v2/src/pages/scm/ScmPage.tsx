@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -766,6 +767,7 @@ export function ScmPage() {
         eyebrow={t('scmEyebrow')} title={t('scmTitle')} sub={t('scmSub')}
         actions={
           <>
+            <RaiseRequestButton sourceModule="SCM" />
             {isDemo && <Badge tone="warning">{t('demoMode')}</Badge>}
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}

@@ -25,16 +25,16 @@ round-trips and persists). No backend change needed — the engine API is alread
 | **Cyber** | `cyber/CyberPage.tsx` (header) — `sourceModule=CYBER` | ✅ Slice 1 |
 | **Compliance / Policy** | `compliance/CompliancePage.tsx` (header) — `sourceModule=COMPLIANCE` | ✅ Slice 1 |
 | **Privacy / PDPL** | `privacy/PrivacyPage.tsx` (header) — `sourceModule=PRIVACY` | ✅ Slice 1 |
-| **BCM** | `bcm/BcmPage.tsx` (`actions={` @ ~L480) — `sourceModule=BCM` | ⏳ Slice 2 |
-| **SOC Ops** | `socops/SocOpsDetailPage.tsx` / `SocOpsEventsPage.tsx` — `sourceModule=SOCOPS` | ⏳ Slice 2 |
-| **Third-Party / TPRM** | `tprm/TprmPage.tsx` (`actions={` @ ~L199) — `sourceModule=TPRM` | ⏳ Slice 2 |
-| **Supply Chain / SCM** | `scm/ScmPage.tsx` (`actions={` @ ~L767) — `sourceModule=SCM` | ⏳ Slice 2 |
-| **ESG / Sustainability** | `esg/EsgPage.tsx` (`actions={` @ ~L190) — `sourceModule=ESG` | ⏳ Slice 2 |
-| **Evidence** | evidence workspace/detail — `sourceModule=EVIDENCE` (note: evidence already has its own real request lifecycle via WF-4 bridge; adoption is the generic entry) | ⏳ Slice 3 |
-| **NDI / SDAIA** | datagov/NDI pages — `sourceModule=NDI` | ⏳ Slice 3 |
-| **Incident** | incident register/detail — `sourceModule=INCIDENT` | ⏳ Slice 3 |
-| **Internal Audit** | audit engagement pages — `sourceModule=AUDIT` | ⏳ Slice 3 |
-| **Reporting** | report distribution — `sourceModule=REPORTING` (REPORT_DISTRIBUTION type) | ⏳ Slice 3 |
+| **BCM** | `bcm/BcmPage.tsx` (`actions={` @ ~L480) — `sourceModule=BCM` | ✅ Slice 2 |
+| **SOC Ops** | `socops/SocOpsDetailPage.tsx` / `SocOpsEventsPage.tsx` — `sourceModule=SOCOPS` | ✅ Slice 2 |
+| **Third-Party / TPRM** | `tprm/TprmPage.tsx` (`actions={` @ ~L199) — `sourceModule=TPRM` | ✅ Slice 2 |
+| **Supply Chain / SCM** | `scm/ScmPage.tsx` (`actions={` @ ~L767) — `sourceModule=SCM` | ✅ Slice 2 |
+| **ESG / Sustainability** | `esg/EsgPage.tsx` (`actions={` @ ~L190) — `sourceModule=ESG` | ✅ Slice 2 |
+| **Evidence** | evidence workspace/detail — `sourceModule=EVIDENCE` (note: evidence already has its own real request lifecycle via WF-4 bridge; adoption is the generic entry) | ✅ Slice 3 |
+| **NDI / SDAIA** | datagov/NDI pages — `sourceModule=NDI` | ✅ Slice 3 |
+| **Incident** | incident register/detail — `sourceModule=INCIDENT` | ✅ Slice 3 |
+| **Internal Audit** | audit engagement pages — `sourceModule=AUDIT` | ✅ Slice 3 |
+| **Reporting** | report distribution — `sourceModule=REPORTING` (REPORT_DISTRIBUTION type) | ✅ Slice 3 |
 
 ## Slice 1 (this batch) — verified
 
@@ -43,12 +43,30 @@ all 5 FE modules Vite-transform 200; live anchor round-trip proven (CYBER/CyberI
 persisted + returned). No backend change → full suite unchanged (2214/0/0 from WF-10). Ratchet
 unaffected (no new endpoints).
 
-## Remaining slices — mechanical
+## Slice 2 — verified
 
-Slices 2–3 are the same one-line insertion per page (import + `<RaiseRequestButton sourceModule=…/>`
-in the header `actions`), using the injection points listed above. Where a page has a per-record
-detail view, pass `sourceRecordType`/`sourceRecordId` so the request anchors to that record and the
-detail page can show its linked requests. No further engine or DB work is required.
+Wired `RaiseRequestButton` into BCM (`BcmPage`), SOC Ops (`SocOpsEventsPage` header **and**
+`SocOpsDetailPage` — the detail one anchored to the specific record via
+`sourceRecordType={config.entityType} sourceRecordId={row.id}`), TPRM (`TprmPage`), SCM (`ScmPage`),
+ESG (`EsgPage`). Fragment-pattern headers got a one-line insert; ESG/SOC-events single-element
+`actions` were wrapped in a fragment. tsc clean; all pages Vite-transform 200.
+
+## Slice 3 — verified
+
+Wired the remaining modules: Evidence (`EvidencePage`), NDI/SDAIA (`NdiPage` — header gained an
+`actions` slot), Incident (`IncidentsPage`), Internal Audit (`AuditWorkspacePage` — header gained an
+`actions` slot), Reporting (`ReportsCentrePage` — button added into the existing actions row,
+`defaultRequestType="REPORT_DISTRIBUTION"`). tsc clean; all pages Vite-transform 200.
+
+## Program complete — all 14 modules on the engine
+
+Every module in the table now raises real, tracked, routed `WorkflowRequest`s through the platform
+engine. Verification (2026-07-06): `npx tsc --noEmit` exit 0; all 11 edited pages + the shared
+component Vite-transform 200; **live end-to-end round-trip proven for a brand-new `sourceModule`
+value** (`INCIDENT` / `SecurityIncident` / #90210 → create 200 → send 200 → `SENT`, anchor persisted
+in `workflow.requests`, then cleaned up). Confirmed the backend stores `sourceModule` as a free
+`@NotBlank @Size(max=40)` string with **no enum/whitelist**, so every module string is accepted.
+No Java changed → backend suite unchanged (2214/0/0); ratchet unaffected (no new endpoints).
 
 ## Non-goals / notes
 
