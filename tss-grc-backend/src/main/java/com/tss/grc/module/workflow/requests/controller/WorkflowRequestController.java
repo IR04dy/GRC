@@ -5,6 +5,7 @@ import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.CreateReques
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.EventResponse;
 import com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RequestResponse;
 import com.tss.grc.module.workflow.requests.service.WorkflowRequestService;
+import com.tss.grc.module.workflow.requests.service.WorkflowRequestSlaScheduler;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ import java.util.List;
 public class WorkflowRequestController {
 
     private final WorkflowRequestService svc;
+    private final WorkflowRequestSlaScheduler slaScheduler;   // WF-2 — manual sweep trigger
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
@@ -115,4 +117,10 @@ public class WorkflowRequestController {
     @GetMapping("/{id}/audit-log")
     @PreAuthorize("isAuthenticated()")
     public List<EventResponse> auditLog(@PathVariable Long id) { return svc.auditLog(id); }
+
+    /** WF-2 — run the SLA sweep on demand (the scheduler also runs it on a timer):
+     *  pre-due reminders + overdue → OVERDUE + once-only escalation. Admin-only ops action. */
+    @PostMapping("/run-sla-sweep")
+    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN')")
+    public WorkflowRequestSlaScheduler.SweepResult runSlaSweep() { return slaScheduler.sweep(); }
 }

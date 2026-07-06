@@ -102,6 +102,11 @@ grc:
   cyber-evidence-expiry:
     scheduler-enabled: true
     scheduler-interval-ms: 60000          # 1 min in dev (prod uses the 1-hour default)
+  # WF-2 — workflow-request SLA clock (pre-due reminders + overdue → OVERDUE + once-only
+  # escalation). Short dev cadence so the reminder/escalation path is observable end-to-end.
+  workflow-request-sla:
+    scheduler-enabled: true
+    scheduler-interval-ms: 60000          # 1 min in dev (prod uses the 5-min default)
 
   # Sprint 12 — ServiceNow ITSM integration. In dev we explicitly enable
   # the adapter in STUB mode so smoke tests against /api/v1/integrations/servicenow

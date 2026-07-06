@@ -129,6 +129,9 @@ grc:
   # re-requested for NCA/SAMA reviews (1-hour default cadence).
   cyber-evidence-expiry:
     scheduler-enabled: true
+  # WF-2 — workflow-request SLA clock (reminders + overdue escalation; 5-min default cadence).
+  workflow-request-sla:
+    scheduler-enabled: true
   storage:
     base-path: ${FILE_STORAGE_PATH:/var/data/tss-grc/uploads}
   notifications:
