@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { ProcessorReviewButton } from '../../components/workflow/Section9RequestForms';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
@@ -116,7 +117,10 @@ export function ProcessorAssessmentsPage() {
   return (
     <Shell title={t('procPageTitle')} sub={t('procPageSub')}>
       <PageHeader eyebrow={t('navPrivacy')} title={t('procPageTitle')} sub={t('procPageSub')}
-        actions={<Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('procNew')}</Button>} />
+        actions={<>
+          <ProcessorReviewButton />
+          <Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('procNew')}</Button>
+        </>} />
 
       <div className="kpi-grid">
         <Kpi Icon={ClipboardCheck} label={t('procKpiApproved')} value={stats.APPROVED} tone="success"

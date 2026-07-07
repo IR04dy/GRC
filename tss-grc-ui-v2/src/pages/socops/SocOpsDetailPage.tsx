@@ -9,6 +9,7 @@ import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
+import { ContainmentRequestButton } from '../../components/workflow/Section9RequestForms';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -715,7 +716,10 @@ export function SocOpsDetailPage() {
         eyebrow={isAr ? config.label.ar : config.label.en}
         title={headline.title}
         sub={headline.sub}
-        actions={<RaiseRequestButton sourceModule="SOCOPS" sourceRecordType={config.entityType} sourceRecordId={Number(row.id ?? id)} />}
+        actions={<>
+          <RaiseRequestButton sourceModule="SOCOPS" sourceRecordType={config.entityType} sourceRecordId={Number(row.id ?? id)} />
+          <ContainmentRequestButton sourceRecordType={config.entityType} sourceRecordId={Number(row.id ?? id)} />
+        </>}
         backTo={config.register.path}
       />
 

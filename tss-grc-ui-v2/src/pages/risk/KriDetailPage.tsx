@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Activity, AlertOctagon, ChevronLeft, TrendingDown } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { KriBreachRequestButton } from '../../components/workflow/Section9RequestForms';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
@@ -162,11 +163,14 @@ export function KriDetailPage() {
         sub={def
           ? `${def.kriCode} · ${KRI_CATEGORY_LABEL[def.category][lang === 'ar' ? 'ar' : 'en']} · ${KRI_FREQUENCY_LABEL[def.frequency][lang === 'ar' ? 'ar' : 'en']}`
           : undefined}
-        actions={def?.latestStatus
-          ? <Badge tone={KRI_STATUS_TONE[def.latestStatus]} dot>
+        actions={<>
+          {def && <KriBreachRequestButton defaultTitleEn={`KRI breach — ${def.kriCode}`} />}
+          {def?.latestStatus && (
+            <Badge tone={KRI_STATUS_TONE[def.latestStatus]} dot>
               {KRI_STATUS_LABEL[def.latestStatus][lang === 'ar' ? 'ar' : 'en']}
             </Badge>
-          : undefined}
+          )}
+        </>}
       />
 
       {error && (

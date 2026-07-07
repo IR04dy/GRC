@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { DataSharingRequestButton } from '../../components/workflow/Section9RequestForms';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
@@ -131,7 +132,10 @@ export function DataSharingPage() {
   return (
     <Shell title={t('dsaPageTitle')} sub={t('dsaPageSub')}>
       <PageHeader eyebrow={t('navPrivacy')} title={t('dsaPageTitle')} sub={t('dsaPageSub')}
-        actions={<Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('dsaNew')}</Button>} />
+        actions={<>
+          <DataSharingRequestButton />
+          <Button variant="primary" Icon={Plus} onClick={() => setCreateOpen(true)}>{t('dsaNew')}</Button>
+        </>} />
 
       <div className="kpi-grid">
         <Kpi Icon={Share2}      label={t('dsaKpiActive')}     value={stats.ACTIVE} tone="success" onClick={() => setTab('ACTIVE')} active={tab === 'ACTIVE'} />
