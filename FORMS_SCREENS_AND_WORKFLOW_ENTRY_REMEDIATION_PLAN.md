@@ -308,9 +308,15 @@ Global primitives (1) → reconciliation/timeline (2) → missing forms on the n
 - **P2/P3-A** — 3 governance-pivot `window.open` popups → in-app `navigate()` (also fixes a per-tab-`sessionStorage` auth bug); **P2/P3-E** — anchored RaiseRequestButton on Finding + CAPA detail. `3a92c3ea`.
 - **P2/P3-C** — verified already present (DSR 30-day + breach 72-hour header countdown badges).
 
-**Deferred by decision (2026-07-07):**
-- **B** (auto-spawn-on-submit + `spawned_request_id` + merged-timeline) — SKIPPED as largely redundant: the P1 anchor-based linkage already makes a submission spawn + list engine requests, and the submission page shows activity + engine timelines side by side. The column duplicates the anchor; auto-spawn is awkward (engine requires recipients).
-- **D** (evidence versioning/expiry/classification across modules) and **F** (engine-routed policy-publish / NDI-package / data-share approvals) — DEFERRED as their own scoped programs (large cross-cutting refactors), not blitzed.
+**Delivered on `feat/forms-p2p3-deep` (2026-07-07, unmerged — awaiting explicit merge):**
+- **B (G1 depth)** — persisted `workflow_submissions.spawned_request_id` (migration **V277**, nullable) + a guarded `PUT /workflow-submissions/{id}/spawned-request/{requestId}` (first-link-wins, org-scoped, audited); the submission page records the primary request on create and shows it as a `WR-#####` link. `136e5739`. (The P1 anchor already lists engine requests; this adds the explicit primary-request pointer for one-click traceability.)
+- **F (engine-routed approvals)** — `ApprovalRequestForms` (POLICY_PUBLISH / NDI_PACKAGE_APPROVAL / DATA_SHARING_APPROVAL) route the three flagship approvals through the engine as SEQUENTIAL, SLA'd, audited requests anchored to the record, instead of a local status flip; wired into PolicyDetail (EXEC_APPROVAL + record panel), NdiPage SubmissionTab, DataSharingPage row. `feb21c15`.
+- **D (evidence classification)** — the shared `platform.attachments` facility (already versioned + expiring) gains a nullable NDMO-aligned `classification` (migration **V278**): backend entity/service/DTOs/controller + `AttachmentsField` selector (staging + edit) + per-row badge. Upgrades every ad-hoc upload site at once. `8fe29095`.
+- **Anchoring long-tail** — record-anchored `RaiseRequestButton` extended to Control / DPIA / Consent / DSR / Privacy-Breach / RoPA / Vendor detail pages. `beb490e4`.
+
+Verified per slice: tsc 0 · Vite 200 · backend targeted tests green · live harness (create/send/anchor-filter, classification round-trip) with `[REVIEW-TEST]` rows cleaned via CHARINDEX. Migrations V277/V278 hand-applied to dev (Flyway off in dev).
+
+**Residual infra deferrals (own scoped programs, not in this backlog):** outbound email (no SMTP bean), recurring attestation/policy scheduling engine, prod Flyway replay of V277/V278.
 
 ---
 
