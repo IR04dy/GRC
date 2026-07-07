@@ -11,6 +11,8 @@ import { Modal } from '../ui/Modal';
 import { Input, Textarea } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { WorkflowActorSelector, validateRecipients } from './WorkflowActorSelector';
+import { WorkflowRoutingSelector } from './WorkflowRoutingSelector';
+import { SLAAndCountdownSelector } from './SLAAndCountdownSelector';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
@@ -114,29 +116,13 @@ export function RaiseRequestButton({
         <div style={{ marginBottom: 10 }}>
           <Input label={ar ? 'العنوان (AR)' : 'Title (AR)'} value={form.titleAr} onChange={e => set('titleAr', e.target.value)} dir="rtl" />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 10 }}>
-          <Select label={ar ? 'التوجيه' : 'Routing'} value={form.routingMode}
-            onChange={e => set('routingMode', e.target.value as RoutingMode)}
-            options={[{ value: 'PARALLEL', label: ar ? 'متوازٍ' : 'Parallel' },
-                      { value: 'SEQUENTIAL', label: ar ? 'تسلسلي' : 'Sequential' },
-                      { value: 'BROADCAST_ACK', label: ar ? 'تعميم بإقرار' : 'Broadcast + ack' }]} />
-          {form.routingMode === 'PARALLEL' ? (
-            <Select label={ar ? 'قاعدة الاكتمال' : 'Completion'} value={form.completionRule}
-              onChange={e => set('completionRule', e.target.value as 'ALL' | 'ANY')}
-              options={[{ value: 'ALL', label: ar ? 'استجابة الجميع' : 'ALL respond' },
-                        { value: 'ANY', label: ar ? 'استجابة أي أحد' : 'ANY one responds' }]} />
-          ) : <div />}
-          <Input label={(ar ? 'الاستحقاق' : 'Due date') + ' *'} type="date" value={form.dueDate} onChange={e => set('dueDate', e.target.value)} />
-          <Select label={ar ? 'الأولوية' : 'Priority'} value={form.priority}
-            onChange={e => set('priority', e.target.value)}
-            options={['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map(p => ({ value: p, label: p }))} />
-          <Input label={ar ? 'تذكير قبل (أيام)' : 'Remind before (days)'} type="number" min={0}
-            value={form.reminderDaysBefore}
-            onChange={e => set('reminderDaysBefore', e.target.value ? Number(e.target.value) : 0)} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10, marginBottom: 12 }}>
-          <Input label={ar ? 'دور التصعيد' : 'Escalation role'} value={form.escalationRole} placeholder="CISO"
-            onChange={e => set('escalationRole', e.target.value)} />
+        <WorkflowRoutingSelector routingMode={form.routingMode} completionRule={form.completionRule}
+          onChange={patch => setForm(f => ({ ...f, ...patch }))} />
+        <SLAAndCountdownSelector
+          value={{ dueDate: form.dueDate, priority: form.priority,
+            reminderDaysBefore: form.reminderDaysBefore, escalationRole: form.escalationRole }}
+          onChange={patch => setForm(f => ({ ...f, ...patch }))} />
+        <div style={{ marginBottom: 12 }}>
           <Textarea label={ar ? 'الوصف' : 'Description'} rows={2} value={form.description}
             onChange={e => set('description', e.target.value)} />
         </div>
