@@ -299,6 +299,21 @@ Global primitives (1) → reconciliation/timeline (2) → missing forms on the n
 
 ---
 
+## Implementation status (2026-07-07)
+
+**Delivered + merged to master:**
+- **P1 primitives** — `GRCStructuredDrawer` + `WorkflowRoutingSelector` + `SLAAndCountdownSelector` (RaiseRequestButton refactored onto them). `454fc725`.
+- **P1 reconciliation (G1)** — submission detail page raises engine requests anchored to the submission (`sourceRecordType=WorkflowSubmission`) + a record-scoped linked-requests panel beside the activity timeline. `991c1bee`.
+- **§9 forms** — `GRCRequestDrawer` + KRI-breach / patch / containment / data-sharing / processor-review, wired into KriDetail / Cyber / SocOpsDetail / DataSharing / ProcessorAssessments; distinct `request_type`, no backend change. `8a03921e`.
+- **P2/P3-A** — 3 governance-pivot `window.open` popups → in-app `navigate()` (also fixes a per-tab-`sessionStorage` auth bug); **P2/P3-E** — anchored RaiseRequestButton on Finding + CAPA detail. `3a92c3ea`.
+- **P2/P3-C** — verified already present (DSR 30-day + breach 72-hour header countdown badges).
+
+**Deferred by decision (2026-07-07):**
+- **B** (auto-spawn-on-submit + `spawned_request_id` + merged-timeline) — SKIPPED as largely redundant: the P1 anchor-based linkage already makes a submission spawn + list engine requests, and the submission page shows activity + engine timelines side by side. The column duplicates the anchor; auto-spawn is awkward (engine requires recipients).
+- **D** (evidence versioning/expiry/classification across modules) and **F** (engine-routed policy-publish / NDI-package / data-share approvals) — DEFERRED as their own scoped programs (large cross-cutting refactors), not blitzed.
+
+---
+
 ### Review stats (LOOP 9)
 - Modules reviewed: **16** · Flagship screens catalogued: ~**60** (representative) of ~**200** routes.
 - Forms assessed: **flagship set across 16 modules** (full CRUD long-tail summarised, not enumerated line-by-line).
