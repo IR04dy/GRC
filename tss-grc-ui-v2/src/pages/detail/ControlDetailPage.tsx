@@ -5,6 +5,7 @@ import { ClipboardCheck, FileCheck2, ListChecks, Link2, CheckCheck, AlertTriangl
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { DetailLayout } from '../../components/layout/DetailLayout';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
@@ -86,6 +87,7 @@ export function ControlDetailPage() {
           <Badge tone="info">L{item.maturityLevel ?? 0}</Badge>
         </>}
         actions={<>
+          <RaiseRequestButton sourceModule="COMPLIANCE" sourceRecordType="Control" sourceRecordId={Number(id) || undefined} />
           {item.status !== 'IMPLEMENTED' && <Button variant="primary" Icon={CheckCheck} onClick={() => transitionControl('IMPLEMENTED', 'controlActMarkImplemented')}>{t('controlActMarkImplemented')}</Button>}
           {item.status !== 'PARTIAL' && <Button variant="secondary" Icon={AlertTriangle} onClick={() => transitionControl('PARTIAL', 'controlActMarkPartial')}>{t('controlActMarkPartial')}</Button>}
           {item.status !== 'NOT_APPLICABLE' && <Button variant="ghost" Icon={ShieldOff} onClick={() => transitionControl('NOT_APPLICABLE', 'controlActMarkNA')}>{t('controlActMarkNA')}</Button>}

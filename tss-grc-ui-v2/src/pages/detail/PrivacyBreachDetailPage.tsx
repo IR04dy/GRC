@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -152,8 +153,9 @@ export function PrivacyBreachDetailPage() {
             </Badge>
           )}
         </>}
-        actions={
-          !terminal && <>
+        actions={<>
+          <RaiseRequestButton sourceModule="PRIVACY" sourceRecordType="Breach" sourceRecordId={Number(id) || undefined} />
+          {!terminal && <>
             {item.status === 'OPEN' && (
               <Button variant="primary" Icon={ShieldCheck}
                       onClick={() => workflow(privacyApi.containBreach, 'تم احتواء الحادثة', 'Breach contained')}>
@@ -173,8 +175,8 @@ export function PrivacyBreachDetailPage() {
                     onClick={() => workflow(privacyApi.closeBreach, 'تم إغلاق الحادثة', 'Breach closed')}>
               {isAr ? 'إغلاق' : 'Close'}
             </Button>
-          </>
-        }
+          </>}
+        </>}
       />
 
       <DetailLayout

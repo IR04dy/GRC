@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -163,8 +164,9 @@ export function DsrDetailPage() {
             </Badge>
           )}
         </>}
-        actions={
-          !terminal && <>
+        actions={<>
+          <RaiseRequestButton sourceModule="PRIVACY" sourceRecordType="Dsr" sourceRecordId={Number(id) || undefined} />
+          {!terminal && <>
             {(item.status === 'OPEN' || item.status === 'PENDING' || item.status === 'NEW') && (
               <Button variant="primary" Icon={PlayCircle}
                       onClick={() => workflow(privacyApi.startDsr, 'تم بدء المعالجة', 'DSR started')}>
@@ -185,8 +187,8 @@ export function DsrDetailPage() {
                     }}>
               {isAr ? 'رفض' : 'Reject'}
             </Button>
-          </>
-        }
+          </>}
+        </>}
       />
 
       <DetailLayout

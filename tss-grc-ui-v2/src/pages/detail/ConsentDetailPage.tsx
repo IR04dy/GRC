@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -180,13 +181,14 @@ export function ConsentDetailPage() {
           <Badge tone="info">{channelLabel(item.grantedVia)}</Badge>
           <Badge tone="neutral">{item.language.toUpperCase()}</Badge>
         </>}
-        actions={
-          item.status === 'ACTIVE'
+        actions={<>
+          <RaiseRequestButton sourceModule="PRIVACY" sourceRecordType="Consent" sourceRecordId={Number(id) || undefined} />
+          {item.status === 'ACTIVE'
             ? <Button variant="primary" Icon={XIcon} onClick={withdraw}>
                 {isAr ? 'سحب الموافقة' : 'Withdraw consent'}
               </Button>
-            : null
-        }
+            : null}
+        </>}
       />
 
       <DetailLayout

@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { Truck, ListChecks, FileCheck2, Link2, RefreshCw, ShieldOff, CheckCheck, Archive } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -78,6 +79,7 @@ export function VendorDetailPage() {
           {item.country && <Badge tone="info">{item.country}</Badge>}
         </>}
         actions={<>
+          <RaiseRequestButton sourceModule="TPRM" sourceRecordType="Vendor" sourceRecordId={Number(id) || undefined} />
           <Button variant="secondary" Icon={RefreshCw} onClick={() => transitionVendor('UNDER_REVIEW', 'vendorActReassess')}>{t('vendorActReassess')}</Button>
           {item.status !== 'ACTIVE' && <Button variant="primary" Icon={CheckCheck} onClick={() => transitionVendor('ACTIVE', 'vendorActActivate')}>{t('vendorActActivate')}</Button>}
           {item.status === 'ACTIVE' && <Button variant="ghost" Icon={ShieldOff} onClick={() => transitionVendor('UNDER_REVIEW', 'vendorActFlagRisk')}>{t('vendorActFlagRisk')}</Button>}

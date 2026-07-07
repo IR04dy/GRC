@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { Fingerprint, ListChecks, ShieldCheck, MessageSquare, Link2, Send, CheckCheck, X as XIcon, RefreshCw } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -82,6 +83,7 @@ export function DpiaDetailPage() {
           {item.overallResidualRisk && <Badge tone={RISK_TONE[item.overallResidualRisk] ?? 'neutral'}>{item.overallResidualRisk}</Badge>}
         </>}
         actions={<>
+          <RaiseRequestButton sourceModule="PRIVACY" sourceRecordType="Dpia" sourceRecordId={Number(id) || undefined} />
           {item.status === 'DRAFT' && <Button variant="primary" Icon={Send} onClick={() => transitionDpia('IN_REVIEW', 'dpiaActSubmitReview')}>{t('dpiaActSubmitReview')}</Button>}
           {item.status === 'IN_REVIEW' && <Button variant="primary" Icon={CheckCheck} onClick={() => transitionDpia('APPROVED', 'dpiaActApprove')}>{t('dpiaActApprove')}</Button>}
           {item.status === 'IN_REVIEW' && <Button variant="ghost" Icon={XIcon} onClick={() => transitionDpia('REJECTED', 'dpiaActReject')}>{t('dpiaActReject')}</Button>}

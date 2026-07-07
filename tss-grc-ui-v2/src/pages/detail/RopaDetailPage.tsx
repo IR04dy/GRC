@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { DetailLayout } from '../../components/layout/DetailLayout';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -104,6 +105,7 @@ export function RopaDetailPage() {
             </Badge>
           )}
         </>}
+        actions={<RaiseRequestButton sourceModule="PRIVACY" sourceRecordType="Ropa" sourceRecordId={Number(id) || undefined} />}
       />
 
       <DetailLayout
