@@ -87,6 +87,18 @@ restarted :8084; **live 7/7** (CYBER request present under `?sourceModule=CYBER`
 case-insensitive, cleaned up); tsc exit 0; all edited pages Vite-transform 200. Commits: proof
 `f87146e1`, fan-out `19523ae1`.
 
+## Post-program polish (branch `feat/engine-live-panels`)
+
+- **Live panel in the 7 tab-less modules** (SOCOPS/SCM/ESG/NDI/Incident/Audit/Reporting) — they had
+  no in-flight-workflows tab, so the `ModuleEngineRequestsPanel` sits below each header.
+- **Retired the mock `ActiveWorkflowsPanel`** — the 7 workflow-tab modules (Cyber/BCM/Compliance/
+  Evidence/Privacy/Risk/TPRM) now show ONLY the live panel; the mock component was deleted.
+  `lib/mockWorkflows.ts` is retained (its `ALL_WORKFLOWS` still feeds the global Workflows overview,
+  board pack, process mining, and workflow-versioning views).
+- **Record-scoped detail panels** — the engine list endpoint gained a `sourceRecordType`+
+  `sourceRecordId` filter (record filter precedes module); `SocOpsDetailPage` and `RiskDetailPage`
+  now show "requests about this record", and RiskDetail also got a record-anchored raise button.
+
 ## Non-goals / notes
 
 - This ADDS an engine-routed entry point to each module; it does not rip out module-specific
