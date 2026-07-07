@@ -9,6 +9,7 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
@@ -193,6 +194,8 @@ export function EsgPage() {
           <Button variant="primary" Icon={Download} onClick={downloadAnnex}>{t('esgDownloadAnnex')}</Button>
         </>}
       />
+
+      <div style={{ marginBottom: 16 }}><ModuleEngineRequestsPanel sourceModule="ESG" /></div>
 
       <div className="kpi-grid esg-kpi-strip">
         <Kpi Icon={Leaf}          label={t('esgKpiTotal')}     value={`${(stats.totalEmissions / 1000).toFixed(1)}k`} tone="primary" onClick={() => setTab('ghg')} active={tab === 'ghg'} />

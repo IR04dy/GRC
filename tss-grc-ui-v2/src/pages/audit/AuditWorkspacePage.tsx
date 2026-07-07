@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -134,6 +135,8 @@ export function AuditWorkspacePage() {
         sub={t('audwsHeaderSub')}
         actions={<RaiseRequestButton sourceModule="AUDIT" />}
       />
+
+      <div style={{ marginBottom: 16 }}><ModuleEngineRequestsPanel sourceModule="AUDIT" /></div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
 

@@ -6,6 +6,7 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
@@ -190,6 +191,8 @@ export function ReportsCentrePage() {
         <Kpi Icon={FileDown} label={t('rcKpiFormats')}   value={formatCount}    tone="info"    to="/reports/centre" />
         <Kpi Icon={Globe}    label={t('rcKpiLanguages')} value={2}              tone="success" to="/reports/centre" />
       </div>
+
+      <div style={{ marginBottom: 16 }}><ModuleEngineRequestsPanel sourceModule="REPORTING" /></div>
 
       <div style={{
         display: 'grid',

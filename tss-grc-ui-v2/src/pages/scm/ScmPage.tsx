@@ -8,6 +8,7 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -790,6 +791,7 @@ export function ScmPage() {
       />
       <WorkflowQuickLaunch modules="SCM" />
       <ModuleSubmissionsPanel module="SCM" />
+      <ModuleEngineRequestsPanel sourceModule="SCM" />
       <div className="kpi-grid">
         <Kpi Icon={Truck}         label={t('scmKpiSuppliers')}        value={stats?.totalVendors ?? vendors.data.length} tone="primary" onClick={() => setTab('suppliers')} />
         <Kpi Icon={AlertTriangle} label={t('scmKpiHighRisk')}         value={stats?.criticalVendors ?? high} tone="danger" onClick={() => setTab('suppliers')} />

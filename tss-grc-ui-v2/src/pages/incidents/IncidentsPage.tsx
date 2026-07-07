@@ -7,6 +7,7 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
 import { ModuleSubmissionsPanel } from '../../components/workflows/ModuleSubmissionsPanel';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
@@ -444,6 +445,7 @@ export function IncidentsPage() {
       />
       <WorkflowQuickLaunch modules="INCIDENT" />
       <ModuleSubmissionsPanel module="INCIDENT" />
+      <ModuleEngineRequestsPanel sourceModule="INCIDENT" />
       <div className="kpi-grid">
         <Kpi Icon={AlertOctagon} label={t('incidentsKpiOpen')}     value={open_count} tone="warning"
           onClick={() => setTab('register')} active={tab === 'register'} />

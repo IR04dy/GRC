@@ -4,6 +4,7 @@ import { Siren, AlertTriangle, Clock, CheckCircle2, RefreshCw } from 'lucide-rea
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -135,6 +136,8 @@ export function SocOpsEventsPage() {
           </>
         }
       />
+
+      <div style={{ marginBottom: 16 }}><ModuleEngineRequestsPanel sourceModule="SOCOPS" /></div>
 
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={Siren}          label={isAr ? 'حرجة مفتوحة' : 'Open CRITICAL'} value={String(counts.crit)}   tone={counts.crit > 0 ? 'danger' : 'success'} onClick={() => setFilter('critical')} active={filter === 'critical'} />
