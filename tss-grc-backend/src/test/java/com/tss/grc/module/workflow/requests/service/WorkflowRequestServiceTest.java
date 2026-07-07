@@ -839,4 +839,25 @@ class WorkflowRequestServiceTest {
         verify(requestRepo).findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(ORG, "CYBER", pageable);
         verify(requestRepo, never()).findByOrganisationIdOrderByCreatedAtDesc(any(), any());
     }
+
+    @Test
+    void list_filtersBySourceRecord_takesPrecedence() {
+        WorkflowRequest r = sentRequest(501L, "PARALLEL", "ALL", null);
+        r.setSourceModule("SOCOPS");
+        r.setSourceRecordType("SecurityEvent");
+        r.setSourceRecordId(4321L);
+        var pageable = PageRequest.of(0, 50);
+        when(requestRepo.findByOrganisationIdAndSourceRecordTypeAndSourceRecordIdOrderByCreatedAtDesc(
+                ORG, "SecurityEvent", 4321L, pageable))
+            .thenReturn(new PageImpl<>(List.of(r)));
+
+        // record type+id supplied → record finder wins over the module finder
+        var result = svc.list(null, "SOCOPS", "SecurityEvent", 4321L, pageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).id()).isEqualTo(501L);
+        verify(requestRepo).findByOrganisationIdAndSourceRecordTypeAndSourceRecordIdOrderByCreatedAtDesc(
+            ORG, "SecurityEvent", 4321L, pageable);
+        verify(requestRepo, never()).findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(any(), any(), any());
+    }
 }

@@ -44,9 +44,11 @@ public class WorkflowRequestController {
     @PreAuthorize("hasPermission('WORKFLOW','READ')")
     public Page<RequestResponse> list(@RequestParam(required = false) String status,
                                       @RequestParam(required = false) String sourceModule,
+                                      @RequestParam(required = false) String sourceRecordType,
+                                      @RequestParam(required = false) Long sourceRecordId,
                                       @RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "50") int size) {
-        return svc.list(status, sourceModule, PageRequest.of(page, Math.min(size, 200)));
+        return svc.list(status, sourceModule, sourceRecordType, sourceRecordId, PageRequest.of(page, Math.min(size, 200)));
     }
 
     /** Inbox — requests addressed to me (directly, via a role I hold, or via my department). */

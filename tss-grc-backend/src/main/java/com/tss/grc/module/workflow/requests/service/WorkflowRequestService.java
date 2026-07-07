@@ -725,14 +725,27 @@ public class WorkflowRequestService {
 
     @Transactional(readOnly = true)
     public Page<RequestResponse> list(String status, Pageable pageable) {
-        return list(status, null, pageable);
+        return list(status, null, null, null, pageable);
     }
 
-    /** List engine requests for the tenant, optionally narrowed by status and/or source module.
-     *  The sourceModule filter powers each module page's live "requests from this module" panel. */
     @Transactional(readOnly = true)
     public Page<RequestResponse> list(String status, String sourceModule, Pageable pageable) {
+        return list(status, sourceModule, null, null, pageable);
+    }
+
+    /** List engine requests for the tenant, optionally narrowed by status, source module, and/or a
+     *  specific source record. sourceModule powers each module page's live panel; the
+     *  sourceRecordType+sourceRecordId pair (both required together) powers a detail page's
+     *  "requests about this record" panel and takes precedence when supplied. */
+    @Transactional(readOnly = true)
+    public Page<RequestResponse> list(String status, String sourceModule,
+                                      String sourceRecordType, Long sourceRecordId, Pageable pageable) {
         Long org = TenantContext.getCurrentTenant();
+        if (sourceRecordType != null && !sourceRecordType.isBlank() && sourceRecordId != null) {
+            return requestRepo.findByOrganisationIdAndSourceRecordTypeAndSourceRecordIdOrderByCreatedAtDesc(
+                    org, sourceRecordType.trim(), sourceRecordId, pageable)
+                .map(this::toResponseShallow);
+        }
         boolean hasStatus = status != null && !status.isBlank();
         String st = hasStatus ? status.toUpperCase() : null;
         String mod = (sourceModule != null && !sourceModule.isBlank()) ? sourceModule.trim().toUpperCase() : null;

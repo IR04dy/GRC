@@ -5,6 +5,8 @@ import { CommsPanel } from '../../components/comms/CommsPanel';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { DetailLayout } from '../../components/layout/DetailLayout';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
@@ -348,6 +350,7 @@ export function RiskDetailPage() {
           {risk.categoryNameEn && <Badge tone="primary">{lang === 'ar' && risk.categoryNameAr ? risk.categoryNameAr : risk.categoryNameEn}</Badge>}
         </>}
         actions={<>
+          <RaiseRequestButton sourceModule="RISK" sourceRecordType="Risk" sourceRecordId={Number(id)} />
           {risk.status === 'OPEN'             && <Button variant="primary" Icon={Send}      onClick={() => workflow(riskApi.submitForReview, 'Submitted for review')}>{t('riskActSubmitReview')}</Button>}
           {risk.status === 'UNDER_ASSESSMENT' && <Button variant="primary" Icon={CheckCheck} onClick={() => workflow(riskApi.approveRisk, 'Approved for treatment')}>{t('riskActApprove')}</Button>}
           {(risk.status === 'OPEN' || risk.status === 'UNDER_ASSESSMENT') &&
@@ -380,6 +383,12 @@ export function RiskDetailPage() {
         <ScoreTile label={t('riskColResidual')} score={risk.residualScore ?? 0} />
         <FieldTile label={t('riskColOwner')}    value={risk.ownerFullNameEn ?? risk.ownerName ?? '—'} />
         <FieldTile label={t('detailIdentified')} value={risk.identifiedDate ?? '—'} />
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <ModuleEngineRequestsPanel sourceModule="RISK"
+          sourceRecordType="Risk" sourceRecordId={Number(id)}
+          titleEn="Requests about this risk" titleAr="طلبات حول هذه المخاطرة" />
       </div>
 
       <DetailLayout

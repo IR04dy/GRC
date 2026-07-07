@@ -8,6 +8,7 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -738,6 +739,12 @@ export function SocOpsDetailPage() {
         </Card>
 
         <EntityActivityTimeline entityType={config.entityType} entityId={Number(row.id ?? id)} />
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <ModuleEngineRequestsPanel sourceModule="SOCOPS"
+          sourceRecordType={config.entityType} sourceRecordId={Number(row.id ?? id)}
+          titleEn="Requests about this record" titleAr="طلبات حول هذا السجل" />
       </div>
 
       {/* SOC-B: playbook run execution — invoke spawns a run + clocked tasks here. */}

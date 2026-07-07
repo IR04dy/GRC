@@ -33,6 +33,10 @@ public interface WorkflowRequestRepository extends JpaRepository<WorkflowRequest
     List<WorkflowRequest> findByOrganisationIdAndSourceRecordTypeAndSourceRecordIdOrderByCreatedAtDesc(
         Long organisationId, String sourceRecordType, Long sourceRecordId);
 
+    /** Paged variant — powers a detail page's "requests about this record" panel. */
+    Page<WorkflowRequest> findByOrganisationIdAndSourceRecordTypeAndSourceRecordIdOrderByCreatedAtDesc(
+        Long organisationId, String sourceRecordType, Long sourceRecordId, Pageable pageable);
+
     /** WF-2 sweep — open requests past their due date (cross-tenant; scheduler runs system-wide). */
     List<WorkflowRequest> findByStatusInAndDueDateBefore(Collection<String> statuses, LocalDate date);
 

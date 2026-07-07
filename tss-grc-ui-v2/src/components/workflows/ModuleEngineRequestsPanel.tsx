@@ -1,4 +1,4 @@
-// Adoption slice 4 — the LIVE counterpart to the mock ActiveWorkflowsPanel.
+// Adoption slice 4 — the LIVE in-flight-requests panel for a module (replaced the mock panel).
 // Fetches the real engine WorkflowRequests raised from a module (filtered server-side by
 // sourceModule) and lists them with status/priority/due + a deep link to the request detail.
 // This is what closes the loop: RaiseRequestButton creates a real request; this panel shows it.
@@ -51,14 +51,11 @@ export function ModuleEngineRequestsPanel({
   useEffect(() => {
     let alive = true;
     setRows(null); setErr(null);
-    workflowRequestsApi.list(undefined, 0, limit, sourceModule)
+    // Record type+id (when given) filter server-side to that record; otherwise by module.
+    workflowRequestsApi.list(undefined, 0, limit, sourceModule, sourceRecordType, sourceRecordId)
       .then(res => {
         if (!alive) return;
-        let content = res.content ?? [];
-        if (sourceRecordId != null)
-          content = content.filter(r => r.sourceRecordId === sourceRecordId
-            && (!sourceRecordType || r.sourceRecordType === sourceRecordType));
-        setRows(content);
+        setRows(res.content ?? []);
       })
       .catch(e => { if (alive) setErr((e as Error)?.message ?? 'Failed to load'); });
     return () => { alive = false; };

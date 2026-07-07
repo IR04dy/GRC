@@ -47,9 +47,7 @@ import {
   CONTROLS, VULNS, SUB_CONTROLS, ASSESSMENTS, EXCEPTIONS,
   INCIDENTS, ASSETS, EVIDENCE, ACTION_PLANS,
 } from './mockCyber';
-import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
 import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
-import { CYBER_WORKFLOWS } from '../../lib/mockWorkflows';
 import { CYBER_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
@@ -1143,14 +1141,7 @@ export function CyberPage() {
       {tab === 'evidence' && <Card padded={false}>{cyberEvidence.loading ? <LoadingRow /> : <DataTable columns={evidenceCols} rows={filteredCyberData as CyberEvidenceDto[]}   empty={<EmptyState Icon={FileCheck2} title={t('cyberEmptyEvidence')} />} />}</Card>}
       {tab === 'policies' && <CyberPoliciesPanel />}
       {tab === 'actions'  && <Card padded={false}>{actionPlans.loading   ? <LoadingRow /> : <DataTable columns={actionCols}   rows={filteredCyberData as CyberActionPlanDto[]} empty={<EmptyState Icon={ListTodo}   title={t('cyberEmptyActions')} />} />}</Card>}
-      {tab === 'workflows' && <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <ModuleEngineRequestsPanel sourceModule="CYBER" />
-        <ActiveWorkflowsPanel
-          workflows={CYBER_WORKFLOWS}
-          title={t('cyberTabWorkflows') ?? 'Workflows'}
-          sub="Cyber incident response (NIST 800-61), vulnerability remediation, control assessments, and exception approvals."
-          t={t} />
-      </div>}
+      {tab === 'workflows' && <ModuleEngineRequestsPanel sourceModule="CYBER" />}
       {tab === 'comms' && <CommsPanel module="INCIDENT" />}
       {tab === 'alignment' && <RegulatoryAlignmentTab domain="CYBER" families={['NCA Cyber', 'SAMA', 'International']} />}
 
