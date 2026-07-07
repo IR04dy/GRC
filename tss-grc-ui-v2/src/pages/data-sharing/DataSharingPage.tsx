@@ -6,6 +6,7 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { DataSharingRequestButton } from '../../components/workflow/Section9RequestForms';
+import { DataSharingApprovalButton } from '../../components/workflow/ApprovalRequestForms';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
@@ -183,7 +184,9 @@ export function DataSharingPage() {
                           <td style={{textAlign:'right'}}>
                             <Button size="sm" variant="ghost" Icon={FolderOpen} title={lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls'} onClick={() => setDocsTarget(r)} />{' '}
                             {r.status === 'DRAFT' && <Button size="sm" variant="primary" disabled={busyId === r.id} onClick={() => onSubmit(r.id)}>{t('dsaSubmit')}</Button>}
-                            {r.status === 'IN_REVIEW' && <Button size="sm" variant="primary" Icon={CheckCircle2} disabled={busyId === r.id} onClick={() => onActivate(r.id)}>{t('dsaActivate')}</Button>}
+                            {r.status === 'IN_REVIEW' && <><DataSharingApprovalButton size="sm" sourceRecordId={r.id}
+                              defaultTitleEn={`DSA approval — ${r.agreementCode ?? r.titleEn}`} />{' '}
+                              <Button size="sm" variant="primary" Icon={CheckCircle2} disabled={busyId === r.id} onClick={() => onActivate(r.id)}>{t('dsaActivate')}</Button></>}
                             {r.status === 'ACTIVE' && <>
                               <Button size="sm" variant="ghost" disabled={busyId === r.id} onClick={() => onExpire(r.id)}>{t('dsaExpire')}</Button>{' '}
                               <Button size="sm" variant="danger" disabled={busyId === r.id} onClick={() => onTerminate(r.id)}>{t('dsaTerminate')}</Button>

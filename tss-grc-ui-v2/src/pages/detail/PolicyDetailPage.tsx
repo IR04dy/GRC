@@ -15,6 +15,8 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
+import { PolicyPublishApprovalButton } from '../../components/workflow/ApprovalRequestForms';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { complianceApi, frameworkApi, type PolicyDto, type PolicyMappingDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -95,6 +97,9 @@ export function PolicyDetailPage() {
         actions={<>
           {item.status === 'DRAFT' && <Button variant="primary"   Icon={Send}      onClick={() => transitionPolicy('LEGAL_REVIEW',  'policyActSubmitLegal')}>{t('policyActSubmitLegal')}</Button>}
           {item.status === 'LEGAL_REVIEW' && <Button variant="primary"   Icon={CheckCheck} onClick={() => transitionPolicy('EXEC_APPROVAL', 'policyActSendExec')}>{t('policyActSendExec')}</Button>}
+          {item.status === 'EXEC_APPROVAL' && <PolicyPublishApprovalButton variant="secondary"
+            sourceRecordId={item.id}
+            defaultTitleEn={`Publish approval — ${item.code ?? title}`} />}
           {item.status === 'EXEC_APPROVAL' && <Button variant="primary" Icon={Megaphone}  onClick={() => transitionPolicy('PUBLISHED',     'policyActPublish')}>{t('policyActPublish')}</Button>}
           {item.status === 'PUBLISHED' && <Button variant="secondary" Icon={RefreshCw} onClick={() => transitionPolicy('REVIEW_DUE',    'policyActMarkReview')}>{t('policyActMarkReview')}</Button>}
           {item.status === 'REVIEW_DUE' && <Button variant="primary"   Icon={CheckCheck} onClick={() => transitionPolicy('PUBLISHED',     'policyActReaffirm')}>{t('policyActReaffirm')}</Button>}
@@ -122,6 +127,8 @@ export function PolicyDetailPage() {
             anchors={POLICY_ANCHORS_BY_ID[item.id] ?? []}
             subtitle="Authorities this policy satisfies." />
           <LinkedChangesPanel entityType="POLICY" entityId={item.id} />
+          <ModuleEngineRequestsPanel sourceModule="COMPLIANCE" sourceRecordType="Policy" sourceRecordId={item.id}
+            titleEn="Approvals & requests" titleAr="الاعتمادات والطلبات" />
         </>}
         main={<>
           <Tabs items={tabs} active={tab} onChange={setTab} />

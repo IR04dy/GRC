@@ -8,6 +8,7 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
+import { NdiPackageApprovalButton } from '../../components/workflow/ApprovalRequestForms';
 import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
@@ -3933,6 +3934,10 @@ function SubmissionTab() {
                 disabled={!pf?.canFinalize}>
                 {isAr ? 'تجهيز (Ready)' : 'Finalize (Ready)'}
               </Button>
+            )}
+            {current.status === 'READY' && !current.approvedAt && (
+              <NdiPackageApprovalButton sourceRecordId={current.id ?? undefined}
+                defaultTitleEn={`Package approval — ${current.packageCode ?? `#${current.id}`}`} />
             )}
             {current.status === 'READY' && !current.approvedAt && (
               <Button size="sm" variant="primary" Icon={Check} onClick={onApprove}>
