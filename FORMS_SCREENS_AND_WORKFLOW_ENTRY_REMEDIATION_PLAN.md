@@ -316,7 +316,7 @@ Global primitives (1) → reconciliation/timeline (2) → missing forms on the n
 
 Verified per slice: tsc 0 · Vite 200 · backend targeted tests green · live harness (create/send/anchor-filter, classification round-trip) with `[REVIEW-TEST]` rows cleaned via CHARINDEX. Migrations V277/V278 hand-applied to dev (Flyway off in dev).
 
-**Residual infra deferrals (own scoped programs, not in this backlog):** outbound email (no SMTP bean), recurring attestation/policy scheduling engine, prod Flyway replay of V277/V278.
+**Residual (operational, not code gaps):** (1) V277/V278 replay to staging/prod is automatic on the next Flyway-enabled deploy (dev has them hand-applied since Flyway is off in dev). (2) Dev has no live SMTP relay wired, so engine reminders/escalations are logged-not-sent in dev — email channels (`EmailChannelSender`, `EmailNotificationChannel`) and prod `mail.smtp.*` config already exist; point `spring.mail.*` at a relay for dev sends. Recurring schedulers already run (`ComplianceDeadlineScheduler`, `PolicyComplianceScheduler`, `ReportSchedulerService`) — not a gap.
 
 ---
 
