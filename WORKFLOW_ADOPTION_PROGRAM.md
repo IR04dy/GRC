@@ -68,6 +68,25 @@ in `workflow.requests`, then cleaned up). Confirmed the backend stores `sourceMo
 `@NotBlank @Size(max=40)` string with **no enum/whitelist**, so every module string is accepted.
 No Java changed → backend suite unchanged (2214/0/0); ratchet unaffected (no new endpoints).
 
+## Slice 4 — live engine-requests panels (replacing the mock in-flight façade)
+
+RaiseRequestButton lets a module *create* real engine requests; slice 4 closes the loop so a module
+also *sees* its real in-flight requests live. Added an optional `sourceModule` filter to
+`GET /api/v1/workflows/requests` (repository finders + service overload + controller param;
+org-scoped, case-insensitive, exclusive — no new endpoint, ratchet unaffected) and a new
+`components/workflows/ModuleEngineRequestsPanel.tsx` that fetches real requests for a module and
+lists code/title/status/priority/due + escalation, deep-linking to `/workflows/requests/:id`.
+
+Wired into **all 7 modules that rendered the mock `ActiveWorkflowsPanel`** (Cyber proof + BCM,
+Compliance, Evidence, Privacy, Risk, TPRM) — the live panel sits **above** the mock one in each
+Workflows tab (additive; the mock is retained as an illustrative cross-module lifecycle view, not
+ripped out). The other 7 modules had no in-flight-workflows tab / mock façade to replace.
+
+Verified: backend `list_filtersBySourceModule` test + authz ratchet green (41/0/0); rebuilt +
+restarted :8084; **live 7/7** (CYBER request present under `?sourceModule=CYBER`, absent under RISK,
+case-insensitive, cleaned up); tsc exit 0; all edited pages Vite-transform 200. Commits: proof
+`f87146e1`, fan-out `19523ae1`.
+
 ## Non-goals / notes
 
 - This ADDS an engine-routed entry point to each module; it does not rip out module-specific
