@@ -2844,6 +2844,7 @@ export interface WorkflowSubmissionDto {
   submittedAt: string;
   reviewedAt?: string;
   reviewerNote?: string;
+  spawnedRequestId?: number | null;   // G1 — the engine request this submission was routed as
 }
 export interface WorkflowSubmissionRequest {
   workflowId: string;
@@ -2883,6 +2884,9 @@ export const workflowSubmissionApi = {
     api.get<WorkflowSubmissionDto>(`/api/v1/workflow-submissions/${id}`),
   review:  (id: number, body: { decision: string; reviewerNote?: string }) =>
     api.post<WorkflowSubmissionDto>(`/api/v1/workflow-submissions/${id}/review`, body),
+  /** G1 — persist the primary engine request this submission was routed as. */
+  linkSpawnedRequest: (id: number, requestId: number) =>
+    api.put<WorkflowSubmissionDto>(`/api/v1/workflow-submissions/${id}/spawned-request/${requestId}`),
   countsByWorkflow: () =>
     api.get<WorkflowSubmissionCountDto[]>('/api/v1/workflow-submissions/counts/by-workflow'),
 };

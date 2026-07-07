@@ -84,6 +84,13 @@ public class WorkflowSubmissionController {
         return service.review(id, body, userIdOf(auth));
     }
 
+    /** Forms remediation (G1) — persist the engine request a submission was routed as. */
+    @PutMapping("/{id}/spawned-request/{requestId}")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
+    public WorkflowSubmission linkSpawnedRequest(@PathVariable Long id, @PathVariable Long requestId) {
+        return service.linkSpawnedRequest(id, requestId);
+    }
+
     private static Long userIdOf(Authentication auth) {
         if (auth != null && auth.getPrincipal() instanceof GrcUserDetails u) return u.getUserId();
         return null;

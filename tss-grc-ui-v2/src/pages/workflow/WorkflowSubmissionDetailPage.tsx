@@ -121,7 +121,8 @@ export function WorkflowSubmissionDetailPage() {
                                 reviewNote={reviewNote}
                                 onReviewNote={setReviewNote}
                                 onAct={act}
-                                onNavigate={navigate}/>}
+                                onNavigate={navigate}
+                                reload={reload}/>}
       </LoadableSection>
     </Shell>
   );
@@ -130,7 +131,7 @@ export function WorkflowSubmissionDetailPage() {
 // ── Body — kept as a function to make LoadableSection happy ─────────
 
 function SubmissionBody({
-  s, isAr, busy, reviewNote, onReviewNote, onAct, onNavigate,
+  s, isAr, busy, reviewNote, onReviewNote, onAct, onNavigate, reload,
 }: {
   s: WorkflowSubmissionDto;
   isAr: boolean;
@@ -139,6 +140,7 @@ function SubmissionBody({
   onReviewNote: (v: string) => void;
   onAct: (decision: 'APPROVE' | 'REJECT' | 'CLOSE' | 'UNDER_REVIEW') => void | Promise<void>;
   onNavigate: ReturnType<typeof useNavigate>;
+  reload: () => void;
 }) {
   const lang = isAr ? 'ar' : 'en';
   const cat = useMemo(() => WORKFLOWS.find(w => w.id === s.workflowId), [s.workflowId]);
@@ -172,6 +174,12 @@ function SubmissionBody({
         <Row k={isAr ? 'وقت الإرسال' : 'Submitted at'} v={formatDate(s.submittedAt)} />
         {s.reviewedAt && <Row k={isAr ? 'وقت المراجعة' : 'Reviewed at'} v={formatDate(s.reviewedAt)} />}
         {s.reviewerNote && <Row k={isAr ? 'ملاحظة المراجع' : 'Reviewer note'} v={s.reviewerNote} wrap />}
+        {s.spawnedRequestId != null && (
+          <Row k={isAr ? 'وُجِّه كطلب' : 'Routed as request'}
+               v={<Link to={`/workflows/requests/${s.spawnedRequestId}`} style={{ color: 'var(--primary-700)' }}>
+                    WR-{String(s.spawnedRequestId).padStart(5, '0')}
+                  </Link>} />
+        )}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
           {cat?.route && (
@@ -197,7 +205,12 @@ function SubmissionBody({
           sourceRecordType="WorkflowSubmission" sourceRecordId={s.id}
           defaultTitleEn={s.titleEn}
           label={isAr ? 'توجيه عبر المحرك' : 'Route via engine'}
-          onCreated={() => setReqRefresh(n => n + 1)} />
+          onCreated={async (created) => {
+            // G1 — persist the primary spawned request on the submission, then refresh.
+            try { await workflowSubmissionApi.linkSpawnedRequest(s.id, created.id); } catch { /* best-effort link */ }
+            setReqRefresh(n => n + 1);
+            reload();
+          }} />
       </div>
       <ModuleEngineRequestsPanel key={`req-${reqRefresh}`} sourceModule={s.workflowModule}
         sourceRecordType="WorkflowSubmission" sourceRecordId={s.id}

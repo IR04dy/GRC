@@ -512,6 +512,37 @@ class WorkflowSubmissionServiceTest {
             .hasMessageContaining("tenant");
     }
 
+    // ── linkSpawnedRequest() — G1 submission↔engine link ──────────────
+
+    @Test void linkSpawnedRequest_setsPrimaryWhenNull() {
+        var existing = sampleSaved(ORG_ID, 555L, "APPROVED");
+        when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
+
+        var out = service.linkSpawnedRequest(555L, 4242L);
+
+        assertThat(out.getSpawnedRequestId()).isEqualTo(4242L);
+        verify(repo).save(existing);
+        verify(audit).log(eq("LINK_REQUEST"), eq("WorkflowSubmission"), eq(555L), anyString());
+    }
+
+    @Test void linkSpawnedRequest_idempotent_doesNotOverwrite() {
+        var existing = sampleSaved(ORG_ID, 555L, "APPROVED");
+        existing.setSpawnedRequestId(111L);
+        when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.of(existing));
+
+        var out = service.linkSpawnedRequest(555L, 999L);
+
+        assertThat(out.getSpawnedRequestId()).isEqualTo(111L);   // first link wins
+        verify(repo, never()).save(any(WorkflowSubmission.class));
+    }
+
+    @Test void linkSpawnedRequest_otherTenantsRow_throwsNotFound() {
+        when(repo.findByOrganisationIdAndId(ORG_ID, 555L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.linkSpawnedRequest(555L, 4242L))
+            .isInstanceOf(EntityNotFoundException.class);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────
 
     private WorkflowSubmission sampleSaved(Long org, Long id, String status) {

@@ -85,6 +85,10 @@ public class WorkflowSubmission {
     @Column(name = "reviewer_note", length = 1000)
     private String reviewerNote;
 
+    /** Forms remediation (G1) — the primary engine WorkflowRequest this submission was routed as. */
+    @Column(name = "spawned_request_id")
+    private Long spawnedRequestId;
+
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
 

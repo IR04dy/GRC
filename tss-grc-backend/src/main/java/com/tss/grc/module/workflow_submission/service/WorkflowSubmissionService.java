@@ -164,6 +164,21 @@ public class WorkflowSubmissionService {
         return saved;
     }
 
+    /** Forms remediation (G1) — persist the primary engine request a submission was routed as.
+     *  Idempotent: only the first spawned request becomes the canonical pointer; subsequent
+     *  requests raised from the submission are still discoverable via the sourceRecord anchor. */
+    @Transactional
+    public WorkflowSubmission linkSpawnedRequest(Long id, Long requestId) {
+        WorkflowSubmission s = get(id);   // org-scoped
+        if (s.getSpawnedRequestId() == null && requestId != null) {
+            s.setSpawnedRequestId(requestId);
+            s = repo.save(s);
+            audit.log("LINK_REQUEST", "WorkflowSubmission", s.getId(),
+                "Linked spawned engine request #" + requestId);
+        }
+        return s;
+    }
+
     /** Build the canonical payload Map for F8 rule-condition matching.
      *  Engine evaluates equality + contains on these string keys. */
     private static Map<String, Object> payloadFor(WorkflowSubmission s) {
