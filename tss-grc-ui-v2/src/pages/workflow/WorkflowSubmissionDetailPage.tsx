@@ -21,6 +21,8 @@ import { ai, type AiSuggestion } from '../../lib/ai';
 import { WORKFLOWS, MODULE_LABEL } from '../../lib/workflowCatalog';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { EntityAutomationRuns } from '../../components/audit/EntityAutomationRuns';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 
 /**
  * Single-submission detail page at /workflows/submissions/:id.
@@ -143,6 +145,8 @@ function SubmissionBody({
   const moduleLabel = MODULE_LABEL[s.workflowModule as keyof typeof MODULE_LABEL];
   const wizardLabel = isAr ? (cat?.titleAr ?? s.workflowId) : (cat?.titleEn ?? s.workflowId);
   const isOpen = s.status === 'SUBMITTED' || s.status === 'UNDER_REVIEW';
+  // G1 reconciliation — bump to remount the linked-requests panel after one is raised.
+  const [reqRefresh, setReqRefresh] = useState(0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -183,6 +187,21 @@ function SubmissionBody({
           </Link>
         </div>
       </Card>
+
+      {/* G1 reconciliation — route this submission through the engine (approval / assignment /
+       *  evidence request) and see every request raised from it, so the wizard submission and its
+       *  engine tasks read as one story instead of two disconnected entry systems. Reuses the
+       *  generic engine adoption — anchored to sourceRecordType="WorkflowSubmission". */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <RaiseRequestButton sourceModule={s.workflowModule}
+          sourceRecordType="WorkflowSubmission" sourceRecordId={s.id}
+          defaultTitleEn={s.titleEn}
+          label={isAr ? 'توجيه عبر المحرك' : 'Route via engine'}
+          onCreated={() => setReqRefresh(n => n + 1)} />
+      </div>
+      <ModuleEngineRequestsPanel key={`req-${reqRefresh}`} sourceModule={s.workflowModule}
+        sourceRecordType="WorkflowSubmission" sourceRecordId={s.id}
+        titleEn="Requests raised from this submission" titleAr="الطلبات المرفوعة من هذا السجل" />
 
       {/* AI review hint — heuristic checklist + suggested decision. */}
       <AiReviewHintCard s={s} isAr={isAr} />
