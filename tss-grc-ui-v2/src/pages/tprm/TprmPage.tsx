@@ -27,6 +27,7 @@ import { tprmApi, ApiError, type TprmVendorDto, type TprmVendorRequest } from '.
 import { useToast } from '../../lib/toast';
 import { VENDORS } from './mockTprm';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { TPRM_WORKFLOWS } from '../../lib/mockWorkflows';
 import { TPRM_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
@@ -308,11 +309,14 @@ export function TprmPage() {
           </Card>
         </div>
       )}
-      {tab === 'workflows' && <ActiveWorkflowsPanel
-        workflows={TPRM_WORKFLOWS}
-        title={t('tprmTabWorkflows') ?? 'Workflows'}
-        sub={t('tprmWorkflowsSub')}
-        t={t} />}
+      {tab === 'workflows' && <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <ModuleEngineRequestsPanel sourceModule="TPRM" />
+        <ActiveWorkflowsPanel
+          workflows={TPRM_WORKFLOWS}
+          title={t('tprmTabWorkflows') ?? 'Workflows'}
+          sub={t('tprmWorkflowsSub')}
+          t={t} />
+      </div>}
       {tab === 'comms' && <CommsPanel module="TPRM" />}
       {tab === 'alignment' && <RegulatoryAlignmentTab domain="TPRM" families={['Third-Party', 'SAMA', 'NCA Cyber', 'Privacy']} />}
 

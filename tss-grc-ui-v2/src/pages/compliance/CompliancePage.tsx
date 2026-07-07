@@ -53,6 +53,7 @@ import {
   FRAMEWORK_DPIAS_BY_ID, FRAMEWORK_KRIS_BY_ID, FRAMEWORK_RISKS_BY_ID,
 } from './mockCompliance';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { COMPLIANCE_WORKFLOWS } from '../../lib/mockWorkflows';
 import { COMPLIANCE_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
@@ -890,11 +891,14 @@ export function CompliancePage() {
         </div>
       )}
 
-      {tab === 'workflows' && <ActiveWorkflowsPanel
-        workflows={COMPLIANCE_WORKFLOWS}
-        title={t('complianceTabWorkflows') ?? 'Workflows'}
-        sub="CAPA closure progression, regulatory-change implementation, policy approvals and audit engagements."
-        t={t} />}
+      {tab === 'workflows' && <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <ModuleEngineRequestsPanel sourceModule="COMPLIANCE" />
+        <ActiveWorkflowsPanel
+          workflows={COMPLIANCE_WORKFLOWS}
+          title={t('complianceTabWorkflows') ?? 'Workflows'}
+          sub="CAPA closure progression, regulatory-change implementation, policy approvals and audit engagements."
+          t={t} />
+      </div>}
 
       <FormModal<ComplianceControlRequest>
         open={open}

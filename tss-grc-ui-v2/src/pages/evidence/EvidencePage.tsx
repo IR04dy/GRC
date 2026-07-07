@@ -38,6 +38,7 @@ import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { EVIDENCE, EVIDENCE_REQUESTS, EVIDENCE_REVIEWS, EVIDENCE_ANCHORS_BY_ID } from './mockEvidence';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { EVIDENCE_WORKFLOWS } from '../../lib/mockWorkflows';
 import { EVIDENCE_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { AnchorChips } from '../../components/authority/AnchorChips';
@@ -577,11 +578,14 @@ export function EvidencePage() {
             : <DataTable columns={itemCols} rows={expiredItems} />}
         </Card>
       )}
-      {tab === 'workflows' && <ActiveWorkflowsPanel
-        workflows={EVIDENCE_WORKFLOWS}
-        title={t('evidenceTabWorkflows') ?? 'Workflows'}
-        sub="Evidence reviews, request fulfilment and renewal of expiring artefacts."
-        t={t} />}
+      {tab === 'workflows' && <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <ModuleEngineRequestsPanel sourceModule="EVIDENCE" />
+        <ActiveWorkflowsPanel
+          workflows={EVIDENCE_WORKFLOWS}
+          title={t('evidenceTabWorkflows') ?? 'Workflows'}
+          sub="Evidence reviews, request fulfilment and renewal of expiring artefacts."
+          t={t} />
+      </div>}
 
       <FormModal<EvidenceItemRequest>
         open={open}

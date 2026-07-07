@@ -40,6 +40,7 @@ import {
 } from './mockRisks';
 import { TimeSeries } from '../../components/viz/TimeSeries';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { RISK_WORKFLOWS } from '../../lib/mockWorkflows';
 import { AppetiteBreachFeed } from '../../components/risk/AppetiteBreachFeed';
 import { SAUDI_APPETITES } from '../../lib/riskAppetiteSaudi';
@@ -486,11 +487,14 @@ export function RiskRegisterPage() {
 
       {tab === 'appetite' && <AppetiteDashboard demoMode={demoMode} risks={risks} />}
 
-      {tab === 'workflows' && <ActiveWorkflowsPanel
-        workflows={RISK_WORKFLOWS}
-        title={t('riskTabWorkflows') ?? 'Workflows'}
-        sub="Active risk-management workflows: lifecycle stages, KRI breach response, appetite breach escalation."
-        t={t} />}
+      {tab === 'workflows' && <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <ModuleEngineRequestsPanel sourceModule="RISK" />
+        <ActiveWorkflowsPanel
+          workflows={RISK_WORKFLOWS}
+          title={t('riskTabWorkflows') ?? 'Workflows'}
+          sub="Active risk-management workflows: lifecycle stages, KRI breach response, appetite breach escalation."
+          t={t} />
+      </div>}
 
       {tab === 'alignment' && <RegulatoryAlignmentTab domain="RISK" families={['Risk', 'SAMA', 'International']} />}
 

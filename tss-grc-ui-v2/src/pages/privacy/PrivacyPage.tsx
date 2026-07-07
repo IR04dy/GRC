@@ -27,6 +27,7 @@ import { DSRS, BREACHES, ROPA, DPIAS } from './mockPrivacy';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
 import { ModuleSubmissionsPanel } from '../../components/workflows/ModuleSubmissionsPanel';
 import { PRIVACY_WORKFLOWS } from '../../lib/mockWorkflows';
@@ -418,11 +419,14 @@ export function PrivacyPage() {
       )}
       {tab === 'dpia' && <DpiaTab toast={toast} t={t} />}
       {tab === 'consent' && <ConsentTab />}
-      {tab === 'workflows' && <ActiveWorkflowsPanel
-        workflows={PRIVACY_WORKFLOWS}
-        title={t('privacyTabWorkflows') ?? 'Workflows'}
-        sub="DSR fulfilment (PDPL 30-day), breach notification (PDPL 72-hour) and DPIA review."
-        t={t} />}
+      {tab === 'workflows' && <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <ModuleEngineRequestsPanel sourceModule="PRIVACY" />
+        <ActiveWorkflowsPanel
+          workflows={PRIVACY_WORKFLOWS}
+          title={t('privacyTabWorkflows') ?? 'Workflows'}
+          sub="DSR fulfilment (PDPL 30-day), breach notification (PDPL 72-hour) and DPIA review."
+          t={t} />
+      </div>}
       {tab === 'comms' && <CommsPanel module="BREACH" />}
       {tab === 'alignment' && <RegulatoryAlignmentTab domain="PRIVACY" families={['Privacy', 'International']} />}
 

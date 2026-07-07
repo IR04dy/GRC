@@ -39,6 +39,7 @@ import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { BCM_PLANS, BCM_PROCESSES, BCM_BIA, BCM_EXERCISES } from './mockBcm';
 import { ActiveWorkflowsPanel } from '../../components/workflows/ActiveWorkflowsPanel';
+import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { BCM_WORKFLOWS } from '../../lib/mockWorkflows';
 import { BCM_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
@@ -591,11 +592,14 @@ export function BcmPage() {
       {tab === 'graph'  && <DependencyGraphTab t={t} />}
 
       {tab === 'comms' && <CrisisCommsTab toast={toast} t={t} />}
-      {tab === 'workflows' && <ActiveWorkflowsPanel
-        workflows={BCM_WORKFLOWS}
-        title={t('bcmTabWorkflows') ?? 'Workflows'}
-        sub="BCP plan approvals, exercise execution, and crisis-management readiness."
-        t={t} />}
+      {tab === 'workflows' && <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <ModuleEngineRequestsPanel sourceModule="BCM" />
+        <ActiveWorkflowsPanel
+          workflows={BCM_WORKFLOWS}
+          title={t('bcmTabWorkflows') ?? 'Workflows'}
+          sub="BCP plan approvals, exercise execution, and crisis-management readiness."
+          t={t} />
+      </div>}
       {tab === 'alignment' && <RegulatoryAlignmentTab domain="BCM" families={['BCM', 'SAMA', 'Resilience', 'International']} />}
 
       {/* ── Modals ── */}
