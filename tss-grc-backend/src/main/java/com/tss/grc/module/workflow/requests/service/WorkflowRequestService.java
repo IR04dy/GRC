@@ -725,10 +725,26 @@ public class WorkflowRequestService {
 
     @Transactional(readOnly = true)
     public Page<RequestResponse> list(String status, Pageable pageable) {
+        return list(status, null, pageable);
+    }
+
+    /** List engine requests for the tenant, optionally narrowed by status and/or source module.
+     *  The sourceModule filter powers each module page's live "requests from this module" panel. */
+    @Transactional(readOnly = true)
+    public Page<RequestResponse> list(String status, String sourceModule, Pageable pageable) {
         Long org = TenantContext.getCurrentTenant();
-        Page<WorkflowRequest> page = (status != null && !status.isBlank())
-            ? requestRepo.findByOrganisationIdAndStatusOrderByCreatedAtDesc(org, status.toUpperCase(), pageable)
-            : requestRepo.findByOrganisationIdOrderByCreatedAtDesc(org, pageable);
+        boolean hasStatus = status != null && !status.isBlank();
+        String st = hasStatus ? status.toUpperCase() : null;
+        String mod = (sourceModule != null && !sourceModule.isBlank()) ? sourceModule.trim().toUpperCase() : null;
+        Page<WorkflowRequest> page;
+        if (mod != null && hasStatus)
+            page = requestRepo.findByOrganisationIdAndSourceModuleAndStatusOrderByCreatedAtDesc(org, mod, st, pageable);
+        else if (mod != null)
+            page = requestRepo.findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(org, mod, pageable);
+        else if (hasStatus)
+            page = requestRepo.findByOrganisationIdAndStatusOrderByCreatedAtDesc(org, st, pageable);
+        else
+            page = requestRepo.findByOrganisationIdOrderByCreatedAtDesc(org, pageable);
         return page.map(this::toResponseShallow);
     }
 

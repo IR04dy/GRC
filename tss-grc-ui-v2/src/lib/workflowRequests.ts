@@ -132,9 +132,11 @@ const act = (id: number, action: string, note?: string, outcome?: string) =>
 export const workflowRequestsApi = {
   create: (body: WorkflowRequestCreate) =>
     api.post<WorkflowRequestDto>('/api/v1/workflows/requests', body),
-  list: (status?: string, page = 0, size = 50) =>
+  list: (status?: string, page = 0, size = 50, sourceModule?: string) =>
     api.get<PageResp<WorkflowRequestDto>>(
-      `/api/v1/workflows/requests?page=${page}&size=${size}${status ? `&status=${encodeURIComponent(status)}` : ''}`),
+      `/api/v1/workflows/requests?page=${page}&size=${size}`
+      + (status ? `&status=${encodeURIComponent(status)}` : '')
+      + (sourceModule ? `&sourceModule=${encodeURIComponent(sourceModule)}` : '')),
   inbox: () => api.get<WorkflowRequestDto[]>('/api/v1/workflows/requests/inbox'),
   get: (id: number) => api.get<WorkflowRequestDto>(`/api/v1/workflows/requests/${id}`),
   auditLog: (id: number) => api.get<WorkflowEventDto[]>(`/api/v1/workflows/requests/${id}/audit-log`),

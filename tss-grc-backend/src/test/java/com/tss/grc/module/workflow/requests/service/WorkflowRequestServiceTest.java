@@ -31,6 +31,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -816,5 +818,25 @@ class WorkflowRequestServiceTest {
         assertThatThrownBy(() -> svc.review(17L, "APPROVE", null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("designated actor");
+    }
+
+    // ── Adoption — list filtered by source module (live per-module panel) ─────
+
+    @Test
+    void list_filtersBySourceModule() {
+        WorkflowRequest r = sentRequest(500L, "PARALLEL", "ALL", null);
+        r.setSourceModule("CYBER");
+        var pageable = PageRequest.of(0, 50);
+        when(requestRepo.findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(ORG, "CYBER", pageable))
+            .thenReturn(new PageImpl<>(List.of(r)));
+
+        // lower-case module in → service upper-cases and routes to the module-scoped finder
+        var result = svc.list(null, "cyber", pageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).id()).isEqualTo(500L);
+        assertThat(result.getContent().get(0).sourceModule()).isEqualTo("CYBER");
+        verify(requestRepo).findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(ORG, "CYBER", pageable);
+        verify(requestRepo, never()).findByOrganisationIdOrderByCreatedAtDesc(any(), any());
     }
 }

@@ -19,6 +19,13 @@ public interface WorkflowRequestRepository extends JpaRepository<WorkflowRequest
     Page<WorkflowRequest> findByOrganisationIdAndStatusOrderByCreatedAtDesc(
         Long organisationId, String status, Pageable pageable);
 
+    /** Adoption — engine requests raised from one module (its live in-flight list). */
+    Page<WorkflowRequest> findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(
+        Long organisationId, String sourceModule, Pageable pageable);
+
+    Page<WorkflowRequest> findByOrganisationIdAndSourceModuleAndStatusOrderByCreatedAtDesc(
+        Long organisationId, String sourceModule, String status, Pageable pageable);
+
     Page<WorkflowRequest> findByOrganisationIdAndInitiatedByOrderByCreatedAtDesc(
         Long organisationId, Long initiatedBy, Pageable pageable);
 
