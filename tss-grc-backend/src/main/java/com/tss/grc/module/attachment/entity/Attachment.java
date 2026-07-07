@@ -64,6 +64,11 @@ public class Attachment {
     @Column(name = "valid_to")
     private LocalDate validTo;
 
+    /** Data classification of the artifact (NDMO-aligned): PUBLIC/INTERNAL/CONFIDENTIAL/RESTRICTED.
+     *  Nullable — legacy rows and uploads that don't set one remain null (treated as "unclassified"). */
+    @Column(name = "classification", length = 30)
+    private String classification;
+
     @Column(name = "uploaded_by", nullable = false)
     private Long uploadedBy;
 

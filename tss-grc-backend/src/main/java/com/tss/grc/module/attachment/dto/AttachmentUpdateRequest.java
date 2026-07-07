@@ -11,5 +11,6 @@ import java.time.LocalDate;
 public record AttachmentUpdateRequest(
     String docType,
     String titleEn,
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd") LocalDate validTo
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd") LocalDate validTo,
+    String classification
 ) {}

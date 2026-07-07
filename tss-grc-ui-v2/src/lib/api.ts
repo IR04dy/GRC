@@ -2447,13 +2447,20 @@ export const ATTACHMENT_DOC_TYPES: AttachmentDocType[] = [
   'CONTRACT', 'MINUTES', 'QUESTIONNAIRE', 'SCREENSHOT', 'OTHER',
 ];
 
+/** NDMO-aligned data classification an attachment/evidence artifact may carry. */
+export type AttachmentClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED';
+export const ATTACHMENT_CLASSIFICATIONS: AttachmentClassification[] = [
+  'PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED',
+];
+
 export interface AttachmentDto {
   id: number;
   entityType: string; entityId: number;
   docType: AttachmentDocType;
   titleEn?: string;
   fileName: string; fileSize?: number; mimeType?: string; sha256?: string;
-  validTo?: string; uploadedById?: number; createdAt?: string;
+  validTo?: string; classification?: AttachmentClassification | null;
+  uploadedById?: number; createdAt?: string;
   version?: number; versionGroupId?: number;
   downloadUrl: string;
 }
@@ -2490,21 +2497,23 @@ export const attachmentsApi = {
   list: (entityType: string, entityId: number) =>
     api.get<AttachmentDto[]>(`/api/v1/attachments/${entityType}/${entityId}`),
   upload: (entityType: string, entityId: number, file: File,
-           opts?: { docType?: AttachmentDocType; title?: string; validTo?: string }) => {
+           opts?: { docType?: AttachmentDocType; title?: string; validTo?: string; classification?: AttachmentClassification }) => {
     const q = new URLSearchParams();
     q.set('docType', opts?.docType ?? 'OTHER');
     if (opts?.title) q.set('title', opts.title);
     if (opts?.validTo) q.set('validTo', opts.validTo);
+    if (opts?.classification) q.set('classification', opts.classification);
     return uploadFile<AttachmentDto>(`/api/v1/attachments/${entityType}/${entityId}?${q.toString()}`, file);
   },
   download: (a: AttachmentDto) => downloadFile(`/api/v1/attachments/${a.id}/download`, a.fileName),
-  update: (id: number, body: { docType?: AttachmentDocType; titleEn?: string; validTo?: string }) =>
+  update: (id: number, body: { docType?: AttachmentDocType; titleEn?: string; validTo?: string; classification?: AttachmentClassification | '' }) =>
     api.patch<AttachmentDto>(`/api/v1/attachments/${id}`, body),
-  newVersion: (id: number, file: File, opts?: { docType?: AttachmentDocType; title?: string; validTo?: string }) => {
+  newVersion: (id: number, file: File, opts?: { docType?: AttachmentDocType; title?: string; validTo?: string; classification?: AttachmentClassification }) => {
     const q = new URLSearchParams();
     if (opts?.docType) q.set('docType', opts.docType);
     if (opts?.title) q.set('title', opts.title);
     if (opts?.validTo) q.set('validTo', opts.validTo);
+    if (opts?.classification) q.set('classification', opts.classification);
     const qs = q.toString();
     return uploadFile<AttachmentDto>(`/api/v1/attachments/${id}/version${qs ? '?' + qs : ''}`, file);
   },

@@ -176,7 +176,7 @@ class ObligationControllerTest {
     private static AttachmentResponse attach(long id, String fileName, String entityType, long entityId) {
         return new AttachmentResponse(
             id, entityType, entityId, "EVIDENCE", fileName, fileName,
-            1024L, "application/pdf", "abc123sha256", null,
+            1024L, "application/pdf", "abc123sha256", null, "INTERNAL",
             99L, null, 1, null, "/api/v1/attachments/" + id + "/download");
     }
 }

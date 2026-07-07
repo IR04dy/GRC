@@ -16,9 +16,19 @@ import { useI18n } from '../../lib/i18n';
 import { tlabel } from '../../lib/labels';
 import { useToast } from '../../lib/toast';
 import {
-  attachmentsApi, ATTACHMENT_DOC_TYPES, ApiError,
-  type AttachmentDto, type AttachmentDocType,
+  attachmentsApi, ATTACHMENT_DOC_TYPES, ATTACHMENT_CLASSIFICATIONS, ApiError,
+  type AttachmentDto, type AttachmentDocType, type AttachmentClassification,
 } from '../../lib/api';
+
+const CLASS_LABELS: Record<AttachmentClassification, { en: string; ar: string }> = {
+  PUBLIC:       { en: 'Public',       ar: 'عام' },
+  INTERNAL:     { en: 'Internal',     ar: 'داخلي' },
+  CONFIDENTIAL: { en: 'Confidential', ar: 'سرّي' },
+  RESTRICTED:   { en: 'Restricted',   ar: 'مقيَّد' },
+};
+const CLASS_TONE: Record<AttachmentClassification, 'success' | 'info' | 'warning' | 'danger'> = {
+  PUBLIC: 'success', INTERNAL: 'info', CONFIDENTIAL: 'warning', RESTRICTED: 'danger',
+};
 
 const DOC_TYPE_LABELS: Record<AttachmentDocType, { en: string; ar: string }> = {
   PLAN:          { en: 'Plan',          ar: 'خطة' },
@@ -67,7 +77,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   const ar = lang === 'ar';
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
-  const seedRef = useRef<{ docType: AttachmentDocType; title: string } | null>(null);
+  const seedRef = useRef<{ docType: AttachmentDocType; title: string; classification?: AttachmentClassification | '' } | null>(null);
   const [items, setItems] = useState<AttachmentDto[]>([]);
   const [loading, setLoading] = useState(true);
   // staging panel (a file has been picked but not yet uploaded)
@@ -75,6 +85,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   const [sDocType, setSDocType] = useState<AttachmentDocType>('PLAN');
   const [sTitle, setSTitle] = useState('');
   const [sValidTo, setSValidTo] = useState('');
+  const [sClass, setSClass] = useState<AttachmentClassification | ''>('');
   const [queue, setQueue] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -83,6 +94,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   const [eDocType, setEDocType] = useState<AttachmentDocType>('OTHER');
   const [eTitle, setETitle] = useState('');
   const [eValidTo, setEValidTo] = useState('');
+  const [eClass, setEClass] = useState<AttachmentClassification | ''>('');
   // delete confirmation
   const [confirmDel, setConfirmDel] = useState<AttachmentDto | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -100,7 +112,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   useEffect(() => { load(); }, [load]);
 
   /** Open the OS file picker, optionally seeding type/title for a re-collect. */
-  function pick(seed?: { docType: AttachmentDocType; title: string }) {
+  function pick(seed?: { docType: AttachmentDocType; title: string; classification?: AttachmentClassification | '' }) {
     seedRef.current = seed ?? null;
     fileRef.current?.click();
   }
@@ -108,7 +120,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
   /** Replace an attachment with a new version (supersedes the current one). */
   function pickReplace(a: AttachmentDto) {
     setReplaceTarget(a);
-    seedRef.current = { docType: a.docType, title: a.titleEn ?? '' };
+    seedRef.current = { docType: a.docType, title: a.titleEn ?? '', classification: a.classification ?? '' };
     fileRef.current?.click();
   }
 
@@ -139,6 +151,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
     setSDocType(seed?.docType ?? 'PLAN');
     setSTitle(seed?.title || base);
     setSValidTo('');
+    setSClass(seed?.classification ?? '');
   }
 
   /** Validate a batch; stage the first valid file and queue the rest. */
@@ -166,7 +179,8 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
 
   async function confirmUpload() {
     if (!staged) return;
-    const opts = { docType: sDocType, title: sTitle.trim() || undefined, validTo: sValidTo || undefined };
+    const opts = { docType: sDocType, title: sTitle.trim() || undefined, validTo: sValidTo || undefined,
+      classification: sClass || undefined };
     setBusy(true);
     try {
       if (replaceTarget) {
@@ -199,13 +213,15 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
     setEDocType(a.docType);
     setETitle(a.titleEn ?? '');
     setEValidTo(a.validTo ?? '');
+    setEClass(a.classification ?? '');
   }
 
   async function saveEdit() {
     if (!editing) return;
     setBusy(true);
     try {
-      await attachmentsApi.update(editing.id, { docType: eDocType, titleEn: eTitle.trim(), validTo: eValidTo || undefined });
+      // '' clears the classification server-side; a value sets it.
+      await attachmentsApi.update(editing.id, { docType: eDocType, titleEn: eTitle.trim(), validTo: eValidTo || undefined, classification: eClass });
       toast.success(ar ? 'تم تحديث المرفق' : 'Attachment updated');
       setEditing(null);
       load();
@@ -270,6 +286,15 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
               title={ar ? 'صالح حتى (اختياري — للشهادات والعقود)' : 'Valid until (optional — for certs/contracts)'}
               aria-label={ar ? 'صالح حتى' : 'Valid until'}
               style={{ ...inputStyle, color: sValidTo ? 'var(--ink-1)' : 'var(--ink-3)' }} />
+            <select value={sClass} onChange={e => setSClass(e.currentTarget.value as AttachmentClassification | '')}
+              title={ar ? 'التصنيف (اختياري)' : 'Classification (optional)'}
+              aria-label={ar ? 'التصنيف' : 'Classification'}
+              style={{ ...inputStyle, color: sClass ? 'var(--ink-1)' : 'var(--ink-3)' }}>
+              <option value="">{ar ? 'التصنيف…' : 'Classification…'}</option>
+              {ATTACHMENT_CLASSIFICATIONS.map(c => (
+                <option key={c} value={c}>{tlabel(CLASS_LABELS, c, ar)}</option>
+              ))}
+            </select>
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button size="sm" variant="ghost" Icon={X} disabled={busy} onClick={cancelStaged}>
@@ -309,6 +334,15 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
             <input type="date" value={eValidTo} onChange={e => setEValidTo(e.currentTarget.value)}
               aria-label={ar ? 'صالح حتى' : 'Valid until'}
               style={{ ...inputStyle, color: eValidTo ? 'var(--ink-1)' : 'var(--ink-3)' }} />
+            <select value={eClass} onChange={e => setEClass(e.currentTarget.value as AttachmentClassification | '')}
+              title={ar ? 'التصنيف' : 'Classification'}
+              aria-label={ar ? 'التصنيف' : 'Classification'}
+              style={{ ...inputStyle, color: eClass ? 'var(--ink-1)' : 'var(--ink-3)' }}>
+              <option value="">{ar ? 'بدون تصنيف' : 'Unclassified'}</option>
+              {ATTACHMENT_CLASSIFICATIONS.map(c => (
+                <option key={c} value={c}>{tlabel(CLASS_LABELS, c, ar)}</option>
+              ))}
+            </select>
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <Button size="sm" variant="ghost" Icon={X} disabled={busy} onClick={() => setEditing(null)}>
@@ -335,7 +369,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
             const expired = a.validTo && a.validTo < today;
             return (
               <div key={a.id} style={{
-                display: 'grid', gridTemplateColumns: 'auto 1fr auto auto auto',
+                display: 'grid', gridTemplateColumns: 'auto 1fr auto auto auto auto',
                 gap: 10, alignItems: 'center', padding: '8px 10px',
                 borderBottom: '1px solid var(--border)', background: 'var(--surface)', fontSize: 12,
               }}>
@@ -350,6 +384,9 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
                 <span style={{ color: 'var(--ink-3)' }} className="mono">
                   {fmtBytes(a.fileSize)}{a.createdAt ? ` · ${a.createdAt.slice(0, 10)}` : ''}
                 </span>
+                {a.classification
+                  ? <Badge tone={CLASS_TONE[a.classification]}>{tlabel(CLASS_LABELS, a.classification, ar)}</Badge>
+                  : <span />}
                 {a.validTo
                   ? <Badge tone={expired ? 'danger' : 'neutral'}>{ar ? 'حتى ' : 'until '}{a.validTo}</Badge>
                   : <span />}
@@ -357,7 +394,7 @@ export function AttachmentsField({ entityType, entityId, label }: AttachmentsFie
                   {expired && (
                     <Button size="sm" variant="ghost" Icon={RefreshCw}
                       title={ar ? 'إعادة التجميع (رفع نسخة محدّثة)' : 'Re-collect (upload a fresh copy)'}
-                      onClick={() => pick({ docType: a.docType, title: a.titleEn || '' })} />
+                      onClick={() => pick({ docType: a.docType, title: a.titleEn || '', classification: a.classification ?? '' })} />
                   )}
                   <Button size="sm" variant="ghost" Icon={Layers} title={ar ? 'رفع نسخة جديدة' : 'Upload new version'}
                     onClick={() => pickReplace(a)} />

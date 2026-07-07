@@ -14,6 +14,7 @@ public record AttachmentResponse(
     String mimeType,
     String sha256,
     LocalDate validTo,
+    String classification,
     Long uploadedById,
     LocalDateTime createdAt,
     Integer version,

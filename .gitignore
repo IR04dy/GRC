@@ -34,6 +34,8 @@ tss-grc-backend/uploads/
 .tmp/
 *.pid
 *.log
+*.log.err
+backend-run.log*
 !.tmp/extract.log
 
 # ─── Python ────────────────────────────────────────────────────────────

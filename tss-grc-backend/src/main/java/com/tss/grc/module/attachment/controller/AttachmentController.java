@@ -53,8 +53,9 @@ public class AttachmentController {
             @RequestParam(value = "title", required = false) String title,
             @RequestParam(value = "validTo", required = false)
                 @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate validTo,
+            @RequestParam(value = "classification", required = false) String classification,
             @AuthenticationPrincipal GrcUserDetails me) {
-        return service.upload(entityType, entityId, docType, title, validTo, file,
+        return service.upload(entityType, entityId, docType, title, validTo, classification, file,
             me != null ? me.getUserId() : null);
     }
 
@@ -79,8 +80,9 @@ public class AttachmentController {
             @RequestParam(value = "title", required = false) String title,
             @RequestParam(value = "validTo", required = false)
                 @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate validTo,
+            @RequestParam(value = "classification", required = false) String classification,
             @AuthenticationPrincipal GrcUserDetails me) {
-        return service.replaceVersion(id, docType, title, validTo, file,
+        return service.replaceVersion(id, docType, title, validTo, classification, file,
             me != null ? me.getUserId() : null);
     }
 
@@ -95,7 +97,7 @@ public class AttachmentController {
     @PreAuthorize("hasPermission('EVIDENCE', 'WRITE')")
     @Operation(summary = "Edit attachment metadata (docType / title / expiry) — binary unchanged")
     public AttachmentResponse update(@PathVariable Long id, @RequestBody AttachmentUpdateRequest req) {
-        return service.update(id, req.docType(), req.titleEn(), req.validTo());
+        return service.update(id, req.docType(), req.titleEn(), req.validTo(), req.classification());
     }
 
     @DeleteMapping("/{id}")

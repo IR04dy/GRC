@@ -23,6 +23,20 @@ public class AttachmentService {
         "PLAN", "REPORT", "POLICY", "CERTIFICATE", "EVIDENCE",
         "CONTRACT", "MINUTES", "QUESTIONNAIRE", "SCREENSHOT", "OTHER");
 
+    /** NDMO-aligned data classifications an evidence artifact may carry. */
+    public static final Set<String> CLASSIFICATIONS = Set.of(
+        "PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED");
+
+    /** Normalize + validate a classification; null/blank stays null (unclassified). */
+    private static String normClassification(String c) {
+        if (c == null || c.isBlank()) return null;
+        String up = c.toUpperCase();
+        if (!CLASSIFICATIONS.contains(up)) {
+            throw new IllegalArgumentException("Unknown classification '" + c + "'. Valid: " + CLASSIFICATIONS);
+        }
+        return up;
+    }
+
     private final AttachmentRepository repository;
     private final AttachmentStorageService storage;
 
@@ -36,7 +50,8 @@ public class AttachmentService {
 
     @Transactional
     public AttachmentResponse upload(String entityType, Long entityId, String docType,
-                                     String titleEn, LocalDate validTo, MultipartFile file, Long userId) {
+                                     String titleEn, LocalDate validTo, String classification,
+                                     MultipartFile file, Long userId) {
         Long orgId = TenantContext.getCurrentTenant();
         String type = (docType == null || docType.isBlank()) ? "OTHER" : docType.toUpperCase();
         if (!DOC_TYPES.contains(type)) {
@@ -55,6 +70,7 @@ public class AttachmentService {
         a.setMimeType(stored.mimeType() == null ? "application/octet-stream" : stored.mimeType());
         a.setSha256Hash(stored.sha256());
         a.setValidTo(validTo);
+        a.setClassification(normClassification(classification));
         a.setUploadedBy(userId);
         a.setVersion(1);
         a.setSuperseded(false);
@@ -72,7 +88,8 @@ public class AttachmentService {
      */
     @Transactional
     public AttachmentResponse replaceVersion(Long oldId, String docType, String titleEn,
-                                             LocalDate validTo, MultipartFile file, Long userId) {
+                                             LocalDate validTo, String classification,
+                                             MultipartFile file, Long userId) {
         Attachment old = mustGet(oldId);
         Long orgId = old.getOrganisationId();
         String type = (docType == null || docType.isBlank()) ? old.getDocType() : docType.toUpperCase();
@@ -92,6 +109,9 @@ public class AttachmentService {
         a.setMimeType(stored.mimeType() == null ? "application/octet-stream" : stored.mimeType());
         a.setSha256Hash(stored.sha256());
         a.setValidTo(validTo != null ? validTo : old.getValidTo());
+        // A new version inherits the prior classification unless the caller overrides it.
+        a.setClassification(classification != null && !classification.isBlank()
+            ? normClassification(classification) : old.getClassification());
         a.setUploadedBy(userId);
         a.setVersion(old.getVersion() + 1);
         a.setVersionGroupId(old.getVersionGroupId() != null ? old.getVersionGroupId() : old.getId());
@@ -117,7 +137,8 @@ public class AttachmentService {
      * clears it.
      */
     @Transactional
-    public AttachmentResponse update(Long id, String docType, String titleEn, LocalDate validTo) {
+    public AttachmentResponse update(Long id, String docType, String titleEn, LocalDate validTo,
+                                     String classification) {
         Attachment a = mustGet(id);
         if (docType != null && !docType.isBlank()) {
             String type = docType.toUpperCase();
@@ -128,6 +149,8 @@ public class AttachmentService {
         }
         if (titleEn != null) a.setTitleEn(titleEn.isBlank() ? null : titleEn);
         if (validTo != null) a.setValidTo(validTo);
+        // Blank string clears the classification; null leaves it unchanged.
+        if (classification != null) a.setClassification(classification.isBlank() ? null : normClassification(classification));
         return toResponse(repository.save(a));
     }
 
@@ -160,7 +183,7 @@ public class AttachmentService {
         return new AttachmentResponse(
             a.getId(), a.getEntityType(), a.getEntityId(), a.getDocType(), a.getTitleEn(),
             a.getFileName(), a.getFileSizeBytes(), a.getMimeType(), a.getSha256Hash(),
-            a.getValidTo(), a.getUploadedBy(), a.getUploadedAt(),
+            a.getValidTo(), a.getClassification(), a.getUploadedBy(), a.getUploadedAt(),
             a.getVersion(), a.getVersionGroupId(),
             "/api/v1/attachments/" + a.getId() + "/download");
     }
