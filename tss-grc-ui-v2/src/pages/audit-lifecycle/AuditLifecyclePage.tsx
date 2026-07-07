@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Stamp, Calendar, FileText, ClipboardCheck, AlertTriangle,
@@ -389,6 +390,7 @@ function FindingsTab({ findings, engagementCode: _ec, onTransition, onCreate, on
   onChainToRisk: (f: Finding) => void;
 }) {
   const { t, lang } = useI18n();
+  const navigate = useNavigate();
   return (
     <div className="alc-section">
       <Card title={t('alcFindingTitle')} Icon={AlertTriangle}
@@ -420,7 +422,7 @@ function FindingsTab({ findings, engagementCode: _ec, onTransition, onCreate, on
                   <div className="alc-item-actions alc-item-actions--wrap">
                     {/* Sprint 11 — open the Risk-Control-Finding pivot view in a new tab. */}
                     <Button size="sm" variant="ghost" Icon={GitBranch}
-                            onClick={() => window.open(`/governance/pivot/finding/${f.id}`, '_blank')}>
+                            onClick={() => navigate(`/governance/pivot/finding/${f.id}`)}>
                       {lang === 'ar' ? 'محور' : 'Pivot'}
                     </Button>
                     {f.status === 'OPEN' && <Button size="sm" variant="primary" onClick={() => onTransition(f, 'MGMT_RESPONSE')}>{t('alcAwaitMgmt')}</Button>}

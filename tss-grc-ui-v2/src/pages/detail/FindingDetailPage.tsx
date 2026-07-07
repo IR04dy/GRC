@@ -5,6 +5,7 @@ import { AlertTriangle, ListChecks, ArrowRight, ShieldCheck, Stamp, Lock, Wrench
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { DetailLayout } from '../../components/layout/DetailLayout';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
@@ -90,6 +91,7 @@ export function FindingDetailPage() {
           <Badge tone={CAPA_STAGE_TONE[stage] ?? 'neutral'}>{stage.replace(/_/g, ' ')}</Badge>
         </>}
         actions={<>
+          <RaiseRequestButton sourceModule="COMPLIANCE" sourceRecordType="Finding" sourceRecordId={Number(id) || undefined} />
           {stage === 'IDENTIFIED'         && <Button variant="primary" Icon={Wrench}      onClick={() => capaAction((id) => complianceApi.capaStartImplementing(id), t('capaActStart'))}>{t('capaActStart')}</Button>}
           {stage === 'IMPLEMENTING'       && <Button variant="primary" Icon={ShieldCheck} onClick={async () => {
             const r = window.prompt('PASS / FAIL / PARTIAL', 'PASS'); if (!r) return;

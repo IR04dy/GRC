@@ -354,7 +354,7 @@ export function RiskRegisterPage() {
         // Sprint 11 — open the Risk-Control-Finding pivot view in a new tab.
         extras.push({
           Icon: GitBranch,
-          onClick: () => window.open(`/governance/pivot/risk/${r.id}`, '_blank'),
+          onClick: () => navigate(`/governance/pivot/risk/${r.id}`),
           title: lang === 'ar' ? 'محور المخاطر والضوابط والنتائج' : 'Open pivot view',
           tone: 'accent',
         });

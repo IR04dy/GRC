@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Shield, Wrench, Layers, GitBranch, Plus, Link2, BookText, Pencil, ArrowRight } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -75,6 +76,7 @@ const NEXT_ASSESS: Record<AssessmentWorkflow, AssessmentWorkflow[]> = {
 export function ControlLibraryPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
+  const navigate = useNavigate();
   const toast = useToast();
   const demoMode = !isAuthenticated();
 
@@ -577,7 +579,7 @@ export function ControlLibraryPage() {
                 <Badge tone={controlTypeTone(selected.controlType)}>{selected.controlType}</Badge>
                 {/* Sprint 11 — open Risk-Control-Finding pivot for this control. */}
                 <button
-                  onClick={() => window.open(`/governance/pivot/control/${selected.id}`, '_blank')}
+                  onClick={() => navigate(`/governance/pivot/control/${selected.id}`)}
                   title={isAr ? 'محور المخاطر والضوابط والنتائج' : 'Open pivot view'}
                   style={{
                     padding: '4px 8px', fontSize: 12,

@@ -7,6 +7,7 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { DetailLayout } from '../../components/layout/DetailLayout';
+import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
 import { RailField, RailFieldGroup } from '../../components/layout/DetailRail';
 import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Card } from '../../components/ui/Card';
@@ -117,6 +118,7 @@ export function CapaDetailPage() {
           {overdue && <Badge tone="danger" dot>{Math.abs(dueIn)}d {t('capaOverdue')}</Badge>}
         </>}
         actions={<>
+          <RaiseRequestButton sourceModule="COMPLIANCE" sourceRecordType="Capa" sourceRecordId={Number(id) || undefined} />
           <Button variant="ghost" Icon={ArrowLeft} onClick={() => window.history.back()}>
             {t('detailBack')}
           </Button>
