@@ -119,6 +119,7 @@ import {
   type EsgTab, type EsgTrajectoryPoint,
 } from '../../lib/esgDashboard';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
+import { printPacket, packetTextToSections } from '../../lib/packetPrint';
 import { formatSarCompact, formatSarFull } from '../../lib/format';
 import '../../styles/pages/esg.css';
 
@@ -137,7 +138,7 @@ import '../../styles/pages/esg.css';
  *   • Survey     — Vendor ESG survey for Scope 3 supplier engagement
  */
 export function EsgPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   // S-P — deep-linkable tabs: initial tab from ?tab=, written back on change.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -179,6 +180,20 @@ export function EsgPage() {
     toast.success(t('esgAnnexDownloadedToast'));
   }
 
+  function printEsgAnnexPdf() {
+    const text = buildEsgAnnex(brand.organisationNameEn, brand.organisationNameAr);
+    printPacket({
+      titleEn: 'ESG / Sustainability Annex — Annual Report',
+      titleAr: 'ملحق الاستدامة والحوكمة البيئية — التقرير السنوي',
+      eyebrowEn: 'CMA Art. 91–94 · SGI · TCFD',
+      eyebrowAr: 'المواد 91–94 · مبادرة السعودية الخضراء · TCFD',
+      referenceId: `ESG-Annex-${REPORT_YEAR}`,
+      classificationEn: 'CONFIDENTIAL — SUSTAINABILITY',
+      classificationAr: 'سرّي — الاستدامة',
+      sections: packetTextToSections(text),
+    }, lang);
+  }
+
   // TCFD + CMA grouping were previously static useMemo blocks against
   // TCFD_ITEMS / CMA_ARTICLES; V60 + V61 promoted both tabs to API-
   // driven so they self-load and self-group.
@@ -191,7 +206,8 @@ export function EsgPage() {
         sub={t('esgPageSub')}
         actions={<>
           <RaiseRequestButton sourceModule="ESG" />
-          <Button variant="primary" Icon={Download} onClick={downloadAnnex}>{t('esgDownloadAnnex')}</Button>
+          <Button variant="primary" Icon={Download} onClick={printEsgAnnexPdf}>{lang === 'ar' ? 'تنزيل PDF' : 'Download PDF'}</Button>
+          <Button variant="ghost" Icon={Download} onClick={downloadAnnex}>{t('esgDownloadAnnex')}</Button>
         </>}
       />
 

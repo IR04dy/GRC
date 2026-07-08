@@ -13,6 +13,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { printPacket, packetTextToSections } from '../../lib/packetPrint';
 import { HijriDate } from '../../components/ui/HijriDate';
 import {
   SCENARIOS, EXERCISES,
@@ -115,6 +116,21 @@ export function CrisisManagementPage() {
     toast.success(t('crisisPacketDownloadedToast'));
   }
 
+  function printNcemaPdf() {
+    if (!active) return;
+    const text = buildNcemaPacket(active, brand.organisationNameEn, brand.organisationNameAr, sccTier);
+    printPacket({
+      titleEn: 'NCEMA / NCA — Initial Situational Awareness Packet',
+      titleAr: 'حزمة الإحاطة الأولية — NCEMA / NCA',
+      eyebrowEn: 'NCEMA / NCA · Situational Awareness',
+      eyebrowAr: 'المركز الوطني لإدارة الطوارئ · إحاطة أولية',
+      referenceId: `NCEMA-${active.id}`,
+      classificationEn: 'CONFIDENTIAL — REGULATOR',
+      classificationAr: 'سرّي — جهة تنظيمية',
+      sections: packetTextToSections(text),
+    }, lang);
+  }
+
   return (
     <Shell title={t('crisisTitle')} sub={t('crisisSub')}>
       <PageHeader
@@ -157,6 +173,7 @@ export function CrisisManagementPage() {
           active={active}
           onTransition={handleTransition}
           onDownloadPacket={downloadNcemaPacket}
+          onPrintPdf={printNcemaPdf}
         />
       )}
 
@@ -360,10 +377,11 @@ export function CrisisManagementPage() {
 
 // ─── Active activation banner ───────────────────────────────────────────────
 
-function ActiveBanner({ active, onTransition, onDownloadPacket }: {
+function ActiveBanner({ active, onTransition, onDownloadPacket, onPrintPdf }: {
   active: ActivationEvent;
   onTransition: (s: ActivationStatus) => void;
   onDownloadPacket: () => void;
+  onPrintPdf: () => void;
 }) {
   const { t, lang } = useI18n();
   const scenario = SCENARIOS.find(s => s.code === active.scenarioCode);
@@ -408,6 +426,9 @@ function ActiveBanner({ active, onTransition, onDownloadPacket }: {
               {t('crisisDowngrade')}
             </Button>
           )}
+          <Button variant="primary" Icon={Download} onClick={onPrintPdf}>
+            {lang === 'ar' ? 'تنزيل PDF' : 'Download PDF'}
+          </Button>
           <Button variant="secondary" Icon={Download} onClick={onDownloadPacket}>
             {t('crisisDownloadPacket')}
           </Button>
