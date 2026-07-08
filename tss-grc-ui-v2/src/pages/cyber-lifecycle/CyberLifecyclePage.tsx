@@ -6,7 +6,7 @@ import {
   AlertOctagon, Wrench,
 } from 'lucide-react';
 import { LifecyclePipeline, type PipelineStage, type PipelineCard, dueLabel } from '../../components/lifecycle/LifecyclePipeline';
-import { printPacket, textToSection } from '../../lib/packetPrint';
+import { printPacket, packetTextToSections } from '../../lib/packetPrint';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -89,7 +89,7 @@ export function CyberLifecyclePage() {
       referenceId: filing.id,
       classificationEn: 'CONFIDENTIAL — REGULATOR',
       classificationAr: 'سرّي — جهة تنظيمية',
-      sections: [textToSection('Full filing', 'التقديم الكامل', text)],
+      sections: packetTextToSections(text),
     }, lang);
   }
 
