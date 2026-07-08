@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollText, Activity, AlertTriangle, AlertOctagon, RefreshCw, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { ScrollText, Activity, AlertTriangle, AlertOctagon, RefreshCw, ChevronLeft, ChevronRight, Filter, Download } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -68,6 +68,14 @@ export function AuditLogPage() {
 
   function applyFilters() { setPage(0); setFilters({ ...draft }); }
   function clearFilters() { setDraft({ severity: '', sourceModule: '', actionType: '' }); setFilters({ severity: '', sourceModule: '', actionType: '' }); setPage(0); }
+  // One-click export-history view — the ExportAuditInterceptor records every download as actionType=EXPORT.
+  function toggleExports() {
+    const on = filters.actionType === 'EXPORT';
+    const next = on ? '' : 'EXPORT';
+    setDraft(d => ({ ...d, actionType: next }));
+    setFilters(f => ({ ...f, actionType: next }));
+    setPage(0);
+  }
 
   const fmtTime = (s?: string) => (s ? s.replace('T', ' ').slice(0, 19) : '—');
 
@@ -103,6 +111,8 @@ export function AuditLogPage() {
               placeholder={isAr ? 'نوع الإجراء' : 'Action type'} style={{ ...SELECT_STYLE, minWidth: 150 }}
               onKeyDown={e => { if (e.key === 'Enter') applyFilters(); }} />
             <Button size="sm" variant="primary" Icon={Filter} onClick={applyFilters}>{isAr ? 'تطبيق' : 'Apply'}</Button>
+            <Button size="sm" variant={filters.actionType === 'EXPORT' ? 'primary' : 'ghost'} Icon={Download}
+              onClick={toggleExports}>{isAr ? 'التصديرات' : 'Exports'}</Button>
             {(filters.severity || filters.sourceModule || filters.actionType) && (
               <Button size="sm" variant="ghost" onClick={clearFilters}>{isAr ? 'مسح' : 'Clear'}</Button>
             )}
