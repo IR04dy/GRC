@@ -62,6 +62,7 @@ public class ClimateReportExportService {
         Document doc = new Document(PageSize.A4, 36, 36, 60, 60);
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
+            writer.setRunDirection(PdfTheme.runDir(ar));   // P0-2: RTL for Arabic climate report
             writer.setPageEvent(PdfTheme.professionalFooter(report.getReportCode(), "Confidential"));
             doc.open();
 
@@ -87,7 +88,7 @@ public class ClimateReportExportService {
 
             // TCFD checklist
             PdfTheme.sectionDivider(doc, "TCFD 4-Pillar Alignment Checklist", "قائمة التحقق من مواءمة TCFD");
-            PdfPTable t1 = table(new float[]{1.3f, 0.8f, 1.3f, 3f, 2.5f},
+            PdfPTable t1 = table(new float[]{1.3f, 0.8f, 1.3f, 3f, 2.5f}, ar,
                     "Pillar", "Code", "Status", "Recommendation", "Gap");
             for (Map<String, Object> e : checklist) {
                 cell(t1, str(e.get("pillar"))); cell(t1, str(e.get("recommendationCode")));
@@ -98,7 +99,7 @@ public class ClimateReportExportService {
 
             // GHG inventory
             PdfTheme.sectionDivider(doc, "GHG Inventory", "جرد غازات الاحتباس الحراري");
-            PdfPTable t2 = table(new float[]{2f, 2f}, "Metric", "Value");
+            PdfPTable t2 = table(new float[]{2f, 2f}, ar, "Metric", "Value");
             kv(t2, "Scope 1 (tCO₂e)", str(ghg.get("scope1Total")));
             kv(t2, "Scope 2 (tCO₂e)", str(ghg.get("scope2Total")));
             kv(t2, "Scope 3 (tCO₂e)", str(ghg.get("scope3Total")));
@@ -110,7 +111,7 @@ public class ClimateReportExportService {
 
             // Gaps & CAPA
             PdfTheme.sectionDivider(doc, "Gaps & Corrective Actions", "الفجوات والإجراءات التصحيحية");
-            PdfPTable t3 = table(new float[]{1.2f, 3f, 1.2f, 1f, 1.5f, 1.2f},
+            PdfPTable t3 = table(new float[]{1.2f, 3f, 1.2f, 1f, 1.5f, 1.2f}, ar,
                     "Code", "Action", "Status", "Priority", "Source", "Target");
             for (Map<String, Object> e : capa) {
                 cell(t3, str(e.get("actionCode"))); cell(t3, str(e.get("titleEn")));
@@ -121,7 +122,7 @@ public class ClimateReportExportService {
 
             // Evidence index
             PdfTheme.sectionDivider(doc, "Evidence Index", "فهرس الأدلة");
-            PdfPTable t4 = table(new float[]{2.6f, 1.2f, 1.2f, 2f, 2.5f},
+            PdfPTable t4 = table(new float[]{2.6f, 1.2f, 1.2f, 2f, 2.5f}, ar,
                     "Title", "Type", "Status", "File", "SHA-256");
             for (Map<String, Object> e : evItems) {
                 cell(t4, str(e.get("titleEn"))); cell(t4, str(e.get("evidenceType")));
@@ -138,14 +139,16 @@ public class ClimateReportExportService {
         return baos.toByteArray();
     }
 
-    private static PdfPTable table(float[] widths, String... headers) throws DocumentException {
+    private static PdfPTable table(float[] widths, boolean ar, String... headers) throws DocumentException {
         PdfPTable t = new PdfPTable(widths);
         t.setWidthPercentage(100);
         t.setSpacingBefore(6);
+        t.setRunDirection(PdfTheme.runDir(ar));   // P0-2: RTL tables for Arabic
         for (String h : headers) {
             PdfPCell c = new PdfPCell(new Phrase(h, PdfFonts.header(9)));
             c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
             c.setBorderColor(PdfFonts.HAIRLINE);
+            c.setHorizontalAlignment(PdfTheme.alignStart(ar));
             c.setPadding(5);
             t.addCell(c);
         }
