@@ -135,6 +135,11 @@ public class BcpBinderPdfBuilder {
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
 
+            // P3 RTL: a pure-AR binder renders right-to-left (paragraphs + tables).
+            // BILINGUAL stays LTR so the side-by-side EN | AR columns keep their reading
+            // order; EN is unchanged. Each single-language table below sets the same rd.
+            writer.setRunDirection(PdfTheme.runDir(wantsAr && !bilingual));
+
             String footerDocLabel = (p.getPlanCode() == null ? "BCP" : p.getPlanCode())
                 + " · " + nz(b.getVersionLabel(), "v1");
             // Watermark + Eastern-numeral footer in a single page-event helper.
@@ -244,6 +249,7 @@ public class BcpBinderPdfBuilder {
 
         PdfPTable t = new PdfPTable(3);
         t.setWidthPercentage(100);
+        t.setRunDirection(PdfTheme.runDir(wantsAr && !bilingual));
         try { t.setWidths(new float[] {1, 6, 6}); } catch (DocumentException ignored) {}
 
         headerCell(t, "#");
@@ -392,6 +398,7 @@ public class BcpBinderPdfBuilder {
         }
         PdfPTable t = new PdfPTable(4);
         t.setWidthPercentage(100);
+        t.setRunDirection(PdfTheme.runDir(wantsAr && !bilingual));
         try { t.setWidths(new float[] {3, 2, 3, 2}); } catch (DocumentException ignored) {}
         headerCell(t, "Recipient / المستلم");
         headerCell(t, "Role / الدور");
@@ -420,6 +427,7 @@ public class BcpBinderPdfBuilder {
         }
         PdfPTable t = new PdfPTable(4);
         t.setWidthPercentage(100);
+        t.setRunDirection(PdfTheme.runDir(wantsAr && !bilingual));
         try { t.setWidths(new float[] {1, 3, 3, 6}); } catch (DocumentException ignored) {}
         headerCell(t, "Version");
         headerCell(t, "Approved at");
