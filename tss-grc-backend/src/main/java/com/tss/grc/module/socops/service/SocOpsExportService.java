@@ -66,8 +66,10 @@ public class SocOpsExportService {
         String orgEn = org == null ? null : org.getNameEn();
         String orgAr = org == null ? null : org.getNameAr();
         return "PDF".equalsIgnoreCase(format)
+                // SOC-Ops export has no language toggle yet (controller takes only ?format=),
+                // so it stays LTR — pass ar=false. Add a lang param here to enable RTL later.
                 ? RegisterExport.pdf(orgEn, orgAr, "SOC Operations", "عمليات الأمن السيبراني",
-                        "Security Event Register", "سجل الأحداث الأمنية", kpis, cols, rows)
+                        "Security Event Register", "سجل الأحداث الأمنية", kpis, cols, rows, false)
                 : RegisterExport.xlsx("Security Events", cols, rows);
     }
 

@@ -99,6 +99,7 @@ public class ExportService {
                 float[] widths = new float[]{ 1.2f, 4f, 1.6f, 1f, 1f, 1f, 1.5f };
                 PdfPTable t = new PdfPTable(widths);
                 t.setWidthPercentage(100);
+                t.setRunDirection(PdfTheme.runDir(ar));
                 String[] hdr = ar
                     ? new String[]{ "الرقم", "المخاطرة", "الفئة", "الاحتمال", "الأثر", "النتيجة", "الحالة" }
                     : new String[]{ "Code",  "Risk",     "Category", "L",       "I",       "Score",   "Status" };
@@ -155,6 +156,7 @@ public class ExportService {
                 float[] widths = new float[]{ 4f, 1.4f, 1.2f, 1f, 1.4f, 1.6f, 1.4f };
                 PdfPTable t = new PdfPTable(widths);
                 t.setWidthPercentage(100);
+                t.setRunDirection(PdfTheme.runDir(ar));
                 String[] hdr = ar
                     ? new String[]{ "الملاحظة", "الأهمية", "المالك", "الأيام", "التصعيد", "مرحلة CAPA", "الحالة" }
                     : new String[]{ "Finding",  "Severity", "Owner",  "Days",   "Tier",     "CAPA Stage",  "Status" };
@@ -216,6 +218,7 @@ public class ExportService {
                 float[] widths = new float[]{ 1.3f, 4f, 1f, 1.3f, 1.3f, 1.3f, 1.6f };
                 PdfPTable t = new PdfPTable(widths);
                 t.setWidthPercentage(100);
+                t.setRunDirection(PdfTheme.runDir(ar));
                 String[] hdr = ar
                     ? new String[]{ "الرمز", "اسم المؤشر", "الحالة", "آخر قراءة", "حد أخضر", "حد أصفر", "المالك" }
                     : new String[]{ "Code",  "KRI",        "Band",    "Latest",     "Green ≤", "Amber ≤", "Owner" };
@@ -259,6 +262,10 @@ public class ExportService {
         Document doc = new Document(PageSize.A4.rotate(), 36, 36, 60, 60);
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
+            // P0-2: flip the whole document RTL for Arabic (was LTR-only — labels were
+            // translated but layout/columns stayed left-to-right). Tables set their own
+            // direction below; cells inherit from the table.
+            writer.setRunDirection(PdfTheme.runDir(ar));
             writer.setPageEvent(PdfTheme.professionalFooter(eyebrowEn, "Internal"));
             doc.open();
 

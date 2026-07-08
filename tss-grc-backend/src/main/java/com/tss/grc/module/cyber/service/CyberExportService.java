@@ -92,7 +92,7 @@ public class CyberExportService {
                 Col.of("Status", CyberControl::getStatus));
         List<PdfTheme.Kpi> kpis = List.of(new PdfTheme.Kpi("Total controls", String.valueOf(rows.size()), ""));
         return emit(fmt, org, "Cyber Controls", "الضوابط السيبرانية",
-                "Cyber Control Register", "سجل الضوابط السيبرانية", kpis, cols, rows);
+                "Cyber Control Register", "سجل الضوابط السيبرانية", kpis, cols, rows, ar);
     }
 
     private byte[] vulnerabilities(Long orgId, Organisation org, boolean ar, String fmt) {
@@ -118,7 +118,7 @@ public class CyberExportService {
                 new PdfTheme.Kpi("High", String.valueOf(high), ""),
                 new PdfTheme.Kpi("Overdue", String.valueOf(over), "past SLA"));
         return emit(fmt, org, "Vulnerabilities", "الثغرات",
-                "Vulnerability Register", "سجل الثغرات", kpis, cols, rows);
+                "Vulnerability Register", "سجل الثغرات", kpis, cols, rows, ar);
     }
 
     private byte[] assessments(Long orgId, Organisation org, boolean ar, String fmt) {
@@ -141,7 +141,7 @@ public class CyberExportService {
                 new PdfTheme.Kpi("Gaps", String.valueOf(gaps), "identified"),
                 new PdfTheme.Kpi("Approved", String.valueOf(appr), ""));
         return emit(fmt, org, "Control Assessments", "تقييم الضوابط",
-                "Control Assessment Register", "سجل تقييم الضوابط", kpis, cols, rows);
+                "Control Assessment Register", "سجل تقييم الضوابط", kpis, cols, rows, ar);
     }
 
     private byte[] incidents(Long orgId, Organisation org, boolean ar, String fmt) {
@@ -162,7 +162,7 @@ public class CyberExportService {
                 new PdfTheme.Kpi("Total", String.valueOf(rows.size()), ""),
                 new PdfTheme.Kpi("Open", String.valueOf(open), "not closed"));
         return emit(fmt, org, "Cyber Incidents", "الحوادث السيبرانية",
-                "Cyber Incident Register", "سجل الحوادث السيبرانية", kpis, cols, rows);
+                "Cyber Incident Register", "سجل الحوادث السيبرانية", kpis, cols, rows, ar);
     }
 
     private byte[] actionPlans(Long orgId, Organisation org, boolean ar, String fmt) {
@@ -185,7 +185,7 @@ public class CyberExportService {
                 new PdfTheme.Kpi("Overdue", String.valueOf(overdue), "past due"),
                 new PdfTheme.Kpi("Completed", String.valueOf(completed), ""));
         return emit(fmt, org, "CAPA / Action Plans", "خطط العمل التصحيحية",
-                "Cyber Action Plan Register", "سجل خطط العمل السيبرانية", kpis, cols, rows);
+                "Cyber Action Plan Register", "سجل خطط العمل السيبرانية", kpis, cols, rows, ar);
     }
 
     private byte[] evidence(Long orgId, Organisation org, boolean ar, String fmt) {
@@ -206,18 +206,18 @@ public class CyberExportService {
                 new PdfTheme.Kpi("Current", String.valueOf(current), ""),
                 new PdfTheme.Kpi("Expired", String.valueOf(expired), ""));
         return emit(fmt, org, "Cyber Evidence", "الأدلة السيبرانية",
-                "Cyber Evidence Register", "سجل الأدلة السيبرانية", kpis, cols, rows);
+                "Cyber Evidence Register", "سجل الأدلة السيبرانية", kpis, cols, rows, ar);
     }
 
     // ── Dispatch + helpers ───────────────────────────────────────────────
 
     private <T> byte[] emit(String fmt, Organisation org, String eyebrowEn, String eyebrowAr,
                             String titleEn, String titleAr, List<PdfTheme.Kpi> kpis,
-                            List<Col<T>> cols, List<T> rows) {
+                            List<Col<T>> cols, List<T> rows, boolean ar) {
         String orgEn = org == null ? null : org.getNameEn();
         String orgAr = org == null ? null : org.getNameAr();
         return "PDF".equalsIgnoreCase(fmt)
-                ? RegisterExport.pdf(orgEn, orgAr, eyebrowEn, eyebrowAr, titleEn, titleAr, kpis, cols, rows)
+                ? RegisterExport.pdf(orgEn, orgAr, eyebrowEn, eyebrowAr, titleEn, titleAr, kpis, cols, rows, ar)
                 : RegisterExport.xlsx(titleEn, cols, rows);
     }
 

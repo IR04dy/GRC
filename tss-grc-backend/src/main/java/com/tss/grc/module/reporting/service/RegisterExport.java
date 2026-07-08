@@ -98,10 +98,12 @@ public final class RegisterExport {
     public static <T> byte[] pdf(String orgNameEn, String orgNameAr,
                                  String eyebrowEn, String eyebrowAr,
                                  String titleEn, String titleAr,
-                                 List<PdfTheme.Kpi> kpis, List<Col<T>> cols, List<T> rows) {
+                                 List<PdfTheme.Kpi> kpis, List<Col<T>> cols, List<T> rows, boolean ar) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document doc = new Document(PageSize.A4.rotate(), 36, 36, 60, 60);
             PdfWriter writer = PdfWriter.getInstance(doc, out);
+            // P0-2: RTL layout for Arabic register PDFs (cyber + SOC-Ops) — was LTR-only.
+            writer.setRunDirection(PdfTheme.runDir(ar));
             writer.setPageEvent(PdfTheme.professionalFooter(eyebrowEn, "Confidential"));
             doc.open();
 
@@ -122,7 +124,8 @@ public final class RegisterExport {
 
             PdfPTable t = new PdfPTable(cols.size());
             t.setWidthPercentage(100);
-            for (Col<T> c : cols) t.addCell(headerCell(c.header()));
+            t.setRunDirection(PdfTheme.runDir(ar));
+            for (Col<T> c : cols) t.addCell(headerCell(c.header(), ar));
             for (T row : rows) {
                 for (Col<T> c : cols) cell(t, c.get().apply(row));
             }
@@ -137,9 +140,9 @@ public final class RegisterExport {
 
     // ── helpers ────────────────────────────────────────────────────────────
 
-    private static PdfPCell headerCell(String text) {
+    private static PdfPCell headerCell(String text, boolean ar) {
         PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.header(8.5f)));
-        c.setHorizontalAlignment(Element.ALIGN_LEFT);
+        c.setHorizontalAlignment(PdfTheme.alignStart(ar));
         c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
         c.setBorderColor(PdfFonts.HAIRLINE);
         c.setPaddingTop(5); c.setPaddingBottom(5); c.setPaddingLeft(5); c.setPaddingRight(5);

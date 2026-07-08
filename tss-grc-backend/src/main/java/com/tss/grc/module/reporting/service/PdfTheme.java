@@ -66,6 +66,21 @@ public final class PdfTheme {
 
     private PdfTheme() {}
 
+    // ── RTL / LTR run direction (export remediation P0-2) ────────────────────
+    /** OpenPDF run direction for a report language. Apply to the {@code PdfWriter}
+     *  (covers ColumnText/paragraphs) AND each {@code PdfPTable} (cells inherit the
+     *  table's direction) so Arabic reports lay out right-to-left, not just with
+     *  translated labels. Mirrors the reference RTL implementation in BoardPackService. */
+    public static int runDir(boolean ar) {
+        return ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR;
+    }
+
+    /** Horizontal alignment matching the run direction — RIGHT for Arabic, LEFT for
+     *  Latin — so table cells/headers don't stay left-aligned under RTL. */
+    public static int alignStart(boolean ar) {
+        return ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT;
+    }
+
     // ────────────────────────────────────────────────────────────────────
     // Cover hero — branded band + title + org + dates + classification
     // ────────────────────────────────────────────────────────────────────
