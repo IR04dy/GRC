@@ -381,8 +381,14 @@ public class ExportService {
             Cell avgCell = tr.createCell(9);
             avgCell.setCellFormula("IFERROR(AVERAGE(J2:J" + rowIdx + "),\"\")");
 
-            sheet.createFreezePane(0, 1);
-            for (int i = 0; i < headers.length; i++) sheet.autoSizeColumn(i);
+            // P1: frozen header + auto-filter (was freeze-only), plus traffic-light conditional
+            // formatting auto-applied to any status/severity/band column. rowIdx-1 = last data
+            // row (excludes any totals row written below the data).
+            XlsxStyler.freezeAndFilter(sheet, headers.length, rowIdx - 1);
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+                if (XlsxStyler.isStatusHeader(headers[i])) XlsxStyler.statusColors(sheet, i, 1, rowIdx - 1);
+            }
             return writeWorkbook(wb);
         } catch (java.io.IOException e) {
             // Only I/O faults from workbook construction/serialisation are wrapped;
@@ -427,8 +433,14 @@ public class ExportService {
                 Cell daysFormula = row.createCell(8);
                 daysFormula.setCellFormula("IF(D" + rowIdx + "<>\"\",TODAY()-DATEVALUE(D" + rowIdx + "),\"\")");
             }
-            sheet.createFreezePane(0, 1);
-            for (int i = 0; i < headers.length; i++) sheet.autoSizeColumn(i);
+            // P1: frozen header + auto-filter (was freeze-only), plus traffic-light conditional
+            // formatting auto-applied to any status/severity/band column. rowIdx-1 = last data
+            // row (excludes any totals row written below the data).
+            XlsxStyler.freezeAndFilter(sheet, headers.length, rowIdx - 1);
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+                if (XlsxStyler.isStatusHeader(headers[i])) XlsxStyler.statusColors(sheet, i, 1, rowIdx - 1);
+            }
             return writeWorkbook(wb);
         } catch (java.io.IOException e) {
             // Only I/O faults from workbook construction/serialisation are wrapped;
@@ -495,8 +507,14 @@ public class ExportService {
             totalCell.setCellFormula("SUM(B2:B" + (bands.length + 1) + ")");
             totalCell.setCellStyle(hdrStyle);
 
-            sheet.createFreezePane(0, 1);
-            for (int i = 0; i < headers.length; i++) sheet.autoSizeColumn(i);
+            // P1: frozen header + auto-filter (was freeze-only), plus traffic-light conditional
+            // formatting auto-applied to any status/severity/band column. rowIdx-1 = last data
+            // row (excludes any totals row written below the data).
+            XlsxStyler.freezeAndFilter(sheet, headers.length, rowIdx - 1);
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+                if (XlsxStyler.isStatusHeader(headers[i])) XlsxStyler.statusColors(sheet, i, 1, rowIdx - 1);
+            }
             summary.autoSizeColumn(0); summary.autoSizeColumn(1);
             return writeWorkbook(wb);
         } catch (java.io.IOException e) {
