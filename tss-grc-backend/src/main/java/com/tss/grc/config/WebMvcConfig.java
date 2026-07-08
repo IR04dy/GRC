@@ -1,14 +1,25 @@
 package com.tss.grc.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.*;
 
 /**
  * Spring MVC configuration — view controllers, resource handlers,
- * CORS (disabled in production), and default page mapping.
+ * CORS (disabled in production), default page mapping, and the export
+ * audit interceptor.
  */
 @Configuration
+@RequiredArgsConstructor
 public class WebMvcConfig implements WebMvcConfigurer {
+
+    private final ExportAuditInterceptor exportAuditInterceptor;
+
+    /** Record every file download (Content-Disposition: attachment) to the audit log. */
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(exportAuditInterceptor).addPathPatterns("/api/**");
+    }
 
     /** Map root "/" to the dashboard redirect. */
     @Override
