@@ -13,6 +13,7 @@ import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
 import com.tss.grc.module.reporting.service.PdfFonts;
 import com.tss.grc.module.reporting.service.PdfTheme;
+import com.tss.grc.module.reporting.service.XlsxStyler;
 import com.tss.grc.module.sust.climate.entity.ClimateReport;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
@@ -232,8 +233,11 @@ public class ClimateReportExportService {
             Row rr = s.createRow(r++);
             for (int i = 0; i < keys.length; i++) rr.createCell(i).setCellValue(str(row.get(keys[i])));
         }
-        s.createFreezePane(0, 1);
-        for (int i = 0; i < headers.length; i++) s.autoSizeColumn(i);
+        XlsxStyler.freezeAndFilter(s, headers.length, r - 1);   // P1: header freeze + auto-filter
+        for (int i = 0; i < headers.length; i++) {
+            s.autoSizeColumn(i);
+            if (XlsxStyler.isStatusHeader(headers[i])) XlsxStyler.statusColors(s, i, 1, r - 1);
+        }
     }
 
     private static void rowKv(Sheet s, int r, String k, String v, CellStyle hdr) {

@@ -16,10 +16,9 @@ import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
 import com.tss.grc.module.reporting.service.PdfFonts;
 import com.tss.grc.module.reporting.service.PdfTheme;
+import com.tss.grc.module.reporting.service.XlsxStyler;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.FillPatternType;
-import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -76,12 +75,8 @@ public class NdiReportExporter {
         try (Workbook wb = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
-            CellStyle headerStyle = wb.createCellStyle();
-            org.apache.poi.ss.usermodel.Font hf = wb.createFont();
-            hf.setBold(true);
-            headerStyle.setFont(hf);
-            headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
-            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            // P1: shared house header (brand teal) instead of the off-house grey.
+            CellStyle headerStyle = XlsxStyler.headerStyle(wb);
 
             // ── Summary sheet ────────────────────────────────────────
             Sheet summary = wb.createSheet("Summary");
@@ -133,7 +128,12 @@ public class NdiReportExporter {
                         dataRow.createCell(i).setCellValue(asString(v));
                     }
                 }
-                for (int i = 0; i < cols.size(); i++) rows.autoSizeColumn(i);
+                // P1: frozen header + auto-filter (was autosize-only) + status conditional formatting.
+                XlsxStyler.freezeAndFilter(rows, cols.size(), r - 1);
+                for (int i = 0; i < cols.size(); i++) {
+                    rows.autoSizeColumn(i);
+                    if (XlsxStyler.isStatusHeader(cols.get(i))) XlsxStyler.statusColors(rows, i, 1, r - 1);
+                }
             }
 
             wb.write(out);
