@@ -37,7 +37,11 @@ public class BcmEvidencePackageController {
     private final BcmEvidencePackageService service;
 
     @GetMapping("/{cycleId}/evidence-package")
-    @PreAuthorize("isAuthenticated()")
+    // The evidence ZIP is the most sensitive export on the platform (full BIA / risk /
+    // strategy / gap / CAPA / compliance-matrix / audit-log dump for the cycle). Gate it
+    // with the same BCM read permission as every other BCM export (BcpPlan/CrisisEvent),
+    // not a bare isAuthenticated() — otherwise any authenticated user in any role can pull it.
+    @PreAuthorize("hasPermission('BCM','READ')")
     public ResponseEntity<ByteArrayResource> download(@PathVariable Long cycleId) {
         EvidencePackage pkg = service.generate(cycleId, currentPrincipalName());
         ByteArrayResource body = new ByteArrayResource(pkg.bytes());

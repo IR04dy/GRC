@@ -297,6 +297,13 @@ public class NdiReportExporter {
 
     private String csvEscape(String s) {
         if (s == null) return "";
+        // Defend against CSV/spreadsheet formula injection (OWASP): NDI report rows are
+        // attacker-influenceable free text; a cell beginning with = + - @ (or tab/CR) is
+        // executed as a formula when a regulator opens the file in Excel/Sheets. Prefix
+        // such cells with a single quote so the value stays literal text.
+        if (!s.isEmpty() && "=+-@\t\r".indexOf(s.charAt(0)) >= 0) {
+            s = "'" + s;
+        }
         if (s.contains(",") || s.contains("\"") || s.contains("\n")) {
             return "\"" + s.replace("\"", "\"\"") + "\"";
         }

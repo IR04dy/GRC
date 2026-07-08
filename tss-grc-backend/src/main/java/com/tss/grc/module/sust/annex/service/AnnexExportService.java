@@ -102,6 +102,10 @@ public class AnnexExportService {
     }
     private static String esc(String s) {
         if (s == null) return "";
+        // CSV/spreadsheet formula-injection guard (OWASP): a cell beginning with = + - @
+        // (or tab/CR) executes as a formula in Excel/Sheets; prefix with a single quote so
+        // the annex value stays literal text when a regulator opens the CSV.
+        if (!s.isEmpty() && "=+-@\t\r".indexOf(s.charAt(0)) >= 0) s = "'" + s;
         if (s.contains(",") || s.contains("\"") || s.contains("\n")) return "\"" + s.replace("\"", "\"\"") + "\"";
         return s;
     }
