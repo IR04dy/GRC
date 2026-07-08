@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Filter, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw, X as XIcon, GitBranch } from 'lucide-react';
+import { AlertTriangle, Filter, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw, X as XIcon, GitBranch, Download } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
@@ -16,7 +16,7 @@ import { DataTable, type Column } from '../../components/ui/DataTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { ExportMenu } from '../../components/ui/ExportMenu';
+import { ExportOptionsModal, type ExportSelection } from '../../components/ui/ExportOptionsModal';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { SavedViewSelector } from '../../components/ui/SavedViewSelector';
 import { defaultViewForPage, type SavedView } from '../../lib/savedViews';
@@ -185,6 +185,7 @@ export function RiskRegisterPage() {
 
   // ── DD-48: filter modal — drives the existing RiskFilters via URL ─────
   const [filterOpen, setFilterOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const riskFilterFields: FilterField[] = [
     { key: 'status',   label: t('filterFieldStatus'),   kind: 'select', options: distinctValues(risks, 'status') },
     { key: 'category', label: t('filterFieldCategory'), kind: 'select', options: distinctValues(risks.filter(r => r.categoryNameEn), 'categoryNameEn') },
@@ -390,12 +391,11 @@ export function RiskRegisterPage() {
             <Button variant="secondary" Icon={Filter} onClick={() => setFilterOpen(true)}>
               {t('riskFilter')}{Object.values(riskFilterValues).filter(Boolean).length > 0 ? ` · ${Object.values(riskFilterValues).filter(Boolean).length}` : ''}
             </Button>
-            <ExportMenu
-              demoMode={demoMode} t={t} toast={toast}
-              onPdf={() => reportingApi.riskRegisterPdf(lang)}
-              onDocx={() => reportingApi.riskRegisterDocx(lang)}
-              onXlsx={() => reportingApi.riskRegisterXlsx()}
-            />
+            <Button variant="secondary" Icon={Download} disabled={demoMode}
+              onClick={() => setExportOpen(true)}
+              title={demoMode ? t('exportSignInRequired') : t('riskExport')}>
+              {t('riskExport')}
+            </Button>
             <Button variant="primary"   Icon={Plus} onClick={startCreate}>{t('riskNew')}</Button>
           </>
         }
@@ -520,6 +520,19 @@ export function RiskRegisterPage() {
           toast.success(t('filterModalApplied'));
         }}
         onClose={() => setFilterOpen(false)} />
+      <ExportOptionsModal
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        t={t} toast={toast}
+        moduleCode="ERM" exportType="RiskRegister"
+        formats={['pdf', 'docx', 'xlsx']}
+        defaultLang={lang === 'ar' ? 'ar' : 'en'}
+        onExport={({ format, lang: L }: ExportSelection) => {
+          if (format === 'pdf')  return reportingApi.riskRegisterPdf(L);
+          if (format === 'docx') return reportingApi.riskRegisterDocx(L);
+          return reportingApi.riskRegisterXlsx();
+        }}
+      />
     </Shell>
   );
 }
