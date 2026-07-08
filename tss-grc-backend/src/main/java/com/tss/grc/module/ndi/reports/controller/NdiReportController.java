@@ -75,9 +75,10 @@ public class NdiReportController {
     @PreAuthorize(READ)
     public ResponseEntity<byte[]> export(@PathVariable Long id,
                                          @RequestParam(defaultValue = "XLSX") String format,
+                                         @RequestParam(defaultValue = "en") String lang,
                                          @RequestParam(required = false) Long cycleId) throws IOException {
         ReportResult r = service.run(id, cycleId);
-        return streamBytes(r, format);
+        return streamBytes(r, format, lang);
     }
 
     /** One-shot ad-hoc export — no saved definition required. */
@@ -85,17 +86,18 @@ public class NdiReportController {
     @PreAuthorize(READ)
     public ResponseEntity<byte[]> exportAdHoc(@RequestParam String type,
                                               @RequestParam(defaultValue = "XLSX") String format,
+                                              @RequestParam(defaultValue = "en") String lang,
                                               @RequestParam(required = false) Long cycleId) throws IOException {
         ReportResult r = service.runAdHoc(type, cycleId);
-        return streamBytes(r, format);
+        return streamBytes(r, format, lang);
     }
 
-    private ResponseEntity<byte[]> streamBytes(ReportResult r, String format) throws IOException {
+    private ResponseEntity<byte[]> streamBytes(ReportResult r, String format, String lang) throws IOException {
         byte[] body;
         MediaType ct;
         String ext;
         switch (format.toUpperCase()) {
-            case "PDF"  -> { body = exporter.toPdf(r);  ct = MediaType.APPLICATION_PDF; ext = "pdf"; }
+            case "PDF"  -> { body = exporter.toPdf(r, lang);  ct = MediaType.APPLICATION_PDF; ext = "pdf"; }
             case "CSV"  -> { body = exporter.toCsv(r);  ct = MediaType.parseMediaType("text/csv;charset=utf-8"); ext = "csv"; }
             case "XLSX" -> { body = exporter.toXlsx(r); ct = MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); ext = "xlsx"; }
             default -> throw new IllegalArgumentException("Unsupported format: " + format);

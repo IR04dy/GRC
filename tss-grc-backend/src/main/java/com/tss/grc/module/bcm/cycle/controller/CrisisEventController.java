@@ -91,9 +91,10 @@ public class CrisisEventController {
      */
     @GetMapping("/{id}/export.pdf")
     @PreAuthorize("hasPermission('BCM', 'READ')")
-    public ResponseEntity<byte[]> exportPdf(@PathVariable Long id) {
+    public ResponseEntity<byte[]> exportPdf(@PathVariable Long id,
+                                            @RequestParam(defaultValue = "en") String lang) {
         CrisisEvent e = service.get(id);
-        byte[] pdf = pdfExporter.export(id);
+        byte[] pdf = pdfExporter.export(id, lang);
         String filename = (e.getEventCode() == null ? "crisis-" + id : e.getEventCode()) + ".pdf";
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)

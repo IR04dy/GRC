@@ -76,12 +76,13 @@ public class CommitteeCatalogController {
     @GetMapping("/forms/{formCode}/export")
     @PreAuthorize("hasPermission('ADMIN','READ')")
     public ResponseEntity<byte[]> exportForm(@PathVariable String formCode,
-                                              @RequestParam(defaultValue = "pdf") String format) {
+                                              @RequestParam(defaultValue = "pdf") String format,
+                                              @RequestParam(defaultValue = "en") String lang) {
         if (!"pdf".equalsIgnoreCase(format)) {
             return ResponseEntity.badRequest().build();
         }
         CommitteeFormTemplate form = catalog.getForm(formCode);
-        byte[] pdf = formExport.exportPdf(formCode);
+        byte[] pdf = formExport.exportPdf(formCode, lang);
         String filename = form.getFormCode() + "-v" + form.getVersion() + ".pdf";
         HttpHeaders h = new HttpHeaders();
         h.setContentType(MediaType.APPLICATION_PDF);

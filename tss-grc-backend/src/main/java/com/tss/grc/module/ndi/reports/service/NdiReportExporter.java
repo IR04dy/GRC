@@ -142,12 +142,21 @@ public class NdiReportExporter {
     }
 
     public byte[] toPdf(ReportResult result) {
+        return toPdf(result, "en");
+    }
+
+    /** @param lang pass "ar" to flip the document + tables to RTL run direction (P3).
+     *  Default "en" leaves output byte-identical to the pre-lang behaviour. */
+    public byte[] toPdf(ReportResult result, String lang) {
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        int rd = PdfTheme.runDir(ar);
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             // Landscape A4 — NDI report rows tend to be wide (control id,
             // domain, score, status, owner, evidence ref…). Letter portrait
             // would force horizontal overflow.
             Document doc = new Document(PageSize.A4.rotate(), 40, 40, 60, 60);
             PdfWriter writer = PdfWriter.getInstance(doc, out);
+            writer.setRunDirection(rd);
             writer.setPageEvent(PdfTheme.professionalFooter(
                 "NDI · " + prettyTitle(result.reportType()), "Internal"));
             doc.open();
@@ -190,7 +199,8 @@ public class NdiReportExporter {
 
                     PdfPTable t = new PdfPTable(2);
                     t.setWidthPercentage(60);
-                    t.setHorizontalAlignment(Element.ALIGN_LEFT);
+                    t.setRunDirection(rd);
+                    t.setHorizontalAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
                     try { t.setWidths(new float[] {2, 3}); } catch (DocumentException ignored) {}
                     headerCell(t, "Key");
                     headerCell(t, "Value");
@@ -212,6 +222,7 @@ public class NdiReportExporter {
                 List<String> cols = collectColumns(result.rows());
                 PdfPTable table = new PdfPTable(cols.size());
                 table.setWidthPercentage(100);
+                table.setRunDirection(rd);
                 for (String c : cols) headerCell(table, prettyKey(c));
                 for (Map<String, Object> data : result.rows()) {
                     for (String c : cols) cell(table, asString(data.get(c)));

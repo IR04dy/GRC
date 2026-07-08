@@ -86,6 +86,14 @@ public class AiRegistryExportService {
 
     @Transactional(readOnly = true)
     public byte[] export(String format, ExportFilter filter) {
+        return export(format, filter, "en");
+    }
+
+    /** @param lang pass "ar" to flip the PDF document + tables to RTL run direction (P3).
+     *  Default "en" leaves output byte-identical to the pre-lang behaviour. XLSX is
+     *  unaffected (Excel handles RTL natively once the bytes are UTF-8). */
+    @Transactional(readOnly = true)
+    public byte[] export(String format, ExportFilter filter, String lang) {
         Long orgId = TenantContext.getCurrentTenant();
         List<MlModel> all = repo.findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(orgId);
         Set<Long> aiaSignedOff = new HashSet<>(auditRepo.findModelIdsWithSignedOffAia(orgId));
@@ -93,7 +101,7 @@ public class AiRegistryExportService {
         Posture p = posture(models, aiaSignedOff);
         Organisation org = orgId == null ? null : orgs.findById(orgId).orElse(null);
         return "PDF".equalsIgnoreCase(format)
-                ? toPdf(models, aiaSignedOff, p, org)
+                ? toPdf(models, aiaSignedOff, p, org, lang)
                 : toXlsx(models, aiaSignedOff, p, org);
     }
 
@@ -238,10 +246,13 @@ public class AiRegistryExportService {
 
     // ─── PDF ───────────────────────────────────────────────────────────
 
-    private byte[] toPdf(List<MlModel> models, Set<Long> aia, Posture p, Organisation org) {
+    private byte[] toPdf(List<MlModel> models, Set<Long> aia, Posture p, Organisation org, String lang) {
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        int rd = PdfTheme.runDir(ar);
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document doc = new Document(PageSize.A4.rotate(), 36, 36, 56, 56);
             PdfWriter writer = PdfWriter.getInstance(doc, out);
+            writer.setRunDirection(rd);
             writer.setPageEvent(PdfTheme.professionalFooter("AI/ML Model Registry", "Confidential"));
             doc.open();
 
@@ -276,6 +287,7 @@ public class AiRegistryExportService {
                     "EU", "Oversight", "Residency", "Fairness", "AIA"};
             PdfPTable t = new PdfPTable(pdfCols.length);
             t.setWidthPercentage(100);
+            t.setRunDirection(rd);
             for (String c : pdfCols) headerCell(t, c);
             for (MlModel m : models) {
                 cell(t, s(m.getModelCode()));

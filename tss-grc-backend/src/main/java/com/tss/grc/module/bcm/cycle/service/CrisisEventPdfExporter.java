@@ -63,6 +63,15 @@ public class CrisisEventPdfExporter {
 
     @Transactional(readOnly = true)
     public byte[] export(Long eventId) {
+        return export(eventId, "en");
+    }
+
+    /** @param lang pass "ar" to flip the document + tables to RTL run direction (P3).
+     *  Default "en" leaves output byte-identical to the pre-lang behaviour. */
+    @Transactional(readOnly = true)
+    public byte[] export(Long eventId, String lang) {
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        int rd = PdfTheme.runDir(ar);
         Long org = TenantContext.getCurrentTenant();
         CrisisEvent e = events.findByIdAndOrganisationId(eventId, org)
             .orElseThrow(() -> new EntityNotFoundException("Crisis event not found: " + eventId));
@@ -76,6 +85,7 @@ public class CrisisEventPdfExporter {
         Document doc = new Document(PageSize.A4, 40, 40, 60, 60);
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
+            writer.setRunDirection(rd);
             // Crisis after-action reports are CONFIDENTIAL — they contain
             // incident timelines and regulator interactions that aren't
             // released externally without legal review.
@@ -83,11 +93,11 @@ public class CrisisEventPdfExporter {
                 "Crisis · " + e.getEventCode(), "Confidential"));
             doc.open();
 
-            renderCover(doc, e, organisation);
+            renderCover(doc, e, organisation, rd);
             renderNarrative(doc, e);
-            renderSitReps(doc, srs);
-            renderDecisions(doc, ds);
-            renderRegulatoryNotifications(doc, rns);
+            renderSitReps(doc, srs, rd);
+            renderDecisions(doc, ds, rd);
+            renderRegulatoryNotifications(doc, rns, rd);
 
             doc.close();
             writer.close();
@@ -103,7 +113,7 @@ public class CrisisEventPdfExporter {
 
     // ─── Cover ────────────────────────────────────────────────────────
 
-    private void renderCover(Document doc, CrisisEvent e, Organisation o) throws DocumentException {
+    private void renderCover(Document doc, CrisisEvent e, Organisation o, int rd) throws DocumentException {
         PdfTheme.Cover cv = new PdfTheme.Cover();
         cv.eyebrow    = "Crisis Event — After-Action Report";
         cv.eyebrowAr  = "حدث أزمة — تقرير ما بعد الحدث";
@@ -143,6 +153,7 @@ public class CrisisEventPdfExporter {
         // Severity chip — small coloured pill keyed to the numeric tier
         if (e.getSeverity() != null) {
             PdfPTable chipWrap = new PdfPTable(2);
+            chipWrap.setRunDirection(rd);
             chipWrap.setWidthPercentage(100);
             try { chipWrap.setWidths(new float[] {1, 9}); } catch (DocumentException ignored) {}
             PdfPCell label = new PdfPCell(new Phrase("SEVERITY", PdfFonts.kpiLabel(8)));
@@ -216,7 +227,7 @@ public class CrisisEventPdfExporter {
 
     // ─── SitReps ──────────────────────────────────────────────────────
 
-    private void renderSitReps(Document doc, List<CrisisSituationReport> srs) throws DocumentException {
+    private void renderSitReps(Document doc, List<CrisisSituationReport> srs, int rd) throws DocumentException {
         PdfTheme.sectionDivider(doc, "Situation Reports", "تقارير الموقف");
 
         if (srs.isEmpty()) {
@@ -225,6 +236,7 @@ public class CrisisEventPdfExporter {
         }
 
         PdfPTable t = new PdfPTable(3);
+        t.setRunDirection(rd);
         t.setWidthPercentage(100);
         try { t.setWidths(new float[] {3, 2, 9}); } catch (DocumentException ignored) {}
         headerCell(t, "Reported at");
@@ -241,7 +253,7 @@ public class CrisisEventPdfExporter {
 
     // ─── Decisions ────────────────────────────────────────────────────
 
-    private void renderDecisions(Document doc, List<CrisisDecision> ds) throws DocumentException {
+    private void renderDecisions(Document doc, List<CrisisDecision> ds, int rd) throws DocumentException {
         PdfTheme.sectionDivider(doc, "Decisions Log", "سجل القرارات");
 
         if (ds.isEmpty()) {
@@ -250,6 +262,7 @@ public class CrisisEventPdfExporter {
         }
 
         PdfPTable t = new PdfPTable(4);
+        t.setRunDirection(rd);
         t.setWidthPercentage(100);
         try { t.setWidths(new float[] {3, 3, 5, 5}); } catch (DocumentException ignored) {}
         headerCell(t, "Decided at");
@@ -272,7 +285,7 @@ public class CrisisEventPdfExporter {
 
     // ─── Regulatory notifications ─────────────────────────────────────
 
-    private void renderRegulatoryNotifications(Document doc, List<CrisisRegulatoryNotification> rns)
+    private void renderRegulatoryNotifications(Document doc, List<CrisisRegulatoryNotification> rns, int rd)
             throws DocumentException {
         PdfTheme.sectionDivider(doc, "Regulatory Notifications", "إخطارات الجهات التنظيمية");
 
@@ -282,6 +295,7 @@ public class CrisisEventPdfExporter {
         }
 
         PdfPTable t = new PdfPTable(5);
+        t.setRunDirection(rd);
         t.setWidthPercentage(100);
         try { t.setWidths(new float[] {2, 3, 3, 4, 4}); } catch (DocumentException ignored) {}
         headerCell(t, "Regulator");

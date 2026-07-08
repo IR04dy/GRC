@@ -155,9 +155,10 @@ public class SustainabilityAnnexController {
     /** S-I — Arabic-capable PDF export (OpenPDF) of the frozen annex snapshot. */
     @GetMapping("/api/sustainability/reports/{id}/export.pdf")
     @PreAuthorize("hasPermission('SUST','READ')")
-    public ResponseEntity<byte[]> exportPdf(@PathVariable Long id) {
+    public ResponseEntity<byte[]> exportPdf(@PathVariable Long id,
+                                            @RequestParam(defaultValue = "en") String lang) {
         SustainabilityReport r = service.getReport(id);
-        byte[] pdf = exportService.pdf(r);
+        byte[] pdf = exportService.pdf(r, lang);
         String fn = (r.getReportCode() == null ? ("report-" + r.getId()) : r.getReportCode()) + ".pdf";
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)

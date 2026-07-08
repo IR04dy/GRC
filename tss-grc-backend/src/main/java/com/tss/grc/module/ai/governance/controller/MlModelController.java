@@ -64,10 +64,11 @@ public class MlModelController {
                                          @RequestParam(required = false) String tier,
                                          @RequestParam(required = false) String domain,
                                          @RequestParam(required = false) String gap,
-                                         @RequestParam(required = false) Boolean euHighRisk) {
+                                         @RequestParam(required = false) Boolean euHighRisk,
+                                         @RequestParam(defaultValue = "en") String lang) {
         boolean pdf = "PDF".equalsIgnoreCase(format);
         byte[] body = exportService.export(format,
-                new AiRegistryExportService.ExportFilter(stage, tier, domain, gap, euHighRisk));
+                new AiRegistryExportService.ExportFilter(stage, tier, domain, gap, euHighRisk), lang);
         MediaType ct = pdf ? MediaType.APPLICATION_PDF
                 : MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         String filename = "ai-model-registry." + (pdf ? "pdf" : "xlsx");

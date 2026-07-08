@@ -71,6 +71,15 @@ public class BcpPlanPdfExporter {
 
     @Transactional(readOnly = true)
     public byte[] export(Long planId) {
+        return export(planId, "en");
+    }
+
+    /** @param lang pass "ar" to flip the document + tables to RTL run direction (P3).
+     *  Default "en" leaves output byte-identical to the pre-lang behaviour. */
+    @Transactional(readOnly = true)
+    public byte[] export(Long planId, String lang) {
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        int rd = PdfTheme.runDir(ar);
         Long org = TenantContext.getCurrentTenant();
         BcpPlan p = plans.findByIdAndOrganisationId(planId, org)
             .orElseThrow(() -> new EntityNotFoundException("Plan not found: " + planId));
@@ -84,6 +93,7 @@ public class BcpPlanPdfExporter {
         Document doc = new Document(PageSize.A4, 40, 40, 60, 60);
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
+            writer.setRunDirection(rd);
             // Classification is RESTRICTED for plans — they expose recovery
             // playbooks. Tenant-specific override could come from a column
             // later; defaulting to RESTRICTED matches the audit threat model.
@@ -93,8 +103,8 @@ public class BcpPlanPdfExporter {
 
             renderCover(doc, p, organisation);
             renderSections(doc, secs);
-            renderVersionHistory(doc, vers);
-            renderDistributionRoster(doc, dist);
+            renderVersionHistory(doc, vers, rd);
+            renderDistributionRoster(doc, dist, rd);
             renderAttestationFooter(doc, p);
 
             doc.close();
@@ -196,7 +206,7 @@ public class BcpPlanPdfExporter {
 
     // ─── Version history ───────────────────────────────────────────────
 
-    private void renderVersionHistory(Document doc, List<BcpVersion> vers) throws DocumentException {
+    private void renderVersionHistory(Document doc, List<BcpVersion> vers, int rd) throws DocumentException {
         PdfTheme.sectionDivider(doc, "Version History", "سجل الإصدارات");
 
         if (vers.isEmpty()) {
@@ -205,6 +215,7 @@ public class BcpPlanPdfExporter {
         }
 
         PdfPTable t = new PdfPTable(4);
+        t.setRunDirection(rd);
         t.setWidthPercentage(100);
         try { t.setWidths(new float[] {1, 3, 3, 7}); } catch (DocumentException ignored) {}
         headerCell(t, "Version");
@@ -223,7 +234,7 @@ public class BcpPlanPdfExporter {
 
     // ─── Distribution roster ───────────────────────────────────────────
 
-    private void renderDistributionRoster(Document doc, List<BcpPlanAcknowledgement> dist) throws DocumentException {
+    private void renderDistributionRoster(Document doc, List<BcpPlanAcknowledgement> dist, int rd) throws DocumentException {
         PdfTheme.sectionDivider(doc, "Distribution & Acknowledgement", "التوزيع والإقرار");
 
         if (dist.isEmpty()) {
@@ -232,6 +243,7 @@ public class BcpPlanPdfExporter {
         }
 
         PdfPTable t = new PdfPTable(6);
+        t.setRunDirection(rd);
         t.setWidthPercentage(100);
         try { t.setWidths(new float[] {1, 4, 3, 2, 3, 2}); } catch (DocumentException ignored) {}
         headerCell(t, "Ver.");

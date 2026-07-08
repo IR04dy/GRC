@@ -81,9 +81,10 @@ public class BcpPlanController {
      */
     @GetMapping("/{id}/export.pdf")
     @PreAuthorize("hasPermission('BCM', 'READ')")
-    public ResponseEntity<byte[]> exportPdf(@PathVariable Long id) {
+    public ResponseEntity<byte[]> exportPdf(@PathVariable Long id,
+                                            @RequestParam(defaultValue = "en") String lang) {
         BcpPlan p = service.get(id);
-        byte[] pdf = pdfExporter.export(id);
+        byte[] pdf = pdfExporter.export(id, lang);
         String filename = (p.getPlanCode() == null ? "plan-" + id : p.getPlanCode()) + ".pdf";
         return ResponseEntity.ok()
             .contentType(MediaType.APPLICATION_PDF)

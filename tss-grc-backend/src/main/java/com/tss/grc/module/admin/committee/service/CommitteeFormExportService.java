@@ -48,6 +48,15 @@ public class CommitteeFormExportService {
 
     @Transactional(readOnly = true)
     public byte[] exportPdf(String formCode) {
+        return exportPdf(formCode, "en");
+    }
+
+    /** @param lang pass "ar" to flip the document to RTL run direction (P3).
+     *  Default "en" leaves output byte-identical to the pre-lang behaviour. */
+    @Transactional(readOnly = true)
+    public byte[] exportPdf(String formCode, String lang) {
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        int rd = PdfTheme.runDir(ar);
         CommitteeFormTemplate form = catalog.getForm(formCode);
         Long orgId = TenantContext.getCurrentTenant();
         Organisation org = orgs.findById(orgId).orElse(null);
@@ -56,6 +65,7 @@ public class CommitteeFormExportService {
         Document doc = new Document(PageSize.A4, 40, 40, 60, 60);
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
+            writer.setRunDirection(rd);
             String docLabel = "Form · " + form.getFormCode() + " · v" + form.getVersion();
             writer.setPageEvent(PdfTheme.professionalFooter(docLabel, "Internal"));
             doc.open();

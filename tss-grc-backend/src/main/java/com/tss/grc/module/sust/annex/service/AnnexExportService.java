@@ -33,11 +33,20 @@ public class AnnexExportService {
 
     /** Branded PDF: cover hero + the frozen markdown annex, line by line. */
     public byte[] pdf(SustainabilityReport r) {
+        return pdf(r, "en");
+    }
+
+    /** @param lang pass "ar" to flip the document to RTL run direction (P3).
+     *  Default "en" leaves output byte-identical to the pre-lang behaviour. */
+    public byte[] pdf(SustainabilityReport r, String lang) {
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        int rd = PdfTheme.runDir(ar);
         Organisation o = orgRepo.findById(r.getOrganisationId()).orElse(null);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         Document doc = new Document(PageSize.A4, 36, 36, 60, 60);
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
+            writer.setRunDirection(rd);
             writer.setPageEvent(PdfTheme.professionalFooter(
                     r.getReportCode() == null ? "Sustainability Annex" : r.getReportCode(), "Internal"));
             doc.open();
