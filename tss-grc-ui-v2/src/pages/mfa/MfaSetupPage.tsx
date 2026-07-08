@@ -9,6 +9,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { printPacket, textToSection } from '../../lib/packetPrint';
 import {
   generateSecret, buildOtpAuthUri, verifyTotp, generateTotp,
   generateRecoveryCodes, secondsLeftInWindow,
@@ -33,7 +34,7 @@ import { getUser } from '../../lib/auth';
  * Already-enrolled users see status + can re-set or unenrol.
  */
 export function MfaSetupPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const user = getUser();
   const userRef = user?.username ?? 'demo@tss.sa';
@@ -154,6 +155,25 @@ export function MfaSetupPage() {
     toast.success(t('mfaCodesDownloaded'));
   }
 
+  /** Branded, printable recovery card (Save-as-PDF). Client-only — the codes are
+   *  rendered in the browser and never sent to the server. */
+  function printRecoveryCard() {
+    printPacket({
+      titleEn: 'Multi-Factor Recovery Codes',
+      titleAr: 'رموز استرداد المصادقة الثنائية',
+      eyebrowEn: 'Account Security',
+      eyebrowAr: 'أمن الحساب',
+      referenceId: userRef,
+      classificationEn: 'CONFIDENTIAL — STORE OFFLINE',
+      classificationAr: 'سرّي — يُحفظ دون اتصال',
+      sections: [
+        textToSection('Recovery codes', 'رموز الاسترداد', recoveryCodes.join('\n')),
+        textToSection('Important', 'مهم',
+          'Each code can be used once. Store this card somewhere safe and offline. Do not share these codes.'),
+      ],
+    }, lang);
+  }
+
   // ── Already-enrolled view ──────────────────────────────────────────
   if (enrolled && existing && !stepDone) {
     return (
@@ -202,6 +222,7 @@ export function MfaSetupPage() {
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <Button variant="primary" Icon={Copy} onClick={() => copyToClipboard(recoveryCodes.join('\n'), t('mfaRecoveryCodesLabel'))}>{t('mfaCopyAll')}</Button>
+            <Button variant="primary" onClick={printRecoveryCard}>{lang === 'ar' ? 'طباعة بطاقة PDF' : 'Print PDF card'}</Button>
             <Button variant="secondary" onClick={downloadRecoveryCodes}>{t('mfaDownloadTxt')}</Button>
             <span style={{ flex: 1 }} />
             <Button variant="ghost" onClick={() => setStepDone(false)}>{t('mfaDoneBtn')}</Button>
