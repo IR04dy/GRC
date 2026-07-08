@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { brandThemeApi, ApiError } from '../../lib/api';
 import {
   loadWhiteLabel, saveWhiteLabel, resetWhiteLabel, subscribeWhiteLabel,
   PALETTE_PRESETS, applyToDom,
@@ -45,19 +46,47 @@ export function WhiteLabelPage() {
     setDraft(d => ({ ...d, ...patch }));
   }
 
-  function save() {
+  async function save() {
     const saved = saveWhiteLabel(draft);
     setConfig(saved);
     toast.success(t('wlSavedToast'));
+    // Persist server-side too, so exported PDFs/XLSX carry the branding (not just the browser UI).
+    try {
+      await brandThemeApi.save({
+        orgNameEn: draft.organisationNameEn,
+        orgNameAr: draft.organisationNameAr,
+        taglineEn: draft.taglineEn,
+        taglineAr: draft.taglineAr,
+        primaryHex: draft.primaryHex,
+        accentHex: draft.accentHex,
+        logoDataUrl: draft.logoDataUrl,
+      });
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (lang === 'ar' ? 'تعذّر حفظ العلامة على الخادم (لن تظهر في التصديرات)'
+                         : 'Could not save branding to the server (exports won’t reflect it)'));
+    }
   }
 
-  function reset() {
+  async function reset() {
     if (!confirm(t('wlResetConfirm'))) return;
     resetWhiteLabel();
     const fresh = loadWhiteLabel();
     setConfig(fresh);
     setDraft(fresh);
     toast.info(t('wlResetToast'));
+    // Push the defaults server-side too, so exports stop rendering the old brand.
+    try {
+      await brandThemeApi.save({
+        orgNameEn: fresh.organisationNameEn,
+        orgNameAr: fresh.organisationNameAr,
+        taglineEn: fresh.taglineEn,
+        taglineAr: fresh.taglineAr,
+        primaryHex: fresh.primaryHex,
+        accentHex: fresh.accentHex,
+        logoDataUrl: fresh.logoDataUrl,
+      });
+    } catch { /* local reset already applied; server sync is best-effort */ }
   }
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);

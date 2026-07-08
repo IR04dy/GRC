@@ -12,6 +12,11 @@ import org.apache.poi.ss.usermodel.SheetConditionalFormatting;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellReference;
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFColor;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.awt.Color;
 
 /**
  * Export remediation P1 — one shared Apache-POI styling helper so every XLSX export gets the same
@@ -33,6 +38,25 @@ public final class XlsxStyler {
         f.setColor(IndexedColors.WHITE.getIndex());
         s.setFont(f);
         s.setFillForegroundColor(IndexedColors.DARK_TEAL.getIndex());
+        s.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        s.setAlignment(HorizontalAlignment.LEFT);
+        return s;
+    }
+
+    /**
+     * Brand-coloured header cell style (white bold on the tenant's primary colour). Used to
+     * propagate a per-tenant {@code BrandTheme} into workbooks. Falls back to the default
+     * {@link #headerStyle(Workbook)} when no brand colour is supplied or the workbook is not
+     * XSSF (the custom RGB fill needs an .xlsx/XSSF workbook).
+     */
+    public static CellStyle headerStyle(Workbook wb, Color brand) {
+        if (brand == null || !(wb instanceof XSSFWorkbook)) return headerStyle(wb);
+        XSSFCellStyle s = (XSSFCellStyle) wb.createCellStyle();
+        Font f = wb.createFont();
+        f.setBold(true);
+        f.setColor(IndexedColors.WHITE.getIndex());
+        s.setFont(f);
+        s.setFillForegroundColor(new XSSFColor(brand, null));
         s.setFillPattern(FillPatternType.SOLID_FOREGROUND);
         s.setAlignment(HorizontalAlignment.LEFT);
         return s;

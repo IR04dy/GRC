@@ -298,15 +298,23 @@ public final class PdfTheme {
      *  section starts on a fresh sheet — match the visual rhythm of the
      *  board pack. Pass titleAr=null to skip the Arabic line. */
     public static void sectionDivider(Document doc, String titleEn, String titleAr) throws DocumentException {
+        sectionDivider(doc, titleEn, titleAr, PdfFonts.BRAND_PRIMARY);
+    }
+
+    /** Brand-colour-aware section divider — pass the tenant's primary colour so section
+     *  bands match the cover. Falls back to {@link PdfFonts#BRAND_PRIMARY} when {@code brand}
+     *  is null. */
+    public static void sectionDivider(Document doc, String titleEn, String titleAr, Color brand) throws DocumentException {
+        Color band = brand != null ? brand : PdfFonts.BRAND_PRIMARY;
         doc.newPage();
         // Brand band — narrow filled cell across the top of the new page
         PdfPTable bar = new PdfPTable(1);
         bar.setWidthPercentage(100);
-        PdfPCell band = new PdfPCell(new Phrase(" "));
-        band.setFixedHeight(4f);
-        band.setBorder(0);
-        band.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
-        bar.addCell(band);
+        PdfPCell bandCell = new PdfPCell(new Phrase(" "));
+        bandCell.setFixedHeight(4f);
+        bandCell.setBorder(0);
+        bandCell.setBackgroundColor(band);
+        bar.addCell(bandCell);
         bar.setSpacingAfter(12);
         doc.add(bar);
 

@@ -13,6 +13,7 @@ import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
+import com.tss.grc.module.platform.branding.service.BrandThemeService;
 import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
 import com.tss.grc.module.risk.kri.entity.KriDefinition;
@@ -68,6 +69,7 @@ public class ExportService {
     private final AuditFindingRepository findingRepo;
     private final KriDefinitionRepository kriRepo;
     private final KriMeasurementRepository measRepo;
+    private final BrandThemeService brandThemeService;
 
     // ── Risk Register ──────────────────────────────────────────────────────
 
@@ -269,14 +271,16 @@ public class ExportService {
             writer.setPageEvent(PdfTheme.professionalFooter(eyebrowEn, "Internal"));
             doc.open();
 
-            // Cover
+            // Cover — carry the tenant brand colour + name override (P2 BrandTheme).
+            BrandThemeService.ResolvedBrand brand = brandThemeService.resolve();
             PdfTheme.Cover cv = new PdfTheme.Cover();
             cv.eyebrow = eyebrowEn;
             cv.eyebrowAr = eyebrowAr;
             cv.titleEn = titleEn;
             cv.titleAr = titleAr;
-            cv.orgNameEn = o == null ? null : o.getNameEn();
-            cv.orgNameAr = o == null ? null : o.getNameAr();
+            cv.orgNameEn = brand.orgNameEn() != null ? brand.orgNameEn() : (o == null ? null : o.getNameEn());
+            cv.orgNameAr = brand.orgNameAr() != null ? brand.orgNameAr() : (o == null ? null : o.getNameAr());
+            cv.brand = brand.primaryColor();
             cv.classification = "Internal";
             PdfTheme.coverHero(doc, cv);
 
@@ -524,16 +528,10 @@ public class ExportService {
         }
     }
 
+    /** Brand-aware header style — fills with the tenant's primary colour (P2 BrandTheme),
+     *  falling back to the shared house teal when no brand is set. */
     private CellStyle headerStyle(Workbook wb) {
-        CellStyle s = wb.createCellStyle();
-        org.apache.poi.ss.usermodel.Font font = wb.createFont();
-        font.setBold(true);
-        font.setColor(IndexedColors.WHITE.getIndex());
-        s.setFont(font);
-        s.setFillForegroundColor(IndexedColors.DARK_TEAL.getIndex());
-        s.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        s.setAlignment(HorizontalAlignment.LEFT);
-        return s;
+        return XlsxStyler.headerStyle(wb, brandThemeService.resolve().primaryColor());
     }
     private CellStyle wrapStyle(Workbook wb) {
         CellStyle s = wb.createCellStyle();

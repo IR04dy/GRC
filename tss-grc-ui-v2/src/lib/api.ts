@@ -2958,6 +2958,24 @@ export const auditLogApi = {
     api.get<AuditLogEntryDto[]>(`/api/v1/audit-log/trace/${encodeURIComponent(correlationId)}`),
 };
 
+// ── Brand theme — per-tenant branding persisted server-side so exports carry it ──
+//    Backend: com.tss.grc.module.platform.branding (BrandThemeController).
+//    GET open to any authenticated user; PUT requires PLATFORM:WRITE.
+export interface BrandThemeDto {
+  orgNameEn: string;
+  orgNameAr: string;
+  taglineEn: string;
+  taglineAr: string;
+  primaryHex: string;
+  accentHex: string;
+  logoDataUrl?: string | null;
+  customised?: boolean;
+}
+export const brandThemeApi = {
+  get:  () => api.get<BrandThemeDto>('/api/v1/platform/brand-theme'),
+  save: (body: Partial<BrandThemeDto>) => api.put<BrandThemeDto>('/api/v1/platform/brand-theme', body),
+};
+
 // ── Issues — generic cross-module finding tracker ──────────────────────
 //    Backend: com.tss.grc.module.platform (IssueController + IssueService).
 //    Lifecycle OPEN → IN_PROGRESS → (BLOCKED →)? RESOLVED → CLOSED, or
