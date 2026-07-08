@@ -3,6 +3,7 @@ package com.tss.grc.module.reporting.controller;
 import com.tss.grc.module.reporting.service.BoardPackPptxService;
 import com.tss.grc.module.reporting.service.BoardPackService;
 import com.tss.grc.module.reporting.service.DocxExportService;
+import com.tss.grc.module.reporting.service.ExportNaming;
 import com.tss.grc.module.reporting.service.ExportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -13,8 +14,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.LocalDate;
 
 /**
  * Bilingual PDF (Q1) + Excel-with-formulas (Q2) export endpoints.
@@ -48,21 +47,21 @@ public class ExportController {
     @Operation(summary = "Risk register PDF — pass ?lang=ar for Arabic RTL")
     public ResponseEntity<byte[]> riskRegisterPdf(@RequestParam(defaultValue = "en") String lang) {
         byte[] body = exportService.riskRegisterPdf(lang);
-        return pdf(body, "risk-register-" + LocalDate.now() + ".pdf");
+        return pdf(body, ExportNaming.build("ERM", "RiskRegister", lang, "pdf"));
     }
 
     @GetMapping("/findings-aging.pdf")
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     public ResponseEntity<byte[]> findingsAgingPdf(@RequestParam(defaultValue = "en") String lang) {
         byte[] body = exportService.findingsAgingPdf(lang);
-        return pdf(body, "audit-findings-aging-" + LocalDate.now() + ".pdf");
+        return pdf(body, ExportNaming.build("Compliance", "FindingsAging", lang, "pdf"));
     }
 
     @GetMapping("/kri-dashboard.pdf")
     @PreAuthorize("hasPermission('RISK','READ')")
     public ResponseEntity<byte[]> kriDashboardPdf(@RequestParam(defaultValue = "en") String lang) {
         byte[] body = exportService.kriDashboardPdf(lang);
-        return pdf(body, "kri-dashboard-" + LocalDate.now() + ".pdf");
+        return pdf(body, ExportNaming.build("ERM", "KRIDashboard", lang, "pdf"));
     }
 
     // ── Excel (Q2) ────────────────────────────────────────────────────────
@@ -71,21 +70,21 @@ public class ExportController {
     @PreAuthorize("hasPermission('RISK','READ')")
     @Operation(summary = "Risk register XLSX with live residual-score formulas")
     public ResponseEntity<byte[]> riskRegisterXlsx() {
-        return xlsx(exportService.riskRegisterXlsx(), "risk-register-" + LocalDate.now() + ".xlsx");
+        return xlsx(exportService.riskRegisterXlsx(), ExportNaming.build("ERM", "RiskRegister", "en", "xlsx"));
     }
 
     @GetMapping("/findings-aging.xlsx")
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
     @Operation(summary = "Findings aging XLSX with live TODAY()-based days-open formula")
     public ResponseEntity<byte[]> findingsXlsx() {
-        return xlsx(exportService.findingsXlsx(), "audit-findings-aging-" + LocalDate.now() + ".xlsx");
+        return xlsx(exportService.findingsXlsx(), ExportNaming.build("Compliance", "FindingsAging", "en", "xlsx"));
     }
 
     @GetMapping("/kri-dashboard.xlsx")
     @PreAuthorize("hasPermission('RISK','READ')")
     @Operation(summary = "KRI dashboard XLSX with COUNTIF summary sheet")
     public ResponseEntity<byte[]> kriXlsx() {
-        return xlsx(exportService.kriDashboardXlsx(), "kri-dashboard-" + LocalDate.now() + ".xlsx");
+        return xlsx(exportService.kriDashboardXlsx(), ExportNaming.build("ERM", "KRIDashboard", "en", "xlsx"));
     }
 
     // ── Word (.docx) ──────────────────────────────────────────────────────
@@ -95,7 +94,7 @@ public class ExportController {
     @Operation(summary = "Risk register DOCX — pass ?lang=ar for Arabic RTL")
     public ResponseEntity<byte[]> riskRegisterDocx(@RequestParam(defaultValue = "en") String lang) {
         return docx(docxExportService.riskRegisterDocx(lang),
-                "risk-register-" + LocalDate.now() + ".docx");
+                ExportNaming.build("ERM", "RiskRegister", lang, "docx"));
     }
 
     @GetMapping("/findings-aging.docx")
@@ -103,7 +102,7 @@ public class ExportController {
     @Operation(summary = "Findings aging DOCX — pass ?lang=ar for Arabic RTL")
     public ResponseEntity<byte[]> findingsAgingDocx(@RequestParam(defaultValue = "en") String lang) {
         return docx(docxExportService.findingsAgingDocx(lang),
-                "audit-findings-aging-" + LocalDate.now() + ".docx");
+                ExportNaming.build("Compliance", "FindingsAging", lang, "docx"));
     }
 
     @GetMapping("/kri-dashboard.docx")
@@ -111,7 +110,7 @@ public class ExportController {
     @Operation(summary = "KRI dashboard DOCX — pass ?lang=ar for Arabic RTL")
     public ResponseEntity<byte[]> kriDashboardDocx(@RequestParam(defaultValue = "en") String lang) {
         return docx(docxExportService.kriDashboardDocx(lang),
-                "kri-dashboard-" + LocalDate.now() + ".docx");
+                ExportNaming.build("ERM", "KRIDashboard", lang, "docx"));
     }
 
     // ── Board pack (S1) ───────────────────────────────────────────────────
@@ -122,7 +121,7 @@ public class ExportController {
         "framework coverage, change management and ethics highlights. Pass ?lang=ar for RTL.")
     public ResponseEntity<byte[]> boardPackPdf(@RequestParam(defaultValue = "en") String lang) {
         byte[] body = boardPackService.generatePdf(lang);
-        return pdf(body, "board-pack-" + LocalDate.now() + ".pdf");
+        return pdf(body, ExportNaming.build("BoardPack", "BoardPack", lang, "pdf"));
     }
 
     @GetMapping("/board-pack.pptx")
@@ -130,7 +129,7 @@ public class ExportController {
     @Operation(summary = "Multi-slide 16:9 board pack PowerPoint deck. Pass ?lang=ar for RTL.")
     public ResponseEntity<byte[]> boardPackPptx(@RequestParam(defaultValue = "en") String lang) {
         byte[] body = boardPackPptxService.generatePptx(lang);
-        return pptx(body, "board-pack-" + LocalDate.now() + ".pptx");
+        return pptx(body, ExportNaming.build("BoardPack", "BoardPack", lang, "pptx"));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
