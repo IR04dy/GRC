@@ -6,7 +6,7 @@
 // @RequireModule("SOCOPS"). Frontend hides nav entries that aren't in the
 // authenticated user's enabledModules.
 
-import { api } from './api';
+import { api, downloadFile } from './api';
 
 // ─── Page wrapper (matches Spring Data Page<T>) ───────────────────────
 export interface PageResp<T> {
@@ -634,6 +634,10 @@ export const socopsApi = {
 
   events:        (page = 0, size = 50) =>
     api.get<PageResp<SecurityEvent>>(`/api/v1/socops/events${pageQ(page, size)}`),
+  // Export the security-event register — server-side XLSX (POI, auto-filter + conditional
+  // formatting) or Arabic-capable PDF (OpenPDF). Streams via the shared download helper.
+  exportEvents:  (format: 'xlsx' | 'pdf') =>
+    downloadFile(`/api/v1/socops/events/export?format=${format}`, `socops-security-events.${format}`),
   eventGet:      (id: number) =>
     api.get<SecurityEvent>(`/api/v1/socops/events/${id}`),
   eventTriage:   (id: number, assigneeUserId?: number) =>

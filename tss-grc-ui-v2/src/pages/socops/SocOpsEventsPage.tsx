@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Siren, AlertTriangle, Clock, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Siren, AlertTriangle, Clock, CheckCircle2, RefreshCw, Download } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { RaiseRequestButton } from '../../components/workflow/RaiseRequestButton';
@@ -130,6 +130,12 @@ export function SocOpsEventsPage() {
         actions={
           <>
             <RaiseRequestButton sourceModule="SOCOPS" />
+            <Button variant="secondary" size="sm" onClick={() => void socopsApi.exportEvents('xlsx')}>
+              <Download size={14} /> {isAr ? 'تصدير Excel' : 'Export Excel'}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => void socopsApi.exportEvents('pdf')}>
+              <Download size={14} /> {isAr ? 'تصدير PDF' : 'Export PDF'}
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => void load()}>
               <RefreshCw size={14} /> {isAr ? 'تحديث' : 'Refresh'}
             </Button>
