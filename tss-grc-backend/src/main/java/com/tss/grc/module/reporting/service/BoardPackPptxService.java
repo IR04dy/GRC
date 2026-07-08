@@ -171,7 +171,7 @@ public class BoardPackPptxService {
                 safe(r.getStatus()),
             };
         }
-        addTable(s, rows, new double[]{ 0.10, 0.65, 0.10, 0.15 }, new Rectangle(60, 110, 840, 380));
+        addTable(s, rows, new double[]{ 0.10, 0.65, 0.10, 0.15 }, new Rectangle(60, 110, 840, 380), ar);
     }
 
     private void slideFindings(XMLSlideShow ppt, Long org, boolean ar) {
@@ -198,7 +198,7 @@ public class BoardPackPptxService {
             { ar ? "تصعيد تنفيذي" : "Executive", String.valueOf(exec) },
             { ar ? "مغلقة" : "Closed",            String.valueOf(closed) },
         };
-        addTable(s, rows, new double[]{ 0.7, 0.3 }, new Rectangle(60, 110, 480, 320));
+        addTable(s, rows, new double[]{ 0.7, 0.3 }, new Rectangle(60, 110, 480, 320), ar);
 
         // Summary callout
         addText(s, ar
@@ -259,7 +259,7 @@ public class BoardPackPptxService {
                 latest != null ? latest.getValue().toPlainString() : "—",
             };
         }
-        addTable(s, rows, new double[]{ 0.15, 0.55, 0.15, 0.15 }, new Rectangle(60, 240, 840, 250));
+        addTable(s, rows, new double[]{ 0.15, 0.55, 0.15, 0.15 }, new Rectangle(60, 240, 840, 250), ar);
     }
 
     private void slideChanges(XMLSlideShow ppt, Long org, boolean ar) {
@@ -284,7 +284,7 @@ public class BoardPackPptxService {
             { ar ? "تراجع" : "Rolled-back",       String.valueOf(rolledBack) },
             { ar ? "طارئة" : "Emergency",         String.valueOf(emergency) },
         };
-        addTable(s, rows, new double[]{ 0.65, 0.35 }, new Rectangle(60, 110, 480, 320));
+        addTable(s, rows, new double[]{ 0.65, 0.35 }, new Rectangle(60, 110, 480, 320), ar);
     }
 
     private void slideEthics(XMLSlideShow ppt, Long org, boolean ar) {
@@ -313,7 +313,7 @@ public class BoardPackPptxService {
             { ar ? "انتقام" : "Retaliation",             String.valueOf(retal) },
             { ar ? "STR مُرفعة" : "STRs filed",          String.valueOf(strs) },
         };
-        addTable(s, rows, new double[]{ 0.65, 0.35 }, new Rectangle(60, 110, 480, 380));
+        addTable(s, rows, new double[]{ 0.65, 0.35 }, new Rectangle(60, 110, 480, 380), ar);
     }
 
     // ── XSLF helpers ────────────────────────────────────────────────────────
@@ -367,7 +367,7 @@ public class BoardPackPptxService {
         rect.setLineColor(null);
     }
 
-    private void addTable(XSLFSlide s, String[][] rows, double[] colWidthPct, Rectangle anchor) {
+    private void addTable(XSLFSlide s, String[][] rows, double[] colWidthPct, Rectangle anchor, boolean ar) {
         if (rows.length == 0) return;
         int cols = rows[0].length;
         XSLFTable table = s.createTable();
@@ -381,7 +381,7 @@ public class BoardPackPptxService {
                 XSLFTableCell cell = row.addCell();
                 cell.clearText();
                 XSLFTextParagraph p = cell.addNewTextParagraph();
-                p.setTextAlign(TextParagraph.TextAlign.LEFT);
+                p.setTextAlign(ar ? TextParagraph.TextAlign.RIGHT : TextParagraph.TextAlign.LEFT);  // P2 §21: RTL cells for AR
                 XSLFTextRun tr = p.addNewTextRun();
                 tr.setText(rows[r][c]);
                 tr.setFontSize((double) (r == 0 ? 12 : 11));
