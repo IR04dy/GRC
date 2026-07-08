@@ -218,7 +218,7 @@ public class CyberExportService {
         String orgAr = org == null ? null : org.getNameAr();
         return "PDF".equalsIgnoreCase(fmt)
                 ? RegisterExport.pdf(orgEn, orgAr, eyebrowEn, eyebrowAr, titleEn, titleAr, kpis, cols, rows, ar)
-                : RegisterExport.xlsx(titleEn, cols, rows);
+                : RegisterExport.xlsx(titleEn, cols, rows, ar);
     }
 
     private static String title(String en, String arText, boolean ar) {

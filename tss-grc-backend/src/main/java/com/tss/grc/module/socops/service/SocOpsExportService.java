@@ -70,7 +70,7 @@ public class SocOpsExportService {
                 // so it stays LTR — pass ar=false. Add a lang param here to enable RTL later.
                 ? RegisterExport.pdf(orgEn, orgAr, "SOC Operations", "عمليات الأمن السيبراني",
                         "Security Event Register", "سجل الأحداث الأمنية", kpis, cols, rows, false)
-                : RegisterExport.xlsx("Security Events", cols, rows);
+                : RegisterExport.xlsx("Security Events", cols, rows, false);
     }
 
     private static String dt(LocalDateTime v) { return v == null ? "" : v.format(DTFMT); }

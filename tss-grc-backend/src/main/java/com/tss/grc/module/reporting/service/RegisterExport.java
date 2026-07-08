@@ -12,9 +12,6 @@ import com.lowagie.text.pdf.PdfWriter;
 import com.tss.grc.common.exception.ExportException;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.FillPatternType;
-import org.apache.poi.ss.usermodel.HorizontalAlignment;
-import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -56,19 +53,12 @@ public final class RegisterExport {
 
     // ── XLSX ─────────────────────────────────────────────────────────────
 
-    public static <T> byte[] xlsx(String sheetName, List<Col<T>> cols, List<T> rows) {
+    public static <T> byte[] xlsx(String sheetName, List<Col<T>> cols, List<T> rows, boolean ar) {
         try (Workbook wb = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
             Sheet sheet = wb.createSheet(safeSheet(sheetName));
-            CellStyle hdrStyle = wb.createCellStyle();
-            org.apache.poi.ss.usermodel.Font f = wb.createFont();
-            f.setBold(true);
-            f.setColor(IndexedColors.WHITE.getIndex());
-            hdrStyle.setFont(f);
-            hdrStyle.setFillForegroundColor(IndexedColors.DARK_TEAL.getIndex());
-            hdrStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-            hdrStyle.setAlignment(HorizontalAlignment.LEFT);
+            CellStyle hdrStyle = XlsxStyler.headerStyle(wb);   // P1: one shared house style
 
             Row h = sheet.createRow(0);
             for (int i = 0; i < cols.size(); i++) {
@@ -83,8 +73,16 @@ public final class RegisterExport {
                     dr.createCell(i).setCellValue(nz(cols.get(i).get().apply(row)));
                 }
             }
-            sheet.createFreezePane(0, 1);
-            for (int i = 0; i < cols.size(); i++) sheet.autoSizeColumn(i);
+            // P1: frozen header + auto-filter (was missing), RTL sheet for Arabic, auto-size,
+            // and traffic-light conditional formatting on any status/severity column.
+            XlsxStyler.freezeAndFilter(sheet, cols.size(), rows.size());
+            XlsxStyler.rightToLeft(sheet, ar);
+            XlsxStyler.autoSize(sheet, cols.size());
+            for (int i = 0; i < cols.size(); i++) {
+                if (XlsxStyler.isStatusHeader(cols.get(i).header())) {
+                    XlsxStyler.statusColors(sheet, i, 1, rows.size());
+                }
+            }
 
             wb.write(out);
             return out.toByteArray();
