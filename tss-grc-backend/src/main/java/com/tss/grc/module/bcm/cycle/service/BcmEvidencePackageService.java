@@ -7,8 +7,17 @@ import com.tss.grc.module.bcm.cycle.repository.*;
 import com.tss.grc.module.platform.auditlog.entity.AuditLogEntry;
 import com.tss.grc.module.platform.auditlog.repository.AuditLogRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.branding.service.BrandThemeService;
 import com.tss.grc.module.platform.entity.Organisation;
 import com.tss.grc.module.platform.repository.OrganisationRepository;
+import com.tss.grc.module.reporting.service.PdfFonts;
+import com.tss.grc.module.reporting.service.PdfTheme;
+import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.PageSize;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.pdf.PdfWriter;
+import java.awt.Color;
 import org.springframework.data.domain.Pageable;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -36,8 +45,8 @@ import java.util.zip.ZipOutputStream;
  * given assessment cycle, ready for handover to an external auditor or
  * regulator. The package contains:
  * <ul>
- *   <li>{@code cover.txt}                   — cover sheet: org, cycle name,
- *       generated-at, generated-by, version, content checksum.</li>
+ *   <li>{@code README.pdf}                  — branded cover (PdfTheme + tenant
+ *       BrandTheme): org, cycle name, status/score, generated-at/by, contents.</li>
  *   <li>{@code bias.xlsx}                   — every APPROVED / ACTIVE BIA in the
  *       cycle with its time-band matrix, criticality, owners.</li>
  *   <li>{@code risks.xlsx}                  — BCM risk register (likelihood,
@@ -79,6 +88,7 @@ public class BcmEvidencePackageService {
     private final AuditLogRepository auditLog;
     private final OrganisationRepository organisations;
     private final AuditLogService audit;
+    private final BrandThemeService brandThemeService;
 
     /**
      * Result holder for the controller — bytes + suggested filename.
@@ -122,12 +132,12 @@ public class BcmEvidencePackageService {
             byte[] gaps_xlsx        = writeGapsAndCapasXlsx(gapRows, capaRows);
             byte[] compliance_xlsx  = writeXlsx("Compliance matrix",        complianceRows, BcmEvidencePackageService::complianceRow, complianceHeader());
             byte[] audit_csv        = writeAuditCsv(auditRows);
-            byte[] cover_txt        = writeCoverSheet(orgName, cycle, generatedByName,
+            byte[] readme_pdf       = writeReadmePdf(orgName, cycle, generatedByName,
                                             biaRows.size(), riskRows.size(), strategyRows.size(),
                                             gapRows.size(), capaRows.size(), complianceRows.size(),
                                             auditRows.size());
 
-            addEntry(zip, "cover.txt",                cover_txt);
+            addEntry(zip, "README.pdf",               readme_pdf);
             addEntry(zip, "bias.xlsx",                bias_xlsx);
             addEntry(zip, "risks.xlsx",               risks_xlsx);
             addEntry(zip, "strategies.xlsx",          strategies_xlsx);
@@ -137,7 +147,7 @@ public class BcmEvidencePackageService {
 
             // MANIFEST.txt last — depends on the other files' bytes for checksums
             String manifest = manifest(
-                "cover.txt",              cover_txt,
+                "README.pdf",             readme_pdf,
                 "bias.xlsx",              bias_xlsx,
                 "risks.xlsx",             risks_xlsx,
                 "strategies.xlsx",        strategies_xlsx,
@@ -347,47 +357,71 @@ public class BcmEvidencePackageService {
 
     // ─── Cover sheet + manifest ───────────────────────────────────
 
-    private static byte[] writeCoverSheet(String orgName, BcmAssessmentCycle cycle,
-                                          String generatedBy,
-                                          int biaCount, int riskCount, int strategyCount,
-                                          int gapCount, int capaCount, int complianceCount,
-                                          int auditCount) {
-        StringBuilder b = new StringBuilder();
-        b.append("================================================================\n");
-        b.append("  BCM Audit Evidence Package\n");
-        b.append("================================================================\n\n");
-        b.append("Organisation        : ").append(orgName).append('\n');
-        b.append("Cycle               : ").append(cycle.getCycleNameEn())
-            .append("  (").append(cycle.getReportingYear()).append(")").append('\n');
-        b.append("Cycle status        : ").append(cycle.getStatus()).append('\n');
-        b.append("Overall score       : ").append(cycle.getOverallScore() == null ? "—" : cycle.getOverallScore()).append('\n');
-        b.append("Generated at        : ").append(LocalDateTime.now().format(ISO)).append(" (UTC)\n");
-        b.append("Generated by        : ").append(generatedBy == null ? "system" : generatedBy).append('\n');
-        b.append("Package version     : 1\n");
-        b.append('\n');
-        b.append("Contents summary\n");
-        b.append("----------------\n");
-        b.append(String.format("  bias.xlsx                %5d row(s)%n",         biaCount));
-        b.append(String.format("  risks.xlsx               %5d row(s)%n",         riskCount));
-        b.append(String.format("  strategies.xlsx          %5d row(s)%n",         strategyCount));
-        b.append(String.format("  gaps_and_capas.xlsx      %5d gap(s) + %d CAPA(s)%n", gapCount, capaCount));
-        b.append(String.format("  compliance_matrix.xlsx   %5d clause(s)%n",      complianceCount));
-        b.append(String.format("  audit_log.csv            %5d entry/entries%n",  auditCount));
-        b.append('\n');
-        b.append("Integrity\n");
-        b.append("---------\n");
-        b.append("  Per-file SHA-256 hashes are listed in MANIFEST.txt. Verify with:\n");
-        b.append("    sha256sum <file>     (Linux / WSL)\n");
-        b.append("    Get-FileHash <file>  (PowerShell)\n");
-        b.append('\n');
-        b.append("Notes\n");
-        b.append("-----\n");
-        b.append("  - This pack contains every approved + active BCM artefact for the cycle.\n");
-        b.append("  - Plan PDFs (BCP / DRP / Crisis after-action) are not yet included; see\n");
-        b.append("    audit Tier-1 item T1.4b (BCP/DRP plan editors) for the follow-up.\n");
-        b.append("  - Rows tagged is_placeholder=true on the compliance matrix require\n");
-        b.append("    official regulatory control library import to be considered final.\n");
-        return b.toString().getBytes();
+    /** Branded README.pdf cover (PdfTheme + tenant BrandTheme) — replaces the former
+     *  plain cover.txt so the evidence pack opens with a leadership-grade cover page. */
+    private byte[] writeReadmePdf(String orgName, BcmAssessmentCycle cycle, String generatedBy,
+                                  int biaCount, int riskCount, int strategyCount,
+                                  int gapCount, int capaCount, int complianceCount, int auditCount) {
+        BrandThemeService.ResolvedBrand brand = brandThemeService.resolve();
+        Color brandColor = brand.primaryColor();
+        String orgEn = brand.orgNameEn() != null ? brand.orgNameEn() : orgName;
+        LocalDateTime now = LocalDateTime.now();
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        Document doc = new Document(PageSize.A4, 48, 48, 60, 60);
+        try {
+            PdfWriter writer = PdfWriter.getInstance(doc, baos);
+            writer.setPageEvent(PdfTheme.professionalFooter("BCM Audit Evidence Package", "Confidential"));
+            doc.open();
+
+            PdfTheme.Cover cv = new PdfTheme.Cover();
+            cv.eyebrow = "BCM Audit Evidence Package";
+            cv.eyebrowAr = "حزمة أدلة تدقيق استمرارية الأعمال";
+            cv.titleEn = cycle.getCycleNameEn() == null ? "Evidence Package" : cycle.getCycleNameEn();
+            cv.subtitle = "Reporting year " + cycle.getReportingYear();
+            cv.orgNameEn = orgEn;
+            cv.orgNameAr = brand.orgNameAr();
+            cv.brand = brandColor;
+            cv.classification = "Confidential";
+            cv.generatedAt = now;
+            PdfTheme.coverHero(doc, cv);
+
+            PdfTheme.kpiStrip(doc, List.of(
+                new PdfTheme.Kpi("BIA", String.valueOf(biaCount), "Assessments"),
+                new PdfTheme.Kpi("Risks", String.valueOf(riskCount), "BCM register"),
+                new PdfTheme.Kpi("Strategies", String.valueOf(strategyCount), "Continuity"),
+                new PdfTheme.Kpi("Compliance", String.valueOf(complianceCount), "Clauses")
+            ));
+
+            var meta = PdfTheme.metadataGrid();
+            PdfTheme.addMetaCell(meta, "Organisation", orgEn);
+            PdfTheme.addMetaCell(meta, "Cycle", cycle.getCycleNameEn() + " (" + cycle.getReportingYear() + ")");
+            PdfTheme.addMetaCell(meta, "Cycle status", cycle.getStatus());
+            PdfTheme.addMetaCell(meta, "Overall score", cycle.getOverallScore() == null ? "—" : String.valueOf(cycle.getOverallScore()));
+            PdfTheme.addMetaCell(meta, "Generated by", generatedBy == null ? "system" : generatedBy);
+            PdfTheme.addMetaCell(meta, "Generated (UTC)", now.format(ISO));
+            doc.add(meta);
+
+            PdfTheme.sectionDivider(doc, "Package contents", "محتويات الحزمة", brandColor);
+            doc.add(new Paragraph("bias.xlsx — " + biaCount + " BIA assessment row(s).", PdfFonts.body(11)));
+            doc.add(new Paragraph("risks.xlsx — " + riskCount + " BCM risk row(s).", PdfFonts.body(11)));
+            doc.add(new Paragraph("strategies.xlsx — " + strategyCount + " continuity strategy row(s).", PdfFonts.body(11)));
+            doc.add(new Paragraph("gaps_and_capas.xlsx — " + gapCount + " gap(s) + " + capaCount + " CAPA(s).", PdfFonts.body(11)));
+            doc.add(new Paragraph("compliance_matrix.xlsx — " + complianceCount + " clause(s).", PdfFonts.body(11)));
+            doc.add(new Paragraph("audit_log.csv — " + auditCount + " audit entry/entries.", PdfFonts.body(11)));
+            doc.add(new Paragraph("MANIFEST.txt — SHA-256 of every file (verify: sha256sum -c / Get-FileHash).", PdfFonts.body(11)));
+
+            PdfTheme.sectionDivider(doc, "Notes", "ملاحظات", brandColor);
+            doc.add(new Paragraph("This pack contains every approved + active BCM artefact for the cycle.", PdfFonts.body(10)));
+            doc.add(new Paragraph("Plan PDFs (BCP / DRP / Crisis after-action) are exported separately.", PdfFonts.body(10)));
+            doc.add(new Paragraph("Compliance rows flagged is_placeholder require official regulatory control-library import to be final.", PdfFonts.body(10)));
+
+            doc.close();
+            writer.close();
+        } catch (DocumentException e) {
+            throw new ExportException("PDF", "BCM evidence README failed", e);
+        }
+        return baos.toByteArray();
     }
 
     /**
