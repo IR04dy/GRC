@@ -97,6 +97,58 @@ public class AnnexExportService {
         return sb.toString();
     }
 
+    /**
+     * HTML export — the frozen snapshot when present, otherwise a branded RTL fallback wrapping the
+     * markdown + metadata. Reports produced by the generic generator store only a markdown snapshot
+     * (content_html null), which previously exported the literal "(empty)"; this makes every report
+     * export a real HTML document.
+     */
+    public String html(SustainabilityReport r) {
+        String stored = r.getContentHtml();
+        if (stored != null && !stored.isBlank()) return stored;
+        String title = r.getTitleEn() != null ? r.getTitleEn()
+                     : r.getTitleAr() != null ? r.getTitleAr()
+                     : (r.getReportCode() == null ? "Sustainability report" : r.getReportCode());
+        String md = r.getContentMarkdown() == null ? "" : r.getContentMarkdown();
+        return "<!doctype html>\n<html dir=\"rtl\" lang=\"ar\">\n<head><meta charset=\"utf-8\">"
+            + "<title>" + htmlEsc(title) + "</title></head>\n<body>\n"
+            + "<h1>" + htmlEsc(title) + "</h1>\n"
+            + "<p><strong>Code:</strong> " + htmlEsc(nz(r.getReportCode()))
+            + " &middot; <strong>Type:</strong> " + htmlEsc(nz(r.getReportType()))
+            + " &middot; <strong>Status:</strong> " + htmlEsc(nz(r.getStatus()))
+            + " &middot; <strong>Version:</strong> " + htmlEsc(nz(r.getVersion())) + "</p>\n"
+            + "<pre style=\"white-space:pre-wrap;font-family:inherit\">" + htmlEsc(md) + "</pre>\n"
+            + "</body>\n</html>\n";
+    }
+
+    /**
+     * JSON export — the frozen snapshot when present, otherwise a metadata object derived from the
+     * report fields (never the literal "(empty)").
+     */
+    public String json(SustainabilityReport r) {
+        String stored = r.getContentJson();
+        if (stored != null && !stored.isBlank()) return stored;
+        try {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("reportCode", r.getReportCode());
+            m.put("reportType", r.getReportType());
+            m.put("status", r.getStatus());
+            m.put("version", r.getVersion());
+            m.put("contentHash", r.getContentHash());
+            m.put("hasMarkdown", r.getContentMarkdown() != null && !r.getContentMarkdown().isBlank());
+            return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(m);
+        } catch (Exception e) {
+            throw new ExportException("JSON", "Annex JSON generation failed", e);
+        }
+    }
+
+    private static String nz(Object v) { return v == null ? "" : String.valueOf(v); }
+
+    private static String htmlEsc(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
     private static String row(String section, String metric, Object value) {
         return esc(section) + "," + esc(metric) + "," + esc(value == null ? "" : String.valueOf(value)) + "\n";
     }

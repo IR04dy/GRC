@@ -137,8 +137,10 @@ public class SustainabilityAnnexController {
         String body; MediaType mt; String ext;
         switch (format.toLowerCase()) {
             case "md", "markdown" -> { body = r.getContentMarkdown(); mt = MediaType.TEXT_PLAIN;   ext = "md";   }
-            case "html"           -> { body = r.getContentHtml();     mt = MediaType.TEXT_HTML;    ext = "html"; }
-            case "json"           -> { body = r.getContentJson();     mt = MediaType.APPLICATION_JSON; ext = "json"; }
+            // html/json derive from the report when the frozen snapshot is null (reports from the
+            // generic generator store only markdown) — so these never export the literal "(empty)".
+            case "html"           -> { body = exportService.html(r);  mt = MediaType.TEXT_HTML;    ext = "html"; }
+            case "json"           -> { body = exportService.json(r);  mt = MediaType.APPLICATION_JSON; ext = "json"; }
             case "csv"            -> { body = exportService.csv(r);   mt = MediaType.parseMediaType("text/csv"); ext = "csv"; }
             default -> throw new IllegalArgumentException("Unsupported format: " + format);
         }
