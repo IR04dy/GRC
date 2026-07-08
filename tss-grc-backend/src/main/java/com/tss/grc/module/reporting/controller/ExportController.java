@@ -5,6 +5,7 @@ import com.tss.grc.module.reporting.service.BoardPackService;
 import com.tss.grc.module.reporting.service.DocxExportService;
 import com.tss.grc.module.reporting.service.ExportNaming;
 import com.tss.grc.module.reporting.service.ExportService;
+import com.tss.grc.module.reporting.service.RegulatorPackageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,9 +33,11 @@ public class ExportController {
     private final BoardPackService boardPackService;
     private final BoardPackPptxService boardPackPptxService;
     private final DocxExportService docxExportService;
+    private final RegulatorPackageService regulatorPackageService;
 
     private static final MediaType XLSX_TYPE =
         MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    private static final MediaType ZIP_TYPE = MediaType.parseMediaType("application/zip");
     private static final MediaType PPTX_TYPE =
         MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.presentationml.presentation");
     private static final MediaType DOCX_TYPE =
@@ -130,6 +133,23 @@ public class ExportController {
     public ResponseEntity<byte[]> boardPackPptx(@RequestParam(defaultValue = "en") String lang) {
         byte[] body = boardPackPptxService.generatePptx(lang);
         return pptx(body, ExportNaming.build("BoardPack", "BoardPack", lang, "pptx"));
+    }
+
+    // ── Regulator / audit evidence package (P2/P3) ────────────────────────
+
+    @GetMapping("/regulator-package.zip")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ') or hasPermission('REPORTING','READ')")
+    @Operation(summary = "Regulator/audit evidence package (ZIP): branded README.pdf + " +
+        "Requirement_Mapping.xlsx + Evidence_Index.xlsx + Audit_Trail.xlsx + manifest.json (SHA-256).")
+    public ResponseEntity<byte[]> regulatorPackage() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder
+            .getContext().getAuthentication();
+        String by = auth == null ? null : auth.getName();
+        RegulatorPackageService.Package pkg = regulatorPackageService.generate(by);
+        return ResponseEntity.ok()
+            .contentType(ZIP_TYPE)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + pkg.filename() + "\"")
+            .body(pkg.bytes());
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
