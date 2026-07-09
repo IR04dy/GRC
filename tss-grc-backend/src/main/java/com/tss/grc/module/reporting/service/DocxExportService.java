@@ -280,13 +280,19 @@ public class DocxExportService {
         spacer.createRun().addBreak();
     }
 
-    private static XWPFTable newTable(XWPFDocument doc, String[] headers, boolean ar) {
+    static XWPFTable newTable(XWPFDocument doc, String[] headers, boolean ar) {
+        return newTable(doc, headers, ar, "094242");
+    }
+
+    /** As {@link #newTable(XWPFDocument, String[], boolean)} but with a caller-supplied header
+     *  fill colour (hex, no {@code #}) — lets the tabular exporter apply the tenant BrandTheme. */
+    static XWPFTable newTable(XWPFDocument doc, String[] headers, boolean ar, String headerHex) {
         XWPFTable t = doc.createTable(1, headers.length);
         t.setWidth("100%");
         XWPFTableRow hr = t.getRow(0);
         for (int i = 0; i < headers.length; i++) {
             XWPFTableCell c = hr.getCell(i);
-            c.setColor("094242");
+            c.setColor(headerHex);
             c.removeParagraph(0);
             XWPFParagraph p = c.addParagraph();
             applyBidi(p, ar);
@@ -300,7 +306,7 @@ public class DocxExportService {
         return t;
     }
 
-    private static void setCell(XWPFTableRow row, int col, String text, boolean ar) {
+    static void setCell(XWPFTableRow row, int col, String text, boolean ar) {
         XWPFTableCell c = row.getCell(col);
         c.removeParagraph(0);
         XWPFParagraph p = c.addParagraph();
@@ -313,7 +319,7 @@ public class DocxExportService {
     }
 
     /** Toggle RTL on a paragraph by setting the {@code w:bidi} run property. */
-    private static void applyBidi(XWPFParagraph p, boolean rtl) {
+    static void applyBidi(XWPFParagraph p, boolean rtl) {
         if (!rtl) return;
         if (p.getCTP().getPPr() == null) p.getCTP().addNewPPr();
         if (p.getCTP().getPPr().getBidi() == null) p.getCTP().getPPr().addNewBidi();
@@ -330,7 +336,7 @@ public class DocxExportService {
         sect.getPgSz().setOrient(STPageOrientation.LANDSCAPE);
     }
 
-    private static byte[] bytes(XWPFDocument doc) {
+    static byte[] bytes(XWPFDocument doc) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             doc.write(baos);
             return baos.toByteArray();

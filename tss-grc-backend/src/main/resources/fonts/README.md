@@ -2,10 +2,12 @@
 
 OpenPDF (the platform's PDF generator — used by every PDF export: reporting/board-pack, BCP
 binder, crisis/plan, cyber/SOC, NDI, sustainability, committee forms, evidence packages) needs a
-TrueType font with Arabic glyphs to render Arabic PDFs. **No Arabic TTF is committed to this repo
-by default** (OFL redistribution is a per-deployment licensing decision, and the binaries are
-2–3 MB each). Until one is provided, `PdfFonts` falls back to an OS font or Helvetica — on a
-fontless Linux/container host, Arabic PDF text renders as boxes.
+TrueType font with Arabic glyphs to render Arabic PDFs.
+
+**`Amiri-Regular.ttf` (SIL OFL 1.1) is bundled here** — see `OFL.txt` for the license. It ships
+inside the JAR and is picked up automatically from the classpath (precedence step 2 below), so
+Arabic PDFs render correctly even on a fontless Linux/container host with no extra config. To use a
+different font instead, either replace this file or set the ops override (step 1).
 
 ## How `PdfFonts` resolves the Arabic font (precedence)
 

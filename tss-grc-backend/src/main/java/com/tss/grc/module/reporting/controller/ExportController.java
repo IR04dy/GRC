@@ -159,13 +159,23 @@ public class ExportController {
     // ── Tabular XLSX from client-supplied data (P5) ─────────────────────────
 
     @PostMapping("/packet.xlsx")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('REPORTING','READ')")
     @Operation(summary = "Branded .xlsx from client-supplied tabular data (sheets/headers/rows). " +
         "Reuses the house XlsxStyler treatment + tenant BrandTheme; filename via ExportNaming.")
     public ResponseEntity<byte[]> packetXlsx(@Valid @RequestBody TabularExportRequest request) {
         byte[] body = tabularExportService.xlsx(request);
         String lang = request.lang() == null || request.lang().isBlank() ? "en" : request.lang();
         return xlsx(body, ExportNaming.build(request.module(), request.exportType(), lang, "xlsx"));
+    }
+
+    @PostMapping("/packet.docx")
+    @PreAuthorize("hasPermission('REPORTING','READ')")
+    @Operation(summary = "Branded .docx from client-supplied tabular data (title + heading+table per " +
+        "sheet). Reuses the tenant BrandTheme + ExportNaming filename; RTL when lang=ar.")
+    public ResponseEntity<byte[]> packetDocx(@Valid @RequestBody TabularExportRequest request) {
+        byte[] body = tabularExportService.docx(request);
+        String lang = request.lang() == null || request.lang().isBlank() ? "en" : request.lang();
+        return docx(body, ExportNaming.build(request.module(), request.exportType(), lang, "docx"));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

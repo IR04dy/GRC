@@ -9,6 +9,12 @@ import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.springframework.stereotype.Service;
 
 import java.awt.Color;
@@ -75,6 +81,53 @@ public class TabularExportService {
             return baos.toByteArray();
         } catch (IOException e) {
             throw new ExportException("XLSX", "Tabular XLSX generation failed", e);
+        }
+    }
+
+    /**
+     * Renders the same {@link TabularExportRequest} as a branded Word document — a title, then one
+     * heading + table per sheet — reusing {@link DocxExportService}'s XWPF helpers with the tenant
+     * brand colour. RTL (bidi) when {@code lang=ar}.
+     */
+    public byte[] docx(TabularExportRequest req) {
+        boolean ar = "ar".equalsIgnoreCase(req.lang());
+        String hex = brandThemeService.resolve().primaryHex().replace("#", "");
+        XWPFDocument doc = new XWPFDocument();
+        try {
+            XWPFParagraph title = doc.createParagraph();
+            DocxExportService.applyBidi(title, ar);
+            title.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
+            XWPFRun tr = title.createRun();
+            tr.setText(req.exportType());
+            tr.setBold(true);
+            tr.setFontSize(18);
+            tr.setColor(hex);
+
+            for (TabularExportRequest.Sheet s : req.sheets()) {
+                XWPFParagraph head = doc.createParagraph();
+                head.setSpacingBefore(240);
+                DocxExportService.applyBidi(head, ar);
+                head.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
+                XWPFRun hr = head.createRun();
+                hr.setText(s.name());
+                hr.setBold(true);
+                hr.setFontSize(13);
+                hr.setColor(hex);
+
+                List<String> headers = s.headers() == null ? List.of() : s.headers();
+                if (headers.isEmpty()) continue;
+                XWPFTable table = DocxExportService.newTable(doc, headers.toArray(new String[0]), ar, hex);
+                List<List<String>> rows = s.rows() == null ? List.of() : s.rows();
+                for (List<String> row : rows) {
+                    XWPFTableRow tRow = table.createRow();
+                    for (int c = 0; c < headers.size(); c++) {
+                        DocxExportService.setCell(tRow, c, c < row.size() && row.get(c) != null ? row.get(c) : "", ar);
+                    }
+                }
+            }
+            return DocxExportService.bytes(doc);
+        } finally {
+            try { doc.close(); } catch (IOException ignored) { /* best-effort */ }
         }
     }
 
