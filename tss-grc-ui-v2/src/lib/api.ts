@@ -2936,6 +2936,8 @@ export interface AuditLogEntryDto {
   actionType: string;
   entityType?: string | null;
   entityId?: number | null;
+  entityCode?: string | null;
+  newValueJson?: string | null;
   sourceModule?: string | null;
   severity: string;
   message?: string | null;

@@ -12,7 +12,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          ScanSearch,
          Scale,
          ShieldX, Shield, ClipboardList, CalendarDays, Banknote, Moon,
-         Cloud, ChevronRight, ScrollText, Archive, GraduationCap,
+         Cloud, ChevronRight, ScrollText, Archive, GraduationCap, Download,
          Calculator, Radar, Spline, Gauge, Sparkles, HelpCircle,
          type LucideIcon } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -431,6 +431,7 @@ const NAV_GROUPS: NavGroup[] = [
         ],
       },
       { id: 'audit-log',   to: '/audit-log',         Icon: ScrollText,   labelKey: 'auditLogTitle' },
+      { id: 'export-hist', to: '/export-history',    Icon: Download,     labelKey: 'exportHistoryTitle' },
       { id: 'sessions',    to: '/account/sessions',  Icon: KeyRound,     labelKey: 'sessionsTitle' },
       { id: 'issues',      to: '/issues',            Icon: ClipboardList, labelKey: 'issuesTitle' },
       { id: 'file-upload', to: '/file-upload',       Icon: FileCheck2,   labelKey: 'fuSidebar' },
