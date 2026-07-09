@@ -21,7 +21,8 @@ public final class GovernanceDtos {
         @NotBlank @Size(max = 100) @Pattern(regexp = "[A-Z][A-Z0-9_]*",
             message = "roleName must be UPPER_SNAKE_CASE") String roleName,
         @NotBlank @Size(max = 200) String displayNameEn,
-        @Size(max = 200) String displayNameAr,
+        // bilingual is mandatory platform-wide (iam.roles.display_name_ar is NOT NULL)
+        @NotBlank @Size(max = 200) String displayNameAr,
         Boolean isActive
     ) {}
 
@@ -55,4 +56,32 @@ public final class GovernanceDtos {
 
     public record EffectiveAccessResponse(Long userId, String username, boolean platformAdmin,
                                           List<String> roles, List<EffectiveGrant> grants) {}
+
+    // ── P2: SoD + recertification (plan §6.4/§6.5) ───────────────────────
+
+    /** Optional approval body — only needed to override a preventive SoD block. */
+    public record ApproveAccessRequest(Boolean override, @Size(max = 1000) String overrideJustification) {}
+
+    public record SodDispositionRequest(
+        @NotBlank @Pattern(regexp = "ACCEPTED_RISK|REMEDIATED") String status,
+        @NotBlank @Size(max = 1000) String note,
+        java.time.LocalDate acceptedUntil
+    ) {}
+
+    public record CreateCampaignRequest(
+        @NotBlank @Size(max = 300) String titleEn,
+        @Size(max = 300) String titleAr,
+        @NotBlank @Pattern(regexp = "PRIVILEGED|MODULE|ALL") String scope,
+        @Size(max = 40) String scopeModule,
+        @NotNull java.time.LocalDate windowStart,
+        @NotNull java.time.LocalDate windowEnd
+    ) {}
+
+    public record ReviewDecisionRequest(
+        @NotBlank @Pattern(regexp = "CERTIFY|REVOKE|MODIFY") String decision,
+        @Size(max = 500) String note
+    ) {}
+
+    /** Optional closure body — exceptionNote only needed when items are still pending. */
+    public record CloseCampaignRequest(@Size(max = 1000) String exceptionNote) {}
 }

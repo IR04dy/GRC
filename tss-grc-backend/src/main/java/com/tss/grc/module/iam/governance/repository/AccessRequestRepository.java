@@ -59,6 +59,18 @@ public interface AccessRequestRepository extends JpaRepository<AccessRequest, Lo
            nativeQuery = true)
     int expireAssignments();
 
+    /** Assignment register for the evidence pack: user × role × window × justification. */
+    @Query(value = """
+        SELECT u.username, r.role_name, ur.source, ur.valid_from, ur.valid_to,
+               ur.justification, ur.assigned_at, ab.username AS approved_by_name
+        FROM iam.user_roles ur
+        JOIN iam.users u ON u.id = ur.user_id AND u.organisation_id = :org AND u.is_deleted = 0
+        JOIN iam.roles r ON r.id = ur.role_id AND r.is_deleted = 0
+        LEFT JOIN iam.users ab ON ab.id = ur.approved_by
+        ORDER BY u.username, r.role_name
+        """, nativeQuery = true)
+    List<Object[]> listAssignments(@Param("org") Long org);
+
     // ── JML hooks (plan §6.3) — LEAVER events from socops.iam_jml_event ─────
 
     @Query(value = """

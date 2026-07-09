@@ -5,6 +5,7 @@ import com.tss.grc.module.iam.entity.Role;
 import com.tss.grc.module.iam.entity.User;
 import com.tss.grc.module.iam.governance.dto.GovernanceDtos.CreateAccessRequest;
 import com.tss.grc.module.iam.governance.entity.AccessRequest;
+import com.tss.grc.module.iam.governance.entity.SodRule;
 import com.tss.grc.module.iam.governance.repository.AccessRequestRepository;
 import com.tss.grc.module.iam.repository.RoleRepository;
 import com.tss.grc.module.iam.repository.UserRepository;
@@ -50,6 +51,7 @@ public class AccessRequestService {
     private final RoleRepository roles;
     private final UserRepository users;
     private final AuditLogService audit;
+    private final SodService sod;
 
     // ── request lifecycle ────────────────────────────────────────────────
 
@@ -89,18 +91,46 @@ public class AccessRequestService {
     }
 
     @Transactional
-    public AccessRequest approve(Long id) {
+    public AccessRequest approve(Long id, boolean override, String overrideJustification) {
         AccessRequest req = mustPending(id);
         Long approver = currentUserId();
         if (approver != null && (approver.equals(req.getCreatedBy()) || approver.equals(req.getBeneficiaryUserId()))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "4-eyes blocked: approver must differ from both requester and beneficiary");
         }
+        // Preventive SoD check (plan §6.4): block grants that would newly complete a
+        // conflicting pair — override requires GRC_ADMINISTRATOR + documented
+        // justification, and still records the violation (source OVERRIDE).
+        List<SodRule> conflicts = sod.grantConflicts(req.getOrganisationId(),
+            req.getBeneficiaryUserId(), req.getRoleId());
+        if (!conflicts.isEmpty()) {
+            String codes = conflicts.stream().map(SodRule::getRuleCode)
+                .reduce((a, b) -> a + ", " + b).orElse("");
+            if (!override) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "SoD conflict (" + codes + ") — approve with override=true and a "
+                        + "justification (GRC_ADMINISTRATOR only) to grant anyway");
+            }
+            if (overrideJustification == null || overrideJustification.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "SoD override requires overrideJustification");
+            }
+            if (!sod.isGovernanceAdmin(approver)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "SoD override requires GRC_ADMINISTRATOR");
+            }
+        }
         // Provision FIRST (native insert), then mutate + save the entity exactly ONCE.
         // Saving twice around a native @Modifying query double-flushes the same row and
         // trips the SQL Server ROWVERSION optimistic lock (stale @Version at commit).
         int inserted = requests.insertAssignment(req.getBeneficiaryUserId(), req.getRoleId(),
             req.getCreatedBy(), req.getValidFrom(), req.getValidTo(), req.getJustification(), approver);
+        if (!conflicts.isEmpty()) {
+            String username = users.findById(req.getBeneficiaryUserId())
+                .map(User::getUsername).orElse("user#" + req.getBeneficiaryUserId());
+            sod.recordOverride(req.getOrganisationId(), req.getBeneficiaryUserId(), username,
+                conflicts, overrideJustification, approver);
+        }
 
         req.setStatus("PROVISIONED");
         req.setApprovedBy(approver);
