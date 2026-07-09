@@ -84,4 +84,14 @@ public final class GovernanceDtos {
 
     /** Optional closure body — exceptionNote only needed when items are still pending. */
     public record CloseCampaignRequest(@Size(max = 1000) String exceptionNote) {}
+
+    // ── P3: break-glass (plan §6.6) ──────────────────────────────────────
+
+    public record BreakGlassActivateRequest(
+        @NotBlank @Size(max = 100) String incidentRef,
+        @Size(max = 1000) String reason,
+        @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(24) Integer validityHours
+    ) {}
+
+    public record BreakGlassReviewRequest(@NotBlank @Size(max = 1000) String note) {}
 }
