@@ -1,7 +1,12 @@
 package com.tss.grc.module.iam.governance.controller;
 
+import com.tss.grc.module.iam.governance.dto.GovernanceDtos.CreateAccessRequest;
 import com.tss.grc.module.iam.governance.dto.GovernanceDtos.EffectiveAccessResponse;
 import com.tss.grc.module.iam.governance.dto.GovernanceDtos.MatrixUpdateRequest;
+import com.tss.grc.module.iam.governance.dto.GovernanceDtos.RejectAccessRequest;
+import com.tss.grc.module.iam.governance.dto.GovernanceDtos.RevokeAssignmentRequest;
+import com.tss.grc.module.iam.governance.entity.AccessRequest;
+import com.tss.grc.module.iam.governance.service.AccessRequestService;
 import com.tss.grc.module.iam.governance.dto.GovernanceDtos.RoleMatrixResponse;
 import com.tss.grc.module.iam.governance.dto.GovernanceDtos.RoleSummary;
 import com.tss.grc.module.iam.governance.dto.GovernanceDtos.RoleUpsertRequest;
@@ -36,11 +41,13 @@ import java.util.List;
 @Tag(name = "IAM — Access governance (roles / matrix / effective access)")
 public class AccessGovernanceController {
 
-    private static final String READ_GUARD   = "hasPermission('IAM','READ')";
-    private static final String WRITE_GUARD  = "hasPermission('IAM','WRITE')";
-    private static final String DELETE_GUARD = "hasPermission('IAM','DELETE')";
+    private static final String READ_GUARD    = "hasPermission('IAM','READ')";
+    private static final String WRITE_GUARD   = "hasPermission('IAM','WRITE')";
+    private static final String APPROVE_GUARD = "hasPermission('IAM','APPROVE')";
+    private static final String DELETE_GUARD  = "hasPermission('IAM','DELETE')";
 
     private final AccessGovernanceService service;
+    private final AccessRequestService requestService;
 
     // ── roles ────────────────────────────────────────────────────────────
 
@@ -83,6 +90,51 @@ public class AccessGovernanceController {
     @PreAuthorize(READ_GUARD)
     public EffectiveAccessResponse effectiveAccess(@PathVariable Long id) {
         return service.effectiveAccess(id);
+    }
+
+    // ── access requests — maker-checker (P1, §6.2) ──────────────────────
+
+    @GetMapping("/requests")
+    @PreAuthorize(READ_GUARD)
+    public List<AccessRequest> listRequests(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String status) {
+        return requestService.list(status);
+    }
+
+    @PostMapping("/requests")
+    @PreAuthorize(WRITE_GUARD)
+    public AccessRequest createRequest(@Valid @RequestBody CreateAccessRequest r) {
+        return requestService.create(r);
+    }
+
+    @PostMapping("/requests/{id}/approve")
+    @PreAuthorize(APPROVE_GUARD)
+    public AccessRequest approveRequest(@PathVariable Long id) { return requestService.approve(id); }
+
+    @PostMapping("/requests/{id}/reject")
+    @PreAuthorize(APPROVE_GUARD)
+    public AccessRequest rejectRequest(@PathVariable Long id, @Valid @RequestBody RejectAccessRequest r) {
+        return requestService.reject(id, r.reason());
+    }
+
+    // ── assignments: revoke + sweeps (P1, §6.3) ─────────────────────────
+
+    @PostMapping("/assignments/revoke")
+    @PreAuthorize(DELETE_GUARD)
+    public java.util.Map<String, Integer> revoke(@Valid @RequestBody RevokeAssignmentRequest r) {
+        return java.util.Map.of("removed", requestService.revoke(r.userId(), r.roleId()));
+    }
+
+    @PostMapping("/assignments/expiry-sweep")
+    @PreAuthorize(WRITE_GUARD)
+    public java.util.Map<String, Integer> expirySweep() {
+        return java.util.Map.of("removed", requestService.manualExpirySweep());
+    }
+
+    @PostMapping("/assignments/jml-sweep")
+    @PreAuthorize(WRITE_GUARD)
+    public java.util.Map<String, Integer> jmlSweep() {
+        return java.util.Map.of("processedLeavers", requestService.jmlSweep());
     }
 
     private static Long currentUserId() {

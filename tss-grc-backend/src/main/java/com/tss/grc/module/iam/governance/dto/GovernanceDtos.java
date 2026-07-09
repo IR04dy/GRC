@@ -38,6 +38,18 @@ public final class GovernanceDtos {
     public record RoleMatrixResponse(Long roleId, String roleName, boolean systemRole,
                                      List<MatrixCell> cells) {}
 
+    public record CreateAccessRequest(
+        @NotNull Long beneficiaryUserId,
+        @NotNull Long roleId,
+        java.time.LocalDateTime validFrom,
+        java.time.LocalDateTime validTo,
+        @NotBlank @Size(max = 1000) String justification
+    ) {}
+
+    public record RejectAccessRequest(@NotBlank @Size(max = 500) String reason) {}
+
+    public record RevokeAssignmentRequest(@NotNull Long userId, @NotNull Long roleId) {}
+
     /** One resolved grant of a user, with the role(s) that deliver it. */
     public record EffectiveGrant(String module, String action, List<String> viaRoles) {}
 
