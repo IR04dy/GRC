@@ -16,13 +16,14 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { reportingApi, ApiError } from '../../lib/api';
 import {
   loadAnnualPlan, transitionPlan,
   workingPapersForEngagement, transitionWorkingPaper,
   loadFindings, findingsForEngagement, transitionFinding,
   loadCapas, transitionCapa,
   subscribeAuditLifecycle, aggregateAuditLifecycle,
-  buildAcPacket,
+  buildAcPacket, buildAcSheets,
   pickEngagementByCode,
   createFinding, createWorkingPaper,
   PLAN_STATUS_LABEL, PLAN_STATUS_TONE,
@@ -90,6 +91,16 @@ export function AuditLifecyclePage() {
     }, lang);
   }
 
+  async function exportAc(kind: 'xlsx' | 'docx') {
+    const payload = { module: 'CMA', exportType: 'AuditCommitteePacket', lang, sheets: buildAcSheets() };
+    try {
+      await (kind === 'xlsx' ? reportingApi.packetXlsx(payload) : reportingApi.packetDocx(payload));
+      toast.success(lang === 'ar' ? 'تم التصدير' : 'Exported');
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر التصدير' : 'Export failed'));
+    }
+  }
+
   return (
     <Shell title={t('alcTitle')} sub={t('alcSub')}>
       <PageHeader
@@ -98,8 +109,10 @@ export function AuditLifecyclePage() {
         sub={t('alcPageSub')}
         actions={
           <>
-            <Button variant="secondary" Icon={Download} onClick={downloadPacket}>{t('alcDownloadPacket')}</Button>
             <Button variant="primary" onClick={printAcPdf}>{t('alcPrintAcPdf')}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => exportAc('xlsx')}>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => exportAc('docx')}>{lang === 'ar' ? 'تصدير Word' : 'Export Word'}</Button>
+            <Button variant="ghost" Icon={Download} onClick={downloadPacket}>{t('alcDownloadPacket')}</Button>
           </>
         }
       />

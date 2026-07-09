@@ -656,6 +656,47 @@ export function buildNcemaPacket(
   return lines.join('\n');
 }
 
+/** Export P5 — NCEMA notification as tabular sheets for a branded .xlsx/.docx. */
+export function buildNcemaSheets(
+  activation: ActivationEvent,
+  sccTier: SccTier,
+): { name: string; headers: string[]; rows: string[][] }[] {
+  const scenario = SCENARIOS.find(s => s.code === activation.scenarioCode);
+  if (!scenario) return [];
+  const dt = (iso: string) => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Riyadh' });
+  return [
+    {
+      name: 'Incident Summary',
+      headers: ['Field', 'Value'],
+      rows: [
+        ['SCC Tier', String(sccTier)],
+        ['Activation ID', activation.id],
+        ['Scenario code', scenario.code],
+        ['Scenario', scenario.titleEn],
+        ['Started (KSA)', dt(activation.startedAt)],
+        ['Real / Drill', activation.isReal ? 'REAL' : 'DRILL'],
+        ['Likelihood × Impact', `${scenario.likelihood} × ${scenario.impact}`],
+        ['Lead role', scenario.leaderRole],
+        ['Status', activation.status],
+      ],
+    },
+    {
+      name: 'Response Actions',
+      headers: ['#', 'Stage', 'Entered', 'Acknowledged'],
+      rows: activation.stageLog.map((s, i) => [String(i + 1), s.labelEn, dt(s.enteredAt),
+        s.acked && s.ackedAt ? dt(s.ackedAt) : '—']),
+    },
+    {
+      name: 'Regulatory Notifications',
+      headers: ['Regulator', 'Status', 'Reference', 'Window (h)'],
+      rows: scenario.regulatoryNotifications.map(rule => {
+        const log = activation.notifications.find(n => n.regulator === rule.regulator);
+        return [rule.regulator, log?.sentAt ? 'SENT' : 'PENDING', log?.referenceId ?? '—', String(rule.maxHours)];
+      }),
+    },
+  ];
+}
+
 // ─── Stats + display helpers ───────────────────────────────────────────────
 
 export const CATEGORY_LABEL: Record<CrisisScenarioCategory, { en: string; ar: string }> = {

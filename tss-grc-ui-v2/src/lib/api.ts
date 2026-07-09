@@ -672,9 +672,11 @@ export const reportingApi = {
   // S1 — board pack
   boardPackPdf:     (lang: string) => downloadFile(`/api/v1/reporting/board-pack.pdf?lang=${encodeURIComponent(lang)}`, 'board-pack.pdf'),
   boardPackPptx:    (lang: string) => downloadFile(`/api/v1/reporting/board-pack.pptx?lang=${encodeURIComponent(lang)}`, 'board-pack.pptx'),
-  // P5 — branded XLSX from client-assembled tabular data (packets whose data lives client-side)
+  // P5 — branded XLSX / DOCX from client-assembled tabular data (packets whose data lives client-side)
   packetXlsx:       (body: TabularExportPayload) =>
     downloadFile('/api/v1/reporting/packet.xlsx', `${body.module}_${body.exportType}.xlsx`, { method: 'POST', jsonBody: body }),
+  packetDocx:       (body: TabularExportPayload) =>
+    downloadFile('/api/v1/reporting/packet.docx', `${body.module}_${body.exportType}.docx`, { method: 'POST', jsonBody: body }),
 };
 
 /** Client payload for {@link reportingApi.packetXlsx} — mirrors the backend TabularExportRequest. */

@@ -92,10 +92,11 @@ export function BcmLifecyclePage() {
     }, lang);
   }
 
-  async function exportOpresXlsx() {
+  async function exportOpres(kind: 'xlsx' | 'docx') {
+    const payload = { module: 'BCM', exportType: 'SamaOpRes', lang, sheets: buildOpresSheets() };
     try {
-      await reportingApi.packetXlsx({ module: 'BCM', exportType: 'SamaOpRes', lang, sheets: buildOpresSheets() });
-      toast.success(lang === 'ar' ? 'تم تصدير Excel' : 'Excel exported');
+      await (kind === 'xlsx' ? reportingApi.packetXlsx(payload) : reportingApi.packetDocx(payload));
+      toast.success(lang === 'ar' ? 'تم التصدير' : 'Exported');
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر التصدير' : 'Export failed'));
     }
@@ -110,7 +111,8 @@ export function BcmLifecyclePage() {
         actions={
           <>
             <Button variant="primary" onClick={printOpresPdf}>{t('bclPrintOpresPdf')}</Button>
-            <Button variant="secondary" Icon={Download} onClick={exportOpresXlsx}>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => exportOpres('xlsx')}>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => exportOpres('docx')}>{lang === 'ar' ? 'تصدير Word' : 'Export Word'}</Button>
             <Button variant="ghost" Icon={Download} onClick={downloadOpres}>{t('bclDownloadOpres')}</Button>
           </>
         }

@@ -14,6 +14,7 @@ import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { printPacket, packetTextToSections } from '../../lib/packetPrint';
+import { reportingApi, ApiError } from '../../lib/api';
 import { HijriDate } from '../../components/ui/HijriDate';
 import {
   SCENARIOS, EXERCISES,
@@ -22,7 +23,7 @@ import {
   ACTIVATION_TONE, ACTIVATION_LABEL, SCC_LABEL,
   loadActive, loadHistory, loadSccTier, saveSccTier,
   startActivation, transitionActivation, ackContact, logRegulatoryNotification,
-  subscribeCrisis, buildNcemaPacket,
+  subscribeCrisis, buildNcemaPacket, buildNcemaSheets,
   type ActivationEvent, type SccTier, type ActivationStatus,
 } from '../../lib/crisis';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
@@ -131,6 +132,17 @@ export function CrisisManagementPage() {
     }, lang);
   }
 
+  async function exportNcema(kind: 'xlsx' | 'docx') {
+    if (!active) return;
+    const payload = { module: 'NCEMA', exportType: 'SituationalAwareness', lang, sheets: buildNcemaSheets(active, sccTier) };
+    try {
+      await (kind === 'xlsx' ? reportingApi.packetXlsx(payload) : reportingApi.packetDocx(payload));
+      toast.success(lang === 'ar' ? 'تم التصدير' : 'Exported');
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر التصدير' : 'Export failed'));
+    }
+  }
+
   return (
     <Shell title={t('crisisTitle')} sub={t('crisisSub')}>
       <PageHeader
@@ -174,6 +186,7 @@ export function CrisisManagementPage() {
           onTransition={handleTransition}
           onDownloadPacket={downloadNcemaPacket}
           onPrintPdf={printNcemaPdf}
+          onExport={exportNcema}
         />
       )}
 
@@ -377,11 +390,12 @@ export function CrisisManagementPage() {
 
 // ─── Active activation banner ───────────────────────────────────────────────
 
-function ActiveBanner({ active, onTransition, onDownloadPacket, onPrintPdf }: {
+function ActiveBanner({ active, onTransition, onDownloadPacket, onPrintPdf, onExport }: {
   active: ActivationEvent;
   onTransition: (s: ActivationStatus) => void;
   onDownloadPacket: () => void;
   onPrintPdf: () => void;
+  onExport: (kind: 'xlsx' | 'docx') => void;
 }) {
   const { t, lang } = useI18n();
   const scenario = SCENARIOS.find(s => s.code === active.scenarioCode);
@@ -429,7 +443,13 @@ function ActiveBanner({ active, onTransition, onDownloadPacket, onPrintPdf }: {
           <Button variant="primary" Icon={Download} onClick={onPrintPdf}>
             {lang === 'ar' ? 'تنزيل PDF' : 'Download PDF'}
           </Button>
-          <Button variant="secondary" Icon={Download} onClick={onDownloadPacket}>
+          <Button variant="secondary" Icon={Download} onClick={() => onExport('xlsx')}>
+            {lang === 'ar' ? 'Excel' : 'Excel'}
+          </Button>
+          <Button variant="secondary" Icon={Download} onClick={() => onExport('docx')}>
+            {lang === 'ar' ? 'Word' : 'Word'}
+          </Button>
+          <Button variant="ghost" Icon={Download} onClick={onDownloadPacket}>
             {t('crisisDownloadPacket')}
           </Button>
           <Button variant="ghost" Icon={StopCircle} onClick={() => onTransition('STAND_DOWN')}>

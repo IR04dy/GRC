@@ -194,12 +194,10 @@ export function EsgPage() {
     }, lang);
   }
 
-  async function exportEsgAnnexXlsx() {
+  async function exportEsgAnnex(kind: 'xlsx' | 'docx') {
+    const payload = { module: 'ESG', exportType: 'SustainabilityAnnex', lang, sheets: buildEsgAnnexSheets() };
     try {
-      await reportingApi.packetXlsx({
-        module: 'ESG', exportType: 'SustainabilityAnnex', lang,
-        sheets: buildEsgAnnexSheets(),
-      });
+      await (kind === 'xlsx' ? reportingApi.packetXlsx(payload) : reportingApi.packetDocx(payload));
       toast.success(t('esgAnnexDownloadedToast'));
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر التصدير' : 'Export failed'));
@@ -219,7 +217,8 @@ export function EsgPage() {
         actions={<>
           <RaiseRequestButton sourceModule="ESG" />
           <Button variant="primary" Icon={Download} onClick={printEsgAnnexPdf}>{lang === 'ar' ? 'تنزيل PDF' : 'Download PDF'}</Button>
-          <Button variant="secondary" Icon={Download} onClick={exportEsgAnnexXlsx}>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</Button>
+          <Button variant="secondary" Icon={Download} onClick={() => exportEsgAnnex('xlsx')}>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</Button>
+          <Button variant="secondary" Icon={Download} onClick={() => exportEsgAnnex('docx')}>{lang === 'ar' ? 'تصدير Word' : 'Export Word'}</Button>
           <Button variant="ghost" Icon={Download} onClick={downloadAnnex}>{t('esgDownloadAnnex')}</Button>
         </>}
       />

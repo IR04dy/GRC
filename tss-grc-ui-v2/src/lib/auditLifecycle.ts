@@ -867,6 +867,64 @@ export function buildAcPacket(orgEn: string, orgAr: string, quarter: string): st
   return lines.join('\n');
 }
 
+/** Export P5 — Audit-Committee packet as tabular sheets for a branded .xlsx/.docx.
+ *  "Severity"/"Status" headers drive the workbook's conditional formatting. */
+export function buildAcSheets(): { name: string; headers: string[]; rows: string[][] }[] {
+  const plan = loadAnnualPlan();
+  const wps = loadWorkingPapers();
+  const findings = loadFindings();
+  const capas = loadCapas();
+  const sev: Record<FindingSeverity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, OBSERVATION: 0 };
+  findings.forEach(f => sev[f.severity]++);
+  const overdue = findings.filter(f => f.targetDate && new Date(f.targetDate) < new Date() && f.status !== 'CLOSED').length;
+  const totalCapas = capas.length;
+  const closedCapas = capas.filter(c => c.status === 'CLOSED').length;
+  const overdueCapas = capas.filter(c => new Date(c.targetDate) < new Date() && c.status !== 'CLOSED').length;
+  return [
+    {
+      name: 'Annual Plan',
+      headers: ['Field', 'Value'],
+      rows: [
+        ['Plan ID', `${plan.id} (${plan.year})`],
+        ['Status', plan.status],
+        ['Approved by', plan.acApprovedBy ?? '—'],
+        ['Budget (hours)', String(plan.budgetHours)],
+        ['Q1 / Q2 / Q3 / Q4', `${plan.q1.length} / ${plan.q2.length} / ${plan.q3.length} / ${plan.q4.length}`],
+      ],
+    },
+    {
+      name: 'Engagements',
+      headers: ['Code', 'Title', 'Status', 'Working Papers', 'Findings'],
+      rows: MOCK_ENGAGEMENTS.map(e => [e.engagementCode ?? '', e.titleEn ?? '', e.status ?? '',
+        String(wps.filter(w => w.engagementCode === e.engagementCode).length),
+        String(findings.filter(f => f.engagementCode === e.engagementCode).length)]),
+    },
+    {
+      name: 'Findings by Severity',
+      headers: ['Severity', 'Count'],
+      rows: [['CRITICAL', String(sev.CRITICAL)], ['HIGH', String(sev.HIGH)], ['MEDIUM', String(sev.MEDIUM)],
+        ['LOW', String(sev.LOW)], ['OBSERVATION', String(sev.OBSERVATION)], ['Overdue', String(overdue)]],
+    },
+    {
+      name: 'CAPA Closure',
+      headers: ['Metric', 'Value'],
+      rows: [
+        ['Total tasks', String(totalCapas)],
+        ['Closed', `${closedCapas} (${totalCapas ? Math.round((closedCapas / totalCapas) * 100) : 0}%)`],
+        ['In progress', String(capas.filter(c => c.status === 'IN_PROGRESS').length)],
+        ['Overdue', String(overdueCapas)],
+      ],
+    },
+    {
+      name: 'Key Findings',
+      headers: ['Ref', 'Severity', 'Status', 'Title', 'Owner', 'Target', 'Frameworks'],
+      rows: findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').map(f =>
+        [f.refNumber, f.severity, f.status, f.titleEn, f.ownerRole ?? '—', f.targetDate ?? '—',
+          f.controlCrosswalk.map(c => `${c.framework}/${c.controlCode}`).join(', ')]),
+    },
+  ];
+}
+
 // ─── Display helpers ───────────────────────────────────────────────────────
 
 export const PLAN_STATUS_LABEL: Record<AnnualPlanStatus, { en: string; ar: string }> = {

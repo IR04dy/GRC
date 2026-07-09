@@ -94,10 +94,11 @@ export function CyberLifecyclePage() {
     }, lang);
   }
 
-  async function exportHaseenXlsx() {
+  async function exportHaseen(kind: 'xlsx' | 'docx') {
+    const payload = { module: 'NCA', exportType: 'HaseenECC', lang, sheets: buildHaseenSheets() };
     try {
-      await reportingApi.packetXlsx({ module: 'NCA', exportType: 'HaseenECC', lang, sheets: buildHaseenSheets() });
-      toast.success(lang === 'ar' ? 'تم تصدير Excel' : 'Excel exported');
+      await (kind === 'xlsx' ? reportingApi.packetXlsx(payload) : reportingApi.packetDocx(payload));
+      toast.success(lang === 'ar' ? 'تم التصدير' : 'Exported');
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر التصدير' : 'Export failed'));
     }
@@ -112,7 +113,8 @@ export function CyberLifecyclePage() {
         actions={
           <>
             <Button variant="primary" onClick={printHaseenPdf}>{t('cycPrintHaseenPdf')}</Button>
-            <Button variant="secondary" Icon={Download} onClick={exportHaseenXlsx}>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => exportHaseen('xlsx')}>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</Button>
+            <Button variant="secondary" Icon={Download} onClick={() => exportHaseen('docx')}>{lang === 'ar' ? 'تصدير Word' : 'Export Word'}</Button>
             <Button variant="ghost" Icon={Download} onClick={downloadHaseenPacket}>{t('cycDownloadHaseen')}</Button>
           </>
         }
