@@ -715,7 +715,13 @@ textarea.input { resize: vertical; min-height: 80px; line-height: var(--leading-
   padding: 13px 14px; border-bottom: 1px solid var(--border);
   font-size: 13px; color: var(--ink-1); vertical-align: middle;
   text-align: start;
+  /* Tabular figures so digits line up column-to-column (counts, scores, %, dates)
+     without needing per-column classes — text is unaffected. */
+  font-variant-numeric: tabular-nums;
 }
+/* Opt-in numeric column alignment: add class="num" to a th/td to right-align it
+   (RTL-aware via `end`) — for count / amount / score / % columns. */
+.grc-table th.num, .grc-table td.num, .tbl th.num, .tbl td.num { text-align: end; }
 .grc-table tbody tr:hover td, .tbl tbody tr:hover td { background: var(--surface-3); }
 .grc-table tbody tr:nth-child(even):not(:hover) td,
 .tbl tbody tr:nth-child(even):not(:hover) td {
