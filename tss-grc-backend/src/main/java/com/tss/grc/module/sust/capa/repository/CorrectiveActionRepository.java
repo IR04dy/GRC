@@ -20,6 +20,9 @@ public interface CorrectiveActionRepository extends JpaRepository<CorrectiveActi
 
     Optional<CorrectiveAction> findByIdAndOrganisationId(Long id, Long org);
 
+    /** G4 auto-CAPA idempotency (trajectory + permit sweeps re-run safely). */
+    boolean existsByOrganisationIdAndSourceTypeAndSourceRef(Long org, String sourceType, String sourceRef);
+
     /** All linked to one source — e.g. show all actions raised against CRO-001. */
     List<CorrectiveAction> findByOrganisationIdAndSourceTypeAndSourceRef(Long org, String sourceType, String sourceRef);
 
