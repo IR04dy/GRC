@@ -16,7 +16,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
-import { ApiError } from '../../lib/api';
+import { ApiError, reportingApi } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
@@ -103,7 +103,7 @@ import {
 import {
   EMISSION_FACTORS,
   loadCalcEntries, appendCalcEntry, deleteCalcEntry,
-  subscribeEsg, buildEsgAnnex,
+  subscribeEsg, buildEsgAnnex, buildEsgAnnexSheets,
   type CalculatorEntry, type EsgStats,
 } from '../../lib/esg';
 // S-O — Vendor ESG surveillance reads the real backend (was VENDOR_SURVEYS mock).
@@ -194,6 +194,18 @@ export function EsgPage() {
     }, lang);
   }
 
+  async function exportEsgAnnexXlsx() {
+    try {
+      await reportingApi.packetXlsx({
+        module: 'ESG', exportType: 'SustainabilityAnnex', lang,
+        sheets: buildEsgAnnexSheets(),
+      });
+      toast.success(t('esgAnnexDownloadedToast'));
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر التصدير' : 'Export failed'));
+    }
+  }
+
   // TCFD + CMA grouping were previously static useMemo blocks against
   // TCFD_ITEMS / CMA_ARTICLES; V60 + V61 promoted both tabs to API-
   // driven so they self-load and self-group.
@@ -207,6 +219,7 @@ export function EsgPage() {
         actions={<>
           <RaiseRequestButton sourceModule="ESG" />
           <Button variant="primary" Icon={Download} onClick={printEsgAnnexPdf}>{lang === 'ar' ? 'تنزيل PDF' : 'Download PDF'}</Button>
+          <Button variant="secondary" Icon={Download} onClick={exportEsgAnnexXlsx}>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</Button>
           <Button variant="ghost" Icon={Download} onClick={downloadAnnex}>{t('esgDownloadAnnex')}</Button>
         </>}
       />

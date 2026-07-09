@@ -524,6 +524,40 @@ export function buildEsgAnnex(orgEn: string, orgAr: string): string {
   return lines.join('\n');
 }
 
+/** Export P5 — the same annex data as tabular sheets for a branded .xlsx
+ *  (POST /api/v1/reporting/packet.xlsx). A "Status" header triggers the
+ *  workbook's status conditional-formatting. */
+export function buildEsgAnnexSheets(): { name: string; headers: string[]; rows: string[][] }[] {
+  const curr = CURRENT_YEAR_RECORD;
+  return [
+    {
+      name: 'GHG Emissions',
+      headers: ['Scope', 'tCO2e', 'Verified', 'Coverage %', 'YoY %'],
+      rows: [
+        ['Scope 1', String(curr.scope1), curr.verifiedScope1 ? 'Yes' : 'No', '100', String(yoyChange(1))],
+        ['Scope 2', String(curr.scope2), curr.verifiedScope2 ? 'Yes' : 'No', '100', String(yoyChange(2))],
+        ['Scope 3', String(curr.scope3), curr.verifiedScope3 ? 'Yes' : 'No', String(curr.scope3CoveragePct), String(yoyChange(3))],
+        ['Total', String(curr.scope1 + curr.scope2 + curr.scope3), '', '', ''],
+      ],
+    },
+    {
+      name: 'Saudi Green Initiative',
+      headers: ['Sector', 'Commitment', 'Progress %', 'Status', 'Target Year'],
+      rows: SGI_COMMITMENTS.map(c => [c.sector, c.titleEn, String(c.progressPct), c.onTrack ? 'ON_TRACK' : 'BEHIND PLAN', String(c.targetYear)]),
+    },
+    {
+      name: 'CMA Articles 91-94',
+      headers: ['Article', 'Title', 'Status', 'Evidence'],
+      rows: CMA_ARTICLES.map(a => [`${a.article}${a.clause ?? ''}`, a.titleEn, a.status, a.evidenceRef ?? '']),
+    },
+    {
+      name: 'TCFD Alignment',
+      headers: ['Pillar', 'Recommendation', 'Status', 'Title'],
+      rows: TCFD_ITEMS.map(t => [t.pillar, t.recommendationCode, t.status, t.titleEn]),
+    },
+  ];
+}
+
 // ─── Aggregation ───────────────────────────────────────────────────────────
 
 export const PILLAR_LABEL: Record<EsgPillar, { en: string; ar: string }> = {

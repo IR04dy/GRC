@@ -148,14 +148,23 @@ export const api = {
  * The filename is taken from the Content-Disposition header when present,
  * otherwise falls back to the supplied `fallbackName`.
  */
-export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+export async function downloadFile(
+  path: string,
+  fallbackName: string,
+  opts?: { method?: string; jsonBody?: unknown },
+): Promise<void> {
   // Wrap in the same refresh-on-401 path as request(). We can't call
   // request() directly because we need the raw Response (blob + headers).
+  const hasBody = opts?.jsonBody !== undefined;
   const attempt = async (token: string | null): Promise<Response> => {
     return fetch(`${API_BASE}${path}`, {
-      method: 'GET',
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+      method: opts?.method ?? 'GET',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+      },
       credentials: 'include',
+      ...(hasBody ? { body: JSON.stringify(opts!.jsonBody) } : {}),
     });
   };
 
@@ -663,7 +672,18 @@ export const reportingApi = {
   // S1 — board pack
   boardPackPdf:     (lang: string) => downloadFile(`/api/v1/reporting/board-pack.pdf?lang=${encodeURIComponent(lang)}`, 'board-pack.pdf'),
   boardPackPptx:    (lang: string) => downloadFile(`/api/v1/reporting/board-pack.pptx?lang=${encodeURIComponent(lang)}`, 'board-pack.pptx'),
+  // P5 — branded XLSX from client-assembled tabular data (packets whose data lives client-side)
+  packetXlsx:       (body: TabularExportPayload) =>
+    downloadFile('/api/v1/reporting/packet.xlsx', `${body.module}_${body.exportType}.xlsx`, { method: 'POST', jsonBody: body }),
 };
+
+/** Client payload for {@link reportingApi.packetXlsx} — mirrors the backend TabularExportRequest. */
+export interface TabularExportPayload {
+  module: string;
+  exportType: string;
+  lang?: string;
+  sheets: { name: string; headers: string[]; rows: string[][] }[];
+}
 
 // ─── Spring Page<T> wrapper ─────────────────────────────────────────────────
 export interface PageResponse<T> {
