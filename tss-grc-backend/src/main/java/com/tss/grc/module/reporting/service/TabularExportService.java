@@ -34,7 +34,23 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class TabularExportService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TabularExportService.class);
+
     private final BrandThemeService brandThemeService;
+
+    // ── resource-exhaustion guards (client supplies the whole payload) ──────────
+    /** Per-cell character cap — below Excel's 32,767 hard limit (POI throws above it). */
+    private static final int MAX_CELL_LEN = 32_000;
+    /** Column cap per sheet (Excel allows 16,384; a regulator table needs far fewer). */
+    private static final int MAX_COLS = 256;
+    /** Total cell budget across the whole workbook/doc — bounds in-memory build + response size. */
+    private static final long MAX_CELLS = 500_000L;
+
+    /** Null-safe + length-capped cell value (never a formula — literal string). */
+    private static String clip(String v) {
+        if (v == null) return "";
+        return v.length() > MAX_CELL_LEN ? v.substring(0, MAX_CELL_LEN) : v;
+    }
 
     public byte[] xlsx(TabularExportRequest req) {
         boolean ar = "ar".equalsIgnoreCase(req.lang());
@@ -43,31 +59,36 @@ public class TabularExportService {
         try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             CellStyle headerStyle = XlsxStyler.headerStyle(wb, brand);
             Set<String> used = new HashSet<>();
+            long cells = 0;
+            boolean budgetHit = false;
 
             for (TabularExportRequest.Sheet s : req.sheets()) {
+                if (budgetHit) break;
                 Sheet sheet = wb.createSheet(uniqueSheetName(s.name(), used));
                 XlsxStyler.rightToLeft(sheet, ar);
 
                 List<String> headers = s.headers() == null ? List.of() : s.headers();
+                int nCols = Math.min(headers.size(), MAX_COLS);
                 int r = 0;
                 Row header = sheet.createRow(r++);
-                for (int c = 0; c < headers.size(); c++) {
+                for (int c = 0; c < nCols; c++) {
                     Cell cell = header.createCell(c);
-                    cell.setCellValue(headers.get(c) == null ? "" : headers.get(c));
+                    cell.setCellValue(clip(headers.get(c)));   // length-capped literal (no formula)
                     cell.setCellStyle(headerStyle);
                 }
+                cells += nCols;
 
                 List<List<String>> rows = s.rows() == null ? List.of() : s.rows();
                 for (List<String> row : rows) {
+                    if (cells >= MAX_CELLS) { budgetHit = true; break; }   // bound total in-memory size
                     Row dr = sheet.createRow(r++);
-                    for (int c = 0; c < row.size(); c++) {
-                        // setCellValue writes a literal string — never a formula — so a leading
-                        // '='/'+'/'-'/'@' cannot inject a formula (unlike CSV).
-                        dr.createCell(c).setCellValue(row.get(c) == null ? "" : row.get(c));
+                    int cols = Math.min(row.size(), MAX_COLS);
+                    for (int c = 0; c < cols; c++) {
+                        dr.createCell(c).setCellValue(clip(row.get(c)));
                     }
+                    cells += cols;
                 }
 
-                int nCols = headers.size();
                 XlsxStyler.freezeAndFilter(sheet, nCols, r - 1);
                 for (int c = 0; c < nCols; c++) {
                     if (XlsxStyler.isStatusHeader(headers.get(c))) {
@@ -76,6 +97,8 @@ public class TabularExportService {
                 }
                 XlsxStyler.autoSize(sheet, nCols);
             }
+            if (budgetHit) log.warn("Tabular XLSX truncated at the {}-cell budget (module={}, type={})",
+                MAX_CELLS, req.module(), req.exportType());
 
             wb.write(baos);
             return baos.toByteArray();
@@ -103,7 +126,10 @@ public class TabularExportService {
             tr.setFontSize(18);
             tr.setColor(hex);
 
+            long cells = 0;
+            boolean budgetHit = false;
             for (TabularExportRequest.Sheet s : req.sheets()) {
+                if (budgetHit) break;
                 XWPFParagraph head = doc.createParagraph();
                 head.setSpacingBefore(240);
                 DocxExportService.applyBidi(head, ar);
@@ -114,17 +140,26 @@ public class TabularExportService {
                 hr.setFontSize(13);
                 hr.setColor(hex);
 
-                List<String> headers = s.headers() == null ? List.of() : s.headers();
-                if (headers.isEmpty()) continue;
-                XWPFTable table = DocxExportService.newTable(doc, headers.toArray(new String[0]), ar, hex);
+                List<String> headersRaw = s.headers() == null ? List.of() : s.headers();
+                if (headersRaw.isEmpty()) continue;
+                int nCols = Math.min(headersRaw.size(), MAX_COLS);
+                String[] headers = new String[nCols];
+                for (int c = 0; c < nCols; c++) headers[c] = clip(headersRaw.get(c));
+                XWPFTable table = DocxExportService.newTable(doc, headers, ar, hex);
+                cells += nCols;
+
                 List<List<String>> rows = s.rows() == null ? List.of() : s.rows();
                 for (List<String> row : rows) {
+                    if (cells >= MAX_CELLS) { budgetHit = true; break; }
                     XWPFTableRow tRow = table.createRow();
-                    for (int c = 0; c < headers.size(); c++) {
-                        DocxExportService.setCell(tRow, c, c < row.size() && row.get(c) != null ? row.get(c) : "", ar);
+                    for (int c = 0; c < nCols; c++) {
+                        DocxExportService.setCell(tRow, c, clip(c < row.size() ? row.get(c) : ""), ar);
                     }
+                    cells += nCols;
                 }
             }
+            if (budgetHit) log.warn("Tabular DOCX truncated at the {}-cell budget (module={}, type={})",
+                MAX_CELLS, req.module(), req.exportType());
             return DocxExportService.bytes(doc);
         } finally {
             try { doc.close(); } catch (IOException ignored) { /* best-effort */ }
