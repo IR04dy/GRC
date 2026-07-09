@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TSS GRC — Executive Overview</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1"></script>
+  <style>
+    :root{
+      --brand:#0E5E5E; --brand-2:#0a4747; --accent:#C8932A;
+      --bg:#f4f6f7; --card:#fff; --ink:#16241f; --ink-2:#5c6a65; --border:#e3e8e6; --radius:12px; --gap:16px;
+      --crit:#C0392B; --high:#E67E22; --med:#C8932A; --low:#2E9E5B; --na:#94A3B8;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+    .wrap{max-width:1360px;margin:0 auto;padding:var(--gap)}
+    header.hero{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;padding:22px 26px;border-radius:var(--radius);margin-bottom:var(--gap);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    header.hero .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.8;font-weight:700}
+    header.hero h1{font-size:22px;font-weight:800;margin-top:2px}
+    header.hero .sub{font-size:13px;opacity:.85;margin-top:3px}
+    header.hero .badge{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:6px 14px;font-size:12px;font-weight:600}
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--gap);margin-bottom:var(--gap)}
+    .kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;position:relative;overflow:hidden}
+    .kpi::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--brand)}
+    .kpi.warn::before{background:var(--high)} .kpi.accent::before{background:var(--accent)}
+    .kpi .lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);font-weight:700}
+    .kpi .val{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:4px}
+    .kpi .cap{font-size:12px;color:var(--ink-2);margin-top:2px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:var(--gap);margin-bottom:var(--gap)}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px}
+    .card h3{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:4px}
+    .card .hint{font-size:11px;color:var(--ink-2);margin-bottom:12px}
+    .card canvas{max-height:280px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead th{text-align:left;padding:9px 12px;border-bottom:2px solid var(--border);color:var(--ink-2);font-size:11px;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;user-select:none}
+    thead th.num,tbody td.num{text-align:right;font-variant-numeric:tabular-nums}
+    tbody td{padding:9px 12px;border-bottom:1px solid #f0f2f1}
+    tbody tr:hover td{background:#f7faf9}
+    .bar-cell{position:relative}
+    .bar-cell .track{height:6px;border-radius:3px;background:var(--brand);opacity:.85}
+    footer{color:var(--ink-2);font-size:12px;text-align:center;padding:14px}
+    @media(max-width:640px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div>
+        <div class="eyebrow">TSS GRC Platform · Riyadh</div>
+        <h1>Executive Overview</h1>
+        <div class="sub">Governance, Risk &amp; Compliance posture — tenant: TSS GRC (org 1)</div>
+      </div>
+      <div class="badge">Snapshot · <span id="asof"></span></div>
+    </header>
+
+    <section class="kpis" id="kpis"></section>
+
+    <section class="grid">
+      <div class="card"><h3>Risk posture by level</h3><div class="hint">Inherent risk register — 51 risks</div><canvas id="cRiskLevel"></canvas></div>
+      <div class="card"><h3>Risk by workflow status</h3><div class="hint">Where each risk sits in its lifecycle</div><canvas id="cRiskStatus"></canvas></div>
+      <div class="card"><h3>Evidence by status</h3><div class="hint">Evidence register readiness</div><canvas id="cEvidence"></canvas></div>
+      <div class="card"><h3>Exports by format</h3><div class="hint">Files generated across the platform</div><canvas id="cExpFmt"></canvas></div>
+      <div class="card"><h3>Exports by module</h3><div class="hint">Which modules produce documents</div><canvas id="cExpMod"></canvas></div>
+      <div class="card"><h3>Top platform activity</h3><div class="hint">Most frequent audit-log actions</div><canvas id="cActivity"></canvas></div>
+    </section>
+
+    <section class="card">
+      <h3>Audit activity detail</h3>
+      <div class="hint">Every state-changing action, most frequent first — click a header to sort.</div>
+      <table id="tActivity"><thead><tr>
+        <th data-k="0">Action</th><th data-k="1" class="num">Count</th><th>Share</th>
+      </tr></thead><tbody></tbody></table>
+    </section>
+
+    <footer>Generated by TSS GRC Platform · self-contained snapshot · data embedded, works offline</footer>
+  </div>
+
+  <script>
+    const DATA = {"risksByLevel": [["—", 2], ["CRITICAL", 2], ["HIGH", 5], ["LOW", 12], ["MEDIUM", 30]], "risksByStatus": [["ACCEPTED", 2], ["CLOSED", 4], ["OPEN", 17], ["UNDER_REVIEW", 28]], "auditByAction": [["REFRESH_TOKEN_ISSUED", 965], ["CREATE", 250], ["TRANSITION", 200], ["DELETE", 175], ["REPORT", 170], ["REFRESH_TOKEN_REVOKED", 147], ["PIVOT_VIEW_GENERATED", 123], ["WORKFLOW_REQUEST_CREATED", 65], ["WORKFLOW_REQUEST_SENT", 53], ["RULE_FIRED", 49], ["UPDATE", 44], ["WORKFLOW_REQUEST_RESPONDED", 32], ["LINK", 31], ["CDL_FIRE:FINDING_OVERDUE:2026-06-30", 28], ["CDL_FIRE:FINDING_OVERDUE:2026-07-07", 28], ["CDL_FIRE:FINDING_OVERDUE:2026-07-06", 28], ["CDL_FIRE:FINDING_OVERDUE:2026-07-01", 28], ["CDL_FIRE:FINDING_OVERDUE:2026-07-03", 28], ["CDL_FIRE:FINDING_OVERDUE:2026-07-08", 28], ["CDL_FIRE:FINDING_OVERDUE:2026-07-02", 28], ["CDL_FIRE:FINDING_OVERDUE:2026-07-04", 28], ["CDL_FIRE:FINDING_OVERDUE:2026-07-09", 28], ["EXPORT", 26], ["ESCALATION_BREACH", 14], ["RECOMPUTE", 14], ["APPROVE", 12], ["EXPORT_PDF", 11], ["SEED", 10], ["UNLINK", 10], ["SLA_BREACH", 10], ["AUTO_CREATE", 9], ["UPLOAD", 9], ["CREATE_RECORD", 8], ["SOC_FIRE:SECURITY_EVENT_SLA_BREACHED", 8], ["SCORE", 7], ["SOC_FIRE:APPSEC_SLA_BREACHED", 7], ["RISK_REVIEW_OVERDUE", 7], ["WORKFLOW_REQUEST_REVIEWED", 7], ["COM_FIRE:COMMITTEE_ACTION_OVERDUE", 6], ["DRAFT", 6], ["WORKFLOW_REQUEST_BRANCHED", 6], ["OPRES_PILLAR_GAP", 5], ["TENABLE_FINDING_INGESTED", 5], ["WORKFLOW_REQUEST_APPROVED", 5], ["WORKFLOW_REQUEST_RESUBMITTED", 5], ["WORKFLOW_REQUEST_OVERDUE", 5], ["CYBER_EVIDENCE_EXPIRED", 5], ["OPRES_CELL_UPDATED", 5], ["CYBER_CAPA_ESCALATED", 4], ["TI_ACTIONED", 4], ["POLICY_CONTROLS_SET", 4], ["ATTEST", 4], ["RISK_REASSESSED", 4], ["RISK_AUDIT_PACKAGE_EXPORTED", 4], ["SOC_FIRE:IAM_PRIVILEGED_REVIEW_DUE", 4], ["IMPORT", 4], ["LINK_EVIDENCE", 4], ["REJECT", 3], ["RUN_COMPLETED", 3], ["STATUS_SYNC", 3], ["CUSTOM", 3], ["WORKFLOW_REQUEST_CLOSED", 3], ["FLAG", 3], ["EXPIRY_SWEEP", 3], ["WORKFLOW_REQUEST_REOPENED", 2], ["SOC_FIRE:CRYPTO_CERT_EXPIRED", 2], ["INGEST_SIEM_EVENT", 2], ["MEMBER_APPOINT", 2], ["IR_PLAYBOOK_CLONE", 2], ["SHADOW_IT_DISCOVERED", 2], ["SKILL_ADD", 2], ["RESOLUTION_CREATE", 2], ["PAPER_CIRCULATE", 2], ["SECURITY_EVENT_TRIAGE", 2], ["WORKFLOW_REQUEST_ESCALATED", 2], ["ACTION_CREATE", 2], ["RESOLVE", 2], ["IR_PLAYBOOK_INVOKE", 2], ["FORENSICS_CUSTODY_TRANSFER", 2], ["ENABLE", 2], ["INGEST", 2], ["OPRES_ASSESSMENT_CLOSED", 1], ["SWEEP", 1], ["BCY_FIRE:BCM_CYCLE_OVERDUE:2026-07-03", 1], ["POL_FIRE:POLICY_REVIEW_DUE:2026-08-01", 1], ["WORKFLOW_RECIPIENT_LIST_CREATED", 1], ["SECURITY_EVENT_RESOLVE", 1], ["BCY_FIRE:BCM_CYCLE_OVERDUE:2026-07-01", 1], ["REOPENED", 1], ["FRAUD_CASE_TRIAGED", 1], ["DETECTION_RULE_UPDATE", 1], ["FORENSICS_CREATE", 1], ["BCY_FIRE:BCM_CYCLE_OVERDUE:2026-07-07", 1], ["RECOMPUTE_ALL", 1], ["RECORD", 1], ["WORKFLOW_REQUEST_UPDATED", 1], ["MEMBER_TERM_END", 1], ["DETECTION_RULE_CREATE", 1], ["BCY_FIRE:BCM_CYCLE_OVERDUE:2026-06-29", 1], ["MEMBER_RENEW", 1], ["BCY_FIRE:BCM_CYCLE_OVERDUE:2026-07-06", 1], ["PDPL_DRAFTED", 1], ["BCY_FIRE:BCM_CYCLE_OVERDUE:2026-07-02", 1], ["TEST", 1], ["BCY_FIRE:BCM_CYCLE_OVERDUE:2026-07-04", 1], ["REG_INSPECTION_TRANSITIONED", 1], ["DEACTIVATE", 1], ["REG_INSPECTION_CREATED", 1], ["CLONE_TEMPLATE", 1], ["ACTIVATE", 1], ["DISABLE", 1], ["FRAUD_CASE_CONFIRMED", 1], ["OPRES_ASSESSMENT_APPROVED", 1], ["REG_DOCUMENT_REQUEST_OPENED", 1], ["FRAUD_CASE_CREATED", 1], ["BCY_FIRE:BCM_CYCLE_OVERDUE:2026-07-05", 1], ["BREACH_REPORTED_TO_SDAIA", 1], ["BCY_FIRE:BCM_CYCLE_OVERDUE:2026-06-30", 1], ["OPRES_ASSESSMENT_CREATED", 1], ["TENABLE_RECAST_APPLIED", 1], ["BCY_FIRE:BCM_CYCLE_OVERDUE:2026-07-08", 1], ["KRI_MEASURED", 1], ["WORKFLOW_REQUEST_RETURNED", 1], ["SPLUNK_EVENT_PUSHED", 1], ["FRAUD_CASE_CLOSED", 1], ["LINK_REQUEST", 1], ["BCY_FIRE:BCM_CYCLE_OVERDUE:2026-07-09", 1], ["RETALIATION_VALIDATED", 1], ["OPRES_ASSESSMENT_SUBMITTED", 1], ["BULK_IMPORT", 1], ["TI_CREATE", 1], ["REOPEN", 1]], "exportsByFormat": [["PDF", 12], ["XLSX", 7], ["ZIP", 3], ["DOCX", 3], ["PPTX", 1]], "exportsByModule": [["REPORTING", 21], ["AI", 3], ["BCM", 1], ["CYBER", 1]], "evidenceByStatus": [["APPROVED", 32], ["DRAFT", 4], ["EXPIRED", 26], ["PENDING_REVIEW", 15], ["REJECTED", 1]], "kpi": {"risks": 51, "evidence": 78, "exports": 26, "auditEvents": 2920, "bcmCycles": 2, "bias": 7}};
+    const BRAND='#0E5E5E', ACCENT='#C8932A';
+    const PALETTE=['#0E5E5E','#C8932A','#1D4E89','#2E9E5B','#8172B3','#C0392B','#E67E22','#4C72B0'];
+    const LEVEL_COLORS={CRITICAL:'#C0392B',HIGH:'#E67E22',MEDIUM:'#C8932A',LOW:'#2E9E5B','—':'#94A3B8'};
+    const pairs = a => ({labels:a.map(x=>x[0]), data:a.map(x=>x[1])});
+    const sum = a => a.reduce((s,x)=>s+x[1],0);
+    document.getElementById('asof').textContent = new Date().toISOString().slice(0,10);
+
+    // KPIs
+    const openRisks = (DATA.risksByStatus.find(x=>x[0]==='OPEN')||[,0])[1];
+    const kpis=[
+      {lbl:'Total risks', val:DATA.kpi.risks, cap:'enterprise register'},
+      {lbl:'Open risks', val:openRisks, cap:'awaiting treatment', cls:'warn'},
+      {lbl:'Evidence items', val:DATA.kpi.evidence, cap:'collected artefacts'},
+      {lbl:'Exports', val:DATA.kpi.exports, cap:'PDF · Excel · Word · ZIP', cls:'accent'},
+      {lbl:'BCM cycles', val:DATA.kpi.bcmCycles, cap:DATA.kpi.bias+' BIA assessments'},
+      {lbl:'Audit events', val:DATA.kpi.auditEvents, cap:'full activity ledger'},
+    ];
+    document.getElementById('kpis').innerHTML = kpis.map(k=>
+      `<div class="kpi ${k.cls||''}"><div class="lbl">${k.lbl}</div><div class="val">${k.val.toLocaleString()}</div><div class="cap">${k.cap}</div></div>`).join('');
+
+    const baseOpts=(extra={})=>Object.assign({responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'right',labels:{usePointStyle:true,padding:12,font:{size:11}}}}},extra);
+    const doughnut=(id,a,colorFn)=>{const p=pairs(a);new Chart(document.getElementById(id),{type:'doughnut',data:{labels:p.labels,datasets:[{data:p.data,backgroundColor:p.labels.map((l,i)=>colorFn?colorFn(l):PALETTE[i%PALETTE.length]),borderColor:'#fff',borderWidth:2}]},options:baseOpts({cutout:'58%',plugins:{legend:{position:'right',labels:{usePointStyle:true,padding:12,font:{size:11}}},tooltip:{callbacks:{label:c=>{const t=c.dataset.data.reduce((x,y)=>x+y,0);return ` ${c.label}: ${c.parsed} (${(c.parsed/t*100).toFixed(0)}%)`;}}}}})});};
+    const bar=(id,a,{horizontal=false,color=BRAND}={})=>{const p=pairs(a);new Chart(document.getElementById(id),{type:'bar',data:{labels:p.labels,datasets:[{data:p.data,backgroundColor:color+'cc',borderColor:color,borderWidth:1,borderRadius:4}]},options:baseOpts({indexAxis:horizontal?'y':'x',plugins:{legend:{display:false}},scales:{x:{grid:{display:horizontal},beginAtZero:true,ticks:{font:{size:11}}},y:{grid:{display:!horizontal},beginAtZero:true,ticks:{font:{size:11}}}}})});};
+
+    doughnut('cRiskLevel', DATA.risksByLevel, l=>LEVEL_COLORS[l]||'#94A3B8');
+    bar('cRiskStatus', DATA.risksByStatus, {color:'#1D4E89'});
+    bar('cEvidence', DATA.evidenceByStatus, {horizontal:true, color:'#2E9E5B'});
+    bar('cExpFmt', DATA.exportsByFormat, {color:ACCENT});
+    doughnut('cExpMod', DATA.exportsByModule);
+    bar('cActivity', DATA.auditByAction.slice(0,12), {horizontal:true, color:BRAND});
+
+    // Sortable activity table
+    const tbody=document.querySelector('#tActivity tbody');
+    const total=sum(DATA.auditByAction), max=DATA.auditByAction[0][1];
+    let rows=DATA.auditByAction.slice(0,40), dir=-1, key=1;
+    const draw=()=>{tbody.innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1].toLocaleString()}</td><td class="bar-cell"><div class="track" style="width:${(r[1]/max*100).toFixed(1)}%"></div></td></tr>`).join('');};
+    document.querySelectorAll('#tActivity th[data-k]').forEach(th=>th.addEventListener('click',()=>{const k=+th.dataset.k;dir=(key===k)?-dir:-1;key=k;rows.sort((a,b)=>a[k]<b[k]?dir:a[k]>b[k]?-dir:0);draw();}));
+    draw();
+  </script>
+</body>
+</html>
