@@ -77,12 +77,18 @@ GHG import accepts `text/plain` (an *input*, not an export).
 9. Offer a branded print "recovery card" (logo + codes grid + single-use warning) in addition to the
    existing `.txt`. **Client-only** — recovery codes must never be POSTed to the server.
 
-### Phase 5 (OPTIONAL, on request) — true server-side binaries (word / excel)
-10. For packets that benefit from an editable/tabular binary (SAMA OpRes RTO table, Haseen per-domain
-    maturity, ESG emissions), add POST endpoints accepting the client payload and generating **PDF via
-    PdfTheme**, **DOCX via DocxExportService**, **XLSX via XlsxStyler** — all with `ExportNaming`
-    filenames + the export audit trail. Bigger lift (DTOs + services + FE POST wiring); implement only
-    if the print-to-PDF of Phases 1–2 is judged insufficient.
+### Phase 5 — true server-side XLSX binaries (the "excel" deliverable) — ✅ DONE
+10. **`POST /api/v1/reporting/packet.xlsx`** (`TabularExportRequest` → `TabularExportService`) turns
+    client-assembled `{module, exportType, lang, sheets[]}` into a branded workbook: XlsxStyler house
+    treatment (brand header via tenant BrandTheme + freeze + auto-filter + RTL + status
+    conditional-formatting), `ExportNaming` filename, auto-audited. Cell values are literal strings
+    (no formula-injection surface). Wired into the three named tabular packets — **ESG annex**
+    (`buildEsgAnnexSheets`), **SAMA OpRes** (`buildOpresSheets`), **NCA Haseen** (`buildHaseenSheets`) —
+    each with an "Export Excel" button beside the PDF + raw `.txt`. `downloadFile()` generalized to
+    POST+JSON. Verified: unit tests + live POST (branded xlsx w/ autoFilter/RTL/CF/brand fill) + FE
+    dynamic-import payload checks.
+11. **Still optional / not built:** DOCX narrative binaries (print-to-PDF of Phases 1–2 covers the
+    narrative need); XLSX for the non-tabular packets (Audit-Committee, NCEMA) — add on request.
 
 ---
 
