@@ -4686,6 +4686,7 @@ export const en = {
   connectorsEyebrow:           'Continuous monitoring',
   connectorsTitle:             'Connectors',
   auditLogTitle:               'Audit log',
+  accessGovTitle:              'Access governance',
   exportHistoryTitle:          'Export history',
   issuesTitle:                 'Issues',
   regHorizonSidebar:           'Regulatory horizon',

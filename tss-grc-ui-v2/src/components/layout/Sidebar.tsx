@@ -431,6 +431,7 @@ const NAV_GROUPS: NavGroup[] = [
         ],
       },
       { id: 'audit-log',   to: '/audit-log',         Icon: ScrollText,   labelKey: 'auditLogTitle' },
+      { id: 'access-gov',  to: '/access-governance', Icon: KeyRound,     labelKey: 'accessGovTitle' },
       { id: 'export-hist', to: '/export-history',    Icon: Download,     labelKey: 'exportHistoryTitle' },
       { id: 'sessions',    to: '/account/sessions',  Icon: KeyRound,     labelKey: 'sessionsTitle' },
       { id: 'issues',      to: '/issues',            Icon: ClipboardList, labelKey: 'issuesTitle' },

@@ -4694,6 +4694,7 @@ export const ar = {
   connectorsEyebrow:           'المراقبة المستمرة',
   connectorsTitle:             'التكاملات',
   auditLogTitle:               'سجل التدقيق',
+  accessGovTitle:              'حوكمة الصلاحيات',
   exportHistoryTitle:          'سجل التصدير',
   issuesTitle:                 'القضايا',
   regHorizonSidebar:           'الأفق التنظيمي',

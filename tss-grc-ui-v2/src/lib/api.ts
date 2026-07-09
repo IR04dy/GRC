@@ -2855,6 +2855,33 @@ export const adminApi = {
   roles:         () => api.get<AdminRoleDto[]>('/api/v1/admin/roles'),
 };
 
+// ── Access Governance — RBAC console (roles / matrix / effective access) ────
+//    Backend: com.tss.grc.module.iam.governance (P0). Reads IAM:READ,
+//    mutations IAM:WRITE, retire IAM:DELETE.
+export interface GovRoleDto {
+  id: number; roleName: string; displayNameEn: string; displayNameAr?: string | null;
+  systemRole: boolean; active: boolean; organisationId?: number | null;
+}
+export interface GovMatrixCell { module: string; action: string; permissionName: string; granted: boolean; }
+export interface GovMatrixDto { roleId: number; roleName: string; systemRole: boolean; cells: GovMatrixCell[]; }
+export interface GovEffectiveGrant { module: string; action: string; viaRoles: string[]; }
+export interface GovEffectiveAccessDto {
+  userId: number; username: string; platformAdmin: boolean; roles: string[]; grants: GovEffectiveGrant[];
+}
+export const governanceApi = {
+  roles:           () => api.get<GovRoleDto[]>('/api/v1/iam/governance/roles'),
+  createRole:      (b: { roleName: string; displayNameEn: string; displayNameAr?: string }) =>
+    api.post<GovRoleDto>('/api/v1/iam/governance/roles', b),
+  updateRole:      (id: number, b: { roleName: string; displayNameEn: string; displayNameAr?: string; isActive?: boolean }) =>
+    api.put<GovRoleDto>(`/api/v1/iam/governance/roles/${id}`, b),
+  deleteRole:      (id: number) => api.delete<void>(`/api/v1/iam/governance/roles/${id}`),
+  matrix:          (id: number) => api.get<GovMatrixDto>(`/api/v1/iam/governance/roles/${id}/matrix`),
+  saveMatrix:      (id: number, grants: { module: string; action: string }[]) =>
+    api.put<GovMatrixDto>(`/api/v1/iam/governance/roles/${id}/matrix`, { grants }),
+  effectiveAccess: (userId: number) =>
+    api.get<GovEffectiveAccessDto>(`/api/v1/iam/governance/users/${userId}/effective-access`),
+};
+
 // ── Workflow submissions — generic ledger for the 12 wizards without ─────
 //    dedicated tables (Risk Treatment, Risk Acceptance, Incident RCA,
 //    Management Review, Digital Signature, Control Test, Cloud CCC, NCA
