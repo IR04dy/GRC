@@ -1,0 +1,89 @@
+package com.tss.grc.module.sust.finance.dto;
+
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+/** Green-Finance uplift G1 — request payloads (responses are the entities themselves,
+ *  matching the climate-module convention). */
+public final class GreenFinanceDtos {
+
+    private GreenFinanceDtos() {}
+
+    public record CreateInstrumentRequest(
+        @NotBlank @Size(max = 40) String instrumentCode,
+        @NotBlank @Pattern(regexp = "GREEN_SUKUK|GREEN_BOND|SUSTAINABILITY_SUKUK|GREEN_LOAN|SLL") String instrumentType,
+        @NotBlank @Size(max = 300) String nameEn,
+        @Size(max = 300) String nameAr,
+        @Size(max = 20) String isin,
+        @Size(max = 60) String listing,
+        LocalDate issueDate,
+        LocalDate maturityDate,
+        @NotNull @DecimalMin(value = "0.0001") BigDecimal amountSarMn,
+        @DecimalMin(value = "0") BigDecimal issuanceCostsSarMn,
+        @Size(max = 300) String frameworkReference,
+        @Pattern(regexp = "MUDARABA|WAKALA|IJARA|HYBRID|NA") String shariahStructure,
+        @Size(max = 200) String shariahApprovalRef,
+        @Size(max = 200) String externalReviewer,
+        @Size(max = 60) String spoRating,
+        @Size(max = 500) String icmaCategories,
+        BigDecimal profitRatePct,
+        Integer lookbackMonths
+    ) {}
+
+    public record TransitionInstrumentRequest(
+        @NotBlank @Pattern(regexp = "DRAFT|SHARIAH_REVIEW|APPROVED|ISSUED|REPORTING|MATURED") String status,
+        @Size(max = 200) String shariahApprovalRef
+    ) {}
+
+    public record CreateProjectRequest(
+        @NotBlank @Size(max = 40) String projectCode,
+        @NotBlank @Size(max = 300) String nameEn,
+        @Size(max = 300) String nameAr,
+        @NotBlank @Pattern(regexp = "RENEWABLE_ENERGY|ENERGY_EFFICIENCY|CLEAN_TRANSPORT|GREEN_BUILDINGS|WATER|WASTE|CCUS|OTHER_ELIGIBLE") String category,
+        String descriptionEn,
+        String descriptionAr,
+        @NotNull @DecimalMin(value = "0.0001") BigDecimal totalCostSarMn,
+        BigDecimal expectedTco2eAvoidedYr,
+        BigDecimal actualTco2eAvoidedYr,
+        BigDecimal expectedMwhRenewableYr,
+        BigDecimal actualMwhRenewableYr,
+        BigDecimal expectedWaterM3SavedYr,
+        BigDecimal actualWaterM3SavedYr
+    ) {}
+
+    public record ProposeAllocationRequest(
+        @NotNull Long instrumentId,
+        @NotNull Long projectId,
+        @NotNull @DecimalMin(value = "0.0001") BigDecimal amountSarMn,
+        @NotNull LocalDate allocationDate,
+        @Pattern(regexp = "NEW_FINANCING|REFINANCING") String financingType
+    ) {}
+
+    public record RejectAllocationRequest(
+        @NotBlank @Size(max = 500) String reason
+    ) {}
+
+    /** Use-of-proceeds summary for one instrument (plan §4.2 figures). */
+    public record InstrumentSummaryResponse(
+        Long instrumentId,
+        String instrumentCode,
+        String status,
+        BigDecimal netProceedsSarMn,
+        BigDecimal allocatedSarMn,
+        BigDecimal unallocatedSarMn,
+        BigDecimal allocationRatioPct,
+        BigDecimal refinancingSharePct,
+        BigDecimal tco2eAvoidedYr,
+        BigDecimal mwhRenewableYr,
+        BigDecimal waterM3SavedYr,
+        BigDecimal intensityTco2ePerSarMn,
+        int approvedAllocations,
+        int pendingAllocations
+    ) {}
+}

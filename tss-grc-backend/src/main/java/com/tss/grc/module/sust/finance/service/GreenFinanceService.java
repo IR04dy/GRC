@@ -1,0 +1,307 @@
+package com.tss.grc.module.sust.finance.service;
+
+import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateInstrumentRequest;
+import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateProjectRequest;
+import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.InstrumentSummaryResponse;
+import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.ProposeAllocationRequest;
+import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.TransitionInstrumentRequest;
+import com.tss.grc.module.sust.finance.entity.GreenInstrument;
+import com.tss.grc.module.sust.finance.entity.GreenProject;
+import com.tss.grc.module.sust.finance.entity.InstrumentAllocation;
+import com.tss.grc.module.sust.finance.repository.GreenInstrumentRepository;
+import com.tss.grc.module.sust.finance.repository.GreenProjectRepository;
+import com.tss.grc.module.sust.finance.repository.InstrumentAllocationRepository;
+import com.tss.grc.security.GrcUserDetails;
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Green-Finance uplift G1 (plan §4) — the Green Sukuk / sustainable-finance register:
+ * instruments, eligible projects, and the maker-checker'd use-of-proceeds ledger with
+ * the §4.2 calculation rules. Hard rules enforced here:
+ * <ul>
+ *   <li>Over-allocation blocked: Σ(APPROVED + pending PROPOSED) never exceeds net proceeds.</li>
+ *   <li>Proposer ≠ approver on every allocation (runtime SoD, §4.3) — 409 on self-approval.</li>
+ *   <li>Sukuk-type instruments cannot pass SHARIAH_REVIEW without a Shariah approval reference.</li>
+ *   <li>Allocations only against instruments in APPROVED/ISSUED/REPORTING state.</li>
+ * </ul>
+ */
+@Service
+@RequiredArgsConstructor
+public class GreenFinanceService {
+
+    private static final Set<String> ALLOCATABLE = Set.of("APPROVED", "ISSUED", "REPORTING");
+    private static final List<String> LIFECYCLE =
+        List.of("DRAFT", "SHARIAH_REVIEW", "APPROVED", "ISSUED", "REPORTING", "MATURED");
+    private static final Set<String> SUKUK_TYPES = Set.of("GREEN_SUKUK", "SUSTAINABILITY_SUKUK");
+
+    private final GreenInstrumentRepository instruments;
+    private final GreenProjectRepository projects;
+    private final InstrumentAllocationRepository allocations;
+    private final AuditLogService audit;
+
+    // ── instruments ─────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<GreenInstrument> listInstruments() {
+        return instruments.findByOrganisationIdAndIsDeletedFalseOrderByInstrumentCodeAsc(org());
+    }
+
+    @Transactional
+    public GreenInstrument createInstrument(CreateInstrumentRequest r) {
+        Long org = org();
+        if (instruments.existsByOrganisationIdAndInstrumentCodeAndIsDeletedFalse(org, r.instrumentCode())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Instrument code already exists: " + r.instrumentCode());
+        }
+        GreenInstrument e = new GreenInstrument();
+        e.setOrganisationId(org);
+        e.setInstrumentCode(r.instrumentCode());
+        e.setInstrumentType(r.instrumentType());
+        e.setNameEn(r.nameEn());
+        e.setNameAr(r.nameAr());
+        e.setIsin(r.isin());
+        e.setListing(r.listing());
+        e.setIssueDate(r.issueDate());
+        e.setMaturityDate(r.maturityDate());
+        e.setAmountSarMn(r.amountSarMn());
+        e.setIssuanceCostsSarMn(r.issuanceCostsSarMn() == null ? BigDecimal.ZERO : r.issuanceCostsSarMn());
+        e.setFrameworkReference(r.frameworkReference());
+        e.setShariahStructure(r.shariahStructure() == null ? "NA" : r.shariahStructure());
+        e.setShariahApprovalRef(r.shariahApprovalRef());
+        e.setExternalReviewer(r.externalReviewer());
+        e.setSpoRating(r.spoRating());
+        e.setIcmaCategories(r.icmaCategories());
+        e.setProfitRatePct(r.profitRatePct());
+        if (r.lookbackMonths() != null) e.setLookbackMonths(r.lookbackMonths());
+        GreenInstrument saved = instruments.save(e);
+        audit.log("CREATE", "GreenInstrument", saved.getId(),
+            "Green instrument created: " + saved.getInstrumentCode() + " (" + saved.getInstrumentType() + ")");
+        return saved;
+    }
+
+    @Transactional
+    public GreenInstrument transitionInstrument(Long id, TransitionInstrumentRequest r) {
+        GreenInstrument e = mustInstrument(id);
+        String from = e.getStatus(), to = r.status();
+        int fromIdx = LIFECYCLE.indexOf(from), toIdx = LIFECYCLE.indexOf(to);
+        if (toIdx < 0 || Math.abs(toIdx - fromIdx) != 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Illegal transition " + from + " -> " + to + " (one lifecycle step at a time)");
+        }
+        // Shariah gate: sukuk types cannot pass SHARIAH_REVIEW without an approval reference.
+        if ("SHARIAH_REVIEW".equals(from) && "APPROVED".equals(to) && SUKUK_TYPES.contains(e.getInstrumentType())) {
+            String ref = r.shariahApprovalRef() != null ? r.shariahApprovalRef() : e.getShariahApprovalRef();
+            if (ref == null || ref.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Sukuk instruments require a Shariah-board approval reference before APPROVED");
+            }
+            e.setShariahApprovalRef(ref);
+            e.setShariahApproved(true);
+        }
+        e.setStatus(to);
+        GreenInstrument saved = instruments.save(e);
+        audit.log("TRANSITION", "GreenInstrument", saved.getId(),
+            "Green instrument " + saved.getInstrumentCode() + ": " + from + " -> " + to);
+        return saved;
+    }
+
+    // ── projects ────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<GreenProject> listProjects() {
+        return projects.findByOrganisationIdAndIsDeletedFalseOrderByProjectCodeAsc(org());
+    }
+
+    @Transactional
+    public GreenProject createProject(CreateProjectRequest r) {
+        Long org = org();
+        if (projects.existsByOrganisationIdAndProjectCodeAndIsDeletedFalse(org, r.projectCode())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Project code already exists: " + r.projectCode());
+        }
+        GreenProject e = new GreenProject();
+        e.setOrganisationId(org);
+        e.setProjectCode(r.projectCode());
+        e.setNameEn(r.nameEn());
+        e.setNameAr(r.nameAr());
+        e.setCategory(r.category());
+        e.setDescriptionEn(r.descriptionEn());
+        e.setDescriptionAr(r.descriptionAr());
+        e.setTotalCostSarMn(r.totalCostSarMn());
+        e.setExpectedTco2eAvoidedYr(r.expectedTco2eAvoidedYr());
+        e.setActualTco2eAvoidedYr(r.actualTco2eAvoidedYr());
+        e.setExpectedMwhRenewableYr(r.expectedMwhRenewableYr());
+        e.setActualMwhRenewableYr(r.actualMwhRenewableYr());
+        e.setExpectedWaterM3SavedYr(r.expectedWaterM3SavedYr());
+        e.setActualWaterM3SavedYr(r.actualWaterM3SavedYr());
+        GreenProject saved = projects.save(e);
+        audit.log("CREATE", "GreenProject", saved.getId(),
+            "Green project created: " + saved.getProjectCode() + " [" + saved.getCategory() + "]");
+        return saved;
+    }
+
+    // ── use-of-proceeds ledger (maker-checker) ──────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<InstrumentAllocation> listAllocations(Long instrumentId) {
+        mustInstrument(instrumentId);
+        return allocations.findByOrganisationIdAndInstrumentIdAndIsDeletedFalseOrderByAllocationDateAsc(org(), instrumentId);
+    }
+
+    @Transactional
+    public InstrumentAllocation proposeAllocation(ProposeAllocationRequest r) {
+        Long org = org();
+        GreenInstrument instr = mustInstrument(r.instrumentId());
+        projects.findByOrganisationIdAndIdAndIsDeletedFalse(org, r.projectId())
+            .orElseThrow(() -> new EntityNotFoundException("Green project not found: " + r.projectId()));
+        if (!ALLOCATABLE.contains(instr.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Instrument must be APPROVED/ISSUED/REPORTING to allocate (is " + instr.getStatus() + ")");
+        }
+        // Over-allocation hard block (§4.2) — counts APPROVED and still-pending PROPOSED.
+        BigDecimal net = GreenFinanceMath.netProceeds(instr.getAmountSarMn(), instr.getIssuanceCostsSarMn());
+        BigDecimal committed = sumAllocations(org, instr.getId(), Set.of("APPROVED", "PROPOSED"), null);
+        if (GreenFinanceMath.wouldOverAllocate(committed, r.amountSarMn(), net)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Over-allocation blocked: committed " + committed + " + " + r.amountSarMn()
+                    + " exceeds net proceeds " + net + " SAR mn");
+        }
+        InstrumentAllocation a = new InstrumentAllocation();
+        a.setOrganisationId(org);
+        a.setInstrumentId(r.instrumentId());
+        a.setProjectId(r.projectId());
+        a.setAmountSarMn(r.amountSarMn());
+        a.setAllocationDate(r.allocationDate());
+        a.setFinancingType(r.financingType() == null ? "NEW_FINANCING" : r.financingType());
+        a.setProposedBy(currentUserId());
+        InstrumentAllocation saved = allocations.save(a);
+        audit.log("CREATE", "InstrumentAllocation", saved.getId(),
+            "Allocation proposed: " + r.amountSarMn() + " SAR mn, instrument " + instr.getInstrumentCode());
+        return saved;
+    }
+
+    @Transactional
+    public InstrumentAllocation approveAllocation(Long id) {
+        InstrumentAllocation a = mustAllocation(id);
+        requirePending(a);
+        Long approver = currentUserId();
+        if (approver != null && approver.equals(a.getProposedBy())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Self-approval blocked: allocation proposer and approver must differ (SoD)");
+        }
+        a.setStatus("APPROVED");
+        a.setApprovedBy(approver);
+        a.setDecidedAt(LocalDateTime.now());
+        InstrumentAllocation saved = allocations.save(a);
+        audit.log("APPROVE", "InstrumentAllocation", saved.getId(),
+            "Allocation approved: " + saved.getAmountSarMn() + " SAR mn");
+        return saved;
+    }
+
+    @Transactional
+    public InstrumentAllocation rejectAllocation(Long id, String reason) {
+        InstrumentAllocation a = mustAllocation(id);
+        requirePending(a);
+        a.setStatus("REJECTED");
+        a.setApprovedBy(currentUserId());
+        a.setDecidedAt(LocalDateTime.now());
+        a.setRejectionReason(reason);
+        InstrumentAllocation saved = allocations.save(a);
+        audit.log("REJECT", "InstrumentAllocation", saved.getId(), "Allocation rejected: " + reason);
+        return saved;
+    }
+
+    // ── §4.2 summary ────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public InstrumentSummaryResponse summary(Long instrumentId) {
+        Long org = org();
+        GreenInstrument instr = mustInstrument(instrumentId);
+        List<InstrumentAllocation> all =
+            allocations.findByOrganisationIdAndInstrumentIdAndIsDeletedFalseOrderByAllocationDateAsc(org, instrumentId);
+
+        BigDecimal net = GreenFinanceMath.netProceeds(instr.getAmountSarMn(), instr.getIssuanceCostsSarMn());
+        BigDecimal allocated = BigDecimal.ZERO, refinanced = BigDecimal.ZERO;
+        BigDecimal tco2e = BigDecimal.ZERO, mwh = BigDecimal.ZERO, water = BigDecimal.ZERO;
+        int approved = 0, pending = 0;
+
+        // Cache projects once for attribution.
+        Map<Long, GreenProject> projById = new java.util.HashMap<>();
+        for (InstrumentAllocation a : all) {
+            if ("PROPOSED".equals(a.getStatus())) { pending++; continue; }
+            if (!"APPROVED".equals(a.getStatus())) continue;
+            approved++;
+            allocated = allocated.add(a.getAmountSarMn());
+            if ("REFINANCING".equals(a.getFinancingType())) refinanced = refinanced.add(a.getAmountSarMn());
+            GreenProject p = projById.computeIfAbsent(a.getProjectId(),
+                pid -> projects.findByOrganisationIdAndIdAndIsDeletedFalse(org, pid).orElse(null));
+            if (p == null) continue;
+            BigDecimal share = GreenFinanceMath.projectShare(a.getAmountSarMn(), p.getTotalCostSarMn());
+            tco2e = tco2e.add(GreenFinanceMath.attributedImpact(share, p.getActualTco2eAvoidedYr()));
+            mwh   = mwh.add(GreenFinanceMath.attributedImpact(share, p.getActualMwhRenewableYr()));
+            water = water.add(GreenFinanceMath.attributedImpact(share, p.getActualWaterM3SavedYr()));
+        }
+
+        return new InstrumentSummaryResponse(
+            instr.getId(), instr.getInstrumentCode(), instr.getStatus(),
+            net,
+            allocated.setScale(4, java.math.RoundingMode.HALF_UP),
+            GreenFinanceMath.unallocated(net, allocated),
+            GreenFinanceMath.allocationRatioPct(allocated, net),
+            GreenFinanceMath.refinancingSharePct(refinanced, allocated),
+            tco2e, mwh, water,
+            GreenFinanceMath.intensityPerSarMn(tco2e, allocated),
+            approved, pending);
+    }
+
+    // ── helpers ─────────────────────────────────────────────────────────
+
+    private BigDecimal sumAllocations(Long org, Long instrumentId, Set<String> statuses, Long excludeId) {
+        return allocations.findByOrganisationIdAndInstrumentIdAndIsDeletedFalseOrderByAllocationDateAsc(org, instrumentId)
+            .stream()
+            .filter(a -> statuses.contains(a.getStatus()))
+            .filter(a -> excludeId == null || !excludeId.equals(a.getId()))
+            .map(InstrumentAllocation::getAmountSarMn)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private GreenInstrument mustInstrument(Long id) {
+        return instruments.findByOrganisationIdAndIdAndIsDeletedFalse(org(), id)
+            .orElseThrow(() -> new EntityNotFoundException("Green instrument not found: " + id));
+    }
+
+    private InstrumentAllocation mustAllocation(Long id) {
+        return allocations.findByOrganisationIdAndIdAndIsDeletedFalse(org(), id)
+            .orElseThrow(() -> new EntityNotFoundException("Allocation not found: " + id));
+    }
+
+    private static void requirePending(InstrumentAllocation a) {
+        if (!"PROPOSED".equals(a.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Allocation already decided (" + a.getStatus() + ")");
+        }
+    }
+
+    private static Long org() {
+        return TenantContext.requireOrganisationId();
+    }
+
+    static Long currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof GrcUserDetails u) return u.getUserId();
+        return null;
+    }
+}
