@@ -87,8 +87,13 @@ GHG import accepts `text/plain` (an *input*, not an export).
     each with an "Export Excel" button beside the PDF + raw `.txt`. `downloadFile()` generalized to
     POST+JSON. Verified: unit tests + live POST (branded xlsx w/ autoFilter/RTL/CF/brand fill) + FE
     dynamic-import payload checks.
-11. **Still optional / not built:** DOCX narrative binaries (print-to-PDF of Phases 1–2 covers the
-    narrative need); XLSX for the non-tabular packets (Audit-Committee, NCEMA) — add on request.
+11. **DOCX binaries + AC/NCEMA XLSX — ✅ DONE (master @ 1f0a7225).** `POST /reporting/packet.docx`
+    (`TabularExportService.docx`, reusing DocxExportService's XWPF helpers + tenant BrandTheme + RTL)
+    with "Export Word" on all five packets; `buildAcSheets`/`buildNcemaSheets` + "Export Excel" on the
+    Audit-Committee and NCEMA packets. Every packet now exports PDF · Excel · Word · raw .txt. Both
+    `packet.xlsx`/`packet.docx` guarded `hasPermission('REPORTING','READ')`.
+12. **Also bundled:** `Amiri-Regular.ttf` (SIL OFL 1.1) in `resources/fonts/` so Arabic PDFs render on
+    a fontless host without config.
 
 ---
 
@@ -99,8 +104,8 @@ GHG import accepts `text/plain` (an *input*, not an export).
   manifest integrity, ExportNaming filename, and an `action=EXPORT` audit row.
 - Commit per slice on `feat/export-txt-to-formats`. **No merge to master until explicitly told.**
 
-## Residuals / decisions to confirm
-- Keep or drop the raw `.txt` secondary button per packet (Crisis keeps it for portal upload; others
-  likely drop). Default: **PDF primary, `.txt` kept only where a machine/portal consumer needs it.**
-- Phase 5 (docx/xlsx binaries) is opt-in — Phases 1–3 already convert every `.txt` to a formatted
-  branded document.
+## Status — COMPLETE (master @ 1f0a7225, 2026-07-09)
+All phases shipped and merged; backend `mvn test` green (2242 tests), FE `tsc` + `vite build` clean.
+Every `.txt` export is now a branded, bilingual/RTL formatted document, and each regulatory packet
+offers **PDF · Excel · Word · raw .txt** (the raw `.txt` retained where a machine/portal consumer
+needs it, e.g. Crisis → Haseen portal). No open items on the export track.
