@@ -4,12 +4,15 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateInstrumentRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateProjectRequest;
+import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateReportRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.InstrumentSummaryResponse;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.ProposeAllocationRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.TransitionInstrumentRequest;
+import com.tss.grc.module.sust.finance.entity.AllocationReport;
 import com.tss.grc.module.sust.finance.entity.GreenInstrument;
 import com.tss.grc.module.sust.finance.entity.GreenProject;
 import com.tss.grc.module.sust.finance.entity.InstrumentAllocation;
+import com.tss.grc.module.sust.finance.repository.AllocationReportRepository;
 import com.tss.grc.module.sust.finance.repository.GreenInstrumentRepository;
 import com.tss.grc.module.sust.finance.repository.GreenProjectRepository;
 import com.tss.grc.module.sust.finance.repository.InstrumentAllocationRepository;
@@ -52,6 +55,7 @@ public class GreenFinanceService {
     private final GreenInstrumentRepository instruments;
     private final GreenProjectRepository projects;
     private final InstrumentAllocationRepository allocations;
+    private final AllocationReportRepository reports;
     private final AuditLogService audit;
 
     // ── instruments ─────────────────────────────────────────────────────
@@ -265,6 +269,84 @@ public class GreenFinanceService {
             tco2e, mwh, water,
             GreenFinanceMath.intensityPerSarMn(tco2e, allocated),
             approved, pending);
+    }
+
+    // ── post-issuance reports (G2, plan §4.1 / REG-7) ────────────────────
+
+    @Transactional(readOnly = true)
+    public List<AllocationReport> listReports(Long instrumentId) {
+        mustInstrument(instrumentId);
+        return reports.findByOrganisationIdAndInstrumentIdAndIsDeletedFalseOrderByPeriodYearDesc(org(), instrumentId);
+    }
+
+    /** Freeze a DRAFT snapshot of the current §4.2 figures for the reporting period. */
+    @Transactional
+    public AllocationReport createReport(CreateReportRequest r) {
+        Long org = org();
+        GreenInstrument instr = mustInstrument(r.instrumentId());
+        String type = r.reportType() == null ? "COMBINED" : r.reportType();
+        if (reports.existsByOrganisationIdAndInstrumentIdAndPeriodYearAndReportTypeAndIsDeletedFalse(
+                org, instr.getId(), r.periodYear(), type)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Report already exists for " + instr.getInstrumentCode() + " / " + r.periodYear() + " / " + type);
+        }
+        InstrumentSummaryResponse s = summary(instr.getId());
+        AllocationReport rep = new AllocationReport();
+        rep.setOrganisationId(org);
+        rep.setInstrumentId(instr.getId());
+        rep.setPeriodYear(r.periodYear());
+        rep.setReportType(type);
+        rep.setAllocatedSarMn(s.allocatedSarMn());
+        rep.setUnallocatedSarMn(s.unallocatedSarMn());
+        rep.setAllocationRatioPct(s.allocationRatioPct());
+        rep.setRefinancingSharePct(s.refinancingSharePct());
+        rep.setTco2eAvoidedYr(s.tco2eAvoidedYr());
+        rep.setMwhRenewableYr(s.mwhRenewableYr());
+        rep.setWaterM3SavedYr(s.waterM3SavedYr());
+        rep.setIntensityTco2ePerSarMn(s.intensityTco2ePerSarMn());
+        rep.setNarrativeEn(r.narrativeEn());
+        rep.setNarrativeAr(r.narrativeAr());
+        AllocationReport saved = reports.save(rep);
+        audit.log("CREATE", "AllocationReport", saved.getId(),
+            "Allocation/impact report drafted: " + instr.getInstrumentCode() + " " + r.periodYear());
+        return saved;
+    }
+
+    @Transactional
+    public AllocationReport approveReport(Long id) {
+        AllocationReport rep = mustReport(id);
+        if (!"DRAFT".equals(rep.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Report is not DRAFT (" + rep.getStatus() + ")");
+        }
+        Long approver = currentUserId();
+        if (approver != null && approver.equals(rep.getCreatedBy())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Self-approval blocked: report creator and approver must differ (SoD)");
+        }
+        rep.setStatus("APPROVED");
+        rep.setApprovedBy(approver);
+        AllocationReport saved = reports.save(rep);
+        audit.log("APPROVE", "AllocationReport", saved.getId(), "Allocation/impact report approved");
+        return saved;
+    }
+
+    @Transactional
+    public AllocationReport publishReport(Long id) {
+        AllocationReport rep = mustReport(id);
+        if (!"APPROVED".equals(rep.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Only APPROVED reports can be published (" + rep.getStatus() + ")");
+        }
+        rep.setStatus("PUBLISHED");
+        rep.setPublishedAt(LocalDateTime.now());
+        AllocationReport saved = reports.save(rep);
+        audit.log("TRANSITION", "AllocationReport", saved.getId(), "Allocation/impact report published");
+        return saved;
+    }
+
+    private AllocationReport mustReport(Long id) {
+        return reports.findByOrganisationIdAndIdAndIsDeletedFalse(org(), id)
+            .orElseThrow(() -> new EntityNotFoundException("Report not found: " + id));
     }
 
     // ── helpers ─────────────────────────────────────────────────────────

@@ -2,13 +2,16 @@ package com.tss.grc.module.sust.finance.controller;
 
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateInstrumentRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateProjectRequest;
+import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateReportRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.InstrumentSummaryResponse;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.ProposeAllocationRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.RejectAllocationRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.TransitionInstrumentRequest;
+import com.tss.grc.module.sust.finance.entity.AllocationReport;
 import com.tss.grc.module.sust.finance.entity.GreenInstrument;
 import com.tss.grc.module.sust.finance.entity.GreenProject;
 import com.tss.grc.module.sust.finance.entity.InstrumentAllocation;
+import com.tss.grc.module.sust.finance.service.GreenFinancePackageService;
 import com.tss.grc.module.sust.finance.service.GreenFinanceService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -40,6 +43,7 @@ public class GreenFinanceController {
     private static final String APPROVE_GUARD = "hasPermission('SUST','APPROVE')";
 
     private final GreenFinanceService service;
+    private final GreenFinancePackageService packageService;
 
     // ── instruments ─────────────────────────────────────────────────────
 
@@ -96,5 +100,40 @@ public class GreenFinanceController {
     @PreAuthorize(APPROVE_GUARD)
     public InstrumentAllocation reject(@PathVariable Long id, @Valid @RequestBody RejectAllocationRequest r) {
         return service.rejectAllocation(id, r.reason());
+    }
+
+    // ── post-issuance reports (G2) ──────────────────────────────────────
+
+    @GetMapping("/instruments/{id}/reports")
+    @PreAuthorize(READ_GUARD)
+    public List<AllocationReport> reports(@PathVariable Long id) { return service.listReports(id); }
+
+    @PostMapping("/reports")
+    @PreAuthorize(WRITE_GUARD)
+    public AllocationReport createReport(@Valid @RequestBody CreateReportRequest r) {
+        return service.createReport(r);
+    }
+
+    @PostMapping("/reports/{id}/approve")
+    @PreAuthorize(APPROVE_GUARD)
+    public AllocationReport approveReport(@PathVariable Long id) { return service.approveReport(id); }
+
+    @PostMapping("/reports/{id}/publish")
+    @PreAuthorize(APPROVE_GUARD)
+    public AllocationReport publishReport(@PathVariable Long id) { return service.publishReport(id); }
+
+    // ── evidence package (G2, §6.7) ─────────────────────────────────────
+
+    @GetMapping("/evidence-package.zip")
+    @PreAuthorize(READ_GUARD)
+    public org.springframework.http.ResponseEntity<byte[]> evidencePackage() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder
+            .getContext().getAuthentication();
+        GreenFinancePackageService.Package pkg = packageService.generate(auth == null ? null : auth.getName());
+        return org.springframework.http.ResponseEntity.ok()
+            .contentType(org.springframework.http.MediaType.parseMediaType("application/zip"))
+            .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"" + pkg.filename() + "\"")
+            .body(pkg.bytes());
     }
 }

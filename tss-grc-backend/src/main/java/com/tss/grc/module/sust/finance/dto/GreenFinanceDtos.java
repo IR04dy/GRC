@@ -69,6 +69,14 @@ public final class GreenFinanceDtos {
         @NotBlank @Size(max = 500) String reason
     ) {}
 
+    public record CreateReportRequest(
+        @NotNull Long instrumentId,
+        @NotNull Integer periodYear,
+        @Pattern(regexp = "ALLOCATION|IMPACT|COMBINED") String reportType,
+        String narrativeEn,
+        String narrativeAr
+    ) {}
+
     /** Use-of-proceeds summary for one instrument (plan §4.2 figures). */
     public record InstrumentSummaryResponse(
         Long instrumentId,
