@@ -97,6 +97,9 @@ public class ExportService {
                 new PdfTheme.Kpi(ar ? "عالية" : "High",   String.valueOf(high), ""),
                 new PdfTheme.Kpi(ar ? "مفتوحة" : "Open",  String.valueOf(open), "")
             ),
+            new ReportMetadata("ERM", ar ? "سجل المخاطر" : "Risk Register",
+                (ar ? "حتى " : "As of ") + DATE_FMT.format(java.time.LocalDate.now()),
+                ar ? "جميع المخاطر (بحد أقصى 1000)" : "All risks (max 1000)", lang, "Internal", risks.size()),
             (doc) -> {
                 float[] widths = new float[]{ 1.2f, 4f, 1.6f, 1f, 1f, 1f, 1.5f };
                 PdfPTable t = new PdfPTable(widths);
@@ -154,6 +157,9 @@ public class ExportService {
                 new PdfTheme.Kpi(ar ? "متجاوزة 30 يوم" : "Past 30d", String.valueOf(past30Final), ar ? "تصعيد مدير" : "Manager tier"),
                 new PdfTheme.Kpi(ar ? "متجاوزة 90 يوم" : "Past 90d", String.valueOf(past90Final), ar ? "تصعيد تنفيذي" : "Exec tier")
             ),
+            new ReportMetadata("Compliance", ar ? "تقرير تقادم الملاحظات" : "Findings Aging Report",
+                (ar ? "حتى " : "As of ") + DATE_FMT.format(java.time.LocalDate.now()),
+                ar ? "جميع الملاحظات (بحد أقصى 1000)" : "All findings (max 1000)", lang, "Internal", findings.size()),
             (doc) -> {
                 float[] widths = new float[]{ 4f, 1.4f, 1.2f, 1f, 1.4f, 1.6f, 1.4f };
                 PdfPTable t = new PdfPTable(widths);
@@ -216,6 +222,9 @@ public class ExportService {
                 new PdfTheme.Kpi(ar ? "أحمر"  : "Red",    String.valueOf(redF),   ""),
                 new PdfTheme.Kpi(ar ? "بدون بيانات" : "No data", String.valueOf(noDataF), "")
             ),
+            new ReportMetadata("ERM", ar ? "لوحة مؤشرات المخاطر" : "KRI Dashboard",
+                (ar ? "حتى " : "As of ") + DATE_FMT.format(java.time.LocalDate.now()),
+                ar ? "جميع المؤشرات النشطة" : "All active KRIs", lang, "Internal", kris.size()),
             (doc) -> {
                 float[] widths = new float[]{ 1.3f, 4f, 1f, 1.3f, 1.3f, 1.3f, 1.6f };
                 PdfPTable t = new PdfPTable(widths);
@@ -257,6 +266,7 @@ public class ExportService {
                                   String eyebrowEn, String eyebrowAr,
                                   String titleEn, String titleAr,
                                   List<PdfTheme.Kpi> kpis,
+                                  ReportMetadata meta,
                                   TableRenderer table) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         // Landscape — register dumps tend to be wide (code + title + L/I/score
@@ -289,6 +299,11 @@ public class ExportService {
                 PdfTheme.kpiStrip(doc, new ArrayList<>(kpis));
             }
 
+            // Standardized metadata block (module/type/period/scope/records/language/classification).
+            if (meta != null) {
+                meta.renderInto(doc, currentUsername());
+            }
+
             // Table
             table.render(doc);
 
@@ -298,6 +313,17 @@ public class ExportService {
             throw new ExportException("PDF", "PDF generation failed", e);
         }
         return baos.toByteArray();
+    }
+
+    /** Best-effort current username for the report metadata block (null → "system"). */
+    private static String currentUsername() {
+        try {
+            var auth = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+            return auth == null ? null : auth.getName();
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private static PdfPCell headerCell(String text) {

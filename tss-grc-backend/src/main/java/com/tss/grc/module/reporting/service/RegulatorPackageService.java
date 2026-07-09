@@ -11,6 +11,7 @@ import com.tss.grc.module.compliance.entity.Control;
 import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.evidence.entity.EvidenceItem;
 import com.tss.grc.module.evidence.repository.EvidenceItemRepository;
+import com.tss.grc.module.evidence.service.EvidenceStorageService;
 import com.tss.grc.module.platform.auditlog.entity.AuditLogEntry;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.branding.service.BrandThemeService;
@@ -32,7 +33,10 @@ import java.io.ByteArrayOutputStream;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -61,15 +65,19 @@ import java.util.zip.ZipOutputStream;
 @RequiredArgsConstructor
 public class RegulatorPackageService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RegulatorPackageService.class);
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int MAX_ROWS   = 5000;   // per data sheet
     private static final int MAX_AUDIT  = 1000;   // audit-trail entries
+    /** Total embedded evidence-binary budget — guards against OOM buffering the ZIP in memory. */
+    private static final long MAX_EVIDENCE_TOTAL_BYTES = 200L * 1024 * 1024;
 
     private final ControlRepository controlRepo;
     private final EvidenceItemRepository evidenceRepo;
     private final AuditLogService auditLogService;
     private final OrganisationRepository orgRepo;
     private final BrandThemeService brandThemeService;
+    private final EvidenceStorageService evidenceStorage;
 
     public record Package(byte[] bytes, String filename) {}
 
@@ -118,18 +126,20 @@ public class RegulatorPackageService {
         byte[] readme = readmePdf(orgName, o == null ? null : o.getNameAr(), brand, brandColor, now,
             generatedByName, controls.size(), evidence.size(), audit.size());
 
-        // ── assemble ZIP (manifest last — it checksums the others) ───────────
+        // ── collect core files + the actual evidence-file binaries ──────────
+        List<String> names = new ArrayList<>(List.of(
+            "README.pdf", "Requirement_Mapping.xlsx", "Evidence_Index.xlsx", "Audit_Trail.xlsx"));
+        List<byte[]> blobs = new ArrayList<>(List.of(readme, mapping, evidenceIndex, auditTrail));
+        embedEvidenceFiles(evidence, names, blobs);
+
+        // ── assemble ZIP (manifest last — it checksums every other entry) ───
         String manifest = manifestJson(org, orgName, now, generatedByName,
             controls.size(), evidence.size(), audit.size(),
-            new String[]{"README.pdf", "Requirement_Mapping.xlsx", "Evidence_Index.xlsx", "Audit_Trail.xlsx"},
-            new byte[][]{readme, mapping, evidenceIndex, auditTrail});
+            names.toArray(new String[0]), blobs.toArray(new byte[0][]));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(out)) {
-            addEntry(zip, "README.pdf", readme);
-            addEntry(zip, "Requirement_Mapping.xlsx", mapping);
-            addEntry(zip, "Evidence_Index.xlsx", evidenceIndex);
-            addEntry(zip, "Audit_Trail.xlsx", auditTrail);
+            for (int i = 0; i < names.size(); i++) addEntry(zip, names.get(i), blobs.get(i));
             addEntry(zip, "manifest.json", manifest.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (java.io.IOException e) {
             throw new ExportException("ZIP", "Regulator package generation failed", e);
@@ -221,8 +231,9 @@ public class RegulatorPackageService {
             doc.add(new Paragraph("README.pdf — this cover and index.", PdfFonts.body(11)));
             doc.add(new Paragraph("Requirement_Mapping.xlsx — controls / requirements × framework × status.", PdfFonts.body(11)));
             doc.add(new Paragraph("Evidence_Index.xlsx — evidence register with integrity hashes.", PdfFonts.body(11)));
+            doc.add(new Paragraph("Evidence_Files/ — the actual uploaded evidence binaries (file-backed items).", PdfFonts.body(11)));
             doc.add(new Paragraph("Audit_Trail.xlsx — recent audit-log activity (who / what / when).", PdfFonts.body(11)));
-            doc.add(new Paragraph("manifest.json — SHA-256 checksum of every file above.", PdfFonts.body(11)));
+            doc.add(new Paragraph("manifest.json — SHA-256 checksum of every file above (incl. each evidence binary).", PdfFonts.body(11)));
 
             doc.close();
             writer.close();
@@ -260,6 +271,59 @@ public class RegulatorPackageService {
     }
 
     // ── helpers ────────────────────────────────────────────────────────────
+
+    /**
+     * Append the actual uploaded evidence-file binaries (under {@code Evidence_Files/}) to the
+     * package name/blob lists, so they land in the ZIP and are checksummed in the manifest.
+     * Link-only / file-less evidence is skipped; a missing or over-budget file is skipped with a
+     * log rather than failing the whole pack. A total-size budget guards against OOM (the ZIP is
+     * buffered in memory).
+     */
+    private void embedEvidenceFiles(List<EvidenceItem> evidence, List<String> names, List<byte[]> blobs) {
+        long remaining = MAX_EVIDENCE_TOTAL_BYTES;
+        int embedded = 0, noFile = 0, missing = 0, tooBig = 0;
+        Set<String> used = new HashSet<>();
+        for (EvidenceItem e : evidence) {
+            String path = e.getFilePath();
+            if (path == null || path.isBlank()) { noFile++; continue; }
+            byte[] bytes;
+            try {
+                bytes = evidenceStorage.load(path);
+            } catch (RuntimeException ex) {
+                missing++;
+                log.warn("Regulator package: evidence file unavailable (id={}, path={}): {}",
+                    e.getId(), path, ex.getMessage());
+                continue;
+            }
+            if (bytes.length > remaining) { tooBig++; continue; }
+            remaining -= bytes.length;
+            names.add(uniqueName("Evidence_Files/" + e.getId() + "_" + safeFileName(e.getFileName()), used));
+            blobs.add(bytes);
+            embedded++;
+        }
+        log.info("Regulator package evidence binaries: embedded={}, no-file={}, missing={}, over-budget={}",
+            embedded, noFile, missing, tooBig);
+    }
+
+    /** Sanitize an original filename for a ZIP entry: strip path separators + illegal chars, cap length. */
+    private static String safeFileName(String raw) {
+        String s = (raw == null || raw.isBlank()) ? "evidence.bin" : raw.trim();
+        s = s.replaceAll("[\\\\/:*?\"<>|\\r\\n]", "_");
+        return s.length() > 120 ? s.substring(s.length() - 120) : s;
+    }
+
+    /** Ensure a unique ZIP entry name (case-insensitive), inserting {@code _n} before the extension. */
+    private static String uniqueName(String base, Set<String> used) {
+        String name = base;
+        int n = 2;
+        while (!used.add(name.toLowerCase())) {
+            int dot = base.lastIndexOf('.');
+            int slash = base.lastIndexOf('/');
+            name = (dot > slash) ? base.substring(0, dot) + "_" + n + base.substring(dot) : base + "_" + n;
+            n++;
+        }
+        return name;
+    }
 
     private static void addEntry(ZipOutputStream zip, String name, byte[] bytes) throws java.io.IOException {
         zip.putNextEntry(new ZipEntry(name));

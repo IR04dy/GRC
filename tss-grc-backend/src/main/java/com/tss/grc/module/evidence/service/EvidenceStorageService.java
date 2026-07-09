@@ -47,4 +47,23 @@ public class EvidenceStorageService extends LocalFileStorageSupport {
         Path target = orgDir.resolve(safeFileName(original)).normalize();
         return write(target, original, file, "Failed to store evidence file.");
     }
+
+    /**
+     * Read the raw bytes of a stored evidence file by its root-relative {@code filePath}
+     * (as persisted on {@code EvidenceItem.filePath}). Path-traversal-guarded — the resolved
+     * path must stay inside the storage root. Mirrors {@code AttachmentStorageService.load}.
+     *
+     * @throws java.nio.file.NoSuchFileException-wrapped IllegalStateException if the file is absent
+     */
+    public byte[] load(String relativePath) {
+        Path target = root.resolve(relativePath).normalize();
+        if (!target.startsWith(root)) {
+            throw new IllegalArgumentException("Requested path escapes the storage root.");
+        }
+        try {
+            return java.nio.file.Files.readAllBytes(target);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Failed to read evidence file: " + relativePath, e);
+        }
+    }
 }
