@@ -812,6 +812,57 @@ export function buildOpresPacket(orgEn: string, orgAr: string, quarter: string):
   return lines.join('\n');
 }
 
+/** Export P5 — SAMA OpRes packet as tabular sheets for a branded .xlsx
+ *  (POST /api/v1/reporting/packet.xlsx). "Status" headers drive conditional formatting. */
+export function buildOpresSheets(): { name: string; headers: string[]; rows: string[][] }[] {
+  const bias = loadBia();
+  const strategies = loadStrategies();
+  const drills = loadDrills();
+  const invocations = loadInvocations();
+  const completed = drills.filter(d => d.status === 'CLOSED');
+  const avg = completed.length ? Math.round(completed.reduce((s, d) => s + (d.score ?? 0), 0) / completed.length) : 0;
+  const dt = (iso: string) => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Riyadh' });
+  return [
+    {
+      name: 'RTO Compliance',
+      headers: ['Tier', 'Process', 'RTO (h)', 'RPO (h)', 'MTPD (h)', 'Impact (k SAR/h)', 'Status', 'Expires'],
+      rows: bias.map(b => {
+        const proc = BCM_PROCESSES.find(p => p.id === b.processId);
+        return [b.tier, proc?.processNameEn ?? '?', String(b.rtoHours), String(b.rpoHours), String(b.mtpdHours),
+          (b.financialImpactSarPerHour / 1000).toFixed(0), b.status, b.expiresAt];
+      }),
+    },
+    {
+      name: 'Recovery Strategies',
+      headers: ['Process', 'Maturity /5', 'Primary Site', 'Alternate Site'],
+      rows: strategies.map(s => {
+        const proc = BCM_PROCESSES.find(p => p.id === s.processId);
+        return [proc?.processNameEn ?? '?', String(s.maturity), s.primarySite, s.alternateSite];
+      }),
+    },
+    {
+      name: 'Drill Programme',
+      headers: ['Metric', 'Value'],
+      rows: [
+        ['Completed', String(completed.length)],
+        ['Planned', String(drills.filter(d => d.status === 'PLANNED').length)],
+        ['NCEMA-led', String(drills.filter(d => d.ncemaLed).length)],
+        ['Avg score /100', completed.length ? String(avg) : '—'],
+      ],
+    },
+    {
+      name: 'Invocation History',
+      headers: ['ID', 'Plan', 'Status', 'Type', 'Declared', 'Actual RTO (h)', 'Notifications'],
+      rows: invocations.map(inv => {
+        const plan = BCM_PLANS.find(p => p.id === inv.planId);
+        return [inv.id, plan?.planNameEn ?? '?', inv.status, inv.isReal ? 'REAL' : 'DRILL', dt(inv.declaredAt),
+          inv.actualRtoHours != null ? String(inv.actualRtoHours) : '',
+          `${inv.notifications.filter(n => n.sentAt).length}/${inv.notifications.length}`];
+      }),
+    },
+  ];
+}
+
 // ─── Display helpers ───────────────────────────────────────────────────────
 
 export const TIER_LABEL: Record<ProcessTier, { en: string; ar: string }> = {

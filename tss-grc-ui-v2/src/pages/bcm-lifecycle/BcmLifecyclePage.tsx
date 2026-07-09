@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { LifecyclePipeline, type PipelineStage, type PipelineCard } from '../../components/lifecycle/LifecyclePipeline';
 import { printPacket, packetTextToSections } from '../../lib/packetPrint';
+import { reportingApi, ApiError } from '../../lib/api';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -21,7 +22,7 @@ import {
   loadDrills, transitionDrill, scheduleDrill,
   loadInvocations, declareInvocation, transitionInvocation, logInvocationNotification,
   activeInvocation, createBia,
-  subscribeBcm, aggregateBcm, buildOpresPacket,
+  subscribeBcm, aggregateBcm, buildOpresPacket, buildOpresSheets,
   pickProcessById, pickPlanById,
   BCM_PROCESSES, BCM_PLANS,
   TIER_LABEL, TIER_TONE, BIA_STATUS_LABEL, BIA_STATUS_TONE,
@@ -91,6 +92,15 @@ export function BcmLifecyclePage() {
     }, lang);
   }
 
+  async function exportOpresXlsx() {
+    try {
+      await reportingApi.packetXlsx({ module: 'BCM', exportType: 'SamaOpRes', lang, sheets: buildOpresSheets() });
+      toast.success(lang === 'ar' ? 'تم تصدير Excel' : 'Excel exported');
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر التصدير' : 'Export failed'));
+    }
+  }
+
   return (
     <Shell title={t('bclTitle')} sub={t('bclSub')}>
       <PageHeader
@@ -99,8 +109,9 @@ export function BcmLifecyclePage() {
         sub={t('bclPageSub')}
         actions={
           <>
-            <Button variant="secondary" Icon={Download} onClick={downloadOpres}>{t('bclDownloadOpres')}</Button>
             <Button variant="primary" onClick={printOpresPdf}>{t('bclPrintOpresPdf')}</Button>
+            <Button variant="secondary" Icon={Download} onClick={exportOpresXlsx}>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</Button>
+            <Button variant="ghost" Icon={Download} onClick={downloadOpres}>{t('bclDownloadOpres')}</Button>
           </>
         }
       />

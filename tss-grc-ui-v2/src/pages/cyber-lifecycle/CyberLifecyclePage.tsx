@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { LifecyclePipeline, type PipelineStage, type PipelineCard, dueLabel } from '../../components/lifecycle/LifecyclePipeline';
 import { printPacket, packetTextToSections } from '../../lib/packetPrint';
+import { reportingApi, ApiError } from '../../lib/api';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -22,7 +23,7 @@ import {
   loadThreats, acknowledgeThreat, createThreat,
   loadSocAlerts, transitionSocAlert, createSocAlert,
   loadPenTests, schedulePenTest, transitionPenTest, recordPenTestFindings,
-  subscribeCyber, aggregateCyber, buildHaseenPacket,
+  subscribeCyber, aggregateCyber, buildHaseenPacket, buildHaseenSheets,
   FILING_STATUS_LABEL, FILING_STATUS_TONE,
   TIER_LABEL, TIER_TONE,
   VULN_SEVERITY_TONE, VULN_STATUS_LABEL, VULN_STATUS_TONE,
@@ -93,6 +94,15 @@ export function CyberLifecyclePage() {
     }, lang);
   }
 
+  async function exportHaseenXlsx() {
+    try {
+      await reportingApi.packetXlsx({ module: 'NCA', exportType: 'HaseenECC', lang, sheets: buildHaseenSheets() });
+      toast.success(lang === 'ar' ? 'تم تصدير Excel' : 'Excel exported');
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر التصدير' : 'Export failed'));
+    }
+  }
+
   return (
     <Shell title={t('cycTitle')} sub={t('cycSub')}>
       <PageHeader
@@ -101,8 +111,9 @@ export function CyberLifecyclePage() {
         sub={t('cycPageSub')}
         actions={
           <>
-            <Button variant="secondary" Icon={Download} onClick={downloadHaseenPacket}>{t('cycDownloadHaseen')}</Button>
             <Button variant="primary" onClick={printHaseenPdf}>{t('cycPrintHaseenPdf')}</Button>
+            <Button variant="secondary" Icon={Download} onClick={exportHaseenXlsx}>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</Button>
+            <Button variant="ghost" Icon={Download} onClick={downloadHaseenPacket}>{t('cycDownloadHaseen')}</Button>
           </>
         }
       />

@@ -711,6 +711,40 @@ export function buildHaseenPacket(orgEn: string, orgAr: string): string {
   return lines.join('\n');
 }
 
+/** Export P5 — NCA Haseen ECC filing as tabular sheets for a branded .xlsx
+ *  (POST /api/v1/reporting/packet.xlsx). The "Severity" header drives conditional formatting. */
+export function buildHaseenSheets(): { name: string; headers: string[]; rows: string[][] }[] {
+  const filing = loadFiling();
+  const vulns = loadVulns();
+  const tests = loadPenTests();
+  const sev: Record<VulnSeverity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+  vulns.forEach(v => sev[v.severity]++);
+  const overdue = vulns.filter(v => new Date(v.dueDate) < new Date() && v.status !== 'CLOSED').length;
+  return [
+    {
+      name: 'ECC Domains',
+      headers: ['Domain', 'Name', 'Maturity', 'Controls', 'Evidenced', 'In Remediation'],
+      rows: filing.scores.map(s => [s.domain, s.nameEn, s.maturity === 0 ? 'N/A' : `${s.maturity}/5`,
+        String(s.controlsTotal), String(s.evidencedControls), String(s.remediationControls)]),
+    },
+    {
+      name: 'Vulnerability Posture',
+      headers: ['Severity', 'Count'],
+      rows: [
+        ['CRITICAL', String(sev.CRITICAL)], ['HIGH', String(sev.HIGH)],
+        ['MEDIUM', String(sev.MEDIUM)], ['LOW', String(sev.LOW)], ['Overdue', String(overdue)],
+      ],
+    },
+    {
+      name: 'Penetration Tests',
+      headers: ['Quarter', 'Scope', 'Vendor', 'Status', 'Critical', 'High', 'Medium', 'Remediation %'],
+      rows: tests.map(t => [t.scheduledQuarter, t.scope, t.vendor, t.status,
+        t.completedAt ? String(t.criticalFindings) : '', t.completedAt ? String(t.highFindings) : '',
+        t.completedAt ? String(t.mediumFindings) : '', t.completedAt ? String(t.remediationPct) : '']),
+    },
+  ];
+}
+
 // ─── Display helpers ───────────────────────────────────────────────────────
 
 export const FILING_STATUS_LABEL: Record<EccFilingStatus, { en: string; ar: string }> = {
