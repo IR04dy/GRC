@@ -6,7 +6,10 @@ import com.tss.grc.module.reporting.service.DocxExportService;
 import com.tss.grc.module.reporting.service.ExportNaming;
 import com.tss.grc.module.reporting.service.ExportService;
 import com.tss.grc.module.reporting.service.RegulatorPackageService;
+import com.tss.grc.module.reporting.service.TabularExportService;
+import com.tss.grc.module.reporting.dto.TabularExportRequest;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +37,7 @@ public class ExportController {
     private final BoardPackPptxService boardPackPptxService;
     private final DocxExportService docxExportService;
     private final RegulatorPackageService regulatorPackageService;
+    private final TabularExportService tabularExportService;
 
     private static final MediaType XLSX_TYPE =
         MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -150,6 +154,18 @@ public class ExportController {
             .contentType(ZIP_TYPE)
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + pkg.filename() + "\"")
             .body(pkg.bytes());
+    }
+
+    // ── Tabular XLSX from client-supplied data (P5) ─────────────────────────
+
+    @PostMapping("/packet.xlsx")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Branded .xlsx from client-supplied tabular data (sheets/headers/rows). " +
+        "Reuses the house XlsxStyler treatment + tenant BrandTheme; filename via ExportNaming.")
+    public ResponseEntity<byte[]> packetXlsx(@Valid @RequestBody TabularExportRequest request) {
+        byte[] body = tabularExportService.xlsx(request);
+        String lang = request.lang() == null || request.lang().isBlank() ? "en" : request.lang();
+        return xlsx(body, ExportNaming.build(request.module(), request.exportType(), lang, "xlsx"));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
