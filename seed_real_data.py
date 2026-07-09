@@ -2437,6 +2437,45 @@ for title_en, title_ar, source, status, il, ii, rl, ri in STC_RISKS:
     )
 
 # ──────────────────────────────────────────────────────────────────────
+# ESG metric readings (org 1) — Green-Finance uplift G0.
+# sust.esg_metric had 26 definitions but sust.esg_metric_reading had ZERO rows,
+# making every metric-backed disclosure un-evidenceable (assurance blocker,
+# plan §1). Seed two plausible readings per metric (mid-year + year-end of the
+# metric's own reporting_year), deterministic from the metric id so re-runs are
+# stable. Skips far-future test years (> 2030). SET NOCOUNT ON is REQUIRED —
+# run()'s @@ROWCOUNT fetch breaks on the INSERT path without it.
+# ──────────────────────────────────────────────────────────────────────
+section("sust.esg_metric_reading — readings for every metric definition")
+
+cur.execute("""SELECT id, metric_code, unit, reporting_year FROM sust.esg_metric
+               WHERE organisation_id = 1 AND is_deleted = 0 AND reporting_year <= 2030""")
+_metrics = cur.fetchall()
+for mid, mcode, unit, ryear in _metrics:
+    u = (unit or '').strip()
+    if u == '%':
+        base = 35 + (mid * 7) % 55                # 35–89 %
+    elif 'SAR' in u or '/' in u:
+        base = 5 + (mid * 3) % 40                 # small intensity ratios
+    else:
+        base = 500 + (mid * 137) % 9000           # absolute quantities
+    for as_of, factor, note in ((f"{ryear}-06-30", 0.94, "H1 reading"),
+                                (f"{ryear}-12-31", 1.00, "Year-end reading")):
+        val = round(base * factor, 4)
+        run(
+            """
+            SET NOCOUNT ON;
+            IF NOT EXISTS (SELECT 1 FROM sust.esg_metric_reading
+                           WHERE metric_id = ? AND as_of = ? AND is_deleted = 0)
+            INSERT INTO sust.esg_metric_reading (organisation_id, metric_id, reading_value,
+                as_of, notes, is_deleted, created_at, created_by)
+            VALUES (1, ?, ?, ?, ?, 0, SYSUTCDATETIME(), 'seed')
+            """,
+            mid, as_of,
+            mid, val, as_of, note,
+            label=f"reading: {mcode} {as_of} = {val}",
+        )
+
+# ──────────────────────────────────────────────────────────────────────
 print(f"\n══════ Summary ══════")
 print(f"  inserted: {inserted}")
 print(f"  skipped (already present): {skipped}")
