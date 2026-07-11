@@ -111,3 +111,6 @@ tss-grc-ui-v2/audit/
 
 # Deployment artifacts staged for the cloud server (jar + UI dist + DB .bak) - not source
 /deploy/
+
+# Filled external config (secrets) must never be committed - only the .template is
+external.properties

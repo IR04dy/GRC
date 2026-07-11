@@ -5,6 +5,7 @@ import org.hibernate.Interceptor;
 import org.hibernate.type.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -83,11 +84,17 @@ public class TenantWriteGuardInterceptor implements Interceptor {
     /**
      * Audit log of blocked attempts — gives ops visibility for tracking
      * attack attempts even when the interceptor's exception is caught and
-     * masked by an upstream try/catch. Optional dependency so the bean
-     * can be constructed in unit tests that don't bring up the audit log.
+     * masked by an upstream try/catch. Injected as a lazy provider, not a
+     * direct reference: this interceptor is wired INTO the EntityManagerFactory,
+     * and AuditLogService needs a JPA repository (which needs the EMF) — a
+     * direct field injection forms a startup cycle the moment the prod-only
+     * tenant-write-guard flag turns the bean on (found on the first real prod
+     * boot). The provider defers resolution to block-time, when the context is
+     * fully started. Optional so the bean can still be constructed bare in
+     * unit tests that don't bring up the audit log.
      */
     @Autowired(required = false)
-    private AuditLogService audit;
+    private ObjectProvider<AuditLogService> auditProvider;
 
     @Override
     public boolean onFlushDirty(
@@ -150,6 +157,7 @@ public class TenantWriteGuardInterceptor implements Interceptor {
             entityName, id, oldOrg, newOrg);
         log.warn("[TenantWriteGuard] {}", msg);
         try {
+            AuditLogService audit = auditProvider == null ? null : auditProvider.getIfAvailable();
             if (audit != null) {
                 audit.log("SECURITY_BLOCK", entityName, id instanceof Long ? (Long) id : null, msg);
             }

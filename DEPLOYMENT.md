@@ -24,9 +24,10 @@ Everything is staged in `deploy/` on the build machine:
 | File | What it is |
 |---|---|
 | `tss-grc-platform-0.1.0-SNAPSHOT.jar` | Backend (merged master: green-finance G0–G4 + RBAC governance P0–P3) |
+| `external.properties` | **ALL runtime configuration** — lives next to the jar, edit + restart to change anything, no rebuild (loaded via `spring.config.import`) |
 | `ui-dist/` (or `ui-dist.zip`) | Production React build (`tss-grc-ui-v2/dist`) |
 | `TSS_GRC_2026-07-11.bak` | Database backup (SQL Server 2019, `RESTORE VERIFYONLY` passed) |
-| `run-backend.cmd` | Service launcher — **all env vars live here** |
+| `run-backend.cmd` | Thin service launcher — just JAVA_HOME + `java -jar` (no env vars needed) |
 | `nginx.conf` | Ready reverse-proxy config |
 | `DEPLOYMENT.md` | This file |
 
@@ -70,7 +71,8 @@ New-Item -ItemType Directory -Force C:\tss-grc\app, C:\tss-grc\ui, C:\tss-grc\lo
 ```
 
 Place the artifacts:
-- jar + `run-backend.cmd` → `C:\tss-grc\app\`
+- jar + `external.properties` + `run-backend.cmd` → `C:\tss-grc\app\`
+  (the jar reads `external.properties` from its working directory — they must sit together)
 - contents of `ui-dist/` (index.html at the top) → `C:\tss-grc\ui\`
 - `.bak` → `C:\tss-grc\backup\`
 - `nginx.conf` → `C:\tss-grc\nginx\conf\nginx.conf` (overwrite the default)
@@ -104,58 +106,43 @@ sqlcmd -S localhost\SQLEXPRESS -U grc_app -P "<STRONG-DB-PASSWORD>" -d TSS_GRC -
 
 ---
 
-## 3. Configure the backend launcher
+## 3. Configure `external.properties` (the ONLY config file)
 
-Edit `C:\tss-grc\app\run-backend.cmd` — every deployment setting lives in this
-one file. Generate the JWT secret first:
+All runtime configuration lives in `C:\tss-grc\app\external.properties`, next
+to the jar. The app imports it at startup (`spring.config.import` in the
+packaged `application.yml`) — **edit the file, restart the service, done; no
+environment variables, no rebuild.** The shipped file is pre-filled for this
+topology; you only have to replace two values:
+
+1. `JWT_SECRET` — generate one:
 
 ```powershell
 -join ((48..57)+(65..90)+(97..122) | Get-Random -Count 64 | ForEach-Object {[char]$_})
 ```
 
-The launcher (template ships in `deploy/`; values you must set are marked `<>`):
+2. `DB_PASSWORD` — the `grc_app` password you created in §2.
 
-```bat
-@echo off
-REM ── TSS GRC backend (prod profile, HTTP behind nginx) ─────────────────────
-set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.12.7-hotspot"
+Everything else is already set for the nginx topology and can be changed
+anytime later: ports/SSL (`SERVER_PORT=8084`, `SERVER_SSL_ENABLED=false`,
+loopback binds), Flyway baseline (`FLYWAY_BASELINE_ON_MIGRATE=true`,
+`FLYWAY_BASELINE_VERSION=292` — the restored DB already contains V1–V292),
+Windows log/upload paths, SMTP relay, and commented blocks for in-app TLS,
+health probes, and the optional integrations (Sentry/ServiceNow/Splunk/
+CrowdStrike/Tenable).
 
-REM security — REQUIRED
-set "JWT_SECRET=<64-char-secret-from-the-generator>"
+Two kinds of entries work in the file:
+- the `UPPER_CASE` names — they feed the `${PLACEHOLDER}` references inside
+  the packaged config (these always win, use them when available);
+- raw Spring keys (e.g. `grc.cors.allowed-origins=...`) — full override of
+  anything not pinned by the packaged prod profile.
 
-REM database
-set "DB_URL=jdbc:sqlserver://localhost\SQLEXPRESS;databaseName=TSS_GRC;encrypt=true;trustServerCertificate=true;sendStringParametersAsUnicode=true"
-set "DB_USERNAME=grc_app"
-set "DB_PASSWORD=<STRONG-DB-PASSWORD>"
+`run-backend.cmd` is now just a thin launcher (`JAVA_HOME` + `java -jar`) —
+you normally never edit it.
 
-REM Flyway — restored DB already carries everything up to V292;
-REM baseline there so only FUTURE migrations (V293+) run.
-set "FLYWAY_BASELINE_ON_MIGRATE=true"
-set "FLYWAY_BASELINE_VERSION=292"
-
-REM HTTP behind nginx (prod profile defaults to 8443+SSL; we terminate at nginx)
-set "SERVER_PORT=8084"
-set "SERVER_SSL_ENABLED=false"
-set "SERVER_ADDRESS=127.0.0.1"
-set "MANAGEMENT_SERVER_ADDRESS=127.0.0.1"
-
-REM windows paths (prod defaults are /var/... Linux paths)
-set "LOGGING_FILE_NAME=C:/tss-grc/logs/application.log"
-set "FILE_STORAGE_PATH=C:/tss-grc/data/uploads"
-
-REM mail — prod profile requires these to resolve; use real SMTP when available
-set "SMTP_HOST=localhost"
-set "SMTP_PORT=587"
-set "SMTP_USERNAME=noreply"
-set "SMTP_PASSWORD=unused"
-
-"%JAVA_HOME%\bin\java.exe" -Xms512m -Xmx2g -jar C:\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar --spring.profiles.active=prod
-```
-
-Lock the file down (it contains secrets):
+Lock the config down (it contains secrets):
 
 ```powershell
-icacls C:\tss-grc\app\run-backend.cmd /inheritance:r /grant:r "Administrators:F" "SYSTEM:F"
+icacls C:\tss-grc\app\external.properties /inheritance:r /grant:r "Administrators:F" "SYSTEM:F"
 ```
 
 ---
@@ -184,8 +171,10 @@ First-boot verification (backend takes ~60–90 s):
 # wait for UP
 curl.exe -s http://127.0.0.1:8090/actuator/health          # {"status":"UP"}
 
-# Flyway must say it BASELINED, not migrated:
-Select-String -Path C:\tss-grc\logs\application.log -Pattern "baseline|Successfully"
+# Flyway must say it BASELINED, not migrated — expect this exact line on
+# first boot: "Successfully baselined schema with version: 292"
+# (and on every later boot: "Schema [platform] is up to date. No migration necessary.")
+Select-String -Path C:\tss-grc\logs\application.log -Pattern "baselined|No migration necessary"
 
 # API login smoke test
 curl.exe -s -X POST http://127.0.0.1:8084/api/auth/login -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"Admin@12345\"}"
@@ -261,7 +250,8 @@ nssm start TssGrcBackend        # Flyway auto-applies any migration > V292
 ```
 
 No manual SQL: any new `V293+__*.sql` in the jar applies itself at startup
-(that's why the restored DB was baselined at 292).
+(that's why the restored DB was baselined at 292). `external.properties` is
+never touched by a redeploy — your configuration survives every upgrade.
 
 ---
 
@@ -269,10 +259,13 @@ No manual SQL: any new `V293+__*.sql` in the jar applies itself at startup
 
 | Symptom | Cause / fix |
 |---|---|
-| Service dies at boot, log says *"JWT_SECRET appears to be a placeholder"* | Set a real ≥32-char `JWT_SECRET` in `run-backend.cmd` (must not contain `change-this`/`placeholder`) |
-| *"Could not resolve placeholder 'SMTP_HOST'"* | The four `SMTP_*` lines are mandatory in the prod profile — keep them even with dummy values |
-| Flyway error *"found non-empty schema without schema history"* | `FLYWAY_BASELINE_ON_MIGRATE=true` missing — add it |
-| Flyway tries to run V3…V292 and fails | `FLYWAY_BASELINE_VERSION=292` missing — the restored DB already has those objects |
+| Config edits seem ignored | `external.properties` must sit in the service's working directory (`C:\tss-grc\app`, next to the jar) — and the service must be restarted |
+| Service dies at boot, log says *"JWT_SECRET appears to be a placeholder"* | Set a real ≥32-char `JWT_SECRET` in `external.properties` (must not contain `change-this`/`placeholder`) |
+| Flyway runs V1/V2 and fails with *"Invalid column name"* | It's checking the wrong (empty) schema — the packaged default `FLYWAY_DEFAULT_SCHEMA=platform` handles this; don't override it to `dbo` |
+| Flyway tries to run V3…V292 and fails | `FLYWAY_BASELINE_VERSION=292` missing/changed — the restored DB already has those objects |
+| Boot fails: *"Schema-validation: wrong column type … is_deleted"* | `HIBERNATE_DDL_AUTO` was set to `validate` — the long-lived DB mixes `smallint`/`bit`; leave it unset (`none`) until types are reconciled |
+| `/actuator/health` DOWN but the app works | An optional-infrastructure probe (LDAP `localhost:389` / SMTP) — packaged default disables both; re-enable via `LDAP_HEALTH_ENABLED` / `MAIL_HEALTH_ENABLED` only when real servers exist |
+| A raw Spring key in `external.properties` doesn't take effect | Profile-specific packaged values beat base-level imports — use the `UPPER_CASE` placeholder name instead (those always win); if no placeholder exists for that key, ask for one to be added |
 | Login works via curl but browser gets CORS errors | You bypassed nginx and hit :8084 directly — always go through port 80 (same origin) |
 | UI loads, everything 404s under `/api` | nginx `proxy_pass` block missing/edited — restore the shipped `nginx.conf` |
 | WebSocket panels dead, `/ws` returns 400 | The `location /ws` block needs the `Upgrade`/`Connection` headers (in the shipped config) |

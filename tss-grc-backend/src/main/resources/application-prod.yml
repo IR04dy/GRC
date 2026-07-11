@@ -18,6 +18,13 @@ spring:
       leak-detection-threshold: 60000
 
   jpa:
+    hibernate:
+      # Schema is Flyway-managed; the long-lived DB mixes smallint/bit for
+      # is_deleted (Python-bootstrapped era), so strict validation fails on
+      # false drift (first hit: ai_governance.ai_lifecycle_event.is_deleted,
+      # live-verified 2026-07-11). Keep OFF like dev; flip to `validate` via
+      # HIBERNATE_DDL_AUTO once column types are reconciled.
+      ddl-auto: ${HIBERNATE_DDL_AUTO:none}
     show-sql: false
     properties:
       hibernate:
@@ -27,11 +34,19 @@ spring:
     enabled: true
     locations: classpath:db/migration/sqlserver
     # baseline-on-migrate: a fresh empty DB is migrated from V1 onwards.
-    # If you're upgrading an EXISTING DB that was bootstrapped pre-V1
-    # (i.e. via the old Python scripts) set FLYWAY_BASELINE_VERSION=2 via env
-    # var so Flyway treats V1+V2 as already applied and only runs V3 onwards.
+    # For an EXISTING DB (restored backup / Python-bootstrapped) set
+    # FLYWAY_BASELINE_VERSION to the newest migration already present (e.g. 292)
+    # so Flyway records a baseline and only applies newer versions.
     baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:true}
     baseline-version: ${FLYWAY_BASELINE_VERSION:0}
+    # The emptiness check that triggers baseline-on-migrate runs against the
+    # DEFAULT schema. The platform's data lives in named schemas (platform, iam,
+    # …) while the connection default (dbo) stays empty — so point Flyway at
+    # `platform`: a restored DB is then correctly detected as non-empty and
+    # BASELINED (live-verified 2026-07-11; with dbo it wrongly re-ran V1/V2).
+    # History table becomes platform.flyway_schema_history. A truly fresh DB
+    # still migrates from V1 (V1 creates the schemas idempotently).
+    default-schema: ${FLYWAY_DEFAULT_SCHEMA:platform}
     clean-disabled: true                   # NEVER run flyway:clean in production
     validate-on-migrate: true
 
@@ -45,10 +60,12 @@ spring:
       enabled: false
 
   mail:
-    host: ${SMTP_HOST}
+    # Safe defaults so the app boots before a real SMTP relay is configured;
+    # set the SMTP_* values in external.properties to enable delivery.
+    host: ${SMTP_HOST:localhost}
     port: ${SMTP_PORT:587}
-    username: ${SMTP_USERNAME}
-    password: ${SMTP_PASSWORD}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -65,7 +82,8 @@ logging:
     org.hibernate.SQL: ERROR
     org.flywaydb: INFO
   file:
-    name: /var/log/tss-grc/application.log
+    # Linux default; on Windows set LOGGING_FILE_NAME=C:/tss-grc/logs/application.log
+    name: ${LOGGING_FILE_NAME:/var/log/tss-grc/application.log}
   logback:
     rollingpolicy:
       max-file-size: 50MB
@@ -73,11 +91,17 @@ logging:
       total-size-cap: 1GB
 
 server:
-  port: 8443
+  # Overridable from external.properties: behind a TLS-terminating reverse
+  # proxy (nginx/IIS) set SERVER_PORT=8084, SERVER_SSL_ENABLED=false and bind
+  # to loopback with SERVER_ADDRESS=127.0.0.1.
+  port: ${SERVER_PORT:8443}
+  address: ${SERVER_ADDRESS:0.0.0.0}
   ssl:
-    enabled: true
-    key-store: ${SSL_KEYSTORE_PATH}
-    key-store-password: ${SSL_KEYSTORE_PASSWORD}
+    enabled: ${SERVER_SSL_ENABLED:true}
+    # Empty defaults so a proxy-terminated deployment (ssl.enabled=false) boots
+    # without a keystore; when SSL is on, a missing path fails fast and loudly.
+    key-store: ${SSL_KEYSTORE_PATH:}
+    key-store-password: ${SSL_KEYSTORE_PASSWORD:}
     key-store-type: PKCS12
     key-alias: tss-grc
   servlet:
@@ -145,6 +169,16 @@ springdoc:
     enabled: false
 
 management:
+  health:
+    # Optional infrastructure must not flip liveness DOWN (nginx/monitors key
+    # off /actuator/health). LDAP (AD integration) and SMTP are auto-probed by
+    # Boot the moment their starters are on the classpath — live-verified
+    # 2026-07-11: no LDAP server => ldap=DOWN => overall DOWN. Re-enable via
+    # external.properties once a real directory / mail relay is wired.
+    ldap:
+      enabled: ${LDAP_HEALTH_ENABLED:false}
+    mail:
+      enabled: ${MAIL_HEALTH_ENABLED:false}
   endpoints:
     web:
       exposure:
@@ -166,4 +200,5 @@ management:
       application: tss-grc-platform
       environment: prod
   server:
-    port: 8090                             # Actuator on separate port, not exposed publicly
+    port: ${MANAGEMENT_SERVER_PORT:8090}   # Actuator on separate port, not exposed publicly
+    address: ${MANAGEMENT_SERVER_ADDRESS:127.0.0.1}

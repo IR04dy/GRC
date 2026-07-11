@@ -10,6 +10,14 @@ spring:
   application:
     name: tss-grc-platform
 
+  # External configuration file — lives NEXT TO the jar (working directory), so
+  # operators can change any property without rebuilding. Values defined there
+  # win over the packaged defaults (they feed the ${PLACEHOLDER} references
+  # below and in the profile files; raw spring keys work too). `optional:` so
+  # dev runs and the test suite still boot when the file is absent.
+  config:
+    import: optional:file:./external.properties
+
   # Multipart upload limits. These MUST live under spring.servlet.multipart —
   # Spring Boot ignores server.servlet.multipart, so the previous override there
   # silently left the 1MB default in force (real policy/evidence uploads >1MB
