@@ -108,3 +108,6 @@ audit/artifacts/e2e/playwright-report/
 # Stray duplicate report at repo root + a misplaced audit output dir
 /audit-report.html
 tss-grc-ui-v2/audit/
+
+# Deployment artifacts staged for the cloud server (jar + UI dist + DB .bak) - not source
+/deploy/
