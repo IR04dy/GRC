@@ -1,6 +1,50 @@
 # RBAC & Access-Governance Module — Design Plan (Saudi-first)
 
-**Author stance:** GRC subject-matter expert · **Status:** PLAN (no code yet) · **Date:** 2026-07-09
+**Author stance:** GRC subject-matter expert · **Status:** ✅ **IMPLEMENTED (P0–P3 backend + P0 console) — merged to master 2026-07-11** · **Date:** 2026-07-09
+
+---
+
+## §0 Implementation status (2026-07-11, master @ 25006609 merge)
+
+| Phase | Shipped | Commit | Migrations |
+|---|---|---|---|
+| **P0** Foundation | V280 lifecycle cols + IAM catalogue · role CRUD (revive pattern) · permission-matrix API w/ structural rules (APPROVE⇒READ, DELETE⇒WRITE) + before/after grant audit · effective-access view · **React Access-Governance console** (`/access-governance`: roles · matrix · effective access) | `ce3c5925`, `f092bc65` | V280 |
+| **P1** Lifecycle | access requests maker-checker (approver≠requester≠beneficiary 409; grant effective only on approve; native-insert-first ROWVERSION pattern) · time-bound assignments · hourly expiry sweep (hard-deletes the join row) · JML LEAVER revoke-all | `38f33112` | V281 |
+| **P2** Assurance | SoD engine: SOD-01..08 pack (PAIR + STRUCTURAL), preventive 409 at approval + GRC_ADMINISTRATOR override (recorded as OVERRIDE violation), nightly 02:30 detective scan (PLATFORM_ADMIN excluded), dispositions OPEN→ACCEPTED_RISK(expiry mandatory)/REMEDIATED, violator can't self-disposition · recertification campaigns (PRIVILEGED/MODULE/ALL snapshot, Hijri+Gregorian windows, CERTIFY/REVOKE(auto-executes)/MODIFY, self-review 409, closure 100% or GRC_ADMIN exception) · access-evidence ZIP (6 artefacts + SHA-256 manifest) · displayNameAr made mandatory (bilingual policy) — 33/33 probes | `eb162dea` | V282, V283 |
+| **P3** Advanced | break-glass (EMERGENCY_RESPONDER template + dedicated IAM/BREAK_GLASS gate for CISO/IR_LEAD/GRC_ADMINISTRATOR, mandatory incident ref, ≤24h, highest-severity audit, auto-expiry sweep, mandatory post-hoc review by non-activator) · `is_privileged` flag + seed · `GET /analytics` (privileged holders, dormant ≥90d, expiring ≤30d, open SoD, break-glass posture, campaign %, top grant holders) · **EXPORT 6th action** (70→94 perms, READ-parity; gating proven on the evidence ZIP: revoke IAM_EXPORT → 403) — 29/29 probes | `48b0971b` | V284 |
+
+Suite 2242→2248/0/0 throughout; ratchet 62. §11 decisions taken as defaults: EXPORT adopted (1);
+4-eyes always-ON, no per-tenant toggle yet (2); cadences manual, presets pending (3); break-glass
+24h, CISO+IR_LEAD+GRC_ADMINISTRATOR (4). Detective scan surfaced **4 real conflicts in dev org 1**
+(rmanager + compliance hold RISK W+A, etc.) — left OPEN deliberately as genuine findings.
+
+**Remaining (NOT yet implemented):**
+1. **§6.8 UI beyond P0** — console covers Roles / Permission Matrix / User Access only. Missing
+   screens (APIs are complete): Access Requests + approvals queue, Review Campaigns, SoD
+   rules/violations/dispositions, Break-glass activate/history, Analytics + evidence-pack button;
+   also §6.1 role compare/diff-vs-template view.
+2. **§6.2 workflow-engine routing** — approvals are dedicated endpoints, not routed through the
+   workflow engine (no inherited SLA/escalation/recipient lists). Deviation by design; wiring the
+   engine (module key IAM) is a clean follow-up.
+3. **§6.2 4-eyes tenant config** — always-ON; the per-tenant disable flag (and the
+   `POST /assignments` direct-grant-with-auto-request path) not built — grants flow only through
+   requests (stricter than planned).
+4. **§6.3 expiry notifications** to owner + IAM_LEAD (audit-logged only; platform has no
+   SMTP/outbox bean).
+5. **§6.3 JML MOVER** → targeted mini-review (LEAVER done).
+6. **§6.5 cadence presets + auto-scheduling** (quarterly-privileged / semi-annual-all) — campaigns
+   are manual-create; no scheduler creates them.
+7. **§6.5 reviewer scoping** (role owner / line manager) + non-response SLA escalation via the
+   workflow engine — any IAM APPROVE holder may decide (self-review blocked).
+8. **§6.6 break-glass notification** to CISO+IAM_LEAD (highest-severity audit event only; also note
+   the ledger's severities are INFO/WARN/ERROR — "CRITICAL" is expressed as ERROR).
+9. **§10 minor**: PLATFORM_ADMIN bypass usage count in analytics.
+
+Deviations (deliberate, stronger than plan): evidence ZIP guarded by **IAM/EXPORT** instead of
+IAM READ + AUDIT_LOG READ (it is the EXPORT-gating pilot); post-hoc break-glass review lives on the
+event row (reviewer≠activator) rather than as a campaign item.
+
+---
 **Scope:** per-module RBAC design for all 24 permission-bearing modules **plus a new Access-Governance
 module** to manage roles, permissions, assignments, segregation of duties, recertification and
 regulator evidence — Arabic-first, for the Saudi market (SAMA / NCA / PDPL-regulated entities).

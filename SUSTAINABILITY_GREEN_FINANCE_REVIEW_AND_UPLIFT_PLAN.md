@@ -1,7 +1,45 @@
 # Sustainability Module — Dual-Expert Review & Green-Finance Uplift Plan
 # مراجعة موديول الاستدامة وخطة التطوير — الصكوك الخضراء والمحفظة الخضراء
 
-**Status:** PLAN (review + design, no code yet) · **Date:** 2026-07-09 · **Lenses:** Sustainability SME + Saudi GRC SME
+**Status:** ✅ **IMPLEMENTED (backend complete, G0–G4) — merged to master 2026-07-11** · **Date:** 2026-07-09 · **Lenses:** Sustainability SME + Saudi GRC SME
+
+---
+
+## §0 Implementation status (2026-07-11, master @ 25006609 merge)
+
+| Phase | Shipped | Commit | Migrations |
+|---|---|---|---|
+| **G0** Foundation | REG-1..11 obligation register (12 bilingual rows) · esg_metric_reading seed closure (26 defs → readings) | `3702c827` | V285 |
+| **G1** Green Sukuk | instruments/projects/UoP ledger · §4.2 math (over-allocation hard block incl. PROPOSED, allocation_ratio, refinancing share) · maker-checker (proposer≠approver 409) · Shariah gate (sukuk needs approval ref) · SUST_APPROVE catalogued | `1f4b76a9` | V286 |
+| **G2** Reporting & impact | project_share (capped 1) · attributed impact · intensity · allocation reports (frozen figures, publish needs APPROVE) · Green-Finance evidence ZIP (branded README.pdf AR/EN + 3 XLSX + SHA-256 manifest) | `5344066e` | — |
+| **G3** Portfolio & credits | taxonomy_entries (ICMA/CCE 10-row seed) · portfolio_assets w/ tagging SoD · GAR · category mix · weighted-DQ (PCAF rollup) · carbon credits (retire needs certificate + purpose) | `c8a30e13` | V287, V288 |
+| **G4** Regulatory horizon | esg_targets + linear trajectory (5% band) → idempotent auto-CAPA · ifrs_s_requirements (14 seeded, coveragePct) · env_permits + expiry sweep → EXPIRED + CRITICAL CAPA · cbam_lines (volume × tCO₂e/t, byGroup) · ck_ca_source widened (ESG_TARGET, ENV_PERMIT) | `58343b97` | V289–V292 |
+
+Every slice live-probed (G4 final: 28/28); suite 2248/0/0; ratchet 62. Migration numbers shifted
+V285–V291(plan) → V285–V292(actual); the planned materiality-axis change was already delivered
+pre-plan by S-Q (V257). Decisions taken as recommended: ICMA+CCE default taxonomy; Shariah as a
+status field; FI + corporate scopes both built.
+
+**Remaining (NOT yet implemented):**
+1. **§6 UI — the entire new frontend family**: Green Finance tabs (Instruments/UoP/Impact/Reports),
+   Green Portfolio, Targets & Transition, Carbon Credits, IFRS S1/S2 Readiness, Env Compliance, and
+   the 7 new ESG-dashboard KPIs. All capabilities are API-complete and live-verified but API-only.
+2. **G0 reading-required blocking rule** — a metric referenced by a disclosure/target without
+   readings should block approval (seed closure done; the enforcement rule is not).
+3. **§5.1 `financed_emissions_record.asset_ref`** per-asset linkage column (portfolio
+   financed-emissions rollup currently computes from records without asset joins).
+4. **§5.2 climate_overlay** — TCFD scenario-loss % applied per portfolio segment.
+5. **§4.2 ESTIMATE flag** on impact figures (actuals-only today).
+6. **§5.3 offset policy rule** — retired credits offsetting capped/gated on gross-reduction
+   disclosure (open decision #4, proposed 10% cap) — ledger built, policy rule not enforced.
+7. **§5.4 dedicated S1/S2 gap export artifact** (summary endpoint exists; not in the ZIP).
+8. **§5.5 interim milestones** on targets (annual actuals only).
+9. **§5.6 violations record type** → CAPA (permits + expiry surveillance done; SUSPENDED status
+   covers part of it).
+10. Roadmap (never phased): ISAE 3410 assurance-lineage completeness view; GHG Scope-3
+    15-category split; allocation-report packet.xlsx/.docx endpoints (reports ship inside the ZIP).
+
+---
 **Scope:** review of the as-built `module/sust` (19 DB tables, verified live) + the uplift required for
 production-readiness in the Saudi market, including the regulatory register (التوجيهات والقوانين واللوائح),
 **Green Sukuk & their calculations (الصكوك الخضراء وحسابها)**, and the **Green Portfolio (المحفظة الخضراء)**.
