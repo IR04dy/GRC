@@ -20,22 +20,15 @@ V285–V291(plan) → V285–V292(actual); the planned materiality-axis change w
 pre-plan by S-Q (V257). Decisions taken as recommended: ICMA+CCE default taxonomy; Shariah as a
 status field; FI + corporate scopes both built.
 
-**Remaining (NOT yet implemented):**
-1. **§6 UI — the entire new frontend family**: Green Finance tabs (Instruments/UoP/Impact/Reports),
-   Green Portfolio, Targets & Transition, Carbon Credits, IFRS S1/S2 Readiness, Env Compliance, and
-   the 7 new ESG-dashboard KPIs. All capabilities are API-complete and live-verified but API-only.
-2. **G0 reading-required blocking rule** — a metric referenced by a disclosure/target without
-   readings should block approval (seed closure done; the enforcement rule is not).
-3. **§5.1 `financed_emissions_record.asset_ref`** per-asset linkage column (portfolio
-   financed-emissions rollup currently computes from records without asset joins).
-4. **§5.2 climate_overlay** — TCFD scenario-loss % applied per portfolio segment.
-5. **§4.2 ESTIMATE flag** on impact figures (actuals-only today).
-6. **§5.3 offset policy rule** — retired credits offsetting capped/gated on gross-reduction
-   disclosure (open decision #4, proposed 10% cap) — ledger built, policy rule not enforced.
-7. **§5.4 dedicated S1/S2 gap export artifact** (summary endpoint exists; not in the ZIP).
-8. **§5.5 interim milestones** on targets (annual actuals only).
-9. **§5.6 violations record type** → CAPA (permits + expiry surveillance done; SUSPENDED status
-   covers part of it).
+**Completion pass (2026-07-12, branch `feat/gov-greenfin-completion`):** items 1–9 below are now
+✅ IMPLEMENTED — **C1 backend** `6fead01f` (V293: reading-required gate on report approval +unit
+test, `asset_ref` linkage + per-asset rollup + summary field, climate overlay endpoint, ESTIMATE
+impact basis + summary flag, 10% offset cap w/ no-target block, IFRS sheet in the ZIP,
+`esg_target_milestones` + piecewise trajectory, `env_permit_violations` → own CAPA; probes 18/18)
+and **UI** `b6f90d1a` (new `/green-finance` page: Instruments/UoP/Reports/Portfolio/Credits + KPI
+strip; EsgPage tabs: Targets & Transition / IFRS S1/S2 / Env Compliance incl. CBAM; tsc + build
+green). Still open: only item 10 (roadmap).
+
 10. Roadmap (never phased): ISAE 3410 assurance-lineage completeness view; GHG Scope-3
     15-category split; allocation-report packet.xlsx/.docx endpoints (reports ship inside the ZIP).
 

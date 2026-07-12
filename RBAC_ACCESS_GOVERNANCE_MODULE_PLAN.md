@@ -18,27 +18,16 @@ Suite 2242→2248/0/0 throughout; ratchet 62. §11 decisions taken as defaults: 
 24h, CISO+IR_LEAD+GRC_ADMINISTRATOR (4). Detective scan surfaced **4 real conflicts in dev org 1**
 (rmanager + compliance hold RISK W+A, etc.) — left OPEN deliberately as genuine findings.
 
-**Remaining (NOT yet implemented):**
-1. **§6.8 UI beyond P0** — console covers Roles / Permission Matrix / User Access only. Missing
-   screens (APIs are complete): Access Requests + approvals queue, Review Campaigns, SoD
-   rules/violations/dispositions, Break-glass activate/history, Analytics + evidence-pack button;
-   also §6.1 role compare/diff-vs-template view.
-2. **§6.2 workflow-engine routing** — approvals are dedicated endpoints, not routed through the
-   workflow engine (no inherited SLA/escalation/recipient lists). Deviation by design; wiring the
-   engine (module key IAM) is a clean follow-up.
-3. **§6.2 4-eyes tenant config** — always-ON; the per-tenant disable flag (and the
-   `POST /assignments` direct-grant-with-auto-request path) not built — grants flow only through
-   requests (stricter than planned).
-4. **§6.3 expiry notifications** to owner + IAM_LEAD (audit-logged only; platform has no
-   SMTP/outbox bean).
-5. **§6.3 JML MOVER** → targeted mini-review (LEAVER done).
-6. **§6.5 cadence presets + auto-scheduling** (quarterly-privileged / semi-annual-all) — campaigns
-   are manual-create; no scheduler creates them.
-7. **§6.5 reviewer scoping** (role owner / line manager) + non-response SLA escalation via the
-   workflow engine — any IAM APPROVE holder may decide (self-review blocked).
-8. **§6.6 break-glass notification** to CISO+IAM_LEAD (highest-severity audit event only; also note
-   the ledger's severities are INFO/WARN/ERROR — "CRITICAL" is expressed as ERROR).
-9. **§10 minor**: PLATFORM_ADMIN bypass usage count in analytics.
+**Completion pass (2026-07-12, branch `feat/gov-greenfin-completion`):** items 1–9 below are now
+✅ IMPLEMENTED — **C2 backend** `079bd448` (V294: workflow-engine visibility on access requests
+(anchored ACCESS_APPROVAL, raised after-commit in REQUIRES_NEW, settled on decide; three TX
+landmines documented in code), `grc.iam.four-eyes-enabled` switch, in-app notifications (expiry →
+IAM_LEAD per-org, break-glass → CISO+IAM_LEAD, campaigns → GRC_ADMINISTRATOR), JML MOVER →
+USER-scoped mini-review, reviewer scoping, daily cadence auto-scheduler (quarterly PRIVILEGED /
+semi-annual ALL + overdue nudges), analytics platformAdminActions30d; probes 34/34) and **UI**
+`b6f90d1a` (console tabs: Access Requests w/ override prompt, Review Campaigns, SoD, Break-glass,
+Analytics + evidence-ZIP button, matrix compare/diff; tsc + build green). Nothing remains from
+this list; §10 roadmap items (ABAC, SSO/Nafath) stay future scope.
 
 Deviations (deliberate, stronger than plan): evidence ZIP guarded by **IAM/EXPORT** instead of
 IAM READ + AUDIT_LOG READ (it is the EXPORT-gating pilot); post-hoc break-glass review lives on the
