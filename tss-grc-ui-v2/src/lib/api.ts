@@ -3014,6 +3014,11 @@ export const greenFinanceApi = {
     api.post<GfReportDto>('/api/v1/sustainability/finance/reports', b),
   approveReport: (id: number) => api.post<GfReportDto>(`/api/v1/sustainability/finance/reports/${id}/approve`, {}),
   publishReport: (id: number) => api.post<GfReportDto>(`/api/v1/sustainability/finance/reports/${id}/publish`, {}),
+  // V295 — standalone per-report exports (shared tabular engine)
+  reportXlsx:    (id: number, lang = 'en') =>
+    downloadFile(`/api/v1/sustainability/finance/reports/${id}/export.xlsx?lang=${lang}`, 'GreenFinance_AllocationReport.xlsx'),
+  reportDocx:    (id: number, lang = 'en') =>
+    downloadFile(`/api/v1/sustainability/finance/reports/${id}/export.docx?lang=${lang}`, 'GreenFinance_AllocationReport.docx'),
   evidenceZip:   () => downloadFile('/api/v1/sustainability/finance/evidence-package.zip', 'GreenFinance_EvidencePackage.zip'),
 };
 
@@ -3114,7 +3119,21 @@ export const esgHorizonApi = {
   createCbam:   (b: Record<string, unknown>) => api.post('/api/v1/sustainability/horizon/cbam', b),
   cbamSummary:  () => api.get<{ totalEmbeddedTco2e: number; byGroup: Record<string, number>; lines: number }>(
     '/api/v1/sustainability/horizon/cbam/summary'),
+  // V295 — ISAE 3410 assurance-lineage view
+  assuranceLineage: (year: number) =>
+    api.get<AssuranceLineageDto>(`/api/v1/sustainability/horizon/assurance-lineage?year=${year}`),
 };
+
+export interface AssuranceLineageRow {
+  objectType: string; code: string; nameEn: string;
+  hasData: boolean; hasEvidence: boolean; verified?: boolean | null; grade: string;
+}
+export interface AssuranceLineageDto {
+  year: number; total: number; complete: number; partial: number; missing: number;
+  readinessPct: number;
+  byType: { objectType: string; total: number; complete: number; partial: number; missing: number }[];
+  rows: AssuranceLineageRow[];
+}
 
 // ── Workflow submissions — generic ledger for the 12 wizards without ─────
 //    dedicated tables (Risk Treatment, Risk Acceptance, Incident RCA,

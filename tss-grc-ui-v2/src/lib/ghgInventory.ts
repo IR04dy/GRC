@@ -20,6 +20,8 @@ export interface GhgEmissionRecord {
   reportingYear: number;
   scope: GhgScope;
   category: string;
+  /** V295 — GHG Protocol Scope-3 category 1–15 (scope 3 only). */
+  scope3Category?: number;
 
   sourceNameEn: string;
   sourceNameAr?: string;

@@ -33,6 +33,9 @@ export interface OrganisationSettings {
    *  expected progress on the linear timeline). */
   sgiAtRiskProgressFactor: number;
 
+  /** V295 (decision #4) — retired offsets ≤ this % of the disclosed gross reduction. */
+  carbonOffsetCapPct: number;
+
   notes?: string;
 }
 

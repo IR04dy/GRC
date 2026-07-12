@@ -333,6 +333,40 @@ public class GreenFinanceService {
         return saved;
     }
 
+    /**
+     * V295 (roadmap closure) — standalone per-report export payload for the shared
+     * tabular engine (packet.xlsx/.docx): the report's frozen §4.2 figures + the
+     * issuing instrument's identity, as one Field/Value sheet.
+     */
+    @Transactional(readOnly = true)
+    public com.tss.grc.module.reporting.dto.TabularExportRequest reportExportPayload(Long reportId, String lang) {
+        AllocationReport rep = mustReport(reportId);
+        GreenInstrument instr = mustInstrument(rep.getInstrumentId());
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        java.util.List<java.util.List<String>> rows = java.util.List.of(
+            java.util.List.of(ar ? "الأداة" : "Instrument", instr.getInstrumentCode() + " — "
+                + (ar && instr.getNameAr() != null ? instr.getNameAr() : instr.getNameEn())),
+            java.util.List.of(ar ? "النوع" : "Type", instr.getInstrumentType()),
+            java.util.List.of(ar ? "فترة التقرير" : "Reporting period", String.valueOf(rep.getPeriodYear())),
+            java.util.List.of(ar ? "نوع التقرير" : "Report type", rep.getReportType()),
+            java.util.List.of(ar ? "المخصص (م ر.س)" : "Allocated (SAR mn)", str(rep.getAllocatedSarMn())),
+            java.util.List.of(ar ? "غير المخصص (م ر.س)" : "Unallocated (SAR mn)", str(rep.getUnallocatedSarMn())),
+            java.util.List.of(ar ? "نسبة التخصيص %" : "Allocation ratio %", str(rep.getAllocationRatioPct())),
+            java.util.List.of(ar ? "حصة إعادة التمويل %" : "Refinancing share %", str(rep.getRefinancingSharePct())),
+            java.util.List.of(ar ? "انبعاثات مُتجنَّبة (طن/سنة)" : "tCO2e avoided / yr", str(rep.getTco2eAvoidedYr())),
+            java.util.List.of(ar ? "طاقة متجددة (م.و.س/سنة)" : "MWh renewable / yr", str(rep.getMwhRenewableYr())),
+            java.util.List.of(ar ? "مياه موفَّرة (م3/سنة)" : "Water m3 saved / yr", str(rep.getWaterM3SavedYr())),
+            java.util.List.of(ar ? "الكثافة (طن/م ر.س)" : "Intensity tCO2e / SAR mn", str(rep.getIntensityTco2ePerSarMn())),
+            java.util.List.of(ar ? "الحالة" : "Status", rep.getStatus()));
+        return new com.tss.grc.module.reporting.dto.TabularExportRequest(
+            "GreenFinance", "AllocationReport" + rep.getPeriodYear(), lang,
+            java.util.List.of(new com.tss.grc.module.reporting.dto.TabularExportRequest.Sheet(
+                (ar ? "تقرير التخصيص والأثر " : "Allocation & Impact ") + rep.getPeriodYear(),
+                java.util.List.of(ar ? "البند" : "Field", ar ? "القيمة" : "Value"), rows)));
+    }
+
+    private static String str(Object o) { return o == null ? "" : String.valueOf(o); }
+
     @Transactional
     public AllocationReport publishReport(Long id) {
         AllocationReport rep = mustReport(id);

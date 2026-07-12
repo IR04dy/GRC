@@ -5,6 +5,7 @@ import com.tss.grc.module.sust.finance.entity.EnvPermit;
 import com.tss.grc.module.sust.finance.entity.EsgTarget;
 import com.tss.grc.module.sust.finance.entity.EsgTargetActual;
 import com.tss.grc.module.sust.finance.entity.IfrsRequirement;
+import com.tss.grc.module.sust.finance.service.AssuranceLineageService;
 import com.tss.grc.module.sust.finance.service.EsgHorizonService;
 import com.tss.grc.module.sust.finance.service.EsgHorizonService.CbamSummary;
 import com.tss.grc.module.sust.finance.service.EsgHorizonService.IfrsSummary;
@@ -50,6 +51,7 @@ public class EsgHorizonController {
     private static final String WRITE_GUARD = "hasPermission('SUST','WRITE')";
 
     private final EsgHorizonService service;
+    private final AssuranceLineageService lineageService;
 
     // ── targets & trajectory ────────────────────────────────────────────
 
@@ -108,6 +110,15 @@ public class EsgHorizonController {
     @PreAuthorize(WRITE_GUARD)
     public Map<String, Integer> trajectorySweep() {
         return Map.of("capasRaised", service.trajectorySweep());
+    }
+
+    // ── ISAE 3410 assurance lineage (roadmap closure) ────────────────────
+
+    @GetMapping("/assurance-lineage")
+    @PreAuthorize(READ_GUARD)
+    public com.tss.grc.module.sust.finance.service.AssuranceLineageService.LineageResponse assuranceLineage(
+            @RequestParam(defaultValue = "2026") Short year) {
+        return lineageService.lineage(year);
     }
 
     // ── IFRS S1/S2 ──────────────────────────────────────────────────────

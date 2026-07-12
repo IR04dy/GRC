@@ -37,6 +37,8 @@ public class GhgEmissionRecord {
     @Column(name = "reporting_year", nullable = false) private Short reportingYear;
     @Column(nullable = false)                          private Short scope;
     @Column(nullable = false, length = 60)             private String category;
+    /** V295 — GHG Protocol Scope-3 category 1–15; NULL for S1/S2 (and uncategorised S3). */
+    @Column(name = "scope3_category")                  private Short scope3Category;
 
     @Column(name = "source_name_en", nullable = false, length = 255) private String sourceNameEn;
     @Column(name = "source_name_ar", length = 255)                   private String sourceNameAr;

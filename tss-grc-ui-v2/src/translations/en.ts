@@ -1654,6 +1654,7 @@ export const en = {
   esgTabTargets:            'Targets & Transition',
   esgTabIfrs:               'IFRS S1/S2',
   esgTabEnv:                'Env Compliance',
+  esgTabAssurance:          'Assurance Lineage',
   greenFinanceSidebar:      'Green Finance',
 
   // ─── Annual Sustainability Annex (V57) ───────────────

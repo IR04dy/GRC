@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Target, BookOpenCheck, Factory, Plus, RefreshCw, ShieldAlert } from 'lucide-react';
+import { Target, BookOpenCheck, Factory, Plus, RefreshCw, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -8,6 +8,7 @@ import { useToast } from '../../lib/toast';
 import {
   esgHorizonApi, ApiError,
   type EsgTargetViewDto, type IfrsReqDto, type EnvPermitViewDto, type CbamLineDto,
+  type AssuranceLineageDto,
 } from '../../lib/api';
 
 /**
@@ -210,6 +211,85 @@ export function IfrsTab() {
           ))}
         </tbody>
       </table>
+    </Card>
+  );
+}
+
+// ─── ISAE 3410 assurance lineage (roadmap closure) ───────────────────────────
+
+export function AssuranceTab() {
+  const { lang } = useI18n(); const isAr = lang === 'ar'; const toast = useToast();
+  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [data, setData] = useState<AssuranceLineageDto | null>(null);
+  const [typeFilter, setTypeFilter] = useState('');
+
+  const load = useCallback(async () => {
+    try { setData(await esgHorizonApi.assuranceLineage(Number(year))); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Failed to load lineage'); }
+  }, [year]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(); }, [load]);
+
+  const gradeTone = (g: string) => g === 'COMPLETE' ? 'success' : g === 'PARTIAL' ? 'warning' : 'danger';
+  const rows = data?.rows.filter(r => !typeFilter || r.objectType === typeFilter) ?? [];
+
+  return (
+    <Card title={isAr ? 'تتبع الأدلة لجاهزية التأكيد الخارجي (ISAE 3410)' : 'Assurance lineage (ISAE 3410 readiness)'} Icon={ShieldCheck}
+      action={
+        <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+          <input type="number" value={year} onChange={e => setYear(e.target.value)} style={{ ...INPUT, minWidth: 80 }} />
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={INPUT}>
+            <option value="">{isAr ? 'كل الأنواع' : 'All types'}</option>
+            {data?.byType.map(t => <option key={t.objectType} value={t.objectType}>{t.objectType}</option>)}
+          </select>
+          <Button size="sm" variant="ghost" Icon={RefreshCw} onClick={() => void load()} />
+        </div>
+      }>
+      {!data
+        ? <div style={EMPTY}>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</div>
+        : <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 12 }}>
+              {[
+                { l: isAr ? 'الجاهزية' : 'Readiness', v: `${fmt(data.readinessPct)}%` },
+                { l: isAr ? 'مكتمل التتبع' : 'Complete', v: String(data.complete) },
+                { l: isAr ? 'جزئي (بلا دليل/تحقق)' : 'Partial', v: String(data.partial) },
+                { l: isAr ? 'بلا بيانات' : 'Missing', v: String(data.missing) },
+                { l: isAr ? 'إجمالي البنود' : 'Total items', v: String(data.total) },
+              ].map(k => (
+                <div key={k.l} style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '8px 10px' }}>
+                  <div style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{k.l}</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{k.v}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingBottom: 10 }}>
+              {data.byType.map(t => (
+                <Badge key={t.objectType} tone={t.missing + t.partial === 0 ? 'success' : 'neutral'}>
+                  {t.objectType}: {t.complete}/{t.total}
+                </Badge>
+              ))}
+            </div>
+            <table className="grc-table">
+              <thead><tr>
+                <th>{isAr ? 'النوع' : 'Type'}</th><th>{isAr ? 'الرمز' : 'Code'}</th>
+                <th>{isAr ? 'البند' : 'Item'}</th>
+                <th>{isAr ? 'بيانات' : 'Data'}</th><th>{isAr ? 'دليل' : 'Evidence'}</th>
+                <th>{isAr ? 'مُتحقَّق' : 'Verified'}</th><th>{isAr ? 'التقييم' : 'Grade'}</th>
+              </tr></thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={`${r.objectType}-${r.code}-${i}`}>
+                    <td><Badge tone="info">{r.objectType}</Badge></td>
+                    <td className="mono text-2xs">{r.code}</td>
+                    <td className="text-2xs">{r.nameEn}</td>
+                    <td>{r.hasData ? '✓' : '—'}</td>
+                    <td>{r.hasEvidence ? '✓' : '—'}</td>
+                    <td>{r.verified == null ? 'n/a' : r.verified ? '✓' : '✗'}</td>
+                    <td><Badge tone={gradeTone(r.grade)} dot>{r.grade}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>}
     </Card>
   );
 }

@@ -18,6 +18,8 @@ public record GhgCreateRequest(
         @NotNull Short reportingYear,
         @NotNull Short scope,
         @NotBlank @Size(max = 60) String category,
+        /** V295 — GHG Protocol Scope-3 category (1–15); only valid when scope = 3. */
+        @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(15) Short scope3Category,
         @NotBlank @Size(max = 255) String sourceNameEn,
         @Size(max = 255) String sourceNameAr,
         @Size(max = 120) String businessUnit,
@@ -41,6 +43,7 @@ public record GhgCreateRequest(
         e.setReportingYear(reportingYear);
         e.setScope(scope);
         e.setCategory(category);
+        e.setScope3Category(scope3Category);
         e.setSourceNameEn(sourceNameEn);
         e.setSourceNameAr(sourceNameAr);
         e.setBusinessUnit(businessUnit);

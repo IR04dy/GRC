@@ -56,10 +56,10 @@ public class GreenPortfolioService {
     private final FinancedEmissionsRecordRepository financedEmissions;
     private final TcfdClimateScenarioRepository scenarios;
     private final EsgTargetRepository esgTargets;
+    private final com.tss.grc.module.sust.settings.service.OrganisationSettingsService settings;
     private final AuditLogService audit;
 
-    /** V293 (plan §5.3 / decision #4) — retired offsets may not exceed this share of
-     *  the disclosed gross reduction (anti-greenwashing). */
+    /** Fallback when the tenant setting is unset (V295 made the cap configurable). */
     private static final BigDecimal OFFSET_CAP_PCT = BigDecimal.valueOf(10);
 
     // ── taxonomy ─────────────────────────────────────────────────────────
@@ -336,11 +336,14 @@ public class GreenPortfolioService {
                 retired = retired.add(c.getQuantityTco2e());
             }
         }
-        BigDecimal cap = grossReduction.multiply(OFFSET_CAP_PCT, MC).divide(HUNDRED, MC);
+        // V295 (decision #4) — the cap % is a tenant setting; fallback 10.
+        BigDecimal capPct = settings.getOrCreate().getCarbonOffsetCapPct();
+        if (capPct == null) capPct = OFFSET_CAP_PCT;
+        BigDecimal cap = grossReduction.multiply(capPct, MC).divide(HUNDRED, MC);
         if (retired.compareTo(cap) > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "Offset cap exceeded: retiring " + candidate.getQuantityTco2e() + " tCO2e would take total retired to "
-                    + retired.setScale(4, RoundingMode.HALF_UP) + " tCO2e, above " + OFFSET_CAP_PCT
+                    + retired.setScale(4, RoundingMode.HALF_UP) + " tCO2e, above " + capPct
                     + "% of the disclosed gross reduction (" + cap.setScale(4, RoundingMode.HALF_UP) + " tCO2e)");
         }
     }

@@ -431,6 +431,8 @@ function ReportsTab({ instruments }: { instruments: GfInstrumentDto[] }) {
                       {r.status === 'APPROVED' &&
                         <Button size="sm" variant="ghost" onClick={() => void act(() => greenFinanceApi.publishReport(r.id), isAr ? 'نُشر' : 'Published')}>
                           {isAr ? 'نشر' : 'Publish'}</Button>}
+                      <Button size="sm" variant="ghost" onClick={() => void greenFinanceApi.reportXlsx(r.id, isAr ? 'ar' : 'en')}>XLSX</Button>
+                      <Button size="sm" variant="ghost" onClick={() => void greenFinanceApi.reportDocx(r.id, isAr ? 'ar' : 'en')}>DOCX</Button>
                     </td>
                   </tr>
                 ))}

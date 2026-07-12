@@ -71,6 +71,14 @@ public class GhgEmissionRecordController {
         return service.trajectory(fromYear, toYear);
     }
 
+    /** V295 — Scope-3 split across the GHG Protocol's 15 value-chain categories. */
+    @GetMapping("/scope3-breakdown")
+    @PreAuthorize("hasPermission('SUST','READ')")
+    public com.tss.grc.module.sust.ghg.service.GhgEmissionRecordService.Scope3Breakdown scope3Breakdown(
+            @RequestParam(defaultValue = "2026") Short year) {
+        return service.scope3Breakdown(year);
+    }
+
     /** S-J — bulk CSV import (T-06). Raw CSV body; returns per-row created/failed summary. */
     @PostMapping(value = "/import", consumes = { "text/csv", "text/plain" })
     @PreAuthorize("hasPermission('SUST','WRITE')")

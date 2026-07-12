@@ -44,6 +44,7 @@ public class GreenFinanceController {
 
     private final GreenFinanceService service;
     private final GreenFinancePackageService packageService;
+    private final com.tss.grc.module.reporting.service.TabularExportService tabularExport;
 
     // ── instruments ─────────────────────────────────────────────────────
 
@@ -117,6 +118,35 @@ public class GreenFinanceController {
     @PostMapping("/reports/{id}/approve")
     @PreAuthorize(APPROVE_GUARD)
     public AllocationReport approveReport(@PathVariable Long id) { return service.approveReport(id); }
+
+    /** V295 — standalone per-report exports via the shared tabular engine. */
+    @GetMapping("/reports/{id}/export.xlsx")
+    @PreAuthorize(READ_GUARD)
+    public org.springframework.http.ResponseEntity<byte[]> reportXlsx(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "en") String lang) {
+        var payload = service.reportExportPayload(id, lang);
+        return attachment(tabularExport.xlsx(payload),
+            com.tss.grc.module.reporting.service.ExportNaming.build("GreenFinance", payload.exportType(), lang, "xlsx"));
+    }
+
+    @GetMapping("/reports/{id}/export.docx")
+    @PreAuthorize(READ_GUARD)
+    public org.springframework.http.ResponseEntity<byte[]> reportDocx(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "en") String lang) {
+        var payload = service.reportExportPayload(id, lang);
+        return attachment(tabularExport.docx(payload),
+            com.tss.grc.module.reporting.service.ExportNaming.build("GreenFinance", payload.exportType(), lang, "docx"));
+    }
+
+    private static org.springframework.http.ResponseEntity<byte[]> attachment(byte[] bytes, String filename) {
+        return org.springframework.http.ResponseEntity.ok()
+            .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"" + filename + "\"")
+            .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+            .body(bytes);
+    }
 
     @PostMapping("/reports/{id}/publish")
     @PreAuthorize(APPROVE_GUARD)

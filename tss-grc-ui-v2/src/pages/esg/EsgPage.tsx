@@ -122,7 +122,7 @@ import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import { printPacket, packetTextToSections } from '../../lib/packetPrint';
 import { formatSarCompact, formatSarFull } from '../../lib/format';
 // Green-finance plan §5.4–§5.7 — regulatory-horizon tabs (targets / IFRS / env+CBAM).
-import { EsgTargetsTab, IfrsTab, EnvComplianceTab } from './EsgHorizonTabs';
+import { EsgTargetsTab, IfrsTab, EnvComplianceTab, AssuranceTab } from './EsgHorizonTabs';
 import '../../styles/pages/esg.css';
 
 // EsgTab + isEsgTab are imported from lib/esgDashboard (single source of truth for the tab ids).
@@ -257,6 +257,7 @@ export function EsgPage() {
           { id: 'targets',    labelKey: 'esgTabTargets',   Icon: Target },
           { id: 'ifrs',       labelKey: 'esgTabIfrs',      Icon: FileText },
           { id: 'env',        labelKey: 'esgTabEnv',       Icon: Wrench },
+          { id: 'assurance',  labelKey: 'esgTabAssurance', Icon: Paperclip },
           { id: 'settings',   labelKey: 'esgTabSettings',  Icon: Wrench },
         ] as { id: EsgTab; labelKey: string; Icon: typeof Leaf }[]).map(tabDef => (
           <button key={tabDef.id} onClick={() => setTab(tabDef.id)}
@@ -285,6 +286,7 @@ export function EsgPage() {
       {tab === 'targets'    && <EsgTargetsTab />}
       {tab === 'ifrs'       && <IfrsTab />}
       {tab === 'env'        && <EnvComplianceTab />}
+      {tab === 'assurance'  && <AssuranceTab />}
       {tab === 'survey'     && <SurveyTab />}
     </Shell>
   );
@@ -4004,6 +4006,7 @@ function GhgInventoryTab() {
         reportingYear: Number(values.reportingYear ?? year),
         scope: Number(values.scope ?? 1) as GhgScope,
         category: String(values.category ?? 'STATIONARY_COMBUSTION'),
+        scope3Category: values.scope3Category ? Number(values.scope3Category) : undefined,
         sourceNameEn: String(values.sourceNameEn ?? '').trim(),
         sourceNameAr: String(values.sourceNameAr ?? '').trim() || undefined,
         emissionValueTco2e: Number(values.emissionValueTco2e ?? 0),
@@ -4088,6 +4091,26 @@ function GhgInventoryTab() {
         { value: 'UPSTREAM_TRANSPORT',       label: 'Upstream transport (S3)' },
         { value: 'WASTE_OPERATIONS',         label: 'Waste from operations (S3)' },
         { value: 'USE_OF_SOLD_PRODUCTS',     label: 'Use of sold products (S3)' },
+      ] },
+    // V295 — GHG Protocol Scope-3 value-chain category (backend rejects it on S1/S2 rows).
+    { kind: 'select',   key: 'scope3Category',     label: isAr ? 'فئة النطاق 3 (1–15)' : 'Scope-3 category (1–15)', span: 6,
+      options: [
+        { value: '', label: isAr ? '— لا ينطبق —' : '— n/a —' },
+        { value: '1',  label: '1 · Purchased goods & services' },
+        { value: '2',  label: '2 · Capital goods' },
+        { value: '3',  label: '3 · Fuel & energy activities' },
+        { value: '4',  label: '4 · Upstream transport' },
+        { value: '5',  label: '5 · Waste in operations' },
+        { value: '6',  label: '6 · Business travel' },
+        { value: '7',  label: '7 · Employee commuting' },
+        { value: '8',  label: '8 · Upstream leased assets' },
+        { value: '9',  label: '9 · Downstream transport' },
+        { value: '10', label: '10 · Processing of sold products' },
+        { value: '11', label: '11 · Use of sold products' },
+        { value: '12', label: '12 · End-of-life of sold products' },
+        { value: '13', label: '13 · Downstream leased assets' },
+        { value: '14', label: '14 · Franchises' },
+        { value: '15', label: '15 · Investments' },
       ] },
     { kind: 'text',     key: 'sourceNameEn',       label: t('ghgFldSourceEn') + ' *', required: true, span: 12 },
     { kind: 'text',     key: 'sourceNameAr',       label: t('ghgFldSourceAr'),         span: 12 },
@@ -4883,6 +4906,9 @@ function SettingsTab() {
             {Num({ en: 'Partial-coverage threshold', ar: 'عتبة التغطية الجزئية' }, 'scope3PartialCoverageThreshold',
               { min: 0, max: 100, step: 0.5, unit: '%',
                 help: { en: 'Below this weighted coverage, GHG aggregate flags Scope 3 as Partial.', ar: 'دون هذه التغطية الموزونة، يصنّف تجميع الانبعاثات النطاق 3 كجزئي.' } })}
+            {Num({ en: 'Carbon-offset cap', ar: 'سقف أرصدة الكربون' }, 'carbonOffsetCapPct',
+              { min: 0, max: 100, step: 0.5, unit: '%',
+                help: { en: 'Retired credits may not exceed this % of the disclosed gross reduction (REG-11 integrity).', ar: 'لا يجوز أن تتجاوز الأرصدة المسحوبة هذه النسبة من إجمالي الخفض المفصح عنه (نزاهة REG-11).' } })}
           </div>
         </div>
 

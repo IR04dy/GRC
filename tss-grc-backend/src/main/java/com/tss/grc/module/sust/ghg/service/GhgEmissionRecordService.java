@@ -103,6 +103,7 @@ public class GhgEmissionRecordService {
         boolean wasVerified = "VERIFIED".equals(cur.getStatus());
 
         if (req.getCategory() != null)           cur.setCategory(req.getCategory());
+        if (req.getScope3Category() != null)     cur.setScope3Category(req.getScope3Category());
         if (req.getSourceNameEn() != null)       cur.setSourceNameEn(req.getSourceNameEn());
         if (req.getSourceNameAr() != null)       cur.setSourceNameAr(req.getSourceNameAr());
         if (req.getBusinessUnit() != null)       cur.setBusinessUnit(req.getBusinessUnit());
@@ -303,10 +304,48 @@ public class GhgEmissionRecordService {
     @Transactional
     public GhgEmissionRecord verify(Long id) { return transition(id, "VERIFIED"); }
 
+    // ── V295 — Scope-3 value-chain breakdown (GHG Protocol 15 categories) ────
+
+    public record Scope3Row(int category, String labelEn, String labelAr, BigDecimal tco2e, long records) {}
+    public record Scope3Breakdown(Short year, BigDecimal totalTco2e, BigDecimal uncategorisedTco2e,
+                                  java.util.List<Scope3Row> categories, BigDecimal coveragePct) {}
+
+    @Transactional(readOnly = true)
+    public Scope3Breakdown scope3Breakdown(Short year) {
+        var s3 = repo.findByOrganisationIdAndReportingYear(org(), year).stream()
+            .filter(r -> r.getScope() != null && r.getScope() == 3)
+            .toList();
+        java.util.Map<Integer, BigDecimal> sums = new java.util.HashMap<>();
+        java.util.Map<Integer, Long> counts = new java.util.HashMap<>();
+        BigDecimal total = BigDecimal.ZERO, uncategorised = BigDecimal.ZERO;
+        for (GhgEmissionRecord r : s3) {
+            BigDecimal v = r.getEmissionValueTco2e() == null ? BigDecimal.ZERO : r.getEmissionValueTco2e();
+            total = total.add(v);
+            if (r.getScope3Category() == null) { uncategorised = uncategorised.add(v); continue; }
+            int c = r.getScope3Category();
+            sums.merge(c, v, BigDecimal::add);
+            counts.merge(c, 1L, Long::sum);
+        }
+        java.util.List<Scope3Row> rows = new java.util.ArrayList<>();
+        for (var cat : com.tss.grc.module.sust.ghg.GhgScope3Categories.all().values()) {
+            rows.add(new Scope3Row(cat.number(), cat.labelEn(), cat.labelAr(),
+                sums.getOrDefault(cat.number(), BigDecimal.ZERO),
+                counts.getOrDefault(cat.number(), 0L)));
+        }
+        BigDecimal coverage = BigDecimal.valueOf(sums.size() * 100.0 / 15)
+            .setScale(1, java.math.RoundingMode.HALF_UP);
+        return new Scope3Breakdown(year, total, uncategorised, rows, coverage);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────
     private void validate(GhgEmissionRecord r) {
         if (r.getScope() == null || r.getScope() < 1 || r.getScope() > 3)
             throw new IllegalArgumentException("scope must be 1, 2 or 3");
+        // V295 — the 15 GHG Protocol value-chain categories only exist for Scope 3.
+        if (r.getScope3Category() != null && r.getScope() != 3)
+            throw new IllegalArgumentException("scope3_category only applies to scope 3 records");
+        if (r.getScope3Category() != null && (r.getScope3Category() < 1 || r.getScope3Category() > 15))
+            throw new IllegalArgumentException("scope3_category must be 1..15");
         if (r.getCoveragePercent() != null
             && (r.getCoveragePercent().signum() < 0
                 || r.getCoveragePercent().compareTo(new BigDecimal("100")) > 0))

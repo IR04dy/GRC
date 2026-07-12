@@ -65,6 +65,8 @@ public class OrganisationSettingsService {
             cur.setSgiAtRiskProgressFactor(req.getSgiAtRiskProgressFactor());
         if (req.getClimateScenarioWeightsStrict() != null)
             cur.setClimateScenarioWeightsStrict(req.getClimateScenarioWeightsStrict());
+        if (req.getCarbonOffsetCapPct() != null)   // V295 — decision #4, tenant-configurable
+            cur.setCarbonOffsetCapPct(req.getCarbonOffsetCapPct());
         if (req.getNotes() != null) cur.setNotes(req.getNotes());
 
         validate(cur);

@@ -18,7 +18,7 @@ class GhgCreateRequestTest {
     @Test
     void toEntity_mapsBusinessFields_andLeavesWorkflowAtDefault() {
         GhgCreateRequest r = new GhgCreateRequest(
-                (short) 2025, (short) 1, "Stationary", "Boiler A", "غلاية", "Ops", "Riyadh HQ",
+                (short) 2025, (short) 3, "Business travel", (short) 6, "Boiler A", "غلاية", "Ops", "Riyadh HQ",
                 new BigDecimal("1000"), "L", new BigDecimal("2.5"), "kgCO2e/L", 7L,
                 null, new BigDecimal("80"), "Bureau Veritas", "GHG Protocol", "notes",
                 "ref.pdf", "Owner", "owner@x.com");
@@ -27,6 +27,7 @@ class GhgCreateRequestTest {
 
         assertThat(e.getId()).isNull();                       // never client-set
         assertThat(e.getReportingYear()).isEqualTo((short) 2025);
+        assertThat(e.getScope3Category()).isEqualTo((short) 6);
         assertThat(e.getSourceNameEn()).isEqualTo("Boiler A");
         assertThat(e.getEmissionFactorId()).isEqualTo(7L);
         assertThat(e.getCoveragePercent()).isEqualByComparingTo("80");
