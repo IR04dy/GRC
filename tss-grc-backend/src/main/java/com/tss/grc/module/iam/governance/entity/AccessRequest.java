@@ -62,4 +62,8 @@ public class AccessRequest extends BaseEntity {
 
     @Column(name = "provisioned_at")
     private LocalDateTime provisionedAt;
+
+    /** V294 — the anchored workflow-engine request raised for inbox/SLA visibility. */
+    @Column(name = "engine_request_id")
+    private Long engineRequestId;
 }

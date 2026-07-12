@@ -40,6 +40,7 @@ public class BreakGlassService {
     private final BreakGlassEventRepository events;
     private final RoleRepository roles;
     private final AuditLogService audit;
+    private final com.tss.grc.module.platform.service.NotificationService notifications;
 
     @Transactional(readOnly = true)
     public List<BreakGlassEvent> list() {
@@ -91,6 +92,19 @@ public class BreakGlassService {
                 + ",\"expiresAt\":\"" + expires + "\",\"incidentRef\":\"" + incidentRef + "\"}")
             .message("CRITICAL: break-glass activated by " + activatorUsername
                 + " for incident " + incidentRef + " (expires " + expires + ", post-hoc review required)"));
+        // V294 (plan §6.6) — in-app notification to the CISO + IAM_LEAD populations.
+        for (String role : List.of("CISO", "IAM_LEAD")) {
+            try {
+                notifications.broadcastToRole(org, role,
+                    "Break-glass activated: " + incidentRef,
+                    "تفعيل وصول الطوارئ: " + incidentRef,
+                    activatorUsername + " activated EMERGENCY_RESPONDER until " + expires
+                        + ". Post-hoc review is mandatory.",
+                    "BREAK_GLASS", "BreakGlassEvent", saved.getId());
+            } catch (RuntimeException ex) {
+                log.warn("break-glass notification to {} failed: {}", role, ex.getMessage());
+            }
+        }
         return saved;
     }
 

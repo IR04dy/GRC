@@ -46,4 +46,18 @@ public interface AccessReviewItemRepository extends JpaRepository<AccessReviewIt
         """, nativeQuery = true)
     int generateItems(@Param("org") Long org, @Param("campaignId") Long campaignId,
                       @Param("scope") String scope, @Param("module") String module);
+
+    /** V294 — USER-scoped snapshot (JML MOVER mini-review): one user's assignments only. */
+    @Modifying
+    @Query(value = """
+        INSERT INTO iam.access_review_items
+            (organisation_id, campaign_id, user_id, username, role_id, role_name, assignment_source, valid_to)
+        SELECT :org, :campaignId, u.id, u.username, r.id, r.role_name, ur.source, ur.valid_to
+        FROM iam.user_roles ur
+        JOIN iam.users u ON u.id = ur.user_id AND u.organisation_id = :org AND u.is_deleted = 0
+        JOIN iam.roles r ON r.id = ur.role_id AND r.is_deleted = 0
+        WHERE u.id = :userId
+        """, nativeQuery = true)
+    int generateItemsForUser(@Param("org") Long org, @Param("campaignId") Long campaignId,
+                             @Param("userId") Long userId);
 }

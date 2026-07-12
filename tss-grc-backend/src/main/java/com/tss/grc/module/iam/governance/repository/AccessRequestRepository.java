@@ -59,6 +59,25 @@ public interface AccessRequestRepository extends JpaRepository<AccessRequest, Lo
            nativeQuery = true)
     int expireAssignments();
 
+    /** V294 — stamp the engine linkage WITHOUT a second entity save (ROWVERSION rule). */
+    @Modifying
+    @Query(value = "UPDATE iam.access_requests SET engine_request_id = :engineId WHERE id = :id",
+           nativeQuery = true)
+    int stampEngineRequestId(@Param("id") Long id, @Param("engineId") Long engineId);
+
+    /** V294 — per-org expiry sweep so the scheduler can notify each tenant's IAM_LEAD. */
+    @Modifying
+    @Query(value = """
+        DELETE ur FROM iam.user_roles ur
+        JOIN iam.users u ON u.id = ur.user_id
+        WHERE u.organisation_id = :org AND ur.valid_to IS NOT NULL AND ur.valid_to < SYSUTCDATETIME()
+        """, nativeQuery = true)
+    int expireAssignmentsForOrg(@Param("org") Long org);
+
+    /** Org ids with live users — sweep/scheduler iteration. */
+    @Query(value = "SELECT DISTINCT organisation_id FROM iam.users WHERE is_deleted = 0", nativeQuery = true)
+    List<Long> distinctOrganisationIds();
+
     /** Assignment register for the evidence pack: user × role × window × justification. */
     @Query(value = """
         SELECT u.username, r.role_name, ur.source, ur.valid_from, ur.valid_to,
@@ -81,6 +100,16 @@ public interface AccessRequestRepository extends JpaRepository<AccessRequest, Lo
           AND j.revoked_at IS NULL AND j.is_deleted = 0
         """, nativeQuery = true)
     List<Object[]> findUnprocessedLeavers(@Param("org") Long org);
+
+    /** V294 — MOVER events open a targeted mini-review of the user's grants (plan §6.3). */
+    @Query(value = """
+        SELECT j.id, u.id AS user_id, j.subject_username
+        FROM socops.iam_jml_event j
+        JOIN iam.users u ON u.username = j.subject_username AND u.organisation_id = j.organisation_id
+        WHERE j.organisation_id = :org AND j.event_type = 'MOVER'
+          AND j.revoked_at IS NULL AND j.is_deleted = 0
+        """, nativeQuery = true)
+    List<Object[]> findUnprocessedMovers(@Param("org") Long org);
 
     @Modifying
     @Query(value = "UPDATE socops.iam_jml_event SET revoked_at = SYSUTCDATETIME() WHERE id = :id",

@@ -9,14 +9,19 @@ import com.tss.grc.module.iam.governance.repository.AccessReviewCampaignReposito
 import com.tss.grc.module.iam.governance.repository.AccessReviewItemRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService.AuditEventBuilder;
+import com.tss.grc.module.platform.service.NotificationService;
 import com.tss.grc.module.reporting.service.PdfTheme;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -33,11 +38,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RecertificationService {
 
+    private static final Logger log = LoggerFactory.getLogger(RecertificationService.class);
+
     private final AccessReviewCampaignRepository campaigns;
     private final AccessReviewItemRepository items;
     private final AccessRequestRepository assignments;
     private final SodService sod;
     private final AuditLogService audit;
+    private final NotificationService notifications;
 
     public record CampaignView(AccessReviewCampaign campaign, long total, long pending) {}
 
@@ -70,6 +78,7 @@ public class RecertificationService {
         c.setWindowStart(r.windowStart());
         c.setWindowEnd(r.windowEnd());
         c.setWindowHijri(PdfTheme.formatHijri(r.windowStart()) + " – " + PdfTheme.formatHijri(r.windowEnd()));
+        c.setReviewerUserId(r.reviewerUserId());   // V294 — optional reviewer scoping
         AccessReviewCampaign saved = campaigns.save(c);
 
         int generated = items.generateItems(org, saved.getId(), saved.getScope(), saved.getScopeModule());
@@ -79,6 +88,99 @@ public class RecertificationService {
             .message("Recertification campaign created (" + saved.getScope() + "): "
                 + saved.getTitleEn() + " — " + generated + " item(s)"));
         return new CampaignView(saved, generated, generated);
+    }
+
+    /** V294 (plan §6.3) — JML MOVER: a targeted USER-scoped mini-review of one user's grants. */
+    @Transactional
+    public AccessReviewCampaign moverMiniReview(Long org, Long userId, String username) {
+        AccessReviewCampaign c = new AccessReviewCampaign();
+        c.setOrganisationId(org);
+        c.setTitleEn("MOVER access review — " + username);
+        c.setTitleAr("مراجعة صلاحيات المنقول — " + username);
+        c.setScope("USER");
+        c.setScopeUserId(userId);
+        c.setWindowStart(LocalDate.now());
+        c.setWindowEnd(LocalDate.now().plusDays(14));
+        c.setWindowHijri(PdfTheme.formatHijri(c.getWindowStart()) + " – " + PdfTheme.formatHijri(c.getWindowEnd()));
+        AccessReviewCampaign saved = campaigns.save(c);
+        int generated = items.generateItemsForUser(org, saved.getId(), userId);
+        audit.recordEvent(new AuditEventBuilder()
+            .actionType("CREATE").sourceModule("IAM").entityType("AccessReviewCampaign")
+            .entityId(saved.getId())
+            .message("MOVER mini-review opened for " + username + " (" + generated + " assignment(s))"));
+        return saved;
+    }
+
+    // ── V294 cadence auto-scheduling (plan §6.5: quarterly privileged / semi-annual all) ──
+
+    /** Daily 03:00 UTC: open the R1/R2 cadence campaigns when the period has none, and
+     *  nudge GRC_ADMINISTRATOR about overdue open campaigns. Off-request-safe. */
+    @Scheduled(cron = "0 0 3 * * *")
+    public void cadenceScheduler() {
+        for (Long org : assignments.distinctOrganisationIds()) {
+            try {
+                TenantContext.setCurrentTenant(org);
+                autoScheduleForOrg(org);
+            } catch (RuntimeException e) {
+                log.warn("recertification cadence scheduler failed for org {}: {}", org, e.getMessage());
+            } finally {
+                TenantContext.clear();
+            }
+        }
+    }
+
+    @Transactional
+    public void autoScheduleForOrg(Long org) {
+        LocalDate today = LocalDate.now();
+        LocalDate quarterStart = today.withDayOfMonth(1).withMonth(((today.getMonthValue() - 1) / 3) * 3 + 1);
+        LocalDate halfStart = today.withDayOfMonth(1).withMonth(today.getMonthValue() <= 6 ? 1 : 7);
+        int q = (today.getMonthValue() - 1) / 3 + 1;
+
+        if (!campaigns.existsByOrganisationIdAndScopeAndWindowStartGreaterThanEqualAndIsDeletedFalse(
+                org, "PRIVILEGED", quarterStart)) {
+            openAutoCampaign(org, "PRIVILEGED",
+                "Q" + q + "-" + today.getYear() + " privileged access review",
+                "مراجعة الصلاحيات المميزة للربع " + q + " — " + today.getYear(), today, today.plusDays(21));
+        }
+        if (!campaigns.existsByOrganisationIdAndScopeAndWindowStartGreaterThanEqualAndIsDeletedFalse(
+                org, "ALL", halfStart)) {
+            openAutoCampaign(org, "ALL",
+                "H" + (today.getMonthValue() <= 6 ? 1 : 2) + "-" + today.getYear() + " full access review",
+                "المراجعة النصف سنوية الشاملة للصلاحيات — " + today.getYear(), today, today.plusDays(30));
+        }
+        // Overdue nudge (plan §6.5 SLA): open campaigns past their window with pending items.
+        for (AccessReviewCampaign c : campaigns
+                .findByOrganisationIdAndStatusAndWindowEndBeforeAndIsDeletedFalse(org, "OPEN", today)) {
+            long pending = items.countByCampaignIdAndDecisionAndIsDeletedFalse(c.getId(), "PENDING");
+            if (pending == 0) continue;
+            notifications.broadcastToRole(org, "GRC_ADMINISTRATOR",
+                "Access review overdue: " + c.getTitleEn(),
+                "مراجعة صلاحيات متأخرة: " + (c.getTitleAr() == null ? c.getTitleEn() : c.getTitleAr()),
+                pending + " item(s) still pending past the review window (" + c.getWindowEnd() + ").",
+                "ACCESS_REVIEW", "AccessReviewCampaign", c.getId());
+        }
+    }
+
+    private void openAutoCampaign(Long org, String scope, String titleEn, String titleAr,
+                                  LocalDate start, LocalDate end) {
+        AccessReviewCampaign c = new AccessReviewCampaign();
+        c.setOrganisationId(org);
+        c.setTitleEn(titleEn);
+        c.setTitleAr(titleAr);
+        c.setScope(scope);
+        c.setWindowStart(start);
+        c.setWindowEnd(end);
+        c.setWindowHijri(PdfTheme.formatHijri(start) + " – " + PdfTheme.formatHijri(end));
+        AccessReviewCampaign saved = campaigns.save(c);
+        int generated = items.generateItems(org, saved.getId(), scope, null);
+        audit.recordEvent(new AuditEventBuilder()
+            .actionType("CREATE").sourceModule("IAM").entityType("AccessReviewCampaign")
+            .entityId(saved.getId())
+            .message("Cadence campaign auto-opened (" + scope + "): " + titleEn + " — " + generated + " item(s)"));
+        notifications.broadcastToRole(org, "GRC_ADMINISTRATOR",
+            "Access review opened: " + titleEn, "فُتحت مراجعة صلاحيات: " + titleAr,
+            generated + " assignment(s) to disposition by " + end + ".",
+            "ACCESS_REVIEW", "AccessReviewCampaign", saved.getId());
     }
 
     @Transactional(readOnly = true)
@@ -105,6 +207,13 @@ public class RecertificationService {
         if (reviewer != null && reviewer.equals(item.getUserId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "Reviewers cannot certify their own access");
+        }
+        // V294 — reviewer scoping: a designated reviewer locks out everyone but
+        // themselves and governance admins.
+        if (c.getReviewerUserId() != null && !c.getReviewerUserId().equals(reviewer)
+                && !sod.isGovernanceAdmin(reviewer)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "This campaign is scoped to a designated reviewer");
         }
         if ("MODIFY".equals(decision) && (note == null || note.isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,

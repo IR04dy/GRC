@@ -74,7 +74,9 @@ public final class GovernanceDtos {
         @NotBlank @Pattern(regexp = "PRIVILEGED|MODULE|ALL") String scope,
         @Size(max = 40) String scopeModule,
         @NotNull java.time.LocalDate windowStart,
-        @NotNull java.time.LocalDate windowEnd
+        @NotNull java.time.LocalDate windowEnd,
+        /** V294 — optional: lock item decisions to this reviewer (+ governance admins). */
+        Long reviewerUserId
     ) {}
 
     public record ReviewDecisionRequest(

@@ -12,4 +12,12 @@ public interface AccessReviewCampaignRepository extends JpaRepository<AccessRevi
     List<AccessReviewCampaign> findByOrganisationIdAndIsDeletedFalseOrderByCreatedAtDesc(Long organisationId);
 
     Optional<AccessReviewCampaign> findByOrganisationIdAndIdAndIsDeletedFalse(Long organisationId, Long id);
+
+    // ── V294 cadence auto-scheduling + overdue surveillance ────────────────
+
+    boolean existsByOrganisationIdAndScopeAndWindowStartGreaterThanEqualAndIsDeletedFalse(
+        Long organisationId, String scope, java.time.LocalDate windowStartFrom);
+
+    List<AccessReviewCampaign> findByOrganisationIdAndStatusAndWindowEndBeforeAndIsDeletedFalse(
+        Long organisationId, String status, java.time.LocalDate windowEndBefore);
 }

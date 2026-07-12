@@ -22,6 +22,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -52,6 +54,15 @@ public class AccessRequestService {
     private final UserRepository users;
     private final AuditLogService audit;
     private final SodService sod;
+    private final RecertificationService recertification;
+    private final com.tss.grc.module.platform.service.NotificationService notifications;
+    private final com.tss.grc.module.workflow.requests.service.WorkflowRequestService workflowEngine;
+    private final org.springframework.transaction.PlatformTransactionManager txManager;
+
+    /** V294 (plan §6.2) — tenant-profile switch: with 4-eyes OFF the requester may also
+     *  decide (beneficiary self-approval stays blocked). Default ON (Saudi profile). */
+    @org.springframework.beans.factory.annotation.Value("${grc.iam.four-eyes-enabled:true}")
+    private boolean fourEyesEnabled;
 
     // ── request lifecycle ────────────────────────────────────────────────
 
@@ -87,16 +98,99 @@ public class AccessRequestService {
         AccessRequest saved = requests.save(req);
         audit.log("CREATE", "AccessRequest", saved.getId(),
             "Access requested: role " + role.getRoleName() + " for " + beneficiary.getUsername());
+        // Engine wiring runs AFTER COMMIT: outside the governance TX it can neither
+        // poison it nor race the row's ROWVERSION (the linkage is stamped natively).
+        final Long requestId = saved.getId();
+        final String roleName = role.getRoleName(), beneficiaryName = beneficiary.getUsername();
+        final String justification = saved.getJustification();
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override public void afterCommit() {
+                    raiseEngineRequest(requestId, roleName, beneficiaryName, justification);
+                }
+            });
         return saved;
+    }
+
+    /**
+     * V294 (plan §6.2) — workflow-engine visibility: every access request also raises an
+     * anchored engine request (inbox / SLA / escalation for the approver population).
+     * Runs AFTER the governance transaction committed (TransactionSynchronization), so an
+     * engine failure can neither surface to the caller nor poison the core flow; the
+     * engine's create and send each open their own transaction (calling them inside one
+     * shared TX double-flushes the same ROWVERSION row — live-found); the back-link is
+     * stamped natively, never via a second entity save.
+     */
+    private void raiseEngineRequest(Long requestId, String roleName, String beneficiaryName, String justification) {
+        try {
+            // Every call gets its own REQUIRES_NEW: afterCommit still has the COMPLETED
+            // transaction context bound, so a plain @Transactional(REQUIRED) engine call
+            // would join it and write without a live transaction (live-found: the created
+            // request came back with a null id). Separate transactions also respect the
+            // ROWVERSION single-flush rule between create and send.
+            Long engineId = inNewTransaction(() ->
+                workflowEngine.create(new com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.CreateRequest(
+                    "IAM", "AccessRequest", requestId, "ACCESS_APPROVAL",
+                    "Access request: " + roleName + " for " + beneficiaryName,
+                    "طلب صلاحية: " + roleName + " للمستخدم " + beneficiaryName,
+                    justification,
+                    null, null, "Approve or reject in Access Governance",
+                    java.time.LocalDate.now().plusDays(3), 72, "HIGH", null,
+                    null, "GRC_ADMINISTRATOR", null,   // escalation path — the engine's HIGH-priority gate
+                    Boolean.FALSE, Boolean.FALSE, null, null, null,
+                    List.of(new com.tss.grc.module.workflow.requests.dto.WorkflowRequestDtos.RecipientDto(
+                        "ROLE", null, "GRC_ADMINISTRATOR", "Access approvers", "ASSIGNEE", 1)),
+                    null, null, null, null, null)).id());
+            inNewTransaction(() -> workflowEngine.send(engineId));
+            inNewTransaction(() -> requests.stampEngineRequestId(requestId, engineId));
+        } catch (RuntimeException e) {
+            log.warn("engine visibility request failed for access request {}: {}", requestId, e.getMessage());
+        }
+    }
+
+    /** V294 — settle the anchored engine request once the governance decision commits. */
+    private void settleEngineRequestAfterCommit(Long requestId, Long engineRequestId, String outcome) {
+        if (engineRequestId == null) return;
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override public void afterCommit() {
+                    try {
+                        inNewTransaction(() ->
+                            workflowEngine.respond(engineRequestId, "Access request " + outcome, outcome));
+                    } catch (RuntimeException first) {
+                        try {
+                            inNewTransaction(() ->
+                                workflowEngine.close(engineRequestId, "Access request " + outcome));
+                        } catch (RuntimeException second) {
+                            log.warn("engine settle failed for access request {} ({}): {}",
+                                requestId, outcome, second.getMessage());
+                        }
+                    }
+                }
+            });
+    }
+
+    /** New-transaction wrapper for the post-commit native stamp. */
+    private <T> T inNewTransaction(java.util.function.Supplier<T> work) {
+        var tt = new org.springframework.transaction.support.TransactionTemplate(txManager);
+        tt.setPropagationBehavior(
+            org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return tt.execute(status -> work.get());
     }
 
     @Transactional
     public AccessRequest approve(Long id, boolean override, String overrideJustification) {
         AccessRequest req = mustPending(id);
         Long approver = currentUserId();
-        if (approver != null && (approver.equals(req.getCreatedBy()) || approver.equals(req.getBeneficiaryUserId()))) {
+        // Beneficiary self-approval is blocked unconditionally; requester==approver is the
+        // 4-eyes rule and follows the tenant profile switch (V294, default ON).
+        if (approver != null && approver.equals(req.getBeneficiaryUserId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                "4-eyes blocked: approver must differ from both requester and beneficiary");
+                "Self-approval blocked: the beneficiary cannot approve their own access");
+        }
+        if (fourEyesEnabled && approver != null && approver.equals(req.getCreatedBy())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "4-eyes blocked: approver must differ from the requester");
         }
         // Preventive SoD check (plan §6.4): block grants that would newly complete a
         // conflicting pair — override requires GRC_ADMINISTRATOR + documented
@@ -144,6 +238,7 @@ public class AccessRequestService {
             .newValueJson("{\"userId\":" + req.getBeneficiaryUserId() + ",\"roleId\":" + req.getRoleId()
                 + ",\"validTo\":\"" + req.getValidTo() + "\",\"insertedRows\":" + inserted + "}")
             .message("Access request approved + provisioned (request " + saved.getId() + ")"));
+        settleEngineRequestAfterCommit(saved.getId(), saved.getEngineRequestId(), "APPROVED");
         return saved;
     }
 
@@ -151,7 +246,7 @@ public class AccessRequestService {
     public AccessRequest reject(Long id, String reason) {
         AccessRequest req = mustPending(id);
         Long approver = currentUserId();
-        if (approver != null && approver.equals(req.getCreatedBy())) {
+        if (fourEyesEnabled && approver != null && approver.equals(req.getCreatedBy())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Requester cannot decide their own request");
         }
         req.setStatus("REJECTED");
@@ -160,6 +255,7 @@ public class AccessRequestService {
         req.setRejectionReason(reason);
         AccessRequest saved = requests.save(req);
         audit.log("REJECT", "AccessRequest", saved.getId(), "Access request rejected: " + reason);
+        settleEngineRequestAfterCommit(saved.getId(), saved.getEngineRequestId(), "REJECTED");
         return saved;
     }
 
@@ -179,32 +275,52 @@ public class AccessRequestService {
         return removed;
     }
 
-    /** Hourly expiry sweep + manual trigger. Off-request-safe (audit guards internally). */
+    /** Hourly expiry sweep + manual trigger. Off-request-safe (audit guards internally).
+     *  V294: per-org so each tenant's IAM_LEAD gets the revocation notification. */
     @Scheduled(fixedDelayString = "PT1H", initialDelayString = "PT10M")
     @Transactional
     public void scheduledExpirySweep() {
-        try {
-            int n = requests.expireAssignments();
-            if (n > 0) {
-                audit.recordEvent(new AuditEventBuilder()
-                    .actionType("ACCESS_REVOKE").sourceModule("IAM").entityType("UserRoleAssignment")
-                    .message("Expiry sweep removed " + n + " time-bound assignment(s)"));
+        for (Long org : requests.distinctOrganisationIds()) {
+            try {
+                int n = requests.expireAssignmentsForOrg(org);
+                if (n > 0) {
+                    audit.recordEvent(new AuditEventBuilder()
+                        .actionType("ACCESS_REVOKE").sourceModule("IAM").entityType("UserRoleAssignment")
+                        .message("Expiry sweep removed " + n + " time-bound assignment(s) (org " + org + ")"));
+                    notifyExpiry(org, n);
+                }
+            } catch (RuntimeException e) {
+                log.warn("access expiry sweep failed for org {}: {}", org, e.getMessage());
             }
-        } catch (RuntimeException e) {
-            log.warn("access expiry sweep failed: {}", e.getMessage());
         }
     }
 
     @Transactional
     public int manualExpirySweep() {
-        int n = requests.expireAssignments();
+        Long org = org();
+        int n = requests.expireAssignmentsForOrg(org);
         audit.recordEvent(new AuditEventBuilder()
             .actionType("ACCESS_REVOKE").sourceModule("IAM").entityType("UserRoleAssignment")
             .message("Manual expiry sweep removed " + n + " assignment(s)"));
+        if (n > 0) notifyExpiry(org, n);
         return n;
     }
 
-    /** JML LEAVER processing (plan §6.3): revoke everything for leavers, stamp the event. */
+    /** V294 (plan §6.3) — in-app notification to the tenant's IAM_LEAD population. */
+    private void notifyExpiry(Long org, int removed) {
+        try {
+            notifications.broadcastToRole(org, "IAM_LEAD",
+                "Time-bound access expired",
+                "انتهت صلاحيات وصول محددة المدة",
+                removed + " assignment(s) auto-revoked past their validity window.",
+                "ACCESS_LIFECYCLE", "UserRoleAssignment", null);
+        } catch (RuntimeException e) {
+            log.warn("expiry notification failed for org {}: {}", org, e.getMessage());
+        }
+    }
+
+    /** JML LEAVER processing (plan §6.3): revoke everything for leavers, stamp the event.
+     *  V294 adds MOVER handling: each mover gets a targeted USER-scoped mini-review. */
     @Transactional
     public int jmlSweep() {
         Long org = org();
@@ -222,6 +338,14 @@ public class AccessRequestService {
                 .entityType("UserRoleAssignment")
                 .entityCode(username)
                 .message("JML LEAVER processed: all " + removed + " assignment(s) revoked for " + username));
+        }
+        for (Object[] row : requests.findUnprocessedMovers(org)) {
+            Long jmlId = ((Number) row[0]).longValue();
+            Long userId = ((Number) row[1]).longValue();
+            String username = String.valueOf(row[2]);
+            recertification.moverMiniReview(org, userId, username);
+            requests.markLeaverProcessed(jmlId);   // same processed-stamp column
+            processed++;
         }
         return processed;
     }

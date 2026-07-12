@@ -40,6 +40,7 @@ public class AccessAnalyticsService {
         long openSodViolations,
         long breakGlassActive,
         long breakGlassAwaitingReview,
+        long platformAdminActions30d,
         List<CampaignCompletion> campaignCompletion,
         List<GrantHolder> topGrantHolders) {}
 
@@ -68,6 +69,7 @@ public class AccessAnalyticsService {
             sodViolations.countByOrganisationIdAndStatusAndIsDeletedFalse(org, "OPEN"),
             breakGlass.countByOrganisationIdAndStatusAndIsDeletedFalse(org, "ACTIVE"),
             breakGlass.countByOrganisationIdAndReviewStatusAndIsDeletedFalse(org, "PENDING_REVIEW"),
+            breakGlass.countPlatformAdminActions30d(org),
             completion,
             top);
     }

@@ -34,6 +34,10 @@ public class AccessReviewCampaign extends BaseEntity {
     @Column(name = "window_start", nullable = false) private LocalDate windowStart;
     @Column(name = "window_end", nullable = false) private LocalDate windowEnd;
     @Column(name = "window_hijri", length = 120) private String windowHijri;
+    /** V294 — optional reviewer scoping: only this user (or a governance admin) decides items. */
+    @Column(name = "reviewer_user_id") private Long reviewerUserId;
+    /** V294 — set for USER-scoped campaigns (JML MOVER mini-reviews). */
+    @Column(name = "scope_user_id") private Long scopeUserId;
     /** OPEN | CLOSED. */
     @Column(nullable = false, length = 15) private String status = "OPEN";
     @Column(name = "closed_at") private LocalDateTime closedAt;

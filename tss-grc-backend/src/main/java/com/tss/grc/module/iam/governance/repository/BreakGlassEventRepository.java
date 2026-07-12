@@ -75,6 +75,18 @@ public interface BreakGlassEventRepository extends JpaRepository<BreakGlassEvent
         """, nativeQuery = true)
     long countExpiringSoon(@Param("org") Long org);
 
+    /** V294 (§10) — PLATFORM_ADMIN bypass visibility: audited actions in the last 30 days
+     *  by users holding the bypass role. */
+    @Query(value = """
+        SELECT COUNT(*) FROM platform.audit_log al
+        WHERE al.organisation_id = :org
+          AND al.created_at > DATEADD(day, -30, SYSUTCDATETIME())
+          AND al.user_id IN (SELECT ur.user_id FROM iam.user_roles ur
+                             JOIN iam.roles r ON r.id = ur.role_id
+                             WHERE r.role_name = 'PLATFORM_ADMIN')
+        """, nativeQuery = true)
+    long countPlatformAdminActions30d(@Param("org") Long org);
+
     /** Top users by distinct effective grants (over-privilege candidates). */
     @Query(value = """
         SELECT TOP 5 u.username, COUNT(DISTINCT rp.permission_id) AS grants
