@@ -58,6 +58,7 @@ public class GreenFinancePackageService {
     private final GreenProjectRepository projects;
     private final InstrumentAllocationRepository allocations;
     private final AllocationReportRepository reports;
+    private final com.tss.grc.module.sust.finance.repository.IfrsRequirementRepository ifrs;
     private final BrandThemeService brandThemeService;
 
     public record Package(byte[] bytes, String filename) {}
@@ -111,10 +112,18 @@ public class GreenFinancePackageService {
                 str(r.getRefinancingSharePct()), str(r.getTco2eAvoidedYr()), str(r.getMwhRenewableYr()),
                 str(r.getWaterM3SavedYr()), str(r.getIntensityTco2ePerSarMn()), r.getStatus()});
 
+        // V293 (plan §5.4) — the S1/S2 gap sheet is part of the SOCPA-readiness pack.
+        byte[] ifrsXlsx = writeXlsx(brandColor, "IFRS S1-S2 Readiness",
+            new String[]{"Code", "Standard", "Pillar", "Requirement (EN)", "Status", "Coverage Ref", "Owner"},
+            ifrs.findByOrganisationIdAndIsDeletedFalseOrderByReqCodeAsc(org),
+            r -> new String[]{r.getReqCode(), r.getStandard(), r.getPillar(), nz(r.getTitleEn()),
+                r.getStatus(), nz(r.getCoverageRef()), nz(r.getOwnerName())});
+
         byte[] readme = readmePdf(brand, brandColor, now, generatedBy, instr.size(), allAllocs.size(), reps.size());
 
-        String[] names = {"README.pdf", "Instruments.xlsx", "Use_of_Proceeds.xlsx", "Impact_Reports.xlsx"};
-        byte[][] blobs = {readme, instrumentsXlsx, uopXlsx, impactXlsx};
+        String[] names = {"README.pdf", "Instruments.xlsx", "Use_of_Proceeds.xlsx", "Impact_Reports.xlsx",
+            "IFRS_S1_S2_Readiness.xlsx"};
+        byte[][] blobs = {readme, instrumentsXlsx, uopXlsx, impactXlsx, ifrsXlsx};
 
         StringBuilder manifest = new StringBuilder();
         manifest.append("{\n  \"package\": \"GreenFinanceEvidence\",\n")

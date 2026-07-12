@@ -21,4 +21,11 @@ public interface FinancedEmissionsRecordRepository extends JpaRepository<Finance
 
     Optional<FinancedEmissionsRecord> findByOrganisationIdAndReportingYearAndReportingPeriodAndAssetClassAndIsDeletedFalse(
             Long organisationId, Integer reportingYear, String reportingPeriod, String assetClass);
+
+    // ── V293 per-asset PCAF rollup (plan §5.1) ──────────────────────────────
+
+    Optional<FinancedEmissionsRecord> findByOrganisationIdAndIdAndIsDeletedFalse(Long organisationId, Long id);
+
+    List<FinancedEmissionsRecord> findByOrganisationIdAndAssetRefAndIsDeletedFalseOrderByReportingYearDesc(
+            Long organisationId, Long assetRef);
 }

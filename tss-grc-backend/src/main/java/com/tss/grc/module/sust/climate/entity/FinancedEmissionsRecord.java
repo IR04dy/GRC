@@ -57,6 +57,10 @@ public class FinancedEmissionsRecord extends BaseEntity {
     @Column(name = "asset_class_label_ar", length = 255)
     private String assetClassLabelAr;
 
+    /** V293 (plan §5.1) — soft FK to sust.portfolio_assets for per-asset PCAF rollups. */
+    @Column(name = "asset_ref")
+    private Long assetRef;
+
     @Column(name = "outstanding_amount_sar_millions", nullable = false, precision = 18, scale = 2)
     private BigDecimal outstandingAmountSarMillions;
 

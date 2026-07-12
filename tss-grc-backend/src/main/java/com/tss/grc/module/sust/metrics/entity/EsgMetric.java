@@ -54,6 +54,9 @@ public class EsgMetric {
 
     @Column(nullable = false, length = 20) private String status = "ACTIVE";
 
+    /** V293 — flagged metrics block annual-report approval while they have no reading. */
+    @Column(name = "reading_required", nullable = false) private Boolean readingRequired = false;
+
     @Column(name = "owner_name",    length = 255) private String ownerName;
     @Column(name = "owner_email",   length = 255) private String ownerEmail;
     @Column(name = "responsible_department", length = 120) private String responsibleDepartment;

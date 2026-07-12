@@ -94,6 +94,16 @@ public class EsgHorizonController {
         return service.addActual(id, r.year(), r.value(), r.notes());
     }
 
+    public record AddMilestoneRequest(@NotNull Integer year, @NotNull BigDecimal value,
+                                      @Size(max = 200) String labelEn, @Size(max = 200) String labelAr) {}
+
+    @PostMapping("/targets/{id}/milestones")
+    @PreAuthorize(WRITE_GUARD)
+    public com.tss.grc.module.sust.finance.entity.EsgTargetMilestone addMilestone(
+            @PathVariable Long id, @Valid @RequestBody AddMilestoneRequest r) {
+        return service.addMilestone(id, r.year(), r.value(), r.labelEn(), r.labelAr());
+    }
+
     @PostMapping("/targets/trajectory-sweep")
     @PreAuthorize(WRITE_GUARD)
     public Map<String, Integer> trajectorySweep() {
@@ -154,6 +164,27 @@ public class EsgHorizonController {
     @PreAuthorize(WRITE_GUARD)
     public Map<String, Integer> permitSweep(@RequestParam(defaultValue = "90") @Min(1) @Max(365) int leadDays) {
         return Map.of("capasRaised", service.permitExpirySweep(leadDays));
+    }
+
+    // V293 (plan §5.6) — violation register; each violation raises its own auto-CAPA.
+
+    public record RecordViolationRequest(
+        @NotNull LocalDate violationDate,
+        @NotBlank @Size(max = 500) String descriptionEn,
+        @Size(max = 500) String descriptionAr,
+        @Pattern(regexp = "CRITICAL|HIGH|MEDIUM") String severity) {}
+
+    @GetMapping("/env-permits/{id}/violations")
+    @PreAuthorize(READ_GUARD)
+    public List<com.tss.grc.module.sust.finance.entity.EnvPermitViolation> violations(@PathVariable Long id) {
+        return service.listViolations(id);
+    }
+
+    @PostMapping("/env-permits/{id}/violations")
+    @PreAuthorize(WRITE_GUARD)
+    public com.tss.grc.module.sust.finance.entity.EnvPermitViolation recordViolation(
+            @PathVariable Long id, @Valid @RequestBody RecordViolationRequest r) {
+        return service.recordViolation(id, r.violationDate(), r.descriptionEn(), r.descriptionAr(), r.severity());
     }
 
     // ── CBAM ────────────────────────────────────────────────────────────

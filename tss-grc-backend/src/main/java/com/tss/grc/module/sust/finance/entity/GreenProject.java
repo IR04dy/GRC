@@ -70,6 +70,11 @@ public class GreenProject extends BaseEntity {
     @Column(name = "actual_water_m3_saved_yr", precision = 18, scale = 4)
     private BigDecimal actualWaterM3SavedYr;
 
+    /** V293 (plan §4.2) — ACTUAL | ESTIMATE: whether the actual-impact figures are
+     *  measured or estimated; instrument summaries surface the flag. */
+    @Column(name = "actual_impact_basis", nullable = false, length = 10)
+    private String actualImpactBasis = "ACTUAL";
+
     /** PLANNED | ACTIVE | COMPLETED. */
     @Column(nullable = false, length = 20)
     private String status = "PLANNED";

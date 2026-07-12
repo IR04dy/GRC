@@ -54,7 +54,9 @@ public final class GreenFinanceDtos {
         BigDecimal expectedMwhRenewableYr,
         BigDecimal actualMwhRenewableYr,
         BigDecimal expectedWaterM3SavedYr,
-        BigDecimal actualWaterM3SavedYr
+        BigDecimal actualWaterM3SavedYr,
+        /** V293 (plan §4.2) — ACTUAL (default) | ESTIMATE: basis of the actual-impact figures. */
+        @Pattern(regexp = "ACTUAL|ESTIMATE") String actualImpactBasis
     ) {}
 
     public record ProposeAllocationRequest(
@@ -92,6 +94,8 @@ public final class GreenFinanceDtos {
         BigDecimal waterM3SavedYr,
         BigDecimal intensityTco2ePerSarMn,
         int approvedAllocations,
-        int pendingAllocations
+        int pendingAllocations,
+        /** V293 — true when any contributing project's actual-impact figures are ESTIMATE-based. */
+        boolean estimateBasis
     ) {}
 }

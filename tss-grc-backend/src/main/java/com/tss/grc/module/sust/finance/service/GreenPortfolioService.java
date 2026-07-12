@@ -3,11 +3,15 @@ package com.tss.grc.module.sust.finance.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.climate.entity.FinancedEmissionsRecord;
+import com.tss.grc.module.sust.climate.entity.TcfdClimateScenario;
 import com.tss.grc.module.sust.climate.repository.FinancedEmissionsRecordRepository;
+import com.tss.grc.module.sust.climate.repository.TcfdClimateScenarioRepository;
 import com.tss.grc.module.sust.finance.entity.CarbonCredit;
+import com.tss.grc.module.sust.finance.entity.EsgTarget;
 import com.tss.grc.module.sust.finance.entity.PortfolioAsset;
 import com.tss.grc.module.sust.finance.entity.TaxonomyEntry;
 import com.tss.grc.module.sust.finance.repository.CarbonCreditRepository;
+import com.tss.grc.module.sust.finance.repository.EsgTargetRepository;
 import com.tss.grc.module.sust.finance.repository.PortfolioAssetRepository;
 import com.tss.grc.module.sust.finance.repository.TaxonomyEntryRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -50,7 +54,13 @@ public class GreenPortfolioService {
     private final PortfolioAssetRepository assets;
     private final CarbonCreditRepository credits;
     private final FinancedEmissionsRecordRepository financedEmissions;
+    private final TcfdClimateScenarioRepository scenarios;
+    private final EsgTargetRepository esgTargets;
     private final AuditLogService audit;
+
+    /** V293 (plan §5.3 / decision #4) — retired offsets may not exceed this share of
+     *  the disclosed gross reduction (anti-greenwashing). */
+    private static final BigDecimal OFFSET_CAP_PCT = BigDecimal.valueOf(10);
 
     // ── taxonomy ─────────────────────────────────────────────────────────
 
@@ -132,6 +142,69 @@ public class GreenPortfolioService {
         return saved;
     }
 
+    // ── V293: financed-emissions ↔ asset linkage (plan §5.1) ─────────────
+
+    /** Link a PCAF financed-emissions record to a portfolio asset (re-link allowed). */
+    @Transactional
+    public FinancedEmissionsRecord linkEmissionRecord(Long assetId, Long recordId) {
+        Long org = org();
+        PortfolioAsset a = mustAsset(assetId);
+        FinancedEmissionsRecord fe = financedEmissions.findByOrganisationIdAndIdAndIsDeletedFalse(org, recordId)
+            .orElseThrow(() -> new EntityNotFoundException("Financed-emissions record not found: " + recordId));
+        fe.setAssetRef(a.getId());
+        FinancedEmissionsRecord saved = financedEmissions.save(fe);
+        audit.log("UPDATE", "FinancedEmissionsRecord", saved.getId(),
+            "Linked to portfolio asset " + a.getAssetCode());
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public List<FinancedEmissionsRecord> assetEmissions(Long assetId) {
+        mustAsset(assetId);
+        return financedEmissions.findByOrganisationIdAndAssetRefAndIsDeletedFalseOrderByReportingYearDesc(org(), assetId);
+    }
+
+    // ── V293: climate overlay (plan §5.2) ────────────────────────────────
+
+    public record OverlayRow(String taxonomyCode, BigDecimal exposureSarMn, BigDecimal stressedLossSarMn) {}
+    public record ClimateOverlay(Long scenarioId, String scenarioType, BigDecimal scenarioLossRatePct,
+                                 List<OverlayRow> byCategory,
+                                 BigDecimal totalEligibleExposureSarMn, BigDecimal totalStressedLossSarMn) {}
+
+    /** Applies the scenario's realised loss rate (expected loss ÷ portfolio at risk)
+     *  across the eligible portfolio's taxonomy segments. */
+    @Transactional(readOnly = true)
+    public ClimateOverlay climateOverlay(Long scenarioId) {
+        Long org = org();
+        TcfdClimateScenario s = scenarios.findById(scenarioId)
+            .filter(x -> org.equals(x.getOrganisationId()) && !Boolean.TRUE.equals(x.getIsDeleted()))
+            .orElseThrow(() -> new EntityNotFoundException("Climate scenario not found: " + scenarioId));
+        if (s.getPortfolioAtRiskSarBillions() == null || s.getPortfolioAtRiskSarBillions().signum() == 0
+                || s.getExpectedLossSarMillions() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Scenario has no computed loss figures yet (add sector impacts first)");
+        }
+        BigDecimal lossRatePct = s.getExpectedLossSarMillions()
+            .divide(s.getPortfolioAtRiskSarBillions().multiply(BigDecimal.valueOf(1000)), MC)
+            .multiply(HUNDRED).setScale(4, RoundingMode.HALF_UP);
+
+        Map<String, BigDecimal> mix = new TreeMap<>();
+        BigDecimal totalEligible = BigDecimal.ZERO;
+        for (PortfolioAsset a : assets.findByOrganisationIdAndIsDeletedFalseOrderByAssetCodeAsc(org)) {
+            if (!"ELIGIBLE".equals(a.getEligibilityStatus()) || a.getTaxonomyCode() == null) continue;
+            mix.merge(a.getTaxonomyCode(), a.getExposureSarMn(), BigDecimal::add);
+            totalEligible = totalEligible.add(a.getExposureSarMn());
+        }
+        List<OverlayRow> rows = mix.entrySet().stream()
+            .map(e -> new OverlayRow(e.getKey(), e.getValue().setScale(4, RoundingMode.HALF_UP),
+                e.getValue().multiply(lossRatePct, MC).divide(HUNDRED, MC).setScale(4, RoundingMode.HALF_UP)))
+            .toList();
+        BigDecimal totalLoss = totalEligible.multiply(lossRatePct, MC).divide(HUNDRED, MC)
+            .setScale(4, RoundingMode.HALF_UP);
+        return new ClimateOverlay(s.getId(), s.getScenarioType(), lossRatePct, rows,
+            totalEligible.setScale(4, RoundingMode.HALF_UP), totalLoss);
+    }
+
     // ── portfolio summary (§5.2 calculations) ────────────────────────────
 
     public record PortfolioSummary(
@@ -142,6 +215,7 @@ public class GreenPortfolioService {
         Map<String, BigDecimal> categoryMixSarMn,
         BigDecimal weightedDataQuality,
         BigDecimal financedEmissionsTco2e,
+        BigDecimal assetLinkedEmissionsTco2e,
         int assets, int eligibleAssets, int pendingTags) {}
 
     @Transactional(readOnly = true)
@@ -173,13 +247,17 @@ public class GreenPortfolioService {
             financedEmissions.findByOrganisationIdAndIsDeletedFalseOrderByReportingYearDescAssetClassAsc(org);
         Integer latestYear = fes.isEmpty() ? null : fes.get(0).getReportingYear();
         BigDecimal dqWeighted = BigDecimal.ZERO, outstanding = BigDecimal.ZERO, feTotal = BigDecimal.ZERO;
+        BigDecimal linkedTotal = BigDecimal.ZERO;
         for (FinancedEmissionsRecord fe : fes) {
             if (latestYear != null && !latestYear.equals(fe.getReportingYear())) continue;
             BigDecimal out = fe.getOutstandingAmountSarMillions() == null ? BigDecimal.ZERO : fe.getOutstandingAmountSarMillions();
             int dq = fe.getDataQualityScore() == null ? 5 : fe.getDataQualityScore();
             dqWeighted = dqWeighted.add(out.multiply(BigDecimal.valueOf(dq)));
             outstanding = outstanding.add(out);
-            if (fe.getTotalFinancedEmissionsTco2e() != null) feTotal = feTotal.add(fe.getTotalFinancedEmissionsTco2e());
+            if (fe.getTotalFinancedEmissionsTco2e() != null) {
+                feTotal = feTotal.add(fe.getTotalFinancedEmissionsTco2e());
+                if (fe.getAssetRef() != null) linkedTotal = linkedTotal.add(fe.getTotalFinancedEmissionsTco2e());
+            }
         }
         BigDecimal wdq = outstanding.signum() == 0 ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
             : dqWeighted.divide(outstanding, MC).setScale(2, RoundingMode.HALF_UP);
@@ -189,6 +267,7 @@ public class GreenPortfolioService {
             assessed.setScale(4, RoundingMode.HALF_UP),
             eligible.setScale(4, RoundingMode.HALF_UP),
             gar, mix, wdq, feTotal.setScale(4, RoundingMode.HALF_UP),
+            linkedTotal.setScale(4, RoundingMode.HALF_UP),
             all.size(), eligibleCount, pending);
     }
 
@@ -221,6 +300,7 @@ public class GreenPortfolioService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Retirement requires a registry certificate reference and a claim purpose");
         }
+        enforceOffsetCap(c);
         c.setStatus("RETIRED");
         c.setRetirementDate(LocalDate.now());
         c.setCertificateRef(certificateRef);
@@ -229,6 +309,40 @@ public class GreenPortfolioService {
         audit.log("TRANSITION", "CarbonCredit", saved.getId(),
             "Carbon credits retired: " + c.getQuantityTco2e() + " tCO2e, cert " + certificateRef);
         return saved;
+    }
+
+    /**
+     * V293 (plan §5.3 / decision #4, anti-greenwashing): offsets are only claimable
+     * against a DISCLOSED gross reduction — retired credits may not exceed
+     * {@value}% … i.e. {@link #OFFSET_CAP_PCT}% of Σ(baseline − target) over the
+     * org's ACTIVE GHG reduction targets. No reduction target ⇒ no retirement.
+     */
+    private void enforceOffsetCap(CarbonCredit candidate) {
+        Long org = org();
+        BigDecimal grossReduction = BigDecimal.ZERO;
+        for (EsgTarget t : esgTargets.findByOrganisationIdAndIsDeletedFalseOrderByTargetCodeAsc(org)) {
+            if (!"ACTIVE".equals(t.getStatus()) || !t.getScope().startsWith("GHG")) continue;
+            if (t.getTargetValue().compareTo(t.getBaselineValue()) >= 0) continue;
+            grossReduction = grossReduction.add(t.getBaselineValue().subtract(t.getTargetValue()));
+        }
+        if (grossReduction.signum() == 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Offset blocked: no ACTIVE gross GHG-reduction target is disclosed — "
+                    + "offsets may only supplement disclosed reductions (REG-11 integrity)");
+        }
+        BigDecimal retired = candidate.getQuantityTco2e();
+        for (CarbonCredit c : credits.findByOrganisationIdAndIsDeletedFalseOrderByVintageYearDesc(org)) {
+            if ("RETIRED".equals(c.getStatus()) && c.getQuantityTco2e() != null && !c.getId().equals(candidate.getId())) {
+                retired = retired.add(c.getQuantityTco2e());
+            }
+        }
+        BigDecimal cap = grossReduction.multiply(OFFSET_CAP_PCT, MC).divide(HUNDRED, MC);
+        if (retired.compareTo(cap) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Offset cap exceeded: retiring " + candidate.getQuantityTco2e() + " tCO2e would take total retired to "
+                    + retired.setScale(4, RoundingMode.HALF_UP) + " tCO2e, above " + OFFSET_CAP_PCT
+                    + "% of the disclosed gross reduction (" + cap.setScale(4, RoundingMode.HALF_UP) + " tCO2e)");
+        }
     }
 
     // ── helpers ──────────────────────────────────────────────────────────

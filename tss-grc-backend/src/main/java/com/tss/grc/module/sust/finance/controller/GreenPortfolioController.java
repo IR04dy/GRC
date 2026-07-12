@@ -88,6 +88,30 @@ public class GreenPortfolioController {
         return service.decideTag(id, r.approve());
     }
 
+    // ── V293: PCAF record ↔ asset linkage + climate overlay ────────────
+
+    public record LinkEmissionRequest(@NotNull Long recordId) {}
+
+    @PostMapping("/assets/{id}/link-emission")
+    @PreAuthorize(WRITE_GUARD)
+    public com.tss.grc.module.sust.climate.entity.FinancedEmissionsRecord linkEmission(
+            @PathVariable Long id, @Valid @RequestBody LinkEmissionRequest r) {
+        return service.linkEmissionRecord(id, r.recordId());
+    }
+
+    @GetMapping("/assets/{id}/financed-emissions")
+    @PreAuthorize(READ_GUARD)
+    public List<com.tss.grc.module.sust.climate.entity.FinancedEmissionsRecord> assetEmissions(@PathVariable Long id) {
+        return service.assetEmissions(id);
+    }
+
+    @GetMapping("/climate-overlay")
+    @PreAuthorize(READ_GUARD)
+    public GreenPortfolioService.ClimateOverlay climateOverlay(
+            @org.springframework.web.bind.annotation.RequestParam Long scenarioId) {
+        return service.climateOverlay(scenarioId);
+    }
+
     // ── carbon credits ──────────────────────────────────────────────────
 
     public record PurchaseCreditRequest(

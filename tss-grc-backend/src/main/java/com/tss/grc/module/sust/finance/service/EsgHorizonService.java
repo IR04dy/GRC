@@ -6,12 +6,16 @@ import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
 import com.tss.grc.module.sust.finance.entity.CbamLine;
 import com.tss.grc.module.sust.finance.entity.EnvPermit;
+import com.tss.grc.module.sust.finance.entity.EnvPermitViolation;
 import com.tss.grc.module.sust.finance.entity.EsgTarget;
 import com.tss.grc.module.sust.finance.entity.EsgTargetActual;
+import com.tss.grc.module.sust.finance.entity.EsgTargetMilestone;
 import com.tss.grc.module.sust.finance.entity.IfrsRequirement;
 import com.tss.grc.module.sust.finance.repository.CbamLineRepository;
 import com.tss.grc.module.sust.finance.repository.EnvPermitRepository;
+import com.tss.grc.module.sust.finance.repository.EnvPermitViolationRepository;
 import com.tss.grc.module.sust.finance.repository.EsgTargetActualRepository;
+import com.tss.grc.module.sust.finance.repository.EsgTargetMilestoneRepository;
 import com.tss.grc.module.sust.finance.repository.EsgTargetRepository;
 import com.tss.grc.module.sust.finance.repository.IfrsRequirementRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -44,8 +48,10 @@ public class EsgHorizonService {
 
     private final EsgTargetRepository targets;
     private final EsgTargetActualRepository actuals;
+    private final EsgTargetMilestoneRepository milestones;
     private final IfrsRequirementRepository ifrs;
     private final EnvPermitRepository permits;
+    private final EnvPermitViolationRepository violations;
     private final CbamLineRepository cbam;
     private final CorrectiveActionRepository capas;
     private final AuditLogService audit;
@@ -53,6 +59,7 @@ public class EsgHorizonService {
     // ── targets & trajectory (§5.5) ──────────────────────────────────────
 
     public record TargetView(EsgTarget target, List<EsgTargetActual> actuals,
+                             List<EsgTargetMilestone> milestones,
                              BigDecimal expectedForLatestActual, String trajectory) {}
 
     @Transactional(readOnly = true)
@@ -62,12 +69,42 @@ public class EsgHorizonService {
             .map(t -> {
                 List<EsgTargetActual> acts =
                     actuals.findByOrganisationIdAndTargetIdAndIsDeletedFalseOrderByYearAsc(org, t.getId());
-                if (acts.isEmpty()) return new TargetView(t, acts, null, "NO_DATA");
+                List<EsgTargetMilestone> ms =
+                    milestones.findByOrganisationIdAndTargetIdAndIsDeletedFalseOrderByYearAsc(org, t.getId());
+                if (acts.isEmpty()) return new TargetView(t, acts, ms, null, "NO_DATA");
                 EsgTargetActual latest = acts.get(acts.size() - 1);
-                BigDecimal expected = expectedValue(t, latest.getYear());
-                return new TargetView(t, acts, expected, trajectoryOf(t, latest.getValue(), expected));
+                BigDecimal expected = expectedValue(t, ms, latest.getYear());
+                return new TargetView(t, acts, ms, expected, trajectoryOf(t, latest.getValue(), expected));
             })
             .toList();
+    }
+
+    /** V293 (plan §5.5) — interim milestone; the trajectory bends through it. */
+    @Transactional
+    public EsgTargetMilestone addMilestone(Long targetId, Integer year, BigDecimal value,
+                                           String labelEn, String labelAr) {
+        Long org = org();
+        EsgTarget t = targets.findByOrganisationIdAndIdAndIsDeletedFalse(org, targetId)
+            .orElseThrow(() -> new EntityNotFoundException("Target not found: " + targetId));
+        if (year <= t.getBaselineYear() || year >= t.getTargetYear()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Milestone year must lie strictly between baseline (" + t.getBaselineYear()
+                    + ") and target (" + t.getTargetYear() + ")");
+        }
+        if (milestones.existsByOrganisationIdAndTargetIdAndYearAndIsDeletedFalse(org, targetId, year)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Milestone already set for " + year);
+        }
+        EsgTargetMilestone m = new EsgTargetMilestone();
+        m.setOrganisationId(org);
+        m.setTargetId(targetId);
+        m.setYear(year);
+        m.setValue(value);
+        m.setLabelEn(labelEn);
+        m.setLabelAr(labelAr);
+        EsgTargetMilestone saved = milestones.save(m);
+        audit.log("CREATE", "EsgTargetMilestone", saved.getId(),
+            "Milestone " + year + " = " + value + " on target " + t.getTargetCode());
+        return saved;
     }
 
     @Transactional
@@ -196,6 +233,52 @@ public class EsgHorizonService {
         return saved;
     }
 
+    // ── V293 (plan §5.6) — violation register: each violation raises its own CAPA ──
+
+    @Transactional(readOnly = true)
+    public List<EnvPermitViolation> listViolations(Long permitId) {
+        mustPermit(permitId);
+        return violations.findByOrganisationIdAndPermitIdAndIsDeletedFalseOrderByViolationDateDesc(org(), permitId);
+    }
+
+    @Transactional
+    public EnvPermitViolation recordViolation(Long permitId, LocalDate violationDate,
+                                              String descriptionEn, String descriptionAr, String severity) {
+        Long org = org();
+        EnvPermit p = mustPermit(permitId);
+        EnvPermitViolation v = new EnvPermitViolation();
+        v.setOrganisationId(org);
+        v.setPermitId(permitId);
+        v.setViolationDate(violationDate);
+        v.setDescriptionEn(descriptionEn);
+        v.setDescriptionAr(descriptionAr);
+        v.setSeverity(severity == null ? "HIGH" : severity);
+        EnvPermitViolation saved = violations.save(v);
+
+        CorrectiveAction ca = new CorrectiveAction();
+        ca.setOrganisationId(org);
+        ca.setSourceType("ENV_PERMIT");                       // whitelisted in ck_ca_source (V289)
+        ca.setSourceRef("ENV_PERMIT_VIOLATION:" + saved.getId());
+        ca.setTitleEn("NCEC violation on permit " + p.getPermitNumber() + ": " + descriptionEn);
+        ca.setTitleAr("مخالفة بيئية على التصريح " + p.getPermitNumber());
+        ca.setDescriptionEn("Facility " + p.getFacilityEn() + " — violation dated " + violationDate
+            + ". Remediate and evidence closure to NCEC.");
+        ca.setPriority("CRITICAL".equals(saved.getSeverity()) ? "CRITICAL" : "HIGH");
+        ca.setTargetDate(LocalDate.now().plusMonths(1));
+        capas.save(ca);
+        saved.setLinkedCapaId(ca.getId());
+        violations.save(saved);
+
+        audit.log("CREATE", "EnvPermitViolation", saved.getId(),
+            "Violation recorded on permit " + p.getPermitNumber() + " (CAPA " + ca.getId() + ")");
+        return saved;
+    }
+
+    private EnvPermit mustPermit(Long id) {
+        return permits.findByOrganisationIdAndIdAndIsDeletedFalse(org(), id)
+            .orElseThrow(() -> new EntityNotFoundException("Permit not found: " + id));
+    }
+
     /** Permits expiring within {@code leadDays} (or already expired) raise an idempotent auto-CAPA. */
     @Transactional
     public int permitExpirySweep(int leadDays) {
@@ -265,12 +348,37 @@ public class EsgHorizonService {
 
     /** Linear interpolation of the baseline→target trajectory at {@code year}. */
     static BigDecimal expectedValue(EsgTarget t, int year) {
-        int span = t.getTargetYear() - t.getBaselineYear();
-        int elapsed = Math.min(Math.max(year - t.getBaselineYear(), 0), span);
-        BigDecimal progress = BigDecimal.valueOf(elapsed).divide(BigDecimal.valueOf(span), MC);
-        return t.getBaselineValue()
-            .add(t.getTargetValue().subtract(t.getBaselineValue()).multiply(progress, MC))
-            .setScale(4, RoundingMode.HALF_UP);
+        return expectedValue(t, List.of(), year);
+    }
+
+    /**
+     * V293 (plan §5.5) — piecewise-linear trajectory: baseline → milestones (year-ordered)
+     * → target. With no milestones this is the original two-point interpolation.
+     */
+    static BigDecimal expectedValue(EsgTarget t, List<EsgTargetMilestone> ms, int year) {
+        // Build the ordered anchor points; milestones are validated inside the span.
+        java.util.ArrayList<Object[]> pts = new java.util.ArrayList<>();
+        pts.add(new Object[]{t.getBaselineYear(), t.getBaselineValue()});
+        if (ms != null) {
+            for (EsgTargetMilestone m : ms) {
+                if (m.getYear() > t.getBaselineYear() && m.getYear() < t.getTargetYear()) {
+                    pts.add(new Object[]{m.getYear(), m.getValue()});
+                }
+            }
+        }
+        pts.add(new Object[]{t.getTargetYear(), t.getTargetValue()});
+
+        int clamped = Math.min(Math.max(year, t.getBaselineYear()), t.getTargetYear());
+        for (int i = 0; i < pts.size() - 1; i++) {
+            int y0 = (Integer) pts.get(i)[0], y1 = (Integer) pts.get(i + 1)[0];
+            if (clamped < y0 || clamped > y1) continue;
+            BigDecimal v0 = (BigDecimal) pts.get(i)[1], v1 = (BigDecimal) pts.get(i + 1)[1];
+            if (y1 == y0) return v1.setScale(4, RoundingMode.HALF_UP);
+            BigDecimal progress = BigDecimal.valueOf(clamped - y0)
+                .divide(BigDecimal.valueOf(y1 - y0), MC);
+            return v0.add(v1.subtract(v0).multiply(progress, MC)).setScale(4, RoundingMode.HALF_UP);
+        }
+        return t.getTargetValue().setScale(4, RoundingMode.HALF_UP);
     }
 
     /** Direction-aware on/off-track with a 5 % tolerance band. */

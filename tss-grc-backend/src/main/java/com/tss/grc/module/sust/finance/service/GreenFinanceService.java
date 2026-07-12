@@ -151,6 +151,7 @@ public class GreenFinanceService {
         e.setActualMwhRenewableYr(r.actualMwhRenewableYr());
         e.setExpectedWaterM3SavedYr(r.expectedWaterM3SavedYr());
         e.setActualWaterM3SavedYr(r.actualWaterM3SavedYr());
+        e.setActualImpactBasis(r.actualImpactBasis() == null ? "ACTUAL" : r.actualImpactBasis());
         GreenProject saved = projects.save(e);
         audit.log("CREATE", "GreenProject", saved.getId(),
             "Green project created: " + saved.getProjectCode() + " [" + saved.getCategory() + "]");
@@ -241,6 +242,7 @@ public class GreenFinanceService {
         BigDecimal allocated = BigDecimal.ZERO, refinanced = BigDecimal.ZERO;
         BigDecimal tco2e = BigDecimal.ZERO, mwh = BigDecimal.ZERO, water = BigDecimal.ZERO;
         int approved = 0, pending = 0;
+        boolean estimateBasis = false;   // V293 — any contributing project on ESTIMATE figures
 
         // Cache projects once for attribution.
         Map<Long, GreenProject> projById = new java.util.HashMap<>();
@@ -253,6 +255,7 @@ public class GreenFinanceService {
             GreenProject p = projById.computeIfAbsent(a.getProjectId(),
                 pid -> projects.findByOrganisationIdAndIdAndIsDeletedFalse(org, pid).orElse(null));
             if (p == null) continue;
+            if ("ESTIMATE".equals(p.getActualImpactBasis())) estimateBasis = true;
             BigDecimal share = GreenFinanceMath.projectShare(a.getAmountSarMn(), p.getTotalCostSarMn());
             tco2e = tco2e.add(GreenFinanceMath.attributedImpact(share, p.getActualTco2eAvoidedYr()));
             mwh   = mwh.add(GreenFinanceMath.attributedImpact(share, p.getActualMwhRenewableYr()));
@@ -268,7 +271,7 @@ public class GreenFinanceService {
             GreenFinanceMath.refinancingSharePct(refinanced, allocated),
             tco2e, mwh, water,
             GreenFinanceMath.intensityPerSarMn(tco2e, allocated),
-            approved, pending);
+            approved, pending, estimateBasis);
     }
 
     // ── post-issuance reports (G2, plan §4.1 / REG-7) ────────────────────

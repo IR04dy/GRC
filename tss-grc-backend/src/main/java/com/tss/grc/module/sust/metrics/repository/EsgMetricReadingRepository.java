@@ -9,4 +9,7 @@ import java.util.List;
 public interface EsgMetricReadingRepository extends JpaRepository<EsgMetricReading, Long> {
 
     List<EsgMetricReading> findByOrganisationIdAndMetricIdOrderByAsOfDescIdDesc(Long organisationId, Long metricId);
+
+    /** V293 reading-required gate — does the metric have at least one reading? */
+    boolean existsByOrganisationIdAndMetricId(Long organisationId, Long metricId);
 }

@@ -58,6 +58,8 @@ public class SustainabilityReportService {
     private final AuditLogService                   audit;
     private final CmaDisclosureService              cmaService;
     private final TcfdItemService                   tcfdService;
+    private final com.tss.grc.module.sust.metrics.repository.EsgMetricRepository metricRepo;
+    private final com.tss.grc.module.sust.metrics.repository.EsgMetricReadingRepository metricReadingRepo;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -240,6 +242,7 @@ public class SustainabilityReportService {
          || ("SUBMITTED".equals(from) && "APPROVED".equals(to))
          || ("APPROVED".equals(from)  && "PUBLISHED".equals(to));
         if (!ok) throw new IllegalTransitionException(from, to, Set.of("SUBMITTED","APPROVED","PUBLISHED"));
+        if ("APPROVED".equals(to)) assertRequiredMetricsHaveReadings(cur);   // V293 gate
         cur.setStatus(to);
         LocalDateTime now = LocalDateTime.now();
         if ("APPROVED".equals(to)) {
@@ -270,6 +273,30 @@ public class SustainabilityReportService {
         audit.log("TRANSITION", "SustainabilityReport", saved.getId(),
             "Report -> " + to + ("APPROVED".equals(to) ? " (locked; sha256=" + saved.getContentHash() + ")" : ""));
         return saved;
+    }
+
+    /**
+     * V293 (green-finance plan G0) — assurance-lineage gate: a metric flagged
+     * {@code reading_required} for the report's year must have at least one reading
+     * before the annual report can be APPROVED (un-evidenceable disclosures block).
+     */
+    private void assertRequiredMetricsHaveReadings(SustainabilityReport report) {
+        Short year = yearRepo.findByIdAndOrganisationId(report.getReportingYearId(), org())
+            .map(y -> y.getYear()).orElse(null);
+        if (year == null) return;   // no resolvable year — nothing to gate against
+        List<String> missing = new java.util.ArrayList<>();
+        for (var m : metricRepo.findByOrganisationIdAndReportingYear(org(), year)) {
+            if (!Boolean.TRUE.equals(m.getReadingRequired()) || !"ACTIVE".equals(m.getStatus())) continue;
+            if (!metricReadingRepo.existsByOrganisationIdAndMetricId(org(), m.getId())) {
+                missing.add(m.getMetricCode());
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT,
+                "Approval blocked: reading-required metrics have no readings for " + year
+                    + ": " + String.join(", ", missing));
+        }
     }
 
     /** SHA-256 hex of the frozen content — S-I content lock. */

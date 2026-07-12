@@ -41,6 +41,8 @@ class SustainabilityReportServiceTest {
     @Mock private AuditLogService audit;
     @Mock private CmaDisclosureService cmaService;
     @Mock private TcfdItemService tcfdService;
+    @Mock private com.tss.grc.module.sust.metrics.repository.EsgMetricRepository metricRepo;
+    @Mock private com.tss.grc.module.sust.metrics.repository.EsgMetricReadingRepository metricReadingRepo;
     @InjectMocks private SustainabilityReportService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG); }
@@ -70,6 +72,29 @@ class SustainabilityReportServiceTest {
         assertThat(out.getApprovedAt()).isNotNull();
         assertThat(out.getContentHash()).isNotNull().hasSize(64); // SHA-256 hex
         assertThat(out.getIsLocked()).isTrue();
+    }
+
+    /** V293 gate — a reading-required ACTIVE metric with no reading blocks APPROVED. */
+    @Test
+    void approve_blocksWhenReadingRequiredMetricHasNoReading() {
+        when(reportRepo.findByIdAndOrganisationId(5L, ORG)).thenReturn(Optional.of(report("SUBMITTED")));
+        com.tss.grc.module.sust.annex.entity.ReportingYear year = new com.tss.grc.module.sust.annex.entity.ReportingYear();
+        year.setYear((short) 2026);
+        when(yearRepo.findByIdAndOrganisationId(1L, ORG)).thenReturn(Optional.of(year));
+        com.tss.grc.module.sust.metrics.entity.EsgMetric metric = new com.tss.grc.module.sust.metrics.entity.EsgMetric();
+        metric.setId(9L); metric.setMetricCode("ENV-WATER-01");
+        metric.setStatus("ACTIVE"); metric.setReadingRequired(true);
+        when(metricRepo.findByOrganisationIdAndReportingYear(ORG, (short) 2026)).thenReturn(List.of(metric));
+        when(metricReadingRepo.existsByOrganisationIdAndMetricId(ORG, 9L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.transitionReport(5L, "APPROVED", user("bob")))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("ENV-WATER-01");
+
+        // With a reading present the same approval goes through.
+        when(metricReadingRepo.existsByOrganisationIdAndMetricId(ORG, 9L)).thenReturn(true);
+        when(reportRepo.save(any(SustainabilityReport.class))).thenAnswer(inv -> inv.getArgument(0));
+        assertThat(service.transitionReport(5L, "APPROVED", user("bob")).getStatus()).isEqualTo("APPROVED");
     }
 
     @Test
