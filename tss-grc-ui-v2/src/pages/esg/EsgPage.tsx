@@ -121,6 +121,8 @@ import {
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import { printPacket, packetTextToSections } from '../../lib/packetPrint';
 import { formatSarCompact, formatSarFull } from '../../lib/format';
+// Green-finance plan §5.4–§5.7 — regulatory-horizon tabs (targets / IFRS / env+CBAM).
+import { EsgTargetsTab, IfrsTab, EnvComplianceTab } from './EsgHorizonTabs';
 import '../../styles/pages/esg.css';
 
 // EsgTab + isEsgTab are imported from lib/esgDashboard (single source of truth for the tab ids).
@@ -252,6 +254,9 @@ export function EsgPage() {
           { id: 'ghg',        labelKey: 'esgTabGhg',       Icon: Leaf },
           { id: 'climate',    labelKey: 'esgTabClimate',   Icon: CloudLightning },
           { id: 'survey',     labelKey: 'esgTabSurvey',    Icon: Truck },
+          { id: 'targets',    labelKey: 'esgTabTargets',   Icon: Target },
+          { id: 'ifrs',       labelKey: 'esgTabIfrs',      Icon: FileText },
+          { id: 'env',        labelKey: 'esgTabEnv',       Icon: Wrench },
           { id: 'settings',   labelKey: 'esgTabSettings',  Icon: Wrench },
         ] as { id: EsgTab; labelKey: string; Icon: typeof Leaf }[]).map(tabDef => (
           <button key={tabDef.id} onClick={() => setTab(tabDef.id)}
@@ -277,6 +282,9 @@ export function EsgPage() {
       {tab === 'ghg'        && <GhgInventoryTab />}
       {tab === 'climate'    && <ClimateTab />}
       {tab === 'settings'   && <SettingsTab />}
+      {tab === 'targets'    && <EsgTargetsTab />}
+      {tab === 'ifrs'       && <IfrsTab />}
+      {tab === 'env'        && <EnvComplianceTab />}
       {tab === 'survey'     && <SurveyTab />}
     </Shell>
   );

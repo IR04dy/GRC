@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ShieldCheck, KeyRound, Grid3X3, UserSearch, Plus, Save, Trash2, RefreshCw } from 'lucide-react';
+import {
+  ShieldCheck, KeyRound, Grid3X3, UserSearch, Plus, Save, Trash2, RefreshCw,
+  Inbox, ClipboardCheck, Scale, Siren, BarChart3,
+} from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -12,8 +15,9 @@ import {
   governanceApi, adminApi, ApiError,
   type GovRoleDto, type GovMatrixDto, type GovEffectiveAccessDto, type AdminUserDto,
 } from '../../lib/api';
+import { RequestsTab, CampaignsTab, SodTab, BreakGlassTab, AnalyticsTab } from './AccessAssuranceTabs';
 
-type TabId = 'roles' | 'matrix' | 'access';
+type TabId = 'roles' | 'matrix' | 'access' | 'requests' | 'campaigns' | 'sod' | 'breakglass' | 'analytics';
 
 /**
  * Access-Governance console (RBAC plan §6.1/§6.8 — P0): the runtime management
@@ -29,6 +33,7 @@ export function AccessGovernancePage() {
 
   const [tab, setTab] = useState<TabId>('roles');
   const [roles, setRoles] = useState<GovRoleDto[]>([]);
+  const [users, setUsers] = useState<AdminUserDto[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadRoles = useCallback(async () => {
@@ -38,6 +43,9 @@ export function AccessGovernancePage() {
     finally { setLoading(false); }
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void loadRoles(); }, [loadRoles]);
+  useEffect(() => {
+    adminApi.users(0, 100).then(p => setUsers(p.content ?? [])).catch(() => setUsers([]));
+  }, []);
 
   return (
     <Shell title={isAr ? 'حوكمة الصلاحيات' : 'Access Governance'}
@@ -51,17 +59,27 @@ export function AccessGovernancePage() {
       />
       <Tabs<TabId>
         items={[
-          { id: 'roles',  label: isAr ? 'الأدوار' : 'Roles',            Icon: KeyRound },
-          { id: 'matrix', label: isAr ? 'مصفوفة الصلاحيات' : 'Permission Matrix', Icon: Grid3X3 },
-          { id: 'access', label: isAr ? 'الوصول الفعلي' : 'Effective Access',     Icon: UserSearch },
+          { id: 'roles',      label: isAr ? 'الأدوار' : 'Roles',            Icon: KeyRound },
+          { id: 'matrix',     label: isAr ? 'مصفوفة الصلاحيات' : 'Permission Matrix', Icon: Grid3X3 },
+          { id: 'access',     label: isAr ? 'الوصول الفعلي' : 'Effective Access',     Icon: UserSearch },
+          { id: 'requests',   label: isAr ? 'طلبات الوصول' : 'Access Requests',       Icon: Inbox },
+          { id: 'campaigns',  label: isAr ? 'حملات المراجعة' : 'Review Campaigns',    Icon: ClipboardCheck },
+          { id: 'sod',        label: isAr ? 'فصل المهام' : 'SoD',                     Icon: Scale },
+          { id: 'breakglass', label: isAr ? 'وصول الطوارئ' : 'Break-glass',           Icon: Siren },
+          { id: 'analytics',  label: isAr ? 'التحليلات' : 'Analytics',                Icon: BarChart3 },
         ]}
         active={tab}
         onChange={setTab}
       />
       <div style={{ marginTop: 16 }}>
-        {tab === 'roles'  && <RolesTab roles={roles} loading={loading} reload={loadRoles} />}
-        {tab === 'matrix' && <MatrixTab roles={roles} />}
-        {tab === 'access' && <AccessTab />}
+        {tab === 'roles'      && <RolesTab roles={roles} loading={loading} reload={loadRoles} />}
+        {tab === 'matrix'     && <MatrixTab roles={roles} />}
+        {tab === 'access'     && <AccessTab />}
+        {tab === 'requests'   && <RequestsTab roles={roles} users={users} />}
+        {tab === 'campaigns'  && <CampaignsTab users={users} />}
+        {tab === 'sod'        && <SodTab />}
+        {tab === 'breakglass' && <BreakGlassTab />}
+        {tab === 'analytics'  && <AnalyticsTab />}
       </div>
     </Shell>
   );
@@ -160,6 +178,16 @@ function MatrixTab({ roles }: { roles: GovRoleDto[] }) {
   const [matrix, setMatrix] = useState<GovMatrixDto | null>(null);
   const [granted, setGranted] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  // V294/§6.1 — side-by-side compare: diff this role against another one.
+  const [compareId, setCompareId] = useState<number | ''>('');
+  const [compareGrants, setCompareGrants] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    if (compareId === '') { setCompareGrants(null); return; }
+    governanceApi.matrix(compareId)
+      .then(m => setCompareGrants(new Set(m.cells.filter(c => c.granted).map(c => `${c.module}/${c.action}`))))
+      .catch(() => setCompareGrants(null));
+  }, [compareId]);
 
   const load = useCallback(async (id: number) => {
     try {
@@ -213,6 +241,10 @@ function MatrixTab({ roles }: { roles: GovRoleDto[] }) {
             <option value="">{isAr ? 'اختر دوراً…' : 'Select a role…'}</option>
             {roles.map(r => <option key={r.id} value={r.id}>{r.roleName}</option>)}
           </select>
+          <select value={compareId} onChange={e => setCompareId(e.target.value === '' ? '' : Number(e.target.value))} style={INPUT}>
+            <option value="">{isAr ? 'قارن مع…' : 'Compare with…'}</option>
+            {roles.filter(r => r.id !== roleId).map(r => <option key={r.id} value={r.id}>{r.roleName}</option>)}
+          </select>
           <Button size="sm" variant="primary" Icon={Save} onClick={() => void save()}
             disabled={busy || !editable}>{isAr ? 'حفظ' : 'Save'}</Button>
         </div>
@@ -247,6 +279,34 @@ function MatrixTab({ roles }: { roles: GovRoleDto[] }) {
                 ))}
               </tbody>
             </table>
+            {compareGrants != null && compareId !== '' && (() => {
+              const compareName = roles.find(r => r.id === compareId)?.roleName ?? '';
+              const onlyA = [...granted].filter(k => !compareGrants.has(k)).sort();
+              const onlyB = [...compareGrants].filter(k => !granted.has(k)).sort();
+              return (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                    {isAr ? `الفروق مقابل ${compareName}` : `Diff vs ${compareName}`}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <Badge tone="success" dot>{isAr ? `هنا فقط (${onlyA.length})` : `Only here (${onlyA.length})`}</Badge>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                        {onlyA.length === 0 ? <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>
+                          : onlyA.map(k => <Badge key={k} tone="neutral">{k}</Badge>)}
+                      </div>
+                    </div>
+                    <div>
+                      <Badge tone="warning" dot>{isAr ? `في ${compareName} فقط (${onlyB.length})` : `Only in ${compareName} (${onlyB.length})`}</Badge>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                        {onlyB.length === 0 ? <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>—</span>
+                          : onlyB.map(k => <Badge key={k} tone="neutral">{k}</Badge>)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </>}
     </Card>
   );

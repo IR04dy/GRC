@@ -1648,6 +1648,10 @@ export const ar = {
   esgTabEvidence:           'مستودع الأدلة',
   esgTabSurvey:             'استبيان المورّدين',
   esgTabSettings:           'الإعدادات',
+  esgTabTargets:            'المستهدفات والتحوّل',
+  esgTabIfrs:               'IFRS S1/S2',
+  esgTabEnv:                'الالتزام البيئي',
+  greenFinanceSidebar:      'التمويل الأخضر',
 
   // ─── Annual Sustainability Annex (V57) ───────────────
   annexYear:           'سنة الإبلاغ:',

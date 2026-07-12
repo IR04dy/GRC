@@ -284,6 +284,7 @@ const IntegrationConsolePage = lazy(() => import('./pages/intake/IntegrationCons
 const AuditLogPage           = lazy(() => import('./pages/platform/AuditLogPage').then(m => ({ default: m.AuditLogPage })));
 const ExportHistoryPage      = lazy(() => import('./pages/platform/ExportHistoryPage').then(m => ({ default: m.ExportHistoryPage })));
 const AccessGovernancePage   = lazy(() => import('./pages/platform/AccessGovernancePage').then(m => ({ default: m.AccessGovernancePage })));
+const GreenFinancePage       = lazy(() => import('./pages/esg/GreenFinancePage').then(m => ({ default: m.GreenFinancePage })));
 const IssuesPage             = lazy(() => import('./pages/platform/IssuesPage').then(m => ({ default: m.IssuesPage })));
 const RegulatoryHorizonPage  = lazy(() => import('./pages/compliance/RegulatoryHorizonPage').then(m => ({ default: m.RegulatoryHorizonPage })));
 const CyberCloudServicesPage = lazy(() => import('./pages/cyber/CyberCloudServicesPage').then(m => ({ default: m.CyberCloudServicesPage })));
@@ -847,6 +848,7 @@ export function App() {
               <Route path="/connectors/:key"    element={<IntegrationConsolePage />} />
               <Route path="/audit-log"          element={<AuditLogPage />} />
               <Route path="/access-governance" element={<AccessGovernancePage />} />
+              <Route path="/green-finance"      element={<GreenFinancePage />} />
               <Route path="/export-history"     element={<ExportHistoryPage />} />
               <Route path="/issues"             element={<IssuesPage />} />
               <Route path="/regulatory/horizon" element={<RegulatoryHorizonPage />} />

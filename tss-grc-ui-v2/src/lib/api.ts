@@ -2882,6 +2882,240 @@ export const governanceApi = {
     api.get<GovEffectiveAccessDto>(`/api/v1/iam/governance/users/${userId}/effective-access`),
 };
 
+// ── Access Governance — assurance surface (P1–P3 + V294) ────────────────────
+//    Requests (maker-checker + engine anchor), recertification campaigns,
+//    SoD rules/violations, break-glass, analytics, evidence ZIP.
+export interface GovAccessRequestDto {
+  id: number; beneficiaryUserId: number; roleId: number;
+  validFrom?: string | null; validTo?: string | null; justification: string;
+  status: string; approvedBy?: number | null; decidedAt?: string | null;
+  rejectionReason?: string | null; provisionedAt?: string | null;
+  engineRequestId?: number | null; createdBy?: number | null; createdAt?: string;
+}
+export interface GovCampaignDto {
+  id: number; titleEn: string; titleAr?: string | null; scope: string;
+  scopeModule?: string | null; scopeUserId?: number | null; reviewerUserId?: number | null;
+  windowStart: string; windowEnd: string; windowHijri?: string | null;
+  status: string; closedAt?: string | null; exceptionNote?: string | null;
+}
+export interface GovCampaignView { campaign: GovCampaignDto; total: number; pending: number; }
+export interface GovReviewItemDto {
+  id: number; campaignId: number; userId: number; username: string;
+  roleId: number; roleName: string; assignmentSource?: string | null;
+  validTo?: string | null; decision: string; decidedBy?: number | null;
+  decidedAt?: string | null; note?: string | null;
+}
+export interface GovSodRuleDto {
+  id: number; ruleCode: string; ruleType: string;
+  moduleA?: string | null; actionA?: string | null; moduleB?: string | null; actionB?: string | null;
+  structuralKey?: string | null; rolePatternCsv?: string | null;
+  severity: string; rationaleEn: string; rationaleAr?: string | null; isActive: boolean;
+}
+export interface GovSodViolationDto {
+  id: number; ruleId: number; ruleCode: string; severity: string;
+  userId: number; username: string; detailEn?: string | null;
+  detectionSource: string; status: string; detectedAt: string;
+  dispositionNote?: string | null; acceptedUntil?: string | null;
+}
+export interface GovBreakGlassDto {
+  id: number; activatedBy: number; activatedByUsername: string; roleId: number;
+  incidentRef: string; reason?: string | null; activatedAt: string; expiresAt: string;
+  status: string; reviewStatus: string; reviewedBy?: number | null;
+  reviewedAt?: string | null; reviewNote?: string | null;
+}
+export interface GovAnalyticsDto {
+  privilegedHolders: number; dormantGrants: number; grantsExpiring30d: number;
+  openSodViolations: number; breakGlassActive: number; breakGlassAwaitingReview: number;
+  platformAdminActions30d: number;
+  campaignCompletion: { id: number; titleEn: string; status: string; total: number; decided: number; completionPct: number }[];
+  topGrantHolders: { username: string; grants: number }[];
+}
+export const governanceAssuranceApi = {
+  requests:        (status?: string) =>
+    api.get<GovAccessRequestDto[]>(`/api/v1/iam/governance/requests${status ? `?status=${status}` : ''}`),
+  createRequest:   (b: { beneficiaryUserId: number; roleId: number; justification: string; validFrom?: string; validTo?: string }) =>
+    api.post<GovAccessRequestDto>('/api/v1/iam/governance/requests', b),
+  approveRequest:  (id: number, b?: { override?: boolean; overrideJustification?: string }) =>
+    api.post<GovAccessRequestDto>(`/api/v1/iam/governance/requests/${id}/approve`, b ?? {}),
+  rejectRequest:   (id: number, reason: string) =>
+    api.post<GovAccessRequestDto>(`/api/v1/iam/governance/requests/${id}/reject`, { reason }),
+  campaigns:       () => api.get<GovCampaignView[]>('/api/v1/iam/governance/campaigns'),
+  createCampaign:  (b: { titleEn: string; titleAr?: string; scope: string; scopeModule?: string; windowStart: string; windowEnd: string; reviewerUserId?: number }) =>
+    api.post<GovCampaignView>('/api/v1/iam/governance/campaigns', b),
+  campaignItems:   (id: number) => api.get<GovReviewItemDto[]>(`/api/v1/iam/governance/campaigns/${id}/items`),
+  decideItem:      (campaignId: number, itemId: number, decision: string, note?: string) =>
+    api.post<GovReviewItemDto>(`/api/v1/iam/governance/campaigns/${campaignId}/items/${itemId}/decision`, { decision, note }),
+  closeCampaign:   (id: number, exceptionNote?: string) =>
+    api.post<GovCampaignView>(`/api/v1/iam/governance/campaigns/${id}/close`, exceptionNote ? { exceptionNote } : {}),
+  sodRules:        () => api.get<GovSodRuleDto[]>('/api/v1/iam/governance/sod/rules'),
+  sodViolations:   (status?: string) =>
+    api.get<GovSodViolationDto[]>(`/api/v1/iam/governance/sod/violations${status ? `?status=${status}` : ''}`),
+  sodScan:         () => api.post<{ violationsRaised: number }>('/api/v1/iam/governance/sod/scan', {}),
+  disposition:     (id: number, b: { status: string; note: string; acceptedUntil?: string }) =>
+    api.post<GovSodViolationDto>(`/api/v1/iam/governance/sod/violations/${id}/disposition`, b),
+  breakGlass:      () => api.get<GovBreakGlassDto[]>('/api/v1/iam/governance/break-glass'),
+  activateBreakGlass: (b: { incidentRef: string; reason?: string; validityHours?: number }) =>
+    api.post<GovBreakGlassDto>('/api/v1/iam/governance/break-glass', b),
+  reviewBreakGlass: (id: number, note: string) =>
+    api.post<GovBreakGlassDto>(`/api/v1/iam/governance/break-glass/${id}/review`, { note }),
+  analytics:       () => api.get<GovAnalyticsDto>('/api/v1/iam/governance/analytics'),
+  evidencePackage: () =>
+    downloadFile('/api/v1/iam/governance/evidence-package.zip', 'AccessGovernance_EvidencePackage.zip'),
+};
+
+// ── Green Finance (الصكوك الخضراء) — instruments / UoP / impact / reports ───
+export interface GfInstrumentDto {
+  id: number; instrumentCode: string; instrumentType: string; nameEn: string; nameAr?: string | null;
+  isin?: string | null; amountSarMn: number; issuanceCostsSarMn?: number | null;
+  shariahStructure?: string | null; shariahApprovalRef?: string | null;
+  externalReviewer?: string | null; spoRating?: string | null; status: string;
+}
+export interface GfProjectDto {
+  id: number; projectCode: string; nameEn: string; nameAr?: string | null; category: string;
+  totalCostSarMn: number; actualTco2eAvoidedYr?: number | null; actualImpactBasis?: string; status: string;
+}
+export interface GfAllocationDto {
+  id: number; instrumentId: number; projectId: number; amountSarMn: number;
+  allocationDate: string; financingType: string; status: string; rejectionReason?: string | null;
+}
+export interface GfSummaryDto {
+  instrumentId: number; instrumentCode: string; status: string;
+  netProceedsSarMn: number; allocatedSarMn: number; unallocatedSarMn: number;
+  allocationRatioPct: number; refinancingSharePct: number;
+  tco2eAvoidedYr: number; mwhRenewableYr: number; waterM3SavedYr: number;
+  intensityTco2ePerSarMn: number; approvedAllocations: number; pendingAllocations: number;
+  estimateBasis: boolean;
+}
+export interface GfReportDto {
+  id: number; instrumentId: number; periodYear: number; reportType: string;
+  allocatedSarMn: number; allocationRatioPct: number; tco2eAvoidedYr: number; status: string;
+}
+export const greenFinanceApi = {
+  instruments:   () => api.get<GfInstrumentDto[]>('/api/v1/sustainability/finance/instruments'),
+  createInstrument: (b: Record<string, unknown>) =>
+    api.post<GfInstrumentDto>('/api/v1/sustainability/finance/instruments', b),
+  transition:    (id: number, status: string, shariahApprovalRef?: string) =>
+    api.post<GfInstrumentDto>(`/api/v1/sustainability/finance/instruments/${id}/transition`, { status, shariahApprovalRef }),
+  projects:      () => api.get<GfProjectDto[]>('/api/v1/sustainability/finance/projects'),
+  createProject: (b: Record<string, unknown>) =>
+    api.post<GfProjectDto>('/api/v1/sustainability/finance/projects', b),
+  allocations:   (instrumentId: number) =>
+    api.get<GfAllocationDto[]>(`/api/v1/sustainability/finance/instruments/${instrumentId}/allocations`),
+  propose:       (b: { instrumentId: number; projectId: number; amountSarMn: number; allocationDate: string; financingType?: string }) =>
+    api.post<GfAllocationDto>('/api/v1/sustainability/finance/allocations', b),
+  approveAlloc:  (id: number) => api.post<GfAllocationDto>(`/api/v1/sustainability/finance/allocations/${id}/approve`, {}),
+  rejectAlloc:   (id: number, reason: string) =>
+    api.post<GfAllocationDto>(`/api/v1/sustainability/finance/allocations/${id}/reject`, { reason }),
+  summary:       (instrumentId: number) =>
+    api.get<GfSummaryDto>(`/api/v1/sustainability/finance/instruments/${instrumentId}/summary`),
+  reports:       (instrumentId: number) =>
+    api.get<GfReportDto[]>(`/api/v1/sustainability/finance/instruments/${instrumentId}/reports`),
+  createReport:  (b: { instrumentId: number; periodYear: number; reportType?: string }) =>
+    api.post<GfReportDto>('/api/v1/sustainability/finance/reports', b),
+  approveReport: (id: number) => api.post<GfReportDto>(`/api/v1/sustainability/finance/reports/${id}/approve`, {}),
+  publishReport: (id: number) => api.post<GfReportDto>(`/api/v1/sustainability/finance/reports/${id}/publish`, {}),
+  evidenceZip:   () => downloadFile('/api/v1/sustainability/finance/evidence-package.zip', 'GreenFinance_EvidencePackage.zip'),
+};
+
+// ── Green Portfolio (المحفظة الخضراء) + carbon credits ──────────────────────
+export interface GpTaxonomyDto { id: number; code: string; nameEn: string; nameAr?: string | null; source: string; }
+export interface GpAssetDto {
+  id: number; assetCode: string; nameEn: string; nameAr?: string | null; sector?: string | null;
+  exposureSarMn: number; taxonomyCode?: string | null; eligibilityStatus: string; proposedStatus?: string | null;
+}
+export interface GpSummaryDto {
+  totalExposureSarMn: number; assessedExposureSarMn: number; eligibleExposureSarMn: number;
+  greenAssetRatioPct: number; categoryMixSarMn: Record<string, number>;
+  weightedDataQuality: number; financedEmissionsTco2e: number; assetLinkedEmissionsTco2e: number;
+  assets: number; eligibleAssets: number; pendingTags: number;
+}
+export interface GpCreditDto {
+  id: number; registry: string; serialRange: string; vintageYear: number;
+  quantityTco2e: number; status: string; retirementDate?: string | null; retirementPurpose?: string | null;
+}
+export interface GpOverlayDto {
+  scenarioId: number; scenarioType: string; scenarioLossRatePct: number;
+  byCategory: { taxonomyCode: string; exposureSarMn: number; stressedLossSarMn: number }[];
+  totalEligibleExposureSarMn: number; totalStressedLossSarMn: number;
+}
+export const greenPortfolioApi = {
+  taxonomy:  () => api.get<GpTaxonomyDto[]>('/api/v1/sustainability/portfolio/taxonomy'),
+  assets:    () => api.get<GpAssetDto[]>('/api/v1/sustainability/portfolio/assets'),
+  createAsset: (b: { assetCode: string; nameEn: string; nameAr?: string; sector?: string; exposureSarMn: number }) =>
+    api.post<GpAssetDto>('/api/v1/sustainability/portfolio/assets', b),
+  proposeTag:  (id: number, taxonomyCode: string, requestedStatus: string) =>
+    api.post<GpAssetDto>(`/api/v1/sustainability/portfolio/assets/${id}/propose-tag`, { taxonomyCode, requestedStatus }),
+  decideTag:   (id: number, approve: boolean) =>
+    api.post<GpAssetDto>(`/api/v1/sustainability/portfolio/assets/${id}/decide-tag`, { approve }),
+  summary:   () => api.get<GpSummaryDto>('/api/v1/sustainability/portfolio/summary'),
+  credits:   () => api.get<GpCreditDto[]>('/api/v1/sustainability/portfolio/credits'),
+  purchase:  (b: { registry: string; serialRange: string; vintageYear: number; quantityTco2e: number; priceSarPerT?: number }) =>
+    api.post<GpCreditDto>('/api/v1/sustainability/portfolio/credits', b),
+  retire:    (id: number, certificateRef: string, purpose: string) =>
+    api.post<GpCreditDto>(`/api/v1/sustainability/portfolio/credits/${id}/retire`, { certificateRef, purpose }),
+  overlay:   (scenarioId: number) =>
+    api.get<GpOverlayDto>(`/api/v1/sustainability/portfolio/climate-overlay?scenarioId=${scenarioId}`),
+};
+
+// ── ESG regulatory horizon — targets / IFRS S1-S2 / NCEC permits / CBAM ─────
+export interface EsgTargetDto {
+  id: number; targetCode: string; titleEn: string; titleAr?: string | null; scope: string; unit: string;
+  baselineYear: number; baselineValue: number; targetYear: number; targetValue: number;
+  sgiAligned: boolean; status: string;
+}
+export interface EsgTargetViewDto {
+  target: EsgTargetDto;
+  actuals: { id: number; year: number; value: number }[];
+  milestones: { id: number; year: number; value: number; labelEn?: string | null }[];
+  expectedForLatestActual?: number | null; trajectory: string;
+}
+export interface IfrsReqDto {
+  id: number; reqCode: string; standard: string; pillar: string; titleEn: string; titleAr?: string | null;
+  status: string; coverageRef?: string | null; ownerName?: string | null;
+}
+export interface EnvPermitViewDto {
+  permit: { id: number; permitNumber: string; facilityEn: string; facilityAr?: string | null;
+    authority: string; permitType?: string | null; expiryDate: string; status: string };
+  daysToExpiry: number;
+}
+export interface EnvViolationDto {
+  id: number; permitId: number; violationDate: string; descriptionEn: string;
+  severity: string; status: string; linkedCapaId?: number | null;
+}
+export interface CbamLineDto {
+  id: number; cnGroup: string; productDescEn: string; periodYear: number; periodQuarter: number;
+  exportVolumeTonnes: number; embeddedTco2ePerTonne: number; totalEmbeddedTco2e: number; dataBasis: string;
+}
+export const esgHorizonApi = {
+  targets:      () => api.get<EsgTargetViewDto[]>('/api/v1/sustainability/horizon/targets'),
+  createTarget: (b: Record<string, unknown>) =>
+    api.post<EsgTargetDto>('/api/v1/sustainability/horizon/targets', b),
+  addActual:    (id: number, year: number, value: number) =>
+    api.post('/api/v1/sustainability/horizon/targets/' + id + '/actuals', { year, value }),
+  addMilestone: (id: number, year: number, value: number, labelEn?: string) =>
+    api.post('/api/v1/sustainability/horizon/targets/' + id + '/milestones', { year, value, labelEn }),
+  trajectorySweep: () =>
+    api.post<{ capasRaised: number }>('/api/v1/sustainability/horizon/targets/trajectory-sweep', {}),
+  ifrs:         () => api.get<IfrsReqDto[]>('/api/v1/sustainability/horizon/ifrs'),
+  ifrsSummary:  () => api.get<{ total: number; covered: number; partial: number; gap: number; coveragePct: number }>(
+    '/api/v1/sustainability/horizon/ifrs/summary'),
+  setIfrsStatus: (id: number, status: string, coverageRef?: string, ownerName?: string) =>
+    api.post<IfrsReqDto>(`/api/v1/sustainability/horizon/ifrs/${id}/status`, { status, coverageRef, ownerName }),
+  permits:      () => api.get<EnvPermitViewDto[]>('/api/v1/sustainability/horizon/env-permits'),
+  createPermit: (b: Record<string, unknown>) =>
+    api.post('/api/v1/sustainability/horizon/env-permits', b),
+  permitSweep:  (leadDays = 90) =>
+    api.post<{ capasRaised: number }>(`/api/v1/sustainability/horizon/env-permits/expiry-sweep?leadDays=${leadDays}`, {}),
+  violations:   (permitId: number) =>
+    api.get<EnvViolationDto[]>(`/api/v1/sustainability/horizon/env-permits/${permitId}/violations`),
+  recordViolation: (permitId: number, b: { violationDate: string; descriptionEn: string; descriptionAr?: string; severity?: string }) =>
+    api.post<EnvViolationDto>(`/api/v1/sustainability/horizon/env-permits/${permitId}/violations`, b),
+  cbam:         () => api.get<CbamLineDto[]>('/api/v1/sustainability/horizon/cbam'),
+  createCbam:   (b: Record<string, unknown>) => api.post('/api/v1/sustainability/horizon/cbam', b),
+  cbamSummary:  () => api.get<{ totalEmbeddedTco2e: number; byGroup: Record<string, number>; lines: number }>(
+    '/api/v1/sustainability/horizon/cbam/summary'),
+};
+
 // ── Workflow submissions — generic ledger for the 12 wizards without ─────
 //    dedicated tables (Risk Treatment, Risk Acceptance, Incident RCA,
 //    Management Review, Digital Signature, Control Test, Cloud CCC, NCA

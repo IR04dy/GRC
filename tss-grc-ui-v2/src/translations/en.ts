@@ -1651,6 +1651,10 @@ export const en = {
   esgTabEvidence:           'Evidence',
   esgTabSurvey:             'Vendor survey',
   esgTabSettings:           'Settings',
+  esgTabTargets:            'Targets & Transition',
+  esgTabIfrs:               'IFRS S1/S2',
+  esgTabEnv:                'Env Compliance',
+  greenFinanceSidebar:      'Green Finance',
 
   // ─── Annual Sustainability Annex (V57) ───────────────
   annexYear:           'Reporting year:',

@@ -12,6 +12,7 @@ import type { EsgStats } from './esg';
 export const ESG_TABS = [
   'overview', 'annex', 'capa', 'calculator', 'cma', 'tcfd', 'materiality',
   'metrics', 'evidence', 'sgi', 'ghg', 'climate', 'survey', 'settings',
+  'targets', 'ifrs', 'env',
 ] as const;
 export type EsgTab = typeof ESG_TABS[number];
 

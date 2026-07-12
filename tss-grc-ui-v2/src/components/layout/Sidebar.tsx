@@ -365,6 +365,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'esg', titleKey: 'navEsgClimate',
     items: [
       { id: 'esg',           to: '/esg',                     Icon: Leaf,           labelKey: 'esgSidebar' },
+      { id: 'green-finance', to: '/green-finance',           Icon: Landmark,       labelKey: 'greenFinanceSidebar' },
       { id: 'tcfd-scn',      to: '/esg/tcfd-scenarios',      Icon: CloudLightning, labelKey: 'tcfdScenariosSidebar' },
       { id: 'fin-emissions', to: '/esg/financed-emissions',  Icon: Factory,        labelKey: 'financedEmissionsSidebar' },
       { id: 'climate-rpt',   to: '/esg/climate-report',      Icon: FileSearch,     labelKey: 'climateReportSidebar' },
