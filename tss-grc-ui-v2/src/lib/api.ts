@@ -10,6 +10,25 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Human-readable message from an RFC-7807 problem body. Bean-validation 400s
+ * carry the per-field reasons in `.errors` and NO `.detail` — without folding
+ * those in, every required-field miss toasts a bare "Validation Failed" and
+ * the button looks broken. Now: "Validation Failed — displayNameAr: Field
+ * must not be blank".
+ */
+function problemMessage(parsed: unknown, fallback: string): string {
+  const p = (parsed as {
+    detail?: string; title?: string; message?: string; errors?: Record<string, string>;
+  }) ?? {};
+  let msg = p.detail ?? p.title ?? p.message ?? fallback;
+  if (p.errors && typeof p.errors === 'object') {
+    const fields = Object.entries(p.errors).map(([f, m]) => `${f}: ${m}`).join('; ');
+    if (fields) msg = `${msg} — ${fields}`;
+  }
+  return msg;
+}
+
 interface FetchOpts extends Omit<RequestInit, 'body'> {
   body?: unknown;
   /** Skip Authorization header even if a token exists. */
@@ -106,8 +125,7 @@ async function request<T>(path: string, opts: FetchOpts = {}): Promise<T> {
     // never showed the actual reason. apiError.ts's getErrorDisplayMessage()
     // already extracted .detail correctly for callers that used it — but
     // pages that did `toast.danger(e.message)` directly missed it.
-    const p = (parsed as { detail?: string; title?: string; message?: string }) ?? {};
-    const msg = p.detail ?? p.title ?? p.message ?? res.statusText ?? 'Request failed';
+    const msg = problemMessage(parsed, res.statusText || 'Request failed');
 
     // 401 handling: try once to refresh + retry. Skip if:
     //   - this IS the refresh / login / logout endpoint (would loop)
@@ -187,8 +205,7 @@ export async function downloadFile(
       const text = await res.text();
       if (text) parsed = JSON.parse(text);
     } catch { /* body wasn't JSON; carry on with statusText only */ }
-    const p = (parsed as { detail?: string; title?: string; message?: string }) ?? {};
-    const msg = p.detail ?? p.title ?? p.message ?? res.statusText ?? 'Download failed';
+    const msg = problemMessage(parsed, res.statusText || 'Download failed');
     throw new ApiError(res.status, msg, parsed);
   }
   const cd = res.headers.get('Content-Disposition') ?? '';
@@ -230,8 +247,7 @@ export async function uploadFile<T>(path: string, file: File, field = 'file'): P
   let parsed: unknown = undefined;
   if (text) { try { parsed = JSON.parse(text); } catch { parsed = text; } }
   if (!res.ok) {
-    const p = (parsed as { detail?: string; title?: string; message?: string }) ?? {};
-    const msg = p.detail ?? p.title ?? p.message ?? res.statusText ?? 'Upload failed';
+    const msg = problemMessage(parsed, res.statusText || 'Upload failed');
     throw new ApiError(res.status, msg, parsed);
   }
   return parsed as T;

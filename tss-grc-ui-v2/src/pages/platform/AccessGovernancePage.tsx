@@ -95,12 +95,14 @@ function RolesTab({ roles, loading, reload }: { roles: GovRoleDto[]; loading: bo
   const [busy, setBusy] = useState(false);
 
   async function create() {
-    if (!form.roleName || !form.displayNameEn) {
-      toast.danger(isAr ? 'اسم الدور والاسم المعروض مطلوبان' : 'Role name and display name are required'); return;
+    // displayNameAr is backend-mandatory (bilingual-data rule) — gate it here
+    // so the button gives a precise reason instead of a validation 400.
+    if (!form.roleName || !form.displayNameEn || !form.displayNameAr) {
+      toast.danger(isAr ? 'اسم الدور والاسمان المعروضان (EN وAR) مطلوبة' : 'Role name and both display names (EN and AR) are required'); return;
     }
     setBusy(true);
     try {
-      await governanceApi.createRole({ roleName: form.roleName.toUpperCase(), displayNameEn: form.displayNameEn, displayNameAr: form.displayNameAr || undefined });
+      await governanceApi.createRole({ roleName: form.roleName.toUpperCase(), displayNameEn: form.displayNameEn, displayNameAr: form.displayNameAr });
       toast.success(isAr ? 'أُنشئ الدور' : 'Role created');
       setForm({ roleName: '', displayNameEn: '', displayNameAr: '' });
       await reload();
