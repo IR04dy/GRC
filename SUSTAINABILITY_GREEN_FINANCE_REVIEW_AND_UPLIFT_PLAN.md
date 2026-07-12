@@ -27,10 +27,21 @@ impact basis + summary flag, 10% offset cap w/ no-target block, IFRS sheet in th
 `esg_target_milestones` + piecewise trajectory, `env_permit_violations` → own CAPA; probes 18/18)
 and **UI** `b6f90d1a` (new `/green-finance` page: Instruments/UoP/Reports/Portfolio/Credits + KPI
 strip; EsgPage tabs: Targets & Transition / IFRS S1/S2 / Env Compliance incl. CBAM; tsc + build
-green). Still open: only item 10 (roadmap).
+green). Still open: nothing — item 10 closed below.
 
-10. Roadmap (never phased): ISAE 3410 assurance-lineage completeness view; GHG Scope-3
-    15-category split; allocation-report packet.xlsx/.docx endpoints (reports ship inside the ZIP).
+10. ✅ IMPLEMENTED — **Roadmap closure** `fdbdbf50` (2026-07-12, V295, live probe 17/17):
+    ISAE 3410 assurance-lineage view (`AssuranceLineageRepository` UNION over the 5 assurable
+    object types → `GET /horizon/assurance-lineage` grading COMPLETE/PARTIAL/MISSING +
+    readinessPct; "Assurance Lineage" EsgPage tab); GHG Scope-3 15-category split
+    (`ghg_emission_record.scope3_category` CHECK 1..15, scope-3-only validation,
+    `GET /ghg/scope3-breakdown` per-category tCO2e + coverage %, FE select);
+    per-report `GET /finance/reports/{id}/export.xlsx|.docx` via the shared
+    `TabularExportService` + row buttons; §9 decision #4 resolved — offset cap now
+    tenant-configurable (`organisation_settings.carbon_offset_cap_pct`, default 10,
+    enforced live in `enforceOffsetCap`, Settings-tab field); §9 decision #5 resolved as a
+    standing obligation — REG-1 wording now mandates verifying SOCPA IFRS S1/S2 phase
+    dates at socpa.org.sa before each reporting cycle (a moving regulatory date is tracked
+    as a verification obligation, not hard-coded).
 
 ---
 **Scope:** review of the as-built `module/sust` (19 DB tables, verified live) + the uplift required for
