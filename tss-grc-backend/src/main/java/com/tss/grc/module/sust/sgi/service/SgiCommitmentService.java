@@ -9,6 +9,7 @@ import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
 import com.tss.grc.module.sust.ghg.repository.GhgEmissionRecordRepository;
 import com.tss.grc.module.sust.metrics.entity.EsgMetricReading;
 import com.tss.grc.module.sust.metrics.repository.EsgMetricReadingRepository;
+import com.tss.grc.module.reporting.dto.TabularExportRequest;
 import com.tss.grc.module.sust.sgi.entity.SgiCommitment;
 import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
@@ -449,6 +450,47 @@ public class SgiCommitmentService {
         return out;
     }
 
+    // ── SGI-E — per-register XLSX export (via the shared tabular engine) ──
+
+    /**
+     * Build the SGI commitment register as one tabular sheet for the branded
+     * XLSX export (XlsxStyler + BrandTheme + ExportNaming + export audit). One
+     * row per commitment (all statuses), with the computed tier + progress.
+     */
+    @Transactional(readOnly = true)
+    public TabularExportRequest exportPayload(String lang) {
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        BigDecimal atRiskFactor = settingsService.getOrCreate().getSgiAtRiskProgressFactor();
+        List<List<String>> rows = new ArrayList<>();
+        for (SgiCommitment c : repo
+                .findByOrganisationIdOrderByTargetYearAscCommitmentCodeAsc(org(), Pageable.unpaged())
+                .getContent()) {
+            Map<String, Object> p = progress(c, atRiskFactor);
+            rows.add(List.of(
+                nn(c.getCommitmentCode()),
+                nn(c.getSector()),
+                ar && c.getTitleAr() != null ? c.getTitleAr() : nn(c.getTitleEn()),
+                nn(c.getUnit()),
+                str(c.getBaselineValue()),
+                str(c.getCurrentValue()),
+                str(c.getTargetValue()),
+                c.getTargetYear() == null ? "" : String.valueOf(c.getTargetYear()),
+                nn(c.getStatus()),
+                String.valueOf(p.get("tier")),
+                String.valueOf(p.get("progressPct")),
+                nn(c.getOwnerName()),
+                nn(c.getValueSource())));
+        }
+        List<String> headers = ar
+            ? List.of("الكود", "القطاع", "العنوان", "الوحدة", "خط الأساس", "الحالي", "الهدف",
+                      "سنة الهدف", "الحالة", "التصنيف", "التقدّم %", "المالك", "المصدر")
+            : List.of("Code", "Sector", "Title", "Unit", "Baseline", "Current", "Target",
+                      "Target year", "Status", "Tier", "Progress %", "Owner", "Source");
+        String sheet = ar ? "سجل التزامات المبادرة الخضراء" : "SGI Commitment Register";
+        return new TabularExportRequest("SGI", "CommitmentRegister", lang,
+            List.of(new TabularExportRequest.Sheet(sheet, headers, rows)));
+    }
+
     // ── S-D — auto-CAPA when behind plan ─────────────────────────────
 
     /**
@@ -494,6 +536,10 @@ public class SgiCommitmentService {
     }
 
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }
+
+    /** null-safe string for export cells. */
+    private static String nn(String s) { return s == null ? "" : s; }
+    private static String str(BigDecimal v) { return v == null ? "" : v.toPlainString(); }
 
     /** num/den * 100 — guards against divide-by-zero and caps at 150 so a
      *  runaway over-achievement doesn't break dashboard rendering. */

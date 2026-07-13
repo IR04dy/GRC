@@ -39,6 +39,7 @@ public class SgiCommitmentController {
 
     private final SgiCommitmentService service;
     private final com.tss.grc.module.sust.sgi.service.SgiSurveillanceService surveillance;
+    private final com.tss.grc.module.reporting.service.TabularExportService tabularExport;
 
     @GetMapping
     @PreAuthorize("hasPermission('SUST','READ')")
@@ -107,6 +108,21 @@ public class SgiCommitmentController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** SGI-E — the whole SGI register as a branded XLSX (via the shared tabular engine). */
+    @GetMapping("/export.xlsx")
+    @PreAuthorize("hasPermission('SUST','READ')")
+    public org.springframework.http.ResponseEntity<byte[]> exportXlsx(
+            @RequestParam(defaultValue = "en") String lang) {
+        byte[] bytes = tabularExport.xlsx(service.exportPayload(lang));
+        String filename = com.tss.grc.module.reporting.service.ExportNaming.build(
+            "SGI", "CommitmentRegister", lang, "xlsx");
+        return org.springframework.http.ResponseEntity.ok()
+            .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"" + filename + "\"")
+            .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+            .body(bytes);
     }
 
     /**

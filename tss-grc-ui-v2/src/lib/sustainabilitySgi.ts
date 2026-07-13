@@ -11,7 +11,7 @@
 //     the commitment's direction (raise-to vs lower-to).
 //   • Rule B — RETIRED requires a written reason.
 
-import { api } from './api';
+import { api, downloadFile } from './api';
 
 export type SgiStatus = 'ACTIVE' | 'ACHIEVED' | 'RETIRED';
 
@@ -53,6 +53,7 @@ export interface SgiCommitment {
   notesEn?: string;
   notesAr?: string;
   evidenceRef?: string;
+  evidenceItemId?: number;      // SGI-A/E — real evidence-subsystem FK
 
   // SGI-C — current_value provenance
   valueSource?: SgiValueSource;
@@ -154,6 +155,12 @@ export function sweepSgi() {
 /** SGI-C — pull current_value from the commitment's linked source. */
 export function refreshValueSgi(id: number) {
   return api.post<SgiCommitment>(`${BASE}/${id}/refresh-value`, {});
+}
+
+/** SGI-E — download the whole SGI register as a branded XLSX. */
+export function exportSgiXlsx(lang: 'en' | 'ar') {
+  return downloadFile(`${BASE}/export.xlsx?lang=${lang}`,
+    `SGI_CommitmentRegister_${lang.toUpperCase()}.xlsx`);
 }
 
 /** Bilingual value-source labels. */

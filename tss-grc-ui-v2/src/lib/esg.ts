@@ -268,99 +268,11 @@ export const CMA_ARTICLES: CmaArticle[] = [
 
 // ─── Saudi Green Initiative — sectoral commitments ─────────────────────────
 
-export type SgiSector = 'ENERGY' | 'INDUSTRY' | 'TRANSPORT' | 'WASTE' | 'FORESTRY' | 'WATER';
-
-export interface SgiCommitment {
-  code: string;
-  sector: SgiSector;
-  titleEn: string;
-  titleAr: string;
-  baseline: number;
-  current: number;
-  target: number;
-  unit: string;
-  /** Year by which target must be hit. */
-  targetYear: number;
-  /** % progress toward target (0–100). */
-  progressPct: number;
-  onTrack: boolean;
-  /** Bilingual narrative on what's driving (or blocking) progress. */
-  notesEn: string;
-  notesAr: string;
-}
-
-export const SGI_COMMITMENTS: SgiCommitment[] = [
-  {
-    code: 'SGI-NETZERO-2060',
-    sector: 'ENERGY',
-    titleEn: 'Net-zero greenhouse gases by 2060',
-    titleAr: 'الحياد الكربوني بحلول 2060',
-    baseline: 195_610, current: 195_610, target: 0,
-    unit: 'tCO2e/yr', targetYear: 2060, progressPct: 8.4, onTrack: true,
-    notesEn: 'Aligned to SGI national target. Renewable PPA programme + grid-decarbonisation reductions on track.',
-    notesAr: 'متّسق مع هدف SGI الوطني. برنامج اتفاقيات شراء الطاقة المتجدّدة وخفض الانبعاثات على المسار.',
-  },
-  {
-    code: 'SGI-30PCT-2030',
-    sector: 'ENERGY',
-    titleEn: 'Cut Scope 1+2 emissions 30% by 2030',
-    titleAr: 'خفض انبعاثات النطاقين 1 و 2 بنسبة 30٪ بحلول 2030',
-    baseline: 60_300, current: 53_130, target: 42_210,
-    unit: 'tCO2e/yr', targetYear: 2030, progressPct: 39.6, onTrack: false,
-    notesEn: 'Behind plan — Scope 2 reduction outpaced but Scope 1 fleet electrification slower than expected.',
-    notesAr: 'متأخّر عن الخطّة — انخفاض النطاق 2 سَبَق المتوقَّع لكن كهربة أسطول النطاق 1 أبطأ.',
-  },
-  {
-    code: 'SGI-RENEWABLE-50',
-    sector: 'ENERGY',
-    titleEn: '50% renewable energy mix by 2030',
-    titleAr: '50٪ مزيج طاقة متجدّدة بحلول 2030',
-    baseline: 8, current: 22, target: 50,
-    unit: '%', targetYear: 2030, progressPct: 33.3, onTrack: true,
-    notesEn: 'Solar PPA signed at three production sites. Sudair PV plant offtake adds 8% expected by 2026.',
-    notesAr: 'وُقّعت اتفاقيات الطاقة الشمسية في ثلاثة مواقع إنتاج. شراء طاقة محطة سدير الشمسية يضيف 8٪ بحلول 2026.',
-  },
-  {
-    code: 'SGI-PLANTING-10B',
-    sector: 'FORESTRY',
-    titleEn: 'Contribute to 10B trees national target',
-    titleAr: 'المساهمة في هدف 10 مليارات شجرة',
-    baseline: 0, current: 124_000, target: 500_000,
-    unit: 'trees', targetYear: 2030, progressPct: 24.8, onTrack: true,
-    notesEn: 'Native-species planting on coast restoration + corporate campus rewilding programmes.',
-    notesAr: 'زراعة أصناف محلية ضمن استعادة الساحل وإعادة تأهيل الحرم المؤسسي.',
-  },
-  {
-    code: 'SGI-EV-FLEET-2030',
-    sector: 'TRANSPORT',
-    titleEn: 'Convert 30% of light-vehicle fleet to EV by 2030',
-    titleAr: 'تحويل 30٪ من أسطول المركبات الخفيفة إلى كهربائي بحلول 2030',
-    baseline: 0, current: 12, target: 30,
-    unit: '%', targetYear: 2030, progressPct: 40, onTrack: true,
-    notesEn: 'EV charging deployed at 18 sites. Lucid + BYD procurement framework in place.',
-    notesAr: 'نُشرت محطات شحن المركبات الكهربائية في 18 موقعاً. إطار شراء Lucid وBYD معتمد.',
-  },
-  {
-    code: 'SGI-WASTE-DIVERT-2030',
-    sector: 'WASTE',
-    titleEn: '60% non-hazardous waste diverted from landfill by 2030',
-    titleAr: 'تحويل 60٪ من النفايات غير الخطرة بعيداً عن المكبّ بحلول 2030',
-    baseline: 18, current: 38, target: 60,
-    unit: '%', targetYear: 2030, progressPct: 47.6, onTrack: true,
-    notesEn: 'On-site segregation programme + GAMEP partnership covering 14 sites.',
-    notesAr: 'برنامج الفصل في الموقع + شراكة الجمعية السعودية للحفاظ على البيئة تشمل 14 موقعاً.',
-  },
-  {
-    code: 'SGI-WATER-INTENSITY',
-    sector: 'WATER',
-    titleEn: 'Reduce water intensity 25% by 2030',
-    titleAr: 'خفض كثافة استهلاك المياه 25٪ بحلول 2030',
-    baseline: 4.2, current: 3.7, target: 3.15,
-    unit: 'm³/SAR1k revenue', targetYear: 2030, progressPct: 47.6, onTrack: true,
-    notesEn: 'Closed-loop cooling at three plants + recycled-water integration for landscaping.',
-    notesAr: 'تبريد دائري مغلق في ثلاثة مصانع + استخدام المياه المُعاد تدويرها في التنسيق.',
-  },
-];
+// SGI-E — the static SGI_COMMITMENTS mock (+ its SgiSector/SgiCommitment types)
+// was removed. The SGI register is now backend-driven (module/sust/sgi, screen
+// ESG → SGI tab, client in lib/sustainabilitySgi.ts) with live progress, source
+// lineage (SGI-C) and governance (SGI-A/B); the overview KPIs come from the live
+// S-P dashboard aggregate (lib/esgDashboard.ts).
 
 // ─── Vendor ESG survey (Scope 3 supplier engagement) ───────────────────────
 
@@ -500,20 +412,15 @@ export function buildEsgAnnex(orgEn: string, orgAr: string): string {
   lines.push(`   Total  : ${(curr.scope1 + curr.scope2 + curr.scope3).toLocaleString()} tCO2e`);
   lines.push(`   YoY    : Scope 1 ${yoyChange(1)}%, Scope 2 ${yoyChange(2)}%, Scope 3 ${yoyChange(3)}%`);
   lines.push('');
-  lines.push('2. SAUDI GREEN INITIATIVE COMMITMENTS · التزامات مبادرة السعودية الخضراء');
-  SGI_COMMITMENTS.forEach(c => {
-    lines.push(`   [${c.sector.padEnd(9)}] ${c.titleEn}`);
-    lines.push(`               ${c.titleAr}`);
-    lines.push(`               Progress: ${c.progressPct}% — ${c.onTrack ? 'ON TRACK' : 'BEHIND PLAN'} (target ${c.targetYear})`);
-  });
-  lines.push('');
-  lines.push('3. CMA ARTICLES 91-94 DISCLOSURE · إفصاح المواد 91-94 من لائحة الحوكمة');
+  // SGI-E — SGI commitments live in the backend register (ESG → SGI tab) with
+  // their own bilingual XLSX export; they are no longer rendered from a mock here.
+  lines.push('2. CMA ARTICLES 91-94 DISCLOSURE · إفصاح المواد 91-94 من لائحة الحوكمة');
   CMA_ARTICLES.forEach(a => {
     lines.push(`   Art. ${a.article}${a.clause ?? ''} [${a.status.padEnd(14)}] ${a.titleEn} / ${a.titleAr}`);
     if (a.evidenceRef) lines.push(`     evidence: ${a.evidenceRef}`);
   });
   lines.push('');
-  lines.push('4. TCFD ALIGNMENT · المحاذاة مع TCFD');
+  lines.push('3. TCFD ALIGNMENT · المحاذاة مع TCFD');
   TCFD_ITEMS.forEach(t => {
     lines.push(`   [${t.pillar.padEnd(15)}] (${t.recommendationCode}) [${t.status.padEnd(14)}] ${t.titleEn}`);
   });
@@ -540,11 +447,8 @@ export function buildEsgAnnexSheets(): { name: string; headers: string[]; rows: 
         ['Total', String(curr.scope1 + curr.scope2 + curr.scope3), '', '', ''],
       ],
     },
-    {
-      name: 'Saudi Green Initiative',
-      headers: ['Sector', 'Commitment', 'Progress %', 'Status', 'Target Year'],
-      rows: SGI_COMMITMENTS.map(c => [c.sector, c.titleEn, String(c.progressPct), c.onTrack ? 'ON_TRACK' : 'BEHIND PLAN', String(c.targetYear)]),
-    },
+    // SGI-E — the Saudi Green Initiative sheet was dropped from this mock annex;
+    // the live SGI register exports its own bilingual XLSX (SGI tab → Export).
     {
       name: 'CMA Articles 91-94',
       headers: ['Article', 'Title', 'Status', 'Evidence'],
@@ -580,14 +484,8 @@ export const STATUS_LABEL: Record<TcfdItem['status'] | CmaArticle['status'], { e
   NOT_APPLICABLE:  { en: 'N/A',              ar: 'لا ينطبق' },
 };
 
-export const SECTOR_LABEL: Record<SgiSector, { en: string; ar: string }> = {
-  ENERGY:    { en: 'Energy',    ar: 'الطاقة' },
-  INDUSTRY:  { en: 'Industry',  ar: 'الصناعة' },
-  TRANSPORT: { en: 'Transport', ar: 'النقل' },
-  WASTE:     { en: 'Waste',     ar: 'النفايات' },
-  FORESTRY:  { en: 'Forestry',  ar: 'الغابات' },
-  WATER:     { en: 'Water',     ar: 'المياه' },
-};
+// SGI-E — SECTOR_LABEL (keyed by the removed SgiSector mock type) is gone; the
+// live SGI tab labels sectors via sgiSectorLabel() in lib/sustainabilitySgi.ts.
 
 export const SURVEY_TONE: Record<VendorEsgSurvey['status'], 'success' | 'info' | 'warning' | 'danger' | 'neutral'> = {
   SUBMITTED:   'success',
@@ -622,35 +520,10 @@ export interface EsgStats {
   surveyOverdue: number;
 }
 
-export function aggregateEsg(): EsgStats {
-  const curr = CURRENT_YEAR_RECORD;
-  const total = curr.scope1 + curr.scope2 + curr.scope3;
-  const yoyTotal = (
-    (curr.scope1 * yoyChange(1))
-    + (curr.scope2 * yoyChange(2))
-    + (curr.scope3 * yoyChange(3))
-  ) / Math.max(1, total);
-  const tcfdDisclosed = TCFD_ITEMS.filter(i => i.status === 'DISCLOSED').length;
-  const cmaApplicable = CMA_ARTICLES.filter(a => a.status !== 'NOT_APPLICABLE');
-  const cmaDisclosed = cmaApplicable.filter(a => a.status === 'DISCLOSED').length;
-  const surveys = effectiveSurveys();
-  return {
-    totalEmissions: total,
-    scope1: curr.scope1, scope2: curr.scope2, scope3: curr.scope3,
-    yoyTotal: Math.round(yoyTotal * 10) / 10,
-    tcfdTotal: TCFD_ITEMS.length,
-    tcfdDisclosed,
-    tcfdCoveragePct: Math.round((tcfdDisclosed / TCFD_ITEMS.length) * 100),
-    cmaTotal: cmaApplicable.length,
-    cmaDisclosed,
-    cmaCoveragePct: Math.round((cmaDisclosed / Math.max(1, cmaApplicable.length)) * 100),
-    sgiOnTrackCount: SGI_COMMITMENTS.filter(c => c.onTrack).length,
-    sgiTotal: SGI_COMMITMENTS.length,
-    surveyTotal: surveys.length,
-    surveySubmitted: surveys.filter(s => s.status === 'SUBMITTED').length,
-    surveyOverdue: surveys.filter(s => s.status === 'OVERDUE').length,
-  };
-}
+// SGI-E — aggregateEsg() (the static ESG-overview mock) was removed; the
+// Overview KPI strip is fed by the live dashboard aggregate via
+// mapDashboardToStats() in lib/esgDashboard.ts. EsgStats (above) is retained as
+// the shared shape that mapper targets.
 
 // Legacy exports kept for backwards compatibility with existing page code.
 export const EMISSIONS = [

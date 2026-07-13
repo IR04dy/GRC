@@ -49,7 +49,7 @@ import {
   type CorrectiveAction, type CapaAggregate, type CapaStatus,
 } from '../../lib/sustainabilityCapa';
 import {
-  listSgi, sgiAggregate, achieveSgi, retireSgi, createSgi, updateSgi, sweepSgi, refreshValueSgi,
+  listSgi, sgiAggregate, achieveSgi, retireSgi, createSgi, updateSgi, sweepSgi, refreshValueSgi, exportSgiXlsx,
   sgiStatusTone, sgiSectorLabel, sgiStatusLabel, sgiTierTone, sgiTierLabel, sgiValueSourceLabel,
   computeProgressPct, canAchieve, computeTier, isMilestoneOverdue,
   type SgiCommitment as SgiC, type SgiAggregate as SgiAgg, type SgiSector, type SgiValueSource,
@@ -4504,6 +4504,10 @@ function SgiTab() {
       label: isAr ? 'ملاحظات (إنجليزي)' : 'Notes (English)' },
     { kind: 'textarea', key: 'notesAr', span: 12, rows: 2,
       label: isAr ? 'ملاحظات (عربي)' : 'Notes (Arabic)' },
+    // SGI-E — attach an evidence reference (Rule D proof for achievement).
+    { kind: 'text', key: 'evidenceRef', span: 12,
+      label: isAr ? 'مرجع الدليل' : 'Evidence reference',
+      placeholder: isAr ? 'مثال: محضر مجلس 2030-Q4' : 'e.g. board minutes 2030-Q4' },
   ];
 
   const editInitial = useMemo<Record<string, unknown>>(() => ({
@@ -4528,6 +4532,7 @@ function SgiTab() {
     valueSource:       editSgi?.valueSource ?? 'MANUAL',
     sourceMetricId:    editSgi?.sourceMetricId != null ? String(editSgi.sourceMetricId) : '',
     sourceScope:       editSgi?.sourceScope != null ? String(editSgi.sourceScope) : '',
+    evidenceRef:       editSgi?.evidenceRef ?? '',
   }), [editSgi]);
 
   async function submitEdit(values: Record<string, unknown>): Promise<void> {
@@ -4572,6 +4577,7 @@ function SgiTab() {
         valueSource: (str(values.valueSource) as SgiValueSource) ?? 'MANUAL',
         sourceMetricId: num(values.sourceMetricId),
         sourceScope: num(values.sourceScope),
+        evidenceRef: str(values.evidenceRef),
       });
       toast.success(isAr ? 'حُدّث الالتزام' : 'Commitment updated');
       setEditSgi(null);
@@ -4649,6 +4655,11 @@ function SgiTab() {
 
       <Card title={isAr ? 'التزامات المبادرة السعودية الخضراء' : 'Saudi Green Initiative commitments'} Icon={Target}
         action={<div className="row-actions">
+          <Button variant="ghost" size="sm" Icon={Download}
+            onClick={() => exportSgiXlsx(isAr ? 'ar' : 'en').catch(e =>
+              toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر التصدير' : 'Export failed')))}>
+            {isAr ? 'تصدير' : 'Export'}
+          </Button>
           <Button variant="secondary" size="sm" Icon={RefreshCw} onClick={onSweep} disabled={sweeping}>
             {sweeping ? (isAr ? 'جارٍ الفحص…' : 'Sweeping…') : (isAr ? 'فحص المراقبة' : 'Run sweep')}
           </Button>
@@ -4700,6 +4711,12 @@ function SgiTab() {
                           {isMilestoneOverdue(c) && (
                             <Badge tone="warning" title={isAr ? 'المرحلة التالية فائتة' : 'Next milestone overdue'}>
                               <Clock size={11} /> {isAr ? 'مرحلة فائتة' : 'Milestone overdue'}
+                            </Badge>
+                          )}
+                          {/* SGI-E — evidence chip (Rule D proof: item FK or ref). */}
+                          {(c.evidenceItemId != null || (c.evidenceRef && c.evidenceRef.trim())) && (
+                            <Badge tone="success" title={c.evidenceRef || (isAr ? 'دليل مرفق' : 'Evidence attached')}>
+                              <Paperclip size={11} /> {isAr ? 'دليل' : 'Evidence'}
                             </Badge>
                           )}
                           {isActive && (

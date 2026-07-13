@@ -19,9 +19,9 @@
 |---|---|---|---|---|
 | SGI-A | Governance gates — SoD on achieve/retire, principal attribution, evidence-gated achieve | **DONE** | `804de092` | none (code-only) |
 | SGI-B | Surveillance — scheduled DELAYED sweep + milestone-overdue watch (+ buttons, notifications) | **DONE** | `804de092` | none (code-only) |
-| SGI-C | Source lineage — current_value linked to GHG inventory / metric readings + refresh action | **DONE** | _(feat/sgi-uplift)_ | **V296 applied** |
+| SGI-C | Source lineage — current_value linked to GHG inventory / metric readings + refresh action | **DONE** | `edf5a43e` | **V296 applied** |
 | SGI-D | Optional by decision — verification state, engine routing, target linkage | **DEFERRED** (decisions #1/#3/#5 = direct APPROVE / defer / defer) | — | — |
-| SGI-E | Cleanup — dead static constants, per-register export, evidence chip on cards | **NOT STARTED** | — | none |
+| SGI-E | Cleanup — dead static constants, per-register export, evidence chip on cards | **DONE** | `7db80dcc` | none |
 
 **Decisions settled (2026-07-13):** #1 direct APPROVE + Rule C (no engine routing);
 #2 evidence gate enforced (Rule D); #3 verification state deferred (assurance stays
@@ -50,6 +50,23 @@ MANUAL rejected. The surveillance sweep refreshes sourced values before judging 
 button + provenance line on sourced cards. Suite **2256/0/0**, ratchet **62**, FE tsc
 clean; live probe **7/7** (metric + GHG-total + per-scope + MANUAL-reject + audit
 trail), zero residue.
+
+**SGI-E as-built (2026-07-13):** dead `SGI_COMMITMENTS` + `SgiSector`/`SgiCommitment`
+mock types + `aggregateEsg()` + `SECTOR_LABEL` removed from `lib/esg.ts` (the annex
+builders' SGI sections too); the live register/dashboards/`lib/sustainabilitySgi.ts`
+already superseded them. `GET /sgi-commitments/export.xlsx` (SUST READ) via the shared
+`TabularExportService` + `ExportNaming` — one bilingual register sheet (code/sector/
+title/unit/baseline/current/target/year/status/tier/progress%/owner/source). FE:
+"Export" button on the tab header, an evidence chip on cards (Rule-D proof) with an
+editable `evidence_ref` field in the edit form. Suite **2256/0/0**, ratchet **62**,
+FE tsc + vitest **43/43** clean; live probe **6/6** (XLSX PK magic, rows==register
+13/13, AR variant, READ-guard, ExportNaming filename).
+
+**Net result — SGI module is now disclosure-grade:** achievement is a two-person,
+evidence-gated, principal-attributed action; the calendar is watched (daily sweep +
+CAPAs + owner alerts); current values carry verifiable source lineage; and the
+register exports itself. SGI-D (verification state / engine routing / target FK)
+remains available if a future decision wants it.
 
 ---
 
