@@ -20,9 +20,13 @@ export type CapaStatus =
 
 export type CapaPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
+// CT-5 — full union of the backend whitelist / ck_ca_source (11 types).
+// EVIDENCE + VENDOR_ESG arrive via the S-C/S-O auto-opens; ESG_TARGET +
+// ENV_PERMIT via the G4 horizon sweeps.
 export type CapaSourceType =
   | 'CLIMATE_RISK' | 'GHG_RECORD' | 'ANNEX_GAP' | 'CMA_DISCLOSURE'
-  | 'TCFD_ITEM'    | 'SGI_COMMITMENT' | 'MANUAL';
+  | 'TCFD_ITEM'    | 'SGI_COMMITMENT' | 'MANUAL'
+  | 'EVIDENCE'     | 'VENDOR_ESG' | 'ESG_TARGET' | 'ENV_PERMIT';
 
 export interface CorrectiveAction {
   id?: number;
@@ -202,6 +206,10 @@ export function capaSourceLabel(s: CapaSourceType, lang: 'en' | 'ar'): string {
     TCFD_ITEM:       'TCFD item',
     SGI_COMMITMENT:  'SGI commitment',
     MANUAL:          'Manual',
+    EVIDENCE:        'Evidence rejection',
+    VENDOR_ESG:      'Vendor ESG',
+    ESG_TARGET:      'ESG target',
+    ENV_PERMIT:      'Environmental permit',
   };
   const ar: Record<CapaSourceType, string> = {
     CLIMATE_RISK:    'مخاطر مناخية',
@@ -211,8 +219,14 @@ export function capaSourceLabel(s: CapaSourceType, lang: 'en' | 'ar'): string {
     TCFD_ITEM:       'بند TCFD',
     SGI_COMMITMENT:  'التزام المبادرة الخضراء',
     MANUAL:          'يدوي',
+    EVIDENCE:        'رفض دليل',
+    VENDOR_ESG:      'استدامة الموردين',
+    ESG_TARGET:      'مستهدف استدامة',
+    ENV_PERMIT:      'تصريح بيئي',
   };
-  return (lang === 'ar' ? ar : en)[s];
+  // Safe fallback (CT-5): a source added server-side before this map learns it
+  // renders as its raw code — never a blank badge.
+  return (lang === 'ar' ? ar : en)[s] ?? s;
 }
 
 /** Bilingual status labels for inline rendering. */

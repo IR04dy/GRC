@@ -47,6 +47,7 @@ import {
   canComplete, capaSourceLabel, capaStatusLabel, capaPriorityLabel,
   daysRemaining,
   type CorrectiveAction, type CapaAggregate, type CapaStatus,
+  type CapaSourceType, type CapaPriority as CapaPrio,
 } from '../../lib/sustainabilityCapa';
 import {
   listSgi, sgiAggregate, achieveSgi, retireSgi, createSgi, updateSgi, sweepSgi, refreshValueSgi, exportSgiXlsx,
@@ -626,6 +627,10 @@ function CapaTab() {
   const [agg, setAgg]     = useState<CapaAggregate | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<CapaStatus | 'ALL'>('ALL');
+  // CT-5 — source + priority narrowing, client-side like the status filter
+  // (the tab loads the full first page once and filters in memory).
+  const [sourceFilter, setSourceFilter]     = useState<CapaSourceType | 'ALL'>('ALL');
+  const [priorityFilter, setPriorityFilter] = useState<CapaPrio | 'ALL'>('ALL');
 
   // Verify-flow modal state. We replace `window.prompt` (which is jarring
   // and unstyled) with a small inline FormModal: it holds the verifier
@@ -647,9 +652,14 @@ function CapaTab() {
   }
   useEffect(() => { void reload(); }, []);
 
-  const filtered = statusFilter === 'ALL'
-    ? items
-    : items.filter(it => it.status === statusFilter);
+  const filtered = items.filter(it =>
+    (statusFilter   === 'ALL' || it.status     === statusFilter) &&
+    (sourceFilter   === 'ALL' || it.sourceType === sourceFilter) &&
+    (priorityFilter === 'ALL' || it.priority   === priorityFilter));
+
+  // Only offer source options that actually occur in the register, so the
+  // dropdown stays short for tenants using few gap engines.
+  const sourceOptions = Array.from(new Set(items.map(it => it.sourceType))).sort();
 
   async function onStart(id: number)    { try { await startCapa(id);    toast.success(isAr ? 'بدأ التنفيذ' : 'Started');     await reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); } }
   async function onComplete(id: number) { try { await completeCapa(id); toast.success(isAr ? 'تم الإكمال — في انتظار التحقّق' : 'Completed — awaiting verification'); await reload(); } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); } }
@@ -714,6 +724,23 @@ function CapaTab() {
               {s === 'ALL' ? (isAr ? 'الكل' : 'All') : capaStatusLabel(s as CapaStatus, isAr ? 'ar' : 'en')}
             </button>
           ))}
+          {/* CT-5 — source + priority narrowing */}
+          <select className="input" style={{ width: 'auto' }} value={sourceFilter}
+            aria-label={isAr ? 'تصفية حسب المصدر' : 'Filter by source'}
+            onChange={e => setSourceFilter(e.target.value as CapaSourceType | 'ALL')}>
+            <option value="ALL">{isAr ? 'كل المصادر' : 'All sources'}</option>
+            {sourceOptions.map(s => (
+              <option key={s} value={s}>{capaSourceLabel(s, isAr ? 'ar' : 'en')}</option>
+            ))}
+          </select>
+          <select className="input" style={{ width: 'auto' }} value={priorityFilter}
+            aria-label={isAr ? 'تصفية حسب الأولوية' : 'Filter by priority'}
+            onChange={e => setPriorityFilter(e.target.value as CapaPrio | 'ALL')}>
+            <option value="ALL">{isAr ? 'كل الأولويات' : 'All priorities'}</option>
+            {(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const).map(p => (
+              <option key={p} value={p}>{capaPriorityLabel(p, isAr ? 'ar' : 'en')}</option>
+            ))}
+          </select>
           <span className="text-2xs text-muted esg-filter-row__count">
             {filtered.length} / {items.length}
           </span>
@@ -725,12 +752,13 @@ function CapaTab() {
             ? (
               <InlineEmpty>
                 <div className="esg-card-center">
-                  <span>{statusFilter === 'ALL'
+                  <span>{statusFilter === 'ALL' && sourceFilter === 'ALL' && priorityFilter === 'ALL'
                     ? (isAr ? 'لا توجد إجراءات تصحيحية بعد' : 'No corrective actions yet')
-                    : (isAr ? 'لا توجد إجراءات بهذه الحالة' : 'No actions match this filter')}</span>
-                  {statusFilter !== 'ALL' && (
-                    <Button variant="ghost" size="sm" Icon={XIcon} onClick={() => setStatusFilter('ALL')}>
-                      {isAr ? 'إزالة التصفية' : 'Clear filter'}
+                    : (isAr ? 'لا توجد إجراءات مطابقة للتصفية' : 'No actions match this filter')}</span>
+                  {(statusFilter !== 'ALL' || sourceFilter !== 'ALL' || priorityFilter !== 'ALL') && (
+                    <Button variant="ghost" size="sm" Icon={XIcon}
+                      onClick={() => { setStatusFilter('ALL'); setSourceFilter('ALL'); setPriorityFilter('ALL'); }}>
+                      {isAr ? 'إزالة التصفية' : 'Clear filters'}
                     </Button>
                   )}
                 </div>

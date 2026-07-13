@@ -48,9 +48,18 @@ public class CorrectiveActionService {
     private static final Set<String> PRIORITIES =
         Set.of("CRITICAL", "HIGH", "MEDIUM", "LOW");
 
-    private static final Set<String> SOURCE_TYPES =
+    /**
+     * CT-5 — must stay equal to the DB {@code ck_ca_source} CHECK constraint
+     * (widened by the G4 migrations with ESG_TARGET + ENV_PERMIT). The horizon
+     * services write those two source types via the repository, so this list
+     * drifting behind the constraint silently 400s manual creation for sources
+     * the DB accepts. Package-visible for the drift-guard test; extend BOTH
+     * (migration + here) when adding a source.
+     */
+    static final Set<String> SOURCE_TYPES =
         Set.of("CLIMATE_RISK", "GHG_RECORD", "ANNEX_GAP", "CMA_DISCLOSURE",
-               "TCFD_ITEM", "SGI_COMMITMENT", "EVIDENCE", "VENDOR_ESG", "MANUAL");
+               "TCFD_ITEM", "SGI_COMMITMENT", "EVIDENCE", "VENDOR_ESG", "MANUAL",
+               "ESG_TARGET", "ENV_PERMIT");
 
     /** A CAPA in one of these states no longer "covers" its source gap, so a
      *  freshly-surfaced gap on that source opens a new CAPA (mirrors the
