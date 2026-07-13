@@ -66,6 +66,18 @@ public final class GreenFinanceMath {
         return nz(share).multiply(nz(projectActualImpact), MC).setScale(4, RoundingMode.HALF_UP);
     }
 
+    /**
+     * GF-1 (plan §4.2 last formula) — the scale factor that caps a project's TOTAL
+     * attributed share at 1 across ALL instruments: a project financed by two sukuk
+     * cannot deliver its impact twice. 1 when the summed share is already ≤ 1;
+     * otherwise 1/Σshare so each instrument keeps its pro-rata slice of 100 %.
+     */
+    public static BigDecimal dedupFactor(BigDecimal totalShare) {
+        BigDecimal t = nz(totalShare);
+        if (t.compareTo(BigDecimal.ONE) <= 0) return BigDecimal.ONE;
+        return BigDecimal.ONE.divide(t, MC);
+    }
+
     /** impact / allocated (per SAR mn), 6 dp; 0 when allocated is 0. */
     public static BigDecimal intensityPerSarMn(BigDecimal impact, BigDecimal allocated) {
         if (nz(allocated).signum() == 0) return BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP);

@@ -22,6 +22,8 @@ public final class GreenFinanceDtos {
         @Size(max = 300) String nameAr,
         @Size(max = 20) String isin,
         @Size(max = 60) String listing,
+        /** GF-5 (V298, REG-8) — offering-document reference. */
+        @Size(max = 200) String prospectusRef,
         LocalDate issueDate,
         LocalDate maturityDate,
         @NotNull @DecimalMin(value = "0.0001") BigDecimal amountSarMn,
@@ -77,6 +79,35 @@ public final class GreenFinanceDtos {
         @Pattern(regexp = "ALLOCATION|IMPACT|COMBINED") String reportType,
         String narrativeEn,
         String narrativeAr
+    ) {}
+
+    /**
+     * GF-1 — org-level attributed impact across ALL instruments with double-count
+     * protection (plan §4.2 last formula): per project, Σ instrument shares is
+     * capped at 1 and each instrument's contribution is scaled pro-rata.
+     */
+    public record PortfolioImpactResponse(
+        BigDecimal tco2eAvoidedYr,
+        BigDecimal mwhRenewableYr,
+        BigDecimal waterM3SavedYr,
+        /** True when any contributing project's actual-impact figures are ESTIMATE-based. */
+        boolean estimateBasis,
+        int projectsCounted,
+        int projectsCapped,
+        java.util.List<InstrumentContribution> byInstrument,
+        java.util.List<ProjectAttribution> byProject
+    ) {}
+
+    /** GF-1 — one instrument's dedup-scaled slice of the portfolio impact. */
+    public record InstrumentContribution(
+        Long instrumentId, String instrumentCode,
+        BigDecimal tco2eAvoidedYr, BigDecimal mwhRenewableYr, BigDecimal waterM3SavedYr
+    ) {}
+
+    /** GF-1 — per-project share accounting; dedupApplied = the cap kicked in. */
+    public record ProjectAttribution(
+        Long projectId, String projectCode,
+        BigDecimal rawShareSum, BigDecimal countedShare, boolean dedupApplied
     ) {}
 
     /** Use-of-proceeds summary for one instrument (plan §4.2 figures). */

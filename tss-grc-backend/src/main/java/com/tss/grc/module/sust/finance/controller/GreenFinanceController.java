@@ -103,6 +103,15 @@ public class GreenFinanceController {
         return service.rejectAllocation(id, r.reason());
     }
 
+    // ── portfolio impact (GF-1) ─────────────────────────────────────────
+
+    /** GF-1 — org-level attributed impact across all instruments, share-capped per project. */
+    @GetMapping("/portfolio-impact")
+    @PreAuthorize(READ_GUARD)
+    public com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.PortfolioImpactResponse portfolioImpact() {
+        return service.portfolioImpact();
+    }
+
     // ── post-issuance reports (G2) ──────────────────────────────────────
 
     @GetMapping("/instruments/{id}/reports")

@@ -15,7 +15,8 @@ import { useToast } from '../../lib/toast';
 import {
   greenFinanceApi, greenPortfolioApi, ApiError,
   type GfInstrumentDto, type GfProjectDto, type GfAllocationDto, type GfSummaryDto,
-  type GfReportDto, type GpAssetDto, type GpTaxonomyDto, type GpSummaryDto, type GpCreditDto,
+  type GfReportDto, type GfPortfolioImpactDto,
+  type GpAssetDto, type GpTaxonomyDto, type GpSummaryDto, type GpCreditDto,
 } from '../../lib/api';
 import { listEvidenceItems, type EvidenceItem } from '../../lib/evidenceItems';
 import { linkSustEvidence, type SustEvidenceEntityType } from '../../lib/sustEvidenceLinks';
@@ -187,16 +188,19 @@ export function GreenFinancePage() {
 
 function InstrumentsTab({ instruments, reload }: { instruments: GfInstrumentDto[]; reload: () => void }) {
   const { lang } = useI18n(); const isAr = lang === 'ar'; const toast = useToast();
-  const [form, setForm] = useState({ instrumentCode: '', instrumentType: 'GREEN_SUKUK', nameEn: '', amountSarMn: '' });
+  const [form, setForm] = useState({ instrumentCode: '', instrumentType: 'GREEN_SUKUK', nameEn: '', amountSarMn: '', prospectusRef: '' });
 
   async function create() {
     if (!form.instrumentCode || !form.nameEn || !form.amountSarMn) {
       toast.danger(isAr ? 'الرمز والاسم والمبلغ مطلوبة' : 'Code, name and amount are required'); return;
     }
     try {
-      await greenFinanceApi.createInstrument({ ...form, amountSarMn: Number(form.amountSarMn) });
+      await greenFinanceApi.createInstrument({
+        ...form, amountSarMn: Number(form.amountSarMn),
+        prospectusRef: form.prospectusRef.trim() || undefined,   // GF-5
+      });
       toast.success(isAr ? 'سُجِّلت الأداة' : 'Instrument registered');
-      setForm({ instrumentCode: '', instrumentType: 'GREEN_SUKUK', nameEn: '', amountSarMn: '' });
+      setForm({ instrumentCode: '', instrumentType: 'GREEN_SUKUK', nameEn: '', amountSarMn: '', prospectusRef: '' });
       reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Create failed'); }
   }
@@ -227,6 +231,9 @@ function InstrumentsTab({ instruments, reload }: { instruments: GfInstrumentDto[
             placeholder={isAr ? 'الاسم (EN)' : 'Name (EN)'} style={{ ...INPUT, minWidth: 170 }} />
           <input type="number" value={form.amountSarMn} onChange={e => setForm(f => ({ ...f, amountSarMn: e.target.value }))}
             placeholder={isAr ? 'المبلغ (م ر.س)' : 'Amount (SAR mn)'} style={INPUT} />
+          <input value={form.prospectusRef} onChange={e => setForm(f => ({ ...f, prospectusRef: e.target.value }))}
+            placeholder={isAr ? 'مرجع نشرة الإصدار' : 'Prospectus ref'} style={INPUT}
+            title={isAr ? 'مرجع نشرة الإصدار / وثيقة الطرح (REG-8)' : 'Offering-document reference (REG-8)'} />
           <Button size="sm" variant="primary" Icon={Plus} onClick={() => void create()}>{isAr ? 'تسجيل' : 'Register'}</Button>
           <Button size="sm" variant="ghost" Icon={Download} onClick={() => void greenFinanceApi.evidenceZip()}
             title={isAr ? 'حزمة أدلة التمويل الأخضر' : 'Green-Finance evidence ZIP'} />
@@ -238,6 +245,7 @@ function InstrumentsTab({ instruments, reload }: { instruments: GfInstrumentDto[
             <thead><tr>
               <th>{isAr ? 'الرمز' : 'Code'}</th><th>{isAr ? 'النوع' : 'Type'}</th>
               <th>{isAr ? 'الاسم' : 'Name'}</th><th>{isAr ? 'المبلغ (م ر.س)' : 'Amount (SAR mn)'}</th>
+              <th>{isAr ? 'نشرة الإصدار' : 'Prospectus'}</th>
               <th>{isAr ? 'الهيكل الشرعي' : 'Shariah'}</th><th>{isAr ? 'الحالة' : 'Status'}</th><th></th>
             </tr></thead>
             <tbody>
@@ -249,6 +257,7 @@ function InstrumentsTab({ instruments, reload }: { instruments: GfInstrumentDto[
                     <td><Badge tone="info">{i.instrumentType}</Badge></td>
                     <td className="text-2xs">{isAr && i.nameAr ? i.nameAr : i.nameEn}</td>
                     <td className="mono text-2xs">{fmt(i.amountSarMn)}</td>
+                    <td className="mono text-2xs" title={i.prospectusRef ?? undefined}>{i.prospectusRef ?? '—'}</td>
                     <td className="text-2xs">{i.shariahStructure ?? '—'}{i.shariahApprovalRef ? ' ✓' : ''}</td>
                     <td><Badge tone={tone(i.status)} dot>{i.status}</Badge></td>
                     <td>
@@ -454,6 +463,65 @@ function UopTab({ instruments }: { instruments: GfInstrumentDto[] }) {
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
 
+/**
+ * GF-1 — org-level attributed impact across ALL instruments (plan §4.2 last
+ * formula). Per-project shares are capped at 1, so a project financed by two
+ * sukuk delivers its impact once, split pro-rata between them.
+ */
+function PortfolioImpactCard() {
+  const { lang } = useI18n(); const isAr = lang === 'ar';
+  const [impact, setImpact] = useState<GfPortfolioImpactDto | null>(null);
+  useEffect(() => { greenFinanceApi.portfolioImpact().then(setImpact).catch(() => setImpact(null)); }, []);
+
+  if (!impact) return null;
+  const METRICS = [
+    { l: isAr ? 'انبعاثات مُتجنَّبة (طن/سنة)' : 'tCO₂e avoided / yr', v: fmt(impact.tco2eAvoidedYr) },
+    { l: isAr ? 'طاقة متجددة (م.و.س/سنة)' : 'MWh renewable / yr', v: fmt(impact.mwhRenewableYr) },
+    { l: isAr ? 'مياه موفَّرة (م³/سنة)' : 'Water m³ saved / yr', v: fmt(impact.waterM3SavedYr) },
+  ];
+  return (
+    <>
+      <Card title={isAr ? 'أثر المحفظة (كل الأدوات)' : 'Portfolio impact (all instruments)'} Icon={TrendingUp}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 10 }}>
+          {METRICS.map(k => (
+            <div key={k.l} style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', padding: '8px 10px' }}>
+              <div style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{k.l}</div>
+              <div style={{ fontSize: 17, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                {k.v}{impact.estimateBasis ? ' *' : ''}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ ...EMPTY, paddingTop: 0, paddingBottom: 4 }}>
+          {isAr
+            ? `محمي من الاحتساب المزدوج: حصص المشروع الواحد عبر الأدوات لا تتجاوز 100 % (${impact.projectsCapped} من ${impact.projectsCounted} مشروعاً جرى تقنينه).`
+            : `Double-count protected: a project's summed share across instruments is capped at 100 % (${impact.projectsCapped} of ${impact.projectsCounted} projects capped).`}
+          {impact.estimateBasis && (isAr ? ' * تتضمن أرقام أثر تقديرية.' : ' * includes ESTIMATE-based figures.')}
+        </div>
+        {impact.byInstrument.length > 0 && (
+          <table className="grc-table">
+            <thead><tr>
+              <th>{isAr ? 'الأداة' : 'Instrument'}</th><th>tCO₂e/yr</th>
+              <th>MWh/yr</th><th>{isAr ? 'مياه م³/سنة' : 'Water m³/yr'}</th>
+            </tr></thead>
+            <tbody>
+              {impact.byInstrument.map(c => (
+                <tr key={c.instrumentId}>
+                  <td className="mono text-2xs">{c.instrumentCode}</td>
+                  <td className="mono text-2xs">{fmt(c.tco2eAvoidedYr)}</td>
+                  <td className="mono text-2xs">{fmt(c.mwhRenewableYr)}</td>
+                  <td className="mono text-2xs">{fmt(c.waterM3SavedYr)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+      <div style={{ height: 16 }} />
+    </>
+  );
+}
+
 function ReportsTab({ instruments }: { instruments: GfInstrumentDto[] }) {
   const { lang } = useI18n(); const isAr = lang === 'ar'; const toast = useToast();
   const [instrumentId, setInstrumentId] = useState<number | ''>('');
@@ -472,6 +540,8 @@ function ReportsTab({ instruments }: { instruments: GfInstrumentDto[] }) {
   }
 
   return (
+    <>
+    <PortfolioImpactCard />
     <Card title={isAr ? 'تقارير التخصيص والأثر السنوية' : 'Annual allocation & impact reports'} Icon={FileBarChart2}
       action={
         <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
@@ -522,6 +592,7 @@ function ReportsTab({ instruments }: { instruments: GfInstrumentDto[] }) {
               </tbody>
             </table>}
     </Card>
+    </>
   );
 }
 

@@ -2985,6 +2985,16 @@ export interface GfInstrumentDto {
   isin?: string | null; amountSarMn: number; issuanceCostsSarMn?: number | null;
   shariahStructure?: string | null; shariahApprovalRef?: string | null;
   externalReviewer?: string | null; spoRating?: string | null; status: string;
+  prospectusRef?: string | null;   // GF-5 (V298, REG-8)
+}
+/** GF-1 — org-level attributed impact, double-count protected per project. */
+export interface GfPortfolioImpactDto {
+  tco2eAvoidedYr: number; mwhRenewableYr: number; waterM3SavedYr: number;
+  estimateBasis: boolean; projectsCounted: number; projectsCapped: number;
+  byInstrument: { instrumentId: number; instrumentCode: string;
+    tco2eAvoidedYr: number; mwhRenewableYr: number; waterM3SavedYr: number }[];
+  byProject: { projectId: number; projectCode: string;
+    rawShareSum: number; countedShare: number; dedupApplied: boolean }[];
 }
 export interface GfProjectDto {
   id: number; projectCode: string; nameEn: string; nameAr?: string | null; category: string;
@@ -3025,6 +3035,8 @@ export const greenFinanceApi = {
     api.post<GfAllocationDto>(`/api/v1/sustainability/finance/allocations/${id}/reject`, { reason }),
   summary:       (instrumentId: number) =>
     api.get<GfSummaryDto>(`/api/v1/sustainability/finance/instruments/${instrumentId}/summary`),
+  portfolioImpact: () =>
+    api.get<GfPortfolioImpactDto>('/api/v1/sustainability/finance/portfolio-impact'),
   reports:       (instrumentId: number) =>
     api.get<GfReportDto[]>(`/api/v1/sustainability/finance/instruments/${instrumentId}/reports`),
   createReport:  (b: { instrumentId: number; periodYear: number; reportType?: string }) =>

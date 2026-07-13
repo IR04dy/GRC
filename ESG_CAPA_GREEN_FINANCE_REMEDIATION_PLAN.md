@@ -24,11 +24,11 @@
 | CT-4 | Verify-as-principal modal fix (drop the ignored typed name) | **DONE** (confirm dialog; Rule-A mirror vs principal name+email) | `c5b7b819` | none |
 | CT-5 | Source-type sync: service whitelist = `ck_ca_source`; FE union/labels; source+priority filters | **DONE** (suite 2257/0/0, live probe 3/3) | `fd8e23b2` | none |
 | CT-6 | CAPA register export.xlsx + source deep-links | **DONE** (suite 2262/0/0, vitest 49/49, probe 5/5: PK magic, rows==register, EXPORT audit row; chips → owning tabs via isEsgTab-guarded map) | `0ec39323` | none |
-| GF-1 | `portfolio_green_impact` rollup (Σ instruments, dedup by project) | **NOT STARTED** | — | none |
-| GF-2 | Green-finance evidence linkage + ISAE assurance-lineage inclusion | **DONE** (suite 2266/0/0, probe 12/12: FK+link row, PARTIAL→COMPLETE, readiness 53.3→60.0, CARBON_CREDIT arm; §5 #2/#3 as recommended; ⚠ COLLATE DATABASE_DEFAULT on green arms — mixed-collation dev DB) | _(this branch)_ | **V298** (applied ×2) |
+| GF-1 | `portfolio_green_impact` rollup (Σ instruments, dedup by project) | **DONE** (suite 2269/0/0 incl. 3 dedup tests, probe 6/6: 60/60 → 500 not 600, 250/250 pro-rata, pyodbc match) | _(this branch)_ | none |
+| GF-2 | Green-finance evidence linkage + ISAE assurance-lineage inclusion | **DONE** (suite 2266/0/0, probe 12/12: FK+link row, PARTIAL→COMPLETE, readiness 53.3→60.0, CARBON_CREDIT arm; §5 #2/#3 as recommended; ⚠ COLLATE DATABASE_DEFAULT on green arms — mixed-collation dev DB) | `3e277362` | **V298** (applied ×2) |
 | GF-3 | Dashboard KPI completion (allocation %, S1/S2 %, permits ≤90d, trajectory) | **NOT STARTED** | — | none |
 | GF-4 | Hijri display on instrument issue/maturity dates | **NOT STARTED** | — | none |
-| GF-5 | `prospectus_ref` field on instruments (REG-8 completion) | **SCHEMA DONE** (column + entity mapping shipped with GF-2; DTO/FE exposure pending) | — | rides V298 |
+| GF-5 | `prospectus_ref` field on instruments (REG-8 completion) | **DONE** (create DTO + form field + register column + report-export line; round-trip proven live) | _(this branch)_ | rides V298 |
 | GF-6 | CBAM embedded-tCO₂e derivation helper from GHG records | **NOT STARTED** | — | none |
 
 Reserved migrations: **V297** (CAPA `action_type`) · **V298** (green-finance evidence FKs +

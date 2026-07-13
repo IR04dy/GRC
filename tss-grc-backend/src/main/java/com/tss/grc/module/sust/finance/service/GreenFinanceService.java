@@ -5,7 +5,10 @@ import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateInstrumentRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateProjectRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateReportRequest;
+import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.InstrumentContribution;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.InstrumentSummaryResponse;
+import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.PortfolioImpactResponse;
+import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.ProjectAttribution;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.ProposeAllocationRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.TransitionInstrumentRequest;
 import com.tss.grc.module.sust.finance.entity.AllocationReport;
@@ -79,6 +82,7 @@ public class GreenFinanceService {
         e.setNameAr(r.nameAr());
         e.setIsin(r.isin());
         e.setListing(r.listing());
+        e.setProspectusRef(r.prospectusRef());
         e.setIssueDate(r.issueDate());
         e.setMaturityDate(r.maturityDate());
         e.setAmountSarMn(r.amountSarMn());
@@ -274,6 +278,80 @@ public class GreenFinanceService {
             approved, pending, estimateBasis);
     }
 
+    /**
+     * GF-1 (plan §4.2 last formula) — org-level attributed impact across ALL
+     * instruments with double-count protection: per project, the summed
+     * instrument shares are capped at 1 ({@link GreenFinanceMath#dedupFactor}),
+     * and each instrument's contribution is scaled pro-rata — a project financed
+     * by two sukuk delivers its impact once, split between them. APPROVED
+     * allocations only (the same population as the per-instrument summary).
+     */
+    @Transactional(readOnly = true)
+    public PortfolioImpactResponse portfolioImpact() {
+        Long org = org();
+        List<GreenInstrument> instrs =
+            instruments.findByOrganisationIdAndIsDeletedFalseOrderByInstrumentCodeAsc(org);
+
+        // project id -> (instrument id -> summed raw share), insertion-ordered.
+        Map<Long, Map<Long, BigDecimal>> sharesByProject = new java.util.LinkedHashMap<>();
+        Map<Long, GreenProject> projById = new java.util.HashMap<>();
+        Map<Long, GreenInstrument> instrById = new java.util.LinkedHashMap<>();
+        for (GreenInstrument gi : instrs) {
+            instrById.put(gi.getId(), gi);
+            for (InstrumentAllocation a : allocations
+                    .findByOrganisationIdAndInstrumentIdAndIsDeletedFalseOrderByAllocationDateAsc(org, gi.getId())) {
+                if (!"APPROVED".equals(a.getStatus())) continue;
+                GreenProject p = projById.computeIfAbsent(a.getProjectId(),
+                    pid -> projects.findByOrganisationIdAndIdAndIsDeletedFalse(org, pid).orElse(null));
+                if (p == null) continue;
+                BigDecimal share = GreenFinanceMath.projectShare(a.getAmountSarMn(), p.getTotalCostSarMn());
+                sharesByProject.computeIfAbsent(p.getId(), k -> new java.util.LinkedHashMap<>())
+                    .merge(gi.getId(), share, BigDecimal::add);
+            }
+        }
+
+        Map<Long, BigDecimal[]> contrib = new java.util.LinkedHashMap<>();   // instr -> {tco2e, mwh, water}
+        List<ProjectAttribution> byProject = new java.util.ArrayList<>();
+        boolean estimateBasis = false;
+        int capped = 0;
+
+        for (Map.Entry<Long, Map<Long, BigDecimal>> e : sharesByProject.entrySet()) {
+            GreenProject p = projById.get(e.getKey());
+            BigDecimal rawSum = e.getValue().values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal factor = GreenFinanceMath.dedupFactor(rawSum);
+            boolean dedup = factor.compareTo(BigDecimal.ONE) < 0;
+            if (dedup) capped++;
+            if ("ESTIMATE".equals(p.getActualImpactBasis())) estimateBasis = true;
+            byProject.add(new ProjectAttribution(p.getId(), p.getProjectCode(),
+                rawSum.setScale(4, java.math.RoundingMode.HALF_UP),
+                (dedup ? BigDecimal.ONE : rawSum).setScale(4, java.math.RoundingMode.HALF_UP),
+                dedup));
+            for (Map.Entry<Long, BigDecimal> se : e.getValue().entrySet()) {
+                BigDecimal effectiveShare = se.getValue().multiply(factor);
+                BigDecimal[] c = contrib.computeIfAbsent(se.getKey(),
+                    k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
+                c[0] = c[0].add(GreenFinanceMath.attributedImpact(effectiveShare, p.getActualTco2eAvoidedYr()));
+                c[1] = c[1].add(GreenFinanceMath.attributedImpact(effectiveShare, p.getActualMwhRenewableYr()));
+                c[2] = c[2].add(GreenFinanceMath.attributedImpact(effectiveShare, p.getActualWaterM3SavedYr()));
+            }
+        }
+
+        // Totals are the sum of the per-instrument slices, so the breakdown
+        // always reconciles with the headline figures.
+        BigDecimal tco2e = BigDecimal.ZERO, mwh = BigDecimal.ZERO, water = BigDecimal.ZERO;
+        List<InstrumentContribution> byInstrument = new java.util.ArrayList<>();
+        for (Map.Entry<Long, BigDecimal[]> ce : contrib.entrySet()) {
+            GreenInstrument gi = instrById.get(ce.getKey());
+            BigDecimal[] c = ce.getValue();
+            tco2e = tco2e.add(c[0]); mwh = mwh.add(c[1]); water = water.add(c[2]);
+            byInstrument.add(new InstrumentContribution(
+                gi.getId(), gi.getInstrumentCode(), c[0], c[1], c[2]));
+        }
+
+        return new PortfolioImpactResponse(tco2e, mwh, water, estimateBasis,
+            sharesByProject.size(), capped, byInstrument, byProject);
+    }
+
     // ── post-issuance reports (G2, plan §4.1 / REG-7) ────────────────────
 
     @Transactional(readOnly = true)
@@ -347,6 +425,7 @@ public class GreenFinanceService {
             java.util.List.of(ar ? "الأداة" : "Instrument", instr.getInstrumentCode() + " — "
                 + (ar && instr.getNameAr() != null ? instr.getNameAr() : instr.getNameEn())),
             java.util.List.of(ar ? "النوع" : "Type", instr.getInstrumentType()),
+            java.util.List.of(ar ? "مرجع نشرة الإصدار" : "Prospectus ref", str(instr.getProspectusRef())),
             java.util.List.of(ar ? "فترة التقرير" : "Reporting period", String.valueOf(rep.getPeriodYear())),
             java.util.List.of(ar ? "نوع التقرير" : "Report type", rep.getReportType()),
             java.util.List.of(ar ? "المخصص (م ر.س)" : "Allocated (SAR mn)", str(rep.getAllocatedSarMn())),
