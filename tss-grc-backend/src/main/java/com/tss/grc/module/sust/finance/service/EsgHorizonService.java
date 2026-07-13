@@ -18,6 +18,8 @@ import com.tss.grc.module.sust.finance.repository.EsgTargetActualRepository;
 import com.tss.grc.module.sust.finance.repository.EsgTargetMilestoneRepository;
 import com.tss.grc.module.sust.finance.repository.EsgTargetRepository;
 import com.tss.grc.module.sust.finance.repository.IfrsRequirementRepository;
+import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
+import com.tss.grc.module.sust.ghg.repository.GhgEmissionRecordRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -53,6 +55,8 @@ public class EsgHorizonService {
     private final EnvPermitRepository permits;
     private final EnvPermitViolationRepository violations;
     private final CbamLineRepository cbam;
+    // GF-6 — the derive-from-GHG helper reads the tenant's verified inventory.
+    private final GhgEmissionRecordRepository ghgRecords;
     private final CorrectiveActionRepository capas;
     private final AuditLogService audit;
 
@@ -317,6 +321,51 @@ public class EsgHorizonService {
     @Transactional(readOnly = true)
     public List<CbamLine> listCbam() {
         return cbam.findByOrganisationIdAndIsDeletedFalseOrderByPeriodYearDescPeriodQuarterDesc(org());
+    }
+
+    /** GF-6 — derivation result: the suggested factor + a full echo of the inputs. */
+    public record CbamDerivation(Integer year, BigDecimal sharePct, BigDecimal productionTonnes,
+                                 BigDecimal totalS1S2Tco2e, int recordsCounted,
+                                 BigDecimal factorTco2ePerTonne, String dataBasisNote) {}
+
+    /**
+     * GF-6 (plan §5.7) — optional assist, never a mandate: suggest the embedded
+     * factor from the tenant's own inventory,
+     * {@code (Σ VERIFIED/APPROVED S1+S2 of :year × sharePct) / productionTonnes},
+     * with the share and tonnes supplied by the user. The returned
+     * {@code dataBasisNote} spells out every input so an auditor can reproduce
+     * the figure; the FE persists it on the CBAM line. Manual entry stays the
+     * default ({@code dataBasis} MEASURED|DEFAULT_VALUES is untouched).
+     */
+    @Transactional(readOnly = true)
+    public CbamDerivation cbamDerive(int year, BigDecimal sharePct, BigDecimal productionTonnes) {
+        if (sharePct == null || sharePct.signum() <= 0 || sharePct.compareTo(BigDecimal.valueOf(100)) > 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sharePct must be in (0, 100]");
+        if (productionTonnes == null || productionTonnes.signum() <= 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "productionTonnes must be > 0");
+
+        BigDecimal total = BigDecimal.ZERO;
+        int counted = 0;
+        for (GhgEmissionRecord r : ghgRecords.findByOrganisationIdAndReportingYear(org(), (short) year)) {
+            if (r.getScope() == null || r.getScope() > 2) continue;                    // S1 + S2 only
+            if (!"VERIFIED".equals(r.getStatus()) && !"APPROVED".equals(r.getStatus())) continue;
+            if (r.getEmissionValueTco2e() != null) { total = total.add(r.getEmissionValueTco2e()); counted++; }
+        }
+
+        BigDecimal factor = deriveCbamFactor(total, sharePct, productionTonnes);
+        String note = "Derived from GHG inventory " + year + ": " + total.toPlainString()
+            + " tCO2e (S1+S2, VERIFIED/APPROVED, " + counted + " records) x "
+            + sharePct.toPlainString() + "% / " + productionTonnes.toPlainString() + " t";
+        return new CbamDerivation(year, sharePct, productionTonnes,
+            total.setScale(4, RoundingMode.HALF_UP), counted, factor, note);
+    }
+
+    /** Pure GF-6 math: {@code total × share% / tonnes}, 6 dp (the factor column's scale). */
+    static BigDecimal deriveCbamFactor(BigDecimal totalS1S2, BigDecimal sharePct, BigDecimal productionTonnes) {
+        return totalS1S2.multiply(sharePct, MC)
+            .divide(BigDecimal.valueOf(100), MC)
+            .divide(productionTonnes, MC)
+            .setScale(6, RoundingMode.HALF_UP);
     }
 
     @Transactional

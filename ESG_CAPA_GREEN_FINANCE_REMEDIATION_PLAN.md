@@ -26,15 +26,17 @@
 | CT-6 | CAPA register export.xlsx + source deep-links | **DONE** (suite 2262/0/0, vitest 49/49, probe 5/5: PK magic, rows==register, EXPORT audit row; chips → owning tabs via isEsgTab-guarded map) | `0ec39323` | none |
 | GF-1 | `portfolio_green_impact` rollup (Σ instruments, dedup by project) | **DONE** (suite 2269/0/0 incl. 3 dedup tests, probe 6/6: 60/60 → 500 not 600, 250/250 pro-rata, pyodbc match) | `70cda039` | none |
 | GF-2 | Green-finance evidence linkage + ISAE assurance-lineage inclusion | **DONE** (suite 2266/0/0, probe 12/12: FK+link row, PARTIAL→COMPLETE, readiness 53.3→60.0, CARBON_CREDIT arm; §5 #2/#3 as recommended; ⚠ COLLATE DATABASE_DEFAULT on green arms — mixed-collation dev DB) | `3e277362` | **V298** (applied ×2) |
-| GF-3 | Dashboard KPI completion (allocation %, S1/S2 %, permits ≤90d, trajectory) | **DONE** (dashboard `horizon` object; probes 9/9 + non-zero 80/200→40%; IFRS 57.1==pyodbc; §5 #4 as recommended: ESG Dashboard strip + /green-finance mirror) | _(this branch)_ | none |
-| GF-4 | Hijri display on instrument issue/maturity dates | **DONE** (DualDate via shared formatHijri; form date inputs w/ Hijri tooltip preview; round-trip + Intl output proven: ١٦ محرم ١٤٤٨ هـ) | _(this branch)_ | none |
+| GF-3 | Dashboard KPI completion (allocation %, S1/S2 %, permits ≤90d, trajectory) | **DONE** (dashboard `horizon` object; probes 9/9 + non-zero 80/200→40%; IFRS 57.1==pyodbc; §5 #4 as recommended: ESG Dashboard strip + /green-finance mirror) | `cd0c0248` | none |
+| GF-4 | Hijri display on instrument issue/maturity dates | **DONE** (DualDate via shared formatHijri; form date inputs w/ Hijri tooltip preview; round-trip + Intl output proven: ١٦ محرم ١٤٤٨ هـ) | `cd0c0248` | none |
 | GF-5 | `prospectus_ref` field on instruments (REG-8 completion) | **DONE** (create DTO + form field + register column + report-export line; round-trip proven live) | `70cda039` | rides V298 |
-| GF-6 | CBAM embedded-tCO₂e derivation helper from GHG records | **NOT STARTED** | — | none |
+| GF-6 | CBAM embedded-tCO₂e derivation helper from GHG records | **DONE** (suite 2272/0/0 incl. 3 math/filter tests; probe 9/9: factor 33.20625 == pyodbc over 5 attested records, note persisted; ⚠ took **V299** `data_basis_note` — the §0 "none" was a planning-time guess, the target design requires persisting the inputs) | _(this branch)_ | **V299** (applied ×2) |
 
-Reserved migrations: **V297** (CAPA `action_type`) · **V298** (green-finance evidence FKs +
-`prospectus_ref`) — **both APPLIED to dev ×2**. Next free: V299.
-Open decisions: **§5** — #1 (preventive manual-only), #2 (lineage = projects + credits) and
-#3 (verified = n/a) resolved as recommended; #4 (KPI placement) pending at GF-3.
+**ALL 12 EPICS DONE (2026-07-13).** Migrations: **V297** (CAPA `action_type`) · **V298**
+(green-finance evidence FKs + `prospectus_ref`) · **V299** (CBAM `data_basis_note`, unplanned
+rider for GF-6) — all APPLIED to dev ×2; prod picks them up via Flyway on the next jar. Next
+free: V300. Open decisions **§5**: all four resolved as recommended (#1 preventive manual-only,
+#2 lineage = projects + credits, #3 verified = n/a, #4 ESG Dashboard strip + /green-finance
+mirror). Branch `feat/esg-capa-remediation` awaits the explicit "merge".
 
 ---
 

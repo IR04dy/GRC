@@ -34,6 +34,9 @@ public class CbamLine extends BaseEntity {
     @Column(name = "eu_importer", length = 200) private String euImporter;
     /** MEASURED | DEFAULT_VALUES. */
     @Column(name = "data_basis", nullable = false, length = 30) private String dataBasis = "MEASURED";
+    /** GF-6 (V299) — audit trail of a derived factor: the GHG-inventory inputs
+     *  (year, S1+S2 total, share %, tonnes) that produced embeddedTco2ePerTonne. */
+    @Column(name = "data_basis_note", length = 500) private String dataBasisNote;
     /** DRAFT | REPORTED. */
     @Column(nullable = false, length = 15) private String status = "DRAFT";
 }

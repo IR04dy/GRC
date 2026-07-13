@@ -305,6 +305,7 @@ export function EnvComplianceTab() {
   const [cForm, setCForm] = useState({
     cnGroup: 'ALUMINIUM', productDescEn: '', periodYear: String(new Date().getFullYear()),
     periodQuarter: '1', exportVolumeTonnes: '', embeddedTco2ePerTonne: '',
+    dataBasisNote: '',   // GF-6 — set by Derive…, cleared on manual factor edits
   });
 
   const load = useCallback(async () => {
@@ -357,11 +358,35 @@ export function EnvComplianceTab() {
         periodYear: Number(cForm.periodYear), periodQuarter: Number(cForm.periodQuarter),
         exportVolumeTonnes: Number(cForm.exportVolumeTonnes),
         embeddedTco2ePerTonne: Number(cForm.embeddedTco2ePerTonne),
+        dataBasisNote: cForm.dataBasisNote || undefined,   // GF-6 audit trail
       });
       toast.success(isAr ? 'أُضيف سطر CBAM' : 'CBAM line added');
-      setCForm(f => ({ ...f, productDescEn: '', exportVolumeTonnes: '', embeddedTco2ePerTonne: '' }));
+      setCForm(f => ({ ...f, productDescEn: '', exportVolumeTonnes: '', embeddedTco2ePerTonne: '', dataBasisNote: '' }));
       await load();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Create failed'); }
+  }
+
+  /**
+   * GF-6 — optional assist: derive the embedded factor from the tenant's own
+   * VERIFIED/APPROVED S1+S2 inventory. The user supplies the production line's
+   * share and tonnes; the server echoes every input in a note persisted with
+   * the line, so the figure stays reproducible. Manual entry remains default.
+   */
+  async function deriveCbam() {
+    const share = prompt(isAr
+      ? `حصة خط الإنتاج من انبعاثات S1+S2 لسنة ${cForm.periodYear} (%):`
+      : `Production line's share of ${cForm.periodYear} S1+S2 emissions (%):`, '10');
+    if (!share) return;
+    const tonnes = prompt(isAr ? 'إنتاج الفترة (طن):' : 'Production tonnes for the period:',
+      cForm.exportVolumeTonnes || '');
+    if (!tonnes) return;
+    try {
+      const d = await esgHorizonApi.cbamDerive(Number(cForm.periodYear), Number(share), Number(tonnes));
+      setCForm(f => ({ ...f, embeddedTco2ePerTonne: String(d.factorTco2ePerTonne), dataBasisNote: d.dataBasisNote }));
+      toast.success(isAr
+        ? `العامل المشتق ${d.factorTco2ePerTonne} tCO₂e/طن (من ${d.recordsCounted} سجلاً معتمداً)`
+        : `Derived ${d.factorTco2ePerTonne} tCO₂e/t (from ${d.recordsCounted} attested records)`);
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Derive failed'); }
   }
 
   return (
@@ -417,8 +442,16 @@ export function EnvComplianceTab() {
               placeholder={isAr ? 'المنتج' : 'Product'} style={{ ...INPUT, minWidth: 150 }} />
             <input type="number" value={cForm.exportVolumeTonnes} onChange={e => setCForm(f => ({ ...f, exportVolumeTonnes: e.target.value }))}
               placeholder={isAr ? 'الحجم (طن)' : 'Volume (t)'} style={{ ...INPUT, minWidth: 85 }} />
-            <input type="number" value={cForm.embeddedTco2ePerTonne} onChange={e => setCForm(f => ({ ...f, embeddedTco2ePerTonne: e.target.value }))}
-              placeholder="tCO₂e/t" style={{ ...INPUT, minWidth: 80 }} />
+            <input type="number" value={cForm.embeddedTco2ePerTonne}
+              // A manual edit invalidates the derivation trail — the note only
+              // ever describes the figure actually saved.
+              onChange={e => setCForm(f => ({ ...f, embeddedTco2ePerTonne: e.target.value, dataBasisNote: '' }))}
+              placeholder="tCO₂e/t" style={{ ...INPUT, minWidth: 80 }}
+              title={cForm.dataBasisNote || undefined} />
+            <Button size="sm" variant="ghost" Icon={RefreshCw} onClick={() => void deriveCbam()}
+              title={isAr ? 'اشتقاق من سجل الانبعاثات (S1+S2 المعتمدة)' : 'Derive from GHG inventory (attested S1+S2)'}>
+              {isAr ? 'اشتقاق…' : 'Derive…'}
+            </Button>
             <Button size="sm" variant="primary" Icon={Plus} onClick={() => void createCbam()}>{isAr ? 'إضافة' : 'Add'}</Button>
           </div>
         }>
@@ -447,7 +480,9 @@ export function EnvComplianceTab() {
                     <td className="mono text-2xs">{fmt(c.exportVolumeTonnes)}</td>
                     <td className="mono text-2xs">{fmt(c.embeddedTco2ePerTonne)}</td>
                     <td className="mono text-2xs">{fmt(c.totalEmbeddedTco2e)}</td>
-                    <td className="text-2xs">{c.dataBasis}</td>
+                    <td className="text-2xs" title={c.dataBasisNote ?? undefined}>
+                      {c.dataBasis}{c.dataBasisNote ? ' ⓘ' : ''}
+                    </td>
                   </tr>
                 ))}
               </tbody>

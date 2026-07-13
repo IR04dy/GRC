@@ -3124,6 +3124,13 @@ export interface EnvViolationDto {
 export interface CbamLineDto {
   id: number; cnGroup: string; productDescEn: string; periodYear: number; periodQuarter: number;
   exportVolumeTonnes: number; embeddedTco2ePerTonne: number; totalEmbeddedTco2e: number; dataBasis: string;
+  dataBasisNote?: string | null;   // GF-6 (V299) — derive-from-GHG audit trail
+}
+/** GF-6 — derive-from-GHG suggestion: the factor + a full echo of the inputs. */
+export interface CbamDerivationDto {
+  year: number; sharePct: number; productionTonnes: number;
+  totalS1S2Tco2e: number; recordsCounted: number;
+  factorTco2ePerTonne: number; dataBasisNote: string;
 }
 export const esgHorizonApi = {
   targets:      () => api.get<EsgTargetViewDto[]>('/api/v1/sustainability/horizon/targets'),
@@ -3153,6 +3160,9 @@ export const esgHorizonApi = {
   createCbam:   (b: Record<string, unknown>) => api.post('/api/v1/sustainability/horizon/cbam', b),
   cbamSummary:  () => api.get<{ totalEmbeddedTco2e: number; byGroup: Record<string, number>; lines: number }>(
     '/api/v1/sustainability/horizon/cbam/summary'),
+  cbamDerive:   (year: number, sharePct: number, productionTonnes: number) =>
+    api.get<CbamDerivationDto>(
+      `/api/v1/sustainability/horizon/cbam/derive?year=${year}&sharePct=${sharePct}&productionTonnes=${productionTonnes}`),
   // V295 — ISAE 3410 assurance-lineage view
   assuranceLineage: (year: number) =>
     api.get<AssuranceLineageDto>(`/api/v1/sustainability/horizon/assurance-lineage?year=${year}`),

@@ -209,7 +209,9 @@ public class EsgHorizonController {
         @NotNull @DecimalMin("0.0001") BigDecimal exportVolumeTonnes,
         @NotNull @DecimalMin("0") BigDecimal embeddedTco2ePerTonne,
         @Size(max = 200) String euImporter,
-        @Pattern(regexp = "MEASURED|DEFAULT_VALUES") String dataBasis) {}
+        @Pattern(regexp = "MEASURED|DEFAULT_VALUES") String dataBasis,
+        /** GF-6 — audit note carrying the derive-from-GHG inputs (optional). */
+        @Size(max = 500) String dataBasisNote) {}
 
     @GetMapping("/cbam")
     @PreAuthorize(READ_GUARD)
@@ -232,6 +234,21 @@ public class EsgHorizonController {
         c.setEmbeddedTco2ePerTonne(r.embeddedTco2ePerTonne());
         if (r.euImporter() != null) c.setEuImporter(r.euImporter());
         if (r.dataBasis() != null) c.setDataBasis(r.dataBasis());
+        if (r.dataBasisNote() != null) c.setDataBasisNote(r.dataBasisNote());
         return service.createCbamLine(c);
+    }
+
+    /**
+     * GF-6 — suggest the embedded factor from the tenant's verified inventory:
+     * {@code (Σ VERIFIED/APPROVED S1+S2 of :year × sharePct) / productionTonnes}.
+     * Read-only assist; the caller decides whether to use it.
+     */
+    @GetMapping("/cbam/derive")
+    @PreAuthorize(READ_GUARD)
+    public EsgHorizonService.CbamDerivation cbamDerive(
+            @RequestParam int year,
+            @RequestParam BigDecimal sharePct,
+            @RequestParam BigDecimal productionTonnes) {
+        return service.cbamDerive(year, sharePct, productionTonnes);
     }
 }
