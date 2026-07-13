@@ -18,11 +18,11 @@
 
 | Epic | Content | Status | Commit | Migration |
 |---|---|---|---|---|
-| CT-1 | CAPA edit modal + evidence attach (unblocks Rule B — the loop can close) | **NOT STARTED** | — | none |
+| CT-1 | CAPA edit modal + evidence attach (unblocks Rule B — the loop can close) | **DONE** (tsc/vitest green, live probe 10/10) | _(this branch)_ | none |
 | CT-2 | "New action" button — manual CAR creation from the tab | **NOT STARTED** | — | none |
 | CT-3 | CAR/PAR: `action_type` CORRECTIVE \| PREVENTIVE + FE select/filter/badge | **NOT STARTED** | — | **V297** |
 | CT-4 | Verify-as-principal modal fix (drop the ignored typed name) | **NOT STARTED** | — | none |
-| CT-5 | Source-type sync: service whitelist = `ck_ca_source`; FE union/labels; source+priority filters | **DONE** (awaiting full-suite gate) | _(feat/esg-capa-remediation)_ | none |
+| CT-5 | Source-type sync: service whitelist = `ck_ca_source`; FE union/labels; source+priority filters | **DONE** (suite 2257/0/0, live probe 3/3) | `fd8e23b2` | none |
 | CT-6 | CAPA register export.xlsx + source deep-links | **NOT STARTED** | — | none |
 | GF-1 | `portfolio_green_impact` rollup (Σ instruments, dedup by project) | **NOT STARTED** | — | none |
 | GF-2 | Green-finance evidence linkage + ISAE assurance-lineage inclusion | **NOT STARTED** | — | **V298** |

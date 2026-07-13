@@ -41,7 +41,7 @@ import {
   type ReportType, type RyStatus,
 } from '../../lib/sustainabilityAnnex';
 import {
-  listCapas, capaAggregate,
+  listCapas, capaAggregate, updateCapa,
   startCapa, completeCapa, verifyCapa, closeCapa, cancelCapa,
   capaStatusTone, capaPriorityTone, capaAllowedNext,
   canComplete, capaSourceLabel, capaStatusLabel, capaPriorityLabel,
@@ -637,6 +637,10 @@ function CapaTab() {
   // name, mirrors Rule A as you type, and stays in the same window so the
   // user can see the action they're verifying.
   const [verifyingAction, setVerifyingAction] = useState<CorrectiveAction | null>(null);
+  // CT-1 — edit modal state. Auto-CAPAs are born without evidence/owner/plan;
+  // this modal is the only in-product way to fill them (evidenceRef unblocks
+  // Rule B, so the lifecycle can actually reach COMPLETED).
+  const [editCapa, setEditCapa] = useState<CorrectiveAction | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -701,6 +705,88 @@ function CapaTab() {
                   : 'Verifier name (must differ from owner)',
       placeholder: isAr ? 'مثال: لينا الحربي (مدير المخاطر)' : 'e.g. Lina Al-Harbi (Risk Manager)' },
   ];
+
+  // CT-1 — full editable definition for a non-terminal action. Lifecycle
+  // fields (status, timestamps, verifier) stay owned by the transitions.
+  const editFields: FieldDef[] = [
+    { kind: 'select', key: 'priority', required: true, span: 4,
+      label: isAr ? 'الأولوية' : 'Priority',
+      options: (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const)
+        .map(p => ({ value: p, label: capaPriorityLabel(p, isAr ? 'ar' : 'en') })) },
+    { kind: 'date', key: 'targetDate', span: 4,
+      label: isAr ? 'تاريخ الاستحقاق' : 'Target date' },
+    { kind: 'text', key: 'assignedTo', span: 4,
+      label: isAr ? 'مُسند إلى' : 'Assigned to' },
+    { kind: 'text', key: 'ownerName', span: 6,
+      label: isAr ? 'المالك' : 'Owner' },
+    { kind: 'text', key: 'ownerEmail', span: 6,
+      label: isAr ? 'بريد المالك' : 'Owner email' },
+    { kind: 'text', key: 'evidenceRef', span: 12,
+      label: isAr ? 'مرجع الدليل (مطلوب قبل الإكمال — القاعدة B)'
+                  : 'Evidence ref (required before Complete — Rule B)' },
+    { kind: 'textarea', key: 'rootCauseEn', span: 6, rows: 2,
+      label: isAr ? 'السبب الجذري (إنجليزي)' : 'Root cause (English)' },
+    { kind: 'textarea', key: 'rootCauseAr', span: 6, rows: 2,
+      label: isAr ? 'السبب الجذري (عربي)' : 'Root cause (Arabic)' },
+    { kind: 'textarea', key: 'remediationPlanEn', span: 6, rows: 2,
+      label: isAr ? 'خطة المعالجة (إنجليزي)' : 'Remediation plan (English)' },
+    { kind: 'textarea', key: 'remediationPlanAr', span: 6, rows: 2,
+      label: isAr ? 'خطة المعالجة (عربي)' : 'Remediation plan (Arabic)' },
+    { kind: 'number', key: 'costEstimateSar', span: 4,
+      label: isAr ? 'الكلفة التقديرية (ر.س)' : 'Cost estimate (SAR)' },
+    { kind: 'number', key: 'effortHours', span: 4,
+      label: isAr ? 'المجهود (ساعات)' : 'Effort (hours)' },
+    { kind: 'textarea', key: 'notes', span: 12, rows: 2,
+      label: isAr ? 'ملاحظات' : 'Notes' },
+  ];
+
+  const editInitial = useMemo<Record<string, unknown>>(() => ({
+    priority:          editCapa?.priority ?? 'MEDIUM',
+    targetDate:        editCapa?.targetDate ?? '',
+    assignedTo:        editCapa?.assignedTo ?? '',
+    ownerName:         editCapa?.ownerName ?? '',
+    ownerEmail:        editCapa?.ownerEmail ?? '',
+    evidenceRef:       editCapa?.evidenceRef ?? '',
+    rootCauseEn:       editCapa?.rootCauseEn ?? '',
+    rootCauseAr:       editCapa?.rootCauseAr ?? '',
+    remediationPlanEn: editCapa?.remediationPlanEn ?? '',
+    remediationPlanAr: editCapa?.remediationPlanAr ?? '',
+    costEstimateSar:   editCapa?.costEstimateSar != null ? String(editCapa.costEstimateSar) : '',
+    effortHours:       editCapa?.effortHours != null ? String(editCapa.effortHours) : '',
+    notes:             editCapa?.notes ?? '',
+  }), [editCapa]);
+
+  async function submitEdit(values: Record<string, unknown>) {
+    if (!editCapa?.id) return;
+    const str = (v: unknown) => { const s = String(v ?? '').trim(); return s || undefined; };
+    const num = (v: unknown) => {
+      const n = Number(v);
+      return v === '' || v == null || !Number.isFinite(n) ? undefined : n;
+    };
+    try {
+      await updateCapa(editCapa.id, {
+        priority:          (str(values.priority) as CapaPrio) ?? 'MEDIUM',
+        targetDate:        str(values.targetDate),
+        assignedTo:        str(values.assignedTo),
+        ownerName:         str(values.ownerName),
+        ownerEmail:        str(values.ownerEmail),
+        evidenceRef:       str(values.evidenceRef),
+        rootCauseEn:       str(values.rootCauseEn),
+        rootCauseAr:       str(values.rootCauseAr),
+        remediationPlanEn: str(values.remediationPlanEn),
+        remediationPlanAr: str(values.remediationPlanAr),
+        costEstimateSar:   num(values.costEstimateSar),
+        effortHours:       num(values.effortHours),
+        notes:             str(values.notes),
+      });
+      toast.success(isAr ? 'حُدّث الإجراء' : 'Action updated');
+      setEditCapa(null);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر تحديث الإجراء' : 'Failed to update action'));
+    }
+  }
 
   return (
     <div className="esg-stack">
@@ -843,6 +929,12 @@ function CapaTab() {
                         <td className="text-xs">{a.ownerName ?? '—'}</td>
                         <td className="esg-text-end">
                           <div className="esg-actions-row">
+                            {/* CT-1 — edit any non-terminal action (server 409s terminal). */}
+                            {a.status !== 'CLOSED' && a.status !== 'CANCELLED' && (
+                              <Button variant="ghost" size="sm" Icon={Pencil}
+                                title={isAr ? 'تعديل' : 'Edit'}
+                                onClick={() => setEditCapa(a)} />
+                            )}
                             {allowed.includes('IN_PROGRESS') && (
                               <Button variant="secondary" size="sm" Icon={ArrowRight} onClick={() => onStart(a.id!)}>
                                 {isAr ? 'بدء' : 'Start'}
@@ -895,6 +987,21 @@ function CapaTab() {
         submitLabel={isAr ? 'تأكيد التحقّق' : 'Confirm verification'}
         onClose={() => setVerifyingAction(null)}
         onSubmit={submitVerify}
+      />
+
+      {/* CT-1 — edit modal: the in-product way to set owner/plan/evidence.
+          evidenceRef here is what unblocks Complete (Rule B). */}
+      <FormModal
+        open={editCapa !== null}
+        title={editCapa
+          ? `${isAr ? 'تعديل الإجراء' : 'Edit action'} · ${editCapa.actionCode ?? `#${editCapa.id}`}`
+          : ''}
+        fields={editFields}
+        initial={editInitial}
+        size="lg"
+        submitLabel={isAr ? 'حفظ التغييرات' : 'Save changes'}
+        onClose={() => setEditCapa(null)}
+        onSubmit={submitEdit}
       />
     </div>
   );
