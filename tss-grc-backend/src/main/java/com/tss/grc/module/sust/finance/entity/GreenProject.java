@@ -78,4 +78,9 @@ public class GreenProject extends BaseEntity {
     /** PLANNED | ACTIVE | COMPLETED. */
     @Column(nullable = false, length = 20)
     private String status = "PLANNED";
+
+    /** GF-2 (V298) — primary linked evidence item (S-C bridge); the project's
+     *  actual-impact figures trace to this in the ISAE 3410 lineage view. */
+    @Column(name = "evidence_item_id")
+    private Long evidenceItemId;
 }

@@ -64,4 +64,10 @@ public class CarbonCredit extends BaseEntity {
 
     @Column(name = "certificate_ref", length = 200)
     private String certificateRef;
+
+    /** GF-2 (V298) — registry-certificate evidence item (S-C bridge). Retirement
+     *  keeps accepting the legacy {@code certificateRef} text but prefers this FK;
+     *  the lineage view treats either as evidence. */
+    @Column(name = "evidence_item_id")
+    private Long evidenceItemId;
 }

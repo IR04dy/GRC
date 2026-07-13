@@ -13,7 +13,21 @@ import java.util.List;
  * (object_type, code, name, has_data, has_evidence, verified). Evidence = the
  * V250 {@code evidence_item_id} FK or a legacy {@code evidence_ref}; "verified"
  * follows each object's own attestation state (GHG lifecycle, CMA/TCFD approval);
- * NULL where the concept doesn't apply (metrics, SGI).
+ * NULL where the concept doesn't apply (metrics, SGI, green finance).
+ *
+ * <p>GF-2 (V298) adds the green-finance figures: <b>GREEN_PROJECT</b> (ACTIVE/
+ * COMPLETED, year-agnostic like SGI; data = any actual-impact figure, evidence =
+ * the FK — projects have no legacy ref) and <b>CARBON_CREDIT</b> (RETIRED lots of
+ * the reporting year — offset claims belong to the year they are retired;
+ * evidence = certificate evidence item or the legacy {@code certificate_ref}).
+ * Instruments/allocations are linkable via the S-C bridge but stay out of the
+ * view (plan §5 decision #2 — projects + credits carry the disclosed figures).
+ *
+ * <p>The green arms carry explicit {@code COLLATE DATABASE_DEFAULT} labels: the
+ * green tables follow the database default collation while the older sust
+ * tables carry explicit-UTF8 columns, and a UNION ORDER BY across two implicit
+ * collations is a runtime error (hit live on dev). An explicit label beats an
+ * implicit one, so this resolves the mix — and is a no-op on a uniform DB.
  */
 public interface AssuranceLineageRepository extends Repository<EsgMetric, Long> {
 
@@ -59,6 +73,28 @@ public interface AssuranceLineageRepository extends Repository<EsgMetric, Long> 
                CAST(NULL AS INT)
         FROM sust.sgi_commitment s
         WHERE s.organisation_id = :org AND s.is_deleted = 0 AND s.status = 'ACTIVE'
+        UNION ALL
+        SELECT 'GREEN_PROJECT',
+               p.project_code COLLATE DATABASE_DEFAULT,
+               p.name_en COLLATE DATABASE_DEFAULT,
+               CASE WHEN p.actual_tco2e_avoided_yr IS NOT NULL OR p.actual_mwh_renewable_yr IS NOT NULL
+                         OR p.actual_water_m3_saved_yr IS NOT NULL
+                    THEN 1 ELSE 0 END,
+               CASE WHEN p.evidence_item_id IS NOT NULL THEN 1 ELSE 0 END,
+               CAST(NULL AS INT)
+        FROM sust.green_projects p
+        WHERE p.organisation_id = :org AND p.is_deleted = 0 AND p.status IN ('ACTIVE', 'COMPLETED')
+        UNION ALL
+        SELECT 'CARBON_CREDIT',
+               CONCAT('CC-', c.id) COLLATE DATABASE_DEFAULT,
+               CONCAT(c.registry, ' ', c.vintage_year, ' — ', COALESCE(c.project_type, 'credits')) COLLATE DATABASE_DEFAULT,
+               1,
+               CASE WHEN c.evidence_item_id IS NOT NULL OR NULLIF(c.certificate_ref, '') IS NOT NULL
+                    THEN 1 ELSE 0 END,
+               CAST(NULL AS INT)
+        FROM sust.carbon_credits c
+        WHERE c.organisation_id = :org AND c.is_deleted = 0 AND c.status = 'RETIRED'
+          AND YEAR(c.retirement_date) = :year
         ORDER BY object_type, code
         """, nativeQuery = true)
     List<Object[]> lineageRows(@Param("org") Long org, @Param("year") Short year);

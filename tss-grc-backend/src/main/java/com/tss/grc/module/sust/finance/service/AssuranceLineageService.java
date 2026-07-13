@@ -70,7 +70,8 @@ public class AssuranceLineageService {
         return new LineageResponse(year, total, complete, partial, missing, readiness, summaries, rows);
     }
 
-    static String grade(boolean hasData, boolean hasEvidence, Boolean verified) {
+    /** Pure grading rule — public so cross-package tests can pin the semantics. */
+    public static String grade(boolean hasData, boolean hasEvidence, Boolean verified) {
         if (!hasData) return "MISSING";
         if (!hasEvidence) return "PARTIAL";
         if (verified != null && !verified) return "PARTIAL";

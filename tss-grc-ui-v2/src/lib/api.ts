@@ -2989,6 +2989,7 @@ export interface GfInstrumentDto {
 export interface GfProjectDto {
   id: number; projectCode: string; nameEn: string; nameAr?: string | null; category: string;
   totalCostSarMn: number; actualTco2eAvoidedYr?: number | null; actualImpactBasis?: string; status: string;
+  evidenceItemId?: number | null;   // GF-2 (V298) — S-C bridge FK
 }
 export interface GfAllocationDto {
   id: number; instrumentId: number; projectId: number; amountSarMn: number;
@@ -3053,6 +3054,7 @@ export interface GpSummaryDto {
 export interface GpCreditDto {
   id: number; registry: string; serialRange: string; vintageYear: number;
   quantityTco2e: number; status: string; retirementDate?: string | null; retirementPurpose?: string | null;
+  evidenceItemId?: number | null;   // GF-2 (V298) — S-C bridge FK (prefers this over certificate_ref text)
 }
 export interface GpOverlayDto {
   scenarioId: number; scenarioType: string; scenarioLossRatePct: number;

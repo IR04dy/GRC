@@ -66,4 +66,8 @@ public class InstrumentAllocation extends BaseEntity {
 
     @Column(name = "rejection_reason", length = 500)
     private String rejectionReason;
+
+    /** GF-2 (V298) — primary linked evidence item (S-C bridge). */
+    @Column(name = "evidence_item_id")
+    private Long evidenceItemId;
 }

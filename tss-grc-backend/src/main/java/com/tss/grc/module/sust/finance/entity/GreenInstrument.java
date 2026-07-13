@@ -100,4 +100,12 @@ public class GreenInstrument extends BaseEntity {
 
     @Column(nullable = false, length = 20)
     private String status = "DRAFT";
+
+    /** GF-5 (V298, REG-8) — offering-document reference next to isin/listing. */
+    @Column(name = "prospectus_ref", length = 200)
+    private String prospectusRef;
+
+    /** GF-2 (V298) — primary linked evidence item (S-C bridge). */
+    @Column(name = "evidence_item_id")
+    private Long evidenceItemId;
 }

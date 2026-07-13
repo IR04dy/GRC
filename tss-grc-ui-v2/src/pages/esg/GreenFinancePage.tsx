@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Leaf, Landmark, ArrowRightLeft, FileBarChart2, Briefcase, Coins, Plus, RefreshCw,
-  Download, CheckCircle2, XCircle, TrendingUp,
+  Download, CheckCircle2, XCircle, TrendingUp, Paperclip,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import { Tabs } from '../../components/ui/Tabs';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -16,6 +17,8 @@ import {
   type GfInstrumentDto, type GfProjectDto, type GfAllocationDto, type GfSummaryDto,
   type GfReportDto, type GpAssetDto, type GpTaxonomyDto, type GpSummaryDto, type GpCreditDto,
 } from '../../lib/api';
+import { listEvidenceItems, type EvidenceItem } from '../../lib/evidenceItems';
+import { linkSustEvidence, type SustEvidenceEntityType } from '../../lib/sustEvidenceLinks';
 
 type TabId = 'instruments' | 'uop' | 'reports' | 'portfolio' | 'credits';
 
@@ -36,6 +39,78 @@ function tone(s: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' 
   }
 }
 const fmt = (n?: number | null) => n == null ? '—' : Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+/**
+ * GF-2 — attach-evidence chip (S-C bridge). Linked → a green paperclip badge
+ * (click to re-link); unlinked → a ghost paperclip button. The picker lists the
+ * tenant's evidence register; linking sets the row's evidence_item_id FK and
+ * records the generic evidence link the assurance package bundles.
+ */
+function EvidenceChip({ entityType, entityId, evidenceItemId, onLinked }: {
+  entityType: SustEvidenceEntityType; entityId: number;
+  evidenceItemId?: number | null; onLinked: () => void;
+}) {
+  const { lang } = useI18n(); const isAr = lang === 'ar'; const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<EvidenceItem[]>([]);
+  const [sel, setSel] = useState('');
+
+  async function openPicker() {
+    try {
+      const pg = await listEvidenceItems({ size: 200 });
+      setItems(pg.content);
+      setSel(evidenceItemId != null ? String(evidenceItemId) : '');
+      setOpen(true);
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر تحميل الأدلة' : 'Failed to load evidence register')); }
+  }
+
+  async function link() {
+    if (!sel) return;
+    try {
+      await linkSustEvidence(entityType, entityId, Number(sel));
+      toast.success(isAr ? 'رُبط الدليل' : 'Evidence linked');
+      setOpen(false);
+      onLinked();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر الربط' : 'Link failed')); }
+  }
+
+  return (
+    <>
+      {evidenceItemId != null
+        ? <button type="button"
+            style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer' }}
+            title={isAr ? 'دليل مرتبط — انقر للتغيير' : 'Evidence linked — click to change'}
+            onClick={() => void openPicker()}>
+            <Badge tone="success"><Paperclip size={10} /> #{evidenceItemId}</Badge>
+          </button>
+        : <Button size="sm" variant="ghost" Icon={Paperclip}
+            title={isAr ? 'ربط دليل' : 'Link evidence'}
+            onClick={() => void openPicker()} />}
+      {open && (
+        <Modal open size="sm"
+          title={isAr ? 'ربط دليل من سجل الأدلة' : 'Link evidence item'}
+          onClose={() => setOpen(false)}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setOpen(false)}>{isAr ? 'إلغاء' : 'Cancel'}</Button>
+              <Button variant="primary" Icon={Paperclip} disabled={!sel} onClick={() => void link()}>
+                {isAr ? 'ربط' : 'Link'}
+              </Button>
+            </>
+          }>
+          <select className="input" style={{ width: '100%' }} value={sel}
+            aria-label={isAr ? 'عنصر الدليل' : 'Evidence item'}
+            onChange={e => setSel(e.target.value)}>
+            <option value="">{isAr ? 'اختر عنصر دليل…' : 'Select an evidence item…'}</option>
+            {items.map(i => (
+              <option key={i.id} value={i.id}>#{i.id} · {i.titleEn} ({i.status})</option>
+            ))}
+          </select>
+        </Modal>
+      )}
+    </>
+  );
+}
 
 /**
  * Green Finance (الصكوك الخضراء والمحفظة الخضراء) — plan §6 UI family over the
@@ -350,6 +425,7 @@ function UopTab({ instruments }: { instruments: GfInstrumentDto[] }) {
                 <th>{isAr ? 'الرمز' : 'Code'}</th><th>{isAr ? 'الاسم' : 'Name'}</th>
                 <th>{isAr ? 'الفئة' : 'Category'}</th><th>{isAr ? 'التكلفة' : 'Cost (SAR mn)'}</th>
                 <th>tCO₂e/yr</th><th>{isAr ? 'الأساس' : 'Basis'}</th>
+                <th>{isAr ? 'الدليل' : 'Evidence'}</th>
               </tr></thead>
               <tbody>
                 {projects.map(p => (
@@ -360,6 +436,13 @@ function UopTab({ instruments }: { instruments: GfInstrumentDto[] }) {
                     <td className="mono text-2xs">{fmt(p.totalCostSarMn)}</td>
                     <td className="mono text-2xs">{fmt(p.actualTco2eAvoidedYr)}</td>
                     <td><Badge tone={p.actualImpactBasis === 'ESTIMATE' ? 'warning' : 'success'}>{p.actualImpactBasis ?? 'ACTUAL'}</Badge></td>
+                    <td>
+                      {/* GF-2 — the project's impact figures trace to this item
+                          in the ISAE 3410 lineage view. */}
+                      <EvidenceChip entityType="GreenProject" entityId={p.id}
+                        evidenceItemId={p.evidenceItemId}
+                        onLinked={() => void greenFinanceApi.projects().then(setProjects).catch(() => undefined)} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -612,7 +695,8 @@ function CreditsTab({ credits, reload }: { credits: GpCreditDto[]; reload: () =>
             <thead><tr>
               <th>{isAr ? 'السجل' : 'Registry'}</th><th>{isAr ? 'النطاق' : 'Serial'}</th>
               <th>{isAr ? 'سنة الإصدار' : 'Vintage'}</th><th>tCO₂e</th>
-              <th>{isAr ? 'الحالة' : 'Status'}</th><th>{isAr ? 'الغرض' : 'Purpose'}</th><th></th>
+              <th>{isAr ? 'الحالة' : 'Status'}</th><th>{isAr ? 'الغرض' : 'Purpose'}</th>
+              <th>{isAr ? 'الدليل' : 'Evidence'}</th><th></th>
             </tr></thead>
             <tbody>
               {credits.map(c => (
@@ -623,6 +707,12 @@ function CreditsTab({ credits, reload }: { credits: GpCreditDto[]; reload: () =>
                   <td className="mono text-2xs">{fmt(c.quantityTco2e)}</td>
                   <td><Badge tone={tone(c.status)} dot>{c.status}</Badge></td>
                   <td className="text-2xs">{c.retirementPurpose ?? '—'}</td>
+                  <td>
+                    {/* GF-2 — registry-certificate evidence; retirement prefers
+                        this FK over the legacy free-text certificate ref. */}
+                    <EvidenceChip entityType="CarbonCredit" entityId={c.id}
+                      evidenceItemId={c.evidenceItemId} onLinked={reload} />
+                  </td>
                   <td>
                     {c.status === 'PURCHASED' &&
                       <Button size="sm" variant="ghost" onClick={() => void retire(c)}>{isAr ? 'سحب' : 'Retire'}</Button>}

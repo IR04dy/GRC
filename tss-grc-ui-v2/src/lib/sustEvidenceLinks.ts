@@ -7,10 +7,12 @@
 
 import { api } from './api';
 
-/** The 6 ESG entity types the S-C bridge accepts (JPA class names). */
+/** The 11 ESG entity types the S-C bridge accepts (JPA class names) —
+ *  V250 six + V256 vendor survey + V298 the four green-finance objects (GF-2). */
 export type SustEvidenceEntityType =
   | 'GhgEmissionRecord' | 'CmaDisclosure' | 'TcfdItem'
-  | 'SgiCommitment' | 'ClimateRiskOpportunity' | 'EsgMetric';
+  | 'SgiCommitment' | 'ClimateRiskOpportunity' | 'EsgMetric' | 'VendorEsgSurvey'
+  | 'GreenProject' | 'GreenInstrument' | 'InstrumentAllocation' | 'CarbonCredit';
 
 export const SUST_EVIDENCE_ENTITY_TYPES: Array<{ value: SustEvidenceEntityType; en: string; ar: string }> = [
   { value: 'GhgEmissionRecord',      en: 'GHG record',        ar: 'سجل انبعاثات' },
@@ -19,6 +21,11 @@ export const SUST_EVIDENCE_ENTITY_TYPES: Array<{ value: SustEvidenceEntityType; 
   { value: 'SgiCommitment',          en: 'SGI commitment',    ar: 'التزام SGI' },
   { value: 'ClimateRiskOpportunity', en: 'Climate risk',      ar: 'مخاطرة مناخية' },
   { value: 'EsgMetric',              en: 'ESG metric',        ar: 'مؤشر ESG' },
+  { value: 'VendorEsgSurvey',        en: 'Vendor ESG survey', ar: 'استبيان استدامة مورد' },
+  { value: 'GreenProject',           en: 'Green project',     ar: 'مشروع أخضر' },
+  { value: 'GreenInstrument',        en: 'Green instrument',  ar: 'أداة تمويل أخضر' },
+  { value: 'InstrumentAllocation',   en: 'Proceeds allocation', ar: 'تخصيص متحصلات' },
+  { value: 'CarbonCredit',           en: 'Carbon credit',     ar: 'أرصدة كربونية' },
 ];
 
 export function linkSustEvidence(

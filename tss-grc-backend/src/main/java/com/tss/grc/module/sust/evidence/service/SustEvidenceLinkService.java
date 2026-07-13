@@ -8,6 +8,10 @@ import com.tss.grc.module.evidence.repository.EvidenceLinkRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.climate.repository.ClimateRiskOpportunityRepository;
 import com.tss.grc.module.sust.cma.repository.CmaDisclosureRepository;
+import com.tss.grc.module.sust.finance.repository.CarbonCreditRepository;
+import com.tss.grc.module.sust.finance.repository.GreenInstrumentRepository;
+import com.tss.grc.module.sust.finance.repository.GreenProjectRepository;
+import com.tss.grc.module.sust.finance.repository.InstrumentAllocationRepository;
 import com.tss.grc.module.sust.ghg.repository.GhgEmissionRecordRepository;
 import com.tss.grc.module.sust.metrics.repository.EsgMetricRepository;
 import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
@@ -38,10 +42,12 @@ public class SustEvidenceLinkService {
 
     public static final String MODULE = "SUSTAINABILITY";
 
-    /** The sustainability entity types that carry an {@code evidence_item_id} FK (V250, +V256 vendor survey). */
+    /** The sustainability entity types that carry an {@code evidence_item_id} FK
+     *  (V250, +V256 vendor survey, +V298 the four green-finance objects — GF-2). */
     private static final Set<String> ENTITY_TYPES = Set.of(
         "GhgEmissionRecord", "CmaDisclosure", "TcfdItem",
-        "SgiCommitment", "ClimateRiskOpportunity", "EsgMetric", "VendorEsgSurvey");
+        "SgiCommitment", "ClimateRiskOpportunity", "EsgMetric", "VendorEsgSurvey",
+        "GreenProject", "GreenInstrument", "InstrumentAllocation", "CarbonCredit");
 
     private final EvidenceItemRepository evidenceItemRepo;
     private final EvidenceLinkRepository evidenceLinkRepo;
@@ -54,6 +60,10 @@ public class SustEvidenceLinkService {
     private final ClimateRiskOpportunityRepository  climateRepo;
     private final EsgMetricRepository               metricRepo;
     private final VendorEsgSurveyRepository          vendorSurveyRepo;
+    private final GreenProjectRepository            greenProjectRepo;
+    private final GreenInstrumentRepository         greenInstrumentRepo;
+    private final InstrumentAllocationRepository    instrumentAllocationRepo;
+    private final CarbonCreditRepository            carbonCreditRepo;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -126,6 +136,23 @@ public class SustEvidenceLinkService {
             case "VendorEsgSurvey" -> {
                 var e = vendorSurveyRepo.findByIdAndOrganisationId(entityId, orgId).orElseThrow(() -> nf(entityType, entityId));
                 e.setEvidenceItemId(evidenceItemId); vendorSurveyRepo.save(e);
+            }
+            // GF-2 (V298) — the green-finance objects join the fabric.
+            case "GreenProject" -> {
+                var e = greenProjectRepo.findByOrganisationIdAndIdAndIsDeletedFalse(orgId, entityId).orElseThrow(() -> nf(entityType, entityId));
+                e.setEvidenceItemId(evidenceItemId); greenProjectRepo.save(e);
+            }
+            case "GreenInstrument" -> {
+                var e = greenInstrumentRepo.findByOrganisationIdAndIdAndIsDeletedFalse(orgId, entityId).orElseThrow(() -> nf(entityType, entityId));
+                e.setEvidenceItemId(evidenceItemId); greenInstrumentRepo.save(e);
+            }
+            case "InstrumentAllocation" -> {
+                var e = instrumentAllocationRepo.findByOrganisationIdAndIdAndIsDeletedFalse(orgId, entityId).orElseThrow(() -> nf(entityType, entityId));
+                e.setEvidenceItemId(evidenceItemId); instrumentAllocationRepo.save(e);
+            }
+            case "CarbonCredit" -> {
+                var e = carbonCreditRepo.findByOrganisationIdAndIdAndIsDeletedFalse(orgId, entityId).orElseThrow(() -> nf(entityType, entityId));
+                e.setEvidenceItemId(evidenceItemId); carbonCreditRepo.save(e);
             }
             default -> throw new IllegalArgumentException("entityType must be one of " + ENTITY_TYPES);
         }
