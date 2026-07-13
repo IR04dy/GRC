@@ -20,6 +20,7 @@ import {
 } from '../../lib/api';
 import { listEvidenceItems, type EvidenceItem } from '../../lib/evidenceItems';
 import { linkSustEvidence, type SustEvidenceEntityType } from '../../lib/sustEvidenceLinks';
+import { formatHijri } from '../../lib/sla';
 
 type TabId = 'instruments' | 'uop' | 'reports' | 'portfolio' | 'credits';
 
@@ -40,6 +41,19 @@ function tone(s: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' 
   }
 }
 const fmt = (n?: number | null) => n == null ? '—' : Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+/** GF-4 — "Gregorian (Hijri)" dual-calendar rendering (the attestation pattern). */
+function DualDate({ iso, isAr }: { iso?: string | null; isAr: boolean }) {
+  if (!iso) return <>—</>;
+  return (
+    <span title={formatHijri(iso, isAr ? 'ar' : 'en')}>
+      {iso}
+      <span style={{ color: 'var(--ink-3)', marginInlineStart: 4 }}>
+        ({formatHijri(iso, isAr ? 'ar' : 'en')})
+      </span>
+    </span>
+  );
+}
 
 /**
  * GF-2 — attach-evidence chip (S-C bridge). Linked → a green paperclip badge
@@ -126,11 +140,14 @@ export function GreenFinancePage() {
   const [instruments, setInstruments] = useState<GfInstrumentDto[]>([]);
   const [portfolio, setPortfolio] = useState<GpSummaryDto | null>(null);
   const [credits, setCredits] = useState<GpCreditDto[]>([]);
+  // GF-1/GF-3 — one page-level fetch feeds the allocation KPI and the Reports-tab card.
+  const [impact, setImpact] = useState<GfPortfolioImpactDto | null>(null);
 
   const reload = useCallback(() => {
     greenFinanceApi.instruments().then(setInstruments).catch(() => setInstruments([]));
     greenPortfolioApi.summary().then(setPortfolio).catch(() => setPortfolio(null));
     greenPortfolioApi.credits().then(setCredits).catch(() => setCredits([]));
+    greenFinanceApi.portfolioImpact().then(setImpact).catch(() => setImpact(null));
   }, []);
   useEffect(() => { reload(); }, [reload]);
 
@@ -140,6 +157,9 @@ export function GreenFinancePage() {
 
   const KPIS = [
     { label: isAr ? 'الأدوات المُصدرة' : 'Instruments', value: String(instruments.length) },
+    // GF-3 mirror — deployment of raised proceeds (post-issuance instruments).
+    { label: isAr ? 'نسبة تخصيص المتحصلات' : 'Proceeds allocation',
+      value: impact ? `${fmt(impact.allocation.allocationRatioPct)}%` : '—' },
     { label: isAr ? 'نسبة الأصول الخضراء GAR' : 'Green Asset Ratio', value: portfolio ? `${fmt(portfolio.greenAssetRatioPct)}%` : '—' },
     { label: isAr ? 'جودة البيانات المرجحة' : 'Weighted DQ (PCAF)', value: portfolio ? fmt(portfolio.weightedDataQuality) : '—' },
     { label: isAr ? 'أرصدة كربون مسحوبة' : 'Credits retired (tCO₂e)', value: fmt(retired) },
@@ -176,7 +196,7 @@ export function GreenFinancePage() {
       <div style={{ marginTop: 16 }}>
         {tab === 'instruments' && <InstrumentsTab instruments={instruments} reload={reload} />}
         {tab === 'uop'         && <UopTab instruments={instruments} />}
-        {tab === 'reports'     && <ReportsTab instruments={instruments} />}
+        {tab === 'reports'     && <ReportsTab instruments={instruments} impact={impact} />}
         {tab === 'portfolio'   && <PortfolioTab summary={portfolio} reload={reload} />}
         {tab === 'credits'     && <CreditsTab credits={credits} reload={reload} />}
       </div>
@@ -188,7 +208,7 @@ export function GreenFinancePage() {
 
 function InstrumentsTab({ instruments, reload }: { instruments: GfInstrumentDto[]; reload: () => void }) {
   const { lang } = useI18n(); const isAr = lang === 'ar'; const toast = useToast();
-  const [form, setForm] = useState({ instrumentCode: '', instrumentType: 'GREEN_SUKUK', nameEn: '', amountSarMn: '', prospectusRef: '' });
+  const [form, setForm] = useState({ instrumentCode: '', instrumentType: 'GREEN_SUKUK', nameEn: '', amountSarMn: '', prospectusRef: '', issueDate: '', maturityDate: '' });
 
   async function create() {
     if (!form.instrumentCode || !form.nameEn || !form.amountSarMn) {
@@ -198,9 +218,11 @@ function InstrumentsTab({ instruments, reload }: { instruments: GfInstrumentDto[
       await greenFinanceApi.createInstrument({
         ...form, amountSarMn: Number(form.amountSarMn),
         prospectusRef: form.prospectusRef.trim() || undefined,   // GF-5
+        issueDate: form.issueDate || undefined,                  // GF-4
+        maturityDate: form.maturityDate || undefined,
       });
       toast.success(isAr ? 'سُجِّلت الأداة' : 'Instrument registered');
-      setForm({ instrumentCode: '', instrumentType: 'GREEN_SUKUK', nameEn: '', amountSarMn: '', prospectusRef: '' });
+      setForm({ instrumentCode: '', instrumentType: 'GREEN_SUKUK', nameEn: '', amountSarMn: '', prospectusRef: '', issueDate: '', maturityDate: '' });
       reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Create failed'); }
   }
@@ -234,6 +256,13 @@ function InstrumentsTab({ instruments, reload }: { instruments: GfInstrumentDto[
           <input value={form.prospectusRef} onChange={e => setForm(f => ({ ...f, prospectusRef: e.target.value }))}
             placeholder={isAr ? 'مرجع نشرة الإصدار' : 'Prospectus ref'} style={INPUT}
             title={isAr ? 'مرجع نشرة الإصدار / وثيقة الطرح (REG-8)' : 'Offering-document reference (REG-8)'} />
+          {/* GF-4 — the title previews the Hijri equivalent as the user picks a date. */}
+          <input type="date" value={form.issueDate} onChange={e => setForm(f => ({ ...f, issueDate: e.target.value }))}
+            style={{ ...INPUT, minWidth: 130 }}
+            title={(isAr ? 'تاريخ الإصدار' : 'Issue date') + (form.issueDate ? ` — ${formatHijri(form.issueDate, isAr ? 'ar' : 'en')}` : '')} />
+          <input type="date" value={form.maturityDate} onChange={e => setForm(f => ({ ...f, maturityDate: e.target.value }))}
+            style={{ ...INPUT, minWidth: 130 }}
+            title={(isAr ? 'تاريخ الاستحقاق' : 'Maturity date') + (form.maturityDate ? ` — ${formatHijri(form.maturityDate, isAr ? 'ar' : 'en')}` : '')} />
           <Button size="sm" variant="primary" Icon={Plus} onClick={() => void create()}>{isAr ? 'تسجيل' : 'Register'}</Button>
           <Button size="sm" variant="ghost" Icon={Download} onClick={() => void greenFinanceApi.evidenceZip()}
             title={isAr ? 'حزمة أدلة التمويل الأخضر' : 'Green-Finance evidence ZIP'} />
@@ -245,6 +274,7 @@ function InstrumentsTab({ instruments, reload }: { instruments: GfInstrumentDto[
             <thead><tr>
               <th>{isAr ? 'الرمز' : 'Code'}</th><th>{isAr ? 'النوع' : 'Type'}</th>
               <th>{isAr ? 'الاسم' : 'Name'}</th><th>{isAr ? 'المبلغ (م ر.س)' : 'Amount (SAR mn)'}</th>
+              <th>{isAr ? 'الإصدار / الاستحقاق' : 'Issue / Maturity'}</th>
               <th>{isAr ? 'نشرة الإصدار' : 'Prospectus'}</th>
               <th>{isAr ? 'الهيكل الشرعي' : 'Shariah'}</th><th>{isAr ? 'الحالة' : 'Status'}</th><th></th>
             </tr></thead>
@@ -257,6 +287,11 @@ function InstrumentsTab({ instruments, reload }: { instruments: GfInstrumentDto[
                     <td><Badge tone="info">{i.instrumentType}</Badge></td>
                     <td className="text-2xs">{isAr && i.nameAr ? i.nameAr : i.nameEn}</td>
                     <td className="mono text-2xs">{fmt(i.amountSarMn)}</td>
+                    <td className="text-2xs">
+                      {/* GF-4 — dual Gregorian (Hijri) dates, the attestation pattern. */}
+                      <div><DualDate iso={i.issueDate} isAr={isAr} /></div>
+                      <div style={{ marginTop: 2 }}><DualDate iso={i.maturityDate} isAr={isAr} /></div>
+                    </td>
                     <td className="mono text-2xs" title={i.prospectusRef ?? undefined}>{i.prospectusRef ?? '—'}</td>
                     <td className="text-2xs">{i.shariahStructure ?? '—'}{i.shariahApprovalRef ? ' ✓' : ''}</td>
                     <td><Badge tone={tone(i.status)} dot>{i.status}</Badge></td>
@@ -468,10 +503,8 @@ function UopTab({ instruments }: { instruments: GfInstrumentDto[] }) {
  * formula). Per-project shares are capped at 1, so a project financed by two
  * sukuk delivers its impact once, split pro-rata between them.
  */
-function PortfolioImpactCard() {
+function PortfolioImpactCard({ impact }: { impact: GfPortfolioImpactDto | null }) {
   const { lang } = useI18n(); const isAr = lang === 'ar';
-  const [impact, setImpact] = useState<GfPortfolioImpactDto | null>(null);
-  useEffect(() => { greenFinanceApi.portfolioImpact().then(setImpact).catch(() => setImpact(null)); }, []);
 
   if (!impact) return null;
   const METRICS = [
@@ -522,7 +555,7 @@ function PortfolioImpactCard() {
   );
 }
 
-function ReportsTab({ instruments }: { instruments: GfInstrumentDto[] }) {
+function ReportsTab({ instruments, impact }: { instruments: GfInstrumentDto[]; impact: GfPortfolioImpactDto | null }) {
   const { lang } = useI18n(); const isAr = lang === 'ar'; const toast = useToast();
   const [instrumentId, setInstrumentId] = useState<number | ''>('');
   const [rows, setRows] = useState<GfReportDto[]>([]);
@@ -541,7 +574,7 @@ function ReportsTab({ instruments }: { instruments: GfInstrumentDto[] }) {
 
   return (
     <>
-    <PortfolioImpactCard />
+    <PortfolioImpactCard impact={impact} />
     <Card title={isAr ? 'تقارير التخصيص والأثر السنوية' : 'Annual allocation & impact reports'} Icon={FileBarChart2}
       action={
         <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>

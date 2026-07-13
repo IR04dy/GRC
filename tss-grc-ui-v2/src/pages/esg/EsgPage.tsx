@@ -272,7 +272,7 @@ export function EsgPage() {
         ))}
       </div>
 
-      {tab === 'overview'   && <OverviewTab />}
+      {tab === 'overview'   && <OverviewTab onNavigate={setTab} />}
       {tab === 'annex'      && <AnnexTab />}
       {tab === 'capa'       && <CapaTab onNavigate={setTab} />}
       {tab === 'calculator' && <CalculatorTab entries={calcEntries}
@@ -1179,7 +1179,9 @@ function CapaTab({ onNavigate }: { onNavigate: (t: EsgTab) => void }) {
 //   Row 5 (close): Annex readiness gauge | Materiality matrix preview
 //   Row 6 (trend): Existing emissions timeseries chart (preserved)
 
-function OverviewTab() {
+// GF-3 — onNavigate is the page's setTab so the horizon KPI tiles can land on
+// their owning tabs (targets / ifrs / env).
+function OverviewTab({ onNavigate }: { onNavigate: (t: EsgTab) => void }) {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
   const [data, setData] = useState<DashboardPayload | null>(null);
@@ -1241,6 +1243,29 @@ function OverviewTab() {
           <Button size="sm" variant="ghost" onClick={() => void reload()} title={isAr ? 'تحديث' : 'Refresh'}>
             <ArrowRight size={14} />
           </Button>
+        </div>
+      )}
+
+      {/* ── GF-3: horizon KPI strip — the four figures the review found
+             missing from the dashboard; each tile lands on its owning tab. */}
+      {data.horizon && (
+        <div className="kpi-grid">
+          <Kpi Icon={Coins} label={isAr ? 'نسبة تخصيص المتحصلات' : 'Proceeds allocation'}
+            value={`${Number(data.horizon.allocationRatioPct).toFixed(1)}%`}
+            tone={Number(data.horizon.allocationRatioPct) >= 90 ? 'success' : 'info'}
+            to="/green-finance" />
+          <Kpi Icon={FileText} label={isAr ? 'تغطية IFRS S1/S2' : 'IFRS S1/S2 coverage'}
+            value={`${Number(data.horizon.ifrsCoveragePct).toFixed(1)}%`}
+            tone={Number(data.horizon.ifrsCoveragePct) >= 80 ? 'success' : 'warning'}
+            onClick={() => onNavigate('ifrs')} />
+          <Kpi Icon={AlertCircle} label={isAr ? 'تصاريح تنتهي ≤ 90 يوماً' : 'Permits expiring ≤ 90d'}
+            value={data.horizon.permitsExpiring90d}
+            tone={data.horizon.permitsExpiring90d > 0 ? 'danger' : 'success'}
+            onClick={() => onNavigate('env')} />
+          <Kpi Icon={Target} label={isAr ? 'مستهدفات على المسار' : 'Targets on track'}
+            value={`${data.horizon.targetsOnTrack} / ${data.horizon.targetsOnTrack + data.horizon.targetsOffTrack + data.horizon.targetsNoData}`}
+            tone={data.horizon.targetsOffTrack > 0 ? 'warning' : 'success'}
+            onClick={() => onNavigate('targets')} />
         </div>
       )}
 

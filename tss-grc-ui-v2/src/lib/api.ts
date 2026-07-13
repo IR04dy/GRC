@@ -2986,6 +2986,7 @@ export interface GfInstrumentDto {
   shariahStructure?: string | null; shariahApprovalRef?: string | null;
   externalReviewer?: string | null; spoRating?: string | null; status: string;
   prospectusRef?: string | null;   // GF-5 (V298, REG-8)
+  issueDate?: string | null; maturityDate?: string | null;   // GF-4 dual-calendar display
 }
 /** GF-1 — org-level attributed impact, double-count protected per project. */
 export interface GfPortfolioImpactDto {
@@ -2995,6 +2996,9 @@ export interface GfPortfolioImpactDto {
     tco2eAvoidedYr: number; mwhRenewableYr: number; waterM3SavedYr: number }[];
   byProject: { projectId: number; projectCode: string;
     rawShareSum: number; countedShare: number; dedupApplied: boolean }[];
+  /** GF-3 — deployment of raised proceeds (post-issuance instruments). */
+  allocation: { netProceedsSarMn: number; allocatedSarMn: number;
+    allocationRatioPct: number; instruments: number };
 }
 export interface GfProjectDto {
   id: number; projectCode: string; nameEn: string; nameAr?: string | null; category: string;

@@ -89,6 +89,16 @@ export interface DashboardPayload {
     meanProgressByCategory: Record<string, number>;
   };
   topGaps: string[];
+  /** GF-3 — the four horizon KPIs (allocation %, IFRS coverage, permits ≤90d, trajectory). */
+  horizon?: {
+    allocationRatioPct: number;
+    allocationInstruments: number;
+    ifrsCoveragePct: number;
+    permitsExpiring90d: number;
+    targetsOnTrack: number;
+    targetsOffTrack: number;
+    targetsNoData: number;
+  };
 }
 
 export function getDashboard(year = 2025) {

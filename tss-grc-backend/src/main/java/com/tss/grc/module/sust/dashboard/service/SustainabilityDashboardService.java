@@ -62,6 +62,10 @@ public class SustainabilityDashboardService {
     // placeholder constant in climateTreatedRate().
     private final com.tss.grc.module.sust.climate.service.ClimateRiskOpportunityService climateService;
     private final OrganisationSettingsService settingsService;
+    // GF-3 — the four horizon KPIs (allocation %, IFRS coverage, permits ≤90d,
+    // trajectory) ride the same one-round-trip payload.
+    private final com.tss.grc.module.sust.finance.service.EsgHorizonService horizonService;
+    private final com.tss.grc.module.sust.finance.service.GreenFinanceService greenFinanceService;
 
     /**
      * Build the full dashboard payload. Returned shape is JSON-stable
@@ -145,7 +149,40 @@ public class SustainabilityDashboardService {
         out.put("materiality", materiality);
         out.put("metrics", metrics);
         out.put("topGaps", topGaps);
+        out.put("horizon", horizonKpis());
         return out;
+    }
+
+    /**
+     * GF-3 — the four horizon KPIs the review found missing from the strip:
+     * portfolio allocation % (post-issuance instruments), IFRS S1/S2 coverage %,
+     * NCEC permits expiring within 90 days (or already expired), and ESG-target
+     * trajectory counts (ACTIVE targets only; NO_DATA = no actuals yet).
+     */
+    private Map<String, Object> horizonKpis() {
+        var alloc = greenFinanceService.portfolioAllocation();
+        var ifrs  = horizonService.ifrsSummary();
+        long permits90 = horizonService.listPermits().stream()
+            .filter(p -> p.daysToExpiry() <= 90)
+            .count();
+        int onTrack = 0, offTrack = 0, noData = 0;
+        for (var tv : horizonService.listTargets()) {
+            if (!"ACTIVE".equals(tv.target().getStatus())) continue;
+            switch (tv.trajectory()) {
+                case "ON_TRACK"  -> onTrack++;
+                case "OFF_TRACK" -> offTrack++;
+                default          -> noData++;
+            }
+        }
+        Map<String, Object> horizon = new LinkedHashMap<>();
+        horizon.put("allocationRatioPct",    alloc.allocationRatioPct());
+        horizon.put("allocationInstruments", alloc.instruments());
+        horizon.put("ifrsCoveragePct",       ifrs.coveragePct());
+        horizon.put("permitsExpiring90d",    permits90);
+        horizon.put("targetsOnTrack",        onTrack);
+        horizon.put("targetsOffTrack",       offTrack);
+        horizon.put("targetsNoData",         noData);
+        return horizon;
     }
 
     // ── Score components ─────────────────────────────────────────────

@@ -95,7 +95,22 @@ public final class GreenFinanceDtos {
         int projectsCounted,
         int projectsCapped,
         java.util.List<InstrumentContribution> byInstrument,
-        java.util.List<ProjectAttribution> byProject
+        java.util.List<ProjectAttribution> byProject,
+        /** GF-3 — portfolio-level use-of-proceeds deployment (post-issuance instruments). */
+        PortfolioAllocation allocation
+    ) {}
+
+    /**
+     * GF-3 — Σ APPROVED allocations over Σ net proceeds across post-issuance
+     * instruments (ISSUED/REPORTING/MATURED): how much of the raised green
+     * money is actually deployed. Feeds the dashboard KPI strip and the
+     * /green-finance mirror tile.
+     */
+    public record PortfolioAllocation(
+        BigDecimal netProceedsSarMn,
+        BigDecimal allocatedSarMn,
+        BigDecimal allocationRatioPct,
+        int instruments
     ) {}
 
     /** GF-1 — one instrument's dedup-scaled slice of the portfolio impact. */

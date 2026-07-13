@@ -7,6 +7,7 @@ import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateProjectRequest
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateReportRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.InstrumentContribution;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.InstrumentSummaryResponse;
+import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.PortfolioAllocation;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.PortfolioImpactResponse;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.ProjectAttribution;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.ProposeAllocationRequest;
@@ -349,7 +350,38 @@ public class GreenFinanceService {
         }
 
         return new PortfolioImpactResponse(tco2e, mwh, water, estimateBasis,
-            sharesByProject.size(), capped, byInstrument, byProject);
+            sharesByProject.size(), capped, byInstrument, byProject,
+            portfolioAllocation());
+    }
+
+    /** Post-issuance lifecycle states — the population of the deployment KPI. */
+    private static final Set<String> POST_ISSUANCE = Set.of("ISSUED", "REPORTING", "MATURED");
+
+    /**
+     * GF-3 — portfolio-level allocation ratio: Σ APPROVED allocations over
+     * Σ net proceeds across post-issuance instruments. DRAFT/SHARIAH_REVIEW/
+     * APPROVED instruments haven't raised money yet, so they would only
+     * dilute the deployment figure.
+     */
+    @Transactional(readOnly = true)
+    public PortfolioAllocation portfolioAllocation() {
+        Long org = org();
+        BigDecimal net = BigDecimal.ZERO, allocated = BigDecimal.ZERO;
+        int count = 0;
+        for (GreenInstrument gi : instruments.findByOrganisationIdAndIsDeletedFalseOrderByInstrumentCodeAsc(org)) {
+            if (!POST_ISSUANCE.contains(gi.getStatus())) continue;
+            count++;
+            net = net.add(GreenFinanceMath.netProceeds(gi.getAmountSarMn(), gi.getIssuanceCostsSarMn()));
+            for (InstrumentAllocation a : allocations
+                    .findByOrganisationIdAndInstrumentIdAndIsDeletedFalseOrderByAllocationDateAsc(org, gi.getId())) {
+                if ("APPROVED".equals(a.getStatus())) allocated = allocated.add(a.getAmountSarMn());
+            }
+        }
+        return new PortfolioAllocation(
+            net.setScale(4, java.math.RoundingMode.HALF_UP),
+            allocated.setScale(4, java.math.RoundingMode.HALF_UP),
+            GreenFinanceMath.allocationRatioPct(allocated, net),
+            count);
     }
 
     // ── post-issuance reports (G2, plan §4.1 / REG-7) ────────────────────
