@@ -55,6 +55,24 @@ public final class CurrentActor {
     }
 
     /**
+     * Whether the current authenticated principal holds the platform-super-admin
+     * authority ({@code ROLE_PLATFORM_ADMIN}). PLATFORM_ADMIN bypasses the
+     * method-level {@code @PreAuthorize} guards in code and, by platform
+     * convention, is excluded from segregation-of-duties self-approval blocks
+     * and the nightly SoD scan — so service-layer SoD gates consult this to let
+     * the super-admin operate a tenant single-handed.
+     *
+     * @return {@code true} when the principal carries {@code ROLE_PLATFORM_ADMIN};
+     *         {@code false} when unauthenticated or the authority is absent.
+     */
+    public static boolean isPlatformAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return false;
+        return auth.getAuthorities().stream()
+            .anyMatch(a -> "ROLE_PLATFORM_ADMIN".equals(a.getAuthority()));
+    }
+
+    /**
      * Resolves the current tenant (organisation) id, failing fast when no tenant
      * is bound to the request thread.
      *

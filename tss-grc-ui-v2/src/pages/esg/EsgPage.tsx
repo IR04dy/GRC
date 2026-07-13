@@ -4,7 +4,7 @@ import {
   Leaf, TrendingDown, TrendingUp, Target, Calculator, FileText, Truck,
   Download, Trash2, CheckCircle2, AlertCircle, Building2,
   CloudLightning, Plus, ArrowRight, Link2, Wrench, Clock,
-  Paperclip, Coins, Hourglass, X as XIcon, Pencil, Upload,
+  Paperclip, Coins, Hourglass, X as XIcon, Pencil, Upload, RefreshCw,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -49,9 +49,9 @@ import {
   type CorrectiveAction, type CapaAggregate, type CapaStatus,
 } from '../../lib/sustainabilityCapa';
 import {
-  listSgi, sgiAggregate, achieveSgi, retireSgi, createSgi, updateSgi,
-  sgiStatusTone, sgiSectorLabel, sgiStatusLabel,
-  computeProgressPct, canAchieve,
+  listSgi, sgiAggregate, achieveSgi, retireSgi, createSgi, updateSgi, sweepSgi,
+  sgiStatusTone, sgiSectorLabel, sgiStatusLabel, sgiTierTone, sgiTierLabel,
+  computeProgressPct, canAchieve, computeTier, isMilestoneOverdue,
   type SgiCommitment as SgiC, type SgiAggregate as SgiAgg, type SgiSector,
 } from '../../lib/sustainabilitySgi';
 import {
@@ -4315,10 +4315,10 @@ function SgiTab() {
   const [items, setItems] = useState<SgiC[]>([]);
   const [agg, setAgg]     = useState<SgiAgg | null>(null);
   const [loading, setLoading] = useState(true);
-  const [achievingId, setAchievingId] = useState<number | null>(null);
   const [retiringId, setRetiringId]   = useState<number | null>(null);
   const [openNew, setOpenNew]         = useState(false);
   const [editSgi, setEditSgi]         = useState<SgiC | null>(null);
+  const [sweeping, setSweeping]       = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -4343,28 +4343,48 @@ function SgiTab() {
     return map;
   }, [items]);
 
-  async function submitAchieve(values: Record<string, unknown>) {
-    if (achievingId == null) return;
-    const achievedBy = String(values.achievedBy ?? '').trim();
-    if (!achievedBy) { toast.danger(isAr ? 'اسم مُعتمِد الإنجاز مطلوب' : 'Approver name required'); return; }
+  // SGI-A — Achieve is a disclosure-grade governance action: no typed name
+  // (the server stamps the authenticated principal), and it is APPROVE-guarded
+  // with Rule C (achiever ≠ last editor, 409) and Rule D (evidence attached,
+  // 400). A plain confirm suffices; the server's message surfaces on failure.
+  async function onAchieve(id: number) {
+    if (!window.confirm(isAr
+      ? 'تأكيد إنجاز الالتزام؟ يتطلب دليلاً مرفقاً، ويجب أن يختلف المُعتمِد عن آخر مُحرِّر (فصل المهام).'
+      : 'Confirm this commitment as achieved? Requires attached evidence, and the approver must differ from the last editor (SoD).')) return;
     try {
-      await achieveSgi(achievingId, achievedBy);
+      await achieveSgi(id);
       toast.success(isAr ? 'تم الإنجاز' : 'Achieved');
-      setAchievingId(null);
       await reload();
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message : 'Action failed');
     }
   }
+  // SGI-B — run the surveillance sweep on demand (also runs daily 03:00 UTC).
+  async function onSweep() {
+    setSweeping(true);
+    try {
+      const r = await sweepSgi();
+      const total = r.delayedCapas + r.milestoneCapas;
+      toast.success(total === 0
+        ? (isAr ? 'اكتمل الفحص — لا انحرافات جديدة' : 'Sweep complete — no new gaps')
+        : (isAr
+          ? `اكتمل الفحص — ${r.delayedCapas} متأخّر و${r.milestoneCapas} مرحلة فائتة`
+          : `Sweep complete — ${r.delayedCapas} behind-plan, ${r.milestoneCapas} overdue-milestone CAPA(s)`));
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر الفحص' : 'Sweep failed'));
+    } finally {
+      setSweeping(false);
+    }
+  }
   async function submitRetire(values: Record<string, unknown>) {
     if (retiringId == null) return;
-    const retiredBy = String(values.retiredBy ?? '').trim();
-    const reason    = String(values.reason    ?? '').trim();
-    if (!retiredBy || !reason) {
-      toast.danger(isAr ? 'الاسم والسبب مطلوبان' : 'Name and reason are required'); return;
+    const reason = String(values.reason ?? '').trim();
+    if (!reason) {
+      toast.danger(isAr ? 'السبب مطلوب' : 'A reason is required'); return;
     }
     try {
-      await retireSgi(retiringId, retiredBy, reason);
+      await retireSgi(retiringId, reason);
       toast.info(isAr ? 'تم التقاعد' : 'Retired');
       setRetiringId(null);
       await reload();
@@ -4373,17 +4393,10 @@ function SgiTab() {
     }
   }
 
-  const achieveFields: FieldDef[] = [
-    { kind: 'text', key: 'achievedBy', required: true, span: 12,
-      label: isAr ? 'اسم المعتَمِد للإنجاز' : 'Approved-by name',
-      placeholder: isAr ? 'مثال: سارة الزهراني (مدير الاستدامة)' : 'e.g. Sara Al-Zahrani (CSO)' },
-  ];
   const retireFields: FieldDef[] = [
-    { kind: 'text', key: 'retiredBy', required: true, span: 12,
-      label: isAr ? 'اسم المعتَمِد للتقاعد' : 'Retired-by name',
-      placeholder: isAr ? 'مثال: سارة الزهراني (مدير الاستدامة)' : 'e.g. Sara Al-Zahrani (CSO)' },
     // FieldDef.textarea doesn't carry a `required` flag — submitRetire
     // re-validates that the reason isn't empty before dispatch (Rule B).
+    // Retirer identity is stamped from the principal, not typed (SGI-A).
     { kind: 'textarea', key: 'reason', span: 12, rows: 3,
       label: isAr ? 'سبب التقاعد (للسجل المراجعي) *' : 'Reason (for audit trail) *' },
   ];
@@ -4596,9 +4609,14 @@ function SgiTab() {
       </div>
 
       <Card title={isAr ? 'التزامات المبادرة السعودية الخضراء' : 'Saudi Green Initiative commitments'} Icon={Target}
-        action={<Button variant="primary" size="sm" Icon={Plus} onClick={() => setOpenNew(true)}>
-          {isAr ? 'التزام جديد' : 'New commitment'}
-        </Button>}>
+        action={<div className="row-actions">
+          <Button variant="secondary" size="sm" Icon={RefreshCw} onClick={onSweep} disabled={sweeping}>
+            {sweeping ? (isAr ? 'جارٍ الفحص…' : 'Sweeping…') : (isAr ? 'فحص المراقبة' : 'Run sweep')}
+          </Button>
+          <Button variant="primary" size="sm" Icon={Plus} onClick={() => setOpenNew(true)}>
+            {isAr ? 'التزام جديد' : 'New commitment'}
+          </Button>
+        </div>}>
         <div className="esg-text-eyebrow-sm">
           {isAr
             ? 'سجلّ الالتزامات المحفوظ مع تتبّع التقدّم، المالك، الموعد التالي، والسجل المراجعي. الإنجاز يتطلّب الوصول للهدف؛ التقاعد يتطلّب سبباً موثّقاً.'
@@ -4634,6 +4652,17 @@ function SgiTab() {
                         </div>
                         <div className="esg-sgi-card__actions">
                           <Badge tone={sgiStatusTone(c.status)}>{sgiStatusLabel(c.status, isAr ? 'ar' : 'en')}</Badge>
+                          {/* SGI-B — indicative tier badge (default AT_RISK factor;
+                              the sweep + KPI strip are authoritative). */}
+                          {(() => { const tier = computeTier(c);
+                            return tier && tier !== 'ON_TRACK'
+                              ? <Badge tone={sgiTierTone(tier)}>{sgiTierLabel(tier, isAr ? 'ar' : 'en')}</Badge>
+                              : null; })()}
+                          {isMilestoneOverdue(c) && (
+                            <Badge tone="warning" title={isAr ? 'المرحلة التالية فائتة' : 'Next milestone overdue'}>
+                              <Clock size={11} /> {isAr ? 'مرحلة فائتة' : 'Milestone overdue'}
+                            </Badge>
+                          )}
                           {isActive && (
                             <>
                               <Button size="sm" variant="ghost" Icon={Pencil}
@@ -4642,7 +4671,7 @@ function SgiTab() {
                               <Button size="sm" variant="secondary" Icon={CheckCircle2}
                                 disabled={!canAchieve(c)}
                                 title={!canAchieve(c) ? (isAr ? 'لم يصل القياس الحالي إلى الهدف بعد' : 'Current value has not met target yet') : undefined}
-                                onClick={() => setAchievingId(c.id!)}>
+                                onClick={() => onAchieve(c.id!)}>
                                 {isAr ? 'إنجاز' : 'Achieve'}
                               </Button>
                               <Button size="sm" variant="ghost" Icon={Trash2}
@@ -4695,20 +4724,10 @@ function SgiTab() {
       </Card>
 
       <FormModal
-        open={achievingId !== null}
-        title={isAr ? 'تأكيد إنجاز الالتزام' : 'Confirm commitment achievement'}
-        fields={achieveFields}
-        initial={{ achievedBy: '' }}
-        size="md"
-        submitLabel={isAr ? 'تأكيد' : 'Confirm'}
-        onClose={() => setAchievingId(null)}
-        onSubmit={submitAchieve}
-      />
-      <FormModal
         open={retiringId !== null}
         title={isAr ? 'تقاعد الالتزام' : 'Retire commitment'}
         fields={retireFields}
-        initial={{ retiredBy: '', reason: '' }}
+        initial={{ reason: '' }}
         size="md"
         submitLabel={isAr ? 'تقاعد' : 'Retire'}
         onClose={() => setRetiringId(null)}

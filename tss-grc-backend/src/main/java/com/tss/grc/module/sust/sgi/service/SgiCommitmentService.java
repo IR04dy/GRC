@@ -1,6 +1,7 @@
 package com.tss.grc.module.sust.sgi.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
@@ -92,7 +93,10 @@ public class SgiCommitmentService {
         req.setRetiredAt(null);
         req.setRetiredBy(null);
         req.setRetiredReason(null);
-        req.setCreatedBy(null);
+        // SGI-A — attribution comes from the authenticated principal, never the
+        // request body (audit-Critical actor-from-principal pattern). created_by
+        // seeds the Rule-C SoD comparison (last-editor ≠ achiever).
+        req.setCreatedBy(CurrentActor.username());
         req.setUpdatedBy(null);
         validate(req);
         SgiCommitment saved = repo.save(req);
@@ -130,6 +134,9 @@ public class SgiCommitmentService {
         if (req.getNotesEn() != null)            cur.setNotesEn(req.getNotesEn());
         if (req.getNotesAr() != null)            cur.setNotesAr(req.getNotesAr());
         if (req.getEvidenceRef() != null)        cur.setEvidenceRef(req.getEvidenceRef());
+        // SGI-A — stamp the last editor from the principal so Rule C can block a
+        // subsequent self-achievement by whoever last touched the numbers.
+        cur.setUpdatedBy(CurrentActor.username());
         validate(cur);
         SgiCommitment saved = repo.save(cur);
         audit.log("UPDATE", "SgiCommitment", saved.getId(), "Updated SGI commitment");
@@ -138,12 +145,25 @@ public class SgiCommitmentService {
     }
 
     /**
-     * Mark a commitment as achieved. Rule A enforces that the current
-     * value has actually met the target (within the direction of the
-     * commitment).
+     * Mark a commitment as achieved — a disclosure-grade governance action
+     * (APPROVE-guarded at the controller). Achieving an externally-reportable
+     * pledge is gated on four rules:
+     * <ul>
+     *   <li><b>Rule A</b> — the current value must have met the target within
+     *       the commitment's direction (raise-to vs lower-to).</li>
+     *   <li><b>Rule C (SGI-A, SoD)</b> — the achiever must differ from the last
+     *       person who wrote the commitment ({@code updated_by}, falling back to
+     *       {@code created_by}); a 409 otherwise. PLATFORM_ADMIN bypasses per
+     *       platform convention (mirrors the SoD-scan exclusion).</li>
+     *   <li><b>Rule D (SGI-A, evidence gate — mirrors GHG Rule 2)</b> — achieving
+     *       requires attached proof: an {@code evidence_item_id} FK or a non-blank
+     *       {@code evidence_ref}.</li>
+     * </ul>
+     * The achiever is stamped from the authenticated principal, never a
+     * request-body name (audit-Critical actor-from-principal pattern).
      */
     @Transactional
-    public SgiCommitment achieve(Long id, String achievedBy) {
+    public SgiCommitment achieve(Long id) {
         SgiCommitment cur = get(id);
         if (!"ACTIVE".equals(cur.getStatus())) {
             throw new IllegalTransitionException(cur.getStatus(), "ACHIEVED", Set.of());
@@ -160,20 +180,35 @@ public class SgiCommitmentService {
             throw new IllegalArgumentException(
                 "Current value has not met the target yet (Rule A — direction-aware comparison).");
         }
+        String achiever = CurrentActor.username();
+        // Rule C — segregation of duties: whoever last wrote the numbers cannot
+        // also declare the pledge met. IllegalStateException maps to 409.
+        String lastEditor = cur.getUpdatedBy() != null ? cur.getUpdatedBy() : cur.getCreatedBy();
+        if (!CurrentActor.isPlatformAdmin() && lastEditor != null && lastEditor.equals(achiever)) {
+            throw new IllegalStateException(
+                "Self-approval blocked: the achiever must differ from the last editor (SoD).");
+        }
+        // Rule D — no public "target met" claim without attached evidence.
+        if (cur.getEvidenceItemId() == null
+                && (cur.getEvidenceRef() == null || cur.getEvidenceRef().isBlank())) {
+            throw new IllegalArgumentException(
+                "Achieving a commitment requires evidence (Rule D): attach an evidence item (evidenceItemId) or set evidence_ref.");
+        }
         cur.setStatus("ACHIEVED");
         cur.setAchievedAt(LocalDateTime.now());
-        cur.setAchievedBy(achievedBy);
+        cur.setAchievedBy(achiever);
         SgiCommitment saved = repo.save(cur);
-        audit.log("TRANSITION", "SgiCommitment", saved.getId(), "SGI commitment ACHIEVED by " + achievedBy);
+        audit.log("TRANSITION", "SgiCommitment", saved.getId(), "SGI commitment ACHIEVED by " + achiever);
         return saved;
     }
 
     /**
-     * Retire a commitment. Rule B enforces that a reason is recorded so
-     * future reporting cycles can explain the change.
+     * Retire a commitment (APPROVE-guarded). Rule B enforces that a reason is
+     * recorded so future reporting cycles can explain the change; the retirer is
+     * stamped from the authenticated principal, not a request-body name.
      */
     @Transactional
-    public SgiCommitment retire(Long id, String retiredBy, String reason) {
+    public SgiCommitment retire(Long id, String reason) {
         SgiCommitment cur = get(id);
         if (!"ACTIVE".equals(cur.getStatus())) {
             throw new IllegalTransitionException(cur.getStatus(), "RETIRED", Set.of());
@@ -181,12 +216,13 @@ public class SgiCommitmentService {
         if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("Retiring a commitment requires a reason (Rule B).");
         }
+        String retirer = CurrentActor.username();
         cur.setStatus("RETIRED");
         cur.setRetiredAt(LocalDateTime.now());
-        cur.setRetiredBy(retiredBy);
+        cur.setRetiredBy(retirer);
         cur.setRetiredReason(reason);
         SgiCommitment saved = repo.save(cur);
-        audit.log("TRANSITION", "SgiCommitment", saved.getId(), "SGI commitment RETIRED by " + retiredBy);
+        audit.log("TRANSITION", "SgiCommitment", saved.getId(), "SGI commitment RETIRED by " + retirer);
         return saved;
     }
 

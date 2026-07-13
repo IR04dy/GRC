@@ -26,8 +26,8 @@ import java.util.Map;
  *   GET    /by-code/:code          fetch by commitment_code (lookup for CapaTab)
  *   POST   /                       create (defaults: ACTIVE)
  *   PUT    /:id                    update (refused if status ∈ ACHIEVED, RETIRED)
- *   POST   /:id/achieve            ACTIVE → ACHIEVED   (Rule A: current vs target)
- *   POST   /:id/retire             ACTIVE → RETIRED    (Rule B: requires reason)
+ *   POST   /:id/achieve            ACTIVE → ACHIEVED   (APPROVE; Rules A/C/D)
+ *   POST   /:id/retire             ACTIVE → RETIRED    (APPROVE; Rule B: reason)
  *   DELETE /:id                    soft-delete
  * </pre>
  */
@@ -38,6 +38,7 @@ import java.util.Map;
 public class SgiCommitmentController {
 
     private final SgiCommitmentService service;
+    private final com.tss.grc.module.sust.sgi.service.SgiSurveillanceService surveillance;
 
     @GetMapping
     @PreAuthorize("hasPermission('SUST','READ')")
@@ -82,19 +83,23 @@ public class SgiCommitmentController {
         return service.update(id, req);
     }
 
-    /** Body: {@code { "achievedBy": "Name" }}. Rule A enforced server-side. */
+    /**
+     * ACTIVE → ACHIEVED. Disclosure-grade governance action: APPROVE-guarded,
+     * no body, achiever stamped from the principal. Rules A (target met),
+     * C (SoD — achiever ≠ last editor, 409) and D (evidence attached, 400)
+     * enforced server-side.
+     */
     @PostMapping("/{id}/achieve")
-    @PreAuthorize("hasPermission('SUST','WRITE')")
-    public SgiCommitment achieve(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
-        String by = body == null ? null : body.get("achievedBy");
-        return service.achieve(id, by);
+    @PreAuthorize("hasPermission('SUST','APPROVE')")
+    public SgiCommitment achieve(@PathVariable Long id) {
+        return service.achieve(id);
     }
 
-    /** Body: {@code { "retiredBy": "Name", "reason": "Replaced by …" }}. */
+    /** ACTIVE → RETIRED. APPROVE-guarded. Body: {@code { "reason": "Replaced by …" }} (Rule B). */
     @PostMapping("/{id}/retire")
-    @PreAuthorize("hasPermission('SUST','WRITE')")
+    @PreAuthorize("hasPermission('SUST','APPROVE')")
     public SgiCommitment retire(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return service.retire(id, body.get("retiredBy"), body.get("reason"));
+        return service.retire(id, body == null ? null : body.get("reason"));
     }
 
     @DeleteMapping("/{id}")
@@ -102,5 +107,17 @@ public class SgiCommitmentController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.softDelete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * SGI-B — manual surveillance sweep for the current tenant: raises the
+     * behind-plan (DELAYED) and overdue-milestone auto-CAPAs. Idempotent; also
+     * runs daily at 03:00 UTC. Mirrors the horizon trajectory/permit sweeps.
+     */
+    @PostMapping("/sweep")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
+    public Map<String, Integer> sweep() {
+        var r = surveillance.sweep();
+        return Map.of("delayedCapas", r.delayedCapas(), "milestoneCapas", r.milestoneCapas());
     }
 }

@@ -14,8 +14,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import com.tss.grc.security.GrcUserDetails;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -36,6 +42,9 @@ import static org.mockito.Mockito.when;
  *   <li>Rule A — achieve requires current_value to meet target within
  *       the direction of the commitment.</li>
  *   <li>Rule B — retire requires a written reason.</li>
+ *   <li>Rule C (SGI-A) — the achiever must differ from the last editor (SoD);
+ *       PLATFORM_ADMIN bypasses.</li>
+ *   <li>Rule D (SGI-A) — achieve requires attached evidence.</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -50,7 +59,18 @@ class SgiCommitmentServiceTest {
     @InjectMocks private SgiCommitmentService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
-    @AfterEach  void tearDown() { TenantContext.clear(); }
+    @AfterEach  void tearDown() { TenantContext.clear(); SecurityContextHolder.clearContext(); }
+
+    /** Bind an authenticated principal so CurrentActor.username()/isPlatformAdmin() resolve. */
+    private void authAs(String username, boolean platformAdmin) {
+        var authorities = platformAdmin
+            ? List.of(new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"))
+            : List.<SimpleGrantedAuthority>of();
+        GrcUserDetails principal = new GrcUserDetails(
+            42L, ORG_ID, username, "x", true, true, authorities);
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(principal, "x", authorities));
+    }
 
     /** S-B — the AT_RISK progress factor is now read from settings. */
     private void stubAtRiskFactor(String factor) {
@@ -162,13 +182,16 @@ class SgiCommitmentServiceTest {
     void achieve_acceptsWhenIncreaseTargetMet() {
         SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("50"), new BigDecimal("50"));
         c.setId(7L); c.setStatus("ACTIVE");
+        c.setEvidenceRef("EVD-SGI-1");            // Rule D — evidence attached
         when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
         when(repo.save(any(SgiCommitment.class))).thenAnswer(inv -> inv.getArgument(0));
+        authAs("sara", false);
 
-        SgiCommitment after = service.achieve(7L, "Sara Al-Zahrani");
+        SgiCommitment after = service.achieve(7L);
 
         assertThat(after.getStatus()).isEqualTo("ACHIEVED");
-        assertThat(after.getAchievedBy()).isEqualTo("Sara Al-Zahrani");
+        // Attribution comes from the authenticated principal, not a body name.
+        assertThat(after.getAchievedBy()).isEqualTo("sara");
         assertThat(after.getAchievedAt()).isNotNull();
     }
 
@@ -178,7 +201,7 @@ class SgiCommitmentServiceTest {
         c.setId(7L); c.setStatus("ACTIVE");
         when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
 
-        assertThatThrownBy(() -> service.achieve(7L, "Sara"))
+        assertThatThrownBy(() -> service.achieve(7L))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("target");
     }
@@ -188,10 +211,12 @@ class SgiCommitmentServiceTest {
         // Lower-to: baseline 4.2 → current 3.0 (below target 3.15) → met.
         SgiCommitment c = commitment(new BigDecimal("4.2"), new BigDecimal("3.0"), new BigDecimal("3.15"));
         c.setId(7L); c.setStatus("ACTIVE");
+        c.setEvidenceItemId(99L);                 // Rule D — real evidence FK
         when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
         when(repo.save(any(SgiCommitment.class))).thenAnswer(inv -> inv.getArgument(0));
+        authAs("lina", false);
 
-        SgiCommitment after = service.achieve(7L, "Lina");
+        SgiCommitment after = service.achieve(7L);
 
         assertThat(after.getStatus()).isEqualTo("ACHIEVED");
     }
@@ -202,8 +227,65 @@ class SgiCommitmentServiceTest {
         c.setId(7L); c.setStatus("ACTIVE");
         when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
 
-        assertThatThrownBy(() -> service.achieve(7L, "Lina"))
+        assertThatThrownBy(() -> service.achieve(7L))
             .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // ── Rule D — Achieve requires attached evidence (SGI-A, mirrors GHG Rule 2) ──
+
+    @Test
+    void achieve_refusesWithoutEvidence() {
+        // Target is met, but no evidence_item_id and no evidence_ref.
+        SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("50"), new BigDecimal("50"));
+        c.setId(7L); c.setStatus("ACTIVE");
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
+        authAs("sara", false);
+
+        assertThatThrownBy(() -> service.achieve(7L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("evidence");
+    }
+
+    // ── Rule C — Achieve blocked for the last editor (SGI-A, SoD) ────
+
+    @Test
+    void achieve_blocksWhenAchieverIsLastEditor() {
+        SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("50"), new BigDecimal("50"));
+        c.setId(7L); c.setStatus("ACTIVE");
+        c.setEvidenceRef("EVD-SGI-1");            // Rule D satisfied so Rule C is what bites
+        c.setUpdatedBy("sara");                    // sara last edited the numbers
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
+        authAs("sara", false);                     // …and sara tries to achieve
+
+        assertThatThrownBy(() -> service.achieve(7L))
+            .isInstanceOf(IllegalStateException.class)     // → 409
+            .hasMessageContaining("Self-approval");
+    }
+
+    @Test
+    void achieve_allowsWhenAchieverDiffersFromLastEditor() {
+        SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("50"), new BigDecimal("50"));
+        c.setId(7L); c.setStatus("ACTIVE");
+        c.setEvidenceRef("EVD-SGI-1");
+        c.setUpdatedBy("sara");
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
+        when(repo.save(any(SgiCommitment.class))).thenAnswer(inv -> inv.getArgument(0));
+        authAs("omar", false);                     // a different second approver
+
+        assertThat(service.achieve(7L).getStatus()).isEqualTo("ACHIEVED");
+    }
+
+    @Test
+    void achieve_platformAdminBypassesSoD() {
+        SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("50"), new BigDecimal("50"));
+        c.setId(7L); c.setStatus("ACTIVE");
+        c.setEvidenceRef("EVD-SGI-1");
+        c.setUpdatedBy("admin");                   // admin last edited…
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
+        when(repo.save(any(SgiCommitment.class))).thenAnswer(inv -> inv.getArgument(0));
+        authAs("admin", true);                      // …and PLATFORM_ADMIN bypasses Rule C
+
+        assertThat(service.achieve(7L).getStatus()).isEqualTo("ACHIEVED");
     }
 
     // ── Rule B — Retire requires reason ─────────────────────────────
@@ -214,10 +296,10 @@ class SgiCommitmentServiceTest {
         c.setId(7L); c.setStatus("ACTIVE");
         when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
 
-        assertThatThrownBy(() -> service.retire(7L, "Sara", null))
+        assertThatThrownBy(() -> service.retire(7L, null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("reason");
-        assertThatThrownBy(() -> service.retire(7L, "Sara", "   "))
+        assertThatThrownBy(() -> service.retire(7L, "   "))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -227,11 +309,13 @@ class SgiCommitmentServiceTest {
         c.setId(7L); c.setStatus("ACTIVE");
         when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
         when(repo.save(any(SgiCommitment.class))).thenAnswer(inv -> inv.getArgument(0));
+        authAs("sara", false);
 
-        SgiCommitment after = service.retire(7L, "Sara", "Replaced by SGI-30PCT-2030");
+        SgiCommitment after = service.retire(7L, "Replaced by SGI-30PCT-2030");
 
         assertThat(after.getStatus()).isEqualTo("RETIRED");
         assertThat(after.getRetiredReason()).contains("Replaced");
+        assertThat(after.getRetiredBy()).isEqualTo("sara");   // principal, not body
     }
 
     // ── Helper ──────────────────────────────────────────────────────

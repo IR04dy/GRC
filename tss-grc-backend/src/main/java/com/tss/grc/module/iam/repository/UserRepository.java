@@ -68,4 +68,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     /** WF-1 — active members of a department, for DEPARTMENT-addressed workflow requests. */
     List<User> findByOrganisationIdAndDepartmentIdAndIsActiveTrue(Long organisationId, Long departmentId);
+
+    /**
+     * SGI-B — resolve a free-text owner e-mail to an active tenant user so an
+     * overdue-milestone sweep can ping the actual owner in-app. Case-insensitive;
+     * returns empty when the e-mail maps to no active user (then the sweep falls
+     * back to the role broadcast the auto-CAPA already performs).
+     */
+    @Query("""
+        SELECT u FROM User u
+        WHERE u.organisationId = :orgId
+          AND LOWER(u.email) = LOWER(:email)
+          AND u.isActive = true
+          AND (u.isLocked IS NULL OR u.isLocked = false)
+        """)
+    List<User> findActiveByOrganisationIdAndEmail(
+        @Param("orgId") Long orgId,
+        @Param("email") String email
+    );
 }

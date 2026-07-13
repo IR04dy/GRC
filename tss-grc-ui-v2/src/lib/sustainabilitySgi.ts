@@ -118,16 +118,30 @@ export function updateSgi(id: number, body: Partial<SgiCommitment>) {
   return api.put<SgiCommitment>(`${BASE}/${id}`, body);
 }
 
-export function achieveSgi(id: number, achievedBy: string) {
-  return api.post<SgiCommitment>(`${BASE}/${id}/achieve`, { achievedBy });
+/**
+ * SGI-A — achieve is now a disclosure-grade, APPROVE-guarded action. No
+ * body: the achiever is stamped from the authenticated principal, and the
+ * server enforces Rule C (achiever ≠ last editor, SoD → 409) and Rule D
+ * (evidence attached → 400).
+ */
+export function achieveSgi(id: number) {
+  return api.post<SgiCommitment>(`${BASE}/${id}/achieve`, {});
 }
 
-export function retireSgi(id: number, retiredBy: string, reason: string) {
-  return api.post<SgiCommitment>(`${BASE}/${id}/retire`, { retiredBy, reason });
+/** SGI-A — retire is APPROVE-guarded; retirer stamped from the principal. */
+export function retireSgi(id: number, reason: string) {
+  return api.post<SgiCommitment>(`${BASE}/${id}/retire`, { reason });
 }
 
 export function deleteSgi(id: number) {
   return api.delete<void>(`${BASE}/${id}`);
+}
+
+export interface SgiSweepResult { delayedCapas: number; milestoneCapas: number }
+
+/** SGI-B — run the surveillance sweep (behind-plan + overdue-milestone auto-CAPAs). */
+export function sweepSgi() {
+  return api.post<SgiSweepResult>(`${BASE}/sweep`, {});
 }
 
 // ─── UI helpers ───────────────────────────────────────────────────────
@@ -226,6 +240,43 @@ export function computeProgressPct(c: SgiCommitment): number {
   if (den === 0) return 0;
   const pct = (num / den) * 100;
   return Math.max(0, Math.min(150, Math.round(pct * 10) / 10));
+}
+
+/**
+ * Expected progress at today's date on the linear baseline→target timeline —
+ * client mirror of the service (SGI-B). Used for the on-card tier badge.
+ */
+export function computeExpectedPct(c: SgiCommitment): number {
+  const by = c.baselineYear ?? 2025;
+  const ty = c.targetYear;
+  const year = new Date().getFullYear();
+  if (ty <= by) return 100;
+  if (year >= ty) return 100;
+  if (year <= by) return 0;
+  return Math.round(((year - by) * 100 / (ty - by)) * 10) / 10;
+}
+
+/**
+ * Progress tier — ON_TRACK / AT_RISK / DELAYED — mirroring the service with the
+ * platform-default AT_RISK factor (0.70). Indicative only: the tenant may have
+ * tightened the factor, and the sweep + KPI strip are the source of truth.
+ * Returns null for non-ACTIVE commitments (their tier is the status).
+ */
+export function computeTier(c: SgiCommitment): 'ON_TRACK' | 'AT_RISK' | 'DELAYED' | null {
+  if (c.status !== 'ACTIVE') return null;
+  const progress = computeProgressPct(c);
+  const expected = computeExpectedPct(c);
+  if (progress >= expected) return 'ON_TRACK';
+  if (progress >= expected * 0.70) return 'AT_RISK';
+  return 'DELAYED';
+}
+
+/** SGI-B — a milestone whose date has passed without a refreshed current value. */
+export function isMilestoneOverdue(c: SgiCommitment): boolean {
+  if (c.status !== 'ACTIVE' || !c.nextMilestoneDate) return false;
+  const today = new Date().toISOString().slice(0, 10);       // yyyy-MM-dd, UTC
+  if (c.nextMilestoneDate >= today) return false;
+  return c.currentValueAsOf == null || c.currentValueAsOf < c.nextMilestoneDate;
 }
 
 /** Rule-A client mirror — disables Achieve until the current value
