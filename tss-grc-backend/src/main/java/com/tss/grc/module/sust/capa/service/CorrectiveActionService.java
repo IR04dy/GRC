@@ -4,6 +4,7 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.service.NotificationService;
+import com.tss.grc.module.reporting.dto.TabularExportRequest;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
@@ -370,6 +371,52 @@ public class CorrectiveActionService {
         out.put("activeTotal", all.size());
         return out;
     }
+
+    // ── Export ───────────────────────────────────────────────────────
+
+    /**
+     * CT-6 — the whole register (all statuses, register order) for the shared
+     * tabular XLSX engine. Localised headers/sheet + title column; lifecycle
+     * codes stay raw so the file diffs cleanly against the API (SGI-E pattern).
+     */
+    public TabularExportRequest exportPayload(String lang) {
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        List<List<String>> rows = new ArrayList<>();
+        for (CorrectiveAction a : repo
+                .findByOrganisationIdOrderByTargetDateAscIdDesc(org(), Pageable.unpaged())
+                .getContent()) {
+            rows.add(List.of(
+                a.getActionCode() == null || a.getActionCode().isBlank()
+                    ? "#" + a.getId() : a.getActionCode(),
+                nn(a.getActionType()),
+                nn(a.getSourceType()),
+                nn(a.getSourceRef()),
+                ar && a.getTitleAr() != null && !a.getTitleAr().isBlank()
+                    ? a.getTitleAr() : nn(a.getTitleEn()),
+                nn(a.getPriority()),
+                nn(a.getStatus()),
+                nn(a.getOwnerName()),
+                nn(a.getAssignedTo()),
+                a.getTargetDate() == null ? "" : a.getTargetDate().toString(),
+                nn(a.getEvidenceRef()),
+                a.getCostEstimateSar() == null ? "" : a.getCostEstimateSar().toPlainString(),
+                a.getEffortHours() == null ? "" : String.valueOf(a.getEffortHours()),
+                nn(a.getVerifiedBy()),
+                a.getClosedAt() == null ? "" : a.getClosedAt().toLocalDate().toString()));
+        }
+        List<String> headers = ar
+            ? List.of("الكود", "النوع", "المصدر", "مرجع المصدر", "العنوان", "الأولوية", "الحالة",
+                      "المالك", "مُسند إلى", "تاريخ الاستحقاق", "مرجع الدليل", "الكلفة (ر.س)",
+                      "المجهود (ساعات)", "تحقّق بواسطة", "تاريخ الإغلاق")
+            : List.of("Code", "Type", "Source", "Source ref", "Title", "Priority", "Status",
+                      "Owner", "Assigned to", "Target date", "Evidence ref", "Cost (SAR)",
+                      "Effort (h)", "Verified by", "Closed on");
+        String sheet = ar ? "سجل الإجراءات التصحيحية" : "Corrective Action Register";
+        return new TabularExportRequest("Sustainability", "CorrectiveActions", lang,
+            List.of(new TabularExportRequest.Sheet(sheet, headers, rows)));
+    }
+
+    private static String nn(String s) { return s == null ? "" : s; }
 
     // ── Helpers ──────────────────────────────────────────────────────
     private void validate(CorrectiveAction r) {

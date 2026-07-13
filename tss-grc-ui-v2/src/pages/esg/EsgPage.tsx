@@ -47,7 +47,7 @@ import {
   capaStatusTone, capaPriorityTone, capaAllowedNext,
   canComplete, canVerify as canVerifyCapa,
   capaSourceLabel, capaStatusLabel, capaPriorityLabel,
-  capaActionTypeLabel, capaActionTypeTone,
+  capaActionTypeLabel, capaActionTypeTone, capaSourceTab, exportCapaXlsx,
   daysRemaining,
   type CorrectiveAction, type CapaAggregate, type CapaStatus,
   type CapaSourceType, type CapaPriority as CapaPrio, type CapaActionType,
@@ -274,7 +274,7 @@ export function EsgPage() {
 
       {tab === 'overview'   && <OverviewTab />}
       {tab === 'annex'      && <AnnexTab />}
-      {tab === 'capa'       && <CapaTab />}
+      {tab === 'capa'       && <CapaTab onNavigate={setTab} />}
       {tab === 'calculator' && <CalculatorTab entries={calcEntries}
         onAdd={(e) => { appendCalcEntry(e); toast.success(t('esgCalcAddedToast')); }}
         onDelete={(id) => { deleteCalcEntry(id); toast.info(t('esgCalcDeletedToast')); }} />}
@@ -621,7 +621,9 @@ function ClimateTab() {
 // allowed transitions; Rule B disables Complete until evidenceRef is set
 // and Rule A prompts for a verifier name distinct from the owner.
 
-function CapaTab() {
+// CT-6 — onNavigate is the page's setTab: source chips jump to the tab that
+// owns the gap (the URL param alone wouldn't re-render the mounted page).
+function CapaTab({ onNavigate }: { onNavigate: (t: EsgTab) => void }) {
   const { lang } = useI18n();
   const toast = useToast();
   const isAr = lang === 'ar';
@@ -887,10 +889,18 @@ function CapaTab() {
       <Card title={isAr ? 'سجلّ الإجراءات التصحيحية للاستدامة' : 'Sustainability Corrective Actions'}
             Icon={Wrench}
             action={
-              /* CT-2 — manual CAR/PAR creation (source fixed to MANUAL). */
-              <Button variant="primary" size="sm" Icon={Plus} onClick={() => setCreating(true)}>
-                {isAr ? 'إجراء جديد' : 'New action'}
-              </Button>
+              <div className="row-actions">
+                {/* CT-6 — whole register as XLSX (EXPORT audit row is central). */}
+                <Button variant="ghost" size="sm" Icon={Download}
+                  onClick={() => exportCapaXlsx(isAr ? 'ar' : 'en').catch(e =>
+                    toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر التصدير' : 'Export failed')))}>
+                  {isAr ? 'تصدير' : 'Export'}
+                </Button>
+                {/* CT-2 — manual CAR/PAR creation (source fixed to MANUAL). */}
+                <Button variant="primary" size="sm" Icon={Plus} onClick={() => setCreating(true)}>
+                  {isAr ? 'إجراء جديد' : 'New action'}
+                </Button>
+              </div>
             }>
         {/* Status filter chips */}
         <div className="esg-filter-row">
@@ -973,6 +983,8 @@ function CapaTab() {
                     const allowed = capaAllowedNext(a.status);
                     const showCost = a.costEstimateSar != null && a.costEstimateSar > 0;
                     const showEffort = a.effortHours != null && a.effortHours > 0;
+                    // CT-6 — the tab owning this gap's source (undefined for MANUAL).
+                    const srcTab = capaSourceTab(a.sourceType);
                     return (
                       <tr key={a.id}>
                         <td className="mono text-2xs">{a.actionCode ?? `#${a.id}`}</td>
@@ -989,7 +1001,18 @@ function CapaTab() {
                           )}
                         </td>
                         <td>
-                          <Badge tone="neutral">{capaSourceLabel(a.sourceType, isAr ? 'ar' : 'en')}</Badge>
+                          {srcTab ? (
+                            <button type="button" className="esg-source-jump"
+                              title={isAr ? 'فتح تبويب المصدر' : 'Open source tab'}
+                              onClick={() => onNavigate(srcTab)}>
+                              <Badge tone="neutral">
+                                {capaSourceLabel(a.sourceType, isAr ? 'ar' : 'en')}
+                                <Link2 size={10} />
+                              </Badge>
+                            </button>
+                          ) : (
+                            <Badge tone="neutral">{capaSourceLabel(a.sourceType, isAr ? 'ar' : 'en')}</Badge>
+                          )}
                           {a.sourceRef && (
                             <div className="mono text-2xs text-muted esg-cell-sub">{a.sourceRef}</div>
                           )}

@@ -1,5 +1,7 @@
 package com.tss.grc.module.sust.capa.controller;
 
+import com.tss.grc.module.reporting.service.ExportNaming;
+import com.tss.grc.module.reporting.service.TabularExportService;
 import com.tss.grc.module.sust.capa.dto.CorrectiveActionCreateRequest;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
@@ -9,6 +11,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,7 +27,8 @@ import java.util.Map;
  *
  * <pre>
  *   GET    /                       list (filterable by status / sourceType / priority)
- *   GET    /aggregate              KPI rollup (by status / priority / source + overdue)
+ *   GET    /aggregate              KPI rollup (by status / priority / source / type + overdue)
+ *   GET    /export.xlsx            whole register as XLSX (audit-logged EXPORT)
  *   GET    /for-source             all actions raised against (sourceType, sourceRef)
  *   GET    /:id                    fetch one
  *   POST   /                       create (defaults: OPEN / MEDIUM)
@@ -43,6 +48,7 @@ import java.util.Map;
 public class CorrectiveActionController {
 
     private final CorrectiveActionService service;
+    private final TabularExportService tabularExport;
 
     @GetMapping
     @PreAuthorize("hasPermission('SUST','READ')")
@@ -62,6 +68,22 @@ public class CorrectiveActionController {
     @GetMapping("/aggregate")
     @PreAuthorize("hasPermission('SUST','READ')")
     public Map<String, Object> aggregate() { return service.aggregate(); }
+
+    /**
+     * CT-6 — the whole CAPA register as a branded XLSX (shared tabular engine).
+     * The EXPORT audit row is recorded centrally by {@code ExportAuditInterceptor}
+     * off the Content-Disposition header.
+     */
+    @GetMapping("/export.xlsx")
+    @PreAuthorize("hasPermission('SUST','READ')")
+    public ResponseEntity<byte[]> exportXlsx(@RequestParam(defaultValue = "en") String lang) {
+        byte[] bytes = tabularExport.xlsx(service.exportPayload(lang));
+        String filename = ExportNaming.build("Sustainability", "CorrectiveActions", lang, "xlsx");
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .body(bytes);
+    }
 
     @GetMapping("/for-source")
     @PreAuthorize("hasPermission('SUST','READ')")

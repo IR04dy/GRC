@@ -751,3 +751,8 @@
 .esg-line-sub  { font-size: var(--text-xs); margin-top: 2px; }
 .esg-th-center { text-align: center; }
 .esg-th-end    { text-align: end; }
+
+/* ─── CT-6: CAPA source deep-link chip ────────────────────── */
+.esg-source-jump { background: none; border: 0; padding: 0; cursor: pointer; }
+.esg-source-jump .badge { display: inline-flex; align-items: center; gap: 3px; }
+.esg-source-jump:hover .badge { text-decoration: underline; }

@@ -13,7 +13,8 @@
 //   OPEN → IN_PROGRESS → COMPLETED → VERIFIED → CLOSED
 //   any  → CANCELLED   (terminal)
 
-import { api } from './api';
+import { api, downloadFile } from './api';
+import { isEsgTab, type EsgTab } from './esgDashboard';
 
 export type CapaStatus =
   | 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'VERIFIED' | 'CLOSED' | 'CANCELLED';
@@ -142,6 +143,12 @@ export function verifyCapa(id: number) {
 export function closeCapa(id: number)    { return api.post<CorrectiveAction>(`${BASE}/${id}/close`); }
 export function cancelCapa(id: number)   { return api.post<CorrectiveAction>(`${BASE}/${id}/cancel`); }
 export function deleteCapa(id: number)   { return api.delete<void>(`${BASE}/${id}`); }
+
+/** CT-6 — whole register as XLSX (server audit-logs the EXPORT centrally). */
+export function exportCapaXlsx(lang: 'en' | 'ar') {
+  return downloadFile(`${BASE}/export.xlsx?lang=${lang}`,
+    `Sustainability_CorrectiveActions_${lang.toUpperCase()}.xlsx`);
+}
 
 // ── UI helpers ───────────────────────────────────────────────────────
 
@@ -288,4 +295,26 @@ export function capaActionTypeLabel(t: CapaActionType, lang: 'en' | 'ar'): strin
 
 export function capaActionTypeTone(t: CapaActionType): 'neutral' | 'primary' {
   return t === 'PREVENTIVE' ? 'primary' : 'neutral';
+}
+
+/**
+ * CT-6 — the ESG tab that owns each CAPA source, for the register's source
+ * deep-links. MANUAL has no owning screen. Guarded by isEsgTab so a renamed
+ * tab id degrades to "no link", never a broken navigation.
+ */
+export function capaSourceTab(s: CapaSourceType): EsgTab | undefined {
+  const map: Partial<Record<CapaSourceType, string>> = {
+    CLIMATE_RISK:   'climate',
+    GHG_RECORD:     'ghg',
+    ANNEX_GAP:      'annex',
+    CMA_DISCLOSURE: 'cma',
+    TCFD_ITEM:      'tcfd',
+    SGI_COMMITMENT: 'sgi',
+    EVIDENCE:       'evidence',
+    VENDOR_ESG:     'survey',
+    ESG_TARGET:     'targets',
+    ENV_PERMIT:     'env',
+  };
+  const t = map[s];
+  return isEsgTab(t) ? t : undefined;
 }

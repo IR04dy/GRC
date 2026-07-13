@@ -4,7 +4,7 @@
 // CT-3/CT-4 — CAR/PAR labels + the principal-based Rule-A mirror.
 import { describe, expect, it } from 'vitest';
 import {
-  canVerify, capaActionTypeLabel, capaSourceLabel,
+  canVerify, capaActionTypeLabel, capaSourceLabel, capaSourceTab,
   type CapaActionType, type CapaSourceType, type CorrectiveAction,
 } from './sustainabilityCapa';
 
@@ -26,6 +26,16 @@ describe('capaSourceLabel (CT-5)', () => {
     const future = 'FUTURE_SOURCE' as CapaSourceType;
     expect(capaSourceLabel(future, 'en')).toBe('FUTURE_SOURCE');
     expect(capaSourceLabel(future, 'ar')).toBe('FUTURE_SOURCE');
+  });
+});
+
+describe('capaSourceTab (CT-6 — source deep-links)', () => {
+  it('maps every source except MANUAL to a live ESG tab id', () => {
+    for (const s of ALL_SOURCES) {
+      if (s === 'MANUAL') continue;
+      expect(capaSourceTab(s), `${s} must deep-link to its owning tab`).toBeTruthy();
+    }
+    expect(capaSourceTab('MANUAL')).toBeUndefined();
   });
 });
 
