@@ -64,6 +64,14 @@ public class SgiCommitment {
     /** S-C — real FK into evidence.evidence_items. */
     @Column(name = "evidence_item_id") private Long evidenceItemId;
 
+    // ── SGI-C (V296) — current_value source lineage ──────────────────────
+    /** MANUAL (default) | ESG_METRIC | GHG_TOTAL — provenance of current_value. */
+    @Column(name = "value_source", nullable = false, length = 20) private String valueSource = "MANUAL";
+    /** FK-by-convention to sust.esg_metric when {@code value_source = ESG_METRIC}. */
+    @Column(name = "source_metric_id") private Long sourceMetricId;
+    /** GHG scope 1..3 to narrow a {@code GHG_TOTAL} refresh; null = all scopes. */
+    @Column(name = "source_scope") private Short sourceScope;
+
     @Column(name = "achieved_at")                private LocalDateTime achievedAt;
     @Column(name = "achieved_by", length = 255)  private String achievedBy;
     @Column(name = "retired_at")                 private LocalDateTime retiredAt;

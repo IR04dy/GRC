@@ -20,4 +20,12 @@ public interface GhgEmissionRecordRepository extends JpaRepository<GhgEmissionRe
 
     /** All records for one year — used by the aggregate / YoY computation. */
     List<GhgEmissionRecord> findByOrganisationIdAndReportingYear(Long org, Short year);
+
+    /**
+     * SGI-C — assured records in the given lifecycle statuses, for the SGI
+     * {@code GHG_TOTAL} refresh (VERIFIED/APPROVED only, so an SGI pledge never
+     * reads an unassured draft figure). Soft-deleted rows are excluded by the
+     * entity {@code @Where}.
+     */
+    List<GhgEmissionRecord> findByOrganisationIdAndStatusIn(Long org, java.util.Collection<String> statuses);
 }

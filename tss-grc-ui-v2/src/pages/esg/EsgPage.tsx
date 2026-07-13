@@ -49,10 +49,10 @@ import {
   type CorrectiveAction, type CapaAggregate, type CapaStatus,
 } from '../../lib/sustainabilityCapa';
 import {
-  listSgi, sgiAggregate, achieveSgi, retireSgi, createSgi, updateSgi, sweepSgi,
-  sgiStatusTone, sgiSectorLabel, sgiStatusLabel, sgiTierTone, sgiTierLabel,
+  listSgi, sgiAggregate, achieveSgi, retireSgi, createSgi, updateSgi, sweepSgi, refreshValueSgi,
+  sgiStatusTone, sgiSectorLabel, sgiStatusLabel, sgiTierTone, sgiTierLabel, sgiValueSourceLabel,
   computeProgressPct, canAchieve, computeTier, isMilestoneOverdue,
-  type SgiCommitment as SgiC, type SgiAggregate as SgiAgg, type SgiSector,
+  type SgiCommitment as SgiC, type SgiAggregate as SgiAgg, type SgiSector, type SgiValueSource,
 } from '../../lib/sustainabilitySgi';
 import {
   listCma, cmaReadiness, markDisclosed, markPartial, markNotDisclosed,
@@ -4377,6 +4377,18 @@ function SgiTab() {
       setSweeping(false);
     }
   }
+  // SGI-C — pull current_value from the commitment's linked source.
+  async function onRefresh(id: number) {
+    try {
+      const c = await refreshValueSgi(id);
+      toast.success(isAr
+        ? `حُدّثت القيمة إلى ${Number(c.currentValue ?? 0).toLocaleString()} ${c.unit}`
+        : `Value refreshed to ${Number(c.currentValue ?? 0).toLocaleString()} ${c.unit}`);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (isAr ? 'تعذّر التحديث من المصدر' : 'Refresh failed'));
+    }
+  }
   async function submitRetire(values: Record<string, unknown>) {
     if (retiringId == null) return;
     const reason = String(values.reason ?? '').trim();
@@ -4428,6 +4440,15 @@ function SgiTab() {
       label: isAr ? 'المالك' : 'Owner' },
     { kind: 'text', key: 'nextMilestoneEn', span: 6,
       label: isAr ? 'المرحلة التالية' : 'Next milestone' },
+    // SGI-C — source lineage for current_value.
+    { kind: 'select', key: 'valueSource', span: 4,
+      label: isAr ? 'مصدر القيمة' : 'Value source',
+      options: (['MANUAL', 'ESG_METRIC', 'GHG_TOTAL'] as SgiValueSource[])
+        .map(s => ({ value: s, label: sgiValueSourceLabel(s, isAr ? 'ar' : 'en') })) },
+    { kind: 'number', key: 'sourceMetricId', span: 4,
+      label: isAr ? 'رقم مؤشر الاستدامة' : 'ESG metric ID' },
+    { kind: 'number', key: 'sourceScope', span: 4, min: 1, max: 3,
+      label: isAr ? 'نطاق الانبعاثات (١-٣)' : 'GHG scope (1–3)' },
     { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
       label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
   ];
@@ -4466,6 +4487,15 @@ function SgiTab() {
       label: isAr ? 'المرحلة التالية (إنجليزي)' : 'Next milestone (English)' },
     { kind: 'text', key: 'nextMilestoneAr', span: 12,
       label: isAr ? 'المرحلة التالية (عربي)' : 'Next milestone (Arabic)' },
+    // SGI-C — source lineage.
+    { kind: 'select', key: 'valueSource', span: 4,
+      label: isAr ? 'مصدر القيمة' : 'Value source',
+      options: (['MANUAL', 'ESG_METRIC', 'GHG_TOTAL'] as SgiValueSource[])
+        .map(s => ({ value: s, label: sgiValueSourceLabel(s, isAr ? 'ar' : 'en') })) },
+    { kind: 'number', key: 'sourceMetricId', span: 4,
+      label: isAr ? 'رقم مؤشر الاستدامة' : 'ESG metric ID' },
+    { kind: 'number', key: 'sourceScope', span: 4, min: 1, max: 3,
+      label: isAr ? 'نطاق الانبعاثات (١-٣)' : 'GHG scope (1–3)' },
     { kind: 'textarea', key: 'descriptionEn', span: 12, rows: 2,
       label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
     { kind: 'textarea', key: 'descriptionAr', span: 12, rows: 2,
@@ -4495,6 +4525,9 @@ function SgiTab() {
     descriptionAr:     editSgi?.descriptionAr ?? '',
     notesEn:           editSgi?.notesEn ?? '',
     notesAr:           editSgi?.notesAr ?? '',
+    valueSource:       editSgi?.valueSource ?? 'MANUAL',
+    sourceMetricId:    editSgi?.sourceMetricId != null ? String(editSgi.sourceMetricId) : '',
+    sourceScope:       editSgi?.sourceScope != null ? String(editSgi.sourceScope) : '',
   }), [editSgi]);
 
   async function submitEdit(values: Record<string, unknown>): Promise<void> {
@@ -4536,6 +4569,9 @@ function SgiTab() {
         descriptionAr: str(values.descriptionAr),
         notesEn: str(values.notesEn),
         notesAr: str(values.notesAr),
+        valueSource: (str(values.valueSource) as SgiValueSource) ?? 'MANUAL',
+        sourceMetricId: num(values.sourceMetricId),
+        sourceScope: num(values.sourceScope),
       });
       toast.success(isAr ? 'حُدّث الالتزام' : 'Commitment updated');
       setEditSgi(null);
@@ -4580,6 +4616,9 @@ function SgiTab() {
         ownerName: str(values.ownerName),
         nextMilestoneEn: str(values.nextMilestoneEn),
         descriptionEn: str(values.descriptionEn),
+        valueSource: (str(values.valueSource) as SgiValueSource) ?? 'MANUAL',
+        sourceMetricId: num(values.sourceMetricId),
+        sourceScope: num(values.sourceScope),
         status: 'ACTIVE',
       });
       toast.success(isAr
@@ -4665,6 +4704,11 @@ function SgiTab() {
                           )}
                           {isActive && (
                             <>
+                              {c.valueSource && c.valueSource !== 'MANUAL' && (
+                                <Button size="sm" variant="ghost" Icon={RefreshCw}
+                                  title={isAr ? 'تحديث من المصدر' : 'Refresh from source'}
+                                  onClick={() => onRefresh(c.id!)} />
+                              )}
                               <Button size="sm" variant="ghost" Icon={Pencil}
                                 title={isAr ? 'تعديل' : 'Edit'}
                                 onClick={() => setEditSgi(c)} />
@@ -4699,6 +4743,17 @@ function SgiTab() {
                         {c.currentValue != null && <span>{isAr ? 'الحالي' : 'Current'}: <span className="mono">{Number(c.currentValue).toLocaleString()}</span> {c.unit}</span>}
                         <span>{isAr ? 'الهدف' : 'Target'}: <span className="mono">{Number(c.targetValue).toLocaleString()}</span> {c.unit}</span>
                       </div>
+                      {c.valueSource && c.valueSource !== 'MANUAL' && (
+                        <div className="esg-sgi-card__notes" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Link2 size={11} />
+                          <span>
+                            {isAr ? 'المصدر' : 'Source'}: {sgiValueSourceLabel(c.valueSource, isAr ? 'ar' : 'en')}
+                            {c.valueSource === 'ESG_METRIC' && c.sourceMetricId != null && ` #${c.sourceMetricId}`}
+                            {c.valueSource === 'GHG_TOTAL' && c.sourceScope != null && ` · ${isAr ? 'النطاق' : 'Scope'} ${c.sourceScope}`}
+                            {c.currentValueAsOf && ` · ${isAr ? 'حتى' : 'as of'} ${c.currentValueAsOf}`}
+                          </span>
+                        </div>
+                      )}
                       {(isAr ? c.notesAr : c.notesEn) && (
                         <div className="esg-sgi-card__notes">
                           {isAr && c.notesAr ? c.notesAr : c.notesEn}
@@ -4742,6 +4797,7 @@ function SgiTab() {
           unit: '', targetValue: '', targetYear: 2030,
           baselineValue: '', baselineYear: '', currentValue: '',
           ownerName: '', nextMilestoneEn: '', descriptionEn: '',
+          valueSource: 'MANUAL', sourceMetricId: '', sourceScope: '',
         }}
         size="lg"
         submitLabel={isAr ? 'إضافة الالتزام' : 'Add commitment'}

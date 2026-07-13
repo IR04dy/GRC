@@ -110,6 +110,16 @@ public class SgiCommitmentController {
     }
 
     /**
+     * SGI-C — pull {@code current_value} from the commitment's linked source
+     * (ESG metric reading or GHG inventory total). MANUAL commitments 400.
+     */
+    @PostMapping("/{id}/refresh-value")
+    @PreAuthorize("hasPermission('SUST','WRITE')")
+    public SgiCommitment refreshValue(@PathVariable Long id) {
+        return service.refreshValue(id);
+    }
+
+    /**
      * SGI-B — manual surveillance sweep for the current tenant: raises the
      * behind-plan (DELAYED) and overdue-milestone auto-CAPAs. Idempotent; also
      * runs daily at 03:00 UTC. Mirrors the horizon trajectory/permit sweeps.

@@ -3,6 +3,10 @@ package com.tss.grc.module.sust.sgi.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
+import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
+import com.tss.grc.module.sust.ghg.repository.GhgEmissionRecordRepository;
+import com.tss.grc.module.sust.metrics.entity.EsgMetricReading;
+import com.tss.grc.module.sust.metrics.repository.EsgMetricReadingRepository;
 import com.tss.grc.module.sust.sgi.entity.SgiCommitment;
 import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
 import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
@@ -56,6 +60,8 @@ class SgiCommitmentServiceTest {
     @Mock private OrganisationSettingsService settingsService;
     @Mock private AuditLogService audit;
     @Mock private CorrectiveActionService capaService;
+    @Mock private EsgMetricReadingRepository metricReadings;
+    @Mock private GhgEmissionRecordRepository ghgRecords;
     @InjectMocks private SgiCommitmentService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -318,7 +324,81 @@ class SgiCommitmentServiceTest {
         assertThat(after.getRetiredBy()).isEqualTo("sara");   // principal, not body
     }
 
+    // ── SGI-C — refresh current_value from a linked source ──────────
+
+    @Test
+    void refreshValue_pullsLatestEsgMetricReading() {
+        SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("10"), new BigDecimal("50"));
+        c.setId(7L); c.setStatus("ACTIVE");
+        c.setValueSource("ESG_METRIC"); c.setSourceMetricId(5L);
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
+        when(repo.save(any(SgiCommitment.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubAtRiskFactor("0.70");
+        authAs("sara", false);
+        EsgMetricReading r1 = reading(new BigDecimal("42.5"), java.time.LocalDate.of(2026, 6, 30));
+        EsgMetricReading r0 = reading(new BigDecimal("30"),   java.time.LocalDate.of(2025, 6, 30));
+        when(metricReadings.findByOrganisationIdAndMetricIdOrderByAsOfDescIdDesc(ORG_ID, 5L))
+            .thenReturn(java.util.List.of(r1, r0));   // newest first
+
+        SgiCommitment after = service.refreshValue(7L);
+
+        assertThat(after.getCurrentValue()).isEqualByComparingTo("42.5");
+        assertThat(after.getCurrentValueAsOf()).isEqualTo(java.time.LocalDate.of(2026, 6, 30));
+    }
+
+    @Test
+    void refreshValue_ghgTotalSumsLatestVerifiedYear() {
+        SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("0"), new BigDecimal("100"));
+        c.setId(7L); c.setStatus("ACTIVE");
+        c.setValueSource("GHG_TOTAL");                 // all scopes
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
+        when(repo.save(any(SgiCommitment.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubAtRiskFactor("0.70");
+        authAs("sara", false);
+        // 2026 is the latest year: 12 + 8 = 20; the 2025 row must be ignored.
+        when(ghgRecords.findByOrganisationIdAndStatusIn(eq(ORG_ID), any()))
+            .thenReturn(java.util.List.of(
+                ghg((short) 2026, (short) 1, new BigDecimal("12")),
+                ghg((short) 2026, (short) 2, new BigDecimal("8")),
+                ghg((short) 2025, (short) 1, new BigDecimal("99"))));
+
+        SgiCommitment after = service.refreshValue(7L);
+
+        assertThat(after.getCurrentValue()).isEqualByComparingTo("20");
+        assertThat(after.getCurrentValueAsOf()).isEqualTo(java.time.LocalDate.of(2026, 12, 31));
+    }
+
+    @Test
+    void refreshValue_rejectsManualSource() {
+        SgiCommitment c = commitment(new BigDecimal("0"), new BigDecimal("10"), new BigDecimal("50"));
+        c.setId(7L); c.setStatus("ACTIVE"); c.setValueSource("MANUAL");
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(c));
+
+        assertThatThrownBy(() -> service.refreshValue(7L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("no linked source");
+    }
+
     // ── Helper ──────────────────────────────────────────────────────
+    private static EsgMetricReading reading(BigDecimal value, java.time.LocalDate asOf) {
+        EsgMetricReading r = new EsgMetricReading();
+        r.setOrganisationId(ORG_ID);
+        r.setReadingValue(value);
+        r.setAsOf(asOf);
+        return r;
+    }
+
+    private static GhgEmissionRecord ghg(short year, short scope, BigDecimal tco2e) {
+        GhgEmissionRecord g = new GhgEmissionRecord();
+        g.setOrganisationId(ORG_ID);
+        g.setReportingYear(year);
+        g.setScope(scope);
+        g.setEmissionValueTco2e(tco2e);
+        g.setStatus("VERIFIED");
+        g.setVerified(true);
+        return g;
+    }
+
     private static SgiCommitment commitment(BigDecimal baseline, BigDecimal current, BigDecimal target) {
         SgiCommitment c = new SgiCommitment();
         c.setOrganisationId(ORG_ID);

@@ -5,6 +5,10 @@ import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
+import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
+import com.tss.grc.module.sust.ghg.repository.GhgEmissionRecordRepository;
+import com.tss.grc.module.sust.metrics.entity.EsgMetricReading;
+import com.tss.grc.module.sust.metrics.repository.EsgMetricReadingRepository;
 import com.tss.grc.module.sust.sgi.entity.SgiCommitment;
 import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
@@ -56,6 +60,8 @@ public class SgiCommitmentService {
     private final OrganisationSettingsService settingsService;
     private final AuditLogService audit;
     private final CorrectiveActionService capaService;
+    private final EsgMetricReadingRepository metricReadings;   // SGI-C — ESG_METRIC source
+    private final GhgEmissionRecordRepository ghgRecords;      // SGI-C — GHG_TOTAL source
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -134,6 +140,10 @@ public class SgiCommitmentService {
         if (req.getNotesEn() != null)            cur.setNotesEn(req.getNotesEn());
         if (req.getNotesAr() != null)            cur.setNotesAr(req.getNotesAr());
         if (req.getEvidenceRef() != null)        cur.setEvidenceRef(req.getEvidenceRef());
+        // SGI-C — source lineage (a MANUAL commitment stays fully hand-edited).
+        if (req.getValueSource() != null)        cur.setValueSource(req.getValueSource());
+        if (req.getSourceMetricId() != null)     cur.setSourceMetricId(req.getSourceMetricId());
+        if (req.getSourceScope() != null)        cur.setSourceScope(req.getSourceScope());
         // SGI-A — stamp the last editor from the principal so Rule C can block a
         // subsequent self-achievement by whoever last touched the numbers.
         cur.setUpdatedBy(CurrentActor.username());
@@ -232,6 +242,106 @@ public class SgiCommitmentService {
         cur.setIsDeleted(true);
         repo.save(cur);
         audit.log("DELETE", "SgiCommitment", id, "Soft-deleted SGI commitment");
+    }
+
+    // ── SGI-C — current_value source lineage ─────────────────────────
+
+    /** value + as-of pulled from a linked source. */
+    private record SourcedValue(BigDecimal value, LocalDate asOf) {}
+
+    /**
+     * Resolve the latest value for a <em>sourced</em> commitment:
+     * <ul>
+     *   <li>{@code ESG_METRIC} — the newest reading of {@code source_metric_id}
+     *       ({@code reading_value} + its {@code as_of}).</li>
+     *   <li>{@code GHG_TOTAL} — the sum of VERIFIED/APPROVED GHG records for the
+     *       latest year that has any (optionally narrowed to {@code source_scope});
+     *       as-of is that year-end.</li>
+     * </ul>
+     * Empty for {@code MANUAL} or when the source has no data yet.
+     */
+    private Optional<SourcedValue> computeSourcedValue(SgiCommitment c) {
+        String src = c.getValueSource();
+        if ("ESG_METRIC".equals(src) && c.getSourceMetricId() != null) {
+            List<EsgMetricReading> readings =
+                metricReadings.findByOrganisationIdAndMetricIdOrderByAsOfDescIdDesc(org(), c.getSourceMetricId());
+            if (readings.isEmpty()) return Optional.empty();
+            EsgMetricReading latest = readings.get(0);
+            return Optional.of(new SourcedValue(latest.getReadingValue(), latest.getAsOf()));
+        }
+        if ("GHG_TOTAL".equals(src)) {
+            List<GhgEmissionRecord> recs =
+                ghgRecords.findByOrganisationIdAndStatusIn(org(), List.of("VERIFIED", "APPROVED"));
+            if (c.getSourceScope() != null) {
+                short sc = c.getSourceScope();
+                recs = recs.stream().filter(g -> g.getScope() != null && g.getScope() == sc).toList();
+            }
+            if (recs.isEmpty()) return Optional.empty();
+            short maxYear = recs.stream().map(GhgEmissionRecord::getReportingYear)
+                .filter(Objects::nonNull).max(Short::compareTo).orElse((short) 0);
+            BigDecimal sum = recs.stream()
+                .filter(g -> g.getReportingYear() != null && g.getReportingYear() == maxYear)
+                .map(GhgEmissionRecord::getEmissionValueTco2e)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            return Optional.of(new SourcedValue(sum, LocalDate.of(maxYear, 12, 31)));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * SGI-C — pull {@code current_value} from the linked source on demand
+     * (SUST WRITE). A refresh changes the numbers, so it stamps the principal as
+     * the last editor (feeding Rule C) and, like any current-value write, opens a
+     * behind-plan auto-CAPA if the refreshed figure is DELAYED. MANUAL commitments
+     * (or sources with no data yet) are rejected with a clear message.
+     */
+    @Transactional
+    public SgiCommitment refreshValue(Long id) {
+        SgiCommitment c = get(id);
+        if (!"ACTIVE".equals(c.getStatus())) {
+            throw new IllegalStateException(
+                "Commitment is " + c.getStatus() + " and cannot be refreshed.");
+        }
+        if (c.getValueSource() == null || "MANUAL".equals(c.getValueSource())) {
+            throw new IllegalArgumentException(
+                "Commitment " + c.getCommitmentCode() + " has no linked source (value_source=MANUAL).");
+        }
+        SourcedValue sv = computeSourcedValue(c).orElseThrow(() -> new IllegalArgumentException(
+            "No source data available to refresh " + c.getCommitmentCode()
+                + " (source " + c.getValueSource() + ")."));
+        BigDecimal old = c.getCurrentValue();
+        c.setCurrentValue(sv.value());
+        c.setCurrentValueAsOf(sv.asOf());
+        c.setUpdatedBy(CurrentActor.username());
+        SgiCommitment saved = repo.save(c);
+        audit.log("UPDATE", "SgiCommitment", saved.getId(),
+            "current_value refreshed from " + c.getValueSource() + ": " + old + " -> " + sv.value()
+                + " (as of " + sv.asOf() + ")");
+        maybeAutoCapaBehindPlan(saved);
+        return saved;
+    }
+
+    /**
+     * SGI-B/SGI-C — used by the surveillance sweep to refresh a sourced value
+     * <em>before</em> judging its tier, so an untouched-but-sourced commitment is
+     * assessed on live data. Persists value + as-of only; it deliberately does
+     * NOT re-stamp {@code updated_by} (no principal off-request, and a background
+     * refresh must not overwrite the SoD attribution). No-op for MANUAL or when
+     * the value is already current.
+     */
+    @Transactional
+    public void refreshSourcedValueQuietly(SgiCommitment c) {
+        if (c.getValueSource() == null || "MANUAL".equals(c.getValueSource())) return;
+        computeSourcedValue(c).ifPresent(sv -> {
+            boolean changed = sv.value().compareTo(nz(c.getCurrentValue())) != 0
+                || !Objects.equals(sv.asOf(), c.getCurrentValueAsOf());
+            if (changed) {
+                c.setCurrentValue(sv.value());
+                c.setCurrentValueAsOf(sv.asOf());
+                repo.save(c);
+            }
+        });
     }
 
     // ── Progress computation ─────────────────────────────────────────

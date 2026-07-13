@@ -17,9 +17,9 @@
 
 | Slice | Content | Status | Commit | Migration |
 |---|---|---|---|---|
-| SGI-A | Governance gates — SoD on achieve/retire, principal attribution, evidence-gated achieve | **DONE** | _(feat/sgi-uplift)_ | none (code-only) |
-| SGI-B | Surveillance — scheduled DELAYED sweep + milestone-overdue watch (+ buttons, notifications) | **DONE** | _(feat/sgi-uplift)_ | none (code-only) |
-| SGI-C | Source lineage — current_value linked to GHG inventory / metric readings + refresh action | **NOT STARTED** | — | V296 (reserved) |
+| SGI-A | Governance gates — SoD on achieve/retire, principal attribution, evidence-gated achieve | **DONE** | `804de092` | none (code-only) |
+| SGI-B | Surveillance — scheduled DELAYED sweep + milestone-overdue watch (+ buttons, notifications) | **DONE** | `804de092` | none (code-only) |
+| SGI-C | Source lineage — current_value linked to GHG inventory / metric readings + refresh action | **DONE** | _(feat/sgi-uplift)_ | **V296 applied** |
 | SGI-D | Optional by decision — verification state, engine routing, target linkage | **DEFERRED** (decisions #1/#3/#5 = direct APPROVE / defer / defer) | — | — |
 | SGI-E | Cleanup — dead static constants, per-register export, evidence chip on cards | **NOT STARTED** | — | none |
 
@@ -38,6 +38,18 @@ owner in-app notification; `POST /sgi-commitments/sweep`. FE: name fields remove
 achieve is a confirm, "Run sweep" button, tier + overdue-milestone card badges.
 Suite **2253/0/0**, ratchet **62**, FE tsc clean; live probe **20/20** (admin +
 so_officer, through the Vite proxy), dev DB left with zero `[REVIEW-TEST]` residue.
+
+**SGI-C as-built (2026-07-13, V296):** `value_source` (MANUAL|ESG_METRIC|GHG_TOTAL) +
+`source_metric_id` + `source_scope` on `sust.sgi_commitment` (V296, applied twice to
+dev). `POST /sgi-commitments/{id}/refresh-value` (SUST WRITE): ESG_METRIC pulls the
+newest `esg_metric_reading` (value + its as-of); GHG_TOTAL sums VERIFIED/APPROVED
+`ghg_emission_record` for the latest year (optionally one scope), as-of = year-end;
+stamps `current_value`/`current_value_as_of` + audit old→new + behind-plan CAPA;
+MANUAL rejected. The surveillance sweep refreshes sourced values before judging tier
+(without re-stamping `updated_by`). FE: source picker in create/edit, "↻ from source"
+button + provenance line on sourced cards. Suite **2256/0/0**, ratchet **62**, FE tsc
+clean; live probe **7/7** (metric + GHG-total + per-scope + MANUAL-reject + audit
+trail), zero residue.
 
 ---
 

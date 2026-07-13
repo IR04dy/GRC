@@ -21,6 +21,8 @@ export type SgiSector =
 
 export type SgiTier = 'ON_TRACK' | 'AT_RISK' | 'DELAYED' | 'ACHIEVED' | 'RETIRED';
 
+export type SgiValueSource = 'MANUAL' | 'ESG_METRIC' | 'GHG_TOTAL';
+
 export interface SgiCommitment {
   id?: number;
   organisationId?: number;
@@ -51,6 +53,11 @@ export interface SgiCommitment {
   notesEn?: string;
   notesAr?: string;
   evidenceRef?: string;
+
+  // SGI-C — current_value provenance
+  valueSource?: SgiValueSource;
+  sourceMetricId?: number;
+  sourceScope?: number;         // 1..3 for GHG_TOTAL
 
   achievedAt?: string;
   achievedBy?: string;
@@ -142,6 +149,22 @@ export interface SgiSweepResult { delayedCapas: number; milestoneCapas: number }
 /** SGI-B — run the surveillance sweep (behind-plan + overdue-milestone auto-CAPAs). */
 export function sweepSgi() {
   return api.post<SgiSweepResult>(`${BASE}/sweep`, {});
+}
+
+/** SGI-C — pull current_value from the commitment's linked source. */
+export function refreshValueSgi(id: number) {
+  return api.post<SgiCommitment>(`${BASE}/${id}/refresh-value`, {});
+}
+
+/** Bilingual value-source labels. */
+export function sgiValueSourceLabel(s: SgiValueSource, lang: 'en' | 'ar'): string {
+  const en: Record<SgiValueSource, string> = {
+    MANUAL: 'Manual', ESG_METRIC: 'ESG metric', GHG_TOTAL: 'GHG inventory',
+  };
+  const ar: Record<SgiValueSource, string> = {
+    MANUAL: 'يدوي', ESG_METRIC: 'مؤشر استدامة', GHG_TOTAL: 'جرد الانبعاثات',
+  };
+  return (lang === 'ar' ? ar : en)[s];
 }
 
 // ─── UI helpers ───────────────────────────────────────────────────────

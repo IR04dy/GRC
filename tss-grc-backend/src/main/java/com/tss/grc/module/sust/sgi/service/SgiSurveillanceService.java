@@ -66,6 +66,8 @@ public class SgiSurveillanceService {
         int milestone = 0;
 
         for (SgiCommitment c : repo.findByOrganisationIdAndStatus(org, "ACTIVE")) {
+            // SGI-C — refresh a sourced value on live data before judging tier.
+            sgiService.refreshSourcedValueQuietly(c);
             // ── behind plan (DELAYED) ────────────────────────────────────
             String tier = String.valueOf(sgiService.progress(c).get("tier"));
             if ("DELAYED".equals(tier)) {
