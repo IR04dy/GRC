@@ -61,6 +61,9 @@ public class CorrectiveActionService {
                "TCFD_ITEM", "SGI_COMMITMENT", "EVIDENCE", "VENDOR_ESG", "MANUAL",
                "ESG_TARGET", "ENV_PERMIT");
 
+    /** CT-3 (V297) — CAR/PAR classification; must stay equal to {@code ck_ca_action_type}. */
+    static final Set<String> ACTION_TYPES = Set.of("CORRECTIVE", "PREVENTIVE");
+
     /** A CAPA in one of these states no longer "covers" its source gap, so a
      *  freshly-surfaced gap on that source opens a new CAPA (mirrors the
      *  compliance F8 AR-EVD-GAP dedup, which skips only NON-closed findings). */
@@ -117,6 +120,7 @@ public class CorrectiveActionService {
         req.setCreatedBy(null);
         req.setUpdatedBy(null);
         if (req.getPriority() == null || req.getPriority().isBlank()) req.setPriority("MEDIUM");
+        if (req.getActionType() == null || req.getActionType().isBlank()) req.setActionType("CORRECTIVE");
         validate(req);
         CorrectiveAction saved = repo.save(req);
         audit.log("CREATE", "CorrectiveAction", saved.getId(), "Corrective action created");
@@ -163,6 +167,9 @@ public class CorrectiveActionService {
         ca.setTitleAr(titleAr);
         ca.setDescriptionEn(descriptionEn);
         ca.setStatus("OPEN");
+        // CT-3 — auto-CAPAs react to a surfaced gap, so they are corrective by
+        // definition; PREVENTIVE exists only via manual creation (plan §5 #1).
+        ca.setActionType("CORRECTIVE");
         ca.setPriority(priority == null || priority.isBlank() ? "MEDIUM" : priority);
         // Give the auto-CAPA a due date so it surfaces in the overdue / due-soon
         // rollups: today + the tenant's executive-escalation window (S-B setting).
@@ -198,6 +205,7 @@ public class CorrectiveActionService {
         if (req.getDescriptionEn() != null)     cur.setDescriptionEn(req.getDescriptionEn());
         if (req.getDescriptionAr() != null)     cur.setDescriptionAr(req.getDescriptionAr());
         if (req.getPriority() != null)          cur.setPriority(req.getPriority());
+        if (req.getActionType() != null)        cur.setActionType(req.getActionType());
         if (req.getOwnerName() != null)         cur.setOwnerName(req.getOwnerName());
         if (req.getOwnerEmail() != null)        cur.setOwnerEmail(req.getOwnerEmail());
         if (req.getAssignedTo() != null)        cur.setAssignedTo(req.getAssignedTo());
@@ -328,14 +336,17 @@ public class CorrectiveActionService {
         Map<String, Integer> byStatus   = new LinkedHashMap<>();
         Map<String, Integer> byPriority = new LinkedHashMap<>();
         Map<String, Integer> bySource   = new LinkedHashMap<>();
+        Map<String, Integer> byType     = new LinkedHashMap<>();
         for (String s : List.of("OPEN", "IN_PROGRESS", "COMPLETED", "VERIFIED")) byStatus.put(s, 0);
         for (String p : List.of("CRITICAL", "HIGH", "MEDIUM", "LOW"))            byPriority.put(p, 0);
+        for (String t : List.of("CORRECTIVE", "PREVENTIVE"))                     byType.put(t, 0);
 
         int overdue = 0, dueSoon = 0, dueSoonWarning = 0;
         for (CorrectiveAction a : all) {
             byStatus.merge(a.getStatus(), 1, Integer::sum);
             byPriority.merge(a.getPriority(), 1, Integer::sum);
             bySource.merge(a.getSourceType(), 1, Integer::sum);
+            if (a.getActionType() != null) byType.merge(a.getActionType(), 1, Integer::sum);
             LocalDate due = a.getTargetDate();
             if (due == null) continue;
             // VERIFIED items are no longer "overdue" — they're awaiting closure.
@@ -355,6 +366,7 @@ public class CorrectiveActionService {
         out.put("dueSoonWarning", dueSoonWarning);
         out.put("byPriority", byPriority);
         out.put("bySource",   bySource);
+        out.put("byType",     byType);
         out.put("activeTotal", all.size());
         return out;
     }
@@ -369,6 +381,8 @@ public class CorrectiveActionService {
             throw new IllegalArgumentException("status must be one of " + STATUSES);
         if (!PRIORITIES.contains(r.getPriority()))
             throw new IllegalArgumentException("priority must be one of " + PRIORITIES);
+        if (r.getActionType() == null || !ACTION_TYPES.contains(r.getActionType()))
+            throw new IllegalArgumentException("actionType must be one of " + ACTION_TYPES);
         if (r.getCostEstimateSar() != null && r.getCostEstimateSar().signum() < 0)
             throw new IllegalArgumentException("costEstimateSar must be >= 0");
         if (r.getEffortHours() != null && r.getEffortHours() < 0)

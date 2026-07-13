@@ -317,6 +317,76 @@ class CorrectiveActionServiceTest {
             .hasMessageContaining("sourceType");
     }
 
+    // ── CT-3 (V297) — CAR/PAR action_type ───────────────────────────
+
+    @Test
+    void create_defaultsActionTypeToCorrective() {
+        when(repo.save(any(CorrectiveAction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CorrectiveAction req = action("OPEN", "Sara");
+        req.setActionType(null);   // client sent nothing
+
+        assertThat(service.create(req).getActionType()).isEqualTo("CORRECTIVE");
+    }
+
+    @Test
+    void create_acceptsPreventive_andRejectsUnknownType() {
+        when(repo.save(any(CorrectiveAction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CorrectiveAction preventive = action("OPEN", "Sara");
+        preventive.setActionType("PREVENTIVE");
+        assertThat(service.create(preventive).getActionType()).isEqualTo("PREVENTIVE");
+
+        CorrectiveAction bogus = action("OPEN", "Sara");
+        bogus.setActionType("PROACTIVE");
+        assertThatThrownBy(() -> service.create(bogus))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("actionType");
+    }
+
+    @Test
+    void update_canReclassify_butNotToUnknownType() {
+        CorrectiveAction a = action("OPEN", "Sara");
+        when(repo.findByIdAndOrganisationId(3L, ORG_ID)).thenReturn(Optional.of(a));
+        when(repo.save(any(CorrectiveAction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CorrectiveAction patch = new CorrectiveAction();
+        patch.setActionType("PREVENTIVE");
+        assertThat(service.update(3L, patch).getActionType()).isEqualTo("PREVENTIVE");
+
+        CorrectiveAction badPatch = new CorrectiveAction();
+        badPatch.setActionType("REACTIVE");
+        assertThatThrownBy(() -> service.update(3L, badPatch))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("actionType");
+    }
+
+    @Test
+    void autoOpen_isAlwaysCorrective() {
+        when(repo.findByOrganisationIdAndSourceTypeAndSourceRef(ORG_ID, "ESG_TARGET", "9"))
+            .thenReturn(List.of());
+        when(repo.save(any(CorrectiveAction.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubCapaWindows(7, 30);
+
+        // Auto-CAPAs react to a surfaced gap — PREVENTIVE is manual-only (§5 #1).
+        assertThat(service.autoOpen("ESG_TARGET", "9", "t", null, "d", "HIGH")
+            .getActionType()).isEqualTo("CORRECTIVE");
+    }
+
+    @Test
+    void aggregate_countsByType() {
+        CorrectiveAction car = action("OPEN", "Sara");
+        CorrectiveAction par = action("OPEN", "Sara");
+        par.setActionType("PREVENTIVE");
+        when(repo.findByOrganisationIdAndStatusIn(eq(ORG_ID), any()))
+            .thenReturn(List.of(car, par));
+        stubCapaWindows(7, 30);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> byType = (Map<String, Integer>) service.aggregate().get("byType");
+        assertThat(byType).containsEntry("CORRECTIVE", 1).containsEntry("PREVENTIVE", 1);
+    }
+
     // ── Helper ──────────────────────────────────────────────────────
     private static CorrectiveAction action(String status, String owner) {
         CorrectiveAction a = new CorrectiveAction();

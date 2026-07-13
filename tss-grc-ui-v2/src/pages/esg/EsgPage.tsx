@@ -16,6 +16,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
+import { Modal } from '../../components/ui/Modal';
 import { ApiError, reportingApi } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
@@ -41,13 +42,15 @@ import {
   type ReportType, type RyStatus,
 } from '../../lib/sustainabilityAnnex';
 import {
-  listCapas, capaAggregate, updateCapa,
+  listCapas, capaAggregate, createCapa, updateCapa,
   startCapa, completeCapa, verifyCapa, closeCapa, cancelCapa,
   capaStatusTone, capaPriorityTone, capaAllowedNext,
-  canComplete, capaSourceLabel, capaStatusLabel, capaPriorityLabel,
+  canComplete, canVerify as canVerifyCapa,
+  capaSourceLabel, capaStatusLabel, capaPriorityLabel,
+  capaActionTypeLabel, capaActionTypeTone,
   daysRemaining,
   type CorrectiveAction, type CapaAggregate, type CapaStatus,
-  type CapaSourceType, type CapaPriority as CapaPrio,
+  type CapaSourceType, type CapaPriority as CapaPrio, type CapaActionType,
 } from '../../lib/sustainabilityCapa';
 import {
   listSgi, sgiAggregate, achieveSgi, retireSgi, createSgi, updateSgi, sweepSgi, refreshValueSgi, exportSgiXlsx,
@@ -631,12 +634,16 @@ function CapaTab() {
   // (the tab loads the full first page once and filters in memory).
   const [sourceFilter, setSourceFilter]     = useState<CapaSourceType | 'ALL'>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<CapaPrio | 'ALL'>('ALL');
+  // CT-3 — CAR/PAR narrowing (older rows without the field count as CORRECTIVE,
+  // matching the V297 backfill default).
+  const [typeFilter, setTypeFilter] = useState<CapaActionType | 'ALL'>('ALL');
 
-  // Verify-flow modal state. We replace `window.prompt` (which is jarring
-  // and unstyled) with a small inline FormModal: it holds the verifier
-  // name, mirrors Rule A as you type, and stays in the same window so the
-  // user can see the action they're verifying.
+  // CT-4 — verify confirm state. The verifier IS the authenticated principal
+  // (the server stamps it and ignores any body), so the modal asks for
+  // confirmation instead of a name; Rule A is mirrored against the principal.
   const [verifyingAction, setVerifyingAction] = useState<CorrectiveAction | null>(null);
+  // CT-2 — manual CAR/PAR creation modal.
+  const [creating, setCreating] = useState(false);
   // CT-1 — edit modal state. Auto-CAPAs are born without evidence/owner/plan;
   // this modal is the only in-product way to fill them (evidenceRef unblocks
   // Rule B, so the lifecycle can actually reach COMPLETED).
@@ -659,7 +666,8 @@ function CapaTab() {
   const filtered = items.filter(it =>
     (statusFilter   === 'ALL' || it.status     === statusFilter) &&
     (sourceFilter   === 'ALL' || it.sourceType === sourceFilter) &&
-    (priorityFilter === 'ALL' || it.priority   === priorityFilter));
+    (priorityFilter === 'ALL' || it.priority   === priorityFilter) &&
+    (typeFilter     === 'ALL' || (it.actionType ?? 'CORRECTIVE') === typeFilter));
 
   // Only offer source options that actually occur in the register, so the
   // dropdown stays short for tenants using few gap engines.
@@ -673,24 +681,17 @@ function CapaTab() {
     try { await cancelCapa(id); toast.info(isAr ? 'تم الإلغاء' : 'Cancelled'); await reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
-  async function submitVerify(values: Record<string, unknown>) {
+  // CT-4 — the acting verifier is the session principal. Rule A mirrored
+  // client-side (name AND email, trim/case-insensitive — same as the server's
+  // sameActor) so a blocked self-verify never round-trips for its 400.
+  const principal = getUser()?.username ?? '';
+  const verifyBlocked = verifyingAction !== null && !canVerifyCapa(verifyingAction, principal);
+
+  async function onConfirmVerify() {
     const a = verifyingAction;
-    if (!a) return;
-    const verifier = String(values.verifiedBy ?? '').trim();
-    if (!verifier) {
-      toast.danger(isAr ? 'اسم الجهة المتحقّقة مطلوب' : 'Verifier name is required');
-      return;
-    }
-    // Rule A — client-side mirror so the user gets immediate feedback
-    // instead of waiting for the 400 round-trip.
-    if (a.ownerName && verifier.toLowerCase() === a.ownerName.trim().toLowerCase()) {
-      toast.danger(isAr
-        ? 'لا يمكن أن يكون المتحقّق هو نفس المالك (القاعدة A — فصل المهام).'
-        : 'Verifier must differ from owner (Rule A — separation of duties).');
-      return;
-    }
+    if (!a || verifyBlocked) return;
     try {
-      await verifyCapa(a.id!, verifier);
+      await verifyCapa(a.id!);
       toast.success(isAr ? 'تم التحقّق' : 'Verified');
       setVerifyingAction(null);
       await reload();
@@ -699,16 +700,90 @@ function CapaTab() {
     }
   }
 
-  const verifyFields: FieldDef[] = [
-    { kind: 'text', key: 'verifiedBy', required: true, span: 12,
-      label: isAr ? 'اسم الجهة المتحقّقة (يجب أن يختلف عن المالك)'
-                  : 'Verifier name (must differ from owner)',
-      placeholder: isAr ? 'مثال: لينا الحربي (مدير المخاطر)' : 'e.g. Lina Al-Harbi (Risk Manager)' },
+  // CT-2 — manual creation. Source is fixed MANUAL; both titles are required
+  // (bilingual rule) and enforced field-by-field by the FormModal validator.
+  async function submitCreate(values: Record<string, unknown>) {
+    const str = (v: unknown) => { const s = String(v ?? '').trim(); return s || undefined; };
+    const num = (v: unknown) => {
+      const n = Number(v);
+      return v === '' || v == null || !Number.isFinite(n) ? undefined : n;
+    };
+    try {
+      await createCapa({
+        sourceType:    'MANUAL',
+        actionType:    (str(values.actionType) as CapaActionType) ?? 'CORRECTIVE',
+        titleEn:       String(values.titleEn ?? '').trim(),
+        titleAr:       String(values.titleAr ?? '').trim(),
+        descriptionEn: str(values.descriptionEn),
+        descriptionAr: str(values.descriptionAr),
+        priority:      (str(values.priority) as CapaPrio) ?? 'MEDIUM',
+        ownerName:     str(values.ownerName),
+        ownerEmail:    str(values.ownerEmail),
+        assignedTo:    str(values.assignedTo),
+        targetDate:    str(values.targetDate),
+        evidenceRef:   str(values.evidenceRef),
+        costEstimateSar: num(values.costEstimateSar),
+        effortHours:     num(values.effortHours),
+      });
+      toast.success(isAr ? 'أُنشئ الإجراء' : 'Action created');
+      setCreating(false);
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (isAr ? 'تعذّر إنشاء الإجراء' : 'Failed to create action'));
+    }
+  }
+
+  const createFields: FieldDef[] = [
+    { kind: 'select', key: 'actionType', required: true, span: 4,
+      label: isAr ? 'نوع الإجراء' : 'Action type',
+      options: (['CORRECTIVE', 'PREVENTIVE'] as const)
+        .map(t => ({ value: t, label: capaActionTypeLabel(t, isAr ? 'ar' : 'en') })) },
+    { kind: 'select', key: 'priority', required: true, span: 4,
+      label: isAr ? 'الأولوية' : 'Priority',
+      options: (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const)
+        .map(p => ({ value: p, label: capaPriorityLabel(p, isAr ? 'ar' : 'en') })) },
+    { kind: 'date', key: 'targetDate', span: 4,
+      label: isAr ? 'تاريخ الاستحقاق' : 'Target date' },
+    { kind: 'text', key: 'titleEn', required: true, span: 6, maxLength: 255,
+      label: isAr ? 'العنوان (إنجليزي)' : 'Title (English)' },
+    { kind: 'text', key: 'titleAr', required: true, span: 6, maxLength: 255,
+      label: isAr ? 'العنوان (عربي)' : 'Title (Arabic)' },
+    { kind: 'textarea', key: 'descriptionEn', span: 6, rows: 2,
+      label: isAr ? 'الوصف (إنجليزي)' : 'Description (English)' },
+    { kind: 'textarea', key: 'descriptionAr', span: 6, rows: 2,
+      label: isAr ? 'الوصف (عربي)' : 'Description (Arabic)' },
+    { kind: 'text', key: 'ownerName', span: 4,
+      label: isAr ? 'المالك' : 'Owner' },
+    { kind: 'text', key: 'ownerEmail', span: 4,
+      label: isAr ? 'بريد المالك' : 'Owner email' },
+    { kind: 'text', key: 'assignedTo', span: 4,
+      label: isAr ? 'مُسند إلى' : 'Assigned to' },
+    { kind: 'text', key: 'evidenceRef', span: 12,
+      label: isAr ? 'مرجع الدليل (اختياري — مطلوب قبل الإكمال، القاعدة B)'
+                  : 'Evidence ref (optional — required before Complete, Rule B)' },
+    { kind: 'number', key: 'costEstimateSar', span: 6, min: 0,
+      label: isAr ? 'الكلفة التقديرية (ر.س)' : 'Cost estimate (SAR)' },
+    { kind: 'number', key: 'effortHours', span: 6, min: 0,
+      label: isAr ? 'المجهود (ساعات)' : 'Effort (hours)' },
   ];
+
+  // Stable identity — FormModal resets its values when `initial` changes, so a
+  // per-render literal would wipe the form on every keystroke.
+  const createInitial = useMemo<Record<string, unknown>>(() => ({
+    actionType: 'CORRECTIVE', priority: 'MEDIUM', targetDate: '',
+    titleEn: '', titleAr: '', descriptionEn: '', descriptionAr: '',
+    ownerName: '', ownerEmail: '', assignedTo: '', evidenceRef: '',
+    costEstimateSar: '', effortHours: '',
+  }), []);
 
   // CT-1 — full editable definition for a non-terminal action. Lifecycle
   // fields (status, timestamps, verifier) stay owned by the transitions.
   const editFields: FieldDef[] = [
+    { kind: 'select', key: 'actionType', required: true, span: 4,
+      label: isAr ? 'نوع الإجراء' : 'Action type',
+      options: (['CORRECTIVE', 'PREVENTIVE'] as const)
+        .map(t => ({ value: t, label: capaActionTypeLabel(t, isAr ? 'ar' : 'en') })) },
     { kind: 'select', key: 'priority', required: true, span: 4,
       label: isAr ? 'الأولوية' : 'Priority',
       options: (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const)
@@ -717,9 +792,9 @@ function CapaTab() {
       label: isAr ? 'تاريخ الاستحقاق' : 'Target date' },
     { kind: 'text', key: 'assignedTo', span: 4,
       label: isAr ? 'مُسند إلى' : 'Assigned to' },
-    { kind: 'text', key: 'ownerName', span: 6,
+    { kind: 'text', key: 'ownerName', span: 4,
       label: isAr ? 'المالك' : 'Owner' },
-    { kind: 'text', key: 'ownerEmail', span: 6,
+    { kind: 'text', key: 'ownerEmail', span: 4,
       label: isAr ? 'بريد المالك' : 'Owner email' },
     { kind: 'text', key: 'evidenceRef', span: 12,
       label: isAr ? 'مرجع الدليل (مطلوب قبل الإكمال — القاعدة B)'
@@ -741,6 +816,7 @@ function CapaTab() {
   ];
 
   const editInitial = useMemo<Record<string, unknown>>(() => ({
+    actionType:        editCapa?.actionType ?? 'CORRECTIVE',
     priority:          editCapa?.priority ?? 'MEDIUM',
     targetDate:        editCapa?.targetDate ?? '',
     assignedTo:        editCapa?.assignedTo ?? '',
@@ -765,6 +841,7 @@ function CapaTab() {
     };
     try {
       await updateCapa(editCapa.id, {
+        actionType:        (str(values.actionType) as CapaActionType) ?? 'CORRECTIVE',
         priority:          (str(values.priority) as CapaPrio) ?? 'MEDIUM',
         targetDate:        str(values.targetDate),
         assignedTo:        str(values.assignedTo),
@@ -798,16 +875,36 @@ function CapaTab() {
         <Kpi Icon={CheckCircle2}  label={isAr ? 'مُتحقَّق منها' : 'Verified'} value={agg?.verified ?? 0}   tone="success" onClick={() => setStatusFilter('VERIFIED')} active={statusFilter === 'VERIFIED'} />
         <Kpi Icon={AlertCircle}   label={isAr ? 'متأخّرة' : 'Overdue'}        value={agg?.overdue ?? 0}     tone={(agg?.overdue ?? 0) > 0 ? 'danger' : 'success'} to="/esg" />
         <Kpi Icon={Clock}         label={isAr ? 'مستحقّة قريباً' : 'Due soon'} value={agg?.dueSoon ?? 0}     tone={(agg?.dueSoon ?? 0) > 0 ? 'warning' : 'success'} to="/esg" />
+        {/* CT-3 — the corrective:preventive split, once the server reports it. */}
+        {agg?.byType && (
+          <Kpi Icon={Target} label={isAr ? 'وقائية نشطة' : 'Preventive open'}
+            value={agg.byType.PREVENTIVE ?? 0} tone="info"
+            onClick={() => setTypeFilter(typeFilter === 'PREVENTIVE' ? 'ALL' : 'PREVENTIVE')}
+            active={typeFilter === 'PREVENTIVE'} />
+        )}
       </div>
 
       <Card title={isAr ? 'سجلّ الإجراءات التصحيحية للاستدامة' : 'Sustainability Corrective Actions'}
-            Icon={Wrench}>
+            Icon={Wrench}
+            action={
+              /* CT-2 — manual CAR/PAR creation (source fixed to MANUAL). */
+              <Button variant="primary" size="sm" Icon={Plus} onClick={() => setCreating(true)}>
+                {isAr ? 'إجراء جديد' : 'New action'}
+              </Button>
+            }>
         {/* Status filter chips */}
         <div className="esg-filter-row">
           {(['ALL', 'OPEN', 'IN_PROGRESS', 'COMPLETED', 'VERIFIED', 'CLOSED', 'CANCELLED'] as const).map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
               className={`esg-filter-btn${statusFilter === s ? ' is-active' : ''}`}>
               {s === 'ALL' ? (isAr ? 'الكل' : 'All') : capaStatusLabel(s as CapaStatus, isAr ? 'ar' : 'en')}
+            </button>
+          ))}
+          {/* CT-3 — CAR/PAR chip pair (click again to clear) */}
+          {(['CORRECTIVE', 'PREVENTIVE'] as const).map(t => (
+            <button key={t} onClick={() => setTypeFilter(typeFilter === t ? 'ALL' : t)}
+              className={`esg-filter-btn${typeFilter === t ? ' is-active' : ''}`}>
+              {capaActionTypeLabel(t, isAr ? 'ar' : 'en')}
             </button>
           ))}
           {/* CT-5 — source + priority narrowing */}
@@ -838,12 +935,12 @@ function CapaTab() {
             ? (
               <InlineEmpty>
                 <div className="esg-card-center">
-                  <span>{statusFilter === 'ALL' && sourceFilter === 'ALL' && priorityFilter === 'ALL'
+                  <span>{statusFilter === 'ALL' && sourceFilter === 'ALL' && priorityFilter === 'ALL' && typeFilter === 'ALL'
                     ? (isAr ? 'لا توجد إجراءات تصحيحية بعد' : 'No corrective actions yet')
                     : (isAr ? 'لا توجد إجراءات مطابقة للتصفية' : 'No actions match this filter')}</span>
-                  {(statusFilter !== 'ALL' || sourceFilter !== 'ALL' || priorityFilter !== 'ALL') && (
+                  {(statusFilter !== 'ALL' || sourceFilter !== 'ALL' || priorityFilter !== 'ALL' || typeFilter !== 'ALL') && (
                     <Button variant="ghost" size="sm" Icon={XIcon}
-                      onClick={() => { setStatusFilter('ALL'); setSourceFilter('ALL'); setPriorityFilter('ALL'); }}>
+                      onClick={() => { setStatusFilter('ALL'); setSourceFilter('ALL'); setPriorityFilter('ALL'); setTypeFilter('ALL'); }}>
                       {isAr ? 'إزالة التصفية' : 'Clear filters'}
                     </Button>
                   )}
@@ -857,6 +954,7 @@ function CapaTab() {
                     <th>{isAr ? 'الكود' : 'Code'}</th>
                     <th>{isAr ? 'العنوان' : 'Title'}</th>
                     <th>{isAr ? 'المصدر' : 'Source'}</th>
+                    <th>{isAr ? 'النوع' : 'Type'}</th>
                     <th>{isAr ? 'الأولوية' : 'Priority'}</th>
                     <th>{isAr ? 'الحالة' : 'Status'}</th>
                     <th>{isAr ? 'تاريخ الاستحقاق' : 'Due'}</th>
@@ -896,6 +994,7 @@ function CapaTab() {
                             <div className="mono text-2xs text-muted esg-cell-sub">{a.sourceRef}</div>
                           )}
                         </td>
+                        <td><Badge tone={capaActionTypeTone(a.actionType ?? 'CORRECTIVE')}>{capaActionTypeLabel(a.actionType ?? 'CORRECTIVE', isAr ? 'ar' : 'en')}</Badge></td>
                         <td><Badge tone={capaPriorityTone(a.priority)}>{capaPriorityLabel(a.priority, isAr ? 'ar' : 'en')}</Badge></td>
                         <td><Badge tone={capaStatusTone(a.status)}>{capaStatusLabel(a.status, isAr ? 'ar' : 'en')}</Badge></td>
                         <td className="mono text-2xs">
@@ -973,20 +1072,56 @@ function CapaTab() {
             )}
       </Card>
 
-      {/* Verify-action modal (replaces window.prompt). The header carries
-          the action code + title so the user has full context while they
-          type the verifier name; Rule A is enforced on submit. */}
+      {/* CT-4 — verify confirm. The server stamps the authenticated principal
+          as verifier (it binds no body), so the modal states that instead of
+          collecting a name; a blocked self-verify (Rule A) never round-trips. */}
+      {verifyingAction !== null && (
+        <Modal
+          open
+          size="md"
+          title={`${isAr ? 'تحقّق من الإجراء' : 'Verify action'} · ${verifyingAction.actionCode ?? `#${verifyingAction.id}`}`}
+          onClose={() => setVerifyingAction(null)}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setVerifyingAction(null)}>
+                {isAr ? 'إلغاء' : 'Cancel'}
+              </Button>
+              <Button variant="primary" Icon={CheckCircle2} disabled={verifyBlocked}
+                onClick={() => void onConfirmVerify()}>
+                {isAr ? 'تأكيد التحقّق' : 'Confirm verification'}
+              </Button>
+            </>
+          }>
+          <p className="text-sm">
+            {isAr
+              ? <>سيُسجَّل حسابك (<strong className="mono">{principal}</strong>) كجهة التحقّق من هذا الإجراء.</>
+              : <>You (<strong className="mono">{principal}</strong>) will be recorded as the verifier of this action.</>}
+          </p>
+          <p className="text-2xs text-muted">
+            {isAr
+              ? <>القاعدة A — فصل المهام: يجب أن تختلف جهة التحقّق عن المالك ({verifyingAction.ownerName ?? '—'}).</>
+              : <>Rule A — separation of duties: the verifier must differ from the owner ({verifyingAction.ownerName ?? '—'}).</>}
+          </p>
+          {verifyBlocked && (
+            <p className="text-2xs esg-date-overdue">
+              {isAr
+                ? 'أنت مالك هذا الإجراء — يلزم مستخدم آخر لإتمام التحقّق.'
+                : 'You are the owner of this action — a second user must perform the verification.'}
+            </p>
+          )}
+        </Modal>
+      )}
+
+      {/* CT-2 — manual CAR/PAR creation; source is fixed to MANUAL. */}
       <FormModal
-        open={verifyingAction !== null}
-        title={verifyingAction
-          ? `${isAr ? 'تحقّق من الإجراء' : 'Verify action'} · ${verifyingAction.actionCode ?? `#${verifyingAction.id}`}`
-          : ''}
-        fields={verifyFields}
-        initial={{ verifiedBy: '' }}
-        size="md"
-        submitLabel={isAr ? 'تأكيد التحقّق' : 'Confirm verification'}
-        onClose={() => setVerifyingAction(null)}
-        onSubmit={submitVerify}
+        open={creating}
+        title={isAr ? 'إجراء جديد (مصدر يدوي)' : 'New action (manual source)'}
+        fields={createFields}
+        initial={createInitial}
+        size="lg"
+        submitLabel={isAr ? 'إنشاء الإجراء' : 'Create action'}
+        onClose={() => setCreating(false)}
+        onSubmit={submitCreate}
       />
 
       {/* CT-1 — edit modal: the in-product way to set owner/plan/evidence.

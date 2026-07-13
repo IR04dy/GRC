@@ -18,10 +18,10 @@
 
 | Epic | Content | Status | Commit | Migration |
 |---|---|---|---|---|
-| CT-1 | CAPA edit modal + evidence attach (unblocks Rule B — the loop can close) | **DONE** (tsc/vitest green, live probe 10/10) | _(this branch)_ | none |
-| CT-2 | "New action" button — manual CAR creation from the tab | **NOT STARTED** | — | none |
-| CT-3 | CAR/PAR: `action_type` CORRECTIVE \| PREVENTIVE + FE select/filter/badge | **NOT STARTED** | — | **V297** |
-| CT-4 | Verify-as-principal modal fix (drop the ignored typed name) | **NOT STARTED** | — | none |
+| CT-1 | CAPA edit modal + evidence attach (unblocks Rule B — the loop can close) | **DONE** (tsc/vitest green, live probe 10/10) | `e8986724` | none |
+| CT-2 | "New action" button — manual CAR creation from the tab | **DONE** (batched with CT-3/CT-4; suite 2262/0/0, vitest 48/48, live probe 11/11) | _(this branch)_ | none |
+| CT-3 | CAR/PAR: `action_type` CORRECTIVE \| PREVENTIVE + FE select/filter/badge | **DONE** (V297 applied ×2 to dev; aggregate `byType`; reclassify via PUT) | _(this branch)_ | **V297** |
+| CT-4 | Verify-as-principal modal fix (drop the ignored typed name) | **DONE** (confirm dialog; Rule-A mirror vs principal name+email) | _(this branch)_ | none |
 | CT-5 | Source-type sync: service whitelist = `ck_ca_source`; FE union/labels; source+priority filters | **DONE** (suite 2257/0/0, live probe 3/3) | `fd8e23b2` | none |
 | CT-6 | CAPA register export.xlsx + source deep-links | **NOT STARTED** | — | none |
 | GF-1 | `portfolio_green_impact` rollup (Σ instruments, dedup by project) | **NOT STARTED** | — | none |
@@ -31,8 +31,9 @@
 | GF-5 | `prospectus_ref` field on instruments (REG-8 completion) | **NOT STARTED** | — | rides V298 |
 | GF-6 | CBAM embedded-tCO₂e derivation helper from GHG records | **NOT STARTED** | — | none |
 
-Reserved migrations: **V297** (CAPA `action_type`) · **V298** (green-finance evidence FKs +
-`prospectus_ref`). Next free at plan time: V297. Open decisions: **§5** (4 items).
+Reserved migrations: **V297** (CAPA `action_type` — **APPLIED to dev ×2**) · **V298**
+(green-finance evidence FKs + `prospectus_ref`). Next free after V298: V299.
+Open decisions: **§5** (4 items — #1 resolved as recommended: preventive is manual-only).
 
 ---
 

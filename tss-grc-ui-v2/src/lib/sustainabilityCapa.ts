@@ -28,6 +28,10 @@ export type CapaSourceType =
   | 'TCFD_ITEM'    | 'SGI_COMMITMENT' | 'MANUAL'
   | 'EVIDENCE'     | 'VENDOR_ESG' | 'ESG_TARGET' | 'ENV_PERMIT';
 
+// CT-3 (V297) — CAR/PAR classification. One register, one lifecycle;
+// auto-opened CAPAs are always CORRECTIVE.
+export type CapaActionType = 'CORRECTIVE' | 'PREVENTIVE';
+
 export interface CorrectiveAction {
   id?: number;
   organisationId?: number;
@@ -35,6 +39,7 @@ export interface CorrectiveAction {
 
   sourceType: CapaSourceType;
   sourceRef?: string;
+  actionType?: CapaActionType;   // CT-3 — server defaults CORRECTIVE
 
   titleEn: string;
   titleAr?: string;
@@ -79,6 +84,7 @@ export interface CapaAggregate {
   dueSoon: number;
   byPriority: Record<CapaPriority, number>;
   bySource:   Record<string, number>;
+  byType?:    Record<CapaActionType, number>;   // CT-3
   activeTotal: number;
 }
 
@@ -128,8 +134,10 @@ export function updateCapa(id: number, body: Partial<CorrectiveAction>) {
 
 export function startCapa(id: number)    { return api.post<CorrectiveAction>(`${BASE}/${id}/start`); }
 export function completeCapa(id: number) { return api.post<CorrectiveAction>(`${BASE}/${id}/complete`); }
-export function verifyCapa(id: number, verifiedBy: string) {
-  return api.post<CorrectiveAction>(`${BASE}/${id}/verify`, { verifiedBy });
+// CT-4 — no body: the server stamps the authenticated principal as verifier
+// (SEC-ESG-002); a client-supplied name was never read.
+export function verifyCapa(id: number) {
+  return api.post<CorrectiveAction>(`${BASE}/${id}/verify`);
 }
 export function closeCapa(id: number)    { return api.post<CorrectiveAction>(`${BASE}/${id}/close`); }
 export function cancelCapa(id: number)   { return api.post<CorrectiveAction>(`${BASE}/${id}/cancel`); }
@@ -176,12 +184,19 @@ export function canComplete(a: CorrectiveAction): boolean {
   return a.status === 'IN_PROGRESS' && !!a.evidenceRef && a.evidenceRef.trim().length > 0;
 }
 
-/** Rule-A client mirror — verifier must differ from owner. */
-export function canVerify(a: CorrectiveAction, verifier: string): boolean {
+/**
+ * Rule-A client mirror (CT-4) — the verifier IS the authenticated principal;
+ * they must differ from the owner. Compared against BOTH the owner display
+ * name and the owner email, trim/case-insensitive — exactly the server's
+ * sameActor() check — so the client verdict matches the 400 the server
+ * would return.
+ */
+export function canVerify(a: CorrectiveAction, principalUsername: string): boolean {
   if (a.status !== 'COMPLETED') return false;
-  if (!verifier || !verifier.trim()) return false;
-  if (!a.ownerName) return true;
-  return verifier.trim().toLowerCase() !== a.ownerName.trim().toLowerCase();
+  if (!principalUsername || !principalUsername.trim()) return false;
+  const same = (x?: string) =>
+    !!x && x.trim().toLowerCase() === principalUsername.trim().toLowerCase();
+  return !same(a.ownerName) && !same(a.ownerEmail);
 }
 
 /**
@@ -258,4 +273,19 @@ export function capaPriorityLabel(p: CapaPriority, lang: 'en' | 'ar'): string {
     CRITICAL: 'حرجة', HIGH: 'عالية', MEDIUM: 'متوسطة', LOW: 'منخفضة',
   };
   return (lang === 'ar' ? ar : en)[p];
+}
+
+/** CT-3 — bilingual CAR/PAR labels (same fallback contract as capaSourceLabel). */
+export function capaActionTypeLabel(t: CapaActionType, lang: 'en' | 'ar'): string {
+  const en: Record<CapaActionType, string> = {
+    CORRECTIVE: 'Corrective', PREVENTIVE: 'Preventive',
+  };
+  const ar: Record<CapaActionType, string> = {
+    CORRECTIVE: 'إجراء تصحيحي', PREVENTIVE: 'إجراء وقائي',
+  };
+  return (lang === 'ar' ? ar : en)[t] ?? t;
+}
+
+export function capaActionTypeTone(t: CapaActionType): 'neutral' | 'primary' {
+  return t === 'PREVENTIVE' ? 'primary' : 'neutral';
 }

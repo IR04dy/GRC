@@ -52,6 +52,11 @@ public class CorrectiveAction {
     @Column(nullable = false, length = 20) private String priority = "MEDIUM";
     @Column(nullable = false, length = 20) private String status   = "OPEN";
 
+    /** CT-3 (V297) — CAR/PAR classification: CORRECTIVE (reactive, gap-driven)
+     *  or PREVENTIVE (raised before a nonconformity materialises). One register,
+     *  one lifecycle; auto-opened CAPAs are always CORRECTIVE. */
+    @Column(name = "action_type", nullable = false, length = 20) private String actionType = "CORRECTIVE";
+
     @Column(name = "owner_name",  length = 255) private String ownerName;
     @Column(name = "owner_email", length = 255) private String ownerEmail;
     @Column(name = "assigned_to", length = 255) private String assignedTo;

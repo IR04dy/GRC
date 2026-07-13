@@ -15,6 +15,7 @@ import java.time.LocalDate;
 public record CorrectiveActionCreateRequest(
         @NotBlank @Size(max = 30) String sourceType,
         @Size(max = 64) String sourceRef,
+        @Size(max = 20) String actionType,
         @NotBlank @Size(max = 255) String titleEn,
         @Size(max = 255) String titleAr,
         String descriptionEn,
@@ -38,6 +39,7 @@ public record CorrectiveActionCreateRequest(
         CorrectiveAction e = new CorrectiveAction();
         e.setSourceType(sourceType);
         e.setSourceRef(sourceRef);
+        if (actionType != null && !actionType.isBlank()) e.setActionType(actionType);
         e.setTitleEn(titleEn);
         e.setTitleAr(titleAr);
         e.setDescriptionEn(descriptionEn);
