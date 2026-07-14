@@ -81,6 +81,60 @@ public final class PdfTheme {
         return ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT;
     }
 
+    /** True when the string contains any Arabic-block character. Such text MUST be
+     *  laid out through a run-direction-aware element (cell/ColumnText with RTL):
+     *  a plain {@code doc.add(new Paragraph(..))} never runs OpenPDF's bidi shaper,
+     *  so the letters render isolated (disconnected) and in reversed visual order —
+     *  the exact defect the Arabic register exports shipped with. */
+    public static boolean hasArabic(String s) {
+        if (s == null) return false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if ((c >= 0x0600 && c <= 0x06FF) || (c >= 0x0750 && c <= 0x077F)
+                || (c >= 0xFB50 && c <= 0xFDFF) || (c >= 0xFE70 && c <= 0xFEFF)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Adds one text line through a borderless single-cell table so the bidi
+     * shaper runs. Alignment follows the document direction ({@code ar});
+     * shaping engages whenever the text itself is Arabic — an Arabic subtitle
+     * inside an English report still joins its letters.
+     */
+    public static void line(Document doc, String text, Font font, boolean ar,
+                            float spacingBefore, float spacingAfter) throws DocumentException {
+        if (text == null || text.isBlank()) return;
+        PdfPTable w = new PdfPTable(1);
+        w.setWidthPercentage(100);
+        PdfPCell c = new PdfPCell(new Phrase(text, font));
+        c.setBorder(0);
+        c.setPadding(0);
+        c.setUseAscender(true);
+        c.setUseDescender(true);
+        c.setHorizontalAlignment(alignStart(ar));
+        // Any non-DEFAULT run direction engages the shaper. Base direction: RTL for
+        // Arabic-primary docs or Arabic-leading lines; LTR for Latin-leading lines
+        // with embedded Arabic (keeps English layout, still joins the Arabic).
+        if (ar || firstStrongIsArabic(text)) c.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        else if (hasArabic(text))            c.setRunDirection(PdfWriter.RUN_DIRECTION_LTR);
+        w.addCell(c);
+        w.setSpacingBefore(spacingBefore);
+        w.setSpacingAfter(spacingAfter);
+        doc.add(w);
+    }
+
+    /** True when the first strong-directional character of the string is Arabic
+     *  (i.e. the line reads as an Arabic sentence, whatever digits/punctuation lead). */
+    public static boolean firstStrongIsArabic(String s) {
+        if (s == null) return false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isLetter(c)) return hasArabic(String.valueOf(c));
+        }
+        return false;
+    }
+
     // ────────────────────────────────────────────────────────────────────
     // Cover hero — branded band + title + org + dates + classification
     // ────────────────────────────────────────────────────────────────────
@@ -113,6 +167,9 @@ public final class PdfTheme {
         public LocalDateTime generatedAt;
         /** Optional brand color override (per-tenant). Defaults to {@link PdfFonts#BRAND_PRIMARY}. */
         public Color brand;
+        /** Arabic-primary document — right-aligns the whole hero and lays every
+         *  line out RTL. Arabic *Ar lines are shaped even when this is false. */
+        public boolean ar;
     }
 
     /** Renders the executive cover hero. Adds a 8-mm coloured band, the eyebrow
@@ -136,82 +193,60 @@ public final class PdfTheme {
         bar.setSpacingAfter(28);
         doc.add(bar);
 
-        // Eyebrow — small uppercase brand-accent tag
+        // Eyebrow — small uppercase brand-accent tag. Every hero line goes through
+        // line() so Arabic shapes and the ar flag right-aligns the whole block.
         if (cv.eyebrow != null && !cv.eyebrow.isBlank()) {
-            Paragraph eb = new Paragraph(cv.eyebrow.toUpperCase(Locale.ROOT), PdfFonts.eyebrow(9));
-            eb.setSpacingAfter(2);
-            doc.add(eb);
+            line(doc, cv.eyebrow.toUpperCase(Locale.ROOT), PdfFonts.eyebrow(9), cv.ar, 0, 2);
         }
-        if (cv.eyebrowAr != null && !cv.eyebrowAr.isBlank()) {
-            Paragraph eba = new Paragraph(cv.eyebrowAr, PdfFonts.eyebrow(9));
-            eba.setSpacingAfter(8);
-            doc.add(eba);
-        }
+        line(doc, cv.eyebrowAr, PdfFonts.eyebrow(9), cv.ar, 0, 8);
 
         // Organisation name — sits just above the title as a smaller line
-        if (cv.orgNameEn != null && !cv.orgNameEn.isBlank()) {
-            Paragraph org = new Paragraph(cv.orgNameEn, PdfFonts.body(11));
-            org.setSpacingAfter(0);
-            doc.add(org);
-        }
-        if (cv.orgNameAr != null && !cv.orgNameAr.isBlank()) {
-            Paragraph orgA = new Paragraph(cv.orgNameAr, PdfFonts.body(11));
-            orgA.setSpacingAfter(10);
-            doc.add(orgA);
-        }
+        line(doc, cv.orgNameEn, PdfFonts.body(11), cv.ar, 0, 0);
+        line(doc, cv.orgNameAr, PdfFonts.body(11), cv.ar, 0, 10);
 
         // Code line (smaller, brand-coloured, sits above the big title)
-        if (cv.code != null && !cv.code.isBlank()) {
-            Paragraph c = new Paragraph(cv.code, PdfFonts.title(13));
-            c.setSpacingAfter(4);
-            doc.add(c);
-        }
+        line(doc, cv.code, PdfFonts.title(13), cv.ar, 0, 4);
 
         // Big title — EN first, then AR slightly smaller
-        if (cv.titleEn != null && !cv.titleEn.isBlank()) {
-            Paragraph t = new Paragraph(cv.titleEn,
-                new Font(PdfFonts.baseFont(), 26, Font.BOLD, brand));
-            t.setSpacingAfter(2);
-            doc.add(t);
-        }
-        if (cv.titleAr != null && !cv.titleAr.isBlank()) {
-            Paragraph ta = new Paragraph(cv.titleAr,
-                new Font(PdfFonts.baseFont(), 18, Font.BOLD, brand));
-            ta.setSpacingAfter(12);
-            doc.add(ta);
-        }
+        line(doc, cv.titleEn, new Font(PdfFonts.baseFont(), 26, Font.BOLD, brand), cv.ar, 0, 2);
+        line(doc, cv.titleAr, new Font(PdfFonts.baseFont(), 18, Font.BOLD, brand), cv.ar, 0, 12);
 
         // Subtitle / tagline
-        if (cv.subtitle != null && !cv.subtitle.isBlank()) {
-            Paragraph s = new Paragraph(cv.subtitle, PdfFonts.body(12));
-            s.setSpacingAfter(2);
-            doc.add(s);
-        }
-        if (cv.subtitleAr != null && !cv.subtitleAr.isBlank()) {
-            Paragraph sa = new Paragraph(cv.subtitleAr, PdfFonts.body(12));
-            sa.setSpacingAfter(18);
-            doc.add(sa);
-        }
+        line(doc, cv.subtitle, PdfFonts.body(12), cv.ar, 0, 2);
+        line(doc, cv.subtitleAr, PdfFonts.body(12), cv.ar, 0, 18);
 
         // Hairline rule between hero and metadata block
         hairline(doc, 24, 8);
 
-        // Generation stamp — Gregorian + Hijri side by side
+        // Generation stamp — Gregorian + Hijri side by side. The Hijri part is
+        // Arabic, so the whole stamp is laid out via a shaping-aware cell.
         String hijri = formatHijri(now.toLocalDate());
         String greg  = now.format(GREG_DATETIME);
         Paragraph stamp = new Paragraph();
-        stamp.add(new Phrase("Generated  ", PdfFonts.small(9)));
+        stamp.add(new Phrase(cv.ar ? "أُنشئ  " : "Generated  ", PdfFonts.small(9)));
         stamp.add(new Phrase(greg, PdfFonts.body(10)));
         stamp.add(new Phrase("    ·    ", PdfFonts.small(9)));
         stamp.add(new Phrase("هـ " + hijri, PdfFonts.body(10)));
-        stamp.setSpacingAfter(8);
-        doc.add(stamp);
+        PdfPTable stampWrap = new PdfPTable(1);
+        stampWrap.setWidthPercentage(100);
+        PdfPCell stampCell = new PdfPCell(stamp);
+        stampCell.setBorder(0);
+        stampCell.setPadding(0);
+        stampCell.setUseAscender(true);
+        stampCell.setUseDescender(true);
+        stampCell.setHorizontalAlignment(alignStart(cv.ar));
+        // RTL base for Arabic covers; LTR base otherwise — either way the shaper
+        // runs, so the Hijri segment joins its letters.
+        stampCell.setRunDirection(runDir(cv.ar));
+        stampWrap.addCell(stampCell);
+        stampWrap.setSpacingAfter(8);
+        doc.add(stampWrap);
 
         // Classification badge — high-contrast pill in the cover for security context
         if (cv.classification != null && !cv.classification.isBlank()) {
             Color cls = classificationColor(cv.classification);
             PdfPTable badge = new PdfPTable(1);
-            badge.setHorizontalAlignment(Element.ALIGN_LEFT);
+            badge.setHorizontalAlignment(alignStart(cv.ar));
             try { badge.setTotalWidth(150); badge.setLockedWidth(true); } catch (Exception ignored) {}
             PdfPCell c = new PdfPCell(new Phrase(cv.classification.toUpperCase(Locale.ROOT),
                 PdfFonts.white(8.5f, true)));
@@ -244,13 +279,19 @@ public final class PdfTheme {
     /** Renders a 1-row strip of KPI tiles. Lays them out in a 4-column table;
      *  callers should pass 2 / 3 / 4 / 6 / 8 tiles (multiples that wrap cleanly). */
     public static void kpiStrip(Document doc, List<Kpi> kpis) throws DocumentException {
+        kpiStrip(doc, kpis, false);
+    }
+
+    /** RTL-aware variant — mirrors the tile order and shapes Arabic labels. */
+    public static void kpiStrip(Document doc, List<Kpi> kpis, boolean ar) throws DocumentException {
         if (kpis == null || kpis.isEmpty()) return;
         int cols = Math.min(4, kpis.size());
         PdfPTable t = new PdfPTable(cols);
         t.setWidthPercentage(100);
         t.setSpacingBefore(8);
         t.setSpacingAfter(14);
-        for (Kpi k : kpis) t.addCell(kpiTile(k.label, k.value, k.sub));
+        t.setRunDirection(runDir(ar));
+        for (Kpi k : kpis) t.addCell(kpiTile(k.label, k.value, k.sub, ar));
         // Pad to a full row of `cols` for visual alignment
         int remainder = kpis.size() % cols;
         if (remainder != 0) {
@@ -266,6 +307,12 @@ public final class PdfTheme {
     /** Single KPI tile cell — warm-paper background, brand border, big bold
      *  value, small uppercase label, optional sub-caption. */
     public static PdfPCell kpiTile(String label, String value, String sub) {
+        return kpiTile(label, value, sub, false);
+    }
+
+    /** RTL-aware tile — right-aligns under {@code ar} and shapes Arabic text
+     *  even inside an LTR document (composite cells never shape otherwise). */
+    public static PdfPCell kpiTile(String label, String value, String sub, boolean ar) {
         PdfPCell c = new PdfPCell();
         c.setPadding(10);
         c.setPaddingTop(8);
@@ -273,18 +320,24 @@ public final class PdfTheme {
         c.setBackgroundColor(PdfFonts.PAPER_BG);
         c.setBorderColor(PdfFonts.PAPER_BORDER);
         c.setBorderWidth(0.5f);
+        if (ar || hasArabic(label) || hasArabic(sub)) {
+            c.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
+        }
 
         Paragraph l = new Paragraph(label == null ? "" : label.toUpperCase(Locale.ROOT),
             PdfFonts.kpiLabel(8));
         l.setSpacingAfter(2);
+        l.setAlignment(alignStart(ar));
         c.addElement(l);
 
         Paragraph v = new Paragraph(value == null ? "—" : value, PdfFonts.kpiValue(20));
         v.setSpacingAfter(2);
+        v.setAlignment(alignStart(ar));
         c.addElement(v);
 
         if (sub != null && !sub.isBlank()) {
             Paragraph s = new Paragraph(sub, PdfFonts.small(8));
+            s.setAlignment(alignStart(ar));
             c.addElement(s);
         }
         return c;
@@ -305,6 +358,12 @@ public final class PdfTheme {
      *  bands match the cover. Falls back to {@link PdfFonts#BRAND_PRIMARY} when {@code brand}
      *  is null. */
     public static void sectionDivider(Document doc, String titleEn, String titleAr, Color brand) throws DocumentException {
+        sectionDivider(doc, titleEn, titleAr, brand, false);
+    }
+
+    /** RTL-aware variant — right-aligns the section titles for Arabic-primary docs;
+     *  the Arabic title line is shaped either way. */
+    public static void sectionDivider(Document doc, String titleEn, String titleAr, Color brand, boolean ar) throws DocumentException {
         Color band = brand != null ? brand : PdfFonts.BRAND_PRIMARY;
         doc.newPage();
         // Brand band — narrow filled cell across the top of the new page
@@ -318,16 +377,9 @@ public final class PdfTheme {
         bar.setSpacingAfter(12);
         doc.add(bar);
 
-        Paragraph t = new Paragraph(titleEn == null ? "" : titleEn, PdfFonts.title(15));
-        t.setSpacingAfter(2);
-        doc.add(t);
-        if (titleAr != null && !titleAr.isBlank()) {
-            Paragraph ta = new Paragraph(titleAr, PdfFonts.bold(12));
-            ta.setSpacingAfter(12);
-            doc.add(ta);
-        } else {
-            t.setSpacingAfter(12);
-        }
+        boolean hasAr = titleAr != null && !titleAr.isBlank();
+        line(doc, titleEn == null ? "" : titleEn, PdfFonts.title(15), ar, 0, hasAr ? 2 : 12);
+        line(doc, titleAr, PdfFonts.bold(12), ar, 0, 12);
     }
 
     // ────────────────────────────────────────────────────────────────────
@@ -347,6 +399,7 @@ public final class PdfTheme {
         c.setBorder(0);
         c.setPadding(4);
         c.setHorizontalAlignment(Element.ALIGN_CENTER);
+        if (hasArabic(text)) c.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);   // shape Arabic labels
         t.addCell(c);
         return t;
     }
@@ -390,15 +443,24 @@ public final class PdfTheme {
      *  the configured table so callers can keep adding rows via
      *  {@link #addMetaCell}. */
     public static PdfPTable metadataGrid() {
+        return metadataGrid(false);
+    }
+
+    /** RTL-aware variant — mirrors the label/value column order for Arabic docs. */
+    public static PdfPTable metadataGrid(boolean ar) {
         PdfPTable t = new PdfPTable(4);
         t.setWidthPercentage(100);
         t.setSpacingBefore(6);
+        t.setRunDirection(runDir(ar));
         try { t.setWidths(new float[] {1.1f, 2, 1.1f, 2}); } catch (DocumentException ignored) {}
         return t;
     }
 
-    /** Adds a label/value pair to a {@link #metadataGrid()} table. */
+    /** Adds a label/value pair to a {@link #metadataGrid()} table. Alignment and
+     *  shaping follow the grid's run direction; Arabic values shape even inside
+     *  an LTR grid (e.g. the Arabic org name on an English cover). */
     public static void addMetaCell(PdfPTable t, String label, String value) {
+        boolean rtl = t.getRunDirection() == PdfWriter.RUN_DIRECTION_RTL;
         PdfPCell l = new PdfPCell(new Phrase(label == null ? "" : label.toUpperCase(Locale.ROOT),
             PdfFonts.kpiLabel(8)));
         PdfPCell v = new PdfPCell(new Phrase(value == null || value.isBlank() ? "—" : value,
@@ -406,6 +468,10 @@ public final class PdfTheme {
         l.setBorder(0); v.setBorder(0);
         l.setPaddingTop(4); l.setPaddingBottom(8);
         v.setPaddingTop(4); v.setPaddingBottom(8);
+        l.setHorizontalAlignment(rtl ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
+        v.setHorizontalAlignment(rtl ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
+        if (!rtl && hasArabic(value)) v.setRunDirection(PdfWriter.RUN_DIRECTION_LTR);
+        if (!rtl && hasArabic(label)) l.setRunDirection(PdfWriter.RUN_DIRECTION_LTR);
         t.addCell(l); t.addCell(v);
     }
 
@@ -472,13 +538,13 @@ public final class PdfTheme {
                 if (!classification.isBlank()) {
                     Phrase cls = new Phrase(classification.toUpperCase(Locale.ROOT),
                         new Font(PdfFonts.baseFont(), 7.5f, Font.BOLD, PdfFonts.BRAND_ACCENT));
-                    ColumnText.showTextAligned(cb, Element.ALIGN_LEFT, cls, doc.left(), baseY, 0);
+                    showFooterText(cb, Element.ALIGN_LEFT, cls, doc.left(), baseY, classification);
                 }
                 // Center: doc label
                 if (!docLabel.isBlank()) {
                     Phrase ctr = new Phrase(docLabel, PdfFonts.small(8));
-                    ColumnText.showTextAligned(cb, Element.ALIGN_CENTER, ctr,
-                        (doc.left() + doc.right()) / 2f, baseY, 0);
+                    showFooterText(cb, Element.ALIGN_CENTER, ctr,
+                        (doc.left() + doc.right()) / 2f, baseY, docLabel);
                 }
                 // Right: "Page X of "+ template
                 String pageText = "Page " + writer.getPageNumber() + " of ";
@@ -488,6 +554,17 @@ public final class PdfTheme {
                     doc.right() - textWidth - 24, baseY, 0);
                 cb.addTemplate(totalTemplate, doc.right() - 24, baseY - 2);
             } catch (Exception ignored) { /* never block document close */ }
+        }
+
+        /** {@code showTextAligned} without a run direction never shapes Arabic —
+         *  route Arabic-bearing footer strings through the RTL-aware overload. */
+        private static void showFooterText(PdfContentByte cb, int align, Phrase p,
+                                           float x, float y, String raw) {
+            if (hasArabic(raw)) {
+                ColumnText.showTextAligned(cb, align, p, x, y, 0, PdfWriter.RUN_DIRECTION_RTL, 0);
+            } else {
+                ColumnText.showTextAligned(cb, align, p, x, y, 0);
+            }
         }
 
         @Override

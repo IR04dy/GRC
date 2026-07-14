@@ -52,11 +52,11 @@ import java.util.Map;
  * report looks identical to the BCP/Crisis/NDI exporters and the board
  * pack — one brand identity across the whole platform's printed output.
  *
- * <p>Locale handling: pass {@code lang = "ar"} to render Arabic column
- * headers and the Arabic organisation name on the cover. The exporter
- * keeps the document run direction LTR throughout; Arabic glyphs are
- * shaped at the run level by the bundled TTF so Latin codes (R-00012)
- * and Arabic headers can coexist without flipping.
+ * <p>Locale handling: pass {@code lang = "ar"} for a fully RTL document —
+ * cover, KPI strip, metadata grid, and tables all lay out right-to-left
+ * with OpenPDF's bidi shaper joining the Arabic letters (every element
+ * carries an explicit run direction; unshaped/LTR Arabic shipped once).
+ * Latin fragments (R-00012 codes) coexist as LTR runs within RTL lines.
  */
 @Service
 @RequiredArgsConstructor
@@ -108,7 +108,7 @@ public class ExportService {
                 String[] hdr = ar
                     ? new String[]{ "الرقم", "المخاطرة", "الفئة", "الاحتمال", "الأثر", "النتيجة", "الحالة" }
                     : new String[]{ "Code",  "Risk",     "Category", "L",       "I",       "Score",   "Status" };
-                for (String h : hdr) t.addCell(headerCell(h));
+                for (String h : hdr) headerCell(t, h);
                 for (Risk r : risks) {
                     String name = ar && r.getTitleAr() != null ? r.getTitleAr() : r.getTitleEn();
                     cell(t, "R-" + String.format("%05d", r.getId()));
@@ -168,7 +168,7 @@ public class ExportService {
                 String[] hdr = ar
                     ? new String[]{ "الملاحظة", "الأهمية", "المالك", "الأيام", "التصعيد", "مرحلة CAPA", "الحالة" }
                     : new String[]{ "Finding",  "Severity", "Owner",  "Days",   "Tier",     "CAPA Stage",  "Status" };
-                for (String h : hdr) t.addCell(headerCell(h));
+                for (String h : hdr) headerCell(t, h);
 
                 for (AuditFinding f : findings) {
                     LocalDateTime created = f.getCreatedAt();
@@ -233,7 +233,7 @@ public class ExportService {
                 String[] hdr = ar
                     ? new String[]{ "الرمز", "اسم المؤشر", "الحالة", "آخر قراءة", "حد أخضر", "حد أصفر", "المالك" }
                     : new String[]{ "Code",  "KRI",        "Band",    "Latest",     "Green ≤", "Amber ≤", "Owner" };
-                for (String h : hdr) t.addCell(headerCell(h));
+                for (String h : hdr) headerCell(t, h);
 
                 for (KriDefinition k : kris) {
                     Object[] latest = latestByKri.get(k.getId());
@@ -292,11 +292,12 @@ public class ExportService {
             cv.orgNameAr = brand.orgNameAr() != null ? brand.orgNameAr() : (o == null ? null : o.getNameAr());
             cv.brand = brand.primaryColor();
             cv.classification = "Internal";
+            cv.ar = ar;   // Arabic covers lay out RTL + shaped (was LTR/unshaped)
             PdfTheme.coverHero(doc, cv);
 
             // KPI strip
             if (kpis != null && !kpis.isEmpty()) {
-                PdfTheme.kpiStrip(doc, new ArrayList<>(kpis));
+                PdfTheme.kpiStrip(doc, new ArrayList<>(kpis), ar);
             }
 
             // Standardized metadata block (module/type/period/scope/records/language/classification).
@@ -326,19 +327,27 @@ public class ExportService {
         }
     }
 
-    private static PdfPCell headerCell(String text) {
+    private static void headerCell(PdfPTable t, String text) {
         PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.header(10)));
         c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
         c.setBorderColor(PdfFonts.HAIRLINE);
         c.setPaddingTop(6); c.setPaddingBottom(6);
         c.setPaddingLeft(6); c.setPaddingRight(6);
-        return c;
+        if (t.getRunDirection() == PdfWriter.RUN_DIRECTION_RTL) {
+            c.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        }
+        t.addCell(c);
     }
     private static void cell(PdfPTable t, String text) {
         PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.body(9)));
         c.setBorderColor(PdfFonts.PAPER_BORDER);
         c.setPaddingTop(5); c.setPaddingBottom(5);
         c.setPaddingLeft(6); c.setPaddingRight(6);
+        // Follow the table's direction (cells inherit shaping from the table,
+        // but alignment stays physical-left unless set explicitly).
+        if (t.getRunDirection() == PdfWriter.RUN_DIRECTION_RTL) {
+            c.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        }
         t.addCell(c);
     }
     private static String safe(String s) { return s == null ? "—" : s; }

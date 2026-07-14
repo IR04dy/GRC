@@ -122,6 +122,7 @@ public class TabularExportService {
             title.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
             XWPFRun tr = title.createRun();
             tr.setText(req.exportType());
+            DocxExportService.applyRtlRun(tr, ar);
             tr.setBold(true);
             tr.setFontSize(18);
             tr.setColor(hex);
@@ -136,6 +137,7 @@ public class TabularExportService {
                 head.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
                 XWPFRun hr = head.createRun();
                 hr.setText(s.name());
+                DocxExportService.applyRtlRun(hr, ar);
                 hr.setBold(true);
                 hr.setFontSize(13);
                 hr.setColor(hex);

@@ -14,7 +14,9 @@ import com.tss.grc.module.risk.kri.repository.KriMeasurementRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.xwpf.usermodel.*;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSectPr;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STPageOrientation;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -215,6 +217,7 @@ public class DocxExportService {
         eb.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
         XWPFRun ebr = eb.createRun();
         ebr.setText(eyebrow);
+        applyRtlRun(ebr, ar);
         ebr.setColor("C9A977");
         ebr.setBold(true);
         ebr.setFontSize(11);
@@ -224,6 +227,7 @@ public class DocxExportService {
         tp.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
         XWPFRun tr = tp.createRun();
         tr.setText(title);
+        applyRtlRun(tr, ar);
         tr.setColor("094242");
         tr.setBold(true);
         tr.setFontSize(26);
@@ -234,6 +238,7 @@ public class DocxExportService {
             op.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
             XWPFRun or = op.createRun();
             or.setText(ar && o.getNameAr() != null ? o.getNameAr() : safe(o.getNameEn()));
+            applyRtlRun(or, ar);
             or.setColor("5C6A65");
             or.setFontSize(12);
         }
@@ -244,6 +249,7 @@ public class DocxExportService {
         XWPFRun dr = dp.createRun();
         dr.setText((ar ? "تاريخ الإصدار: " : "Issued: ") + LocalDate.now()
                 + (ar ? "  •  تصنيف: داخلي" : "  •  Classification: Internal"));
+        applyRtlRun(dr, ar);
         dr.setColor("5C6A65");
         dr.setFontSize(9);
         dr.addBreak();
@@ -253,6 +259,7 @@ public class DocxExportService {
         XWPFTable strip = doc.createTable(1, kpis.length);
         strip.setWidth("100%");
         strip.removeBorders();
+        applyBidiVisual(strip, ar);   // tile order mirrors for Arabic
         XWPFTableRow row = strip.getRow(0);
         for (int i = 0; i < kpis.length; i++) {
             XWPFTableCell c = row.getCell(i);
@@ -263,6 +270,7 @@ public class DocxExportService {
             lbl.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
             XWPFRun lblr = lbl.createRun();
             lblr.setText(kpis[i][0]);
+            applyRtlRun(lblr, ar);
             lblr.setColor("5C6A65");
             lblr.setFontSize(9);
             lblr.setBold(true);
@@ -272,6 +280,7 @@ public class DocxExportService {
             val.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
             XWPFRun valr = val.createRun();
             valr.setText(kpis[i][1]);
+            applyRtlRun(valr, ar);
             valr.setColor("094242");
             valr.setFontSize(20);
             valr.setBold(true);
@@ -289,6 +298,7 @@ public class DocxExportService {
     static XWPFTable newTable(XWPFDocument doc, String[] headers, boolean ar, String headerHex) {
         XWPFTable t = doc.createTable(1, headers.length);
         t.setWidth("100%");
+        applyBidiVisual(t, ar);   // mirror the column order for Arabic
         XWPFTableRow hr = t.getRow(0);
         for (int i = 0; i < headers.length; i++) {
             XWPFTableCell c = hr.getCell(i);
@@ -299,6 +309,7 @@ public class DocxExportService {
             p.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
             XWPFRun r = p.createRun();
             r.setText(headers[i]);
+            applyRtlRun(r, ar);
             r.setColor("FFFFFF");
             r.setBold(true);
             r.setFontSize(10);
@@ -314,6 +325,7 @@ public class DocxExportService {
         p.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
         XWPFRun r = p.createRun();
         r.setText(text);
+        applyRtlRun(r, ar);
         r.setColor("1A1A1A");
         r.setFontSize(9);
     }
@@ -323,6 +335,26 @@ public class DocxExportService {
         if (!rtl) return;
         if (p.getCTP().getPPr() == null) p.getCTP().addNewPPr();
         if (p.getCTP().getPPr().getBidi() == null) p.getCTP().getPPr().addNewBidi();
+    }
+
+    /**
+     * {@code w:bidiVisual} on the table properties — without it Word lays the
+     * columns out left-to-right even when every paragraph is bidi/right-aligned,
+     * which is exactly how the Arabic register tables shipped ("tables start
+     * from the left"). With it, Word mirrors the column order for RTL reading.
+     */
+    static void applyBidiVisual(XWPFTable t, boolean rtl) {
+        if (!rtl) return;
+        CTTblPr pr = t.getCTTbl().getTblPr() != null ? t.getCTTbl().getTblPr() : t.getCTTbl().addNewTblPr();
+        if (!pr.isSetBidiVisual()) pr.addNewBidiVisual();
+    }
+
+    /** {@code w:rtl} on the run properties — Word needs it to order mixed
+     *  Arabic/Latin/digit runs correctly inside a bidi paragraph. */
+    static void applyRtlRun(XWPFRun r, boolean rtl) {
+        if (!rtl) return;
+        CTRPr pr = r.getCTR().isSetRPr() ? r.getCTR().getRPr() : r.getCTR().addNewRPr();
+        if (pr.sizeOfRtlArray() == 0) pr.addNewRtl();
     }
 
     /** A4 landscape — register dumps benefit from the extra horizontal room. */
