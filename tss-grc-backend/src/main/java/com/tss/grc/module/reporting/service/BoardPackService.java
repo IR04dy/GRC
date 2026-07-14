@@ -164,15 +164,15 @@ public class BoardPackService {
         cv.subtitle   = "Risk · Compliance · Continuity Snapshot";
         cv.subtitleAr = "نظرة شاملة على المخاطر والامتثال والاستمرارية";
         cv.classification = "Confidential";
+        cv.ar = ar;   // Arabic covers lay out RTL + right-aligned
         PdfTheme.coverHero(doc, cv);
 
-        Paragraph footnote = new Paragraph(
+        // Centered + shaped — a plain centered Paragraph leaves the Arabic
+        // disconnected (no bidi shaping outside run-direction-aware elements).
+        PdfTheme.centeredLine(doc,
             ar ? "تم إنشاء هذه الحزمة تلقائيًا بواسطة منصة TSS GRC."
                : "This pack was generated automatically by the TSS GRC Platform.",
-            PdfFonts.small(9));
-        footnote.setAlignment(Element.ALIGN_CENTER);
-        footnote.setSpacingBefore(180);
-        doc.add(footnote);
+            PdfFonts.small(9), 180, 0);
     }
 
     // ── Section: Executive Summary ──────────────────────────────────────────
@@ -214,17 +214,21 @@ public class BoardPackService {
         c.setBorderColor(PdfFonts.PAPER_BORDER);
         c.setBackgroundColor(PdfFonts.PAPER_BG);
         c.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
+        // ALIGN semantics mirror under RTL runs — visualStart returns the
+        // constant that lands at the reading start (visual right for Arabic).
+        int align = PdfTheme.visualStart(ar,
+            ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
 
         Paragraph l = new Paragraph(label, PdfFonts.small(9));
-        l.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
+        l.setAlignment(align);
         c.addElement(l);
 
         Paragraph v = new Paragraph(value, PdfFonts.kpiValue(20));
-        v.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
+        v.setAlignment(align);
         c.addElement(v);
 
         Paragraph s = new Paragraph(sub, PdfFonts.small(8));
-        s.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
+        s.setAlignment(align);
         c.addElement(s);
 
         t.addCell(c);
@@ -273,13 +277,11 @@ public class BoardPackService {
             else if (days >= 30) mgr++;
             else onTrack++;
         }
-        Paragraph escalation = new Paragraph(
+        // Shaping-aware line — plain paragraphs never shape Arabic.
+        PdfTheme.line(doc,
             ar ? "تقادم الملاحظات: في المسار " + onTrack + " · مدير " + mgr + " · مدير عام " + dir + " · تنفيذي " + exec
                : "Aging tiers: On Track " + onTrack + " · Manager " + mgr + " · Director " + dir + " · Exec " + exec,
-            PdfFonts.normal(11));
-        escalation.setSpacingAfter(10);
-        escalation.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        doc.add(escalation);
+            PdfFonts.normal(11), ar, 0, 10);
 
         // Open findings table — top 15 oldest first
         findings.sort(Comparator.comparing((AuditFinding f) -> f.getCreatedAt() == null ? LocalDateTime.MAX : f.getCreatedAt()));
@@ -327,13 +329,10 @@ public class BoardPackService {
             else if ("AMBER".equals(latestBand)) amber++;
             else if ("RED".equals(latestBand)) red++;
         }
-        Paragraph bands = new Paragraph(
+        PdfTheme.line(doc,
             ar ? "نطاقات: أخضر " + green + " · أصفر " + amber + " · أحمر " + red + " · بدون بيانات " + noData
                : "Bands: Green " + green + " · Amber " + amber + " · Red " + red + " · No Data " + noData,
-            PdfFonts.normal(11));
-        bands.setSpacingAfter(10);
-        bands.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        doc.add(bands);
+            PdfFonts.normal(11), ar, 0, 10);
 
         float[] widths = new float[]{ 1.2f, 4f, 1f, 1.2f, 1.2f, 1.4f };
         PdfPTable t = buildTable(widths, ar);
@@ -388,14 +387,11 @@ public class BoardPackService {
         }
         doc.add(t);
 
-        // Small-print attribution
-        Paragraph note = new Paragraph(
+        // Small-print attribution (shaping-aware)
+        PdfTheme.line(doc,
             ar ? "* لا تظهر الأطر الخالية تمامًا من السياسات والضوابط والملاحظات."
                : "* Frameworks with zero policies, controls and findings are omitted.",
-            PdfFonts.small(8));
-        note.setSpacingBefore(8);
-        note.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        doc.add(note);
+            PdfFonts.small(8), ar, 8, 0);
     }
 
     // ── Section: Change Mgmt ────────────────────────────────────────────────
@@ -415,15 +411,13 @@ public class BoardPackService {
         long rolledBack = changeRepo.countByOrganisationIdAndOutcome(org, "ROLLED_BACK");
         long emergency  = changeRepo.countByOrganisationIdAndChangeType(org, "EMERGENCY");
 
-        Paragraph p = new Paragraph(
+        PdfTheme.line(doc,
             ar
               ? "إجمالي " + total + " · قيد التنفيذ " + inFlight + " · ناجحة " + success
                 + " · تراجع " + rolledBack + " · طارئة " + emergency
               : "Total " + total + " · In-flight " + inFlight + " · Success " + success
                 + " · Rolled-back " + rolledBack + " · Emergency " + emergency,
-            PdfFonts.normal(11));
-        p.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        doc.add(p);
+            PdfFonts.normal(11), ar, 0, 0);
     }
 
     // ── Section: Ethics & Compliance ───────────────────────────────────────
@@ -440,7 +434,7 @@ public class BoardPackService {
         long retal         = caseRepo.countByOrganisationIdAndCategory(org, "RETALIATION");
         long strs          = amlRepo.countByOrganisationIdAndStrFiled(org, true);
 
-        Paragraph p = new Paragraph(
+        PdfTheme.line(doc,
             ar
               ? "قضايا: " + total + " · مفتوحة " + openCases + " · مُثبتة " + substantiated
                 + " · رشاوى/عمولات " + bribery + " · غسل أموال " + amlSusp + " · انتقام " + retal
@@ -448,9 +442,7 @@ public class BoardPackService {
               : "Cases: " + total + " · Open " + openCases + " · Substantiated " + substantiated
                 + " · Bribery/Kickback " + bribery + " · AML suspicion " + amlSusp + " · Retaliation " + retal
                 + " · STRs filed " + strs,
-            PdfFonts.normal(11));
-        p.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        doc.add(p);
+            PdfFonts.normal(11), ar, 0, 0);
     }
 
     // ── Section: Sustainability & ESG (S-N) ────────────────────────────────
@@ -508,24 +500,21 @@ public class BoardPackService {
     private static String str(Object o) { return (o == null || o.toString().isBlank()) ? "—" : o.toString(); }
 
     private void renderClosing(Document doc, boolean ar) throws DocumentException {
-        Paragraph p = new Paragraph(
+        PdfTheme.centeredLine(doc,
             ar
               ? "تم إعداد هذه الحزمة آليًا من بيانات منصة TSS GRC الحية. "
                 + "للاستفسارات حول البيانات الواردة، يرجى التواصل مع مكتب إدارة المخاطر المؤسسية."
               : "This pack is auto-generated from live TSS GRC platform data. "
                 + "For questions about any figure, contact the Group ERM Office.",
-            PdfFonts.small(10));
-        p.setSpacingBefore(40);
-        p.setAlignment(Element.ALIGN_CENTER);
-        doc.add(p);
+            PdfFonts.small(10), 40, 0);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
     private void renderSectionHeader(Document doc, String title, boolean ar) throws DocumentException {
-        Paragraph p = new Paragraph(title, PdfFonts.title(16));
-        p.setAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        p.setSpacingAfter(12);
-        doc.add(p);
+        // Shaping-aware — section titles are Arabic sentences in ar packs; a
+        // plain Paragraph rendered them disconnected (and ALIGN_RIGHT would be
+        // mirrored inside RTL elements — PdfTheme.line handles both).
+        PdfTheme.line(doc, title, PdfFonts.title(16), ar, 0, 12);
     }
 
     private PdfPTable buildTable(float[] widths, boolean ar) throws DocumentException {
@@ -539,8 +528,10 @@ public class BoardPackService {
         PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.header(10)));
         c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
         c.setPadding(6);
-        c.setHorizontalAlignment(ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
         c.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
+        // ALIGN semantics mirror under RTL runs — visualStart lands at the reading start.
+        c.setHorizontalAlignment(PdfTheme.visualStart(ar,
+            ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR));
         c.setBorderColor(PdfFonts.HAIRLINE);
         return c;
     }
@@ -548,8 +539,9 @@ public class BoardPackService {
     private PdfPCell bodyCell(String text, boolean rtl) {
         PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.body(9)));
         c.setPadding(5);
-        c.setHorizontalAlignment(rtl ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
         c.setRunDirection(rtl ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
+        c.setHorizontalAlignment(PdfTheme.visualStart(rtl,
+            rtl ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR));
         c.setBorderColor(PdfFonts.PAPER_BORDER);
         return c;
     }

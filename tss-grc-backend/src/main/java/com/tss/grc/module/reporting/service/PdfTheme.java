@@ -142,6 +142,27 @@ public final class PdfTheme {
         doc.add(w);
     }
 
+    /** As {@link #line} but centre-aligned (centre is unaffected by the RTL
+     *  alignment mirror) — for footnotes/closings that must still shape Arabic. */
+    public static void centeredLine(Document doc, String text, Font font,
+                                    float spacingBefore, float spacingAfter) throws DocumentException {
+        if (text == null || text.isBlank()) return;
+        PdfPTable w = new PdfPTable(1);
+        w.setWidthPercentage(100);
+        PdfPCell c = new PdfPCell(new Phrase(text, font));
+        c.setBorder(0);
+        c.setPadding(0);
+        c.setUseAscender(true);
+        c.setUseDescender(true);
+        c.setHorizontalAlignment(Element.ALIGN_CENTER);
+        if (firstStrongIsArabic(text))  c.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        else if (hasArabic(text))       c.setRunDirection(PdfWriter.RUN_DIRECTION_LTR);
+        w.addCell(c);
+        w.setSpacingBefore(spacingBefore);
+        w.setSpacingAfter(spacingAfter);
+        doc.add(w);
+    }
+
     /** True when the first strong-directional character of the string is Arabic
      *  (i.e. the line reads as an Arabic sentence, whatever digits/punctuation lead). */
     public static boolean firstStrongIsArabic(String s) {
