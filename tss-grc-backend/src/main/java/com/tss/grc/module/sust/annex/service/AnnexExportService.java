@@ -62,13 +62,23 @@ public class AnnexExportService {
             cv.subtitle = "Status: " + r.getStatus()
                     + (r.getContentHash() != null ? "   ·   SHA-256 " + r.getContentHash().substring(0, 12) + "…" : "");
             cv.classification = "Internal";
+            cv.ar = ar;   // right-align + RTL the cover for Arabic exports
             PdfTheme.coverHero(doc, cv);
 
             String md = r.getContentMarkdown() == null ? "(empty)" : r.getContentMarkdown();
             for (String line : md.split("\n", -1)) {
-                Paragraph p = new Paragraph(line.isEmpty() ? " " : line, PdfFonts.body(9));
-                p.setLeading(12f);
-                doc.add(p);
+                // Arabic body lines must go through a shaping-aware element — a
+                // plain Paragraph renders them as disconnected letters (audit
+                // finding). Latin-only lines keep the original path so English
+                // output stays byte-identical to the pre-lang behaviour.
+                if ((ar || PdfTheme.hasArabic(line)) && !line.isBlank()) {
+                    PdfTheme.line(doc, line, PdfFonts.body(9), ar, 0, 0);
+                } else {
+                    // blank spacer lines + Latin-only lines keep the original path
+                    Paragraph p = new Paragraph(line.isEmpty() ? " " : line, PdfFonts.body(9));
+                    p.setLeading(12f);
+                    doc.add(p);
+                }
             }
             doc.close();
             writer.close();

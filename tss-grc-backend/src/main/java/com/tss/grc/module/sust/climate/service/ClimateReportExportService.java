@@ -148,7 +148,10 @@ public class ClimateReportExportService {
             PdfPCell c = new PdfPCell(new Phrase(h, PdfFonts.header(9)));
             c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
             c.setBorderColor(PdfFonts.HAIRLINE);
-            c.setHorizontalAlignment(PdfTheme.alignStart(ar));
+            // RTL table cells mirror ALIGN semantics — visualStart, not alignStart.
+            c.setHorizontalAlignment(PdfTheme.visualStart(ar,
+                ar ? com.lowagie.text.pdf.PdfWriter.RUN_DIRECTION_RTL
+                   : com.lowagie.text.pdf.PdfWriter.RUN_DIRECTION_DEFAULT));
             c.setPadding(5);
             t.addCell(c);
         }

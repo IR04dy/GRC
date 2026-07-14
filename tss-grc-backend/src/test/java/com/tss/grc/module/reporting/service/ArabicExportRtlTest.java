@@ -40,6 +40,23 @@ class ArabicExportRtlTest {
         assertThat(PdfTheme.firstStrongIsArabic("—")).isFalse();
     }
 
+    @Test
+    void visualStart_compensatesForMirroredAlignmentUnderRtlRuns() {
+        // Measured live: ALIGN_RIGHT + RUN_DIRECTION_RTL rendered at the physical
+        // LEFT (x=0.04) — OpenPDF mirrors LEFT/RIGHT semantics under RTL runs.
+        int RTL = com.lowagie.text.pdf.PdfWriter.RUN_DIRECTION_RTL;
+        int DEF = com.lowagie.text.pdf.PdfWriter.RUN_DIRECTION_DEFAULT;
+        int LTR = com.lowagie.text.pdf.PdfWriter.RUN_DIRECTION_LTR;
+        // Arabic doc, RTL run: reading start = visual right = mirrored ALIGN_LEFT.
+        assertThat(PdfTheme.visualStart(true, RTL)).isEqualTo(com.lowagie.text.Element.ALIGN_LEFT);
+        // English doc, no run direction: plain left.
+        assertThat(PdfTheme.visualStart(false, DEF)).isEqualTo(com.lowagie.text.Element.ALIGN_LEFT);
+        // Arabic line inside an English doc (RTL run): keep it at the visual left.
+        assertThat(PdfTheme.visualStart(false, RTL)).isEqualTo(com.lowagie.text.Element.ALIGN_RIGHT);
+        // English doc, LTR run (mixed line): no mirroring, plain left.
+        assertThat(PdfTheme.visualStart(false, LTR)).isEqualTo(com.lowagie.text.Element.ALIGN_LEFT);
+    }
+
     // ── DOCX table direction + run rtl ───────────────────────────────────
 
     @Test

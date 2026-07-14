@@ -76,9 +76,25 @@ public final class PdfTheme {
     }
 
     /** Horizontal alignment matching the run direction — RIGHT for Arabic, LEFT for
-     *  Latin — so table cells/headers don't stay left-aligned under RTL. */
+     *  Latin — so table cells/headers don't stay left-aligned under RTL. NOTE:
+     *  only valid for elements WITHOUT an RTL run direction; under
+     *  {@code RUN_DIRECTION_RTL} OpenPDF mirrors the LEFT/RIGHT semantics — use
+     *  {@link #visualStart(boolean, int)} there instead (measured live: an
+     *  ALIGN_RIGHT + RTL cover line rendered at x=0.04, the physical left). */
     public static int alignStart(boolean ar) {
         return ar ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT;
+    }
+
+    /**
+     * The alignment constant that renders at the reading start of the document
+     * direction — accounting for OpenPDF mirroring ALIGN_LEFT/RIGHT semantics
+     * whenever the element carries {@code RUN_DIRECTION_RTL}: there, ALIGN_LEFT
+     * means "start" (visual right) and ALIGN_RIGHT means "end" (visual left).
+     */
+    public static int visualStart(boolean ar, int runDirection) {
+        boolean wantVisualRight = ar;                                        // Arabic docs start at the right
+        if (runDirection == PdfWriter.RUN_DIRECTION_RTL) wantVisualRight = !wantVisualRight;
+        return wantVisualRight ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT;
     }
 
     /** True when the string contains any Arabic-block character. Such text MUST be
@@ -112,12 +128,14 @@ public final class PdfTheme {
         c.setPadding(0);
         c.setUseAscender(true);
         c.setUseDescender(true);
-        c.setHorizontalAlignment(alignStart(ar));
         // Any non-DEFAULT run direction engages the shaper. Base direction: RTL for
         // Arabic-primary docs or Arabic-leading lines; LTR for Latin-leading lines
         // with embedded Arabic (keeps English layout, still joins the Arabic).
-        if (ar || firstStrongIsArabic(text)) c.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
-        else if (hasArabic(text))            c.setRunDirection(PdfWriter.RUN_DIRECTION_LTR);
+        int dir = PdfWriter.RUN_DIRECTION_DEFAULT;
+        if (ar || firstStrongIsArabic(text)) dir = PdfWriter.RUN_DIRECTION_RTL;
+        else if (hasArabic(text))            dir = PdfWriter.RUN_DIRECTION_LTR;
+        if (dir != PdfWriter.RUN_DIRECTION_DEFAULT) c.setRunDirection(dir);
+        c.setHorizontalAlignment(visualStart(ar, dir));
         w.addCell(c);
         w.setSpacingBefore(spacingBefore);
         w.setSpacingAfter(spacingAfter);
@@ -234,10 +252,10 @@ public final class PdfTheme {
         stampCell.setPadding(0);
         stampCell.setUseAscender(true);
         stampCell.setUseDescender(true);
-        stampCell.setHorizontalAlignment(alignStart(cv.ar));
         // RTL base for Arabic covers; LTR base otherwise — either way the shaper
         // runs, so the Hijri segment joins its letters.
         stampCell.setRunDirection(runDir(cv.ar));
+        stampCell.setHorizontalAlignment(visualStart(cv.ar, runDir(cv.ar)));
         stampWrap.addCell(stampCell);
         stampWrap.setSpacingAfter(8);
         doc.add(stampWrap);
@@ -320,24 +338,27 @@ public final class PdfTheme {
         c.setBackgroundColor(PdfFonts.PAPER_BG);
         c.setBorderColor(PdfFonts.PAPER_BORDER);
         c.setBorderWidth(0.5f);
+        int dir = PdfWriter.RUN_DIRECTION_DEFAULT;
         if (ar || hasArabic(label) || hasArabic(sub)) {
-            c.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
+            dir = ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR;
+            c.setRunDirection(dir);
         }
+        int align = visualStart(ar, dir);
 
         Paragraph l = new Paragraph(label == null ? "" : label.toUpperCase(Locale.ROOT),
             PdfFonts.kpiLabel(8));
         l.setSpacingAfter(2);
-        l.setAlignment(alignStart(ar));
+        l.setAlignment(align);
         c.addElement(l);
 
         Paragraph v = new Paragraph(value == null ? "—" : value, PdfFonts.kpiValue(20));
         v.setSpacingAfter(2);
-        v.setAlignment(alignStart(ar));
+        v.setAlignment(align);
         c.addElement(v);
 
         if (sub != null && !sub.isBlank()) {
             Paragraph s = new Paragraph(sub, PdfFonts.small(8));
-            s.setAlignment(alignStart(ar));
+            s.setAlignment(align);
             c.addElement(s);
         }
         return c;
@@ -468,8 +489,11 @@ public final class PdfTheme {
         l.setBorder(0); v.setBorder(0);
         l.setPaddingTop(4); l.setPaddingBottom(8);
         v.setPaddingTop(4); v.setPaddingBottom(8);
-        l.setHorizontalAlignment(rtl ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-        v.setHorizontalAlignment(rtl ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
+        // Cells inherit the grid's run direction; ALIGN under RTL is mirrored,
+        // so "start of reading" is visualStart(), not a literal RIGHT.
+        int dir = rtl ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_DEFAULT;
+        l.setHorizontalAlignment(visualStart(rtl, dir));
+        v.setHorizontalAlignment(visualStart(rtl, dir));
         if (!rtl && hasArabic(value)) v.setRunDirection(PdfWriter.RUN_DIRECTION_LTR);
         if (!rtl && hasArabic(label)) l.setRunDirection(PdfWriter.RUN_DIRECTION_LTR);
         t.addCell(l); t.addCell(v);

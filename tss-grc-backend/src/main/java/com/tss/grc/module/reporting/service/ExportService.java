@@ -334,7 +334,8 @@ public class ExportService {
         c.setPaddingTop(6); c.setPaddingBottom(6);
         c.setPaddingLeft(6); c.setPaddingRight(6);
         if (t.getRunDirection() == PdfWriter.RUN_DIRECTION_RTL) {
-            c.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            // ALIGN semantics mirror under RTL: LEFT = reading start = visual right.
+            c.setHorizontalAlignment(PdfTheme.visualStart(true, PdfWriter.RUN_DIRECTION_RTL));
         }
         t.addCell(c);
     }
@@ -344,9 +345,9 @@ public class ExportService {
         c.setPaddingTop(5); c.setPaddingBottom(5);
         c.setPaddingLeft(6); c.setPaddingRight(6);
         // Follow the table's direction (cells inherit shaping from the table,
-        // but alignment stays physical-left unless set explicitly).
+        // but alignment needs the mirrored constant — see PdfTheme.visualStart).
         if (t.getRunDirection() == PdfWriter.RUN_DIRECTION_RTL) {
-            c.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            c.setHorizontalAlignment(PdfTheme.visualStart(true, PdfWriter.RUN_DIRECTION_RTL));
         }
         t.addCell(c);
     }

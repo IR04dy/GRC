@@ -114,11 +114,12 @@ public final class RegisterExport {
             cv.orgNameAr = orgNameAr;
             cv.classification = "Confidential";
             cv.generatedAt = LocalDateTime.now();
+            cv.ar = ar;   // Arabic covers lay out RTL (audit: table mirrored, cover didn't)
             PdfTheme.coverHero(doc, cv);
 
-            if (kpis != null && !kpis.isEmpty()) PdfTheme.kpiStrip(doc, new ArrayList<>(kpis));
+            if (kpis != null && !kpis.isEmpty()) PdfTheme.kpiStrip(doc, new ArrayList<>(kpis), ar);
 
-            PdfTheme.sectionDivider(doc, titleEn + " (" + rows.size() + ")", titleAr);
+            PdfTheme.sectionDivider(doc, titleEn + " (" + rows.size() + ")", titleAr, null, ar);
 
             PdfPTable t = new PdfPTable(cols.size());
             t.setWidthPercentage(100);
@@ -140,7 +141,10 @@ public final class RegisterExport {
 
     private static PdfPCell headerCell(String text, boolean ar) {
         PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.header(8.5f)));
-        c.setHorizontalAlignment(PdfTheme.alignStart(ar));
+        // Header cells sit in an RTL table when ar — the alignment constant must
+        // account for OpenPDF's mirrored semantics (PdfTheme.visualStart).
+        c.setHorizontalAlignment(PdfTheme.visualStart(ar,
+            ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_DEFAULT));
         c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
         c.setBorderColor(PdfFonts.HAIRLINE);
         c.setPaddingTop(5); c.setPaddingBottom(5); c.setPaddingLeft(5); c.setPaddingRight(5);
@@ -151,6 +155,11 @@ public final class RegisterExport {
         PdfPCell c = new PdfPCell(new Phrase(text == null || text.isBlank() ? "—" : text, PdfFonts.body(8)));
         c.setBorderColor(PdfFonts.PAPER_BORDER);
         c.setPaddingTop(4); c.setPaddingBottom(4); c.setPaddingLeft(5); c.setPaddingRight(5);
+        // Follow the table's direction — cells inherit shaping; alignment needs
+        // the mirrored constant (see PdfTheme.visualStart).
+        if (t.getRunDirection() == PdfWriter.RUN_DIRECTION_RTL) {
+            c.setHorizontalAlignment(PdfTheme.visualStart(true, PdfWriter.RUN_DIRECTION_RTL));
+        }
         t.addCell(c);
     }
 

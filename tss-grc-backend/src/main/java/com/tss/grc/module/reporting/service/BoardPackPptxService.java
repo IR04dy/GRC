@@ -378,12 +378,16 @@ public class BoardPackPptxService {
             XSLFTableRow row = table.addRow();
             row.setHeight(r == 0 ? 28 : 24);
             for (int c = 0; c < cols; c++) {
+                // PPTX has no bidiVisual equivalent — mirror the column order by
+                // hand for Arabic so the first logical column sits rightmost
+                // (text alignment alone left the columns LTR; found by audit).
+                int sc = ar ? cols - 1 - c : c;
                 XSLFTableCell cell = row.addCell();
                 cell.clearText();
                 XSLFTextParagraph p = cell.addNewTextParagraph();
                 p.setTextAlign(ar ? TextParagraph.TextAlign.RIGHT : TextParagraph.TextAlign.LEFT);  // P2 §21: RTL cells for AR
                 XSLFTextRun tr = p.addNewTextRun();
-                tr.setText(rows[r][c]);
+                tr.setText(rows[r][sc]);
                 tr.setFontSize((double) (r == 0 ? 12 : 11));
                 tr.setBold(r == 0);
                 tr.setFontColor(r == 0 ? Color.WHITE : INK);
@@ -393,7 +397,8 @@ public class BoardPackPptxService {
             }
         }
         for (int c = 0; c < cols; c++) {
-            table.setColumnWidth(c, anchor.width * colWidthPct[c]);
+            // Widths mirror with the content so each column keeps its intended size.
+            table.setColumnWidth(c, anchor.width * colWidthPct[ar ? cols - 1 - c : c]);
         }
     }
 
