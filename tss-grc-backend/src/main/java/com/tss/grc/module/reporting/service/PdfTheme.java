@@ -142,6 +142,19 @@ public final class PdfTheme {
         doc.add(w);
     }
 
+    /**
+     * Arabic content in a cell of an LTR table needs its own RTL run to shape
+     * (cells only inherit direction from RTL tables); alignment uses the
+     * mirrored constant so the text still reads from its natural right side.
+     * No-op for Latin text or when the table is already RTL.
+     */
+    public static void shapeCellIfArabic(PdfPTable t, PdfPCell c, String text) {
+        if (hasArabic(text) && t.getRunDirection() != PdfWriter.RUN_DIRECTION_RTL) {
+            c.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+            c.setHorizontalAlignment(visualStart(true, PdfWriter.RUN_DIRECTION_RTL));
+        }
+    }
+
     /** As {@link #line} but centre-aligned (centre is unaffected by the RTL
      *  alignment mirror) — for footnotes/closings that must still shape Arabic. */
     public static void centeredLine(Document doc, String text, Font font,

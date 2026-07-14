@@ -184,10 +184,10 @@ public class BcpPlanPdfExporter {
             titleEn.setSpacingAfter(2);
             doc.add(titleEn);
 
+            // Arabic titles/bodies go through the shaping-aware line() and start
+            // at the RIGHT — a plain Paragraph rendered them disconnected/left.
             if (s.getSectionTitleAr() != null && !s.getSectionTitleAr().isBlank()) {
-                Paragraph titleAr = new Paragraph(s.getSectionTitleAr(), PdfFonts.small(10));
-                titleAr.setSpacingAfter(4);
-                doc.add(titleAr);
+                PdfTheme.line(doc, s.getSectionTitleAr(), PdfFonts.small(10), true, 0, 4);
             }
 
             String bodyEn = nz(s.getBodyEn());
@@ -197,9 +197,7 @@ public class BcpPlanPdfExporter {
                 doc.add(p);
             }
             if (s.getBodyAr() != null && !s.getBodyAr().isBlank()) {
-                Paragraph p = new Paragraph(s.getBodyAr(), PdfFonts.body(10));
-                p.setSpacingAfter(10);
-                doc.add(p);
+                PdfTheme.line(doc, s.getBodyAr(), PdfFonts.body(10), true, 0, 10);
             }
         }
     }
@@ -283,9 +281,14 @@ public class BcpPlanPdfExporter {
                 + " · " + nz(a.getAttestedByName())
                 + " · " + nz(a.getAttestationOutcome())
                 + (a.getNotes() == null || a.getNotes().isBlank() ? "" : " — " + a.getNotes());
-            Paragraph para = new Paragraph(line, PdfFonts.small(9));
-            para.setSpacingAfter(3);
-            doc.add(para);
+            // Attester names / notes can be Arabic — shape defensively.
+            if (PdfTheme.hasArabic(line)) {
+                PdfTheme.line(doc, line, PdfFonts.small(9), false, 0, 3);
+            } else {
+                Paragraph para = new Paragraph(line, PdfFonts.small(9));
+                para.setSpacingAfter(3);
+                doc.add(para);
+            }
         }
     }
 
@@ -297,6 +300,7 @@ public class BcpPlanPdfExporter {
         c.setBorderColor(PdfFonts.HAIRLINE);
         c.setPaddingTop(6); c.setPaddingBottom(6);
         c.setPaddingLeft(6); c.setPaddingRight(6);
+        rtlIfArabic(t, c, txt);
         t.addCell(c);
     }
     private static void cell(PdfPTable t, String txt) {
@@ -304,7 +308,19 @@ public class BcpPlanPdfExporter {
         c.setBorderColor(PdfFonts.PAPER_BORDER);
         c.setPaddingTop(5); c.setPaddingBottom(5);
         c.setPaddingLeft(6); c.setPaddingRight(6);
+        rtlIfArabic(t, c, txt);
         t.addCell(c);
+    }
+
+    /** Arabic cell content in an LTR table needs its own RTL run to shape;
+     *  alignment uses the mirrored constant (see PdfTheme.visualStart). */
+    private static void rtlIfArabic(PdfPTable t, PdfPCell c, String txt) {
+        if (PdfTheme.hasArabic(txt)
+                && t.getRunDirection() != com.lowagie.text.pdf.PdfWriter.RUN_DIRECTION_RTL) {
+            c.setRunDirection(com.lowagie.text.pdf.PdfWriter.RUN_DIRECTION_RTL);
+            c.setHorizontalAlignment(PdfTheme.visualStart(true,
+                com.lowagie.text.pdf.PdfWriter.RUN_DIRECTION_RTL));
+        }
     }
     private static String nz(String s) { return s == null ? "—" : s; }
 }

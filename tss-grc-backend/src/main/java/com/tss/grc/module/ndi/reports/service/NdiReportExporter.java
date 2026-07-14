@@ -177,6 +177,7 @@ public class NdiReportExporter {
             cv.orgNameAr = org == null ? null : org.getNameAr();
             cv.classification = "Internal";
             cv.generatedAt = result.generatedAt() == null ? null : result.generatedAt().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime();
+            cv.ar = ar;   // Arabic reports lay the cover out RTL
             PdfTheme.coverHero(doc, cv);
 
             // ── Summary KPI strip + key/value table ──────────────────
@@ -188,7 +189,7 @@ public class NdiReportExporter {
                     Map.Entry<String, Object> e = entries.get(i);
                     kpis.add(new PdfTheme.Kpi(prettyKey(e.getKey()), asString(e.getValue()), ""));
                 }
-                PdfTheme.kpiStrip(doc, kpis);
+                PdfTheme.kpiStrip(doc, kpis, ar);
 
                 // Remaining keys as a key/value list (only if more than 4)
                 if (entries.size() > 4) {
@@ -289,11 +290,13 @@ public class NdiReportExporter {
 
     private static void headerCell(PdfPTable t, String text) {
         PdfPCell c = new PdfPCell(new Phrase(text, PdfFonts.header(9)));
+        // ALIGN_LEFT = reading start in both directions (mirrored under RTL tables).
         c.setHorizontalAlignment(Element.ALIGN_LEFT);
         c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
         c.setBorderColor(PdfFonts.HAIRLINE);
         c.setPaddingTop(6); c.setPaddingBottom(6);
         c.setPaddingLeft(6); c.setPaddingRight(6);
+        PdfTheme.shapeCellIfArabic(t, c, text);
         t.addCell(c);
     }
 
@@ -303,6 +306,7 @@ public class NdiReportExporter {
         c.setBorderColor(PdfFonts.PAPER_BORDER);
         c.setPaddingTop(5); c.setPaddingBottom(5);
         c.setPaddingLeft(6); c.setPaddingRight(6);
+        PdfTheme.shapeCellIfArabic(t, c, text);
         t.addCell(c);
     }
 

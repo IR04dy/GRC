@@ -187,10 +187,12 @@ public class CrisisEventPdfExporter {
     private void renderNarrative(Document doc, CrisisEvent e) throws DocumentException {
         PdfTheme.sectionDivider(doc, "Description & Root Cause", "الوصف والسبب الجذري");
 
+        // User-entered narrative is frequently Arabic — route through the
+        // shaping-aware line() (Arabic-leading text right-aligns + shapes;
+        // Latin text keeps its left start).
         if (e.getDescription() != null && !e.getDescription().isBlank()) {
-            Paragraph desc = new Paragraph(e.getDescription(), PdfFonts.body(10));
-            desc.setSpacingAfter(10);
-            doc.add(desc);
+            PdfTheme.line(doc, e.getDescription(), PdfFonts.body(10),
+                PdfTheme.firstStrongIsArabic(e.getDescription()), 0, 10);
         } else {
             doc.add(new Paragraph("(no description recorded)", PdfFonts.small(10)));
         }
@@ -201,9 +203,8 @@ public class CrisisEventPdfExporter {
             rcLabel.setSpacingAfter(4);
             doc.add(rcLabel);
 
-            Paragraph rc = new Paragraph(e.getRootCause(), PdfFonts.body(10));
-            rc.setSpacingAfter(10);
-            doc.add(rc);
+            PdfTheme.line(doc, e.getRootCause(), PdfFonts.body(10),
+                PdfTheme.firstStrongIsArabic(e.getRootCause()), 0, 10);
         }
 
         // Affected-scope JSON arrays as labelled lists
@@ -218,6 +219,11 @@ public class CrisisEventPdfExporter {
 
     private void affectedLine(Document doc, String label, String json) throws DocumentException {
         if (json == null || json.isBlank() || "[]".equals(json.trim())) return;
+        if (PdfTheme.hasArabic(json)) {
+            // Arabic service/site names inside the JSON — shape the whole line.
+            PdfTheme.line(doc, label + ": " + json, PdfFonts.small(9), false, 0, 3);
+            return;
+        }
         Paragraph p = new Paragraph();
         p.add(new Phrase(label + ": ", PdfFonts.bold(10)));
         p.add(new Phrase(json, PdfFonts.small(9)));
@@ -359,6 +365,7 @@ public class CrisisEventPdfExporter {
         c.setBorderColor(PdfFonts.HAIRLINE);
         c.setPaddingTop(6); c.setPaddingBottom(6);
         c.setPaddingLeft(6); c.setPaddingRight(6);
+        PdfTheme.shapeCellIfArabic(t, c, txt);
         t.addCell(c);
     }
     private static void cell(PdfPTable t, String txt) {
@@ -366,6 +373,7 @@ public class CrisisEventPdfExporter {
         c.setBorderColor(PdfFonts.PAPER_BORDER);
         c.setPaddingTop(5); c.setPaddingBottom(5);
         c.setPaddingLeft(6); c.setPaddingRight(6);
+        PdfTheme.shapeCellIfArabic(t, c, txt);
         t.addCell(c);
     }
 }

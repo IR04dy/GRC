@@ -197,29 +197,25 @@ public class BcpBinderPdfBuilder {
         cv.orgNameAr  = o == null ? null : o.getNameAr();
         cv.classification = "Restricted";
         cv.generatedAt = b.getGeneratedAt() != null ? b.getGeneratedAt() : LocalDateTime.now();
+        boolean arDoc = wantsAr && !bilingual;   // pure-AR binder lays out RTL
+        cv.ar = arDoc;
         PdfTheme.coverHero(doc, cv);
 
         // Hijri + Gregorian generation date — Saudi-native dual format.
         // Format example: "23 May 2026 · ١٥ ذو القعدة ١٤٤٧هـ" — the AR
         // half is rendered with the Hijri formatter and Eastern-Arabic
-        // numerals.
+        // numerals. Rendered through the shaping-aware line() so the Hijri
+        // month names join their letters (a plain Paragraph never shapes).
         LocalDate gregDate = cv.generatedAt.toLocalDate();
         String hijriAr  = formatHijriArabic(gregDate);
         String gregEn   = gregDate.format(DT_GREG_LONG);
-
-        Paragraph dateLine = new Paragraph();
-        dateLine.add(new Phrase(gregEn, PdfFonts.body(11)));
-        dateLine.add(new Phrase("    ·    ", PdfFonts.small(10)));
-        dateLine.add(new Phrase(hijriAr + " هـ", PdfFonts.body(11)));
-        dateLine.setSpacingBefore(4);
-        dateLine.setSpacingAfter(14);
-        doc.add(dateLine);
+        PdfTheme.line(doc, gregEn + "    ·    " + hijriAr + " هـ", PdfFonts.body(11), arDoc, 4, 14);
 
         // Responsible officer block — falls back to "—" when the plan
         // doesn't yet carry an owner. Bilingual label always present so
         // a printed copy carries the same field whether the source was
         // EN-only or AR-only.
-        PdfPTable meta = PdfTheme.metadataGrid();
+        PdfPTable meta = PdfTheme.metadataGrid(arDoc);
         PdfTheme.addMetaCell(meta, "Plan type",        nz(p.getPlanType(), "BCP"));
         PdfTheme.addMetaCell(meta, "نوع الخطة",         nz(p.getPlanType(), "BCP"));
         PdfTheme.addMetaCell(meta, "Version",          nz(b.getVersionLabel(), "v1"));
@@ -234,18 +230,15 @@ public class BcpBinderPdfBuilder {
 
         // Saudi-native distribution banner: AR phrasing "محكوم — غير قابل للتوزيع"
         // is the regulator-recognised wording — same as SAMA RegOnline cover
-        // sheets and the AAOIFI shari'ah board template.
-        Paragraph banner = new Paragraph();
-        banner.add(new Phrase("مستند محكوم — غير قابل للتوزيع",
-            new Font(PdfFonts.baseFont(), 11, Font.BOLD, PdfFonts.DANGER)));
-        banner.setSpacingBefore(24);
-        doc.add(banner);
+        // sheets and the AAOIFI shari'ah board template. line() shapes it.
+        PdfTheme.line(doc, "مستند محكوم — غير قابل للتوزيع",
+            new Font(PdfFonts.baseFont(), 11, Font.BOLD, PdfFonts.DANGER), arDoc, 24, 0);
     }
 
     // ─── Table of contents ─────────────────────────────────────────
 
     private void renderTableOfContents(Document doc, boolean bilingual, boolean wantsAr) throws DocumentException {
-        PdfTheme.sectionDivider(doc, "Table of Contents", "فهرس المحتويات");
+        PdfTheme.sectionDivider(doc, "Table of Contents", "فهرس المحتويات", null, wantsAr && !bilingual);
 
         PdfPTable t = new PdfPTable(3);
         t.setWidthPercentage(100);
@@ -269,7 +262,7 @@ public class BcpBinderPdfBuilder {
 
     private void renderPlanMetadata(Document doc, BuildInput in, boolean bilingual, boolean wantsAr) throws DocumentException {
         BcpPlan p = in.plan();
-        PdfTheme.sectionDivider(doc, "1. Organisational context", "١. السياق التنظيمي");
+        PdfTheme.sectionDivider(doc, "1. Organisational context", "١. السياق التنظيمي", null, wantsAr && !bilingual);
 
         Organisation o = in.organisation();
         String orgEn = o == null ? "—" : nz(o.getNameEn(), "—");
@@ -284,7 +277,7 @@ public class BcpBinderPdfBuilder {
                 + "عند تعذّر الوصول إلى منصة الحوكمة والمخاطر والامتثال.");
 
         // 2. Purpose & scope
-        PdfTheme.sectionDivider(doc, "2. Purpose & scope", "٢. الهدف والنطاق");
+        PdfTheme.sectionDivider(doc, "2. Purpose & scope", "٢. الهدف والنطاق", null, wantsAr && !bilingual);
         addBilingualParagraph(doc, bilingual, wantsAr,
             "Purpose: ensure continuity of " + nz(p.getTitleEn(), "the critical service")
                 + " within RTO " + (p.getRtoHours() == null ? "—" : (p.getRtoHours() + "h"))
@@ -294,7 +287,7 @@ public class BcpBinderPdfBuilder {
                 + " ونقطة التعافي المستهدفة " + (p.getRpoHours() == null ? "—" : (p.getRpoHours() + " ساعة")) + ".");
 
         // 3. Roles & responsibilities
-        PdfTheme.sectionDivider(doc, "3. Roles & responsibilities", "٣. الأدوار والمسؤوليات");
+        PdfTheme.sectionDivider(doc, "3. Roles & responsibilities", "٣. الأدوار والمسؤوليات", null, wantsAr && !bilingual);
         addBilingualParagraph(doc, bilingual, wantsAr,
             "Plan owner: " + nz(p.getApprovedBy(), "—")
                 + ". Response team: " + nz(p.getResponseTeamRole(), "—") + ".",
@@ -306,7 +299,7 @@ public class BcpBinderPdfBuilder {
 
     private void renderRtoMtpdMatrix(Document doc, BuildInput in, boolean bilingual, boolean wantsAr) throws DocumentException {
         BcpPlan p = in.plan();
-        PdfTheme.sectionDivider(doc, "4. Business Impact Analysis", "٤. تحليل الأثر التجاري");
+        PdfTheme.sectionDivider(doc, "4. Business Impact Analysis", "٤. تحليل الأثر التجاري", null, wantsAr && !bilingual);
 
         PdfTheme.kpiStrip(doc, List.of(
             new PdfTheme.Kpi("RTO",  p.getRtoHours()  == null ? "—" : (p.getRtoHours()  + "h"), "Recovery Time"),
@@ -314,7 +307,7 @@ public class BcpBinderPdfBuilder {
             new PdfTheme.Kpi("MTPD", p.getMtpdHours() == null ? "—" : (p.getMtpdHours() + "h"), "Max Tolerable"),
             new PdfTheme.Kpi("Version", "v" + (p.getCurrentVersion() == null ? 1 : p.getCurrentVersion()),
                 nz(p.getStatus(), "DRAFT"))
-        ));
+        ), wantsAr && !bilingual);
 
         addBilingualParagraph(doc, bilingual, wantsAr,
             "The recovery targets above were captured from BIA #"
@@ -334,17 +327,17 @@ public class BcpBinderPdfBuilder {
         List<BcpSection> secs = in.sections();
 
         // 5. Continuity strategy
-        PdfTheme.sectionDivider(doc, "5. Continuity strategy", "٥. استراتيجية الاستمرارية");
+        PdfTheme.sectionDivider(doc, "5. Continuity strategy", "٥. استراتيجية الاستمرارية", null, wantsAr && !bilingual);
         renderMatchedSection(doc, secs, bilingual, wantsAr,
             "recovery_priorities", "strategy", "continuity_strategy");
 
         // 6. Recovery procedures
-        PdfTheme.sectionDivider(doc, "6. Recovery procedures", "٦. إجراءات الاسترداد");
+        PdfTheme.sectionDivider(doc, "6. Recovery procedures", "٦. إجراءات الاسترداد", null, wantsAr && !bilingual);
         renderMatchedSection(doc, secs, bilingual, wantsAr,
             "recovery_procedures", "recovery", "activation_criteria");
 
         // 7. Contact tree
-        PdfTheme.sectionDivider(doc, "7. Contact tree", "٧. شجرة الاتصال");
+        PdfTheme.sectionDivider(doc, "7. Contact tree", "٧. شجرة الاتصال", null, wantsAr && !bilingual);
         renderContactTree(doc, in, bilingual, wantsAr);
 
         // 8. Crisis communication templates — cross-link to Slice 9-E v2 templates.
@@ -352,7 +345,7 @@ public class BcpBinderPdfBuilder {
         // we list which template-set the plan ties to and instruct the printed-copy
         // user where the active templates can be found if the platform is online.
         PdfTheme.sectionDivider(doc, "8. Crisis communication templates",
-            "٨. قوالب الاتصالات في حالة الأزمات");
+            "٨. قوالب الاتصالات في حالة الأزمات", null, wantsAr && !bilingual);
         addBilingualParagraph(doc, bilingual, wantsAr,
             "Crisis communication templates live in the platform's Crisis Comms registry "
                 + "(Slice 9-E). When operating offline, use the contact tree above and the "
@@ -418,7 +411,7 @@ public class BcpBinderPdfBuilder {
     private void renderVersionHistory(Document doc, BuildInput in,
                                       boolean bilingual, boolean wantsAr) throws DocumentException {
         List<BcpVersion> versions = in.versions();
-        PdfTheme.sectionDivider(doc, "Version history", "سجل الإصدارات");
+        PdfTheme.sectionDivider(doc, "Version history", "سجل الإصدارات", null, wantsAr && !bilingual);
         if (versions == null || versions.isEmpty()) {
             addBilingualParagraph(doc, bilingual, wantsAr,
                 "(No approved versions yet.)",
@@ -446,7 +439,7 @@ public class BcpBinderPdfBuilder {
 
     private void renderAppendices(Document doc, BuildInput in,
                                   boolean bilingual, boolean wantsAr) throws DocumentException {
-        PdfTheme.sectionDivider(doc, "9. Appendices", "٩. ملاحق");
+        PdfTheme.sectionDivider(doc, "9. Appendices", "٩. ملاحق", null, wantsAr && !bilingual);
         addBilingualParagraph(doc, bilingual, wantsAr,
             "A1. SAMA RegOnline notification stub — use when reporting an operational "
                 + "disruption per SAMA BCF Annex D within the 2-hour clock.",
@@ -480,13 +473,11 @@ public class BcpBinderPdfBuilder {
             t.addCell(textCell(nz(ar, "—"), false));
             doc.add(t);
         } else if (wantsAr) {
-            Paragraph p = new Paragraph(nz(ar, "—"), PdfFonts.body(10));
-            p.setSpacingAfter(8);
-            doc.add(p);
+            // Shaping-aware + right-aligned — a plain Paragraph rendered the
+            // Arabic body disconnected and left-anchored.
+            PdfTheme.line(doc, nz(ar, "—"), PdfFonts.body(10), true, 0, 8);
         } else {
-            Paragraph p = new Paragraph(nz(en, "—"), PdfFonts.body(10));
-            p.setSpacingAfter(8);
-            doc.add(p);
+            PdfTheme.line(doc, nz(en, "—"), PdfFonts.body(10), false, 0, 8);
         }
     }
 
@@ -496,6 +487,12 @@ public class BcpBinderPdfBuilder {
         c.setBorderColor(PdfFonts.PAPER_BORDER);
         c.setBorderWidth(0.4f);
         c.setPadding(8);
+        // The AR column of a bilingual row must still shape + read from the
+        // right; the mirrored ALIGN semantics under RTL make that ALIGN_LEFT.
+        if (PdfTheme.hasArabic(text)) {
+            c.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+            c.setHorizontalAlignment(PdfTheme.visualStart(true, PdfWriter.RUN_DIRECTION_RTL));
+        }
         return c;
     }
 
@@ -504,6 +501,11 @@ public class BcpBinderPdfBuilder {
         c.setBackgroundColor(PdfFonts.BRAND_PRIMARY);
         c.setBorderColor(PdfFonts.HAIRLINE);
         c.setPadding(6);
+        // Arabic headers inside an LTR (bilingual) table need their own RTL run.
+        if (PdfTheme.hasArabic(text) && t.getRunDirection() != PdfWriter.RUN_DIRECTION_RTL) {
+            c.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+            c.setHorizontalAlignment(PdfTheme.visualStart(true, PdfWriter.RUN_DIRECTION_RTL));
+        }
         t.addCell(c);
     }
 
@@ -511,6 +513,10 @@ public class BcpBinderPdfBuilder {
         PdfPCell c = new PdfPCell(new Phrase(nz(text, "—"), PdfFonts.body(9)));
         c.setBorderColor(PdfFonts.PAPER_BORDER);
         c.setPadding(5);
+        if (PdfTheme.hasArabic(text) && t.getRunDirection() != PdfWriter.RUN_DIRECTION_RTL) {
+            c.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+            c.setHorizontalAlignment(PdfTheme.visualStart(true, PdfWriter.RUN_DIRECTION_RTL));
+        }
         t.addCell(c);
     }
 
@@ -629,9 +635,18 @@ public class BcpBinderPdfBuilder {
                 String preText = wantsAr ? ("صفحة " + pageNum + " من ") : ("Page " + n + " of ");
                 Phrase right = new Phrase(preText, PdfFonts.small(8));
                 float textWidth = PdfFonts.small(8).getBaseFont().getWidthPoint(preText, 8f);
-                ColumnText.showTextAligned(cb, Element.ALIGN_LEFT, right,
-                    doc.right() - textWidth - 30, baseY, 0);
-                cb.addTemplate(totalTemplate, doc.right() - 30, baseY - 2);
+                if (wantsAr) {
+                    // Shape the Arabic (plain showTextAligned never does) and put
+                    // the "of Y" total on the LEFT — Arabic reads صفحة ٣ من ١٢
+                    // right-to-left, so the total is the leftmost run.
+                    ColumnText.showTextAligned(cb, Element.ALIGN_RIGHT, right,
+                        doc.right(), baseY, 0, PdfWriter.RUN_DIRECTION_RTL, 0);
+                    cb.addTemplate(totalTemplate, doc.right() - textWidth - 18, baseY - 2);
+                } else {
+                    ColumnText.showTextAligned(cb, Element.ALIGN_LEFT, right,
+                        doc.right() - textWidth - 30, baseY, 0);
+                    cb.addTemplate(totalTemplate, doc.right() - 30, baseY - 2);
+                }
             } catch (Exception ignored) {
                 // never block document close
             }

@@ -125,9 +125,9 @@ public class CommitteeFormExportService {
         doc.add(pEn);
 
         if (form.getPurposeAr() != null && !form.getPurposeAr().isBlank()) {
-            Paragraph pAr = new Paragraph(form.getPurposeAr(), PdfFonts.normal(10));
-            pAr.setSpacingAfter(10);
-            doc.add(pAr);
+            // Shaped + right-aligned — a plain Paragraph renders the Arabic
+            // purpose disconnected and anchored left.
+            PdfTheme.line(doc, form.getPurposeAr(), PdfFonts.normal(10), true, 0, 10);
         }
     }
 
@@ -142,9 +142,7 @@ public class CommitteeFormExportService {
         if (form.getContentMdAr() != null && !form.getContentMdAr().isBlank()) {
             doc.newPage();
             PdfTheme.sectionDivider(doc, "Form Body (Arabic)", "نص النموذج بالعربية");
-            for (Paragraph p : markdownToParagraphs(form.getContentMdAr())) {
-                doc.add(p);
-            }
+            renderMarkdownShaped(doc, form.getContentMdAr());
         }
     }
 
@@ -167,8 +165,33 @@ public class CommitteeFormExportService {
             Paragraph sp = new Paragraph(" ", PdfFonts.small(8));
             sp.setSpacingAfter(8);
             doc.add(sp);
-            for (Paragraph p : markdownToParagraphs(form.getCompletionGuideAr())) {
+            renderMarkdownShaped(doc, form.getCompletionGuideAr());
+        }
+    }
+
+    /**
+     * Arabic twin of {@link #markdownToParagraphs}: same mini-markdown rules,
+     * but every line goes through {@link PdfTheme#line} so the Arabic shapes
+     * and starts at the RIGHT (plain Paragraphs render it disconnected/left).
+     */
+    private static void renderMarkdownShaped(Document doc, String md) throws DocumentException {
+        if (md == null || md.isBlank()) return;
+        for (String raw : md.split("\\r?\\n")) {
+            String line = raw == null ? "" : raw.replace('\t', ' ');
+            if (line.isBlank()) {
+                Paragraph p = new Paragraph(" ", PdfFonts.normal(10));
+                p.setSpacingAfter(2);
                 doc.add(p);
+            } else if (line.startsWith("### ")) {
+                PdfTheme.line(doc, line.substring(4).trim(), PdfFonts.bold(11), true, 6, 2);
+            } else if (line.startsWith("## ")) {
+                PdfTheme.line(doc, line.substring(3).trim(), PdfFonts.bold(12), true, 8, 3);
+            } else if (line.startsWith("# ")) {
+                PdfTheme.line(doc, line.substring(2).trim(), PdfFonts.bold(14), true, 10, 4);
+            } else if (line.startsWith("- ")) {
+                PdfTheme.line(doc, "•  " + line.substring(2).trim(), PdfFonts.normal(10), true, 0, 1);
+            } else {
+                PdfTheme.line(doc, line, PdfFonts.normal(10), true, 0, 2);
             }
         }
     }
