@@ -42,10 +42,15 @@ Run in an **elevated** PowerShell:
 ```powershell
 # Java 17 (Temurin) — the app is pinned to 17
 winget install EclipseAdoptium.Temurin.17.JDK
-
-# NSSM — runs the jar and nginx as Windows services
-winget install NSSM.NSSM
 ```
+
+**Service wrapper — WinSW** (no installer, no PATH changes): download
+`WinSW-x64.exe` (or the `WinSW.NET4.exe` build) once from
+https://github.com/winsw/winsw/releases and copy it next to each thing you
+want to run as a service. One copy of the exe per service, renamed to the
+service's name, with an XML of the same base name beside it (§4).
+`winget install NSSM.NSSM` works too if winget is available, but WinSW is
+what this runbook uses.
 
 **SQL Server 2019 or newer** (Express is fine to start; the .bak is version
 15.0 and cannot restore to anything older):
@@ -147,23 +152,68 @@ icacls C:\tss-grc\app\external.properties /inheritance:r /grant:r "Administrator
 
 ---
 
-## 4. Install the services
+## 4. Install the services (WinSW)
+
+WinSW convention: `<name>.exe` (a renamed copy of the WinSW binary) +
+`<name>.xml` (the service definition) side by side; then `<name>.exe install`.
+
+**Backend** — copy WinSW to `C:\tss-grc\app\backend-service.exe` and create
+`C:\tss-grc\app\backend-service.xml`:
+
+```xml
+<service>
+  <id>TssGrcBackend</id>
+  <name>TSS GRC Backend</name>
+  <description>Spring Boot REST API for the TSS GRC platform.</description>
+  <executable>java</executable>
+  <arguments>-jar C:\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar --spring.profiles.active=prod</arguments>
+  <workingdirectory>C:\tss-grc\app</workingdirectory>
+  <startmode>Automatic</startmode>
+  <logpath>C:\tss-grc\logs</logpath>
+  <log mode="roll"></log>
+  <onfailure action="restart" delay="10 sec"/>
+</service>
+```
+
+(`workingdirectory` matters: `external.properties` is resolved relative to it.)
+
+**nginx** — copy WinSW to `C:\tss-grc\nginx\nginx-service.exe` and create
+`C:\tss-grc\nginx\nginx-service.xml`. nginx needs a graceful stop
+(`-s stop`), not a process kill — hence the stop executable:
+
+```xml
+<service>
+  <id>TssGrcNginx</id>
+  <name>TSS GRC UI (nginx)</name>
+  <description>Serves the TSS GRC web UI and proxies /api and /ws to the backend.</description>
+  <executable>C:\tss-grc\nginx\nginx.exe</executable>
+  <startarguments>-p C:\tss-grc\nginx</startarguments>
+  <stopexecutable>C:\tss-grc\nginx\nginx.exe</stopexecutable>
+  <stoparguments>-p C:\tss-grc\nginx -s stop</stoparguments>
+  <startmode>Automatic</startmode>
+  <stoptimeout>15 sec</stoptimeout>
+  <logpath>C:\tss-grc\nginx\logs</logpath>
+  <log mode="roll"></log>
+  <onfailure action="restart" delay="10 sec"/>
+</service>
+```
+
+Install and start both:
 
 ```powershell
-# backend
-nssm install TssGrcBackend C:\tss-grc\app\run-backend.cmd
-nssm set TssGrcBackend AppDirectory C:\tss-grc\app
-nssm set TssGrcBackend AppStdout C:\tss-grc\logs\service.out.log
-nssm set TssGrcBackend AppStderr C:\tss-grc\logs\service.err.log
-nssm set TssGrcBackend Start SERVICE_AUTO_START
-nssm start TssGrcBackend
+C:\tss-grc\app\backend-service.exe install
+C:\tss-grc\app\backend-service.exe start
 
-# nginx
-nssm install TssGrcNginx C:\tss-grc\nginx\nginx.exe
-nssm set TssGrcNginx AppDirectory C:\tss-grc\nginx
-nssm set TssGrcNginx Start SERVICE_AUTO_START
-nssm start TssGrcNginx
+# always test the config before first start:
+C:\tss-grc\nginx\nginx.exe -t -p C:\tss-grc\nginx
+C:\tss-grc\nginx\nginx-service.exe install
+C:\tss-grc\nginx\nginx-service.exe start
 ```
+
+Before starting the nginx service, make sure no manually-started nginx is
+still running (`C:\tss-grc\nginx\nginx.exe -s stop -p C:\tss-grc\nginx`,
+ignore errors) and that nothing else owns port 80 — on Windows Server, IIS
+often does (`Stop-Service W3SVC; Set-Service W3SVC -StartupType Manual`).
 
 First-boot verification (backend takes ~60–90 s):
 
@@ -243,10 +293,10 @@ cd ../tss-grc-ui-v2 && npm run build
 On the server:
 
 ```powershell
-nssm stop TssGrcBackend
+Stop-Service TssGrcBackend
 Copy-Item <new>.jar C:\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar -Force
 Remove-Item C:\tss-grc\ui\* -Recurse -Force; Copy-Item <new-dist>\* C:\tss-grc\ui\ -Recurse
-nssm start TssGrcBackend        # Flyway auto-applies any migration > V292
+Start-Service TssGrcBackend     # Flyway auto-applies any migration > V292
 ```
 
 No manual SQL: any new `V293+__*.sql` in the jar applies itself at startup
