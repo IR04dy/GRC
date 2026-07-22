@@ -27,6 +27,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import org.springframework.security.access.AccessDeniedException;
 import java.util.Optional;
 
@@ -118,6 +119,40 @@ class PolicyManagementServiceTest {
         // DRAFT → PUBLISHED is not allowed (must go via REVIEW + APPROVED)
         assertThatThrownBy(() -> service.transition(1L, "PUBLISHED", "alice"))
             .isInstanceOf(IllegalTransitionException.class);
+    }
+
+    // ── CH-12: version diff + supersede-on-publish ───────────────────────────
+
+    @Test void diffVersions_returnsOnlyChangedFields() {
+        PolicyDocument v1 = draft(); v1.setVersion("1.0"); v1.setTitleEn("Old title"); v1.setCategory("CYBER");
+        PolicyDocument v2 = draft(); v2.setId(2L); v2.setVersion("2.0"); v2.setTitleEn("New title"); v2.setCategory("CYBER");
+        when(docs.findByOrganisationIdAndPolicyCodeAndVersion(ORG_ID, "ISMS-001", "1.0")).thenReturn(Optional.of(v1));
+        when(docs.findByOrganisationIdAndPolicyCodeAndVersion(ORG_ID, "ISMS-001", "2.0")).thenReturn(Optional.of(v2));
+
+        Map<String, Object> diff = service.diffVersions("ISMS-001", "1.0", "2.0");
+
+        assertThat(diff.get("policyCode")).isEqualTo("ISMS-001");
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> changes = (List<Map<String, String>>) diff.get("changes");
+        assertThat(changes).anySatisfy(c -> {
+            assertThat(c.get("field")).isEqualTo("titleEn");
+            assertThat(c.get("from")).isEqualTo("Old title");
+            assertThat(c.get("to")).isEqualTo("New title");
+        });
+        assertThat(changes).noneSatisfy(c -> assertThat(c.get("field")).isEqualTo("category")); // unchanged
+    }
+
+    @Test void publish_supersedesOlderPublishedVersion() {
+        PolicyDocument v2 = draft(); v2.setId(2L); v2.setVersion("2.0"); v2.setStatus("APPROVED"); v2.setEffectiveDate(LocalDate.now());
+        PolicyDocument v1 = draft(); v1.setId(1L); v1.setVersion("1.0"); v1.setStatus("PUBLISHED");
+        when(docs.findByIdAndOrganisationId(2L, ORG_ID)).thenReturn(Optional.of(v2));
+        when(docs.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(docs.findByOrganisationIdOrderByPolicyCodeAscVersionDesc(ORG_ID)).thenReturn(List.of(v2, v1));
+
+        service.transition(2L, "PUBLISHED", "admin", true);   // admin → SoD waived
+
+        assertThat(v1.getStatus()).isEqualTo("ARCHIVED");
+        assertThat(v1.getRetiredReason()).contains("Superseded by v2.0");
     }
 
     // ── C-6 segregation of duty on approval ──────────────────────────────────

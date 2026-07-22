@@ -87,6 +87,14 @@ public class PolicyController {
         return service.newVersion(policyCode, body.get("newVersion"));
     }
 
+    /** CH-12: field-level diff between two versions of a policy code. */
+    @GetMapping("/documents/{policyCode}/diff")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
+    public Map<String, Object> diff(@PathVariable String policyCode,
+                                    @RequestParam String from, @RequestParam String to) {
+        return service.diffVersions(policyCode, from, to);
+    }
+
     @DeleteMapping("/documents/{id}")
     @PreAuthorize("hasPermission('COMPLIANCE','DELETE')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

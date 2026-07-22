@@ -114,6 +114,18 @@ export function transitionPolicy(id: number, to: PolicyStatus) {
 export function newPolicyVersion(policyCode: string, newVersion: string) {
   return api.post<PolicyDocument>(`${BASE}/documents/${encodeURIComponent(policyCode)}/new-version`, { newVersion });
 }
+
+// CH-12: field-level diff between two versions of a policy code.
+export interface PolicyVersionDiff {
+  policyCode: string;
+  fromVersion: string;
+  toVersion: string;
+  changes: { field: string; from: string | null; to: string | null }[];
+}
+export function diffPolicyVersions(policyCode: string, from: string, to: string) {
+  return api.get<PolicyVersionDiff>(
+    `${BASE}/documents/${encodeURIComponent(policyCode)}/diff?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+}
 export function deletePolicy(id: number)               { return api.delete<void>(`${BASE}/documents/${id}`); }
 export function runPolicyExpirySweep()                 { return api.post<{flippedCount: number; flippedIds: number[]}>(`${BASE}/documents/expiry-sweep`); }
 export function policyAggregate()                      { return api.get<PolicyAggregate>(`${BASE}/aggregate`); }

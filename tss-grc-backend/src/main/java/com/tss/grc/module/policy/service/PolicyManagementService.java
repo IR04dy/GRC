@@ -414,6 +414,7 @@ public class PolicyManagementService {
         // compliance posture refresh keys on it, so it gets a dedicated
         // trigger separate from the generic transition stream.
         if ("PUBLISHED".equals(to)) {
+            supersedePriorPublished(saved, actor);   // CH-12: one live PUBLISHED version per code
             emitPolicy("POLICY_PUBLISHED", saved, from);
         } else if ("EXPIRED".equals(to)) {
             emitPolicy("POLICY_EXPIRED", saved, from);
@@ -422,6 +423,75 @@ public class PolicyManagementService {
         }
         return saved;
     }
+
+    /**
+     * CH-12 — when a new version publishes, archive any OLDER still-PUBLISHED version
+     * of the same policy code so the register shows one live version. The prior
+     * version is marked ARCHIVED with a "Superseded by v…" reason (audited).
+     */
+    private void supersedePriorPublished(PolicyDocument published, String actor) {
+        Long o = org();
+        for (PolicyDocument other : docs.findByOrganisationIdOrderByPolicyCodeAscVersionDesc(o)) {
+            if (!published.getPolicyCode().equals(other.getPolicyCode())) continue;
+            if (other.getId().equals(published.getId()))                  continue;
+            if (!"PUBLISHED".equals(other.getStatus()))                   continue;
+            if (compareVersions(other.getVersion(), published.getVersion()) >= 0) continue; // only older
+            other.setStatus("ARCHIVED");
+            other.setRetiredReason("Superseded by v" + published.getVersion());
+            docs.save(other);
+            audit.log("SUPERSEDED", "PolicyDocument", other.getId(),
+                "Superseded by v" + published.getVersion() + (actor != null ? " (" + actor + ")" : ""));
+        }
+    }
+
+    /**
+     * CH-12 — field-level diff between two versions of the same policy code. Returns
+     * {@code {policyCode, fromVersion, toVersion, changes:[{field, from, to}]}} with
+     * only the fields that differ. Read-only; org-scoped.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> diffVersions(String policyCode, String fromVersion, String toVersion) {
+        Long o = org();
+        PolicyDocument a = docs.findByOrganisationIdAndPolicyCodeAndVersion(o, policyCode, fromVersion)
+            .orElseThrow(() -> new EntityNotFoundException("Version not found: " + policyCode + " v" + fromVersion));
+        PolicyDocument b = docs.findByOrganisationIdAndPolicyCodeAndVersion(o, policyCode, toVersion)
+            .orElseThrow(() -> new EntityNotFoundException("Version not found: " + policyCode + " v" + toVersion));
+        List<Map<String, String>> changes = new ArrayList<>();
+        addDiff(changes, "titleEn",            a.getTitleEn(),            b.getTitleEn());
+        addDiff(changes, "titleAr",            a.getTitleAr(),            b.getTitleAr());
+        addDiff(changes, "summaryEn",          a.getSummaryEn(),          b.getSummaryEn());
+        addDiff(changes, "summaryAr",          a.getSummaryAr(),          b.getSummaryAr());
+        addDiff(changes, "category",           a.getCategory(),           b.getCategory());
+        addDiff(changes, "bodyUrl",            a.getBodyUrl(),            b.getBodyUrl());
+        addDiff(changes, "status",             a.getStatus(),             b.getStatus());
+        addDiff(changes, "effectiveDate",      str(a.getEffectiveDate()), str(b.getEffectiveDate()));
+        addDiff(changes, "expiryDate",         str(a.getExpiryDate()),    str(b.getExpiryDate()));
+        addDiff(changes, "nextReviewDate",     str(a.getNextReviewDate()),str(b.getNextReviewDate()));
+        addDiff(changes, "reviewCadence",      a.getReviewCadence(),      b.getReviewCadence());
+        addDiff(changes, "ownerName",          a.getOwnerName(),          b.getOwnerName());
+        addDiff(changes, "approverName",       a.getApproverName(),       b.getApproverName());
+        addDiff(changes, "relatedFramework",   a.getRelatedFramework(),   b.getRelatedFramework());
+        addDiff(changes, "relatedControls",    a.getRelatedControls(),    b.getRelatedControls());
+        addDiff(changes, "applicabilityScope", a.getApplicabilityScope(), b.getApplicabilityScope());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("policyCode",  policyCode);
+        out.put("fromVersion", fromVersion);
+        out.put("toVersion",   toVersion);
+        out.put("changes",     changes);
+        return out;
+    }
+
+    private static void addDiff(List<Map<String, String>> changes, String field, String from, String to) {
+        if (!Objects.equals(from, to)) {
+            Map<String, String> d = new LinkedHashMap<>();
+            d.put("field", field);
+            d.put("from",  from);
+            d.put("to",    to);
+            changes.add(d);
+        }
+    }
+
+    private static String str(Object o) { return o == null ? null : o.toString(); }
 
     /**
      * Create the next version of an existing policy — copies metadata
