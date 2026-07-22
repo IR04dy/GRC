@@ -324,4 +324,40 @@ class ChangeManagementServiceTest {
         assertThat(emitted.payload()).containsEntry("status", "ROLLED_BACK");
         assertThat(emitted.payload()).containsEntry("outcome", "ROLLED_BACK");
     }
+
+    // ── CM-C3: lifecycle-integrity — status cannot be set via create()/update() ──
+
+    @Test
+    void update_does_not_change_status_even_if_body_sets_it() {
+        // A PUT carrying status=CLOSED on a DRAFT change must NOT close it —
+        // status changes may only happen through the guarded transition().
+        ChangeRequest existing = change("DRAFT", "NORMAL");
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(existing));
+        when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ChangeRequest body = new ChangeRequest();
+        body.setStatus("CLOSED");            // attempted lifecycle bypass
+        body.setTitleEn("edited title");     // legitimate metadata edit
+        ChangeRequest out = service.update(CHANGE_ID, body);
+
+        assertThat(out.getStatus()).isEqualTo("DRAFT");        // bypass blocked
+        assertThat(out.getTitleEn()).isEqualTo("edited title"); // metadata still applied
+    }
+
+    @Test
+    void create_ignores_client_supplied_status_and_defaults_DRAFT() {
+        when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> {
+            ChangeRequest c = inv.getArgument(0);
+            c.setId(CHANGE_ID);
+            return c;
+        });
+
+        ChangeRequest req = new ChangeRequest();
+        req.setTitleEn("New change");
+        req.setChangeType("NORMAL");
+        req.setStatus("PUBLISHED");          // attempted; must be ignored on create
+        ChangeRequest out = service.create(req);
+
+        assertThat(out.getStatus()).isEqualTo("DRAFT");
+    }
 }

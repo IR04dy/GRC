@@ -400,7 +400,10 @@ public class ChangeManagementService {
         if (src.getRequestedDate()        != null) target.setRequestedDate(src.getRequestedDate());
         if (src.getScheduledStart()       != null) target.setScheduledStart(src.getScheduledStart());
         if (src.getScheduledEnd()         != null) target.setScheduledEnd(src.getScheduledEnd());
-        if (src.getStatus()               != null) target.setStatus(src.getStatus());
+        // CM-C3 (lifecycle integrity): status is DELIBERATELY not copied from the
+        // request body. All status changes must go through transition()/guard();
+        // create() defaults to DRAFT. This closes the PUT/create bypass where a
+        // client could set any status (e.g. DRAFT→CLOSED) skipping the state machine.
     }
 
     private void guard(ChangeRequest c, String target) {
