@@ -11,6 +11,8 @@ import com.lowagie.text.Phrase;
 import com.lowagie.text.pdf.*;
 import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.change_mgmt.entity.ChangeRequest;
+import com.tss.grc.module.change_mgmt.repository.ChangeRequestRepository;
 import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.platform.branding.service.BrandThemeService;
@@ -70,6 +72,7 @@ public class ExportService {
     private final KriDefinitionRepository kriRepo;
     private final KriMeasurementRepository measRepo;
     private final BrandThemeService brandThemeService;
+    private final ChangeRequestRepository changeRepo;   // CH-4: change register export
 
     // ── Risk Register ──────────────────────────────────────────────────────
 
@@ -121,6 +124,107 @@ public class ExportService {
                 }
                 doc.add(t);
             });
+    }
+
+    // ── Change register (CH-4) ─────────────────────────────────────────────
+    // Fixes the review defect where the Changes "Export" button downloaded the
+    // RISK register. This is a real change-register export (PDF + XLSX; DOCX in
+    // DocxExportService), org-scoped, RTL-aware, mirroring the risk exporters.
+
+    @Transactional(readOnly = true)
+    public byte[] changeRegisterPdf(String lang) {
+        Long org = TenantContext.getCurrentTenant();
+        Organisation o = orgRepo.findById(org).orElse(null);
+        boolean ar = "ar".equalsIgnoreCase(lang);
+
+        List<ChangeRequest> changes = changeRepo
+            .findByOrganisationIdOrderByCreatedAtDesc(org, PageRequest.of(0, 1000)).getContent();
+        long total     = changes.size();
+        long emergency = changes.stream().filter(c -> "EMERGENCY".equalsIgnoreCase(c.getChangeType())).count();
+        long open      = changes.stream().filter(c ->
+            !"CLOSED".equalsIgnoreCase(c.getStatus()) && !"CANCELLED".equalsIgnoreCase(c.getStatus())).count();
+        long closed    = changes.stream().filter(c -> "CLOSED".equalsIgnoreCase(c.getStatus())).count();
+
+        return buildReportPdf(o, ar,
+            "Change Management", "إدارة التغيير",
+            "Change Register",   "سجل التغييرات",
+            List.of(
+                new PdfTheme.Kpi(ar ? "الإجمالي" : "Total",    String.valueOf(total),     "All states"),
+                new PdfTheme.Kpi(ar ? "طارئة"   : "Emergency", String.valueOf(emergency), ar ? "مسار طارئ" : "Bypass path"),
+                new PdfTheme.Kpi(ar ? "مفتوحة"  : "Open",      String.valueOf(open),      ""),
+                new PdfTheme.Kpi(ar ? "مغلقة"   : "Closed",    String.valueOf(closed),    "")
+            ),
+            new ReportMetadata("Change", ar ? "سجل التغييرات" : "Change Register",
+                (ar ? "حتى " : "As of ") + DATE_FMT.format(java.time.LocalDate.now()),
+                ar ? "جميع التغييرات (بحد أقصى 1000)" : "All changes (max 1000)", lang, "Internal", changes.size()),
+            (doc) -> {
+                float[] widths = new float[]{ 1.4f, 4f, 1.2f, 1f, 1.6f, 1.3f, 1.6f };
+                PdfPTable t = new PdfPTable(widths);
+                t.setWidthPercentage(100);
+                t.setRunDirection(PdfTheme.runDir(ar));
+                String[] hdr = ar
+                    ? new String[]{ "الرمز", "التغيير", "النوع", "الخطورة", "المالك", "تاريخ الطلب", "الحالة" }
+                    : new String[]{ "Code",  "Change",  "Type",  "Risk",    "Owner",  "Requested",   "Status" };
+                for (String h : hdr) headerCell(t, h);
+                for (ChangeRequest c : changes) {
+                    String name = ar && c.getTitleAr() != null ? c.getTitleAr() : c.getTitleEn();
+                    cell(t, safe(c.getChangeCode()));
+                    cell(t, safe(name));
+                    cell(t, safe(c.getChangeType()));
+                    cell(t, safe(c.getRiskLevel()));
+                    cell(t, safe(c.getChangeOwnerName()));
+                    cell(t, c.getRequestedDate() != null ? c.getRequestedDate().toString() : "");
+                    cell(t, safe(c.getStatus()));
+                }
+                doc.add(t);
+            });
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] changeRegisterXlsx() {
+        Long org = TenantContext.getCurrentTenant();
+        List<ChangeRequest> changes = changeRepo
+            .findByOrganisationIdOrderByCreatedAtDesc(org, PageRequest.of(0, 1000)).getContent();
+
+        try (Workbook wb = new XSSFWorkbook()) {
+            Sheet sheet = wb.createSheet("Change Register");
+            CellStyle hdrStyle = headerStyle(wb);
+            CellStyle wrapStyle = wrapStyle(wb);
+
+            String[] headers = { "Code", "Title (EN)", "Title (AR)", "Type", "Risk", "Owner",
+                "Requested By", "Requested Date", "Scheduled Start", "Status", "Outcome" };
+            Row hdr = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                Cell c = hdr.createCell(i);
+                c.setCellValue(headers[i]);
+                c.setCellStyle(hdrStyle);
+            }
+
+            int rowIdx = 1;
+            for (ChangeRequest c : changes) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(safe(c.getChangeCode()));
+                Cell t1 = row.createCell(1); t1.setCellValue(safe(c.getTitleEn())); t1.setCellStyle(wrapStyle);
+                Cell t2 = row.createCell(2); t2.setCellValue(safe(c.getTitleAr())); t2.setCellStyle(wrapStyle);
+                row.createCell(3).setCellValue(safe(c.getChangeType()));
+                row.createCell(4).setCellValue(safe(c.getRiskLevel()));
+                row.createCell(5).setCellValue(safe(c.getChangeOwnerName()));
+                row.createCell(6).setCellValue(safe(c.getRequestedByName()));
+                row.createCell(7).setCellValue(c.getRequestedDate() != null ? c.getRequestedDate().toString() : "");
+                row.createCell(8).setCellValue(c.getScheduledStart() != null ? c.getScheduledStart().toString() : "");
+                row.createCell(9).setCellValue(safe(c.getStatus()));
+                row.createCell(10).setCellValue(safe(c.getOutcome()));
+            }
+
+            XlsxStyler.freezeAndFilter(sheet, headers.length, rowIdx - 1);
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+                if (XlsxStyler.isStatusHeader(headers[i])) XlsxStyler.statusColors(sheet, i, 1, rowIdx - 1);
+            }
+            return writeWorkbook(wb);
+        } catch (java.io.IOException e) {
+            throw new ExportException("Excel", "Excel generation failed", e);
+        }
     }
 
     // ── Findings aging ─────────────────────────────────────────────────────

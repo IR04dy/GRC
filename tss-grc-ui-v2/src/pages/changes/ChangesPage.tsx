@@ -225,9 +225,9 @@ export function ChangesPage() {
             </Button>
             <ExportMenu
               demoMode={demoMode} t={t} toast={toast}
-              onPdf={() => reportingApi.riskRegisterPdf(lang)}
-              onDocx={() => reportingApi.riskRegisterDocx(lang)}
-              onXlsx={() => reportingApi.riskRegisterXlsx()}
+              onPdf={() => reportingApi.changeRegisterPdf(lang)}
+              onDocx={() => reportingApi.changeRegisterDocx(lang)}
+              onXlsx={() => reportingApi.changeRegisterXlsx()}
             />
             {/* DD-76: route new change requests through Services Center so the
                 risk-assessment fields (DD-70) get filled and a CAB gate is computed. */}

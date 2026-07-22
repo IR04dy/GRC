@@ -120,6 +120,29 @@ public class ExportController {
                 ExportNaming.build("ERM", "KRIDashboard", lang, "docx"));
     }
 
+    // ── Change register (CH-4) ────────────────────────────────────────────
+
+    @GetMapping("/change-register.pdf")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Change register PDF — pass ?lang=ar for Arabic RTL")
+    public ResponseEntity<byte[]> changeRegisterPdf(@RequestParam(defaultValue = "en") String lang) {
+        return pdf(exportService.changeRegisterPdf(lang), ExportNaming.build("Change", "ChangeRegister", lang, "pdf"));
+    }
+
+    @GetMapping("/change-register.xlsx")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Change register XLSX")
+    public ResponseEntity<byte[]> changeRegisterXlsx() {
+        return xlsx(exportService.changeRegisterXlsx(), ExportNaming.build("Change", "ChangeRegister", "en", "xlsx"));
+    }
+
+    @GetMapping("/change-register.docx")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Change register DOCX — pass ?lang=ar for Arabic RTL")
+    public ResponseEntity<byte[]> changeRegisterDocx(@RequestParam(defaultValue = "en") String lang) {
+        return docx(docxExportService.changeRegisterDocx(lang), ExportNaming.build("Change", "ChangeRegister", lang, "docx"));
+    }
+
     // ── Board pack (S1) ───────────────────────────────────────────────────
 
     @GetMapping("/board-pack.pdf")

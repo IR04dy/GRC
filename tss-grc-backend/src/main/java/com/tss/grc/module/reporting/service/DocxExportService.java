@@ -2,6 +2,8 @@ package com.tss.grc.module.reporting.service;
 
 import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.change_mgmt.entity.ChangeRequest;
+import com.tss.grc.module.change_mgmt.repository.ChangeRequestRepository;
 import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.platform.entity.Organisation;
@@ -49,6 +51,7 @@ public class DocxExportService {
     private final AuditFindingRepository findingRepo;
     private final KriDefinitionRepository kriRepo;
     private final KriMeasurementRepository measRepo;
+    private final ChangeRequestRepository changeRepo;   // CH-4: change register export
 
     // ── Risk Register ──────────────────────────────────────────────────────
 
@@ -94,6 +97,55 @@ public class DocxExportService {
             return bytes(doc);
         } catch (Exception e) {
             throw new ExportException("Word", "Word generation failed (Risk Register)", e);
+        }
+    }
+
+    // ── Change register (CH-4) ─────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public byte[] changeRegisterDocx(String lang) {
+        Long org = TenantContext.getCurrentTenant();
+        Organisation o = orgRepo.findById(org).orElse(null);
+        boolean ar = "ar".equalsIgnoreCase(lang);
+
+        List<ChangeRequest> changes = changeRepo
+            .findByOrganisationIdOrderByCreatedAtDesc(org, PageRequest.of(0, 1000)).getContent();
+        long emergency = changes.stream().filter(c -> "EMERGENCY".equalsIgnoreCase(c.getChangeType())).count();
+        long open = changes.stream().filter(c ->
+            !"CLOSED".equalsIgnoreCase(c.getStatus()) && !"CANCELLED".equalsIgnoreCase(c.getStatus())).count();
+        long closed = changes.stream().filter(c -> "CLOSED".equalsIgnoreCase(c.getStatus())).count();
+
+        try (XWPFDocument doc = new XWPFDocument()) {
+            applyLandscape(doc);
+            cover(doc, o, ar,
+                ar ? "سجل التغييرات" : "Change Register",
+                ar ? "إدارة التغيير" : "Change Management");
+            kpiStrip(doc, ar, new String[][]{
+                { ar ? "الإجمالي" : "Total",    String.valueOf(changes.size()) },
+                { ar ? "طارئة"   : "Emergency", String.valueOf(emergency) },
+                { ar ? "مفتوحة"  : "Open",      String.valueOf(open) },
+                { ar ? "مغلقة"   : "Closed",    String.valueOf(closed) },
+            });
+
+            String[] hdr = ar
+                ? new String[]{ "الرمز", "التغيير", "النوع", "الخطورة", "المالك", "تاريخ الطلب", "الحالة" }
+                : new String[]{ "Code",  "Change",  "Type",  "Risk",    "Owner",  "Requested",   "Status" };
+            XWPFTable t = newTable(doc, hdr, ar);
+
+            for (ChangeRequest c : changes) {
+                String name = ar && c.getTitleAr() != null ? c.getTitleAr() : c.getTitleEn();
+                XWPFTableRow row = t.createRow();
+                setCell(row, 0, safe(c.getChangeCode()), ar);
+                setCell(row, 1, safe(name), ar);
+                setCell(row, 2, safe(c.getChangeType()), ar);
+                setCell(row, 3, safe(c.getRiskLevel()), ar);
+                setCell(row, 4, safe(c.getChangeOwnerName()), ar);
+                setCell(row, 5, c.getRequestedDate() != null ? c.getRequestedDate().toString() : "—", ar);
+                setCell(row, 6, safe(c.getStatus()), ar);
+            }
+            return bytes(doc);
+        } catch (Exception e) {
+            throw new ExportException("Word", "Word generation failed (Change Register)", e);
         }
     }
 
