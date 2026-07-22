@@ -76,25 +76,25 @@ class CyberPolicyControllerTest {
 
     @Test
     void create_forcesCyberCategoryWhenMissing() {
-        when(policy.create(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(policy.create(any(), any())).thenAnswer(inv -> inv.getArgument(0));
         PolicyDocument body = new PolicyDocument();
         body.setPolicyCode("X"); body.setTitleEn("t");   // category null
-        assertThat(controller.create(body).getBody().getCategory()).isEqualTo("CYBER");
+        assertThat(controller.create(body, null).getBody().getCategory()).isEqualTo("CYBER");
     }
 
     @Test
     void create_rewritesOutOfScopeCategoryToCyber() {
-        when(policy.create(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(policy.create(any(), any())).thenAnswer(inv -> inv.getArgument(0));
         PolicyDocument body = new PolicyDocument();
         body.setPolicyCode("X"); body.setTitleEn("t"); body.setCategory("FINANCE");
-        assertThat(controller.create(body).getBody().getCategory()).isEqualTo("CYBER");
+        assertThat(controller.create(body, null).getBody().getCategory()).isEqualTo("CYBER");
     }
 
     @Test
     void create_keepsInScopeInfoSecCategory() {
-        when(policy.create(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(policy.create(any(), any())).thenAnswer(inv -> inv.getArgument(0));
         PolicyDocument body = new PolicyDocument();
         body.setPolicyCode("X"); body.setTitleEn("t"); body.setCategory("INFORMATION_SECURITY");
-        assertThat(controller.create(body).getBody().getCategory()).isEqualTo("INFORMATION_SECURITY");
+        assertThat(controller.create(body, null).getBody().getCategory()).isEqualTo("INFORMATION_SECURITY");
     }
 }

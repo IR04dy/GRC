@@ -299,7 +299,7 @@ public class PolicyManagementService {
     }
 
     @Transactional
-    public PolicyDocument create(PolicyDocument body) {
+    public PolicyDocument create(PolicyDocument body, String actor) {
         if (body.getPolicyCode() == null || body.getPolicyCode().isBlank())
             throw new IllegalArgumentException("policyCode is required");
         if (body.getTitleEn() == null || body.getTitleEn().isBlank())
@@ -315,6 +315,10 @@ public class PolicyManagementService {
                 "Policy version already exists: " + body.getPolicyCode() + " v" + body.getVersion());
         body.setId(null);
         body.setOrganisationId(org());
+        // CH-7 (SoD): stamp the authenticated creator so transition()'s approval guard
+        // (author cannot approve their own policy) has a real identity to compare
+        // against — createdBy was previously never populated, so that guard never fired.
+        body.setCreatedBy(actor);
         PolicyDocument saved = docs.save(body);
         audit.log("CREATE", "PolicyDocument", saved.getId(),
             "Policy created: " + nullSafe(saved.getPolicyCode()) + " v" + nullSafe(saved.getVersion())

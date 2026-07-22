@@ -27,6 +27,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.security.access.AccessDeniedException;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -309,7 +310,7 @@ class PolicyManagementServiceTest {
         when(docs.findByOrganisationIdAndPolicyCodeAndVersion(ORG_ID, "ISMS-001", "1.0"))
             .thenReturn(Optional.of(draft()));
 
-        assertThatThrownBy(() -> service.create(body))
+        assertThatThrownBy(() -> service.create(body, "author1"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("already exists");
     }
@@ -326,7 +327,36 @@ class PolicyManagementServiceTest {
             .thenReturn(Optional.empty());
         when(docs.save(any(PolicyDocument.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThat(service.create(body).getStatus()).isEqualTo("DRAFT");
+        assertThat(service.create(body, "author1").getStatus()).isEqualTo("DRAFT");
+    }
+
+    // ── CH-7 / PM-C3: segregation of duty on approval (createdBy now populated) ──
+
+    @Test void create_stamps_createdBy_from_actor() {
+        PolicyDocument body = new PolicyDocument();
+        body.setPolicyCode("ISMS-003"); body.setVersion("1.0"); body.setTitleEn("Backup Policy");
+        when(docs.findByOrganisationIdAndPolicyCodeAndVersion(ORG_ID, "ISMS-003", "1.0")).thenReturn(Optional.empty());
+        when(docs.save(any(PolicyDocument.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.create(body, "alice").getCreatedBy()).isEqualTo("alice");
+    }
+
+    @Test void approve_own_policy_is_blocked_by_SoD() {
+        PolicyDocument p = draft(); p.setStatus("REVIEW"); p.setCreatedBy("alice");
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
+
+        assertThatThrownBy(() -> service.transition(1L, "APPROVED", "alice", false))
+            .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void approve_by_different_actor_succeeds() {
+        PolicyDocument p = draft(); p.setStatus("REVIEW"); p.setCreatedBy("alice");
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
+        when(docs.save(any(PolicyDocument.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PolicyDocument out = service.transition(1L, "APPROVED", "bob", false);
+        assertThat(out.getStatus()).isEqualTo("APPROVED");
+        assertThat(out.getApproverName()).isEqualTo("bob");
     }
 
     // ── CH-3 / PM-M2: audit coverage on previously-silent policy ops ────────────

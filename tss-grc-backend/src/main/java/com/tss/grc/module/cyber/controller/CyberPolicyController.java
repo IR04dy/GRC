@@ -92,11 +92,11 @@ public class CyberPolicyController {
 
     @PostMapping
     @PreAuthorize("hasPermission('CYBER','WRITE')")
-    public ResponseEntity<PolicyDocument> create(@RequestBody PolicyDocument body) {
+    public ResponseEntity<PolicyDocument> create(@RequestBody PolicyDocument body, Authentication auth) {
         // Keep cyber-created policies inside the cyber category space.
         if (body.getCategory() == null || !CYBER_CATEGORIES.contains(body.getCategory()))
             body.setCategory("CYBER");
-        return ResponseEntity.status(HttpStatus.CREATED).body(policy.create(body));
+        return ResponseEntity.status(HttpStatus.CREATED).body(policy.create(body, actor(auth)));
     }
 
     @PutMapping("/{id}")

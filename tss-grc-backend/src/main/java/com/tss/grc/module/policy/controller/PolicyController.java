@@ -62,8 +62,8 @@ public class PolicyController {
 
     @PostMapping("/documents")
     @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
-    public ResponseEntity<PolicyDocument> create(@RequestBody PolicyDocument body) {
-        return ResponseEntity.ok(service.create(body));
+    public ResponseEntity<PolicyDocument> create(@RequestBody PolicyDocument body, Authentication auth) {
+        return ResponseEntity.ok(service.create(body, actor(auth)));
     }
 
     @PutMapping("/documents/{id}")
