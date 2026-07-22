@@ -142,7 +142,9 @@ public class FrameworkAnchorService {
         }
         List<Map<String, Object>> out = new ArrayList<>();
         for (Framework f : all) {
-            List<PolicyFrameworkMapping> rows = mappingRepo.findByFrameworkId(f.getId());
+            // CH-15: mappings carry no organisation_id — scope by parent policy's org
+            // so the coverage tallies don't count other tenants' framework mappings.
+            List<PolicyFrameworkMapping> rows = mappingRepo.findByFrameworkIdAndPolicyOrg(f.getId(), org);
             long full = 0, partial = 0, oos = 0, na = 0;
             for (PolicyFrameworkMapping m : rows) {
                 String s = m.getSatisfaction() == null ? "" : m.getSatisfaction();

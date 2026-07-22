@@ -365,7 +365,9 @@ public class BoardPackService {
         for (String h : hdr) t.addCell(headerCell(h, ar));
 
         for (Framework f : frameworks) {
-            List<PolicyFrameworkMapping> rows = mappingRepo.findByFrameworkId(f.getId());
+            // CH-15: org-scope via parent policy — the mapping table has no
+            // organisation_id, so findByFrameworkId would tally every tenant's rows.
+            List<PolicyFrameworkMapping> rows = mappingRepo.findByFrameworkIdAndPolicyOrg(f.getId(), org);
             long full = 0;
             for (PolicyFrameworkMapping m : rows) {
                 if ("FULL".equals(m.getSatisfaction())) full++;
