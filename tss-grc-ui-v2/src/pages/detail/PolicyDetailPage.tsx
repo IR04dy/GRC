@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useParams } from 'react-router-dom';
-import { BookCopy, History, Award, Link2, Send, CheckCheck, Megaphone, RefreshCw, Archive } from 'lucide-react';
+import { BookCopy, Award, Link2, CheckCheck, ArrowRight } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
 import { DetailLayout } from '../../components/layout/DetailLayout';
@@ -11,68 +11,69 @@ import { Card } from '../../components/ui/Card';
 import { Field } from '../../components/ui/Field';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
 import { SignaturePanel } from '../../components/ui/SignaturePanel';
-import { Badge, type BadgeTone } from '../../components/ui/Badge';
+import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LinkedChangesPanel } from '../../components/ui/LinkedChangesPanel';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { PolicyPublishApprovalButton } from '../../components/workflow/ApprovalRequestForms';
 import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
-import { complianceApi, frameworkApi, type PolicyDto, type PolicyMappingDto } from '../../lib/api';
+import { frameworkApi, ApiError, type PolicyMappingDto } from '../../lib/api';
+import {
+  getPolicy, transitionPolicy, policyStatusTone, policyStatusLabel, nextPolicyStatuses,
+  type PolicyDocument, type PolicyStatus,
+} from '../../lib/policy';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
 import { POLICY_ANCHORS_BY_ID } from '../../lib/entityAnchors';
-import { POLICIES, POLICY_LIFECYCLE_EVENTS_BY_ID } from '../compliance/mockCompliance';
-import { PolicyLifecycleStrip } from '../../components/compliance/PolicyLifecycleStrip';
-import { PolicyVersionHistory } from '../../components/compliance/PolicyVersionHistory';
-import type { PolicyStage } from '../../lib/policyLifecycle';
 
-type TabId = 'overview' | 'mappings' | 'lifecycle' | 'versions' | 'docs' | 'signoff' | 'links' | 'activity';
-
-const STATUS_TONE: Record<string, BadgeTone> = {
-  DRAFT: 'neutral', LEGAL_REVIEW: 'info', EXEC_APPROVAL: 'accent',
-  PUBLISHED: 'success', REVIEW_DUE: 'warning', RETIRED: 'neutral', REJECTED: 'danger',
-};
+type TabId = 'overview' | 'mappings' | 'docs' | 'signoff' | 'links' | 'activity';
 
 export function PolicyDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
   const toast = useToast();
-  const [item, setItem] = useState<PolicyDto | null>(null);
+  const [item, setItem] = useState<PolicyDocument | null>(null);
   const [mappings, setMappings] = useState<PolicyMappingDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<TabId>('overview');
 
+  // CH-9: read the canonical register (policy.documents). No mock fallback — a
+  // bad/unknown id honestly shows "Not found" instead of fabricated demo data.
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     Promise.all([
-      complianceApi.policies(0, 200)
-        .then(p => p.content?.find(p => p.id === Number(id)) ?? null)
-        .catch(() => POLICIES.find(p => p.id === Number(id)) ?? null),
+      getPolicy(Number(id)).catch(() => null),
       frameworkApi.mappingsFor(Number(id)).catch(() => [] as PolicyMappingDto[]),
     ]).then(([p, m]) => { setItem(p); setMappings(m); }).finally(() => setLoading(false));
   }, [id]);
 
-  // Demo-mode workflow transitions — mutate local item.status + audit toast.
-  // (Real backend wires would call complianceApi.policy{SubmitForReview,Approve,Publish,…}
-  //  but those don't exist; in this build we surface the lifecycle so the
-  //  detail page is no longer read-only.)
-  function transitionPolicy(toStatus: string, msgKey: string) {
-    if (!item) return;
-    setItem({ ...item, status: toStatus });
-    toast.success(t(msgKey));
+  // Real lifecycle transition against the canonical API (replaces the former
+  // demo-only local status flip). The backend enforces the state machine + SoD.
+  async function runTransition(to: PolicyStatus) {
+    if (!item?.id || busy) return;
+    setBusy(true);
+    try {
+      const updated = await transitionPolicy(item.id, to);
+      setItem(updated);
+      toast.success(`${lang === 'ar' ? '→ ' : '→ '}${policyStatusLabel(to, lang === 'ar' ? 'ar' : 'en')}`);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Action failed');
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (loading) return <Shell title={t('modCompliance')}><InlineEmpty>{t('riskLoading')}</InlineEmpty></Shell>;
   if (!item)   return <Shell title={t('modCompliance')}><div style={{ padding: 32, textAlign: 'center', color: 'var(--danger-fg)' }}>Not found</div></Shell>;
 
   const title = lang === 'ar' && item.titleAr ? item.titleAr : item.titleEn;
+  const l = lang === 'ar' ? 'ar' : 'en';
   const tabs: TabItem<TabId>[] = [
     { id: 'overview',  label: t('detailTabOverview') },
     { id: 'mappings',  label: t('detailTabMappings') },
-    { id: 'versions',  label: t('policyTabVersions') },
-    { id: 'lifecycle', label: t('detailTabLifecycle') },
     { id: 'docs',      label: lang === 'ar' ? 'المستندات' : 'Documents' },
     { id: 'signoff',   label: lang === 'ar' ? 'التوقيعات' : 'Sign-off' },
     { id: 'links',     label: t('detailTabLinks') },
@@ -84,26 +85,28 @@ export function PolicyDetailPage() {
       <DetailHeader
         breadcrumbs={[
           { label: t('modCompliance'), to: '/compliance' },
-          { label: t('complianceTabPolicies'), to: '/compliance?tab=policies' },
-          { label: item.code ?? `#${item.id}` },
+          { label: t('complianceTabPolicies'), to: '/policy-management' },
+          { label: item.policyCode ?? `#${item.id}` },
         ]}
-        eyebrow={item.code}
+        eyebrow={item.policyCode}
         title={title}
         badges={<>
-          <Badge tone={STATUS_TONE[item.status] ?? 'neutral'} dot>{(item.status ?? '').replace(/_/g, ' ')}</Badge>
+          <Badge tone={policyStatusTone(item.status)} dot>{policyStatusLabel(item.status, l)}</Badge>
           {item.version && <Badge tone="primary">v{item.version}</Badge>}
           {item.category && <Badge tone="info">{item.category.replace(/_/g, ' ')}</Badge>}
         </>}
         actions={<>
-          {item.status === 'DRAFT' && <Button variant="primary"   Icon={Send}      onClick={() => transitionPolicy('LEGAL_REVIEW',  'policyActSubmitLegal')}>{t('policyActSubmitLegal')}</Button>}
-          {item.status === 'LEGAL_REVIEW' && <Button variant="primary"   Icon={CheckCheck} onClick={() => transitionPolicy('EXEC_APPROVAL', 'policyActSendExec')}>{t('policyActSendExec')}</Button>}
-          {item.status === 'EXEC_APPROVAL' && <PolicyPublishApprovalButton variant="secondary"
-            sourceRecordId={item.id}
-            defaultTitleEn={`Publish approval — ${item.code ?? title}`} />}
-          {item.status === 'EXEC_APPROVAL' && <Button variant="primary" Icon={Megaphone}  onClick={() => transitionPolicy('PUBLISHED',     'policyActPublish')}>{t('policyActPublish')}</Button>}
-          {item.status === 'PUBLISHED' && <Button variant="secondary" Icon={RefreshCw} onClick={() => transitionPolicy('REVIEW_DUE',    'policyActMarkReview')}>{t('policyActMarkReview')}</Button>}
-          {item.status === 'REVIEW_DUE' && <Button variant="primary"   Icon={CheckCheck} onClick={() => transitionPolicy('PUBLISHED',     'policyActReaffirm')}>{t('policyActReaffirm')}</Button>}
-          {(item.status === 'PUBLISHED' || item.status === 'REVIEW_DUE') && <Button variant="ghost" Icon={Archive} onClick={() => transitionPolicy('RETIRED',       'policyActRetire')}>{t('policyActRetire')}</Button>}
+          {nextPolicyStatuses(item.status).map(next => (
+            <Button key={next} variant={next === 'PUBLISHED' || next === 'APPROVED' || next === 'REVIEW' ? 'primary' : 'ghost'}
+                    Icon={ArrowRight} disabled={busy} onClick={() => runTransition(next)}>
+              {policyStatusLabel(next, l)}
+            </Button>
+          ))}
+          {item.status === 'APPROVED' && (
+            <PolicyPublishApprovalButton variant="secondary"
+              sourceRecordId={item.id!}
+              defaultTitleEn={`Publish approval — ${item.policyCode ?? title}`} />
+          )}
         </>}
       />
 
@@ -114,108 +117,82 @@ export function PolicyDetailPage() {
               <RailField
                 label={t('fldStatus')}
                 accent
-                value={<Badge tone={STATUS_TONE[item.status] ?? 'neutral'} dot>{(item.status ?? '').replace(/_/g, ' ')}</Badge>}
+                value={<Badge tone={policyStatusTone(item.status)} dot>{policyStatusLabel(item.status, l)}</Badge>}
               />
-              <RailField label={t('fldCode')}     value={item.code ?? '—'} mono />
+              <RailField label={t('fldCode')}     value={item.policyCode ?? '—'} mono />
               <RailField label={t('fldVersion')}  value={`v${item.version ?? '—'}`} mono />
               <RailField label={t('fldCategory')} value={(item.category ?? '').replace(/_/g, ' ')} />
-              <RailField label={t('complianceFldEffectiveFrom')} value={item.effectiveFrom ?? '—'} mono />
+              <RailField label={t('complianceFldEffectiveFrom')} value={item.effectiveDate ?? '—'} mono />
               <RailField label={t('fldNextReviewDate')}          value={item.nextReviewDate ?? '—'} mono />
+              {item.ownerName && <RailField label={lang === 'ar' ? 'المالك' : 'Owner'} value={item.ownerName} />}
+              {item.approverName && <RailField label={lang === 'ar' ? 'المعتمِد' : 'Approver'} value={item.approverName} />}
             </RailFieldGroup>
           </Card>
           <EntityAnchorsPanel
-            anchors={POLICY_ANCHORS_BY_ID[item.id] ?? []}
+            anchors={POLICY_ANCHORS_BY_ID[item.id!] ?? []}
             subtitle="Authorities this policy satisfies." />
-          <LinkedChangesPanel entityType="POLICY" entityId={item.id} />
-          <ModuleEngineRequestsPanel sourceModule="COMPLIANCE" sourceRecordType="Policy" sourceRecordId={item.id}
+          <LinkedChangesPanel entityType="POLICY" entityId={item.id!} />
+          <ModuleEngineRequestsPanel sourceModule="COMPLIANCE" sourceRecordType="Policy" sourceRecordId={item.id!}
             titleEn="Approvals & requests" titleAr="الاعتمادات والطلبات" />
         </>}
         main={<>
           <Tabs items={tabs} active={tab} onChange={setTab} />
 
           {tab === 'overview' && (
-            <>
-              {/* Sprint 6 — visual lifecycle strip on top of the overview */}
-              <div style={{ marginBottom: 16 }}>
-                <PolicyLifecycleStrip current={item.status as PolicyStage} />
-              </div>
-              <Card title={t('detailTabOverview')} Icon={BookCopy}>
-                <Field label={t('fldCode')}     value={item.code ?? '—'} mono bold />
-                <Field label={t('colTitle')}    value={title} bold />
-                <Field label={t('fldVersion')}  value={item.version ?? '—'} mono />
-                <Field label={t('fldCategory')} value={(item.category ?? '').replace(/_/g, ' ')} />
-                <Field label={t('complianceFldEffectiveFrom')} value={item.effectiveFrom ?? '—'} mono />
-                <Field label={t('fldNextReviewDate')} value={item.nextReviewDate ?? '—'} mono />
-                <Field label={t('complianceFldPolicyContent')} value={item.contentEn ?? '—'} multiline />
-              </Card>
-            </>
+            <Card title={t('detailTabOverview')} Icon={BookCopy}>
+              <Field label={t('fldCode')}     value={item.policyCode ?? '—'} mono bold />
+              <Field label={t('colTitle')}    value={title} bold />
+              <Field label={t('fldVersion')}  value={item.version ?? '—'} mono />
+              <Field label={t('fldCategory')} value={(item.category ?? '').replace(/_/g, ' ')} />
+              <Field label={t('complianceFldEffectiveFrom')} value={item.effectiveDate ?? '—'} mono />
+              <Field label={t('fldNextReviewDate')} value={item.nextReviewDate ?? '—'} mono />
+              <Field label={t('complianceFldPolicyContent')}
+                     value={(lang === 'ar' ? item.summaryAr : item.summaryEn) ?? item.summaryEn ?? '—'} multiline />
+            </Card>
           )}
 
-          {tab === 'versions' && (
-            <PolicyVersionHistory policyId={item.id} />
-          )}
-
-      {tab === 'mappings' && (
-        <Card title={t('detailTabMappings')} Icon={Award}>
-          {mappings.length === 0
-            ? <InlineEmpty compact>{t('detailMappingsEmpty')}</InlineEmpty>
-            : <div style={{ display: 'grid', gap: 6, padding: 4 }}>
-              {mappings.map(m => (
-                <div key={m.mappingId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', fontSize: 13 }}>
-                  <Badge tone="primary">{m.frameworkCode}{m.frameworkVersion ? ' · ' + m.frameworkVersion : ''}</Badge>
-                  <span style={{ flex: 1 }}>{m.frameworkName}</span>
-                  {m.clauseRef && <span className="mono" style={{ fontSize: 12 }}>{m.clauseRef}</span>}
-                  <Badge tone={m.satisfaction === 'FULL' ? 'success' : m.satisfaction === 'PARTIAL' ? 'warning' : 'neutral'}>{m.satisfaction.replace(/_/g, ' ')}</Badge>
-                </div>
-              ))}
-            </div>
-          }
-        </Card>
-      )}
-      {tab === 'lifecycle' && (
-        <Card title={t('detailTabLifecycle')} Icon={History}
-          action={<Badge tone="primary">{(POLICY_LIFECYCLE_EVENTS_BY_ID[item.id] ?? []).length}</Badge>}>
-          {(POLICY_LIFECYCLE_EVENTS_BY_ID[item.id] ?? []).length === 0
-            ? <InlineEmpty compact>{t('detailLifecycleHint')}</InlineEmpty>
-            : <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {(POLICY_LIFECYCLE_EVENTS_BY_ID[item.id] ?? []).map(ev => (
-                  <div key={ev.id} style={{ display: 'grid', gridTemplateColumns: '160px 140px 1fr', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'flex-start' }}>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{ev.at.replace('T', ' ').slice(0, 16)}</span>
-                    <Badge tone={ev.stage === 'PUBLISHED' ? 'success' : ev.stage === 'EXEC_APPROVAL' ? 'accent' : ev.stage === 'LEGAL_REVIEW' ? 'info' : ev.stage === 'REVIEW_DUE' ? 'warning' : ev.stage === 'RETIRED' ? 'neutral' : 'primary'}>{ev.stage.replace(/_/g, ' ')}</Badge>
-                    <div>
-                      <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>{ev.message}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>by {ev.actor}</div>
+          {tab === 'mappings' && (
+            <Card title={t('detailTabMappings')} Icon={Award}>
+              {mappings.length === 0
+                ? <InlineEmpty compact>{t('detailMappingsEmpty')}</InlineEmpty>
+                : <div style={{ display: 'grid', gap: 6, padding: 4 }}>
+                  {mappings.map(m => (
+                    <div key={m.mappingId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', fontSize: 13 }}>
+                      <Badge tone="primary">{m.frameworkCode}{m.frameworkVersion ? ' · ' + m.frameworkVersion : ''}</Badge>
+                      <span style={{ flex: 1 }}>{m.frameworkName}</span>
+                      {m.clauseRef && <span className="mono" style={{ fontSize: 12 }}>{m.clauseRef}</span>}
+                      <Badge tone={m.satisfaction === 'FULL' ? 'success' : m.satisfaction === 'PARTIAL' ? 'warning' : 'neutral'}>{m.satisfaction.replace(/_/g, ' ')}</Badge>
                     </div>
-                  </div>
-                ))}
-              </div>}
-        </Card>
-      )}
-      {tab === 'docs' && (
-        <Card title={lang === 'ar' ? 'مستندات السياسة' : 'Policy documents'} Icon={BookCopy}>
-          <AttachmentsField entityType="POLICY" entityId={item.id} />
-        </Card>
-      )}
-      {tab === 'signoff' && (
-        <Card title={lang === 'ar' ? 'اعتماد السياسة' : 'Policy sign-off'} Icon={CheckCheck}>
-          <SignaturePanel entityType="POLICY" entityId={item.id} />
-        </Card>
-      )}
-      {tab === 'links' && (
-        <Card title={t('detailTabLinks')} Icon={Link2}>
-          <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>
-        </Card>
-      )}
-      {tab === 'activity' && (
-        <EntityActivityTimeline
-          entityType="Policy"
-          entityId={item.id}
-          titleEn="Policy activity timeline"
-          titleAr="سجل نشاط السياسة" />
-      )}
+                  ))}
+                </div>
+              }
+            </Card>
+          )}
+
+          {tab === 'docs' && (
+            <Card title={lang === 'ar' ? 'مستندات السياسة' : 'Policy documents'} Icon={BookCopy}>
+              <AttachmentsField entityType="POLICY" entityId={item.id!} />
+            </Card>
+          )}
+          {tab === 'signoff' && (
+            <Card title={lang === 'ar' ? 'اعتماد السياسة' : 'Policy sign-off'} Icon={CheckCheck}>
+              <SignaturePanel entityType="POLICY" entityId={item.id!} />
+            </Card>
+          )}
+          {tab === 'links' && (
+            <Card title={t('detailTabLinks')} Icon={Link2}>
+              <InlineEmpty compact>Linked records appear in the right rail. Use the rail's Linked Changes card to navigate to related change requests.</InlineEmpty>
+            </Card>
+          )}
+          {tab === 'activity' && (
+            <EntityActivityTimeline
+              entityType="Policy"
+              entityId={item.id!}
+              titleEn="Policy activity timeline"
+              titleAr="سجل نشاط السياسة" />
+          )}
         </>}
       />
     </Shell>
   );
 }
-

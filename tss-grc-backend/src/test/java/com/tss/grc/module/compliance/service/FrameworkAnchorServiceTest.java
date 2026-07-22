@@ -5,8 +5,6 @@ import com.tss.grc.module.compliance.entity.Framework;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.compliance.repository.FrameworkRepository;
-import com.tss.grc.module.compliance.repository.PolicyFrameworkMappingRepository;
-import com.tss.grc.module.compliance.repository.PolicyRepository;
 import com.tss.grc.module.policy.entity.PolicyDocumentFrameworkMapping;
 import com.tss.grc.module.policy.repository.PolicyDocumentFrameworkMappingRepository;
 import com.tss.grc.module.policy.repository.PolicyDocumentRepository;
@@ -42,8 +40,6 @@ class FrameworkAnchorServiceTest {
     private static final Long FW_ID = 10L;
 
     @Mock private FrameworkRepository frameworkRepo;
-    @Mock private PolicyRepository policyRepo;
-    @Mock private PolicyFrameworkMappingRepository mappingRepo;
     @Mock private PolicyDocumentRepository policyDocRepo;
     @Mock private PolicyDocumentFrameworkMappingRepository docMappingRepo;
     @Mock private AuditFindingRepository findingRepo;

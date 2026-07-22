@@ -4,13 +4,9 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.entity.Control;
 import com.tss.grc.module.compliance.entity.Framework;
-import com.tss.grc.module.compliance.entity.Policy;
-import com.tss.grc.module.compliance.entity.PolicyFrameworkMapping;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.compliance.repository.FrameworkRepository;
-import com.tss.grc.module.compliance.repository.PolicyFrameworkMappingRepository;
-import com.tss.grc.module.compliance.repository.PolicyRepository;
 import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.entity.PolicyDocumentFrameworkMapping;
 import com.tss.grc.module.policy.repository.PolicyDocumentFrameworkMappingRepository;
@@ -41,8 +37,6 @@ import java.util.*;
 public class FrameworkAnchorService {
 
     private final FrameworkRepository frameworkRepo;
-    private final PolicyRepository policyRepo;                 // legacy — only mappingsForPolicy (PolicyDetailPage, CH-9)
-    private final PolicyFrameworkMappingRepository mappingRepo; // legacy — only mappingsForPolicy
     private final PolicyDocumentRepository policyDocRepo;               // CH-6: canonical register
     private final PolicyDocumentFrameworkMappingRepository docMappingRepo; // CH-6: canonical mappings
     private final AuditFindingRepository findingRepo;
@@ -82,10 +76,11 @@ public class FrameworkAnchorService {
     }
 
     public List<Map<String, Object>> mappingsForPolicy(Long id) {
-        requirePolicy(id);
-        List<PolicyFrameworkMapping> mappings = mappingRepo.findByPolicyId(id);
+        // CH-9: canonical — {id} is a policy.documents id.
+        requireDocument(id);
+        List<PolicyDocumentFrameworkMapping> mappings = docMappingRepo.findByDocumentId(id);
         List<Map<String, Object>> out = new ArrayList<>();
-        for (PolicyFrameworkMapping m : mappings) {
+        for (PolicyDocumentFrameworkMapping m : mappings) {
             Framework f = frameworkRepo.findById(m.getFrameworkId()).orElse(null);
             Map<String, Object> row = new HashMap<>();
             row.put("mappingId",     m.getId());
@@ -312,15 +307,7 @@ public class FrameworkAnchorService {
         return out;
     }
 
-    // Legacy — retained only for mappingsForPolicy() (PolicyDetailPage, pending CH-9).
-    private Policy requirePolicy(Long id) {
-        Long org = TenantContext.getCurrentTenant();
-        return policyRepo.findById(id)
-            .filter(p -> p.getOrganisationId().equals(org))
-            .orElseThrow(() -> new EntityNotFoundException("Policy not found: " + id));
-    }
-
-    // CH-6 — canonical guards (org derived from the row itself / the document).
+    // CH-6/CH-9 — canonical guards (org derived from the row itself / the document).
     private PolicyDocument requireDocument(Long id) {
         Long org = TenantContext.getCurrentTenant();
         return policyDocRepo.findById(id)
