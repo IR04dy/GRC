@@ -439,6 +439,9 @@ public class ChangeManagementService {
         long success = byOutcome.getOrDefault("SUCCESS", 0L);
         long withOutcome = byOutcome.values().stream().mapToLong(Long::longValue).sum();
         out.put("successRatePct", withOutcome == 0 ? 0 : Math.round(success * 1000.0 / withOutcome) / 10.0);
+
+        // CH-5: overdue open tasks (dueAt passed, not DONE/SKIPPED) — the SLA KPI.
+        out.put("overdueTasks", taskRepo.countOverdueOpen(org, java.time.LocalDateTime.now()));
         return out;
     }
 

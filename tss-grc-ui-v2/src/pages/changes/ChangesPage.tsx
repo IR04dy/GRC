@@ -434,8 +434,16 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
   async function addTask() {
     const title = window.prompt(t('changeTaskTitle'), '');
     if (!title) return;
-    try { await changeApi.addTask(change!.id, { titleEn: title, status: 'PENDING' }); void reload(); }
-    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+    // CH-5: capture owner + due date so the SLA scheduler can act on the task.
+    // Interim prompt-based capture; CH-8 replaces the task flow with a real modal.
+    const owner = (window.prompt(lang === 'ar' ? 'المالك (اختياري)' : 'Owner (optional)', '') ?? '').trim();
+    const dueRaw = (window.prompt(lang === 'ar' ? 'تاريخ الاستحقاق YYYY-MM-DD (اختياري)' : 'Due date YYYY-MM-DD (optional)', '') ?? '').trim();
+    const dueAt = /^\d{4}-\d{2}-\d{2}$/.test(dueRaw) ? `${dueRaw}T17:00:00` : undefined;
+    try {
+      await changeApi.addTask(change!.id, { titleEn: title, status: 'PENDING',
+        ownerName: owner || undefined, dueAt });
+      void reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function flipTask(task: ChangeTaskDto) {
     const next = task.status === 'PENDING' ? 'IN_PROGRESS' : task.status === 'IN_PROGRESS' ? 'DONE' : 'PENDING';

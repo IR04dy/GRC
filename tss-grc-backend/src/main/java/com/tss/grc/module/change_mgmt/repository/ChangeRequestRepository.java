@@ -44,4 +44,8 @@ public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, Lo
         GROUP BY c.status
         """)
     java.util.List<Object[]> countByStatusGrouped(@Param("orgId") Long orgId);
+
+    /** CH-5: tenants that have any change request — the SLA scheduler iterates these. */
+    @Query("SELECT DISTINCT c.organisationId FROM ChangeRequest c")
+    java.util.List<Long> findDistinctOrganisationIds();
 }
