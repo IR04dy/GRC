@@ -56,6 +56,10 @@ public class ChangeRequest {
     @Column(name = "test_plan", columnDefinition = "NVARCHAR(MAX)")
     private String testPlan;
 
+    // CH-11: first-class implementation plan (completes the impl/test/rollback trio).
+    @Column(name = "implementation_plan", columnDefinition = "NVARCHAR(MAX)")
+    private String implementationPlan;
+
     @Column(name = "business_justification", columnDefinition = "NVARCHAR(MAX)")
     private String businessJustification;
 
@@ -106,6 +110,26 @@ public class ChangeRequest {
 
     @Column(name = "outcome", length = 30)
     private String outcome;
+
+    // CH-11: structured post-implementation review (PIR). post_review_date above
+    // records WHEN the review window opened; these record its CONTENT + sign-off.
+    @Column(name = "pir_summary", columnDefinition = "NVARCHAR(MAX)")
+    private String pirSummary;
+
+    @Column(name = "pir_objectives_met")
+    private Boolean pirObjectivesMet;
+
+    @Column(name = "pir_lessons", columnDefinition = "NVARCHAR(MAX)")
+    private String pirLessons;
+
+    @Column(name = "pir_follow_up", columnDefinition = "NVARCHAR(MAX)")
+    private String pirFollowUp;
+
+    @Column(name = "pir_reviewed_by", length = 255)
+    private String pirReviewedBy;
+
+    @Column(name = "pir_reviewed_at")
+    private LocalDateTime pirReviewedAt;
 
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;

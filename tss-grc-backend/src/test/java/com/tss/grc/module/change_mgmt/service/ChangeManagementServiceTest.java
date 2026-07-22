@@ -191,12 +191,60 @@ class ChangeManagementServiceTest {
 
     @Test
     void transition_POST_REVIEW_to_CLOSED_stamps_closureDate() {
-        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("POST_REVIEW", "NORMAL")));
+        ChangeRequest reviewed = change("POST_REVIEW", "NORMAL");
+        reviewed.setPirSummary("Deployed cleanly; monitored 24h, no regressions.");  // CH-11: PIR recorded
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(reviewed));
         when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ChangeRequest out = service.transition(CHANGE_ID, "CLOSED", new HashMap<>());
         assertThat(out.getStatus()).isEqualTo("CLOSED");
         assertThat(out.getClosureDate()).isNotNull();
+    }
+
+    // ─── CH-11: change-plan + PIR objects ────────────────────────────
+
+    @Test
+    void transition_to_CLOSED_without_pir_blocks_normal_change() {
+        // Mandatory retrospective: a NORMAL change with no PIR summary cannot close.
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("POST_REVIEW", "NORMAL")));
+
+        assertThatThrownBy(() -> service.transition(CHANGE_ID, "CLOSED", new HashMap<>()))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("post-implementation review (PIR) summary is required");
+    }
+
+    @Test
+    void transition_to_CLOSED_without_pir_allowed_for_standard_change() {
+        // STANDARD (pre-approved) changes are exempt from the mandatory PIR gate.
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("POST_REVIEW", "STANDARD")));
+        when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ChangeRequest out = service.transition(CHANGE_ID, "CLOSED", new HashMap<>());
+        assertThat(out.getStatus()).isEqualTo("CLOSED");
+        assertThat(out.getClosureDate()).isNotNull();
+    }
+
+    @Test
+    void transition_to_POST_REVIEW_captures_pir_content_and_stamps_signoff() {
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("IMPLEMENTED", "NORMAL")));
+        when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("pirSummary", "Change succeeded; one minor follow-up.");
+        body.put("pirObjectivesMet", true);
+        body.put("pirLessons", "Stage the config change earlier next time.");
+        body.put("pirFollowUp", "Open CAPA to automate the pre-flight check.");
+        body.put("reviewer", "Dana Reviewer");
+        ChangeRequest out = service.transition(CHANGE_ID, "POST_REVIEW", body);
+
+        assertThat(out.getStatus()).isEqualTo("POST_REVIEW");
+        assertThat(out.getPostReviewDate()).isNotNull();
+        assertThat(out.getPirSummary()).contains("succeeded");
+        assertThat(out.getPirObjectivesMet()).isTrue();
+        assertThat(out.getPirLessons()).contains("Stage the config");
+        assertThat(out.getPirFollowUp()).contains("CAPA");
+        assertThat(out.getPirReviewedBy()).isEqualTo("Dana Reviewer");
+        assertThat(out.getPirReviewedAt()).isNotNull();
     }
 
     // ─── Rework path (CAB_REJECTED → DRAFT) ──────────────────────────

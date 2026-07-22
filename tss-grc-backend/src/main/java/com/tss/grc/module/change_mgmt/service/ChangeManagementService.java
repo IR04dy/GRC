@@ -231,8 +231,25 @@ public class ChangeManagementService {
             }
             case "POST_REVIEW" -> {
                 if (c.getPostReviewDate() == null) c.setPostReviewDate(LocalDate.now());
+                // CH-11: capture the PIR content at the review moment. Any field may
+                // be supplied via the transition body; the review sign-off (who/when)
+                // is system-stamped so it cannot be back-dated or forged by the client.
+                capturePir(c, body);
+                c.setPirReviewedAt(LocalDateTime.now());
+                String reviewer = strFromBody(body, "reviewer");
+                if (reviewer == null) reviewer = strFromBody(body, "reviewedBy");
+                if (reviewer != null && !reviewer.isBlank()) c.setPirReviewedBy(reviewer);
             }
             case "CLOSED" -> {
+                // CH-11 (mandatory retrospective): a NORMAL/EMERGENCY change cannot be
+                // closed without a recorded PIR summary — this is the "mandatory
+                // retrospective review" governance gate (CH-1). STANDARD changes are
+                // pre-approved/low-risk and exempt. A 409 (IllegalStateException).
+                if (!"STANDARD".equals(c.getChangeType())
+                        && (c.getPirSummary() == null || c.getPirSummary().isBlank()))
+                    throw new IllegalStateException(
+                        "Cannot close: a post-implementation review (PIR) summary is required "
+                            + "for " + nullSafeStr(c.getChangeType()) + " changes before closure");
                 if (c.getClosureDate() == null) c.setClosureDate(LocalDate.now());
             }
             default -> { /* no extra side-effects */ }
@@ -465,7 +482,15 @@ public class ChangeManagementService {
         if (src.getImpactSummary()        != null) target.setImpactSummary(src.getImpactSummary());
         if (src.getRollbackPlan()         != null) target.setRollbackPlan(src.getRollbackPlan());
         if (src.getTestPlan()             != null) target.setTestPlan(src.getTestPlan());
+        if (src.getImplementationPlan()   != null) target.setImplementationPlan(src.getImplementationPlan());
         if (src.getBusinessJustification()!= null) target.setBusinessJustification(src.getBusinessJustification());
+        // CH-11: PIR content is editable via PUT (a reviewer can refine the
+        // retrospective after it was first captured at the POST_REVIEW transition).
+        // pir_reviewed_by / pir_reviewed_at are system-stamped, never client-set.
+        if (src.getPirSummary()           != null) target.setPirSummary(src.getPirSummary());
+        if (src.getPirObjectivesMet()     != null) target.setPirObjectivesMet(src.getPirObjectivesMet());
+        if (src.getPirLessons()           != null) target.setPirLessons(src.getPirLessons());
+        if (src.getPirFollowUp()          != null) target.setPirFollowUp(src.getPirFollowUp());
         if (src.getRequestedByName()      != null) target.setRequestedByName(src.getRequestedByName());
         if (src.getChangeOwnerName()      != null) target.setChangeOwnerName(src.getChangeOwnerName());
         if (src.getImplementerName()      != null) target.setImplementerName(src.getImplementerName());
@@ -494,5 +519,20 @@ public class ChangeManagementService {
     private static String blank(String s) { return (s == null || s.isBlank()) ? null : s; }
     private static String strFromBody(Map<String, Object> body, String key) {
         return body != null && body.get(key) != null ? body.get(key).toString() : null;
+    }
+
+    /** CH-11: pull PIR content fields off a transition body when present, leaving
+     *  any already-recorded value untouched if the body omits the field. */
+    private static void capturePir(ChangeRequest c, Map<String, Object> body) {
+        if (body == null) return;
+        String summary = strFromBody(body, "pirSummary");
+        if (summary != null && !summary.isBlank()) c.setPirSummary(summary);
+        String lessons = strFromBody(body, "pirLessons");
+        if (lessons != null && !lessons.isBlank()) c.setPirLessons(lessons);
+        String followUp = strFromBody(body, "pirFollowUp");
+        if (followUp != null && !followUp.isBlank()) c.setPirFollowUp(followUp);
+        Object met = body.get("pirObjectivesMet");
+        if (met instanceof Boolean b) c.setPirObjectivesMet(b);
+        else if (met != null) c.setPirObjectivesMet(Boolean.parseBoolean(met.toString()));
     }
 }

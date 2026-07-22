@@ -4,6 +4,7 @@ import {
   GitBranch, Filter, Plus, BarChart3, ListChecks, KanbanSquare, Activity,
   CheckCheck, X as XIcon, ArrowRight, AlertTriangle, ShieldCheck, Clock, Send,
   Wrench, Stamp, ChevronRight, MessageSquare, Link2, RefreshCw, Trash2, FolderOpen,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -85,7 +86,7 @@ const LINK_TYPE_OPTIONS = ['AFFECTS', 'TRIGGERED_BY', 'MITIGATES', 'TARGETS', 'R
 const EMPTY: Partial<ChangeRequestDto> = {
   changeType: 'NORMAL', riskLevel: 'MEDIUM', category: 'INFRASTRUCTURE',
   titleEn: '', titleAr: '', descriptionEn: '',
-  impactSummary: '', rollbackPlan: '', testPlan: '',
+  impactSummary: '', rollbackPlan: '', testPlan: '', implementationPlan: '',
   businessJustification: '', requestedByName: '', changeOwnerName: '',
   scheduledStart: undefined, scheduledEnd: undefined,
 };
@@ -160,6 +161,7 @@ export function ChangesPage() {
     { kind: 'date',     key: 'scheduledEnd',         label: t('changeFldScheduledEnd'), span: 6 },
     { kind: 'textarea', key: 'descriptionEn',        label: t('changeFldDescription'), rows: 3, span: 12 },
     { kind: 'textarea', key: 'impactSummary',        label: t('changeFldImpact'), rows: 2, span: 12 },
+    { kind: 'textarea', key: 'implementationPlan',   label: t('changeFldImplPlan'), rows: 2, span: 12 },
     { kind: 'textarea', key: 'rollbackPlan',         label: t('changeFldRollback'), rows: 2, span: 12 },
     { kind: 'textarea', key: 'testPlan',             label: t('changeFldTestPlan'), rows: 2, span: 12 },
     { kind: 'textarea', key: 'businessJustification',label: t('changeFldJustification'), rows: 2, span: 12 },
@@ -502,7 +504,9 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
           </div>
           <div className="changes-blocks">
             {change.descriptionEn && <Block label={t('changeFldDescription')} body={change.descriptionEn} />}
+            {change.businessJustification && <Block label={t('changeFldJustification')} body={change.businessJustification} />}
             {change.impactSummary && <Block label={t('changeFldImpact')} body={change.impactSummary} />}
+            {change.implementationPlan && <Block label={t('changeFldImplPlan')} body={change.implementationPlan} />}
             {change.rollbackPlan  && <Block label={t('changeFldRollback')} body={change.rollbackPlan} />}
             {change.testPlan      && <Block label={t('changeFldTestPlan')} body={change.testPlan} />}
           </div>
@@ -521,6 +525,8 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
             )}
           </div>
         </Card>
+
+        <PirCard change={change} onChanged={onChanged} toast={toast} />
 
         <Card title={t('changeApprovals')} Icon={Stamp}>
           {approvals.length === 0
@@ -602,6 +608,92 @@ function Block({ label, body }: { label: string; body: string }) {
     <div className="changes-block-label">{label}</div>
     <div className="changes-block-body">{body}</div>
   </div>;
+}
+
+// ─── CH-11: post-implementation review (PIR) ───────────────────────────────
+// Surfaced once a change reaches an implemented/rolled-back state. Editable
+// until the change is CLOSED (a NORMAL/EMERGENCY change cannot close without a
+// PIR summary — the backend enforces the mandatory-retrospective gate). The
+// review sign-off (who/when) is stamped by the POST_REVIEW transition server-side.
+const PIR_STATES = ['IMPLEMENTED', 'POST_REVIEW', 'ROLLED_BACK', 'CLOSED'];
+function PirCard({ change, onChanged, toast }: {
+  change: ChangeRequestDto;
+  onChanged: () => void | Promise<void>;
+  toast: ReturnType<typeof useToast>;
+}) {
+  const { t } = useI18n();
+  const locked = change.status === 'CLOSED';
+  const [summary, setSummary] = useState('');
+  const [met, setMet] = useState<'' | 'true' | 'false'>('');
+  const [lessons, setLessons] = useState('');
+  const [followUp, setFollowUp] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setSummary(change.pirSummary ?? '');
+    setMet(change.pirObjectivesMet === true ? 'true' : change.pirObjectivesMet === false ? 'false' : '');
+    setLessons(change.pirLessons ?? '');
+    setFollowUp(change.pirFollowUp ?? '');
+  }, [change.id, change.pirSummary, change.pirObjectivesMet, change.pirLessons, change.pirFollowUp]);
+
+  if (!PIR_STATES.includes(change.status)) return null;
+
+  async function save() {
+    setSaving(true);
+    try {
+      await changeApi.update(change.id, {
+        pirSummary: summary || undefined,
+        pirObjectivesMet: met === '' ? undefined : met === 'true',
+        pirLessons: lessons || undefined,
+        pirFollowUp: followUp || undefined,
+      });
+      toast.success(t('changePirSaved'));
+      await onChanged();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
+    finally { setSaving(false); }
+  }
+
+  const signoff = change.pirReviewedAt
+    ? <Badge tone="success">{t('changePirReviewed')} · {new Date(change.pirReviewedAt).toLocaleDateString()}</Badge>
+    : <Badge tone="warning">{t('changePirPending')}</Badge>;
+
+  if (locked) {
+    return (
+      <Card title={t('changePirTitle')} Icon={ClipboardCheck} action={signoff}>
+        <div className="changes-blocks">
+          {change.pirSummary && <Block label={t('changePirSummary')} body={change.pirSummary} />}
+          <Field label={t('changePirObjectives')}
+                 value={change.pirObjectivesMet == null ? t('changePirUnset') : change.pirObjectivesMet ? t('changePirYes') : t('changePirNo')} />
+          {change.pirLessons && <Block label={t('changePirLessons')} body={change.pirLessons} />}
+          {change.pirFollowUp && <Block label={t('changePirFollowUp')} body={change.pirFollowUp} />}
+          {change.pirReviewedBy && <Field label={t('changePirReviewedBy')} value={change.pirReviewedBy} />}
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card title={t('changePirTitle')} Icon={ClipboardCheck} action={signoff}>
+      <div className="changes-pir-form">
+        <label className="changes-block-label">{t('changePirSummary')}</label>
+        <textarea rows={2} value={summary} onChange={e => setSummary(e.target.value)} className="changes-pir-input" />
+        <label className="changes-block-label">{t('changePirObjectives')}</label>
+        <select value={met} onChange={e => setMet(e.target.value as '' | 'true' | 'false')} className="changes-pir-input">
+          <option value="">{t('changePirUnset')}</option>
+          <option value="true">{t('changePirYes')}</option>
+          <option value="false">{t('changePirNo')}</option>
+        </select>
+        <label className="changes-block-label">{t('changePirLessons')}</label>
+        <textarea rows={2} value={lessons} onChange={e => setLessons(e.target.value)} className="changes-pir-input" />
+        <label className="changes-block-label">{t('changePirFollowUp')}</label>
+        <textarea rows={2} value={followUp} onChange={e => setFollowUp(e.target.value)} className="changes-pir-input" />
+        {change.pirReviewedBy && <Field label={t('changePirReviewedBy')} value={change.pirReviewedBy} />}
+        <div className="changes-actions-row">
+          <Button variant="primary" Icon={ClipboardCheck} onClick={save} disabled={saving}>{t('changePirSave')}</Button>
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 // ─── Analytics ─────────────────────────────────────────────────────────────

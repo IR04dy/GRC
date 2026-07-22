@@ -236,6 +236,24 @@
   color: var(--ink-1);
 }
 
+/* ─── CH-11: PIR form ─────────────────────────────────────── */
+.changes-pir-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.changes-pir-form .changes-block-label { margin-top: var(--sp-2); }
+.changes-pir-input {
+  width: 100%;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-1);
+  font: inherit;
+  resize: vertical;
+}
+
 /* ─── Field / Block helpers ───────────────────────────────── */
 .changes-field-label {
   font-size: var(--text-2xs);

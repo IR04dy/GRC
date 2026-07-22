@@ -529,6 +529,7 @@ export interface ChangeRequestDto {
   impactSummary?: string;
   rollbackPlan?: string;
   testPlan?: string;
+  implementationPlan?: string;   // CH-11
   businessJustification?: string;
   requestedByName?: string;
   changeOwnerName?: string;
@@ -544,6 +545,13 @@ export interface ChangeRequestDto {
   cabDecisionAt?: string;
   cabDecisionNotes?: string;
   outcome?: string;
+  // CH-11: structured post-implementation review (PIR)
+  pirSummary?: string;
+  pirObjectivesMet?: boolean;
+  pirLessons?: string;
+  pirFollowUp?: string;
+  pirReviewedBy?: string;
+  pirReviewedAt?: string;
   createdAt?: string;
 }
 export interface ChangeApprovalDto {
