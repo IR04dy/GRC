@@ -123,61 +123,14 @@ public class RegChangePolicyController {
         return policyService.get(id);
     }
 
-    @PostMapping("/policies")
-    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
-    @ResponseStatus(HttpStatus.CREATED)
-    public Policy createPolicy(@RequestBody Policy req) {
-        return policyService.create(req);
-    }
-
-    @PutMapping("/policies/{id}")
-    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
-    public Policy updatePolicy(@PathVariable Long id, @RequestBody Policy req) {
-        return policyService.update(id, req);
-    }
-
-    @DeleteMapping("/policies/{id}")
-    @PreAuthorize("hasPermission('COMPLIANCE','DELETE')")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deletePolicy(@PathVariable Long id) {
-        policyService.delete(id);
-    }
-
-    @PostMapping("/policies/{id}/submit-for-legal-review")
-    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
-    public Policy submitForLegalReview(@PathVariable Long id) {
-        return policyService.submitForLegalReview(id);
-    }
-
-    @PostMapping("/policies/{id}/legal-approve")
-    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
-    public Policy legalApprove(@PathVariable Long id) {
-        return policyService.legalApprove(id);
-    }
-
-    @PostMapping("/policies/{id}/exec-approve")
-    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
-    public Policy executiveApprove(@PathVariable Long id) {
-        return policyService.executiveApprove(id);
-    }
-
-    @PostMapping("/policies/{id}/mark-review-due")
-    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
-    public Policy markReviewDue(@PathVariable Long id) {
-        return policyService.markReviewDue(id);
-    }
-
-    @PostMapping("/policies/{id}/retire")
-    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
-    public Policy retirePolicy(@PathVariable Long id) {
-        return policyService.retire(id);
-    }
-
-    @PostMapping("/policies/{id}/reject")
-    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
-    public Policy rejectPolicy(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        return policyService.reject(id, body);
-    }
+    // ── Legacy policy writes RETIRED (CH-6 / PM-C1) ─────────────────────────
+    // The write lifecycle for the legacy compliance.policies register is retired:
+    // policy authoring lives solely on the canonical register
+    // (POST/PUT/DELETE /api/policy/documents + /transition). Only the read
+    // endpoints (list/get/stats) remain, still serving the /policies/:id detail
+    // page until it is repointed to the canonical API in CH-9. PolicyService keeps
+    // the now HTTP-unexposed lifecycle methods (+ their tests) through this
+    // expand-contract window; the whole legacy service goes with CH-9.
 
     @GetMapping("/policies/stats")
     @PreAuthorize("hasPermission('COMPLIANCE','READ')")
