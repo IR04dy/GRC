@@ -51,6 +51,11 @@ public class ChangeManagementService {
         Map.entry("CLOSED",             Set.<String>of())
     );
 
+    // CH-2: allowed enum values, mirrored by the V300 DB CHECK constraints.
+    private static final Set<String> CHANGE_TYPES = Set.of("STANDARD", "NORMAL", "EMERGENCY");
+    private static final Set<String> RISK_LEVELS  = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
+    private static final Set<String> OUTCOMES     = Set.of("SUCCESS", "PARTIAL_SUCCESS", "FAILED", "ROLLED_BACK");
+
     private final ChangeRequestRepository changeRepo;
     private final ChangeApprovalRepository approvalRepo;
     private final ChangeTaskRepository taskRepo;
@@ -212,7 +217,12 @@ public class ChangeManagementService {
             }
             case "IMPLEMENTED" -> {
                 if (c.getImplementationEnded() == null) c.setImplementationEnded(LocalDateTime.now());
-                if (body.get("outcome") != null) c.setOutcome(body.get("outcome").toString());
+                if (body.get("outcome") != null) {
+                    String oc = body.get("outcome").toString();
+                    if (!OUTCOMES.contains(oc))
+                        throw new IllegalArgumentException("Invalid outcome '" + oc + "' — allowed: " + OUTCOMES);
+                    c.setOutcome(oc);
+                }
                 else if (c.getOutcome() == null) c.setOutcome("SUCCESS");
             }
             case "ROLLED_BACK" -> {
@@ -435,6 +445,12 @@ public class ChangeManagementService {
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private void apply(ChangeRequest target, ChangeRequest src) {
+        // CH-2 (validation): reject invalid enums with a 400 up front, rather than
+        // letting them reach the V300 DB CHECK constraints and surface as a 500.
+        if (src.getChangeType() != null && !CHANGE_TYPES.contains(src.getChangeType()))
+            throw new IllegalArgumentException("Invalid changeType '" + src.getChangeType() + "' — allowed: " + CHANGE_TYPES);
+        if (src.getRiskLevel() != null && !RISK_LEVELS.contains(src.getRiskLevel()))
+            throw new IllegalArgumentException("Invalid riskLevel '" + src.getRiskLevel() + "' — allowed: " + RISK_LEVELS);
         if (src.getChangeCode()           != null) target.setChangeCode(src.getChangeCode());
         if (src.getTitleEn()              != null) target.setTitleEn(src.getTitleEn());
         if (src.getTitleAr()              != null) target.setTitleAr(src.getTitleAr());

@@ -447,4 +447,31 @@ class ChangeManagementServiceTest {
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("Segregation of duty");
     }
+
+    // ── CH-2: invalid enums rejected with 400 (IllegalArgumentException) ────────
+
+    @Test
+    void create_rejects_invalid_changeType() {
+        ChangeRequest req = new ChangeRequest();
+        req.setTitleEn("x"); req.setChangeType("MADE_UP");
+        assertThatThrownBy(() -> service.create(req))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("changeType");
+    }
+
+    @Test
+    void create_rejects_invalid_riskLevel() {
+        ChangeRequest req = new ChangeRequest();
+        req.setTitleEn("x"); req.setChangeType("NORMAL"); req.setRiskLevel("NUCLEAR");
+        assertThatThrownBy(() -> service.create(req))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("riskLevel");
+    }
+
+    @Test
+    void transition_to_IMPLEMENTED_rejects_invalid_outcome() {
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("IMPLEMENTING", "NORMAL")));
+        Map<String, Object> body = new HashMap<>();
+        body.put("outcome", "BOGUS");
+        assertThatThrownBy(() -> service.transition(CHANGE_ID, "IMPLEMENTED", body))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("outcome");
+    }
 }
