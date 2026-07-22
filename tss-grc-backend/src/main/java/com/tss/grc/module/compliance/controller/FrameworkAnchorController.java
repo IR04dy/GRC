@@ -1,7 +1,7 @@
 package com.tss.grc.module.compliance.controller;
 
 import com.tss.grc.module.compliance.entity.Framework;
-import com.tss.grc.module.compliance.entity.PolicyFrameworkMapping;
+import com.tss.grc.module.policy.entity.PolicyDocumentFrameworkMapping;
 import com.tss.grc.module.compliance.service.FrameworkAnchorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -59,13 +59,13 @@ public class FrameworkAnchorController {
     @PostMapping("/policies/{id}/mappings")
     @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
     @ResponseStatus(HttpStatus.CREATED)
-    public PolicyFrameworkMapping addMapping(@PathVariable Long id, @RequestBody PolicyFrameworkMapping body) {
+    public PolicyDocumentFrameworkMapping addMapping(@PathVariable Long id, @RequestBody PolicyDocumentFrameworkMapping body) {
         return service.addMapping(id, body);
     }
 
     @PutMapping("/policies/mappings/{mappingId}")
     @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
-    public PolicyFrameworkMapping updateMapping(@PathVariable Long mappingId, @RequestBody PolicyFrameworkMapping body) {
+    public PolicyDocumentFrameworkMapping updateMapping(@PathVariable Long mappingId, @RequestBody PolicyDocumentFrameworkMapping body) {
         return service.updateMapping(mappingId, body);
     }
 

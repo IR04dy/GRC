@@ -2,12 +2,14 @@ package com.tss.grc.module.compliance.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.entity.Framework;
-import com.tss.grc.module.compliance.entity.PolicyFrameworkMapping;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.compliance.repository.FrameworkRepository;
 import com.tss.grc.module.compliance.repository.PolicyFrameworkMappingRepository;
 import com.tss.grc.module.compliance.repository.PolicyRepository;
+import com.tss.grc.module.policy.entity.PolicyDocumentFrameworkMapping;
+import com.tss.grc.module.policy.repository.PolicyDocumentFrameworkMappingRepository;
+import com.tss.grc.module.policy.repository.PolicyDocumentRepository;
 import com.tss.grc.module.privacy.repository.DpiaRepository;
 import com.tss.grc.module.risk.kri.repository.KriDefinitionRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
@@ -23,16 +25,15 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * CH-15 — {@link FrameworkAnchorService#coverage()} must scope policy→framework
- * mappings to the current tenant. The {@code policy_framework_mappings} table has
- * no organisation_id, so the count would otherwise tally every other tenant's
- * mappings for the same framework. Scope is derived from the parent policy's org.
+ * CH-6 — {@link FrameworkAnchorService#coverage()} reads the canonical
+ * {@code policy.document_framework_mappings}, org-scoped by the mapping row's own
+ * organisation_id (no parent-policy subquery). Tenant scope must come from the
+ * active TenantContext, and the satisfaction tallies must reflect only that
+ * tenant's mappings for the framework.
  */
 @ExtendWith(MockitoExtension.class)
 class FrameworkAnchorServiceTest {
@@ -43,6 +44,8 @@ class FrameworkAnchorServiceTest {
     @Mock private FrameworkRepository frameworkRepo;
     @Mock private PolicyRepository policyRepo;
     @Mock private PolicyFrameworkMappingRepository mappingRepo;
+    @Mock private PolicyDocumentRepository policyDocRepo;
+    @Mock private PolicyDocumentFrameworkMappingRepository docMappingRepo;
     @Mock private AuditFindingRepository findingRepo;
     @Mock private ControlRepository controlRepo;
     @Mock private DpiaRepository dpiaRepo;
@@ -63,19 +66,20 @@ class FrameworkAnchorServiceTest {
         return f;
     }
 
-    private static PolicyFrameworkMapping mapping(String satisfaction) {
-        PolicyFrameworkMapping m = new PolicyFrameworkMapping();
+    private static PolicyDocumentFrameworkMapping mapping(String satisfaction) {
+        PolicyDocumentFrameworkMapping m = new PolicyDocumentFrameworkMapping();
+        m.setOrganisationId(ORG);
+        m.setDocumentId(100L);
         m.setFrameworkId(FW_ID);
         m.setSatisfaction(satisfaction);
         return m;
     }
 
     @Test
-    void coverage_scopesMappingsToCurrentTenantViaParentPolicy() {
+    void coverage_talliesCanonicalMappingsForTheActiveTenant() {
         when(frameworkRepo.findByIsActiveTrueOrderByFamilyAscCodeAsc())
                 .thenReturn(List.of(framework(FW_ID)));
-        // Only THIS tenant's three mappings come back from the org-scoped query.
-        when(mappingRepo.findByFrameworkIdAndPolicyOrg(FW_ID, ORG))
+        when(docMappingRepo.findByOrganisationIdAndFrameworkId(ORG, FW_ID))
                 .thenReturn(List.of(mapping("FULL"), mapping("PARTIAL"), mapping("FULL")));
 
         List<Map<String, Object>> out = service.coverage();
@@ -88,22 +92,21 @@ class FrameworkAnchorServiceTest {
         assertThat(r.get("outOfScope")).isEqualTo(0L);
         assertThat(r.get("notApplicable")).isEqualTo(0L);
 
-        // The leaky, org-blind lookup must never be used for the tally.
-        verify(mappingRepo).findByFrameworkIdAndPolicyOrg(FW_ID, ORG);
-        verify(mappingRepo, never()).findByFrameworkId(anyLong());
+        // Coverage reads the canonical, org-scoped mapping table.
+        verify(docMappingRepo).findByOrganisationIdAndFrameworkId(ORG, FW_ID);
     }
 
     @Test
-    void coverage_threadsTheActiveTenantIntoTheLookup() {
+    void coverage_scopesToTheActiveTenant() {
         TenantContext.setCurrentTenant(7L);
         when(frameworkRepo.findByIsActiveTrueOrderByFamilyAscCodeAsc())
                 .thenReturn(List.of(framework(FW_ID)));
-        when(mappingRepo.findByFrameworkIdAndPolicyOrg(FW_ID, 7L))
+        when(docMappingRepo.findByOrganisationIdAndFrameworkId(7L, FW_ID))
                 .thenReturn(List.of(mapping("FULL")));
 
         service.coverage();
 
-        // org=7 (not a hardcoded value) is what reaches the repository.
-        verify(mappingRepo).findByFrameworkIdAndPolicyOrg(FW_ID, 7L);
+        // org=7 (from TenantContext, not hardcoded) is what reaches the repository.
+        verify(docMappingRepo).findByOrganisationIdAndFrameworkId(7L, FW_ID);
     }
 }

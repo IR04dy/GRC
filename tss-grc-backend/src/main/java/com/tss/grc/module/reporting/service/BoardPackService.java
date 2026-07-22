@@ -7,11 +7,11 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.change_mgmt.repository.ChangeRequestRepository;
 import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.entity.Framework;
-import com.tss.grc.module.compliance.entity.PolicyFrameworkMapping;
+import com.tss.grc.module.policy.entity.PolicyDocumentFrameworkMapping;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.compliance.repository.FrameworkRepository;
-import com.tss.grc.module.compliance.repository.PolicyFrameworkMappingRepository;
+import com.tss.grc.module.policy.repository.PolicyDocumentFrameworkMappingRepository;
 import com.tss.grc.module.ethics.repository.AmlAlertRepository;
 import com.tss.grc.module.ethics.repository.EthicsCaseRepository;
 import com.tss.grc.module.platform.entity.Organisation;
@@ -67,7 +67,7 @@ public class BoardPackService {
     private final KriDefinitionRepository kriRepo;
     private final KriMeasurementRepository measRepo;
     private final FrameworkRepository frameworkRepo;
-    private final PolicyFrameworkMappingRepository mappingRepo;
+    private final PolicyDocumentFrameworkMappingRepository docMappingRepo; // CH-6: canonical register
     private final ControlRepository controlRepo;
     private final ChangeRequestRepository changeRepo;
     private final EthicsCaseRepository caseRepo;
@@ -365,11 +365,10 @@ public class BoardPackService {
         for (String h : hdr) t.addCell(headerCell(h, ar));
 
         for (Framework f : frameworks) {
-            // CH-15: org-scope via parent policy — the mapping table has no
-            // organisation_id, so findByFrameworkId would tally every tenant's rows.
-            List<PolicyFrameworkMapping> rows = mappingRepo.findByFrameworkIdAndPolicyOrg(f.getId(), org);
+            // CH-6: canonical mapping table, org-scoped by its own organisation_id.
+            List<PolicyDocumentFrameworkMapping> rows = docMappingRepo.findByOrganisationIdAndFrameworkId(org, f.getId());
             long full = 0;
-            for (PolicyFrameworkMapping m : rows) {
+            for (PolicyDocumentFrameworkMapping m : rows) {
                 if ("FULL".equals(m.getSatisfaction())) full++;
             }
             int policyCount = rows.size();

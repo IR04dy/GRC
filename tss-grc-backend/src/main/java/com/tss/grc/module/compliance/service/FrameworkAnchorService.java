@@ -11,6 +11,10 @@ import com.tss.grc.module.compliance.repository.ControlRepository;
 import com.tss.grc.module.compliance.repository.FrameworkRepository;
 import com.tss.grc.module.compliance.repository.PolicyFrameworkMappingRepository;
 import com.tss.grc.module.compliance.repository.PolicyRepository;
+import com.tss.grc.module.policy.entity.PolicyDocument;
+import com.tss.grc.module.policy.entity.PolicyDocumentFrameworkMapping;
+import com.tss.grc.module.policy.repository.PolicyDocumentFrameworkMappingRepository;
+import com.tss.grc.module.policy.repository.PolicyDocumentRepository;
 import com.tss.grc.module.privacy.entity.Dpia;
 import com.tss.grc.module.privacy.repository.DpiaRepository;
 import com.tss.grc.module.risk.kri.entity.KriDefinition;
@@ -37,8 +41,10 @@ import java.util.*;
 public class FrameworkAnchorService {
 
     private final FrameworkRepository frameworkRepo;
-    private final PolicyRepository policyRepo;
-    private final PolicyFrameworkMappingRepository mappingRepo;
+    private final PolicyRepository policyRepo;                 // legacy — only mappingsForPolicy (PolicyDetailPage, CH-9)
+    private final PolicyFrameworkMappingRepository mappingRepo; // legacy — only mappingsForPolicy
+    private final PolicyDocumentRepository policyDocRepo;               // CH-6: canonical register
+    private final PolicyDocumentFrameworkMappingRepository docMappingRepo; // CH-6: canonical mappings
     private final AuditFindingRepository findingRepo;
     private final ControlRepository controlRepo;
     private final DpiaRepository dpiaRepo;
@@ -50,16 +56,17 @@ public class FrameworkAnchorService {
     }
 
     public List<Map<String, Object>> policiesForFramework(Long id) {
+        // CH-6: read the canonical register (policy.documents + canonical mappings).
         Long org = TenantContext.getCurrentTenant();
-        List<PolicyFrameworkMapping> mappings = mappingRepo.findByFrameworkId(id);
+        List<PolicyDocumentFrameworkMapping> mappings = docMappingRepo.findByOrganisationIdAndFrameworkId(org, id);
         List<Map<String, Object>> out = new ArrayList<>();
-        for (PolicyFrameworkMapping m : mappings) {
-            Policy p = policyRepo.findById(m.getPolicyId()).orElse(null);
+        for (PolicyDocumentFrameworkMapping m : mappings) {
+            PolicyDocument p = policyDocRepo.findById(m.getDocumentId()).orElse(null);
             if (p == null || !p.getOrganisationId().equals(org)) continue;
             Map<String, Object> row = new HashMap<>();
             row.put("mappingId",     m.getId());
             row.put("policyId",      p.getId());
-            row.put("code",          p.getCode());
+            row.put("code",          p.getPolicyCode());
             row.put("titleEn",       p.getTitleEn());
             row.put("titleAr",       p.getTitleAr());
             row.put("version",       p.getVersion());
@@ -95,34 +102,35 @@ public class FrameworkAnchorService {
     }
 
     @Transactional
-    public PolicyFrameworkMapping addMapping(Long id, PolicyFrameworkMapping body) {
-        requirePolicy(id);
+    public PolicyDocumentFrameworkMapping addMapping(Long documentId, PolicyDocumentFrameworkMapping body) {
+        // CH-6: {documentId} is a canonical policy.documents id.
+        PolicyDocument doc = requireDocument(documentId);
         if (body.getFrameworkId() == null) throw new IllegalArgumentException("frameworkId is required");
-        body.setId(null);            // force INSERT — block merge() into a cross-tenant row (SEC-CMP-001)
-        body.setIsDeleted(false);
-        body.setPolicyId(id);
-        if (body.getSatisfaction() == null) body.setSatisfaction("PARTIAL");
-        return mappingRepo.save(body);
+        PolicyDocumentFrameworkMapping m = new PolicyDocumentFrameworkMapping();
+        m.setOrganisationId(doc.getOrganisationId());
+        m.setDocumentId(documentId);
+        m.setFrameworkId(body.getFrameworkId());
+        m.setClauseRef(body.getClauseRef());
+        m.setSatisfaction(body.getSatisfaction() == null ? "PARTIAL" : body.getSatisfaction());
+        m.setNotes(body.getNotes());
+        m.setIsDeleted(false);
+        return docMappingRepo.save(m);
     }
 
     @Transactional
-    public PolicyFrameworkMapping updateMapping(Long mappingId, PolicyFrameworkMapping body) {
-        PolicyFrameworkMapping m = mappingRepo.findById(mappingId)
-            .orElseThrow(() -> new EntityNotFoundException("Mapping not found: " + mappingId));
-        requirePolicy(m.getPolicyId());
+    public PolicyDocumentFrameworkMapping updateMapping(Long mappingId, PolicyDocumentFrameworkMapping body) {
+        PolicyDocumentFrameworkMapping m = requireDocMapping(mappingId);
         if (body.getClauseRef()    != null) m.setClauseRef(body.getClauseRef());
         if (body.getSatisfaction() != null) m.setSatisfaction(body.getSatisfaction());
         if (body.getNotes()        != null) m.setNotes(body.getNotes());
-        return mappingRepo.save(m);
+        return docMappingRepo.save(m);
     }
 
     @Transactional
     public void deleteMapping(Long mappingId) {
-        PolicyFrameworkMapping m = mappingRepo.findById(mappingId)
-            .orElseThrow(() -> new EntityNotFoundException("Mapping not found: " + mappingId));
-        requirePolicy(m.getPolicyId());
+        PolicyDocumentFrameworkMapping m = requireDocMapping(mappingId);
         m.setIsDeleted(true);
-        mappingRepo.save(m);
+        docMappingRepo.save(m);
     }
 
     public List<Map<String, Object>> coverage() {
@@ -142,11 +150,11 @@ public class FrameworkAnchorService {
         }
         List<Map<String, Object>> out = new ArrayList<>();
         for (Framework f : all) {
-            // CH-15: mappings carry no organisation_id — scope by parent policy's org
-            // so the coverage tallies don't count other tenants' framework mappings.
-            List<PolicyFrameworkMapping> rows = mappingRepo.findByFrameworkIdAndPolicyOrg(f.getId(), org);
+            // CH-6: read the canonical mapping table, org-scoped by its own
+            // organisation_id column (retires the CH-15 parent-policy subquery).
+            List<PolicyDocumentFrameworkMapping> rows = docMappingRepo.findByOrganisationIdAndFrameworkId(org, f.getId());
             long full = 0, partial = 0, oos = 0, na = 0;
-            for (PolicyFrameworkMapping m : rows) {
+            for (PolicyDocumentFrameworkMapping m : rows) {
                 String s = m.getSatisfaction() == null ? "" : m.getSatisfaction();
                 switch (s) {
                     case "FULL"           -> full++;
@@ -304,10 +312,26 @@ public class FrameworkAnchorService {
         return out;
     }
 
+    // Legacy — retained only for mappingsForPolicy() (PolicyDetailPage, pending CH-9).
     private Policy requirePolicy(Long id) {
         Long org = TenantContext.getCurrentTenant();
         return policyRepo.findById(id)
             .filter(p -> p.getOrganisationId().equals(org))
             .orElseThrow(() -> new EntityNotFoundException("Policy not found: " + id));
+    }
+
+    // CH-6 — canonical guards (org derived from the row itself / the document).
+    private PolicyDocument requireDocument(Long id) {
+        Long org = TenantContext.getCurrentTenant();
+        return policyDocRepo.findById(id)
+            .filter(d -> d.getOrganisationId().equals(org))
+            .orElseThrow(() -> new EntityNotFoundException("Policy document not found: " + id));
+    }
+
+    private PolicyDocumentFrameworkMapping requireDocMapping(Long mappingId) {
+        Long org = TenantContext.getCurrentTenant();
+        return docMappingRepo.findById(mappingId)
+            .filter(m -> m.getOrganisationId().equals(org))
+            .orElseThrow(() -> new EntityNotFoundException("Mapping not found: " + mappingId));
     }
 }
