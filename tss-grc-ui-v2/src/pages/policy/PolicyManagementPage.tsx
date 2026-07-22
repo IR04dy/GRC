@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
-  ShieldCheck, FileText, AlertCircle, CheckCircle2, ArrowRight, Plus, Trash2, Wrench, Paperclip, Download,
+  ShieldCheck, FileText, AlertCircle, CheckCircle2, ArrowRight, Plus, Trash2, Wrench, Paperclip, Download, GitCompare,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -17,7 +17,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import {
-  listPolicies, createPolicy, transitionPolicy, deletePolicy,
+  listPolicies, createPolicy, transitionPolicy, deletePolicy, diffPolicyVersions, type PolicyVersionDiff,
   newPolicyVersion, updatePolicy, runPolicyExpirySweep, policyAggregate, getPolicyEvidencePackage, getPolicyResolvedControls,
   setPolicyControlLinks, listControlCatalog, listFrameworks,
   listExceptions, createException, transitionException, runExceptionExpirySweep,
@@ -177,6 +177,7 @@ function DocumentsTab() {
   const [showCreate, setShowCreate] = useState(false);
   const [docsFor, setDocsFor] = useState<PolicyDocument | null>(null);
   const [controlsFor, setControlsFor] = useState<PolicyDocument | null>(null);
+  const [diffFor, setDiffFor] = useState<PolicyDocument | null>(null);
   const [frameworks, setFrameworks] = useState<FrameworkOption[]>([]);
   useEffect(() => { listFrameworks().then(setFrameworks).catch(() => setFrameworks([])); }, []);
 
@@ -388,6 +389,8 @@ function DocumentsTab() {
                       )}
                       <Button size="sm" variant="ghost" Icon={Plus} onClick={() => onNewVersion(p)}
                         title={isAr ? 'إصدار جديد' : 'New version'} />
+                      <Button size="sm" variant="ghost" Icon={GitCompare} onClick={() => setDiffFor(p)}
+                        title={isAr ? 'مقارنة الإصدارات' : 'Compare versions'} />
                       <Button size="sm" variant="ghost" Icon={Paperclip} onClick={() => setDocsFor(p)}
                         title={isAr ? 'المستندات والمرفقات' : 'Documents & attachments'} />
                       <Button size="sm" variant="ghost" Icon={Download} onClick={() => onExportPack(p)}
@@ -435,6 +438,10 @@ function DocumentsTab() {
 
       {controlsFor && (
         <ControlsModal policy={controlsFor} onClose={() => setControlsFor(null)} />
+      )}
+
+      {diffFor && (
+        <DiffModal policy={diffFor} onClose={() => setDiffFor(null)} />
       )}
     </div>
   );
@@ -526,6 +533,113 @@ function ControlsModal({ policy, onClose }: { policy: PolicyDocument; onClose: (
               {saving ? (isAr ? 'جارٍ الحفظ…' : 'Saving…') : (isAr ? 'حفظ الروابط' : 'Save links')}
             </Button>
           </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ─── CH-10b: version diff viewer (surfaces the CH-12 diff endpoint) ──────
+/** Segment-wise numeric version compare (so v10.0 > v2.0, not lexical). */
+function cmpVersion(a: string, b: string): number {
+  const pa = a.split('.').map(n => parseInt(n, 10) || 0);
+  const pb = b.split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+function DiffModal({ policy, onClose }: { policy: PolicyDocument; onClose: () => void }) {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+  const selStyle: CSSProperties = {
+    padding: '6px 10px', fontSize: 12, minWidth: 160, border: '1px solid var(--border)',
+    borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)',
+  };
+
+  const [versions, setVersions] = useState<PolicyDocument[]>([]);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [diff, setDiff] = useState<PolicyVersionDiff | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [comparing, setComparing] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    listPolicies({ latestOnly: false })
+      .then(all => {
+        if (!alive) return;
+        const mine = all
+          .filter(p => p.policyCode === policy.policyCode)
+          .sort((a, b) => cmpVersion(b.version, a.version));   // newest first
+        setVersions(mine);
+        if (mine.length >= 2) { setTo(mine[0].version); setFrom(mine[1].version); }
+        else if (mine.length === 1) { setTo(mine[0].version); setFrom(mine[0].version); }
+      })
+      .catch(() => { if (alive) setVersions([]); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [policy.policyCode]);
+
+  async function compare() {
+    if (!from || !to || from === to) return;
+    setComparing(true);
+    try { setDiff(await diffPolicyVersions(policy.policyCode, from, to)); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Compare failed'); }
+    finally { setComparing(false); }
+  }
+
+  return (
+    <Modal open size="lg"
+      title={isAr ? `مقارنة الإصدارات — ${policy.policyCode}` : `Compare versions — ${policy.policyCode}`}
+      onClose={onClose}>
+      {loading ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
+       : versions.length < 2 ? <InlineEmpty>{isAr ? 'يلزم وجود إصدارين على الأقل للمقارنة.' : 'At least two versions are needed to compare.'}</InlineEmpty>
+       : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 12 }}>
+              <div style={{ color: 'var(--ink-3)', marginBottom: 4 }}>{isAr ? 'من الإصدار' : 'From version'}</div>
+              <select value={from} onChange={e => { setFrom(e.target.value); setDiff(null); }} style={selStyle}>
+                {versions.map(v => <option key={v.version} value={v.version}>v{v.version} · {policyStatusLabel(v.status, isAr ? 'ar' : 'en')}</option>)}
+              </select>
+            </label>
+            <label style={{ fontSize: 12 }}>
+              <div style={{ color: 'var(--ink-3)', marginBottom: 4 }}>{isAr ? 'إلى الإصدار' : 'To version'}</div>
+              <select value={to} onChange={e => { setTo(e.target.value); setDiff(null); }} style={selStyle}>
+                {versions.map(v => <option key={v.version} value={v.version}>v{v.version} · {policyStatusLabel(v.status, isAr ? 'ar' : 'en')}</option>)}
+              </select>
+            </label>
+            <Button Icon={GitCompare} onClick={compare} disabled={comparing || from === to}>
+              {comparing ? (isAr ? 'جارٍ المقارنة…' : 'Comparing…') : (isAr ? 'قارن' : 'Compare')}
+            </Button>
+          </div>
+          {from === to && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{isAr ? 'اختر إصدارين مختلفين.' : 'Pick two different versions.'}</div>}
+          {diff && (
+            diff.changes.length === 0
+              ? <InlineEmpty>{isAr ? `لا توجد فروق بين v${diff.fromVersion} و v${diff.toVersion}.` : `No differences between v${diff.fromVersion} and v${diff.toVersion}.`}</InlineEmpty>
+              : (
+                <table className="grc-table">
+                  <thead><tr>
+                    <th>{isAr ? 'الحقل' : 'Field'}</th>
+                    <th>v{diff.fromVersion}</th>
+                    <th>v{diff.toVersion}</th>
+                  </tr></thead>
+                  <tbody>
+                    {diff.changes.map(c => (
+                      <tr key={c.field}>
+                        <td className="mono text-2xs">{c.field}</td>
+                        <td className="text-xs" style={{ color: 'var(--ink-3)', whiteSpace: 'pre-wrap' }}>{c.from ?? '—'}</td>
+                        <td className="text-xs" style={{ color: 'var(--ink-1)', fontWeight: 600, whiteSpace: 'pre-wrap' }}>{c.to ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+          )}
         </div>
       )}
     </Modal>
