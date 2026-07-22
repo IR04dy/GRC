@@ -123,8 +123,7 @@ class PolicyManagementServiceTest {
         p.setEffectiveDate(LocalDate.now());
         p.setBodyUrl(null);   // no controlled body
         when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
-        when(attachments.findByOrganisationIdAndEntityTypeAndEntityIdAndSupersededFalseOrderByUploadedAtDesc(
-            ORG_ID, "POLICY", 1L)).thenReturn(List.of());   // no attachments either
+        // no attachments under either entity-type key (unstubbed -> empty list)
 
         assertThatThrownBy(() -> service.transition(1L, "PUBLISHED", "alice"))
             .isInstanceOf(IllegalStateException.class)
@@ -139,8 +138,9 @@ class PolicyManagementServiceTest {
         p.setBodyUrl(null);
         when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
         when(docs.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // "PolicyDocument" is the primary/first-checked key (matches live data)
         when(attachments.findByOrganisationIdAndEntityTypeAndEntityIdAndSupersededFalseOrderByUploadedAtDesc(
-            ORG_ID, "POLICY", 1L)).thenReturn(List.of(new Attachment()));
+            ORG_ID, "PolicyDocument", 1L)).thenReturn(List.of(new Attachment()));
 
         PolicyDocument out = service.transition(1L, "PUBLISHED", "alice");
         assertThat(out.getStatus()).isEqualTo("PUBLISHED");

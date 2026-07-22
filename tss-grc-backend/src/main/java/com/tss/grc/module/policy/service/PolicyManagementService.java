@@ -411,10 +411,7 @@ public class PolicyManagementService {
         // fails ISO 9001/27001 document-control. A 409 (IllegalStateException).
         if ("PUBLISHED".equals(to)) {
             boolean hasBody = p.getBodyUrl() != null && !p.getBodyUrl().isBlank();
-            boolean hasAttachment = hasBody || !attachments
-                .findByOrganisationIdAndEntityTypeAndEntityIdAndSupersededFalseOrderByUploadedAtDesc(
-                    p.getOrganisationId(), "POLICY", p.getId()).isEmpty();
-            if (!hasBody && !hasAttachment)
+            if (!hasBody && !hasPolicyAttachment(p))
                 throw new IllegalStateException(
                     "Cannot publish: a policy document requires a body (body_url) or an "
                         + "uploaded attachment before it can be published");
@@ -438,6 +435,22 @@ public class PolicyManagementService {
             emitPolicy("POLICY_TRANSITIONED", saved, from);
         }
         return saved;
+    }
+
+    /** CH-10: a policy document's uploaded files. The UI has historically attached
+     *  under two entity-type keys — "PolicyDocument" (Policy Management page, the
+     *  bulk of live data) and "POLICY" (the policy detail page) — so the
+     *  document-control gate must recognise either. */
+    private static final List<String> POLICY_ATTACHMENT_ENTITY_TYPES = List.of("PolicyDocument", "POLICY");
+
+    private boolean hasPolicyAttachment(PolicyDocument p) {
+        for (String entityType : POLICY_ATTACHMENT_ENTITY_TYPES) {
+            boolean present = !attachments
+                .findByOrganisationIdAndEntityTypeAndEntityIdAndSupersededFalseOrderByUploadedAtDesc(
+                    p.getOrganisationId(), entityType, p.getId()).isEmpty();
+            if (present) return true;
+        }
+        return false;
     }
 
     /**
