@@ -314,6 +314,21 @@ class PolicyManagementServiceTest {
             .hasMessageContaining("already exists");
     }
 
+    @Test void create_forcesDRAFT_evenIfBodyRequestsPublished() {
+        // PM-C2: a client cannot create a policy already PUBLISHED and skip the
+        // review/approval state machine + SoD + effective-date publish guard.
+        PolicyDocument body = new PolicyDocument();
+        body.setPolicyCode("ISMS-002");
+        body.setVersion("1.0");
+        body.setTitleEn("Access Control Policy");
+        body.setStatus("PUBLISHED");                 // attempted bypass
+        when(docs.findByOrganisationIdAndPolicyCodeAndVersion(ORG_ID, "ISMS-002", "1.0"))
+            .thenReturn(Optional.empty());
+        when(docs.save(any(PolicyDocument.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.create(body).getStatus()).isEqualTo("DRAFT");
+    }
+
     // ── F7 / F8 emission contract ─────────────────────────────────────────────
 
     @Test void publish_emits_POLICY_PUBLISHED_with_previousStatus_and_writes_audit() {

@@ -52,6 +52,10 @@ public class PolicyService {
         // merge() into a potentially cross-tenant row.
         req.setId(null);
         req.setOrganisationId(TenantContext.getCurrentTenant());
+        // PM-C2 (lifecycle integrity): a new policy always starts at DRAFT; a client
+        // cannot create one already PUBLISHED/EXEC_APPROVAL and skip the legal/exec
+        // lifecycle actions. Status advances only via the workflow methods below.
+        req.setStatus("DRAFT");
         Policy saved = repo.save(req);
         emit(saved);
         return saved;

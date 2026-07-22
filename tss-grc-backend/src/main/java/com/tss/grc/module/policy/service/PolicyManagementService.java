@@ -46,8 +46,6 @@ import java.util.*;
 @RequiredArgsConstructor
 public class PolicyManagementService {
 
-    private static final Set<String> POLICY_STATUSES = Set.of(
-        "DRAFT", "REVIEW", "APPROVED", "PUBLISHED", "EXPIRED", "ARCHIVED");
     private static final Set<String> EXCEPTION_STATUSES = Set.of(
         "REQUESTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "EXPIRED", "REVOKED");
     private static final Set<String> ATT_STATUSES = Set.of(
@@ -275,9 +273,11 @@ public class PolicyManagementService {
         if (body.getTitleEn() == null || body.getTitleEn().isBlank())
             throw new IllegalArgumentException("titleEn is required");
         if (body.getVersion() == null) body.setVersion("1.0");
-        if (body.getStatus() == null)  body.setStatus("DRAFT");
-        if (!POLICY_STATUSES.contains(body.getStatus()))
-            throw new IllegalArgumentException("Invalid policy status: " + body.getStatus());
+        // PM-C2 (lifecycle integrity): a new policy ALWAYS starts at DRAFT. A client
+        // cannot create one already APPROVED/PUBLISHED — that would skip transition()'s
+        // state machine, the C-6 SoD approval check, and the effective-date publish
+        // guard. Status advances only via transition().
+        body.setStatus("DRAFT");
         if (docs.findByOrganisationIdAndPolicyCodeAndVersion(org(), body.getPolicyCode(), body.getVersion()).isPresent())
             throw new IllegalArgumentException(
                 "Policy version already exists: " + body.getPolicyCode() + " v" + body.getVersion());

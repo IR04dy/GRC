@@ -234,6 +234,21 @@ class PolicyServiceTest {
         assertThat(after.getRejectionReason()).isNull();
     }
 
+    // ─── create (mass-assignment + lifecycle defense) ────────────────
+
+    @Test
+    void create_forcesDRAFT_and_nulls_id_ignoring_client_status() {
+        // PM-C2 / mass-assignment: a client cannot create a policy already
+        // PUBLISHED (skipping legal/exec approval) nor merge into another row.
+        Policy req = policy("PUBLISHED");   // client-supplied status + id
+        when(repo.save(any(Policy.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Policy out = service.create(req);
+        assertThat(out.getStatus()).isEqualTo("DRAFT");
+        assertThat(out.getId()).isNull();
+        assertThat(out.getOrganisationId()).isEqualTo(ORG_ID);
+    }
+
     // ─── tenant scope ────────────────────────────────────────────────
 
     @Test
