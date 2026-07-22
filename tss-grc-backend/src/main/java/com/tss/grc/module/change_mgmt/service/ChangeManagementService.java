@@ -150,6 +150,8 @@ public class ChangeManagementService {
         ChangeRequest c = require(id);
         apply(c, req);
         ChangeRequest saved = changeRepo.save(c);
+        audit.log("UPDATE", "ChangeRequest", saved.getId(),
+            "Change " + nullSafeMsg(saved.getChangeCode()) + " metadata updated");
         emitChange(saved);
         return saved;
     }
@@ -159,6 +161,8 @@ public class ChangeManagementService {
         ChangeRequest c = require(id);
         c.setIsDeleted(true);
         changeRepo.save(c);
+        audit.log("DELETE", "ChangeRequest", c.getId(),
+            "Change " + nullSafeMsg(c.getChangeCode()) + " soft-deleted");
         emitChange(c);
     }
 
@@ -226,7 +230,12 @@ public class ChangeManagementService {
         if (body.getDecision() == null) throw new IllegalArgumentException("decision is required");
         if (body.getApproverName() == null || body.getApproverName().isBlank())
             throw new IllegalArgumentException("approverName is required");
-        return approvalRepo.save(body);
+        ChangeApproval saved = approvalRepo.save(body);
+        audit.log("APPROVAL", "ChangeRequest", changeId,
+            "CAB vote on change " + nullSafeMsg(c.getChangeCode()) + ": "
+                + nullSafeMsg(saved.getDecision()) + " by " + nullSafeMsg(saved.getApproverName())
+                + (saved.getApproverRole() != null ? " (" + saved.getApproverRole() + ")" : ""));
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -248,7 +257,10 @@ public class ChangeManagementService {
         require(changeId);
         body.setChangeRequestId(changeId);
         if (body.getStatus() == null) body.setStatus("PENDING");
-        return taskRepo.save(body);
+        ChangeTask saved = taskRepo.save(body);
+        audit.log("TASK_ADD", "ChangeRequest", changeId,
+            "Task added to change " + changeId + ": " + nullSafeMsg(saved.getTitleEn()));
+        return saved;
     }
 
     @Transactional
@@ -266,7 +278,10 @@ public class ChangeManagementService {
         if (body.getSortOrder()  != null) t.setSortOrder(body.getSortOrder());
         if (body.getDueAt()      != null) t.setDueAt(body.getDueAt());
         if (body.getNotes()      != null) t.setNotes(body.getNotes());
-        return taskRepo.save(t);
+        ChangeTask saved = taskRepo.save(t);
+        audit.log("TASK_UPDATE", "ChangeRequest", t.getChangeRequestId(),
+            "Task " + taskId + " updated (status " + nullSafeMsg(saved.getStatus()) + ")");
+        return saved;
     }
 
     @Transactional
@@ -274,6 +289,8 @@ public class ChangeManagementService {
         ChangeTask t = taskRepo.findById(taskId)
             .orElseThrow(() -> new EntityNotFoundException("Task not found: " + taskId));
         require(t.getChangeRequestId());
+        audit.log("TASK_DELETE", "ChangeRequest", t.getChangeRequestId(),
+            "Task " + taskId + " deleted: " + nullSafeMsg(t.getTitleEn()));
         taskRepo.deleteById(taskId);
     }
 
@@ -318,7 +335,11 @@ public class ChangeManagementService {
         if (body.getEntityType() == null || body.getEntityId() == null)
             throw new IllegalArgumentException("entityType and entityId are required");
         if (body.getLinkType() == null) body.setLinkType("AFFECTS");
-        return linkRepo.save(body);
+        ChangeLink saved = linkRepo.save(body);
+        audit.log("LINK_ADD", "ChangeRequest", changeId,
+            "Link added to change " + changeId + ": " + nullSafeMsg(saved.getLinkType())
+                + " → " + nullSafeMsg(saved.getEntityType()) + " #" + saved.getEntityId());
+        return saved;
     }
 
     @Transactional
@@ -328,6 +349,8 @@ public class ChangeManagementService {
         require(l.getChangeRequestId());
         l.setIsDeleted(true);
         linkRepo.save(l);
+        audit.log("LINK_DELETE", "ChangeRequest", l.getChangeRequestId(),
+            "Link " + linkId + " removed (" + nullSafeMsg(l.getEntityType()) + " #" + l.getEntityId() + ")");
     }
 
     // ── Comments ────────────────────────────────────────────────────────────
@@ -345,7 +368,10 @@ public class ChangeManagementService {
         if (body.getBody() == null || body.getBody().isBlank())
             throw new IllegalArgumentException("body is required");
         if (body.getAuthorName() == null) body.setAuthorName("Unknown");
-        return commentRepo.save(body);
+        ChangeComment saved = commentRepo.save(body);
+        audit.log("COMMENT_ADD", "ChangeRequest", changeId,
+            "Comment added to change " + changeId + " by " + nullSafeMsg(saved.getAuthorName()));
+        return saved;
     }
 
     // ── Analytics ───────────────────────────────────────────────────────────

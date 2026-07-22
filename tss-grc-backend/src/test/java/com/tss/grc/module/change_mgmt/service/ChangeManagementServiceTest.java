@@ -1,6 +1,7 @@
 package com.tss.grc.module.change_mgmt.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.change_mgmt.entity.ChangeApproval;
 import com.tss.grc.module.change_mgmt.entity.ChangeRequest;
 import com.tss.grc.module.change_mgmt.repository.*;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
@@ -359,5 +360,42 @@ class ChangeManagementServiceTest {
         ChangeRequest out = service.create(req);
 
         assertThat(out.getStatus()).isEqualTo("DRAFT");
+    }
+
+    // ── CH-3: audit coverage on the previously-silent mutating ops ──────────────
+
+    @Test
+    void update_writes_audit_log() {
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("DRAFT", "NORMAL")));
+        when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ChangeRequest body = new ChangeRequest();
+        body.setTitleEn("edited");
+        service.update(CHANGE_ID, body);
+
+        verify(audit).log(eq("UPDATE"), eq("ChangeRequest"), eq(CHANGE_ID), any(String.class));
+    }
+
+    @Test
+    void delete_writes_audit_log() {
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("DRAFT", "NORMAL")));
+        when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.delete(CHANGE_ID);
+
+        verify(audit).log(eq("DELETE"), eq("ChangeRequest"), eq(CHANGE_ID), any(String.class));
+    }
+
+    @Test
+    void recordApproval_writes_audit_log() {
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("CAB_PENDING", "NORMAL")));
+        when(approvalRepo.save(any(ChangeApproval.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ChangeApproval vote = new ChangeApproval();
+        vote.setDecision("APPROVE");
+        vote.setApproverName("Bob CAB");
+        service.recordApproval(CHANGE_ID, vote);
+
+        verify(audit).log(eq("APPROVAL"), eq("ChangeRequest"), eq(CHANGE_ID), any(String.class));
     }
 }
