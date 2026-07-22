@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -77,6 +78,13 @@ class ChangeManagementServiceTest {
         return c;
     }
 
+    private static ChangeApproval approve() {
+        ChangeApproval a = new ChangeApproval();
+        a.setDecision("APPROVE");
+        a.setApproverName("Bob CAB");
+        return a;
+    }
+
     // ─── Happy path ──────────────────────────────────────────────────
 
     @Test
@@ -92,6 +100,7 @@ class ChangeManagementServiceTest {
     void transition_CAB_PENDING_to_CAB_APPROVED_records_decision() {
         when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("CAB_PENDING", "NORMAL")));
         when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(approvalRepo.findByChangeRequestIdOrderByDecidedAtAsc(CHANGE_ID)).thenReturn(List.of(approve()));
 
         Map<String, Object> body = new HashMap<>();
         body.put("notes", "Approved by CAB on 2026-05-08");
@@ -281,6 +290,7 @@ class ChangeManagementServiceTest {
     void transition_to_CAB_APPROVED_emits_CHANGE_CAB_APPROVED() {
         when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("CAB_PENDING", "NORMAL")));
         when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(approvalRepo.findByChangeRequestIdOrderByDecidedAtAsc(CHANGE_ID)).thenReturn(List.of(approve()));
 
         Map<String, Object> body = new HashMap<>();
         body.put("notes", "Approved unanimously");
@@ -397,5 +407,44 @@ class ChangeManagementServiceTest {
         service.recordApproval(CHANGE_ID, vote);
 
         verify(audit).log(eq("APPROVAL"), eq("ChangeRequest"), eq(CHANGE_ID), any(String.class));
+    }
+
+    // ── CM-C2: CAB quorum + requester segregation-of-duty (service layer) ───────
+
+    @Test
+    void transition_CAB_APPROVED_blocked_without_quorum() {
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("CAB_PENDING", "NORMAL")));
+        when(approvalRepo.findByChangeRequestIdOrderByDecidedAtAsc(CHANGE_ID)).thenReturn(List.of()); // no votes
+
+        assertThatThrownBy(() -> service.transition(CHANGE_ID, "CAB_APPROVED", new HashMap<>()))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("APPROVE vote");
+    }
+
+    @Test
+    void transition_CAB_APPROVED_blocked_with_reject_on_record() {
+        ChangeApproval reject = new ChangeApproval();
+        reject.setDecision("REJECT"); reject.setApproverName("Carol CAB");
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("CAB_PENDING", "NORMAL")));
+        when(approvalRepo.findByChangeRequestIdOrderByDecidedAtAsc(CHANGE_ID)).thenReturn(List.of(reject));
+
+        assertThatThrownBy(() -> service.transition(CHANGE_ID, "CAB_APPROVED", new HashMap<>()))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("REJECT");
+    }
+
+    @Test
+    void recordApproval_self_vote_blocked_by_SoD() {
+        ChangeRequest c = change("CAB_PENDING", "NORMAL");
+        c.setRequestedByName("Alice Requester");
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(c));
+
+        ChangeApproval selfVote = new ChangeApproval();
+        selfVote.setDecision("APPROVE");
+        selfVote.setApproverName("Alice Requester");   // requester voting on own change
+
+        assertThatThrownBy(() -> service.recordApproval(CHANGE_ID, selfVote))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Segregation of duty");
     }
 }

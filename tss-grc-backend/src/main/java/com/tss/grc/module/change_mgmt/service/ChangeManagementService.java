@@ -9,6 +9,7 @@ import com.tss.grc.platform.realtime.BroadcastHelper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -60,6 +61,12 @@ public class ChangeManagementService {
 
     @Autowired(required = false)
     private BroadcastHelper bcast;
+
+    /** CM-C2: minimum recorded APPROVE votes required before a change may move to
+     *  CAB_APPROVED. Configurable per deployment; defaults to 1 (four-eyes). */
+    @Value("${grc.change.cab-min-approvals:1}")
+    private int cabMinApprovals = 1;
+
     private void emitChange(ChangeRequest cr) {
         if (bcast != null) bcast.entity(cr.getOrganisationId(), "change_request", cr.getId(), cr);
     }
@@ -180,6 +187,19 @@ public class ChangeManagementService {
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
             }
             case "CAB_APPROVED" -> {
+                // CM-C2 (CAB quorum): approval must be backed by recorded votes —
+                // at least `cabMinApprovals` APPROVE and zero REJECT. Closes the
+                // rubber-stamp path where a change reached CAB_APPROVED with no
+                // votes, or despite a recorded rejection.
+                List<ChangeApproval> votes = approvalRepo.findByChangeRequestIdOrderByDecidedAtAsc(id);
+                if (votes.stream().anyMatch(v -> "REJECT".equalsIgnoreCase(v.getDecision())))
+                    throw new IllegalStateException(
+                        "Cannot CAB-approve: a REJECT vote is on record — route to CAB_REJECTED");
+                long approves = votes.stream().filter(v -> "APPROVE".equalsIgnoreCase(v.getDecision())).count();
+                if (approves < cabMinApprovals)
+                    throw new IllegalStateException(
+                        "Cannot CAB-approve: requires at least " + cabMinApprovals
+                            + " recorded APPROVE vote(s) (have " + approves + ")");
                 c.setCabDecisionAt(LocalDateTime.now());
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
             }
@@ -230,6 +250,13 @@ public class ChangeManagementService {
         if (body.getDecision() == null) throw new IllegalArgumentException("decision is required");
         if (body.getApproverName() == null || body.getApproverName().isBlank())
             throw new IllegalArgumentException("approverName is required");
+        // CM-C2 (SoD): the change requester / owner cannot cast a CAB vote on their
+        // own change. (Name-based check; principal-id capture is a follow-up.)
+        String approver = body.getApproverName().trim();
+        if (approver.equalsIgnoreCase(nullSafeStr(c.getRequestedByName()).trim())
+                || approver.equalsIgnoreCase(nullSafeStr(c.getChangeOwnerName()).trim()))
+            throw new IllegalStateException(
+                "Segregation of duty: the change requester/owner cannot cast a CAB vote on their own change");
         ChangeApproval saved = approvalRepo.save(body);
         audit.log("APPROVAL", "ChangeRequest", changeId,
             "CAB vote on change " + nullSafeMsg(c.getChangeCode()) + ": "
