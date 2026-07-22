@@ -690,6 +690,7 @@ export const reportingApi = {
   changeRegisterPdf:  (lang: string) => downloadFile(`/api/v1/reporting/change-register.pdf?lang=${encodeURIComponent(lang)}`, 'change-register.pdf'),
   changeRegisterXlsx: () => downloadFile('/api/v1/reporting/change-register.xlsx', 'change-register.xlsx'),
   changeRegisterDocx: (lang: string) => downloadFile(`/api/v1/reporting/change-register.docx?lang=${encodeURIComponent(lang)}`, 'change-register.docx'),
+  cabPackPdf:         (id: number, lang: string) => downloadFile(`/api/v1/reporting/change/${id}/cab-pack.pdf?lang=${encodeURIComponent(lang)}`, `cab-pack-${id}.pdf`),
   findingsPdf:      (lang: string) => downloadFile(`/api/v1/reporting/findings-aging.pdf?lang=${encodeURIComponent(lang)}`, 'findings.pdf'),
   findingsXlsx:     () => downloadFile('/api/v1/reporting/findings-aging.xlsx', 'findings.xlsx'),
   findingsDocx:     (lang: string) => downloadFile(`/api/v1/reporting/findings-aging.docx?lang=${encodeURIComponent(lang)}`, 'findings.docx'),

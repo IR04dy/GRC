@@ -143,6 +143,14 @@ public class ExportController {
         return docx(docxExportService.changeRegisterDocx(lang), ExportNaming.build("Change", "ChangeRegister", lang, "docx"));
     }
 
+    @GetMapping("/change/{id}/cab-pack.pdf")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "CH-11: consolidated CAB pack for one change (details, plans, votes, "
+        + "tasks, links, PIR). Pass ?lang=ar for Arabic RTL.")
+    public ResponseEntity<byte[]> cabPackPdf(@PathVariable Long id, @RequestParam(defaultValue = "en") String lang) {
+        return pdf(exportService.cabPackPdf(id, lang), ExportNaming.build("Change", "CABPack-" + id, lang, "pdf"));
+    }
+
     // ── Board pack (S1) ───────────────────────────────────────────────────
 
     @GetMapping("/board-pack.pdf")

@@ -251,6 +251,7 @@ export const ar = {
   changePirYes:              'نعم',
   changePirNo:               'لا',
   changePirUnset:            '— غير محدد —',
+  changeCabPack:             'حزمة مجلس التغيير',
   changeEmptyTitle:          'لا توجد طلبات تغيير',
   changeEmptySub:             'أنشئ أول طلب لبدء تتبعه في دورة حياة ITIL.',
   changeKanbanDone:          'مكتمل',

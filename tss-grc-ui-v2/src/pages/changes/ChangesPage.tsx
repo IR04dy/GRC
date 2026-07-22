@@ -4,7 +4,7 @@ import {
   GitBranch, Filter, Plus, BarChart3, ListChecks, KanbanSquare, Activity,
   CheckCheck, X as XIcon, ArrowRight, AlertTriangle, ShieldCheck, Clock, Send,
   Wrench, Stamp, ChevronRight, MessageSquare, Link2, RefreshCw, Trash2, FolderOpen,
-  ClipboardCheck,
+  ClipboardCheck, FileDown,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -523,6 +523,10 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
             {change.status === 'IMPLEMENTING' && (
               <Button variant="ghost" Icon={Wrench} onClick={() => onTransition(change, 'ROLLED_BACK')}>{t('changeRollback')}</Button>
             )}
+            <Button variant="secondary" Icon={FileDown} onClick={async () => {
+              try { await reportingApi.cabPackPdf(change!.id, lang); }
+              catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Export failed'); }
+            }}>{t('changeCabPack')}</Button>
           </div>
         </Card>
 

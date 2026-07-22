@@ -253,6 +253,7 @@ export const en = {
   changePirYes:              'Yes',
   changePirNo:               'No',
   changePirUnset:            '— not stated —',
+  changeCabPack:             'CAB Pack',
   changeEmptyTitle:          'No change requests yet',
   changeEmptySub:            'Create the first change request to start tracking it through the ITIL lifecycle.',
   changeKanbanDone:          'Done',

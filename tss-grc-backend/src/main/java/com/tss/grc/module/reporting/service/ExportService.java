@@ -11,8 +11,15 @@ import com.lowagie.text.Phrase;
 import com.lowagie.text.pdf.*;
 import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.change_mgmt.entity.ChangeApproval;
+import com.tss.grc.module.change_mgmt.entity.ChangeLink;
 import com.tss.grc.module.change_mgmt.entity.ChangeRequest;
+import com.tss.grc.module.change_mgmt.entity.ChangeTask;
+import com.tss.grc.module.change_mgmt.repository.ChangeApprovalRepository;
+import com.tss.grc.module.change_mgmt.repository.ChangeLinkRepository;
 import com.tss.grc.module.change_mgmt.repository.ChangeRequestRepository;
+import com.tss.grc.module.change_mgmt.repository.ChangeTaskRepository;
+import jakarta.persistence.EntityNotFoundException;
 import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.platform.branding.service.BrandThemeService;
@@ -73,6 +80,9 @@ public class ExportService {
     private final KriMeasurementRepository measRepo;
     private final BrandThemeService brandThemeService;
     private final ChangeRequestRepository changeRepo;   // CH-4: change register export
+    private final ChangeApprovalRepository changeApprovalRepo; // CH-11: CAB pack
+    private final ChangeTaskRepository changeTaskRepo;         // CH-11: CAB pack
+    private final ChangeLinkRepository changeLinkRepo;         // CH-11: CAB pack
 
     // ── Risk Register ──────────────────────────────────────────────────────
 
@@ -227,6 +237,199 @@ public class ExportService {
         }
     }
 
+    // ── CH-11: CAB pack (single change, portrait, RTL) ─────────────────────
+    //
+    // A consolidated Change Advisory Board pack for ONE change: the record header
+    // + KPIs, the plans/rationale, the CAB decision, the recorded votes, the
+    // implementation tasks, cross-module links, and the post-implementation
+    // review. This is the artifact a CAB circulates/minutes against — distinct
+    // from the register export (CH-4), which lists all changes.
+
+    @Transactional(readOnly = true)
+    public byte[] cabPackPdf(Long changeId, String lang) {
+        Long org = TenantContext.getCurrentTenant();
+        Organisation o = orgRepo.findById(org).orElse(null);
+        boolean ar = "ar".equalsIgnoreCase(lang);
+
+        ChangeRequest c = changeRepo.findById(changeId)
+            .filter(x -> x.getOrganisationId().equals(org) && !Boolean.TRUE.equals(x.getIsDeleted()))
+            .orElseThrow(() -> new EntityNotFoundException("Change request not found: " + changeId));
+        List<ChangeApproval> approvals = changeApprovalRepo.findByChangeRequestIdOrderByDecidedAtAsc(changeId);
+        List<ChangeTask> tasks = changeTaskRepo.findByChangeRequestIdOrderBySortOrderAsc(changeId);
+        List<ChangeLink> links = changeLinkRepo.findByChangeRequestId(changeId);
+
+        long approve = approvals.stream().filter(a -> "APPROVE".equalsIgnoreCase(a.getDecision())).count();
+        long reject  = approvals.stream().filter(a -> "REJECT".equalsIgnoreCase(a.getDecision())).count();
+        String title = ar && c.getTitleAr() != null ? c.getTitleAr() : c.getTitleEn();
+
+        return buildReportPdf(o, ar,
+            "Change Advisory Board", "مجلس استشارة التغيير",
+            (ar ? "حزمة مجلس التغيير — " : "CAB Pack — ") + safe(c.getChangeCode()),
+            (ar ? "حزمة مجلس التغيير — " : "CAB Pack — ") + safe(c.getChangeCode()),
+            List.of(
+                new PdfTheme.Kpi(ar ? "النوع"    : "Type",   safe(c.getChangeType()), ""),
+                new PdfTheme.Kpi(ar ? "الخطورة"  : "Risk",   safe(c.getRiskLevel()),  ""),
+                new PdfTheme.Kpi(ar ? "الحالة"   : "Status", safe(c.getStatus()),     ""),
+                new PdfTheme.Kpi(ar ? "الأصوات"  : "Votes",  approve + "/" + approvals.size(),
+                    reject > 0 ? (ar ? "يوجد رفض" : "has REJECT") : "")
+            ),
+            new ReportMetadata("Change", ar ? "حزمة مجلس التغيير" : "CAB Pack",
+                (ar ? "حتى " : "As of ") + DATE_FMT.format(LocalDate.now()),
+                safe(c.getChangeCode()), lang, "Internal", 1),
+            (doc) -> {
+                // Change title bar
+                PdfPTable bar = fullTable(ar);
+                headerCell(bar, safe(title));
+                doc.add(bar);
+
+                // Details (2-col label/value form)
+                cabSection(doc, ar, "Change Details", "تفاصيل التغيير");
+                PdfPTable d = kvTable(ar);
+                kvRow(d, ar, "Requested by", "مقدّم الطلب", safe(c.getRequestedByName()));
+                kvRow(d, ar, "Change owner", "مالك التغيير", safe(c.getChangeOwnerName()));
+                kvRow(d, ar, "Implementer",  "المنفّذ",      safe(c.getImplementerName()));
+                kvRow(d, ar, "Category",     "الفئة",        safe(c.getCategory()));
+                kvRow(d, ar, "Requested date", "تاريخ الطلب",
+                    c.getRequestedDate() != null ? c.getRequestedDate().toString() : "—");
+                kvRow(d, ar, "Scheduled start", "بداية الجدولة",
+                    c.getScheduledStart() != null ? c.getScheduledStart().toString() : "—");
+                kvRow(d, ar, "Scheduled end", "نهاية الجدولة",
+                    c.getScheduledEnd() != null ? c.getScheduledEnd().toString() : "—");
+                kvRow(d, ar, "Outcome", "النتيجة", safe(c.getOutcome()));
+                doc.add(d);
+
+                // Plans & rationale (only non-blank blocks)
+                cabSection(doc, ar, "Plans & Rationale", "الخطط والمبرر");
+                PdfPTable p = kvTable(ar);
+                kvRowIf(p, ar, "Business justification", "المبرر التجاري", c.getBusinessJustification());
+                kvRowIf(p, ar, "Impact",              "الأثر",       c.getImpactSummary());
+                kvRowIf(p, ar, "Implementation plan", "خطة التنفيذ", c.getImplementationPlan());
+                kvRowIf(p, ar, "Test plan",           "خطة الاختبار", c.getTestPlan());
+                kvRowIf(p, ar, "Rollback plan",       "خطة التراجع", c.getRollbackPlan());
+                if (isBlank(c.getBusinessJustification()) && isBlank(c.getImpactSummary())
+                        && isBlank(c.getImplementationPlan()) && isBlank(c.getTestPlan())
+                        && isBlank(c.getRollbackPlan()))
+                    kvRow(p, ar, "—", "—", ar ? "لم تُسجّل خطط" : "No plans recorded");
+                doc.add(p);
+
+                // CAB decision
+                if (c.getCabDecisionAt() != null || !isBlank(c.getCabDecisionNotes())) {
+                    cabSection(doc, ar, "CAB Decision", "قرار المجلس");
+                    PdfPTable cd = kvTable(ar);
+                    kvRow(cd, ar, "Decided at", "تاريخ القرار",
+                        c.getCabDecisionAt() != null ? c.getCabDecisionAt().toString() : "—");
+                    kvRowIf(cd, ar, "Notes", "ملاحظات", c.getCabDecisionNotes());
+                    doc.add(cd);
+                }
+
+                // Approval votes
+                cabSection(doc, ar, "CAB Votes", "أصوات المجلس");
+                if (approvals.isEmpty()) {
+                    PdfPTable e = fullTable(ar); cell(e, ar ? "لا توجد أصوات" : "No votes recorded"); doc.add(e);
+                } else {
+                    PdfPTable vt = new PdfPTable(new float[]{ 1.2f, 2f, 1.5f, 2f, 3f });
+                    vt.setWidthPercentage(100); vt.setRunDirection(PdfTheme.runDir(ar));
+                    for (String h : (ar ? new String[]{ "القرار", "المُصوّت", "الدور", "التاريخ", "ملاحظات" }
+                                        : new String[]{ "Decision", "Approver", "Role", "Decided", "Comments" }))
+                        headerCell(vt, h);
+                    for (ChangeApproval a : approvals) {
+                        cell(vt, safe(a.getDecision()));
+                        cell(vt, safe(a.getApproverName()));
+                        cell(vt, safe(a.getApproverRole()));
+                        cell(vt, a.getDecidedAt() != null ? a.getDecidedAt().toString() : "—");
+                        cell(vt, safe(a.getComments()));
+                    }
+                    doc.add(vt);
+                }
+
+                // Implementation tasks
+                cabSection(doc, ar, "Implementation Tasks", "مهام التنفيذ");
+                if (tasks.isEmpty()) {
+                    PdfPTable e = fullTable(ar); cell(e, ar ? "لا توجد مهام" : "No tasks"); doc.add(e);
+                } else {
+                    PdfPTable tt = new PdfPTable(new float[]{ 4f, 2f, 1.5f, 2f });
+                    tt.setWidthPercentage(100); tt.setRunDirection(PdfTheme.runDir(ar));
+                    for (String h : (ar ? new String[]{ "المهمة", "المالك", "الحالة", "الاستحقاق" }
+                                        : new String[]{ "Task", "Owner", "Status", "Due" }))
+                        headerCell(tt, h);
+                    for (ChangeTask k : tasks) {
+                        String kn = ar && k.getTitleAr() != null ? k.getTitleAr() : k.getTitleEn();
+                        cell(tt, safe(kn));
+                        cell(tt, safe(k.getOwnerName()));
+                        cell(tt, safe(k.getStatus()));
+                        cell(tt, k.getDueAt() != null ? k.getDueAt().toString() : "—");
+                    }
+                    doc.add(tt);
+                }
+
+                // Cross-module links
+                if (!links.isEmpty()) {
+                    cabSection(doc, ar, "Linked Items", "العناصر المرتبطة");
+                    PdfPTable lt = new PdfPTable(new float[]{ 2.5f, 1.5f, 2.5f });
+                    lt.setWidthPercentage(100); lt.setRunDirection(PdfTheme.runDir(ar));
+                    for (String h : (ar ? new String[]{ "النوع", "المعرّف", "نوع الربط" }
+                                        : new String[]{ "Entity", "ID", "Link" }))
+                        headerCell(lt, h);
+                    for (ChangeLink l : links) {
+                        cell(lt, safe(l.getEntityType()));
+                        cell(lt, l.getEntityId() != null ? l.getEntityId().toString() : "—");
+                        cell(lt, safe(l.getLinkType()));
+                    }
+                    doc.add(lt);
+                }
+
+                // Post-implementation review
+                if (!isBlank(c.getPirSummary()) || c.getPirObjectivesMet() != null
+                        || !isBlank(c.getPirLessons()) || !isBlank(c.getPirFollowUp())
+                        || !isBlank(c.getPirReviewedBy())) {
+                    cabSection(doc, ar, "Post-Implementation Review", "مراجعة ما بعد التنفيذ");
+                    PdfPTable rt = kvTable(ar);
+                    kvRowIf(rt, ar, "Summary", "الملخص", c.getPirSummary());
+                    if (c.getPirObjectivesMet() != null)
+                        kvRow(rt, ar, "Objectives met", "تحقّق الأهداف",
+                            c.getPirObjectivesMet() ? (ar ? "نعم" : "Yes") : (ar ? "لا" : "No"));
+                    kvRowIf(rt, ar, "Lessons learned", "الدروس المستفادة", c.getPirLessons());
+                    kvRowIf(rt, ar, "Follow-up actions", "إجراءات المتابعة", c.getPirFollowUp());
+                    kvRowIf(rt, ar, "Reviewed by", "روجعت بواسطة", c.getPirReviewedBy());
+                    if (c.getPirReviewedAt() != null)
+                        kvRow(rt, ar, "Reviewed at", "تاريخ المراجعة", c.getPirReviewedAt().toString());
+                    doc.add(rt);
+                }
+            },
+            false); // portrait
+    }
+
+    // ── CAB-pack layout helpers ─────────────────────────────────────────────
+    private static boolean isBlank(String s) { return s == null || s.isBlank(); }
+
+    private static PdfPTable fullTable(boolean ar) {
+        PdfPTable t = new PdfPTable(1);
+        t.setWidthPercentage(100);
+        t.setRunDirection(PdfTheme.runDir(ar));
+        return t;
+    }
+    private static PdfPTable kvTable(boolean ar) {
+        PdfPTable t = new PdfPTable(new float[]{ 1.6f, 4f });
+        t.setWidthPercentage(100);
+        t.setRunDirection(PdfTheme.runDir(ar));
+        t.setSpacingBefore(4);
+        return t;
+    }
+    private static void kvRow(PdfPTable t, boolean ar, String labelEn, String labelAr, String value) {
+        headerCell(t, ar ? labelAr : labelEn);
+        cell(t, value);
+    }
+    private static void kvRowIf(PdfPTable t, boolean ar, String labelEn, String labelAr, String value) {
+        if (!isBlank(value)) kvRow(t, ar, labelEn, labelAr, value);
+    }
+    private void cabSection(Document doc, boolean ar, String en, String arT) throws DocumentException {
+        Paragraph p = new Paragraph(ar ? arT : en, PdfFonts.header(11));
+        p.setSpacingBefore(12);
+        p.setSpacingAfter(2);
+        if (ar) p.setAlignment(Element.ALIGN_RIGHT);
+        doc.add(p);
+    }
+
     // ── Findings aging ─────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -372,10 +575,20 @@ public class ExportService {
                                   List<PdfTheme.Kpi> kpis,
                                   ReportMetadata meta,
                                   TableRenderer table) {
+        // Register dumps are wide (code + title + L/I/score + status + …), so the
+        // default is landscape; single-record narrative packs pass landscape=false.
+        return buildReportPdf(o, ar, eyebrowEn, eyebrowAr, titleEn, titleAr, kpis, meta, table, true);
+    }
+
+    private byte[] buildReportPdf(Organisation o, boolean ar,
+                                  String eyebrowEn, String eyebrowAr,
+                                  String titleEn, String titleAr,
+                                  List<PdfTheme.Kpi> kpis,
+                                  ReportMetadata meta,
+                                  TableRenderer table,
+                                  boolean landscape) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        // Landscape — register dumps tend to be wide (code + title + L/I/score
-        // + status + …). Portrait would force horizontal overflow.
-        Document doc = new Document(PageSize.A4.rotate(), 36, 36, 60, 60);
+        Document doc = new Document(landscape ? PageSize.A4.rotate() : PageSize.A4, 36, 36, 60, 60);
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, baos);
             // P0-2: flip the whole document RTL for Arabic (was LTR-only — labels were
