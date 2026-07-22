@@ -14,6 +14,8 @@ import com.tss.grc.module.policy.entity.PolicyException;
 import com.tss.grc.module.policy.repository.PolicyAttestationRepository;
 import com.tss.grc.module.policy.repository.PolicyDocumentRepository;
 import com.tss.grc.module.policy.repository.PolicyExceptionRepository;
+import com.tss.grc.module.attachment.entity.Attachment;
+import com.tss.grc.module.attachment.repository.AttachmentRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,6 +74,7 @@ class PolicyManagementServiceTest {
     @Mock private ApplicationEventPublisher publisher;
     @Mock private ControlRepository controls;
     @Mock private PolicyDocumentControlLinkRepository controlLinks;
+    @Mock private AttachmentRepository attachments;
 
     @InjectMocks private PolicyManagementService service;
 
@@ -87,6 +90,7 @@ class PolicyManagementServiceTest {
         p.setTitleEn("Information Security Policy");
         p.setCategory("CYBER");
         p.setStatus("DRAFT");
+        p.setBodyUrl("https://docs.example.com/isms-001-v1.pdf");  // CH-10: a controlled body
         return p;
     }
 
@@ -110,6 +114,36 @@ class PolicyManagementServiceTest {
         PolicyDocument out = service.transition(1L, "PUBLISHED", "alice");
         assertThat(out.getStatus()).isEqualTo("PUBLISHED");
         assertThat(out.getPublishedAt()).isNotNull();
+    }
+
+    @Test void policy_publish_blocked_without_body_or_attachment() {
+        // CH-10 document control: no body_url and no attachment → cannot publish.
+        PolicyDocument p = draft();
+        p.setStatus("APPROVED");
+        p.setEffectiveDate(LocalDate.now());
+        p.setBodyUrl(null);   // no controlled body
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
+        when(attachments.findByOrganisationIdAndEntityTypeAndEntityIdAndSupersededFalseOrderByUploadedAtDesc(
+            ORG_ID, "POLICY", 1L)).thenReturn(List.of());   // no attachments either
+
+        assertThatThrownBy(() -> service.transition(1L, "PUBLISHED", "alice"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("body (body_url) or an");
+    }
+
+    @Test void policy_publish_allowed_with_attachment_and_no_bodyUrl() {
+        // An uploaded attachment satisfies the document-control gate on its own.
+        PolicyDocument p = draft();
+        p.setStatus("APPROVED");
+        p.setEffectiveDate(LocalDate.now());
+        p.setBodyUrl(null);
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
+        when(docs.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(attachments.findByOrganisationIdAndEntityTypeAndEntityIdAndSupersededFalseOrderByUploadedAtDesc(
+            ORG_ID, "POLICY", 1L)).thenReturn(List.of(new Attachment()));
+
+        PolicyDocument out = service.transition(1L, "PUBLISHED", "alice");
+        assertThat(out.getStatus()).isEqualTo("PUBLISHED");
     }
 
     @Test void policy_illegalTransitionRejected() {

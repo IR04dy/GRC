@@ -14,6 +14,7 @@ import com.tss.grc.module.policy.entity.PolicyException;
 import com.tss.grc.module.policy.repository.PolicyAttestationRepository;
 import com.tss.grc.module.policy.repository.PolicyDocumentRepository;
 import com.tss.grc.module.policy.repository.PolicyExceptionRepository;
+import com.tss.grc.module.attachment.repository.AttachmentRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -58,6 +59,7 @@ public class PolicyManagementService {
     private final ApplicationEventPublisher publisher;
     private final ControlRepository controls;
     private final PolicyDocumentControlLinkRepository controlLinks;
+    private final AttachmentRepository attachments;   // CH-10: require-document-before-publish gate
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -403,6 +405,20 @@ public class PolicyManagementService {
         }
         if ("PUBLISHED".equals(to) && p.getEffectiveDate() == null)
             throw new IllegalArgumentException("effective_date is required before publishing");
+        // CH-10 (document control): a policy cannot go live without an actual
+        // document — either a body_url (link to the controlled text) or at least
+        // one uploaded attachment. Closes the "publish an empty shell" gap that
+        // fails ISO 9001/27001 document-control. A 409 (IllegalStateException).
+        if ("PUBLISHED".equals(to)) {
+            boolean hasBody = p.getBodyUrl() != null && !p.getBodyUrl().isBlank();
+            boolean hasAttachment = hasBody || !attachments
+                .findByOrganisationIdAndEntityTypeAndEntityIdAndSupersededFalseOrderByUploadedAtDesc(
+                    p.getOrganisationId(), "POLICY", p.getId()).isEmpty();
+            if (!hasBody && !hasAttachment)
+                throw new IllegalStateException(
+                    "Cannot publish: a policy document requires a body (body_url) or an "
+                        + "uploaded attachment before it can be published");
+        }
         p.setStatus(to);
         if ("APPROVED".equals(to) && actor != null) p.setApproverName(actor);
         if ("PUBLISHED".equals(to))                 p.setPublishedAt(LocalDateTime.now());
