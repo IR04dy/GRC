@@ -254,10 +254,42 @@ public class PolicyManagementService {
     @Transactional(readOnly = true)
     public List<PolicyDocument> list(String status, String category, boolean latestOnly) {
         Long o = org();
-        if (latestOnly) return docs.findLatestVersionPerCode(o);
+        if (latestOnly) {
+            // PM-H2: pick the latest version per code by NUMERIC comparison, not the
+            // lexical DB max() (which ranked "9.0" above "10.0"). Input is code-asc, so
+            // the LinkedHashMap preserves policy-code order in the result.
+            Map<String, PolicyDocument> latestByCode = new LinkedHashMap<>();
+            for (PolicyDocument p : docs.findByOrganisationIdOrderByPolicyCodeAscVersionDesc(o))
+                latestByCode.merge(p.getPolicyCode(), p,
+                    (a, b) -> compareVersions(a.getVersion(), b.getVersion()) >= 0 ? a : b);
+            return new ArrayList<>(latestByCode.values());
+        }
         if (status != null)   return docs.findByOrganisationIdAndStatusOrderByPolicyCodeAscVersionDesc(o, status);
         if (category != null) return docs.findByOrganisationIdAndCategoryOrderByPolicyCodeAscVersionDesc(o, category);
         return docs.findByOrganisationIdOrderByPolicyCodeAscVersionDesc(o);
+    }
+
+    /**
+     * Compare dotted version strings NUMERICALLY ("9.0" &lt; "10.0"), not lexically.
+     * Segment-by-segment integer compare; a non-numeric segment falls back to a
+     * lexical compare of that segment; missing trailing segments count as 0. (PM-H2)
+     */
+    static int compareVersions(String a, String b) {
+        if (a == null || b == null) return a == null ? (b == null ? 0 : -1) : 1;
+        String[] pa = a.split("\\."), pb = b.split("\\.");
+        int n = Math.max(pa.length, pb.length);
+        for (int i = 0; i < n; i++) {
+            String sa = i < pa.length ? pa[i].trim() : "0";
+            String sb = i < pb.length ? pb[i].trim() : "0";
+            Integer ia = tryParseInt(sa), ib = tryParseInt(sb);
+            int c = (ia != null && ib != null) ? Integer.compare(ia, ib) : sa.compareTo(sb);
+            if (c != 0) return c;
+        }
+        return 0;
+    }
+
+    private static Integer tryParseInt(String s) {
+        try { return Integer.parseInt(s); } catch (NumberFormatException e) { return null; }
     }
 
     @Transactional(readOnly = true)
@@ -398,7 +430,10 @@ public class PolicyManagementService {
             .filter(p -> policyCode.equals(p.getPolicyCode())).toList();
         if (existing.isEmpty())
             throw new EntityNotFoundException("Policy code not found: " + policyCode);
-        PolicyDocument latest = existing.get(0);
+        // PM-H2: latest by NUMERIC version, not the lexical list order (get(0)).
+        PolicyDocument latest = existing.stream()
+            .max((x, y) -> compareVersions(x.getVersion(), y.getVersion()))
+            .orElseThrow();
         if (docs.findByOrganisationIdAndPolicyCodeAndVersion(o, policyCode, newVersion).isPresent())
             throw new IllegalArgumentException("Version already exists: " + policyCode + " v" + newVersion);
         PolicyDocument next = new PolicyDocument();

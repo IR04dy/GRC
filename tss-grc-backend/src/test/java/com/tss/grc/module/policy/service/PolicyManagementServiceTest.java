@@ -351,6 +351,27 @@ class PolicyManagementServiceTest {
         verify(audit).log(eq("DELETE"), eq("PolicyDocument"), eq(1L), any(String.class));
     }
 
+    // ── PM-H2: latest-version resolution is numeric, not lexical ────────────────
+
+    @Test void version_compare_is_numeric_not_lexical() {
+        assertThat(PolicyManagementService.compareVersions("9.0", "10.0")).isNegative();
+        assertThat(PolicyManagementService.compareVersions("10.0", "9.0")).isPositive();
+        assertThat(PolicyManagementService.compareVersions("2.10", "2.9")).isPositive();
+        assertThat(PolicyManagementService.compareVersions("1.0", "1.0")).isZero();
+    }
+
+    @Test void list_latestOnly_picks_numerically_highest_version() {
+        PolicyDocument v9  = draft(); v9.setId(9L);   v9.setVersion("9.0");
+        PolicyDocument v10 = draft(); v10.setId(10L); v10.setVersion("10.0");   // same policyCode
+        when(docs.findByOrganisationIdOrderByPolicyCodeAscVersionDesc(ORG_ID))
+            .thenReturn(List.of(v9, v10));
+
+        List<PolicyDocument> out = service.list(null, null, true);
+
+        assertThat(out).hasSize(1);
+        assertThat(out.get(0).getVersion()).isEqualTo("10.0");   // not "9.0" (lexical max)
+    }
+
     // ── F7 / F8 emission contract ─────────────────────────────────────────────
 
     @Test void publish_emits_POLICY_PUBLISHED_with_previousStatus_and_writes_audit() {

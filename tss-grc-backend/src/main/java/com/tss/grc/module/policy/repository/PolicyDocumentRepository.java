@@ -20,17 +20,9 @@ public interface PolicyDocumentRepository extends JpaRepository<PolicyDocument, 
 
     Optional<PolicyDocument> findByOrganisationIdAndPolicyCodeAndVersion(Long org, String policyCode, String version);
 
-    /** Latest version per policy_code. */
-    @Query("""
-        select p from PolicyDocument p
-        where p.organisationId = :orgId
-          and p.version = (
-            select max(p2.version) from PolicyDocument p2
-            where p2.organisationId = :orgId and p2.policyCode = p.policyCode
-          )
-        order by p.policyCode asc
-    """)
-    List<PolicyDocument> findLatestVersionPerCode(Long orgId);
+    // Latest-version-per-code is computed in PolicyManagementService via a numeric
+    // version comparator (PM-H2). The old JPQL used max(version) — a LEXICAL compare
+    // that ranked "9.0" above "10.0" — so it is removed rather than left as a trap.
 
     /** PUBLISHED rows whose expiry has passed. */
     @Query("""
