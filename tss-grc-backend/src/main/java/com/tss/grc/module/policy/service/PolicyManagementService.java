@@ -300,7 +300,11 @@ public class PolicyManagementService {
             if (body.getNextReviewDate() != null) p.setNextReviewDate(body.getNextReviewDate());
             if (body.getNotes() != null)          p.setNotes(body.getNotes());
             if (body.getRetiredReason() != null)  p.setRetiredReason(body.getRetiredReason());
-            return docs.save(p);
+            PolicyDocument saved = docs.save(p);
+            audit.log("UPDATE", "PolicyDocument", saved.getId(),
+                "Policy " + nullSafe(saved.getPolicyCode()) + " v" + nullSafe(saved.getVersion())
+                    + " metadata updated (published)");
+            return saved;
         }
         if (body.getTitleEn() != null)         p.setTitleEn(body.getTitleEn());
         if (body.getTitleAr() != null)         p.setTitleAr(body.getTitleAr());
@@ -320,7 +324,10 @@ public class PolicyManagementService {
         if (body.getRelatedFramework() != null) p.setRelatedFramework(body.getRelatedFramework());
         if (body.getRelatedControls() != null)  p.setRelatedControls(body.getRelatedControls());
         if (body.getNotes() != null)           p.setNotes(body.getNotes());
-        return docs.save(p);
+        PolicyDocument saved = docs.save(p);
+        audit.log("UPDATE", "PolicyDocument", saved.getId(),
+            "Policy " + nullSafe(saved.getPolicyCode()) + " v" + nullSafe(saved.getVersion()) + " updated");
+        return saved;
     }
 
     /** Backward-compatible entry point — no admin override, so SoD is enforced. */
@@ -412,7 +419,11 @@ public class PolicyManagementService {
         next.setRelatedControls(latest.getRelatedControls());
         next.setStatus("DRAFT");
         next.setNotes("Cloned from " + policyCode + " v" + latest.getVersion());
-        return docs.save(next);
+        PolicyDocument saved = docs.save(next);
+        audit.log("NEW_VERSION", "PolicyDocument", saved.getId(),
+            "Policy " + nullSafe(policyCode) + " new version v" + nullSafe(newVersion)
+                + " cloned from v" + nullSafe(latest.getVersion()));
+        return saved;
     }
 
     @Transactional
@@ -422,6 +433,8 @@ public class PolicyManagementService {
             throw new IllegalStateException("Cannot delete a PUBLISHED policy — transition to ARCHIVED first");
         p.setIsDeleted(true);
         docs.save(p);
+        audit.log("DELETE", "PolicyDocument", p.getId(),
+            "Policy " + nullSafe(p.getPolicyCode()) + " v" + nullSafe(p.getVersion()) + " soft-deleted");
     }
 
     @Transactional
@@ -487,7 +500,9 @@ public class PolicyManagementService {
         if (body.getEffectiveDate() != null)        e.setEffectiveDate(body.getEffectiveDate());
         if (body.getExpiryDate() != null)           e.setExpiryDate(body.getExpiryDate());
         if (body.getNotes() != null)                e.setNotes(body.getNotes());
-        return exceptions.save(e);
+        PolicyException saved = exceptions.save(e);
+        audit.log("UPDATE", "PolicyException", saved.getId(), "Exception #" + saved.getId() + " updated");
+        return saved;
     }
 
     @Transactional
@@ -530,6 +545,7 @@ public class PolicyManagementService {
         PolicyException e = getException(id);
         e.setIsDeleted(true);
         exceptions.save(e);
+        audit.log("DELETE", "PolicyException", e.getId(), "Exception #" + e.getId() + " soft-deleted");
     }
 
     @Transactional

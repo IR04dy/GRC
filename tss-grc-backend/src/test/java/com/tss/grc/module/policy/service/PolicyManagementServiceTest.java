@@ -329,6 +329,28 @@ class PolicyManagementServiceTest {
         assertThat(service.create(body).getStatus()).isEqualTo("DRAFT");
     }
 
+    // ── CH-3 / PM-M2: audit coverage on previously-silent policy ops ────────────
+
+    @Test void update_writes_audit_log() {
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(draft()));
+        when(docs.save(any(PolicyDocument.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PolicyDocument body = new PolicyDocument();
+        body.setSummaryEn("edited summary");
+        service.update(1L, body);
+
+        verify(audit).log(eq("UPDATE"), eq("PolicyDocument"), eq(1L), any(String.class));
+    }
+
+    @Test void delete_writes_audit_log() {
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(draft())); // DRAFT → deletable
+        when(docs.save(any(PolicyDocument.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.delete(1L);
+
+        verify(audit).log(eq("DELETE"), eq("PolicyDocument"), eq(1L), any(String.class));
+    }
+
     // ── F7 / F8 emission contract ─────────────────────────────────────────────
 
     @Test void publish_emits_POLICY_PUBLISHED_with_previousStatus_and_writes_audit() {
