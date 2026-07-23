@@ -172,4 +172,45 @@ public class ChangeManagementController {
     @PreAuthorize("hasPermission('CHANGE','READ')")
     @Operation(summary = "Resolve the authorisation required for a specific change and whether it is satisfied.")
     public Map<String, Object> authorisation(@PathVariable Long id) { return service.resolveAuthorisation(id); }
+
+    // ── CH-17: freeze windows + change calendar + conflicts ───────────────────
+
+    @GetMapping("/freeze-windows")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    public List<ChangeFreezeWindow> freezeWindows() { return service.freezeWindows(); }
+
+    @PostMapping("/freeze-windows")
+    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ChangeFreezeWindow createFreezeWindow(@RequestBody ChangeFreezeWindow body) {
+        return service.createFreezeWindow(body);
+    }
+
+    @DeleteMapping("/freeze-windows/{id}")
+    @PreAuthorize("hasPermission('CHANGE','DELETE')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteFreezeWindow(@PathVariable Long id) { service.deleteFreezeWindow(id); }
+
+    @GetMapping("/calendar")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Scheduled changes + active freeze windows intersecting [from,to].")
+    public Map<String, Object> calendar(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+        java.time.LocalDateTime f = parseDt(from, java.time.LocalDateTime.now().minusDays(7));
+        java.time.LocalDateTime t = parseDt(to, f.plusDays(120));
+        return service.calendar(f, t);
+    }
+
+    @GetMapping("/{id}/conflicts")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Other live changes whose scheduled window overlaps this change's.")
+    public List<Map<String, Object>> conflicts(@PathVariable Long id) { return service.conflicts(id); }
+
+    /** Accept either an ISO date-time ("2026-12-25T09:00:00") or a plain date ("2026-12-25"). */
+    private static java.time.LocalDateTime parseDt(String s, java.time.LocalDateTime dflt) {
+        if (s == null || s.isBlank()) return dflt;
+        try { return java.time.LocalDateTime.parse(s); }
+        catch (Exception e) { return java.time.LocalDate.parse(s).atStartOfDay(); }
+    }
 }

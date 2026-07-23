@@ -82,6 +82,11 @@ public class ChangeManagementService {
     @Autowired(required = false)
     private ChangeAuthorisationMatrixRepository authMatrixRepo;
 
+    /** CH-17: freeze/blackout windows. Optional — when absent, no freeze gate
+     *  is enforced (keeps directly-constructed unit tests working). */
+    @Autowired(required = false)
+    private ChangeFreezeWindowRepository freezeRepo;
+
     /** CM-C2: minimum recorded APPROVE votes required before a change may move to
      *  CAB_APPROVED. Configurable per deployment; defaults to 1 (four-eyes). */
     @Value("${grc.change.cab-min-approvals:1}")
@@ -230,6 +235,10 @@ public class ChangeManagementService {
                 c.setCabDecisionAt(LocalDateTime.now());
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
             }
+            case "SCHEDULED" ->
+                // CH-17: block scheduling into an active freeze/blackout window
+                // (emergencies exempt where the window permits).
+                enforceFreeze(c);
             case "IMPLEMENTING" -> {
                 if (c.getImplementationStarted() == null) c.setImplementationStarted(LocalDateTime.now());
             }
@@ -601,6 +610,118 @@ public class ChangeManagementService {
         out.put("approvesRecorded", approves);
         out.put("satisfied",       approves >= required);
         return out;
+    }
+
+    // ── CH-17: freeze windows, change calendar, conflict detection ────────────
+
+    /** Reject a move to SCHEDULED whose window intersects an active freeze
+     *  (EMERGENCY changes are exempt where the window allows it). No-op if the
+     *  freeze repo is not wired or the change has no scheduled start. */
+    private void enforceFreeze(ChangeRequest c) {
+        if (freezeRepo == null || c.getScheduledStart() == null) return;
+        LocalDateTime start = c.getScheduledStart();
+        LocalDateTime end = c.getScheduledEnd() != null ? c.getScheduledEnd() : start;
+        boolean emergency = "EMERGENCY".equals(c.getChangeType());
+        for (ChangeFreezeWindow w : freezeRepo.findByOrganisationIdAndActiveTrue(c.getOrganisationId())) {
+            boolean overlaps = !start.isAfter(w.getEndsAt()) && !end.isBefore(w.getStartsAt());
+            if (!overlaps) continue;
+            boolean appliesToScope = "ALL".equals(w.getScope())
+                || ("CATEGORY".equals(w.getScope()) && w.getScopeValue() != null
+                    && w.getScopeValue().equalsIgnoreCase(nullSafeStr(c.getCategory())));
+            if (!appliesToScope) continue;
+            if (emergency && Boolean.TRUE.equals(w.getAllowEmergency())) continue;   // emergency exemption
+            throw new IllegalStateException(
+                "Cannot schedule: the change window falls within an active freeze — "
+                    + nullSafeStr(w.getNameEn()) + " (" + w.getStartsAt() + " to " + w.getEndsAt() + ")"
+                    + (emergency ? "" : ". Only EMERGENCY changes may be scheduled during this freeze."));
+        }
+    }
+
+    /** CH-17: the change calendar — scheduled changes intersecting [from,to] plus
+     *  the active freeze windows overlapping that range (for the FE to band). */
+    @Transactional(readOnly = true)
+    public Map<String, Object> calendar(LocalDateTime from, LocalDateTime to) {
+        Long org = TenantContext.getCurrentTenant();
+        Map<String, Object> out = new HashMap<>();
+        out.put("from", from); out.put("to", to);
+        out.put("changes", changeRepo.findScheduledBetween(org, from, to).stream().map(c -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", c.getId());               m.put("changeCode", c.getChangeCode());
+            m.put("titleEn", c.getTitleEn());     m.put("titleAr", c.getTitleAr());
+            m.put("changeType", c.getChangeType());m.put("riskLevel", c.getRiskLevel());
+            m.put("status", c.getStatus());
+            m.put("scheduledStart", c.getScheduledStart()); m.put("scheduledEnd", c.getScheduledEnd());
+            return m;
+        }).toList());
+        out.put("freezes", freezeRepo == null ? List.of()
+            : freezeRepo.findByOrganisationIdAndActiveTrueAndStartsAtLessThanEqualAndEndsAtGreaterThanEqual(org, to, from));
+        return out;
+    }
+
+    /** CH-17: schedule conflicts — other live changes whose window overlaps this
+     *  change's, flagged where they also share a linked entity or category. */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> conflicts(Long id) {
+        ChangeRequest c = require(id);
+        if (c.getScheduledStart() == null) return List.of();
+        LocalDateTime start = c.getScheduledStart();
+        LocalDateTime end = c.getScheduledEnd() != null ? c.getScheduledEnd() : start;
+        Set<String> myLinks = linkRepo.findByChangeRequestId(id).stream()
+            .map(l -> l.getEntityType() + "#" + l.getEntityId())
+            .collect(java.util.stream.Collectors.toSet());
+        return changeRepo.findScheduleConflicts(c.getOrganisationId(), id, start, end).stream().map(o -> {
+            Set<String> theirLinks = linkRepo.findByChangeRequestId(o.getId()).stream()
+                .map(l -> l.getEntityType() + "#" + l.getEntityId())
+                .collect(java.util.stream.Collectors.toSet());
+            Set<String> shared = new java.util.HashSet<>(myLinks); shared.retainAll(theirLinks);
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", o.getId());                m.put("changeCode", o.getChangeCode());
+            m.put("titleEn", o.getTitleEn());      m.put("status", o.getStatus());
+            m.put("scheduledStart", o.getScheduledStart()); m.put("scheduledEnd", o.getScheduledEnd());
+            m.put("sameCategory", c.getCategory() != null && c.getCategory().equals(o.getCategory()));
+            m.put("sharedEntities", new java.util.ArrayList<>(shared));
+            return m;
+        }).toList();
+    }
+
+    // ── CH-17: freeze-window management ───────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<ChangeFreezeWindow> freezeWindows() {
+        if (freezeRepo == null) return List.of();
+        return freezeRepo.findByOrganisationIdOrderByStartsAtAsc(TenantContext.getCurrentTenant());
+    }
+
+    @Transactional
+    public ChangeFreezeWindow createFreezeWindow(ChangeFreezeWindow body) {
+        if (freezeRepo == null) throw new IllegalStateException("Freeze windows unavailable");
+        body.setId(null);
+        body.setIsDeleted(false);
+        body.setOrganisationId(TenantContext.getCurrentTenant());
+        if (body.getStartsAt() == null || body.getEndsAt() == null)
+            throw new IllegalArgumentException("startsAt and endsAt are required");
+        if (body.getEndsAt().isBefore(body.getStartsAt()))
+            throw new IllegalArgumentException("endsAt must be on or after startsAt");
+        if (body.getScope() == null) body.setScope("ALL");
+        if (body.getCode() == null || body.getCode().isBlank())
+            body.setCode("FW-" + System.currentTimeMillis());
+        ChangeFreezeWindow saved = freezeRepo.save(body);
+        audit.log("FREEZE_CREATE", "ChangeFreezeWindow", saved.getId(),
+            "Freeze window created: " + nullSafeMsg(saved.getNameEn())
+                + " (" + saved.getStartsAt() + " → " + saved.getEndsAt() + ")");
+        return saved;
+    }
+
+    @Transactional
+    public void deleteFreezeWindow(Long id) {
+        if (freezeRepo == null) throw new IllegalStateException("Freeze windows unavailable");
+        ChangeFreezeWindow w = freezeRepo.findById(id)
+            .filter(x -> x.getOrganisationId().equals(TenantContext.getCurrentTenant()))
+            .orElseThrow(() -> new EntityNotFoundException("Freeze window not found: " + id));
+        w.setIsDeleted(true);
+        freezeRepo.save(w);
+        audit.log("FREEZE_DELETE", "ChangeFreezeWindow", id,
+            "Freeze window removed: " + nullSafeMsg(w.getNameEn()));
     }
 
     // ── CH-13: rolled-back change → auto-raised incident + back-link ──────────
