@@ -19,6 +19,8 @@ import com.tss.grc.module.change_mgmt.repository.ChangeApprovalRepository;
 import com.tss.grc.module.change_mgmt.repository.ChangeLinkRepository;
 import com.tss.grc.module.change_mgmt.repository.ChangeRequestRepository;
 import com.tss.grc.module.change_mgmt.repository.ChangeTaskRepository;
+import com.tss.grc.module.policy.entity.PolicyDocument;
+import com.tss.grc.module.policy.repository.PolicyDocumentRepository;
 import jakarta.persistence.EntityNotFoundException;
 import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
@@ -83,6 +85,7 @@ public class ExportService {
     private final ChangeApprovalRepository changeApprovalRepo; // CH-11: CAB pack
     private final ChangeTaskRepository changeTaskRepo;         // CH-11: CAB pack
     private final ChangeLinkRepository changeLinkRepo;         // CH-11: CAB pack
+    private final PolicyDocumentRepository policyDocRepo;      // CH-10: controlled policy PDF
 
     // ── Risk Register ──────────────────────────────────────────────────────
 
@@ -428,6 +431,81 @@ public class ExportService {
         p.setSpacingAfter(2);
         if (ar) p.setAlignment(Element.ALIGN_RIGHT);
         doc.add(p);
+    }
+
+    // ── CH-10: controlled policy document (renders inline content_md to a PDF) ──
+    //
+    // The controlled-output side of the CH-10 structured editor: takes a policy's
+    // authored content_md (markdown-ish: #/##/### headings, - bullets, paragraphs)
+    // and renders a branded, portrait, RTL-aware document. Every line goes through
+    // a borderless full-width table so Arabic content shapes + mirrors exactly like
+    // the rest of the platform's exports.
+
+    @Transactional(readOnly = true)
+    public byte[] policyDocumentPdf(Long policyId, String lang) {
+        Long org = TenantContext.getCurrentTenant();
+        Organisation o = orgRepo.findById(org).orElse(null);
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        PolicyDocument p = policyDocRepo.findByIdAndOrganisationId(policyId, org)
+            .orElseThrow(() -> new EntityNotFoundException("Policy document not found: " + policyId));
+        String title = ar && p.getTitleAr() != null ? p.getTitleAr() : p.getTitleEn();
+        String content = p.getContentMd() != null ? p.getContentMd() : "";
+
+        return buildReportPdf(o, ar,
+            "Policy Document", "وثيقة سياسة",
+            safe(title) + "  ·  v" + safe(p.getVersion()),
+            safe(title) + "  ·  v" + safe(p.getVersion()),
+            List.of(
+                new PdfTheme.Kpi(ar ? "الإصدار" : "Version",  safe(p.getVersion()),  ""),
+                new PdfTheme.Kpi(ar ? "الحالة"  : "Status",   safe(p.getStatus()),   ""),
+                new PdfTheme.Kpi(ar ? "الفئة"   : "Category", safe(p.getCategory()), ""),
+                new PdfTheme.Kpi(ar ? "السريان" : "Effective",
+                    p.getEffectiveDate() != null ? p.getEffectiveDate().toString() : "—", "")
+            ),
+            new ReportMetadata("Policy", ar ? "وثيقة سياسة" : "Policy Document",
+                (ar ? "حتى " : "As of ") + DATE_FMT.format(LocalDate.now()),
+                safe(p.getPolicyCode()) + " v" + safe(p.getVersion()), lang, "Internal", 1),
+            (doc) -> renderPolicyContent(doc, content, ar),
+            false); // portrait
+    }
+
+    private void renderPolicyContent(Document doc, String content, boolean ar) throws DocumentException {
+        if (content == null || content.isBlank()) {
+            Paragraph none = new Paragraph(ar ? "لا يوجد محتوى مُدرج بعد." : "No inline content authored yet.",
+                PdfFonts.body(11));
+            if (ar) none.setAlignment(Element.ALIGN_RIGHT);
+            doc.add(none);
+            return;
+        }
+        PdfPTable t = new PdfPTable(1);
+        t.setWidthPercentage(100);
+        t.setRunDirection(PdfTheme.runDir(ar));
+        for (String raw : content.split("\r?\n")) {
+            String line = raw.strip();
+            if (line.isEmpty())                 contentCell(t, " ",                    PdfFonts.body(6),   ar, 2, 0);
+            else if (line.startsWith("### "))   contentCell(t, line.substring(4),      PdfFonts.header(11), ar, 6, 0);
+            else if (line.startsWith("## "))    contentCell(t, line.substring(3),      PdfFonts.header(13), ar, 8, 0);
+            else if (line.startsWith("# "))     contentCell(t, line.substring(2),      PdfFonts.header(15), ar, 10, 0);
+            else if (line.startsWith("- ") || line.startsWith("* "))
+                                                contentCell(t, "•  " + line.substring(2), PdfFonts.body(10), ar, 2, 14);
+            else                                contentCell(t, line,                   PdfFonts.body(10),  ar, 3, 0);
+        }
+        doc.add(t);
+    }
+
+    private static void contentCell(PdfPTable t, String text, com.lowagie.text.Font font,
+                                    boolean ar, float topPad, float indent) {
+        PdfPCell c = new PdfPCell(new Phrase(text, font));
+        c.setBorder(PdfPCell.NO_BORDER);
+        c.setPaddingTop(topPad);
+        c.setPaddingBottom(1);
+        if (t.getRunDirection() == PdfWriter.RUN_DIRECTION_RTL) {
+            c.setHorizontalAlignment(PdfTheme.visualStart(true, PdfWriter.RUN_DIRECTION_RTL));
+            c.setPaddingRight(indent);
+        } else {
+            c.setPaddingLeft(indent);
+        }
+        t.addCell(c);
     }
 
     // ── Findings aging ─────────────────────────────────────────────────────

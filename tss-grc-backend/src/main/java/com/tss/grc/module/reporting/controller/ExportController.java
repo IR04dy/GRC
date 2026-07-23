@@ -151,6 +151,14 @@ public class ExportController {
         return pdf(exportService.cabPackPdf(id, lang), ExportNaming.build("Change", "CABPack-" + id, lang, "pdf"));
     }
 
+    @GetMapping("/policy/{id}/document.pdf")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
+    @Operation(summary = "CH-10: controlled policy document PDF rendered from the authored inline "
+        + "content (content_md). Pass ?lang=ar for Arabic RTL.")
+    public ResponseEntity<byte[]> policyDocumentPdf(@PathVariable Long id, @RequestParam(defaultValue = "en") String lang) {
+        return pdf(exportService.policyDocumentPdf(id, lang), ExportNaming.build("Policy", "PolicyDoc-" + id, lang, "pdf"));
+    }
+
     // ── Board pack (S1) ───────────────────────────────────────────────────
 
     @GetMapping("/board-pack.pdf")
