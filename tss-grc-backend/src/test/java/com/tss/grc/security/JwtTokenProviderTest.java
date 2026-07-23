@@ -118,4 +118,31 @@ class JwtTokenProviderTest {
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("placeholder");
     }
+
+    // ─────────── validateToken robustness (refresh-500 regression) ───────────
+
+    @Test
+    void validateToken_returns_false_for_foreign_key_signature_never_throws() {
+        // Regression: a refresh cookie signed with a DIFFERENT key (stale/rotated)
+        // must be rejected as invalid (false), never bubble an
+        // io.jsonwebtoken.security.SignatureException — which previously escaped
+        // validateToken() and surfaced as HTTP 500 on /api/auth/refresh instead of
+        // a clean 401 (so returning users with an old cookie saw "internal server
+        // error" instead of a login redirect).
+        JwtTokenProvider provider = new JwtTokenProvider(VALID_32, "", 900_000L, 604_800_000L, null, null);
+        String foreignKeyToken = io.jsonwebtoken.Jwts.builder()
+                .subject("42")
+                .signWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor(
+                        "ZYXWVUTSRQPONMLKJIHGFEDCBA987654".getBytes()))  // 32 chars, different key
+                .compact();
+        assertThat(provider.validateToken(foreignKeyToken)).isFalse();
+    }
+
+    @Test
+    void validateToken_returns_false_for_null_empty_and_garbage() {
+        JwtTokenProvider provider = new JwtTokenProvider(VALID_32, "", 900_000L, 604_800_000L, null, null);
+        assertThat(provider.validateToken(null)).isFalse();
+        assertThat(provider.validateToken("")).isFalse();
+        assertThat(provider.validateToken("not-a-jwt")).isFalse();
+    }
 }

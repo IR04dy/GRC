@@ -315,7 +315,13 @@ public class JwtTokenProvider {
             return true;
         } catch (ExpiredJwtException e) {
             log.debug("JWT expired: {}", e.getMessage());
-        } catch (UnsupportedJwtException | MalformedJwtException | IllegalArgumentException e) {
+        } catch (JwtException | IllegalArgumentException e) {
+            // Base JwtException covers signature mismatch (io.jsonwebtoken.security.
+            // SignatureException — a stale/foreign-key refresh cookie), malformed,
+            // unsupported, and empty/null tokens. Previously SignatureException was
+            // NOT caught here, so a stale refresh cookie escaped as an unhandled
+            // exception → HTTP 500 on /api/auth/refresh instead of a clean 401.
+            // Any invalid token is simply "not valid" — never a 500.
             log.warn("Invalid JWT: {}", e.getMessage());
         }
         return false;
