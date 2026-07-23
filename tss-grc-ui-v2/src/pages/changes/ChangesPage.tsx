@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   GitBranch, Filter, Plus, BarChart3, ListChecks, KanbanSquare, Activity,
   CheckCheck, X as XIcon, ArrowRight, AlertTriangle, ShieldCheck, Clock, Send,
@@ -40,6 +40,9 @@ import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import '../../styles/pages/changes.css';
 
 type TabId = 'register' | 'kanban' | 'workflow' | 'analytics' | 'integrations' | 'comms';
+const TAB_IDS: TabId[] = ['register', 'kanban', 'workflow', 'analytics', 'integrations', 'comms'];
+// Changes eligible for a post-implementation review (the PIR process queue).
+const REVIEW_STATUSES = ['IMPLEMENTED', 'ROLLED_BACK', 'POST_REVIEW'];
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   DRAFT: 'neutral', SUBMITTED: 'info', IMPACT_ASSESSED: 'info',
@@ -95,14 +98,30 @@ export function ChangesPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const demoMode = !isAuthenticated();
 
-  const [tab, setTab] = useState<TabId>('register');
+  // Change-Enablement process-bar deep-links: ?tab= opens a tab; ?review=1 shows
+  // changes awaiting a post-implementation review; ?type= filters by change type.
+  const reviewMode = searchParams.get('review') === '1';
+  const typeParam = (searchParams.get('type') ?? '').toUpperCase();
+  const [tab, setTab] = useState<TabId>(() => {
+    const tp = searchParams.get('tab') as TabId | null;
+    return tp && TAB_IDS.includes(tp) ? tp : 'register';
+  });
   const [apiItems, setItems] = useState<ChangeRequestDto[]>([]);
   // DD-71: include intake-promoted change requests in the visible register.
   const promotedChanges = usePromoted('CHANGE').map(toChangeRequestDto);
   const items = useMemo(() => [...promotedChanges, ...apiItems], [promotedChanges, apiItems]);
   const changeProv = usePromotedProvenance('CHANGE');
+  // Register rows honour the process-bar deep-link filters (review queue / type).
+  const registerFiltered = reviewMode || !!typeParam;
+  const registerRows = useMemo(() => {
+    let rows = items;
+    if (reviewMode) rows = rows.filter(c => REVIEW_STATUSES.includes(c.status));
+    if (typeParam)  rows = rows.filter(c => (c.changeType ?? '').toUpperCase() === typeParam);
+    return rows;
+  }, [items, reviewMode, typeParam]);
   const [loading, setLoading] = useState(false);
   const [analytics, setAnalytics] = useState<ChangeAnalyticsDto | null>(null);
 
@@ -257,12 +276,28 @@ export function ChangesPage() {
       <Tabs items={tabs} active={tab} onChange={setTab} />
 
       {tab === 'register' && (
-        <Card padded={false}>
-          {loading ? <Loading /> :
-            <DataTable columns={cols} rows={items}
-                       empty={<EmptyState Icon={GitBranch} title={t('changeEmptyTitle')} sub={t('changeEmptySub')} />} />
-          }
-        </Card>
+        <>
+          {registerFiltered && (
+            <div className="changes-filter-banner">
+              <span>
+                {reviewMode ? t('changeReviewQueue')
+                            : `${typeParam} ${lang === 'ar' ? 'تغييرات' : 'changes'}`}
+                <span className="changes-filter-banner__count"> · {registerRows.length}</span>
+              </span>
+              <button type="button" onClick={() => setSearchParams({})} className="changes-filter-banner__clear">
+                <XIcon size={13} /> {t('changeFilterClear')}
+              </button>
+            </div>
+          )}
+          <Card padded={false}>
+            {loading ? <Loading /> :
+              <DataTable columns={cols} rows={registerRows}
+                         empty={<EmptyState Icon={GitBranch}
+                           title={registerFiltered ? t('changeReviewEmptyTitle') : t('changeEmptyTitle')}
+                           sub={registerFiltered ? t('changeReviewEmptySub') : t('changeEmptySub')} />} />
+            }
+          </Card>
+        </>
       )}
 
       {tab === 'kanban' && (

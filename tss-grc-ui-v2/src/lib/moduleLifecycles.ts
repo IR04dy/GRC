@@ -631,6 +631,13 @@ export const EVIDENCE_LIFECYCLES: ProcessLifecycle[] = [
 ];
 
 // ─── Change Management (ITIL v4) ───────────────────────────────────────────
+// Each process is one ITIL v4 Change-Enablement path with a DISTINCT, correct
+// primary action: the two origination paths (Standard/Normal, Emergency) launch
+// the change-request intake — Emergency prefills the EMERGENCY type — while the
+// Post-Implementation Review is a review of an EXISTING implemented change and so
+// routes to the review queue, never the "new change" form. (Previously all three
+// shared intakeKind=CHANGE_REQUEST, so every tile's "Submit new" opened the same
+// new-change form — including PIR, which does not originate a change.)
 export const CHANGE_LIFECYCLES: ProcessLifecycle[] = [
   {
     name: 'Standard / Normal Change',
@@ -639,10 +646,10 @@ export const CHANGE_LIFECYCLES: ProcessLifecycle[] = [
     Icon: Workflow,
     stages: ['Submitted', 'Impact', 'CAB review', 'Scheduled', 'Implemented', 'Closed'],
     activeCount: 4, overdueCount: 0,
-    primary:  { label: 'Change register', labelAr: 'سجل التغييرات', href: '/changes' },
+    primary:   { label: 'New change request', labelAr: 'طلب تغيير جديد', href: '/intake/change_request' },
+    secondary: { label: 'Change register',    labelAr: 'سجل التغييرات',  href: '/changes' },
     steward:  'Change Owner',
     sla:      '7-day CAB',
-    intakeKind: 'CHANGE_REQUEST',
   },
   {
     name: 'Emergency Change (E-CAB)',
@@ -651,10 +658,10 @@ export const CHANGE_LIFECYCLES: ProcessLifecycle[] = [
     Icon: Flame,
     stages: ['Raised', 'E-CAB', 'Implemented', 'Post-review'],
     activeCount: 1, overdueCount: 0,
-    primary:  { label: 'Emergencies', labelAr: 'الطوارئ',     href: '/changes?tab=register' },
+    primary:   { label: 'Raise emergency change', labelAr: 'رفع تغيير طارئ', href: '/intake/change_request?type=EMERGENCY' },
+    secondary: { label: 'Emergency register',     labelAr: 'سجل الطوارئ',    href: '/changes?type=EMERGENCY' },
     steward:  'CAB Chair',
     sla:      'Same-day',
-    intakeKind: 'CHANGE_REQUEST',
   },
   {
     name: 'Post-Implementation Review (PIR)',
@@ -663,10 +670,12 @@ export const CHANGE_LIFECYCLES: ProcessLifecycle[] = [
     Icon: ClipboardCheck,
     stages: ['Implemented', 'Validated', 'Lessons captured', 'Closed'],
     activeCount: 0, overdueCount: 0,
-    primary:  { label: 'Closed changes', labelAr: 'التغييرات المغلقة',  href: '/changes' },
+    // A PIR reviews an existing implemented change — it never creates one. Routes
+    // to the changes awaiting review; the review itself is recorded on the change.
+    primary:   { label: 'Review implemented changes', labelAr: 'مراجعة التغييرات المنفّذة', href: '/changes?review=1' },
+    secondary: { label: 'Change register',            labelAr: 'سجل التغييرات',           href: '/changes' },
     steward:  'Change Manager',
     sla:      '5-day PIR',
-    intakeKind: 'CHANGE_REQUEST',
   },
 ];
 

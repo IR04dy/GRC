@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, ArrowRight, Copy, ArrowLeft, FileText } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -41,6 +41,18 @@ export function IntakeFormPage() {
   const kind = (kindParam ?? '').toUpperCase() as IntakeKind;
   const catalog = INTAKE_CATALOG[kind];
   const fields = INTAKE_FORM_FIELDS[kind];
+
+  // Prefill from the URL — e.g. the "Raise emergency change" process launcher
+  // deep-links to /intake/change_request?type=EMERGENCY so the type is preselected.
+  const [searchParams] = useSearchParams();
+  const initialValues = useMemo<Record<string, string>>(() => {
+    const seed: Record<string, string> = {};
+    const type = (searchParams.get('type') ?? '').toUpperCase();
+    if (kind === 'CHANGE_REQUEST' && ['STANDARD', 'NORMAL', 'EMERGENCY'].includes(type)) {
+      seed.changeType = type;
+    }
+    return seed;
+  }, [kind, searchParams]);
 
   if (!catalog || !fields) {
     return (
@@ -175,6 +187,7 @@ export function IntakeFormPage() {
           submitLabel={t('intakeFormSubmit')}
           onSubmit={onSubmit}
           onChange={kind === 'CHANGE_REQUEST' ? setLiveValues : undefined}
+          initial={initialValues}
         />
       </Card>
     </Shell>

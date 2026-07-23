@@ -236,6 +236,37 @@
   color: var(--ink-1);
 }
 
+/* ─── Change-Enablement: register filter banner ───────────── */
+.changes-filter-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-3);
+  background: var(--info-bg);
+  border: 1px solid var(--info-fg);
+  border-radius: var(--r-sm);
+  font-size: var(--text-sm);
+  color: var(--ink-1);
+  font-weight: 600;
+}
+.changes-filter-banner__count { color: var(--ink-3); font-weight: 400; }
+.changes-filter-banner__clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--sp-2) var(--sp-3);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.changes-filter-banner__clear:hover { background: var(--surface-2); color: var(--ink-1); }
+
 /* ─── CH-11: PIR form ─────────────────────────────────────── */
 .changes-pir-form {
   display: flex;

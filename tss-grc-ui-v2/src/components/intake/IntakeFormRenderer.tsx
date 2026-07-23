@@ -19,7 +19,7 @@ import {
  * privacy-breach, risk-issue, control-observation, policy-exception)
  * so the visual + UX is identical across all five.
  */
-export function IntakeFormRenderer({ fields, submitLabel, onSubmit, onChange }: {
+export function IntakeFormRenderer({ fields, submitLabel, onSubmit, onChange, initial }: {
   fields: IntakeFieldDef[];
   submitLabel: string;
   onSubmit: (payload: Record<string, string>) => void;
@@ -27,10 +27,13 @@ export function IntakeFormRenderer({ fields, submitLabel, onSubmit, onChange }: 
    *  can render a live preview (e.g. the change-risk panel that
    *  recomputes as the user picks values). */
   onChange?: (values: Record<string, string>) => void;
+  /** Optional seed values — e.g. a process launcher prefilling changeType so
+   *  "Raise emergency change" lands on the form with EMERGENCY pre-selected. */
+  initial?: Record<string, string>;
 }) {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>(() => ({ ...(initial ?? {}) }));
 
   // DD-73: broadcast values to the parent via effect rather than from
   // inside the setState updater — calling the parent's setState during a

@@ -38,6 +38,12 @@ export function ProcessDetailModal({ lc, onClose }: {
     ? (lang === 'ar' && lc.secondary.labelAr ? lc.secondary.labelAr : lc.secondary.label)
     : undefined;
 
+  // The primary button opens the intake form only when it actually points at one
+  // (an /intake/… href, or an intakeKind fallback with no href). Otherwise it just
+  // navigates to a view — so the how-to text must not claim "opens the intake form".
+  const primaryIsIntake = (lc.primary.href ?? '').startsWith('/intake/')
+    || (!lc.primary.href && !lc.primary.onClick && !!lc.intakeKind);
+
   /**
    * Primary button — does what its LABEL says.
    *
@@ -207,11 +213,13 @@ export function ProcessDetailModal({ lc, onClose }: {
             {t('processDetailHowToUse')}
           </div>
           <div>
-            <strong>{primaryLabel}</strong> — {t('processDetailStartExplain').replace('{name}', name)}
+            <strong>{primaryLabel}</strong> — {primaryIsIntake
+              ? t('processDetailStartExplain').replace('{name}', name)
+              : t('processDetailPrimaryNavExplain').replace('{label}', primaryLabel)}
           </div>
-          {secondaryLabel && (
+          {secondaryLabel && lc.secondary?.href && (
             <div style={{ marginTop: 4 }}>
-              <strong>{t('processDetailOpenRegister')}</strong> — {t('processDetailRegisterExplain')}
+              <strong>{secondaryLabel}</strong> — {t('processDetailRegisterExplain')}
             </div>
           )}
         </div>
