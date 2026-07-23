@@ -5,6 +5,8 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.admin.committee.dto.CommitteeDtos.*;
 import com.tss.grc.module.admin.committee.entity.Committee;
 import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
+import com.tss.grc.module.admin.committee.entity.CommitteeMeetingAttendee;
+import com.tss.grc.module.admin.committee.repository.CommitteeMeetingAttendeeRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -39,6 +41,7 @@ public class CommitteeService {
 
     private final CommitteeRepository repo;
     private final CommitteeMeetingRepository meetingRepo;
+    private final CommitteeMeetingAttendeeRepository attendeeRepo;   // CH-14
 
     /**
      * Returns {@code true} when the underlying SQL error looks like a
@@ -243,6 +246,9 @@ public class CommitteeService {
             if (req.decisionsJson() != null) m.setDecisionsJson(req.decisionsJson());
             if (req.actionItemsJson() != null) m.setActionItemsJson(req.actionItemsJson());
         }
+        // CH-14: when structured attendance exists, compute quorum deterministically
+        // (overriding any client-supplied flag); otherwise keep the supplied value.
+        recomputeQuorum(m);
         return m;
     }
 
@@ -252,6 +258,12 @@ public class CommitteeService {
         if (!"COMPLETED".equals(m.getStatus())) {
             throw new IllegalTransitionException(m.getStatus(), "MINUTES_APPROVED", Set.of("COMPLETED"));
         }
+        // CH-14 (governance gate): minutes cannot be approved for a meeting that did
+        // not reach quorum — a quorate meeting is a precondition for binding decisions.
+        if (m.getQuorumMet() == null || m.getQuorumMet() != 1)
+            throw new IllegalStateException(
+                "Cannot approve minutes: the meeting did not reach quorum. Record attendance "
+                    + "and ensure enough voting members were present.");
         m.setStatus("MINUTES_APPROVED");
         m.setMinutesApprovedAt(LocalDateTime.now());
         m.setMinutesApprovedBy(approverId);
@@ -269,6 +281,68 @@ public class CommitteeService {
         m.setStatus("CANCELLED");
         m.setCancelReason(req.reason());
         return m;
+    }
+
+    // ── CH-14: structured attendance + deterministic quorum ──────────────────
+
+    /** Replace the meeting's attendance sheet, then (re)compute quorum from it. */
+    @Transactional
+    public QuorumView recordAttendance(Long meetingId, AttendanceRequest req) {
+        CommitteeMeeting m = getMeeting(meetingId);
+        attendeeRepo.deleteByCommitteeMeetingId(meetingId);
+        if (req != null && req.attendees() != null) {
+            for (AttendeeRow r : req.attendees()) {
+                if (r.memberName() == null || r.memberName().isBlank()) continue;
+                CommitteeMeetingAttendee a = new CommitteeMeetingAttendee();
+                a.setOrganisationId(m.getOrganisationId());
+                a.setCommitteeMeetingId(meetingId);
+                a.setMemberName(r.memberName().trim());
+                a.setMemberRole(r.memberRole());
+                a.setIsVotingMember(r.votingMember() == null || r.votingMember());
+                a.setPresent(Boolean.TRUE.equals(r.present()));
+                a.setCoiDeclared(Boolean.TRUE.equals(r.coiDeclared()));
+                a.setCoiNote(r.coiNote());
+                attendeeRepo.save(a);
+            }
+        }
+        recomputeQuorum(m);
+        return quorum(meetingId);
+    }
+
+    /** Deterministic quorum view for a meeting (present voting members vs the
+     *  committee's quorum_pct). */
+    @Transactional(readOnly = true)
+    public QuorumView quorum(Long meetingId) {
+        CommitteeMeeting m = getMeeting(meetingId);
+        List<CommitteeMeetingAttendee> rows = attendeeRepo.findByCommitteeMeetingId(meetingId);
+        int pct = quorumPctOf(m);
+        int totalVoting   = (int) rows.stream().filter(a -> Boolean.TRUE.equals(a.getIsVotingMember())).count();
+        int presentVoting = (int) rows.stream()
+            .filter(a -> Boolean.TRUE.equals(a.getIsVotingMember()) && Boolean.TRUE.equals(a.getPresent())).count();
+        int required = totalVoting == 0 ? 0 : Math.max(1, (int) Math.ceil(totalVoting * pct / 100.0));
+        boolean met = totalVoting > 0 && presentVoting >= required;
+        List<AttendeeRow> view = rows.stream()
+            .map(a -> new AttendeeRow(a.getMemberName(), a.getMemberRole(), a.getIsVotingMember(),
+                a.getPresent(), a.getCoiDeclared(), a.getCoiNote())).toList();
+        return new QuorumView(meetingId, pct, totalVoting, presentVoting, required, met, view);
+    }
+
+    /** Recompute + persist quorum_met from structured attendance, if any rows exist. */
+    private void recomputeQuorum(CommitteeMeeting m) {
+        List<CommitteeMeetingAttendee> rows = attendeeRepo.findByCommitteeMeetingId(m.getId());
+        if (rows.isEmpty()) return;   // no structured attendance → leave the existing flag intact
+        int pct = quorumPctOf(m);
+        int totalVoting   = (int) rows.stream().filter(a -> Boolean.TRUE.equals(a.getIsVotingMember())).count();
+        int presentVoting = (int) rows.stream()
+            .filter(a -> Boolean.TRUE.equals(a.getIsVotingMember()) && Boolean.TRUE.equals(a.getPresent())).count();
+        int required = totalVoting == 0 ? 0 : Math.max(1, (int) Math.ceil(totalVoting * pct / 100.0));
+        m.setQuorumMet((short) (totalVoting > 0 && presentVoting >= required ? 1 : 0));
+    }
+
+    private int quorumPctOf(CommitteeMeeting m) {
+        Integer pct = m.getCommitteeId() == null ? null
+            : repo.findById(m.getCommitteeId()).map(Committee::getQuorumPct).orElse(null);
+        return pct != null ? pct : 50;   // sensible default when the committee has no configured pct
     }
 
     private String generateMeetingCode(String committeeCode) {

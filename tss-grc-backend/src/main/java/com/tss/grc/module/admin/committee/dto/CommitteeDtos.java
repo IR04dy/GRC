@@ -89,6 +89,23 @@ public final class CommitteeDtos {
 
     public record MeetingCancelRequest(@NotBlank @Size(max = 500) String reason) {}
 
+    // ── CH-14: structured attendance + deterministic quorum ──────────────────
+    public record AttendeeRow(
+            @NotBlank @Size(max = 255) String memberName,
+            @Size(max = 120) String memberRole,
+            Boolean votingMember, Boolean present,
+            Boolean coiDeclared, String coiNote
+    ) {}
+
+    public record AttendanceRequest(java.util.List<AttendeeRow> attendees) {}
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record QuorumView(
+            Long meetingId, Integer quorumPct,
+            int totalVoting, int presentVoting, int requiredVoting,
+            boolean quorumMet, java.util.List<AttendeeRow> attendees
+    ) {}
+
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record MeetingResponse(
             Long id, String meetingCode, String externalId,

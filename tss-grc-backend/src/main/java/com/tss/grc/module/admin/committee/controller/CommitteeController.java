@@ -121,6 +121,20 @@ public class CommitteeController {
         return MeetingResponse.from(service.cancelMeeting(id, req));
     }
 
+    // ── CH-14: attendance + deterministic quorum ─────────────────────────────
+
+    @PostMapping("/meetings/{id}/attendance")
+    @PreAuthorize("hasPermission('ADMIN','WRITE')")
+    public QuorumView recordAttendance(@PathVariable Long id, @RequestBody AttendanceRequest req) {
+        return service.recordAttendance(id, req);
+    }
+
+    @GetMapping("/meetings/{id}/quorum")
+    @PreAuthorize("hasPermission('ADMIN','READ')")
+    public QuorumView quorum(@PathVariable Long id) {
+        return service.quorum(id);
+    }
+
     private static Long userIdOf(Authentication auth) {
         if (auth != null && auth.getPrincipal() instanceof GrcUserDetails u) return u.getUserId();
         return null;
