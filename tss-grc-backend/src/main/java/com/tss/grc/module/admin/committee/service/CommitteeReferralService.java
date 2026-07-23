@@ -4,10 +4,12 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.admin.committee.entity.Committee;
 import com.tss.grc.module.admin.committee.entity.CommitteeGateMap;
 import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
+import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
 import com.tss.grc.module.admin.committee.repository.CommitteeGateMapRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeReferralRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeResolutionRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class CommitteeReferralService {
     private final CommitteeGateMapRepository   gateMapRepo;
     private final CommitteeRepository          committeeRepo;
     private final CommitteeResolutionRepository resolutionRepo;
+    private final CommitteeMeetingRepository    meetingRepo;
 
     /**
      * Create (or reuse) the active referral of a source item to its CAB/ECAB
@@ -95,6 +98,38 @@ public class CommitteeReferralService {
         ref.setMeetingId(res.getMeetingId());
         ref.setStatus("SCHEDULED");
         return referralRepo.save(ref);
+    }
+
+    /**
+     * S3 gate: assert the committee has APPROVED this referred item — its linked
+     * resolution carried {@code outcome=APPROVED} on quorate (MINUTES_APPROVED)
+     * minutes with at least {@code minApprovals} FOR votes. Throws (→409)
+     * otherwise. Read-only: the caller advances its own state on success.
+     */
+    @Transactional(readOnly = true)
+    public void assertDecisionApproves(String sourceModule, Long sourceEntityId, int minApprovals) {
+        Long org = TenantContext.getCurrentTenant();
+        CommitteeReferral ref = referralRepo
+            .findByOrganisationIdAndSourceModuleAndSourceEntityId(org, sourceModule, sourceEntityId)
+            .orElseThrow(() -> new IllegalStateException("No committee referral to gate on"));
+        if (ref.getResolutionId() == null)
+            throw new IllegalStateException("The committee motion has not been raised and linked yet");
+        CommitteeResolution res = resolutionRepo.findByIdAndOrganisationId(ref.getResolutionId(), org)
+            .orElseThrow(() -> new IllegalStateException("The linked committee resolution is missing"));
+        if (res.getMeetingId() != null) {
+            CommitteeMeeting mtg = meetingRepo.findByIdAndOrganisationId(res.getMeetingId(), org)
+                .orElseThrow(() -> new IllegalStateException("The linked committee meeting is missing"));
+            if (!"MINUTES_APPROVED".equals(mtg.getStatus()))
+                throw new IllegalStateException(
+                    "Committee minutes are not approved yet (meeting is " + mtg.getStatus() + ")");
+        }
+        if (!"APPROVED".equals(res.getOutcome()))
+            throw new IllegalStateException(
+                "The committee did not approve this item (resolution outcome is " + res.getOutcome() + ")");
+        int forVotes = res.getVoteFor() == null ? 0 : res.getVoteFor();
+        if (forVotes < minApprovals)
+            throw new IllegalStateException("Committee approval is short of the required "
+                + minApprovals + " FOR vote(s) — has " + forVotes);
     }
 
     @Transactional(readOnly = true)

@@ -219,22 +219,31 @@ public class ChangeManagementService {
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
             }
             case "CAB_APPROVED" -> {
-                // CM-C2 (CAB quorum): approval must be backed by recorded votes —
-                // at least `cabMinApprovals` APPROVE and zero REJECT. Closes the
-                // rubber-stamp path where a change reached CAB_APPROVED with no
-                // votes, or despite a recorded rejection.
-                List<ChangeApproval> votes = approvalRepo.findByChangeRequestIdOrderByDecidedAtAsc(id);
-                if (votes.stream().anyMatch(v -> "REJECT".equalsIgnoreCase(v.getDecision())))
-                    throw new IllegalStateException(
-                        "Cannot CAB-approve: a REJECT vote is on record — route to CAB_REJECTED");
-                long approves = votes.stream().filter(v -> "APPROVE".equalsIgnoreCase(v.getDecision())).count();
-                // CH-17: the required count comes from the (type x risk) authorisation
-                // matrix cell, falling back to the flat cab-min-approvals default.
-                int required = requiredApprovals(c);
-                if (approves < required)
-                    throw new IllegalStateException(
-                        "Cannot CAB-approve: requires at least " + required
-                            + " recorded APPROVE vote(s) (have " + approves + ")");
+                // Track D: a change referred to a committee is decided THERE — the
+                // committee's carried resolution is the CAB decision (system-of-
+                // record), asserted on quorate (MINUTES_APPROVED) minutes. A
+                // non-referred change takes the legacy recorded-votes gate below,
+                // byte-for-byte, so nothing changes for the existing flow.
+                if (referralService != null && referralService.activeReferral("CHANGE", id).isPresent()) {
+                    referralService.assertDecisionApproves("CHANGE", id, requiredApprovals(c));
+                } else {
+                    // CM-C2 (CAB quorum): approval must be backed by recorded votes —
+                    // at least `cabMinApprovals` APPROVE and zero REJECT. Closes the
+                    // rubber-stamp path where a change reached CAB_APPROVED with no
+                    // votes, or despite a recorded rejection.
+                    List<ChangeApproval> votes = approvalRepo.findByChangeRequestIdOrderByDecidedAtAsc(id);
+                    if (votes.stream().anyMatch(v -> "REJECT".equalsIgnoreCase(v.getDecision())))
+                        throw new IllegalStateException(
+                            "Cannot CAB-approve: a REJECT vote is on record — route to CAB_REJECTED");
+                    long approves = votes.stream().filter(v -> "APPROVE".equalsIgnoreCase(v.getDecision())).count();
+                    // CH-17: the required count comes from the (type x risk) authorisation
+                    // matrix cell, falling back to the flat cab-min-approvals default.
+                    int required = requiredApprovals(c);
+                    if (approves < required)
+                        throw new IllegalStateException(
+                            "Cannot CAB-approve: requires at least " + required
+                                + " recorded APPROVE vote(s) (have " + approves + ")");
+                }
                 c.setCabDecisionAt(LocalDateTime.now());
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
             }
@@ -309,6 +318,11 @@ public class ChangeManagementService {
     @Transactional
     public ChangeApproval recordApproval(Long changeId, ChangeApproval body) {
         ChangeRequest c = require(changeId);
+        // Track D: a referred change is decided in committee — block the direct
+        // CAB vote path so the two can't both satisfy CAB_APPROVED (no dual-count).
+        if (referralService != null && referralService.activeReferral("CHANGE", changeId).isPresent())
+            throw new IllegalStateException(
+                "This change is routed through a committee — record the decision as a committee vote, not a direct CAB vote");
         if (!"CAB_PENDING".equals(c.getStatus()) && !"IMPACT_ASSESSED".equals(c.getStatus()))
             throw new IllegalArgumentException("CAB votes can only be recorded while the change is in IMPACT_ASSESSED or CAB_PENDING");
         body.setChangeRequestId(changeId);
