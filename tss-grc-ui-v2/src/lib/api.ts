@@ -644,6 +644,9 @@ export interface ChangeConflictView {
 export interface ChangeReferralView {
   id?: number; referralId?: number; committeeId?: number; gate?: string; mode?: string;
   status?: string; meetingId?: number | null; resolutionId?: number | null; referredBy?: string;
+  // enriched committee decision (from the linked resolution + meeting)
+  resolutionOutcome?: string; voteFor?: number; voteAgainst?: number; voteAbstain?: number;
+  meetingStatus?: string; quorumMet?: boolean;
 }
 
 export const changeApi = {

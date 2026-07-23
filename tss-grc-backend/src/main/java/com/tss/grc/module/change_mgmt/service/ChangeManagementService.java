@@ -687,6 +687,7 @@ public class ChangeManagementService {
             out.put("meetingId",    r.getMeetingId());
             out.put("resolutionId", r.getResolutionId());
             out.put("referredBy",   r.getReferredBy());
+            referralService.enrich(r, out);   // resolution outcome/tally + meeting status/quorum
         });
         return out;
     }

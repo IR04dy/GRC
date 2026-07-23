@@ -626,9 +626,20 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
                 <Badge tone={referral.status === 'DECIDED' ? 'success' : 'neutral'}>{referral.status}</Badge>
                 {referral.mode === 'RATIFICATION' && <Badge tone="warning">{lang === 'ar' ? 'مصادقة لاحقة' : 'ratification'}</Badge>}
               </div>
-              {referral.resolutionId
-                ? <div className="mono" style={{ fontSize: 12 }}>{lang === 'ar' ? 'القرار' : 'Resolution'} #{referral.resolutionId}{referral.meetingId ? ` · mtg #${referral.meetingId}` : ''}</div>
-                : <div className="changes-conflicts-note">{lang === 'ar' ? 'بانتظار رفع القرار في اجتماع اللجنة وربطه' : 'Awaiting the motion to be raised in a committee meeting and linked'}</div>}
+              {referral.resolutionId ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12 }}>
+                  <div>
+                    {lang === 'ar' ? 'القرار' : 'Resolution'} <span className="mono">#{referral.resolutionId}</span>
+                    {referral.resolutionOutcome && <>{' · '}<Badge tone={referral.resolutionOutcome === 'APPROVED' ? 'success' : referral.resolutionOutcome === 'REJECTED' ? 'danger' : 'warning'}>{referral.resolutionOutcome}</Badge></>}
+                    {referral.voteFor != null && <span className="mono" style={{ color: 'var(--ink-3)' }}>{'  '}{lang === 'ar' ? 'مع' : 'for'} {referral.voteFor} · {lang === 'ar' ? 'ضد' : 'against'} {referral.voteAgainst} · {lang === 'ar' ? 'ممتنع' : 'abstain'} {referral.voteAbstain}</span>}
+                  </div>
+                  <div className="changes-gov-sub">
+                    {lang === 'ar' ? 'الاجتماع' : 'Meeting'} {referral.meetingId ? <span className="mono">#{referral.meetingId}</span> : '—'}
+                    {referral.meetingStatus && <>{' · '}{referral.meetingStatus.replace(/_/g, ' ')}</>}
+                    {referral.quorumMet != null && <>{' · '}<Badge tone={referral.quorumMet ? 'success' : 'neutral'}>{referral.quorumMet ? (lang === 'ar' ? 'اكتمل النصاب' : 'quorum met') : (lang === 'ar' ? 'دون نصاب' : 'no quorum')}</Badge></>}
+                  </div>
+                </div>
+              ) : <div className="changes-conflicts-note">{lang === 'ar' ? 'بانتظار رفع القرار في اجتماع اللجنة وربطه' : 'Awaiting the motion to be raised in a committee meeting and linked'}</div>}
             </div>
           ) : ['IMPACT_ASSESSED', 'CAB_PENDING'].includes(change.status) ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

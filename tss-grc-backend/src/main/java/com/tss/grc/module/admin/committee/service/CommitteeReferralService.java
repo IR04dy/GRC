@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -136,5 +137,30 @@ public class CommitteeReferralService {
     public Optional<CommitteeReferral> activeReferral(String sourceModule, Long sourceEntityId) {
         return referralRepo.findByOrganisationIdAndSourceModuleAndSourceEntityId(
             TenantContext.getCurrentTenant(), sourceModule, sourceEntityId);
+    }
+
+    /**
+     * Enrich a referral view with the linked resolution's outcome + tally and the
+     * meeting's status + quorum, so the source module's detail (guarded by its own
+     * READ permission) can show the committee decision without the viewer needing
+     * committee-admin access.
+     */
+    @Transactional(readOnly = true)
+    public void enrich(CommitteeReferral ref, Map<String, Object> out) {
+        Long org = TenantContext.getCurrentTenant();
+        if (ref.getResolutionId() != null) {
+            resolutionRepo.findByIdAndOrganisationId(ref.getResolutionId(), org).ifPresent(r -> {
+                out.put("resolutionOutcome", r.getOutcome());
+                out.put("voteFor",     r.getVoteFor());
+                out.put("voteAgainst", r.getVoteAgainst());
+                out.put("voteAbstain", r.getVoteAbstain());
+            });
+        }
+        if (ref.getMeetingId() != null) {
+            meetingRepo.findByIdAndOrganisationId(ref.getMeetingId(), org).ifPresent(m -> {
+                out.put("meetingStatus", m.getStatus());
+                out.put("quorumMet", m.getQuorumMet() != null && m.getQuorumMet() == 1);
+            });
+        }
     }
 }

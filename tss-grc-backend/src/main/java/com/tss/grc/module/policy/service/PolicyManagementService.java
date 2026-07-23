@@ -496,6 +496,7 @@ public class PolicyManagementService {
             out.put("status",       r.getStatus());
             out.put("meetingId",    r.getMeetingId());
             out.put("resolutionId", r.getResolutionId());
+            referralService.enrich(r, out);   // resolution outcome/tally + meeting status/quorum
         });
         return out;
     }
