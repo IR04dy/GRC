@@ -33,7 +33,6 @@ export interface PolicyDocument {
   retiredReason?: string;
   relatedFramework?: string;
   relatedControls?: string;
-  frameworkId?: number;
   notes?: string;
 }
 

@@ -198,11 +198,13 @@ function DocumentsTab() {
 
   async function onCreate(body: Record<string, unknown>) {
     try {
-      // C-12: the framework field is a real FK picker — derive framework_id and
-      // the display name from the chosen framework.
-      const fwId = body.frameworkId ? Number(body.frameworkId) : undefined;
+      // C-12 / PM-M5: the "Related framework" picker resolves to the human-readable
+      // relatedFramework name only. The dead framework_id scalar was dropped (V312);
+      // the canonical FK linkage lives in policy.document_framework_mappings.
+      const fwId = body.frameworkPick ? Number(body.frameworkPick) : undefined;
       const fw = frameworks.find(f => f.id === fwId);
-      const payload = { ...body, frameworkId: fwId, relatedFramework: fw?.nameEn };
+      const { frameworkPick: _omit, ...rest } = body;
+      const payload = { ...rest, relatedFramework: fw?.nameEn };
       await createPolicy(payload as unknown as Partial<PolicyDocument>);
       toast.success(isAr ? 'تم إنشاء السياسة' : 'Policy created');
       setShowCreate(false);
@@ -326,7 +328,7 @@ function DocumentsTab() {
         { value: 'TRIENNIAL', label: isAr ? 'كل 3 سنوات' : 'Triennial' },
         { value: 'AD_HOC', label: isAr ? 'حسب الحاجة' : 'Ad hoc' },
       ] },
-    { kind: 'select',   key: 'frameworkId', span: 4, label: isAr ? 'الإطار المرتبط' : 'Related framework',
+    { kind: 'select',   key: 'frameworkPick', span: 4, label: isAr ? 'الإطار المرتبط' : 'Related framework',
       options: frameworks.map(f => ({ value: String(f.id), label: isAr && f.nameAr ? f.nameAr : f.nameEn })) },
     { kind: 'textarea', key: 'summaryEn', span: 12, rows: 2, label: isAr ? 'الملخص (إنجليزي)' : 'Summary (EN)' },
     { kind: 'textarea', key: 'summaryAr', span: 12, rows: 2, label: isAr ? 'الملخص (عربي)' : 'Summary (AR)' },
