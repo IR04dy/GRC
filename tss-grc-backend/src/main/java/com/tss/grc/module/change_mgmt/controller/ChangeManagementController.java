@@ -2,6 +2,7 @@ package com.tss.grc.module.change_mgmt.controller;
 
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.service.ChangeManagementService;
+import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
@@ -142,6 +144,23 @@ public class ChangeManagementController {
             @RequestParam String entityType,
             @RequestParam Long entityId) {
         return service.linksForEntity(entityType, entityId);
+    }
+
+    // ── Track D: route a change's CAB decision through the committee engine ───
+    @PostMapping("/{id}/refer-to-committee")
+    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CommitteeReferral referToCommittee(@PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body, Principal principal) {
+        Long committeeId = (body != null && body.get("committeeId") != null)
+            ? Long.valueOf(body.get("committeeId").toString()) : null;
+        return service.referToCommittee(id, committeeId, principal != null ? principal.getName() : null);
+    }
+
+    @GetMapping("/{id}/committee")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    public Map<String, Object> committeeReferral(@PathVariable Long id) {
+        return service.committeeReferral(id);
     }
 
     // ── Comments ────────────────────────────────────────────────────────────

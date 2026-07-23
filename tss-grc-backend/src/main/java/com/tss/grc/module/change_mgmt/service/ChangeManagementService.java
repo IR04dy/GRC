@@ -6,6 +6,8 @@ import com.tss.grc.module.change_mgmt.repository.*;
 import com.tss.grc.module.incident.dto.IncidentRequest;
 import com.tss.grc.module.incident.dto.IncidentResponse;
 import com.tss.grc.module.incident.service.IncidentService;
+import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
+import com.tss.grc.module.admin.committee.service.CommitteeReferralService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.platform.realtime.BroadcastHelper;
@@ -86,6 +88,11 @@ public class ChangeManagementService {
      *  is enforced (keeps directly-constructed unit tests working). */
     @Autowired(required = false)
     private ChangeFreezeWindowRepository freezeRepo;
+
+    /** Track D: committee re-route. Optional (field-injected) so directly-
+     *  constructed unit tests need not supply it — referral endpoints then no-op. */
+    @Autowired(required = false)
+    private CommitteeReferralService referralService;
 
     /** CM-C2: minimum recorded APPROVE votes required before a change may move to
      *  CAB_APPROVED. Configurable per deployment; defaults to 1 (four-eyes). */
@@ -610,6 +617,47 @@ public class ChangeManagementService {
         out.put("requiredRoles",   m != null ? m.getRequiredRoles() : null);
         out.put("approvesRecorded", approves);
         out.put("satisfied",       approves >= required);
+        return out;
+    }
+
+    // ── Track D: refer a change to its CAB/ECAB committee ─────────────────────
+
+    /** Route this change's CAB decision THROUGH the committee engine. The gate
+     *  comes from the CH-17 matrix (AUTO → no CAB, rejected); the committee id may
+     *  be passed explicitly or is resolved from the per-tenant gate map. S1: link
+     *  only — this does NOT yet gate the CAB_APPROVED transition. */
+    @Transactional
+    public CommitteeReferral referToCommittee(Long id, Long committeeId, String referredBy) {
+        if (referralService == null)
+            throw new IllegalStateException("Committee referral is not available");
+        ChangeRequest c = require(id);
+        ChangeAuthorisationMatrix m = resolveMatrix(c);
+        String gate = (m != null && m.getGate() != null) ? m.getGate() : "CAB";
+        if ("AUTO".equalsIgnoreCase(gate))
+            throw new IllegalArgumentException("This change is AUTO-authorised (no CAB) — nothing to refer");
+        String mode = "EMERGENCY".equals(c.getChangeType()) ? "RATIFICATION" : "APPROVAL";
+        CommitteeReferral r = referralService.refer("CHANGE", id, gate, mode, committeeId, referredBy);
+        audit.log("REFER_TO_COMMITTEE", "ChangeRequest", id,
+            "Referred to committee " + r.getCommitteeId() + " (gate " + gate + ", mode " + mode + ")");
+        return r;
+    }
+
+    /** The active committee referral for a change (empty map when none). */
+    @Transactional(readOnly = true)
+    public Map<String, Object> committeeReferral(Long id) {
+        require(id);
+        Map<String, Object> out = new HashMap<>();
+        if (referralService == null) return out;
+        referralService.activeReferral("CHANGE", id).ifPresent(r -> {
+            out.put("referralId",   r.getId());
+            out.put("committeeId",  r.getCommitteeId());
+            out.put("gate",         r.getGate());
+            out.put("mode",         r.getMode());
+            out.put("status",       r.getStatus());
+            out.put("meetingId",    r.getMeetingId());
+            out.put("resolutionId", r.getResolutionId());
+            out.put("referredBy",   r.getReferredBy());
+        });
         return out;
     }
 
