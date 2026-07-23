@@ -640,14 +640,31 @@ export const EVIDENCE_LIFECYCLES: ProcessLifecycle[] = [
 // new-change form — including PIR, which does not originate a change.)
 export const CHANGE_LIFECYCLES: ProcessLifecycle[] = [
   {
-    name: 'Standard / Normal Change',
-    nameAr: 'تغيير قياسي / عادي',
+    // A Standard change is a pre-authorised, low-risk, repeatable change: it is
+    // raised and implemented WITHOUT a CAB review (the authorisation is the
+    // pre-approval of the change model itself). Distinct path from Normal.
+    name: 'Standard Change (pre-authorised)',
+    nameAr: 'تغيير قياسي (معتمد مسبقًا)',
+    reference: 'ITIL v4 — Standard Change',
+    Icon: FileCheck2,
+    stages: ['Submitted', 'Pre-authorised', 'Scheduled', 'Implemented', 'Closed'],
+    activeCount: 2, overdueCount: 0,
+    primary:   { label: 'New standard change', labelAr: 'تغيير قياسي جديد',        href: '/intake/change_request?type=STANDARD' },
+    secondary: { label: 'Standard register',   labelAr: 'سجل التغييرات القياسية', href: '/changes?type=STANDARD' },
+    steward:  'Change Owner',
+    sla:      'Pre-approved · no CAB',
+  },
+  {
+    // A Normal change is the default authorised path: impact assessment then a
+    // CAB review/vote before it can be scheduled and implemented.
+    name: 'Normal Change (CAB)',
+    nameAr: 'تغيير عادي (لجنة استشارة التغيير)',
     reference: 'ITIL v4 — Change Enablement',
     Icon: Workflow,
     stages: ['Submitted', 'Impact', 'CAB review', 'Scheduled', 'Implemented', 'Closed'],
     activeCount: 4, overdueCount: 0,
-    primary:   { label: 'New change request', labelAr: 'طلب تغيير جديد', href: '/intake/change_request' },
-    secondary: { label: 'Change register',    labelAr: 'سجل التغييرات',  href: '/changes' },
+    primary:   { label: 'New normal change', labelAr: 'تغيير عادي جديد',        href: '/intake/change_request?type=NORMAL' },
+    secondary: { label: 'Normal register',   labelAr: 'سجل التغييرات العادية', href: '/changes?type=NORMAL' },
     steward:  'Change Owner',
     sla:      '7-day CAB',
   },
