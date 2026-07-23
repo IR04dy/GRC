@@ -305,7 +305,7 @@ function DocumentsTab() {
         { value: 'GENERAL',              label: 'General' },
       ] },
     { kind: 'text',     key: 'titleEn', required: true, span: 6, label: isAr ? 'العنوان (إنجليزي) *' : 'Title (EN) *' },
-    { kind: 'text',     key: 'titleAr', span: 6, label: isAr ? 'العنوان (عربي)' : 'Title (AR)' },
+    { kind: 'text',     key: 'titleAr', required: true, span: 6, label: isAr ? 'العنوان (عربي) *' : 'Title (AR) *' },
     { kind: 'text',     key: 'ownerName', span: 6, label: isAr ? 'المالك' : 'Owner' },
     { kind: 'text',     key: 'ownerEmail', span: 6, label: isAr ? 'بريد المالك' : 'Owner email' },
     { kind: 'select',   key: 'reviewCadence', span: 4, label: isAr ? 'دورة المراجعة' : 'Review cadence',

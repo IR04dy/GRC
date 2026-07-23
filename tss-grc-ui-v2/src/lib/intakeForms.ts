@@ -384,7 +384,9 @@ export const INTAKE_FORM_FIELDS: Partial<Record<IntakeKind, IntakeFieldDef[]>> =
     { key: 'titleEn', kind: 'text', required: true, span: 6,
       labelEn: 'Change title (English)',
       labelAr: 'عنوان التغيير (إنجليزي)' },
-    { key: 'titleAr', kind: 'text', span: 6,
+    // CH-2: Arabic title is client-gated required — this is an Arabic-primary,
+    // bilingual platform (house rule #7: user-visible records carry *_en AND *_ar).
+    { key: 'titleAr', kind: 'text', required: true, span: 6,
       labelEn: 'Change title (Arabic)',
       labelAr: 'عنوان التغيير (عربي)' },
     { key: 'description', kind: 'textarea', required: true,
