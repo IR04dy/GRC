@@ -12,7 +12,7 @@ import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { Modal } from '../../components/ui/Modal';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
-import { ApiError, reportingApi } from '../../lib/api';
+import { ApiError, reportingApi, frameworkApi, type FrameworkPolicyRowDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
@@ -181,6 +181,33 @@ function DocumentsTab() {
   const [contentFor, setContentFor] = useState<PolicyDocument | null>(null);
   const [frameworks, setFrameworks] = useState<FrameworkOption[]>([]);
   useEffect(() => { listFrameworks().then(setFrameworks).catch(() => setFrameworks([])); }, []);
+  // Framework/standard filter + per-policy chips, sourced from the canonical
+  // policy<->framework mapping (FrameworkAnchorService). FE-only: invert
+  // policiesFor(framework) across every framework into policyId -> frameworks[].
+  // A policy legitimately satisfies many frameworks, so this is a filter over a
+  // many-to-many mapping, not a single-bucket category.
+  const [frameworkFilter, setFrameworkFilter] = useState<number | ''>('');
+  const [policyFrameworks, setPolicyFrameworks] = useState<Map<number, FrameworkOption[]>>(new Map());
+  useEffect(() => {
+    if (frameworks.length === 0) { setPolicyFrameworks(new Map()); return; }
+    let cancelled = false;
+    Promise.all(frameworks.map(f =>
+      frameworkApi.policiesFor(f.id)
+        .then(rows => ({ f, rows }))
+        .catch(() => ({ f, rows: [] as FrameworkPolicyRowDto[] })),
+    )).then(results => {
+      if (cancelled) return;
+      const m = new Map<number, FrameworkOption[]>();
+      for (const { f, rows } of results)
+        for (const r of rows) {
+          const list = m.get(r.policyId) ?? [];
+          if (!list.some(x => x.id === f.id)) list.push(f);
+          m.set(r.policyId, list);
+        }
+      setPolicyFrameworks(m);
+    }).catch(() => { if (!cancelled) setPolicyFrameworks(new Map()); });
+    return () => { cancelled = true; };
+  }, [frameworks]);
 
   async function reload() {
     setLoading(true);
@@ -334,6 +361,13 @@ function DocumentsTab() {
     { kind: 'textarea', key: 'summaryAr', span: 12, rows: 2, label: isAr ? 'الملخص (عربي)' : 'Summary (AR)' },
   ], [isAr]);
 
+  const visibleItems = useMemo(
+    () => frameworkFilter === ''
+      ? items
+      : items.filter(p => p.id != null && (policyFrameworks.get(p.id)?.some(f => f.id === frameworkFilter) ?? false)),
+    [items, frameworkFilter, policyFrameworks],
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Card title={isAr ? 'مستندات السياسات' : 'Policy documents'} Icon={FileText}
@@ -343,6 +377,16 @@ function DocumentsTab() {
               <input type="checkbox" checked={latestOnly} onChange={e => setLatestOnly(e.target.checked)} />
               {isAr ? 'أحدث نسخة فقط' : 'Latest version only'}
             </label>
+            <select value={frameworkFilter === '' ? '' : String(frameworkFilter)}
+              onChange={e => setFrameworkFilter(e.target.value ? Number(e.target.value) : '')}
+              title={isAr ? 'تصفية حسب الإطار / المعيار / اللائحة' : 'Filter by framework / standard / regulation'}
+              style={{ padding: '6px 10px', fontSize: 12, minWidth: 150, border: '1px solid var(--border)',
+                       borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
+              <option value="">{isAr ? 'كل الأطر' : 'All frameworks'}</option>
+              {frameworks.map(f => (
+                <option key={f.id} value={f.id}>{isAr && f.nameAr ? f.nameAr : f.nameEn}</option>
+              ))}
+            </select>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as PolicyStatus | '')}
               style={{ padding: '6px 10px', fontSize: 12, minWidth: 140, border: '1px solid var(--border)',
                        borderRadius: 'var(--r-sm)', background: 'var(--surface-1)', color: 'var(--ink-1)' }}>
@@ -360,7 +404,7 @@ function DocumentsTab() {
           </div>
         }>
         {loading ? <InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty>
-         : items.length === 0 ? <InlineEmpty>{isAr ? 'لا توجد سياسات' : 'No policies'}</InlineEmpty>
+         : visibleItems.length === 0 ? <InlineEmpty>{frameworkFilter !== '' ? (isAr ? 'لا توجد سياسات مرتبطة بهذا الإطار' : 'No policies mapped to this framework') : (isAr ? 'لا توجد سياسات' : 'No policies')}</InlineEmpty>
          : (
           <table className="grc-table">
             <thead><tr>
@@ -374,15 +418,25 @@ function DocumentsTab() {
               <th style={{ textAlign: 'end' }}>{isAr ? 'الإجراءات' : 'Actions'}</th>
             </tr></thead>
             <tbody>
-              {items.map(p => (
+              {visibleItems.map(p => (
                 <tr key={p.id}>
                   <td className="mono text-2xs">{p.policyCode}</td>
                   <td className="mono text-2xs">v{p.version}</td>
                   <td>
                     <div style={{ fontWeight: 600 }}>{isAr && p.titleAr ? p.titleAr : p.titleEn}</div>
-                    {p.relatedFramework && (
+                    {p.id != null && (policyFrameworks.get(p.id)?.length ?? 0) > 0 ? (
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
+                        {policyFrameworks.get(p.id)!.map(f => (
+                          <span key={f.id} title={isAr ? 'إطار مرتبط' : 'Mapped framework'}
+                            style={{ fontSize: 10, padding: '1px 7px', borderRadius: 999, whiteSpace: 'nowrap',
+                              background: 'var(--surface-1)', color: 'var(--ink-2)', border: '1px solid var(--border)' }}>
+                            {isAr && f.nameAr ? f.nameAr : f.nameEn}
+                          </span>
+                        ))}
+                      </div>
+                    ) : p.relatedFramework ? (
                       <div className="text-2xs text-muted" style={{ marginTop: 2 }}>{p.relatedFramework}</div>
-                    )}
+                    ) : null}
                   </td>
                   <td className="text-xs">{p.category}</td>
                   <td><Badge tone={policyStatusTone(p.status)}>{policyStatusLabel(p.status, isAr ? 'ar' : 'en')}</Badge></td>
