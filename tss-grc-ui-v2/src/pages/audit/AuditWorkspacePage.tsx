@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Briefcase, ClipboardCheck, FileCheck2, BookCopy,
@@ -15,7 +15,8 @@ import { Tabs, type TabItem } from '../../components/ui/Tabs';
 import { Kpi } from '../../components/ui/Kpi';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Donut } from '../../components/viz/Donut';
-import { COMPLIANCE_FINDINGS, POLICIES, AUDIT_ENGAGEMENTS } from '../compliance/mockCompliance';
+import { COMPLIANCE_FINDINGS, AUDIT_ENGAGEMENTS } from '../compliance/mockCompliance';
+import { listPolicies, type PolicyDocument } from '../../lib/policy';
 import { EVIDENCE, EVIDENCE_REQUESTS, EVIDENCE_REVIEWS } from '../evidence/mockEvidence';
 import { useI18n } from '../../lib/i18n';
 import { AUTHORITIES } from '../../lib/authorities';
@@ -78,10 +79,20 @@ export function AuditWorkspacePage() {
   );
 
   // ─── Document review queue ─────────────────────────────────────────────
-  const policyQueue = useMemo(() =>
-    POLICIES.filter(p => p.status === 'LEGAL_REVIEW' || p.status === 'EXEC_APPROVAL' || p.status === 'REVIEW_DUE')
-            .sort((a, b) => (a.nextReviewDate ?? '').localeCompare(b.nextReviewDate ?? ''))
-  , []);
+  // CH-9: the document review queue reads the CANONICAL policy register (not the
+  // mock POLICIES) so rows link to a real /policies/:id. Auditors see policies in
+  // governance flux — under review or awaiting publish — plus any published
+  // policy whose review date has already passed.
+  const [policyQueue, setPolicyQueue] = useState<PolicyDocument[]>([]);
+  useEffect(() => {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    listPolicies({ latestOnly: true })
+      .then(docs => setPolicyQueue(
+        docs.filter(p => p.status === 'REVIEW' || p.status === 'APPROVED'
+                      || (p.status === 'PUBLISHED' && !!p.nextReviewDate && p.nextReviewDate <= todayIso))
+            .sort((a, b) => (a.nextReviewDate ?? '').localeCompare(b.nextReviewDate ?? ''))))
+      .catch(() => setPolicyQueue([]));
+  }, []);
 
   const evidencePending = useMemo(() =>
     EVIDENCE.filter(e => e.status === 'PENDING_REVIEW')
@@ -262,10 +273,10 @@ export function AuditWorkspacePage() {
                         {p.titleEn}
                       </div>
                       <div className="audws-row__sub">
-                        {p.code} · v{p.version} · {p.category}
+                        {p.policyCode} · v{p.version} · {p.category}
                       </div>
                     </div>
-                    <Badge tone={p.status === 'LEGAL_REVIEW' ? 'info' : p.status === 'EXEC_APPROVAL' ? 'accent' : 'warning'}>
+                    <Badge tone={p.status === 'REVIEW' ? 'info' : p.status === 'APPROVED' ? 'accent' : 'warning'}>
                       {p.status.replace(/_/g, ' ')}
                     </Badge>
                   </Link>

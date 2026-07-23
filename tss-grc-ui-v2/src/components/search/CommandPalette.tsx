@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X as XIcon, Clock, CornerDownLeft } from 'lucide-react';
-import { searchIndex, getSearchItemById, type SearchItem, type EntityKind } from '../../lib/searchIndex';
+import { searchIndex, getSearchItemById, hydratePolicySearch, type SearchItem, type EntityKind } from '../../lib/searchIndex';
+import { listPolicies } from '../../lib/policy';
 
 /**
  * Cmd/Ctrl+K command palette — cross-entity universal search.
@@ -33,7 +34,19 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
-  const results = useMemo(() => searchIndex(query, { limit: 50 }), [query]);
+  const [policyHydrated, setPolicyHydrated] = useState(false);
+
+  // CH-9: on first open, pull canonical policies so policy search results link
+  // to a real /policies/:id (the mock ids don't exist on the canonical detail
+  // page). Best-effort — keeps the mock fallback on failure.
+  useEffect(() => {
+    if (!open || policyHydrated) return;
+    listPolicies({ latestOnly: true })
+      .then(docs => { hydratePolicySearch(docs); setPolicyHydrated(true); })
+      .catch(() => { /* keep mock fallback */ });
+  }, [open, policyHydrated]);
+
+  const results = useMemo(() => searchIndex(query, { limit: 50 }), [query, policyHydrated]);
 
   // Recent items (when palette opens with empty query, prepend these)
   const recent = useMemo(() => {

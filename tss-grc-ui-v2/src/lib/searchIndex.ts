@@ -64,6 +64,11 @@ const PAGE_ITEMS: SearchItem[] = [
   { id: 'page-licensing',  kind: 'PAGE', title: 'Module Licensing',    href: '/admin/licensing', Icon: ShieldAlert,     keywords: ['license', 'enabled modules', 'features', 'admin'] },
 ];
 
+// CH-9: policy search items are hydrated from the canonical policy API at
+// runtime (see hydratePolicySearch) so results link to a real /policies/:id.
+// Until that runs, the mock POLICIES set is used as a fallback.
+let LIVE_POLICY_ITEMS: SearchItem[] | null = null;
+
 function buildEntityItems(): SearchItem[] {
   const items: SearchItem[] = [];
 
@@ -103,16 +108,22 @@ function buildEntityItems(): SearchItem[] {
     });
   }
 
-  for (const p of POLICIES) {
-    items.push({
-      id: `policy-${p.id}`, kind: 'POLICY',
-      title: p.titleEn,
-      subtitle: `v${p.version} · ${p.status}${p.category ? ` · ${p.category}` : ''}`,
-      ref: p.code,
-      href: `/policies/${p.id}`,
-      Icon: BookCopy,
-      keywords: [p.status, p.category ?? '', p.code],
-    });
+  // CH-9: prefer canonical policies (real ids → working /policies/:id links);
+  // fall back to the mock set until hydratePolicySearch has run.
+  if (LIVE_POLICY_ITEMS) {
+    items.push(...LIVE_POLICY_ITEMS);
+  } else {
+    for (const p of POLICIES) {
+      items.push({
+        id: `policy-${p.id}`, kind: 'POLICY',
+        title: p.titleEn,
+        subtitle: `v${p.version} · ${p.status}${p.category ? ` · ${p.category}` : ''}`,
+        ref: p.code,
+        href: `/policies/${p.id}`,
+        Icon: BookCopy,
+        keywords: [p.status, p.category ?? '', p.code],
+      });
+    }
   }
 
   for (const e of EVIDENCE) {
@@ -229,6 +240,29 @@ function getIndex(): SearchItem[] {
   if (CACHE) return CACHE;
   CACHE = [...PAGE_ITEMS, ...buildEntityItems()];
   return CACHE;
+}
+
+/**
+ * CH-9: replace the mock policy search items with canonical policies fetched
+ * from the policy API, so the command palette and any search links resolve to
+ * a real /policies/:id detail page. Invalidates the cache so the next search
+ * rebuilds the index with live data. Safe to call repeatedly.
+ */
+export function hydratePolicySearch(
+  docs: Array<{ id?: number; policyCode: string; version: string; titleEn: string; status: string; category?: string }>,
+): void {
+  LIVE_POLICY_ITEMS = docs
+    .filter((p): p is typeof p & { id: number } => p.id != null)
+    .map(p => ({
+    id: `policy-${p.id}`, kind: 'POLICY' as const,
+    title: p.titleEn,
+    subtitle: `v${p.version} · ${p.status}${p.category ? ` · ${p.category}` : ''}`,
+    ref: p.policyCode,
+    href: `/policies/${p.id}`,
+    Icon: BookCopy,
+    keywords: [p.status, p.category ?? '', p.policyCode],
+  }));
+  CACHE = null;
 }
 
 /**
