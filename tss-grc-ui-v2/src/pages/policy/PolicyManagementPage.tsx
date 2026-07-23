@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
-  ShieldCheck, FileText, AlertCircle, CheckCircle2, ArrowRight, Plus, Trash2, Wrench, Paperclip, Download, GitCompare, FilePen,
+  ShieldCheck, FileText, AlertCircle, CheckCircle2, ArrowRight, Plus, Trash2, Wrench, Paperclip, Download, GitCompare, FilePen, Gavel,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -17,7 +17,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import {
-  listPolicies, createPolicy, transitionPolicy, deletePolicy, diffPolicyVersions, type PolicyVersionDiff,
+  listPolicies, createPolicy, transitionPolicy, referPolicyToCommittee, deletePolicy, diffPolicyVersions, type PolicyVersionDiff,
   newPolicyVersion, updatePolicy, runPolicyExpirySweep, policyAggregate, getPolicyEvidencePackage, getPolicyResolvedControls,
   setPolicyControlLinks, listControlCatalog, listFrameworks,
   listExceptions, createException, transitionException, runExceptionExpirySweep,
@@ -222,6 +222,17 @@ function DocumentsTab() {
     }
   }
 
+  // Track D: route this policy's approval through a committee (gate CAB).
+  async function onReferToCommittee(p: PolicyDocument) {
+    try {
+      await referPolicyToCommittee(p.id!);
+      toast.success(isAr ? 'تم التوجيه إلى اللجنة' : 'Referred to committee');
+      await reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Refer failed');
+    }
+  }
+
   async function onNewVersion(p: PolicyDocument) {
     const next = await dialog.prompt({
       title: isAr ? 'إصدار جديد' : 'New version',
@@ -401,6 +412,10 @@ function DocumentsTab() {
                       {p.relatedControls && (
                         <Button size="sm" variant="ghost" Icon={ShieldCheck} onClick={() => setControlsFor(p)}
                           title={isAr ? 'الضوابط المرتبطة' : 'Mapped controls'} />
+                      )}
+                      {p.status === 'REVIEW' && (
+                        <Button size="sm" variant="ghost" Icon={Gavel} onClick={() => onReferToCommittee(p)}
+                          title={isAr ? 'التوجيه إلى لجنة (CAB)' : 'Refer to committee (CAB)'} />
                       )}
                       <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => onDelete(p)}
                         title={isAr ? 'حذف' : 'Delete'} />

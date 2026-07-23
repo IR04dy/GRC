@@ -112,6 +112,18 @@ export function updatePolicy(id: number, body: Partial<PolicyDocument>) { return
 export function transitionPolicy(id: number, to: PolicyStatus) {
   return api.post<PolicyDocument>(`${BASE}/documents/${id}/transition`, { to });
 }
+// Track D: route policy approval through a committee (mirror of the change re-route).
+export interface PolicyCommitteeReferral {
+  referralId?: number; committeeId?: number; gate?: string; status?: string;
+  meetingId?: number | null; resolutionId?: number | null;
+}
+export function referPolicyToCommittee(id: number, committeeId?: number) {
+  return api.post<PolicyCommitteeReferral>(`${BASE}/documents/${id}/refer-to-committee`,
+    committeeId != null ? { committeeId } : {});
+}
+export function policyCommitteeReferral(id: number) {
+  return api.get<PolicyCommitteeReferral>(`${BASE}/documents/${id}/committee`);
+}
 export function newPolicyVersion(policyCode: string, newVersion: string) {
   return api.post<PolicyDocument>(`${BASE}/documents/${encodeURIComponent(policyCode)}/new-version`, { newVersion });
 }
