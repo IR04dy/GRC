@@ -15,8 +15,11 @@ import com.tss.grc.module.policy.repository.PolicyAttestationRepository;
 import com.tss.grc.module.policy.repository.PolicyDocumentRepository;
 import com.tss.grc.module.policy.repository.PolicyExceptionRepository;
 import com.tss.grc.module.attachment.repository.AttachmentRepository;
+import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
+import com.tss.grc.module.admin.committee.service.CommitteeReferralService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -53,6 +56,12 @@ public class PolicyManagementService {
         "PENDING", "ATTESTED", "DECLINED", "EXPIRED");
 
     private final PolicyDocumentRepository docs;
+
+    /** Track D (S5): route policy approval through the committee engine.
+     *  Optional (field-injected) so directly-constructed unit tests are
+     *  unaffected — the referral endpoints/gate then no-op. */
+    @Autowired(required = false)
+    private CommitteeReferralService referralService;
     private final PolicyExceptionRepository exceptions;
     private final PolicyAttestationRepository attestations;
     private final AuditLogService audit;
@@ -404,6 +413,14 @@ public class PolicyManagementService {
             throw new AccessDeniedException(
                 "Segregation of duty: the policy author/owner cannot approve their own policy");
         }
+        // Track D (S5): a policy referred to a committee is APPROVED there — the
+        // committee's carried resolution is the approval decision, asserted on
+        // quorate (MINUTES_APPROVED) minutes. The CH-7 SoD guard above stays as an
+        // independent check; non-referred policies are unaffected.
+        if ("APPROVED".equals(to) && referralService != null
+                && referralService.activeReferral("POLICY", id).isPresent()) {
+            referralService.assertDecisionApproves("POLICY", id, 1);
+        }
         if ("PUBLISHED".equals(to) && p.getEffectiveDate() == null)
             throw new IllegalArgumentException("effective_date is required before publishing");
         // CH-10 (document control): a policy cannot go live without an actual
@@ -437,6 +454,50 @@ public class PolicyManagementService {
             emitPolicy("POLICY_TRANSITIONED", saved, from);
         }
         return saved;
+    }
+
+    // ── Track D (S5): route policy approval through the committee engine ──────
+
+    /** Refer a policy to its committee. Gate is CAB (policy has no ECAB); the
+     *  author/owner names are captured for force-recusal (CH-7 SoD). */
+    @Transactional
+    public CommitteeReferral referToCommittee(Long id, Long committeeId, String referredBy) {
+        if (referralService == null) throw new IllegalStateException("Committee referral is not available");
+        PolicyDocument p = get(id);
+        String recusal = java.util.stream.Stream.of(p.getCreatedBy(), p.getOwnerName(), p.getOwnerEmail())
+            .filter(x -> x != null && !x.isBlank()).map(String::trim).distinct()
+            .collect(java.util.stream.Collectors.joining(","));
+        CommitteeReferral r = referralService.refer("POLICY", id, "CAB", "APPROVAL", committeeId, referredBy,
+            recusal.isBlank() ? null : recusal);
+        audit.log("REFER_TO_COMMITTEE", "PolicyDocument", id, "Referred to committee " + r.getCommitteeId());
+        return r;
+    }
+
+    /** Bind the committee resolution deciding this policy. */
+    @Transactional
+    public CommitteeReferral linkPolicyResolution(Long id, Long resolutionId) {
+        if (referralService == null) throw new IllegalStateException("Committee referral is not available");
+        get(id);
+        CommitteeReferral r = referralService.linkResolution("POLICY", id, resolutionId);
+        audit.log("REFER_LINK_RESOLUTION", "PolicyDocument", id, "Linked committee resolution " + resolutionId);
+        return r;
+    }
+
+    /** The active committee referral for a policy (empty map when none). */
+    @Transactional(readOnly = true)
+    public Map<String, Object> committeeReferral(Long id) {
+        get(id);
+        Map<String, Object> out = new HashMap<>();
+        if (referralService == null) return out;
+        referralService.activeReferral("POLICY", id).ifPresent(r -> {
+            out.put("referralId",   r.getId());
+            out.put("committeeId",  r.getCommitteeId());
+            out.put("gate",         r.getGate());
+            out.put("status",       r.getStatus());
+            out.put("meetingId",    r.getMeetingId());
+            out.put("resolutionId", r.getResolutionId());
+        });
+        return out;
     }
 
     /** CH-10: a policy document's uploaded files. The UI has historically attached

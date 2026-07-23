@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
@@ -78,6 +79,28 @@ public class PolicyController {
                                      @RequestBody Map<String, String> body,
                                      Authentication auth) {
         return service.transition(id, body.get("to"), actor(auth), isComplianceAdmin(auth));
+    }
+
+    // ── Track D (S5): route policy approval through the committee engine ──────
+    @PostMapping("/documents/{id}/refer-to-committee")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
+    public CommitteeReferral referToCommittee(@PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body, Authentication auth) {
+        Long committeeId = (body != null && body.get("committeeId") != null)
+            ? Long.valueOf(body.get("committeeId").toString()) : null;
+        return service.referToCommittee(id, committeeId, actor(auth));
+    }
+
+    @GetMapping("/documents/{id}/committee")
+    @PreAuthorize("hasPermission('COMPLIANCE','READ')")
+    public Map<String, Object> policyCommitteeReferral(@PathVariable Long id) {
+        return service.committeeReferral(id);
+    }
+
+    @PostMapping("/documents/{id}/committee/resolution")
+    @PreAuthorize("hasPermission('COMPLIANCE','WRITE')")
+    public CommitteeReferral linkPolicyResolution(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        return service.linkPolicyResolution(id, Long.valueOf(body.get("resolutionId").toString()));
     }
 
     @PostMapping("/documents/{policyCode}/new-version")
