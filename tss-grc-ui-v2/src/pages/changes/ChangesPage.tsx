@@ -28,7 +28,8 @@ import {
 } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
-import { isAuthenticated } from '../../lib/auth';
+import { useDialog } from '../../lib/dialog';
+import { isAuthenticated, getUser } from '../../lib/auth';
 import { CHANGE_REQUESTS, CHANGE_ANALYTICS } from './mockChanges';
 import { CHANGE_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
@@ -434,6 +435,12 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
   const [tasks, setTasks] = useState<ChangeTaskDto[]>([]);
   const [comments, setComments] = useState<ChangeCommentDto[]>([]);
   const [commentBody, setCommentBody] = useState('');
+  const dialog = useDialog();
+  // CH-8: real themed modals replace the old window.prompt / window.confirm flows.
+  const [voteDecision, setVoteDecision] = useState<'APPROVE' | 'REJECT' | 'DEFER' | 'ABSTAIN' | null>(null);
+  const [taskOpen, setTaskOpen] = useState(false);
+  const voteInitial = useMemo(() => ({ approverName: getUser()?.username ?? '', approverRole: '', comments: '' }), [voteDecision]);
+  const taskInitial = useMemo(() => ({ titleEn: '', ownerName: '', dueDate: '' }), []);
 
   async function reload() {
     if (!change) { setApprovals([]); setTasks([]); setComments([]); return; }
@@ -456,29 +463,31 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
     );
   }
 
-  async function castVote(decision: 'APPROVE' | 'REJECT' | 'DEFER' | 'ABSTAIN') {
-    const name = window.prompt(t('changeApproverName'), '');
-    if (!name) return;
-    const role = window.prompt(t('changeApproverRole'), '') ?? '';
-    const comments = window.prompt(t('changeApproverComments'), '') ?? '';
+  function castVote(decision: 'APPROVE' | 'REJECT' | 'DEFER' | 'ABSTAIN') {
+    setVoteDecision(decision);
+  }
+  async function submitVote(v: { approverName: string; approverRole: string; comments: string }) {
+    if (!voteDecision) return;
     try {
-      await changeApi.approve(change!.id, { approverName: name, approverRole: role, decision, comments });
+      await changeApi.approve(change!.id, {
+        approverName: v.approverName, approverRole: v.approverRole,
+        decision: voteDecision, comments: v.comments,
+      });
       toast.success(t('changeVoteRecorded'));
+      setVoteDecision(null);
       void reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
 
-  async function addTask() {
-    const title = window.prompt(t('changeTaskTitle'), '');
-    if (!title) return;
-    // CH-5: capture owner + due date so the SLA scheduler can act on the task.
-    // Interim prompt-based capture; CH-8 replaces the task flow with a real modal.
-    const owner = (window.prompt(lang === 'ar' ? 'المالك (اختياري)' : 'Owner (optional)', '') ?? '').trim();
-    const dueRaw = (window.prompt(lang === 'ar' ? 'تاريخ الاستحقاق YYYY-MM-DD (اختياري)' : 'Due date YYYY-MM-DD (optional)', '') ?? '').trim();
-    const dueAt = /^\d{4}-\d{2}-\d{2}$/.test(dueRaw) ? `${dueRaw}T17:00:00` : undefined;
+  function addTask() { setTaskOpen(true); }
+  // CH-5 captures owner + due date so the SLA scheduler can act on the task;
+  // CH-8 moves that capture out of chained window.prompt calls into a real modal.
+  async function submitTask(v: { titleEn: string; ownerName: string; dueDate: string }) {
+    const dueAt = /^\d{4}-\d{2}-\d{2}$/.test(v.dueDate) ? `${v.dueDate}T17:00:00` : undefined;
     try {
-      await changeApi.addTask(change!.id, { titleEn: title, status: 'PENDING',
-        ownerName: owner || undefined, dueAt });
+      await changeApi.addTask(change!.id, { titleEn: v.titleEn, status: 'PENDING',
+        ownerName: v.ownerName || undefined, dueAt });
+      setTaskOpen(false);
       void reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
@@ -488,14 +497,17 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function deleteTask(task: ChangeTaskDto) {
-    if (!window.confirm(t('changeTaskDeleteConfirm'))) return;
+    const ok = await dialog.confirm({ title: t('deleteBtn'), body: t('changeTaskDeleteConfirm'),
+      destructive: true, submitLabel: t('deleteBtn') });
+    if (!ok) return;
     try { await changeApi.deleteTask(task.id!); void reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function postComment() {
     if (!commentBody.trim()) return;
     try {
-      await changeApi.comment(change!.id, { authorName: 'You', body: commentBody });
+      // CH-8: attribute the comment to the signed-in user, not a hardcoded 'You'.
+      await changeApi.comment(change!.id, { authorName: getUser()?.username ?? 'You', body: commentBody });
       setCommentBody(''); void reload();
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
@@ -630,6 +642,34 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
           </div>
         </Card>
 
+        <FormModal
+          open={voteDecision !== null}
+          title={`${t('changeVoteModalTitle')} · ${voteDecision ?? ''}`}
+          size="md"
+          fields={[
+            { kind: 'text', key: 'approverName', label: t('changeApproverName'), required: true, span: 12 },
+            { kind: 'text', key: 'approverRole', label: t('changeApproverRole'), span: 12 },
+            { kind: 'textarea', key: 'comments', label: t('changeApproverComments'), rows: 3, span: 12 },
+          ]}
+          initial={voteInitial}
+          submitLabel={t('changeVoteRecordBtn')}
+          onClose={() => setVoteDecision(null)}
+          onSubmit={submitVote}
+        />
+        <FormModal
+          open={taskOpen}
+          title={t('changeAddTask')}
+          size="md"
+          fields={[
+            { kind: 'text', key: 'titleEn', label: t('changeTaskTitle'), required: true, span: 12 },
+            { kind: 'text', key: 'ownerName', label: t('changeTaskOwner'), span: 6 },
+            { kind: 'date', key: 'dueDate', label: t('changeTaskDueDate'), span: 6 },
+          ]}
+          initial={taskInitial}
+          submitLabel={t('changeAddTask')}
+          onClose={() => setTaskOpen(false)}
+          onSubmit={submitTask}
+        />
         <button onClick={() => onChanged()} className="changes-refresh-hidden">refresh-poke</button>
       </div>
     </div>
@@ -775,6 +815,9 @@ function IntegrationsPanel({ items, detailId, setDetailId, onChanged, t, toast }
 }) {
   const change = items.find(c => c.id === detailId) ?? null;
   const [links, setLinks] = useState<ChangeLinkDto[]>([]);
+  const dialog = useDialog();
+  const [linkOpen, setLinkOpen] = useState(false);
+  const linkInitial = useMemo(() => ({ entityType: 'RISK', entityId: undefined as number | undefined, linkType: 'AFFECTS' }), []);
 
   async function reload() {
     if (!change) { setLinks([]); return; }
@@ -782,21 +825,23 @@ function IntegrationsPanel({ items, detailId, setDetailId, onChanged, t, toast }
   }
   useEffect(() => { void reload(); /* eslint-disable-next-line */ }, [detailId]);
 
-  async function addLink() {
+  function addLink() { if (change) setLinkOpen(true); }
+  // CH-8: a real modal with proper <select> controls for entity/link type —
+  // replaces three chained window.prompt calls that also allowed invalid free-text.
+  async function submitLink(v: { entityType: string; entityId?: number; linkType: string }) {
     if (!change) return;
-    const entityType = window.prompt(t('changeLinkEntityType') + ' (' + ENTITY_TYPE_OPTIONS.map(o => o.value).join(', ') + ')', 'RISK');
-    if (!entityType) return;
-    const entityIdStr = window.prompt(t('changeLinkEntityId'), '');
-    if (!entityIdStr) return;
-    const entityId = Number(entityIdStr);
-    if (Number.isNaN(entityId)) { toast.danger('Invalid id'); return; }
-    const linkType = window.prompt(t('changeLinkType') + ' (' + LINK_TYPE_OPTIONS.map(o => o.value).join(', ') + ')', 'AFFECTS') ?? 'AFFECTS';
-    try { await changeApi.addLink(change.id, { entityType, entityId, linkType }); void reload(); void onChanged(); }
-    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
+    const entityId = Number(v.entityId);
+    if (!Number.isFinite(entityId)) { toast.danger(t('changeLinkInvalidId')); return; }
+    try {
+      await changeApi.addLink(change.id, { entityType: v.entityType, entityId, linkType: v.linkType });
+      setLinkOpen(false); void reload(); void onChanged();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
   async function deleteLink(l: ChangeLinkDto) {
     if (!l.id) return;
-    if (!window.confirm(t('changeLinkDeleteConfirm'))) return;
+    const ok = await dialog.confirm({ title: t('changeLinkRemove'), body: t('changeLinkDeleteConfirm'),
+      destructive: true, submitLabel: t('changeLinkRemove') });
+    if (!ok) return;
     try { await changeApi.deleteLink(l.id); void reload(); }
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
@@ -817,7 +862,8 @@ function IntegrationsPanel({ items, detailId, setDetailId, onChanged, t, toast }
   }
 
   return (
-    <Card title={`${t('changeIntegrationsFor')} · ${change.changeCode ?? '#' + change.id}`}
+    <>
+      <Card title={`${t('changeIntegrationsFor')} · ${change.changeCode ?? '#' + change.id}`}
           Icon={Link2}
           action={<Button variant="primary" Icon={Plus} onClick={addLink}>{t('changeLinkAdd')}</Button>}>
       {links.length === 0
@@ -838,7 +884,22 @@ function IntegrationsPanel({ items, detailId, setDetailId, onChanged, t, toast }
           </div>
         )
       }
-    </Card>
+      </Card>
+      <FormModal
+        open={linkOpen}
+        title={t('changeLinkAdd')}
+        size="md"
+        fields={[
+          { kind: 'select', key: 'entityType', label: t('changeLinkEntityType'), required: true, span: 6, options: ENTITY_TYPE_OPTIONS },
+          { kind: 'number', key: 'entityId', label: t('changeLinkEntityId'), required: true, span: 6, min: 1 },
+          { kind: 'select', key: 'linkType', label: t('changeLinkType'), required: true, span: 12, options: LINK_TYPE_OPTIONS },
+        ]}
+        initial={linkInitial}
+        submitLabel={t('changeLinkAdd')}
+        onClose={() => setLinkOpen(false)}
+        onSubmit={submitLink}
+      />
+    </>
   );
 }
 

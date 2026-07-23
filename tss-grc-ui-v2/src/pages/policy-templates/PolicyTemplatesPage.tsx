@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { useDialog } from '../../lib/dialog';
 import {
   POLICY_TEMPLATES, POLICY_CATEGORIES,
   loadCloned, clonePolicy, deleteCloned, subscribePolicyTemplates,
@@ -29,6 +30,7 @@ import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 export function PolicyTemplatesPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const dialog = useDialog();
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<PolicyCategory | 'all'>('all');
@@ -58,8 +60,13 @@ export function PolicyTemplatesPage() {
     toast.success(`${t('ptClonedToast')} — ${c.cloneCode}`);
   }
 
-  function deleteClone(cloneCode: string) {
-    if (!confirm(t('ptDeleteCloneConfirm'))) return;
+  async function deleteClone(cloneCode: string) {
+    // CH-8: themed confirm dialog instead of the browser's native confirm().
+    const ok = await dialog.confirm({
+      title: t('ptDeleteCloneTitle'), body: t('ptDeleteCloneConfirm'),
+      destructive: true, submitLabel: t('deleteBtn'),
+    });
+    if (!ok) return;
     deleteCloned(cloneCode);
     toast.info(t('ptCloneDeletedToast'));
   }
