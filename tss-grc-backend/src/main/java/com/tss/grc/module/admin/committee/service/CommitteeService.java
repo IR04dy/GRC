@@ -9,6 +9,7 @@ import com.tss.grc.module.admin.committee.entity.CommitteeMeetingAttendee;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingAttendeeRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
+import com.tss.grc.module.signature.service.SignatureService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -16,9 +17,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.Collections;
@@ -42,6 +46,12 @@ public class CommitteeService {
     private final CommitteeRepository repo;
     private final CommitteeMeetingRepository meetingRepo;
     private final CommitteeMeetingAttendeeRepository attendeeRepo;   // CH-14
+
+    /** Track D (S4): reuse the platform e-signature subsystem to record a
+     *  non-repudiable sign-off when committee minutes are approved. Optional so
+     *  directly-constructed unit tests are unaffected (sign-off then no-ops). */
+    @Autowired(required = false)
+    private SignatureService signatureService;
 
     /**
      * Returns {@code true} when the underlying SQL error looks like a
@@ -268,7 +278,32 @@ public class CommitteeService {
         m.setMinutesApprovedAt(LocalDateTime.now());
         m.setMinutesApprovedBy(approverId);
         m.setApproverName(approverName);
+        // Track D (S4): record the approver's e-signature on the approved minutes
+        // via the platform signature subsystem — a non-repudiable sign-off whose
+        // statement carries a content hash of the minutes (tamper-evidence). The
+        // signed entity is queryable at GET /api/v1/signatures/committee_meeting/{id}.
+        if (signatureService != null && approverId != null) {
+            String statement = "Approved the minutes of committee meeting "
+                + (m.getMeetingCode() != null ? m.getMeetingCode() : ("#" + m.getId()))
+                + " — minutes sha256=" + minutesDigest(m);
+            signatureService.sign("committee_meeting", m.getId(), "APPROVE", statement, approverId);
+        }
         return m;
+    }
+
+    /** SHA-256 of the meeting's minutes content, binding the sign-off to what was
+     *  approved (empty-safe). */
+    private static String minutesDigest(CommitteeMeeting m) {
+        String content = (m.getMinutesEn() == null ? "" : m.getMinutesEn())
+            + "|" + (m.getMinutesAr() == null ? "" : m.getMinutesAr());
+        try {
+            byte[] h = MessageDigest.getInstance("SHA-256").digest(content.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(h.length * 2);
+            for (byte b : h) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return "unavailable";
+        }
     }
 
     @Transactional
