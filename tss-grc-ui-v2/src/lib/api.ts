@@ -640,6 +640,12 @@ export interface ChangeConflictView {
   sameCategory?: boolean; sharedEntities?: string[];
 }
 
+// Track D: committee re-route — a change's CAB decision routed through a committee.
+export interface ChangeReferralView {
+  id?: number; referralId?: number; committeeId?: number; gate?: string; mode?: string;
+  status?: string; meetingId?: number | null; resolutionId?: number | null; referredBy?: string;
+}
+
 export const changeApi = {
   list:        (qs: { status?: string; type?: string; risk?: string; category?: string; page?: number; size?: number } = {}) => {
     const p = new URLSearchParams();
@@ -691,6 +697,12 @@ export const changeApi = {
     return api.get<ChangeCalendarView>(`/api/v1/changes/calendar${q ? '?' + q : ''}`);
   },
   conflicts:     (id: number) => api.get<ChangeConflictView[]>(`/api/v1/changes/${id}/conflicts`),
+  // Track D: route the CAB decision through a committee
+  referToCommittee: (id: number, committeeId?: number) =>
+    api.post<ChangeReferralView>(`/api/v1/changes/${id}/refer-to-committee`, committeeId != null ? { committeeId } : {}),
+  committeeReferral: (id: number) => api.get<ChangeReferralView>(`/api/v1/changes/${id}/committee`),
+  linkCommitteeResolution: (id: number, resolutionId: number) =>
+    api.post<ChangeReferralView>(`/api/v1/changes/${id}/committee/resolution`, { resolutionId }),
 };
 
 // ─── Reporting — Scheduled reports (R4) ────────────────────────────────────

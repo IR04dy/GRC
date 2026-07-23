@@ -26,6 +26,7 @@ import {
   type ChangeRequestDto, type ChangeApprovalDto, type ChangeTaskDto,
   type ChangeLinkDto, type ChangeCommentDto, type ChangeAnalyticsDto,
   type ChangeConflictView,
+  type ChangeReferralView,
 } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -440,6 +441,8 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
   const [tasks, setTasks] = useState<ChangeTaskDto[]>([]);
   const [comments, setComments] = useState<ChangeCommentDto[]>([]);
   const [conflicts, setConflicts] = useState<ChangeConflictView[]>([]);
+  const [referral, setReferral] = useState<ChangeReferralView | null>(null);   // Track D
+  const [busyRef, setBusyRef] = useState(false);
   const [commentBody, setCommentBody] = useState('');
   const dialog = useDialog();
   // CH-8: real themed modals replace the old window.prompt / window.confirm flows.
@@ -449,18 +452,28 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
   const taskInitial = useMemo(() => ({ titleEn: '', ownerName: '', dueDate: '' }), []);
 
   async function reload() {
-    if (!change) { setApprovals([]); setTasks([]); setComments([]); setConflicts([]); return; }
+    if (!change) { setApprovals([]); setTasks([]); setComments([]); setConflicts([]); setReferral(null); return; }
     try {
-      const [a, k, c, cf] = await Promise.all([
+      const [a, k, c, cf, ref] = await Promise.all([
         changeApi.approvals(change.id),
         changeApi.tasks(change.id),
         changeApi.comments(change.id),
         changeApi.conflicts(change.id),
+        changeApi.committeeReferral(change.id).catch(() => null),
       ]);
       setApprovals(a); setTasks(k); setComments(c); setConflicts(cf);
+      setReferral(ref && (ref.referralId || ref.id) ? ref : null);
     } catch { /* silent */ }
   }
   useEffect(() => { void reload(); /* eslint-disable-next-line */ }, [detailId, items]);
+
+  // Track D: route this change's CAB decision through a committee.
+  async function referToCommittee() {
+    setBusyRef(true);
+    try { await changeApi.referToCommittee(change!.id); toast.success(lang === 'ar' ? 'تم التوجيه إلى اللجنة' : 'Referred to committee'); void reload(); }
+    catch (e) { toast.danger(e instanceof Error ? e.message : 'Action failed'); }
+    finally { setBusyRef(false); }
+  }
 
   if (!change) {
     return (
@@ -603,6 +616,29 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
             ))}
           </Card>
         )}
+
+        <Card title={lang === 'ar' ? 'التوجيه إلى اللجنة (CAB/ECAB)' : 'Committee routing (CAB/ECAB)'}>
+          {referral ? (
+            <div className="changes-gov-sub" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div>
+                {lang === 'ar' ? 'موجّه إلى اللجنة' : 'Routed to committee'} <span className="mono">#{referral.committeeId}</span>{' · '}
+                <Badge tone="info">{referral.gate}</Badge>{' '}
+                <Badge tone={referral.status === 'DECIDED' ? 'success' : 'neutral'}>{referral.status}</Badge>
+                {referral.mode === 'RATIFICATION' && <Badge tone="warning">{lang === 'ar' ? 'مصادقة لاحقة' : 'ratification'}</Badge>}
+              </div>
+              {referral.resolutionId
+                ? <div className="mono" style={{ fontSize: 12 }}>{lang === 'ar' ? 'القرار' : 'Resolution'} #{referral.resolutionId}{referral.meetingId ? ` · mtg #${referral.meetingId}` : ''}</div>
+                : <div className="changes-conflicts-note">{lang === 'ar' ? 'بانتظار رفع القرار في اجتماع اللجنة وربطه' : 'Awaiting the motion to be raised in a committee meeting and linked'}</div>}
+            </div>
+          ) : ['IMPACT_ASSESSED', 'CAB_PENDING'].includes(change.status) ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span className="changes-gov-sub">{lang === 'ar' ? 'وجّه قرار CAB إلى لجنة (نصاب + تصويت + محضر معتمد).' : 'Route the CAB decision to a committee (quorum + vote + approved minutes).'}</span>
+              <Button size="sm" variant="primary" disabled={busyRef} onClick={referToCommittee}>
+                {lang === 'ar' ? 'التوجيه إلى CAB/ECAB' : 'Refer to CAB/ECAB'}
+              </Button>
+            </div>
+          ) : <div className="changes-conflicts-note">{lang === 'ar' ? 'لا ينطبق في هذه الحالة' : 'Not applicable in this state'}</div>}
+        </Card>
 
         <Card title={t('changeApprovals')} Icon={Stamp}>
           {approvals.length === 0
