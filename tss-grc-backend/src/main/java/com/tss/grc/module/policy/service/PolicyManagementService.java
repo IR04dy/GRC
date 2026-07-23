@@ -349,6 +349,7 @@ public class PolicyManagementService {
         if (body.getSummaryEn() != null)       p.setSummaryEn(body.getSummaryEn());
         if (body.getSummaryAr() != null)       p.setSummaryAr(body.getSummaryAr());
         if (body.getBodyUrl() != null)         p.setBodyUrl(body.getBodyUrl());
+        if (body.getContentMd() != null)       p.setContentMd(body.getContentMd());   // CH-10 inline content
         if (body.getCategory() != null)        p.setCategory(body.getCategory());
         if (body.getApplicabilityScope() != null) p.setApplicabilityScope(body.getApplicabilityScope());
         if (body.getOwnerName() != null)       p.setOwnerName(body.getOwnerName());
@@ -410,11 +411,12 @@ public class PolicyManagementService {
         // one uploaded attachment. Closes the "publish an empty shell" gap that
         // fails ISO 9001/27001 document-control. A 409 (IllegalStateException).
         if ("PUBLISHED".equals(to)) {
-            boolean hasBody = p.getBodyUrl() != null && !p.getBodyUrl().isBlank();
+            boolean hasBody = (p.getBodyUrl() != null && !p.getBodyUrl().isBlank())
+                           || (p.getContentMd() != null && !p.getContentMd().isBlank());
             if (!hasBody && !hasPolicyAttachment(p))
                 throw new IllegalStateException(
-                    "Cannot publish: a policy document requires a body (body_url) or an "
-                        + "uploaded attachment before it can be published");
+                    "Cannot publish: a policy document requires content — a body_url, inline "
+                        + "content, or an uploaded attachment — before it can be published");
         }
         p.setStatus(to);
         if ("APPROVED".equals(to) && actor != null) p.setApproverName(actor);
@@ -492,6 +494,7 @@ public class PolicyManagementService {
         addDiff(changes, "summaryAr",          a.getSummaryAr(),          b.getSummaryAr());
         addDiff(changes, "category",           a.getCategory(),           b.getCategory());
         addDiff(changes, "bodyUrl",            a.getBodyUrl(),            b.getBodyUrl());
+        addDiff(changes, "contentMd",          a.getContentMd(),          b.getContentMd());
         addDiff(changes, "status",             a.getStatus(),             b.getStatus());
         addDiff(changes, "effectiveDate",      str(a.getEffectiveDate()), str(b.getEffectiveDate()));
         addDiff(changes, "expiryDate",         str(a.getExpiryDate()),    str(b.getExpiryDate()));
@@ -548,6 +551,7 @@ public class PolicyManagementService {
         next.setSummaryEn(latest.getSummaryEn());
         next.setSummaryAr(latest.getSummaryAr());
         next.setBodyUrl(latest.getBodyUrl());
+        next.setContentMd(latest.getContentMd());   // CH-10: inherit inline content into the new version
         next.setCategory(latest.getCategory());
         next.setApplicabilityScope(latest.getApplicabilityScope());
         next.setOwnerName(latest.getOwnerName());

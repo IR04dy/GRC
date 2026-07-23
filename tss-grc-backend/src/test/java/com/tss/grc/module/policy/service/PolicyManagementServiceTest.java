@@ -127,7 +127,21 @@ class PolicyManagementServiceTest {
 
         assertThatThrownBy(() -> service.transition(1L, "PUBLISHED", "alice"))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("body (body_url) or an");
+            .hasMessageContaining("uploaded attachment");
+    }
+
+    @Test void policy_publish_allowed_with_inline_content_no_bodyUrl() {
+        // CH-10: authored inline content (content_md) satisfies the document gate.
+        PolicyDocument p = draft();
+        p.setStatus("APPROVED");
+        p.setEffectiveDate(LocalDate.now());
+        p.setBodyUrl(null);
+        p.setContentMd("## Purpose\nProtect information assets.\n## Scope\nAll staff.");
+        when(docs.findByIdAndOrganisationId(1L, ORG_ID)).thenReturn(Optional.of(p));
+        when(docs.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        PolicyDocument out = service.transition(1L, "PUBLISHED", "alice");
+        assertThat(out.getStatus()).isEqualTo("PUBLISHED");
     }
 
     @Test void policy_publish_allowed_with_attachment_and_no_bodyUrl() {

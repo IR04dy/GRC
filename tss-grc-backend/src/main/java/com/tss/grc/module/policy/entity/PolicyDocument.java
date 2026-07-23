@@ -34,6 +34,9 @@ public class PolicyDocument {
     @Column(name = "summary_en", columnDefinition = "NVARCHAR(MAX)") private String summaryEn;
     @Column(name = "summary_ar", columnDefinition = "NVARCHAR(MAX)") private String summaryAr;
     @Column(name = "body_url", length = 500)                   private String bodyUrl;
+    // CH-10: inline structured policy body (markdown). Authored in-app; rendered
+    // to a controlled PDF/Word and satisfies the require-a-document publish gate.
+    @Column(name = "content_md", columnDefinition = "NVARCHAR(MAX)") private String contentMd;
 
     @Column(nullable = false, length = 60) private String category;
     @Column(name = "applicability_scope", columnDefinition = "NVARCHAR(MAX)") private String applicabilityScope;
