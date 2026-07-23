@@ -3,6 +3,9 @@ package com.tss.grc.module.change_mgmt.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.repository.*;
+import com.tss.grc.module.incident.dto.IncidentRequest;
+import com.tss.grc.module.incident.dto.IncidentResponse;
+import com.tss.grc.module.incident.service.IncidentService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.platform.realtime.BroadcastHelper;
@@ -66,6 +69,12 @@ public class ChangeManagementService {
 
     @Autowired(required = false)
     private BroadcastHelper bcast;
+
+    /** CH-13: auto-open a downstream incident when a change is rolled back.
+     *  Optional (field-injected) so unit tests that construct the service
+     *  directly need not supply it — the rollback hook then no-ops. */
+    @Autowired(required = false)
+    private IncidentService incidentService;
 
     /** CM-C2: minimum recorded APPROVE votes required before a change may move to
      *  CAB_APPROVED. Configurable per deployment; defaults to 1 (four-eyes). */
@@ -228,6 +237,10 @@ public class ChangeManagementService {
             case "ROLLED_BACK" -> {
                 if (c.getImplementationEnded() == null) c.setImplementationEnded(LocalDateTime.now());
                 c.setOutcome("ROLLED_BACK");
+                // CH-13: a rolled-back change is a textbook incident precursor —
+                // auto-open an incident and back-link it (INCIDENT / TRIGGERED_BY)
+                // so the failure enters the incident lifecycle, not just the log.
+                autoRaiseRollbackIncident(c);
             }
             case "POST_REVIEW" -> {
                 if (c.getPostReviewDate() == null) c.setPostReviewDate(LocalDate.now());
@@ -534,5 +547,52 @@ public class ChangeManagementService {
         Object met = body.get("pirObjectivesMet");
         if (met instanceof Boolean b) c.setPirObjectivesMet(b);
         else if (met != null) c.setPirObjectivesMet(Boolean.parseBoolean(met.toString()));
+    }
+
+    // ── CH-13: rolled-back change → auto-raised incident + back-link ──────────
+
+    /** Map a change risk level onto an incident severity (identical vocabulary;
+     *  anything unexpected defaults to MEDIUM). */
+    private static String mapRiskToSeverity(String riskLevel) {
+        return RISK_LEVELS.contains(riskLevel) ? riskLevel : "MEDIUM";
+    }
+
+    /**
+     * CH-13: when a change is rolled back, open a downstream Incident and link it
+     * back to the change ({@code INCIDENT} / {@code TRIGGERED_BY}) so the failure
+     * enters the NIST 800-61r2 incident lifecycle instead of only emitting a
+     * CHANGE_FAILED event. Idempotent — skips if the change already carries an
+     * INCIDENT TRIGGERED_BY link. No-op when the incident module is not wired
+     * (unit tests that construct the service directly leave incidentService null).
+     */
+    private void autoRaiseRollbackIncident(ChangeRequest c) {
+        if (incidentService == null) return;
+        boolean already = linkRepo.findByChangeRequestId(c.getId()).stream()
+            .anyMatch(l -> "INCIDENT".equals(l.getEntityType()) && "TRIGGERED_BY".equals(l.getLinkType()));
+        if (already) return;
+
+        String code = nullSafeStr(c.getChangeCode());
+        IncidentResponse inc = incidentService.create(new IncidentRequest(
+            "Failed change " + code + " — rolled back",
+            "تغيير فاشل " + code + " — تم التراجع",
+            mapRiskToSeverity(c.getRiskLevel()), "INFRASTRUCTURE", "OPEN",
+            blank(c.getChangeOwnerName()),
+            LocalDate.now(), null,
+            "Auto-raised from rolled-back change " + code
+                + " (" + nullSafeStr(c.getTitleEn()) + "). Investigate root cause "
+                + "(test-plan gap, missing rollback step) and confirm service restoration.",
+            null, null, null));
+
+        ChangeLink link = new ChangeLink();
+        link.setChangeRequestId(c.getId());
+        link.setEntityType("INCIDENT");
+        link.setEntityId(inc.id());
+        link.setLinkType("TRIGGERED_BY");
+        link.setNotes("Auto-linked: incident raised on rollback of " + code);
+        linkRepo.save(link);
+
+        audit.log("ROLLBACK_INCIDENT", "ChangeRequest", c.getId(),
+            "Rolled-back change " + nullSafeMsg(code) + " auto-raised incident #" + inc.id()
+                + " and linked it (INCIDENT / TRIGGERED_BY)");
     }
 }
