@@ -51,6 +51,11 @@ public class CommitteeReferral {
     @Column(name = "referred_by", length = 150)
     private String referredBy;
 
+    /** CSV of names (requester/author + owner) force-RECUSED from the committee
+     *  vote on this item — SoD, so the requester can't cast the deciding vote. */
+    @Column(name = "recusal_names", length = 500)
+    private String recusalNames;
+
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
 

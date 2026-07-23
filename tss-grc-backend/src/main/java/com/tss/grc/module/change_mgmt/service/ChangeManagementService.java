@@ -636,9 +636,25 @@ public class ChangeManagementService {
         if ("AUTO".equalsIgnoreCase(gate))
             throw new IllegalArgumentException("This change is AUTO-authorised (no CAB) — nothing to refer");
         String mode = "EMERGENCY".equals(c.getChangeType()) ? "RATIFICATION" : "APPROVAL";
-        CommitteeReferral r = referralService.refer("CHANGE", id, gate, mode, committeeId, referredBy);
+        // SoD: the requester/owner will be force-RECUSED from the committee vote.
+        String recusal = java.util.stream.Stream.of(c.getRequestedByName(), c.getChangeOwnerName())
+            .filter(x -> x != null && !x.isBlank()).map(String::trim).distinct()
+            .collect(java.util.stream.Collectors.joining(","));
+        CommitteeReferral r = referralService.refer("CHANGE", id, gate, mode, committeeId, referredBy,
+            recusal.isBlank() ? null : recusal);
         audit.log("REFER_TO_COMMITTEE", "ChangeRequest", id,
             "Referred to committee " + r.getCommitteeId() + " (gate " + gate + ", mode " + mode + ")");
+        return r;
+    }
+
+    /** Bind the committee resolution deciding this change (secretary links the
+     *  motion after raising it in the meeting). */
+    @Transactional
+    public CommitteeReferral linkChangeResolution(Long id, Long resolutionId) {
+        if (referralService == null) throw new IllegalStateException("Committee referral is not available");
+        require(id);
+        CommitteeReferral r = referralService.linkResolution("CHANGE", id, resolutionId);
+        audit.log("REFER_LINK_RESOLUTION", "ChangeRequest", id, "Linked committee resolution " + resolutionId);
         return r;
     }
 

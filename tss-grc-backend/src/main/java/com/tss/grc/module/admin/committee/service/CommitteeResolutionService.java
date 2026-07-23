@@ -6,10 +6,12 @@ import com.tss.grc.module.admin.committee.entity.CommitteeResolutionVote;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingAttendeeRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeResolutionRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeResolutionVoteRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeReferralRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -44,6 +46,12 @@ public class CommitteeResolutionService {
     private final ApplicationEventPublisher     publisher;
     private final CommitteeResolutionVoteRepository  voteRepo;      // CH-14
     private final CommitteeMeetingAttendeeRepository attendeeRepo;  // CH-14
+
+    /** Track D (S2): optional — force-RECUSE a referred item's requester/author
+     *  from the deciding vote. Field-injected so directly-constructed unit tests
+     *  are unaffected (the recusal simply no-ops when absent). */
+    @Autowired(required = false)
+    private CommitteeReferralRepository referralRepo;
 
     private static final java.util.Set<String> VOTE_VALUES =
         java.util.Set.of("FOR", "AGAINST", "ABSTAIN", "RECUSED");
@@ -90,6 +98,17 @@ public class CommitteeResolutionService {
                 .anyMatch(a -> member.equalsIgnoreCase(a.getMemberName())
                     && Boolean.TRUE.equals(a.getCoiDeclared()));
             if (conflicted) vote = "RECUSED";
+        }
+
+        // Track D SoD: force-RECUSE the referred item's requester/author (same
+        // mechanic as COI) — they cannot cast the deciding committee vote.
+        if (!"RECUSED".equals(vote) && referralRepo != null) {
+            var refOpt = referralRepo.findByResolutionId(resolutionId);
+            if (refOpt.isPresent() && refOpt.get().getRecusalNames() != null) {
+                for (String nm : refOpt.get().getRecusalNames().split(",")) {
+                    if (member.equalsIgnoreCase(nm.trim())) { vote = "RECUSED"; break; }
+                }
+            }
         }
 
         CommitteeResolutionVote v = voteRepo.findByResolutionIdAndMemberName(resolutionId, member)

@@ -163,6 +163,13 @@ public class ChangeManagementController {
         return service.committeeReferral(id);
     }
 
+    @PostMapping("/{id}/committee/resolution")
+    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    public CommitteeReferral linkChangeResolution(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Long resolutionId = Long.valueOf(body.get("resolutionId").toString());
+        return service.linkChangeResolution(id, resolutionId);
+    }
+
     // ── Comments ────────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/comments")
