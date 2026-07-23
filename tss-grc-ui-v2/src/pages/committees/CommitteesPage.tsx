@@ -29,6 +29,7 @@ import {
   type ResolutionOutcome, type ConfidentialityLevel, type CommitteeType, type MeetingCadence,
   type ActionPriority,
 } from '../../lib/committees';
+import { AttendanceModal } from './AttendanceModal';
 
 /** Committee type -> registry-code stem, mirroring the seeded set (COM-RISK, COM-AUDIT, …). */
 const TYPE_CODE_STEM: Record<CommitteeType, string> = {
@@ -108,6 +109,7 @@ export function CommitteesPage() {
   const [actions, setActions] = useState<ActionItemRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [attendanceMeeting, setAttendanceMeeting] = useState<CommitteeMeeting | null>(null);   // CH-14
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [openResolution, setOpenResolution] = useState(false);
   const [openMeeting, setOpenMeeting] = useState(false);
@@ -780,6 +782,15 @@ export function CommitteesPage() {
                                   </Button>
                                 </>
                               )}
+                              {['SCHEDULED', 'IN_PROGRESS', 'COMPLETED'].includes(m.status) && (
+                                <>
+                                  <Button size="sm" variant="secondary" Icon={Users}
+                                    disabled={busyId === m.id} onClick={() => setAttendanceMeeting(m)}>
+                                    {t('comAttendanceQuorum')}
+                                  </Button>
+                                  {' '}
+                                </>
+                              )}
                               {m.status === 'IN_PROGRESS' && (
                                 <Button size="sm" variant="primary" Icon={CheckCircle2}
                                   disabled={busyId === m.id} onClick={() => onComplete(m.id)}>
@@ -1177,6 +1188,14 @@ export function CommitteesPage() {
         onClose={() => setDissolveTarget(null)}
         onSubmit={submitDissolve}
       />
+
+      {attendanceMeeting && (
+        <AttendanceModal
+          meeting={attendanceMeeting}
+          onClose={() => setAttendanceMeeting(null)}
+          onSaved={reload}
+        />
+      )}
     </Shell>
   );
 }

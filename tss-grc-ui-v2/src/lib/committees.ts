@@ -101,6 +101,40 @@ export function cancelMeeting(id: number, reason: string): Promise<CommitteeMeet
   return api.post(`${BASE}/meetings/${id}/cancel`, { reason });
 }
 
+// ── CH-14: attendance + deterministic quorum ───────────────────────────────
+export interface AttendeeRow {
+  memberName: string; memberRole?: string;
+  votingMember?: boolean; present?: boolean;
+  coiDeclared?: boolean; coiNote?: string;
+}
+export interface QuorumView {
+  meetingId: number; quorumPct?: number;
+  totalVoting: number; presentVoting: number; requiredVoting: number;
+  quorumMet: boolean; attendees: AttendeeRow[];
+}
+export function recordAttendance(meetingId: number, attendees: AttendeeRow[]): Promise<QuorumView> {
+  return api.post(`${BASE}/meetings/${meetingId}/attendance`, { attendees });
+}
+export function getQuorum(meetingId: number): Promise<QuorumView> {
+  return api.get(`${BASE}/meetings/${meetingId}/quorum`);
+}
+
+// ── CH-14: per-member resolution voting ────────────────────────────────────
+export interface ResolutionVote {
+  id: number; resolutionId: number; meetingId?: number;
+  memberName: string; memberRole?: string;
+  vote: string; rationale?: string; createdAt?: string;
+}
+export function recordResolutionVote(
+  resolutionId: number,
+  body: { memberName: string; memberRole?: string; vote: string; rationale?: string },
+): Promise<Resolution> {
+  return api.post(`/api/v1/committees/resolutions/${resolutionId}/votes`, body);
+}
+export function listResolutionVotes(resolutionId: number): Promise<ResolutionVote[]> {
+  return api.get(`/api/v1/committees/resolutions/${resolutionId}/votes`);
+}
+
 // ─── Catalog (V154-V156) ───────────────────────────────────────────────
 // The 19-template Saudi-regulated catalog + standing-item library + forms
 // library. Global (not tenant-scoped) — every tenant sees the same data.
