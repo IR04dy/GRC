@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Landmark, CheckCircle2, XCircle, Calendar, Play, FileCheck2, Users,
-  ChevronRight, ChevronDown, Gavel, ClipboardList, ListChecks, RefreshCw,
+  ChevronRight, ChevronDown, Gavel, ClipboardList, ListChecks, RefreshCw, Vote,
   ExternalLink, AlertTriangle, ShieldAlert, Plus, Ban,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
@@ -30,6 +30,7 @@ import {
   type ActionPriority,
 } from '../../lib/committees';
 import { AttendanceModal } from './AttendanceModal';
+import { ResolutionVotesModal } from './ResolutionVotesModal';
 
 /** Committee type -> registry-code stem, mirroring the seeded set (COM-RISK, COM-AUDIT, …). */
 const TYPE_CODE_STEM: Record<CommitteeType, string> = {
@@ -110,6 +111,7 @@ export function CommitteesPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [attendanceMeeting, setAttendanceMeeting] = useState<CommitteeMeeting | null>(null);   // CH-14
+  const [votesResolution, setVotesResolution] = useState<Resolution | null>(null);             // CH-14
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [openResolution, setOpenResolution] = useState(false);
   const [openMeeting, setOpenMeeting] = useState(false);
@@ -997,6 +999,11 @@ export function CommitteesPage() {
                                       {lang === 'ar' && r.dissentNotesAr ? r.dissentNotesAr : r.dissentNotesEn}
                                     </p>
                                   )}
+                                  <div style={{ marginTop: 10 }}>
+                                    <Button size="sm" variant="ghost" Icon={Vote} onClick={() => setVotesResolution(r)}>
+                                      {isAr ? 'التصويت الفردي' : 'Per-member votes'}
+                                    </Button>
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -1193,6 +1200,14 @@ export function CommitteesPage() {
         <AttendanceModal
           meeting={attendanceMeeting}
           onClose={() => setAttendanceMeeting(null)}
+          onSaved={reload}
+        />
+      )}
+
+      {votesResolution && (
+        <ResolutionVotesModal
+          resolution={votesResolution}
+          onClose={() => setVotesResolution(null)}
           onSaved={reload}
         />
       )}
