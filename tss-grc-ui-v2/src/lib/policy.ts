@@ -17,6 +17,7 @@ export interface PolicyDocument {
   summaryEn?: string;
   summaryAr?: string;
   bodyUrl?: string;
+  contentMd?: string;   // CH-10 inline structured content
   category: string;
   applicabilityScope?: string;
   ownerName?: string;

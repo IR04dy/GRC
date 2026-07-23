@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
-  ShieldCheck, FileText, AlertCircle, CheckCircle2, ArrowRight, Plus, Trash2, Wrench, Paperclip, Download, GitCompare,
+  ShieldCheck, FileText, AlertCircle, CheckCircle2, ArrowRight, Plus, Trash2, Wrench, Paperclip, Download, GitCompare, FilePen,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -12,7 +12,7 @@ import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { Modal } from '../../components/ui/Modal';
 import { AttachmentsField } from '../../components/ui/AttachmentsField';
-import { ApiError } from '../../lib/api';
+import { ApiError, reportingApi } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
@@ -178,6 +178,7 @@ function DocumentsTab() {
   const [docsFor, setDocsFor] = useState<PolicyDocument | null>(null);
   const [controlsFor, setControlsFor] = useState<PolicyDocument | null>(null);
   const [diffFor, setDiffFor] = useState<PolicyDocument | null>(null);
+  const [contentFor, setContentFor] = useState<PolicyDocument | null>(null);
   const [frameworks, setFrameworks] = useState<FrameworkOption[]>([]);
   useEffect(() => { listFrameworks().then(setFrameworks).catch(() => setFrameworks([])); }, []);
 
@@ -387,6 +388,8 @@ function DocumentsTab() {
                         <Button size="sm" variant="ghost" Icon={Wrench} onClick={() => onSetEffective(p)}
                           title={isAr ? 'تعيين السريان' : 'Set effective date'} />
                       )}
+                      <Button size="sm" variant="ghost" Icon={FilePen} onClick={() => setContentFor(p)}
+                        title={isAr ? 'محرّر المحتوى' : 'Content editor'} />
                       <Button size="sm" variant="ghost" Icon={Plus} onClick={() => onNewVersion(p)}
                         title={isAr ? 'إصدار جديد' : 'New version'} />
                       <Button size="sm" variant="ghost" Icon={GitCompare} onClick={() => setDiffFor(p)}
@@ -442,6 +445,10 @@ function DocumentsTab() {
 
       {diffFor && (
         <DiffModal policy={diffFor} onClose={() => setDiffFor(null)} />
+      )}
+
+      {contentFor && (
+        <ContentModal policy={contentFor} onClose={() => setContentFor(null)} onSaved={reload} />
       )}
     </div>
   );
@@ -642,6 +649,68 @@ function DiffModal({ policy, onClose }: { policy: PolicyDocument; onClose: () =>
           )}
         </div>
       )}
+    </Modal>
+  );
+}
+
+// ─── CH-10: structured policy content editor + controlled-output generation ──
+function ContentModal({ policy, onClose, onSaved }: {
+  policy: PolicyDocument; onClose: () => void; onSaved: () => void | Promise<void>;
+}) {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const isAr = lang === 'ar';
+  // The backend freezes body/content once a policy is PUBLISHED (and beyond);
+  // the editor mirrors that — read-only, but still generatable.
+  const locked = policy.status === 'PUBLISHED' || policy.status === 'ARCHIVED' || policy.status === 'EXPIRED';
+  const [content, setContent] = useState(policy.contentMd ?? '');
+  const [saving, setSaving] = useState(false);
+
+  const TEMPLATE = isAr
+    ? '## الغرض\n\n## النطاق\n\n## بنود السياسة\n\n## الأدوار والمسؤوليات\n\n## الإنفاذ\n\n## المراجعة\n'
+    : '## Purpose\n\n## Scope\n\n## Policy Statements\n\n## Roles & Responsibilities\n\n## Enforcement\n\n## Review\n';
+
+  async function save() {
+    setSaving(true);
+    try {
+      await updatePolicy(policy.id!, { contentMd: content });
+      toast.success(isAr ? 'تم حفظ المحتوى' : 'Content saved');
+      await onSaved();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Save failed'); }
+    finally { setSaving(false); }
+  }
+  async function generate() {
+    try { await reportingApi.policyDocumentPdf(policy.id!, isAr ? 'ar' : 'en'); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Generate failed'); }
+  }
+
+  return (
+    <Modal open size="lg"
+      title={isAr ? `محتوى السياسة — ${policy.policyCode} v${policy.version}` : `Policy content — ${policy.policyCode} v${policy.version}`}
+      onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {!locked && (
+            <Button size="sm" variant="secondary" onClick={() => setContent(c => c.trim() ? c : TEMPLATE)}>
+              {isAr ? 'إدراج قالب الأقسام' : 'Insert section template'}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" Icon={Download} onClick={generate}>
+            {isAr ? 'توليد مستند PDF' : 'Generate PDF'}
+          </Button>
+          {locked && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+            {isAr ? 'المحتوى مجمّد بعد النشر' : 'Content is frozen once published'}</span>}
+        </div>
+        <textarea value={content} onChange={e => setContent(e.target.value)} readOnly={locked} rows={18}
+          placeholder={isAr ? 'اكتب نص السياسة بصيغة ماركداون (## عنوان القسم، - نقطة)…' : 'Write the policy text in markdown (## Section heading, - bullet)…'}
+          style={{ width: '100%', fontFamily: 'var(--font-mono)', fontSize: 12, padding: 10,
+                   border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+                   background: locked ? 'var(--surface-2)' : 'var(--surface-1)', color: 'var(--ink-1)', resize: 'vertical' }} />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button variant="secondary" onClick={onClose}>{isAr ? 'إغلاق' : 'Close'}</Button>
+          {!locked && <Button onClick={save} disabled={saving}>{saving ? (isAr ? 'جارٍ الحفظ…' : 'Saving…') : (isAr ? 'حفظ' : 'Save')}</Button>}
+        </div>
+      </div>
     </Modal>
   );
 }
