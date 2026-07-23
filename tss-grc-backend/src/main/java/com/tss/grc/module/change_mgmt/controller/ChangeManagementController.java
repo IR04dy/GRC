@@ -160,4 +160,16 @@ public class ChangeManagementController {
     @GetMapping("/analytics")
     @PreAuthorize("hasPermission('CHANGE','READ')")
     public Map<String, Object> analytics() { return service.analytics(); }
+
+    // ── CH-17: authorisation matrix ──────────────────────────────────────────
+
+    @GetMapping("/authorisation-matrix")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "The tenant's (change type x risk) authorisation matrix — the gate + quorum per cell.")
+    public List<ChangeAuthorisationMatrix> authorisationMatrix() { return service.authorisationMatrix(); }
+
+    @GetMapping("/{id}/authorisation")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Resolve the authorisation required for a specific change and whether it is satisfied.")
+    public Map<String, Object> authorisation(@PathVariable Long id) { return service.resolveAuthorisation(id); }
 }

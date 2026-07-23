@@ -76,6 +76,12 @@ public class ChangeManagementService {
     @Autowired(required = false)
     private IncidentService incidentService;
 
+    /** CH-17: per-tenant (type x risk) authorisation matrix driving the CAB
+     *  quorum. Optional — when absent the flat cab-min-approvals default applies
+     *  (keeps unit tests that construct the service directly working). */
+    @Autowired(required = false)
+    private ChangeAuthorisationMatrixRepository authMatrixRepo;
+
     /** CM-C2: minimum recorded APPROVE votes required before a change may move to
      *  CAB_APPROVED. Configurable per deployment; defaults to 1 (four-eyes). */
     @Value("${grc.change.cab-min-approvals:1}")
@@ -210,9 +216,12 @@ public class ChangeManagementService {
                     throw new IllegalStateException(
                         "Cannot CAB-approve: a REJECT vote is on record — route to CAB_REJECTED");
                 long approves = votes.stream().filter(v -> "APPROVE".equalsIgnoreCase(v.getDecision())).count();
-                if (approves < cabMinApprovals)
+                // CH-17: the required count comes from the (type x risk) authorisation
+                // matrix cell, falling back to the flat cab-min-approvals default.
+                int required = requiredApprovals(c);
+                if (approves < required)
                     throw new IllegalStateException(
-                        "Cannot CAB-approve: requires at least " + cabMinApprovals
+                        "Cannot CAB-approve: requires at least " + required
                             + " recorded APPROVE vote(s) (have " + approves + ")");
                 c.setCabDecisionAt(LocalDateTime.now());
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
@@ -547,6 +556,51 @@ public class ChangeManagementService {
         Object met = body.get("pirObjectivesMet");
         if (met instanceof Boolean b) c.setPirObjectivesMet(b);
         else if (met != null) c.setPirObjectivesMet(Boolean.parseBoolean(met.toString()));
+    }
+
+    // ── CH-17: classification-driven authorisation matrix ────────────────────
+
+    /** Look up the (type x risk) authorisation row for a change; null if the
+     *  matrix is not wired or no cell matches. */
+    private ChangeAuthorisationMatrix resolveMatrix(ChangeRequest c) {
+        if (authMatrixRepo == null || c.getChangeType() == null || c.getRiskLevel() == null) return null;
+        return authMatrixRepo
+            .findByOrganisationIdAndChangeTypeAndRiskLevel(c.getOrganisationId(), c.getChangeType(), c.getRiskLevel())
+            .orElse(null);
+    }
+
+    /** Minimum APPROVE votes for this change to reach CAB_APPROVED — the matrix
+     *  cell for its (type, risk), else the flat cab-min-approvals default. */
+    private int requiredApprovals(ChangeRequest c) {
+        ChangeAuthorisationMatrix m = resolveMatrix(c);
+        return (m != null && m.getMinApprovals() != null) ? m.getMinApprovals() : cabMinApprovals;
+    }
+
+    /** CH-17: the tenant's full authorisation matrix (for admin/FE display). */
+    @Transactional(readOnly = true)
+    public List<ChangeAuthorisationMatrix> authorisationMatrix() {
+        if (authMatrixRepo == null) return List.of();
+        return authMatrixRepo.findByOrganisationIdOrderByChangeTypeAscRiskLevelAsc(TenantContext.getCurrentTenant());
+    }
+
+    /** CH-17: the authorisation required for a specific change (gate / min
+     *  approvals / advisory roles) alongside how many APPROVE votes it has. */
+    @Transactional(readOnly = true)
+    public Map<String, Object> resolveAuthorisation(Long id) {
+        ChangeRequest c = require(id);
+        ChangeAuthorisationMatrix m = resolveMatrix(c);
+        long approves = approvalRepo.findByChangeRequestIdOrderByDecidedAtAsc(id).stream()
+            .filter(v -> "APPROVE".equalsIgnoreCase(v.getDecision())).count();
+        int required = requiredApprovals(c);
+        Map<String, Object> out = new HashMap<>();
+        out.put("changeType",      c.getChangeType());
+        out.put("riskLevel",       c.getRiskLevel());
+        out.put("gate",            m != null ? m.getGate() : "CAB");
+        out.put("minApprovals",    required);
+        out.put("requiredRoles",   m != null ? m.getRequiredRoles() : null);
+        out.put("approvesRecorded", approves);
+        out.put("satisfied",       approves >= required);
+        return out;
     }
 
     // ── CH-13: rolled-back change → auto-raised incident + back-link ──────────
