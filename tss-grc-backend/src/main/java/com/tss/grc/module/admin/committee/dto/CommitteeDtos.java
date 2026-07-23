@@ -106,6 +106,13 @@ public final class CommitteeDtos {
             boolean quorumMet, java.util.List<AttendeeRow> attendees
     ) {}
 
+    public record ResolutionVoteRequest(
+            @NotBlank @Size(max = 255) String memberName,
+            @Size(max = 120) String memberRole,
+            @NotBlank String vote,   // FOR | AGAINST | ABSTAIN | RECUSED
+            String rationale
+    ) {}
+
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record MeetingResponse(
             Long id, String meetingCode, String externalId,

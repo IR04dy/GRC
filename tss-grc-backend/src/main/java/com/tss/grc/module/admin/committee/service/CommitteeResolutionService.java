@@ -2,7 +2,10 @@ package com.tss.grc.module.admin.committee.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
+import com.tss.grc.module.admin.committee.entity.CommitteeResolutionVote;
+import com.tss.grc.module.admin.committee.repository.CommitteeMeetingAttendeeRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeResolutionRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeResolutionVoteRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
@@ -39,6 +42,11 @@ public class CommitteeResolutionService {
     private final CommitteeResolutionRepository repo;
     private final AuditLogService               audit;
     private final ApplicationEventPublisher     publisher;
+    private final CommitteeResolutionVoteRepository  voteRepo;      // CH-14
+    private final CommitteeMeetingAttendeeRepository attendeeRepo;  // CH-14
+
+    private static final java.util.Set<String> VOTE_VALUES =
+        java.util.Set.of("FOR", "AGAINST", "ABSTAIN", "RECUSED");
 
     @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
     public Page<CommitteeResolution> list(Pageable pageable) {
@@ -57,6 +65,77 @@ public class CommitteeResolutionService {
     public CommitteeResolution get(Long id) {
         return repo.findByIdAndOrganisationId(id, TenantContext.getCurrentTenant())
             .orElseThrow(() -> new EntityNotFoundException("CommitteeResolution " + id));
+    }
+
+    // ── CH-14: per-member resolution voting + recusal/COI ────────────────────
+
+    /** Record (or update) one member's vote on a resolution, then re-derive the
+     *  aggregate tally + outcome. A member who declared a conflict of interest on
+     *  the meeting attendance is forced to RECUSED (excluded from the tally). */
+    @Transactional
+    public CommitteeResolution recordVote(Long resolutionId, String memberName, String voteRaw,
+                                          String memberRole, String rationale) {
+        CommitteeResolution r = get(resolutionId);   // org-scoped
+        if (memberName == null || memberName.isBlank())
+            throw new IllegalArgumentException("memberName is required");
+        String vote = voteRaw == null ? "" : voteRaw.trim().toUpperCase();
+        if (!VOTE_VALUES.contains(vote))
+            throw new IllegalArgumentException("vote must be one of " + VOTE_VALUES);
+        String member = memberName.trim();
+
+        // COI forces recusal: a member who declared a conflict on the meeting
+        // attendance cannot cast a counted vote.
+        if (r.getMeetingId() != null && !"RECUSED".equals(vote)) {
+            boolean conflicted = attendeeRepo.findByCommitteeMeetingId(r.getMeetingId()).stream()
+                .anyMatch(a -> member.equalsIgnoreCase(a.getMemberName())
+                    && Boolean.TRUE.equals(a.getCoiDeclared()));
+            if (conflicted) vote = "RECUSED";
+        }
+
+        CommitteeResolutionVote v = voteRepo.findByResolutionIdAndMemberName(resolutionId, member)
+            .orElseGet(CommitteeResolutionVote::new);
+        v.setOrganisationId(TenantContext.getCurrentTenant());
+        v.setResolutionId(resolutionId);
+        v.setMeetingId(r.getMeetingId());
+        v.setMemberName(member);
+        v.setMemberRole(memberRole);
+        v.setVote(vote);
+        v.setRationale(rationale);
+        voteRepo.save(v);
+
+        recomputeTally(r);
+        audit.log("RESOLUTION_VOTE", "CommitteeResolution", resolutionId,
+            member + " voted " + vote + " -> tally " + r.getVoteFor() + "/" + r.getVoteAgainst()
+                + "/" + r.getVoteAbstain() + " (" + r.getOutcome() + ")");
+        return r;
+    }
+
+    @Transactional(readOnly = true)
+    public List<CommitteeResolutionVote> votes(Long resolutionId) {
+        get(resolutionId);   // org-scope guard
+        return voteRepo.findByResolutionId(resolutionId);
+    }
+
+    /** Re-derive vote_for/against/abstain (RECUSED excluded) + outcome from the
+     *  per-member votes and persist onto the resolution. */
+    private void recomputeTally(CommitteeResolution r) {
+        List<CommitteeResolutionVote> vs = voteRepo.findByResolutionId(r.getId());
+        int forC = (int) vs.stream().filter(x -> "FOR".equals(x.getVote())).count();
+        int agC  = (int) vs.stream().filter(x -> "AGAINST".equals(x.getVote())).count();
+        int abC  = (int) vs.stream().filter(x -> "ABSTAIN".equals(x.getVote())).count();
+        r.setVoteFor(forC);
+        r.setVoteAgainst(agC);
+        r.setVoteAbstain(abC);
+        // Map the tally onto the resolution's permitted outcome vocabulary
+        // (CK_resolution_outcome: APPROVED | REJECTED | DEFERRED | WITHDRAWN).
+        // A tie among cast FOR/AGAINST votes fails the motion (REJECTED); only
+        // abstentions/recusals leave it undecided (DEFERRED).
+        String outcome;
+        if (forC > agC)               outcome = "APPROVED";
+        else if (forC > 0 || agC > 0) outcome = "REJECTED";
+        else                          outcome = "DEFERRED";
+        r.setOutcome(outcome);
+        repo.save(r);
     }
 
     @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)

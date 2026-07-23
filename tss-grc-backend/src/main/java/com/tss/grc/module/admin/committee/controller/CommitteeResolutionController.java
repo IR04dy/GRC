@@ -1,7 +1,10 @@
 package com.tss.grc.module.admin.committee.controller;
 
+import com.tss.grc.module.admin.committee.dto.CommitteeDtos.ResolutionVoteRequest;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
+import com.tss.grc.module.admin.committee.entity.CommitteeResolutionVote;
 import com.tss.grc.module.admin.committee.service.CommitteeResolutionService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -47,5 +50,19 @@ public class CommitteeResolutionController {
     @PreAuthorize("hasPermission('ADMIN','WRITE')")
     public CommitteeResolution create(@RequestBody CommitteeResolution in) {
         return service.create(in);
+    }
+
+    // ── CH-14: per-member voting + recusal/COI ───────────────────────────────
+
+    @PostMapping("/{id}/votes")
+    @PreAuthorize("hasPermission('ADMIN','WRITE')")
+    public CommitteeResolution recordVote(@PathVariable Long id, @Valid @RequestBody ResolutionVoteRequest req) {
+        return service.recordVote(id, req.memberName(), req.vote(), req.memberRole(), req.rationale());
+    }
+
+    @GetMapping("/{id}/votes")
+    @PreAuthorize("hasPermission('ADMIN','READ')")
+    public List<CommitteeResolutionVote> votes(@PathVariable Long id) {
+        return service.votes(id);
     }
 }
