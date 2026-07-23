@@ -391,25 +391,26 @@ public class ChangeManagementService {
     @Transactional(readOnly = true)
     public List<Map<String, Object>> linksForEntity(String entityType, Long entityId) {
         Long org = TenantContext.getCurrentTenant();
-        return linkRepo.findByEntityTypeAndEntityId(entityType, entityId).stream()
-            .map(l -> changeRepo.findById(l.getChangeRequestId())
-                .filter(c -> c.getOrganisationId().equals(org) && !Boolean.TRUE.equals(c.getIsDeleted()))
-                .map(c -> {
-                    Map<String, Object> m = new HashMap<>();
-                    m.put("linkId",      l.getId());
-                    m.put("linkType",    l.getLinkType());
-                    m.put("changeId",    c.getId());
-                    m.put("changeCode",  c.getChangeCode());
-                    m.put("titleEn",     c.getTitleEn());
-                    m.put("titleAr",     c.getTitleAr());
-                    m.put("status",      c.getStatus());
-                    m.put("changeType",  c.getChangeType());
-                    m.put("riskLevel",   c.getRiskLevel());
-                    m.put("scheduledStart", c.getScheduledStart());
-                    return m;
-                })
-                .orElse(null))
-            .filter(java.util.Objects::nonNull)
+        // CM-L3: the tenant filter now runs in SQL via the join (was an
+        // org-unscoped fetch + per-row post-filter). @Where on both entities
+        // drops soft-deleted links and changes.
+        return linkRepo.findLinkedChangesForEntity(entityType, entityId, org).stream()
+            .map(row -> {
+                ChangeLink l = (ChangeLink) row[0];
+                ChangeRequest c = (ChangeRequest) row[1];
+                Map<String, Object> m = new HashMap<>();
+                m.put("linkId",      l.getId());
+                m.put("linkType",    l.getLinkType());
+                m.put("changeId",    c.getId());
+                m.put("changeCode",  c.getChangeCode());
+                m.put("titleEn",     c.getTitleEn());
+                m.put("titleAr",     c.getTitleAr());
+                m.put("status",      c.getStatus());
+                m.put("changeType",  c.getChangeType());
+                m.put("riskLevel",   c.getRiskLevel());
+                m.put("scheduledStart", c.getScheduledStart());
+                return m;
+            })
             .toList();
     }
 
