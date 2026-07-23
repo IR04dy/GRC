@@ -25,6 +25,7 @@ import {
   changeApi, reportingApi, ApiError,
   type ChangeRequestDto, type ChangeApprovalDto, type ChangeTaskDto,
   type ChangeLinkDto, type ChangeCommentDto, type ChangeAnalyticsDto,
+  type ChangeConflictView,
 } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
@@ -35,13 +36,14 @@ import { CHANGE_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { CHANGE_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
+import { GovernancePanel } from './GovernancePanel';
 import { usePromoted } from '../../lib/promotedRecords';
 import { toChangeRequestDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import '../../styles/pages/changes.css';
 
-type TabId = 'register' | 'kanban' | 'workflow' | 'analytics' | 'integrations' | 'comms';
-const TAB_IDS: TabId[] = ['register', 'kanban', 'workflow', 'analytics', 'integrations', 'comms'];
+type TabId = 'register' | 'kanban' | 'workflow' | 'analytics' | 'integrations' | 'governance' | 'comms';
+const TAB_IDS: TabId[] = ['register', 'kanban', 'workflow', 'analytics', 'integrations', 'governance', 'comms'];
 // Changes eligible for a post-implementation review (the PIR process queue).
 const REVIEW_STATUSES = ['IMPLEMENTED', 'ROLLED_BACK', 'POST_REVIEW'];
 
@@ -164,6 +166,7 @@ export function ChangesPage() {
     { id: 'workflow',     label: t('changeTabWorkflow') },
     { id: 'analytics',    label: t('changeTabAnalytics') },
     { id: 'integrations', label: t('changeTabIntegrations') },
+    { id: 'governance',   label: t('changeTabGovernance') },
     { id: 'comms',        label: t('detailTabComms') },
   ];
 
@@ -326,6 +329,8 @@ export function ChangesPage() {
         />
       )}
 
+      {tab === 'governance' && <GovernancePanel toast={toast} />}
+
       {tab === 'comms' && <CommsPanel module="CHANGE" />}
 
       <FormModal<Partial<ChangeRequestDto>>
@@ -434,6 +439,7 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
   const [approvals, setApprovals] = useState<ChangeApprovalDto[]>([]);
   const [tasks, setTasks] = useState<ChangeTaskDto[]>([]);
   const [comments, setComments] = useState<ChangeCommentDto[]>([]);
+  const [conflicts, setConflicts] = useState<ChangeConflictView[]>([]);
   const [commentBody, setCommentBody] = useState('');
   const dialog = useDialog();
   // CH-8: real themed modals replace the old window.prompt / window.confirm flows.
@@ -443,14 +449,15 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
   const taskInitial = useMemo(() => ({ titleEn: '', ownerName: '', dueDate: '' }), []);
 
   async function reload() {
-    if (!change) { setApprovals([]); setTasks([]); setComments([]); return; }
+    if (!change) { setApprovals([]); setTasks([]); setComments([]); setConflicts([]); return; }
     try {
-      const [a, k, c] = await Promise.all([
+      const [a, k, c, cf] = await Promise.all([
         changeApi.approvals(change.id),
         changeApi.tasks(change.id),
         changeApi.comments(change.id),
+        changeApi.conflicts(change.id),
       ]);
-      setApprovals(a); setTasks(k); setComments(c);
+      setApprovals(a); setTasks(k); setComments(c); setConflicts(cf);
     } catch { /* silent */ }
   }
   useEffect(() => { void reload(); /* eslint-disable-next-line */ }, [detailId, items]);
@@ -578,6 +585,24 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
         </Card>
 
         <PirCard change={change} onChanged={onChanged} toast={toast} />
+
+        {conflicts.length > 0 && (
+          <Card title={t('changeConflictsTitle')} Icon={AlertTriangle}>
+            <div className="changes-conflicts-note">{t('changeConflictsSub')}</div>
+            {conflicts.map(cf => (
+              <div key={cf.id} className="changes-conflict-row">
+                <span className="mono">{cf.changeCode ?? `#${cf.id}`}</span>
+                <span className="changes-conflict-title">{cf.titleEn}</span>
+                <span className="mono changes-conflict-when">
+                  {cf.scheduledStart ? new Date(cf.scheduledStart).toLocaleDateString() : ''}
+                </span>
+                {cf.sameCategory && <Badge tone="warning">{t('changeConflictSameCat')}</Badge>}
+                {cf.sharedEntities && cf.sharedEntities.length > 0 &&
+                  <Badge tone="danger">{t('changeConflictShared')}: {cf.sharedEntities.length}</Badge>}
+              </div>
+            ))}
+          </Card>
+        )}
 
         <Card title={t('changeApprovals')} Icon={Stamp}>
           {approvals.length === 0

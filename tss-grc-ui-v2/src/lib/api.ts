@@ -604,6 +604,42 @@ export interface LinkedChangeView {
   scheduledStart?: string;
 }
 
+// ─── CH-17: authorisation matrix + freeze windows + calendar + conflicts ───
+export interface ChangeAuthMatrixCell {
+  id: number; organisationId?: number;
+  changeType: string; riskLevel: string;
+  gate: string; minApprovals: number; requiredRoles?: string | null;
+  notesEn?: string; notesAr?: string;
+}
+export interface ChangeAuthorisationView {
+  changeType: string; riskLevel: string; gate: string;
+  minApprovals: number; requiredRoles?: string | null;
+  approvesRecorded: number; satisfied: boolean;
+}
+export interface ChangeFreezeWindowDto {
+  id?: number; organisationId?: number;
+  code?: string; nameEn: string; nameAr?: string;
+  startsAt: string; endsAt: string;
+  scope?: string; scopeValue?: string | null;
+  allowEmergency?: boolean; active?: boolean;
+  notesEn?: string; notesAr?: string;
+}
+export interface ChangeCalendarItem {
+  id: number; changeCode?: string; titleEn?: string; titleAr?: string;
+  changeType?: string; riskLevel?: string; status?: string;
+  scheduledStart?: string; scheduledEnd?: string;
+}
+export interface ChangeCalendarView {
+  from: string; to: string;
+  changes: ChangeCalendarItem[];
+  freezes: ChangeFreezeWindowDto[];
+}
+export interface ChangeConflictView {
+  id: number; changeCode?: string; titleEn?: string; status?: string;
+  scheduledStart?: string; scheduledEnd?: string;
+  sameCategory?: boolean; sharedEntities?: string[];
+}
+
 export const changeApi = {
   list:        (qs: { status?: string; type?: string; risk?: string; category?: string; page?: number; size?: number } = {}) => {
     const p = new URLSearchParams();
@@ -640,6 +676,21 @@ export const changeApi = {
   comment:     (id: number, body: Partial<ChangeCommentDto>) => api.post<ChangeCommentDto>(`/api/v1/changes/${id}/comments`, body),
 
   analytics:   () => api.get<ChangeAnalyticsDto>('/api/v1/changes/analytics'),
+
+  // CH-17: classification-driven authorisation + freeze/calendar/conflicts
+  authorisationMatrix: () => api.get<ChangeAuthMatrixCell[]>('/api/v1/changes/authorisation-matrix'),
+  authorisation: (id: number) => api.get<ChangeAuthorisationView>(`/api/v1/changes/${id}/authorisation`),
+  freezeWindows: () => api.get<ChangeFreezeWindowDto[]>('/api/v1/changes/freeze-windows'),
+  createFreeze:  (body: Partial<ChangeFreezeWindowDto>) => api.post<ChangeFreezeWindowDto>('/api/v1/changes/freeze-windows', body),
+  deleteFreeze:  (id: number) => api.delete<void>(`/api/v1/changes/freeze-windows/${id}`),
+  calendar:      (from?: string, to?: string) => {
+    const p = new URLSearchParams();
+    if (from) p.set('from', from);
+    if (to)   p.set('to', to);
+    const q = p.toString();
+    return api.get<ChangeCalendarView>(`/api/v1/changes/calendar${q ? '?' + q : ''}`);
+  },
+  conflicts:     (id: number) => api.get<ChangeConflictView[]>(`/api/v1/changes/${id}/conflicts`),
 };
 
 // ─── Reporting — Scheduled reports (R4) ────────────────────────────────────
