@@ -72,7 +72,7 @@ are **one** piece of work, not two.
 
 | ID | Src | Action | Size | Status | Migration |
 |---|---|---|---|---|---|
-| **DF-3** | F2-21 | **Committee vote provenance** — voter from `Authentication`; body `memberName` only under secretary/chair authority, stamped `recorded_by_user_id`/`on_behalf`; reject non-roster names; recusal on the **resolved** identity; refuse cross-user overwrite; **add the forged-actor test `ADR-006` demands** | M | 🔵 **IN PROGRESS** — V315 written; entity/service/controller/tests next | **V315** |
+| **DF-3** | F2-21 | **Committee vote provenance** — voter from `Authentication`; body `memberName` only under secretary/chair authority, stamped `recorded_by_user_id`/`on_behalf`; reject non-roster names; recusal on the **resolved** identity; refuse cross-user overwrite; **add the forged-actor test `ADR-006` demands** | M | ✅ **DONE** `f3ea92fc` — 23 new tests, suite **2,438/0**, 5/5 guards mutation-proven, live probe **11/11**, V315 applied dev ×2 | **V315** |
 | **W0-2** | F2-10 | **Activate the staged jar** (`…jar.new`) — closes DF-1 + DF-2 | S | ⏳ **awaits an elevated restart — user action** | — |
 | W0-3 | F2-10 | Post-deploy verification (24 h): break-glass sweep clean, no stale-cookie 500s | S | blocked on W0-2 | — |
 | W0-7 | F2-10 | Build ID + migration head on `/actuator/info`; post-deploy probe compares to `master` | S | ⬜ | — |
@@ -83,7 +83,8 @@ are **one** piece of work, not two.
 | F2-07b | F2-07 | CI test: every route has a nav path or explicit `detailOnly: true` | S | ⬜ | — |
 | **D-1** | D-1 | `git worktree remove .claude/worktrees/vigilant-swartz-073bd4` (branch already merged) — removes 273 phantom doc files | XS | ⬜ | — |
 | F2-20 | F2-20 | Delete the empty `module/datagov` package | XS | ⬜ | — |
-| F2-13a | F2-13 | **Grant-tightness report** — roles-per-permission; flag any business-write permission held by >50% of roles or any read-only/external/machine persona (`WORKFLOW_WRITE` is in 55 of 57) | S | ⬜ | — |
+| **F2-23** | F2-23 | **Catalogue a narrow committee-vote permission.** Measured: **no role holds `ADMIN:WRITE`**, so only `PLATFORM_ADMIN` can record a vote and DF-3's member-self-vote path is unreachable. Add `ADMIN:VOTE` (or a `COMMITTEE` module), keep `ADMIN:APPROVE` as the on-behalf authority, grant per **D-7**. Do **not** widen `ADMIN:WRITE` | S | ⬜ | V316 |
+| F2-13a | F2-13 | **Grant-tightness report** — roles-per-permission, **in both directions**: flag any business-write permission held by >50% of roles or by a read-only/external/machine persona (`WORKFLOW_WRITE` is in 55 of 57), **and any catalogued permission no role holds at all** (`ADMIN:WRITE` is in 0 — a dead permission is an unreachable feature) | S | ⬜ | — |
 | F2-22a | F2-22 | Mass-assignment **audit script** over the 216 entity-bound `@RequestBody` sites + `@JsonIgnore` on `id`/`organisationId` in a mapped superclass as the immediate mitigation | S | ⬜ | — |
 
 ### Wave 1 — the spine (weeks). Everything durable attaches to the module registry.
@@ -148,7 +149,7 @@ are **one** piece of work, not two.
 | V313 | SIGNATURE/AI/CAPA permission catalogue + grants | ✅ dev ×2 · **prod pending the W0-2 restart** |
 | V314 | Committee gate map seed (org 1; orgs 2/3 flagged, not fabricated) | ✅ dev ×2 · **prod pending** |
 | **V315** | **Committee vote provenance** (`recorded_by_user_id`, `recorded_by_name`, `on_behalf`) — DF-3 | 🔵 written, not yet applied |
-| **V316** | `ck_change_status` 14 → 17 — X-2 | ⬜ |
+| **V316** | `ck_change_status` 14 → 17 — X-2 · **and/or** the committee-vote permission — F2-23 | ⬜ |
 | V317 | Licence backfill + entitlement rollout — F2-04 | ⬜ *(gated)* |
 | V318+ | Schema moves — F2-06b · grant tightening — F2-13b · CAB tables — S6 · CE-4…CE-12 | ⬜ |
 
@@ -187,6 +188,7 @@ A slice is done when **all** of these hold. This is the standard every completed
 | D-2 | ECAB emergency-ratification SLA (default 5 business days) — per tenant? | S7 | GRC owner |
 | D-4 | Is **`incident`** a separate SKU or part of Cyber? Decides whether its `cyber`-schema entities move or the packages merge | F2-06b | Product |
 | D-5 | Which Saudi integration pack generation governs (root 20 files vs `docs/` 33)? | W0-6 | Product |
+| **D-7** | **Which roles may cast a committee vote?** Today the answer is "only `PLATFORM_ADMIN`" | F2-23 | GRC owner |
 | D-6 | Does `PLATFORM_ADMIN` bypass **entitlement**? *(Recommendation: no for business modules, yes for platform administration)* | F2-04 | Security + Business |
 
 ---
@@ -211,9 +213,9 @@ Recorded so absence reads as a decision, not an oversight:
 
 ## §8 Immediate next actions
 
-1. **Finish DF-3** — entity + service + controller + tests, then apply V315 to dev ×2 and live-probe the
-   forged-vote attempt (expect **403**), the non-roster name (**400**), and the on-behalf path (**200**
-   with `on_behalf = 1`). *In progress.*
+1. ✅ **DF-3 is done** (`f3ea92fc`) — forged vote **403**, non-roster name **400**, on-behalf **200** with
+   `on_behalf = 1`; all 5 guards mutation-proven; suite **2,438/0**; V315 applied to dev ×2. It surfaced
+   **F2-23**: no role holds `ADMIN:WRITE`, so only `PLATFORM_ADMIN` can record a vote — blocked on **D-7**.
 2. **Restart the service** to activate the staged jar — closes DF-1 + DF-2 and lands V313–V315.
    **Only the operator can do this.**
 3. **Answer D-3.** It re-prioritises a third of this plan and nothing else in Wave 0/1 waits on it.

@@ -46,6 +46,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 | F2-18 | The governance core is assured at unit level only | Assurance | **P2** |
 | F2-19 | Documentation asserts numbers nothing verifies — including this project's own plans | Governance | **P2** |
 | **F2-22** | 216 write endpoints bind a JPA entity from the request body; defence verified in only one | Security | **P2*** |
+| **F2-23** | **No role holds `ADMIN:WRITE`, so only `PLATFORM_ADMIN` can record a committee vote** | Security | **P1** |
 | F2-20 | `datagov` — a documented module with no implementation | Product | **P3** |
 
 \* F2-22's severity is provisional pending the audit it recommends — the pattern's *extent* is measured, its *exploitability* is not.
@@ -511,6 +512,30 @@ Start-Service TssGrcBackend
 | **Priority** | Medium-high — cheap, and it protects every other document's credibility. |
 | **Expected ROI** | High — makes the whole Bible trustworthy by construction. |
 | **References** | Baseline §0, §10. `Governance/BIBLE_VALIDATION_LOG.md`. |
+
+---
+
+## F2-23 · No role holds `ADMIN:WRITE`, so only `PLATFORM_ADMIN` can record a committee vote
+
+| Field | Content |
+|---|---|
+| **ID** | F2-23 |
+| **Category** | Security / authorisation catalogue / product usability |
+| **Severity** | **P1 Critical** |
+| **Current State** | `POST /api/v1/committees/resolutions/{id}/votes` is guarded by `hasPermission('ADMIN','WRITE')`. Measured against `iam.role_permissions`: **zero roles hold `ADMIN:WRITE`**, and `so_officer` (CISO + SECURITY_ANALYST + SUSTAINABILITY_OFFICER) holds **no `ADMIN` permission at all**. `PLATFORM_ADMIN` reaches the endpoint only because it bypasses in code. Found by the DF-3 live probe, which expected an ordinary member's self-vote to succeed and got **403**. |
+| **Problem** | Committee voting — the platform's system of record for change and policy approval — is in practice a **platform-administrator-only** operation. The "member casts their own vote" path that DF-3 introduces as the safe default is **unreachable for every real committee member**, so every vote is necessarily recorded by an administrator and (correctly, post-DF-3) stamped `on_behalf = 1`. A committee cannot self-serve its own decisions. |
+| **Root Cause** | The endpoint inherited the broad `ADMIN` module permission because committees live under `module/admin`. `ADMIN:WRITE` means "administer the platform's committee configuration", which is a different thing from "cast the vote I am entitled to cast" — and no role was ever granted it, so the permission is catalogued but dead. It is the mirror image of F2-13 (`WORKFLOW_WRITE` held by 55 of 57 roles): the same missing control — nobody measures who holds what. |
+| **Business Impact** | Members cannot vote in their own committee. Either committees are administered by IT on members' behalf — undermining the segregation-of-duties story the product sells — or the feature goes unused. It also means the on-behalf trail DF-3 adds will read `on_behalf = 1` on **every** vote: accurate, but it hides the distinction it was built to expose. |
+| **Technical Impact** | Small: catalogue a narrower permission and grant it. DF-3 already resolves identity from the roster, so the self-vote path works the moment a member can reach the endpoint. |
+| **UX Impact** | The CH-14 voting panel is unusable by the members it was built for. |
+| **Sales Impact** | "Can our committee members vote in the system?" — today, only if you give them a platform-administration permission. That answer fails a segregation-of-duties review. |
+| **Recommendation** | **Do not widen `ADMIN:WRITE`** — that would hand committee *administration* to every voting member. Instead: (1) catalogue a narrow action for casting one's own vote — `ADMIN:VOTE`, or better a dedicated `COMMITTEE` module with `READ`/`VOTE`/`APPROVE` once F2-01's registry exists; (2) guard `recordVote` with it, keeping `ADMIN:APPROVE` as the separate on-behalf authority DF-3 already requires; (3) grant it to the roles that actually sit on committees — **a governance decision, not an engineering one** (decision D-7); (4) add the F2-13 grant report in its **inverse** form too: flag any catalogued permission that **no** role holds, because a dead permission is an unreachable feature. |
+| **Alternatives** | (a) Grant `ADMIN:WRITE` to committee-member roles — rejected, it carries committee administration. (b) Drop the permission check and rely on roster membership alone — rejected: entitlement and permission are separate concerns, and an unguarded write endpoint breaches the authorisation ratchet. (c) Leave it administrator-mediated and document that all votes are recorded on behalf — tenable only if the customer accepts that committees never self-serve, and it should then be an explicit decision rather than a silent default. |
+| **Trade-offs** | One migration plus a per-tenant grant decision. Until it lands, DF-3's forgery fix is fully effective — the hole is closed either way; this is about who can legitimately reach the endpoint. |
+| **Effort** | **S** — one catalogue migration, one guard change, one grant set, one live probe. |
+| **Priority** | High — pairs with F2-05 (permission conversion) and F2-13 (grant tightness); all three are the same missing control seen from different sides. |
+| **Expected ROI** | High — makes a built, tested, now-secure feature usable by its intended users. |
+| **References** | Live probe `Appendix/scripts/probe_df3_vote_provenance.py` check 1; the `iam.role_permissions` query quoted above. Related: F2-05, F2-13, F2-01. |
 
 ---
 
