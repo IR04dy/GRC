@@ -51,7 +51,9 @@ Required env vars — dev refuses to boot without real values:
 
 ```bash
 cd tss-grc-backend
-JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-boot:run -Dspring.profiles.active=dev
+SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-boot:run
+# profile MUST be the env var: -Dspring.profiles.active on the mvn CLI never reaches the
+# forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
 mvn -o clean package        # full build + all tests (~2,250 tests, 10–15 min)
