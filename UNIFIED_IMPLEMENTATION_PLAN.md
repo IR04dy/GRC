@@ -520,7 +520,7 @@ body → S7 meeting cycle → S8 workflow/evidence/FSC → CE-13 frontend split.
 
 ---
 
-## §6d Council review — 2026-07-25 (five Fable 5 seats, adversarially briefed)
+## §6d Council review — 2026-07-25 (three rounds, ten Fable 5 seats, adversarially briefed)
 
 Three rounds of reviewers with deliberately conflicting mandates read this plan against the repository;
 several were briefed to argue *against* positions already committed here. Aggregate verdict:
