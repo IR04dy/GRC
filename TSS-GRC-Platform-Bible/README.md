@@ -51,6 +51,19 @@ Start with the two consolidated governing documents:
 - [Independent Enterprise Product Audit](TSS_GRC_PLATFORM_AUDIT_REPORT.md)
 - [Transformation Implementation Plan](TSS_GRC_PLATFORM_IMPLEMENTATION_PLAN.md)
 
+Those two are the **strategic frame** — verdict, phases, councils, release gates, metrics. Two
+companion documents at the repository root are the **execution layer** and are kept deliberately separate:
+
+- [`UNIFIED_IMPLEMENTATION_PLAN.md`](../UNIFIED_IMPLEMENTATION_PLAN.md) — the execution tracker: concrete
+  items with verified status, migration ledger and live-probe results.
+- [`TSS_GRC_PLATFORM_ASSESSMENT.md`](../TSS_GRC_PLATFORM_ASSESSMENT.md) — the measured evidence base: 24
+  findings in the 18-field format, each with a command that re-verifies it.
+
+⚠ The reconciliation between the two sets is **provisional and unconfirmed**, so nothing is stamped
+superseded. Their complementarity is evidenced rather than assumed: Phase 0 of the plan above found
+caller-supplied actor identity in **change approvals**, the root-level review found the same defect in
+**committee votes**, and neither found the other's instance.
+
 | Area | Governing documents |
 |---|---|
 | Governance | [Evidence and maintenance standard](Governance/EVIDENCE_AND_MAINTENANCE_STANDARD.md), [assessment method](Governance/ASSESSMENT_METHOD.md) |
