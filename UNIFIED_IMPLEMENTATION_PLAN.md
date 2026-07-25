@@ -219,11 +219,13 @@ The centre of gravity — the four items that turn a gate into an operating mode
 
 ## §6 Decisions required from the user
 
-**Blocking S6 (answer before CAB work starts):**
-| # | Decision | Recommendation |
-|---|---|---|
-| **D-1** | CAB modelling: profile over the committee engine, or dedicated tables? | **Profile** — endorsed by validation (§1.1); a fork duplicates 4,638 LoC and splits the audit trail |
-| **D-2** | Agenda auto-build trigger: on demand / on meeting creation / nightly | **On demand with a preview diff** — auto-mutating an agenda a human is editing is a trust problem |
+**Blocking S6 — ✅ DECIDED 2026-07-25** (adopted as recommended; reversible by the user at any point before S6 starts):
+| # | Decision | **Adopted** | Rationale |
+|---|---|---|---|
+| **D-1** | CAB modelling | ✅ **(a) Profile over the committee engine** — `CabProfile` + `CabAgendaItem` + `ChangeDecision` layered on `admin.committee*`; **no second meeting engine** | Independently validated (§1.1). A fork duplicates 4,638 LoC and splits the minutes/e-signature audit trail in two — the opposite of what a regulator wants. One engine also means the S3 committee tests protect the CAB too. |
+| **D-2** | Agenda auto-build trigger | ✅ **(a) On demand, with a preview diff** — the secretary clicks "Build agenda" and sees *added / kept / dropped* before committing | Auto-mutating an agenda a human is mid-edit is a trust problem, and a nightly job would silently re-order a published agenda. On-demand keeps the secretary accountable for what the meeting considers — an audit expectation. The rebuild stays idempotent, so the button is safe to press twice. |
+
+*Consequence for S6/S7:* `CabAgendaService.buildAgenda()` returns a **proposed** agenda diff; a separate `commitAgenda()` persists it. Both guarded by `CHANGE/CAB_SCHEDULE` (V317).
 
 **Needed by S7:**
 | # | Decision | Recommendation |
