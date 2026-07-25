@@ -69,18 +69,23 @@ it *cheaper*:
 
 ---
 
-## §2 The one decision that gates a third of this plan
+## §2 The decision that gated a third of this plan — ANSWERED
 
 **D-3 · Is the commercial model per-module SKUs, or a single suite licence?**
+→ **Per-module SKUs, one deployment, one database.** [ADR-013](TSS-GRC-Platform-Bible/Decisions/ADR-013-PER-MODULE-SKU-AND-ENTITLEMENT.md), 2026-07-25.
 
-| If **per-module** | If **suite-only** |
+So the left column below is now the live plan: **F2-04, F2-05 and F2-06 are Wave 2 as written**, ADR-009…012
+are adopted, and the 11 Saudi Tier-B modules are the first SKUs. Wave 2 is **un-gated**.
+
+| Consequence | Detail |
 |---|---|
-| F2-04 (entitlement rollout), F2-05 (permission conversion), F2-06 (schema ownership) are **P0/P1 and Wave 2** | The same three drop to **P2 hygiene**, and Wave 2 becomes assurance-only |
-| ADR-009…012 are adopted as written | ADR-011 (schema ownership) becomes advisory |
-| The 11 Saudi Tier-B modules are the first SKUs | Test floors still apply, but packaging work stops |
+| Wave 2 is unblocked | F2-04 / F2-05 / F2-06 proceed at P1 |
+| One item is **added ahead of F2-04** | **W2-0 grandfather licence backfill.** Orgs 2 and 3 hold exactly one licence row each (`SOCOPS`); `@RequireModule` is fail-closed, so annotating controllers before backfilling would black out two of three tenants |
+| The SKU catalogue moves out of code | `LicensingService.KNOWN_MODULES` is a hard-coded `Set.of` of 20 codes that calls itself the source of truth — a recompile per SKU. It moves into the module registry (F2-01) |
+| Two other decisions dissolved | **D-4** (`incident` joins the Cyber & SOC *SKU*; the package does not move, so F2-06b is no longer gated) and **D-6** (no role bypasses entitlement — platform administration is inside the mandatory Base SKU, so there is nothing to bypass) |
 
-**Everything else in this plan is unaffected by the answer.** Do not wait on it to start Wave 0 or 1.
-Answer before Wave 2 begins. *(Assessment Part 3 §9 lists the other seven business questions.)*
+Pricing is **not** decided and is not this plan's business. *(Assessment Part 3 §9 lists the other business
+questions.)*
 
 ---
 
@@ -103,9 +108,11 @@ are **one** piece of work, not two.
 | **F2-08a** | F2-08 | **Promote the export toolkit to the kernel** — `PdfTheme`, `PdfFonts`, `XlsxStyler`, `ExportNaming`, `RegisterExport`, `TabularExport*` → `module/platform/export`. Removes all 25 inbound edges to `reporting`, kills the apparent `socops→reporting` cycle, moves `ai` to Tier A | S | ⬜ | — |
 | **F2-07a** | F2-07 | **Route reconciliation matrix** — all 328 routes × {nav entry? · module owner? · real API or mock? · last touched}; classify the ~144 URL-only screens **promote / merge / retire** | S | ⬜ | — |
 | F2-07b | F2-07 | CI test: every route has a nav path or explicit `detailOnly: true` | S | ⬜ | — |
-| **D-1** | D-1 | `git worktree remove .claude/worktrees/vigilant-swartz-073bd4` (branch already merged) — removes 273 phantom doc files | XS | ⬜ | — |
+| **W0-1** | D-1 | `git worktree remove .claude/worktrees/vigilant-swartz-073bd4` (branch already merged) — removes 273 phantom doc files. *(Renamed from "D-1": it collided with decision D-1 in §6, which is a different thing entirely)* | XS | ✅ **DONE** — `git worktree list` shows only the main tree; corpus now 353 on disk / 335 tracked | — |
 | F2-20 | F2-20 | **Register** `module/datagov` as maturity `PLANNED` — **do not delete it.** Reading its `package-info.java` showed a deliberate, well-argued v2 deferral (scope + Collibra/Alation overlap + pointers to the live adjacent capabilities), not a stray placeholder | XS | ⬜ *(rides F2-01)* | — |
-| **F2-23** | F2-23 | **Catalogue a narrow committee-vote permission.** Measured: **no role holds `ADMIN:WRITE`**, so only `PLATFORM_ADMIN` can record a vote and DF-3's member-self-vote path is unreachable. Add `ADMIN:VOTE` (or a `COMMITTEE` module), keep `ADMIN:APPROVE` as the on-behalf authority, grant per **D-7**. Do **not** widen `ADMIN:WRITE` | S | ⬜ | V316 |
+| **F2-23** | F2-23 | **Catalogue a narrow committee-vote permission.** Measured: **no role holds `ADMIN:WRITE`**, so only `PLATFORM_ADMIN` can record a vote and DF-3's member-self-vote path is unreachable | S | ✅ **DONE** `5ec6edfe` — resolved by **ADR-014**, and the shape is the *inverse* of what this row proposed: `ADMIN:APPROVE` became the **vote** capability (15 roles) and `ADMIN:WRITE` the **secretariat/on-behalf** right (3 roles), because the same grant also appointed roster members — a voter could add themselves to a roster and manufacture quorum. `ADMIN:READ` 21, `ADMIN:EXPORT` 7. Suite 2,460/0, 5/5 mutations proven, live-probed | **V317** |
+| **F2-25** | new | **Appointing a committee member 500s and is mass-assignable.** `POST /committees/registry/terms` binds the `CommitteeMemberTerm` entity raw, no `@Valid`, never stamps `organisationId` → an *authorised* secretariat call fails; `id`/`organisationId` are client-settable on the table that defines quorum. Fix: DTO + tenant stamp + `@Valid` + tests | XS | ⬜ **blocks the D-7 rollout** | — |
+| **F2-26** | new | **No roster seat is linked to a platform user** (`member_user_id` NULL on every row), so nobody can cast their own vote — only the secretariat on-behalf path works. Fix: optional `memberUserId` + user picker + roster-linkage report; link the dev personas (CISO→`so_officer`, CCO→`compliance`, CRO→`rmanager`). **Do not guess links for real seats** | S | ⬜ *(after F2-25)* | — |
 | F2-13a | F2-13 | **Grant-tightness report** — roles-per-permission, **in both directions**: flag any business-write permission held by >50% of roles or by a read-only/external/machine persona (`WORKFLOW_WRITE` is in 55 of 57), **and any catalogued permission no role holds at all** (`ADMIN:WRITE` is in 0 — a dead permission is an unreachable feature) | S | ⬜ | — |
 | F2-22a | F2-22 | Mass-assignment **audit script** over the 216 entity-bound `@RequestBody` sites + `@JsonIgnore` on `id`/`organisationId` in a mapped superclass as the immediate mitigation | S | ⬜ | — |
 
@@ -170,15 +177,21 @@ are **one** piece of work, not two.
 |---|---|---|
 | V313 | SIGNATURE/AI/CAPA permission catalogue + grants | ✅ dev ×2 · **prod pending the W0-2 restart** |
 | V314 | Committee gate map seed (org 1; orgs 2/3 flagged, not fabricated) | ✅ dev ×2 · **prod pending** |
-| **V315** | **Committee vote provenance** (`recorded_by_user_id`, `recorded_by_name`, `on_behalf`) — DF-3 | 🔵 written, not yet applied |
-| **V316** | `ck_change_status` 14 → 17 — X-2 · **and/or** the committee-vote permission — F2-23 | ⬜ |
-| V317 | Licence backfill + entitlement rollout — F2-04 | ⬜ *(gated)* |
-| V318+ | Schema moves — F2-06b · grant tightening — F2-13b · CAB tables — S6 · CE-4…CE-12 | ⬜ |
+| **V315** | **Committee vote provenance** (`recorded_by_user_id`, `recorded_by_name`, `on_behalf`) — DF-3 | ✅ dev ×2 · **prod pending** |
+| **V316** | **CAB approval provenance** — filtered unique index `(change_request_id, approver_id)` — DF-4 | ✅ dev ×2 · **prod pending** |
+| **V317** | **Committee + change-authority grants** — `ADMIN:APPROVE` catalogued, `CHANGE_MANAGER` role created, four ADMIN grant sets + `CHANGE:APPROVE` 3→9 — D-7/D-8, F2-23 | ✅ dev ×2 · **prod pending** |
+| V318 | `ck_change_status` 14 → 17 — X-2 *(was V316, reassigned twice)* | ⬜ |
+| V319 | Licence backfill + entitlement rollout — F2-04 *(was V317)* | ⬜ |
+| V320+ | Schema moves — F2-06b · grant tightening — F2-13b · CAB tables — S6 · CE-4…CE-12 | ⬜ |
 
 **Rules.** Additive only unless explicitly authorised. Idempotent. Applied to dev **twice** via pyodbc
-(Flyway is off in dev). Prod picks them up via Flyway on the next jar — **baseline is V312, so V313–V315
+(Flyway is off in dev). Prod picks them up via Flyway on the next jar — **baseline is V312, so V313–V317
 all land on the next restart.** `flyway.clean` is disabled; never run it. Every destructive change needs
 a reverse recipe in the file header and the user's explicit OK.
+
+⚠ **Reserved numbers move.** `V316` was reserved for `ck_change_status`, then taken by DF-4; `V317` was
+reserved for the entitlement backfill, then taken by the D-7/D-8 grants. Read this table, not an older
+plan section, before writing a migration — and re-check it immediately before the file is created.
 
 ---
 
@@ -262,15 +275,33 @@ Recorded so absence reads as a decision, not an oversight:
 
 ## §8 Immediate next actions
 
-1. ✅ **DF-3 is done** (`f3ea92fc`) — forged vote **403**, non-roster name **400**, on-behalf **200** with
-   `on_behalf = 1`; all 5 guards mutation-proven; suite **2,438/0**; V315 applied to dev ×2. It surfaced
-   **F2-23**: no role holds `ADMIN:WRITE`, so only `PLATFORM_ADMIN` can record a vote — blocked on **D-7**.
-2. **Restart the service** to activate the staged jar — closes DF-1 + DF-2 and lands V313–V315.
-   **Only the operator can do this.**
-3. **Answer D-3.** It re-prioritises a third of this plan and nothing else in Wave 0/1 waits on it.
+**Done since this section was written:** DF-3 (`f3ea92fc`), DF-4 (`21c83d09`), F2-23 + D-3/D-7/D-8 +
+doc governance (`5ec6edfe`), landmines 26–28 (`8d42a37d`), W0-1 worktree removal. Suite **2,460/0**.
+
+### The one thing only the operator can do
+
+**Activate the staged jar.** Closes DF-1 (failing 33–35×/day in production) and DF-2, and lands
+**V313–V317**. Attempted 2026-07-25 from this session and refused: *"Cannot open TssGrcBackend service"* —
+it needs an **elevated** shell. Filenames below are the verified ones on disk; a pre-swap safety copy of
+the live jar is already at `D:\Deployment\tss-grc\backup\jar-before-restart-20260725.jar`.
 
 ```powershell
 Stop-Service TssGrcBackend
-if (Test-Path 'D:\Deployment\tss-grc\app\tss-grc-platform.jar.new') { Move-Item -Force 'D:\Deployment\tss-grc\app\tss-grc-platform.jar.new' 'D:\Deployment\tss-grc\app\tss-grc-platform.jar' }
+Move-Item -Force 'D:\Deployment\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar.new' 'D:\Deployment\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar'
 Start-Service TssGrcBackend
+Invoke-RestMethod http://localhost:8091/actuator/health
 ```
+
+### Next engineering slices, in order
+
+1. **F2-25** (XS, ~2 h) — DTO + tenant stamp + `@Valid` on committee member appointment. It **blocks the
+   D-7 rollout**: the grants are live, and the first thing a customer must do returns a 500.
+2. **F2-26** (S, ~1 d) — link roster seats to platform users so a member can cast their own vote instead
+   of every vote being secretariat-recorded `on_behalf = 1`.
+3. **W2-1a** (S) — de-mock the three executive surfaces (`searchIndex.ts`, `widgets.tsx`, `boardPack.ts`).
+4. **F2-22a** (S) — mass-assignment audit over the 216 entity-bound `@RequestBody` sites. F2-25 is the
+   fourth instance of this class found by hand (after F2-21, F2-24 and the roster); the sweep is overdue.
+5. **F2-13a** (S) — grant-tightness report in both directions. It would have caught F2-23 *and* the
+   ungrantable `ADMIN_APPROVE` automatically.
+6. **F2-08a** (S) — promote the export toolkit to the kernel; removes all 25 inbound edges to `reporting`.
+7. **W2-0** (S) — grandfather licence backfill, **before** any `@RequireModule` sweep.
