@@ -114,3 +114,11 @@ tss-grc-ui-v2/audit/
 
 # Filled external config (secrets) must never be committed - only the .template is
 external.properties
+
+# ── Local operator artefacts (never commit) ────────────────────────────────
+# 28 MB database dump: a point-in-time snapshot that may carry tenant data, and
+# would permanently bloat the repository. Keep DB snapshots in backup/ on the
+# deployment host, not in git.
+DB-*.sql
+# Machine-specific LAN exposure helper (embeds this host's network details).
+expose-lan.ps1

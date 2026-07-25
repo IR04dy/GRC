@@ -258,3 +258,56 @@ The `prod` Spring profile is fail-fast on misconfiguration:
 ## License
 
 Proprietary — Trusted Security Solutions. All rights reserved.
+
+---
+
+## Appendix — standalone single-page prototype (`index.html`)
+
+> Scope note: the sections above describe **this platform** — the Spring Boot
+> backend (`tss-grc-backend`) and React SPA (`tss-grc-ui-v2`). The material below
+> describes a separate, self-contained demo artefact that also lives in this
+> repository root. It is not part of the deployed platform and shares no code
+> with it.
+
+The standalone `index.html` at the repository root is a single-page prototype for a **National GRC (Governance, Risk, and Compliance) Platform** with Arabic (RTL) and English (LTR) support.
+
+## What is included
+
+- Full front-end application in `index.html`
+- Login and MFA flow (client-side mock)
+- Multi-module navigation (risk, compliance, audit, policies, board reporting, evidence, etc.)
+- Charts and analytics powered by Chart.js
+- In-browser PDF export with classification watermarking
+- CSV export utilities
+- Role-based page-access logic in the client layer
+
+## Run locally
+
+Because this is a static app, you can run it directly with any local web server.
+
+### Option 1 (Python)
+
+```bash
+python3 -m http.server 8080
+```
+
+Then open:
+
+- http://localhost:8080/index.html
+
+### Option 2 (VS Code Live Server)
+
+Open the folder and launch `index.html` with Live Server.
+
+## Notes
+
+- This project is currently front-end only.
+- Data persistence, real authentication, and backend APIs should be added in a production implementation.
+
+## Test
+
+Run a basic smoke test:
+
+```bash
+./scripts/smoke_test.sh
+```
