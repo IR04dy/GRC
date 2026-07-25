@@ -214,7 +214,7 @@ Profiles: `dev` (Swagger on, Flyway off, permissive CORS, 1-h tokens) · `prod` 
 
 ## §5 Business process design
 
-> The ten load-bearing end-to-end processes. Format: actors → steps → **server-enforced controls** (the parts a UI cannot bypass) → records produced. Detailed screen flows: chronicle §3.
+> The ten load-bearing end-to-end processes. Format: actors → steps → **server-enforced controls** (the parts a UI cannot bypass) → records produced. Detailed screen flows: chronicle §3. **Per-process user stories with testable acceptance criteria: `PLATFORM_USER_STORIES.md`** (84 stories, status-tracked ✅/🔶/⬜ against this pack's backlog).
 
 **BP-1 Change enablement (ITIL v4).** Requester → Change manager → CAB/ECAB committee → Implementer → Reviewer.
 Draft (type/category/risk, plans, bilingual titles) → submit → impact assess → authorisation matrix resolves gate (AUTO/CAB/ECAB + min approvals) → CAB vote *or* committee referral (quorum + SoD recusal + e-signed minutes) → schedule (freeze/conflict checks) → implement (tasks w/ SLA scheduler) → PIR → close.
@@ -473,6 +473,7 @@ TD-2 BaseEntity · TD-3 FE dedup/façades/@Valid DTOs · TD-4 outsourcing merge 
 | Ops/install/troubleshooting/landmines/history | `PROJECT_CHRONICLE.md` (§ index in its TOC) |
 | Go-live runbook | `DEPLOYMENT.md` · dev bring-up: `LOCAL_SETUP.md` |
 | This pack | `PLATFORM_ARCHITECTURE_PACK.md` (you are here) |
+| User-story register (per process, status-tracked) | `PLATFORM_USER_STORIES.md` |
 | Next programme | `CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md` |
 | Past programmes (each with §0 tracker) | `MODULE_REVIEW_AND_REMEDIATION_PLAN.md` (compliance/policy) · `ERM_RISK_MANAGEMENT_*` · `SUSTAINABILITY_ESG_*` · `SUSTAINABILITY_GREEN_FINANCE_*` · `ESG_CAPA_GREEN_FINANCE_*` · `CHANGE_AND_POLICY_*` · RBAC governance plan · cyber/socops + workflow + export programmes (see memory/chronicle §13) |
 | Platform audit (2026-06-18, 287 findings) | `reports/audit-report.html` + `audit/` data |
