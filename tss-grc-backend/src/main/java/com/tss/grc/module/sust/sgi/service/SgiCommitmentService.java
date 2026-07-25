@@ -9,7 +9,7 @@ import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
 import com.tss.grc.module.sust.ghg.repository.GhgEmissionRecordRepository;
 import com.tss.grc.module.sust.metrics.entity.EsgMetricReading;
 import com.tss.grc.module.sust.metrics.repository.EsgMetricReadingRepository;
-import com.tss.grc.module.reporting.dto.TabularExportRequest;
+import com.tss.grc.module.platform.export.TabularExportRequest;
 import com.tss.grc.module.sust.sgi.entity.SgiCommitment;
 import com.tss.grc.module.sust.sgi.repository.SgiCommitmentRepository;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;

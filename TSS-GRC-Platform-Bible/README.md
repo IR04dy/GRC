@@ -46,6 +46,11 @@ No feature may be called “complete”, “compliant”, “secure”, “marke
 
 ## Repository map
 
+Start with the two consolidated governing documents:
+
+- [Independent Enterprise Product Audit](TSS_GRC_PLATFORM_AUDIT_REPORT.md)
+- [Transformation Implementation Plan](TSS_GRC_PLATFORM_IMPLEMENTATION_PLAN.md)
+
 | Area | Governing documents |
 |---|---|
 | Governance | [Evidence and maintenance standard](Governance/EVIDENCE_AND_MAINTENANCE_STANDARD.md), [assessment method](Governance/ASSESSMENT_METHOD.md) |

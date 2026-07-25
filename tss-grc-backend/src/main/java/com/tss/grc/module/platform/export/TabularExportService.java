@@ -1,8 +1,7 @@
-package com.tss.grc.module.reporting.service;
+package com.tss.grc.module.platform.export;
 
 import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.module.platform.branding.service.BrandThemeService;
-import com.tss.grc.module.reporting.dto.TabularExportRequest;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -109,7 +108,7 @@ public class TabularExportService {
 
     /**
      * Renders the same {@link TabularExportRequest} as a branded Word document — a title, then one
-     * heading + table per sheet — reusing {@link DocxExportService}'s XWPF helpers with the tenant
+     * heading + table per sheet — reusing {@link DocxKit}'s XWPF helpers with the tenant
      * brand colour. RTL (bidi) when {@code lang=ar}.
      */
     public byte[] docx(TabularExportRequest req) {
@@ -118,11 +117,11 @@ public class TabularExportService {
         XWPFDocument doc = new XWPFDocument();
         try {
             XWPFParagraph title = doc.createParagraph();
-            DocxExportService.applyBidi(title, ar);
+            DocxKit.applyBidi(title, ar);
             title.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
             XWPFRun tr = title.createRun();
             tr.setText(req.exportType());
-            DocxExportService.applyRtlRun(tr, ar);
+            DocxKit.applyRtlRun(tr, ar);
             tr.setBold(true);
             tr.setFontSize(18);
             tr.setColor(hex);
@@ -133,11 +132,11 @@ public class TabularExportService {
                 if (budgetHit) break;
                 XWPFParagraph head = doc.createParagraph();
                 head.setSpacingBefore(240);
-                DocxExportService.applyBidi(head, ar);
+                DocxKit.applyBidi(head, ar);
                 head.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
                 XWPFRun hr = head.createRun();
                 hr.setText(s.name());
-                DocxExportService.applyRtlRun(hr, ar);
+                DocxKit.applyRtlRun(hr, ar);
                 hr.setBold(true);
                 hr.setFontSize(13);
                 hr.setColor(hex);
@@ -147,7 +146,7 @@ public class TabularExportService {
                 int nCols = Math.min(headersRaw.size(), MAX_COLS);
                 String[] headers = new String[nCols];
                 for (int c = 0; c < nCols; c++) headers[c] = clip(headersRaw.get(c));
-                XWPFTable table = DocxExportService.newTable(doc, headers, ar, hex);
+                XWPFTable table = DocxKit.newTable(doc, headers, ar, hex);
                 cells += nCols;
 
                 List<List<String>> rows = s.rows() == null ? List.of() : s.rows();
@@ -155,14 +154,14 @@ public class TabularExportService {
                     if (cells >= MAX_CELLS) { budgetHit = true; break; }
                     XWPFTableRow tRow = table.createRow();
                     for (int c = 0; c < nCols; c++) {
-                        DocxExportService.setCell(tRow, c, clip(c < row.size() ? row.get(c) : ""), ar);
+                        DocxKit.setCell(tRow, c, clip(c < row.size() ? row.get(c) : ""), ar);
                     }
                     cells += nCols;
                 }
             }
             if (budgetHit) log.warn("Tabular DOCX truncated at the {}-cell budget (module={}, type={})",
                 MAX_CELLS, req.module(), req.exportType());
-            return DocxExportService.bytes(doc);
+            return DocxKit.bytes(doc);
         } finally {
             try { doc.close(); } catch (IOException ignored) { /* best-effort */ }
         }

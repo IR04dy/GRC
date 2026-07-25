@@ -47,7 +47,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 | F2-19 | Documentation asserts numbers nothing verifies — including this project's own plans | Governance | **P2** |
 | **F2-22** | 216 write endpoints bind a JPA entity from the request body; defence verified in only one | Security | **P2*** |
 | **F2-23** | **No role holds `ADMIN:WRITE`, so only `PLATFORM_ADMIN` can record a committee vote** | Security | **P1** |
-| F2-20 | `datagov` — a documented module with no implementation | Product | **P3** |
+| F2-20 | `datagov` is a **deliberate v2 deferral**, not a stray placeholder — register it, don't delete it | Product | **P3** |
 
 \* F2-22's severity is provisional pending the audit it recommends — the pattern's *extent* is measured, its *exploitability* is not.
 
@@ -546,19 +546,19 @@ Start-Service TssGrcBackend
 | **ID** | F2-20 |
 | **Category** | Product hygiene |
 | **Severity** | **P3 Medium** |
-| **Current State** | `module/datagov/` contains one file: `package-info.java`, 18 lines, no code. `CLAUDE.md` lists `datagov` among the backend modules. Baseline §1.1. |
-| **Problem** | A named module with zero implementation appears in the platform's own documentation — the smallest, clearest instance of the F2-01 inventory failure. |
-| **Root Cause** | A package created in anticipation of work that never started; nothing detects an empty module. |
-| **Business Impact** | Small in isolation; corrosive in aggregate — it is the kind of detail a diligence reviewer cites as evidence that the module list is aspirational. |
+| **Current State** | `module/datagov/` contains one file: `package-info.java`, 18 lines, no code — and **reading it changed this finding.** It is not an accidental placeholder: it states "**RESERVED FOR v2**", explains *why* data governance is deferred (substantial scope, and it competes with specialised products such as Collibra and Alation that customers may already own), and points to the adjacent capabilities that **are** live — privacy data-mapping (RoPA/DPIA), the cyber asset register, and evidence-to-control mapping. `CLAUDE.md` listed `datagov` among the implemented modules, which is the actual defect; that is now corrected. Baseline §1.1. |
+| **Problem** | Narrower than first stated. The deferral itself is sound and better reasoned than several formal ADRs. The problem is only that **nothing distinguishes "reserved" from "implemented"** in any machine-readable place, so a package with a deliberate `PLANNED` status was counted as a capability in the module list. That is an F2-01 registry gap, not a hygiene failure in this package. |
+| **Root Cause** | There is no maturity field anywhere a build can read, so "reserved for v2" can only be expressed in prose that no control consumes — the same root cause as F2-01. |
+| **Business Impact** | Minimal, and partly **positive**: a documented, justified scope boundary is exactly what a diligence reviewer wants to see. The risk is only that an undifferentiated module list turns a deliberate deferral into an apparent gap. |
 | **Technical Impact** | None. |
 | **UX Impact** | None (no screens). |
 | **Sales Impact** | Reputational only — and only if listed as a capability. |
-| **Recommendation** | Either delete the package, or register it in the module registry with maturity **`PLANNED`** and exclude it from all capability lists. Recommendation: **delete** — data governance is substantially covered by `dataclass`, `data_officer`, `privacy` and `datagov`'s absence changes nothing. The F2-01 registry CI check prevents recurrence. |
-| **Alternatives** | Keep as a placeholder — acceptable only with an explicit `PLANNED` maturity that the datasheet generator honours. |
+| **Recommendation** | **Keep the package and register it — do not delete it.** An earlier draft of this finding recommended deletion; reading the file overturned that. The `package-info.java` is the only written record of a real product decision (deferring data governance and why), and deleting it would destroy that reasoning while changing nothing about the code. Instead: register `datagov` with maturity **`PLANNED`** in the F2-01 registry, exclude `PLANNED` modules from every generated capability list and datasheet, and have the registry check assert that a package with no types carries a non-GA maturity. Then "reserved" is a fact a build can check rather than a comment a reader may miss. |
+| **Alternatives** | (a) Delete it — rejected: it destroys a documented decision for no engineering gain. (b) Move the rationale into an ADR and delete the package — defensible, and arguably tidier; rejected only because the rationale is most useful exactly where a developer looking for `datagov` will find it. |
 | **Trade-offs** | None. |
-| **Effort** | **XS** (minutes) |
+| **Effort** | **XS** — one registry row; no code change. |
 | **Priority** | Low — bundle with F2-01. |
-| **Expected ROI** | Low absolute, high per minute. |
+| **Expected ROI** | Low absolute. Recorded mainly as a lesson: three of this review's findings changed after reading the artefact rather than measuring around it. |
 | **References** | Baseline §1.1. |
 
 ---

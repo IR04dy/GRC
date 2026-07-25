@@ -22,8 +22,8 @@ import com.tss.grc.module.bcm.cycle.entity.BcpPlanAcknowledgement;
 import com.tss.grc.module.bcm.cycle.entity.BcpSection;
 import com.tss.grc.module.bcm.cycle.entity.BcpVersion;
 import com.tss.grc.module.platform.entity.Organisation;
-import com.tss.grc.module.reporting.service.PdfFonts;
-import com.tss.grc.module.reporting.service.PdfTheme;
+import com.tss.grc.module.platform.export.PdfFonts;
+import com.tss.grc.module.platform.export.PdfTheme;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

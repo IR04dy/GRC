@@ -1,4 +1,4 @@
-package com.tss.grc.module.reporting.dto;
+package com.tss.grc.module.platform.export;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;

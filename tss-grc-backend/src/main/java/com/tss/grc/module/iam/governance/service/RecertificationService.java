@@ -10,7 +10,7 @@ import com.tss.grc.module.iam.governance.repository.AccessReviewItemRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService.AuditEventBuilder;
 import com.tss.grc.module.platform.service.NotificationService;
-import com.tss.grc.module.reporting.service.PdfTheme;
+import com.tss.grc.module.platform.export.PdfTheme;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;

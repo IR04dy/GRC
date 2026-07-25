@@ -1,7 +1,7 @@
 package com.tss.grc.module.sust.capa.controller;
 
-import com.tss.grc.module.reporting.service.ExportNaming;
-import com.tss.grc.module.reporting.service.TabularExportService;
+import com.tss.grc.module.platform.export.ExportNaming;
+import com.tss.grc.module.platform.export.TabularExportService;
 import com.tss.grc.module.sust.capa.dto.CorrectiveActionCreateRequest;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;

@@ -1,5 +1,9 @@
 package com.tss.grc.module.reporting.service;
 
+import com.tss.grc.module.platform.export.PdfFonts;
+import com.tss.grc.module.platform.export.PdfTheme;
+import com.tss.grc.module.platform.export.XlsxStyler;
+
 // Explicit imports — wildcard com.lowagie.text.* collides with
 // org.apache.poi.ss.usermodel.* on Cell and Row.
 import com.lowagie.text.Document;

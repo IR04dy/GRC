@@ -1,5 +1,12 @@
 package com.tss.grc.module.reporting.service;
 
+import static com.tss.grc.module.platform.export.DocxKit.applyBidi;
+import static com.tss.grc.module.platform.export.DocxKit.applyBidiVisual;
+import static com.tss.grc.module.platform.export.DocxKit.applyRtlRun;
+import static com.tss.grc.module.platform.export.DocxKit.bytes;
+import static com.tss.grc.module.platform.export.DocxKit.newTable;
+import static com.tss.grc.module.platform.export.DocxKit.setCell;
+
 import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.change_mgmt.entity.ChangeRequest;
@@ -341,73 +348,11 @@ public class DocxExportService {
         spacer.createRun().addBreak();
     }
 
-    static XWPFTable newTable(XWPFDocument doc, String[] headers, boolean ar) {
-        return newTable(doc, headers, ar, "094242");
-    }
-
-    /** As {@link #newTable(XWPFDocument, String[], boolean)} but with a caller-supplied header
-     *  fill colour (hex, no {@code #}) — lets the tabular exporter apply the tenant BrandTheme. */
-    static XWPFTable newTable(XWPFDocument doc, String[] headers, boolean ar, String headerHex) {
-        XWPFTable t = doc.createTable(1, headers.length);
-        t.setWidth("100%");
-        applyBidiVisual(t, ar);   // mirror the column order for Arabic
-        XWPFTableRow hr = t.getRow(0);
-        for (int i = 0; i < headers.length; i++) {
-            XWPFTableCell c = hr.getCell(i);
-            c.setColor(headerHex);
-            c.removeParagraph(0);
-            XWPFParagraph p = c.addParagraph();
-            applyBidi(p, ar);
-            p.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
-            XWPFRun r = p.createRun();
-            r.setText(headers[i]);
-            applyRtlRun(r, ar);
-            r.setColor("FFFFFF");
-            r.setBold(true);
-            r.setFontSize(10);
-        }
-        return t;
-    }
-
-    static void setCell(XWPFTableRow row, int col, String text, boolean ar) {
-        XWPFTableCell c = row.getCell(col);
-        c.removeParagraph(0);
-        XWPFParagraph p = c.addParagraph();
-        applyBidi(p, ar);
-        p.setAlignment(ar ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
-        XWPFRun r = p.createRun();
-        r.setText(text);
-        applyRtlRun(r, ar);
-        r.setColor("1A1A1A");
-        r.setFontSize(9);
-    }
-
-    /** Toggle RTL on a paragraph by setting the {@code w:bidi} run property. */
-    static void applyBidi(XWPFParagraph p, boolean rtl) {
-        if (!rtl) return;
-        if (p.getCTP().getPPr() == null) p.getCTP().addNewPPr();
-        if (p.getCTP().getPPr().getBidi() == null) p.getCTP().getPPr().addNewBidi();
-    }
-
-    /**
-     * {@code w:bidiVisual} on the table properties — without it Word lays the
-     * columns out left-to-right even when every paragraph is bidi/right-aligned,
-     * which is exactly how the Arabic register tables shipped ("tables start
-     * from the left"). With it, Word mirrors the column order for RTL reading.
-     */
-    static void applyBidiVisual(XWPFTable t, boolean rtl) {
-        if (!rtl) return;
-        CTTblPr pr = t.getCTTbl().getTblPr() != null ? t.getCTTbl().getTblPr() : t.getCTTbl().addNewTblPr();
-        if (!pr.isSetBidiVisual()) pr.addNewBidiVisual();
-    }
-
-    /** {@code w:rtl} on the run properties — Word needs it to order mixed
-     *  Arabic/Latin/digit runs correctly inside a bidi paragraph. */
-    static void applyRtlRun(XWPFRun r, boolean rtl) {
-        if (!rtl) return;
-        CTRPr pr = r.getCTR().isSetRPr() ? r.getCTR().getRPr() : r.getCTR().addNewRPr();
-        if (pr.sizeOfRtlArray() == 0) pr.addNewRtl();
-    }
+    // F2-08a: newTable / setCell / applyBidi / applyBidiVisual / applyRtlRun / bytes were
+    // lifted from here into the kernel as com.tss.grc.module.platform.export.DocxKit. They
+    // were pure POI with no business semantics, and TabularExportService (now kernel) called
+    // them as same-package neighbours — a dependency imports cannot express. They are
+    // static-imported above, so the ~21 call sites in this class are unchanged.
 
     /** A4 landscape — register dumps benefit from the extra horizontal room. */
     private static void applyLandscape(XWPFDocument doc) {
@@ -418,15 +363,6 @@ public class DocxExportService {
         sect.getPgSz().setW(BigInteger.valueOf(16838)); // A4 long edge in twentieths of a point
         sect.getPgSz().setH(BigInteger.valueOf(11906)); // short edge
         sect.getPgSz().setOrient(STPageOrientation.LANDSCAPE);
-    }
-
-    static byte[] bytes(XWPFDocument doc) {
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            doc.write(baos);
-            return baos.toByteArray();
-        } catch (Exception e) {
-            throw new ExportException("Word", "Word write failed", e);
-        }
     }
 
     private static String safe(String s) { return s == null || s.isBlank() ? "—" : s; }

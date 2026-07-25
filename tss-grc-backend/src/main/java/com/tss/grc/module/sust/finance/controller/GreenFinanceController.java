@@ -44,7 +44,7 @@ public class GreenFinanceController {
 
     private final GreenFinanceService service;
     private final GreenFinancePackageService packageService;
-    private final com.tss.grc.module.reporting.service.TabularExportService tabularExport;
+    private final com.tss.grc.module.platform.export.TabularExportService tabularExport;
 
     // ── instruments ─────────────────────────────────────────────────────
 
@@ -136,7 +136,7 @@ public class GreenFinanceController {
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "en") String lang) {
         var payload = service.reportExportPayload(id, lang);
         return attachment(tabularExport.xlsx(payload),
-            com.tss.grc.module.reporting.service.ExportNaming.build("GreenFinance", payload.exportType(), lang, "xlsx"));
+            com.tss.grc.module.platform.export.ExportNaming.build("GreenFinance", payload.exportType(), lang, "xlsx"));
     }
 
     @GetMapping("/reports/{id}/export.docx")
@@ -146,7 +146,7 @@ public class GreenFinanceController {
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "en") String lang) {
         var payload = service.reportExportPayload(id, lang);
         return attachment(tabularExport.docx(payload),
-            com.tss.grc.module.reporting.service.ExportNaming.build("GreenFinance", payload.exportType(), lang, "docx"));
+            com.tss.grc.module.platform.export.ExportNaming.build("GreenFinance", payload.exportType(), lang, "docx"));
     }
 
     private static org.springframework.http.ResponseEntity<byte[]> attachment(byte[] bytes, String filename) {

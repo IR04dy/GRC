@@ -39,7 +39,7 @@ public class SgiCommitmentController {
 
     private final SgiCommitmentService service;
     private final com.tss.grc.module.sust.sgi.service.SgiSurveillanceService surveillance;
-    private final com.tss.grc.module.reporting.service.TabularExportService tabularExport;
+    private final com.tss.grc.module.platform.export.TabularExportService tabularExport;
 
     @GetMapping
     @PreAuthorize("hasPermission('SUST','READ')")
@@ -116,7 +116,7 @@ public class SgiCommitmentController {
     public org.springframework.http.ResponseEntity<byte[]> exportXlsx(
             @RequestParam(defaultValue = "en") String lang) {
         byte[] bytes = tabularExport.xlsx(service.exportPayload(lang));
-        String filename = com.tss.grc.module.reporting.service.ExportNaming.build(
+        String filename = com.tss.grc.module.platform.export.ExportNaming.build(
             "SGI", "CommitmentRegister", lang, "xlsx");
         return org.springframework.http.ResponseEntity.ok()
             .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,

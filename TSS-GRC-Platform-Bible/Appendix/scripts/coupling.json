@@ -1,0 +1,1542 @@
+{
+ "modules": [
+  {
+   "module": "admin",
+   "loc": 4919,
+   "files": 48,
+   "entities": 14,
+   "controllers": 7,
+   "endpoints": 59,
+   "repos": 14,
+   "services": 9,
+   "schemas": [
+    "admin"
+   ],
+   "perms": [
+    "ADMIN"
+   ],
+   "tests": 90,
+   "testfiles": 5,
+   "fan_out": 2,
+   "fan_out_edges": 19,
+   "fan_in": 5,
+   "peers": {
+    "platform": 18,
+    "signature": 1
+   },
+   "kernel": 13
+  },
+  {
+   "module": "ai",
+   "loc": 3758,
+   "files": 32,
+   "entities": 8,
+   "controllers": 5,
+   "endpoints": 35,
+   "repos": 8,
+   "services": 6,
+   "schemas": [
+    "ai",
+    "ai_governance"
+   ],
+   "perms": [
+    "AI"
+   ],
+   "tests": 48,
+   "testfiles": 5,
+   "fan_out": 2,
+   "fan_out_edges": 14,
+   "fan_in": 1,
+   "peers": {
+    "platform": 12,
+    "intake": 2
+   },
+   "kernel": 17
+  },
+  {
+   "module": "aml",
+   "loc": 2165,
+   "files": 16,
+   "entities": 4,
+   "controllers": 1,
+   "endpoints": 14,
+   "repos": 4,
+   "services": 5,
+   "schemas": [
+    "aml"
+   ],
+   "perms": [],
+   "tests": 47,
+   "testfiles": 4,
+   "fan_out": 1,
+   "fan_out_edges": 6,
+   "fan_in": 0,
+   "peers": {
+    "platform": 6
+   },
+   "kernel": 6
+  },
+  {
+   "module": "approvals",
+   "loc": 470,
+   "files": 6,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 5,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "approvals"
+   ],
+   "perms": [
+    "WORKFLOW"
+   ],
+   "tests": 12,
+   "testfiles": 1,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 3
+  },
+  {
+   "module": "attachment",
+   "loc": 509,
+   "files": 7,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 7,
+   "repos": 1,
+   "services": 2,
+   "schemas": [
+    "platform"
+   ],
+   "perms": [
+    "EVIDENCE"
+   ],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 0,
+   "fan_out_edges": 0,
+   "fan_in": 2,
+   "peers": {},
+   "kernel": 3
+  },
+  {
+   "module": "audit_committee",
+   "loc": 1581,
+   "files": 8,
+   "entities": 2,
+   "controllers": 1,
+   "endpoints": 7,
+   "repos": 2,
+   "services": 1,
+   "schemas": [
+    "audit_committee"
+   ],
+   "perms": [],
+   "tests": 26,
+   "testfiles": 2,
+   "fan_out": 10,
+   "fan_out_edges": 29,
+   "fan_in": 0,
+   "peers": {
+    "compliance": 6,
+    "sust": 4,
+    "tprm": 4,
+    "ai": 3,
+    "capa": 2,
+    "ccm": 2,
+    "governance": 2,
+    "incident": 2,
+    "platform": 2,
+    "risk": 2
+   },
+   "kernel": 4
+  },
+  {
+   "module": "audit_eng",
+   "loc": 354,
+   "files": 6,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 5,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "audit_eng"
+   ],
+   "perms": [
+    "AUDIT"
+   ],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 0,
+   "fan_out_edges": 0,
+   "fan_in": 0,
+   "peers": {},
+   "kernel": 3
+  },
+  {
+   "module": "audit_lc",
+   "loc": 3177,
+   "files": 28,
+   "entities": 8,
+   "controllers": 3,
+   "endpoints": 50,
+   "repos": 8,
+   "services": 5,
+   "schemas": [
+    "audit_lc"
+   ],
+   "perms": [
+    "AUDIT"
+   ],
+   "tests": 58,
+   "testfiles": 5,
+   "fan_out": 1,
+   "fan_out_edges": 7,
+   "fan_in": 2,
+   "peers": {
+    "platform": 7
+   },
+   "kernel": 10
+  },
+  {
+   "module": "auth",
+   "loc": 894,
+   "files": 6,
+   "entities": 1,
+   "controllers": 2,
+   "endpoints": 7,
+   "repos": 1,
+   "services": 2,
+   "schemas": [
+    "platform"
+   ],
+   "perms": [],
+   "tests": 22,
+   "testfiles": 3,
+   "fan_out": 2,
+   "fan_out_edges": 4,
+   "fan_in": 0,
+   "peers": {
+    "iam": 2,
+    "platform": 2
+   },
+   "kernel": 4
+  },
+  {
+   "module": "bcm",
+   "loc": 25130,
+   "files": 198,
+   "entities": 50,
+   "controllers": 37,
+   "endpoints": 261,
+   "repos": 50,
+   "services": 36,
+   "schemas": [
+    "bcm"
+   ],
+   "perms": [
+    "BCM"
+   ],
+   "tests": 395,
+   "testfiles": 31,
+   "fan_out": 6,
+   "fan_out_edges": 88,
+   "fan_in": 2,
+   "peers": {
+    "platform": 76,
+    "tprm": 6,
+    "cyber": 2,
+    "capa": 2,
+    "evidence": 1,
+    "admin": 1
+   },
+   "kernel": 67
+  },
+  {
+   "module": "bcm_lc",
+   "loc": 391,
+   "files": 6,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 5,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "bcm_lc"
+   ],
+   "perms": [
+    "BCM"
+   ],
+   "tests": 6,
+   "testfiles": 1,
+   "fan_out": 0,
+   "fan_out_edges": 0,
+   "fan_in": 0,
+   "peers": {},
+   "kernel": 3
+  },
+  {
+   "module": "board_pack",
+   "loc": 353,
+   "files": 6,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 5,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "board_pack"
+   ],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 0,
+   "fan_out_edges": 0,
+   "fan_in": 0,
+   "peers": {},
+   "kernel": 3
+  },
+  {
+   "module": "capa",
+   "loc": 464,
+   "files": 6,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 6,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "capa"
+   ],
+   "perms": [
+    "CAPA"
+   ],
+   "tests": 12,
+   "testfiles": 1,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 6,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 3
+  },
+  {
+   "module": "ccm",
+   "loc": 2031,
+   "files": 22,
+   "entities": 2,
+   "controllers": 1,
+   "endpoints": 10,
+   "repos": 2,
+   "services": 2,
+   "schemas": [
+    "ccm"
+   ],
+   "perms": [],
+   "tests": 39,
+   "testfiles": 5,
+   "fan_out": 1,
+   "fan_out_edges": 4,
+   "fan_in": 2,
+   "peers": {
+    "platform": 4
+   },
+   "kernel": 4
+  },
+  {
+   "module": "change_mgmt",
+   "loc": 2022,
+   "files": 19,
+   "entities": 7,
+   "controllers": 1,
+   "endpoints": 30,
+   "repos": 7,
+   "services": 2,
+   "schemas": [
+    "change_mgmt"
+   ],
+   "perms": [
+    "CHANGE"
+   ],
+   "tests": 36,
+   "testfiles": 2,
+   "fan_out": 3,
+   "fan_out_edges": 12,
+   "fan_in": 1,
+   "peers": {
+    "platform": 6,
+    "admin": 3,
+    "incident": 3
+   },
+   "kernel": 4
+  },
+  {
+   "module": "compliance",
+   "loc": 5659,
+   "files": 52,
+   "entities": 11,
+   "controllers": 8,
+   "endpoints": 81,
+   "repos": 11,
+   "services": 10,
+   "schemas": [
+    "compliance"
+   ],
+   "perms": [
+    "COMPLIANCE",
+    "PRIVACY",
+    "RISK"
+   ],
+   "tests": 107,
+   "testfiles": 9,
+   "fan_out": 5,
+   "fan_out_edges": 27,
+   "fan_in": 4,
+   "peers": {
+    "platform": 14,
+    "policy": 5,
+    "risk": 4,
+    "attachment": 2,
+    "privacy": 2
+   },
+   "kernel": 23
+  },
+  {
+   "module": "consumer",
+   "loc": 1420,
+   "files": 10,
+   "entities": 3,
+   "controllers": 1,
+   "endpoints": 11,
+   "repos": 3,
+   "services": 1,
+   "schemas": [
+    "consumer"
+   ],
+   "perms": [],
+   "tests": 20,
+   "testfiles": 2,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 6
+  },
+  {
+   "module": "controlmap",
+   "loc": 384,
+   "files": 7,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 3,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "evidence"
+   ],
+   "perms": [
+    "COMPLIANCE"
+   ],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 1,
+   "fan_out_edges": 7,
+   "fan_in": 0,
+   "peers": {
+    "evidence": 7
+   },
+   "kernel": 2
+  },
+  {
+   "module": "cpty",
+   "loc": 1688,
+   "files": 14,
+   "entities": 5,
+   "controllers": 1,
+   "endpoints": 14,
+   "repos": 5,
+   "services": 1,
+   "schemas": [
+    "cpty"
+   ],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 7
+  },
+  {
+   "module": "cyber",
+   "loc": 7269,
+   "files": 68,
+   "entities": 16,
+   "controllers": 7,
+   "endpoints": 98,
+   "repos": 16,
+   "services": 19,
+   "schemas": [
+    "cyber"
+   ],
+   "perms": [
+    "CYBER"
+   ],
+   "tests": 117,
+   "testfiles": 20,
+   "fan_out": 4,
+   "fan_out_edges": 29,
+   "fan_in": 3,
+   "peers": {
+    "platform": 23,
+    "evidence": 3,
+    "policy": 2,
+    "incident": 1
+   },
+   "kernel": 33
+  },
+  {
+   "module": "cyber_lc",
+   "loc": 506,
+   "files": 6,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 5,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "cyber_lc"
+   ],
+   "perms": [
+    "CYBER"
+   ],
+   "tests": 11,
+   "testfiles": 1,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 3
+  },
+  {
+   "module": "dashboard",
+   "loc": 362,
+   "files": 8,
+   "entities": 0,
+   "controllers": 1,
+   "endpoints": 8,
+   "repos": 0,
+   "services": 1,
+   "schemas": [],
+   "perms": [
+    "COMPLIANCE",
+    "INCIDENT",
+    "RISK"
+   ],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 5,
+   "fan_out_edges": 9,
+   "fan_in": 0,
+   "peers": {
+    "risk": 4,
+    "compliance": 2,
+    "iam": 1,
+    "incident": 1,
+    "workflow": 1
+   },
+   "kernel": 1
+  },
+  {
+   "module": "data_officer",
+   "loc": 2373,
+   "files": 23,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 37,
+   "repos": 14,
+   "services": 4,
+   "schemas": [
+    "data_officer"
+   ],
+   "perms": [
+    "PRIVACY"
+   ],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 1,
+   "fan_out_edges": 1,
+   "fan_in": 0,
+   "peers": {
+    "platform": 1
+   },
+   "kernel": 2
+  },
+  {
+   "module": "dataclass",
+   "loc": 988,
+   "files": 12,
+   "entities": 4,
+   "controllers": 1,
+   "endpoints": 13,
+   "repos": 4,
+   "services": 1,
+   "schemas": [
+    "dataclass"
+   ],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 1,
+   "fan_out_edges": 1,
+   "fan_in": 0,
+   "peers": {
+    "platform": 1
+   },
+   "kernel": 6
+  },
+  {
+   "module": "datagov",
+   "loc": 18,
+   "files": 1,
+   "entities": 0,
+   "controllers": 0,
+   "endpoints": 0,
+   "repos": 0,
+   "services": 0,
+   "schemas": [],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 0,
+   "fan_out_edges": 0,
+   "fan_in": 0,
+   "peers": {},
+   "kernel": 0
+  },
+  {
+   "module": "ethics",
+   "loc": 4841,
+   "files": 46,
+   "entities": 14,
+   "controllers": 7,
+   "endpoints": 72,
+   "repos": 14,
+   "services": 7,
+   "schemas": [
+    "ethics"
+   ],
+   "perms": [
+    "COMPLIANCE"
+   ],
+   "tests": 83,
+   "testfiles": 6,
+   "fan_out": 1,
+   "fan_out_edges": 8,
+   "fan_in": 1,
+   "peers": {
+    "platform": 8
+   },
+   "kernel": 22
+  },
+  {
+   "module": "evidence",
+   "loc": 3683,
+   "files": 55,
+   "entities": 11,
+   "controllers": 7,
+   "endpoints": 37,
+   "repos": 11,
+   "services": 8,
+   "schemas": [
+    "evidence"
+   ],
+   "perms": [
+    "EVIDENCE"
+   ],
+   "tests": 21,
+   "testfiles": 2,
+   "fan_out": 2,
+   "fan_out_edges": 12,
+   "fan_in": 7,
+   "peers": {
+    "iam": 6,
+    "platform": 6
+   },
+   "kernel": 17
+  },
+  {
+   "module": "fraud",
+   "loc": 1301,
+   "files": 10,
+   "entities": 3,
+   "controllers": 1,
+   "endpoints": 10,
+   "repos": 3,
+   "services": 1,
+   "schemas": [
+    "fraud"
+   ],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 5
+  },
+  {
+   "module": "governance",
+   "loc": 1857,
+   "files": 13,
+   "entities": 1,
+   "controllers": 2,
+   "endpoints": 7,
+   "repos": 1,
+   "services": 2,
+   "schemas": [
+    "platform"
+   ],
+   "perms": [],
+   "tests": 30,
+   "testfiles": 4,
+   "fan_out": 8,
+   "fan_out_edges": 32,
+   "fan_in": 1,
+   "peers": {
+    "platform": 10,
+    "audit_lc": 4,
+    "capa": 4,
+    "ccm": 4,
+    "risk": 4,
+    "iam": 3,
+    "policy": 2,
+    "privacy_lc": 1
+   },
+   "kernel": 3
+  },
+  {
+   "module": "iam",
+   "loc": 3913,
+   "files": 37,
+   "entities": 10,
+   "controllers": 4,
+   "endpoints": 36,
+   "repos": 9,
+   "services": 10,
+   "schemas": [
+    "iam"
+   ],
+   "perms": [
+    "IAM"
+   ],
+   "tests": 31,
+   "testfiles": 4,
+   "fan_out": 1,
+   "fan_out_edges": 19,
+   "fan_in": 9,
+   "peers": {
+    "platform": 19
+   },
+   "kernel": 19
+  },
+  {
+   "module": "incident",
+   "loc": 1585,
+   "files": 13,
+   "entities": 2,
+   "controllers": 2,
+   "endpoints": 22,
+   "repos": 2,
+   "services": 2,
+   "schemas": [
+    "cyber"
+   ],
+   "perms": [
+    "CAPA",
+    "INCIDENT"
+   ],
+   "tests": 31,
+   "testfiles": 2,
+   "fan_out": 2,
+   "fan_out_edges": 7,
+   "fan_in": 5,
+   "peers": {
+    "capa": 5,
+    "platform": 2
+   },
+   "kernel": 6
+  },
+  {
+   "module": "intake",
+   "loc": 662,
+   "files": 9,
+   "entities": 2,
+   "controllers": 1,
+   "endpoints": 4,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "intake"
+   ],
+   "perms": [
+    "INTAKE"
+   ],
+   "tests": 3,
+   "testfiles": 1,
+   "fan_out": 0,
+   "fan_out_edges": 0,
+   "fan_in": 1,
+   "peers": {},
+   "kernel": 2
+  },
+  {
+   "module": "integrations",
+   "loc": 7568,
+   "files": 68,
+   "entities": 6,
+   "controllers": 6,
+   "endpoints": 24,
+   "repos": 6,
+   "services": 6,
+   "schemas": [
+    "platform"
+   ],
+   "perms": [],
+   "tests": 119,
+   "testfiles": 15,
+   "fan_out": 3,
+   "fan_out_edges": 21,
+   "fan_in": 0,
+   "peers": {
+    "platform": 13,
+    "socops": 6,
+    "cyber": 2
+   },
+   "kernel": 20
+  },
+  {
+   "module": "knowledge",
+   "loc": 355,
+   "files": 6,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 6,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "kb"
+   ],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 0,
+   "fan_out_edges": 0,
+   "fan_in": 0,
+   "peers": {},
+   "kernel": 3
+  },
+  {
+   "module": "nca_ecc",
+   "loc": 368,
+   "files": 6,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 6,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "nca_ecc"
+   ],
+   "perms": [
+    "COMPLIANCE",
+    "CYBER"
+   ],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 0,
+   "fan_out_edges": 0,
+   "fan_in": 0,
+   "peers": {},
+   "kernel": 3
+  },
+  {
+   "module": "ndi",
+   "loc": 7717,
+   "files": 62,
+   "entities": 15,
+   "controllers": 14,
+   "endpoints": 127,
+   "repos": 15,
+   "services": 15,
+   "schemas": [
+    "ndi"
+   ],
+   "perms": [
+    "NDI"
+   ],
+   "tests": 11,
+   "testfiles": 2,
+   "fan_out": 2,
+   "fan_out_edges": 7,
+   "fan_in": 1,
+   "peers": {
+    "platform": 5,
+    "risk": 2
+   },
+   "kernel": 22
+  },
+  {
+   "module": "openbanking",
+   "loc": 1913,
+   "files": 14,
+   "entities": 5,
+   "controllers": 1,
+   "endpoints": 18,
+   "repos": 5,
+   "services": 1,
+   "schemas": [
+    "openbanking"
+   ],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 7
+  },
+  {
+   "module": "opres",
+   "loc": 950,
+   "files": 10,
+   "entities": 3,
+   "controllers": 1,
+   "endpoints": 9,
+   "repos": 3,
+   "services": 1,
+   "schemas": [
+    "opres"
+   ],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 5
+  },
+  {
+   "module": "outsourcing",
+   "loc": 1655,
+   "files": 14,
+   "entities": 5,
+   "controllers": 1,
+   "endpoints": 17,
+   "repos": 5,
+   "services": 1,
+   "schemas": [
+    "outsourcing"
+   ],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 1,
+   "fan_out_edges": 1,
+   "fan_in": 0,
+   "peers": {
+    "platform": 1
+   },
+   "kernel": 7
+  },
+  {
+   "module": "platform",
+   "loc": 11701,
+   "files": 109,
+   "entities": 24,
+   "controllers": 20,
+   "endpoints": 122,
+   "repos": 22,
+   "services": 21,
+   "schemas": [
+    "platform"
+   ],
+   "perms": [
+    "AI",
+    "AUDIT_LOG",
+    "AUTOMATION",
+    "CONTROL_LIB",
+    "EVIDENCE",
+    "PLATFORM",
+    "PRIVACY",
+    "REGULATORY",
+    "RISK"
+   ],
+   "tests": 169,
+   "testfiles": 21,
+   "fan_out": 9,
+   "fan_out_edges": 34,
+   "fan_in": 45,
+   "peers": {
+    "risk": 14,
+    "evidence": 5,
+    "privacy": 3,
+    "audit_lc": 2,
+    "capa": 2,
+    "ndi": 2,
+    "bcm": 2,
+    "privacy_lc": 2,
+    "iam": 2
+   },
+   "kernel": 41
+  },
+  {
+   "module": "policy",
+   "loc": 1774,
+   "files": 13,
+   "entities": 5,
+   "controllers": 1,
+   "endpoints": 27,
+   "repos": 5,
+   "services": 1,
+   "schemas": [
+    "policy"
+   ],
+   "perms": [
+    "COMPLIANCE"
+   ],
+   "tests": 39,
+   "testfiles": 1,
+   "fan_out": 4,
+   "fan_out_edges": 14,
+   "fan_in": 5,
+   "peers": {
+    "platform": 6,
+    "attachment": 3,
+    "admin": 3,
+    "compliance": 2
+   },
+   "kernel": 3
+  },
+  {
+   "module": "privacy",
+   "loc": 5804,
+   "files": 63,
+   "entities": 16,
+   "controllers": 12,
+   "endpoints": 99,
+   "repos": 16,
+   "services": 13,
+   "schemas": [
+    "privacy"
+   ],
+   "perms": [
+    "CYBER",
+    "PRIVACY"
+   ],
+   "tests": 79,
+   "testfiles": 7,
+   "fan_out": 2,
+   "fan_out_edges": 12,
+   "fan_in": 3,
+   "peers": {
+    "platform": 11,
+    "tprm": 1
+   },
+   "kernel": 26
+  },
+  {
+   "module": "privacy_lc",
+   "loc": 416,
+   "files": 6,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 5,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "privacy_lc"
+   ],
+   "perms": [
+    "PRIVACY"
+   ],
+   "tests": 10,
+   "testfiles": 1,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 2,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 3
+  },
+  {
+   "module": "regchange",
+   "loc": 444,
+   "files": 6,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 5,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "regchange"
+   ],
+   "perms": [
+    "COMPLIANCE"
+   ],
+   "tests": 6,
+   "testfiles": 1,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 3
+  },
+  {
+   "module": "reginspect",
+   "loc": 1160,
+   "files": 10,
+   "entities": 3,
+   "controllers": 1,
+   "endpoints": 10,
+   "repos": 3,
+   "services": 1,
+   "schemas": [
+    "reginspect"
+   ],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 5
+  },
+  {
+   "module": "regreporting",
+   "loc": 1628,
+   "files": 10,
+   "entities": 3,
+   "controllers": 1,
+   "endpoints": 17,
+   "repos": 3,
+   "services": 1,
+   "schemas": [
+    "regreporting"
+   ],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 5
+  },
+  {
+   "module": "reporting",
+   "loc": 3610,
+   "files": 15,
+   "entities": 2,
+   "controllers": 2,
+   "endpoints": 27,
+   "repos": 2,
+   "services": 7,
+   "schemas": [
+    "reporting"
+   ],
+   "perms": [
+    "CHANGE",
+    "COMPLIANCE",
+    "REPORTING",
+    "RISK"
+   ],
+   "tests": 26,
+   "testfiles": 9,
+   "fan_out": 8,
+   "fan_out_edges": 94,
+   "fan_in": 0,
+   "peers": {
+    "platform": 35,
+    "risk": 22,
+    "compliance": 13,
+    "change_mgmt": 12,
+    "ethics": 4,
+    "policy": 4,
+    "evidence": 3,
+    "sust": 1
+   },
+   "kernel": 12
+  },
+  {
+   "module": "risk",
+   "loc": 8955,
+   "files": 99,
+   "entities": 23,
+   "controllers": 14,
+   "endpoints": 101,
+   "repos": 23,
+   "services": 20,
+   "schemas": [
+    "risk"
+   ],
+   "perms": [
+    "RISK"
+   ],
+   "tests": 147,
+   "testfiles": 14,
+   "fan_out": 5,
+   "fan_out_edges": 28,
+   "fan_in": 8,
+   "peers": {
+    "platform": 21,
+    "admin": 2,
+    "policy": 2,
+    "iam": 2,
+    "risk_lc": 1
+   },
+   "kernel": 41
+  },
+  {
+   "module": "risk_lc",
+   "loc": 584,
+   "files": 7,
+   "entities": 3,
+   "controllers": 2,
+   "endpoints": 5,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "risk_lc"
+   ],
+   "perms": [
+    "RISK"
+   ],
+   "tests": 6,
+   "testfiles": 1,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 1,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 3
+  },
+  {
+   "module": "rrp",
+   "loc": 1910,
+   "files": 14,
+   "entities": 5,
+   "controllers": 1,
+   "endpoints": 17,
+   "repos": 5,
+   "services": 1,
+   "schemas": [
+    "rrp"
+   ],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 7
+  },
+  {
+   "module": "scm",
+   "loc": 3808,
+   "files": 46,
+   "entities": 14,
+   "controllers": 5,
+   "endpoints": 66,
+   "repos": 12,
+   "services": 6,
+   "schemas": [
+    "scm"
+   ],
+   "perms": [
+    "SCM"
+   ],
+   "tests": 15,
+   "testfiles": 1,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 1,
+   "peers": {
+    "tprm": 2
+   },
+   "kernel": 12
+  },
+  {
+   "module": "sharia",
+   "loc": 2234,
+   "files": 16,
+   "entities": 6,
+   "controllers": 1,
+   "endpoints": 21,
+   "repos": 6,
+   "services": 1,
+   "schemas": [
+    "sharia"
+   ],
+   "perms": [],
+   "tests": 0,
+   "testfiles": 0,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 8
+  },
+  {
+   "module": "signature",
+   "loc": 811,
+   "files": 12,
+   "entities": 2,
+   "controllers": 2,
+   "endpoints": 10,
+   "repos": 2,
+   "services": 2,
+   "schemas": [
+    "platform",
+    "signature"
+   ],
+   "perms": [
+    "SIGNATURE"
+   ],
+   "tests": 11,
+   "testfiles": 1,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 1,
+   "peers": {
+    "iam": 2
+   },
+   "kernel": 5
+  },
+  {
+   "module": "socops",
+   "loc": 6787,
+   "files": 101,
+   "entities": 25,
+   "controllers": 22,
+   "endpoints": 111,
+   "repos": 25,
+   "services": 24,
+   "schemas": [
+    "socops"
+   ],
+   "perms": [],
+   "tests": 36,
+   "testfiles": 6,
+   "fan_out": 3,
+   "fan_out_edges": 73,
+   "fan_in": 1,
+   "peers": {
+    "platform": 68,
+    "incident": 3,
+    "cyber": 2
+   },
+   "kernel": 52
+  },
+  {
+   "module": "sust",
+   "loc": 16704,
+   "files": 140,
+   "entities": 34,
+   "controllers": 21,
+   "endpoints": 226,
+   "repos": 34,
+   "services": 29,
+   "schemas": [
+    "sust"
+   ],
+   "perms": [
+    "SUST"
+   ],
+   "tests": 200,
+   "testfiles": 25,
+   "fan_out": 5,
+   "fan_out_edges": 55,
+   "fan_in": 2,
+   "peers": {
+    "platform": 42,
+    "risk": 5,
+    "evidence": 4,
+    "iam": 2,
+    "tprm": 2
+   },
+   "kernel": 74
+  },
+  {
+   "module": "tprm",
+   "loc": 5399,
+   "files": 43,
+   "entities": 12,
+   "controllers": 6,
+   "endpoints": 70,
+   "repos": 12,
+   "services": 10,
+   "schemas": [
+    "tprm"
+   ],
+   "perms": [
+    "TPRM"
+   ],
+   "tests": 109,
+   "testfiles": 10,
+   "fan_out": 5,
+   "fan_out_edges": 18,
+   "fan_in": 5,
+   "peers": {
+    "platform": 12,
+    "capa": 2,
+    "scm": 2,
+    "privacy": 1,
+    "bcm": 1
+   },
+   "kernel": 15
+  },
+  {
+   "module": "workflow",
+   "loc": 5127,
+   "files": 45,
+   "entities": 14,
+   "controllers": 5,
+   "endpoints": 44,
+   "repos": 14,
+   "services": 6,
+   "schemas": [
+    "workflow"
+   ],
+   "perms": [
+    "BCM",
+    "COMPLIANCE",
+    "CYBER",
+    "EVIDENCE",
+    "INCIDENT",
+    "PLATFORM_ADMIN",
+    "PRIVACY",
+    "RISK",
+    "SCM",
+    "WORKFLOW"
+   ],
+   "tests": 99,
+   "testfiles": 6,
+   "fan_out": 4,
+   "fan_out_edges": 26,
+   "fan_in": 1,
+   "peers": {
+    "platform": 14,
+    "admin": 6,
+    "evidence": 3,
+    "iam": 3
+   },
+   "kernel": 16
+  },
+  {
+   "module": "workflow_submission",
+   "loc": 494,
+   "files": 4,
+   "entities": 1,
+   "controllers": 1,
+   "endpoints": 6,
+   "repos": 1,
+   "services": 1,
+   "schemas": [
+    "workflow"
+   ],
+   "perms": [
+    "WORKFLOW"
+   ],
+   "tests": 35,
+   "testfiles": 1,
+   "fan_out": 1,
+   "fan_out_edges": 2,
+   "fan_in": 0,
+   "peers": {
+    "platform": 2
+   },
+   "kernel": 2
+  }
+ ],
+ "fe": {
+  "pages": 329,
+  "api_files": 236,
+  "mock_sites": 97,
+  "mock_files": [
+   "lib/auditLifecycle.ts",
+   "lib/bcmLifecycle.ts",
+   "lib/boardPack.ts",
+   "lib/mockWorkflows.ts",
+   "lib/paTriggers.ts",
+   "lib/processMining.ts",
+   "lib/riskLifecycle.ts",
+   "lib/searchIndex.ts",
+   "lib/workflowVersioning.ts",
+   "pages/admin/AdminPage.tsx",
+   "pages/audit-lifecycle/AuditLifecyclePage.tsx",
+   "pages/audit/AuditWorkspacePage.tsx",
+   "pages/audit/EngagementDetailPage.tsx",
+   "pages/authority/AuthoritiesIndexPage.tsx",
+   "pages/authority/AuthorityWorkspacePage.tsx",
+   "pages/bcm/BcmPage.tsx",
+   "pages/changes/ChangesPage.tsx",
+   "pages/compliance/CompliancePage.tsx",
+   "pages/cyber/CyberPage.tsx",
+   "pages/dashboard/widgets.tsx",
+   "pages/detail/ControlDetailPage.tsx",
+   "pages/detail/DpiaDetailPage.tsx",
+   "pages/detail/FindingDetailPage.tsx",
+   "pages/detail/VendorDetailPage.tsx",
+   "pages/ethics/EthicsPage.tsx",
+   "pages/evidence/EvidencePage.tsx",
+   "pages/incidents/IncidentsPage.tsx",
+   "pages/privacy/PrivacyPage.tsx",
+   "pages/reporting/ReportSchedulesPage.tsx",
+   "pages/risk-lifecycle/RiskLifecyclePage.tsx",
+   "pages/risk/RiskDetailPage.tsx",
+   "pages/risk/RiskRegisterPage.tsx",
+   "pages/scm/ScmPage.tsx",
+   "pages/tprm/TprmOnboardingPanel.tsx",
+   "pages/tprm/TprmPage.tsx",
+   "pages/workflow/WorkflowsPage.tsx"
+  ]
+ }
+}

@@ -1,5 +1,8 @@
 package com.tss.grc.module.reporting.service;
 
+import com.tss.grc.module.platform.export.PdfFonts;
+import com.tss.grc.module.platform.export.PdfTheme;
+
 import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.pdf.PdfPTable;

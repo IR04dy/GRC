@@ -449,7 +449,7 @@ public class GreenFinanceService {
      * issuing instrument's identity, as one Field/Value sheet.
      */
     @Transactional(readOnly = true)
-    public com.tss.grc.module.reporting.dto.TabularExportRequest reportExportPayload(Long reportId, String lang) {
+    public com.tss.grc.module.platform.export.TabularExportRequest reportExportPayload(Long reportId, String lang) {
         AllocationReport rep = mustReport(reportId);
         GreenInstrument instr = mustInstrument(rep.getInstrumentId());
         boolean ar = "ar".equalsIgnoreCase(lang);
@@ -469,9 +469,9 @@ public class GreenFinanceService {
             java.util.List.of(ar ? "مياه موفَّرة (م3/سنة)" : "Water m3 saved / yr", str(rep.getWaterM3SavedYr())),
             java.util.List.of(ar ? "الكثافة (طن/م ر.س)" : "Intensity tCO2e / SAR mn", str(rep.getIntensityTco2ePerSarMn())),
             java.util.List.of(ar ? "الحالة" : "Status", rep.getStatus()));
-        return new com.tss.grc.module.reporting.dto.TabularExportRequest(
+        return new com.tss.grc.module.platform.export.TabularExportRequest(
             "GreenFinance", "AllocationReport" + rep.getPeriodYear(), lang,
-            java.util.List.of(new com.tss.grc.module.reporting.dto.TabularExportRequest.Sheet(
+            java.util.List.of(new com.tss.grc.module.platform.export.TabularExportRequest.Sheet(
                 (ar ? "تقرير التخصيص والأثر " : "Allocation & Impact ") + rep.getPeriodYear(),
                 java.util.List.of(ar ? "البند" : "Field", ar ? "القيمة" : "Value"), rows)));
     }

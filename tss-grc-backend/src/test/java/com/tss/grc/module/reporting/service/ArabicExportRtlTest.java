@@ -1,5 +1,9 @@
 package com.tss.grc.module.reporting.service;
 
+import com.tss.grc.module.platform.export.DocxKit;
+
+import com.tss.grc.module.platform.export.PdfTheme;
+
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
@@ -62,10 +66,10 @@ class ArabicExportRtlTest {
     @Test
     void arabicDocxTable_carriesBidiVisual_andRtlRuns() throws Exception {
         try (XWPFDocument doc = new XWPFDocument()) {
-            XWPFTable t = DocxExportService.newTable(doc, new String[]{"الرقم", "المخاطرة"}, true);
+            XWPFTable t = DocxKit.newTable(doc, new String[]{"الرقم", "المخاطرة"}, true);
             XWPFTableRow row = t.createRow();
-            DocxExportService.setCell(row, 0, "R-00001", true);
-            DocxExportService.setCell(row, 1, "مخاطرة تجريبية", true);
+            DocxKit.setCell(row, 0, "R-00001", true);
+            DocxKit.setCell(row, 1, "مخاطرة تجريبية", true);
 
             // The debug serializer uses the main: prefix instead of w: — assert
             // on the local names so the test is prefix-agnostic.
@@ -79,9 +83,9 @@ class ArabicExportRtlTest {
     @Test
     void englishDocxTable_staysLtr() throws Exception {
         try (XWPFDocument doc = new XWPFDocument()) {
-            XWPFTable t = DocxExportService.newTable(doc, new String[]{"Code", "Risk"}, false);
+            XWPFTable t = DocxKit.newTable(doc, new String[]{"Code", "Risk"}, false);
             XWPFTableRow row = t.createRow();
-            DocxExportService.setCell(row, 0, "R-00001", false);
+            DocxKit.setCell(row, 0, "R-00001", false);
 
             String xml = docXml(doc);
             assertThat(xml).doesNotContain("bidiVisual");

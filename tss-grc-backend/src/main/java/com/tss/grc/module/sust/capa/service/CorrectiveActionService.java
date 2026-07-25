@@ -4,7 +4,7 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.service.NotificationService;
-import com.tss.grc.module.reporting.dto.TabularExportRequest;
+import com.tss.grc.module.platform.export.TabularExportRequest;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.repository.CorrectiveActionRepository;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;

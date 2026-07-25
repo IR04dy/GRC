@@ -1,5 +1,7 @@
 package com.tss.grc.module.platform.branding.service;
 
+import com.tss.grc.module.platform.export.PdfFonts;
+
 import org.junit.jupiter.api.Test;
 
 import java.awt.Color;
