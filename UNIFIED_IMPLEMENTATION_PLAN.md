@@ -179,17 +179,18 @@ The centre of gravity — the four items that turn a gate into an operating mode
 
 | ID | Action | Stage | Size | Status | Migration |
 |---|---|---|---|---|---|
-| W0-1 | Merge `fix/break-glass-sweep-tx` | S0 | S | **READY** | — |
-| W0-2 | Rebuild + activate jar (closes DF-1 + DF-2) | S0 | S | staged | — |
-| W0-3 | Post-deploy verification (24 h) | S0 | S | not started | — |
+| W0-1 | Merge `fix/break-glass-sweep-tx` | S0 | S | ✅ **DONE** — master `ccc06799` | — |
+| W0-2 | Rebuild + activate jar (closes DF-1 + DF-2) | S0 | S | ⏳ **jar built + staged** (`...jar.new`, 104,934,012 B, suite 2322/0/0) — awaits the elevated restart | — |
+| W0-3 | Post-deploy verification (24 h) | S0 | S | blocked on W0-2 restart | — |
 | W0-7 | Deployed build ID on `/actuator/info` | S0 | S | not started | — |
+| — | *(unplanned, found by the S0 build)* de-flake `ComplaintServiceTest` — Saturday-only failure | S0 | S | ✅ **DONE** — master `d859060b` | — |
 | W0-4 | Permission catalogue: SIGNATURE, AI, CAPA APPROVE | S1 | S | not started | **V313** |
 | W0-5 | Guard the 5 e-signature endpoints | S1 | S | not started | rides V313 |
 | W0-6 | Fix `AGENTS.md`; stamp V1 docs HISTORIC | S1 | S | not started | — |
 | W1-3 | Guard 45 business writes; ratchet 62 → 17 | S2 | M | not started | rides V313 |
 | W1-6 | Tenant-isolation test pack | S2 | M | not started | — |
-| W1-1 | Committee-engine test suite (6 classes) | S3 | M | not started | — |
-| W1-2 | `ModulePermissionEvaluator` test matrix | S3 | S | not started | — |
+| W1-1 | Committee-engine test suite (6 classes) | S3 | M | 🔶 **1 of 6 DONE** — `CommitteeReferralGateTest` (20 cases, mutation-verified) `00939e76`. Remaining: Quorum · Recusal · Tally · MinutesSignature · TenantIsolation | — |
+| W1-2 | `ModulePermissionEvaluator` test matrix | S3 | S | ✅ **DONE** — 14 cases `00939e76` | — |
 | W1-4 | Seed gate map + config-health check | S4 | M | not started | **V314** |
 | W1-5 | Retained worked committee decision | S4 | S | not started | — |
 | **CE-1** | Module separation + ports + boundary test | S5 | L | not started | — |
