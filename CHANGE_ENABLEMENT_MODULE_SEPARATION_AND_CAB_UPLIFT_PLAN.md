@@ -3,7 +3,7 @@
 
 > **Plan type:** design & implementation plan — **no product code changed by this document**.
 > **Date:** 2026-07-23 · **Baseline as written:** `master` @ `00ba890e` · backend suite 2316/0/0 · ratchet 62 · next free migration V313.
-> **Re-baselined 2026-07-25:** suite **2,460/0/0** · ratchet **21** · next free migration **V320** · branch `feat/change-policy-remediation`.
+> **Re-baselined 2026-07-25:** suite **2,460/0/0** · ratchet **21** · next free migration **V318** (F2-28); the first CE number is **V322** · branch `feat/change-policy-remediation`.
 > **Predecessor:** `CHANGE_AND_POLICY_MODULE_REVIEW_AND_REMEDIATION_PLAN.md` (CH-1…CH-17 + Tracks A–D — **100 % delivered and merged**). This plan starts where that one ended: the change module is now *correct* (guarded, audited, SoD-gated, committee-routed). It is not yet *separate*, and its CAB is a thin gate rather than a governed body with its own lifecycle and records.
 > **House rules** (`CLAUDE.md`): verified slices · feature branch · **no merge without explicit "merge"** · **ratchet ≤ 21** (was 62 when this plan was written) · idempotent migrations applied twice to dev via pyodbc (Flyway OFF in dev) · `[REVIEW-TEST]` + CHARINDEX cleanup · **destructive DB ops need explicit OK** · bilingual `*_en` + `*_ar`.
 
@@ -25,7 +25,7 @@
 > ⚠ **Two corrections to this document, both material:**
 > 1. **The migration numbers below are stale.** V313–V317 have been taken by other work (V313 permissions,
 >    V314 gate map, V315 vote provenance, V316 CAB approval provenance, V317 committee/change-authority
->    grants). CE migrations are renumbered **V320–V328** (V318 is F2-28, V319 is `ck_change_status` — both land before CE work); the unified plan's §4 ledger is authoritative.
+>    grants). CE migrations are renumbered **V322–V331, assigned in delivery order** (V318 F2-28, V319 `ck_change_status`, V320 W2-0, V321 F2-04 all land first); the unified plan's §4 ledger is authoritative.
 >    Re-check it immediately before creating any migration file.
 > 2. **CE-3/CE-4 are gated on F2-28 (DF-5).** The committee quorum denominator is currently caller-authored,
 >    and CE-4 asserts CAB decisions on quorate minutes. Building CAB governance on that would give every CAB
@@ -40,23 +40,23 @@
 |---|---|---|---|---|---|
 | **CE-0** | **Lift Change out of the Risk nav group** — own `navChange` sidebar group with CAB / calendar-FSC / decision-register beneath it (`Sidebar.tsx:106`) | XS | NOT STARTED | — | none |
 | **CE-1** | Module separation: `change_mgmt` → `module/change` w/ sub-packages, ports/adapters, import-boundary ratchet test | L | **NOT STARTED** | — | none (code-only) |
-| **CE-2** | Change **model catalogue** (standard/pre-approved change templates) | M | NOT STARTED | — | **V320** |
-| **CE-3** | **CAB as a governed body**: charter/ToR, membership matrix + roles, quorum policy, term review | M | NOT STARTED | — | **V321** |
-| **CE-4** | **CAB meeting cycle** + agenda auto-build from the CAB queue + papers pack | L | NOT STARTED | — | **V322** |
-| **CE-5** | **Decision write-back**: APPROVE/REJECT/DEFER/MORE_INFO/CONDITIONAL + conditions register | M | NOT STARTED | — | **V323** |
-| **CE-6** | **ECAB** emergency path + mandatory retrospective **ratification** with SLA | M | NOT STARTED | — | **V324** |
-| **CE-7** | Real **PIR** object (findings, actions, lessons) + auto-CAPA link | M | NOT STARTED | — | **V325** |
-| **CE-8** | **FSC** (forward schedule of change) + **PSO** + conflict/collision hardening | M | NOT STARTED | — | **V326** |
-| **CE-9** | Change **records & evidence** — adopt the platform evidence/attachment subsystem + retention | M | NOT STARTED | — | **V327** |
+| **CE-2** | Change **model catalogue** (standard/pre-approved change templates) | M | NOT STARTED | — | **V328** |
+| **CE-3** | **CAB as a governed body**: charter/ToR, membership matrix + roles, quorum policy, term review | M | NOT STARTED | — | **V322** |
+| **CE-4** | **CAB meeting cycle** + agenda auto-build from the CAB queue + papers pack | L | NOT STARTED | — | **V324** |
+| **CE-5** | **Decision write-back**: APPROVE/REJECT/DEFER/MORE_INFO/CONDITIONAL + conditions register | M | NOT STARTED | — | **V325** |
+| **CE-6** | **ECAB** emergency path + mandatory retrospective **ratification** with SLA | M | NOT STARTED | — | **V326** |
+| **CE-7** | Real **PIR** object (findings, actions, lessons) + auto-CAPA link | M | NOT STARTED | — | **V327** |
+| **CE-8** | **FSC** (forward schedule of change) + **PSO** + conflict/collision hardening | M | NOT STARTED | — | **V329** |
+| **CE-9** | Change **records & evidence** — adopt the platform evidence/attachment subsystem + retention | M | NOT STARTED | — | **V330** |
 | **CE-10** | **Workflow-engine adoption** for change authorisations (15th module) | M | NOT STARTED | — | none |
-| **CE-11** | **Unauthorised-change detection** + reconciliation register | S | NOT STARTED | — | **V328** |
+| **CE-11** | **Unauthorised-change detection** + reconciliation register | S | NOT STARTED | — | **V331** |
 | **CE-12** | ITIL/ISO **KPI pack** + CAB throughput analytics | S | NOT STARTED | — | none |
 | **CE-13** | FE: split `ChangesPage` → Change workspace + **CAB workspace** (agenda builder, voting, minutes) | L | NOT STARTED | — | none |
 | **CE-14** | Exports/records pack: agenda pack, minutes, decision register (RTL + bilingual) | M | NOT STARTED | — | none |
-| **CE-15** | RBAC: CAB roles + `CHANGE`/`CAB` permissions + SoD gates | S | NOT STARTED | — | **V329** |
+| **CE-15** | RBAC: CAB roles + `CHANGE`/`CAB` permissions + SoD gates | S | NOT STARTED | — | **V323** |
 | **CE-16** | Docs: PROJECT_CHRONICLE §, `package-info`, CAB operating runbook | S | NOT STARTED | — | none |
 
-**Migrations reserved: V320 – V329** *(renumbered 2026-07-25 — V313–V317 taken; **V318 = F2-28 quorum integrity, V319 = ck_change_status**, both of which land first)*.
+**Migrations reserved: V322 – V331** *(in DELIVERY order — S6 first, then S7, then S8; V318–V321 belong to F2-28, `ck_change_status`, W2-0 and F2-04)* .
 Every migration idempotent, `GO`-separated, applied to dev **twice**. **The unified plan's §4 ledger is
 authoritative** — reserved numbers have already moved twice, so re-check it before creating a file.
 **Open decisions requiring the user: §19** — do not start CE-3/CE-4 before the **unified plan's** D-1 and D-2 are answered (not CD-1/CD-2),
@@ -189,7 +189,7 @@ Services: `CommitteeService` (393), `CommitteeCalendarService` (286), `Committee
 
 ### 3.4 Tests
 
-`ChangeManagementServiceTest`, `ChangeTaskSlaSchedulerTest`, `reporting/ChangeRegisterExportTest`. **No architecture/boundary test exists** — the only ratchet is `ControllerAuthorizationRatchetTest` (`BASELINE_UNGUARDED_WRITE_ENDPOINTS = 62`).
+`ChangeManagementServiceTest`, `ChangeTaskSlaSchedulerTest`, `reporting/ChangeRegisterExportTest`. **No architecture/boundary test exists** — the only ratchet is `ControllerAuthorizationRatchetTest` (`BASELINE_UNGUARDED_WRITE_ENDPOINTS = 21` (was 62 when this plan was written)).
 
 ---
 
@@ -310,21 +310,21 @@ New tables all in schema `change_mgmt`, all with `organisation_id`, `is_deleted`
 
 | Table | Migration | Purpose | Key columns |
 |---|---|---|---|
-| `change_model` | V313 | Change model / template catalogue | `code`, `name_en/ar`, `change_type`, `risk_default`, `gate_override`, `pre_approved` (bit), `authorised_by`, `authorised_until`, `standard_steps` (JSON), `rollback_template`, `test_template`, `max_lead_time_hours`, `review_cadence`, `status` |
-| `change_model_usage` | V313 | Which change used which model (audit + KPI) | `change_id`, `model_id`, `applied_at`, `deviation_notes` |
-| `cab_profile` | V314 | CAB as a governed body | `committee_id` (→ `admin.committees`), `gate` (CAB│ECAB), `charter_en/ar`, `terms_of_reference`, `scope_json`, `quorum_min_members`, `quorum_requires_chair` (bit), `min_approvals`, `chair_member_id`, `secretary_member_id`, `standing_cadence`, `notice_period_hours`, `review_due_date`, `status` |
-| `cab_member_role` | V314 | Role of a member **on this CAB** | `cab_profile_id`, `member_id`, `role` (CHAIR│VICE_CHAIR│SECRETARY│MEMBER│OBSERVER│DELEGATE), `delegate_for_member_id`, `voting` (bit), `from_date`, `to_date` |
-| `cab_agenda_item` | V315 | Change ↔ meeting binding | `meeting_id`, `change_id`, `seq`, `presenter_name`, `time_box_minutes`, `item_type` (AUTHORISATION│RATIFICATION│REVIEW│INFORMATION), `paper_id`, `status` (PROPOSED│TABLED│DEFERRED│WITHDRAWN│DECIDED) |
-| `change_decision` | V316 | Change-facing decision record | `change_id`, `meeting_id`, `resolution_id`, `outcome` (APPROVED│APPROVED_WITH_CONDITIONS│REJECTED│DEFERRED│MORE_INFO_REQUIRED), `decided_at`, `vote_for/against/abstain`, `quorum_met` (bit), `rationale_en/ar`, `effective_from`, `effective_to`, `superseded_by` |
-| `change_decision_condition` | V316 | Enforceable conditions | `decision_id`, `seq`, `condition_en/ar`, `owner_name`, `due_at`, `satisfied_at`, `satisfied_by`, `evidence_id`, `status` (OPEN│SATISFIED│WAIVED) |
-| `change_ratification` | V317 | ECAB retrospective ratification | `change_id`, `required_by` (datetime), `referred_at`, `meeting_id`, `resolution_id`, `outcome`, `ratified_at`, `breach` (bit), `breach_reason` |
-| `change_pir` | V318 | Real PIR record | `change_id`, `review_date`, `reviewer_name`, `outcome` (SUCCESS│PARTIAL│FAILED│ROLLED_BACK), `objectives_met` (bit), `on_time` (bit), `within_scope` (bit), `incidents_caused`, `summary_en/ar`, `approved_by`, `approved_at` |
-| `change_pir_finding` | V318 | PIR findings → actions | `pir_id`, `seq`, `finding_en/ar`, `severity`, `root_cause`, `capa_id` (→ `sust.corrective_action`), `action_owner`, `due_at`, `status` |
-| `change_schedule_entry` | V319 | FSC + PSO | `change_id`, `window_start`, `window_end`, `entry_type` (PLANNED│PSO│MAINTENANCE), `services_affected`, `outage_expected` (bit), `outage_minutes`, `published` (bit), `published_at` |
-| `change_evidence_link` | V320 | Change ↔ platform evidence | `change_id`, `evidence_id`, `purpose` (TEST_RESULT│APPROVAL│BACKOUT_PROOF│IMPLEMENTATION_LOG│PIR), `required` (bit), `verified_at`, `verified_by` |
-| `change_unauthorised` | V321 | Reconciliation register | `detected_at`, `source` (MANUAL│SCAN│INTEGRATION), `asset_ref`, `description_en/ar`, `matched_change_id`, `status` (OPEN│MATCHED│FALSE_POSITIVE│ESCALATED), `incident_id`, `escalated_to` |
+| `change_model` | *(see §0)* | Change model / template catalogue | `code`, `name_en/ar`, `change_type`, `risk_default`, `gate_override`, `pre_approved` (bit), `authorised_by`, `authorised_until`, `standard_steps` (JSON), `rollback_template`, `test_template`, `max_lead_time_hours`, `review_cadence`, `status` |
+| `change_model_usage` | *(see §0)* | Which change used which model (audit + KPI) | `change_id`, `model_id`, `applied_at`, `deviation_notes` |
+| `cab_profile` | *(see §0)* | CAB as a governed body | `committee_id` (→ `admin.committees`), `gate` (CAB│ECAB), `charter_en/ar`, `terms_of_reference`, `scope_json`, `quorum_min_members`, `quorum_requires_chair` (bit), `min_approvals`, `chair_member_id`, `secretary_member_id`, `standing_cadence`, `notice_period_hours`, `review_due_date`, `status` |
+| `cab_member_role` | *(see §0)* | Role of a member **on this CAB** | `cab_profile_id`, `member_id`, `role` (CHAIR│VICE_CHAIR│SECRETARY│MEMBER│OBSERVER│DELEGATE), `delegate_for_member_id`, `voting` (bit), `from_date`, `to_date` |
+| `cab_agenda_item` | *(see §0)* | Change ↔ meeting binding | `meeting_id`, `change_id`, `seq`, `presenter_name`, `time_box_minutes`, `item_type` (AUTHORISATION│RATIFICATION│REVIEW│INFORMATION), `paper_id`, `status` (PROPOSED│TABLED│DEFERRED│WITHDRAWN│DECIDED) |
+| `change_decision` | *(see §0)* | Change-facing decision record | `change_id`, `meeting_id`, `resolution_id`, `outcome` (APPROVED│APPROVED_WITH_CONDITIONS│REJECTED│DEFERRED│MORE_INFO_REQUIRED), `decided_at`, `vote_for/against/abstain`, `quorum_met` (bit), `rationale_en/ar`, `effective_from`, `effective_to`, `superseded_by` |
+| `change_decision_condition` | *(see §0)* | Enforceable conditions | `decision_id`, `seq`, `condition_en/ar`, `owner_name`, `due_at`, `satisfied_at`, `satisfied_by`, `evidence_id`, `status` (OPEN│SATISFIED│WAIVED) |
+| `change_ratification` | *(see §0)* | ECAB retrospective ratification | `change_id`, `required_by` (datetime), `referred_at`, `meeting_id`, `resolution_id`, `outcome`, `ratified_at`, `breach` (bit), `breach_reason` |
+| `change_pir` | *(see §0)* | Real PIR record | `change_id`, `review_date`, `reviewer_name`, `outcome` (SUCCESS│PARTIAL│FAILED│ROLLED_BACK), `objectives_met` (bit), `on_time` (bit), `within_scope` (bit), `incidents_caused`, `summary_en/ar`, `approved_by`, `approved_at` |
+| `change_pir_finding` | *(see §0)* | PIR findings → actions | `pir_id`, `seq`, `finding_en/ar`, `severity`, `root_cause`, `capa_id` (→ `sust.corrective_action`), `action_owner`, `due_at`, `status` |
+| `change_schedule_entry` | *(see §0)* | FSC + PSO | `change_id`, `window_start`, `window_end`, `entry_type` (PLANNED│PSO│MAINTENANCE), `services_affected`, `outage_expected` (bit), `outage_minutes`, `published` (bit), `published_at` |
+| `change_evidence_link` | *(see §0)* | Change ↔ platform evidence | `change_id`, `evidence_id`, `purpose` (TEST_RESULT│APPROVAL│BACKOUT_PROOF│IMPLEMENTATION_LOG│PIR), `required` (bit), `verified_at`, `verified_by` |
+| `change_unauthorised` | *(see §0)* | Reconciliation register | `detected_at`, `source` (MANUAL│SCAN│INTEGRATION), `asset_ref`, `description_en/ar`, `matched_change_id`, `status` (OPEN│MATCHED│FALSE_POSITIVE│ESCALATED), `incident_id`, `escalated_to` |
 
-**`change_requests` additions** (V313/V316/V317 — additive columns only): `change_model_id`, `current_decision_id`, `ratification_id`, `conditions_open_count` (denormalised for the guard), `unauthorised_flag`.
+**`change_requests` additions** (*additive columns only — numbers per §0*): `change_model_id`, `current_decision_id`, `ratification_id`, `conditions_open_count` (denormalised for the guard), `unauthorised_flag`.
 
 **CHECK constraints** on every new enum column (the CH-2/V300 convention) — and remember the `ck_ca_source` landmine: **any new CAPA `source_type` (e.g. `CHANGE_PIR`) must be added to the CHECK or inserts 500.**
 
@@ -441,7 +441,7 @@ All exports go through the existing RTL-correct generators (Amiri font, bilingua
 
 ## §10 RBAC & SoD (CE-15)
 
-New permissions (V322), catalogued in `iam.permissions` and granted per the 55-role persona matrix:
+New permissions (CE-15 — see §0 for the number), catalogued in `iam.permissions` and granted per the 55-role persona matrix:
 
 | Permission | Holder intent |
 |---|---|
@@ -509,7 +509,7 @@ Backed by SQL over the new records, surfaced on `ChangeAnalyticsPage` + the ESG/
 
 ## §14 Migration & data plan
 
-1. **Numbering** — V313…V322 as mapped in §0. Each: idempotent guards (`IF OBJECT_ID … IS NULL`, `IF COL_LENGTH … IS NULL`, `NOT EXISTS` backfills), `GO`-separated, applied to dev **twice** via `apply_migration.py`, reverse recipe documented in the header.
+1. **Numbering** — the values mapped in §0 (**V322–V331**, delivery order); re-check §4 of the unified plan immediately before creating a file. Each: idempotent guards (`IF OBJECT_ID … IS NULL`, `IF COL_LENGTH … IS NULL`, `NOT EXISTS` backfills), `GO`-separated, applied to dev **twice** via `apply_migration.py`, reverse recipe documented in the header.
 2. **Additive only** — no column drops, no schema rename, no data deletion. Every new column NULLable or DEFAULTed. (A `change_mgmt` → `change` **schema** rename is explicitly **rejected**: destructive, requires an outage, breaks native SQL and Flyway history for zero functional gain.)
 3. **Backfills** — (a) seed a `change_model` per distinct `(change_type, category)` in use, marking existing `STANDARD` rows' models `pre_approved = 0` until a human authorises them (fail-closed, never auto-bless); (b) create a `cab_profile` for each existing `committee_gate_map` row; (c) synthesise `change_pir` rows from the CH-11 PIR summary strings, flagged `source = LEGACY_SUMMARY`; (d) create `change_ratification` rows for closed emergency changes marked `breach = 1, breach_reason = 'PRE-CE6 LEGACY'` — the historical truth, visible rather than hidden.
 4. **Package move (CE-1)** — a single mechanical commit (imports + `@ComponentScan` reach + test packages), no behaviour change, full suite green before and after. FE untouched by CE-1 (API paths unchanged: `/api/v1/changes` stays).
@@ -590,13 +590,13 @@ Each slice: build → targeted unit tests → migration applied ×2 to dev → *
 
 | # | Decision | Options | Recommendation |
 |---|---|---|---|
-| **D-1** | CAB modelling | (a) **Profile over the committee engine** · (b) dedicated CAB tables + own meeting engine | **(a)** — one meeting engine, one minutes/e-signature trail platform-wide; (b) duplicates 4,638 LoC and splits the audit story |
-| **D-2** | Agenda auto-build trigger | (a) **On demand** (secretary clicks "Build agenda") · (b) automatic on meeting creation · (c) scheduled nightly | **(a)** with a preview diff — auto-mutating an agenda a human is editing is a trust problem |
-| **D-3** | Ratification SLA default | 3 / **5** / 10 business days, per-tenant override | **5 business days**, per-tenant override; breach flags rather than blocks (blocking a closed emergency change helps nobody) |
-| **D-4** | New-guard rollout | (a) **Off for existing tenants + dry-run report** · (b) on immediately | **(a)** — see §17 |
-| **D-5** | Approval expiry | Do CAB approvals expire? **Yes**, default 30 days (`effective_to`) · No | **Yes, 30 days** — a 6-month-old approval for a since-changed system is a real audit finding |
-| **D-6** | Standard-change auto-approval | May a pre-approved model skip CAB entirely (`AUTO` gate)? | **Yes**, but only with `pre_approved = 1` **and** a live `authorised_until` **and** a named authoriser — fail-closed on expiry (§7.2 `ModelComplianceGuard`) |
-| **D-7** | Delegate voting | Allowed always · **only when principal absent** · never | **Only when principal absent** — recorded as a delegated vote in the minutes |
+| **CD-1** ✅ **DECIDED** | CAB modelling | (a) **Profile over the committee engine** · (b) dedicated CAB tables + own meeting engine | **(a)** — one meeting engine, one minutes/e-signature trail platform-wide; (b) duplicates 4,638 LoC and splits the audit story |
+| **CD-2** | Agenda auto-build trigger | (a) **On demand** (secretary clicks "Build agenda") · (b) automatic on meeting creation · (c) scheduled nightly | **(a)** with a preview diff — auto-mutating an agenda a human is editing is a trust problem |
+| **CD-3** | Ratification SLA default | 3 / **5** / 10 business days, per-tenant override | **5 business days**, per-tenant override; breach flags rather than blocks (blocking a closed emergency change helps nobody) |
+| **CD-4** | New-guard rollout | (a) **Off for existing tenants + dry-run report** · (b) on immediately | **(a)** — see §17 |
+| **CD-5** | Approval expiry | Do CAB approvals expire? **Yes**, default 30 days (`effective_to`) · No | **Yes, 30 days** — a 6-month-old approval for a since-changed system is a real audit finding |
+| **CD-6** | Standard-change auto-approval | May a pre-approved model skip CAB entirely (`AUTO` gate)? | **Yes**, but only with `pre_approved = 1` **and** a live `authorised_until` **and** a named authoriser — fail-closed on expiry (§7.2 `ModelComplianceGuard`) |
+| **CD-7** | Delegate voting | Allowed always · **only when principal absent** · never | **Only when principal absent** — recorded as a delegated vote in the minutes |
 
 ---
 
