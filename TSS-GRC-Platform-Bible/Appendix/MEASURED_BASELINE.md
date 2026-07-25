@@ -345,19 +345,112 @@ proves they converge. A migration that is correct under Flyway but was hand-appl
 
 ---
 
+## 7.1 Prior-audit evidence vault — `audit/` (tracked, 98 files)
+
+**Correction to this review.** An earlier draft of `Registers/FINDINGS_REGISTER_V2.md` asserted that no
+performance, accessibility, secret-scanning or coverage evidence existed. **That was wrong.** The
+repository contains a tracked audit evidence vault from the **2026-06-18** audit at commit `3ca91bf`,
+produced with 12 named tools. It is the third time in this review that "not found" turned out not to
+mean "does not exist" — the same error recorded against `ADR-002` in `Governance/BIBLE_VALIDATION_LOG.md`.
+
+| Artefact | Location | Content |
+|---|---|---|
+| Measured metrics | `audit/metrics.json` | LoC, backend counts, coverage, quality, deps, secrets, load test, accessibility |
+| Load test | `audit/artifacts/k6/load.js`, `audit/raw/k6-summary.json` | 4 scenarios, full metrics |
+| Accessibility | `audit/raw/lighthouse-login.report.html`, `audit/findings/dyn-a11y.json` | Lighthouse + axe-core |
+| Security scans | `audit/raw/gitleaks.json`, `bandit.json`, trivy, `npm audit` | secrets, Python SAST, CVEs |
+| Quality | `audit/raw/jscpd/` | duplication |
+| Findings | `audit/all_findings.json`, `crit_high.json`, `verdicts.json`, `workstreams.json` | the 287 findings |
+| E2E | `audit/artifacts/e2e/`, `audit/findings/dyn-*.json` | Playwright functional/UX/a11y |
+
+**Tools used (from `metrics.json`):** trivy 0.71.1 · gitleaks 8.30.1 · npm audit · bandit 1.9.4 · jscpd ·
+tsc 5.6 · JaCoCo 0.8.12 · Maven Surefire · Playwright 1.49 + `@axe-core/playwright` · Lighthouse ·
+k6 2.0 · 35+ manual review subagents.
+
+### 7.2 Performance — measured, and good within its scope
+
+| Metric | Value |
+|---|---:|
+| Endpoint tested | **`GET /api/v1/risk/risks`** (authenticated, admin) — **1 of 2,160** |
+| Scenarios | baseline 20 VU/35 s · spike →100 VU · soak 15 VU/45 s · breakpoint arrival-rate →350/s |
+| Total requests | **18,763** · 110.1 req/s |
+| Latency | p50 **8.6 ms** · p95 **26.9 ms** · max 194.2 ms |
+| Errors | **0.0%** · checks passed **100%** (18,762/18,762) |
+| Ceiling | **Not reached.** Hikari pool (dev max 10) never exhausted |
+
+The audit's own note is candid and worth quoting in spirit: no failure threshold was reached up to
+~350 req/s on this fast read path, so the true ceiling is higher and would need a heavier/write endpoint
+or a larger dataset to find.
+
+**So the finding is coverage, not absence:** one read endpoint, at dev data volumes, before the
+remediation programmes. No write path, export, dashboard or search was load-tested, and there is still
+no capacity model or p95 target per endpoint. (Finding F2-17, reframed.)
+
+### 7.3 Accessibility — measured, with one serious open violation
+
+| Metric | Value |
+|---|---:|
+| Lighthouse `/login` — **accessibility** | **100** |
+| Lighthouse `/login` — performance · best-practices · SEO | **38** · 77 · 82 |
+| axe-core violations on `/login` | **0** |
+| Pages scanned by axe | **10** |
+| Authenticated-page violation | **`color-contrast` (WCAG 1.4.3, serious)** — **68 instances** |
+
+⚠ The Lighthouse performance score of 38 was taken against the **Vite dev server** (`localhost:5173`),
+which is not representative of a production build — treat it as unmeasured rather than bad.
+The **68 colour-contrast instances are real and actionable**, and they sit against a design system with
+central tokens (§5.3), so the fix is likely a small number of token changes rather than 68 edits.
+
+### 7.4 Coverage, quality and dependencies (2026-06-18 vintage)
+
+| Metric | Value | Note |
+|---|---:|---|
+| Backend tests then | 1,858 | **now 2,415** |
+| **Instruction coverage** | **37.1%** | JaCoCo, 1,324 classes |
+| **Branch coverage** | **26.0%** | |
+| **Line coverage** | **38.5%** | |
+| Frontend tests then | **0** (`runner: none`) | now 49 via vitest |
+| Code duplication | **5.41%** — 1,666 clones, 21,062 lines | jscpd over 389,021 lines |
+| **ESLint configured** | **`false`** | ⚠ a precondition for F2-11's lint ratchets — they cannot be added until ESLint exists |
+| trivy dependency vulns | 36 | not triaged by severity in `metrics.json` |
+| `npm audit` | 5 (1 high, 3 moderate, 1 low) | |
+| gitleaks hits | **21 → 0 real** | see below |
+| Module packages then | **62** | vs **58** now — consolidation since |
+
+**The 21 gitleaks hits are all false positives**, verified match by match in this review:
+placeholder tokens in integration docs (`SPLUNK_HEC_TOKEN="00112233-4455-6677-8899-aabbccddeeff"`,
+`TENABLE_ACCESS_KEY="abc123def456..."`), `localStorage` key constants
+(`KEY = 'grc.mfa.enrolment.v1'`, `'grc.bcm.invocation.v1'`, …), form-field keys
+(`'c5BreachNotification'`), a seed client identifier (`fapi_client="lean-prod-aspsp1-2024"`) and a demo
+vendor-portal access code (`'NEOM-2026-A4Z9'`). **No secret leakage was found.**
+
+Process point: `metrics.json` publishes the **untriaged** count of 21, and "21 secret hits" is exactly
+the kind of number that alarms a reader who does not open the file. Scan output should carry a triage
+verdict beside the raw count.
+
+**Overall, this vault materially strengthens the platform's evidence position** — and it was invisible to
+this review until the documentation register was compiled, which is itself the argument for D-5
+(no document register) in `Appendix/DOCUMENTATION_REGISTER_AND_AUDIT_SUPPORT.md`.
+
+---
+
 ## 8. What this baseline does **not** measure
 
 Stated so no reader over-reads it:
 
-- **Runtime performance / load behaviour** — no profiling, no load test was run.
+- **Runtime performance beyond one endpoint** — a k6 load test exists (§7.2) covering `GET /api/v1/risk/risks` only. No profiling, no write-path or export load test, no capacity model.
 - **Test *quality*** — 2,415 passing tests is a count, not an assertion-strength measure. Spot mutation
-  checks were done on the committee engine and `ModulePermissionEvaluator` only.
+  checks were done on the committee engine and `ModulePermissionEvaluator` only. JaCoCo coverage from
+  2026-06-18 was **37.1% instruction / 26.0% branch / 38.5% line** (§7.4); it has not been re-measured
+  since the suite grew from 1,858 to 2,415 tests. **F2-21 is the proof that coverage is not provenance:**
+  the committee engine's 38 tests all pass and none of them notices that the voter's identity is
+  attacker-supplied.
 - **Functional correctness of the 19 zero-test modules** — they may work perfectly; the point is that
   **nothing proves it**, and nothing would catch a regression.
 - **Actual tenant data volumes** — dev carries 3 seeded Saudi tenants; there is no production data
   profile in scope.
-- **Accessibility conformance** — no automated axe/WCAG run; UX findings are structural, from source.
-- **Penetration testing** — the security findings are design- and code-level only.
+- **Accessibility beyond the 2026-06-18 sweep** — axe-core + Lighthouse were run over 10 pages (§7.3): login clean, 68 serious colour-contrast instances open. Focus management, keyboard reachability and screen-reader labelling remain unmeasured.
+- **Penetration testing** — none. Automated scanning exists (gitleaks, trivy, bandit, npm audit — §7.4) but scanning is not a pentest; the security findings here are design- and code-level.
 
 ---
 

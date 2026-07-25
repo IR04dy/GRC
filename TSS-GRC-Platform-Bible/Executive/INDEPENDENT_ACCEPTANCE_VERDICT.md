@@ -74,7 +74,7 @@ against a running system rather than more of the same.
 | Can I define my own roles and grant granular permissions? | **For 37 of 58 modules.** The other 21 compare hard-coded role *names*, so a custom role granted `SHARIA_WRITE` still gets 403. Least privilege is unachievable there. |
 | Can my DBA see clean data ownership? | **Mostly.** 50 schemas, one per module — except nine, of which `incident` writing into the `cyber` schema is the one that will be questioned. |
 | Will my users find the features I paid for? | **Probably not all.** ~144 of 328 screens are reachable only by typing a URL. |
-| What are the performance limits? | **Unknown.** No load test, no capacity model, no p95 targets, for 2,160 endpoints. |
+| What are the performance limits? | **Partly known.** A k6 load test (2026-06-18) shows **p95 26.9 ms, 0 errors over 18,763 requests** up to a 100-VU spike — on **one read endpoint of 2,160**, at dev data volumes. No write-path test, no capacity model, no per-endpoint p95 target. |
 | Is it stable in production? | **A known daily failure is live.** The break-glass sweep defect (33–35 failures/day) is fixed, built and staged — and the service has not been restarted. |
 | Can I get my data out? | **Yes** — strong export coverage (PDF/XLSX/DOCX/PPTX, RTL Arabic) across 22 generators. Genuine strength. |
 
@@ -155,10 +155,10 @@ for the business.**
 | **Commercial packaging readiness** | **3/10** | Entitlement subsystem built (tier/seats/validity, fail-closed guard) but wired to 8.6% of controllers and unconsumed by the FE; module inventory understated by 40% in the operative documents |
 | Security architecture | **4/10** | Guard *coverage* ratcheted 62→21 — but committee vote provenance is forgeable (F2-21), 21 modules bypass the permission catalogue, 216 endpoints bind entities from the body, and grant tightness is unmeasured |
 | Operations | **5/10** | Known-fixed defects live in production; dev/prod schemas built by two mechanisms with no convergence proof |
-| Performance / scalability | **2/10** | No evidence of any kind |
-| Documentation | **6/10** | Extensive and now partly generated — but has asserted wrong numbers, including in its own plans |
+| Performance / scalability | **4/10** | A real k6 harness with 4 scenarios exists and the one path measured is excellent (p95 26.9 ms, 0/18,763 errors) — but it is 1 of 2,160 endpoints, read-only, at dev volumes, with no capacity model |
+| Documentation | **5/10** | Extensive (331 tracked files, 74,878 lines) and now partly generated — but has asserted wrong numbers including in its own plans, 65% is stale and unmarked, a stale worktree duplicates the corpus, and two competing generations of the Saudi pack both claim authority |
 
-**Weighted overall: 5.3 / 10 — "strong engineering, unpackaged product, one unenforceable core control."**
+**Weighted overall: 5.5 / 10 — "strong engineering, unpackaged product, one unenforceable core control."**
 
 The gap between the domain score (8) and the packaging score (2) *is* the finding. The hard part —
 building 186 kLoC of Saudi GRC domain logic — is done. The easy part — declaring what exists, proving

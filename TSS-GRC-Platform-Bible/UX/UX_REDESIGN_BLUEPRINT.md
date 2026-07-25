@@ -213,17 +213,46 @@ the weakest localisation.
 
 ---
 
-## 7. Accessibility — declared unmeasured
+## 7. Accessibility — measured, with one serious open violation
 
-No automated accessibility run was performed (Baseline §8), so **no conformance claim is made**. What is
-structurally in place: a semantic component library, `dir`-aware layout, design tokens permitting
-contrast adjustment. What is unknown: contrast ratios, focus management, keyboard reachability, screen-reader
-labelling, `aria` coverage.
+**Corrected.** An earlier draft of this section stated that no accessibility run had been performed.
+That was wrong: the tracked `audit/` evidence vault (2026-06-18 @ `3ca91bf`) contains a real
+accessibility assessment using **Playwright 1.49 + `@axe-core/playwright`** and **Lighthouse**.
 
-**Recommendation.** Add `axe-core` to the component test suite and run it over the 12 workspace landing
-pages plus the top 20 registers. Target WCAG 2.1 AA — DGA digital-accessibility expectations make this a
-procurement question for Saudi government buyers, not a nice-to-have. Until measured, the honest answer
-in an RFP is "design-system-level support, conformance not yet audited."
+| Measure | Result |
+|---|---:|
+| Lighthouse `/login` — **accessibility** | **100** |
+| axe-core violations on `/login` | **0** |
+| Pages scanned by axe | **10** |
+| Authenticated-page violation | **`color-contrast` — WCAG 1.4.3, severity *serious*** |
+| Instances | **68** |
+| Lighthouse `/login` — best-practices · SEO | 77 · 82 |
+| Lighthouse `/login` — performance | 38 ⚠ *measured against the Vite **dev** server; not representative of a production build — treat as unmeasured* |
+
+**So the real position is better than "unmeasured" and worse than "conformant".** The login surface is
+clean and scores 100. The authenticated application carries **68 instances of a serious colour-contrast
+failure** — the single most common WCAG failure in enterprise dashboards, and the one that most affects
+users reading dense risk and compliance tables.
+
+**Why this is cheap to fix, and why that matters.** Contrast is a **token** problem, and this platform
+has central tokens (`styles/tokens.css`, 15 KB) with 99% component adoption (§1). 68 reported instances
+almost certainly trace to a small number of token pairs — muted text on tinted card backgrounds, badge
+foregrounds, disabled states. Fixing the tokens fixes every instance at once. This is the highest
+accessibility return per hour available anywhere in the frontend.
+
+**Recommendation.** (1) Extract the 68 instances from `audit/findings/dyn-a11y.json`, group by
+token pair, and fix at the token level — not per component. (2) Re-run the existing axe harness to
+confirm zero. (3) Wire `@axe-core/playwright` into CI over the 12 workspace landing pages plus the top
+20 registers, as a **ratchet** (violations may only fall). (4) Extend beyond contrast to focus
+management, keyboard reachability and screen-reader labelling — none of which the current 10-page sweep
+reports on, so they remain genuinely unmeasured. (5) Then issue a WCAG 2.1 AA conformance statement:
+DGA digital-accessibility expectations make it a procurement question for Saudi government buyers, and
+the evidence to support one is now within reach.
+
+**Honest RFP answer today:** "axe-core and Lighthouse are in our audit pipeline; the login surface passes
+with an accessibility score of 100 and zero violations; one serious colour-contrast issue is open across
+authenticated pages and is being remediated at the design-token level. A formal AA conformance statement
+is not yet issued."
 
 ---
 

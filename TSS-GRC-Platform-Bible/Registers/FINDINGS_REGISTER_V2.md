@@ -42,7 +42,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 | F2-14 | Config-gated controls with no config-health check (a defect *class*) | Governance | **P2** |
 | F2-15 | 3,650 lines of fabricated records ship in the production bundle | Trust | **P2** |
 | F2-16 | Two page monoliths carry 7.7% of all frontend code | Maintainability | **P2** |
-| F2-17 | Zero performance or load evidence for 2,160 endpoints | Scalability | **P2** |
+| F2-17 | Performance evidence covers **1 of 2,160 endpoints** (and is good on that one) | Scalability | **P2** |
 | F2-18 | The governance core is assured at unit level only | Assurance | **P2** |
 | F2-19 | Documentation asserts numbers nothing verifies — including this project's own plans | Governance | **P2** |
 | **F2-22** | 216 write endpoints bind a JPA entity from the request body; defence verified in only one | Security | **P2*** |
@@ -120,7 +120,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 | **Effort** | **L** overall; **M** for the first four modules (2–3 weeks). |
 | **Priority** | **Immediate** for the four named; scheduled thereafter. |
 | **Expected ROI** | High — converts the differentiator from a claim into evidence, which is what both regulators and diligence reviewers actually buy. |
-| **References** | Baseline §6. Competitors: none of the five majors ship a Sharia-governance or SAMA-outsourcing module — this is genuinely defensible ground, which is exactly why leaving it unassured is the costliest choice in the register. |
+| **References** | Baseline §6, §7.4 (JaCoCo 37.1% instruction / 26.0% branch / 38.5% line at 2026-06-18 — platform-wide, never per-module). Competitors: none of the five majors ship a Sharia-governance or SAMA-outsourcing module — this is genuinely defensible ground, which is exactly why leaving it unassured is the costliest choice in the register. |
 
 ---
 
@@ -312,7 +312,7 @@ Start-Service TssGrcBackend
 | **Technical Impact** | No third language is addable without touching 431 files. Translation cannot be outsourced, because strings live in TSX ternaries. Arabic coverage is unmeasurable. |
 | **UX Impact** | Mixed-language screens — the most visible quality defect a bilingual user meets, and the one that most damages perceived polish. |
 | **Sales Impact** | Government and semi-government procurement in Saudi Arabia routinely requires full Arabic UI. "85% of screens contain Arabic" is not a passing answer to "is the interface Arabic?" |
-| **Recommendation** | (1) Add ESLint rules: no bare Latin string literal in JSX text or in `label`/`title`/`placeholder`; no `lang === 'ar'` in `pages/**` (allow it only inside `components/` primitives where a genuine layout branch is needed). Introduce both as **ratchets** — current count recorded, only allowed to fall. (2) Migrate the 439 hardcoded strings into the catalogue (mechanical, scriptable). (3) Convert the 431 inline-conditional files to `t()` progressively, prioritising the 49 zero-Arabic pages. (4) Add an **Arabic-coverage CI report** per module — measurable, reportable to a customer, and answers the procurement question with a number. |
+| **Recommendation** | **Precondition: ESLint is not configured at all** (`audit/metrics.json` -> `eslint_configured: false`), so step 0 is to add an ESLint baseline before any lint ratchet can exist. Then: (1) rules for no bare Latin string literal in JSX text or in `label`/`title`/`placeholder`; no `lang === 'ar'` in `pages/**` (allow it only inside `components/` primitives where a genuine layout branch is needed). Introduce both as **ratchets** — current count recorded, only allowed to fall. (2) Migrate the 439 hardcoded strings into the catalogue (mechanical, scriptable). (3) Convert the 431 inline-conditional files to `t()` progressively, prioritising the 49 zero-Arabic pages. (4) Add an **Arabic-coverage CI report** per module — measurable, reportable to a customer, and answers the procurement question with a number. |
 | **Alternatives** | (a) Accept inline conditionals as legitimate and drop the catalogue — rejected: loses translator workflow, third-language capability and measurability. (b) Automated machine translation of the 439 — useful as a first pass but requires Arabic GRC-terminology review; regulatory terms are exactly where machine translation fails. |
 | **Trade-offs** | The lint ratchets will initially fail on many files; ratcheting (not blocking) is what makes adoption feasible. |
 | **Effort** | **S** for the lint ratchets + coverage report; **M** for the 439 strings; **L** for the full 431-file convergence. |
@@ -448,21 +448,21 @@ Start-Service TssGrcBackend
 |---|---|
 | **ID** | F2-17 |
 | **Category** | Scalability |
-| **Severity** | **P2 High** |
-| **Current State** | 2,160 endpoints, 417 entities, 50 schemas, 3 seeded tenants. No load test, no profiling, no query-plan review, no documented capacity model. One FE performance decision is evidenced (`PERF-FE-002`, per-locale dictionary lazy-loading) — good practice, and the only performance artefact found. |
-| **Problem** | No evidence for any capacity claim. Enterprise RFPs in Saudi financial services routinely require concurrent-user figures, response-time targets and a scaling model. |
-| **Root Cause** | Pre-launch focus on functional breadth. |
-| **Business Impact** | Cannot answer capacity questions; cannot size hosting; cannot commit to an SLA. |
+| **Severity** | **P2 High** — *reframed after finding the evidence* |
+| **Current State** | **A real k6 load test exists and is tracked** (`audit/artifacts/k6/load.js`, `audit/raw/k6-summary.json`, 2026-06-18 @ `3ca91bf`): 4 scenarios (baseline 20 VU · spike to 100 VU · soak 15 VU · breakpoint arrival-rate to 350/s), **18,763 requests, 0 errors, 100% checks passed, p50 8.6 ms / p95 26.9 ms / max 194 ms**, and the Hikari pool never exhausted. It tests **`GET /api/v1/risk/risks` — one endpoint of 2,160**, read-only, at dev data volumes. `PERF-FE-002` (per-locale dictionary lazy-loading) is a second, FE-side performance decision. Baseline §7.1-7.2. |
+| **Problem** | **Coverage, not absence.** The one path measured is fast and stable, and the audit's own note says the ceiling was never reached. But no **write** endpoint, export, dashboard or search has been load-tested; there is no realistic data volume, no capacity model, and no per-endpoint p95 target. An RFP asking for concurrent-user figures still cannot be answered — and the fastest read path is the least informative thing to have measured. |
+| **Root Cause** | The audit scoped load testing to one representative read to prove the harness, and the harness was never extended. `metrics.json` records the limitation honestly — the gap is follow-through, not candour. |
+| **Business Impact** | Cannot size hosting or commit to an SLA. Materially mitigated: a working k6 harness with thresholds and summary export already exists, so this is scenario authoring rather than a new capability. |
 | **Technical Impact** | Likely N+1 query problems are unmeasured — a documented landmine already warns that lazy collections fail outside the session, implying entity-graph complexity that typically carries N+1s. |
 | **UX Impact** | Unknown; large registers (with real data volumes) are the usual first casualty. |
 | **Sales Impact** | Blocks enterprise RFP responses and any SLA commitment. |
-| **Recommendation** | Establish a minimum performance baseline: (1) seed one tenant to realistic volume (10k risks, 50k controls, 200k evidence items, 1M audit-log rows); (2) load-test the **20 highest-traffic endpoints** (registers, dashboards, search, exports) at 50/200/500 concurrent users; (3) publish a capacity model and per-endpoint p95 targets; (4) add a CI performance smoke test on the top 5 to catch regressions. Scope deliberately to 20 endpoints — enough for an RFP answer, small enough to finish. |
+| **Recommendation** | **Extend the existing harness — do not start over.** (1) Seed one tenant to realistic volume (10k risks, 50k controls, 200k evidence items, 1M audit-log rows) — this also produces the demo tenant F2-02 needs. (2) Add scenarios to `audit/artifacts/k6/load.js` for the **20 highest-traffic endpoints**, deliberately including **write** paths, exports, dashboards and search. (3) Raise the dev Hikari pool above 10 so a ceiling can actually be found. (4) Publish a capacity model and per-endpoint p95 targets. (5) Run the top 5 in CI as a regression smoke. |
 | **Alternatives** | Buy an APM tool and instrument production — complementary, but with few tenants it yields little data and answers no RFP today. |
 | **Trade-offs** | Realistic seeding is itself a project; it also produces the demo tenant recommended in F2-02 — do both with one dataset. |
-| **Effort** | **L** (3–4 weeks incl. seeding) |
+| **Effort** | **M–L** — the harness, thresholds and summary export exist; most of the cost is realistic seeding. |
 | **Priority** | Medium — immediate if an enterprise RFP is live. |
 | **Expected ROI** | Medium-high — unblocks enterprise deals and de-risks the first large customer. |
-| **References** | Baseline §0, §8. |
+| **References** | Baseline §7.1, §7.2, §8; `audit/metrics.json` -> `load_test_k6`. **Correction:** this finding originally read "zero performance or load evidence" — wrong; the evidence was in the tracked `audit/` vault. |
 
 ---
 
