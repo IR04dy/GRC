@@ -85,8 +85,19 @@ class ControllerAuthorizationRatchetTest {
      * down per {@code UNIFIED_IMPLEMENTATION_PLAN.md} stage S2, whose target floor is
      * 17 (8 legitimately-public + 9 self-scoped endpoints, each to be marked
      * explicitly rather than silently tolerated).
+     *
+     * <p>S2 tranche 1 (2026-07-25) lowered it a further FOURTEEN — 58 to 44:
+     * the 7 {@code AiSuggestionController} POSTs plus {@code AiControlMappingController
+     * #suggest} now require {@code hasPermission('AI','WRITE')} (they read tenant
+     * governance data and draft recommendations — practitioners only), and the six
+     * {@code RootCauseAnalysisController} writes are split by authority:
+     * create/update/submit need {@code INCIDENT WRITE}, generate-capas needs
+     * {@code CAPA WRITE}, and approve/reject need {@code CAPA APPROVE} — approving an
+     * RCA gates the corrective actions generated from it, so it is an authority act,
+     * not an authoring one. Read endpoints were deliberately left alone in this
+     * tranche (the ratchet counts writes; read-gating is a separate reviewed sweep).
      */
-    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 58;
+    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 44;
 
     @Test
     void noNewUnguardedWriteEndpoints() {

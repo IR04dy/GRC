@@ -33,7 +33,7 @@ public class AiControlMappingController {
     private final AiControlMappingService service;
 
     @PostMapping("/suggest")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AI','WRITE')")
     public SuggestionResponse suggest(@Valid @RequestBody SuggestionRequest body) {
         return service.suggest(body);
     }

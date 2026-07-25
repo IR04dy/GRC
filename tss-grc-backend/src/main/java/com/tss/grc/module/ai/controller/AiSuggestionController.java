@@ -39,37 +39,37 @@ public class AiSuggestionController {
     private final AiSuggestionService service;
 
     @PostMapping("/risk-description")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AI','WRITE')")
     public AiSuggestion riskDescription(@RequestBody RiskDescriptionInput body) {
         return service.suggestRiskDescription(body);
     }
 
     @PostMapping("/bia-rto-rpo")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AI','WRITE')")
     public AiSuggestion biaRecommendation(@RequestBody BiaRecommendationInput body) {
         return service.suggestBiaRtoRpo(body);
     }
 
     @PostMapping("/evidence-quality")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AI','WRITE')")
     public AiSuggestion evidenceQuality(@RequestBody EvidenceQualityInput body) {
         return service.reviewEvidenceQuality(body);
     }
 
     @PostMapping("/incident-root-cause")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AI','WRITE')")
     public AiSuggestion incidentRootCause(@RequestBody IncidentRootCauseInput body) {
         return service.draftIncidentRootCause(body);
     }
 
     @PostMapping("/board-summary")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AI','WRITE')")
     public AiSuggestion boardSummary(@RequestBody BoardSummaryInput body) {
         return service.draftBoardSummary(body);
     }
 
     @PostMapping("/workflow-submission-review")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AI','WRITE')")
     public AiSuggestion workflowSubmissionReview(@RequestBody WorkflowSubmissionReviewInput body) {
         return service.suggestWorkflowSubmissionReview(body);
     }
@@ -87,7 +87,7 @@ public class AiSuggestionController {
     }
 
     @PostMapping("/suggestions/{id}/review")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AI','WRITE')")
     public AiSuggestion review(@PathVariable Long id, @RequestBody ReviewBody body) {
         return service.review(id, body);
     }

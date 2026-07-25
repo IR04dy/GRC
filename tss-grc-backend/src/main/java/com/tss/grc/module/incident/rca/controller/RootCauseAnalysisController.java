@@ -50,42 +50,46 @@ public class RootCauseAnalysisController {
     public Response get(@PathVariable Long id) { return Response.from(service.get(id)); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('INCIDENT','WRITE')")
     @Operation(summary = "Create a new RCA in DRAFT state.")
     public ResponseEntity<Response> create(@RequestBody @Valid CreateRequest body, Authentication auth) {
         return ResponseEntity.ok(Response.from(service.create(body, userId(auth))));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('INCIDENT','WRITE')")
     @Operation(summary = "Update fields on a DRAFT RCA. Refuses on non-DRAFT.")
     public Response update(@PathVariable Long id, @RequestBody @Valid UpdateRequest body) {
         return Response.from(service.update(id, body));
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('INCIDENT','WRITE')")
     @Operation(summary = "Submit DRAFT for review.")
     public Response submit(@PathVariable Long id, Authentication auth) {
         return Response.from(service.submit(id, userId(auth)));
     }
 
+    // S2 (finding F-1): approving/rejecting a root-cause analysis is an authority
+    // act — it gates the corrective actions generated from it — yet both carried
+    // only isAuthenticated(), so any logged-in principal incl. VIEWER could approve.
+    // CAPA_APPROVE was catalogued by V313 and granted to the existing approver personas.
     @PostMapping("/{id}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CAPA','APPROVE')")
     @Operation(summary = "Approve an IN_REVIEW RCA.")
     public Response approve(@PathVariable Long id, Authentication auth) {
         return Response.from(service.approve(id, userId(auth), auth.getName()));
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CAPA','APPROVE')")
     @Operation(summary = "Reject an IN_REVIEW RCA. Reason is mandatory.")
     public Response reject(@PathVariable Long id, @RequestBody @Valid RejectRequest body) {
         return Response.from(service.reject(id, body));
     }
 
     @PostMapping("/{id}/generate-capas")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('CAPA','WRITE')")
     @Operation(summary = "Spawn one CAPA per numbered recommendation in the RCA. APPROVED only. "
                        + "Optional ?owner=<name> overrides the default (the RCA facilitator).")
     public List<CapaTaskDto> generateCapas(@PathVariable Long id,
