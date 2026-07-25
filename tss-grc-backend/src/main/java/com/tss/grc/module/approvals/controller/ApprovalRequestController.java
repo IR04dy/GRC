@@ -29,14 +29,19 @@ public class ApprovalRequestController {
     @PreAuthorize("isAuthenticated()")
     public ApprovalRequestDto get(@PathVariable String id) { return service.get(id); }
 
+    // S2 (F-1): defence in depth. ApprovalRequestService already refuses a
+    // decision from anyone but the current assignee (SEC-IAM-002, AccessDeniedException),
+    // so these were service-compensated rather than wide open — but the controller
+    // carried no authority check, so any authenticated principal could raise a
+    // request or attempt a transition. Now gated on the WORKFLOW module.
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public ResponseEntity<ApprovalRequestDto> create(@RequestBody @Valid ApprovalRequestDto req) {
         return ResponseEntity.ok(service.create(req));
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','APPROVE')")
     public ApprovalRequestDto transition(@PathVariable String id,
                                          @RequestBody @Valid ApprovalRequestDto.TransitionRequest req,
                                          Authentication auth) {

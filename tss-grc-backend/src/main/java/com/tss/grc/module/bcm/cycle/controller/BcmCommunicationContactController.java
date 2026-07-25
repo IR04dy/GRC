@@ -44,13 +44,13 @@ public class BcmCommunicationContactController {
     public BcmCommunicationContact get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping("/contacts")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public ResponseEntity<BcmCommunicationContact> create(@RequestBody BcmCommunicationContact body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PutMapping("/contacts/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public BcmCommunicationContact update(@PathVariable Long id, @RequestBody BcmCommunicationContact body) {
         return service.update(id, body);
     }
@@ -58,7 +58,7 @@ public class BcmCommunicationContactController {
     public record TestResultBody(String result, String notes) {}
 
     @PostMapping("/contacts/{id}/test-result")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public BcmCommunicationContact recordTestResult(@PathVariable Long id, @RequestBody TestResultBody body) {
         return service.recordTestResult(id, body.result(), body.notes());
     }
@@ -68,7 +68,7 @@ public class BcmCommunicationContactController {
     public Map<String, Long> stats() { return service.testResultStats(); }
 
     @DeleteMapping("/contacts/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','DELETE')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();

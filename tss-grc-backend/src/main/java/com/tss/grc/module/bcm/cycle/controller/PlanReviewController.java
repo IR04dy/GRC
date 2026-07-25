@@ -64,7 +64,7 @@ public class PlanReviewController {
     }
 
     @PostMapping("/{id}/attest")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','APPROVE')")
     public BcpPlanReviewAttestation attest(@PathVariable Long id,
                                            @RequestBody(required = false) AttestBody body) {
         boolean isCritical = isCriticalTier(id);
@@ -76,7 +76,7 @@ public class PlanReviewController {
     }
 
     @PostMapping("/review/sweep")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public SweepResult sweep() { return service.sweep(); }
 
     /**

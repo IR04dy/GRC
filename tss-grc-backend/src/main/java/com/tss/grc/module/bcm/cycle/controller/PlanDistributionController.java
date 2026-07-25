@@ -59,7 +59,7 @@ public class PlanDistributionController {
     }
 
     @PostMapping("/{planId}/distribution")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public List<BcpPlanAcknowledgement> distribute(@PathVariable Long planId,
                                                    @RequestBody DistributeBody body) {
         return service.distribute(planId, body.recipients(), body.channel(), actor(), body.notes());
@@ -80,7 +80,7 @@ public class PlanDistributionController {
     }
 
     @PostMapping("/{planId}/distribution/mark-stale")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public int markStale(@PathVariable Long planId) {
         return service.markStale(planId);
     }

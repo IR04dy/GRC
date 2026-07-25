@@ -83,7 +83,7 @@ public class BcmLibraryController {
      * back to a BIA (so attestation cadence resolves to critical-tier).
      */
     @PostMapping("/plan-templates/{code}/clone")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public BcpPlan clonePlanTemplate(@PathVariable String code,
                                      @RequestBody(required = false) CloneTemplateBody body) {
         BcpPlanTemplate t = templates.findByTemplateCode(code)

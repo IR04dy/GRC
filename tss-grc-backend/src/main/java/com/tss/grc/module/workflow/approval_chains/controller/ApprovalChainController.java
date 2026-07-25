@@ -127,7 +127,7 @@ public class ApprovalChainController {
     }
 
     @PostMapping("/{id}/actions")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','APPROVE')")
     public InstanceResponse recordAction(@PathVariable Long id,
                                           @RequestBody @Valid InstanceActionRequest req) {
         // SECURITY (SEC-IAM-001): the acting identity is taken from the
@@ -137,7 +137,7 @@ public class ApprovalChainController {
     }
 
     @PostMapping("/{id}/withdraw")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('WORKFLOW','APPROVE')")
     public InstanceResponse withdraw(@PathVariable Long id,
                                       @RequestBody @Valid InstanceWithdrawRequest req) {
         // SECURITY (SEC-IAM-001): only the authenticated originator may withdraw.

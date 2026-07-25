@@ -47,13 +47,13 @@ public class CrisisAarController {
     public CrisisAar get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping("/generate/{crisisEventId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public CrisisAar generate(@PathVariable Long crisisEventId) {
         return service.generate(crisisEventId);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public CrisisAar update(@PathVariable Long id, @RequestBody UpdateBody body) {
         return service.update(id, body);
     }
@@ -61,7 +61,7 @@ public class CrisisAarController {
     public record TransitionBody(Long digitalSignatureTxnId) {}
 
     @PostMapping("/{id}/transitions/{target}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','APPROVE')")
     public CrisisAar transition(@PathVariable Long id,
                                 @PathVariable String target,
                                 @RequestBody(required = false) TransitionBody body) {

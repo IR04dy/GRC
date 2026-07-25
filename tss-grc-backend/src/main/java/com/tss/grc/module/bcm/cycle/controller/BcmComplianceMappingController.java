@@ -57,31 +57,31 @@ public class BcmComplianceMappingController {
     public BcmComplianceMapping get(@PathVariable Long id) { return service.get(id); }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public ResponseEntity<BcmComplianceMapping> create(@Valid @RequestBody BcmComplianceMapping body) {
         return ResponseEntity.ok(service.create(body));
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public BcmComplianceMapping update(@PathVariable Long id, @RequestBody BcmComplianceMapping body) {
         return service.update(id, body);
     }
 
     @PostMapping("/{id}/attach-evidence")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public BcmComplianceMapping attachEvidence(@PathVariable Long id, @RequestBody AttachEvidenceBody body) {
         return service.attachEvidence(id, body.evidenceId());
     }
 
     @PostMapping("/{id}/assess")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public BcmComplianceMapping assess(@PathVariable Long id, @RequestBody AssessBody body) {
         return service.assessCompliance(id, body.status(), body.assessedBy(), body.notes());
     }
 
     @PostMapping("/{id}/attach-gap")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public BcmComplianceMapping attachGap(@PathVariable Long id, @RequestBody AttachGapBody body) {
         return service.attachGap(id, body.gapId());
     }

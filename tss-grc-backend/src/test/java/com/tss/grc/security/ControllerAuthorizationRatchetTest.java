@@ -96,8 +96,55 @@ class ControllerAuthorizationRatchetTest {
      * RCA gates the corrective actions generated from it, so it is an authority act,
      * not an authoring one. Read endpoints were deliberately left alone in this
      * tranche (the ratchet counts writes; read-gating is a separate reviewed sweep).
+     *
+     * <p>S2 tranche 2 (2026-07-25) lowered it a further TWENTY-THREE — 44 to 21 — and
+     * that 21 is now the <em>enumerated</em> floor rather than an unexplained residue:
+     * <ul>
+     *   <li><b>8 legitimately public</b>: AuthController login/logout/refresh,
+     *       ComplaintController#submitPublic, PublicWorkflowRequestController#respond,
+     *       VendorBcpAttestationController#submitByToken, WhistleblowerCaseController
+     *       #publicReply/#publicSubmit — all rate-limited by
+     *       PublicEndpointRateLimitFilter, several gated by an opaque token.</li>
+     *   <li><b>10 self-scoped</b> (the principal IS the authority, and the handler
+     *       resolves the row from the caller): HelpController#trackView,
+     *       NotificationController#markRead/#markAllRead, RefreshTokenAdminController
+     *       #revokeAllMine/#revokeOne (verified: lists only the caller's sessions and
+     *       404s otherwise), SavedViewController#create/#update/#delete,
+     *       WebPushController#register/#unregister.</li>
+     *   <li><b>3 participant actions pending an OWNERSHIP fix</b>, deliberately NOT
+     *       permission-guarded: PlanDistributionController#acknowledge/#decline and
+     *       ExerciseRuntimeController#respond. BCM_READ is granted to only 17 of 57
+     *       roles, so a permission here would lock out ordinary staff who are plan
+     *       recipients / exercise participants. The real defect is that
+     *       PlanDistributionService.transition() scopes by organisation but never
+     *       checks the caller is the row's designated recipient — so one user can
+     *       acknowledge another's plan distribution, and that acknowledgement is BCM
+     *       compliance evidence. Fix = bind to recipientUserId (the column exists),
+     *       not a role. Tracked as its own slice.</li>
+     * </ul>
+     * Guarded in this tranche: 17 manager-side BCM writes (contacts, compliance
+     * mappings, library clone, settings, distribute/mark-stale, review attest+sweep,
+     * crisis AAR generate/update/transition), the two @PatchMapping updates an earlier
+     * Post|Put|Delete sweep had missed, ApprovalChain#recordAction/#withdraw and
+     * ApprovalRequest#create/#transition. Authority actions (attest, AAR transition,
+     * approval record/withdraw/transition) take APPROVE, authoring takes WRITE,
+     * settings reset takes PLATFORM_ADMIN.
+     *
+     * <p><b>Caveat this ratchet cannot see — "guarded" is not "restricted".</b> The scan
+     * only asks whether a {@code hasPermission}/{@code hasAnyRole} guard is present, not
+     * whether the permission behind it is narrowly granted. {@code WORKFLOW_WRITE} is
+     * held by <b>55 of 57 roles, including VIEWER</b> (the over-grant that caused CH-1 to
+     * carve a dedicated CHANGE module out of it in V301), so
+     * {@code ApprovalRequestController#create} now counts as guarded yet a read-only
+     * viewer still passes it — live-verified 200. The guard is still worth having (it is
+     * module-scoped and tightens automatically if those grants are ever cleaned up), but
+     * this floor number must not be read as least-privilege. Deciding is the control that
+     * matters there, and it IS properly gated: {@code #transition} requires WORKFLOW
+     * APPROVE, which VIEWER does not hold (403 verified). A grant-tightness audit —
+     * "which permissions are so widely granted that guarding on them is cosmetic?" — is
+     * a separate exercise from this endpoint-coverage ratchet.
      */
-    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 44;
+    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 21;
 
     @Test
     void noNewUnguardedWriteEndpoints() {

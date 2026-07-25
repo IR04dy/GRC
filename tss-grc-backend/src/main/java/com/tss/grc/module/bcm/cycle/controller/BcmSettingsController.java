@@ -28,10 +28,10 @@ public class BcmSettingsController {
     public BcmSettings get() { return service.getOrInit(); }
 
     @PatchMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public BcmSettings update(@RequestBody BcmSettings body) { return service.update(body); }
 
     @PostMapping("/reset")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public BcmSettings reset() { return service.reset(); }
 }
