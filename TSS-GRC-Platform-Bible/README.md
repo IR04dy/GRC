@@ -59,10 +59,19 @@ companion documents at the repository root are the **execution layer** and are k
 - [`TSS_GRC_PLATFORM_ASSESSMENT.md`](../TSS_GRC_PLATFORM_ASSESSMENT.md) — the measured evidence base: 24
   findings in the 18-field format, each with a command that re-verifies it.
 
-⚠ The reconciliation between the two sets is **provisional and unconfirmed**, so nothing is stamped
-superseded. Their complementarity is evidenced rather than assumed: Phase 0 of the plan above found
-caller-supplied actor identity in **change approvals**, the root-level review found the same defect in
-**committee votes**, and neither found the other's instance.
+✅ **The reconciliation is complete as of 2026-07-25** — see
+[`UNIFIED_IMPLEMENTATION_PLAN.md` §6b](../UNIFIED_IMPLEMENTATION_PLAN.md), where all 16 `F-0NN` findings
+are re-derived from source and from the running system, given a truth label, judged, and mapped to a
+backlog item. Neither document is superseded: they are complementary, and the reconciliation proved it
+three times over on the *same defect class*, each time in code the other pass had not looked at —
+**change approvals** (found here, `F-001` → DF-4), **committee votes** (found by the root-level review →
+DF-3), and **the committee quorum denominator** (found here as `F-003`, **missed by the root-level review**,
+confirmed in code during reconciliation → **DF-5 / F2-28, now the highest open P0**).
+
+Summary of the judgment: structural measurements reproduce almost exactly; three findings required
+correction (`F-002` partly contradicted, `F-009` contradicted, `F-011` partly contradicted); one was
+materially understated (`F-008` — the defect is platform-wide, not one endpoint); one remains unverified
+(`F-010`). Two of this report's Critical findings are closed with mutation proof and live probes.
 
 | Area | Governing documents |
 |---|---|
@@ -121,6 +130,13 @@ Proof sections into CI tests is the highest-leverage governance action available
 themselves are already right.
 
 ## Baseline verification
+
+⚠ **This section is the v1.0 baseline and is superseded on three figures.** Re-measured 2026-07-25 and
+recorded in `UNIFIED_IMPLEMENTATION_PLAN.md` §6b: the backend suite is **2,460/0**; the authorisation
+ratchet is **21**, not 62 (it had already been ratcheted when this was written, and the sibling audit
+report repeats the stale 62); cross-module imports are **754 · 128 directed pairs · 13 bidirectional**.
+The live probes listed below as "open" have since been **run**. Retained unedited as the baseline of
+record — this is exactly the `F-013` failure mode the corpus warns about, occurring inside the corpus.
 
 The initial assessment executed:
 

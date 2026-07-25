@@ -33,8 +33,9 @@
 | Stages complete | **S1, S2, S3, S4** (S0 partially — the restart is outstanding) |
 | Module census | **58 packages**, 186,285 LoC, 417 entities, 2,160 endpoints (was documented as 24) |
 | Known-fixed-but-not-running | **DF-1** break-glass sweep (was failing 33–35×/day) · **DF-2** stale-cookie 500 · **DF-3/DF-4** provenance · **D-7/D-8** grants (V317 is in dev; :80 still serves the 07-23 jar) |
-| Open P0s | **F2-02** fabricated data on 3 executive surfaces · **F2-03** Saudi modules untested · **F2-04** entitlement wired to 8.6% *(DF-3/F2-21 closed at `f3ea92fc`; DF-4/F2-24 at `21c83d09`)* |
+| Open P0s | **F2-28 / DF-5 quorum denominator is caller-authored** (found by reconciling the v1.0 audit's F-003 — the highest open item) · **F2-02** fabricated data on 3 executive surfaces · **F2-03** Saudi modules untested · **F2-04** entitlement wired to 8.6% *(DF-3/F2-21 closed at `f3ea92fc`; DF-4/F2-24 at `21c83d09`)* |
 | New P1s from the D-7 probes | **F2-25** appointing a committee member 500s and is mass-assignable · **F2-26** no roster seat is linked to a platform user, so nobody can self-vote |
+| New from the §6b reconciliation | **F2-28** quorum integrity (P0) · **F2-27** 23 of 24 `EXPORT` permissions are dead, bulk export is `READ`-authorised (P1) · **F2-29** named change commands (P2) · **F2-30** enforce the bilingual `*_ar` invariant (S) |
 
 ⚠ **The `:80` deployment is still running the 2026-07-23 jar.** `jar.new` is staged and the swap needs an
 **elevated** shell — attempted this session and refused (`Cannot open TssGrcBackend service`). Until it runs,
@@ -252,6 +253,84 @@ defect F2-02 exists to record.
 | F2-23b | Split a `COMMITTEE` permission module out of `ADMIN`. `ADMIN:*` gates the 7 committee controllers and **nothing else** — 59 methods — so the module name is a misnomer that couples committee grants to unrelated admin screens | ADR-014 |
 | F2-13c | Per-change-type change authority (standard / normal / emergency) in data, sourced from the CH-17 authorisation matrix. Would let `EXECUTIVE_REVIEWER` leave the normal-change voting set | ADR-015 |
 | W2-0 | **Grandfather licence backfill** — must land before any `@RequireModule` sweep | ADR-013 |
+
+---
+
+## §6b Reconciliation with the strategic frame — the 16 `F-0NN` findings, judged
+
+**This closes the reconciliation the Bible's `README` marked "provisional and unconfirmed".** Every finding
+in [`TSS_GRC_PLATFORM_AUDIT_REPORT.md`](TSS-GRC-Platform-Bible/TSS_GRC_PLATFORM_AUDIT_REPORT.md) §10 was
+re-derived from source and from the running system on 2026-07-25, using that document's own truth labels.
+Nothing was accepted because it was written down, including the parts that flatter this plan.
+
+| # | Claim | Label | Judgment | Lands as |
+|---|---|---|---|---|
+| **F-001** | Change approval identity is client-controlled | `VERIFIED` → **CLOSED** | True when written. Closed at `21c83d09`: actor from `Authentication`, DTO with no approver field, SoD on the resolved user id, `CHANGE:APPROVE`, `V316` unique index → 409. 7 of its 9 P0-A steps done; steps 8–9 (named commands, ECAB ratification) are F-002's | **DF-4 / F2-24 ✅** |
+| **F-002** | Generic transitions bypass approval semantics | `PARTLY CONTRADICTED` | **The exploit is closed; the design debt is real.** `CAB_APPROVED` now requires a quorate committee resolution (Track D) *or* ≥N recorded `APPROVE` votes with zero `REJECT` (CM-C2 + the CH-17 matrix); `EMERGENCY_APPROVED` requires `changeType = EMERGENCY`. So a `CHANGE:WRITE` holder can *advance* a legitimately-decided change but cannot *manufacture* the decision. The literal claim — a generic transition guarded by `WRITE` reaching privileged states — is still true. **Critical → P2** | **NEW F2-29** (below) |
+| **F-003** | Committee votes **and quorum** can be manufactured | `VERIFIED` — **half open, and the open half is P0** | Vote identity closed (`f3ea92fc`, V315, V317). **The quorum half was never closed and this register's first pass missed it.** Attendance is caller-authored free text, the denominator is computed *from that sheet*, and `quorumMet` can be set directly with zero attendance | **DF-5 / F2-28 — new P0** |
+| **F-004** | Package licensing is not platform-wide | `VERIFIED` | Exact: 22 `@RequireModule` controllers of 252, all `socops`. Un-gated by ADR-013; needs W2-0 backfill first | **F2-04** (Wave 2) |
+| **F-005** | Module boundaries are not executable | `VERIFIED`, numbers corrected | Re-measured: **754** peer imports (audit: 734), **128** directed pairs (136), **13** bidirectional (14). Volume up, tangle down — and still no architecture test | **F2-08b** (Wave 1) |
+| **F-006** | IA exposes implementation sprawl | `VERIFIED` | **329** routed pages in a 925-line `App.tsx` | **F2-07 / F2-07c** |
+| **F-007** | Arabic completeness claims exceed enforcement | `VERIFIED`, and sharper than stated | `ChangeRequest.titleEn` is `nullable = false`; **`titleAr` has neither `nullable = false` nor `@NotBlank`**. So `CLAUDE.md` house rule 7 — *"Arabic names are backend-mandatory"* — is **asserted and not enforced**. A documented platform invariant that no layer checks | **NEW F2-30** (below) |
+| **F-008** | Export authorisation violates least privilege | `VERIFIED`, **far broader than stated** | 24 `MODULE:EXPORT` permissions catalogued and granted to up to **55 of 57 roles**; **exactly one endpoint enforces any of them.** Every register, the board pack and the regulator ZIP are `READ`-authorised. The mirror image of F2-23 | **F2-27 — new P1** |
+| **F-009** | Governance core lacks adversarial test coverage | `CONTRADICTED` | **6 committee test classes, 99 test methods** — forged actor, roster eligibility, quorum, recusal/COI, tenant isolation, authorisation separation. It was *already* self-contradicted on the day it was written: the sibling document counted 19 recusal + 19 tally tests. Residual gap is narrow: no `EmergencyChangeRatificationTest`, and the two-principal probes are scripted but not in CI | **W1-5** (not a finding) |
+| **F-010** | Canonical ownership is fragmented | `EVIDENCE-BACKED` — **not independently verified** | I did not audit object ownership and will not rate it from inference. Retained unrated | **F2-06 family** |
+| **F-011** | Accessibility conformance is unproven | `PARTLY CONTRADICTED` | An axe harness exists and measured **68 serious `color-contrast` violations** — so "no report available" is wrong. But independent WCAG 2.2 AA conformance and assistive-technology testing are genuinely absent | **F2-A11Y** |
+| **F-012** | Saudi regulatory content lacks a governed lifecycle | `EVIDENCE-BACKED` | Not code-checkable; the Content Office recommendation stands and is a business decision, not an engineering slice | **Wave 4 / business** |
+| **F-013** | Documentation completion markers are unsafe | `VERIFIED` — **including inside the Bible itself** | Five instances: `CLAUDE.md` said 24 modules against 58 measured; this audit reports the ratchet at **62** when it is **21**; it reports **2,316** tests while its same-day sibling reports 2,415; the documentation register's census was stale within days; §8 of *this* plan carried a restart command naming a jar that does not exist. The finding is correct and it indicts the corpus that contains it | **ADR-016 + F2-19** |
+| **F-014** | Approval primitives are duplicated | `EVIDENCE-BACKED`, partly confirmed | Confirmed in outline: a direct CAB path, a committee path, workflow chains, generic approvals and signatures coexist with differing actor/SoD semantics. Not measured in depth | **P1, Wave 2+** |
+| **F-015** | Large frontend units obstruct UX evolution | `VERIFIED` | `EsgPage.tsx` **5,582** lines, `NdiPage.tsx` **4,969** | **F2-16 / F2-12** |
+| **F-016** | Production-like operational proof is incomplete | `VERIFIED by absence` | No witnessed restore, failover or benchmark evidence retained | **F2-17 / W4** |
+
+### The audit's own verification claims, re-run
+
+| Claim | Then | Now | Verdict |
+|---|---|---|---|
+| Backend suite | 2,316 | **2,460 / 0** | grew; both figures plausible at their commit |
+| Authorisation ratchet | "threshold of 62" | **21** | **stale in the audit** — it had already been ratcheted |
+| Module directories | 58 | **58** | exact |
+| Controllers · repositories · services | ~252 · 423 · 313 | **252 · 423 · 314** | essentially exact |
+| `@RequireModule` controllers | 22, all SOC Ops | **22, all SOC Ops** | exact |
+| Cross-module imports · pairs · bidirectional | 734 · 136 · 14 | **754 · 128 · 13** | corrected |
+| Routed frontend pages | "more than 300" | **329** | exact |
+| Live two-principal probes | "remain open" | **run** | **closed** — 15/18 through the Vite proxy |
+
+**Verdict on the strategic frame: sound, and worth having.** Its structural measurements reproduce almost
+exactly. Three findings needed correction (F-002, F-009, F-011), one was materially understated (F-008),
+one is unverified (F-010) — and **one caught a live P0 that this register's own first pass missed** (F-003's
+quorum half). That is the second time the two passes have caught different instances of the *same* defect
+class in different code, which retires any argument that one of them is redundant.
+
+### Rating, re-judged
+
+The audit's 3.0/5 was fair at its baseline. On measured change since:
+
+| Dimension | Audit | Now | Why |
+|---|---:|---:|---|
+| Security / control integrity | 1.8 | **2.6** | 2 of its 7 critical weaknesses closed with mutation proof and live probes, 1 mitigated; but F2-28 (quorum) is a live P0 and F2-27 (export) is platform-wide |
+| Commercial packaging | 2.4 | **2.6** | still 22 of 252 controllers, but the decision is made (ADR-013) and the mechanism is proven fail-closed |
+| Quality / operations | 3.2 | **3.4** | +144 tests, adversarial governance tests, mutation-proven guards; operational evidence still absent |
+| Enterprise architecture | 2.6 | **2.6** | unchanged — pairs and cycles improved marginally, no architecture test yet |
+| **Weighted** | **3.0** | **≈3.1** | Movement is real but narrow. **Still `Qualified`** |
+
+**Market verdict, changed in one place:** the audit made a controlled pilot conditional on Criticals
+closing. F-001 is closed and F-002 is mitigated — but **F2-28 is a new open Critical**, so *"pilot after
+Criticals close"* still holds and now has a specific, costed blocker: 3–5 days, sequenced behind F2-25 (2 h)
+and F2-26 (1 d). General availability, government final acceptance and per-module sale verdicts are
+**unchanged**.
+
+### New backlog items created by this reconciliation
+
+| ID | Src | Action | Size | Status |
+|---|---|---|---|---|
+| **F2-28 / DF-5** | F-003 | **Quorum integrity — P0.** Attendance rows reference a roster seat, `votingMember` from the seat, denominator = active voting roster (not the sheet), refuse client `quorumMet`, snapshot the roster at meeting start, audit sheet replacement | M | ⬜ **highest open item** |
+| **F2-27** | F-008 | **Enforce `MODULE:EXPORT` on every export endpoint** + per-tenant impact query first + a ratchet test on binary-returning endpoints + wire Export History auditing | S | ⬜ |
+| **F2-29** | F-002 | Split `POST /{id}/transition` into named commands with state-specific permissions; `CAB_APPROVED`/`CAB_REJECTED`/`EMERGENCY_APPROVED` require `CHANGE:APPROVE`, not `WRITE`. **Exploit already blocked — this is design debt, P2** | M | ⬜ |
+| **F2-30** | F-007 | Enforce the bilingual invariant `CLAUDE.md` already claims: `@NotBlank`/`nullable=false` on `*_ar` for material records, starting with `ChangeRequest.titleAr`; a test that fails when a material entity has a mandatory `*_en` and an optional `*_ar` | S | ⬜ |
+
+**Sequence:** F2-25 (2 h) → F2-26 (1 d) → **F2-28 (3–5 d)** → F2-27 (1 d) → F2-30 (S) → F2-29 (P2, later).
+F2-28 depends on both roster items: the roster cannot be the quorum denominator while appointment 500s and
+every seat is unlinked.
 
 ---
 
