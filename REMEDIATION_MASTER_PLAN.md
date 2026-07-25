@@ -1,4 +1,10 @@
 # TSS GRC Platform — Master Action & Remediation Plan
+
+> ### ⬛ SUPERSEDED AS A PLAN — 2026-07-25
+> Its actions are absorbed into **[`UNIFIED_IMPLEMENTATION_PLAN.md`](UNIFIED_IMPLEMENTATION_PLAN.md)**,
+> which is now the single governing plan. Retained for traceability — the analysis and findings here are
+> still valid evidence; only the *sequencing* is superseded. Findings are re-specified in full (18 fields
+> each, with re-verification commands) in **[`TSS_GRC_PLATFORM_ASSESSMENT.md`](TSS_GRC_PLATFORM_ASSESSMENT.md)**.
 ### خطة الإجراءات والمعالجة الشاملة
 
 > **Purpose.** The single executable backlog for the platform. It consolidates **every open item from every source** — the independent assessment's 9 findings, the live defect register, the vendor's own carry-overs, the third-party foundation pack's adopted items, the Change-Enablement programme, and the deferred audit tail — into one ordered, verifiable plan.

@@ -1,4 +1,10 @@
 # GRC_REVIEW_FOUNDATION_PACK — Judgment, Validation, Debate & Corrective Action Plan
+
+> ### ⬛ SUPERSEDED AS A PLAN — 2026-07-25
+> Its actions are absorbed into **[`UNIFIED_IMPLEMENTATION_PLAN.md`](UNIFIED_IMPLEMENTATION_PLAN.md)**,
+> which is now the single governing plan. Retained for traceability — the analysis and findings here are
+> still valid evidence; only the *sequencing* is superseded. Findings are re-specified in full (18 fields
+> each, with re-verification commands) in **[`TSS_GRC_PLATFORM_ASSESSMENT.md`](TSS_GRC_PLATFORM_ASSESSMENT.md)**.
 ### تقييم ومناقشة حزمة أسس المراجعة وخطة الإجراءات الصحيحة
 
 > **Artifact assessed:** `C:\Users\User\Desktop\GRC_REVIEW_FOUNDATION_PACK.zip` (40 KB, 18 files, authored **2026-07-25**) — 11 foundation documents (`00_PROJECT_CHARTER` … `10_BASELINE_ASSESSMENT`), 5 `meta/` trackers, and `source/` copies of this repo's `PLATFORM_ARCHITECTURE_PACK.md` + `PLATFORM_USER_STORIES.md`.
