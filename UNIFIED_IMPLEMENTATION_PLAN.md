@@ -48,6 +48,12 @@ it *cheaper*:
 5. **And DF-3 itself surfaced F2-23** — the vote endpoint's `ADMIN:WRITE` guard is held by **no role**,
    so a fix for forgery immediately exposed an unreachable feature. Closing one control gap tends to
    reveal the next; the plan expects that rather than treating it as scope creep.
+6. **Two independent reviews converged on the same defect class in different code paths.** This review
+   found caller-supplied identity in **committee votes** (DF-3); the Bible's
+   `TSS_GRC_PLATFORM_IMPLEMENTATION_PLAN.md` Phase 0 independently found it in **change
+   approvals** (now **DF-4**). Neither found the other's instance. That is strong evidence the
+   *class* needs a systematic sweep — every write path that accepts an actor identity — rather
+   than instance-by-instance fixes. Folded into F2-22's audit scope.
 
 ---
 
@@ -76,6 +82,7 @@ are **one** piece of work, not two.
 | ID | Src | Action | Size | Status | Migration |
 |---|---|---|---|---|---|
 | **DF-3** | F2-21 | **Committee vote provenance** — voter from `Authentication`; body `memberName` only under secretary/chair authority, stamped `recorded_by_user_id`/`on_behalf`; reject non-roster names; recusal on the **resolved** identity; refuse cross-user overwrite; **add the forged-actor test `ADR-006` demands** | M | ✅ **DONE** `f3ea92fc` — 23 new tests, suite **2,438/0**, 5/5 guards mutation-proven, live probe **11/11**, V315 applied dev ×2 | **V315** |
+| **DF-4** | F2-24 | **CAB approval provenance — DF-3's twin.** `recordApproval` binds the `ChangeApproval` entity from the body and trusts `approverName`, so the CM-C2 SoD gate (name-based, acknowledged in-code as interim) is bypassed by submitting another name — **a requester can approve their own change**. Also `CHANGE:WRITE`-guarded, so raise and approve are not separated, and nothing enforces one vote per approver. Fix per DF-3: DTO not entity, actor from `Authentication`, SoD on resolved user id, guard → `CHANGE:APPROVE`, unique `(org, change, approver_user_id)` → 409, forged-actor tests, mutation-verified | M | ⬜ **next** | V316 |
 | **W0-2** | F2-10 | **Activate the staged jar** (`…jar.new`) — closes DF-1 + DF-2 | S | ⏳ **awaits an elevated restart — user action** | — |
 | W0-3 | F2-10 | Post-deploy verification (24 h): break-glass sweep clean, no stale-cookie 500s | S | blocked on W0-2 | — |
 | W0-7 | F2-10 | Build ID + migration head on `/actuator/info`; post-deploy probe compares to `master` | S | ⬜ | — |

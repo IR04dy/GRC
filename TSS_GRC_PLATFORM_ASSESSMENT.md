@@ -298,6 +298,7 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 | ID | Title | Cat | Sev |
 |---|---|---|---|
 | **F2-21** | **Committee votes are recorded under a caller-supplied name** — recusal, quorum and SoD all bypassable | **Security** | **P0** |
+| **F2-24** | **CAB approvals carry a caller-supplied approver name** — a requester can approve their own change | **Security** | **P0** |
 | F2-01 | An accurate 58-module inventory exists and no control reads it; 24 is still the operative figure | Product | **P0** |
 | F2-02 | Global search, executive dashboard and board pack render mock data | Trust | **P0** |
 | F2-03 | The Saudi-differentiating modules are the untested ones | Assurance | **P0** |
@@ -319,9 +320,33 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 | F2-19 | Documentation asserts numbers nothing verifies — including this project's own plans | Governance | **P2** |
 | **F2-22** | 216 write endpoints bind a JPA entity from the request body; defence verified in only one | Security | **P2*** |
 | **F2-23** | **No role holds `ADMIN:WRITE`, so only `PLATFORM_ADMIN` can record a committee vote** | Security | **P1** |
-| F2-20 | `datagov` — a documented module with no implementation | Product | **P3** |
+| F2-20 | `datagov` is a **deliberate v2 deferral**, not a stray placeholder — register it, don't delete it | Product | **P3** |
 
 \* F2-22's severity is provisional pending the audit it recommends — the pattern's *extent* is measured, its *exploitability* is not.
+
+---
+
+### F2-24 · CAB approvals carry a caller-supplied approver name — DF-3's twin
+
+| Field | Content |
+|---|---|
+| **ID** | F2-24 (delivery item **DF-4**) |
+| **Category** | Security / non-repudiation / segregation of duties |
+| **Severity** | **P0 Blocker** |
+| **Current State** | `POST /api/v1/changes/{id}/approvals` → `ChangeManagementController#recordApproval(@PathVariable Long id, @RequestBody ChangeApproval body)` binds the **JPA entity directly from the request body**, and that entity carries `approverId`, `approverName` and `approverRole`. `ChangeManagementService.recordApproval` validates that `approverName` is non-blank and then trusts it. The endpoint is guarded by `hasPermission('CHANGE','WRITE')`. The source comment states the gap outright: *"CM-C2 (SoD): the change requester / owner cannot cast a CAB vote on their own change. (Name-based check; principal-id capture is a follow-up.)"* |
+| **Problem** | The same forgery as F2-21, in the change-approval path, and the SoD control fails the same way: the requester/owner check compares the **claimed** `approverName` against `requestedByName`/`changeOwnerName`, so **a requester can approve their own change by submitting any other name**. Compounding: (1) the entity is bound from the body, so `id` and any other persisted field are client-settable — the F2-22 mass-assignment class; (2) `CHANGE:WRITE` guards it, so **every principal who can raise a change can also cast the CAB vote on it** — write and approve are not separated; (3) `audit.log` records the claimed name, so the ledger corroborates the forgery; (4) nothing enforces one vote per approver per change, so a single caller can submit several names and manufacture a CAB majority. |
+| **Root Cause** | Identical to F2-21 and acknowledged in-code as deferred work. The `CM-C2` SoD control was added at the *name* level as an interim measure and the principal-id capture never followed. Nothing failed in the meantime, because no test asserts actor provenance — the same blind spot recorded in F2-21. |
+| **Business Impact** | Change authorisation is the control an IT auditor tests first, and ITIL/ISO 20000 conformance rests on it. A requester who can approve their own change defeats the platform's headline segregation-of-duties claim in the module the CE programme is built around. |
+| **Technical Impact** | Contained: one controller, one service method, one DTO, one migration for `approver_user_id` + a uniqueness constraint. DF-3 established the pattern, so this is a second application of a proven fix rather than new design. |
+| **UX Impact** | None for the legitimate path. As with DF-3, a secretary/chair recording a vote from the floor must remain possible and must be stamped as on-behalf rather than forbidden. |
+| **Sales Impact** | "Can a requester approve their own change?" is a standard question in any IT-governance review; today the honest answer is "yes, by typing a different name". |
+| **Recommendation** | **Apply the DF-3 pattern.** (1) Replace the entity-bound body with a `CabVoteRequest` DTO carrying only `decision`, `approverRole`, `rationale` and an optional `onBehalfOf`. (2) Derive the approver from `Authentication`; persist `approver_user_id` alongside the display-name snapshot. (3) Evaluate the CM-C2 SoD gate on the **resolved user id** against the change's requester/owner ids, falling back to names only for legacy rows without ids. (4) Change the guard to `hasPermission('CHANGE','APPROVE')` — the permission exists and is already granted by the `V301` matrix, so write and approve become genuinely separate. (5) Add a unique constraint on `(organisation_id, change_request_id, approver_user_id)` so one approver cannot be counted twice, returning **409** on a duplicate. (6) Add the forged-actor and self-approval tests, and mutation-verify each guard. (7) Leave existing rows' `approver_user_id` NULL = *provenance unknown (pre-fix)* — never back-filled. |
+| **Alternatives** | (a) Keep the name-based SoD check and merely log the authenticated caller — rejected for the same reason as in F2-21: the *gate* would still evaluate the claimed name. (b) Fix only the guard (`WRITE` → `APPROVE`) — worthwhile and cheap, but it does not stop a legitimate approver voting as somebody else. (c) Route every change through the committee engine (Track D) so `recordApproval` becomes dead code — attractive long-term, and it is where CE-5 is heading, but the direct path is live today and must be safe now. |
+| **Trade-offs** | The DTO change is a breaking API change for any client that posts a full `ChangeApproval`. The uniqueness constraint may collide with existing duplicate rows — the migration must report them rather than delete them. |
+| **Effort** | **S–M** — 1–2 days, following DF-3. |
+| **Priority** | **Immediate**, directly after DF-3. It is the same defect in the module the change-enablement programme depends on. |
+| **Expected ROI** | Very high — restores the segregation-of-duties claim on change approval for a day or two of work, using a pattern already proven in this codebase. |
+| **References** | `ChangeManagementController.java:98-102`, `ChangeManagementService.recordApproval`, `ChangeApproval` entity. Related: F2-21 (same defect, committee path), F2-22 (entity-bound body), F2-13/F2-23 (permission granularity). **Credit:** independently identified as work package **P0-A** in `TSS-GRC-Platform-Bible/TSS_GRC_PLATFORM_IMPLEMENTATION_PLAN.md` ("remove `approverName` and `approverId` from caller authority"; "replace `CHANGE:WRITE` with `CHANGE:APPROVE`"; "enforce unique tenant/change/user vote"). That plan found this instance; this review found the committee one. Two independent passes converging on the same defect class in two different code paths is the strongest possible argument that the *class* — not just the instances — needs a systematic sweep. |
 
 ---
 
@@ -818,19 +843,19 @@ Start-Service TssGrcBackend
 | **ID** | F2-20 |
 | **Category** | Product hygiene |
 | **Severity** | **P3 Medium** |
-| **Current State** | `module/datagov/` contains one file: `package-info.java`, 18 lines, no code. `CLAUDE.md` lists `datagov` among the backend modules. Baseline §1.1. |
-| **Problem** | A named module with zero implementation appears in the platform's own documentation — the smallest, clearest instance of the F2-01 inventory failure. |
-| **Root Cause** | A package created in anticipation of work that never started; nothing detects an empty module. |
-| **Business Impact** | Small in isolation; corrosive in aggregate — it is the kind of detail a diligence reviewer cites as evidence that the module list is aspirational. |
+| **Current State** | `module/datagov/` contains one file: `package-info.java`, 18 lines, no code — and **reading it changed this finding.** It is not an accidental placeholder: it states "**RESERVED FOR v2**", explains *why* data governance is deferred (substantial scope, and it competes with specialised products such as Collibra and Alation that customers may already own), and points to the adjacent capabilities that **are** live — privacy data-mapping (RoPA/DPIA), the cyber asset register, and evidence-to-control mapping. `CLAUDE.md` listed `datagov` among the implemented modules, which is the actual defect; that is now corrected. Baseline §1.1. |
+| **Problem** | Narrower than first stated. The deferral itself is sound and better reasoned than several formal ADRs. The problem is only that **nothing distinguishes "reserved" from "implemented"** in any machine-readable place, so a package with a deliberate `PLANNED` status was counted as a capability in the module list. That is an F2-01 registry gap, not a hygiene failure in this package. |
+| **Root Cause** | There is no maturity field anywhere a build can read, so "reserved for v2" can only be expressed in prose that no control consumes — the same root cause as F2-01. |
+| **Business Impact** | Minimal, and partly **positive**: a documented, justified scope boundary is exactly what a diligence reviewer wants to see. The risk is only that an undifferentiated module list turns a deliberate deferral into an apparent gap. |
 | **Technical Impact** | None. |
 | **UX Impact** | None (no screens). |
 | **Sales Impact** | Reputational only — and only if listed as a capability. |
-| **Recommendation** | Either delete the package, or register it in the module registry with maturity **`PLANNED`** and exclude it from all capability lists. Recommendation: **delete** — data governance is substantially covered by `dataclass`, `data_officer`, `privacy` and `datagov`'s absence changes nothing. The F2-01 registry CI check prevents recurrence. |
-| **Alternatives** | Keep as a placeholder — acceptable only with an explicit `PLANNED` maturity that the datasheet generator honours. |
+| **Recommendation** | **Keep the package and register it — do not delete it.** An earlier draft of this finding recommended deletion; reading the file overturned that. The `package-info.java` is the only written record of a real product decision (deferring data governance and why), and deleting it would destroy that reasoning while changing nothing about the code. Instead: register `datagov` with maturity **`PLANNED`** in the F2-01 registry, exclude `PLANNED` modules from every generated capability list and datasheet, and have the registry check assert that a package with no types carries a non-GA maturity. Then "reserved" is a fact a build can check rather than a comment a reader may miss. |
+| **Alternatives** | (a) Delete it — rejected: it destroys a documented decision for no engineering gain. (b) Move the rationale into an ADR and delete the package — defensible, and arguably tidier; rejected only because the rationale is most useful exactly where a developer looking for `datagov` will find it. |
 | **Trade-offs** | None. |
-| **Effort** | **XS** (minutes) |
+| **Effort** | **XS** — one registry row; no code change. |
 | **Priority** | Low — bundle with F2-01. |
-| **Expected ROI** | Low absolute, high per minute. |
+| **Expected ROI** | Low absolute. Recorded mainly as a lesson: three of this review's findings changed after reading the artefact rather than measuring around it. |
 | **References** | Baseline §1.1. |
 
 ---
