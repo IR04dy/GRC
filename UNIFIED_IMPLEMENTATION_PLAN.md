@@ -184,15 +184,15 @@ The centre of gravity — the four items that turn a gate into an operating mode
 | W0-3 | Post-deploy verification (24 h) | S0 | S | blocked on W0-2 restart | — |
 | W0-7 | Deployed build ID on `/actuator/info` | S0 | S | not started | — |
 | — | *(unplanned, found by the S0 build)* de-flake `ComplaintServiceTest` — Saturday-only failure | S0 | S | ✅ **DONE** — master `d859060b` | — |
-| W0-4 | Permission catalogue: SIGNATURE, AI, CAPA APPROVE | S1 | S | not started | **V313** |
-| W0-5 | Guard the 5 e-signature endpoints | S1 | S | not started | rides V313 |
-| W0-6 | Fix `AGENTS.md`; stamp V1 docs HISTORIC | S1 | S | not started | — |
-| W1-3 | Guard 45 business writes; ratchet 62 → 17 | S2 | M | not started | rides V313 |
-| W1-6 | Tenant-isolation test pack | S2 | M | not started | — |
-| W1-1 | Committee-engine test suite (6 classes) | S3 | M | 🔶 **1 of 6 DONE** — `CommitteeReferralGateTest` (20 cases, mutation-verified) `00939e76`. Remaining: Quorum · Recusal · Tally · MinutesSignature · TenantIsolation | — |
+| W0-4 | Permission catalogue: SIGNATURE, AI, CAPA APPROVE | S1 | S | ✅ **DONE** `9410b2f3` (applied dev ×2) | **V313** |
+| W0-5 | Guard the e-signature endpoints | S1 | S | ✅ **DONE** `9410b2f3` — 4 endpoints (not 5: `#expire` was already admin-only); live 8/8 | rides V313 |
+| W0-6 | Fix `AGENTS.md`; stamp V1 docs HISTORIC | S1 | S | ⬜ not started | — |
+| W1-3 | Guard the business writes; ratchet 62 → **21** | S2 | M | ✅ **DONE** `d8d9b56b` + `782da646` — 41 endpoints guarded; floor now enumerated (8 public + 10 self-scoped + 3 participant) | rides V313 |
+| W1-6 | Tenant-isolation test pack | S2 | M | 🔶 committee engine done (`ab28f348`); other module families pending | — |
+| W1-1 | Committee-engine test suite | S3 | M | ✅ **DONE** — 5 classes / **93 tests**, all mutation- or live-verified (`00939e76`, `083c6119`, `033abaf5`, `ab28f348`) | — |
 | W1-2 | `ModulePermissionEvaluator` test matrix | S3 | S | ✅ **DONE** — 14 cases `00939e76` | — |
-| W1-4 | Seed gate map + config-health check | S4 | M | not started | **V314** |
-| W1-5 | Retained worked committee decision | S4 | S | not started | — |
+| W1-4 | Seed gate map + config-health check | S4 | M | ✅ **DONE** `616dabc6` — org 1 mapped (CAB→IT Steering, ECAB→Exec); orgs 2/3 have no committees so are FLAGGED, not fabricated; startup WARN + `/governance-health` live-verified | **V314** |
+| W1-5 | Retained worked committee decision | S4 | S | ⬜ next in S4 | — |
 | **CE-1** | Module separation + ports + boundary test | S5 | L | not started | — |
 | **X-2 fix** | **Extend `ck_change_status` to 17 values** | S5 | S | not started | **V315** |
 | CE-13a | FE `pages/change/` skeleton | S5 | S | not started | — |
