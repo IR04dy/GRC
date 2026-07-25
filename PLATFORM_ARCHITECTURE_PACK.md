@@ -424,7 +424,7 @@ Scale: **A** hardened (deep-reviewed + remediated + live-probed) · **B** functi
 
 | ID | Defect | Evidence | Severity |
 |---|---|---|---|
-| DF-1 | **Break-glass expiry sweep fails every ~30 min in prod** — `WARN BreakGlassService: break-glass expiry sweep failed: Executing an update/delete query` (a `@Modifying` JPQL running without a transaction in the scheduled sweep — off-request TX landmine class) | prod log 18:43/19:08/19:38/19:56 on 2026-07-23 | **High** (expired grants may outlive their window) |
+| DF-1 | **Break-glass expiry sweep fails every ~30 min in prod** — `WARN BreakGlassService: break-glass expiry sweep failed: Executing an update/delete query` (a `@Modifying` JPQL running without a transaction in the scheduled sweep — off-request TX landmine class) — **fixed in code** (`5dd05fde` on `fix/break-glass-sweep-tx`, 2026-07-25: per-org REQUIRES_NEW `TransactionTemplate` + explicit `TenantContext` + org-scoped native update + 6-test regression class; suite 2322/0/0, live-proven on dev incl. per-org audit rows + viewer 403); **unmerged + prod jar not yet rebuilt** | prod log 18:43/19:08/19:38/19:56 on 2026-07-23 | **High until merge + deploy** (expired grants may outlive their window on the running jar) |
 | DF-2 | Auth-refresh 500 on stale cookies — **fixed in code** (`00ba890e`, ADR-022) but the fixed jar is **staged, not yet activated** on :80 | this session | High until service restart |
 | DF-3 | Service worker serves the stale shell after redeploy (one hard refresh needed) | deploy verification | Medium |
 | DF-4 | Dev-only: `CommitteesPage` HMR ToastProvider artifact; DevTools transient `APPLICATION FAILED TO START` on recompile | dev logs | Low |
@@ -451,7 +451,7 @@ Scale: **A** hardened (deep-reviewed + remediated + live-probed) · **B** functi
 ### C — Defects & session finds (this pack §13.3)
 | ID | Item |
 |---|---|
-| BL-C1 | **Fix DF-1**: wrap the break-glass expiry sweep in an explicit transaction (`TransactionTemplate`/`@Transactional` on the sweep path) + regression test |
+| BL-C1 | ~~**Fix DF-1**: wrap the break-glass expiry sweep in an explicit transaction (`TransactionTemplate`/`@Transactional` on the sweep path) + regression test~~ **DONE in code** — `5dd05fde` on `fix/break-glass-sweep-tx` (2026-07-25); awaits merge to master + prod jar rebuild/restart |
 | BL-C2 | **Activate DF-2**: elevated jar swap on :80 (staged `jar.new`, idempotent snippet ready) |
 | BL-C3 | SW update strategy (versioned SW / skipWaiting+clients.claim) |
 | BL-C4 | Delete `mockChanges.ts` once CE-13 lands; archive `tss-grc-ui/` |
