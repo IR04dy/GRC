@@ -10,7 +10,7 @@ Working tree: `D:\AYMAN\GRC` — remote `github.com/Ayman-Server/Claude-GRC-2` (
 
 - **`PROJECT_CHRONICLE.md`** — the master reference: business + functional reference for
   every module/screen/API, installation, configuration, operations, the full
-  troubleshooting encyclopedia, all 25 developer landmines, and the complete
+  troubleshooting encyclopedia, all 28 developer landmines, and the complete
   development history. **Read it before deep work; this file stays lean on purpose.**
 - `DEPLOYMENT.md` — Windows Server go-live runbook (WinSW services + nginx).
 - `*_PLAN.md` at repo root — per-program review/remediation plans; each carries a
@@ -181,7 +181,7 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   Deployed server: `D:\Deployment\tss-grc` — WinSW services, backend :8090 /
   management :8091, nginx :80 serves the SPA + proxies `/api` and `/ws`.
 
-## Top landmines (full list of 25: PROJECT_CHRONICLE §16)
+## Top landmines (full list of 28: PROJECT_CHRONICLE §16)
 
 - `JAVA_HOME` → JDK 17, always (fresh shells default to 11).
 - ROWVERSION double-flush: never save an entity twice around a native

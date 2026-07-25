@@ -1029,7 +1029,26 @@ The user's actual server uses `D:\Deployment\tss-grc\` with **WinSW** (not NSSM)
 24. **nginx as a service** — must stop via `-s stop` (graceful), never a raw kill;
     the WinSW `stopexecutable` pattern handles it.
 25. **Background build wrappers** can report exit 0 on a failed Maven run — always
-    grep the log for `BUILD SUCCESS` / `Tests run:`.
+    grep the log for `BUILD SUCCESS` / `Tests run:`. Corollary hit twice on 2026-07-25:
+    the same wrapper reports exit 0 when Maven never ran at all (`no POM in this
+    directory` — a persisted `cd` to the repo root). Grep for the totals line, not the
+    exit code, every time.
+26. **Restoring a mutated source file with `shutil.copy2` preserves its mtime**, so
+    Maven's incremental compiler sees source-older-than-class and leaves the **last
+    mutation's class** in `target/classes`. Symptom: a mutation run reports every guard
+    proven, then the next full suite fails on correct source (and a dev backend started
+    from that tree serves mutated behaviour). Restore by **writing the text and touching
+    the file** (`os.utime`), never `copy2`.
+27. **A mutation-testing harness needs a control run.** An already-failing test reports
+    `CAUGHT` for *every* mutation, because the harness only observes `BUILD FAILURE`.
+    Prove each test green on unmutated source **first** and abort if it is not —
+    otherwise a broken test manufactures a clean bill of health for guards nobody checked.
+28. **A permission the code tests for must exist in `iam.permissions`.** Two separate
+    defects came from this: `ADMIN:*` guarded 59 committee methods while held by **zero**
+    roles (F2-23), and `mayRecordOnBehalf` matched the authority `ADMIN_APPROVE` when that
+    permission was not catalogued at all, so no tenant could ever grant it. **A guard
+    nobody holds is indistinguishable from a broken feature** — when adding or retargeting
+    a guard, query the grant set in the same slice.
 
 ---
 
