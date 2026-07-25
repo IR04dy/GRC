@@ -65,7 +65,41 @@ No feature may be called “complete”, “compliant”, “secure”, “marke
 | Roadmap | [Implementation roadmap](Roadmap/IMPLEMENTATION_ROADMAP.md), [future vision](Roadmap/FUTURE_VISION.md) |
 | Backlog | [Product backlog](Backlog/PRODUCT_BACKLOG.md) |
 | Visuals | [Heatmaps](Heatmaps/PLATFORM_HEATMAPS.md), [diagrams](Diagrams/PLATFORM_DIAGRAMS.md) |
-| Appendices | [Evidence request](Appendix/EVIDENCE_REQUEST.md), [references](Appendix/REFERENCES.md), [traceability](Appendix/TRACEABILITY.md) |
+| Appendices | **[Measured baseline](Appendix/MEASURED_BASELINE.md)** — the evidence base, with [reproduction scripts](Appendix/scripts/) |
+
+## Independent review pass — 2026-07-25
+
+A second, independent pass re-derived every checkable claim in this Bible from source and added the
+documents below. It is deliberately separated from the v1.0 corpus so a reader can see what is *measured*
+versus what is *asserted*.
+
+| Document | What it is |
+|---|---|
+| **[Measured baseline](Appendix/MEASURED_BASELINE.md)** | The evidence base every other new document cites — 58 modules, 186,285 LoC, coupling graph, guard styles, entitlement adoption, i18n and UX metrics. Reproducible via `Appendix/scripts/`. |
+| **[Findings register V2](Registers/FINDINGS_REGISTER_V2.md)** | 22 findings in the required 18-field format (ID → Root Cause → four Impacts → Recommendation → Alternatives → Trade-offs → Effort → Priority → ROI → References), each anchored to a baseline section. Supersedes `FINDINGS_REGISTER.md` on measured facts. |
+| **[Module separability & SKU model](Architecture/MODULE_SEPARABILITY_AND_SKU_MODEL.md)** | Per-module separability tier (A/B/C/K) for all 58, derived from the coupling graph, plus a 14-SKU catalogue. Supersedes `MODULE_INDEPENDENCE_AND_PACKAGING.md` and `Heatmaps/MODULE_INDEPENDENCE_MATRIX.md` on measured facts. |
+| **[UX redesign blueprint](UX/UX_REDESIGN_BLUEPRINT.md)** | Corrects the "complete UX redesign" recommendation — measurement shows a real design system at 99% adoption. Redesigns the *information architecture* instead: 12 workspaces, route reconciliation, Arabic convergence, truthful-UI principle. |
+| **[Independent acceptance verdict](Executive/INDEPENDENT_ACCEPTANCE_VERDICT.md)** | Three separate verdicts — government acceptance committee, enterprise customer, investor due diligence — with a 13-dimension scorecard and four non-negotiable conditions. |
+| **[Bible validation log](Governance/BIBLE_VALIDATION_LOG.md)** | Per-document verdict on this corpus: VERIFIED / SOUND / UNVERIFIED / PARTLY CONTRADICTED / CONTRADICTED, with the specific check applied and what was *not* checked. |
+| **ADR-009 … ADR-012** | [Module registry](Decisions/ADR-009-MODULE-REGISTRY.md) · [permission-only authorisation](Decisions/ADR-010-PERMISSION-ONLY-AUTHORISATION.md) · [schema ownership](Decisions/ADR-011-SCHEMA-OWNERSHIP.md) · [boundary enforcement and ports](Decisions/ADR-012-BOUNDARY-ENFORCEMENT-AND-PORTS.md) — the four rules this pass introduces, each enforced by a test rather than a document. |
+
+**Three headline results of the validation pass:**
+
+1. **The v1.0 corpus is more rigorous than its packaging suggested.** `ADR-001`'s "734 cross-module
+   imports / 14 bidirectional pairs" and every per-module file count in `SOURCE_MODULE_INVENTORY.md`
+   reproduced **exactly** under independent measurement. `ADR-002`'s claim that licensing infrastructure
+   exists was also correct — the second pass initially disputed it and was wrong.
+2. **Its single most valuable sentence was true and unproven.** `EXECUTIVE_VERDICT.md` warned that
+   "governance decisions can be authored under caller-supplied identities." That has now been located and
+   confirmed in code: committee votes are recorded under a request-body name (F2-21), which makes
+   recusal, quorum and segregation of duties bypassable. It is the highest-severity finding in either pass.
+3. **Two v1.0 recommendations should not be actioned as written** — a complete UX redesign (contradicted
+   by 99% design-system adoption) and building an entitlement layer (one already exists, wired to 8.6%
+   of controllers).
+
+**Every ADR in this Bible has a "Proof" section naming tests that mostly do not exist.** Turning those
+Proof sections into CI tests is the highest-leverage governance action available, because the decisions
+themselves are already right.
 
 ## Baseline verification
 

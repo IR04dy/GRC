@@ -131,11 +131,27 @@ Full persona list: PROJECT_CHRONICLE §4.
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
 
-Backend modules under `module/`: `admin`, `ai`, `auth`, `bcm`, `compliance`,
-`cyber`, `dashboard`, `datagov`, `evidence`, `iam` (+`iam/governance`), `incident`,
-`intake`, `ndi`, `platform`, `privacy`, `reporting`, `risk`, `scm`, `socops`,
-`sust` (+`finance`/`ghg`/`capa`/`vendor`), `tprm`, `workflow` — each
+Backend modules under `module/` — **58 packages** (57 with code; `datagov` is an empty
+placeholder), 186 kLoC, 417 entities, 2,160 endpoints. Each follows
 `controller / dto / entity / repository / service`.
+
+- **Largest:** `bcm` 25k · `sust` 16.7k (+`finance`/`ghg`/`capa`/`vendor`) ·
+  `platform` 10k · `risk` 9k · `ndi` 7.7k · `integrations` 7.6k · `cyber` 7.3k ·
+  `socops` 6.8k · `privacy` · `compliance` · `tprm` · `workflow` · `reporting` ·
+  `ethics` · `admin` · `iam` (+`iam/governance`) · `scm` · `ai` · `evidence` · `audit_lc`
+- **Saudi / financial-sector:** `sharia`, `openbanking`, `outsourcing`, `rrp`, `cpty`,
+  `regreporting`, `reginspect`, `aml`, `fraud`, `consumer`, `opres`, `nca_ecc`,
+  `dataclass`, `data_officer`, `regchange`
+- **Kernel-ish:** `auth`, `attachment`, `signature`, `approvals`, `capa`, `intake`,
+  `dashboard`, `knowledge`, `controlmap`, `workflow_submission`
+- **Other:** `change_mgmt`, `policy`, `incident`, `governance`, `ccm`, `audit_committee`,
+  `audit_eng`, `board_pack`, and the `*_lc` lifecycle packages (`risk_lc`, `cyber_lc`,
+  `bcm_lc`, `privacy_lc`)
+
+⚠ **This file previously listed 24 modules** — a 40% understatement that silently scoped
+34 packages out of the RBAC catalogue, the test bar and every remediation plan. Full census
+with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md`
+(regenerate with `Appendix/scripts/coupling.py`).
 
 **Key patterns:**
 - **Multi-tenancy** — `TenantContext` thread-local from JWT; **every repository

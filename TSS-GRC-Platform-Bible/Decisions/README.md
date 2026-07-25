@@ -13,3 +13,16 @@
 
 Existing repository ADRs remain historical evidence. This directory governs the transformation target.
 
+
+## Independent review pass — 2026-07-25
+
+| ADR | Title | Status | Makes enforceable |
+|---|---|---|---|
+| [ADR-009](ADR-009-MODULE-REGISTRY.md) | Module Registry as a Build Artefact | Proposed | — (new) |
+| [ADR-010](ADR-010-PERMISSION-ONLY-AUTHORISATION.md) | Permission-Only Authorisation in Module Code | Proposed | ADR-006 |
+| [ADR-011](ADR-011-SCHEMA-OWNERSHIP.md) | Schema Ownership Equals Module Ownership | Proposed | ADR-003 |
+| [ADR-012](ADR-012-BOUNDARY-ENFORCEMENT-AND-PORTS.md) | Boundary Enforcement and Consumer-Owned Ports | Proposed | ADR-001 |
+
+**ADR-001 through ADR-008 are retained unchanged.** Validation of each — including the finding that
+`ADR-006` is contradicted *in implementation* by F2-21, and that `ADR-001`/`ADR-002`'s factual claims
+reproduce exactly — is recorded in [`Governance/BIBLE_VALIDATION_LOG.md`](../Governance/BIBLE_VALIDATION_LOG.md).
