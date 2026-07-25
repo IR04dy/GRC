@@ -4,11 +4,14 @@ import com.tss.grc.module.admin.committee.dto.CommitteeDtos.ResolutionVoteReques
 import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolutionVote;
 import com.tss.grc.module.admin.committee.service.CommitteeResolutionService;
+import com.tss.grc.security.GrcUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -54,15 +57,66 @@ public class CommitteeResolutionController {
 
     // ── CH-14: per-member voting + recusal/COI ───────────────────────────────
 
+    /**
+     * Record the caller's vote on a resolution.
+     *
+     * <p><b>DF-3 / F2-21.</b> The voter is the <b>authenticated principal</b>, not a
+     * name in the request body. Omit {@code memberName} to vote as yourself — that is
+     * the normal path. Supplying {@code memberName} for someone else is only honoured
+     * for a committee secretary/chair (see {@link #mayRecordOnBehalf}), and the row is
+     * then stamped {@code on_behalf = 1} with the real actor recorded, so an on-behalf
+     * vote is permitted but never silent.
+     *
+     * <p>Previously this passed {@code req.memberName()} straight through, so any
+     * principal with {@code ADMIN:WRITE} could vote as any name — defeating recusal,
+     * quorum and vote ownership. The sibling {@code CommitteeController#approveMinutes}
+     * already derived its actor from {@code Authentication}; this now matches it.
+     */
     @PostMapping("/{id}/votes")
     @PreAuthorize("hasPermission('ADMIN','WRITE')")
-    public CommitteeResolution recordVote(@PathVariable Long id, @Valid @RequestBody ResolutionVoteRequest req) {
-        return service.recordVote(id, req.memberName(), req.vote(), req.memberRole(), req.rationale());
+    public CommitteeResolution recordVote(@PathVariable Long id,
+                                          @Valid @RequestBody ResolutionVoteRequest req,
+                                          Authentication auth) {
+        return service.recordVote(id, req.memberName(), req.vote(), req.memberRole(),
+            req.rationale(),
+            new CommitteeResolutionService.VoteActor(
+                userIdOf(auth), usernameOf(auth), mayRecordOnBehalf(auth)));
     }
 
     @GetMapping("/{id}/votes")
     @PreAuthorize("hasPermission('ADMIN','READ')")
     public List<CommitteeResolutionVote> votes(@PathVariable Long id) {
         return service.votes(id);
+    }
+
+    // ── DF-3: actor resolution (mirrors CommitteeController) ─────────────────
+
+    private static Long userIdOf(Authentication auth) {
+        if (auth != null && auth.getPrincipal() instanceof GrcUserDetails u) return u.getUserId();
+        return null;
+    }
+
+    private static String usernameOf(Authentication auth) {
+        if (auth != null && auth.getPrincipal() instanceof GrcUserDetails u) return u.getUsername();
+        return auth != null ? auth.getName() : null;
+    }
+
+    /**
+     * May this principal record a vote for a <em>different</em> member — the committee
+     * secretary/chair minuting a show of hands?
+     *
+     * <p>Matched against granted authorities the same way {@code ModulePermissionEvaluator}
+     * does it: an exact {@code MODULE_ACTION} authority, plus the {@code ROLE_PLATFORM_ADMIN}
+     * bypass. {@code ADMIN:APPROVE} is the committee-administration authority, deliberately
+     * distinct from the {@code ADMIN:WRITE} that merely permits casting your own vote —
+     * so "can vote" and "can vote for someone else" are separate grants a tenant controls.
+     */
+    private static boolean mayRecordOnBehalf(Authentication auth) {
+        if (auth == null || auth.getAuthorities() == null) return false;
+        for (GrantedAuthority a : auth.getAuthorities()) {
+            String s = a.getAuthority();
+            if ("ROLE_PLATFORM_ADMIN".equals(s) || "ADMIN_APPROVE".equals(s)) return true;
+        }
+        return false;
     }
 }

@@ -2,10 +2,12 @@ package com.tss.grc.module.admin.committee.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.admin.committee.entity.CommitteeMeetingAttendee;
+import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
 import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolutionVote;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingAttendeeRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeReferralRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeResolutionRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeResolutionVoteRepository;
@@ -21,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
@@ -62,11 +65,52 @@ class CommitteeVoteRecusalTallyTest {
     @Mock CommitteeResolutionVoteRepository   voteRepo;
     @Mock CommitteeMeetingAttendeeRepository  attendeeRepo;
     @Mock CommitteeReferralRepository         referralRepo;
+    @Mock CommitteeMemberTermRepository       memberTermRepo;   // DF-3
 
     @InjectMocks CommitteeResolutionService service;
 
     /** Votes "persisted" by the service, so recomputeTally sees what was saved. */
     private final List<CommitteeResolutionVote> stored = new ArrayList<>();
+
+    private static final Long COMMITTEE_ID = 7L;
+
+    /**
+     * DF-3: every member named in these tests must now be on the committee's active
+     * roster, and each gets a linked platform user id so a vote can be attributed. The
+     * ids are the roster index — {@link #asSelf} turns a name back into that member's
+     * own actor, so each test below records the vote it always meant to record: the
+     * member's own, by that member.
+     */
+    private static final List<String> ROSTER = List.of(
+        "Ali", "Ali Hassan", "Noura", "Sara", "Sara Al-Otaibi", "Omar", "Mansour Bin Ali");
+
+    private CommitteeMemberTerm term(String name, long userId, int voting) {
+        CommitteeMemberTerm t = new CommitteeMemberTerm();
+        t.setId(userId);
+        t.setOrganisationId(ORG);
+        t.setCommitteeId(COMMITTEE_ID);
+        t.setMemberName(name);
+        t.setMemberUserId(userId);
+        t.setRole("Member");
+        t.setIsVotingMember((short) voting);
+        return t;
+    }
+
+    /** The actor for "this member is casting their own vote". */
+    private CommitteeResolutionService.VoteActor asSelf(String memberName) {
+        long id = ROSTER.indexOf(memberName.trim()) + 100L;
+        return CommitteeResolutionService.VoteActor.self(id, memberName.trim());
+    }
+
+    /**
+     * Every pre-DF-3 call site funnels through here. The signature change is the point:
+     * a vote can no longer be recorded without saying who recorded it, so the tests have
+     * to name an actor — and these tests name the member themselves, which is what they
+     * were always implicitly asserting.
+     */
+    private CommitteeResolution vote(String member, String v, String role, String rationale) {
+        return service.recordVote(RES_ID, member, v, role, rationale, asSelf(member));
+    }
 
     @BeforeEach
     void setUp() {
@@ -80,7 +124,7 @@ class CommitteeVoteRecusalTallyTest {
         CommitteeResolution res = new CommitteeResolution();
         res.setId(RES_ID);
         res.setOrganisationId(ORG);
-        res.setCommitteeId(7L);
+        res.setCommitteeId(COMMITTEE_ID);
         res.setMeetingId(MEETING_ID);
         when(repo.findByIdAndOrganisationId(RES_ID, ORG)).thenReturn(Optional.of(res));
         when(repo.save(any(CommitteeResolution.class))).thenAnswer(i -> i.getArgument(0));
@@ -98,6 +142,10 @@ class CommitteeVoteRecusalTallyTest {
         when(voteRepo.findByResolutionId(RES_ID)).thenReturn(stored);
         when(attendeeRepo.findByCommitteeMeetingId(MEETING_ID)).thenReturn(List.of());
         when(referralRepo.findByResolutionId(RES_ID)).thenReturn(Optional.empty());
+        // DF-3: the active roster now gates who may vote at all.
+        List<CommitteeMemberTerm> roster = new ArrayList<>();
+        for (int i = 0; i < ROSTER.size(); i++) roster.add(term(ROSTER.get(i), 100L + i, 1));
+        when(memberTermRepo.findActiveByCommittee(ORG, COMMITTEE_ID)).thenReturn(roster);
     }
 
     @AfterEach
@@ -132,22 +180,40 @@ class CommitteeVoteRecusalTallyTest {
 
     @Test
     void rejects_an_unknown_vote_value() {
-        assertThatThrownBy(() -> service.recordVote(RES_ID, "Ali", "MAYBE", "MEMBER", null))
+        assertThatThrownBy(() -> vote("Ali", "MAYBE", "MEMBER", null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("vote must be one of");
     }
 
+    /**
+     * DF-3 changed this deliberately. A blank {@code memberName} used to be rejected
+     * ("memberName is required") because the name <em>was</em> the identity. Now the
+     * identity is the authenticated actor, so blank means "my own vote", and it is
+     * refused only when the actor holds no seat on this committee — a strictly stronger
+     * rule, since the old code accepted any non-blank string from anyone.
+     */
     @Test
-    void rejects_a_blank_member_name() {
-        assertThatThrownBy(() -> service.recordVote(RES_ID, "   ", "FOR", "MEMBER", null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("memberName is required");
+    void a_blank_member_name_is_refused_when_the_actor_holds_no_seat() {
+        assertThatThrownBy(() -> service.recordVote(RES_ID, "   ", "FOR", "MEMBER", null,
+                CommitteeResolutionService.VoteActor.self(9999L, "outsider")))
+            .isInstanceOf(AccessDeniedException.class)
+            .hasMessageContaining("not an active member of this committee");
         verify(voteRepo, never()).save(any());
     }
 
     @Test
+    void a_blank_member_name_records_the_actors_own_vote() {
+        CommitteeResolution out = service.recordVote(RES_ID, null, "FOR", "MEMBER", null,
+            CommitteeResolutionService.VoteActor.self(100L, "Ali"));
+        assertThat(voteOf("Ali")).isEqualTo("FOR");
+        assertThat(stored.get(0).getOnBehalf()).isFalse();
+        assertThat(stored.get(0).getRecordedByUserId()).isEqualTo(100L);
+        assertThat(out.getVoteFor()).isEqualTo(1);
+    }
+
+    @Test
     void accepts_a_lowercase_padded_vote_value() {
-        service.recordVote(RES_ID, "  Ali  ", " for ", "MEMBER", null);
+        vote("  Ali  ", " for ", "MEMBER", null);
         assertThat(voteOf("Ali")).isEqualTo("FOR");
     }
 
@@ -157,7 +223,7 @@ class CommitteeVoteRecusalTallyTest {
     void a_member_who_declared_a_conflict_is_forced_to_recused() {
         when(attendeeRepo.findByCommitteeMeetingId(MEETING_ID))
             .thenReturn(List.of(attendee("Ali Hassan", true)));
-        CommitteeResolution out = service.recordVote(RES_ID, "Ali Hassan", "FOR", "MEMBER", null);
+        CommitteeResolution out = vote("Ali Hassan", "FOR", "MEMBER", null);
         assertThat(voteOf("Ali Hassan")).isEqualTo("RECUSED");
         assertThat(out.getVoteFor()).isZero();
     }
@@ -166,7 +232,7 @@ class CommitteeVoteRecusalTallyTest {
     void the_conflict_match_is_case_insensitive() {
         when(attendeeRepo.findByCommitteeMeetingId(MEETING_ID))
             .thenReturn(List.of(attendee("Ali Hassan", true)));
-        service.recordVote(RES_ID, "ALI HASSAN", "AGAINST", "MEMBER", null);
+        vote("ALI HASSAN", "AGAINST", "MEMBER", null);
         assertThat(voteOf("ALI HASSAN")).isEqualTo("RECUSED");
     }
 
@@ -174,7 +240,7 @@ class CommitteeVoteRecusalTallyTest {
     void a_member_without_a_declared_conflict_votes_normally() {
         when(attendeeRepo.findByCommitteeMeetingId(MEETING_ID))
             .thenReturn(List.of(attendee("Ali Hassan", false), attendee("Noura", true)));
-        CommitteeResolution out = service.recordVote(RES_ID, "Ali Hassan", "FOR", "MEMBER", null);
+        CommitteeResolution out = vote("Ali Hassan", "FOR", "MEMBER", null);
         assertThat(voteOf("Ali Hassan")).isEqualTo("FOR");
         assertThat(out.getVoteFor()).isEqualTo(1);
     }
@@ -184,28 +250,28 @@ class CommitteeVoteRecusalTallyTest {
     @Test
     void the_referred_items_requester_is_forced_to_recused() {
         givenReferralRecusing("Sara Al-Otaibi,Mansour Bin Ali");
-        service.recordVote(RES_ID, "Mansour Bin Ali", "FOR", "CHAIR", null);
+        vote("Mansour Bin Ali", "FOR", "CHAIR", null);
         assertThat(voteOf("Mansour Bin Ali")).isEqualTo("RECUSED");
     }
 
     @Test
     void the_referral_recusal_list_tolerates_padding_and_case() {
         givenReferralRecusing(" sara al-otaibi , Mansour Bin Ali ");
-        service.recordVote(RES_ID, "Sara Al-Otaibi", "FOR", "MEMBER", null);
+        vote("Sara Al-Otaibi", "FOR", "MEMBER", null);
         assertThat(voteOf("Sara Al-Otaibi")).isEqualTo("RECUSED");
     }
 
     @Test
     void a_member_not_on_the_recusal_list_is_unaffected() {
         givenReferralRecusing("Sara Al-Otaibi");
-        CommitteeResolution out = service.recordVote(RES_ID, "Ali Hassan", "FOR", "MEMBER", null);
+        CommitteeResolution out = vote("Ali Hassan", "FOR", "MEMBER", null);
         assertThat(voteOf("Ali Hassan")).isEqualTo("FOR");
         assertThat(out.getVoteFor()).isEqualTo(1);
     }
 
     @Test
     void an_explicit_recused_vote_short_circuits_the_conflict_lookup() {
-        service.recordVote(RES_ID, "Ali Hassan", "RECUSED", "MEMBER", "stepping out");
+        vote("Ali Hassan", "RECUSED", "MEMBER", "stepping out");
         assertThat(voteOf("Ali Hassan")).isEqualTo("RECUSED");
         verify(attendeeRepo, never()).findByCommitteeMeetingId(anyLong());
     }
@@ -215,9 +281,9 @@ class CommitteeVoteRecusalTallyTest {
     @Test
     void recused_votes_are_excluded_from_every_tally_bucket() {
         givenReferralRecusing("Sara Al-Otaibi");
-        service.recordVote(RES_ID, "Ali",   "FOR",     "MEMBER", null);
-        service.recordVote(RES_ID, "Noura", "ABSTAIN", "MEMBER", null);
-        CommitteeResolution out = service.recordVote(RES_ID, "Sara Al-Otaibi", "FOR", "MEMBER", null);
+        vote("Ali",   "FOR",     "MEMBER", null);
+        vote("Noura", "ABSTAIN", "MEMBER", null);
+        CommitteeResolution out = vote("Sara Al-Otaibi", "FOR", "MEMBER", null);
 
         assertThat(voteOf("Sara Al-Otaibi")).isEqualTo("RECUSED");
         assertThat(out.getVoteFor()).isEqualTo(1);       // Sara's FOR must not count
@@ -228,9 +294,9 @@ class CommitteeVoteRecusalTallyTest {
 
     @Test
     void outcome_is_approved_when_for_outnumbers_against() {
-        service.recordVote(RES_ID, "Ali",   "FOR",     "MEMBER", null);
-        service.recordVote(RES_ID, "Noura", "FOR",     "MEMBER", null);
-        CommitteeResolution out = service.recordVote(RES_ID, "Omar", "AGAINST", "MEMBER", null);
+        vote("Ali",   "FOR",     "MEMBER", null);
+        vote("Noura", "FOR",     "MEMBER", null);
+        CommitteeResolution out = vote("Omar", "AGAINST", "MEMBER", null);
         assertThat(out.getOutcome()).isEqualTo("APPROVED");
         assertThat(out.getVoteFor()).isEqualTo(2);
         assertThat(out.getVoteAgainst()).isEqualTo(1);
@@ -238,15 +304,15 @@ class CommitteeVoteRecusalTallyTest {
 
     @Test
     void a_tie_fails_the_motion_rather_than_carrying_it() {
-        service.recordVote(RES_ID, "Ali", "FOR", "MEMBER", null);
-        CommitteeResolution out = service.recordVote(RES_ID, "Omar", "AGAINST", "MEMBER", null);
+        vote("Ali", "FOR", "MEMBER", null);
+        CommitteeResolution out = vote("Omar", "AGAINST", "MEMBER", null);
         assertThat(out.getOutcome()).isEqualTo("REJECTED");
     }
 
     @Test
     void outcome_is_rejected_when_against_outnumbers_for() {
-        service.recordVote(RES_ID, "Ali",   "AGAINST", "MEMBER", null);
-        CommitteeResolution out = service.recordVote(RES_ID, "Omar", "AGAINST", "MEMBER", null);
+        vote("Ali",   "AGAINST", "MEMBER", null);
+        CommitteeResolution out = vote("Omar", "AGAINST", "MEMBER", null);
         assertThat(out.getOutcome()).isEqualTo("REJECTED");
         assertThat(out.getVoteFor()).isZero();
     }
@@ -254,8 +320,8 @@ class CommitteeVoteRecusalTallyTest {
     @Test
     void only_abstentions_and_recusals_leave_the_motion_deferred() {
         givenReferralRecusing("Sara");
-        service.recordVote(RES_ID, "Ali",  "ABSTAIN", "MEMBER", null);
-        CommitteeResolution out = service.recordVote(RES_ID, "Sara", "FOR", "MEMBER", null);
+        vote("Ali",  "ABSTAIN", "MEMBER", null);
+        CommitteeResolution out = vote("Sara", "FOR", "MEMBER", null);
         assertThat(out.getOutcome()).isEqualTo("DEFERRED");
         assertThat(out.getVoteFor()).isZero();
         assertThat(out.getVoteAbstain()).isEqualTo(1);
@@ -263,8 +329,8 @@ class CommitteeVoteRecusalTallyTest {
 
     @Test
     void a_member_changing_their_vote_updates_the_row_instead_of_double_counting() {
-        service.recordVote(RES_ID, "Ali", "FOR", "MEMBER", null);
-        CommitteeResolution out = service.recordVote(RES_ID, "Ali", "AGAINST", "MEMBER", "changed my mind");
+        vote("Ali", "FOR", "MEMBER", null);
+        CommitteeResolution out = vote("Ali", "AGAINST", "MEMBER", "changed my mind");
         assertThat(stored).hasSize(1);
         assertThat(out.getVoteFor()).isZero();
         assertThat(out.getVoteAgainst()).isEqualTo(1);
@@ -274,7 +340,7 @@ class CommitteeVoteRecusalTallyTest {
 
     @Test
     void every_vote_is_audited_with_the_resulting_tally_and_outcome() {
-        service.recordVote(RES_ID, "Ali", "FOR", "CHAIR", null);
+        vote("Ali", "FOR", "CHAIR", null);
         ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
         verify(audit).log(eq("RESOLUTION_VOTE"), eq("CommitteeResolution"), eq(RES_ID), detail.capture());
         assertThat(detail.getValue())
@@ -285,7 +351,7 @@ class CommitteeVoteRecusalTallyTest {
 
     @Test
     void the_vote_row_carries_the_meeting_org_and_role_for_the_minutes() {
-        service.recordVote(RES_ID, "Ali", "FOR", "CHAIR", "because");
+        vote("Ali", "FOR", "CHAIR", "because");
         CommitteeResolutionVote v = stored.get(0);
         assertThat(v.getResolutionId()).isEqualTo(RES_ID);
         assertThat(v.getMeetingId()).isEqualTo(MEETING_ID);
@@ -301,7 +367,7 @@ class CommitteeVoteRecusalTallyTest {
     @Test
     void recording_a_vote_still_works_when_the_referral_repository_is_absent() {
         ReflectionTestUtils.setField(service, "referralRepo", null);
-        CommitteeResolution out = service.recordVote(RES_ID, "Ali", "FOR", "MEMBER", null);
+        CommitteeResolution out = vote("Ali", "FOR", "MEMBER", null);
         assertThat(voteOf("Ali")).isEqualTo("FOR");
         assertThat(out.getOutcome()).isEqualTo("APPROVED");
     }

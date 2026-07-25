@@ -106,8 +106,20 @@ public final class CommitteeDtos {
             boolean quorumMet, java.util.List<AttendeeRow> attendees
     ) {}
 
+    /**
+     * DF-3 / F2-21: {@code memberName} is now <b>optional</b> and no longer identifies
+     * the voter — the voter is the authenticated principal.
+     *
+     * <p>Omit it to cast your own vote (the normal path). Supply it only when a committee
+     * secretary or chair is recording a vote <em>on behalf of</em> a named member; that
+     * requires {@code ADMIN:APPROVE} and stamps {@code on_behalf = 1}. It was previously
+     * {@code @NotBlank} and taken as the voter's identity, which is precisely the defect:
+     * any caller could vote as any name. Note the ordering landmine — {@code @Valid} runs
+     * <em>before</em> {@code @PreAuthorize}, so a probe of the authorisation behaviour
+     * still needs a body that satisfies these constraints.
+     */
     public record ResolutionVoteRequest(
-            @NotBlank @Size(max = 255) String memberName,
+            @Size(max = 255) String memberName,
             @Size(max = 120) String memberRole,
             @NotBlank String vote,   // FOR | AGAINST | ABSTAIN | RECUSED
             String rationale

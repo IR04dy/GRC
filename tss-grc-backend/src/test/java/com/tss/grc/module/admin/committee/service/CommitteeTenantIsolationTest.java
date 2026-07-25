@@ -4,6 +4,7 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingAttendeeRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeReferralRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
@@ -132,6 +133,7 @@ class CommitteeTenantIsolationTest {
     @Mock AuditLogService                    audit;
     @Mock ApplicationEventPublisher          publisher;
     @Mock CommitteeResolutionVoteRepository  voteRepo;
+    @Mock CommitteeMemberTermRepository      memberTermRepo;
     @Mock CommitteeMeetingAttendeeRepository attendeeRepo2;
     @InjectMocks CommitteeResolutionService resolutionService;
 
@@ -152,7 +154,8 @@ class CommitteeTenantIsolationTest {
         TenantContext.setCurrentTenant(OURS);
         when(resRepo.findByIdAndOrganisationId(RES_ID, OURS)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> resolutionService.recordVote(RES_ID, "Ali", "FOR", "MEMBER", null))
+        assertThatThrownBy(() -> resolutionService.recordVote(RES_ID, "Ali", "FOR", "MEMBER", null,
+                CommitteeResolutionService.VoteActor.self(100L, "Ali")))
             .isInstanceOf(EntityNotFoundException.class);
         verify(voteRepo, never()).save(any());
         verify(audit, never()).log(anyString(), anyString(), anyLong(), anyString());
