@@ -4,7 +4,7 @@
 > workstreams and the CE change-enablement backlog) with the independent assessment's findings
 > (`F2-*`, `D-*`) into one backlog, one sequence, one migration ledger.
 >
-> **Status:** ACTIVE · **Version:** 2.0 (merged) · **Date:** 2026-07-25 · **Tree:** `700facad`
+> **Status:** ACTIVE · **Version:** 2.1 · **Date:** 2026-07-25 · **Tree:** `eaa79285`
 >
 > | Document | Relationship to this plan |
 > |---|---|
@@ -22,17 +22,17 @@
 
 ## §1 Where we actually are
 
-**Verified at `700facad`:**
+**Verified at `eaa79285`:**
 
 | | |
 |---|---|
-| Backend suite | **2,415 tests / 0 failures** |
+| Backend suite | **2,438 tests / 0 failures** (2,415 + 23 from DF-3) |
 | Authorisation ratchet | **21** (from 62) — floor enumerated: 8 public + 10 self-scoped + 3 participant-scoped |
-| Migrations | packaged **V1–V315**; dev has V313/V314 applied by hand; **prod Flyway baseline V312** |
+| Migrations | packaged **V1–V315**; dev has **V313, V314, V315** applied by hand; **prod Flyway baseline V312** — all three land on the next restart |
 | Stages complete | **S1, S2, S3, S4** (S0 partially — the restart is outstanding) |
 | Module census | **58 packages**, 186,285 LoC, 417 entities, 2,160 endpoints (was documented as 24) |
 | Known-fixed-but-not-running | **DF-1** break-glass sweep (was failing 33–35×/day) · **DF-2** stale-cookie 500 |
-| Open P0s | **DF-3/F2-21** vote provenance *(in progress)* · **F2-02** fabricated data on 3 executive surfaces · **F2-03** Saudi modules untested · **F2-04** entitlement wired to 8.6% |
+| Open P0s | **F2-02** fabricated data on 3 executive surfaces · **F2-03** Saudi modules untested · **F2-04** entitlement wired to 8.6% *(DF-3/F2-21 closed at `f3ea92fc`)* |
 
 **What the assessment changed about this plan.** Four things, each of which moved work *earlier* or made
 it *cheaper*:
@@ -45,6 +45,9 @@ it *cheaper*:
    (~1 day) improves eight modules' separability (F2-08a).
 4. **Three "absent" things exist** — a k6 load harness, axe/Lighthouse accessibility evidence, and
    platform-wide JaCoCo coverage, all in the tracked `audit/` vault. Extend, don't build.
+5. **And DF-3 itself surfaced F2-23** — the vote endpoint's `ADMIN:WRITE` guard is held by **no role**,
+   so a fix for forgery immediately exposed an unreachable feature. Closing one control gap tends to
+   reveal the next; the plan expects that rather than treating it as scope creep.
 
 ---
 
