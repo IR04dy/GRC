@@ -29,17 +29,31 @@
 |---|---|
 | Backend suite | **2,460 tests / 0 failures** (2,415 + 23 DF-3 + 13 DF-4 + 9 D-7) |
 | Authorisation ratchet | **21** (from 62) — floor enumerated: 8 public + 10 self-scoped + 3 participant-scoped — ⚠ **one of the 3 is a defect, not a floor**: see **W0-8** (plan-distribution acknowledgement is not bound to its recipient). Unchanged by D-7/D-8: guards were *retargeted*, none removed |
-| Migrations | packaged **V1–V317**; dev has **V313–V317** applied by hand; **prod Flyway baseline V312** — all five land on the next restart. Next free: **V318** |
+| Migrations | repo packages **V1–V317**; dev has **V313–V317** applied by hand. **Prod Flyway history head is V312** (configured `FLYWAY_BASELINE_VERSION=292`). ⚠ **The staged jar packages only V1–V312** — verified by opening it as a zip: 300 migrations, highest V312. **V313–V317 do NOT land on the restart.** Next free: **V318** |
 | Stages complete | **S1, S2, S3, S4** (S0 partially — the restart is outstanding) |
 | Module census | **58 packages**, 186,285 LoC, 417 entities, 2,160 endpoints, 255 `@RestController` classes (was documented as 24 modules) |
-| Known-fixed-but-not-running | **DF-1** break-glass sweep (was failing 33–35×/day) · **DF-2** stale-cookie 500 · **DF-3/DF-4** provenance · **D-7/D-8** grants (V317 is in dev; :80 still serves the 07-23 jar) |
+| Known-fixed-but-not-running | **DF-1** break-glass sweep (failing 33–35×/day) · **DF-2** stale-cookie 500 — **these two the staged jar does deliver** (`5dd05fde` predates the 17:37 build). **DF-3, DF-4, D-7/D-8 and S1–S4's guard sweeps it does NOT** — those commits land at 17:51–21:28, *after* the jar was built, and all 20 sit on an **unmerged** branch. They need merge → rebuild → restage → a **second** restart (**W0-2b**) |
 | Open P0s | **F2-28 / DF-5 quorum denominator is caller-authored** (found by reconciling the v1.0 audit's F-003 — the highest open item) · **F2-02** fabricated data on 3 executive surfaces · **F2-03** Saudi modules untested · **F2-04** entitlement wired to 8.6% *(DF-3/F2-21 closed at `f3ea92fc`; DF-4/F2-24 at `21c83d09`)* |
 | From the D-7 probes | **F2-25** appointing a committee member 500s on a reasonable body *(**P2** — the mass-assignment half was **disproved** in round-2 review; the service defends)* · **F2-26** no roster seat is linked to a platform user, so nobody can self-vote (**P1**) |
 | New from the §6b reconciliation | **F2-28** quorum integrity (P0) · **F2-27** 23 of 24 `EXPORT` permissions are dead, bulk export is `READ`-authorised (P1) · **F2-29** named change commands (P2) · **F2-30** enforce the bilingual `*_ar` invariant (S) |
 
-⚠ **The `:80` deployment is still running the 2026-07-23 jar.** `jar.new` is staged and the swap needs an
-**elevated** shell — attempted this session and refused (`Cannot open TssGrcBackend service`). Until it runs,
-DF-1 keeps failing 33–35×/day in production and none of V313–V317 is applied there:
+⚠ **The `:80` deployment is still running the 2026-07-23 jar**, and **what the restart delivers was
+misstated in every previous revision of this plan.** Round-3 review opened the staged artifact as a zip;
+I confirmed it. `jar.new` (built **17:37**) packages **300 migrations, highest V312** — byte-identical in
+migration content to the live jar. So the swap applies **zero** migrations and ships **only** the code
+changes committed before 17:37: **DF-1 and DF-2**. Everything else — DF-3 (20:07), DF-4 (20:42),
+V313–V317, the e-signature/AI/BCM guard sweeps that took the ratchet 44 → 21 (17:51–18:05) — postdates the
+build **and** sits on an unmerged branch (`master...feat/change-policy-remediation` = **0 / 20**).
+
+**This was the plan's most consequential error:** W0-2 is the one action assigned to a human, and W0-3's
+verification protocol (break-glass clean, no stale-cookie 500s) would have gone **green** while forgeable
+committee votes and self-approvable changes remained live in production. Fixing DF-1's 33–35 failures/day
+is still worth the restart — it is simply not the provenance fix.
+
+**W0-7 (build ID + migration head on `/actuator/info`) is now a precondition** for this plan ever again
+asserting that anything "lands on the next restart". It would have made this claim impossible to write.
+
+Still worth running now, for DF-1 + DF-2 only:
 
 ```powershell
 Stop-Service TssGrcBackend; Move-Item -Force 'D:\Deployment\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar.new' 'D:\Deployment\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar'; Start-Service TssGrcBackend
@@ -70,17 +84,47 @@ it *cheaper*:
 
 ---
 
+## §1b Owner action register — the constraint this plan was not managing
+
+**Round-3 review named the plan's biggest unexamined assumption: that the binding constraint is
+engineering throughput.** The record says otherwise. Every *completed* item is engineer-solo work; every
+*stalled* item waits on a human who is not the engineer. The plan meticulously instruments the engineering
+side — ratchets, per-slice DoD, mutation proofs, a migration ledger — and had **zero instrumentation for
+the other actor**. Owner-blocked items were scattered across §1, §6, §6d and §8 with no aggregate view, no
+requested date and no escalation. This table is that view.
+
+| # | Action needed from the owner | Blocks | Requested | Notes |
+|---|---|---|---|---|
+| **O-1** | **Elevated restart** (`Stop-Service` → `Move-Item` → `Start-Service`) | DF-1 (33–35 failures/day), DF-2, W0-3 | 2026-07-25 | Attempted and refused this session — needs an elevated shell. **Delivers DF-1/DF-2 only** (§1) |
+| **O-2** | **`merge` authorisation** for `feat/change-policy-remediation` (20 commits) | DF-3, DF-4, D-7/D-8, V313–V317, the ratchet 44→21 guard sweeps — *everything provenance-related reaching production* | 2026-07-25 | House rule 2 forbids merging without the explicit word. Then rebuild → restage → **O-1 again** (W0-2b) |
+| **O-3** | **F2-35** — ratify ONE SKU catalogue; specifically, are committee/board governance and access governance **paid** or **free Base**? | **All of Wave 2** (W2-0, F2-04) | 2026-07-25 | Both advocates argued it in §6d; recommendation on the record. ~$0.5M–2.7M/yr either way on the reviewer's price anchors |
+| **O-4** | **D-1** — which committee constitutes each tenant's CAB / ECAB | **S6** (and therefore S7, S8, CE-13) | earlier | Per-tenant charter fact; orgs 2/3 have no committees. Deliberately not fabricated |
+| **O-5** | **D-2** — ECAB ratification SLA (default 5 business days) | **S7** | earlier | Per-tenant |
+| **O-6** | **D-9** — SKU shelf name for Change Enablement | nothing (cosmetic) | 2026-07-25 | **Recommendation withdrawn** — round 2 showed "Change Enablement" is ITIL 4's own practice name. Defer to pricing time |
+| **O-7** | Commission the **independent penetration test**, **witnessed restore/failover**, and **WCAG conformance statement** | 3 of the audit's own §11 acceptance gates | not yet | §7 calls these out of scope, which reads as a silent rejection of three gates unless an owner is named |
+
+**Why this table earns its place:** if owner latency stays at its demonstrated level, Wave 2 cannot start
+(O-3), Wave 3 cannot pass S6 (O-4), and **nothing new reaches production at all** (O-2) — while the
+engineering loop keeps producing verified commits that accumulate on an unmerged branch. The programme's
+end date becomes independent of engineering pace, and §1's "where we actually are" keeps meaning *where the
+branch is*, which is not where the product is. Finding 1 (the staged jar) is that gap's first casualty.
+
+**Make owner latency as visible as the authorisation ratchet.** Update `Requested` and add a waiting-days
+column at each review.
+
+---
+
 ## §2 The decision that gated a third of this plan — ANSWERED
 
 **D-3 · Is the commercial model per-module SKUs, or a single suite licence?**
 → **Per-module SKUs, one deployment, one database.** [ADR-013](TSS-GRC-Platform-Bible/Decisions/ADR-013-PER-MODULE-SKU-AND-ENTITLEMENT.md), 2026-07-25.
 
 So the left column below is now the live plan: **F2-04, F2-05 and F2-06 are Wave 2 as written**, ADR-009…012
-are adopted, and the 11 Saudi Tier-B modules are the first SKUs. Wave 2 is **un-gated**.
+are adopted, and the 11 Saudi Tier-B modules are the first SKUs. **D-3 no longer gates Wave 2 — but F2-35 now does** (§6d): the SKU catalogue exists in three contradictory versions, and W2-0/F2-04 cannot be written until one is ratified.
 
 | Consequence | Detail |
 |---|---|
-| Wave 2 is unblocked | F2-04 / F2-05 / F2-06 proceed at P1 |
+| Wave 2 is unblocked *by D-3* | F2-04 / F2-05 / F2-06 proceed at P1 — **once F2-35 ratifies one catalogue** |
 | One item is **added ahead of F2-04** | **W2-0 grandfather licence backfill.** Orgs 2 and 3 hold exactly one licence row each (`SOCOPS`); `@RequireModule` is fail-closed, so annotating controllers before backfilling would black out two of three tenants |
 | The SKU catalogue moves out of code | `LicensingService.KNOWN_MODULES` is a hard-coded `Set.of` of 20 codes that calls itself the source of truth — a recompile per SKU. It moves into the module registry (F2-01) |
 | Two other decisions dissolved | **D-4** (`incident` joins the Cyber & SOC *SKU*; the package does not move, so F2-06b is no longer gated) and **D-6** (no role bypasses entitlement — platform administration is inside the mandatory Base SKU, so there is nothing to bypass) |
@@ -112,7 +156,7 @@ are **one** piece of work, not two.
 | **W0-1** | D-1 | `git worktree remove .claude/worktrees/vigilant-swartz-073bd4` (branch already merged) — removes 273 phantom doc files. *(Renamed from "D-1": it collided with decision D-1 in §6, which is a different thing entirely)* | XS | ✅ **DONE** — `git worktree list` shows only the main tree; corpus now 353 on disk / 335 tracked | — |
 | F2-20 | F2-20 | **Register** `module/datagov` as maturity `PLANNED` — **do not delete it.** Reading its `package-info.java` showed a deliberate, well-argued v2 deferral (scope + Collibra/Alation overlap + pointers to the live adjacent capabilities), not a stray placeholder | XS | ⬜ *(rides F2-01)* | — |
 | **F2-23** | F2-23 | **Catalogue a narrow committee-vote permission.** Measured: **no role holds `ADMIN:WRITE`**, so only `PLATFORM_ADMIN` can record a vote and DF-3's member-self-vote path is unreachable | S | ✅ **DONE** `5ec6edfe` — resolved by **ADR-014**, and the shape is the *inverse* of what this row proposed: `ADMIN:APPROVE` became the **vote** capability (15 roles) and `ADMIN:WRITE` the **secretariat/on-behalf** right (3 roles), because the same grant also appointed roster members — a voter could add themselves to a roster and manufacture quorum. `ADMIN:READ` 21, `ADMIN:EXPORT` 7. Suite 2,460/0, 5/5 mutations proven, live-probed | **V317** |
-| **W0-8** | ratchet javadoc | **Bind plan-distribution acknowledgement to its recipient.** `PlanDistributionService.transition()` never checks the caller is the designated recipient, so one user can acknowledge another's plan distribution — **and that acknowledgement is BCM compliance evidence.** Fix: bind to `recipientUserId`. The code comment says "tracked as its own slice"; the council found it was tracked in **no plan at all**, surviving only in `ControllerAuthorizationRatchetTest`'s floor enumeration, where §1 presents it as legitimate rather than as a defect pending fix | S | ⬜ | — |
+| **W0-8** | ratchet javadoc | ⚠ **WITHDRAWN — already fixed before this row was written.** `PlanDistributionService` was bound to `recipientUserId` at **`e9056b09`** (on master, with a 12-case `PlanDistributionOwnershipTest`), **four hours before** the round-1 council endorsed it as an open defect "tracked in no plan at all". The row was authored from `ControllerAuthorizationRatchetTest`'s javadoc, which still says "pending an OWNERSHIP fix … tracked as its own slice" — **the javadoc is stale and the plan inherited its staleness.** Lesson added to the review protocol: *grep the git history before accepting a code comment as evidence of an open item.* **Residual (S):** the javadoc itself, plus `ExerciseRuntimeController#respond` — the third participant-scoped endpoint, which `e9056b09` did not touch | S | 🔶 **residual only** | — |
 | **F2-25** | new | **Appointing a committee member 500s on a reasonable body.** `POST /committees/registry/terms` binds the entity raw with **no `@Valid`**, and `appointed_at`/`term_starts_at` are NOT NULL with no default — so an authorised call dies as a `DataIntegrityViolation` surfaced as 500. Fix: `MemberTermRequest` DTO (dates `@NotNull`), `@Valid`, in-tenant `committeeId` check, 400-not-500 tests; sweep `/skills`, which binds an entity too. ⚠ **P1 → P2:** the original entry claimed a cross-tenant mass-assignment vector; the service has defended since `8373d6f8` and a live probe disproved it — see the register's Correction field | XS | ⬜ **prerequisite for F2-26/F2-28** | — |
 | **F2-26** | new | **No roster seat is linked to a platform user** (`member_user_id` NULL on all 31 rows), so nobody can cast their own vote — only the secretariat on-behalf path works. Fix: optional `memberUserId` on the DTO + in-tenant validation, a `POST /terms/{id}/link-user` endpoint *(does not exist yet — guard, audit, re-link and clear semantics all undefined)*, and a linkage report distinguishing **unlinked** from **external** (a director with no login must not read as a gap). ⚠ **The dev-persona links must ship as a SEED SCRIPT, never in V318** — a Flyway migration name-matching personas would fabricate governance identities on real tenants, which §7 forbids. `member_user_id` has existed since **V154**, so V318's "link" half is at most an FK/index and possibly nothing | S | ⬜ *(after F2-25)* | — |
 | F2-13a | F2-13 | **Grant-tightness report** — roles-per-permission, **in both directions**: flag any business-write permission held by >50% of roles or by a read-only/external/machine persona (`WORKFLOW_WRITE` is in 55 of 57), **and any catalogued permission no role holds at all** (`ADMIN:WRITE` is in 0 — a dead permission is an unreachable feature) | S | ⬜ | — |
@@ -137,7 +181,7 @@ are **one** piece of work, not two.
 | ID | Src | Action | Size | Status | Migration |
 |---|---|---|---|---|---|
 | **W2-0** | ADR-013 | **Grandfather licence backfill — must land before ANY `@RequireModule` annotation.** Orgs 2/3 hold one licence row each, and the aspect is fail-closed. **Grant-all-then-tighten**, not license-what-has-data (which false-negatives on read-only, empty and seasonal usage → 403s for paying customers). Also fix new-org provisioning: nothing creates licence rows on organisation creation, so post-sweep every new tenant is born blacked out (F2-32) | S | ⬜ **blocked on F2-35** | **V320** |
-| **F2-04** | F2-04 | **Entitlement rollout** — extend `KNOWN_MODULES` 20 → 58 from the registry; `@RequireModule` at class level on every business controller; wire the existing `moduleEnabled()` FE helper into navigation + route registration; **licence backfill migration before enforcing**; cross-tenant test (a tenant licensed for X gets 403 on Y — orgs 2/3 are already seeded for exactly this) | M | ⬜ | **V320–V321** (see §4) |
+| **F2-04** | F2-04 | **Entitlement rollout** — extend `KNOWN_MODULES` 20 → 58 from the registry; `@RequireModule` at class level on every business controller; wire the existing `moduleEnabled()` FE helper into navigation + route registration; **licence backfill migration before enforcing**; cross-tenant test. ⚠ **The cited fixture does not survive W2-0:** "orgs 2/3 are already seeded for exactly this" is true today (one `SOCOPS` row each, verified in dev *and* prod) but grant-all-then-tighten removes it, and per F2-32 nothing provisions licences at org creation, so a fresh org is fail-closed on everything. **The test must create its own org + licence rows** | M | ⬜ | **V320–V321** (see §4) |
 | F2-06b | F2-06 | Schema moves, in ownership order: **`integrations` out of `platform` first**, then `controlmap`. *(The `incident`→`cyber` question is **dissolved** — D-4/ADR-013: `incident` joins the Cyber & SOC SKU and the package does not move.)* Compatibility view for one release + rollback recipe | M each | ⬜ | V332+ (see §4) |
 | **F2-09** | F2-09 | **Schema-convergence CI job** — Flyway `V1`→head on an empty DB, dump, diff against the Python-bootstrapped dev schema; fail on any un-allow-listed difference | M | ⬜ | — |
 | F2-13b | F2-13 | Tighten the over-broad grants the Wave-0 report surfaces, starting with `WORKFLOW_WRITE`; per-tenant impact query before each change | M | ⬜ | V332+ (see §4) |
@@ -478,11 +522,25 @@ body → S7 meeting cycle → S8 workflow/evidence/FSC → CE-13 frontend split.
 
 ## §6d Council review — 2026-07-25 (five Fable 5 seats, adversarially briefed)
 
-Five reviewers with deliberately conflicting mandates read this plan against the repository. Two were
-briefed to argue *against* positions already committed here. Their aggregate verdict:
-**ACCEPT-WITH-CONDITIONS as a programme** — the measured claims verify (~30 checked exactly across seats),
-and the defects were almost entirely in the *status and sequencing layer*, which had drifted ten commits
-behind its own branch.
+Three rounds of reviewers with deliberately conflicting mandates read this plan against the repository;
+several were briefed to argue *against* positions already committed here. Aggregate verdict:
+**ACCEPT-WITH-CONDITIONS as a programme** — and round 3 fairly objected that the previous revision
+enumerated *no conditions*, making the verdict unauditable. **The conditions are:**
+
+1. **O-2 merge authorisation**, without which no provenance fix reaches production (§1b).
+2. **F2-28 closed** before S6 — non-negotiable, now sized M→L with a 16-item acceptance checklist.
+3. **F2-35 ratified** before W2-0/F2-04 are written.
+4. **A retained acceptance-evidence artefact** per slice (probe output + environment fingerprint),
+   replacing evidence that currently lives only in commit messages.
+5. **W0-7 shipped** before this plan again asserts what a deployment contains.
+6. **The four acceptance gates with no owner** (pen test, witnessed restore, WCAG conformance, Saudi
+   content provenance) either get an owner in §1b or are restated as accepted risks.
+
+Two corrections to the previous summary, both round 3's: the defects were **not** "almost entirely in the
+status layer" — items 7 and 9 below (an unconditional downgrade of a forgery-adjacent finding, and a +0.8
+self-rating with an open P0 on the same surface) are **judgment** errors, and calling them clerical
+flatters the process. And the claims that verified were the *code* claims: **no round verified an artefact
+until round 3, which found the plan's deployment claims false** (§1).
 
 ### Errors of mine they caught, now fixed above
 
@@ -516,10 +574,12 @@ them. Recorded because a subagent's confident negative is not evidence.
 
 | ID | Finding | Sev | Source |
 |---|---|---|---|
-| **F2-31** | **The audit ledger has no tamper-evidence of its own.** Committee minutes carry a SHA-256 signature; `audit.log` — which every control cites as proof — has no hash-chaining, no WORM/retention policy and no protection from administrative deletion. F2-21 already demonstrated that this ledger will faithfully corroborate a forgery. NCA ECC **2-12** requires event-log protection and ≥12-month retention; also ISO 27001 A.8.15, SAMA CSF logging | **P1** | GRC seat |
+| **F2-31** | **The audit ledger has no tamper-evidence of its own.** Committee minutes carry a SHA-256 signature; `audit.log` — which every control cites as proof — has no hash-chaining, no WORM/retention policy and no protection from administrative deletion. F2-21 already demonstrated that this ledger will faithfully corroborate a forgery. NCA ECC **2-12** requires event-log protection and ≥12-month retention; also ISO 27001 A.8.15, SAMA CSF logging | **P1** — ⚠ *with a caveat round 3 added: hash-chaining an audit ledger is near-theatre while the DBA, platform admin and deployment operator are the same person on the same SQL box. The control is defeated by its own threat model until key custody separates, so pair it with an off-box or append-only sink or state plainly that it is deterrence, not prevention.* | GRC seat |
 | **F2-32** | **The licence lifecycle has no data plane.** ADR-013 gates HTTP controller entry only. The aspect fails closed when `TenantContext` is empty off-request, so it **cannot** be extended to schedulers as designed — and today no scheduler, workflow fan-out, event listener or auto-CAPA path checks entitlement: unlicensed modules keep computing, breaching SLAs and raising CAPAs. De-licensing has no semantics either: `CommitteeReferral` rows live in the **`admin`** schema keyed by `sourceModule='CHANGE'`, so a lapsed licence leaves e-signed minutes and ledger entries referencing records nobody can open, with no answer for a PDPL erasure request. **Plus: nothing creates licence rows when an organisation is created**, so after a fail-closed sweep every new tenant is born blacked out | **P1** | Architecture seat |
-| **F2-33** | **Onboarding step 3 "Invite teammates" is localStorage-only** (`tss-grc-ui-v2/src/lib/onboarding.ts:169-184`) — invited users are never created. This is F2-02's defect class on the **first-run journey**, and a `/mock/i` CI rule will never catch it because it fabricates local state rather than importing a mock file. Wire it to the user-admin API or cut the step | **P1** | Product seat |
+| **F2-33** | ⬇ **P2** *(round 3: real but over-rated at P1 — nothing downstream consumes it as evidence, unlike F2-02's executive surfaces; P1 only if onboarding sits in a sales-demo path)*. **Onboarding step 3 "Invite teammates" is localStorage-only** (`tss-grc-ui-v2/src/lib/onboarding.ts:169-184`) — invited users are never created. This is F2-02's defect class on the **first-run journey**, and a `/mock/i` CI rule will never catch it because it fabricates local state rather than importing a mock file. Wire it to the user-admin API or cut the step | **P1** | Product seat |
 | **F2-34** | **Kernel purity, and the rule contradiction that blocks F2-08b.** 40 kernel→business import lines (`platform`→`risk` 14, `privacy` 3, `bcm` 2, `ndi` 2, `audit_lc` 2, `privacy_lc` 2; `integrations`→`socops` 6, `cyber` 2; `dashboard`→`risk` 4, `compliance` 2, `incident` 1), concentrated in `platform/calendar`, `platform/completion/*`, `dashboard` and the `integrations` connectors. The kernel participates in **6** bidirectional pairs on the architecture seat's count, against the **13** the plan's own graph reports — the two use different methods and reconciling them is part of this item. Either way the kernel is the largest cycle participant, so ADR-002's "kernel boots alone" is unachievable and had **no backlog item**. And `MODULE_SEPARABILITY` §2 says kernel imports don't count while §6c's rule says only `common`/`security`/`platform`/`spi` are legal — under the first reading `CommitteePort` is unnecessary. **The boundary ratchet cannot be seeded until one reading wins** | **P1** | Architecture seat |
+| **F2-36** | **CI never runs where the work happens.** `.github/workflows/ci.yml` triggers **only** on push to master and PRs to master — so the 20 pending commits, including DF-3 and DF-4, have **never executed in CI**; `tsc` is deliberately excluded (~45 errors); and the backend job defines no SQL Server service container, so "CI green" and the local 2,460-test green are not known to mean the same thing. Every item saying "CI fails / CI rule" (F2-01, W2-1b, F2-07b, F2-09, F2-19b, F2-11, F2-A11Y) assumes an enforcement point that fires only **after** merge | **P2** | Round 3 |
+| **F2-37** | **The production jar ships `BOOT-INF/classes/db/seed/V999__seed_mock_data.sql`** — inert for Flyway (wrong location) but mock seed data inside the shipped artefact of a platform whose P0 list includes "fabricated data ships in the production bundle". Fold into F2-15 | **P3** | Round 3 |
 | **F2-35** | **The SKU catalogue exists in three contradictory versions, and one conflict is commercial.** (A) `MODULE_SEPARABILITY_AND_SKU_MODEL.md` §6 — Base + 13, ratified by ADR-013. (B) `Product/PRODUCT_STRATEGY_PACKAGING_AND_SALES.md` — 18 packages that sell **`ACCESS_GOV`** and **`GOVERNANCE` (committees, board packs, signatures)** as *paid*, contradicting ADR-013 and §6c which place them in the mandatory **free** Base. (C) `LicensingService.KNOWN_MODULES` — 20 code-shaped codes. **7 packages appear in no SKU: `ndi` (7,717 LoC, 127 endpoints — the SDAIA/NDMO differentiator), `reporting`, `governance`, `board_pack`, `knowledge`, `workflow_submission`, `datagov`.** Org 1 already holds `EVIDENCE`/`REPORTING` licence rows for capabilities ADR-013 calls mandatory-Base. **W2-0 and F2-04 are unwritable until one catalogue is ratified** — the backfill content differs ~3× by grain | **P1 — blocks Wave 2** | Product + Architecture seats |
 
 ### Recommendations accepted, pending your call
@@ -549,6 +609,24 @@ them. Recorded because a subagent's confident negative is not evidence.
 - **State a contention rule:** if Wave 1 and Wave 3 compete for the same engineer, **F2-03 Tier-1 floors on
   `data_officer` and `outsourcing` outrank S6–S8.** W3-5 ("no zero-test module in any commercial scope
   statement") makes the flagship Saudi SKU unsellable until F2-03 lands, so it is revenue critical-path.
+
+### The structural finding — accepted, not yet acted on
+
+Round 3's strongest argument is that this file's **error rate is a data-structure problem, not a diligence
+problem**: the same author catches and creates these errors within hours. v2.2 is simultaneously a backlog
+(§3), a status dashboard (§1), an owner register (§1b), a migration ledger (§4), a decision log (§6), an
+audit adjudication (§6b), an architecture spec (§6c) and council minutes (§6d) — with the backlog living in
+**four** places and **three sequences that disagree** (§6b: F2-25→26→28→27→30→29 · §6c: "CE-0 do now" ·
+§8: CE-0 last, F2-30 absent). Six revisions in under three hours is how the Wave-3 cells, the W0-8 phantom
+and the 328/329 remnant all shipped stale *on the evening the council fixed their predecessors*. Also
+unfalsifiable: the preamble claims to merge "stages S0–**S9**", and **S9 is defined nowhere in the repository**.
+
+**Accepted remedy (not yet done — it is real work, and half-doing it would make things worse):** one
+machine-checkable backlog containing every open item exactly once (id, wave, size, status, blocked-on,
+migration) that F2-01's CI can lint; §4 as the only migration ledger, with **migration numbers deleted from
+§3**; review rounds appending to `FINDINGS_REGISTER_V2.md` only, never new plan sections; and §1's numbers
+generated by script per F2-19b rather than typed. The plan already prescribes every one of these mechanisms
+for *other* documents.
 
 ### Absences the council named that this plan had not consciously excluded
 
