@@ -73,8 +73,20 @@ class ControllerAuthorizationRatchetTest {
      * It is {@code permitAll} by design, throttled per-IP by
      * PublicEndpointRateLimitFilter and gated by a 122-bit random token — a
      * sanctioned floor member, not a missing guard.
+     *
+     * <p>S1/W0-5 (2026-07-25) lowered the floor by FOUR — from 62 to 58 — by guarding
+     * the e-signature writes, the highest-risk members of the residual set: the
+     * independent assessment (finding F-1) showed that ADR-019 sells e-signed minutes
+     * as tamper-evidence while {@code SignatureController#sign} carried NO authority
+     * check at all and {@code DigitalSignatureController#create/sign/reject} carried
+     * only {@code isAuthenticated()} — so a read-only VIEWER could record signatures.
+     * They now require {@code hasPermission('SIGNATURE', 'WRITE'|'APPROVE')},
+     * catalogued and granted by migration V313. The remaining 58 are being worked
+     * down per {@code UNIFIED_IMPLEMENTATION_PLAN.md} stage S2, whose target floor is
+     * 17 (8 legitimately-public + 9 self-scoped endpoints, each to be marked
+     * explicitly rather than silently tolerated).
      */
-    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 62;
+    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 58;
 
     @Test
     void noNewUnguardedWriteEndpoints() {

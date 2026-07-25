@@ -73,8 +73,17 @@ public class DigitalSignatureController {
     @PreAuthorize("isAuthenticated()")
     public Response get(@PathVariable Long id) { return Response.from(service.get(id)); }
 
+    // S1/W0-5 (finding F-1): the three write endpoints below carried only
+    // isAuthenticated(), so any logged-in principal — including the read-only
+    // VIEWER — could open, sign or decline a signature transaction. Signing
+    // authority is now an explicit permission (V313: SIGNATURE_WRITE to raise,
+    // SIGNATURE_APPROVE to sign/reject, granted to the roles already trusted with
+    // an APPROVE action). The pre-existing SEC-IAM-003 controls stay: the service
+    // still binds the act to the authenticated principal so only the DESIGNATED
+    // signer can complete a request — these guards add "may this principal sign
+    // at all", which was the missing half.
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SIGNATURE','WRITE')")
     @Operation(summary = "Open a new signature request. Status starts at REQUESTED.")
     public ResponseEntity<Response> create(@RequestBody @Valid CreateRequest body, Authentication auth) {
         Long initiatorId = userIdOf(auth);
@@ -83,7 +92,7 @@ public class DigitalSignatureController {
     }
 
     @PostMapping("/{id}/sign")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SIGNATURE','APPROVE')")
     @Operation(summary = "Sign a REQUESTED transaction. Stores hash + cert ref + signature timestamp.")
     public Response sign(@PathVariable Long id, @RequestBody @Valid SignRequest body, Authentication auth) {
         // SEC-IAM-003: bind the signing act to the authenticated principal so only
@@ -92,7 +101,7 @@ public class DigitalSignatureController {
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('SIGNATURE','APPROVE')")
     @Operation(summary = "Reject a REQUESTED transaction. Rejection reason is mandatory.")
     public Response reject(@PathVariable Long id, @RequestBody @Valid RejectRequest body, Authentication auth) {
         // SEC-IAM-003: only the designated signer may decline the request.
