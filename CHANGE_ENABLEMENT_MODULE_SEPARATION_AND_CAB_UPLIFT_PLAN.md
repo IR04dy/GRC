@@ -2,9 +2,10 @@
 ### فصل وحدة إدارة التغيير وتطوير لجنة استشارات التغيير (CAB)
 
 > **Plan type:** design & implementation plan — **no product code changed by this document**.
-> **Date:** 2026-07-23 · **Baseline:** `master` @ `00ba890e` · backend suite **2316/0/0** · ratchet **62** · next free migration **V313**.
+> **Date:** 2026-07-23 · **Baseline as written:** `master` @ `00ba890e` · backend suite 2316/0/0 · ratchet 62 · next free migration V313.
+> **Re-baselined 2026-07-25:** suite **2,460/0/0** · ratchet **21** · next free migration **V320** · branch `feat/change-policy-remediation`.
 > **Predecessor:** `CHANGE_AND_POLICY_MODULE_REVIEW_AND_REMEDIATION_PLAN.md` (CH-1…CH-17 + Tracks A–D — **100 % delivered and merged**). This plan starts where that one ended: the change module is now *correct* (guarded, audited, SoD-gated, committee-routed). It is not yet *separate*, and its CAB is a thin gate rather than a governed body with its own lifecycle and records.
-> **House rules** (`CLAUDE.md`): verified slices · feature branch · **no merge without explicit "merge"** · ratchet ≤ 62 · idempotent migrations applied twice to dev via pyodbc (Flyway OFF in dev) · `[REVIEW-TEST]` + CHARINDEX cleanup · **destructive DB ops need explicit OK** · bilingual `*_en` + `*_ar`.
+> **House rules** (`CLAUDE.md`): verified slices · feature branch · **no merge without explicit "merge"** · **ratchet ≤ 21** (was 62 when this plan was written) · idempotent migrations applied twice to dev via pyodbc (Flyway OFF in dev) · `[REVIEW-TEST]` + CHARINDEX cleanup · **destructive DB ops need explicit OK** · bilingual `*_en` + `*_ar`.
 
 ---
 
@@ -12,27 +13,54 @@
 
 > Single source of truth for progress. Update the row **in the same commit** as the slice.
 
+> **Status:** LIVE SPECIFICATION · **Sequenced by:**
+> [`UNIFIED_IMPLEMENTATION_PLAN.md`](UNIFIED_IMPLEMENTATION_PLAN.md) §6c and Wave 3 · **Last reconciled:** 2026-07-25
+>
+> **Elevated 2026-07-25** at the owner's direction: Change Enablement becomes a first-class module with
+> explicit CAB, committee-integration and workflow structure, and is lifted out of the Risk navigation
+> group. §6c of the unified plan records the measured premise — **the backend was never under Risk**
+> (`module/change_mgmt`, own `change_mgmt` schema, **0 imports either way with `risk`**); what placed it
+> under Risk is `Sidebar.tsx:106`. New **CE-0** covers that nav split (XS, do first).
+>
+> ⚠ **Two corrections to this document, both material:**
+> 1. **The migration numbers below are stale.** V313–V317 have been taken by other work (V313 permissions,
+>    V314 gate map, V315 vote provenance, V316 CAB approval provenance, V317 committee/change-authority
+>    grants). CE migrations are renumbered **V320–V328** (V318 is F2-28, V319 is `ck_change_status` — both land before CE work); the unified plan's §4 ledger is authoritative.
+>    Re-check it immediately before creating any migration file.
+> 2. **CE-3/CE-4 are gated on F2-28 (DF-5).** The committee quorum denominator is currently caller-authored,
+>    and CE-4 asserts CAB decisions on quorate minutes. Building CAB governance on that would give every CAB
+>    decision a forgeable validity precondition. Close F2-28 first (3–5 days).
+>
+> Also already shipped since this plan was written: CH-5 change-task SLA scheduler, CH-17 authorisation
+> matrix + freeze windows, Track D committee re-route + e-signed minutes, and **DF-4** (CAB approval
+> provenance — actor from `Authentication`, `CHANGE:APPROVE`, one vote per approver). **CE-15's RBAC half is
+> partly done:** V317 created `CHANGE_MANAGER` and took `CHANGE:APPROVE` to 9 roles (ADR-015).
+
 | Epic | Content | Size | Status | Commit | Migration |
 |---|---|---|---|---|---|
+| **CE-0** | **Lift Change out of the Risk nav group** — own `navChange` sidebar group with CAB / calendar-FSC / decision-register beneath it (`Sidebar.tsx:106`) | XS | NOT STARTED | — | none |
 | **CE-1** | Module separation: `change_mgmt` → `module/change` w/ sub-packages, ports/adapters, import-boundary ratchet test | L | **NOT STARTED** | — | none (code-only) |
-| **CE-2** | Change **model catalogue** (standard/pre-approved change templates) | M | NOT STARTED | — | **V313** |
-| **CE-3** | **CAB as a governed body**: charter/ToR, membership matrix + roles, quorum policy, term review | M | NOT STARTED | — | **V314** |
-| **CE-4** | **CAB meeting cycle** + agenda auto-build from the CAB queue + papers pack | L | NOT STARTED | — | **V315** |
-| **CE-5** | **Decision write-back**: APPROVE/REJECT/DEFER/MORE_INFO/CONDITIONAL + conditions register | M | NOT STARTED | — | **V316** |
-| **CE-6** | **ECAB** emergency path + mandatory retrospective **ratification** with SLA | M | NOT STARTED | — | **V317** |
-| **CE-7** | Real **PIR** object (findings, actions, lessons) + auto-CAPA link | M | NOT STARTED | — | **V318** |
-| **CE-8** | **FSC** (forward schedule of change) + **PSO** + conflict/collision hardening | M | NOT STARTED | — | **V319** |
-| **CE-9** | Change **records & evidence** — adopt the platform evidence/attachment subsystem + retention | M | NOT STARTED | — | **V320** |
+| **CE-2** | Change **model catalogue** (standard/pre-approved change templates) | M | NOT STARTED | — | **V320** |
+| **CE-3** | **CAB as a governed body**: charter/ToR, membership matrix + roles, quorum policy, term review | M | NOT STARTED | — | **V321** |
+| **CE-4** | **CAB meeting cycle** + agenda auto-build from the CAB queue + papers pack | L | NOT STARTED | — | **V322** |
+| **CE-5** | **Decision write-back**: APPROVE/REJECT/DEFER/MORE_INFO/CONDITIONAL + conditions register | M | NOT STARTED | — | **V323** |
+| **CE-6** | **ECAB** emergency path + mandatory retrospective **ratification** with SLA | M | NOT STARTED | — | **V324** |
+| **CE-7** | Real **PIR** object (findings, actions, lessons) + auto-CAPA link | M | NOT STARTED | — | **V325** |
+| **CE-8** | **FSC** (forward schedule of change) + **PSO** + conflict/collision hardening | M | NOT STARTED | — | **V326** |
+| **CE-9** | Change **records & evidence** — adopt the platform evidence/attachment subsystem + retention | M | NOT STARTED | — | **V327** |
 | **CE-10** | **Workflow-engine adoption** for change authorisations (15th module) | M | NOT STARTED | — | none |
-| **CE-11** | **Unauthorised-change detection** + reconciliation register | S | NOT STARTED | — | **V321** |
+| **CE-11** | **Unauthorised-change detection** + reconciliation register | S | NOT STARTED | — | **V328** |
 | **CE-12** | ITIL/ISO **KPI pack** + CAB throughput analytics | S | NOT STARTED | — | none |
 | **CE-13** | FE: split `ChangesPage` → Change workspace + **CAB workspace** (agenda builder, voting, minutes) | L | NOT STARTED | — | none |
 | **CE-14** | Exports/records pack: agenda pack, minutes, decision register (RTL + bilingual) | M | NOT STARTED | — | none |
-| **CE-15** | RBAC: CAB roles + `CHANGE`/`CAB` permissions + SoD gates | S | NOT STARTED | — | **V322** |
+| **CE-15** | RBAC: CAB roles + `CHANGE`/`CAB` permissions + SoD gates | S | NOT STARTED | — | **V329** |
 | **CE-16** | Docs: PROJECT_CHRONICLE §, `package-info`, CAB operating runbook | S | NOT STARTED | — | none |
 
-**Migrations reserved: V313 – V322** (headroom to V325). Every migration idempotent, `GO`-separated, applied to dev **twice**.
-**Open decisions requiring the user: §19** — do not start CE-3/CE-4 before D-1 and D-2 are answered.
+**Migrations reserved: V320 – V329** *(renumbered 2026-07-25 — V313–V317 taken; **V318 = F2-28 quorum integrity, V319 = ck_change_status**, both of which land first)*.
+Every migration idempotent, `GO`-separated, applied to dev **twice**. **The unified plan's §4 ledger is
+authoritative** — reserved numbers have already moved twice, so re-check it before creating a file.
+**Open decisions requiring the user: §19** — do not start CE-3/CE-4 before D-1 and D-2 are answered,
+**and not before F2-28 (quorum integrity) is closed.**
 
 ---
 

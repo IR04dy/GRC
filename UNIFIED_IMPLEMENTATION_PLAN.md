@@ -142,15 +142,27 @@ are **one** piece of work, not two.
 | **F2-14** | F2-14 | **`ControlHealth` SPI** — each control declares its required configuration and reports `IN_FORCE │ NOT_CONFIGURED │ DEGRADED`; Control Assurance dashboard + `/actuator/health`; audit the 8 config-gated candidates (authorisation matrix, freeze windows, SLA policies, quorum policies, workflow gate maps, `ck_ca_source`, evidence-mandatory flags, escalation targets). **Generalises `ChangeGovernanceHealthService` — and is saleable** | M | ⬜ | — |
 | F2-22b | F2-22 | DTOs for the highest-risk entity-bound endpoints (approval state, tallies, statuses); ratchet the count down | L | ⬜ | — |
 
-### Wave 3 — change enablement (the CE backlog, unchanged in content, re-gated)
+### Wave 3 — Change Enablement as a first-class module *(see **§6c** for the target structure)*
+
+**Elevated 2026-07-25 at the owner's direction:** Change Enablement becomes a properly structured module of
+its own — change record + lifecycle + authority + **CAB** + **committee integration** + **workflow** — and is
+lifted out of the Risk grouping in the UI. §6c specifies the structure; this table sequences it.
 
 | Stage | Src | Action | Gate | Status | Migration |
 |---|---|---|---|---|---|
-| **S5** | CE-1 | **Module extraction** `module/change_mgmt` → `module/change` with sub-packages + SPI ports (`CommitteePort`, `IncidentPort`; **`EvidencePort`/`WorkflowPort` deferred to S8 where a real caller exists** — a port with no consumer is the F2-14 anti-pattern) + `ChangeModuleBoundaryTest` + FE `pages/change/` skeleton (**keep `mockChanges.ts` — X-7**) | DF-3, S2, S3 | ⬜ | — |
-| **S5** | X-2 | **Extend `ck_change_status` 14 → 17** (`CAB_DEFERRED`, `MORE_INFO_REQUIRED`, `PENDING_RATIFICATION`). Runtime-breaking if any CE state code ships first. *(Plan v1 said "13 existing" — it is 14; target 17 unchanged)* | — | ⬜ | **V316** |
-| S6 | CE-3, CE-15 | CAB as a governed body — `cab_profile`, `cab_member_role`, charter/ToR, board lifecycle, CAB permissions **catalogued and guarded in the same migration** | S4, S5, **D-1/D-2 answered** | ⬜ | V320, V321 |
-| S7 | CE-4…CE-7, CE-14a | Agenda auto-build · decision write-back + conditions register · ECAB ratification SLA · PIR record (**add `CHANGE_PIR` to `ck_ca_source` in the same migration**) · agenda/minutes exports | S6 | ⬜ | V322–V325 |
-| S8 | CE-9, CE-2, CE-10, CE-8, CE-11, CE-12, CE-14b | Evidence integration via `EvidencePort` (+ switch `ConditionsSatisfiedGuard` to require **verified** evidence) · change-model catalogue · workflow adoption (15th module) · FSC/PSO · unauthorised-change register · KPI pack · decision-register export | S7 | ⬜ | V326–V328 |
+| **CE-0** | new | **Lift Change out of the Risk nav group** — `Sidebar.tsx:106` places `/changes` inside `// 1. Risk Management (CRO)`. Promote to its own `navChange` group with the CAB, calendar/FSC and decision-register entries beneath it. **This is the whole of "not under risk"** — the backend was never under risk (§6c) | none | ⬜ **do first — XS** | — |
+| **S5** | CE-1 | **Module restructure** `module/change_mgmt` → `module/change` with the 11 sub-packages of §6c + SPI ports (`CommitteePort`, `IncidentPort`; **`EvidencePort`/`WorkflowPort` deferred to S8 where a real caller exists** — a port with no consumer is the F2-14 anti-pattern) + `ChangeModuleBoundaryTest` + FE `pages/change/` workspace skeleton (**keep `mockChanges.ts` — X-7**) | DF-3, S2, S3 | ⬜ | — |
+| **S5** | X-2 | **Extend `ck_change_status` 14 → 17** (`CAB_DEFERRED`, `MORE_INFO_REQUIRED`, `PENDING_RATIFICATION`). Runtime-breaking if any CE state code ships first | — | ⬜ | **V318** |
+| **S6** | CE-3, CE-15 | **CAB as a governed body** — `cab_profile`, `cab_member_role`, charter/ToR, term lifecycle, quorum policy; CAB permissions **catalogued and guarded in the same migration** (the F2-23 lesson) | S5, **F2-28 closed**, **D-1/D-2 answered** | ⬜ | V319, V320 |
+| **S7** | CE-4…CE-7, CE-14a | **CAB meeting cycle** — agenda auto-build from the CAB queue · decision write-back + conditions register · ECAB ratification SLA · PIR object (**add `CHANGE_PIR` to `ck_ca_source` in the same migration**) · agenda/minutes exports | S6 | ⬜ | V321–V324 |
+| **S8** | CE-9, CE-2, CE-10, CE-8, CE-11, CE-12, CE-14b | Evidence via `EvidencePort` (+ `ConditionsSatisfiedGuard` requires **verified** evidence) · change-model catalogue · **workflow adoption (15th module)** · FSC/PSO · unauthorised-change register · KPI pack · decision-register export | S7 | ⬜ | V325–V327 |
+| **CE-13** | CE-13 | FE: `ChangesPage` → **Change workspace + CAB workspace** (agenda builder, voting panel, minutes). Only then delete `mockChanges.ts` | S7 | ⬜ | — |
+
+⚠ **S6 is gated on F2-28, and this is not negotiable.** CE-3 makes the CAB a governed body *over the
+committee engine*, and CE-4's decisions are asserted on quorate minutes. The quorum denominator is
+currently caller-authored (F2-28/DF-5). Building CAB governance on it would **industrialise** the defect:
+every CAB decision would inherit a forgeable validity precondition, and the CAB pack export would present
+it as evidence. Close F2-28 first — it is 3–5 days and already sequenced ahead.
 
 ### Wave 4 — truthful UI, assurance breadth, strategy
 
@@ -181,9 +193,16 @@ are **one** piece of work, not two.
 | **V315** | **Committee vote provenance** (`recorded_by_user_id`, `recorded_by_name`, `on_behalf`) — DF-3 | ✅ dev ×2 · **prod pending** |
 | **V316** | **CAB approval provenance** — filtered unique index `(change_request_id, approver_id)` — DF-4 | ✅ dev ×2 · **prod pending** |
 | **V317** | **Committee + change-authority grants** — `ADMIN:APPROVE` catalogued, `CHANGE_MANAGER` role created, four ADMIN grant sets + `CHANGE:APPROVE` 3→9 — D-7/D-8, F2-23 | ✅ dev ×2 · **prod pending** |
-| V318 | `ck_change_status` 14 → 17 — X-2 *(was V316, reassigned twice)* | ⬜ |
-| V319 | Licence backfill + entitlement rollout — F2-04 *(was V317)* | ⬜ |
-| V320+ | Schema moves — F2-06b · grant tightening — F2-13b · CAB tables — S6 · CE-4…CE-12 | ⬜ |
+| **V318** | Roster→user link + **quorum integrity — F2-28 / DF-5**. Takes the *lowest* free number because it lands **first**: Flyway applies in version order, so a lower number created later would be skipped out-of-order on an already-migrated database | ⬜ **next to write** |
+| V319 | `ck_change_status` 14 → 17 — X-2 *(reassigned three times: V316 → V317 → V318 → V319)* | ⬜ |
+| V320–V329 | **Change Enablement (CE-2…CE-15)** — change models (V320), CAB profile/roles (V321), meeting cycle (V322), decisions + conditions (V323), ECAB ratification (V324), PIR (V325), FSC/PSO (V326), evidence (V327), unauthorised-change register (V328), CAB RBAC (V329). Renumbered from the CE plan's stale V313–V322 | ⬜ |
+| V330 | Licence backfill + entitlement rollout — F2-04 | ⬜ |
+| V331+ | Schema moves — F2-06b · grant tightening — F2-13b | ⬜ |
+
+**Reservations are advisory, order is not.** A number is only real when the file exists. Because
+`ck_change_status` has now been reassigned three times, treat every row above as *intent* and re-run
+`ls db/migration/sqlserver | sed 's/^V\([0-9]*\)__.*/\1/' | sort -n | tail -1` immediately before creating
+a file. **Never insert a number below an already-applied migration** — Flyway would skip it.
 
 **Rules.** Additive only unless explicitly authorised. Idempotent. Applied to dev **twice** via pyodbc
 (Flyway is off in dev). Prod picks them up via Flyway on the next jar — **baseline is V312, so V313–V317
@@ -331,6 +350,111 @@ and F2-26 (1 d). General availability, government final acceptance and per-modul
 **Sequence:** F2-25 (2 h) → F2-26 (1 d) → **F2-28 (3–5 d)** → F2-27 (1 d) → F2-30 (S) → F2-29 (P2, later).
 F2-28 depends on both roster items: the roster cannot be the quorum denominator while appointment 500s and
 every seat is unlinked.
+
+---
+
+## §6c Change Enablement — a separate, properly structured module
+
+**Owner's direction, 2026-07-25:** *"split change management to be a separate module, not under the risk
+module, with more well structure including committee and CAB management and workflow."*
+
+### First, the premise — measured, because it changes the size of the job
+
+**Change management is already separate from Risk in the backend.** Verified:
+
+| Check | Result |
+|---|---|
+| Backend package | `module/change_mgmt` — its own top-level package, 2,157 LoC, 7 entities, 30 endpoints, 49 tests |
+| Schema ownership | **all 7 entities write to `change_mgmt`** — no risk tables |
+| `change_mgmt` → `risk` imports | **0** |
+| `risk` → `change_mgmt` imports | **0** |
+| Peer imports | `platform` 6, `admin` 3, `incident` 3 — **fan-out 3, fan-in 1**, one of the cleanest modules in the platform |
+| Frontend route | `/changes` — a **top-level** route, not nested under `/risk` |
+
+**What *is* under Risk is the navigation.** `tss-grc-ui-v2/src/components/layout/Sidebar.tsx:106` places
+`{ id: 'changes', to: '/changes' }` inside the group commented `// ─── 1. Risk Management (CRO)`. So every
+user opening the sidebar sees Change Management as a Risk sub-item, and that is a real product defect —
+ITIL change enablement reports to a service-management or IT-governance function, not to the CRO.
+
+The consequence is favourable: **this is an information-architecture and structuring job, not a backend
+extraction.** There is no risk-coupling to unpick, no schema to move, no data migration. CE-0 (lift the nav
+group) is hours. The substance of the work is the *internal* structure and the CAB/committee/workflow depth
+— which is CE-1…CE-16, already specified and now elevated.
+
+### Target structure
+
+Backend, from
+[`CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md`](CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md)
+§5. The schema name **stays `change_mgmt`** — renaming a schema is destructive with no functional benefit.
+
+```
+module/change/
+├── package-info.java   module contract + allowed dependencies (the ADR-009 registry entry)
+├── request/            the change record — ChangeRequest, ChangeComment, ChangeLink
+├── lifecycle/          ChangeStateMachine (pure, no I/O) + guards:
+│                       FreezeWindow, Conflict, PirRequired, CabDecision, ConditionsSatisfied
+├── authority/          ChangeAuthorisationMatrix — type × risk → gate + min_approvals  (CH-17)
+├── model/              change models / pre-approved standard-change templates      (CE-2)
+├── cab/                ⭐ CAB profile, agenda, decisions, conditions, ECAB ratification (CE-3…CE-6)
+├── schedule/           FSC · PSO · freeze windows · collision detection             (CE-8)
+├── task/               ChangeTask + SLA scheduler                                   (CH-5, shipped)
+├── pir/                post-implementation review                                   (CE-7)
+├── assurance/          unauthorised-change reconciliation                           (CE-11)
+├── analytics/          ITIL/ISO KPI pack + CAB throughput                           (CE-12)
+└── spi/                ⭐ OUTBOUND PORTS — interfaces only, no peer imports
+                        CommitteePort · IncidentPort · EvidencePort · WorkflowPort
+
+module/change_adapters/ adapters live OUTSIDE the module, so neither side depends on the other
+```
+
+**The rule that makes the separation real (ADR-012):** `module/change/**` may import only itself,
+`common.*`, `security.*`, `platform.*` and its own `spi` interfaces — **never another `module.<peer>`**.
+Enforced by `ChangeModuleBoundaryTest`, ratcheted. Today's 3 peer imports (`admin`, `incident`) become
+2 ports plus 2 adapters.
+
+### How committee, CAB and workflow relate — the three the owner named
+
+These are three different things and the structure must keep them distinct:
+
+| Concern | Owner | Relationship |
+|---|---|---|
+| **Committee engine** | `admin/committee` — **kernel**, in the mandatory Base Platform SKU | Generic: charters, member terms, meetings, attendance, quorum, resolutions, e-signed minutes, gate→committee routing. Used by 14 modules, not just change. **Stays in the kernel** — moving it into `change` would make every other module depend on a commercial package |
+| **CAB** | `module/change/cab` — **the Change Enablement SKU** | A CAB *is* a committee with change-specific behaviour: a queue-driven agenda, change decisions, conditions, ECAB ratification. So `cab/` holds the change-specific profile and workflow and reaches the generic engine through **`CommitteePort`** — it does not reimplement quorum or minutes |
+| **Workflow engine** | `module/workflow` — **kernel** | Change authorisations become workflow requests via **`WorkflowPort`** (CE-10, the 15th adopting module). The change module owns *what* needs authorising; the engine owns routing, SLA and escalation |
+
+**The design decision, stated so it is not re-litigated:** CAB is a *profile over the committee engine*,
+not a parallel implementation. The alternative — a self-contained CAB with its own membership, quorum and
+minutes — was rejected because it duplicates the engine (F-014's defect class), doubles the surface where
+quorum can be forged (F2-28), and would give the platform two answers to "was this decision quorate?".
+Track D already routes change and policy approval through committees with quorum, SoD-recusal and e-signed
+minutes; `cab/` builds on that.
+
+### Frontend
+
+`pages/changes/ChangesPage.tsx` splits into a **Change workspace** and a **CAB workspace** (CE-13), and the
+sidebar gains its own group (CE-0):
+
+```
+Change Enablement            ← its own nav group, NOT under Risk Management
+├── Change register          the record: raise, assess, link, tasks
+├── CAB                      agenda builder · voting panel · minutes · decision register
+├── Change calendar / FSC    forward schedule, freeze windows, collisions
+├── Change models            pre-approved standard changes
+└── PIR & assurance          post-implementation reviews, unauthorised-change register
+```
+
+### Commercial position (ADR-013)
+
+**Change Enablement is its own SKU** — already in the ratified catalogue
+(`Architecture/MODULE_SEPARABILITY_AND_SKU_MODEL.md` §6, comparator: ServiceNow ITSM). It depends on the
+Base Platform SKU for the committee engine, the workflow engine, evidence and audit — which is exactly the
+kernel-plus-package shape ADR-013 requires, and the reason the committee engine must not move into it.
+`@RequireModule("CHANGE")` lands with F2-04.
+
+### Sequence
+
+**CE-0 (hours, do now)** → F2-25 → F2-26 → **F2-28 (unblocks S6)** → S5 restructure → S6 CAB as a governed
+body → S7 meeting cycle → S8 workflow/evidence/FSC → CE-13 frontend split.
 
 ---
 
