@@ -28,7 +28,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -128,6 +131,16 @@ class ComplaintServiceTest {
             return c;
         });
 
+        // Captured BEFORE the call: the service stamps its own LocalDateTime.now(),
+        // so a `now` taken afterwards is strictly later and erodes the measured
+        // span by a few millis. With Duration.toDays() truncating, that turned the
+        // tightest real case into a false failure — starting on a KSA weekend day
+        // (Fri/Sat) five business days lands Sun..Thu, i.e. exactly 5 calendar
+        // days, which measured as 4d 23h 59m -> 4. The test therefore failed only
+        // when it happened to run on a Saturday. Compare whole calendar days from
+        // a pre-call instant instead: intra-day noise cannot affect the result.
+        LocalDate startedOn = LocalDate.now();
+
         SubmitComplaintResponse resp = service.submitPublicComplaint(publicReq());
 
         assertThat(resp.complaintNo()).matches("CMP-\\d{4}-000001");
@@ -140,11 +153,17 @@ class ComplaintServiceTest {
         // (5 business days >= 5 calendar days) and the resolution SLA
         // at least 20 calendar days out — guards against the JDK
         // Sat/Sun default sneaking in (which would understate the SLA).
-        LocalDateTime now = LocalDateTime.now();
-        assertThat(java.time.Duration.between(now, resp.ackSlaDueOn()).toDays())
+        assertThat(ChronoUnit.DAYS.between(startedOn, resp.ackSlaDueOn().toLocalDate()))
                 .isGreaterThanOrEqualTo(5);
-        assertThat(java.time.Duration.between(now, resp.resolutionSlaDueOn()).toDays())
+        assertThat(ChronoUnit.DAYS.between(startedOn, resp.resolutionSlaDueOn().toLocalDate()))
                 .isGreaterThanOrEqualTo(20);
+
+        // KSA weekend must never be an SLA due date (the guard the durations
+        // above were reaching for, asserted directly).
+        assertThat(resp.ackSlaDueOn().getDayOfWeek())
+                .isNotIn(DayOfWeek.FRIDAY, DayOfWeek.SATURDAY);
+        assertThat(resp.resolutionSlaDueOn().getDayOfWeek())
+                .isNotIn(DayOfWeek.FRIDAY, DayOfWeek.SATURDAY);
 
         ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
         verify(publisher, atLeastOnce()).publishEvent(ev.capture());
