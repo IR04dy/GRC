@@ -8,6 +8,7 @@ import com.tss.grc.module.bcm.cycle.repository.BcpPlanRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -119,23 +120,46 @@ public class PlanDistributionService {
 
     /** Recipient confirms receipt + acceptance of the version they were sent. */
     @Transactional
-    public BcpPlanAcknowledgement acknowledge(Long ackId, String notes, String byName) {
-        return transition(ackId, "ACKNOWLEDGED", notes, byName);
+    public BcpPlanAcknowledgement acknowledge(Long ackId, String notes, String byName,
+                                              Long actorUserId, boolean canActOnBehalf) {
+        return transition(ackId, "ACKNOWLEDGED", notes, byName, actorUserId, canActOnBehalf);
     }
 
     /** Recipient pushes back — still evidence-worthy, ties up the row. */
     @Transactional
-    public BcpPlanAcknowledgement decline(Long ackId, String notes, String byName) {
-        return transition(ackId, "DECLINED", notes, byName);
+    public BcpPlanAcknowledgement decline(Long ackId, String notes, String byName,
+                                          Long actorUserId, boolean canActOnBehalf) {
+        return transition(ackId, "DECLINED", notes, byName, actorUserId, canActOnBehalf);
     }
 
-    private BcpPlanAcknowledgement transition(Long ackId, String to, String notes, String byName) {
+    private BcpPlanAcknowledgement transition(Long ackId, String to, String notes, String byName,
+                                              Long actorUserId, boolean canActOnBehalf) {
         if (!ACK_TARGETS.contains(to))
             throw new IllegalArgumentException("Invalid target status: " + to);
         BcpPlanAcknowledgement row = acks.findByIdAndOrganisationId(ackId, org())
             .orElseThrow(() -> new EntityNotFoundException("Acknowledgement not found: " + ackId));
+
+        // OWNERSHIP: an acknowledgement is BCM compliance evidence that a NAMED
+        // recipient received and accepted a specific plan version. Previously this
+        // method scoped by organisation only, so any authenticated user in the org
+        // could acknowledge or decline somebody else's distribution and the row would
+        // read as that recipient's acceptance (only the audit line named the real
+        // clicker). A permission cannot express this — BCM_READ is held by 17 of 57
+        // roles while plan recipients are ordinary staff — so it is an identity check:
+        // you may only act on your own row, unless you hold BCM WRITE, in which case
+        // it is recorded explicitly as acting on behalf of the recipient.
+        if (!canActOnBehalf && !isDesignatedRecipient(row, actorUserId, byName))
+            throw new AccessDeniedException(
+                "Only the designated recipient (" + row.getRecipientName() + ") may "
+                    + to.toLowerCase() + " this plan distribution.");
+        boolean onBehalf = !isDesignatedRecipient(row, actorUserId, byName);
+
+        // Pre-existing rule, kept: a superseded distribution cannot be acted on.
+        // Ordered AFTER the ownership check so an unauthorised caller learns nothing
+        // about the row's state.
         if ("STALE".equals(row.getStatus()))
             throw new IllegalStateException("This distribution is stale — request a fresh copy.");
+
         row.setStatus(to);
         row.setAcknowledgedAt(LocalDateTime.now());
         row.setAcknowledgementNotes(notes);
@@ -143,8 +167,23 @@ public class PlanDistributionService {
         BcpPlanAcknowledgement saved = acks.save(row);
         audit.log(to, "BcpPlanAcknowledgement", saved.getId(),
             "Plan v" + saved.getPlanVersion() + " " + to.toLowerCase()
-                + " by " + (byName == null ? saved.getRecipientName() : byName));
+                + " by " + (byName == null ? saved.getRecipientName() : byName)
+                + (onBehalf ? " ON BEHALF OF " + saved.getRecipientName() : ""));
         return saved;
+    }
+
+    /**
+     * True when the caller is the row's designated recipient. Prefers the FK
+     * ({@code recipientUserId}); falls back to a name/e-mail match for rows
+     * distributed before the user link was captured, so legacy distributions stay
+     * actionable by the person actually named on them.
+     */
+    private boolean isDesignatedRecipient(BcpPlanAcknowledgement row, Long actorUserId, String byName) {
+        if (row.getRecipientUserId() != null && actorUserId != null)
+            return row.getRecipientUserId().equals(actorUserId);
+        if (byName == null || byName.isBlank()) return false;
+        return byName.equalsIgnoreCase(row.getRecipientName())
+            || byName.equalsIgnoreCase(row.getRecipientEmail());
     }
 
     // ── List + stats ──────────────────────────────────────────────

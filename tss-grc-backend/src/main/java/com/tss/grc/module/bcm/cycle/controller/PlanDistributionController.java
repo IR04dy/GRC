@@ -4,6 +4,7 @@ import com.tss.grc.module.bcm.cycle.entity.BcpPlanAcknowledgement;
 import com.tss.grc.module.bcm.cycle.service.PlanDistributionService;
 import com.tss.grc.module.bcm.cycle.service.PlanDistributionService.DistributionStats;
 import com.tss.grc.module.bcm.cycle.service.PlanDistributionService.Recipient;
+import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,6 +39,24 @@ public class PlanDistributionController {
         return a == null ? null : a.getName();
     }
 
+    /** The caller's user id, used to prove they are the designated recipient. */
+    private static Long actorUserId() {
+        Authentication a = SecurityContextHolder.getContext().getAuthentication();
+        return (a != null && a.getPrincipal() instanceof GrcUserDetails u) ? u.getUserId() : null;
+    }
+
+    /**
+     * BCM WRITE holders may acknowledge/decline on a recipient's behalf (recorded as
+     * such in the audit trail). Everyone else may only act on their own distribution
+     * row — enforced in the service, since it needs the row to know the recipient.
+     */
+    private static boolean canActOnBehalf() {
+        Authentication a = SecurityContextHolder.getContext().getAuthentication();
+        if (a == null) return false;
+        return a.getAuthorities().stream().map(Object::toString)
+            .anyMatch(x -> "BCM_WRITE".equals(x) || "ROLE_PLATFORM_ADMIN".equals(x));
+    }
+
     public record DistributeBody(
         List<Recipient> recipients,
         String channel,
@@ -69,14 +88,16 @@ public class PlanDistributionController {
     @PreAuthorize("isAuthenticated()")
     public BcpPlanAcknowledgement acknowledge(@PathVariable Long ackId,
                                               @RequestBody(required = false) AckBody body) {
-        return service.acknowledge(ackId, body == null ? null : body.notes(), actor());
+        return service.acknowledge(ackId, body == null ? null : body.notes(), actor(),
+                                   actorUserId(), canActOnBehalf());
     }
 
     @PostMapping("/distribution/{ackId}/decline")
     @PreAuthorize("isAuthenticated()")
     public BcpPlanAcknowledgement decline(@PathVariable Long ackId,
                                           @RequestBody(required = false) AckBody body) {
-        return service.decline(ackId, body == null ? null : body.notes(), actor());
+        return service.decline(ackId, body == null ? null : body.notes(), actor(),
+                               actorUserId(), canActOnBehalf());
     }
 
     @PostMapping("/{planId}/distribution/mark-stale")
