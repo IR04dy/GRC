@@ -4,11 +4,11 @@
 > workstreams and the CE change-enablement backlog) with the independent assessment's findings
 > (`F2-*`, `D-*`) into one backlog, one sequence, one migration ledger.
 >
-> **Status:** ACTIVE · **Version:** 2.1 · **Date:** 2026-07-25 · **Tree:** `eaa79285`
+> **Status:** ACTIVE · **Version:** 2.2 · **Date:** 2026-07-25 · **Tree:** `ff087c7c` · **Reviewed by:** a 5-seat Fable 5 council (§6d)
 >
 > | Document | Relationship to this plan |
 > |---|---|
-> | [`TSS_GRC_PLATFORM_ASSESSMENT.md`](TSS_GRC_PLATFORM_ASSESSMENT.md) | **Evidence base — not a plan.** Every `F2-*` / `D-*` row below is specified there in full (18 fields each) with a re-verification command. Cite it; do not duplicate it. |
+> | [`TSS_GRC_PLATFORM_ASSESSMENT.md`](TSS_GRC_PLATFORM_ASSESSMENT.md) | **Evidence base — not a plan.** `F2-01`…`F2-24` and `D-1`…`D-8` are specified there in full (18 fields each) with a re-verification command. ⚠ **`F2-25`…`F2-35` and `DF-5` are NOT in the assessment** — they were found after it was generated, and their 18-field specs live in [`Registers/FINDINGS_REGISTER_V2.md`](TSS-GRC-Platform-Bible/Registers/FINDINGS_REGISTER_V2.md). Check the register first for anything above F2-24. |
 > | `REMEDIATION_MASTER_PLAN.md`, `INDEPENDENT_PLATFORM_ASSESSMENT.md`, `FOUNDATION_PACK_ASSESSMENT_AND_ACTION_PLAN.md` | **Superseded as plans.** Retained for traceability; their actions are absorbed below. |
 > | [`TSS-GRC-Platform-Bible/TSS_GRC_PLATFORM_AUDIT_REPORT.md`](TSS-GRC-Platform-Bible/TSS_GRC_PLATFORM_AUDIT_REPORT.md) · [`…/TSS_GRC_PLATFORM_IMPLEMENTATION_PLAN.md`](TSS-GRC-Platform-Bible/TSS_GRC_PLATFORM_IMPLEMENTATION_PLAN.md) | **Strategic frame — complementary, not competing.** Those two carry the programme structure this plan does not: Phases 0–6 over 12–24 months, councils, team shape, release gates, metrics, and the evidence the business must supply. **This plan is the execution tracker** — concrete items with verified status, migrations and probe results. Read theirs for *why and in what order*; read this for *what is actually done*. <br>⚠ **Provisional arrangement.** Both were produced independently on 2026-07-25 and the reconciliation has not been confirmed, so neither is stamped superseded. The complementarity is evidenced: their Phase 0 P0-A found caller-supplied actor identity in **change approvals** (now **DF-4**) while this review found it in **committee votes** (**DF-3**) — *neither found the other's instance*. |
 > | `CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md` | **Live specification** for CE-1…CE-16. This plan sequences it; that document details it. |
@@ -23,7 +23,7 @@
 
 ## §1 Where we actually are
 
-**Verified at `eaa79285`:**
+**Verified at `ff087c7c`:**
 
 | | |
 |---|---|
@@ -31,7 +31,7 @@
 | Authorisation ratchet | **21** (from 62) — floor enumerated: 8 public + 10 self-scoped + 3 participant-scoped. Unchanged by D-7/D-8: guards were *retargeted*, none removed |
 | Migrations | packaged **V1–V317**; dev has **V313–V317** applied by hand; **prod Flyway baseline V312** — all five land on the next restart. Next free: **V318** |
 | Stages complete | **S1, S2, S3, S4** (S0 partially — the restart is outstanding) |
-| Module census | **58 packages**, 186,285 LoC, 417 entities, 2,160 endpoints (was documented as 24) |
+| Module census | **58 packages**, 186,285 LoC, 417 entities, 2,160 endpoints, 255 `@RestController` classes (was documented as 24 modules) |
 | Known-fixed-but-not-running | **DF-1** break-glass sweep (was failing 33–35×/day) · **DF-2** stale-cookie 500 · **DF-3/DF-4** provenance · **D-7/D-8** grants (V317 is in dev; :80 still serves the 07-23 jar) |
 | Open P0s | **F2-28 / DF-5 quorum denominator is caller-authored** (found by reconciling the v1.0 audit's F-003 — the highest open item) · **F2-02** fabricated data on 3 executive surfaces · **F2-03** Saudi modules untested · **F2-04** entitlement wired to 8.6% *(DF-3/F2-21 closed at `f3ea92fc`; DF-4/F2-24 at `21c83d09`)* |
 | New P1s from the D-7 probes | **F2-25** appointing a committee member 500s and is mass-assignable · **F2-26** no roster seat is linked to a platform user, so nobody can self-vote |
@@ -100,18 +100,19 @@ are **one** piece of work, not two.
 | ID | Src | Action | Size | Status | Migration |
 |---|---|---|---|---|---|
 | **DF-3** | F2-21 | **Committee vote provenance** — voter from `Authentication`; body `memberName` only under secretary/chair authority, stamped `recorded_by_user_id`/`on_behalf`; reject non-roster names; recusal on the **resolved** identity; refuse cross-user overwrite; **add the forged-actor test `ADR-006` demands** | M | ✅ **DONE** `f3ea92fc` — 23 new tests, suite **2,438/0**, 5/5 guards mutation-proven, live probe **11/11**, V315 applied dev ×2 | **V315** |
-| **DF-4** | F2-24 | **CAB approval provenance — DF-3's twin.** `recordApproval` binds the `ChangeApproval` entity from the body and trusts `approverName`, so the CM-C2 SoD gate (name-based, acknowledged in-code as interim) is bypassed by submitting another name — **a requester can approve their own change**. Also `CHANGE:WRITE`-guarded, so raise and approve are not separated, and nothing enforces one vote per approver. Fix per DF-3: DTO not entity, actor from `Authentication`, SoD on resolved user id, guard → `CHANGE:APPROVE`, unique `(change, approver_id)` filtered index → 409, forged-actor tests, mutation-verified | M | ✅ **DONE** — 12 new tests, 6/6 guards mutation-proven, V316 applied dev ×2. **Authority tightened 41 roles → 3** (`CHANGE:WRITE` was held by 41 of 57; `CHANGE:APPROVE` by GRC_ADMINISTRATOR, ORG_ADMIN, RISK_MANAGER). Verified reachable — no repeat of F2-23 | **V316** |
+| **DF-4** | F2-24 | **CAB approval provenance — DF-3's twin.** `recordApproval` binds the `ChangeApproval` entity from the body and trusts `approverName`, so the CM-C2 SoD gate (name-based, acknowledged in-code as interim) is bypassed by submitting another name — **a requester can approve their own change**. Also `CHANGE:WRITE`-guarded, so raise and approve are not separated, and nothing enforces one vote per approver. Fix per DF-3: DTO not entity, actor from `Authentication`, SoD on resolved user id, guard → `CHANGE:APPROVE`, unique `(change, approver_id)` filtered index → 409, forged-actor tests, mutation-verified | M | ✅ **DONE** — 13 new tests (12 in `CabVoteProvenanceTest` + 1 in `ChangeManagementServiceTest`), 6/6 guards mutation-proven, V316 applied dev ×2. **Authority tightened 41 roles → 3** (`CHANGE:WRITE` was held by 41 of 57; `CHANGE:APPROVE` by GRC_ADMINISTRATOR, ORG_ADMIN, RISK_MANAGER). Verified reachable — no repeat of F2-23 | **V316** |
 | **W0-2** | F2-10 | **Activate the staged jar** (`…jar.new`) — closes DF-1 + DF-2 | S | ⏳ **awaits an elevated restart — user action** | — |
 | W0-3 | F2-10 | Post-deploy verification (24 h): break-glass sweep clean, no stale-cookie 500s | S | blocked on W0-2 | — |
 | W0-7 | F2-10 | Build ID + migration head on `/actuator/info`; post-deploy probe compares to `master` | S | ⬜ | — |
 | **W2-1a** | F2-02 | **De-mock the three executive surfaces** — `lib/searchIndex.ts` (7), `pages/dashboard/widgets.tsx` (4), `lib/boardPack.ts` (3) → real API or `EmptyState` | S | ⬜ | — |
 | W2-1b | F2-02/F2-15 | CI rule: no `/mock/i` import outside `**/*.test.*` + **backend-down acceptance test** (every register → error state, **zero rows**) | S | ⬜ | — |
-| **F2-08a** | F2-08 | **Promote the export toolkit to the kernel** — `PdfTheme`, `PdfFonts`, `XlsxStyler`, `ExportNaming`, `RegisterExport`, `TabularExport*` → `module/platform/export`. Removes all 25 inbound edges to `reporting`, kills the apparent `socops→reporting` cycle, moves `ai` to Tier A | S | ⬜ | — |
-| **F2-07a** | F2-07 | **Route reconciliation matrix** — all 328 routes × {nav entry? · module owner? · real API or mock? · last touched}; classify the ~144 URL-only screens **promote / merge / retire** | S | ⬜ | — |
+| **F2-08a** | F2-08 | **Promote the export toolkit to the kernel** — `PdfTheme`, `PdfFonts`, `XlsxStyler`, `ExportNaming`, `RegisterExport`, `TabularExport*` (+`DocxKit`) → `module/platform/export` | S | ✅ **DONE** `313dd6dd` — all 9 files present; `reporting` fan-in **25 → 0**; 22 files now import `platform.export`. *Was listed open in two places until the council caught it* | — |
+| **F2-07a** | F2-07 | **Route reconciliation matrix** — all 328 routes × {nav entry? · module owner? · real API or mock? · last touched}; classify the URL-only screens (**329** routes vs **184** nav entries — the unreachable set is larger than the 145 difference, because several entries are query-tab variants of one route) **promote / merge / retire** | S | ⬜ | — |
 | F2-07b | F2-07 | CI test: every route has a nav path or explicit `detailOnly: true` | S | ⬜ | — |
 | **W0-1** | D-1 | `git worktree remove .claude/worktrees/vigilant-swartz-073bd4` (branch already merged) — removes 273 phantom doc files. *(Renamed from "D-1": it collided with decision D-1 in §6, which is a different thing entirely)* | XS | ✅ **DONE** — `git worktree list` shows only the main tree; corpus now 353 on disk / 335 tracked | — |
 | F2-20 | F2-20 | **Register** `module/datagov` as maturity `PLANNED` — **do not delete it.** Reading its `package-info.java` showed a deliberate, well-argued v2 deferral (scope + Collibra/Alation overlap + pointers to the live adjacent capabilities), not a stray placeholder | XS | ⬜ *(rides F2-01)* | — |
 | **F2-23** | F2-23 | **Catalogue a narrow committee-vote permission.** Measured: **no role holds `ADMIN:WRITE`**, so only `PLATFORM_ADMIN` can record a vote and DF-3's member-self-vote path is unreachable | S | ✅ **DONE** `5ec6edfe` — resolved by **ADR-014**, and the shape is the *inverse* of what this row proposed: `ADMIN:APPROVE` became the **vote** capability (15 roles) and `ADMIN:WRITE` the **secretariat/on-behalf** right (3 roles), because the same grant also appointed roster members — a voter could add themselves to a roster and manufacture quorum. `ADMIN:READ` 21, `ADMIN:EXPORT` 7. Suite 2,460/0, 5/5 mutations proven, live-probed | **V317** |
+| **W0-8** | ratchet javadoc | **Bind plan-distribution acknowledgement to its recipient.** `PlanDistributionService.transition()` never checks the caller is the designated recipient, so one user can acknowledge another's plan distribution — **and that acknowledgement is BCM compliance evidence.** Fix: bind to `recipientUserId`. The code comment says "tracked as its own slice"; the council found it was tracked in **no plan at all**, surviving only in `ControllerAuthorizationRatchetTest`'s floor enumeration, where §1 presents it as legitimate rather than as a defect pending fix | S | ⬜ | — |
 | **F2-25** | new | **Appointing a committee member 500s and is mass-assignable.** `POST /committees/registry/terms` binds the `CommitteeMemberTerm` entity raw, no `@Valid`, never stamps `organisationId` → an *authorised* secretariat call fails; `id`/`organisationId` are client-settable on the table that defines quorum. Fix: DTO + tenant stamp + `@Valid` + tests | XS | ⬜ **blocks the D-7 rollout** | — |
 | **F2-26** | new | **No roster seat is linked to a platform user** (`member_user_id` NULL on every row), so nobody can cast their own vote — only the secretariat on-behalf path works. Fix: optional `memberUserId` + user picker + roster-linkage report; link the dev personas (CISO→`so_officer`, CCO→`compliance`, CRO→`rmanager`). **Do not guess links for real seats** | S | ⬜ *(after F2-25)* | — |
 | F2-13a | F2-13 | **Grant-tightness report** — roles-per-permission, **in both directions**: flag any business-write permission held by >50% of roles or by a read-only/external/machine persona (`WORKFLOW_WRITE` is in 55 of 57), **and any catalogued permission no role holds at all** (`ADMIN:WRITE` is in 0 — a dead permission is an unreachable feature) | S | ⬜ | — |
@@ -123,22 +124,23 @@ are **one** piece of work, not two.
 |---|---|---|---|---|---|
 | **F2-01** | F2-01 | **Module registry** `module-registry.yaml` — seeded from the *verified* `SOURCE_MODULE_INVENTORY.md`; per module: owner, SKU, maturity, tier, schema, permission prefix, test floor, FE route root, docs. **CI fails** on package↔registry mismatch, unmet floor, schema disagreement, or any document stating a contradicting module count | M | ⬜ | — |
 | **F2-03** | W3-3 | **Tier-1 test floors** on the regulator-facing modules, in order: `outsourcing`, `nca_ecc`, `sharia`, `data_officer`, then `openbanking`, `dataclass`, `rrp`. Every state transition + authorisation branch, plus one live HTTP probe per write endpoint | L (parallel) | ⬜ | — |
-| **F2-05** | F2-05 | **Permission conversion** — catalogue permissions for the 21 role-guarded modules, convert `hasAnyRole` → `hasPermission`, grant to exactly the roles previously named (**behaviour-identical on day one**); add the **tightness ratchet** (`hasAnyRole` in `module/**` → 0) | L (S per module) | ⬜ | V316+ |
+| **F2-05** | F2-05 | **Permission conversion** — catalogue permissions for the 21 role-guarded modules, convert `hasAnyRole` → `hasPermission`, grant to exactly the roles previously named (**behaviour-identical on day one**); add the **tightness ratchet** (`hasAnyRole` in `module/**` → 0) | L (S per module) | ⬜ | see §4 |
 | **F2-06a** | F2-06 | **Schema-ownership enforcement test** — every `@Entity` schema == its registry schema. Cheap, permanent, stops new violations | S | ⬜ | — |
-| **F2-08b** | W4-1 | **Ratcheted boundary test** over all 58 packages, seeded from today's graph (734 edges, 14 bidirectional pairs); only allowed to decrease | S | ⬜ | — |
+| **F2-08b** | W4-1 | **Ratcheted boundary test** over all 58 packages, seeded from the graph **as measured at seeding time** (754 peer imports · 128 directed pairs · 13 bidirectional at `ff087c7c` — the earlier 734/14 predates F2-08a); only allowed to decrease. ⚠ **Cannot be seeded until the kernel-import question is settled** — see F2-34 | S | ⬜ | — |
 | W0-6 | D-3/D-4/F2-19 | **Stamp the doc corpus** — `HISTORIC` banner on the 7 root snapshots (`STATUS.md` 3,119 lines first) + the 158 `docs/` files; decide which Saudi pack generation governs and stamp the other `SUPERSEDED BY`; replace its dead `feat/pdpl-extensions` anchor with a SHA | S | ⬜ | — |
 | F2-19b | D-5 | Run the measurement scripts + `doc_register.py` **in CI** so the baseline and register cannot drift | S | ⬜ | — |
 | W1-5 | F2-18 | **Golden-path committee integration test** through the real HTTP stack + DB: constitute → refer → vote with a recusal → quorum → approve minutes → verify the e-signature → assert the change advanced and the ledger recorded it. Retain the decision as `[DEMO-EVIDENCE]` (never `[REVIEW-TEST]`) | M | ⬜ | — |
 | W1-6 | — | Tenant-isolation test pack for the remaining module families (committee engine ✅ done) | M | 🔶 partial | — |
 
-### Wave 2 — make the commercial model real *(gated on D-3)*
+### Wave 2 — make the commercial model real *(**un-gated** — D-3 answered by ADR-013)*
 
 | ID | Src | Action | Size | Status | Migration |
 |---|---|---|---|---|---|
-| **F2-04** | F2-04 | **Entitlement rollout** — extend `KNOWN_MODULES` 20 → 58 from the registry; `@RequireModule` at class level on every business controller; wire the existing `moduleEnabled()` FE helper into navigation + route registration; **licence backfill migration before enforcing**; cross-tenant test (a tenant licensed for X gets 403 on Y — orgs 2/3 are already seeded for exactly this) | M | ⬜ *(gated)* | V317 |
-| F2-06b | F2-06 | Schema moves, in ownership order: **`incident`→`cyber` decision first** (separate SKU or merge?), then `integrations` out of `platform`, then `controlmap`. Compatibility view for one release + rollback recipe | M each | ⬜ *(gated)* | V318+ |
+| **W2-0** | ADR-013 | **Grandfather licence backfill — must land before ANY `@RequireModule` annotation.** Orgs 2/3 hold one licence row each, and the aspect is fail-closed. **Grant-all-then-tighten**, not license-what-has-data (which false-negatives on read-only, empty and seasonal usage → 403s for paying customers). Also fix new-org provisioning: nothing creates licence rows on organisation creation, so post-sweep every new tenant is born blacked out (F2-32) | S | ⬜ **blocked on F2-35** | **V320** |
+| **F2-04** | F2-04 | **Entitlement rollout** — extend `KNOWN_MODULES` 20 → 58 from the registry; `@RequireModule` at class level on every business controller; wire the existing `moduleEnabled()` FE helper into navigation + route registration; **licence backfill migration before enforcing**; cross-tenant test (a tenant licensed for X gets 403 on Y — orgs 2/3 are already seeded for exactly this) | M | ⬜ | **V320–V321** (see §4) |
+| F2-06b | F2-06 | Schema moves, in ownership order: **`integrations` out of `platform` first**, then `controlmap`. *(The `incident`→`cyber` question is **dissolved** — D-4/ADR-013: `incident` joins the Cyber & SOC SKU and the package does not move.)* Compatibility view for one release + rollback recipe | M each | ⬜ | V331+ (see §4) |
 | **F2-09** | F2-09 | **Schema-convergence CI job** — Flyway `V1`→head on an empty DB, dump, diff against the Python-bootstrapped dev schema; fail on any un-allow-listed difference | M | ⬜ | — |
-| F2-13b | F2-13 | Tighten the over-broad grants the Wave-0 report surfaces, starting with `WORKFLOW_WRITE`; per-tenant impact query before each change | M | ⬜ | V319 |
+| F2-13b | F2-13 | Tighten the over-broad grants the Wave-0 report surfaces, starting with `WORKFLOW_WRITE`; per-tenant impact query before each change | M | ⬜ | V331+ (see §4) |
 | **F2-14** | F2-14 | **`ControlHealth` SPI** — each control declares its required configuration and reports `IN_FORCE │ NOT_CONFIGURED │ DEGRADED`; Control Assurance dashboard + `/actuator/health`; audit the 8 config-gated candidates (authorisation matrix, freeze windows, SLA policies, quorum policies, workflow gate maps, `ck_ca_source`, evidence-mandatory flags, escalation targets). **Generalises `ChangeGovernanceHealthService` — and is saleable** | M | ⬜ | — |
 | F2-22b | F2-22 | DTOs for the highest-risk entity-bound endpoints (approval state, tallies, statuses); ratchet the count down | L | ⬜ | — |
 
@@ -150,11 +152,11 @@ lifted out of the Risk grouping in the UI. §6c specifies the structure; this ta
 
 | Stage | Src | Action | Gate | Status | Migration |
 |---|---|---|---|---|---|
-| **CE-0** | new | **Lift Change out of the Risk nav group** — `Sidebar.tsx:106` places `/changes` inside `// 1. Risk Management (CRO)`. Promote to its own `navChange` group with the CAB, calendar/FSC and decision-register entries beneath it. **This is the whole of "not under risk"** — the backend was never under risk (§6c) | none | ⬜ **do first — XS** | — |
+| **CE-0** | new | **Lift Change out of the Risk nav group** — `Sidebar.tsx:106` places `/changes` inside `// 1. Risk Management (CRO)`. Promote to its own `navChange` group with the CAB, calendar/FSC and decision-register entries beneath it. **This is the whole of "not under risk"** — the backend was never under risk (§6c). ⚠ **Scope:** the CAB and decision-register screens do not exist until S7/CE-13, so CE-0 ships the group with the entries that resolve **today** (register, calendar/FSC) and adds the rest as they land — building nav-to-nowhere is the F2-02 anti-pattern. Also amend `UX_REDESIGN_BLUEPRINT.md:68` in the same commit (§6d) or Wave 4 re-files Change under "Governance & Administration" | none | ⬜ **do first — XS** | — |
 | **S5** | CE-1 | **Module restructure** `module/change_mgmt` → `module/change` with the 11 sub-packages of §6c + SPI ports (`CommitteePort`, `IncidentPort`; **`EvidencePort`/`WorkflowPort` deferred to S8 where a real caller exists** — a port with no consumer is the F2-14 anti-pattern) + `ChangeModuleBoundaryTest` + FE `pages/change/` workspace skeleton (**keep `mockChanges.ts` — X-7**) | DF-3, S2, S3 | ⬜ | — |
-| **S5** | X-2 | **Extend `ck_change_status` 14 → 17** (`CAB_DEFERRED`, `MORE_INFO_REQUIRED`, `PENDING_RATIFICATION`). Runtime-breaking if any CE state code ships first | — | ⬜ | **V318** |
-| **S6** | CE-3, CE-15 | **CAB as a governed body** — `cab_profile`, `cab_member_role`, charter/ToR, term lifecycle, quorum policy; CAB permissions **catalogued and guarded in the same migration** (the F2-23 lesson) | S5, **F2-28 closed**, **D-1/D-2 answered** | ⬜ | V319, V320 |
-| **S7** | CE-4…CE-7, CE-14a | **CAB meeting cycle** — agenda auto-build from the CAB queue · decision write-back + conditions register · ECAB ratification SLA · PIR object (**add `CHANGE_PIR` to `ck_ca_source` in the same migration**) · agenda/minutes exports | S6 | ⬜ | V321–V324 |
+| **S5** | X-2 | **Extend `ck_change_status` 14 → 17** (`CAB_DEFERRED`, `MORE_INFO_REQUIRED`, `PENDING_RATIFICATION`). Runtime-breaking if any CE state code ships first | — | ⬜ | **V319** *(see §4 — V318 is F2-28)* |
+| **S6** | CE-3, CE-15 | **CAB as a governed body** — `cab_profile`, `cab_member_role`, charter/ToR, term lifecycle, quorum policy (**per-committee `quorum_pct` semantics + required-roles-present**, so a security-impacting change cannot pass a quorate CAB with no security member); CAB permissions **catalogued and guarded in the same migration** (the F2-23 lesson) | S5, **F2-28 closed**, **W1-5 green**, **D-1 answered** | ⬜ | V319, V320 |
+| **S7** | CE-4…CE-7, CE-14a | **CAB meeting cycle** — agenda auto-build from the CAB queue · decision write-back + conditions register · ECAB ratification SLA · PIR object (**add `CHANGE_PIR` to `ck_ca_source` in the same migration**) · agenda/minutes exports · **state which decision mode is authoritative per change type** (meeting-bound minutes vs asynchronous electronic vote — leaving it ambiguous recreates F-014's two-answers defect) | S6, **D-2 answered** | ⬜ | V321–V324 |
 | **S8** | CE-9, CE-2, CE-10, CE-8, CE-11, CE-12, CE-14b | Evidence via `EvidencePort` (+ `ConditionsSatisfiedGuard` requires **verified** evidence) · change-model catalogue · **workflow adoption (15th module)** · FSC/PSO · unauthorised-change register · KPI pack · decision-register export | S7 | ⬜ | V325–V327 |
 | **CE-13** | CE-13 | FE: `ChangesPage` → **Change workspace + CAB workspace** (agenda builder, voting panel, minutes). Only then delete `mockChanges.ts` | S7 | ⬜ | — |
 
@@ -170,10 +172,10 @@ it as evidence. Close F2-28 first — it is 3–5 days and already sequenced ahe
 |---|---|---|---|---|
 | F2-07c | W2-*/CE-13b | **12-workspace IA**, navigation generated from registry + entitlements; retire the flat 184-entry sidebar; complete the `ChangesPage` split and **only now delete `mockChanges.ts`** | L | ⬜ |
 | F2-15 | W2-* | Remaining 26 mock import sites; move the 15 mock files (3,650 lines) to `__fixtures__` or delete | M | ⬜ |
-| **F2-11** | — | **i18n convergence** — ESLint baseline first (**`eslint_configured: false` today**), then no-bare-Latin-JSX and no-`lang === 'ar'`-in-`pages/**` as **ratchets**; migrate the 439 hardcoded strings; fix the 49 zero-Arabic pages; per-module Arabic-coverage CI report | S→L | ⬜ |
+| **F2-11** | — | ⬆ **Partly pulled into Wave 1 by the council** — it was silently moved from Wave 1 to Wave 4 with no stated reason. Wave 1 takes the ESLint ratchet + the pages on the five persona journeys; the rest stays here. **i18n convergence** — ESLint baseline first (**`eslint_configured: false` today**), then no-bare-Latin-JSX and no-`lang === 'ar'`-in-`pages/**` as **ratchets**; migrate the 439 hardcoded strings; fix the 49 zero-Arabic pages; per-module Arabic-coverage CI report | S→L | ⬜ |
 | **F2-A11Y** | Part 5 §7 | Fix the **68 `color-contrast` (WCAG 1.4.3, serious)** instances **at the design-token level**, not per component; re-run the existing axe harness; wire `@axe-core/playwright` into CI as a ratchet; then extend to focus/keyboard/screen-reader (genuinely unmeasured) | M | ⬜ |
-| **F2-12** | — | `ndi` containment — characterisation tests over its **82 writes** *first*, then split `NdiPage.tsx` (4,970 lines) along tab boundaries | L | ⬜ |
-| F2-16 | — | Split `EsgPage.tsx` (5,583) — **before** `ndi`, since `sust` has 200 tests to catch mistakes; page-size ratchet (no new file > 800 lines, existing may only shrink) | M | ⬜ |
+| **F2-12** | — | `ndi` containment — characterisation tests over its **82 writes** *first*, then split `NdiPage.tsx` (4,969 lines) along tab boundaries | L | ⬜ |
+| F2-16 | — | Split `EsgPage.tsx` (5,582) — **before** `ndi`, since `sust` has 200 tests to catch mistakes; page-size ratchet (no new file > 800 lines, existing may only shrink) | M | ⬜ |
 | **F2-17** | — | **Extend** the existing k6 harness: realistic seed volumes (10k risks / 50k controls / 200k evidence / 1M audit rows — this is also F2-02's demo tenant), 20 highest-traffic endpoints **including writes/exports/search**, raise dev Hikari above 10 so a ceiling can be found, publish p95 targets, top-5 in CI | L | ⬜ |
 | W3-1 | — | The 84 user stories as a CI probe suite | M | ⬜ |
 | W3-2 | — | Module scorecard **generated from the registry** — with *Assurance* and *Operating-evidence* columns | S | ⬜ |
@@ -193,16 +195,32 @@ it as evidence. Close F2-28 first — it is 3–5 days and already sequenced ahe
 | **V315** | **Committee vote provenance** (`recorded_by_user_id`, `recorded_by_name`, `on_behalf`) — DF-3 | ✅ dev ×2 · **prod pending** |
 | **V316** | **CAB approval provenance** — filtered unique index `(change_request_id, approver_id)` — DF-4 | ✅ dev ×2 · **prod pending** |
 | **V317** | **Committee + change-authority grants** — `ADMIN:APPROVE` catalogued, `CHANGE_MANAGER` role created, four ADMIN grant sets + `CHANGE:APPROVE` 3→9 — D-7/D-8, F2-23 | ✅ dev ×2 · **prod pending** |
-| **V318** | Roster→user link + **quorum integrity — F2-28 / DF-5**. Takes the *lowest* free number because it lands **first**: Flyway applies in version order, so a lower number created later would be skipped out-of-order on an already-migrated database | ⬜ **next to write** |
-| V319 | `ck_change_status` 14 → 17 — X-2 *(reassigned three times: V316 → V317 → V318 → V319)* | ⬜ |
-| V320–V329 | **Change Enablement (CE-2…CE-15)** — change models (V320), CAB profile/roles (V321), meeting cycle (V322), decisions + conditions (V323), ECAB ratification (V324), PIR (V325), FSC/PSO (V326), evidence (V327), unauthorised-change register (V328), CAB RBAC (V329). Renumbered from the CE plan's stale V313–V322 | ⬜ |
-| V330 | Licence backfill + entitlement rollout — F2-04 | ⬜ |
-| V331+ | Schema moves — F2-06b · grant tightening — F2-13b | ⬜ |
+**Numbers are reserved in DELIVERY order, not in ID order.** This was wrong in the previous revision and
+the review council caught it: CE-2 held `V320` while being delivered in **S8**, after CE-3…CE-7 (`V321`–
+`V325`) would already be applied — so `V320` would have been authored *below* an applied migration and
+**Flyway would have skipped it**, exactly the rule stated below. Reserved by wave:
 
-**Reservations are advisory, order is not.** A number is only real when the file exists. Because
-`ck_change_status` has now been reassigned three times, treat every row above as *intent* and re-run
-`ls db/migration/sqlserver | sed 's/^V\([0-9]*\)__.*/\1/' | sort -n | tail -1` immediately before creating
-a file. **Never insert a number below an already-applied migration** — Flyway would skip it.
+| Migration | Item | State |
+|---|---|---|
+| **V318** | Roster→user link + **quorum integrity — F2-28 / DF-5**. Lowest free number because it lands **first** | ⬜ **next to write** |
+| V319 | `ck_change_status` 14 → 17 — X-2 *(reassigned four times: V316 → V317 → V318 → V319)* | ⬜ |
+| V320 | **W2-0 grandfather licence backfill** — must precede any `@RequireModule` sweep | ⬜ |
+| V321 | Licence catalogue → data (`KNOWN_MODULES` out of `Set.of`) + entitlement rollout — F2-04 | ⬜ |
+| V322–V323 | **S6** — CAB as a governed body: `cab_profile`, `cab_member_role`, charter/ToR, quorum policy, CAB permissions (CE-3, CE-15) | ⬜ |
+| V324–V327 | **S7** — meeting cycle: agenda, decision write-back + conditions, ECAB ratification SLA, PIR (+`CHANGE_PIR` in `ck_ca_source`) (CE-4…CE-7) | ⬜ |
+| V328–V330 | **S8** — change models (CE-2), FSC/PSO (CE-8), evidence (CE-9), unauthorised-change register (CE-11) | ⬜ |
+| V331+ | Schema moves — F2-06b · grant tightening — F2-13b · audit-ledger integrity — F2-31 | ⬜ |
+
+**Reservations are advisory; ordering is not.** A number is only real when the file exists. Treat every row
+above as *intent*, and immediately before creating a file run:
+
+```bash
+ls tss-grc-backend/src/main/resources/db/migration/sqlserver | sed 's/^V\([0-9]*\)__.*/\1/' | sort -n | tail -1
+```
+
+**Never author a number below an already-applied migration** — Flyway applies in version order and would
+skip it. Corollary the council had to point out: **if item A is delivered before item B, A takes the lower
+number**, no matter which has the earlier ID.
 
 **Rules.** Additive only unless explicitly authorised. Idempotent. Applied to dev **twice** via pyodbc
 (Flyway is off in dev). Prod picks them up via Flyway on the next jar — **baseline is V312, so V313–V317
@@ -285,14 +303,14 @@ Nothing was accepted because it was written down, including the parts that flatt
 | # | Claim | Label | Judgment | Lands as |
 |---|---|---|---|---|
 | **F-001** | Change approval identity is client-controlled | `VERIFIED` → **CLOSED** | True when written. Closed at `21c83d09`: actor from `Authentication`, DTO with no approver field, SoD on the resolved user id, `CHANGE:APPROVE`, `V316` unique index → 409. 7 of its 9 P0-A steps done; steps 8–9 (named commands, ECAB ratification) are F-002's | **DF-4 / F2-24 ✅** |
-| **F-002** | Generic transitions bypass approval semantics | `PARTLY CONTRADICTED` | **The exploit is closed; the design debt is real.** `CAB_APPROVED` now requires a quorate committee resolution (Track D) *or* ≥N recorded `APPROVE` votes with zero `REJECT` (CM-C2 + the CH-17 matrix); `EMERGENCY_APPROVED` requires `changeType = EMERGENCY`. So a `CHANGE:WRITE` holder can *advance* a legitimately-decided change but cannot *manufacture* the decision. The literal claim — a generic transition guarded by `WRITE` reaching privileged states — is still true. **Critical → P2** | **NEW F2-29** (below) |
+| **F-002** | Generic transitions bypass approval semantics | `PARTLY CONTRADICTED` | **The exploit is closed; the design debt is real.** `CAB_APPROVED` now requires a quorate committee resolution (Track D) *or* ≥N recorded `APPROVE` votes with zero `REJECT` (CM-C2 + the CH-17 matrix); `EMERGENCY_APPROVED` requires `changeType = EMERGENCY`. So a `CHANGE:WRITE` holder can *advance* a legitimately-decided change but cannot *manufacture* the decision. The literal claim — a generic transition guarded by `WRITE` reaching privileged states — is still true. **Critical → P1, downgrading to P2 only when F2-28 closes.** The council overturned an unconditional P2: `CAB_APPROVED` has two legitimating legs — recorded votes (sound after DF-4) *or* a quorate committee resolution — and the second leg rests on `quorumMet`, which F2-28 proves is caller-authored. Until V318 lands, one of the two paths that make this "closed" is itself forgeable | **NEW F2-29** (below) |
 | **F-003** | Committee votes **and quorum** can be manufactured | `VERIFIED` — **half open, and the open half is P0** | Vote identity closed (`f3ea92fc`, V315, V317). **The quorum half was never closed and this register's first pass missed it.** Attendance is caller-authored free text, the denominator is computed *from that sheet*, and `quorumMet` can be set directly with zero attendance | **DF-5 / F2-28 — new P0** |
 | **F-004** | Package licensing is not platform-wide | `VERIFIED` | Exact: 22 `@RequireModule` controllers of 252, all `socops`. Un-gated by ADR-013; needs W2-0 backfill first | **F2-04** (Wave 2) |
 | **F-005** | Module boundaries are not executable | `VERIFIED`, numbers corrected | Re-measured: **754** peer imports (audit: 734), **128** directed pairs (136), **13** bidirectional (14). Volume up, tangle down — and still no architecture test | **F2-08b** (Wave 1) |
 | **F-006** | IA exposes implementation sprawl | `VERIFIED` | **329** routed pages in a 925-line `App.tsx` | **F2-07 / F2-07c** |
 | **F-007** | Arabic completeness claims exceed enforcement | `VERIFIED`, and sharper than stated | `ChangeRequest.titleEn` is `nullable = false`; **`titleAr` has neither `nullable = false` nor `@NotBlank`**. So `CLAUDE.md` house rule 7 — *"Arabic names are backend-mandatory"* — is **asserted and not enforced**. A documented platform invariant that no layer checks | **NEW F2-30** (below) |
 | **F-008** | Export authorisation violates least privilege | `VERIFIED`, **far broader than stated** | 24 `MODULE:EXPORT` permissions catalogued and granted to up to **55 of 57 roles**; **exactly one endpoint enforces any of them.** Every register, the board pack and the regulator ZIP are `READ`-authorised. The mirror image of F2-23 | **F2-27 — new P1** |
-| **F-009** | Governance core lacks adversarial test coverage | `CONTRADICTED` | **6 committee test classes, 99 test methods** — forged actor, roster eligibility, quorum, recusal/COI, tenant isolation, authorisation separation. It was *already* self-contradicted on the day it was written: the sibling document counted 19 recusal + 19 tally tests. Residual gap is narrow: no `EmergencyChangeRatificationTest`, and the two-principal probes are scripted but not in CI | **W1-5** (not a finding) |
+| **F-009** | Governance core lacks adversarial test coverage | `OVERTAKEN` *(was labelled `CONTRADICTED` — the council was right that this was self-serving: several of those test classes were written the same day the finding was re-judged, so the audit was correct when its evidence was gathered)* | **6 committee test classes, 99 test methods** — forged actor, roster eligibility, quorum, recusal/COI, tenant isolation, authorisation separation. It was *already* self-contradicted on the day it was written: the sibling document counted 19 recusal + 19 tally tests. Residual gap is narrow: no `EmergencyChangeRatificationTest`, and the two-principal probes are scripted but not in CI | **W1-5** (not a finding) |
 | **F-010** | Canonical ownership is fragmented | `EVIDENCE-BACKED` — **not independently verified** | I did not audit object ownership and will not rate it from inference. Retained unrated | **F2-06 family** |
 | **F-011** | Accessibility conformance is unproven | `PARTLY CONTRADICTED` | An axe harness exists and measured **68 serious `color-contrast` violations** — so "no report available" is wrong. But independent WCAG 2.2 AA conformance and assistive-technology testing are genuinely absent | **F2-A11Y** |
 | **F-012** | Saudi regulatory content lacks a governed lifecycle | `EVIDENCE-BACKED` | Not code-checkable; the Content Office recommendation stands and is a business decision, not an engineering slice | **Wave 4 / business** |
@@ -326,11 +344,11 @@ The audit's 3.0/5 was fair at its baseline. On measured change since:
 
 | Dimension | Audit | Now | Why |
 |---|---:|---:|---|
-| Security / control integrity | 1.8 | **2.6** | 2 of its 7 critical weaknesses closed with mutation proof and live probes, 1 mitigated; but F2-28 (quorum) is a live P0 and F2-27 (export) is platform-wide |
+| Security / control integrity | 1.8 | **2.3** | 2 of its 7 critical weaknesses closed with mutation proof and live probes, 1 mitigated — but a live P0 forgery chain on the governance backbone (F2-28), a platform-wide least-privilege inversion (F2-27) and 214 unaudited mass-assignment sites do not support 2.6. Council: "2.2–2.4 is the defensible band"; I had written "movement is real but narrow" and then awarded +0.8 |
 | Commercial packaging | 2.4 | **2.6** | still 22 of 252 controllers, but the decision is made (ADR-013) and the mechanism is proven fail-closed |
 | Quality / operations | 3.2 | **3.4** | +144 tests, adversarial governance tests, mutation-proven guards; operational evidence still absent |
 | Enterprise architecture | 2.6 | **2.6** | unchanged — pairs and cycles improved marginally, no architecture test yet |
-| **Weighted** | **3.0** | **≈3.1** | Movement is real but narrow. **Still `Qualified`** |
+| **Weighted** | **3.0** | **≈3.05** | Movement is real but narrow. **Still `Qualified`** |
 
 **Market verdict, changed in one place:** the audit made a controlled pilot conditional on Criticals
 closing. F-001 is closed and F-002 is mitigated — but **F2-28 is a new open Critical**, so *"pilot after
@@ -418,7 +436,7 @@ These are three different things and the structure must keep them distinct:
 
 | Concern | Owner | Relationship |
 |---|---|---|
-| **Committee engine** | `admin/committee` — **kernel**, in the mandatory Base Platform SKU | Generic: charters, member terms, meetings, attendance, quorum, resolutions, e-signed minutes, gate→committee routing. Used by 14 modules, not just change. **Stays in the kernel** — moving it into `change` would make every other module depend on a commercial package |
+| **Committee engine** | `admin/committee` — **kernel**, in the mandatory Base Platform SKU | Generic: charters, member terms, meetings, attendance, quorum, resolutions, e-signed minutes, gate→committee routing. Consumed by **5** external packages — `bcm`, `change_mgmt`, `policy`, `risk`, `workflow` *(`grep -rl "import com.tss.grc.module.admin.committee" src/main/java`)*. ⚠ **An earlier revision of this row claimed "14 modules" — that was the *workflow*-engine adoption count transplanted into a sentence about the *committee* engine, an ADR-016 R5 violation committed the day ADR-016 was accepted.** The conclusion is unchanged and rests on a stronger fact: the **kernel workflow engine structurally depends on committee** — `WorkflowRequestService` implements `COMMITTEE` as a first-class recipient type with roster fan-out and the SLA scheduler reads `CommitteeMemberTerm` — so the engine cannot move into a commercial package without dragging the kernel with it. Four SKUs consume committee referrals |
 | **CAB** | `module/change/cab` — **the Change Enablement SKU** | A CAB *is* a committee with change-specific behaviour: a queue-driven agenda, change decisions, conditions, ECAB ratification. So `cab/` holds the change-specific profile and workflow and reaches the generic engine through **`CommitteePort`** — it does not reimplement quorum or minutes |
 | **Workflow engine** | `module/workflow` — **kernel** | Change authorisations become workflow requests via **`WorkflowPort`** (CE-10, the 15th adopting module). The change module owns *what* needs authorising; the engine owns routing, SLA and escalation |
 
@@ -455,6 +473,100 @@ kernel-plus-package shape ADR-013 requires, and the reason the committee engine 
 
 **CE-0 (hours, do now)** → F2-25 → F2-26 → **F2-28 (unblocks S6)** → S5 restructure → S6 CAB as a governed
 body → S7 meeting cycle → S8 workflow/evidence/FSC → CE-13 frontend split.
+
+---
+
+## §6d Council review — 2026-07-25 (five Fable 5 seats, adversarially briefed)
+
+Five reviewers with deliberately conflicting mandates read this plan against the repository. Two were
+briefed to argue *against* positions already committed here. Their aggregate verdict:
+**ACCEPT-WITH-CONDITIONS as a programme** — the measured claims verify (~30 checked exactly across seats),
+and the defects were almost entirely in the *status and sequencing layer*, which had drifted ten commits
+behind its own branch.
+
+### Errors of mine they caught, now fixed above
+
+| # | Error | Fix |
+|---|---|---|
+| 1 | **§6c claimed the committee engine is "used by 14 modules". It is 5.** That was the *workflow*-adoption count transplanted — an ADR-016 R5 violation (uncited number) committed the day ADR-016 was accepted | §6c corrected, command cited, conclusion re-grounded on the kernel workflow engine's structural dependency |
+| 2 | **`V318` was claimed by two rows** — Wave 3 for `ck_change_status`, §4 for F2-28 | Wave 3 → V319 |
+| 3 | **The §4 reservation scheme violated its own Flyway rule** — CE-2 held V320 while delivered in S8, *after* V321–V325 would be applied, so V320 would have been skipped | §4 re-reserved in **delivery order** |
+| 4 | **§8 omitted F2-28**, the plan's own highest-open P0, while listing six lesser items | Inserted as slice 3 |
+| 5 | **F2-08a was already complete** (`313dd6dd`, `reporting` fan-in 25 → 0) yet listed `⬜` in Wave 0 *and* as next-action #6 in a §8 rewritten the same day — the sixth instance of F-013, mine | Marked ✅; removed from §8 |
+| 6 | **The header promised every `F2-*` row is specified in the assessment.** F2-25…F2-30 are not in it — F2-28's only spec was one table row | Header scoped; register named as the source above F2-24 |
+| 7 | **F-002's P2 downgrade was unconditional** when one of its two legitimating legs (quorate resolution) rests on the forgeable `quorumMet` | Now **P1 → P2 on F2-28 closure** |
+| 8 | **F-009 was labelled `CONTRADICTED`** by tests written the same day | Relabelled `OVERTAKEN` |
+| 9 | **Security re-rated 1.8 → 2.6** while a P0 forgery chain was open | **2.3** |
+| 10 | **Wave 2 was "un-gated" in §2 and "(gated)" in §3**; F2-06b still posed the dissolved D-4 question | Both corrected |
+| 11 | Four stale migration cells, a stale boundary seed (734/14), the tree stamp 10 commits behind, DF-4 "12 vs 13 tests", and number drift (routes 328/329, pages 5,583/5,582 and 4,970/4,969) | All normalised to the re-measured values |
+
+**One council claim I checked and rejected:** the delivery seat reported that the pre-swap safety jar
+does not exist and that the `Move-Item` restart would destroy the only copy of the running jar. **False.**
+`D:\Deployment\tss-grc\backup\jar-before-restart-20260725.jar` is present at 104,933,172 bytes — byte-size
+identical to the live jar — alongside three further copies from earlier deploys
+(`.pre-authfix-20260723_201100`, `.pre-S0-20260725_173748`, `.pre-deploy-*`). Its directory listing missed
+them. Recorded because a subagent's confident negative is not evidence.
+
+### New findings the council produced
+
+18-field specs are **not yet written** for these; they are stated here and must be added to
+`FINDINGS_REGISTER_V2.md` before any is scheduled.
+
+| ID | Finding | Sev | Source |
+|---|---|---|---|
+| **F2-31** | **The audit ledger has no tamper-evidence of its own.** Committee minutes carry a SHA-256 signature; `audit.log` — which every control cites as proof — has no hash-chaining, no WORM/retention policy and no protection from administrative deletion. F2-21 already demonstrated that this ledger will faithfully corroborate a forgery. NCA ECC **2-12** requires event-log protection and ≥12-month retention; also ISO 27001 A.8.15, SAMA CSF logging | **P1** | GRC seat |
+| **F2-32** | **The licence lifecycle has no data plane.** ADR-013 gates HTTP controller entry only. The aspect fails closed when `TenantContext` is empty off-request, so it **cannot** be extended to schedulers as designed — and today no scheduler, workflow fan-out, event listener or auto-CAPA path checks entitlement: unlicensed modules keep computing, breaching SLAs and raising CAPAs. De-licensing has no semantics either: `CommitteeReferral` rows live in the **`admin`** schema keyed by `sourceModule='CHANGE'`, so a lapsed licence leaves e-signed minutes and ledger entries referencing records nobody can open, with no answer for a PDPL erasure request. **Plus: nothing creates licence rows when an organisation is created**, so after a fail-closed sweep every new tenant is born blacked out | **P1** | Architecture seat |
+| **F2-33** | **Onboarding step 3 "Invite teammates" is localStorage-only** (`tss-grc-ui-v2/src/lib/onboarding.ts:169-184`) — invited users are never created. This is F2-02's defect class on the **first-run journey**, and a `/mock/i` CI rule will never catch it because it fabricates local state rather than importing a mock file. Wire it to the user-admin API or cut the step | **P1** | Product seat |
+| **F2-34** | **Kernel purity, and the rule contradiction that blocks F2-08b.** 40 kernel→business import lines (`platform`→`risk` 14, `privacy` 3, `bcm` 2, `ndi` 2, `audit_lc` 2, `privacy_lc` 2; `integrations`→`socops` 6, `cyber` 2; `dashboard`→`risk` 4, `compliance` 2, `incident` 1), concentrated in `platform/calendar`, `platform/completion/*`, `dashboard` and the `integrations` connectors. The kernel participates in 6 of 10 bidirectional pairs, so ADR-002's "kernel boots alone" is unachievable and had **no backlog item**. And `MODULE_SEPARABILITY` §2 says kernel imports don't count while §6c's rule says only `common`/`security`/`platform`/`spi` are legal — under the first reading `CommitteePort` is unnecessary. **The boundary ratchet cannot be seeded until one reading wins** | **P1** | Architecture seat |
+| **F2-35** | **The SKU catalogue exists in three contradictory versions, and one conflict is commercial.** (A) `MODULE_SEPARABILITY_AND_SKU_MODEL.md` §6 — Base + 13, ratified by ADR-013. (B) `Product/PRODUCT_STRATEGY_PACKAGING_AND_SALES.md` — 18 packages that sell **`ACCESS_GOV`** and **`GOVERNANCE` (committees, board packs, signatures)** as *paid*, contradicting ADR-013 and §6c which place them in the mandatory **free** Base. (C) `LicensingService.KNOWN_MODULES` — 20 code-shaped codes. **7 packages appear in no SKU: `ndi` (7,717 LoC, 127 endpoints — the SDAIA/NDMO differentiator), `reporting`, `governance`, `board_pack`, `knowledge`, `workflow_submission`, `datagov`.** Org 1 already holds `EVIDENCE`/`REPORTING` licence rows for capabilities ADR-013 calls mandatory-Base. **W2-0 and F2-04 are unwritable until one catalogue is ratified** — the backfill content differs ~3× by grain | **P1 — blocks Wave 2** | Product + Architecture seats |
+
+### Recommendations accepted, pending your call
+
+- **Rename the SKU "Change Enablement" → "Change Governance & CAB".** Under the ITSM name it competes with
+  ServiceNow/Jira on CMDB, service catalogue and release pipelines and loses on brand. What §6c actually
+  builds is change *governance* — CAB quorum integrity, SoD-recusal, e-signed minutes, evidence-bound
+  conditions, an unauthorised-change register — sold to the CISO/CAE/CCO as SAMA CSF and NCA ECC change
+  control. Same code, different buyer, winnable deal. **Your decision (D-9).**
+- **CE-0 and F2-07c contradict each other.** `UX_REDESIGN_BLUEPRINT.md:68` places `change_mgmt` inside
+  workspace 12 "Governance & Administration" and there is **no Change workspace among the 12** — so
+  Wave 4's registry-generated navigation would delete CE-0's group and re-file Change under an admin
+  catch-all, silently reversing the owner's direction. **Fix in the same commit as CE-0:** amend the
+  blueprint table (Change becomes workspace 13) and give F2-01's registry a `workspace:` field from day
+  one, so the decision lives in data rather than in a `.tsx` file Wave 4 retires.
+- **W1-5 (golden-path committee integration test) becomes a hard S6 gate** beside F2-28 — a CAB built on
+  an engine proven only at unit level repeats F2-18.
+- **Grandfather by grant-all-then-tighten, not by data presence.** "License every SKU a tenant has data
+  in" false-negatives on read-only, configured-but-empty and seasonal usage → 403s for paying customers.
+- **F2-01 becomes a two-stage registry.** v1 enforces only package↔entry parity, schema agreement and
+  module-count claims. `sku`/`owner`/`test_floor` become enforceable as they are actually decided —
+  otherwise a CI-enforced registry stuffed with placeholder SKUs is the F2-14 anti-pattern.
+- **Pull i18n forward.** It was silently moved from Wave 1 (where the UX blueprint put it) to Wave 4 with
+  no stated reason, on a product whose headline claim is Arabic-first with 49 zero-Arabic pages. Minimum:
+  the ESLint ratchet plus the pages on the five persona journeys. Same for **F2-A11Y's token-level
+  contrast fix** — days of work, parked behind two waves.
+- **State a contention rule:** if Wave 1 and Wave 3 compete for the same engineer, **F2-03 Tier-1 floors on
+  `data_officer` and `outsourcing` outrank S6–S8.** W3-5 ("no zero-test module in any commercial scope
+  statement") makes the flagship Saudi SKU unsellable until F2-03 lands, so it is revenue critical-path.
+
+### Absences the council named that this plan had not consciously excluded
+
+- **Data import / time-to-first-value.** Nothing anywhere imports an existing risk register, control
+  library or obligation list. Every GRC displacement deal opens with "load our register"; pilots that
+  start from a blank screen stall. Not in scope, not out of scope — simply absent.
+- **The locked-module upsell surface.** F2-04 hides unlicensed modules; per-module SKUs on one deployment
+  is an *expansion-revenue* architecture, so the merchandising half (a visible locked workspace with
+  "licensed under X — request a trial") should exist. One component.
+- **Mobile approvals and signatures** — the highest-frequency executive touch, with no item and no
+  out-of-scope entry, which by this plan's own standard ("absence reads as a decision") it must have.
+- **Day-zero empty states** across ~300 registers, and **nobody owns a curated demo tenant + script**.
+- **Retention, disposition and legal hold** (PDPL storage limitation; Companies Law minute retention).
+- **Witnessed restore/failover, an independent penetration test, and a WCAG conformance statement** have
+  no owner — §7 calls them out of scope, which the GRC seat fairly reads as *silent rejections of three
+  of the audit's own §11 acceptance gates*.
+- **An acceptance-evidence dossier.** The §5 definition of done is strong engineering evidence but wholly
+  **self-attested and unretained** — probe output lives in commit messages, mutation proofs leave no
+  artefact. Adding a retained pack (probe output + environment fingerprint + reviewer sign-off) is
+  actionable now; the *independence* half is a business decision, not a schedulable task.
 
 ---
 
@@ -497,14 +609,30 @@ Invoke-RestMethod http://localhost:8091/actuator/health
 
 ### Next engineering slices, in order
 
-1. **F2-25** (XS, ~2 h) — DTO + tenant stamp + `@Valid` on committee member appointment. It **blocks the
-   D-7 rollout**: the grants are live, and the first thing a customer must do returns a 500.
+**0. Write F2-28's spec first.** The council found it is *not startable from this plan alone*: its whole
+specification is one table row, and the assessment the header points at has nothing above F2-24. Half a
+page — endpoint and table inventory, roster-snapshot semantics, the `quorum_pct` denominator decision —
+before V318 is authored.
+
+1. **F2-25** (XS code, ~½ d with the house DoD) — DTO + tenant stamp + `@Valid` on committee member
+   appointment. It **blocks the D-7 rollout**: the grants are live and the first thing a customer must do
+   returns a 500. **Must include a foreign-`organisationId` probe** — only the missing-org 500 was
+   exercised, so the cross-tenant half of the finding is still unproven.
 2. **F2-26** (S, ~1 d) — link roster seats to platform users so a member can cast their own vote instead
    of every vote being secretariat-recorded `on_behalf = 1`.
-3. **W2-1a** (S) — de-mock the three executive surfaces (`searchIndex.ts`, `widgets.tsx`, `boardPack.ts`).
-4. **F2-22a** (S) — mass-assignment audit over the 216 entity-bound `@RequestBody` sites. F2-25 is the
+3. **F2-28 / DF-5** (M, 3–5 d) — **the highest open P0**, and absent from this list until the council
+   caught it. Roster-bound attendance, denominator from the roster, refuse client `quorumMet`, snapshot at
+   meeting start, audit sheet replacement. Migration **V318**.
+4. **F2-27** (S, ~1 d) — enforce `MODULE:EXPORT` on every export endpoint, per-tenant impact query first.
+   The cheapest high-severity item in the register; it was in §6b's sequence but not this list.
+5. **W2-1a** (S) — de-mock the three executive surfaces (`searchIndex.ts`, `widgets.tsx`, `boardPack.ts`)
+   **plus F2-33's onboarding invite**, which is the same defect on the first-run journey.
+6. **F2-22a** (S) — mass-assignment audit over the 216 entity-bound `@RequestBody` sites. F2-25 is the
    fourth instance of this class found by hand (after F2-21, F2-24 and the roster); the sweep is overdue.
-5. **F2-13a** (S) — grant-tightness report in both directions. It would have caught F2-23 *and* the
+7. **F2-13a** (S) — grant-tightness report in both directions. It would have caught F2-23 *and* the
    ungrantable `ADMIN_APPROVE` automatically.
-6. **F2-08a** (S) — promote the export toolkit to the kernel; removes all 25 inbound edges to `reporting`.
-7. **W2-0** (S) — grandfather licence backfill, **before** any `@RequireModule` sweep.
+8. **F2-35** (S, product + engineer) — ratify **one** SKU catalogue. **W2-0 and F2-04 cannot be written
+   until this lands**, and it is the gate on all of Wave 2.
+9. **CE-0** (XS) — lift Change out of the Risk nav group, amending the UX blueprint in the same commit.
+
+*(F2-08a was item 6 here until the council found it had already shipped at `313dd6dd`.)*

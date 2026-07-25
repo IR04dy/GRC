@@ -59,7 +59,7 @@
 **Migrations reserved: V320 – V329** *(renumbered 2026-07-25 — V313–V317 taken; **V318 = F2-28 quorum integrity, V319 = ck_change_status**, both of which land first)*.
 Every migration idempotent, `GO`-separated, applied to dev **twice**. **The unified plan's §4 ledger is
 authoritative** — reserved numbers have already moved twice, so re-check it before creating a file.
-**Open decisions requiring the user: §19** — do not start CE-3/CE-4 before D-1 and D-2 are answered,
+**Open decisions requiring the user: §19** — do not start CE-3/CE-4 before the **unified plan's** D-1 and D-2 are answered (not CD-1/CD-2),
 **and not before F2-28 (quorum integrity) is closed.**
 
 ---
@@ -453,7 +453,7 @@ New permissions (V322), catalogued in `iam.permissions` and granted per the 55-r
 
 **SoD gates (server-enforced 409, each live-probed with two users):** requester ≠ decision recorder · chair cannot solely approve own change · delegate votes only in the principal's absence · PIR approver ≠ change implementer · condition `satisfied_by` ≠ the condition's own owner where the model demands independence.
 
-**Ratchet:** every new write endpoint carries a real `hasPermission` guard — the count must stay **≤ 62** (`ControllerAuthorizationRatchetTest`).
+**Ratchet:** every new write endpoint carries a real `hasPermission` guard — the count must stay **≤ 21** (`ControllerAuthorizationRatchetTest`).
 
 ---
 
@@ -586,7 +586,7 @@ Each slice: build → targeted unit tests → migration applied ×2 to dev → *
 
 ---
 
-## §19 Open decisions (need the user before P1)
+## §19 Open decisions *(renumbered **CD-1…CD-7** 2026-07-25 — the previous D-1…D-7 collided with the unified plan's own D-1…D-9, which are different questions. CD-1 "CAB profile vs dedicated engine" is now **DECIDED** by §6c/ADR-013: a profile over the committee engine.)* (need the user before P1)
 
 | # | Decision | Options | Recommendation |
 |---|---|---|---|
@@ -613,7 +613,7 @@ Each slice: build → targeted unit tests → migration applied ×2 to dev → *
 - [ ] FSC/PSO published; unauthorised changes detectable and reconcilable.
 - [ ] Agenda pack, minutes (e-signed), decision register export bilingually, RTL-correct.
 - [ ] KPI pack live: success rate, emergency ratio, quorum-met rate, ratification breaches.
-- [ ] Ratchet ≤ 62 · full suite green · every slice live-probed · Arabic mandatory throughout.
+- [ ] Ratchet ≤ 21 · full suite green · every slice live-probed · Arabic mandatory throughout.
 - [ ] `PROJECT_CHRONICLE.md` section + `package-info.java` contract + CAB operating runbook written.
 
 ---
