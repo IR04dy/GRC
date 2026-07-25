@@ -636,6 +636,54 @@ Start-Service TssGrcBackend
 
 ---
 
+## F2-25 · Appointing a committee member is broken *and* mass-assignable — on the table that defines quorum
+
+| Field | Content |
+|---|---|
+| **ID** | F2-25 |
+| **Category** | Correctness / security (mass assignment) / control integrity |
+| **Severity** | **P1 High** — a functional break on the write path that governs voting eligibility |
+| **Current State** | Found by live probe while verifying D-7 (ADR-014), not by code reading. `POST /api/v1/committees/registry/terms` → `CommitteeMemberRegistryController#appoint(@RequestBody CommitteeMemberTerm in)` binds the **JPA entity directly**, with **no `@Valid`** and no DTO. Probed through the Vite proxy with a minimal, sane body (`committeeId`, `memberName`, `role`, `isVotingMember`): `viewer` → **403**, `so_officer` → **403** (both correct — the guard works), `compliance` (the secretariat persona, holding `ADMIN:WRITE`) → **500 "An unexpected database error occurred."** The guard is passed and the insert then fails, because `organisation_id` is never stamped from `TenantContext`. |
+| **Problem** | Three defects in one method. **1. Appointing a committee member through the API does not work at all** — every caller who is *authorised* gets a 500. **2. It is an F2-22 mass-assignment instance on the worst possible table:** `id` and `organisation_id` are client-settable on `committee_member_terms`, the row set that determines who may vote and therefore what constitutes quorum. A caller who supplies `organisationId` writes a roster row into **another tenant's** committee. **3. A constraint violation surfaces as 500, not 400**, so the API cannot tell a caller what it did wrong. |
+| **Root Cause** | The same root cause as F2-21 and F2-24, one table over: an early-phase entity-bound endpoint that was never revisited when the table became a control surface. CH-14 made the roster load-bearing for quorum and recusal; DF-3 made the roster the authority on who may vote; nobody re-examined how rows *get into* it. **No test caught it** because the service is unit-tested with a pre-populated entity — the tests supply `organisationId` themselves, which is exactly the blind spot F2-18 describes. |
+| **Business Impact** | D-7 has just unlocked the committee subsystem for 22 personas, and the first thing a customer must do — constitute a committee and appoint its members — returns a 500. The feature is unusable on day one of the rollout without this fix. |
+| **Technical Impact** | Small and contained: one DTO, one service line stamping `organisationId`, one `@Valid`. Two hours. |
+| **UX Impact** | The user sees a generic "unexpected database error" with no indication of what to correct. The bilingual field-level toast machinery (`problemMessage()`) is bypassed entirely because there is no bean-validation error map to fold in. |
+| **Sales Impact** | This is a live-demo failure on the governance module, in the flow a Saudi board secretary would exercise first. Cheap to fix, expensive to be caught doing. |
+| **Recommendation** | 1. Introduce `MemberTermRequest` (DTO) with `@NotNull committeeId`, `@NotBlank memberName`, `@NotBlank role`, `isVotingMember`, term dates — **no `id`, no `organisationId`**. 2. `appoint` stamps `organisationId` from `TenantContext`, exactly as the sibling committee services do. 3. Add `@Valid`, remembering it fires **before** `@PreAuthorize`, so authorisation probes still need a valid body. 4. Add the tests: a foreign `organisationId` in the body is ignored; a missing `memberName` is a 400 not a 500; an appointment by a non-secretariat persona is 403. 5. Sweep the other three write methods on this controller (`/terms/{id}/end`, `/terms/{id}/renew`, `/skills`) — they take request records and are likely fine, but they were not probed. |
+| **Alternatives** | (a) Keep the entity and null `id`/`organisationId` defensively in the service — cheaper, and it leaves the contract lying about what it accepts. (b) Fix only the 500 by stamping the tenant, leaving mass assignment — rejected: the tenant-crossing write is the more serious half. |
+| **Trade-offs** | A DTO is a small API change. Any existing client that posts `id` or `organisationId` will now have those fields ignored — which is the point, and no first-party client does. |
+| **Effort** | **XS** — 2 hours including tests. |
+| **Priority** | **Immediate, alongside the D-7 rollout.** It is the first blocker a customer hits after the grants land. |
+| **Expected ROI** | Very high per hour: two hours converts an unusable governance flow into a working one and closes a cross-tenant write. |
+| **References** | `CommitteeMemberRegistryController.java:41-44`. Probe: `scratchpad/probe_d7_d8.py` (§b). Same class as **F2-22**; same root cause as **F2-21** / **F2-24**. Sits directly on the roster that **ADR-014** makes authoritative. |
+
+---
+
+## F2-26 · No committee member is linked to a platform user, so nobody can cast their own vote
+
+| Field | Content |
+|---|---|
+| **ID** | F2-26 |
+| **Category** | Data completeness / adoption blocker |
+| **Severity** | **P1 High** — it renders half of the D-7 unlock unreachable |
+| **Current State** | Every row in `admin.committee_member_terms` has **`member_user_id = NULL`** (all 25+ seeded rows across 8 committees in org 1). Rosters are named strings — "CRO", "CISO", "General Counsel", "Abdullah Al-Saud" — with no link to `iam.users`. DF-3's roster match therefore always falls through to name comparison, and no dev username ("so_officer", "compliance") matches any roster name. Live-probed: with `ADMIN:APPROVE` correctly granted, `so_officer` still cannot self-vote — the service returns **403 "You are not an active member of this committee"**, which is the control behaving correctly on incomplete data. |
+| **Problem** | After ADR-014, the platform has two vote paths: a member casting their own vote, and the secretariat recording one on their behalf (stamped `on_behalf = 1`). **Only the second works.** Every vote in the system must therefore be entered by a board secretary and flagged as on-behalf, which is precisely the secretary-entry model that F2-21 identified as the root of the original defect. The provenance columns are honest about it, so nothing is *forged* — but the platform cannot demonstrate a member voting as themselves, which is the control an auditor will ask to see. |
+| **Root Cause** | The committee seed data (`seed_gov_committee_activity.py`, `V154`/`V157`/`V159`) predates `member_user_id` and models members as job titles, which is how a charter reads. `member_user_id` was added later as the authoritative field and never populated. The column is nullable, so nothing surfaced the gap; DF-3 then made it load-bearing without checking it was populated. **This is the F2-23 lesson repeating a third time:** a mechanism was built, and nobody verified the data it depends on actually exists. |
+| **Business Impact** | A customer's first real committee meeting cannot record member self-votes. Quorum still computes, minutes still e-sign, and every vote carries `on_behalf = 1` — an auditor reading that column sees a committee where no member ever voted personally. |
+| **Technical Impact** | No code change needed. It is a data/UX problem: the appointment flow must capture a platform user, and existing rows need linking or explicit acknowledgement. **Blocked by F2-25** — the appointment endpoint 500s, so rosters cannot currently be edited through the API at all. |
+| **UX Impact** | The member-appointment form needs a user picker (searchable, bilingual) beside the free-text name, and the committee detail screen should show which seats are unlinked. Today the failure reads to a legitimate committee member as "you are not a member of this committee", which is both true and useless. |
+| **Sales Impact** | Demoing the governance module means demoing the on-behalf path only. The self-vote path — the stronger story, and the one that distinguishes this from a minutes-typing tool — cannot be shown until seats are linked. |
+| **Recommendation** | 1. **After F2-25**, add an optional `memberUserId` to the appointment DTO with a user picker in the FE; validate that the user belongs to the current tenant. 2. Add a **roster-linkage report** on the committee detail screen: *n of m seats linked to a platform user*, so the gap is visible rather than discovered at a meeting. 3. **Do not guess links for existing rows.** Offer a per-seat "link to user" action to the secretariat and leave unlinked seats explicitly unlinked — the same stance V315 takes on pre-fix votes and V316 on pre-fix approvals. Inventing an identity for a governance seat is the defect, not the fix. 4. For the dev/demo dataset, link the seats that correspond to real dev personas (CISO → `so_officer`, CCO/Compliance → `compliance`, CRO → `rmanager`) so the self-vote path is demonstrable. |
+| **Alternatives** | (a) Match roster members to users by name at runtime — rejected: name matching is exactly the weakness DF-3 removed, and re-introducing it as a *resolution* mechanism undoes that. (b) Make `member_user_id` NOT NULL — rejected: a charter legitimately seats an external independent director who has no platform login, and forcing a link would either block the appointment or invent a user. |
+| **Trade-offs** | Keeping the column nullable means the "unlinked seat" state persists indefinitely; the linkage report is what stops it being invisible. External directors will legitimately never be linked, so the report must distinguish *unlinked* from *external*. |
+| **Effort** | **S** — 1 day (DTO field + picker + report), plus **XS** for the dev-data linking. Sequenced after F2-25. |
+| **Priority** | **High — immediately after F2-25**, and both belong to the D-7 rollout rather than to a later wave. |
+| **Expected ROI** | High: it converts the committee module from "secretary types the minutes" to "members vote and it is attributable", which is the difference between a document store and a governance control. |
+| **References** | `admin.committee_member_terms.member_user_id` (all NULL), `CommitteeResolutionService.recordVote` roster match, `seed_gov_committee_activity.py:254`. Probe: `scratchpad/probe_d7_d8.py` (§c). **ADR-014** ("membership confers the vote") depends on this data existing. Same class as **F2-23**. |
+
+---
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

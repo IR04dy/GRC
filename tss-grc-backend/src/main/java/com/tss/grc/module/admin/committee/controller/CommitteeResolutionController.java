@@ -71,9 +71,15 @@ public class CommitteeResolutionController {
      * principal with {@code ADMIN:WRITE} could vote as any name — defeating recusal,
      * quorum and vote ownership. The sibling {@code CommitteeController#approveMinutes}
      * already derived its actor from {@code Authentication}; this now matches it.
+     *
+     * <p><b>D-7 / ADR-014.</b> Guarded by {@code ADMIN:APPROVE} — the vote capability —
+     * not by the {@code ADMIN:WRITE} that administers committees. The two were the same
+     * grant, so anyone who could vote could appoint themselves to the roster and
+     * manufacture a quorum. Membership of {@code committee_member_terms} still confers
+     * the vote; this permission only opens the door.
      */
     @PostMapping("/{id}/votes")
-    @PreAuthorize("hasPermission('ADMIN','WRITE')")
+    @PreAuthorize("hasPermission('ADMIN','APPROVE')")
     public CommitteeResolution recordVote(@PathVariable Long id,
                                           @Valid @RequestBody ResolutionVoteRequest req,
                                           Authentication auth) {
@@ -107,15 +113,25 @@ public class CommitteeResolutionController {
      *
      * <p>Matched against granted authorities the same way {@code ModulePermissionEvaluator}
      * does it: an exact {@code MODULE_ACTION} authority, plus the {@code ROLE_PLATFORM_ADMIN}
-     * bypass. {@code ADMIN:APPROVE} is the committee-administration authority, deliberately
-     * distinct from the {@code ADMIN:WRITE} that merely permits casting your own vote —
-     * so "can vote" and "can vote for someone else" are separate grants a tenant controls.
+     * bypass.
+     *
+     * <p><b>Corrected under D-7 / ADR-014.</b> This originally tested for {@code ADMIN_APPROVE}
+     * at a time when {@code ADMIN:APPROVE} <em>was not in the permission catalogue at all</em>,
+     * so no tenant could ever grant it and the on-behalf path was in practice
+     * {@code PLATFORM_ADMIN}-only — the Javadoc claimed a tenant-controlled split the data did
+     * not support. The capability now tested is {@code ADMIN_WRITE}, the <b>secretariat</b>
+     * right (held by 3 roles: board secretary, GRC administrator, organisation administrator),
+     * which is the persona that legitimately minutes a show of hands. An ordinary committee
+     * member holds {@code ADMIN:APPROVE} only and can therefore vote solely as themselves.
+     *
+     * <p>An on-behalf vote is permitted but never silent: the row is stamped
+     * {@code on_behalf = 1} with {@code recorded_by_user_id} set to the real actor (V315).
      */
     private static boolean mayRecordOnBehalf(Authentication auth) {
         if (auth == null || auth.getAuthorities() == null) return false;
         for (GrantedAuthority a : auth.getAuthorities()) {
             String s = a.getAuthority();
-            if ("ROLE_PLATFORM_ADMIN".equals(s) || "ADMIN_APPROVE".equals(s)) return true;
+            if ("ROLE_PLATFORM_ADMIN".equals(s) || "ADMIN_WRITE".equals(s)) return true;
         }
         return false;
     }

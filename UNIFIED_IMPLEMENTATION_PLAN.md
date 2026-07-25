@@ -27,13 +27,24 @@
 
 | | |
 |---|---|
-| Backend suite | **2,438 tests / 0 failures** (2,415 + 23 from DF-3) |
-| Authorisation ratchet | **21** (from 62) — floor enumerated: 8 public + 10 self-scoped + 3 participant-scoped |
-| Migrations | packaged **V1–V315**; dev has **V313, V314, V315** applied by hand; **prod Flyway baseline V312** — all three land on the next restart |
+| Backend suite | **2,460 tests / 0 failures** (2,415 + 23 DF-3 + 13 DF-4 + 9 D-7) |
+| Authorisation ratchet | **21** (from 62) — floor enumerated: 8 public + 10 self-scoped + 3 participant-scoped. Unchanged by D-7/D-8: guards were *retargeted*, none removed |
+| Migrations | packaged **V1–V317**; dev has **V313–V317** applied by hand; **prod Flyway baseline V312** — all five land on the next restart. Next free: **V318** |
 | Stages complete | **S1, S2, S3, S4** (S0 partially — the restart is outstanding) |
 | Module census | **58 packages**, 186,285 LoC, 417 entities, 2,160 endpoints (was documented as 24) |
-| Known-fixed-but-not-running | **DF-1** break-glass sweep (was failing 33–35×/day) · **DF-2** stale-cookie 500 |
-| Open P0s | **F2-02** fabricated data on 3 executive surfaces · **F2-03** Saudi modules untested · **F2-04** entitlement wired to 8.6% *(DF-3/F2-21 closed at `f3ea92fc`)* |
+| Known-fixed-but-not-running | **DF-1** break-glass sweep (was failing 33–35×/day) · **DF-2** stale-cookie 500 · **DF-3/DF-4** provenance · **D-7/D-8** grants (V317 is in dev; :80 still serves the 07-23 jar) |
+| Open P0s | **F2-02** fabricated data on 3 executive surfaces · **F2-03** Saudi modules untested · **F2-04** entitlement wired to 8.6% *(DF-3/F2-21 closed at `f3ea92fc`; DF-4/F2-24 at `21c83d09`)* |
+| New P1s from the D-7 probes | **F2-25** appointing a committee member 500s and is mass-assignable · **F2-26** no roster seat is linked to a platform user, so nobody can self-vote |
+
+⚠ **The `:80` deployment is still running the 2026-07-23 jar.** `jar.new` is staged and the swap needs an
+**elevated** shell — attempted this session and refused (`Cannot open TssGrcBackend service`). Until it runs,
+DF-1 keeps failing 33–35×/day in production and none of V313–V317 is applied there:
+
+```powershell
+Stop-Service TssGrcBackend; Move-Item -Force 'D:\Deployment\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar.new' 'D:\Deployment\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar'; Start-Service TssGrcBackend
+```
+
+A pre-swap safety copy of the live jar is already at `D:\Deployment\tss-grc\backup\jar-before-restart-20260725.jar`.
 
 **What the assessment changed about this plan.** Four things, each of which moved work *earlier* or made
 it *cheaper*:
@@ -192,16 +203,42 @@ A slice is done when **all** of these hold. This is the standard every completed
 
 ## §6 Open decisions
 
+**Six of eight are now decided** (2026-07-25), on the owner's instruction to adopt the leader-aligned
+best-practice default rather than keep a third of the plan blocked. Each carries an ADR with the
+comparator evidence, the alternatives, the trade-offs accepted and its reversal cost.
+
+### Decided
+
+| # | Decision | Answer | ADR |
+|---|---|---|---|
+| **D-3** | Per-module SKUs or suite-only? | **Per-module SKUs, one deployment, one database**, enforced by the `@RequireModule` aspect that already exists; a **mandatory Base Platform SKU**; the catalogue moves from `LicensingService.KNOWN_MODULES` (`Set.of`, needs a recompile) into the module registry; **grandfather backfill first** — orgs 2/3 hold one licence row each, so annotating before backfilling is an outage. Pricing explicitly out of scope | [ADR-013](TSS-GRC-Platform-Bible/Decisions/ADR-013-PER-MODULE-SKU-AND-ENTITLEMENT.md) |
+| **D-4** | `incident` — separate SKU or part of Cyber? | **Dissolved.** A SKU is a commercial view over packages, so this was never architectural. `incident` joins the **Cyber & SOC** SKU; the package does not move. **F2-06b is no longer gated on this** and is judged purely on ADR-011 | ADR-013 |
+| **D-6** | Does `PLATFORM_ADMIN` bypass entitlement? | **No — never, for any role.** The question dissolves: platform administration lives in the mandatory Base SKU, so there is nothing to bypass. One rule beats a role-dependent one, and it is what Salesforce does | ADR-013 |
+| **D-7** | Which roles may cast a committee vote? | **Roster confers the vote; the grant opens the door.** `ADMIN:APPROVE` created (**15 roles**); `ADMIN:WRITE` cut to the **secretariat (3)** because it also appoints member terms — the same grant did both, so any voter could add themselves to a roster and manufacture a quorum. `ADMIN:READ` **21**, `ADMIN:EXPORT` **7**. `INTERNAL_AUDITOR` gets READ+EXPORT but **no vote** (IIA 1110 independence) | [ADR-014](TSS-GRC-Platform-Bible/Decisions/ADR-014-COMMITTEE-VOTING-RIGHTS.md) |
+| **D-8** | Which roles may cast a CAB vote? | **Guard stays `CHANGE:APPROVE`; the grant was the defect.** Created the missing ITIL **`CHANGE_MANAGER`** role and took `CHANGE:APPROVE` from **3 → 9**: +CHANGE_MANAGER, SERVICE_OWNER, CISO, CYBER_MANAGER, COMPLIANCE_OFFICER, EXECUTIVE_REVIEWER. Safe to widen because DF-4's provenance controls carry the load | [ADR-015](TSS-GRC-Platform-Bible/Decisions/ADR-015-CHANGE-AUTHORITY-AND-CAB-VOTING.md) |
+| **Doc governance** | How is the 335-document corpus governed? *(was "provisional")* | **Docs-as-code, one canonical doc per subject, machine-checked.** Status header on every `.md` (`AUTHORITATIVE`/`GENERATED`/`HISTORIC`/`SUPERSEDED-BY`), supersede-never-delete, generated files never hand-edited, every quantitative claim cites its command, register CI-enforced. Grounded in ISO 27001 §7.5 — *the clause this product sells* | [ADR-016](TSS-GRC-Platform-Bible/Decisions/ADR-016-DOCUMENTATION-GOVERNANCE.md) |
+
+**D-5** (which Saudi integration pack generation governs — root 20 files vs `docs/` 33) is **downgraded
+from a decision to a task** under W0-6: ADR-016 R2/R3 supply the rule, so it needs a content diff and a
+`SUPERSEDED-BY` header, not a judgement call.
+
+### Still open — these need tenant-specific business input and cannot be defaulted
+
 | # | Decision | Blocks | Owner |
 |---|---|---|---|
-| **D-3** | **Per-module SKUs or suite-only?** | Wave 2 (F2-04, F2-05 priority, F2-06) | Business |
-| D-1 | Which committee constitutes CAB / ECAB per tenant? Orgs 2/3 have **no** committees and were deliberately **not** fabricated | S6 | GRC owner |
+| D-1 | Which committee constitutes CAB / ECAB **per tenant**? Orgs 2/3 have **no** committees and were deliberately **not** fabricated | S6 | GRC owner |
 | D-2 | ECAB emergency-ratification SLA (default 5 business days) — per tenant? | S7 | GRC owner |
-| D-4 | Is **`incident`** a separate SKU or part of Cyber? Decides whether its `cyber`-schema entities move or the packages merge | F2-06b | Product |
-| D-5 | Which Saudi integration pack generation governs (root 20 files vs `docs/` 33)? | W0-6 | Product |
-| **D-7** | **Which roles may cast a committee vote?** Today the answer is "only `PLATFORM_ADMIN`" | F2-23 | GRC owner |
-| **D-8** | **Which roles may cast a CAB vote?** DF-4 narrowed it from **41 roles to 3** (GRC_ADMINISTRATOR, ORG_ADMIN, RISK_MANAGER) by moving the guard to `CHANGE:APPROVE`. That is a large, correct tightening — but **CISO, SERVICE_OWNER and any change-manager role are not in the set**, and a real CAB usually includes them. Review the grant, do not widen the guard. ⚠ **Deployment note:** any tenant user who was voting via `CHANGE:WRITE` and holds none of the three roles now receives **403** | F2-13b | GRC owner |
-| D-6 | Does `PLATFORM_ADMIN` bypass **entitlement**? *(Recommendation: no for business modules, yes for platform administration)* | F2-04 | Security + Business |
+
+Both are per-customer charter facts. Inventing them would be fabricating governance data, which is the
+defect F2-02 exists to record.
+
+### Follow-ups these decisions created
+
+| # | Item | From |
+|---|---|---|
+| F2-23b | Split a `COMMITTEE` permission module out of `ADMIN`. `ADMIN:*` gates the 7 committee controllers and **nothing else** — 59 methods — so the module name is a misnomer that couples committee grants to unrelated admin screens | ADR-014 |
+| F2-13c | Per-change-type change authority (standard / normal / emergency) in data, sourced from the CH-17 authorisation matrix. Would let `EXECUTIVE_REVIEWER` leave the normal-change voting set | ADR-015 |
+| W2-0 | **Grandfather licence backfill** — must land before any `@RequireModule` sweep | ADR-013 |
 
 ---
 
