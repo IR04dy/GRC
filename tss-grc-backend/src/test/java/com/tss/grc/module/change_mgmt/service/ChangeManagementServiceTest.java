@@ -1,5 +1,7 @@
 package com.tss.grc.module.change_mgmt.service;
 
+import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
+
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.change_mgmt.entity.ChangeApproval;
 import com.tss.grc.module.change_mgmt.entity.ChangeRequest;
@@ -449,10 +451,8 @@ class ChangeManagementServiceTest {
         when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(change("CAB_PENDING", "NORMAL")));
         when(approvalRepo.save(any(ChangeApproval.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        ChangeApproval vote = new ChangeApproval();
-        vote.setDecision("APPROVE");
-        vote.setApproverName("Bob CAB");
-        service.recordApproval(CHANGE_ID, vote);
+        service.recordApproval(CHANGE_ID, new CabVoteRequest("APPROVE", "CAB Member", null),
+            77L, "Bob CAB");
 
         verify(audit).log(eq("APPROVAL"), eq("ChangeRequest"), eq(CHANGE_ID), any(String.class));
     }
@@ -481,17 +481,37 @@ class ChangeManagementServiceTest {
             .hasMessageContaining("REJECT");
     }
 
+    /**
+     * DF-4 changed how this is enforced. The SoD gate now compares the authenticated
+     * USER ID, not a name from the body — which is the whole point: this test used to
+     * pass while the defect existed, because it politely supplied the requester's real
+     * name. See {@link CabVoteProvenanceTest} for the forged-actor cases.
+     */
     @Test
     void recordApproval_self_vote_blocked_by_SoD() {
         ChangeRequest c = change("CAB_PENDING", "NORMAL");
+        c.setRequestedById(42L);
         c.setRequestedByName("Alice Requester");
         when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(c));
 
-        ChangeApproval selfVote = new ChangeApproval();
-        selfVote.setDecision("APPROVE");
-        selfVote.setApproverName("Alice Requester");   // requester voting on own change
+        assertThatThrownBy(() -> service.recordApproval(CHANGE_ID,
+                new CabVoteRequest("APPROVE", "CAB Member", null), 42L, "Alice Requester"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Segregation of duty");
+    }
 
-        assertThatThrownBy(() -> service.recordApproval(CHANGE_ID, selfVote))
+    /** Legacy changes have no requester/owner id, so the name comparison remains as a
+     *  documented fallback — never as the primary test. */
+    @Test
+    void recordApproval_self_vote_blocked_by_name_only_for_legacy_changes_without_ids() {
+        ChangeRequest c = change("CAB_PENDING", "NORMAL");
+        c.setRequestedById(null);
+        c.setChangeOwnerId(null);
+        c.setRequestedByName("Alice Requester");
+        when(changeRepo.findById(CHANGE_ID)).thenReturn(Optional.of(c));
+
+        assertThatThrownBy(() -> service.recordApproval(CHANGE_ID,
+                new CabVoteRequest("APPROVE", "CAB Member", null), 99L, "Alice Requester"))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("Segregation of duty");
     }

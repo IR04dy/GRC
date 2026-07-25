@@ -1,5 +1,13 @@
 package com.tss.grc.module.change_mgmt.controller;
 
+import jakarta.validation.Valid;
+
+import org.springframework.security.core.Authentication;
+
+import com.tss.grc.security.GrcUserDetails;
+
+import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
+
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService;
 import com.tss.grc.module.change_mgmt.service.ChangeManagementService;
@@ -95,11 +103,36 @@ public class ChangeManagementController {
         return service.approvals(id);
     }
 
+    /**
+     * Record the caller's CAB vote on a change.
+     *
+     * <p><b>DF-4 / F2-24.</b> The approver is the <b>authenticated principal</b>. The body
+     * is a {@link CabVoteRequest} carrying only the decision, the voting capacity and a
+     * rationale — it no longer accepts an approver name or id, because the CM-C2
+     * segregation-of-duties gate used to compare that claimed name and a requester could
+     * therefore approve their own change by naming somebody else.
+     *
+     * <p>The guard is {@code CHANGE:APPROVE}, not {@code CHANGE:WRITE}: raising a change
+     * and authorising one are different privileges, and the permission already exists and
+     * is granted by the V301 matrix.
+     */
     @PostMapping("/{id}/approvals")
-    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    @PreAuthorize("hasPermission('CHANGE','APPROVE')")
     @ResponseStatus(HttpStatus.CREATED)
-    public ChangeApproval recordApproval(@PathVariable Long id, @RequestBody ChangeApproval body) {
-        return service.recordApproval(id, body);
+    public ChangeApproval recordApproval(@PathVariable Long id,
+                                         @Valid @RequestBody CabVoteRequest body,
+                                         Authentication auth) {
+        return service.recordApproval(id, body, userIdOf(auth), usernameOf(auth));
+    }
+
+    private static Long userIdOf(Authentication auth) {
+        if (auth != null && auth.getPrincipal() instanceof GrcUserDetails u) return u.getUserId();
+        return null;
+    }
+
+    private static String usernameOf(Authentication auth) {
+        if (auth != null && auth.getPrincipal() instanceof GrcUserDetails u) return u.getUsername();
+        return auth != null ? auth.getName() : null;
     }
 
     // ── Tasks ───────────────────────────────────────────────────────────────

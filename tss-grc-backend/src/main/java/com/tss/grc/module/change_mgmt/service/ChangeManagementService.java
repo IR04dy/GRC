@@ -1,6 +1,8 @@
 package com.tss.grc.module.change_mgmt.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import org.springframework.security.access.AccessDeniedException;
+import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.repository.*;
 import com.tss.grc.module.incident.dto.IncidentRequest;
@@ -60,6 +62,9 @@ public class ChangeManagementService {
     private static final Set<String> CHANGE_TYPES = Set.of("STANDARD", "NORMAL", "EMERGENCY");
     private static final Set<String> RISK_LEVELS  = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
     private static final Set<String> OUTCOMES     = Set.of("SUCCESS", "PARTIAL_SUCCESS", "FAILED", "ROLLED_BACK");
+
+    /** DF-4: CAB decisions a vote may carry. */
+    private static final Set<String> CAB_DECISIONS = Set.of("APPROVE", "REJECT", "DEFER", "ABSTAIN");
 
     private final ChangeRequestRepository changeRepo;
     private final ChangeApprovalRepository approvalRepo;
@@ -316,7 +321,27 @@ public class ChangeManagementService {
     // ── Approvals ───────────────────────────────────────────────────────────
 
     @Transactional
-    public ChangeApproval recordApproval(Long changeId, ChangeApproval body) {
+    /**
+     * Record one CAB vote on a change.
+     *
+     * <p><b>DF-4 / F2-24 — actor provenance.</b> This method previously took the
+     * {@code ChangeApproval} entity straight from the request body and trusted
+     * {@code approverName}. Because the CM-C2 segregation-of-duties gate compared that
+     * <em>claimed</em> name against the change's requester and owner, **a requester could
+     * approve their own change by submitting any other name** — and `approver_id` was
+     * client-settable, nothing enforced one vote per approver, and the audit line repeated
+     * the claim. The in-code comment conceded it: "(Name-based check; principal-id capture
+     * is a follow-up.)" This is that follow-up, and it mirrors the committee-vote fix
+     * (DF-3) so the two paths now behave the same way.
+     *
+     * <p>The ordering below is the control: tenant scope, then referral routing, then
+     * lifecycle state, then <em>identity</em>, then SoD <em>on the resolved user id</em>,
+     * then duplicate detection. The SoD check falls back to name comparison only for
+     * legacy changes whose {@code requestedById}/{@code changeOwnerId} were never captured
+     * — a fallback, never the primary test.
+     */
+    public ChangeApproval recordApproval(Long changeId, CabVoteRequest req,
+                                         Long actorUserId, String actorName) {
         ChangeRequest c = require(changeId);
         // Track D: a referred change is decided in committee — block the direct
         // CAB vote path so the two can't both satisfy CAB_APPROVED (no dual-count).
@@ -325,22 +350,50 @@ public class ChangeManagementService {
                 "This change is routed through a committee — record the decision as a committee vote, not a direct CAB vote");
         if (!"CAB_PENDING".equals(c.getStatus()) && !"IMPACT_ASSESSED".equals(c.getStatus()))
             throw new IllegalArgumentException("CAB votes can only be recorded while the change is in IMPACT_ASSESSED or CAB_PENDING");
-        body.setChangeRequestId(changeId);
-        if (body.getDecision() == null) throw new IllegalArgumentException("decision is required");
-        if (body.getApproverName() == null || body.getApproverName().isBlank())
-            throw new IllegalArgumentException("approverName is required");
-        // CM-C2 (SoD): the change requester / owner cannot cast a CAB vote on their
-        // own change. (Name-based check; principal-id capture is a follow-up.)
-        String approver = body.getApproverName().trim();
-        if (approver.equalsIgnoreCase(nullSafeStr(c.getRequestedByName()).trim())
-                || approver.equalsIgnoreCase(nullSafeStr(c.getChangeOwnerName()).trim()))
+        if (req == null || req.decision() == null || req.decision().isBlank())
+            throw new IllegalArgumentException("decision is required");
+        String decision = req.decision().trim().toUpperCase();
+        if (!CAB_DECISIONS.contains(decision))
+            throw new IllegalArgumentException("decision must be one of " + CAB_DECISIONS);
+
+        // The approver is the authenticated caller — never a name from the body.
+        if (actorUserId == null && nullSafeStr(actorName).isBlank())
+            throw new AccessDeniedException("A CAB vote must be cast by an identified user.");
+        String approver = nullSafeStr(actorName).isBlank() ? ("user#" + actorUserId) : actorName.trim();
+
+        // CM-C2 (SoD): the change requester / owner cannot cast a CAB vote on their own
+        // change. Now evaluated on the resolved USER ID, which the caller cannot choose.
+        boolean selfById = actorUserId != null
+            && (actorUserId.equals(c.getRequestedById()) || actorUserId.equals(c.getChangeOwnerId()));
+        // Legacy fallback only: changes recorded before requester/owner ids were captured.
+        boolean selfByName = c.getRequestedById() == null && c.getChangeOwnerId() == null
+            && (approver.equalsIgnoreCase(nullSafeStr(c.getRequestedByName()).trim())
+                || approver.equalsIgnoreCase(nullSafeStr(c.getChangeOwnerName()).trim()));
+        if (selfById || selfByName)
             throw new IllegalStateException(
                 "Segregation of duty: the change requester/owner cannot cast a CAB vote on their own change");
+
+        // One vote per approver per change — the DB enforces this too (V316), so a race
+        // surfaces as a constraint violation rather than a double-counted majority.
+        if (actorUserId != null
+                && approvalRepo.findByChangeRequestIdAndApproverId(changeId, actorUserId).isPresent())
+            throw new IllegalStateException(
+                "You have already recorded a CAB vote on this change — withdraw or amend the existing vote "
+              + "rather than casting a second one.");
+
+        ChangeApproval body = new ChangeApproval();
+        body.setChangeRequestId(changeId);
+        body.setApproverId(actorUserId);
+        body.setApproverName(approver);
+        body.setApproverRole(req.approverRole());
+        body.setDecision(decision);
+        body.setComments(req.comments());
         ChangeApproval saved = approvalRepo.save(body);
         audit.log("APPROVAL", "ChangeRequest", changeId,
             "CAB vote on change " + nullSafeMsg(c.getChangeCode()) + ": "
                 + nullSafeMsg(saved.getDecision()) + " by " + nullSafeMsg(saved.getApproverName())
-                + (saved.getApproverRole() != null ? " (" + saved.getApproverRole() + ")" : ""));
+                + " (user#" + saved.getApproverId() + ")"
+                + (saved.getApproverRole() != null ? " as " + saved.getApproverRole() : ""));
         return saved;
     }
 
