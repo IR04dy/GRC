@@ -1,6 +1,7 @@
 package com.tss.grc.module.change_mgmt.controller;
 
 import com.tss.grc.module.change_mgmt.entity.*;
+import com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService;
 import com.tss.grc.module.change_mgmt.service.ChangeManagementService;
 import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,6 +35,7 @@ import java.util.Map;
 public class ChangeManagementController {
 
     private final ChangeManagementService service;
+    private final ChangeGovernanceHealthService governanceHealth;
 
     // ── Listing + CRUD ──────────────────────────────────────────────────────
 
@@ -188,6 +190,19 @@ public class ChangeManagementController {
     public Map<String, Object> analytics() { return service.analytics(); }
 
     // ── CH-17: authorisation matrix ──────────────────────────────────────────
+
+    /**
+     * S4/W1-4 (finding F-4): is this tenant's committee routing actually configured?
+     * The authorisation matrix can demand CAB/ECAB while no committee is mapped, in
+     * which case referrals fail and changes fall back to the legacy tally — an absent
+     * configuration row, not an error, so it needs to be asked about explicitly.
+     */
+    @GetMapping("/governance-health")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Committee gate-map configuration health for this organisation")
+    public Map<String, Object> governanceHealth() {
+        return governanceHealth.currentTenantHealth();
+    }
 
     @GetMapping("/authorisation-matrix")
     @PreAuthorize("hasPermission('CHANGE','READ')")
