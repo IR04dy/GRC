@@ -40,13 +40,21 @@ public interface BreakGlassEventRepository extends JpaRepository<BreakGlassEvent
                                    @Param("validTo") LocalDateTime validTo,
                                    @Param("justification") String justification);
 
-    /** Flip past-due ACTIVE events to EXPIRED (the user_roles row dies via the P1 sweep). */
+    /** Org ids still holding ACTIVE events — the sweep iterates these (schedulers must be org-explicit). */
+    @Query(value = """
+        SELECT DISTINCT organisation_id FROM iam.break_glass_events
+        WHERE status = 'ACTIVE' AND is_deleted = 0
+        """, nativeQuery = true)
+    List<Long> distinctActiveOrganisationIds();
+
+    /** Flip one org's past-due ACTIVE events to EXPIRED (the user_roles row dies via the P1 sweep). */
     @Modifying
     @Query(value = """
         UPDATE iam.break_glass_events SET status = 'EXPIRED'
-        WHERE status = 'ACTIVE' AND expires_at < SYSUTCDATETIME() AND is_deleted = 0
+        WHERE organisation_id = :org AND status = 'ACTIVE'
+          AND expires_at < SYSUTCDATETIME() AND is_deleted = 0
         """, nativeQuery = true)
-    int expireEvents();
+    int expireEventsForOrg(@Param("org") Long org);
 
     // ── analytics natives (plan §6.7) ────────────────────────────────────────
 

@@ -14,11 +14,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * RBAC Access-Governance P3 (plan §6.6) — break-glass emergency access.
@@ -41,6 +45,7 @@ public class BreakGlassService {
     private final RoleRepository roles;
     private final AuditLogService audit;
     private final com.tss.grc.module.platform.service.NotificationService notifications;
+    private final PlatformTransactionManager txManager;
 
     @Transactional(readOnly = true)
     public List<BreakGlassEvent> list() {
@@ -130,10 +135,38 @@ public class BreakGlassService {
         return saved;
     }
 
-    /** Flip past-due events to EXPIRED (assignment removal is the P1 hourly sweep). */
+    /** Flip the caller's past-due events to EXPIRED (assignment removal is the P1 hourly sweep). */
     @Transactional
     public int expirySweep() {
-        int n = events.expireEvents();
+        return expireAndAudit(org());
+    }
+
+    /**
+     * DF-1/BL-C1 — scheduler threads carry no ambient transaction, so the {@code @Modifying}
+     * expiry update must run inside a per-call REQUIRES_NEW {@link TransactionTemplate}
+     * (§16 engine-wiring rule; without it prod threw {@code TransactionRequiredException}
+     * every run and expired grants outlived their window). Self-invoking the
+     * {@code @Transactional} {@link #expirySweep()} would bypass the proxy — same failure.
+     * Org-explicit: each tenant is swept + audited under its own {@link TenantContext} binding.
+     */
+    @Scheduled(fixedDelayString = "PT30M", initialDelayString = "PT5M")
+    public void scheduledExpirySweep() {
+        for (Long org : events.distinctActiveOrganisationIds()) {
+            try {
+                TenantContext.setCurrentTenant(org);
+                int n = inNewTransaction(() -> expireAndAudit(org));
+                if (n > 0) log.info("break-glass sweep: org {} — {} event(s) expired", org, n);
+            } catch (RuntimeException e) {
+                log.warn("break-glass expiry sweep failed for org {}: {}", org, e.getMessage());
+            } finally {
+                TenantContext.clear();
+            }
+        }
+    }
+
+    /** One org's expiry pass: the native flip + the CRITICAL-trail audit row (same TX). */
+    private int expireAndAudit(Long org) {
+        int n = events.expireEventsForOrg(org);
         if (n > 0) {
             audit.recordEvent(new AuditEventBuilder()
                 .actionType("ACCESS_REVOKE").sourceModule("IAM").entityType("BreakGlassEvent")
@@ -142,14 +175,11 @@ public class BreakGlassService {
         return n;
     }
 
-    @Scheduled(fixedDelayString = "PT30M", initialDelayString = "PT5M")
-    public void scheduledExpirySweep() {
-        try {
-            int n = events.expireEvents();
-            if (n > 0) log.info("break-glass sweep: {} event(s) expired", n);
-        } catch (RuntimeException e) {
-            log.warn("break-glass expiry sweep failed: {}", e.getMessage());
-        }
+    /** New-transaction wrapper for scheduler work (there is no transaction to join off-request). */
+    private <T> T inNewTransaction(Supplier<T> work) {
+        TransactionTemplate tt = new TransactionTemplate(txManager);
+        tt.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return tt.execute(status -> work.get());
     }
 
     private static Long org() {
