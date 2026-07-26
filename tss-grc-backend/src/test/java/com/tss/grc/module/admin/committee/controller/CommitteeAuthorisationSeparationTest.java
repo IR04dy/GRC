@@ -85,6 +85,44 @@ class CommitteeAuthorisationSeparationTest {
             .doesNotContain("hasPermission('ADMIN','APPROVE')");
     }
 
+    /**
+     * <b>F2-26.</b> Linking a seat to a platform user is the act that <em>confers</em> the
+     * ability to self-vote, so it belongs to the secretariat right and not to the vote
+     * capability. If it were {@code ADMIN:APPROVE}, a voter could link their own account to
+     * any seat on any committee and manufacture a quorum — re-opening, through a new
+     * endpoint, exactly the escalation V317 decomposed {@code ADMIN:WRITE} to close.
+     *
+     * <p>{@code writeGuardsOf} above already covers this endpoint as one of the registry's
+     * writes; this states the specific reason so the next person to touch it sees it.
+     */
+    @Test
+    void linking_a_seat_to_a_platform_user_requires_ADMIN_WRITE() {
+        assertThat(guardOf(CommitteeMemberRegistryController.class, "linkUser"))
+            .isEqualTo("hasPermission('ADMIN','WRITE')");
+    }
+
+    /**
+     * <b>F2-26.</b> The picker is a read, but it is guarded by {@code ADMIN:WRITE} on
+     * purpose: measured on the live grant table, {@code BOARD_SECRETARY} holds
+     * {@code ADMIN:WRITE} and <em>not</em> {@code IAM:READ}, so sourcing the picker from the
+     * IAM user list would 403 for the one persona that maintains committee rosters while
+     * still letting them perform the link. Pinned because it reads like a mistake and is
+     * not one — and because widening {@code IAM:READ} to the secretariat instead would have
+     * disclosed email, roles and lock state to obtain a name.
+     */
+    @Test
+    void the_linkable_user_picker_is_gated_by_the_right_that_performs_the_link() {
+        assertThat(guardOf(CommitteeMemberRegistryController.class, "linkableUsers"))
+            .isEqualTo("hasPermission('ADMIN','WRITE')");
+    }
+
+    /** The linkage report is a report: visible to everyone who can see the committee. */
+    @Test
+    void the_linkage_report_is_readable_with_ADMIN_READ() {
+        assertThat(guardOf(CommitteeMemberRegistryController.class, "linkage"))
+            .isEqualTo("hasPermission('ADMIN','READ')");
+    }
+
     // ── 2. on-behalf recording keys on a GRANTABLE capability ────────────────
 
     /**

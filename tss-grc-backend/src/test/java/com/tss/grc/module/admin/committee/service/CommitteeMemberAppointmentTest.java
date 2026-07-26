@@ -7,6 +7,8 @@ import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
 import com.tss.grc.module.admin.committee.repository.CommitteeMemberSkillRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
+import com.tss.grc.module.iam.entity.User;
+import com.tss.grc.module.iam.repository.UserRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,6 +59,7 @@ class CommitteeMemberAppointmentTest {
     @Mock CommitteeMemberTermRepository  terms;
     @Mock CommitteeRepository            committees;
     @Mock CommitteeMemberSkillRepository skills;
+    @Mock UserRepository                 users;
     @Mock AuditLogService                audit;
     @Mock ApplicationEventPublisher      publisher;
 
@@ -171,9 +174,20 @@ class CommitteeMemberAppointmentTest {
         assertThat(saved.getRole()).isEqualTo("Chair");
     }
 
-    /** F2-26 depends on this field surviving the DTO round-trip. */
+    /**
+     * F2-26 depends on this field surviving the DTO round-trip — and, since F2-26 shipped,
+     * on it being validated: the user must be an active member of the caller's own tenant.
+     * {@code CommitteeSeatLinkageTest} covers the rejection paths; this covers the happy one.
+     */
     @Test
     void an_optional_platform_user_link_is_carried_through() {
+        User u = new User();
+        u.setId(8L);
+        u.setUsername("so_officer");
+        u.setOrganisationId(ORG);
+        u.setIsActive(true);
+        when(users.findById(8L)).thenReturn(Optional.of(u));
+
         MemberTermRequest linked = new MemberTermRequest(COMMITTEE, "CISO", 8L, "Member",
             (short) 1, (short) 0, null, LocalDate.of(2026, 1, 1), null,
             LocalDate.of(2026, 1, 1), null, null);

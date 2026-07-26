@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Users, Award, ShieldCheck, ChevronLeft, AlertCircle, BadgeCheck, UserPlus, Plus,
-  RefreshCw, UserMinus,
+  RefreshCw, UserMinus, Link2,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -18,8 +18,9 @@ import {
   listCommittees, listMemberTerms, listSkills, skillCoverage, getIndependenceStats, appointMember,
   renewMemberTerm, endMemberTerm,
   addSkill,
+  linkSeatUser, listLinkableUsers, getSeatLinkage,
   type Committee, type CommitteeMemberTerm, type CommitteeMemberSkill,
-  type IndependenceStats,
+  type IndependenceStats, type LinkableUser, type SeatLinkageReport, type SeatLinkState,
 } from '../../lib/committees';
 
 /** Term-of-office roles (CMA/SAMA committee composition). */
@@ -47,6 +48,20 @@ const SKILL_LEVELS: Array<{ value: string; en: string; ar: string }> = [
   { value: 'INTERMEDIATE', en: 'Intermediate', ar: 'متوسط' },
   { value: 'EXPERT',       en: 'Expert',       ar: 'خبير' },
 ];
+
+/** F2-26 — the three states of a seat's platform-user link, and how each reads. */
+const LINK_STATE: Record<SeatLinkState, { en: string; ar: string; tone: 'success' | 'neutral' | 'warning' }> = {
+  LINKED:   { en: 'Linked',       ar: 'مرتبط',        tone: 'success' },
+  EXTERNAL: { en: 'External',     ar: 'خارجي',        tone: 'neutral' },
+  UNLINKED: { en: 'Not linked',   ar: 'غير مرتبط',    tone: 'warning' },
+};
+
+/** Label for a user in the picker: name, then the username as the disambiguator between
+ *  colleagues with similar names — the same shape WorkflowActorSelector uses. */
+function userLabel(u: LinkableUser, isAr: boolean): string {
+  const name = (isAr ? u.fullNameAr : u.fullNameEn) || u.fullNameEn || u.username;
+  return `${name} (${u.username})`;
+}
 
 /**
  * Member registry page — shows the current panel + the historical
@@ -79,6 +94,10 @@ export function CommitteeMemberRegistryPage() {
   const [openSkill, setOpenSkill] = useState(false);
   const [renewTarget, setRenewTarget] = useState<CommitteeMemberTerm | null>(null);
   const [endTarget, setEndTarget] = useState<CommitteeMemberTerm | null>(null);
+  // F2-26
+  const [linkage, setLinkage] = useState<SeatLinkageReport | null>(null);
+  const [linkable, setLinkable] = useState<LinkableUser[]>([]);
+  const [linkTarget, setLinkTarget] = useState<CommitteeMemberTerm | null>(null);
 
   useEffect(() => {
     if (!Number.isFinite(cid)) return;
@@ -90,13 +109,19 @@ export function CommitteeMemberRegistryPage() {
       listSkills(cid).catch(() => [] as CommitteeMemberSkill[]),
       skillCoverage(cid).catch(() => ({}) as Record<string, number>),
       getIndependenceStats(cid).catch(() => null as IndependenceStats | null),
-    ]).then(([c, t, s, cov, ind]) => {
+      getSeatLinkage(cid).catch(() => null as SeatLinkageReport | null),
+      // The picker needs ADMIN:WRITE; a read-only viewer gets 403 here and simply sees no
+      // picker, which is correct — they cannot link seats either.
+      listLinkableUsers(cid).catch(() => [] as LinkableUser[]),
+    ]).then(([c, t, s, cov, ind, lnk, lu]) => {
       if (cancelled) return;
       setCommittee(c.content.find(x => x.id === cid) ?? null);
       setTerms(t);
       setSkills(s);
       setCoverage(cov);
       setIndep(ind);
+      setLinkage(lnk);
+      setLinkable(lu);
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [cid, reloadKey]);
@@ -129,10 +154,24 @@ export function CommitteeMemberRegistryPage() {
     : (isAr ? 'تسجيل أعضاء اللجنة' : 'Committee member registry');
 
   // ---- Appoint member ------------------------------------------------------
+  // F2-26: only users with no active seat on THIS committee are offered — a second seat
+  // would count one person twice toward quorum, so the service 409s. Greying them out here
+  // means the secretary never has to discover that by submitting.
+  const freeUsers = useMemo(() => linkable.filter(u => u.heldSeats === 0), [linkable]);
+
   const appointFields: FieldDef[] = [
     { key: 'memberName', kind: 'text', label: isAr ? 'اسم العضو' : 'Member name', required: true, span: 6, maxLength: 255 },
     { key: 'role', kind: 'select', label: isAr ? 'الدور' : 'Role', required: true, span: 6,
       options: MEMBER_ROLES.map(r => ({ value: r, label: isAr ? (ROLE_LABEL_AR[r] ?? r) : r })) },
+    // Optional on purpose: a charter legitimately seats an external independent director
+    // who has no login. Forcing a link would either block the appointment or invent a user.
+    { key: 'memberUserId', kind: 'select-searchable', span: 12,
+      label: isAr ? 'مستخدم المنصة (اختياري)' : 'Platform user (optional)',
+      placeholder: isAr ? 'اتركه فارغاً للأعضاء الخارجيين…' : 'Leave empty for external members…',
+      options: freeUsers.map(u => ({ value: String(u.id), label: userLabel(u, isAr) })),
+      emptyHint: isAr
+        ? 'الربط يتيح للعضو التصويت بنفسه؛ بدونه تُسجّل الأصوات نيابةً عنه.'
+        : 'Linking lets the member cast their own vote; without it, votes are recorded on their behalf.' },
     { key: 'isIndependent', kind: 'select', label: isAr ? 'مستقل' : 'Independent', span: 6,
       options: [{ value: '1', label: isAr ? 'نعم' : 'Yes' }, { value: '0', label: isAr ? 'لا' : 'No' }] },
     { key: 'isVotingMember', kind: 'select', label: isAr ? 'عضو مصوّت' : 'Voting member', span: 6,
@@ -147,7 +186,7 @@ export function CommitteeMemberRegistryPage() {
   ];
 
   const appointInitial: Record<string, string> = {
-    memberName: '', role: 'Member', isIndependent: '1', isVotingMember: '1',
+    memberName: '', role: 'Member', memberUserId: '', isIndependent: '1', isVotingMember: '1',
     appointedAt: '2026-06-01', appointedByReso: '', termStartsAt: '2026-06-01',
     termEndsAt: '2029-05-31', termNumber: '1', independenceBasisEn: '',
   };
@@ -168,6 +207,7 @@ export function CommitteeMemberRegistryPage() {
         committeeId: cid,
         memberName,
         role,
+        memberUserId: v.memberUserId ? Number(v.memberUserId) : null,
         isIndependent: Number(v.isIndependent) === 1 ? 1 : 0,
         isVotingMember: Number(v.isVotingMember) === 1 ? 1 : 0,
         independenceBasisEn: opt(v.independenceBasisEn) ?? null,
@@ -180,7 +220,84 @@ export function CommitteeMemberRegistryPage() {
       toast.success(isAr ? `تم تعيين ${memberName}` : `${memberName} appointed`);
       setOpenAppoint(false);
       setReloadKey(k => k + 1);
-    } catch { toast.danger(isAr ? 'تعذّر تعيين العضو' : 'Failed to appoint member'); }
+    } catch (e) {
+      // The server now names the field (F2-25) and the conflict (F2-26 — "already holds an
+      // active seat"). Swallowing that into a generic toast would waste both fixes: it is
+      // the difference between "failed" and "that person already sits on this committee".
+      toast.danger(e instanceof Error ? e.message
+        : (isAr ? 'تعذّر تعيين العضو' : 'Failed to appoint member'));
+    }
+  }
+
+  // ---- F2-26: link a seat to a platform user -------------------------------
+  // Three states in one submit, because two endpoints ("link" / "declare external") could
+  // disagree and leave a seat both linked and declared external.
+  const linkFields: FieldDef[] = [
+    { key: 'mode', kind: 'select', span: 12, required: true,
+      label: isAr ? 'حالة المقعد' : 'Seat state',
+      options: [
+        { value: 'LINK',     label: isAr ? 'ربط بمستخدم في المنصة' : 'Link to a platform user' },
+        { value: 'EXTERNAL', label: isAr ? 'عضو خارجي — لا يوجد حساب' : 'External member — no platform account' },
+        { value: 'CLEAR',    label: isAr ? 'إلغاء الربط' : 'Clear the link' },
+      ] },
+    { key: 'memberUserId', kind: 'select-searchable', span: 12,
+      label: isAr ? 'المستخدم' : 'Platform user',
+      placeholder: isAr ? 'ابحث بالاسم أو اسم المستخدم…' : 'Search by name or username…',
+      options: linkable
+        // The seat being edited must still offer its own current holder, or a re-save of an
+        // unrelated field would look like the link had been lost.
+        .filter(u => u.heldSeats === 0 || u.id === linkTarget?.memberUserId)
+        .map(u => ({ value: String(u.id), label: userLabel(u, isAr) })) },
+    // FormModal's textarea takes no placeholder, so the example lives in the label — the
+    // secretary needs to know what a *sufficient* basis looks like, not just that one is due.
+    { key: 'basisEn', kind: 'textarea', span: 12, rows: 2,
+      label: isAr
+        ? 'سبب عدم وجود حساب (مطلوب للأعضاء الخارجيين) — مثال: شريك مكتب المراجعة الخارجي، يحضر بموجب المادة 54 ولا يملك حساباً'
+        : 'Why there is no platform account (required for external) — e.g. “External audit firm partner, attends under CMA Article 54, holds no account”' },
+    { key: 'reason', kind: 'textarea', span: 12, rows: 2,
+      label: isAr ? 'ملاحظة للسجل (اختياري)' : 'Note for the audit ledger (optional)' },
+  ];
+
+  const linkInitial: Record<string, string> = useMemo(() => ({
+    mode: linkTarget?.noPlatformUser ? 'EXTERNAL' : 'LINK',
+    memberUserId: linkTarget?.memberUserId ? String(linkTarget.memberUserId) : '',
+    basisEn: linkTarget?.noPlatformUserBasisEn ?? '',
+    reason: '',
+  }), [linkTarget]);
+
+  async function submitLink(v: Record<string, string>) {
+    if (!linkTarget) return;
+    const mode = v.mode;
+    if (mode === 'LINK' && !v.memberUserId) {
+      toast.danger(isAr ? 'يُرجى اختيار مستخدم' : 'Please select a platform user'); return;
+    }
+    if (mode === 'EXTERNAL' && !String(v.basisEn ?? '').trim()) {
+      toast.danger(isAr
+        ? 'سبب عدم وجود حساب مطلوب للأعضاء الخارجيين'
+        : 'A reason is required when declaring that a seat has no platform account');
+      return;
+    }
+    const reason = String(v.reason ?? '').trim() || null;
+    try {
+      await linkSeatUser(linkTarget.id, mode === 'LINK'
+        ? { memberUserId: Number(v.memberUserId), reason }
+        : mode === 'EXTERNAL'
+          ? { noPlatformUser: true, basisEn: String(v.basisEn).trim(), reason }
+          : { reason });
+      toast.success(mode === 'CLEAR'
+        ? (isAr ? `تم إلغاء ربط ${linkTarget.memberName}` : `${linkTarget.memberName} unlinked`)
+        : (isAr ? `تم تحديث مقعد ${linkTarget.memberName}` : `${linkTarget.memberName}'s seat updated`));
+      setLinkTarget(null);
+      setReloadKey(k => k + 1);
+    } catch (e) {
+      toast.danger(e instanceof Error ? e.message
+        : (isAr ? 'تعذّر تحديث الربط' : 'Failed to update the link'));
+    }
+  }
+
+  /** The linkage state of one active seat, from the report (which resolves the username). */
+  function seatLink(termId: number) {
+    return linkage?.seats.find(s => s.termId === termId);
   }
 
   // ---- Add a skill to the matrix -------------------------------------------
@@ -329,7 +446,34 @@ export function CommitteeMemberRegistryPage() {
         <Kpi Icon={AlertCircle}  label={isAr ? 'انتهاء قريب (90 يوم)' : 'Expiring soon (90d)'}
              value={expiringSoon} tone={expiringSoon > 0 ? 'warning' : 'neutral'}
              to="/committees" />
+        {/* F2-26 — voting coverage, not blended coverage. Non-voting invitees never cast a
+            counted vote, so a single percentage can read healthy while every voting chair
+            is unlinked and no member can vote as themselves. */}
+        <Kpi Icon={Link2}
+             label={isAr ? 'مقاعد مصوّتة مرتبطة' : 'Voting seats linked'}
+             value={linkage ? `${linkage.votingLinked}/${linkage.votingSeats}` : '—'}
+             tone={!linkage || linkage.votingSeats === 0 ? 'neutral'
+                   : linkage.votingUnlinked === 0 ? 'success'
+                   : linkage.votingLinked === 0 ? 'danger' : 'warning'}
+             to="/committees" />
       </div>
+
+      {/* F2-26 — the gap becomes a sentence on the page the secretariat already uses,
+          instead of a discovery made in a meeting. */}
+      {linkage && linkage.votingUnlinked > 0 && (
+        <Card title={isAr ? 'ربط المقاعد بمستخدمي المنصة' : 'Seat-to-user linkage'} Icon={Link2}>
+          <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.7 }}>
+            {isAr
+              ? `${linkage.votingUnlinked} من ${linkage.votingSeats} مقعد مصوّت غير مرتبط بمستخدم في المنصة، لذلك لا يمكن لهؤلاء الأعضاء التصويت بأنفسهم — تُسجّل أصواتهم أمانة اللجنة نيابةً عنهم. اربط المقعد من عمود «مستخدم المنصة»، أو صرّح بأن العضو خارجي إن لم يكن لديه حساب.`
+              : `${linkage.votingUnlinked} of ${linkage.votingSeats} voting seats are not linked to a platform user, so those members cannot cast their own vote — the secretariat has to record it on their behalf. Link a seat from the “Platform user” column, or declare the member external if they will never hold an account.`}
+            {linkage.declaredExternal > 0 && (
+              <> {isAr
+                ? `(${linkage.declaredExternal} مقعد خارجي معلَن — لا يُحتسب كنقص.)`
+                : `(${linkage.declaredExternal} declared external — not counted as a gap.)`}</>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Active members panel */}
       <Card title={isAr ? 'الأعضاء النشطون' : 'Active members'} Icon={Users}
@@ -352,6 +496,7 @@ export function CommitteeMemberRegistryPage() {
                   <tr>
                     <th>{isAr ? 'العضو' : 'Member'}</th>
                     <th>{isAr ? 'الدور' : 'Role'}</th>
+                    <th>{isAr ? 'مستخدم المنصة' : 'Platform user'}</th>
                     <th>{isAr ? 'مستقل' : 'Independent'}</th>
                     <th>{isAr ? 'فترة' : 'Term'}</th>
                     <th>{isAr ? 'بدء الفترة' : 'Term starts'}</th>
@@ -365,6 +510,32 @@ export function CommitteeMemberRegistryPage() {
                     <tr key={t.id}>
                       <td>{t.memberName}</td>
                       <td>{t.role}</td>
+                      {/* F2-26. The resolved username is shown, not just "linked": a mis-link
+                          — the CRO's seat pointing at the auditor's account — is only visible
+                          if the report says whose account it is. */}
+                      <td>
+                        {(() => {
+                          const s = seatLink(t.id);
+                          const state = s?.state ?? (t.memberUserId ? 'LINKED'
+                                       : t.noPlatformUser ? 'EXTERNAL' : 'UNLINKED');
+                          const meta = LINK_STATE[state];
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <Badge tone={meta.tone}>{isAr ? meta.ar : meta.en}</Badge>
+                              {state === 'LINKED' && s?.username && (
+                                <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>
+                                  {s.username}
+                                </span>
+                              )}
+                              {state === 'EXTERNAL' && s?.basisEn && (
+                                <span style={{ fontSize: 10, color: 'var(--ink-3)' }} title={s.basisEn}>
+                                  {s.basisEn.length > 32 ? `${s.basisEn.slice(0, 32)}…` : s.basisEn}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td>
                         {t.isIndependent === 1
                           ? <Badge tone="success">{isAr ? 'مستقل' : 'Independent'}</Badge>
@@ -376,6 +547,9 @@ export function CommitteeMemberRegistryPage() {
                       <td className="mono">{t.appointedByReso ?? '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6, justifyContent: isAr ? 'flex-start' : 'flex-end' }}>
+                          <Button size="sm" variant="ghost" Icon={Link2} onClick={() => setLinkTarget(t)}>
+                            {isAr ? 'الربط' : 'Link'}
+                          </Button>
                           <Button size="sm" variant="secondary" Icon={RefreshCw} onClick={() => setRenewTarget(t)}>
                             {isAr ? 'تجديد' : 'Renew'}
                           </Button>
@@ -502,6 +676,18 @@ export function CommitteeMemberRegistryPage() {
         submitLabel={isAr ? 'إضافة' : 'Add skill'}
         onClose={() => setOpenSkill(false)}
         onSubmit={submitSkill}
+      />
+
+      <FormModal
+        open={linkTarget != null}
+        title={isAr
+          ? `ربط المقعد بمستخدم${linkTarget ? ` — ${linkTarget.memberName}` : ''}`
+          : `Seat platform user${linkTarget ? ` — ${linkTarget.memberName}` : ''}`}
+        fields={linkFields}
+        initial={linkInitial}
+        submitLabel={isAr ? 'حفظ' : 'Save'}
+        onClose={() => setLinkTarget(null)}
+        onSubmit={submitLink}
       />
 
       <FormModal

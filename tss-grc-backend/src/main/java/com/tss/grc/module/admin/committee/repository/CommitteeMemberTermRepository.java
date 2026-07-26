@@ -51,6 +51,27 @@ public interface CommitteeMemberTermRepository extends JpaRepository<CommitteeMe
     """)
     List<Long> findActiveCommitteeIdsForUser(Long organisationId, Long userId);
 
+    /**
+     * F2-26 — how many ACTIVE seats this user already holds on this committee.
+     *
+     * <p>Guards the invariant that one person occupies at most one seat per committee.
+     * Two ACTIVE seats for the same user would count that person <b>twice</b> in the
+     * quorum denominator F2-28 is about to derive from this table, and would let them cast
+     * two counted votes on one resolution — the same manufacture-a-quorum outcome DF-3
+     * closed from the other direction. {@code excludeTermId} lets a re-link of the seat
+     * being edited pass without matching itself.
+     */
+    @Query("""
+        SELECT COUNT(t) FROM CommitteeMemberTerm t
+        WHERE t.organisationId = :organisationId
+          AND t.committeeId = :committeeId
+          AND t.memberUserId = :userId
+          AND t.renewalStatus = 'ACTIVE'
+          AND (:excludeTermId IS NULL OR t.id <> :excludeTermId)
+    """)
+    long countActiveSeatsForUser(Long organisationId, Long committeeId, Long userId,
+                                Long excludeTermId);
+
     /** Independence ratio numerator — count of independent active members. */
     @Query("""
         SELECT COUNT(t) FROM CommitteeMemberTerm t

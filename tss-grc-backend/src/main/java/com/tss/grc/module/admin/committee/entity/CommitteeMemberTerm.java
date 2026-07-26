@@ -38,8 +38,35 @@ public class CommitteeMemberTerm {
     @Column(name = "member_name", nullable = false, length = 255)
     private String memberName;
 
+    /**
+     * The platform user who holds this seat, or NULL. Authoritative for
+     * {@code CommitteeResolutionService.recordVote} — the field that decides whether a
+     * vote is the member's own or the secretariat's on their behalf, and (after F2-28)
+     * a term in the quorum denominator. See {@link #noPlatformUser} for why NULL alone
+     * cannot be read as "unlinked".
+     */
     @Column(name = "member_user_id")
     private Long memberUserId;
+
+    /**
+     * F2-26. 1 = this seat is not expected to have a platform login — an external
+     * auditor, an external advisor, a director who attends in person only.
+     *
+     * <p>Without this flag, a NULL {@code memberUserId} means both "awaiting secretariat
+     * action" and "will never be linked", which is why 31 unlinked seats went unnoticed:
+     * a coverage report built on NULL either nags about seats that cannot be linked or
+     * gets ignored. With it the seat has three states — LINKED, EXTERNAL (declared),
+     * UNLINKED (a real gap) — and only the third is a finding.
+     */
+    @Column(name = "no_platform_user", nullable = false)
+    private Boolean noPlatformUser = false;
+
+    /** Why this seat has no platform user. Mandatory whenever {@link #noPlatformUser}
+     *  is set — an undocumented "external" claim is the same unevidenced assertion the
+     *  flag exists to remove. Enforced in the service and by
+     *  {@code ck_cmt_no_platform_user}. */
+    @Column(name = "no_platform_user_basis_en", length = 300)
+    private String noPlatformUserBasisEn;
 
     /** Chair | Vice-Chair | Member | Secretary | Standing Invitee | External Advisor */
     @Column(nullable = false, length = 120)

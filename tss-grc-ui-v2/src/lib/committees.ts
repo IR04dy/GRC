@@ -268,6 +268,60 @@ export interface CommitteeMemberTerm {
   endReason: string | null;
   endedAt: string | null;
   createdAt: string;
+  /** F2-26 — declared to have no platform login (external auditor/advisor). Distinguishes
+   *  a seat that will never be linked from one that simply has not been linked yet. */
+  noPlatformUser?: boolean;
+  noPlatformUserBasisEn?: string | null;
+}
+
+// ─── F2-26: roster seat → platform user ───────────────────────────────
+
+/** LINKED = holds a platform user · EXTERNAL = declared to have none · UNLINKED = gap. */
+export type SeatLinkState = 'LINKED' | 'EXTERNAL' | 'UNLINKED';
+
+export interface LinkableUser {
+  id: number;
+  username: string;
+  fullNameEn: string | null;
+  fullNameAr: string | null;
+  jobTitleEn: string | null;
+  /** ACTIVE seats this user already holds on the committee being populated. > 0 means
+   *  picking them would 409 — one person cannot count twice toward quorum. */
+  heldSeats: number;
+}
+
+export interface SeatLinkageSeat {
+  termId: number;
+  memberName: string;
+  role: string;
+  votingMember: boolean;
+  state: SeatLinkState;
+  memberUserId: number | null;
+  username: string | null;
+  fullNameEn: string | null;
+  basisEn: string | null;
+}
+
+export interface SeatLinkageReport {
+  committeeId: number;
+  activeSeats: number;
+  linked: number;
+  declaredExternal: number;
+  unlinked: number;
+  votingSeats: number;
+  votingLinked: number;
+  votingUnlinked: number;
+  /** linked / (activeSeats − declaredExternal): declared-external seats leave the
+   *  denominator, or a committee that seats an external auditor could never reach 100%. */
+  coveragePct: number;
+  seats: SeatLinkageSeat[];
+}
+
+export interface LinkUserBody {
+  memberUserId?: number | null;
+  noPlatformUser?: boolean;
+  basisEn?: string | null;
+  reason?: string | null;
 }
 
 export interface CommitteeMemberSkill {
@@ -311,6 +365,40 @@ export function endMemberTerm(termId: number, renewalStatus: string, reason: str
 export function renewMemberTerm(termId: number, newStart: string, newEnd: string, resolutionCode: string)
     : Promise<CommitteeMemberTerm> {
   return api.post(`${REG_BASE}/terms/${termId}/renew`, { newStart, newEnd, resolutionCode });
+}
+
+/**
+ * F2-26 — set which platform user holds a seat: link, re-link, declare external, or clear.
+ *
+ * `{ memberUserId }` links · `{ noPlatformUser: true, basisEn }` declares external ·
+ * `{}` clears back to unlinked. 409 when the user already holds an active seat on the
+ * committee (one person must not count twice toward quorum) or when the term is closed.
+ */
+export function linkSeatUser(termId: number, body: LinkUserBody): Promise<CommitteeMemberTerm> {
+  return api.post(`${REG_BASE}/terms/${termId}/link-user`, body);
+}
+
+/**
+ * F2-26 — users the secretariat may attach to a seat.
+ *
+ * Served by the committee module under `ADMIN:WRITE`, **not** from the IAM user list:
+ * `BOARD_SECRETARY` holds `ADMIN:WRITE` but not `IAM:READ`, so a picker sourced from
+ * `/api/v1/admin/users` would 403 for the persona that maintains rosters. This is also why
+ * the picker must not use `lib/userDirectory` — that is a hardcoded demo directory whose
+ * ids (`usr-001`) do not exist in `iam.users`, and linking a governance seat to a
+ * fabricated identity is the defect F2-26 is about.
+ */
+export function listLinkableUsers(committeeId?: number, q?: string): Promise<LinkableUser[]> {
+  const p = new URLSearchParams();
+  if (committeeId != null) p.set('committeeId', String(committeeId));
+  if (q) p.set('q', q);
+  const qs = p.toString();
+  return api.get(`${REG_BASE}/linkable-users${qs ? `?${qs}` : ''}`);
+}
+
+/** F2-26 — roster-linkage coverage: how many seats can cast their own vote. */
+export function getSeatLinkage(committeeId: number): Promise<SeatLinkageReport> {
+  return api.get(`${REG_BASE}/committees/${committeeId}/linkage`);
 }
 
 export function listSkills(committeeId: number): Promise<CommitteeMemberSkill[]> {
