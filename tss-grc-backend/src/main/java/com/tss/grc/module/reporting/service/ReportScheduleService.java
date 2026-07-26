@@ -76,9 +76,23 @@ public class ReportScheduleService {
         return runRepo.findTop50ByOrganisationIdOrderByTriggeredAtDesc(TenantContext.getCurrentTenant());
     }
 
+    /**
+     * Copies the caller-settable fields. Deliberately field-by-field rather than a bean copy:
+     * {@code id}, {@code organisationId}, {@code externalId}, the audit stamps and the
+     * {@code lastRun*} outcome fields are server-owned, and the controller binds the entity
+     * straight from the request body.
+     *
+     * <p>F2-13a: {@code nameAr} and {@code descriptionAr} were missing from this list, so the two
+     * Arabic columns V20 added were accepted by the endpoint, mapped by the entity, and dropped
+     * here without an error — every schedule was English-only and nothing said so. Invisible until
+     * V321 made these endpoints reachable at all: no role held {@code REPORTING:WRITE}, so no
+     * request had ever completed.
+     */
     private void apply(ReportSchedule t, ReportSchedule s) {
         if (s.getName()           != null) t.setName(s.getName());
+        if (s.getNameAr()         != null) t.setNameAr(s.getNameAr());
         if (s.getDescription()    != null) t.setDescription(s.getDescription());
+        if (s.getDescriptionAr()  != null) t.setDescriptionAr(s.getDescriptionAr());
         if (s.getReportType()     != null) t.setReportType(s.getReportType());
         if (s.getFormat()         != null) t.setFormat(s.getFormat());
         if (s.getLanguage()       != null) t.setLanguage(s.getLanguage());

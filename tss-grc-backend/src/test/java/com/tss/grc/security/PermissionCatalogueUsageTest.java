@@ -53,8 +53,34 @@ class PermissionCatalogueUsageTest {
     private static final Pattern HAS_PERMISSION =
         Pattern.compile("hasPermission\\(\\s*'([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\s*\\)");
 
-    /** Where the report script picks up the code-side half. */
+    /** Where the report script picks up the code-side half: the distinct pairs. */
     private static final Path OUT = Path.of("target", "permission-usage.txt");
+
+    /**
+     * And the guard sites behind them, {@code CLASS#member MODULE:ACTION} per line.
+     *
+     * <p>The pair list alone answers "is this permission guarded anywhere", which is enough to
+     * find a dead permission but not enough to act on one: a report that says
+     * {@code REPORTING:WRITE} is held by no role is a curiosity until it also says which three
+     * endpoints that closes. Emitted from the same reflection pass so the two files cannot
+     * disagree.
+     */
+    private static final Path SITES = Path.of("target", "permission-usage-sites.txt");
+
+    /**
+     * The subset of sites whose guard ANDs a {@code hasAnyRole} leg onto the permission.
+     *
+     * <p>This is the report's honesty margin. The tightness join answers "who holds this
+     * permission", which equals "who gets through this endpoint" only when the permission is the
+     * whole guard. Where a second leg is ANDed on, holding the permission is necessary but not
+     * sufficient, and the report must not claim otherwise.
+     *
+     * <p>Emitted rather than remembered, and the reason is a third repeat of the same lesson:
+     * grepping for the two calls on one line returns <b>3</b> files, because a guard that spans
+     * two source lines is invisible to a line-oriented match. Reflection over the assembled
+     * annotation value says <b>73 sites</b> — 5% of the guard set, not 0.2%.
+     */
+    private static final Path COMPOSED = Path.of("target", "permission-usage-composed.txt");
 
     /**
      * Distinct MODULE:ACTION pairs referenced by any {@code @PreAuthorize} in the platform.
@@ -72,6 +98,7 @@ class PermissionCatalogueUsageTest {
     void everyGuardedPermissionIsRecordedForTheTightnessReport() throws Exception {
         Set<String> pairs = new TreeSet<>();
         List<String> sites = new ArrayList<>();
+        List<String> composed = new ArrayList<>();
 
         var scanner = new ClassPathScanningCandidateComponentProvider(false);
         scanner.addIncludeFilter(new AnnotationTypeFilter(RestController.class));
@@ -82,18 +109,27 @@ class PermissionCatalogueUsageTest {
             } catch (Throwable t) {
                 continue;
             }
-            collect(c.getAnnotation(PreAuthorize.class), c.getSimpleName(), "<class>", pairs, sites);
+            collect(c.getAnnotation(PreAuthorize.class), c.getSimpleName(), "<class>",
+                    pairs, sites, composed);
             for (Method m : c.getDeclaredMethods()) {
-                collect(m.getAnnotation(PreAuthorize.class), c.getSimpleName(), m.getName(), pairs, sites);
+                collect(m.getAnnotation(PreAuthorize.class), c.getSimpleName(), m.getName(),
+                        pairs, sites, composed);
             }
         }
 
         Files.createDirectories(OUT.getParent());
         Files.write(OUT, pairs);
+        sites.sort(String::compareTo);
+        Files.write(SITES, sites);
+        composed.sort(String::compareTo);
+        Files.write(COMPOSED, composed);
 
         System.out.println("[F2-13a] distinct MODULE:ACTION pairs guarded in code = " + pairs.size());
         System.out.println("[F2-13a] guard sites = " + sites.size());
+        System.out.println("[F2-13a] sites ANDing a hasAnyRole leg = " + composed.size());
         System.out.println("[F2-13a] wrote " + OUT.toAbsolutePath());
+        System.out.println("[F2-13a] wrote " + SITES.toAbsolutePath());
+        System.out.println("[F2-13a] wrote " + COMPOSED.toAbsolutePath());
         pairs.forEach(p -> System.out.println("  " + p));
 
         assertThat(pairs)
@@ -148,14 +184,18 @@ class PermissionCatalogueUsageTest {
     }
 
     private static void collect(PreAuthorize pa, String cls, String member,
-                                Set<String> pairs, List<String> sites) {
+                                Set<String> pairs, List<String> sites, List<String> composed) {
         if (pa == null) {
             return;
         }
+        boolean andsARole = pa.value().contains("hasAnyRole") || pa.value().contains("hasRole");
         Matcher m = HAS_PERMISSION.matcher(pa.value());
         while (m.find()) {
             pairs.add(m.group(1) + ":" + m.group(2));
             sites.add(cls + "#" + member + " " + m.group(1) + ":" + m.group(2));
+            if (andsARole) {
+                composed.add(cls + "#" + member + " " + m.group(1) + ":" + m.group(2));
+            }
         }
     }
 }

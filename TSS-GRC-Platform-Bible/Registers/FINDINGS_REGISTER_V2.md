@@ -837,6 +837,58 @@ Start-Service TssGrcBackend
 
 ---
 
+## F2-43 · Scheduled reporting was unreachable — `REPORTING:WRITE` was held by zero of 57 roles
+
+| Field | Content |
+|---|---|
+| **ID** | F2-43 |
+| **Category** | Authorisation / dead grant / unreachable feature — the **F2-23 class** |
+| **Severity** | **P2 Medium** — a whole shipped feature was inaccessible to every persona, but fail-closed: no data was exposed and no wrong answer was produced |
+| **Provenance** | Found 2026-07-26 by **F2-13a**, the first run of `Appendix/scripts/grant_tightness.py`, which joins the compiled `@PreAuthorize` set to `iam.role_permissions`. Not findable from either side alone — the guard looks ordinary and the catalogue row exists |
+| **Current State** | `REPORTING:WRITE` guarded `ReportScheduleController#create`, `#update` and `#runNow` — the entire write surface of scheduled reporting — and **0 of 57 roles held it**. The guards are permission-only, with no ORed `hasAnyRole` leg to fall through to, so every request 403'd except `PLATFORM_ADMIN`'s, which passes on `ModulePermissionEvaluator`'s hardcoded code bypass rather than on any grant. Meanwhile **18 roles held `REPORTING:READ`** and could list schedules they could never create, and `ORG_ADMIN` held `REPORTING:DELETE` — able to delete a schedule it could neither create nor list |
+| **Problem** | `ReportSchedulerService` ticks every minute, regenerates a PDF/XLSX via `ExportService` and emails it — the platform's only unattended reporting path, and the answer to "can this send the board its pack automatically". A tenant could see the schedule list, see the empty state, and have no way to add a row. The failure mode is silence: 403 is not logged as an error, and whoever tested the feature almost certainly tested as `admin`, for whom it worked |
+| **Root Cause** | The permission was catalogued and the guards written; the grant rows were never authored. Identical to **F2-23** (`ADMIN:APPROVE` guarding 59 committee methods while absent from the catalogue) and **F2-27** (`AI:EXPORT` absent while 41 roles held `AI:READ`) — **the sixth instance of one shape: the mechanism was correct and its data or precondition never existed.** What made this one invisible for longer is that `PLATFORM_ADMIN`'s bypass is indistinguishable from a working grant |
+| **Business Impact** | Unattended regulatory and board reporting is a buying reason, not a nicety — SAMA/NCA reporting cadence is exactly what a scheduled export is for. A demo run as `admin` shows the feature working; the first customer administrator to try it cannot create a schedule and gets no explanation |
+| **Technical Impact** | Repaired by **V321**: `REPORTING:WRITE` + `REPORTING:READ` to `ORG_ADMIN` (already trusted with `REPORTING:DELETE`) and `GRC_ADMINISTRATOR` (the tenant's GRC operations admin, which held no `REPORTING` permission at all). Deliberately **not** granted to the 18 `REPORTING:READ` holders: creating a schedule mails a whole register to an arbitrary address on a cron, so create is an administrative act. Deliberately **not** granted `REPORTING:EXPORT` — F2-27 made that a live file-download right and widening exfiltration is not part of unblocking a feature |
+| **UX Impact** | Before: the create form 403'd with a bare "Access Denied". After: two admin personas can schedule, and the read-only 18 still cannot — which is the correct shape, not a compromise |
+| **Recommendation** | 1. **V321** as shipped. 2. Keep `grant_tightness.py` in the release checklist — this class is undetectable by inspection and trivial to re-introduce, because adding a `hasPermission` guard needs no corresponding grant to compile, boot, or pass tests. 3. When a permission-only guard is added, the same commit should either grant it or state why nobody holds it |
+| **Alternatives** | (a) Grant to all 18 `REPORTING:READ` holders — rejected: read access to a register is not authority to email it on a schedule. (b) Change the guards to `REPORTING:READ` — rejected: it would make scheduling available to `VIEWER` and `REGULATOR_VIEWER`, which is the F2-27 defect in reverse. (c) Leave it platform-admin-only — rejected: a tenant that cannot administer its own scheduled reports does not own the feature |
+| **Trade-offs** | Two roles is deliberately tight, and some tenants will want `COMPLIANCE_OFFICER` scheduling reports. That is a role-editor change, not a code change — the reversible direction. The opposite mistake (granting broadly now) is the one F2-13b exists to undo |
+| **Effort** | **XS** — one idempotent migration, four grant rows |
+| **Priority** | **Done.** Cheap, and it closed the only section-A2 instance the report found |
+| **Verification** | V321 applied twice to dev via pyodbc, second pass delta 0 (`REPORTING:WRITE` holders 0→2, `READ` 18→20, `role_permissions` 1435→1439). Live 13/13 through the running stack: `viewer` GET 200 / POST 403 / PUT 403 / run-now 403 (holds `READ`+`EXPORT`, never `WRITE`); `compliance` GET 200 / POST **201** / PUT 200 / run-now 200 with a `SUCCESS` `ReportRun`; `compliance` DELETE still **403** (`REPORTING:DELETE` not granted). `organisationId` stamped 1 from `TenantContext`, not from the body. Test rows removed with `CHARINDEX`. Re-running the report shows section A2 = 0 |
+| **Status** | ✅ **CLOSED 2026-07-26** — V321 + `grant_tightness.py`. Exposed **F2-44** on the way through |
+| **References** | `V321__reporting_write_grant.sql`, `module/reporting/controller/ReportScheduleController.java:38,43,54`, `ReportSchedulerService`, `Appendix/scripts/grant_tightness.py` §A2, `Appendix/GRANT_TIGHTNESS.md`, `PermissionCatalogueUsageTest`. Same class as **F2-23**, **F2-27** |
+| **Lesson** | The plan's own illustration of this class was "`ADMIN:WRITE` is in 0 roles". Measurement says `ADMIN:WRITE` is held by **3** — the plan's example had already been fixed, and the real instance was a permission the plan never named. **A finding's illustrative example decays like any other measurement**; re-measure before quoting it. And the reason this needed a script rather than a careful reading: the two facts live in a Java annotation and a SQL table that no build step, test, or code review ever compares |
+
+---
+
+## F2-44 · The reporting service accepted Arabic names and threw them away
+
+| Field | Content |
+|---|---|
+| **ID** | F2-44 |
+| **Category** | Bilingual invariant / silent field drop — the **F2-30 class**, on the write path |
+| **Severity** | **P3 Low** — one entity, and the surface was unreachable until the same day it was found |
+| **Provenance** | Found 2026-07-26 by the **F2-43** live probe, at probe 8 of 13. The probe asserted the Arabic name round-tripped because CLAUDE.md's bilingual rule says it must; it came back missing. Not visible in any code review of the diff, because the omission is in a file the diff did not touch |
+| **Current State** | `ReportScheduleService.apply()` copies caller-settable fields one by one. `nameAr` and `descriptionAr` — the two columns V20 added to `reporting.report_schedules` — were **not in the list**. The endpoint accepted them, Jackson bound them, the entity mapped them, and the service dropped both without an error. `POST` returned **201** with the Arabic name silently absent |
+| **Problem** | Arabic is the platform's primary language for a Saudi tenant. A bilingual administrator names a scheduled report in Arabic, gets a 201, and the Arabic name is gone — with no message, no validation error, and a row that looks saved. 8 of the 11 seeded schedules *do* carry Arabic names, because the seed script writes the table directly; the API never could |
+| **Root Cause** | A hand-written field-by-field copy loop, added before V20 introduced the Arabic columns and never revisited. The class of defect is structural: every such loop silently omits whatever is added to the entity afterwards. **It survived because the endpoints were unreachable** — no role held `REPORTING:WRITE`, so in the platform's entire history not one create had ever completed. F2-43 and F2-44 are one causal chain: the dead grant hid the dropped field |
+| **Business Impact** | Small in isolation, but it is the platform's core bilingual promise failing on a write path, and it fails in the most expensive way — invisibly, on a record the user believes they saved |
+| **Technical Impact** | Two lines in `apply()`. `ReportScheduleBilingualTest` (3 tests) pins create, update, and — the case a naive fix breaks — that an **omitted** Arabic field is left alone rather than blanked, so an English-only rename cannot wipe an existing Arabic name |
+| **UX Impact** | An Arabic-named schedule now persists and renders. No visible change for English-only tenants |
+| **Recommendation** | 1. Fixed as shipped. 2. **F2-30 tranche 2 should sweep hand-written copy loops, not only entity annotations** — `@NotBlank` on `nameAr` would have turned this silent drop into a 400 only if the field reached the entity, which it never did. A `*_ar` column that no service copies is invisible to a validation-based ratchet. 3. Candidate sweep: services with an `apply(entity, entity)` shape and a bilingual entity |
+| **Alternatives** | (a) Replace the copy loop with a bean-mapper — rejected here: the explicit loop is what keeps `id`, `organisationId`, `externalId`, the audit stamps and the `lastRun*` outcome fields server-owned on an endpoint that binds the entity straight from the request body (F2-22's shape). A mapper would have to re-express all of that as exclusions. (b) Add `@NotBlank nameAr` — deferred: 4 of 11 existing rows are blank, so it would make them uneditable; the F2-30 data-blocked rule applies |
+| **Trade-offs** | Keeping the explicit loop keeps this defect possible for the next column added. The test is the mitigation, and it is cheaper than the alternative's exclusion list |
+| **Effort** | **XS** — two lines, three tests |
+| **Priority** | **Done** — found and fixed inside the same slice |
+| **Verification** | Live: probe 8 failed (`nameAr` absent) before the fix, passed after a recompile and DevTools restart, 13/13. `ReportScheduleBilingualTest` 3/3. Full suite **2,538/0/0**. Measured: `reporting.report_schedules` 11 rows, 4 with blank `name_ar` |
+| **Status** | ✅ **CLOSED 2026-07-26** |
+| **References** | `module/reporting/service/ReportScheduleService.java` `apply()`, `ReportScheduleBilingualTest`, `ReportSchedule` entity (V20 added `name_ar`/`description_ar`). Same invariant as **F2-30**; exposed by **F2-43** |
+| **Lesson** | **Unblocking a feature is where its untested code paths surface.** The slice's scope was a report and a grant migration; the moment a request could actually complete, the first thing behind the guard was broken. Two corollaries: a live probe that asserts the *house rules* rather than only the *change* is what caught it — the bilingual assertion had nothing to do with authorisation — and a defect can stay invisible not because it is subtle but because the code path was closed |
+
+---
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.
