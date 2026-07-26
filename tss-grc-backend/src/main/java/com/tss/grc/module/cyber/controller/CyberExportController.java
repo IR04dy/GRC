@@ -39,7 +39,7 @@ public class CyberExportController {
     private final CyberExportService exportService;
 
     @GetMapping
-    @PreAuthorize("hasPermission('CYBER', 'READ')")
+    @PreAuthorize("hasPermission('CYBER', 'EXPORT')")
     @Operation(summary = "Export a cyber register (controls | vulnerabilities | assessments | incidents | "
             + "action-plans | evidence) as an Excel workbook or an Arabic-capable executive PDF. lang=ar renders Arabic titles.")
     public ResponseEntity<byte[]> export(@RequestParam String register,

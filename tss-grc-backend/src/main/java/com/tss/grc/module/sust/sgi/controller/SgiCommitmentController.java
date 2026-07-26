@@ -112,7 +112,7 @@ public class SgiCommitmentController {
 
     /** SGI-E — the whole SGI register as a branded XLSX (via the shared tabular engine). */
     @GetMapping("/export.xlsx")
-    @PreAuthorize("hasPermission('SUST','READ')")
+    @PreAuthorize("hasPermission('SUST','EXPORT')")
     public org.springframework.http.ResponseEntity<byte[]> exportXlsx(
             @RequestParam(defaultValue = "en") String lang) {
         byte[] bytes = tabularExport.xlsx(service.exportPayload(lang));

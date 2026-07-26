@@ -43,6 +43,12 @@ import java.util.List;
 public class ClimateReportController {
 
     private static final String READ_GUARD  = "hasPermission('SUST','READ')";
+    /**
+     * F2-27 — a separate constant for the two file-returning handlers, because READ_GUARD
+     * still guards this controller's JSON reads. Access-preserving: all 33 roles holding
+     * SUST:READ also hold SUST:EXPORT (measured — zero gap).
+     */
+    private static final String EXPORT_GUARD = "hasPermission('SUST','EXPORT')";
     private static final String WRITE_GUARD = "hasPermission('SUST','WRITE')";
 
     private final TcfdReportService service;
@@ -88,7 +94,7 @@ public class ClimateReportController {
     public ClimateReport publish(@PathVariable Long id) { return reportService.publish(id); }
 
     @GetMapping("/{id}/export.pdf")
-    @PreAuthorize(READ_GUARD)
+    @PreAuthorize(EXPORT_GUARD)
     @Operation(summary = "Export the locked snapshot as an Arabic-capable PDF (OpenPDF).")
     public ResponseEntity<byte[]> exportPdf(@PathVariable Long id,
                                             @RequestParam(defaultValue = "en") String lang) {
@@ -101,7 +107,7 @@ public class ClimateReportController {
     }
 
     @GetMapping("/{id}/export.xlsx")
-    @PreAuthorize(READ_GUARD)
+    @PreAuthorize(EXPORT_GUARD)
     @Operation(summary = "Export the locked snapshot as an Excel workbook (POI).")
     public ResponseEntity<byte[]> exportXlsx(@PathVariable Long id) {
         ClimateReport r = reportService.get(id);

@@ -39,9 +39,15 @@ public class BcmEvidencePackageController {
     @GetMapping("/{cycleId}/evidence-package")
     // The evidence ZIP is the most sensitive export on the platform (full BIA / risk /
     // strategy / gap / CAPA / compliance-matrix / audit-log dump for the cycle). Gate it
-    // with the same BCM read permission as every other BCM export (BcpPlan/CrisisEvent),
+    // with the same BCM permission as every other BCM export (BcpPlan/CrisisEvent),
     // not a bare isAuthenticated() — otherwise any authenticated user in any role can pull it.
-    @PreAuthorize("hasPermission('BCM','READ')")
+    //
+    // F2-27: that permission is now BCM:EXPORT, not BCM:READ. This endpoint is the clearest
+    // illustration of the finding — its author reasoned explicitly about sensitivity, called
+    // it the most sensitive export on the platform, and still reached for READ, because at
+    // the time EXPORT enforced nothing anywhere in the codebase and so did not read as a real
+    // option. Access-preserving: all 17 roles holding BCM:READ also hold BCM:EXPORT.
+    @PreAuthorize("hasPermission('BCM','EXPORT')")
     public ResponseEntity<ByteArrayResource> download(@PathVariable Long cycleId) {
         EvidencePackage pkg = service.generate(cycleId, currentPrincipalName());
         ByteArrayResource body = new ByteArrayResource(pkg.bytes());

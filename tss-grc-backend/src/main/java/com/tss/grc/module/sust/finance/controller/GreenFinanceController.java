@@ -39,6 +39,13 @@ import java.util.List;
 public class GreenFinanceController {
 
     private static final String READ_GUARD    = "hasPermission('SUST','READ')";
+    /**
+     * F2-27 — a separate constant for the three file-returning handlers (the two per-report
+     * exports and the evidence-package ZIP), because READ_GUARD still guards this
+     * controller's JSON reads. Access-preserving: all 33 roles holding SUST:READ also hold
+     * SUST:EXPORT (measured — zero gap).
+     */
+    private static final String EXPORT_GUARD  = "hasPermission('SUST','EXPORT')";
     private static final String WRITE_GUARD   = "hasPermission('SUST','WRITE')";
     private static final String APPROVE_GUARD = "hasPermission('SUST','APPROVE')";
 
@@ -130,7 +137,7 @@ public class GreenFinanceController {
 
     /** V295 — standalone per-report exports via the shared tabular engine. */
     @GetMapping("/reports/{id}/export.xlsx")
-    @PreAuthorize(READ_GUARD)
+    @PreAuthorize(EXPORT_GUARD)
     public org.springframework.http.ResponseEntity<byte[]> reportXlsx(
             @PathVariable Long id,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "en") String lang) {
@@ -140,7 +147,7 @@ public class GreenFinanceController {
     }
 
     @GetMapping("/reports/{id}/export.docx")
-    @PreAuthorize(READ_GUARD)
+    @PreAuthorize(EXPORT_GUARD)
     public org.springframework.http.ResponseEntity<byte[]> reportDocx(
             @PathVariable Long id,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "en") String lang) {
@@ -164,7 +171,7 @@ public class GreenFinanceController {
     // ── evidence package (G2, §6.7) ─────────────────────────────────────
 
     @GetMapping("/evidence-package.zip")
-    @PreAuthorize(READ_GUARD)
+    @PreAuthorize(EXPORT_GUARD)
     public org.springframework.http.ResponseEntity<byte[]> evidencePackage() {
         var auth = org.springframework.security.core.context.SecurityContextHolder
             .getContext().getAuthentication();

@@ -90,7 +90,7 @@ public class CrisisEventController {
      * Includes the SitReps timeline, decisions log, and regulator notifications.
      */
     @GetMapping("/{id}/export.pdf")
-    @PreAuthorize("hasPermission('BCM', 'READ')")
+    @PreAuthorize("hasPermission('BCM', 'EXPORT')")
     public ResponseEntity<byte[]> exportPdf(@PathVariable Long id,
                                             @RequestParam(defaultValue = "en") String lang) {
         CrisisEvent e = service.get(id);

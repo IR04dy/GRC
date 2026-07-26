@@ -55,7 +55,7 @@ public class CalendarController {
      * browser download saves a sensibly-named .ics file too.
      */
     @GetMapping(value = "/events.ics", produces = "text/calendar; charset=UTF-8")
-    @PreAuthorize("hasPermission('PLATFORM','READ')")
+    @PreAuthorize("hasPermission('PLATFORM','EXPORT')")
     public ResponseEntity<byte[]> exportIcs(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate to,

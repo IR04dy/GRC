@@ -44,6 +44,22 @@ public class MlModelController {
             "hasAnyRole('RISK_MANAGER','CISO','MODEL_OWNER','DPO','AUDITOR','PLATFORM_ADMIN')";
     private static final String WRITE_GUARD =
             "hasAnyRole('RISK_MANAGER','MODEL_OWNER','CISO','PLATFORM_ADMIN')";
+    /**
+     * F2-27 — extracting the model inventory as a file needs the catalogued AI:EXPORT
+     * permission, AND-ed in front of the role list rather than replacing it, so this
+     * narrows and never widens. Two measured details behind the exact expression:
+     * <ul>
+     *   <li>{@code MODEL_OWNER} is dropped — it appears in {@code READ_GUARD} but is not a
+     *       defined role in {@code iam.roles}, so it never matched anything.</li>
+     *   <li>{@code AUDITOR} is kept, and V320 grants it {@code AI:EXPORT} explicitly: it
+     *       holds no {@code AI:READ}, so the set-derived grant would have missed it and this
+     *       AND would have 403'd a role this endpoint has always allowed.</li>
+     * </ul>
+     * V320 catalogues AI:EXPORT (it did not exist) and grants it to the 41 AI:READ roles.
+     */
+    private static final String EXPORT_GUARD =
+            "hasPermission('AI','EXPORT') and "
+            + "hasAnyRole('RISK_MANAGER','CISO','DPO','AUDITOR','PLATFORM_ADMIN')";
 
     private final MlModelService service;
     private final AiRegistryExportService exportService;
@@ -56,7 +72,7 @@ public class MlModelController {
     }
 
     @GetMapping("/export")
-    @PreAuthorize(READ_GUARD)
+    @PreAuthorize(EXPORT_GUARD)
     @Operation(summary = "Regulator-ready AI registry pack (XLSX or PDF): posture summary + per-model attributes. "
             + "Optional filters (stage/tier/domain/euHighRisk/gap) export only the matching subset — e.g. gap=AIA for a remediation list.")
     public ResponseEntity<byte[]> export(@RequestParam(defaultValue = "XLSX") String format,

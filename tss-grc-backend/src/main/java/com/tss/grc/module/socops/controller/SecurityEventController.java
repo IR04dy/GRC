@@ -48,9 +48,19 @@ public class SecurityEventController {
         return svc.list(PageRequest.of(page, Math.min(size, 200)));
     }
 
-    /** CY-F — export the security-event register as Excel or Arabic-capable PDF. */
+    /**
+     * CY-F — export the security-event register as Excel or Arabic-capable PDF.
+     *
+     * <p>F2-27: CYBER:EXPORT is AND-ed in front of the role list. The {@code socops} module
+     * has NO permissions of its own in {@code iam.permissions} — it is guarded entirely by
+     * role names — so the SOC register could not be restricted through the catalogue at all.
+     * CYBER:EXPORT is the right module (socops is the SOC arm of cyber) and all four roles
+     * listed here already hold it, so this AND costs nobody access while making the export
+     * administrable. Converting the residual role check to a permission is F2-05's scope.
+     */
     @GetMapping("/export")
-    @PreAuthorize("hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
+    @PreAuthorize("hasPermission('CYBER','EXPORT') and "
+        + "hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
     public ResponseEntity<byte[]> export(@RequestParam(defaultValue = "XLSX") String format) {
         byte[] body = exportSvc.exportSecurityEvents(format);
         boolean pdf = "PDF".equalsIgnoreCase(format);

@@ -63,3 +63,23 @@ export function hasAnyRole(...roles: string[]): boolean {
   const wanted = roles.map(strip);
   return user.roles.some(r => wanted.includes(strip(r)));
 }
+
+/**
+ * F2-27 — may the current user extract this module's data as a file?
+ *
+ * Every file-returning endpoint on the backend now requires
+ * `hasPermission('MODULE','EXPORT')` (it used to accept `MODULE:READ`, so viewing one
+ * record on screen conferred the right to download the whole register). The login payload
+ * already carries permissions as bare authorities alongside roles — `CHANGE_EXPORT`,
+ * `RISK_EXPORT`, … — so this is a lookup, not a round-trip.
+ *
+ * `PLATFORM_ADMIN` is honoured because `ModulePermissionEvaluator` bypasses in code for it;
+ * hiding a control the server would allow is the same defect in the other direction.
+ *
+ * Use it to hide an export control rather than let the user click into a 403. Only worth
+ * doing where the grant actually differs from READ — most modules grant READ and EXPORT to
+ * identical role sets, so gating those is cosmetic.
+ */
+export function canExport(module: string): boolean {
+  return hasAnyRole('PLATFORM_ADMIN', `${module.toUpperCase()}_EXPORT`);
+}

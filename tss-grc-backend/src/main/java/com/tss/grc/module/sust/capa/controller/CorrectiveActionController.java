@@ -75,7 +75,7 @@ public class CorrectiveActionController {
      * off the Content-Disposition header.
      */
     @GetMapping("/export.xlsx")
-    @PreAuthorize("hasPermission('SUST','READ')")
+    @PreAuthorize("hasPermission('SUST','EXPORT')")
     public ResponseEntity<byte[]> exportXlsx(@RequestParam(defaultValue = "en") String lang) {
         byte[] bytes = tabularExport.xlsx(service.exportPayload(lang));
         String filename = ExportNaming.build("Sustainability", "CorrectiveActions", lang, "xlsx");

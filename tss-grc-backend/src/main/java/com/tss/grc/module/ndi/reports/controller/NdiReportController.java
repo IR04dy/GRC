@@ -25,6 +25,13 @@ public class NdiReportController {
     private static final String READ  = "hasPermission('NDI','READ')";
     private static final String WRITE = "hasPermission('NDI','WRITE')";
     private static final String APPROVE = "hasPermission('NDI','APPROVE') or hasRole('PLATFORM_ADMIN')";
+    /**
+     * F2-27 — running a report and streaming it as a file is an extraction, not a view.
+     * A separate constant rather than a lift of {@link #READ}, because READ still guards the
+     * JSON list/detail endpoints in this controller. Access-preserving: every role holding
+     * NDI:READ also holds NDI:EXPORT (32 of 58, measured — zero gap).
+     */
+    private static final String EXPORT = "hasPermission('NDI','EXPORT')";
 
     private final NdiReportService service;
     private final NdiReportExporter exporter;
@@ -72,7 +79,7 @@ public class NdiReportController {
 
     /** Run a saved report and stream the result as the requested binary format. */
     @GetMapping("/{id}/export")
-    @PreAuthorize(READ)
+    @PreAuthorize(EXPORT)
     public ResponseEntity<byte[]> export(@PathVariable Long id,
                                          @RequestParam(defaultValue = "XLSX") String format,
                                          @RequestParam(defaultValue = "en") String lang,
@@ -83,7 +90,7 @@ public class NdiReportController {
 
     /** One-shot ad-hoc export — no saved definition required. */
     @GetMapping("/export-adhoc")
-    @PreAuthorize(READ)
+    @PreAuthorize(EXPORT)
     public ResponseEntity<byte[]> exportAdHoc(@RequestParam String type,
                                               @RequestParam(defaultValue = "XLSX") String format,
                                               @RequestParam(defaultValue = "en") String lang,

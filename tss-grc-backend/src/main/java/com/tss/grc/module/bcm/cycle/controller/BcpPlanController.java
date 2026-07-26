@@ -80,7 +80,7 @@ public class BcpPlanController {
      * browser saves "BCP-2026-000001.pdf" rather than "export".
      */
     @GetMapping("/{id}/export.pdf")
-    @PreAuthorize("hasPermission('BCM', 'READ')")
+    @PreAuthorize("hasPermission('BCM', 'EXPORT')")
     public ResponseEntity<byte[]> exportPdf(@PathVariable Long id,
                                             @RequestParam(defaultValue = "en") String lang) {
         BcpPlan p = service.get(id);

@@ -83,8 +83,15 @@ public class BcpBinderController {
      * {@code download_count} and audits the access (auditors need this for
      * the offline-distribution log).
      */
+    // F2-27: BCM:EXPORT AND-ed in front of the role list — the binder is a full BCP
+    // extract, and a raw role-name check bypasses the permission catalogue entirely, so
+    // BCM:EXPORT could never restrict it. AND narrows and never widens. 'BOARD_MEMBER' is
+    // dropped: it is not a defined role in iam.roles, so it never matched. V320 grants
+    // BCM:EXPORT to CISO and CFO, which this list allows but the catalogue did not — without
+    // that grant the AND would have denied two roles the endpoint has always permitted.
     @GetMapping("/binders/{exportId}/download")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR','BOARD_MEMBER','CFO')")
+    @PreAuthorize("hasPermission('BCM','EXPORT') and "
+        + "hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR','CFO')")
     public ResponseEntity<byte[]> download(@PathVariable Long exportId) {
         DownloadResult r = service.download(exportId);
         return ResponseEntity.ok()

@@ -31,7 +31,7 @@ import {
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
-import { isAuthenticated, getUser } from '../../lib/auth';
+import { isAuthenticated, getUser, canExport } from '../../lib/auth';
 import { CHANGE_REQUESTS, CHANGE_ANALYTICS } from './mockChanges';
 import { CHANGE_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
@@ -249,12 +249,17 @@ export function ChangesPage() {
               onClick={() => window.dispatchEvent(new CustomEvent('grc:open-palette'))}>
               {t('actionFilter')}
             </Button>
-            <ExportMenu
-              demoMode={demoMode} t={t} toast={toast}
-              onPdf={() => reportingApi.changeRegisterPdf(lang)}
-              onDocx={() => reportingApi.changeRegisterDocx(lang)}
-              onXlsx={() => reportingApi.changeRegisterXlsx()}
-            />
+{/* F2-27: the change register is the ONE export whose grants differ from READ —
+                CHANGE:EXPORT is withheld from VIEWER, which CHANGE:READ is not. Hide the
+                menu rather than let a read-only user click into a 403. */}
+            {canExport('CHANGE') && (
+              <ExportMenu
+                demoMode={demoMode} t={t} toast={toast}
+                onPdf={() => reportingApi.changeRegisterPdf(lang)}
+                onDocx={() => reportingApi.changeRegisterDocx(lang)}
+                onXlsx={() => reportingApi.changeRegisterXlsx()}
+              />
+            )}
             {/* DD-76: route new change requests through Services Center so the
                 risk-assessment fields (DD-70) get filled and a CAB gate is computed. */}
             <Button variant="primary" Icon={Plus} onClick={() => navigate('/intake/change_request')}>{t('changeNew')}</Button>
@@ -590,10 +595,13 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
             {change.status === 'IMPLEMENTING' && (
               <Button variant="ghost" Icon={Wrench} onClick={() => onTransition(change, 'ROLLED_BACK')}>{t('changeRollback')}</Button>
             )}
-            <Button variant="secondary" Icon={FileDown} onClick={async () => {
-              try { await reportingApi.cabPackPdf(change!.id, lang); }
-              catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Export failed'); }
-            }}>{t('changeCabPack')}</Button>
+{/* F2-27: same gate as the register menu — the CAB pack is a CHANGE:EXPORT artefact. */}
+            {canExport('CHANGE') && (
+              <Button variant="secondary" Icon={FileDown} onClick={async () => {
+                try { await reportingApi.cabPackPdf(change!.id, lang); }
+                catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Export failed'); }
+              }}>{t('changeCabPack')}</Button>
+            )}
           </div>
         </Card>
 
