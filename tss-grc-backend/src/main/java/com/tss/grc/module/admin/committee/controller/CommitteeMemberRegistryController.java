@@ -1,8 +1,10 @@
 package com.tss.grc.module.admin.committee.controller;
 
+import com.tss.grc.module.admin.committee.dto.MemberTermRequest;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberSkill;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
 import com.tss.grc.module.admin.committee.service.CommitteeMemberRegistryService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -38,10 +40,25 @@ public class CommitteeMemberRegistryController {
         return service.independenceStats(committeeId);
     }
 
+    /**
+     * Appoint a member to a committee's roster.
+     *
+     * <p><b>F2-25.</b> Binds {@link MemberTermRequest}, not the JPA entity. The entity's
+     * {@code nullable = false} columns used to be the only statement of what a caller had
+     * to supply, enforced at the database rather than at the boundary — so a body missing
+     * {@code appointedAt} or {@code termStartsAt} (neither of which has a default) died as
+     * a {@code DataIntegrityViolation} and surfaced as a **500**. An authorised secretary
+     * could not appoint a member and the API could not say which field was wrong.
+     *
+     * <p>Guarded by {@code ADMIN:WRITE} — the **secretariat** right, held by 3 roles. This
+     * is deliberately *not* {@code ADMIN:APPROVE} (the vote capability, 15 roles): if one
+     * grant did both, any voter could appoint themselves to a roster and manufacture a
+     * quorum. See ADR-014.
+     */
     @PostMapping("/terms")
     @PreAuthorize("hasPermission('ADMIN','WRITE')")
-    public CommitteeMemberTerm appoint(@RequestBody CommitteeMemberTerm in) {
-        return service.appoint(in);
+    public CommitteeMemberTerm appoint(@Valid @RequestBody MemberTermRequest req) {
+        return service.appoint(req);
     }
 
     @PostMapping("/terms/{id}/end")

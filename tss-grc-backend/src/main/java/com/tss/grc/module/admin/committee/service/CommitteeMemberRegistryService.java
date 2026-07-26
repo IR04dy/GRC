@@ -1,10 +1,12 @@
 package com.tss.grc.module.admin.committee.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.admin.committee.dto.MemberTermRequest;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberSkill;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
 import com.tss.grc.module.admin.committee.repository.CommitteeMemberSkillRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
@@ -43,6 +45,7 @@ import java.util.Map;
 public class CommitteeMemberRegistryService {
 
     private final CommitteeMemberTermRepository  terms;
+    private final CommitteeRepository            committees;
     private final CommitteeMemberSkillRepository skills;
     private final AuditLogService                audit;
     private final ApplicationEventPublisher      publisher;
@@ -67,14 +70,40 @@ public class CommitteeMemberRegistryService {
             .orElseThrow(() -> new EntityNotFoundException("CommitteeMemberTerm " + id));
     }
 
-    /** Appoint a member. Creates a new term row with {@code renewalStatus=ACTIVE}. */
+    /**
+     * Appoint a member. Creates a new term row with {@code renewalStatus=ACTIVE}.
+     *
+     * <p><b>F2-25.</b> Takes a validated {@link MemberTermRequest} rather than the JPA
+     * entity, so the mandatory fields are stated at the boundary instead of being discovered
+     * as a {@code DataIntegrityViolation} → 500. The tenant and {@code id} handling below is
+     * unchanged and was already correct; it is kept (belt and braces) because the DTO now
+     * makes those fields unreachable from the request anyway.
+     */
     @Transactional
-    public CommitteeMemberTerm appoint(CommitteeMemberTerm in) {
-        // Mass-assignment defense — controller accepts the entity directly
-        // via @RequestBody. Null id forces save() into INSERT instead of
-        // merge() which could overwrite a cross-tenant row.
-        in.setId(null);
+    public CommitteeMemberTerm appoint(MemberTermRequest req) {
         Long org = TenantContext.getCurrentTenant();
+
+        // F2-25: the committee must exist in THIS tenant. Previously any committeeId was
+        // accepted blind, so a typo produced an orphan roster row that silently counted
+        // toward nothing — and a foreign id produced a row pointing across tenants.
+        CommitteeMemberTerm in = new CommitteeMemberTerm();
+        in.setCommitteeId(requireCommitteeInTenant(req.committeeId(), org));
+        in.setMemberName(req.memberName().trim());
+        in.setMemberUserId(req.memberUserId());
+        in.setRole(req.role().trim());
+        if (req.isVotingMember() != null) in.setIsVotingMember(req.isVotingMember());
+        if (req.isIndependent()  != null) in.setIsIndependent(req.isIndependent());
+        in.setIndependenceBasisEn(req.independenceBasisEn());
+        in.setAppointedAt(req.appointedAt());
+        in.setAppointedByReso(req.appointedByReso());
+        in.setTermStartsAt(req.termStartsAt());
+        in.setTermEndsAt(req.termEndsAt());
+        if (req.termNumber() != null) in.setTermNumber(req.termNumber());
+
+        // Retained from the pre-DTO implementation: null id forces save() into INSERT
+        // instead of merge(), and the tenant is stamped server-side, never taken from the
+        // caller. A review-council live probe confirmed this defence works.
+        in.setId(null);
         in.setOrganisationId(org);
         in.setCreatedAt(LocalDateTime.now());
         if (in.getRenewalStatus() == null) in.setRenewalStatus("ACTIVE");
@@ -245,5 +274,21 @@ public class CommitteeMemberRegistryService {
         m.put("isIndependent", t.getIsIndependent() != null && t.getIsIndependent() == 1 ? "true" : "false");
         m.putAll(extra);
         return m;
+    }
+
+    /**
+     * F2-25: resolve a committee id within the caller's tenant, or reject with a message
+     * that names the problem. Returns the id so callers can use it inline.
+     *
+     * <p>400 rather than 404 deliberately: the id arrived in a request body as a reference,
+     * not as the addressed resource, and a 404 here would let a caller probe which committee
+     * ids exist in other tenants by distinguishing "not found" from "not yours". Both cases
+     * return the same 400.
+     */
+    private Long requireCommitteeInTenant(Long committeeId, Long org) {
+        if (committees.findByIdAndOrganisationId(committeeId, org).isEmpty())
+            throw new IllegalArgumentException(
+                "Committee " + committeeId + " does not exist in this organisation.");
+        return committeeId;
     }
 }
