@@ -17,11 +17,17 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -161,6 +167,119 @@ class MassAssignmentRatchetTest {
             .contains("\"id\":42");
         assertThat(json).as("createdBy must still be readable — it is audit evidence")
             .contains("\"createdBy\":7");
+    }
+
+    /**
+     * F2-22b's work list: for each entity-bound endpoint, which <em>authority-bearing</em> fields
+     * are still settable from the body now that {@link BaseEntity}'s nine are not.
+     *
+     * <p>F2-22a closed the fields every entity shares. What remains is per-entity and is where the
+     * four hand-found bypasses actually lived: {@code organisationId} (cross-tenant write),
+     * {@code status} (state-machine bypass — reach an approved state without the approval
+     * endpoint's guard), {@code approvedBy}/{@code signedBy}/{@code verifiedBy} (forged authority,
+     * DF-3 and DF-4 exactly), and {@code vote*}/{@code quorum*} (forged governance outcome, F2-28's
+     * class). Ranking 214 endpoints by hand is how the first four were found — one at a time, over
+     * months — so this emits the ranking instead.
+     *
+     * <p>Written to {@code target/mass-assignment-risk.txt}, highest-risk first. It asserts only
+     * that the profile is non-empty: the count that must not grow is
+     * {@link #noNewEntityBoundWriteEndpoints()}, and which endpoints get DTOs first is a judgement
+     * this file informs rather than makes.
+     */
+    @Test
+    void riskProfileIsRecordedForF2_22b() throws Exception {
+        List<Ranked> ranked = rankEntityBoundWrites();
+        Path out = Path.of("target", "mass-assignment-risk.txt");
+        Files.createDirectories(out.getParent());
+        List<String> lines = new ArrayList<>();
+        for (Ranked r : ranked) {
+            lines.add(String.format("%-6s %-64s %s", r.tier, r.site, String.join(",", r.fields)));
+        }
+        Files.write(out, lines);
+
+        Map<String, Long> byTier = new TreeMap<>();
+        for (Ranked r : ranked) {
+            byTier.merge(r.tier, 1L, Long::sum);
+        }
+        System.out.println("[F2-22b risk profile] endpoints by tier = " + byTier);
+        System.out.println("[F2-22b risk profile] wrote " + out.toAbsolutePath());
+        ranked.stream().filter(r -> !"LOW".equals(r.tier)).limit(60)
+              .forEach(r -> System.out.println("  " + r.tier + " " + r.site + " -> " + r.fields));
+
+        assertThat(ranked)
+            .as("The risk profile is empty, which means the scan broke — not that 214 "
+                + "entity-bound endpoints expose nothing.")
+            .isNotEmpty();
+    }
+
+    /** Field names that decide tenancy, state or authority — never a caller's to set. */
+    private static final List<String> TENANT = List.of("organisationId");
+    private static final List<String> AUTHORITY = List.of(
+        "approvedBy", "approvedAt", "approverId", "rejectedBy", "decidedBy", "decidedAt",
+        "signedBy", "signedAt", "verifiedBy", "verifiedAt", "reviewedBy", "recordedBy",
+        "recordedByUserId", "recordedByName", "onBehalf", "closedBy", "publishedBy",
+        "authorisedBy", "authorizedBy", "certifiedBy", "attestedBy", "escalatedBy");
+    private static final List<String> OUTCOME = List.of(
+        "voteFor", "voteAgainst", "voteAbstain", "votesFor", "votesAgainst", "votesAbstain",
+        "quorumMet", "quorumSource", "tallySource", "outcome", "verdict", "residualScore",
+        "riskScore", "complianceScore", "maturityLevel");
+    private static final List<String> STATE = List.of(
+        "status", "state", "workflowStatus", "approvalStatus", "lifecycleStatus", "isApproved",
+        "isActive", "isLocked", "isPublished", "isVerified", "isSigned", "isClosed");
+
+    /** One endpoint plus the risky fields its body type still exposes. */
+    record Ranked(String tier, String site, List<String> fields) { }
+
+    static List<Ranked> rankEntityBoundWrites() {
+        var scanner = new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new AnnotationTypeFilter(RestController.class));
+        List<Ranked> out = new ArrayList<>();
+        for (var bd : scanner.findCandidateComponents("com.tss.grc")) {
+            Class<?> c;
+            try {
+                c = Class.forName(bd.getBeanClassName());
+            } catch (Throwable t) {
+                continue;
+            }
+            for (Method m : c.getDeclaredMethods()) {
+                if (!isWriteMapping(m)) {
+                    continue;
+                }
+                for (Parameter param : m.getParameters()) {
+                    if (!hasRequestBody(param) || !param.getType().isAnnotationPresent(Entity.class)) {
+                        continue;
+                    }
+                    Class<?> type = param.getType();
+                    List<String> hits = new ArrayList<>();
+                    boolean tenant = false, authority = false, outcome = false, state = false;
+                    for (Class<?> k = type; k != null && k != Object.class; k = k.getSuperclass()) {
+                        // BaseEntity's fields are READ_ONLY platform-wide (F2-22a) — skip them so
+                        // the ranking shows only what is still bindable.
+                        if (k == BaseEntity.class) {
+                            break;
+                        }
+                        for (Field f : k.getDeclaredFields()) {
+                            String n = f.getName();
+                            if (TENANT.contains(n)) { hits.add(n); tenant = true; }
+                            else if (AUTHORITY.contains(n)) { hits.add(n); authority = true; }
+                            else if (OUTCOME.contains(n)) { hits.add(n); outcome = true; }
+                            else if (STATE.contains(n)) { hits.add(n); state = true; }
+                        }
+                    }
+                    String tier = tenant && (authority || outcome) ? "CRIT"
+                                : (authority || outcome) ? "HIGH"
+                                : tenant ? "TENANT"
+                                : state ? "STATE" : "LOW";
+                    Collections.sort(hits);
+                    out.add(new Ranked(tier, c.getSimpleName() + "#" + m.getName()
+                                             + "(" + type.getSimpleName() + ")", hits));
+                }
+            }
+        }
+        List<String> order = List.of("CRIT", "HIGH", "TENANT", "STATE", "LOW");
+        out.sort(Comparator.<Ranked, Integer>comparing(r -> order.indexOf(r.tier))
+                          .thenComparing(Ranked::site));
+        return out;
     }
 
     /** Concrete stand-in for "any entity", so the round-trip exercises BaseEntity itself. */

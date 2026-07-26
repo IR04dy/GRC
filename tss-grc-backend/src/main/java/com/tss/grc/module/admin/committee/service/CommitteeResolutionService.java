@@ -147,6 +147,32 @@ public class CommitteeResolutionService {
 
         Long org = TenantContext.getCurrentTenant();
 
+        // ── F2-40: a recorded tally is not a starting point for counted votes ───
+        // recomputeTally() below rewrites vote_for/against/abstain from the vote rows, so the
+        // first vote cast on a resolution whose tally was asserted from the minutes would
+        // replace it — 5/0/0 APPROVED becomes 1/0/0, or 0/0/0 DEFERRED on a RECUSED vote. There
+        // is no correct arithmetic that merges the two: the asserted figures count members who
+        // have no vote row and never will. Refuse instead of converting, the same stance V319
+        // took on an asserted quorum. All 20 pre-V322 resolutions sit behind this guard.
+        // The test is "would this vote overwrite something a person recorded", not the label
+        // alone: an unlabelled row with a zero tally has nothing to lose and stays votable, which
+        // is also how a resolution created empty behaves before its first vote.
+        String tallySrc = r.getTallySource();
+        boolean asserted = "ASSERTED".equals(tallySrc) || "ASSERTED_LEGACY".equals(tallySrc);
+        boolean unlabelledButRecorded = tallySrc == null
+            && (zero(r.getVoteFor()) + zero(r.getVoteAgainst()) + zero(r.getVoteAbstain())) > 0;
+        if (asserted || unlabelledButRecorded)
+            throw new IllegalStateException(
+                "Resolution " + r.getResolutionCode() + " carries a tally that was "
+              + ("ASSERTED".equals(tallySrc)
+                    ? "recorded from the minutes by "
+                      + (r.getTallyRecordedByName() == null
+                            ? "user#" + r.getTallyRecordedByUserId() : r.getTallyRecordedByName())
+                    : "recorded before vote provenance existed")
+              + " (" + r.getVoteFor() + "/" + r.getVoteAgainst() + "/" + r.getVoteAbstain()
+              + " · " + r.getOutcome() + "), so counting a vote here would overwrite it. "
+              + "To decide a motion by in-platform voting, create the resolution with no tally.");
+
         // ── the committee's active roster is the only source of eligible voters ──
         List<CommitteeMemberTerm> roster = r.getCommitteeId() == null
             ? List.of()
@@ -260,7 +286,13 @@ public class CommitteeResolutionService {
     }
 
     /** Re-derive vote_for/against/abstain (RECUSED excluded) + outcome from the
-     *  per-member votes and persist onto the resolution. */
+     *  per-member votes and persist onto the resolution.
+     *
+     *  <p>F2-40 — this method <b>overwrites</b> the tally, and with zero vote rows that means
+     *  {@code 0/0/0 -> DEFERRED}. Before V322 it could therefore rewrite a recorded 5/0/0
+     *  APPROVED board decision to 1/0/0 on the first vote cast, or to 0/0/0 DEFERRED on a
+     *  RECUSED one, silently. {@link #recordVote} now refuses to reach here on an asserted
+     *  resolution; the stamp below is what makes a computed tally identifiable as such. */
     private void recomputeTally(CommitteeResolution r) {
         List<CommitteeResolutionVote> vs = voteRepo.findByResolutionId(r.getId());
         int forC = (int) vs.stream().filter(x -> "FOR".equals(x.getVote())).count();
@@ -278,8 +310,14 @@ public class CommitteeResolutionService {
         else if (forC > 0 || agC > 0) outcome = "REJECTED";
         else                          outcome = "DEFERRED";
         r.setOutcome(outcome);
+        r.setTallySource("COMPUTED");
+        r.setTallyRecordedByUserId(null);   // the vote rows carry their own attribution
+        r.setTallyRecordedByName(null);
+        r.setTallyStampedAt(LocalDateTime.now());
         repo.save(r);
     }
+
+    private static int zero(Integer i) { return i == null ? 0 : i; }
 
     @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
     public List<CommitteeResolution> listByMeeting(Long meetingId) {
@@ -303,8 +341,18 @@ public class CommitteeResolutionService {
         }
     }
 
+    /**
+     * F2-40 — a tally supplied at creation is <b>asserted</b>, and is now recorded as such.
+     *
+     * <p>The secretariat form on {@code CommitteesPage} posts {@code voteFor}/{@code voteAgainst}/
+     * {@code voteAbstain}/{@code outcome} straight from the minutes, which is the normal path for a
+     * committee that votes in the room. That stays legal. What changes is that the row says so:
+     * {@code ASSERTED} with the authenticated recorder stamped on it, versus {@code COMPUTED} for a
+     * resolution created empty and decided through {@link #recordVote}. Provenance is taken from
+     * {@code Authentication}, never from the body — the DF-3 rule.
+     */
     @Transactional
-    public CommitteeResolution create(CommitteeResolution in) {
+    public CommitteeResolution create(CommitteeResolution in, VoteActor actor) {
         // Mass-assignment defense — see CommitteeActionItemService.create()
         // for the full attack path. Force id=null so save() persists a new
         // row instead of merge()-ing into a potentially cross-tenant row.
@@ -312,11 +360,32 @@ public class CommitteeResolutionService {
         Long org = TenantContext.getCurrentTenant();
         in.setOrganisationId(org);
         in.setCreatedAt(LocalDateTime.now());
+
+        int assertedVotes = zero(in.getVoteFor()) + zero(in.getVoteAgainst()) + zero(in.getVoteAbstain());
+        in.setTallyRecordedByUserId(null);
+        in.setTallyRecordedByName(null);
+        if (assertedVotes > 0) {
+            in.setTallySource("ASSERTED");
+            if (actor != null) {
+                in.setTallyRecordedByUserId(actor.userId());
+                in.setTallyRecordedByName(norm(actor.username()).isEmpty() ? null : actor.username());
+            }
+        } else {
+            // No numbers asserted, so the tally is whatever the votes say — including nothing yet.
+            in.setTallySource("COMPUTED");
+        }
+        in.setTallyStampedAt(LocalDateTime.now());
+
         CommitteeResolution saved = repo.save(in);
 
         audit.log("RESOLUTION_CREATE", "CommitteeResolution", saved.getId(),
             saved.getResolutionCode() + " · " + saved.getOutcome()
-                + " (" + saved.getVoteFor() + "/" + saved.getVoteAgainst() + "/" + saved.getVoteAbstain() + ")");
+                + " (" + saved.getVoteFor() + "/" + saved.getVoteAgainst() + "/" + saved.getVoteAbstain() + ")"
+                + " tally=" + saved.getTallySource()
+                + ("ASSERTED".equals(saved.getTallySource())
+                    ? " recorded by " + (saved.getTallyRecordedByName() == null
+                        ? "user#" + saved.getTallyRecordedByUserId() : saved.getTallyRecordedByName())
+                    : ""));
 
         // F8 — broadcast resolution outcomes so downstream automation can
         // act (regulator notification, board notification, risk-register

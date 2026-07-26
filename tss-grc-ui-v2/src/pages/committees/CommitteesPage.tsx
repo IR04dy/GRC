@@ -972,6 +972,24 @@ export function CommitteesPage() {
                             <td><Badge tone={OUTCOME_TONE[r.outcome]}>{r.outcome}</Badge></td>
                             <td className="mono">{r.voteFor} / {r.voteAgainst} / {r.voteAbstain}
                               {totalVotes > 0 && <span style={{ color:'var(--ink-3)' }}> ({totalVotes})</span>}
+                              {/* F2-40 — a tally recorded from the minutes and one counted from
+                                  per-member votes are both legitimate and must not look alike. */}
+                              {r.tallySource && r.tallySource !== 'COMPUTED' && (
+                                <span title={r.tallySource === 'ASSERTED'
+                                  ? (isAr
+                                      ? `مُدرَج من المحضر بواسطة ${r.tallyRecordedByName ?? '—'}`
+                                      : `Recorded from the minutes by ${r.tallyRecordedByName ?? 'an unnamed user'}`)
+                                  : (isAr
+                                      ? 'مُدرَج قبل تتبّع مصدر التصويت — لا يمكن التحقق من مصدره'
+                                      : 'Recorded before vote provenance existed — source cannot be verified')}
+                                  style={{ marginInlineStart: 6 }}>
+                                  <Badge tone={r.tallySource === 'ASSERTED' ? 'info' : 'warning'}>
+                                    {r.tallySource === 'ASSERTED'
+                                      ? (isAr ? 'من المحضر' : 'from minutes')
+                                      : (isAr ? 'قديم' : 'legacy')}
+                                  </Badge>
+                                </span>
+                              )}
                             </td>
                             <td className="mono">{r.effectiveFrom ?? '—'}</td>
                             <td className="mono">{r.reviewRequiredBy ?? '—'}</td>

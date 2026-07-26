@@ -567,6 +567,16 @@ export interface Resolution {
   dissentNotesEn: string | null;
   dissentNotesAr: string | null;
   createdAt: string;
+  /**
+   * F2-40 — where the tally came from. `COMPUTED` from per-member vote rows, `ASSERTED`
+   * recorded from the minutes by `tallyRecordedByName`, `ASSERTED_LEGACY` present before V322
+   * with no recoverable provenance. Server-assigned: the four fields are READ_ONLY on the
+   * entity, so posting them does nothing.
+   */
+  tallySource: 'COMPUTED' | 'ASSERTED' | 'ASSERTED_LEGACY' | null;
+  tallyRecordedByUserId: number | null;
+  tallyRecordedByName: string | null;
+  tallyStampedAt: string | null;
 }
 
 export interface ActionItemRecord {

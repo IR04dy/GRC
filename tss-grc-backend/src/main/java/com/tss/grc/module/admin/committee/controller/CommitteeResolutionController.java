@@ -49,11 +49,21 @@ public class CommitteeResolutionController {
         return service.listByCommittee(committeeId);
     }
 
+    /**
+     * Create a resolution.
+     *
+     * <p>F2-40 — a tally posted here is a tally read off the minutes, so the row is stamped
+     * {@code ASSERTED} with the authenticated recorder. Post it with no tally and it is
+     * {@code COMPUTED}, open to in-platform voting via {@link #recordVote}. The provenance comes
+     * from {@code Authentication}; the four {@code tally*} fields are {@code READ_ONLY} on the
+     * entity so a caller cannot supply their own.
+     */
     @PostMapping
     @PreAuthorize("hasPermission('ADMIN','WRITE')")
     // F2-30: @Valid so the new @NotBlank on titleAr/bodyAr reports as a field-naming 400.
-    public CommitteeResolution create(@Valid @RequestBody CommitteeResolution in) {
-        return service.create(in);
+    public CommitteeResolution create(@Valid @RequestBody CommitteeResolution in, Authentication auth) {
+        return service.create(in, new CommitteeResolutionService.VoteActor(
+            userIdOf(auth), usernameOf(auth), mayRecordOnBehalf(auth)));
     }
 
     // ── CH-14: per-member voting + recusal/COI ───────────────────────────────

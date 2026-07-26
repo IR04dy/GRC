@@ -1,5 +1,6 @@
 package com.tss.grc.module.admin.committee.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.persistence.*;
 import lombok.*;
@@ -112,4 +113,44 @@ public class CommitteeResolution {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    // ── F2-40 / V322 — where this tally came from ────────────────────────────
+
+    /**
+     * <b>{@code COMPUTED}</b> — derived by {@code recomputeTally()} from
+     * {@code committee_resolution_vote} rows. <b>{@code ASSERTED}</b> — recorded by a named user
+     * from minutes of a vote taken outside the platform, which is what the secretariat form on
+     * {@code CommitteesPage} does and a legitimate flow for a board that votes on paper.
+     * <b>{@code ASSERTED_LEGACY}</b> — present before V322, provenance unknown: all 20 rows that
+     * existed then, every one APPROVED with a scalar tally and not one vote row.
+     *
+     * <p>Labelling rather than refusing is the whole correction here. The obvious fix — "the
+     * tally is caller-authored, so ignore the caller's tally" — would have silently discarded the
+     * recorded decision the UI exists to capture. What was actually missing is the ability to
+     * tell an asserted tally from a computed one, which is also what stops
+     * {@code recomputeTally()} overwriting a recorded board decision with {@code 0/0/0 DEFERRED}.
+     */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @Column(name = "tally_source", length = 20)
+    private String tallySource;
+
+    /**
+     * Who asserted it. Server-assigned from the authenticated principal and
+     * {@code READ_ONLY} for the same reason DF-3 made the voter server-assigned: a provenance
+     * field a caller can set records nothing. {@code NULL} on {@code COMPUTED} rows (the votes
+     * carry their own attribution) and on the {@code ASSERTED_LEGACY} rows, where there is no
+     * attribution to record and inventing one would be worse than the gap.
+     */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @Column(name = "tally_recorded_by_user_id")
+    private Long tallyRecordedByUserId;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @Column(name = "tally_recorded_by_name", length = 255)
+    private String tallyRecordedByName;
+
+    /** When the source was last established — asserted at create, or recomputed from votes. */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @Column(name = "tally_stamped_at")
+    private LocalDateTime tallyStampedAt;
 }
