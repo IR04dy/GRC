@@ -183,6 +183,122 @@ class TenantWriteGuardInterceptorTest {
         }
     }
 
+    // ── F2-22b: the INSERT leg ────────────────────────────────────────────
+    //
+    // Until 2026-07-26 this class had exactly one @Override, onFlushDirty, so the guard fired only
+    // on a change to an existing row's organisationId. A create was never examined. That matters
+    // more than the update case it did cover: organisationId is bindable on 148 of the platform's
+    // 214 entity-bound write endpoints (it is declared per-entity, so F2-22a's BaseEntity fix does
+    // not reach it), and a create endpoint that forgets its
+    // setOrganisationId(TenantContext.getCurrentTenant()) stamp inserts straight into whichever
+    // org the request body names. Meanwhile application-prod.yml turns this bean ON and describes
+    // it as the backstop "so a single missed per-service guard cannot silently write across
+    // tenants" — which was true for updates and false for inserts.
+    //
+    // decideInsert() cannot reuse the update rule: an insert has no previous state, so "unchanged"
+    // is meaningless. The invariant is that a new row belongs to the request's tenant.
+
+    private static final String[] ORG_ONLY = new String[] { "organisationId" };
+
+    @Test
+    void blocksAnInsertIntoAnotherTenantWithoutOptIn() {
+        TenantContext.setCurrentTenant(1L);
+
+        assertThatThrownBy(() ->
+            guard.decideInsert(new FakeEntity(), null, new Object[] { 2L }, ORG_ONLY))
+            .isInstanceOf(SecurityException.class)
+            .hasMessageContaining("Cross-tenant insert blocked")
+            .hasMessageContaining("org 2")
+            .hasMessageContaining("org 1")
+            // the message has to tell whoever reads the log which of the two causes it is
+            .hasMessageContaining("missing its setOrganisationId")
+            .hasMessageContaining("allowCrossTenantWrite");
+    }
+
+    @Test
+    void allowsAnInsertIntoTheRequestsOwnTenant() {
+        TenantContext.setCurrentTenant(1L);
+
+        assertThatCode(() ->
+            guard.decideInsert(new FakeEntity(), null, new Object[] { 1L }, ORG_ONLY))
+            .doesNotThrowAnyException();
+    }
+
+    /**
+     * The licence-grant path. {@code LicensingService.upsert} is the only endpoint on the platform
+     * that requires {@code organisationId} in the request body, so it runs inside the scope; if
+     * this did not pass, enabling the insert leg would break module licensing and W2-0's backfill.
+     */
+    @Test
+    void allowsACrossTenantInsertInsideTheOptInScope() {
+        TenantContext.setCurrentTenant(1L);
+
+        try (var scope = TenantContext.allowCrossTenantWrite()) {
+            assertThatCode(() ->
+                guard.decideInsert(new FakeEntity(), null, new Object[] { 2L }, ORG_ONLY))
+                .doesNotThrowAnyException();
+        }
+
+        // ...and the scope closes, so the next insert is judged again.
+        assertThatThrownBy(() ->
+            guard.decideInsert(new FakeEntity(), null, new Object[] { 2L }, ORG_ONLY))
+            .isInstanceOf(SecurityException.class);
+    }
+
+    /**
+     * Off-request there is no tenant to compare against — schedulers and sweeps run with
+     * {@code TenantContext} unset (a documented landmine). Throwing there would break every sweep
+     * the moment the flag is switched on, and would do it in production only.
+     */
+    @Test
+    void allowsAnInsertWhenNoTenantIsOnTheThread() {
+        assertThat(TenantContext.getCurrentTenant()).isNull();
+
+        assertThatCode(() ->
+            guard.decideInsert(new FakeEntity(), null, new Object[] { 7L }, ORG_ONLY))
+            .doesNotThrowAnyException();
+    }
+
+    /**
+     * A null tenant on the row is not a cross-tenant write. It is a NOT NULL violation about to
+     * happen, and the database reports that far more usefully than a SecurityException would —
+     * it is also the shape a service produces when it stamps the tenant after building the entity.
+     */
+    @Test
+    void allowsAnInsertWithNoTenantOnTheRowAndLetsTheColumnComplain() {
+        TenantContext.setCurrentTenant(1L);
+
+        assertThatCode(() ->
+            guard.decideInsert(new FakeEntity(), null, new Object[] { null }, ORG_ONLY))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void ignoresAnInsertOfAnEntityWithNoTenantColumn() {
+        TenantContext.setCurrentTenant(1L);
+
+        assertThatCode(() ->
+            guard.decideInsert(new FakeEntity(), null,
+                new Object[] { "ISO 27001", "A.5.1" },
+                new String[] { "frameworkName", "clause" }))
+            .as("platform-shared catalogues have no tenant column and are out of scope")
+            .doesNotThrowAnyException();
+    }
+
+    /**
+     * The interceptor inspects; it must never rewrite the state array Hibernate is about to
+     * persist. {@code onSave} returning true tells Hibernate the state was modified, which would
+     * make this bean a silent mutator of every insert on the platform.
+     */
+    @Test
+    void theInsertLegNeverReportsHavingModifiedTheState() {
+        TenantContext.setCurrentTenant(1L);
+        Object[] state = new Object[] { 1L };
+
+        assertThat(guard.decideInsert(new FakeEntity(), null, state, ORG_ONLY)).isFalse();
+        assertThat(state[0]).as("and the array is untouched").isEqualTo(1L);
+    }
+
     // ── Helper ────────────────────────────────────────────────────────────
 
     /** Placeholder so {@code entity.getClass().getSimpleName()} returns

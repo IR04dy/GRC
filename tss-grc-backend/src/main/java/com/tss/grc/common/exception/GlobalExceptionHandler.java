@@ -211,6 +211,32 @@ public class GlobalExceptionHandler {
         return pd;
     }
 
+    /**
+     * A tenant-isolation block from {@code TenantWriteGuardInterceptor} — <b>403, not 500</b>.
+     *
+     * <p>F2-22b. The interceptor throws {@link SecurityException} when a write would cross tenants
+     * without an explicit {@code TenantContext.allowCrossTenantWrite()} opt-in, and nothing handled
+     * it: the platform's most serious runtime security control surfaced as an "unexpected error".
+     * Its own javadoc claimed "response is 403". That mattered twice over — a caller could not tell
+     * a refusal from a bug, and neither could whoever watched the 500 rate, so a real attempt would
+     * have looked exactly like a defect.
+     *
+     * <p>The detail deliberately does <b>not</b> echo {@code ex.getMessage()}. That message names
+     * the entity and both organisation ids to make the server log actionable; returning it would
+     * confirm to a prober which tenant ids exist. The audit ledger already carries the full text
+     * under {@code SECURITY_BLOCK}, and the log line below carries it for operators.
+     */
+    @ExceptionHandler(SecurityException.class)
+    public ProblemDetail handleTenantIsolation(SecurityException ex) {
+        log.warn("Tenant isolation block: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN,
+            "This operation would write data belonging to another organisation and was refused.");
+        pd.setTitle("Cross-Tenant Write Refused");
+        pd.setType(URI.create("https://grc.tss.com/errors/cross-tenant-write"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
     /** Catch-all for IllegalStateException not caught by a more specific handler. */
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException ex) {

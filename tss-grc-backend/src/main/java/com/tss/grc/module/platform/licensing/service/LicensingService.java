@@ -81,10 +81,37 @@ public class LicensingService {
         return repo.findByOrganisationIdOrderByModuleCodeAsc(TenantContext.getCurrentTenant());
     }
 
-    /** Admin: upsert a license row. */
+    /**
+     * Admin: upsert a license row.
+     *
+     * <p><b>F2-22b — the platform's one legitimate body-supplied tenant.</b> Granting a module
+     * licence is inherently cross-tenant: a platform operator names the organisation being
+     * licensed, so {@code organisationId} must come from the request and this is the only endpoint
+     * on the platform that requires it (measured across all 214 entity-bound writes). Everything
+     * else stamps the tenant from {@code TenantContext}.
+     *
+     * <p>Which is why the whole body runs inside {@link TenantContext#allowCrossTenantWrite()}:
+     * {@code TenantWriteGuardInterceptor} gained an INSERT leg and it is ON in production and now
+     * in dev, so a licence inserted for any org other than the caller's own is a cross-tenant
+     * insert and must declare itself. Mutation-proven: with this scope removed, granting org 2 a
+     * module it does not hold returns <b>403 cross-tenant-write</b>.
+     *
+     * <p>⚠ To be exact about what the scope does and does not rescue: the HTTP endpoint is
+     * <em>already</em> single-tenant, because {@code LicensingController.upsert} overwrites the
+     * body's {@code organisationId} with {@code TenantContext} before calling this. So today's API
+     * traffic never needed the scope. It is here for the service as an API — W2-0's licence
+     * backfill grants across orgs 2/3 — and the controller's stamp is itself a limitation on that
+     * backfill, recorded as <b>F2-45</b>.
+     */
     @CacheEvict(value = "licenses", key = "#body.organisationId")
     @Transactional
     public OrganisationLicense upsert(OrganisationLicense body) {
+        try (var crossTenant = TenantContext.allowCrossTenantWrite()) {
+            return upsertInternal(body);
+        }
+    }
+
+    private OrganisationLicense upsertInternal(OrganisationLicense body) {
         if (body.getOrganisationId() == null)
             throw new IllegalArgumentException("organisationId is required");
         if (body.getModuleCode() == null || body.getModuleCode().isBlank())

@@ -49,6 +49,12 @@ public class LicensingController {
     @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     public ResponseEntity<OrganisationLicense> upsert(@RequestBody OrganisationLicense body) {
         // Force the current tenant onto the body — keeps cross-tenant writes from sneaking through.
+        //
+        // F2-22b: this line, not the service, is why the HTTP licence endpoint is single-tenant. It
+        // means a PLATFORM_ADMIN can only license the org they are currently switched into, so
+        // W2-0's "grant-all-then-tighten" backfill across orgs 2/3 cannot run through this endpoint
+        // as it stands — recorded as F2-45 rather than changed here, because widening it is a
+        // product decision about who may license whom.
         body.setOrganisationId(TenantContext.getCurrentTenant());
         return ResponseEntity.ok(service.upsert(body));
     }

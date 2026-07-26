@@ -78,6 +78,22 @@ grc:
   security:
     max-failed-login-attempts: 99
     lockout-duration-minutes: 1
+    # F2-22b — run the cross-tenant write backstop in DEV too.
+    #
+    # The interceptor defaults OFF and only application-prod.yml turned it on, so for its whole
+    # life it ran exclusively where nobody could observe it. That is how it kept a hole for so
+    # long: it implemented onFlushDirty and not onSave, meaning it examined UPDATES and ignored
+    # INSERTS — the half that matters most, since organisationId is bindable on 148 of the 214
+    # entity-bound write endpoints and a create endpoint that forgets its tenant stamp writes
+    # into whatever org the request body names.
+    #
+    # A security control that runs only in production is tested only by customers. On here, a
+    # missing setOrganisationId(TenantContext.getCurrentTenant()) fails on the developer's own
+    # machine, in the request that introduced it, with a message naming both organisations.
+    # Legitimate cross-tenant paths opt in via TenantContext.allowCrossTenantWrite() — the
+    # licence grant, the org switcher, the tenant-walking sweeps.
+    tenant-write-guard:
+      enabled: true
 
   # CY-D — make the SLA escalation clock actually tick. The scheduler defaults to
   # enabled=false (see VulnerabilitySlaScheduler) and NO profile turned it on, so
