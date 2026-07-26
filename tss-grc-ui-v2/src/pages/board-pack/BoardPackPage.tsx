@@ -38,6 +38,41 @@ export function BoardPackPage() {
 
   return (
     <Shell title={t('boardPackTitle')} sub={t('boardPackSub')}>
+      {/*
+        F2-42 — this page's figures are SAMPLE DATA, and until it is consolidated it must say
+        so on screen and in print.
+
+        The platform has two board packs. The real one is server-side: BoardPackService and
+        BoardPackPptxService read live repositories (organisation, risk, findings, KRI
+        definitions + measurements, changes, ethics cases, AML alerts) and are exported by
+        GET /api/v1/reporting/board-pack.pdf and .pptx — both verified returning real bytes,
+        and both already linked from the dashboard. This page renders a different thing:
+        buildBoardPack() in lib/boardPack.ts assembles its payload from eight hardcoded
+        arrays (SAUDI_APPETITES, APPROVAL_REQUESTS, CCM_CHECKS, ASSETS, CHAIN_RULES,
+        ALL_WORKFLOWS, AUDIT_ENGAGEMENTS, BREACHES). So the screen and the PDF disagree, and
+        the PDF is the correct one.
+
+        The fix is a consolidation decision, not a rewire — reconstructing on the client what
+        the server already computes would duplicate the logic and the two would drift. Until
+        that decision lands (F2-42), the honest interim measure is a banner: a board pack that
+        is unlabelled sample data is the actual defect, and labelling it costs nothing. It is
+        deliberately NOT hidden from print, because a printed pack is exactly the artefact
+        that gets quoted in a meeting.
+      */}
+      <div style={{
+        display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 16,
+        padding: '10px 14px', borderRadius: 'var(--r-sm)',
+        background: 'var(--warning-bg)', color: 'var(--warning-fg)',
+        border: '1px solid var(--warning-fg)', font: '600 12.5px var(--font-sans)',
+      }}>
+        <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>
+          {lang === 'ar'
+            ? 'بيانات نموذجية — الأرقام في هذه الصفحة توضيحية وليست بيانات مؤسستك. للحصول على حزمة المجلس الفعلية، نزّلها بصيغة PDF أو PowerPoint من لوحة المعلومات.'
+            : 'Sample data — the figures on this page are illustrative and are not your organisation’s. For the real board pack, download the PDF or PowerPoint from the dashboard.'}
+        </span>
+      </div>
+
       {/* Action bar — hidden during print */}
       <div className="bp-actions" style={{
         display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16,
