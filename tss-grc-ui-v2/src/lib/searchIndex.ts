@@ -1,30 +1,44 @@
 // Aggregated cross-entity search index for the Cmd/Ctrl+K command palette.
-// Pulls from every mock dataset so the palette can find risks, findings,
-// controls, policies, evidence, authorities, vendors, DPIAs, KRIs,
-// engagements, incidents, and the module landing pages themselves.
+//
+// W2-1a (F2-02) — this file used to import EIGHT mock datasets (mockRisks,
+// mockCompliance, mockEvidence, mockTprm, mockPrivacy, mockCyber, mockIncidents,
+// mockChanges) and index them, so the palette confidently returned risks, findings,
+// controls, vendors, DPIAs, incidents and changes that DO NOT EXIST in the tenant —
+// with refs and hrefs that looked real and led to 404s or to another tenant's ids.
+// A search box that invents records is worse than one that finds nothing, because the
+// user cannot tell the difference.
+//
+// Entity items are now populated ONLY from the live API, by hydrateSearchIndex().
+// Until that resolves the palette indexes pages and the static regulator catalogue and
+// nothing else — an honest empty result rather than a fabricated one. CH-9 established
+// this pattern for policies; this generalises it to every kind.
+//
+// AUTHORITIES is deliberately kept: lib/authorities.ts is the static catalogue of real
+// Saudi regulators (NCA, SAMA, SDAIA, CMA…) and their frameworks. It is reference data
+// that ships with the product, not fabricated tenant data.
 import type { LucideIcon } from 'lucide-react';
 import {
   AlertTriangle, ClipboardCheck, BookCopy, FileCheck2, Truck,
-  Fingerprint, Activity, Briefcase, Landmark, Flame, AlertOctagon,
+  Fingerprint, Activity, Landmark, AlertOctagon,
   LockKeyhole, RefreshCw, Workflow, ShieldAlert, Files, GitBranch,
   Stamp, LayoutDashboard, Calendar, Bell, ListChecks,
 } from 'lucide-react';
 
-import { MOCK_RISKS, KRIS } from '../pages/risk/mockRisks';
-import {
-  COMPLIANCE_CONTROLS, COMPLIANCE_FINDINGS, POLICIES, AUDIT_ENGAGEMENTS,
-} from '../pages/compliance/mockCompliance';
-import { EVIDENCE } from '../pages/evidence/mockEvidence';
 import { AUTHORITIES } from './authorities';
-import { VENDORS } from '../pages/tprm/mockTprm';
-import { DPIAS } from '../pages/privacy/mockPrivacy';
-import { INCIDENTS as CYBER_INCIDENTS_MOCK } from '../pages/cyber/mockCyber';
-import { INCIDENTS } from '../pages/incidents/mockIncidents';
-import { CHANGE_REQUESTS } from '../pages/changes/mockChanges';
+import {
+  riskApi, complianceApi, dpiaApi, tprmApi, incidentApi, changeApi,
+} from './api';
+import { listEvidenceItems } from './evidenceItems';
+import { kriApi } from './kriEngine';
 
 export type EntityKind =
   | 'PAGE' | 'RISK' | 'FINDING' | 'CONTROL' | 'POLICY' | 'EVIDENCE'
   | 'AUTHORITY' | 'VENDOR' | 'DPIA' | 'KRI' | 'ENGAGEMENT' | 'INCIDENT' | 'CHANGE';
+// ENGAGEMENT is declared but never hydrated: audit engagements have no list endpoint in
+// lib/ (auditEngagement.ts only derives milestones/workflows from one already fetched), so
+// the honest state is zero indexed engagements rather than the mock set this file used to
+// carry. The kind and its `audit:` search prefix stay so wiring it later is a one-entry
+// change to the hydrate task list.
 
 export interface SearchItem {
   id: string;             // unique-per-kind id
@@ -64,204 +78,188 @@ const PAGE_ITEMS: SearchItem[] = [
   { id: 'page-licensing',  kind: 'PAGE', title: 'Module Licensing',    href: '/admin/licensing', Icon: ShieldAlert,     keywords: ['license', 'enabled modules', 'features', 'admin'] },
 ];
 
-// CH-9: policy search items are hydrated from the canonical policy API at
-// runtime (see hydratePolicySearch) so results link to a real /policies/:id.
-// Until that runs, the mock POLICIES set is used as a fallback.
-let LIVE_POLICY_ITEMS: SearchItem[] | null = null;
+// ── live entity items, per kind ──────────────────────────────────────────────
+// Populated by hydrateSearchIndex() from the real API. A kind absent from this map
+// contributes NOTHING to the index — the palette then finds no risks rather than
+// finding invented ones.
+type LiveItems = Partial<Record<EntityKind, SearchItem[]>>;
+let LIVE: LiveItems = {};
 
-function buildEntityItems(): SearchItem[] {
-  const items: SearchItem[] = [];
-
-  for (const r of MOCK_RISKS) {
-    items.push({
-      id: `risk-${r.id}`, kind: 'RISK',
-      title: r.titleEn,
-      subtitle: `${r.categoryNameEn ?? '—'} · owner ${r.ownerFullNameEn ?? '—'}`,
-      ref: r.riskCode,
-      href: `/risk/${r.id}`,
-      Icon: AlertTriangle,
-      keywords: [r.status, r.riskLevel ?? '', r.categoryNameEn ?? ''],
-    });
-  }
-
-  for (const f of COMPLIANCE_FINDINGS) {
-    items.push({
-      id: `finding-${f.id}`, kind: 'FINDING',
-      title: f.title,
-      subtitle: `${f.severity} · owner ${f.owner ?? '—'} · ${f.status}`,
-      ref: `AUD-F-${String(f.id).padStart(3, '0')}`,
-      href: `/findings/${f.id}`,
-      Icon: AlertTriangle,
-      keywords: [f.severity, f.status, f.capaStage ?? '', f.clauseRef ?? ''],
-    });
-  }
-
-  for (const c of COMPLIANCE_CONTROLS) {
-    items.push({
-      id: `control-${c.id}`, kind: 'CONTROL',
-      title: c.nameEn,
-      subtitle: `${c.framework} · ${c.status} · L${c.maturityLevel ?? 0}`,
-      ref: c.code,
-      href: `/controls/${c.id}`,
-      Icon: ClipboardCheck,
-      keywords: [c.framework, c.status, c.domain ?? '', c.owner ?? ''],
-    });
-  }
-
-  // CH-9: prefer canonical policies (real ids → working /policies/:id links);
-  // fall back to the mock set until hydratePolicySearch has run.
-  if (LIVE_POLICY_ITEMS) {
-    items.push(...LIVE_POLICY_ITEMS);
-  } else {
-    for (const p of POLICIES) {
-      items.push({
-        id: `policy-${p.id}`, kind: 'POLICY',
-        title: p.titleEn,
-        subtitle: `v${p.version} · ${p.status}${p.category ? ` · ${p.category}` : ''}`,
-        ref: p.code,
-        href: `/policies/${p.id}`,
-        Icon: BookCopy,
-        keywords: [p.status, p.category ?? '', p.code],
-      });
-    }
-  }
-
-  for (const e of EVIDENCE) {
-    items.push({
-      id: `evidence-${e.id}`, kind: 'EVIDENCE',
-      title: e.titleEn,
-      subtitle: `${(e.evidenceType ?? '').replace(/_/g, ' ')} · ${e.status} · ${e.frameworkCode ?? ''}`,
-      ref: e.evidenceCode,
-      href: `/evidence`,
-      Icon: FileCheck2,
-      keywords: [e.evidenceType ?? '', e.status ?? '', e.frameworkCode ?? '', e.controlCode ?? ''],
-    });
-  }
-
-  for (const a of AUTHORITIES) {
-    items.push({
-      id: `authority-${a.code}`, kind: 'AUTHORITY',
-      title: a.nameEn,
-      subtitle: `${a.taglineEn ?? ''} · ${a.jurisdiction}`,
-      ref: a.code,
-      href: `/authority/${a.code}`,
-      Icon: Landmark,
-      keywords: [a.code, a.nameAr, a.jurisdiction, ...a.domains, ...a.frameworkCodes],
-    });
-  }
-
-  for (const v of VENDORS) {
-    items.push({
-      id: `vendor-${v.id}`, kind: 'VENDOR',
-      title: v.vendorName,
-      subtitle: `${v.vendorType ?? '—'} · ${v.riskRating} · ${v.status}`,
-      href: `/vendors/${v.id}`,
-      Icon: Truck,
-      keywords: [v.riskRating, v.status, v.vendorType ?? '', v.country ?? ''],
-    });
-  }
-
-  for (const d of DPIAS) {
-    items.push({
-      id: `dpia-${d.id}`, kind: 'DPIA',
-      title: d.titleEn,
-      subtitle: `${d.triggerReason.replace(/_/g, ' ')} · ${d.status}${d.overallResidualRisk ? ` · residual ${d.overallResidualRisk}` : ''}`,
-      ref: `DPIA-${d.id}`,
-      href: `/dpias/${d.id}`,
-      Icon: Fingerprint,
-      keywords: [d.status, d.triggerReason, d.overallResidualRisk ?? ''],
-    });
-  }
-
-  for (const k of KRIS) {
-    items.push({
-      id: `kri-${k.id}`, kind: 'KRI',
-      title: k.nameEn,
-      subtitle: `${k.frequency} · owner ${k.owner ?? '—'} · ${k.unit ?? ''}`,
-      ref: k.code,
-      href: `/risk?tab=kri`,
-      Icon: Activity,
-      keywords: [k.code ?? '', k.framework ?? '', k.direction],
-    });
-  }
-
-  for (const eng of AUDIT_ENGAGEMENTS) {
-    items.push({
-      id: `engagement-${eng.id}`, kind: 'ENGAGEMENT',
-      title: eng.titleEn,
-      subtitle: `${eng.auditorFirm ?? '—'} · ${eng.framework ?? ''} · ${eng.status}`,
-      ref: eng.engagementCode,
-      href: `/audit-workspace/engagement/${eng.id}`,
-      Icon: Briefcase,
-      keywords: [eng.auditType, eng.framework ?? '', eng.status, eng.leadAuditor ?? ''],
-    });
-  }
-
-  for (const i of CYBER_INCIDENTS_MOCK) {
-    items.push({
-      id: `cyber-incident-${i.id}`, kind: 'INCIDENT',
-      title: i.titleEn,
-      subtitle: `${i.severity} · ${i.status}${i.affectedAssetName ? ` · ${i.affectedAssetName}` : ''}`,
-      ref: i.incidentNumber,
-      href: `/cyber?tab=incidents`,
-      Icon: Flame,
-      keywords: [i.severity ?? '', i.status ?? '', i.incidentType ?? ''],
-    });
-  }
-
-  for (const i of INCIDENTS) {
-    items.push({
-      id: `incident-${i.id}`, kind: 'INCIDENT',
-      title: i.title,
-      subtitle: `${i.severity} · ${i.category ?? '—'} · ${i.status}`,
-      href: `/incidents`,
-      Icon: AlertOctagon,
-      keywords: [i.severity, i.status, i.category ?? '', i.assignee ?? ''],
-    });
-  }
-
-  for (const ch of CHANGE_REQUESTS) {
-    items.push({
-      id: `change-${ch.id}`, kind: 'CHANGE',
-      title: ch.titleEn,
-      subtitle: `${ch.changeType} · ${ch.status}${ch.riskLevel ? ` · ${ch.riskLevel}` : ''}`,
-      ref: ch.changeCode,
-      href: `/changes`,
-      Icon: GitBranch,
-      keywords: [ch.changeType, ch.status, ch.riskLevel ?? '', ch.category ?? ''],
-    });
-  }
-
-  return items;
+/** The regulator catalogue is static product reference data, always indexable. */
+function authorityItems(): SearchItem[] {
+  return AUTHORITIES.map(a => ({
+    id: `authority-${a.code}`, kind: 'AUTHORITY' as const,
+    title: a.nameEn,
+    subtitle: `${a.taglineEn ?? ''} · ${a.jurisdiction}`,
+    ref: a.code,
+    href: `/authority/${a.code}`,
+    Icon: Landmark,
+    keywords: [a.code, a.nameAr, a.jurisdiction, ...a.domains, ...a.frameworkCodes],
+  }));
 }
 
 let CACHE: SearchItem[] | null = null;
 function getIndex(): SearchItem[] {
   if (CACHE) return CACHE;
-  CACHE = [...PAGE_ITEMS, ...buildEntityItems()];
+  const live: SearchItem[] = [];
+  for (const kind of Object.keys(LIVE) as EntityKind[]) {
+    live.push(...(LIVE[kind] ?? []));
+  }
+  CACHE = [...PAGE_ITEMS, ...authorityItems(), ...live];
   return CACHE;
 }
 
+/** What the index currently holds — the palette shows this instead of pretending. */
+export interface SearchIndexStatus {
+  /** true once hydrateSearchIndex() has completed at least one pass. */
+  hydrated: boolean;
+  /** Entity kinds that returned data. */
+  kinds: EntityKind[];
+  /** Live entity items indexed (excludes pages and the regulator catalogue). */
+  entityItems: number;
+  /** Kinds whose fetch failed — the palette can say so rather than imply "none exist". */
+  failed: EntityKind[];
+}
+
+let HYDRATED = false;
+let FAILED: EntityKind[] = [];
+
+export function searchIndexStatus(): SearchIndexStatus {
+  const kinds = (Object.keys(LIVE) as EntityKind[]).filter(k => (LIVE[k] ?? []).length > 0);
+  return {
+    hydrated: HYDRATED,
+    kinds,
+    entityItems: kinds.reduce((n, k) => n + (LIVE[k] ?? []).length, 0),
+    failed: [...FAILED],
+  };
+}
+
+/** Longest field wins as the title; keeps the mappers below readable. */
+function firstText(...vals: Array<string | null | undefined>): string {
+  return vals.find(v => v != null && String(v).trim() !== '') ?? '—';
+}
+
 /**
- * CH-9: replace the mock policy search items with canonical policies fetched
- * from the policy API, so the command palette and any search links resolve to
- * a real /policies/:id detail page. Invalidates the cache so the next search
- * rebuilds the index with live data. Safe to call repeatedly.
+ * Fetch every indexable kind from the live API and rebuild the index.
+ *
+ * Best-effort per kind: one module being unlicensed, empty or down must not blank the
+ * whole palette, so each fetch is settled independently and a failure is RECORDED in
+ * {@link searchIndexStatus} rather than silently treated as "no records". That
+ * distinction is the point of W2-1a — the previous implementation could not tell
+ * "nothing found" from "nothing loaded", because it always had mock rows to show.
+ *
+ * Page size is capped per kind: the palette is a jump-to, not a report. A tenant with
+ * 5,000 risks does not need all of them in memory to satisfy a prefix search, and the
+ * registers themselves are the place to browse exhaustively.
+ */
+export async function hydrateSearchIndex(): Promise<SearchIndexStatus> {
+  const CAP = 200;
+  const next: LiveItems = {};
+  const failed: EntityKind[] = [];
+
+  const tasks: Array<[EntityKind, () => Promise<SearchItem[]>]> = [
+    ['RISK', async () => (await riskApi.list(undefined, 0, CAP)).content.map(r => ({
+      id: `risk-${r.id}`, kind: 'RISK' as const,
+      title: firstText(r.titleEn, r.titleAr),
+      subtitle: `${r.categoryNameEn ?? '—'} · owner ${r.ownerFullNameEn ?? '—'}`,
+      ref: r.riskCode, href: `/risk/${r.id}`, Icon: AlertTriangle,
+      keywords: [r.status ?? '', r.riskLevel ?? '', r.categoryNameEn ?? ''],
+    }))],
+    ['FINDING', async () => (await complianceApi.findings(0, CAP)).content.map(f => ({
+      id: `finding-${f.id}`, kind: 'FINDING' as const,
+      title: firstText(f.title),
+      subtitle: `${f.severity ?? '—'} · owner ${f.owner ?? '—'} · ${f.status ?? '—'}`,
+      ref: `AUD-F-${String(f.id).padStart(3, '0')}`,
+      href: `/findings/${f.id}`, Icon: AlertTriangle,
+      keywords: [f.severity ?? '', f.status ?? '', f.capaStage ?? '', f.clauseRef ?? ''],
+    }))],
+    ['CONTROL', async () => (await complianceApi.controls(0, CAP)).content.map(c => ({
+      id: `control-${c.id}`, kind: 'CONTROL' as const,
+      title: firstText(c.nameEn, c.nameAr),
+      subtitle: `${c.framework} · ${c.status} · L${c.maturityLevel ?? 0}`,
+      ref: c.code, href: `/controls/${c.id}`, Icon: ClipboardCheck,
+      keywords: [c.framework, c.status, c.domain ?? '', c.owner ?? ''],
+    }))],
+    ['EVIDENCE', async () => (await listEvidenceItems({ size: CAP })).content.map(e => ({
+      id: `evidence-${e.id}`, kind: 'EVIDENCE' as const,
+      title: firstText(e.titleEn, e.titleAr),
+      subtitle: `${(e.evidenceType ?? '').replace(/_/g, ' ')} · ${e.status ?? ''}`,
+      ref: e.evidenceCode, href: `/evidence`, Icon: FileCheck2,
+      keywords: [e.evidenceType ?? '', e.status ?? ''],
+    }))],
+    ['VENDOR', async () => (await tprmApi.vendors(0, CAP)).content.map(v => ({
+      id: `vendor-${v.id}`, kind: 'VENDOR' as const,
+      title: firstText(v.vendorName, v.vendorNameAr),
+      subtitle: `${v.vendorType ?? '—'} · ${v.riskRating ?? '—'} · ${v.status ?? ''}`,
+      href: `/vendors/${v.id}`, Icon: Truck,
+      keywords: [v.riskRating ?? '', v.status ?? '', v.vendorType ?? ''],
+    }))],
+    ['DPIA', async () => (await dpiaApi.list(0, CAP)).content.map(d => ({
+      id: `dpia-${d.id}`, kind: 'DPIA' as const,
+      title: firstText(d.titleEn, d.titleAr),
+      subtitle: `${(d.triggerReason ?? '').replace(/_/g, ' ')} · ${d.status ?? ''}`,
+      ref: `DPIA-${d.id}`, href: `/dpias/${d.id}`, Icon: Fingerprint,
+      keywords: [d.status ?? '', d.triggerReason ?? ''],
+    }))],
+    ['INCIDENT', async () => (await incidentApi.list(0, CAP)).content.map(i => ({
+      id: `incident-${i.id}`, kind: 'INCIDENT' as const,
+      title: firstText(i.title, i.titleAr),
+      subtitle: `${i.severity ?? '—'} · ${i.category ?? '—'} · ${i.status ?? ''}`,
+      href: `/incidents`, Icon: AlertOctagon,
+      keywords: [i.severity ?? '', i.status ?? '', i.category ?? '', i.assignee ?? ''],
+    }))],
+    ['KRI', async () => (await kriApi.listDefinitions()).slice(0, CAP).map(k => ({
+      id: `kri-${k.id}`, kind: 'KRI' as const,
+      title: firstText(k.titleEn, k.titleAr),
+      subtitle: `${k.frequency ?? '—'} · ${k.category ?? ''}`,
+      ref: k.kriCode, href: `/risk?tab=kri`, Icon: Activity,
+      keywords: [k.kriCode ?? '', k.category ?? '', k.frequency ?? ''],
+    }))],
+    ['CHANGE', async () => (await changeApi.list({ size: CAP })).content.map(ch => ({
+      id: `change-${ch.id}`, kind: 'CHANGE' as const,
+      title: firstText(ch.titleEn, ch.titleAr),
+      subtitle: `${ch.changeType ?? '—'} · ${ch.status ?? ''}`,
+      ref: ch.changeCode, href: `/changes`, Icon: GitBranch,
+      keywords: [ch.changeType ?? '', ch.status ?? '', ch.riskLevel ?? ''],
+    }))],
+  ];
+
+  const settled = await Promise.allSettled(tasks.map(([, fn]) => fn()));
+  settled.forEach((res, idx) => {
+    const kind = tasks[idx][0];
+    if (res.status === 'fulfilled') {
+      next[kind] = res.value;
+    } else {
+      failed.push(kind);
+    }
+  });
+
+  LIVE = next;
+  FAILED = failed;
+  HYDRATED = true;
+  CACHE = null;
+  return searchIndexStatus();
+}
+
+/**
+ * CH-9 — kept as a named entry point because the command palette hydrates policies from
+ * the canonical policy API (it is the one kind with a bespoke list call and a real
+ * /policies/:id detail route). Merges into the same LIVE registry as everything else.
  */
 export function hydratePolicySearch(
   docs: Array<{ id?: number; policyCode: string; version: string; titleEn: string; status: string; category?: string }>,
 ): void {
-  LIVE_POLICY_ITEMS = docs
+  LIVE.POLICY = docs
     .filter((p): p is typeof p & { id: number } => p.id != null)
     .map(p => ({
-    id: `policy-${p.id}`, kind: 'POLICY' as const,
-    title: p.titleEn,
-    subtitle: `v${p.version} · ${p.status}${p.category ? ` · ${p.category}` : ''}`,
-    ref: p.policyCode,
-    href: `/policies/${p.id}`,
-    Icon: BookCopy,
-    keywords: [p.status, p.category ?? '', p.policyCode],
-  }));
+      id: `policy-${p.id}`, kind: 'POLICY' as const,
+      title: p.titleEn,
+      subtitle: `v${p.version} · ${p.status}${p.category ? ` · ${p.category}` : ''}`,
+      ref: p.policyCode,
+      href: `/policies/${p.id}`,
+      Icon: BookCopy,
+      keywords: [p.status, p.category ?? '', p.policyCode],
+    }));
   CACHE = null;
 }
 
@@ -341,5 +339,5 @@ export function getSearchItemById(id: string): SearchItem | undefined {
   return getIndex().find(it => it.id === id);
 }
 
-/** Reset for tests / live data refresh — not used in app code today. */
-export function _resetSearchIndex() { CACHE = null; }
+/** Reset for tests — drops live items and the cache so a test starts from pages only. */
+export function _resetSearchIndex() { CACHE = null; LIVE = {}; HYDRATED = false; FAILED = []; }

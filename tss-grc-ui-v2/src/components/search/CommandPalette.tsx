@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X as XIcon, Clock, CornerDownLeft } from 'lucide-react';
-import { searchIndex, getSearchItemById, hydratePolicySearch, type SearchItem, type EntityKind } from '../../lib/searchIndex';
+import {
+  searchIndex, getSearchItemById, hydratePolicySearch, hydrateSearchIndex, searchIndexStatus,
+  type SearchItem, type EntityKind, type SearchIndexStatus,
+} from '../../lib/searchIndex';
 import { listPolicies } from '../../lib/policy';
 
 /**
@@ -43,10 +46,29 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     if (!open || policyHydrated) return;
     listPolicies({ latestOnly: true })
       .then(docs => { hydratePolicySearch(docs); setPolicyHydrated(true); })
-      .catch(() => { /* keep mock fallback */ });
+      .catch(() => { setPolicyHydrated(true); });
   }, [open, policyHydrated]);
 
-  const results = useMemo(() => searchIndex(query, { limit: 50 }), [query, policyHydrated]);
+  // W2-1a: entity items come from the live API only — this file used to search eight mock
+  // datasets, so the palette returned risks, vendors and incidents that did not exist in the
+  // tenant. Hydrate on first open; until it resolves the palette offers pages and the
+  // regulator catalogue, and `indexState` lets the footer say which it is rather than
+  // leaving the user to read an empty list as "no such record".
+  const [indexState, setIndexState] = useState<SearchIndexStatus>(() => searchIndexStatus());
+  const [indexing, setIndexing] = useState(false);
+  useEffect(() => {
+    if (!open || indexState.hydrated || indexing) return;
+    setIndexing(true);
+    hydrateSearchIndex()
+      .then(setIndexState)
+      .catch(() => setIndexState(searchIndexStatus()))
+      .finally(() => setIndexing(false));
+  }, [open, indexState.hydrated, indexing]);
+
+  const results = useMemo(
+    () => searchIndex(query, { limit: 50 }),
+    [query, policyHydrated, indexState],
+  );
 
   // Recent items (when palette opens with empty query, prepend these)
   const recent = useMemo(() => {
@@ -190,7 +212,18 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         <div style={{ overflowY: 'auto', padding: 6 }}>
           {flat.length === 0
             ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-                No matches for <code style={{ background: 'var(--surface-2)', padding: '1px 6px', borderRadius: 4 }}>{query}</code>
+                {indexing
+                  ? <>Indexing your records…</>
+                  : !indexState.hydrated
+                    ? <>Records are not indexed yet — only pages are searchable.</>
+                    : <>No matches for <code style={{ background: 'var(--surface-2)', padding: '1px 6px', borderRadius: 4 }}>{query}</code></>}
+                {/* W2-1a: a failed fetch must never read as "no such record". */}
+                {indexState.failed.length > 0 && (
+                  <div style={{ marginTop: 10, fontSize: 12, color: 'var(--warning, #b45309)' }}>
+                    {indexState.failed.length} module{indexState.failed.length === 1 ? '' : 's'} could
+                    not be searched ({indexState.failed.join(', ').toLowerCase()}) — results are incomplete.
+                  </div>
+                )}
               </div>
             : (() => {
                 let cursor = 0;
