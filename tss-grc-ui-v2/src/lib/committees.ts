@@ -101,19 +101,61 @@ export function cancelMeeting(id: number, reason: string): Promise<CommitteeMeet
   return api.post(`${BASE}/meetings/${id}/cancel`, { reason });
 }
 
-// ── CH-14: attendance + deterministic quorum ───────────────────────────────
+// ── CH-14 attendance · F2-28 seat-bound quorum ──────────────────────────────
+
+/**
+ * F2-28 — what the caller sends: who was in the room. Nothing else.
+ *
+ * A mark names a roster seat, or a guest. Identity and voting eligibility come from the seat,
+ * so the request can no longer author them — which is the finding: the old shape carried a
+ * free-text name plus a client-set `votingMember`, and the quorum denominator was a count of
+ * the rows supplied, so inventing six voting attendees and marking four present made a
+ * committee quorate.
+ *
+ * Absence needs no mark: a voting seat with no mark is absent and still counts in the
+ * denominator. Forgetting one can only make a meeting look *less* quorate.
+ */
+export interface AttendanceMark {
+  /** The roster seat (`CommitteeMemberTerm.id`). Omit for a guest. */
+  memberTermId?: number | null;
+  /** Guest's name — required when there is no `memberTermId`. */
+  guestName?: string | null;
+  guestRole?: string | null;
+  present?: boolean;
+  coiDeclared?: boolean;
+  coiNote?: string | null;
+}
+
+/** Output only — `votingMember` is resolved from the seat, never echoed from a request. */
 export interface AttendeeRow {
+  memberTermId?: number | null;
   memberName: string; memberRole?: string;
   votingMember?: boolean; present?: boolean;
   coiDeclared?: boolean; coiNote?: string;
+  /** A non-member who attended; never counts toward quorum. */
+  guest?: boolean;
 }
+
 export interface QuorumView {
   meetingId: number; quorumPct?: number;
-  totalVoting: number; presentVoting: number; requiredVoting: number;
-  quorumMet: boolean; attendees: AttendeeRow[];
+  /** The denominator: the committee's ACTIVE VOTING ROSTER — not a count of attendance rows.
+   *  An absent member counts here, which is what quorum means. */
+  totalVoting: number;
+  presentVoting: number; requiredVoting: number;
+  quorumMet: boolean;
+  /** `COMPUTED` = derived by the platform · `ASSERTED_LEGACY` = a flag a caller supplied before
+   *  V319 (17 meetings, 15 of them e-signed) · absent = no quorum established. */
+  quorumSource?: 'COMPUTED' | 'ASSERTED_LEGACY';
+  computedAt?: string;
+  /** Voting seats nobody marked — absent by default. Surfaced so the rule is visible. */
+  unrecordedVoting: number;
+  /** Voting seats with no platform user (F2-26) — why a member may not be able to self-vote. */
+  rosterUnlinked: number;
+  attendees: AttendeeRow[];
 }
-export function recordAttendance(meetingId: number, attendees: AttendeeRow[]): Promise<QuorumView> {
-  return api.post(`${BASE}/meetings/${meetingId}/attendance`, { attendees });
+
+export function recordAttendance(meetingId: number, marks: AttendanceMark[]): Promise<QuorumView> {
+  return api.post(`${BASE}/meetings/${meetingId}/attendance`, { marks });
 }
 export function getQuorum(meetingId: number): Promise<QuorumView> {
   return api.get(`${BASE}/meetings/${meetingId}/quorum`);

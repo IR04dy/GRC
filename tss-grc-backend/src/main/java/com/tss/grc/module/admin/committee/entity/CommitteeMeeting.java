@@ -46,8 +46,43 @@ public class CommitteeMeeting {
     private String locationOrLink;
 
     @Column(name = "agenda_json",       columnDefinition = "NVARCHAR(MAX)") private String agendaJson;
+
+    /**
+     * ⚠ <b>Legacy, read-only (F2-28).</b> The free-text attendance blob predates structured
+     * attendance and is a <em>second</em> caller-authored attendance surface — 32 meetings
+     * carry one. {@code completeMeeting} no longer accepts it; the column is retained so
+     * historical minutes stay readable, not because anything should write it.
+     */
     @Column(name = "attendees_json",    columnDefinition = "NVARCHAR(MAX)") private String attendeesJson;
+
     @Column(name = "quorum_met")                                            private Short  quorumMet;
+
+    /**
+     * F2-28 / DF-5 — <b>where this meeting's quorum flag came from.</b>
+     *
+     * <p>{@code COMPUTED} — derived by the platform from seat-bound attendance against the
+     * committee's active voting roster. {@code ASSERTED_LEGACY} — supplied by whoever called
+     * {@code complete}, which was the only source that ever existed before V319 (17 meetings,
+     * 15 of them e-signed). {@code NULL} — no quorum has been established.
+     *
+     * <p>The legacy rows are <b>labelled, not flipped</b>: a retroactive "no attendance ⇒ not
+     * quorate" rule would invalidate approved, e-signed governance history to make a new
+     * control look clean. V315 and V316 take the same stance on pre-fix votes and approvals.
+     */
+    @Column(name = "quorum_source", length = 20) private String quorumSource;
+
+    /** The denominator actually used, persisted at compute time. The live roster changes;
+     *  a past meeting's arithmetic must not. This is the roster snapshot. */
+    @Column(name = "quorum_denominator") private Integer quorumDenominator;
+    @Column(name = "quorum_present")     private Integer quorumPresent;
+    @Column(name = "quorum_required")    private Integer quorumRequired;
+    @Column(name = "quorum_computed_at") private LocalDateTime quorumComputedAt;
+
+    /** Who last replaced the attendance sheet. Makes the replacement attributable, and is the
+     *  input to the four-eyes gate on minutes approval (F2-39): the person who authored the
+     *  attendance cannot approve the minutes that rest on it. */
+    @Column(name = "attendance_recorded_by") private Long attendanceRecordedBy;
+    @Column(name = "attendance_recorded_at") private LocalDateTime attendanceRecordedAt;
     @Column(name = "minutes_en",        columnDefinition = "NVARCHAR(MAX)") private String minutesEn;
     @Column(name = "minutes_ar",        columnDefinition = "NVARCHAR(MAX)") private String minutesAr;
     @Column(name = "decisions_json",    columnDefinition = "NVARCHAR(MAX)") private String decisionsJson;

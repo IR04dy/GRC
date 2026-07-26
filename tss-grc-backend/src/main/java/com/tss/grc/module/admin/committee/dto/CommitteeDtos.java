@@ -89,21 +89,78 @@ public final class CommitteeDtos {
 
     public record MeetingCancelRequest(@NotBlank @Size(max = 500) String reason) {}
 
-    // ── CH-14: structured attendance + deterministic quorum ──────────────────
+    // ── CH-14 structured attendance · F2-28 seat-bound quorum ────────────────
+
+    /**
+     * <b>F2-28 / DF-5 — input.</b> One mark per person: either a roster seat's presence, or a
+     * declared guest.
+     *
+     * <p><b>Why this replaced the old input shape.</b> {@code AttendeeRow} carried a free-text
+     * {@code memberName} <em>and</em> a client-set {@code votingMember}, and
+     * {@code recordAttendance} rebuilt the whole sheet from it — so the caller chose both the
+     * numerator and the denominator of quorum. Invent six voting attendees, mark four present,
+     * and a 67% committee is quorate. Here the caller supplies only <b>who was in the room</b>;
+     * identity comes from the roster seat and eligibility comes with it.
+     *
+     * <p>Absence needs no mark. A voting seat with no mark is <b>absent</b>, and still counts in
+     * the denominator — which is the whole point of quorum. Marking absences explicitly is
+     * therefore optional courtesy, not a load-bearing act, and forgetting one can only ever
+     * make a meeting look <em>less</em> quorate.
+     */
+    public record AttendanceMark(
+            /** The roster seat. NULL means this is a guest, and {@code guestName} is required. */
+            Long memberTermId,
+            /** Guest's name, for the minutes. Required iff {@code memberTermId} is NULL. */
+            @Size(max = 255) String guestName,
+            /** Guest's role/affiliation ("External auditor — KPMG"). */
+            @Size(max = 120) String guestRole,
+            Boolean present,
+            Boolean coiDeclared,
+            @Size(max = 1000) String coiNote
+    ) {}
+
+    public record AttendanceRequest(java.util.List<AttendanceMark> marks) {}
+
+    /** <b>Output only.</b> {@code votingMember} is resolved from the seat, never echoed from a
+     *  request — the field's presence here is what made the old shape ambiguous. */
     public record AttendeeRow(
+            Long memberTermId,
             @NotBlank @Size(max = 255) String memberName,
             @Size(max = 120) String memberRole,
             Boolean votingMember, Boolean present,
-            Boolean coiDeclared, String coiNote
+            Boolean coiDeclared, String coiNote,
+            /** TRUE = a non-member who attended; never counts toward quorum. */
+            Boolean guest
     ) {}
 
-    public record AttendanceRequest(java.util.List<AttendeeRow> attendees) {}
-
+    /**
+     * <b>F2-28 / DF-5.</b> The quorum arithmetic, with its provenance.
+     *
+     * @param totalVoting      the <b>denominator</b>: active voting seats on the committee's
+     *                         roster — <em>not</em> a count of attendance rows. An absent member
+     *                         counts here, which is what quorum means
+     * @param presentVoting    voting seats marked present
+     * @param requiredVoting   {@code ceil(totalVoting × quorumPct / 100)}, minimum 1
+     * @param quorumSource     {@code COMPUTED} · {@code ASSERTED_LEGACY} (a flag a caller
+     *                         supplied before V319 — 17 meetings, 15 e-signed) · {@code null}
+     * @param computedAt       when the arithmetic was persisted; a past quorum does not move
+     *                         when the roster later changes
+     * @param unrecordedVoting voting seats with no mark at all — absent by default. Surfaced so
+     *                         the "absence needs no mark" rule is visible rather than silent
+     * @param rosterUnlinked   voting seats not linked to a platform user (F2-26). Not a quorum
+     *                         input; reported here because it is the reason a member may be
+     *                         unable to cast their own vote at this meeting
+     */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record QuorumView(
             Long meetingId, Integer quorumPct,
             int totalVoting, int presentVoting, int requiredVoting,
-            boolean quorumMet, java.util.List<AttendeeRow> attendees
+            boolean quorumMet,
+            String quorumSource,
+            java.time.LocalDateTime computedAt,
+            int unrecordedVoting,
+            int rosterUnlinked,
+            java.util.List<AttendeeRow> attendees
     ) {}
 
     /**

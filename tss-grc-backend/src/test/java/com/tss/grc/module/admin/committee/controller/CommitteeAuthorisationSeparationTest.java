@@ -77,12 +77,55 @@ class CommitteeAuthorisationSeparationTest {
         assertThat(memberWriteGuards).doesNotContain("hasPermission('ADMIN','APPROVE')");
     }
 
-    /** Constituting a committee is administration too — same reasoning. */
+    /**
+     * Constituting a committee, scheduling meetings, recording attendance — administration.
+     *
+     * <p>⚠ <b>This test previously asserted that NO write on this controller used
+     * {@code ADMIN:APPROVE}, which encoded a defect as the expectation (F2-39).</b> ADR-014's
+     * capability table assigns "manage … minutes" (drafting) to {@code ADMIN:WRITE} and
+     * <b>"approve minutes"</b> to {@code ADMIN:APPROVE} — but the code guarded
+     * {@code approve-minutes} with {@code WRITE}, so the 3 roles that draft the minutes were the
+     * only ones who could approve them and the 15 the ADR entitled could not. A blanket
+     * "no APPROVE here" assertion is how that survived: it was mechanically true and
+     * substantively wrong. The rule is now stated per capability.
+     */
     @Test
-    void constituting_a_committee_still_requires_ADMIN_WRITE() {
-        assertThat(writeGuardsOf(CommitteeController.class))
-            .isNotEmpty()
-            .doesNotContain("hasPermission('ADMIN','APPROVE')");
+    void administering_a_committee_requires_ADMIN_WRITE_and_approving_minutes_does_not() {
+        List<String> guards = writeGuardsOf(CommitteeController.class);
+        assertThat(guards).contains("hasPermission('ADMIN','WRITE')");
+        assertThat(guardOf(CommitteeController.class, "createCommittee"))
+            .isEqualTo("hasPermission('ADMIN','WRITE')");
+        assertThat(guardOf(CommitteeController.class, "recordAttendance"))
+            .isEqualTo("hasPermission('ADMIN','WRITE')");
+    }
+
+    /**
+     * <b>F2-39.</b> Approving minutes is the act that makes a meeting's record binding and
+     * e-signs it, and ADR-014 assigns it to the vote capability — the committee-eligible
+     * population (15 roles), not the 3-role secretariat that drafted the document. All three
+     * secretariat roles also hold {@code ADMIN:APPROVE} (V317), so correcting this widens the
+     * population to the one the ADR specified without stranding anybody.
+     */
+    @Test
+    void approving_minutes_requires_ADMIN_APPROVE_per_ADR_014() {
+        assertThat(guardOf(CommitteeController.class, "approveMinutes"))
+            .isEqualTo("hasPermission('ADMIN','APPROVE')");
+    }
+
+    /**
+     * The escalation that matters is the reverse direction: the vote capability must not reach
+     * committee *administration*. Recording attendance is the input to quorum, so if
+     * {@code ADMIN:APPROVE} could write it, a voter could author the denominator of the quorum
+     * that legitimises their own vote — F2-28 from the other end.
+     */
+    @Test
+    void the_vote_capability_cannot_record_attendance_or_constitute_a_committee() {
+        assertThat(guardOf(CommitteeController.class, "recordAttendance"))
+            .isNotEqualTo("hasPermission('ADMIN','APPROVE')");
+        assertThat(guardOf(CommitteeController.class, "createCommittee"))
+            .isNotEqualTo("hasPermission('ADMIN','APPROVE')");
+        assertThat(guardOf(CommitteeController.class, "completeMeeting"))
+            .isNotEqualTo("hasPermission('ADMIN','APPROVE')");
     }
 
     /**

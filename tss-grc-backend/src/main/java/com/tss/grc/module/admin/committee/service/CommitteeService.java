@@ -6,9 +6,12 @@ import com.tss.grc.module.admin.committee.dto.CommitteeDtos.*;
 import com.tss.grc.module.admin.committee.entity.Committee;
 import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
 import com.tss.grc.module.admin.committee.entity.CommitteeMeetingAttendee;
+import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingAttendeeRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
+import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.signature.service.SignatureService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +29,7 @@ import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.Collections;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -46,6 +50,9 @@ public class CommitteeService {
     private final CommitteeRepository repo;
     private final CommitteeMeetingRepository meetingRepo;
     private final CommitteeMeetingAttendeeRepository attendeeRepo;   // CH-14
+    /** F2-28: the roster is the quorum denominator and the attendance eligibility list. */
+    private final CommitteeMemberTermRepository memberTermRepo;
+    private final AuditLogService audit;
 
     /** Track D (S4): reuse the platform e-signature subsystem to record a
      *  non-repudiable sign-off when committee minutes are approved. Optional so
@@ -246,19 +253,32 @@ public class CommitteeService {
             throw new IllegalTransitionException(m.getStatus(), "COMPLETED",
                     Set.of("SCHEDULED", "IN_PROGRESS"));
         }
+        // F2-28 / DF-5: quorum is DERIVED, never asserted. Both of these fields are refused
+        // loudly rather than ignored quietly — a security-relevant value that is silently
+        // dropped teaches the caller nothing, and every quorum fact in the database before
+        // V319 (17 meetings, 15 e-signed) arrived through `quorumMet` on this very call.
+        if (req != null && req.quorumMet() != null)
+            throw new IllegalArgumentException(
+                "quorumMet cannot be supplied. Quorum is computed from the attendance sheet "
+              + "against the committee's active voting roster — record attendance at "
+              + "POST /meetings/" + id + "/attendance and it will be derived.");
+        if (req != null && req.attendeesJson() != null)
+            throw new IllegalArgumentException(
+                "attendeesJson is no longer accepted. It was a second, free-text attendance "
+              + "surface alongside the structured sheet; record attendance at "
+              + "POST /meetings/" + id + "/attendance instead.");
+
         m.setStatus("COMPLETED");
         m.setEndedAt(LocalDateTime.now());
         if (req != null) {
             if (req.minutesEn() != null) m.setMinutesEn(req.minutesEn());
             if (req.minutesAr() != null) m.setMinutesAr(req.minutesAr());
-            if (req.attendeesJson() != null) m.setAttendeesJson(req.attendeesJson());
-            if (req.quorumMet() != null) m.setQuorumMet(req.quorumMet());
             if (req.decisionsJson() != null) m.setDecisionsJson(req.decisionsJson());
             if (req.actionItemsJson() != null) m.setActionItemsJson(req.actionItemsJson());
         }
-        // CH-14: when structured attendance exists, compute quorum deterministically
-        // (overriding any client-supplied flag); otherwise keep the supplied value.
-        recomputeQuorum(m);
+        // No quorum recomputation here. Quorum has exactly one origin — recordAttendance —
+        // because the old early-return-when-no-rows behaviour on this path is what let an
+        // asserted flag become a governance fact.
         return m;
     }
 
@@ -274,6 +294,29 @@ public class CommitteeService {
             throw new IllegalStateException(
                 "Cannot approve minutes: the meeting did not reach quorum. Record attendance "
                     + "and ensure enough voting members were present.");
+
+        // F2-28 / DF-5: the flag must have been DERIVED, not asserted. Pre-V319 meetings carry
+        // ASSERTED_LEGACY and are deliberately left as they are — 15 are already approved and
+        // e-signed, and retroactively invalidating approved governance history to make a new
+        // control look clean is the opposite of an audit trail. But a meeting still awaiting
+        // approval cannot pass on an assertion: record the attendance and it becomes COMPUTED.
+        if (!"COMPUTED".equals(m.getQuorumSource()))
+            throw new IllegalStateException(
+                "Cannot approve minutes: this meeting's quorum was "
+              + (m.getQuorumSource() == null ? "never established" : "asserted rather than computed")
+              + ". Record the attendance sheet so quorum is derived from the committee's active "
+              + "voting roster, then approve.");
+
+        // F2-39: whoever authored the attendance sheet cannot be the one who approves the
+        // minutes that rest on it. Quorum is now computed rather than typed, but the *input* is
+        // still a human judgement about who was in the room — so the last link in F2-28's chain
+        // (attendance → quorum → approved minutes → an approved change) needs a second pair of
+        // eyes, the same 409-shaped gate the platform uses for allocation approval and
+        // break-glass self-review.
+        if (approverId != null && approverId.equals(m.getAttendanceRecordedBy()))
+            throw new IllegalStateException(
+                "You recorded this meeting's attendance, so you cannot also approve its minutes. "
+              + "Quorum rests on that sheet — another authorised approver must sign it off.");
         m.setStatus("MINUTES_APPROVED");
         m.setMinutesApprovedAt(LocalDateTime.now());
         m.setMinutesApprovedBy(approverId);
@@ -318,60 +361,202 @@ public class CommitteeService {
         return m;
     }
 
-    // ── CH-14: structured attendance + deterministic quorum ──────────────────
+    // ── CH-14 structured attendance · F2-28/DF-5 seat-bound quorum ───────────
 
-    /** Replace the meeting's attendance sheet, then (re)compute quorum from it. */
+    /**
+     * Replace the meeting's attendance sheet from roster seats, then compute and persist quorum.
+     *
+     * <p><b>F2-28 / DF-5 — what was wrong.</b> This method rebuilt the sheet from free-text
+     * {@code memberName} plus a <em>client-set</em> {@code votingMember}, and {@code quorum()}
+     * then derived both the numerator and the denominator from those same rows. Invent six
+     * voting attendees, mark four present, and a 67% committee is quorate. Or skip attendance
+     * entirely and pass {@code quorumMet = 1} to {@code complete}, because the old
+     * {@code recomputeQuorum} returned early when no rows existed. Then {@code approveMinutes}
+     * gates only on that flag, the minutes are SHA-256 e-signed, and Track D asserts
+     * {@code CAB_APPROVED} on quorate {@code MINUTES_APPROVED} minutes — a complete chain from
+     * typed-in attendance to an approved change.
+     *
+     * <p>Measured before the fix: {@code committee_meeting_attendee} held <b>0 rows</b>. The
+     * deterministic path CH-14 built had never executed on real data, so <em>every</em> quorum
+     * fact in the database was caller-supplied.
+     *
+     * <p><b>Three changes.</b> (1) A mark names a <b>roster seat</b>, and voting eligibility is
+     * copied from that seat, never from the body. (2) The denominator is the committee's
+     * <b>active voting roster</b>, not the sheet — an absent member still counts, which is what
+     * quorum means. (3) The arithmetic is <b>persisted</b>, so a later roster change cannot move
+     * a past meeting's quorum.
+     *
+     * <p>Refused once the minutes are approved: the sheet is an input to a flag that has already
+     * been e-signed, and rewriting it afterwards would change the signed conclusion while the
+     * signature — which hashes only the minutes text — still verified.
+     */
     @Transactional
-    public QuorumView recordAttendance(Long meetingId, AttendanceRequest req) {
+    public QuorumView recordAttendance(Long meetingId, AttendanceRequest req, Long actorUserId) {
         CommitteeMeeting m = getMeeting(meetingId);
-        attendeeRepo.deleteByCommitteeMeetingId(meetingId);
-        if (req != null && req.attendees() != null) {
-            for (AttendeeRow r : req.attendees()) {
-                if (r.memberName() == null || r.memberName().isBlank()) continue;
-                CommitteeMeetingAttendee a = new CommitteeMeetingAttendee();
-                a.setOrganisationId(m.getOrganisationId());
-                a.setCommitteeMeetingId(meetingId);
-                a.setMemberName(r.memberName().trim());
-                a.setMemberRole(r.memberRole());
-                a.setIsVotingMember(r.votingMember() == null || r.votingMember());
-                a.setPresent(Boolean.TRUE.equals(r.present()));
-                a.setCoiDeclared(Boolean.TRUE.equals(r.coiDeclared()));
-                a.setCoiNote(r.coiNote());
-                attendeeRepo.save(a);
+        if (!Set.of("SCHEDULED", "IN_PROGRESS", "COMPLETED").contains(m.getStatus()))
+            throw new IllegalStateException(
+                "Attendance cannot be recorded for a meeting that is " + m.getStatus()
+              + ". Once the minutes are approved the attendance sheet is part of an e-signed "
+              + "record and cannot be replaced.");
+
+        Long org = m.getOrganisationId();
+        // The roster IS the eligibility list. A mark that does not resolve to an active seat of
+        // THIS committee is refused rather than silently created as a free-text row.
+        Map<Long, CommitteeMemberTerm> roster = m.getCommitteeId() == null
+            ? Map.of()
+            : memberTermRepo.findActiveByCommittee(org, m.getCommitteeId()).stream()
+                .collect(java.util.stream.Collectors.toMap(CommitteeMemberTerm::getId, t -> t,
+                    (a, b) -> a, java.util.LinkedHashMap::new));
+
+        List<CommitteeMeetingAttendee> previous = attendeeRepo.findByCommitteeMeetingId(meetingId);
+        List<CommitteeMeetingAttendee> incoming = new java.util.ArrayList<>();
+        Set<Long> seenSeats = new java.util.HashSet<>();
+
+        for (AttendanceMark mk : req == null || req.marks() == null ? List.<AttendanceMark>of() : req.marks()) {
+            CommitteeMeetingAttendee a = new CommitteeMeetingAttendee();
+            a.setOrganisationId(org);
+            a.setCommitteeMeetingId(meetingId);
+
+            if (mk.memberTermId() != null) {
+                CommitteeMemberTerm seat = roster.get(mk.memberTermId());
+                if (seat == null)
+                    throw new IllegalArgumentException(
+                        "Seat " + mk.memberTermId() + " is not on this committee's active roster, "
+                      + "so attendance cannot be recorded against it. Attendance is a selection "
+                      + "from the roster; a non-member who attended is recorded as a guest.");
+                if (!seenSeats.add(seat.getId()))
+                    throw new IllegalArgumentException(
+                        seat.getMemberName() + " appears twice in this attendance sheet. One mark "
+                      + "per seat — a duplicate would count them twice toward quorum.");
+                a.setMemberTermId(seat.getId());
+                a.setIsGuest(false);
+                // Copied from the roster, not the request. This is the line the finding is about.
+                a.setMemberName(seat.getMemberName());
+                a.setMemberRole(seat.getRole());
+                a.setIsVotingMember(seat.getIsVotingMember() != null && seat.getIsVotingMember() == 1);
+            } else {
+                if (mk.guestName() == null || mk.guestName().isBlank())
+                    throw new IllegalArgumentException(
+                        "A mark must name either a roster seat (memberTermId) or a guest "
+                      + "(guestName). A nameless free-text attendee is what F2-28 removed.");
+                a.setMemberTermId(null);
+                a.setIsGuest(true);
+                a.setMemberName(mk.guestName().trim());
+                a.setMemberRole(mk.guestRole());
+                a.setIsVotingMember(false);   // a guest never counts, in either direction
             }
+            a.setPresent(Boolean.TRUE.equals(mk.present()));
+            a.setCoiDeclared(Boolean.TRUE.equals(mk.coiDeclared()));
+            a.setCoiNote(mk.coiNote());
+            incoming.add(a);
         }
-        recomputeQuorum(m);
+
+        attendeeRepo.deleteByCommitteeMeetingId(meetingId);
+        attendeeRepo.flush();          // the unique (meeting, seat) index must not see both sheets
+        for (CommitteeMeetingAttendee a : incoming) attendeeRepo.save(a);
+
+        m.setAttendanceRecordedBy(actorUserId);
+        m.setAttendanceRecordedAt(LocalDateTime.now());
+        computeQuorum(m, incoming);
+
+        // The register's item 6: replacement must not be silent. The sheet is deleted and
+        // rebuilt, so the ledger is the only record of what it replaced.
+        audit.log("MEETING_ATTENDANCE", "CommitteeMeeting", meetingId,
+            "Attendance sheet replaced · " + previous.size() + " row(s) → " + incoming.size()
+                + " · present " + m.getQuorumPresent() + "/" + m.getQuorumDenominator()
+                + " (required " + m.getQuorumRequired() + ") · quorum "
+                + (m.getQuorumMet() != null && m.getQuorumMet() == 1 ? "MET" : "NOT MET")
+                + (previous.isEmpty() ? "" : " · replaced: " + summarise(previous)));
+
         return quorum(meetingId);
     }
 
-    /** Deterministic quorum view for a meeting (present voting members vs the
-     *  committee's quorum_pct). */
+    /**
+     * The quorum arithmetic, read back from what was persisted.
+     *
+     * <p>Deliberately <b>not</b> recomputed on read. If the denominator came from the live
+     * roster every time, appointing a member next year would silently change last year's
+     * quorum — so {@link #computeQuorum} persists the numbers and this reports them. When a
+     * meeting has no computed quorum yet (or carries a pre-V319 {@code ASSERTED_LEGACY} flag),
+     * the roster figures are shown for context and {@code quorumSource} says where the flag
+     * came from.
+     */
     @Transactional(readOnly = true)
     public QuorumView quorum(Long meetingId) {
         CommitteeMeeting m = getMeeting(meetingId);
         List<CommitteeMeetingAttendee> rows = attendeeRepo.findByCommitteeMeetingId(meetingId);
+        List<CommitteeMemberTerm> roster = rosterOf(m);
         int pct = quorumPctOf(m);
-        int totalVoting   = (int) rows.stream().filter(a -> Boolean.TRUE.equals(a.getIsVotingMember())).count();
-        int presentVoting = (int) rows.stream()
-            .filter(a -> Boolean.TRUE.equals(a.getIsVotingMember()) && Boolean.TRUE.equals(a.getPresent())).count();
-        int required = totalVoting == 0 ? 0 : Math.max(1, (int) Math.ceil(totalVoting * pct / 100.0));
-        boolean met = totalVoting > 0 && presentVoting >= required;
+
+        int rosterVoting = (int) roster.stream()
+            .filter(t -> t.getIsVotingMember() != null && t.getIsVotingMember() == 1).count();
+        int totalVoting = m.getQuorumDenominator() != null ? m.getQuorumDenominator() : rosterVoting;
+        int presentVoting = m.getQuorumPresent() != null ? m.getQuorumPresent()
+            : (int) rows.stream().filter(a -> Boolean.TRUE.equals(a.getIsVotingMember())
+                                           && Boolean.TRUE.equals(a.getPresent())).count();
+        int required = m.getQuorumRequired() != null ? m.getQuorumRequired() : requiredFor(totalVoting, pct);
+
+        Set<Long> markedSeats = rows.stream().map(CommitteeMeetingAttendee::getMemberTermId)
+            .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        int unrecorded = (int) roster.stream()
+            .filter(t -> t.getIsVotingMember() != null && t.getIsVotingMember() == 1)
+            .filter(t -> !markedSeats.contains(t.getId())).count();
+        int unlinked = (int) roster.stream()
+            .filter(t -> t.getIsVotingMember() != null && t.getIsVotingMember() == 1)
+            .filter(t -> t.getMemberUserId() == null).count();
+
         List<AttendeeRow> view = rows.stream()
-            .map(a -> new AttendeeRow(a.getMemberName(), a.getMemberRole(), a.getIsVotingMember(),
-                a.getPresent(), a.getCoiDeclared(), a.getCoiNote())).toList();
-        return new QuorumView(meetingId, pct, totalVoting, presentVoting, required, met, view);
+            .map(a -> new AttendeeRow(a.getMemberTermId(), a.getMemberName(), a.getMemberRole(),
+                a.getIsVotingMember(), a.getPresent(), a.getCoiDeclared(), a.getCoiNote(),
+                a.getIsGuest())).toList();
+
+        return new QuorumView(meetingId, pct, totalVoting, presentVoting, required,
+            m.getQuorumMet() != null && m.getQuorumMet() == 1,
+            m.getQuorumSource(), m.getQuorumComputedAt(), unrecorded, unlinked, view);
     }
 
-    /** Recompute + persist quorum_met from structured attendance, if any rows exist. */
-    private void recomputeQuorum(CommitteeMeeting m) {
-        List<CommitteeMeetingAttendee> rows = attendeeRepo.findByCommitteeMeetingId(m.getId());
-        if (rows.isEmpty()) return;   // no structured attendance → leave the existing flag intact
+    /**
+     * Compute and persist quorum from seat-bound attendance against the roster denominator.
+     *
+     * <p>Called only from {@link #recordAttendance}. The old {@code recomputeQuorum} ran on
+     * {@code complete} as well and returned early when no rows existed — which is precisely
+     * how a caller-supplied {@code quorumMet} survived to become 17 meetings' quorum fact.
+     * Quorum now has exactly one origin: recorded attendance.
+     */
+    private void computeQuorum(CommitteeMeeting m, List<CommitteeMeetingAttendee> rows) {
         int pct = quorumPctOf(m);
-        int totalVoting   = (int) rows.stream().filter(a -> Boolean.TRUE.equals(a.getIsVotingMember())).count();
+        int totalVoting = (int) rosterOf(m).stream()
+            .filter(t -> t.getIsVotingMember() != null && t.getIsVotingMember() == 1).count();
         int presentVoting = (int) rows.stream()
-            .filter(a -> Boolean.TRUE.equals(a.getIsVotingMember()) && Boolean.TRUE.equals(a.getPresent())).count();
-        int required = totalVoting == 0 ? 0 : Math.max(1, (int) Math.ceil(totalVoting * pct / 100.0));
+            .filter(a -> Boolean.TRUE.equals(a.getIsVotingMember())
+                      && Boolean.TRUE.equals(a.getPresent())).count();
+        int required = requiredFor(totalVoting, pct);
+
+        m.setQuorumDenominator(totalVoting);
+        m.setQuorumPresent(presentVoting);
+        m.setQuorumRequired(required);
+        m.setQuorumComputedAt(LocalDateTime.now());
+        m.setQuorumSource("COMPUTED");
+        // A committee with no active voting seats cannot be quorate. Previously this read as
+        // "no rows → keep the flag", which let an empty roster inherit an asserted 1.
         m.setQuorumMet((short) (totalVoting > 0 && presentVoting >= required ? 1 : 0));
+    }
+
+    private List<CommitteeMemberTerm> rosterOf(CommitteeMeeting m) {
+        return m.getCommitteeId() == null ? List.of()
+            : memberTermRepo.findActiveByCommittee(m.getOrganisationId(), m.getCommitteeId());
+    }
+
+    private static int requiredFor(int totalVoting, int pct) {
+        return totalVoting == 0 ? 0 : Math.max(1, (int) Math.ceil(totalVoting * pct / 100.0));
+    }
+
+    /** Compact description of a replaced sheet, for the ledger. */
+    private static String summarise(List<CommitteeMeetingAttendee> rows) {
+        return rows.stream()
+            .map(a -> a.getMemberName() + (Boolean.TRUE.equals(a.getPresent()) ? "=present" : "=absent"))
+            .limit(20)
+            .collect(java.util.stream.Collectors.joining(", "));
     }
 
     private int quorumPctOf(CommitteeMeeting m) {
