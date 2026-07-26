@@ -1,5 +1,6 @@
 package com.tss.grc.module.change_mgmt.entity;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -31,6 +32,10 @@ public class ChangeFreezeWindow {
     @Column(name = "name_en", nullable = false, length = 200)
     private String nameEn;
 
+    // F2-30 — house rule 7 ("Arabic names are backend-mandatory") was asserted in
+    // CLAUDE.md and enforced nowhere. Measured 0 blank rows on this column before the
+    // constraint landed, so it cannot strand an existing record.
+    @NotBlank
     @Column(name = "name_ar", length = 200)
     private String nameAr;
 

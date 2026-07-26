@@ -1,5 +1,6 @@
 package com.tss.grc.module.admin.committee.entity;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -45,6 +46,10 @@ public class CommitteeMeetingPaper {
     @Column(name = "title_en", nullable = false, length = 500)
     private String titleEn;
 
+    // F2-30 — house rule 7 ("Arabic names are backend-mandatory") was asserted in
+    // CLAUDE.md and enforced nowhere. Measured 0 blank rows on this column before the
+    // constraint landed, so it cannot strand an existing record.
+    @NotBlank
     @Column(name = "title_ar", length = 500)
     private String titleAr;
 

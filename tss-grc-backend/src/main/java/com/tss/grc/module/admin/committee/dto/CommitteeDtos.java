@@ -3,6 +3,7 @@ package com.tss.grc.module.admin.committee.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.tss.grc.module.admin.committee.entity.Committee;
 import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -16,7 +17,11 @@ public final class CommitteeDtos {
     public record CommitteeCreateRequest(
             @NotBlank @Size(max = 64) String code,
             @NotBlank @Size(max = 255) String nameEn,
-            String nameAr,
+            // F2-30 — the DTO carried the same asymmetry as the entity: nameEn mandatory,
+            // nameAr free. This is Committee's real write path (the entity constraint is the
+            // backstop for service-layer saves), and it yields a field-naming 400 via the
+            // long-standing MethodArgumentNotValidException handler.
+            @NotBlank @Size(max = 255) String nameAr,
             String descriptionEn, String descriptionAr,
             @NotBlank @Size(max = 30) String committeeType,
             String chairpersonName, String chairpersonRole,

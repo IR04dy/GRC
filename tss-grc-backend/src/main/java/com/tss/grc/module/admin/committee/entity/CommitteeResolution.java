@@ -1,5 +1,6 @@
 package com.tss.grc.module.admin.committee.entity;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -52,12 +53,22 @@ public class CommitteeResolution {
     @Column(name = "title_en", nullable = false, length = 500)
     private String titleEn;
 
+    // F2-30 — house rule 7 ("Arabic names are backend-mandatory") was asserted in
+    // CLAUDE.md and enforced nowhere. Measured 0 blank rows on this column before the
+    // constraint landed, so it cannot strand an existing record.
+    @NotBlank
     @Column(name = "title_ar", length = 500)
     private String titleAr;
 
     @Column(name = "body_en", nullable = false, columnDefinition = "NVARCHAR(MAX)")
     private String bodyEn;
 
+    // F2-30 — house rule 7 ("Arabic names are backend-mandatory") was asserted in
+    // CLAUDE.md and enforced nowhere. Measured 0 blank rows on this column before the
+    // constraint landed, so it cannot strand an existing record. The resolution BODY is
+    // the operative text of a board decision, so an Arabic-only tenant reading a
+    // resolution in English is exactly the failure house rule 7 exists to prevent.
+    @NotBlank
     @Column(name = "body_ar", columnDefinition = "NVARCHAR(MAX)")
     private String bodyAr;
 

@@ -67,13 +67,18 @@ public class ChangeManagementController {
     @PostMapping
     @PreAuthorize("hasPermission('CHANGE','WRITE')")
     @ResponseStatus(HttpStatus.CREATED)
-    public ChangeRequest create(@RequestBody ChangeRequest body) {
+    // F2-30: @Valid so the new @NotBlank on titleAr reports as a 400 naming the field
+    // through the MethodArgumentNotValidException handler, rather than failing at flush and
+    // arriving as a TransactionSystemException. ⚠ @Valid fires BEFORE @PreAuthorize, so
+    // permission probes against this endpoint now need a valid body (CLAUDE.md landmine).
+    // The entity binding itself is F2-22a's scope, not this slice's.
+    public ChangeRequest create(@Valid @RequestBody ChangeRequest body) {
         return service.create(body);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasPermission('CHANGE','WRITE')")
-    public ChangeRequest update(@PathVariable Long id, @RequestBody ChangeRequest body) {
+    public ChangeRequest update(@PathVariable Long id, @Valid @RequestBody ChangeRequest body) {
         return service.update(id, body);
     }
 
@@ -144,11 +149,11 @@ public class ChangeManagementController {
     @PostMapping("/{id}/tasks")
     @PreAuthorize("hasPermission('CHANGE','WRITE')")
     @ResponseStatus(HttpStatus.CREATED)
-    public ChangeTask addTask(@PathVariable Long id, @RequestBody ChangeTask body) { return service.addTask(id, body); }
+    public ChangeTask addTask(@PathVariable Long id, @Valid @RequestBody ChangeTask body) { return service.addTask(id, body); }
 
     @PutMapping("/tasks/{taskId}")
     @PreAuthorize("hasPermission('CHANGE','WRITE')")
-    public ChangeTask updateTask(@PathVariable Long taskId, @RequestBody ChangeTask body) { return service.updateTask(taskId, body); }
+    public ChangeTask updateTask(@PathVariable Long taskId, @Valid @RequestBody ChangeTask body) { return service.updateTask(taskId, body); }
 
     @DeleteMapping("/tasks/{taskId}")
     @PreAuthorize("hasPermission('CHANGE','DELETE')")
@@ -256,7 +261,7 @@ public class ChangeManagementController {
     @PostMapping("/freeze-windows")
     @PreAuthorize("hasPermission('CHANGE','WRITE')")
     @ResponseStatus(HttpStatus.CREATED)
-    public ChangeFreezeWindow createFreezeWindow(@RequestBody ChangeFreezeWindow body) {
+    public ChangeFreezeWindow createFreezeWindow(@Valid @RequestBody ChangeFreezeWindow body) {
         return service.createFreezeWindow(body);
     }
 

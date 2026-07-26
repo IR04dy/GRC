@@ -5,6 +5,7 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -50,6 +51,90 @@ public class GlobalExceptionHandler {
         Map<String, String> errors = ex.getBindingResult().getFieldErrors().stream()
             .collect(Collectors.toMap(FieldError::getField, fe -> fe.getDefaultMessage() != null ? fe.getDefaultMessage() : "invalid", (a, b) -> a));
         ProblemDetail pd = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        pd.setTitle("Validation Failed");
+        pd.setType(URI.create("https://grc.tss.com/errors/validation"));
+        pd.setProperty("errors", errors);
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
+     * F2-30 — bean-validation failures raised by <em>Hibernate</em> rather than Spring MVC.
+     *
+     * <p>{@link #handleValidation} only sees {@code MethodArgumentNotValidException}, which
+     * Spring MVC throws when a {@code @Valid @RequestBody} fails. A constraint on an
+     * <em>entity</em> field is enforced somewhere else entirely: Hibernate's
+     * {@code BeanValidationEventListener} runs it on pre-persist / pre-update and throws
+     * {@link ConstraintViolationException} during flush, which Spring's transaction
+     * interceptor then wraps in {@link TransactionSystemException} at commit. Neither was
+     * handled, so <b>every entity-level constraint in the platform surfaced as a bare 500</b>
+     * — measured before this handler existed, with no entity carrying a single
+     * {@code @NotBlank}.
+     *
+     * <p>That mattered for F2-30 specifically. `CLAUDE.md` house rule 7 says Arabic names are
+     * backend-mandatory; enforcing it needs constraints on {@code *_ar} fields, and the write
+     * paths that most need it bind the JPA entity straight from the request body with no DTO
+     * and no {@code @Valid} (`create(@RequestBody ChangeRequest body)` — the F2-22a class), so
+     * the entity constraint is the only available lever. Adding those constraints without this
+     * handler would have converted "you forgot the Arabic title" into an opaque 500 — making
+     * the platform worse at explaining a failure it had just started detecting.
+     *
+     * <p><b>Scope, stated precisely.</b> {@link #handleConstraint} below already catches a
+     * {@link ConstraintViolationException} that propagates <em>unwrapped</em> — the
+     * {@code @Validated} service-method case, which throws before any transaction boundary.
+     * That is not the entity case. A constraint on a JPA field fails during <b>flush</b>,
+     * inside the transaction, so Spring's interceptor wraps it at commit and the unwrapped
+     * handler never sees it. This handler closes that leg, and shares
+     * {@link #constraintProblem} with the unwrapped one so both answer identically.
+     */
+    @ExceptionHandler(TransactionSystemException.class)
+    public ProblemDetail handleTransactionSystem(TransactionSystemException ex) {
+        ConstraintViolationException cve = findConstraintViolation(ex);
+        if (cve != null) {
+            return constraintProblem(cve);
+        }
+        // Some other commit failure — a genuine 500, and not something to dress up as a 400.
+        log.error("Transaction failed on commit: {}", ex.getMessage(), ex);
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+            "The transaction could not be committed.");
+        pd.setTitle("Transaction Failed");
+        pd.setType(URI.create("https://grc.tss.com/errors/transaction"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /** Walks the cause chain — the violation is nested inside TransactionSystemException. */
+    private static ConstraintViolationException findConstraintViolation(Throwable t) {
+        for (Throwable cur = t; cur != null && cur.getCause() != cur; cur = cur.getCause()) {
+            if (cur instanceof ConstraintViolationException cve) {
+                return cve;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Shared 400 body for a bean-validation failure, wrapped or not.
+     *
+     * <p>Carries the {@code errors} map keyed by property path <em>as well as</em> the joined
+     * {@code detail} the unwrapped handler has always produced. The map is what the frontend's
+     * {@code problemMessage()} folds into a toast naming the offending field, so entity-level
+     * constraints report like every other validation failure with no frontend change.
+     */
+    private static ProblemDetail constraintProblem(ConstraintViolationException ex) {
+        Map<String, String> errors = ex.getConstraintViolations().stream()
+            .collect(Collectors.toMap(
+                v -> v.getPropertyPath() == null ? "entity" : v.getPropertyPath().toString(),
+                v -> v.getMessage() != null ? v.getMessage() : "invalid",
+                (a, b) -> a));
+        String detail = ex.getConstraintViolations().stream()
+            .map(v -> v.getPropertyPath() + " " + v.getMessage())
+            .collect(Collectors.joining("; "));
+        if (detail.isBlank()) {
+            detail = "Validation failed.";
+        }
+        log.warn("[entity-validation] {}", errors);
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
         pd.setTitle("Validation Failed");
         pd.setType(URI.create("https://grc.tss.com/errors/validation"));
         pd.setProperty("errors", errors);
@@ -364,20 +449,19 @@ public class GlobalExceptionHandler {
 
     /**
      * Bean Validation constraint violation surfaced from inside a service
-     * (typically a {@code @Validated} method-level check). Without this,
-     * Hibernate's constraint failures bubbled up as 500.
+     * (typically a {@code @Validated} method-level check), propagating
+     * <em>unwrapped</em> because it was thrown before a transaction boundary.
+     *
+     * <p>F2-30 corrected this javadoc's claim that it stopped "Hibernate's constraint
+     * failures" bubbling up as 500. It did not: an <em>entity</em> constraint fails at flush
+     * inside the transaction and reaches the advice as {@link TransactionSystemException},
+     * which nothing handled. {@link #handleTransactionSystem} is that leg; both now build the
+     * body with {@link #constraintProblem}, which adds the {@code errors} map this handler
+     * never emitted.
      */
     @ExceptionHandler(ConstraintViolationException.class)
     public ProblemDetail handleConstraint(ConstraintViolationException ex) {
-        String detail = ex.getConstraintViolations().stream()
-            .map(v -> v.getPropertyPath() + " " + v.getMessage())
-            .collect(Collectors.joining("; "));
-        if (detail.isBlank()) detail = "Validation failed.";
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
-        pd.setTitle("Validation Failed");
-        pd.setType(URI.create("https://grc.tss.com/errors/validation"));
-        pd.setProperty("timestamp", Instant.now());
-        return pd;
+        return constraintProblem(ex);
     }
 
     /**

@@ -51,7 +51,8 @@ public class CommitteeResolutionController {
 
     @PostMapping
     @PreAuthorize("hasPermission('ADMIN','WRITE')")
-    public CommitteeResolution create(@RequestBody CommitteeResolution in) {
+    // F2-30: @Valid so the new @NotBlank on titleAr/bodyAr reports as a field-naming 400.
+    public CommitteeResolution create(@Valid @RequestBody CommitteeResolution in) {
         return service.create(in);
     }
 
