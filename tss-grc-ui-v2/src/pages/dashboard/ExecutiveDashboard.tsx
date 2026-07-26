@@ -8,13 +8,18 @@ import {
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
+// W2-1a-ii: the recent-activity card renders recorded events, not hardcoded ones.
+import { loadActivity, subscribeActivity, type ActivityEvent } from '../../lib/activityLog';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { TimeSeries, type TimeSeriesPoint } from '../../components/viz/TimeSeries';
 import { RadialGauge } from '../../components/viz/RadialGauge';
 import { GAUGE_HERO } from '../../lib/gaugeSizes';
 import { ragBands } from '../../lib/ragColors';
 import { Progress } from '../../components/ui/Progress';
-import { dashboardApi, type DashboardStats, type TrendPoint } from '../../lib/api';
+import {
+  dashboardApi, riskApi, complianceApi, calendarApi,
+  type DashboardStats, type TrendPoint,
+} from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { mlModelApi, aggregateMlRegistry, type MlModelResponse } from '../../lib/aiGovernance';
 import '../../styles/pages/executive-dashboard.css';
@@ -576,9 +581,95 @@ function FrameworkReadiness({ stats }: { stats: DashboardStats }) {
 
 // ─── 5. Attention strip (3 columns) ─────────────────────────────────────
 
+/**
+ * W2-1a-ii — all three columns of this strip were hardcoded.
+ *
+ * "Needs decision" listed three items an executive was told were awaiting their decision:
+ * `R-0042 — Concentration risk on AWS Riyadh region` (CRITICAL, 2d), an NCA finding
+ * `ECC-2-4-3`, and an overdue Jeddah DC recovery exercise. None existed. `R-0042` is the
+ * mock risk code W2-1a-i proved is not findable in the tenant.
+ *
+ * "Upcoming deadlines" listed four REGULATORY dates — SAMA H1 attestation in 12 days, NCA
+ * ECC refresh in 28, PDPL Article 8 ROPA in 45, Nitaqat Q2 in 58 — with regulator chips and
+ * day counts. That is the most dangerous of the three: a tenant trusting this strip could
+ * miss a real filing while the dashboard showed a comfortable 12-day runway to a deadline
+ * that was never theirs.
+ *
+ * All three now read live data. Each column degrades to its own empty state rather than a
+ * placeholder, because "nothing needs your decision" and "we could not load your deadlines"
+ * are different statements and an executive summary must not conflate them.
+ */
 function AttentionStrip() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
+
+  const [decisions, setDecisions] = useState<AttentionItem[] | null>(null);
+  const [deadlines, setDeadlines] = useState<DeadlineItem[] | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated()) return;
+    let alive = true;
+
+    // Needs decision = open CRITICAL/HIGH risks + open HIGH/CRITICAL findings, oldest first.
+    Promise.all([
+      riskApi.list(undefined, 0, 200).catch(() => null),
+      complianceApi.findings(0, 200).catch(() => null),
+    ]).then(([risks, findings]) => {
+      if (!alive) return;
+      if (!risks && !findings) { setDecisions(null); return; }
+      const items: AttentionItem[] = [];
+      for (const r of risks?.content ?? []) {
+        const sev = (r.riskLevel ?? '').toUpperCase();
+        if (!['CRITICAL', 'HIGH'].includes(sev)) continue;
+        if (['CLOSED', 'MITIGATED', 'ACCEPTED'].includes((r.status ?? '').toUpperCase())) continue;
+        items.push({
+          titleEn: `${r.riskCode ?? 'Risk'} — ${r.titleEn ?? ''}`.trim(),
+          titleAr: `${r.riskCode ?? ''} — ${r.titleAr || r.titleEn || ''}`.trim(),
+          sev: sev === 'CRITICAL' ? 'CRITICAL' : 'HIGH',
+          age: ageLabel(r.createdAt),
+        });
+      }
+      for (const f of findings?.content ?? []) {
+        const sev = (f.severity ?? '').toUpperCase();
+        if (!['CRITICAL', 'HIGH'].includes(sev)) continue;
+        if ((f.status ?? '').toUpperCase() === 'CLOSED') continue;
+        items.push({
+          titleEn: f.title, titleAr: f.title,
+          sev: sev === 'CRITICAL' ? 'CRITICAL' : 'HIGH',
+          age: ageLabel(f.dueDate),
+        });
+      }
+      setDecisions(items.slice(0, 5));
+    });
+
+    // Upcoming deadlines = the real compliance calendar, next 120 days.
+    const from = new Date().toISOString().slice(0, 10);
+    const to = new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 10);
+    calendarApi.list(from, to)
+      .then(evts => {
+        if (!alive) return;
+        const day = 86400000;
+        setDeadlines(evts
+          .filter(e => e.eventType !== 'PUBLIC_HOLIDAY')
+          .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+          .slice(0, 5)
+          .map(e => ({
+            titleEn: e.titleEn,
+            titleAr: e.titleAr || e.titleEn,
+            days: Math.max(0, Math.round((new Date(e.startsAt).getTime() - Date.now()) / day)),
+            regulator: (e.eventType || '').replace(/_/g, ' '),
+          })));
+      })
+      .catch(() => { if (alive) setDeadlines(null); });
+
+    return () => { alive = false; };
+  }, []);
+
+  const empty = (en: string, ar: string) => (
+    <div style={{ padding: '20px 4px', font: '500 12.5px var(--font-sans)', color: 'var(--ink-3)', textAlign: 'center' }}>
+      {isAr ? ar : en}
+    </div>
+  );
 
   return (
     <div style={{
@@ -587,20 +678,19 @@ function AttentionStrip() {
       gap: 16,
     }}>
       <Card title={isAr ? 'يستوجب القرار' : 'Needs decision'} Icon={AlertOctagon}>
-        <AttentionList items={[
-          { titleEn: 'R-0042 — Concentration risk on AWS Riyadh region',  titleAr: 'تركّز المخاطر على منطقة أرامكو السحابية', sev: 'CRITICAL', age: '2d' },
-          { titleEn: 'NCA finding ECC-2-4-3 — privileged session log',     titleAr: 'ملاحظة NCA — سجلّ الجلسات الإدارية',     sev: 'HIGH',     age: '4d' },
-          { titleEn: 'BCM IT-DRP exercise overdue (Jeddah DC)',            titleAr: 'تمرين التعافي IT-DRP متأخّر — مركز جدة',  sev: 'HIGH',     age: '6d' },
-        ]} />
+        {decisions == null
+          ? empty('Could not load open items.', 'تعذّر تحميل العناصر المفتوحة.')
+          : decisions.length === 0
+            ? empty('Nothing awaiting a decision.', 'لا يوجد ما ينتظر قرارًا.')
+            : <AttentionList items={decisions} />}
       </Card>
 
       <Card title={isAr ? 'مواعيد قادمة' : 'Upcoming deadlines'} Icon={Calendar}>
-        <DeadlineList items={[
-          { titleEn: 'SAMA H1 cybersecurity attestation',     titleAr: 'إقرار الأمن السيبراني نصف السنوي — ساما',     days: 12, regulator: 'SAMA' },
-          { titleEn: 'NCA ECC self-assessment refresh',       titleAr: 'تحديث التقييم الذاتي للضوابط الأساسية',         days: 28, regulator: 'NCA' },
-          { titleEn: 'PDPL Article 8 ROPA re-certification',  titleAr: 'إعادة اعتماد سجلّ المعالجة — مادة 8',           days: 45, regulator: 'SDAIA' },
-          { titleEn: 'Nitaqat quarterly report (Q2)',         titleAr: 'تقرير نطاقات الربع الثاني',                     days: 58, regulator: 'HRSD' },
-        ]} />
+        {deadlines == null
+          ? empty('Could not load your calendar.', 'تعذّر تحميل التقويم.')
+          : deadlines.length === 0
+            ? empty('No deadlines in the next 120 days.', 'لا مواعيد في الـ120 يومًا القادمة.')
+            : <DeadlineList items={deadlines} />}
       </Card>
 
       <Card title={isAr ? 'النشاط الأخير' : 'Recent activity'} Icon={Activity}>
@@ -608,6 +698,16 @@ function AttentionStrip() {
       </Card>
     </div>
   );
+}
+
+type AttentionItem = { titleEn: string; titleAr: string; sev: 'CRITICAL' | 'HIGH' | 'MEDIUM'; age: string };
+type DeadlineItem = { titleEn: string; titleAr: string; days: number; regulator: string };
+
+/** "2d" / "5w" since a timestamp; em dash when there is no date to age from. */
+function ageLabel(iso?: string | null): string {
+  if (!iso) return '—';
+  const days = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 86400000));
+  return days < 14 ? `${days}d` : `${Math.round(days / 7)}w`;
 }
 
 function AttentionList({ items }: { items: Array<{ titleEn: string; titleAr: string; sev: 'CRITICAL' | 'HIGH' | 'MEDIUM'; age: string }> }) {
@@ -680,15 +780,77 @@ function DeadlineList({ items }: { items: Array<{ titleEn: string; titleAr: stri
   );
 }
 
+/**
+ * Recent activity — from the real activity log.
+ *
+ * W2-1a-ii — this was FOUR HARDCODED BILINGUAL LINES presented as a live feed with relative
+ * timestamps: "Risk R-0042 mitigated by Sara A.", "ECC control AC-3 evidence approved",
+ * "KRI threshold breached: failed logins", "Vendor reassessment overdue: Cloud4Saudi". None
+ * of it happened. `R-0042` is the mock risk code W2-1a-i proved is not findable in the
+ * tenant, so the executive dashboard reported activity on a record that does not exist —
+ * and it was translated into Arabic, which is how much care went into making it look real.
+ *
+ * Two things worth recording about how this was found. First, it is NOT a mock *import*, so
+ * the plan's count of mock imports in this file was zero and the planned `/mock/i` CI rule
+ * (W2-1b) would never have flagged it — the same blind spot F2-33 has. Second, `widgets.tsx`
+ * carried a SECOND copy of the same fabrication with slightly different wording ("New risk
+ * R-0042 added by Sara"), and fixing that one changed nothing on screen because THIS is the
+ * component the executive dashboard renders. Only the browser check caught that; the code
+ * change looked complete.
+ */
 function RecentActivityList() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
-  const items = [
-    { Icon: ShieldCheck,   tone: 'success', textEn: 'Risk R-0042 mitigated by Sara A.', textAr: 'تخفيف المخاطرة R-0042 بواسطة سارة', time: '2m' },
-    { Icon: Award,         tone: 'primary', textEn: 'ECC control AC-3 evidence approved', textAr: 'اعتماد دليل الضابط AC-3', time: '14m' },
-    { Icon: AlertTriangle, tone: 'danger',  textEn: 'KRI threshold breached: failed logins', textAr: 'تجاوز عتبة المؤشّر: محاولات دخول فاشلة', time: '1h' },
-    { Icon: Clock,         tone: 'warning', textEn: 'Vendor reassessment overdue: Cloud4Saudi', textAr: 'تأخّر إعادة تقييم المورّد: كلاود فور سعودي', time: '3h' },
-  ];
+  const [events, setEvents] = useState<ActivityEvent[]>(() => loadActivity());
+  useEffect(() => subscribeActivity(() => setEvents(loadActivity())), []);
+
+  const now = Date.now();
+  const ago = (iso: string) => {
+    const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
+    if (mins < 60) return `${mins}m`;
+    if (mins < 1440) return `${Math.round(mins / 60)}h`;
+    return `${Math.round(mins / 1440)}d`;
+  };
+  const look = (action: string) => {
+    switch (action) {
+      case 'CREATED':        return { Icon: Award,         tone: 'success' };
+      case 'TRANSITIONED':   return { Icon: ShieldCheck,   tone: 'primary' };
+      case 'CLOSED':         return { Icon: ShieldCheck,   tone: 'success' };
+      case 'REOPENED':       return { Icon: AlertTriangle, tone: 'danger' };
+      case 'EVIDENCE_ADDED': return { Icon: Award,         tone: 'primary' };
+      default:               return { Icon: Clock,         tone: 'warning' };
+    }
+  };
+  const describe = (e: ActivityEvent) => {
+    const what = `${e.entityType.replace(/-/g, ' ')} ${e.entityId}`;
+    if (e.action === 'TRANSITIONED') return `${what}: ${e.fromStatus ?? '?'} → ${e.toStatus ?? '?'}`;
+    if (isAr) {
+      if (e.action === 'CREATED')  return `إنشاء ${what}`;
+      if (e.action === 'ASSIGNED') return `إسناد ${what}`;
+      return e.noteAr?.trim() || `${e.action} · ${what}`;
+    }
+    if (e.action === 'CREATED')  return `Created ${what}`;
+    if (e.action === 'ASSIGNED') return `Assigned ${what}${e.assigneeId ? ` → ${e.assigneeId}` : ''}`;
+    return e.noteEn?.trim() || `${e.action} · ${what}`;
+  };
+
+  const items = [...events]
+    .sort((a, b) => b.ts.localeCompare(a.ts))
+    .slice(0, 5)
+    .map(e => {
+      const { Icon, tone } = look(e.action);
+      const text = describe(e);
+      return { Icon, tone, textEn: text, textAr: text, time: ago(e.ts) };
+    });
+
+  if (items.length === 0) {
+    return (
+      <div style={{ padding: '20px 4px', font: '500 12.5px var(--font-sans)', color: 'var(--ink-3)', textAlign: 'center' }}>
+        {isAr ? 'لا يوجد نشاط مسجل بعد.' : 'No activity recorded yet.'}
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {items.map((it, i) => (

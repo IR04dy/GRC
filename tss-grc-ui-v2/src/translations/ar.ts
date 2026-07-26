@@ -780,7 +780,7 @@ export const ar = {
   dashSaudiAuthoritySub:         'العمل / التأمينات / نطاقات — تشغيل العمليات والمتطلّبات',
   dashSaudiOpenWorkspace:        'افتح مساحة عمل الموارد البشرية',
   dashKpiOpenIntakes:            'استلامات مفتوحة',
-  dashKpiOverdueReassessments:   'إعادة تقييم الموردين المتأخرة',
+  dashKpiNeverAssessedVendors:   'موردون لم يتم تقييمهم',
   dashKpiCabQueue:                'طابور لجنة CAB',
 
   // ── DD-85: لوحة وزارة التجارة ──────────────────────────────────────

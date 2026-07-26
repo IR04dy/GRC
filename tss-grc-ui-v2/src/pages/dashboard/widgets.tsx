@@ -7,9 +7,15 @@ import { Badge } from '../../components/ui/Badge';
 import { Progress } from '../../components/ui/Progress';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { BarChart3D } from '../../components/viz/BarChart3D';
-import type { DashboardStats } from '../../lib/api';
+import type { DashboardStats, ComplianceFindingDto } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { listFourthParty } from '../../lib/fourthParty';
+// W2-1a-ii: these four widgets used to compute from mock datasets (mockTprm, mockChanges,
+// mockCompliance) imported at module scope, so the dashboard's regulator RAG, CAB queue and
+// overdue-reassessment KPIs were derived from records that do not exist in the tenant.
+import { complianceApi, changeApi, tprmApi } from '../../lib/api';
+import { listVendorAssessments } from '../../lib/tprmQuestionnaire';
+import { loadActivity, subscribeActivity, type ActivityEvent } from '../../lib/activityLog';
 import { listTpc } from '../../lib/thirdPartyCyber';
 import { listSrt } from '../../lib/resilienceTests';
 import { listProcessorAssessments } from '../../lib/processorAssessments';
@@ -18,11 +24,7 @@ import {
   loadNitaqatState, computeSaudization, classifyNitaqatBand, nitaqatMeta,
 } from '../../lib/nitaqat';
 import { useIntake, hoursUntilSla } from '../../lib/intake';
-import { VENDORS } from '../tprm/mockTprm';
-import { VENDOR_TPRM_META } from '../tprm/mockTprm';
-import { reviewBucket } from '../../lib/vendorOnboarding';
-import { CHANGE_REQUESTS } from '../changes/mockChanges';
-import { COMPLIANCE_FINDINGS, AUDIT_ENGAGEMENTS } from '../compliance/mockCompliance';
+
 
 export type WidgetSize = 'sm' | 'md' | 'lg';
 
@@ -78,7 +80,7 @@ export const WIDGETS: DashboardWidget[] = [
         <FrameworksDrill stats={stats} />
       </Card> },
 
-  // Activity (mock)
+  // Activity — real recorded events from lib/activityLog (W2-1a-ii)
   { id: 'activity',          titleKey: 'cardActivity',     defaultSize: 'md', category: 'list',
     render: ({ t }) =>
       <Card title={t('cardActivity')} Icon={Activity}>
@@ -93,8 +95,10 @@ export const WIDGETS: DashboardWidget[] = [
       </Card> },
   { id: 'kpi-open-intakes',           titleKey: 'dashKpiOpenIntakes',           defaultSize: 'sm', isKpi: true, category: 'kpi',
     render: ({ t }) => <OpenIntakesKpi t={t} /> },
-  { id: 'kpi-overdue-reassessments',  titleKey: 'dashKpiOverdueReassessments',  defaultSize: 'sm', isKpi: true, category: 'kpi',
-    render: ({ t }) => <OverdueReassessmentsKpi t={t} /> },
+  // W2-1a-ii: renamed with its metric — the tier/cadence needed for "overdue" exists only
+  // in a frontend mock, so the live KPI is "never assessed" and says so.
+  { id: 'kpi-never-assessed-vendors', titleKey: 'dashKpiNeverAssessedVendors', defaultSize: 'sm', isKpi: true, category: 'kpi',
+    render: ({ t }) => <NeverAssessedVendorsKpi t={t} /> },
   { id: 'kpi-cab-queue',              titleKey: 'dashKpiCabQueue',              defaultSize: 'sm', isKpi: true, category: 'kpi',
     render: ({ t }) => <CabQueueKpi t={t} /> },
 
@@ -118,7 +122,7 @@ export const DEFAULT_LAYOUT: Array<{ id: string; size: WidgetSize }> = [
   // DD-87: front-door + workflow KPIs surface the modules that previously
   // only showed up under deep tabs (Services Center, TPRM reassessment, CAB).
   { id: 'kpi-open-intakes',           size: 'sm' },
-  { id: 'kpi-overdue-reassessments',  size: 'sm' },
+  { id: 'kpi-never-assessed-vendors', size: 'sm' },
   { id: 'kpi-cab-queue',              size: 'sm' },
   { id: 'kpi-critical-risks',         size: 'sm' },
   { id: 'tprm-snapshot',              size: 'lg' },
@@ -196,8 +200,13 @@ interface RegulatorTile {
   /** What this regulator covers, single-clause description for the tile body. */
   scopeEnShort: string;
   scopeArShort: string;
-  /** Headline number to render large. */
-  metric: number | string;
+  /**
+   * Headline number to render large. `null` means NOT MEASURED — W2-1a-ii: four of these
+   * tiles were fed by a mock array with no live replacement, and a 0 on a regulator tile is
+   * a compliance assertion ("nothing open against CMA"), not an honest absence. The tile
+   * renders an em dash and a neutral chip instead.
+   */
+  metric: number | string | null;
   /** EN/AR label under the metric. */
   metricLabelEn: string;
   metricLabelAr: string;
@@ -208,11 +217,31 @@ interface RegulatorTile {
   statusAr: string;
 }
 
-/** Build the regulator tile array from live compliance data. */
+/**
+ * Build the regulator tile array from live compliance data.
+ *
+ * W2-1a-ii — this function's name and comments always claimed "live compliance data" and it
+ * read `COMPLIANCE_FINDINGS`, a mock array. The RAG status on the Saudi regulator tiles —
+ * the first thing an executive sees on the dashboard — was therefore green/amber/red against
+ * findings that do not exist in the tenant. Now fetched from complianceApi.findings().
+ *
+ * Until the fetch resolves (and if it fails) the tiles render a null metric rather than 0: a
+ * zero would read as "no open findings against NCA ECC", which is a compliance assertion and
+ * not a loading state.
+ */
 function useSaudiRegulatorTiles(): RegulatorTile[] {
+  const [findings, setFindings] = useState<ComplianceFindingDto[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    complianceApi.findings(0, 500)
+      .then(r => { if (live) setFindings(r.content); })
+      .catch(() => { if (live) setFindings(null); });
+    return () => { live = false; };
+  }, []);
+
   // ── Helpers — derive RAG from real finding counts ────────────────
   const findingsForFramework = (frameworkId: number) =>
-    COMPLIANCE_FINDINGS.filter(f => f.frameworkId === frameworkId && f.status !== 'CLOSED');
+    (findings ?? []).filter(f => f.frameworkId === frameworkId && f.status !== 'CLOSED');
   const ragFromFindings = (open: number, critical: number): 'success' | 'warning' | 'danger' => {
     if (critical > 0 || open >= 5) return 'danger';
     if (open > 0)                  return 'warning';
@@ -240,16 +269,19 @@ function useSaudiRegulatorTiles(): RegulatorTile[] {
   const band = classifyNitaqatBand(saudization);
   const nitaqatMetaInfo = nitaqatMeta(band);
 
-  // ── CMA, CITC, ZATCA, NCEMA — use audit-engagement coverage as a
-  //    proxy when we don't have direct finding-frameworks for them.
-  //    Tiles still render the count + status; clicking them goes to
-  //    the authority workspace where the deep data lives.
-  const engagementsFor = (fwPrefix: string) =>
-    AUDIT_ENGAGEMENTS.filter(e => (e.framework ?? '').toUpperCase().includes(fwPrefix)).length;
-  const cmaCount   = engagementsFor('CMA');
-  const citcCount  = engagementsFor('CITC') + engagementsFor('CLOUD');
-  const zatcaCount = engagementsFor('ZATCA');
-  const ncemaCount = engagementsFor('NCEMA') + engagementsFor('ISO_22301');
+  // ── CMA, CITC, ZATCA, NCEMA ─────────────────────────
+  // These four used audit-engagement coverage as a proxy, read from the mock
+  // AUDIT_ENGAGEMENTS array. There is NO live list endpoint for audit engagements
+  // (lib/auditEngagement.ts only derives milestones from one already fetched — the same gap
+  // W2-1a-i hit when indexing them for search), so there is nothing to substitute. Rather
+  // than keep a fabricated count or substitute a zero, the metric is null and the tile
+  // renders an em dash: the tenant may well have CMA obligations, and claiming "0" would be
+  // a stronger and more wrong statement than "not measured here". Clicking through to the
+  // authority workspace still reaches the real data.
+  const cmaCount   = null;
+  const citcCount  = null;
+  const zatcaCount = null;
+  const ncemaCount = null;
 
   return [
     {
@@ -294,11 +326,11 @@ function useSaudiRegulatorTiles(): RegulatorTile[] {
       scopeEnShort: 'Listed-company governance',
       scopeArShort: 'حوكمة الشركات المساهمة',
       metric: cmaCount,
-      metricLabelEn: 'active engagements',
-      metricLabelAr: 'مهام نشطة',
-      status: cmaCount > 0 ? 'info' : 'success',
-      statusEn: cmaCount > 0 ? 'In progress' : 'On track',
-      statusAr: cmaCount > 0 ? 'قيد التنفيذ' : 'ضمن المسار',
+      metricLabelEn: 'not measured here',
+      metricLabelAr: 'غير مُقاس هنا',
+      status: 'info',
+      statusEn: 'Open workspace',
+      statusAr: 'افتح مساحة العمل',
     },
     {
       code: 'CITC',
@@ -306,11 +338,11 @@ function useSaudiRegulatorTiles(): RegulatorTile[] {
       scopeEnShort: 'Telecom + Cloud Computing Regs',
       scopeArShort: 'الاتصالات وضوابط الحوسبة السحابية',
       metric: citcCount,
-      metricLabelEn: 'active engagements',
-      metricLabelAr: 'مهام نشطة',
-      status: citcCount > 0 ? 'info' : 'success',
-      statusEn: citcCount > 0 ? 'In progress' : 'On track',
-      statusAr: citcCount > 0 ? 'قيد التنفيذ' : 'ضمن المسار',
+      metricLabelEn: 'not measured here',
+      metricLabelAr: 'غير مُقاس هنا',
+      status: 'info',
+      statusEn: 'Open workspace',
+      statusAr: 'افتح مساحة العمل',
     },
     {
       code: 'ZATCA',
@@ -318,11 +350,11 @@ function useSaudiRegulatorTiles(): RegulatorTile[] {
       scopeEnShort: 'E-invoicing (Fatoorah), VAT, Customs',
       scopeArShort: 'الفوترة الإلكترونية والضرائب والجمارك',
       metric: zatcaCount,
-      metricLabelEn: 'active engagements',
-      metricLabelAr: 'مهام نشطة',
-      status: zatcaCount > 0 ? 'info' : 'success',
-      statusEn: zatcaCount > 0 ? 'In progress' : 'On track',
-      statusAr: zatcaCount > 0 ? 'قيد التنفيذ' : 'ضمن المسار',
+      metricLabelEn: 'not measured here',
+      metricLabelAr: 'غير مُقاس هنا',
+      status: 'info',
+      statusEn: 'Open workspace',
+      statusAr: 'افتح مساحة العمل',
     },
     {
       code: 'HRSD',
@@ -345,11 +377,11 @@ function useSaudiRegulatorTiles(): RegulatorTile[] {
       scopeEnShort: 'Business Continuity (ISO 22301)',
       scopeArShort: 'استمرارية الأعمال (آيزو 22301)',
       metric: ncemaCount,
-      metricLabelEn: 'active exercises',
-      metricLabelAr: 'تمارين قائمة',
-      status: ncemaCount > 0 ? 'info' : 'success',
-      statusEn: ncemaCount > 0 ? 'In progress' : 'On track',
-      statusAr: ncemaCount > 0 ? 'قيد التنفيذ' : 'ضمن المسار',
+      metricLabelEn: 'not measured here',
+      metricLabelAr: 'غير مُقاس هنا',
+      status: 'info',
+      statusEn: 'Open workspace',
+      statusAr: 'افتح مساحة العمل',
     },
   ];
 }
@@ -419,7 +451,7 @@ function SaudiPostureWidget({ t: _t }: { t: (k: string) => string }) {
             {/* Headline metric */}
             <div style={{ marginTop: 12, display: 'flex', alignItems: 'baseline', gap: 6 }}>
               <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink-1)', lineHeight: 1 }}>
-                {tile.metric}
+                {tile.metric ?? '—'}
               </span>
               <span className="text-2xs text-muted">
                 {isAr ? tile.metricLabelAr : tile.metricLabelEn}
@@ -453,54 +485,149 @@ function OpenIntakesKpi({ t }: { t: (k: string) => string }) {
   />;
 }
 
-/** Overdue vendor reassessments — clicks through to the TPRM dashboard. */
-function OverdueReassessmentsKpi({ t }: { t: (k: string) => string }) {
-  const overdueCount = VENDORS.reduce((acc, v) => {
-    const meta = VENDOR_TPRM_META[v.id];
-    if (!meta || meta.onboardingStage !== 'ACTIVE') return acc;
-    return reviewBucket(meta.tier, meta.lastAssessedAt) === 'OVERDUE' ? acc + 1 : acc;
-  }, 0);
+/**
+ * Vendors with no assessment on record — clicks through to the TPRM dashboard.
+ *
+ * W2-1a-ii — this KPI used to read "overdue reassessments" from `VENDOR_TPRM_META`, a mock
+ * map keyed by mock vendor id. It could not be ported as-is: the tier and reassessment
+ * cadence it depends on (`reviewBucket(tier, lastAssessedAt)`) exist ONLY in that frontend
+ * mock. `TprmVendorDto` carries no tier and no last-assessed date, and `riskRating`
+ * (HIGH/CRITICAL) does not map to `VendorTier` (TIER_1..4) — so picking a mapping would mean
+ * inventing this tenant's reassessment policy, the same fabrication in a new place.
+ *
+ * What IS live and meaningful: active vendors with no assessment row at all. It needs no
+ * cadence assumption, and "this supplier has never been assessed" is a stronger TPRM signal
+ * than a date slipping. The label changes with it — a KPI must not keep a name it no longer
+ * means.
+ */
+function NeverAssessedVendorsKpi({ t }: { t: (k: string) => string }) {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    Promise.all([tprmApi.vendors(0, 500), listVendorAssessments()])
+      .then(([vendors, assessments]) => {
+        if (!live) return;
+        const assessed = new Set(assessments.map(a => a.vendorId));
+        const active = vendors.content.filter(v => (v.status ?? '').toUpperCase() === 'ACTIVE');
+        setCount(active.filter(v => !assessed.has(v.id)).length);
+      })
+      .catch(() => { if (live) setCount(null); });
+    return () => { live = false; };
+  }, []);
   return <Kpi
     Icon={Clock}
-    label={t('dashKpiOverdueReassessments')}
-    value={overdueCount}
-    tone={overdueCount > 0 ? 'warning' : 'success'}
+    label={t('dashKpiNeverAssessedVendors')}
+    value={count ?? '—'}
+    tone={count == null ? 'neutral' : count > 0 ? 'warning' : 'success'}
     to="/tprm"
   />;
 }
 
-/** CAB queue — change requests in CAB review or pending approval. */
+const CAB_IN_FLIGHT = ['CAB_REVIEW', 'IMPACT_ASSESSMENT', 'SCHEDULED', 'SUBMITTED'];
+
+/**
+ * CAB queue — change requests in CAB review or pending approval.
+ * W2-1a-ii: counted from the mockChanges array; now from changeApi.list(). Null while
+ * loading or on failure, so the tile shows an em dash rather than asserting an empty CAB.
+ */
 function CabQueueKpi({ t }: { t: (k: string) => string }) {
-  const inFlight = CHANGE_REQUESTS.filter(c =>
-    c.status === 'CAB_REVIEW' || c.status === 'IMPACT_ASSESSMENT' || c.status === 'SCHEDULED' || c.status === 'SUBMITTED'
-  ).length;
+  const [inFlight, setInFlight] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    changeApi.list({ size: 500 })
+      .then(r => { if (live) setInFlight(r.content.filter(c => CAB_IN_FLIGHT.includes(c.status ?? '')).length); })
+      .catch(() => { if (live) setInFlight(null); });
+    return () => { live = false; };
+  }, []);
   return <Kpi
     Icon={GitBranch}
     label={t('dashKpiCabQueue')}
-    value={inFlight}
+    value={inFlight ?? '—'}
     tone="info"
     to="/changes"
   />;
 }
 
+/** Icon + tone per recorded action, so the feed reads at a glance. */
+const ACTIVITY_LOOK: Record<string, { Icon: typeof Plus; color: string }> = {
+  CREATED:        { Icon: Plus,          color: 'var(--success-fg)' },
+  TRANSITIONED:   { Icon: Check,         color: 'var(--primary)' },
+  CLOSED:         { Icon: Check,         color: 'var(--success-fg)' },
+  REOPENED:       { Icon: AlertTriangle, color: 'var(--danger-fg)' },
+  ASSIGNED:       { Icon: FileText,      color: 'var(--accent-700)' },
+  COMMENTED:      { Icon: FileText,      color: 'var(--ink-3)' },
+  EVIDENCE_ADDED: { Icon: FileText,      color: 'var(--primary)' },
+  NOTIFIED:       { Icon: FileText,      color: 'var(--ink-3)' },
+};
+
+/** "2m" / "14m" / "3h" / "5d" from a timestamp. */
+function agoLabel(iso: string, now: number): string {
+  const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
+  if (mins < 60) return `${mins}m`;
+  if (mins < 1440) return `${Math.round(mins / 60)}h`;
+  return `${Math.round(mins / 1440)}d`;
+}
+
+function describeActivity(e: ActivityEvent): string {
+  const what = `${e.entityType.replace(/-/g, ' ')} ${e.entityId}`;
+  switch (e.action) {
+    case 'CREATED':    return `Created ${what}`;
+    case 'TRANSITIONED': return `${what}: ${e.fromStatus ?? '?'} → ${e.toStatus ?? '?'}`;
+    case 'ASSIGNED':   return `Assigned ${what}${e.assigneeId ? ` to ${e.assigneeId}` : ''}`;
+    default:           return e.noteEn?.trim() || `${e.action} · ${what}`;
+  }
+}
+
+/**
+ * Recent activity.
+ *
+ * W2-1a-ii — this was FOUR HARDCODED LINES presented as a live feed with relative
+ * timestamps: "New risk R-0042 added by Sara", "Control AC-3 evidence approved",
+ * "KRI threshold breached: failed logins", "Policy v2.4 sent for attestation". None of it
+ * ever happened, and `R-0042` is the same mock risk code W2-1a-i proved is not findable in
+ * the tenant — so the dashboard reported the creation of a record that does not exist.
+ *
+ * Worth naming precisely: this was NOT a mock *import*, which is why the plan's count of
+ * four mock imports in this file missed it and why the planned `/mock/i` CI rule (W2-1b)
+ * would never have caught it. It is the same blind spot F2-33 has — fabrication written
+ * inline rather than imported. A CI rule that greps for mock imports cannot see either.
+ *
+ * Now rendered from the real activity log (`lib/activityLog.ts`), which records genuine user
+ * actions — transitions, creations, assignments — as they happen, and subscribes so the tile
+ * updates live. An empty log renders an empty state, because a new tenant genuinely has no
+ * activity yet and saying so is the honest answer.
+ */
 function ActivityFeed() {
-  const items = [
-    { Icon: Plus,          color: 'var(--success-fg)', text: 'New risk R-0042 added by Sara',          time: '2m' },
-    { Icon: Check,         color: 'var(--primary)',    text: 'Control AC-3 evidence approved',         time: '14m' },
-    { Icon: AlertTriangle, color: 'var(--danger-fg)',  text: 'KRI threshold breached: failed logins', time: '1h' },
-    { Icon: FileText,      color: 'var(--accent-700)', text: 'Policy v2.4 sent for attestation',       time: '3h' },
-  ];
+  const [events, setEvents] = useState<ActivityEvent[]>(() => loadActivity());
+  useEffect(() => subscribeActivity(() => setEvents(loadActivity())), []);
+
+  const recent = [...events]
+    .sort((a, b) => b.ts.localeCompare(a.ts))
+    .slice(0, 6);
+  const now = Date.now();
+
+  if (recent.length === 0) {
+    return (
+      <div style={{ padding: '18px 4px', fontSize: 13, color: 'var(--ink-3)', textAlign: 'center' }}>
+        No activity recorded yet.
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
-      {items.map((it, k) => (
-        <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--surface-3)', color: it.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <it.Icon size={14} />
+      {recent.map(e => {
+        const look = ACTIVITY_LOOK[e.action] ?? { Icon: AlertTriangle, color: 'var(--ink-3)' };
+        return (
+          <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--surface-3)', color: look.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <look.Icon size={14} />
+            </div>
+            <div style={{ flex: 1, color: 'var(--ink-1)' }}>{describeActivity(e)}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>{agoLabel(e.ts, now)}</div>
           </div>
-          <div style={{ flex: 1, color: 'var(--ink-1)' }}>{it.text}</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>{it.time}</div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

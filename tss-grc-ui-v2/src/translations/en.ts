@@ -784,7 +784,7 @@ export const en = {
   dashSaudiAuthoritySub:         'Labor / GOSI / Nitaqat — process initiation + requirements',
   dashSaudiOpenWorkspace:        'Open the HRSD workspace',
   dashKpiOpenIntakes:            'Open intakes',
-  dashKpiOverdueReassessments:   'Overdue vendor reassessments',
+  dashKpiNeverAssessedVendors:   'Vendors never assessed',
   dashKpiCabQueue:                'CAB queue',
 
   // ── DD-85: MOC (Ministry of Commerce) panel ─────────────────────────
