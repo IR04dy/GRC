@@ -1,5 +1,6 @@
 package com.tss.grc.module.ndi.cycle.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -69,7 +70,9 @@ public class NdiAssessmentCycle {
     @Column(name = "submission_readiness_status", length = 20)
     private String submissionReadinessStatus;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_by", length = 255) private String approvedBy;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at")  private LocalDateTime approvedAt;
     @Column(name = "submitted_at") private LocalDateTime submittedAt;
     @Column(name = "closed_at")    private LocalDateTime closedAt;

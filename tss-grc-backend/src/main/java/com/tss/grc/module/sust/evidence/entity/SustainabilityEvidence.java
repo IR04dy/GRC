@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.evidence.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -71,7 +72,9 @@ public class SustainabilityEvidence {
     @Column(name = "owner_email", length = 255) private String ownerEmail;
     @Column(name = "reviewer_name", length = 255) private String reviewerName;
     @Column(name = "reviewed_at")                  private LocalDateTime reviewedAt;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_by",  length = 255)   private String approvedBy;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at")                  private LocalDateTime approvedAt;
 
     @Column(name = "supersedes_id") private Long supersedesId;

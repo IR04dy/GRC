@@ -1,5 +1,6 @@
 package com.tss.grc.module.tprm.cyber.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -69,6 +70,7 @@ public class ThirdPartyCyberAssessment {
 
     @Column(name = "assessed_at")  private LocalDateTime assessedAt;
     @Column(name = "assessor_name", length = 255) private String assessorName;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at")  private LocalDateTime approvedAt;
     @Column(name = "approver_name", length = 255) private String approverName;
 

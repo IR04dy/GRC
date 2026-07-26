@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.materiality.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -77,7 +78,9 @@ public class MaterialTopic {
     @Column(name = "owner_email",  length = 255) private String ownerEmail;
     @Column(columnDefinition = "NVARCHAR(MAX)") private String notes;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at")              private LocalDateTime approvedAt;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_by", length = 255) private String approvedBy;
 
     @Column(name = "is_deleted", nullable = false) private Boolean isDeleted = false;

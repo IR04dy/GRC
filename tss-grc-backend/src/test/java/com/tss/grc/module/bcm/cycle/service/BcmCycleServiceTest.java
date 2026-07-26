@@ -169,4 +169,90 @@ class BcmCycleServiceTest {
         assertThatThrownBy(() -> service.createGovernance(body))
             .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("review frequency");
     }
+
+    // ── F2-22b(ii): create must not be a shortcut into an approved state ──────────────────
+    //
+    // Both creates read "if (status == null) DRAFT" and then validated the value against a set that
+    // CONTAINS APPROVED. So POST /cycles {"status":"APPROVED"} landed an approved cycle without
+    // passing a single rule in transition() — no state chain, no server-side approvedBy stamp, no
+    // TRANSITION audit row. And because updateCycle() refuses to edit an APPROVED cycle, the forged
+    // record was then immutable except by transition. `approvedBy`/`approvedAt` were bindable from
+    // the same body, so the approval could also name anyone: DF-4's defect on a second surface.
+
+    @Test void cycle_cannotBeCreatedAlreadyApproved() {
+        BcmAssessmentCycle body = cycle(null);
+        body.setId(null);
+        body.setStatus("APPROVED");
+        body.setApprovedBy("the_ceo");
+
+        assertThatThrownBy(() -> service.createCycle(body))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("created at DRAFT")
+            .hasMessageContaining("status=APPROVED")
+            // the refusal has to say where to go instead, or it is just an obstacle
+            .hasMessageContaining("/cycles/{id}/transition");
+    }
+
+    @Test void cycle_cannotBeCreatedMidChainEither() {
+        BcmAssessmentCycle body = cycle(null);
+        body.setId(null);
+        body.setStatus("UNDER_REVIEW");
+
+        assertThatThrownBy(() -> service.createCycle(body))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("status=UNDER_REVIEW");
+    }
+
+    @Test void cycle_createdAtDraftWhetherOrNotTheBodySaysSo() {
+        when(cycles.findByOrganisationIdAndReportingYear(ORG_ID, (short) 2025))
+            .thenReturn(Optional.empty());
+        when(cycles.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        BcmAssessmentCycle silent = cycle(null);
+        silent.setId(null);
+        silent.setStatus(null);
+        assertThat(service.createCycle(silent).getStatus()).isEqualTo("DRAFT");
+
+        BcmAssessmentCycle explicit = cycle(null);
+        explicit.setId(null);
+        explicit.setStatus("DRAFT");
+        assertThat(service.createCycle(explicit).getStatus())
+            .as("a UI that posts DRAFT explicitly must keep working — that is what NdiPage does")
+            .isEqualTo("DRAFT");
+    }
+
+    @Test void gov_cannotBeCreatedAlreadyActive() {
+        BcmGovernanceRecord body = gov("ACTIVE");
+        body.setId(null);
+
+        assertThatThrownBy(() -> service.createGovernance(body))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("approvalStatus=ACTIVE")
+            .hasMessageContaining("/governance/{id}/transition");
+    }
+
+    /**
+     * The transition path is the one that may set them, and it stamps the actor rather than reading
+     * a name from the body — asserted by {@code gov_underReviewToApprovedStampsApprover} above.
+     * This pins the other half: the fields are no longer deserialisable at all, so no create or
+     * update can supply them however the service is written.
+     */
+    @Test void approvalProvenanceIsNotDeserialisable() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+            .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+
+        BcmGovernanceRecord bound = mapper.readValue(
+            "{\"policyTitleEn\":\"BCM Policy\",\"approvedBy\":\"the_ceo\","
+            + "\"approvedAt\":\"2001-01-01T00:00:00\"}", BcmGovernanceRecord.class);
+
+        assertThat(bound.getPolicyTitleEn()).as("ordinary fields still bind").isEqualTo("BCM Policy");
+        assertThat(bound.getApprovedBy()).isNull();
+        assertThat(bound.getApprovedAt()).isNull();
+
+        // ...and they must still be SERIALISED, or the approval column vanishes from every screen
+        // and export that shows who approved a record (the F2-22a @JsonIgnore trap).
+        BcmGovernanceRecord out = gov("APPROVED");
+        out.setApprovedBy("real_approver");
+        assertThat(mapper.writeValueAsString(out)).contains("\"approvedBy\":\"real_approver\"");
+    }
 }

@@ -105,7 +105,19 @@ public class BcmBiaAssessmentService {
         body.setId(null);
         Long org = TenantContext.getCurrentTenant();
         body.setOrganisationId(org);
-        if (body.getApprovalStatus() == null) body.setApprovalStatus("DRAFT");
+        // F2-22b(ii) — a BIA is created at DRAFT and reaches APPROVED only through transition().
+        //
+        // Accepting the body's approvalStatus skipped that method's approval gate outright:
+        // "APPROVED" requires mtpdHours to be set, RTO ≤ MTPD, and criticality recomputed. A create
+        // supplying approvalStatus=APPROVED produced an approved BIA with no MTPD and an unchecked
+        // recovery objective — the number the whole BCM programme is built on. Rejected, not
+        // silently downgraded (F2-44).
+        if (body.getApprovalStatus() != null && !"DRAFT".equals(body.getApprovalStatus()))
+            throw new IllegalArgumentException(
+                "A new BIA is created at DRAFT; approvalStatus=" + body.getApprovalStatus()
+                + " was rejected because approval requires mtpdHours and RTO ≤ MTPD, which this "
+                + "endpoint does not check. Create it, then POST /bia-assessments/{id}/transition.");
+        body.setApprovalStatus("DRAFT");
         if (body.getBiaCode() == null || body.getBiaCode().isBlank()) {
             body.setBiaCode(nextCode());
         }

@@ -1,5 +1,6 @@
 package com.tss.grc.module.ndi.plan.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -46,6 +47,7 @@ public class NdiImprovementPlan {
     @Column(name = "owner_name",     length = 255) private String ownerName;
     @Column(name = "owner_email",    length = 255) private String ownerEmail;
     @Column(name = "approver_name",  length = 255) private String approverName;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at")                  private LocalDateTime approvedAt;
 
     @Column(nullable = false, length = 20) private String status;

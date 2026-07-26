@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.ghg.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -77,6 +78,7 @@ public class GhgEmissionRecord {
 
     @Column(nullable = false, length = 20) private String status = "DRAFT";
     @Column(name = "submitted_at")          private LocalDateTime submittedAt;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at")           private LocalDateTime approvedAt;
 
     @Column(name = "is_deleted", nullable = false) private Boolean isDeleted = false;

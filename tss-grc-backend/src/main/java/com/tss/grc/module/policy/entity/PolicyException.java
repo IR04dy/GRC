@@ -1,5 +1,6 @@
 package com.tss.grc.module.policy.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -46,6 +47,7 @@ public class PolicyException {
 
     @Column(name = "requested_at",  nullable = false) private LocalDateTime requestedAt;
     @Column(name = "reviewed_at")                     private LocalDateTime reviewedAt;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at")                     private LocalDateTime approvedAt;
     @Column(name = "rejected_at")                     private LocalDateTime rejectedAt;
     @Column(name = "rejection_reason", columnDefinition = "NVARCHAR(MAX)") private String rejectionReason;

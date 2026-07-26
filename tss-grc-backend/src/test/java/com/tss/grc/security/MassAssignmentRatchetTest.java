@@ -1,5 +1,6 @@
 package com.tss.grc.security;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.tss.grc.common.model.BaseEntity;
@@ -260,6 +261,15 @@ class MassAssignmentRatchetTest {
                         }
                         for (Field f : k.getDeclaredFields()) {
                             String n = f.getName();
+                            // F2-22b(ii) — a field already marked READ_ONLY cannot arrive from a
+                            // caller, so it is not part of this endpoint's risk. Without this the
+                            // ranking is a static census and cannot show the tranches making
+                            // progress: it would still list approvedBy on 21 entities that no
+                            // longer bind it.
+                            JsonProperty jp = f.getAnnotation(JsonProperty.class);
+                            if (jp != null && jp.access() == JsonProperty.Access.READ_ONLY) {
+                                continue;
+                            }
                             if (TENANT.contains(n)) { hits.add(n); tenant = true; }
                             else if (AUTHORITY.contains(n)) { hits.add(n); authority = true; }
                             else if (OUTCOME.contains(n)) { hits.add(n); outcome = true; }

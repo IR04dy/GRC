@@ -1,5 +1,6 @@
 package com.tss.grc.module.ndi.compliance.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -79,6 +80,7 @@ public class NdiComplianceAssessment {
     @Column(name = "lifecycle_status", nullable = false, length = 20) private String lifecycleStatus = "DRAFT";
     @Column(name = "submitted_at") private LocalDateTime submittedAt;
     @Column(name = "reviewed_at")  private LocalDateTime reviewedAt;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at")  private LocalDateTime approvedAt;
     @Column(name = "returned_at")  private LocalDateTime returnedAt;
     @Column(name = "return_reason", columnDefinition = "NVARCHAR(MAX)") private String returnReason;

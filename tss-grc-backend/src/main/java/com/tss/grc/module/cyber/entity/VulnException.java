@@ -1,5 +1,6 @@
 package com.tss.grc.module.cyber.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -50,6 +51,7 @@ public class VulnException {
     private LocalDate expiryDate;
 
     @Column(name = "approved_at")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private LocalDate approvedAt;
 
     @Column(name = "is_deleted", nullable = false)

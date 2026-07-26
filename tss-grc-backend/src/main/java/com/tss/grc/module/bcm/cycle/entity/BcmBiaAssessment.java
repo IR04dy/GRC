@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -126,9 +127,11 @@ public class BcmBiaAssessment {
     private String approvalStatus = "DRAFT";
 
     @Column(name = "approved_by", length = 255)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String approvedBy;
 
     @Column(name = "approved_at")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private LocalDateTime approvedAt;
 
     /** Soft FK back to the BCM plan generated from this BIA, if any. */

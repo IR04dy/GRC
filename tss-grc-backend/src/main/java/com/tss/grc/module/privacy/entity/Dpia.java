@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -61,6 +62,7 @@ public class Dpia {
     private LocalDate nextReviewDate;
 
     @Column(name = "approved_at")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private LocalDateTime approvedAt;
 
     @Column(name = "rejected_at")

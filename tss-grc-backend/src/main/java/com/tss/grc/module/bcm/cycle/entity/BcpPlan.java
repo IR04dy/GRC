@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -75,7 +76,9 @@ public class BcpPlan {
     @Column(name = "current_version", nullable = false)
     private Integer currentVersion = 1;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_by", length = 255) private String        approvedBy;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at")               private LocalDateTime approvedAt;
     @Column(name = "published_at")              private LocalDateTime publishedAt;
     @Column(name = "last_exercised_at")         private LocalDateTime lastExercisedAt;

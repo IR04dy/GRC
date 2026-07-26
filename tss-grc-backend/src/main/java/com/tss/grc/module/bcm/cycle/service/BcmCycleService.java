@@ -129,9 +129,17 @@ public class BcmCycleService {
                 "A BCM cycle already exists for reporting year " + body.getReportingYear());
         body.setId(null);
         body.setOrganisationId(org());
-        if (body.getStatus() == null) body.setStatus("DRAFT");
-        if (!CYCLE_STATUSES.contains(body.getStatus()))
-            throw new IllegalArgumentException("Invalid status: " + body.getStatus());
+        // F2-22b(ii) — a new cycle starts at DRAFT and gets anywhere else only by transition.
+        //
+        // This used to read "if (status == null) DRAFT" and then validate the value against
+        // CYCLE_STATUSES — which contains APPROVED. So POST /cycles {"status":"APPROVED"} created an
+        // already-approved cycle, skipping every rule in transition() (DRAFT → IN_PROGRESS →
+        // UNDER_REVIEW → APPROVED), its server-side approvedBy stamp and its audit trail. Since
+        // updateCycle() refuses to edit an APPROVED cycle, the forged record was then immutable
+        // except by transition. Rejected rather than silently downgraded: F2-44 is the cost of
+        // quietly dropping a field a caller sent.
+        requireInitialState(body.getStatus(), "DRAFT", "status", "/cycles/{id}/transition");
+        body.setStatus("DRAFT");
         BcmAssessmentCycle saved = cycles.save(body);
         auditCycle(saved, "CREATE", null, saved.getStatus(),
             "BCM cycle created: " + saved.getCycleNameEn());
@@ -217,9 +225,11 @@ public class BcmCycleService {
         body.setId(null);
         body.setOrganisationId(org());
         if (body.getPolicyVersion() == null) body.setPolicyVersion("1.0");
-        if (body.getApprovalStatus() == null) body.setApprovalStatus("DRAFT");
-        if (!GOVERNANCE_STATUSES.contains(body.getApprovalStatus()))
-            throw new IllegalArgumentException("Invalid approval status: " + body.getApprovalStatus());
+        // F2-22b(ii) — same bypass as createCycle: GOVERNANCE_STATUSES contains APPROVED and ACTIVE,
+        // so a create could publish an approved BCM policy record without passing the review chain.
+        requireInitialState(body.getApprovalStatus(), "DRAFT", "approvalStatus",
+                            "/governance/{id}/transition");
+        body.setApprovalStatus("DRAFT");
         BcmGovernanceRecord saved = governance.save(body);
         auditGovernance(saved, "CREATE", null, saved.getApprovalStatus(),
             "Governance record created: " + saved.getPolicyTitleEn());
@@ -295,6 +305,29 @@ public class BcmCycleService {
     // ─── Helpers ───────────────────────────────────────────────────
 
     /** A non-null committee link must reference a real committee in this org. */
+    /**
+     * F2-22b(ii) — refuse a create that asks to start anywhere but the state machine's first state.
+     *
+     * <p>Rejecting is deliberate. Silently forcing the initial state would be the F2-44 defect — a
+     * caller sends a field, gets a 200, and the value is gone with no explanation. Naming the
+     * transition endpoint in the message turns the refusal into instructions.
+     *
+     * @param requested what the request body asked for, or {@code null} to accept the default
+     * @param initial   the only state a new record may be created in
+     * @param field     the field name, so the message names what the caller actually sent
+     * @param transitionPath where the caller should go instead
+     */
+    private static void requireInitialState(String requested, String initial,
+                                           String field, String transitionPath) {
+        if (requested == null || initial.equals(requested)) {
+            return;
+        }
+        throw new IllegalArgumentException(
+            "A new record is created at " + initial + "; " + field + "=" + requested
+            + " was rejected because reaching that state has preconditions this endpoint does not "
+            + "check. Create it, then POST " + transitionPath + ".");
+    }
+
     private void validateCommittee(Long committeeId) {
         if (committeeId == null) return;
         committees.findByIdAndOrganisationId(committeeId, org()).orElseThrow(() ->

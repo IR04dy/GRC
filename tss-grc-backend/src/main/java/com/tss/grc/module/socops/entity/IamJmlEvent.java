@@ -1,5 +1,6 @@
 package com.tss.grc.module.socops.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.tss.grc.common.model.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -46,6 +47,7 @@ public class IamJmlEvent extends BaseEntity {
     @Column(name = "sod_violation_detail", columnDefinition = "NVARCHAR(MAX)") private String sodViolationDetail;
 
     @Column(name = "requested_at") private LocalDateTime requestedAt;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at") private LocalDateTime approvedAt;
     @Column(name = "completed_at") private LocalDateTime completedAt;
     @Column(name = "revoked_at") private LocalDateTime revokedAt;

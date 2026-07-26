@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.processor.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -57,6 +58,7 @@ public class ProcessorAssessment {
     @Column(name = "assessed_at")     private LocalDateTime assessedAt;
     @Column(name = "assessed_by")     private Long          assessedBy;
     @Column(name = "assessor_name", length = 255) private String assessorName;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at")     private LocalDateTime approvedAt;
     @Column(name = "approver_name", length = 255) private String approverName;
 

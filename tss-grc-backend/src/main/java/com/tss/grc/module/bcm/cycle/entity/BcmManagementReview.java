@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -73,9 +74,11 @@ public class BcmManagementReview {
     private String status = "DRAFT";
 
     @Column(name = "approved_by", length = 255)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String approvedBy;
 
     @Column(name = "approved_at")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private LocalDateTime approvedAt;
 
     @Column(name = "notes_en", columnDefinition = "NVARCHAR(MAX)")

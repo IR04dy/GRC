@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.cma.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -72,7 +73,9 @@ public class CmaDisclosure {
     @Column(name = "reviewer_email", length = 255) private String reviewerEmail;
     @Column(name = "last_reviewed_at")              private LocalDateTime lastReviewedAt;
     @Column(name = "approval_status", length = 30)  private String approvalStatus;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_by", length = 255)     private String approvedBy;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at")                    private LocalDateTime approvedAt;
 
     @Column(columnDefinition = "NVARCHAR(MAX)") private String notes;
