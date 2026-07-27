@@ -84,7 +84,7 @@ materially understated (`F-008` — the defect is platform-wide, not one endpoin
 | Processes | [Business-process design](Process/BUSINESS_PROCESS_DESIGN.md), [state machines](Process/STATE_MACHINE_CATALOGUE.md) |
 | Data | [Data architecture](Data/DATA_ARCHITECTURE.md) |
 | Integration | [Integration architecture](Integration/INTEGRATION_ARCHITECTURE.md) |
-| Security | [Security architecture](Security/SECURITY_ARCHITECTURE.md), [abuse cases](Security/ABUSE_CASE_CATALOGUE.md) |
+| Security | [Security architecture](Security/SECURITY_ARCHITECTURE.md), [secure code review (2026-07-26)](Security/SECURE_CODE_REVIEW_2026-07-26.md), [abuse cases](Security/ABUSE_CASE_CATALOGUE.md) |
 | AI | [AI transformation](AI/AI_TRANSFORMATION.md) |
 | Saudi | [Saudi readiness](Saudi/SAUDI_MARKET_AND_REGULATORY_READINESS.md) |
 | Decisions | [ADR index](Decisions/README.md), [rejected ideas](Decisions/REJECTED_IDEAS.md), [lessons learned](Decisions/LESSONS_LEARNED.md) |
