@@ -80,7 +80,7 @@ public class TreatmentPlanDto {
     public static class TransitionRequest {
         @NotBlank @Pattern(regexp = "DRAFT|SUBMITTED|APPROVED|IN_PROGRESS|COMPLETED|REJECTED")
         private String status;
-        private String approvedBy;
+        // F2-22b(vi): approvedBy removed — stamped from the principal.
         private String rejectedReason;
     }
 }

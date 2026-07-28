@@ -8,6 +8,7 @@ import com.tss.grc.module.risk_lc.dto.TreatmentPlanDto;
 import com.tss.grc.module.risk_lc.entity.TreatmentPlan;
 import com.tss.grc.module.risk_lc.repository.TreatmentPlanRepository;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
+import com.tss.grc.common.security.CurrentActor;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -150,7 +151,12 @@ public class TreatmentPlanService {
         p.setStatus(req.getStatus());
         if ("SUBMITTED".equals(req.getStatus()))   p.setSubmittedAt(LocalDateTime.now());
         if ("APPROVED".equals(req.getStatus())) {
-            p.setApprovedBy(req.getApprovedBy());
+            // F2-22b(vi): the approver is the authenticated principal, not the request's.
+            // This line was worse than forgeable — it assigned UNCONDITIONALLY, so when the SPA
+            // omitted the field (it always does: riskLifecycle.transitionPlan passes `by` as
+            // undefined from every caller) it wrote NULL over the approver. Measured before the
+            // fix: the single APPROVED treatment plan in the dev database had no approver at all.
+            p.setApprovedBy(actorOrFail(p.getExternalId()));
             p.setApprovedAt(LocalDateTime.now());
         }
         if ("REJECTED".equals(req.getStatus())) {
@@ -160,8 +166,10 @@ public class TreatmentPlanService {
         audit.log("TRANSITION", "TreatmentPlan", p.getId(),
             "Treatment plan " + nullSafeMsg(p.getExternalId())
                 + " status " + previousStatus + " → " + req.getStatus()
-                + ("APPROVED".equals(req.getStatus()) && req.getApprovedBy() != null
-                    ? " by " + req.getApprovedBy() : "")
+                // F2-22b(vi): the saved entity's approver (the authenticated principal), not
+                // the request's — which was usually null, so the audit row said nothing.
+                + ("APPROVED".equals(req.getStatus()) && p.getApprovedBy() != null
+                    ? " by " + p.getApprovedBy() : "")
                 + ("REJECTED".equals(req.getStatus()) && req.getRejectedReason() != null
                     ? ": " + req.getRejectedReason() : ""));
         // Per-state trigger so downstream rules can target specific lifecycle
@@ -206,5 +214,22 @@ public class TreatmentPlanService {
         Integer maxSeq = repo.findMaxExternalIdSeq(orgId, "TP-" + year + "-%");
         long next = (maxSeq == null ? 0 : maxSeq) + 1;
         return String.format("TP-%d-%03d", year, next);
+    }
+
+    /**
+     * F2-22b(vi) — who approved a risk treatment plan, from the security context.
+     *
+     * <p>Refuses rather than writing null, which is what the previous unconditional
+     * {@code setApprovedBy(req.getApprovedBy())} did on every SPA-driven approval.
+     */
+    private String actorOrFail(String externalId) {
+        String actor = CurrentActor.username();
+        if (actor == null || actor.isBlank()) {
+            throw new IllegalStateException(
+                "No authenticated principal to record as the approver of treatment plan "
+                + externalId + ". Accepting a risk treatment without naming who accepted it"
+                + " leaves the residual-risk decision unattributed.");
+        }
+        return actor;
     }
 }

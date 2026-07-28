@@ -67,9 +67,8 @@ public class BoardPackDto {
     public static class TransitionRequest {
         @NotBlank @Pattern(regexp = "DRAFT|IN_REVIEW|APPROVED|PUBLISHED|CANCELLED")
         private String status;
-        private String reviewedBy;
+        // F2-22b(vi): reviewedBy / approvedBy removed — stamped from the principal.
         private String reviewCommentsEn;
-        private String approvedBy;
         private String publicationUrl;
         private String cancellationReasonEn;
     }

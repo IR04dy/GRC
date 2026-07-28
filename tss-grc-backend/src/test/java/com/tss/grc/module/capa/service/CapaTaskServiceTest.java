@@ -7,6 +7,10 @@ import com.tss.grc.module.capa.entity.CapaTask;
 import com.tss.grc.module.capa.repository.CapaTaskRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
+import com.tss.grc.security.GrcUserDetails;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.AfterEach;
@@ -19,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,8 +54,22 @@ class CapaTaskServiceTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private CapaTaskService service;
 
-    @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
-    @AfterEach  void tearDown() { TenantContext.clear(); }
+    /**
+     * F2-22b(vi) — the CLOSED branch now stamps the verifier from the security context, so these
+     * tests must present a principal. Production always has one (the transition sits behind
+     * {@code @PreAuthorize}); a unit test that omits it was only ever passing because the field
+     * came from the request body.
+     */
+    @BeforeEach void setUp() {
+        TenantContext.setCurrentTenant(ORG_ID);
+        GrcUserDetails p = new GrcUserDetails(9L, ORG_ID, "the_real_auditor", "x", true, true, List.of());
+        Authentication a = new UsernamePasswordAuthenticationToken(p, "x", p.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(a);
+    }
+    @AfterEach  void tearDown() {
+        TenantContext.clear();
+        SecurityContextHolder.clearContext();
+    }
 
     private static CapaTask task(String status) {
         CapaTask t = new CapaTask();
@@ -107,11 +126,12 @@ class CapaTaskServiceTest {
         when(repo.save(any(CapaTask.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CapaTaskDto.TransitionRequest t = tx("CLOSED");
-        t.setVerifiedBy("auditor");
         CapaTaskDto out = service.transition(EXT_ID, t);
 
         assertThat(out.getStatus()).isEqualTo("CLOSED");
-        assertThat(out.getVerifiedBy()).isEqualTo("auditor");
+        // F2-22b(vi): the verifier is the authenticated principal. The request DTO no longer
+        // carries verifiedBy at all, so there is nothing for a caller to name.
+        assertThat(out.getVerifiedBy()).isEqualTo("the_real_auditor");
         assertThat(out.getClosedAt()).isNotNull();
     }
 
@@ -172,13 +192,16 @@ class CapaTaskServiceTest {
         when(repo.save(any(CapaTask.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CapaTaskDto.TransitionRequest t = tx("CLOSED");
-        t.setVerifiedBy("auditor");
         service.transition(EXT_ID, t);
 
         ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
         verify(audit).log(eq("CLOSED"), eq("CapaTask"), eq(77L), message.capture());
         assertThat(message.getValue()).contains("AWAITING_VERIFICATION → CLOSED");
-        assertThat(message.getValue()).contains("verified by auditor");
+        // F2-22b(vi): the audit message reads the verifier off the SAVED entity, so it names the
+        // authenticated principal. It used to echo the request body — meaning the forensic record
+        // repeated whatever the caller claimed, and said nothing at all when the caller (i.e. every
+        // real UI call) omitted the field.
+        assertThat(message.getValue()).contains("verified by the_real_auditor");
     }
 
     @Test
@@ -213,7 +236,6 @@ class CapaTaskServiceTest {
         when(repo.save(any(CapaTask.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CapaTaskDto.TransitionRequest t = tx("CLOSED");
-        t.setVerifiedBy("auditor");
         service.transition(EXT_ID, t);
 
         ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);

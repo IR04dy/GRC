@@ -6,6 +6,7 @@ import com.tss.grc.module.board_pack.dto.BoardPackDto;
 import com.tss.grc.module.board_pack.entity.BoardPack;
 import com.tss.grc.module.board_pack.repository.BoardPackRepository;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
+import com.tss.grc.common.security.CurrentActor;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -94,8 +95,13 @@ public class BoardPackService {
             case "IN_REVIEW" -> p.setSubmittedForReviewAt(now);
             case "APPROVED"  -> {
                 p.setReviewedAt(now); p.setApprovedAt(now);
-                if (req.getReviewedBy() != null) p.setReviewedBy(req.getReviewedBy());
-                if (req.getApprovedBy() != null) p.setApprovedBy(req.getApprovedBy());
+                // F2-22b(vi): a board pack's reviewer and approver are the authenticated
+                // principal. Measured before the fix: only 2 of 9 APPROVED/PUBLISHED packs
+                // named an approver at all, because no UI sends these fields — so the
+                // governance record that goes to the board was both forgeable and usually empty.
+                String actor = actorOrFail(p.getExternalId());
+                p.setReviewedBy(actor);
+                p.setApprovedBy(actor);
                 if (req.getReviewCommentsEn() != null) p.setReviewCommentsEn(req.getReviewCommentsEn());
             }
             case "PUBLISHED" -> {
@@ -127,5 +133,21 @@ public class BoardPackService {
         return String.format("BP-%d-%s",
             LocalDateTime.now().getYear(),
             safe.length() > 6 ? safe.substring(0, 6) : safe);
+    }
+
+    /**
+     * F2-22b(vi) — who reviewed and approved a board pack, from the security context.
+     *
+     * <p>Refuses rather than recording an anonymous approval: this is the governance artefact the
+     * board itself reads, and "approved by nobody" is what 7 of the 9 approved packs already said.
+     */
+    private String actorOrFail(String externalId) {
+        String actor = CurrentActor.username();
+        if (actor == null || actor.isBlank()) {
+            throw new IllegalStateException(
+                "No authenticated principal to record as the approver of board pack " + externalId
+                + ". An approval with no approver is not an approval.");
+        }
+        return actor;
     }
 }

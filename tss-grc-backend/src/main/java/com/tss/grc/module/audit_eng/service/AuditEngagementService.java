@@ -6,6 +6,7 @@ import com.tss.grc.module.audit_eng.dto.AuditEngagementDto;
 import com.tss.grc.module.audit_eng.entity.AuditEngagement;
 import com.tss.grc.module.audit_eng.repository.AuditEngagementRepository;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
+import com.tss.grc.common.util.ExternalIds;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -128,8 +129,9 @@ public class AuditEngagementService {
     }
 
     private String generateExternalId() {
-        return String.format("ENG-%d-%s",
-            LocalDateTime.now().getYear(),
-            Long.toHexString(System.currentTimeMillis()).toUpperCase().substring(0, 6));
+        // F2-48: substring(0, 6) kept the HIGH-ORDER hex digits, so this id changed once
+        // per 2^20 ms (~17.5 min) and every ENG raised in one window collided on the unique
+        // index. Shared generator now, so the tenth copy cannot reintroduce it.
+        return ExternalIds.generate("ENG");
     }
 }

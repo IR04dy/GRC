@@ -11,6 +11,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import com.tss.grc.module.audit_lc.dto.FindingDto;
 import com.tss.grc.module.audit_lc.entity.Finding;
 import com.tss.grc.module.audit_lc.repository.FindingRepository;
+import com.tss.grc.common.util.ExternalIds;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -150,9 +151,10 @@ public class FindingService {
     }
 
     private String generateExternalId() {
-        return String.format("FIN-%d-%s",
-            LocalDateTime.now().getYear(),
-            Long.toHexString(System.currentTimeMillis()).toUpperCase().substring(0, 6));
+        // F2-48: substring(0, 6) kept the HIGH-ORDER hex digits, so this id changed once
+        // per 2^20 ms (~17.5 min) and every FIN raised in one window collided on the unique
+        // index. Shared generator now, so the tenth copy cannot reintroduce it.
+        return ExternalIds.generate("FIN");
     }
 
     /** Canonical payload Map for F8 rule-condition matching on Finding

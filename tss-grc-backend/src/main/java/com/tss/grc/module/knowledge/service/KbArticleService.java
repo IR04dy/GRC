@@ -6,6 +6,7 @@ import com.tss.grc.module.knowledge.dto.KbArticleDto;
 import com.tss.grc.module.knowledge.entity.KbArticle;
 import com.tss.grc.module.knowledge.repository.KbArticleRepository;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
+import com.tss.grc.common.util.ExternalIds;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -141,8 +142,9 @@ public class KbArticleService {
     }
 
     private String generateExternalId() {
-        return String.format("KB-%d-%s",
-            LocalDateTime.now().getYear(),
-            Long.toHexString(System.currentTimeMillis()).toUpperCase().substring(0, 6));
+        // F2-48: substring(0, 6) kept the HIGH-ORDER hex digits, so this id changed once
+        // per 2^20 ms (~17.5 min) and every KB raised in one window collided on the unique
+        // index. Shared generator now, so the tenth copy cannot reintroduce it.
+        return ExternalIds.generate("KB");
     }
 }

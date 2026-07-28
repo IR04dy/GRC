@@ -8,6 +8,7 @@ import com.tss.grc.module.regchange.dto.RegulatoryChangeDto;
 import com.tss.grc.module.regchange.entity.RegulatoryChange;
 import com.tss.grc.module.regchange.repository.RegulatoryChangeRepository;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
+import com.tss.grc.common.util.ExternalIds;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -216,8 +217,9 @@ public class RegulatoryChangeService {
     }
 
     private String generateExternalId() {
-        return String.format("RC-%d-%s",
-            LocalDateTime.now().getYear(),
-            Long.toHexString(System.currentTimeMillis()).toUpperCase().substring(0, 6));
+        // F2-48: substring(0, 6) kept the HIGH-ORDER hex digits, so this id changed once
+        // per 2^20 ms (~17.5 min) and every RC raised in one window collided on the unique
+        // index. Shared generator now, so the tenth copy cannot reintroduce it.
+        return ExternalIds.generate("RC");
     }
 }

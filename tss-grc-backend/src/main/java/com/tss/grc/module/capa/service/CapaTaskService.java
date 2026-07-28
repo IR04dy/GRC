@@ -8,6 +8,8 @@ import com.tss.grc.module.capa.repository.CapaTaskRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
+import com.tss.grc.common.security.CurrentActor;
+import com.tss.grc.common.util.ExternalIds;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
@@ -163,7 +164,11 @@ public class CapaTaskService {
         }
         if ("CLOSED".equals(req.getStatus())) {
             t.setVerifiedAt(now);
-            if (req.getVerifiedBy() != null) t.setVerifiedBy(req.getVerifiedBy());
+            // F2-22b(vi): the verifier is the authenticated principal, never the request's.
+            // CAPA verification is the evidence that a remediation actually happened, so a
+            // caller-supplied name is DF-3's defect. It was also empty in practice — no UI
+            // sends this field, so a CLOSED CAPA recorded a verification time and nobody.
+            t.setVerifiedBy(verifierOrFail(t.getExternalId()));
             t.setClosedAt(now);
         }
         if ("CANCELLED".equals(req.getStatus())) {
@@ -183,8 +188,10 @@ public class CapaTaskService {
         audit.log(saved.getStatus(), "CapaTask", saved.getId(),
             "CAPA " + saved.getExternalId()
             + " " + previousStatus + " → " + saved.getStatus()
-            + (req.getVerifiedBy() != null && "CLOSED".equals(saved.getStatus())
-                ? " · verified by " + req.getVerifiedBy() : "")
+            // F2-22b(vi): read the verifier off the SAVED entity, not the request — the audit
+            // row must name who actually verified, which is now the authenticated principal.
+            + (saved.getVerifiedBy() != null && "CLOSED".equals(saved.getStatus())
+                ? " · verified by " + saved.getVerifiedBy() : "")
             + (req.getCancellationReasonEn() != null && "CANCELLED".equals(saved.getStatus())
                 ? " · reason: " + req.getCancellationReasonEn() : "")
             + (req.getProgressNotesEn() != null && !req.getProgressNotesEn().isBlank()
@@ -233,6 +240,23 @@ public class CapaTaskService {
     }
 
     /**
+     * F2-22b(vi) — who verified a CAPA closure, from the security context.
+     *
+     * <p>Fails rather than writing an anonymous verification: a CLOSED CAPA whose verifier is
+     * unknown is the same as an unverified one, and this transition is reachable only from an
+     * authenticated request.
+     */
+    private String verifierOrFail(String externalId) {
+        String actor = CurrentActor.username();
+        if (actor == null || actor.isBlank()) {
+            throw new IllegalStateException(
+                "No authenticated principal to record as the verifier of CAPA " + externalId
+                + ". A closure with no verifier is not a verification.");
+        }
+        return actor;
+    }
+
+    /**
      * F2-48 — this generator collided with itself, so a tenant could open ONE CAPA every ~17½
      * minutes and every other attempt failed.
      *
@@ -257,9 +281,6 @@ public class CapaTaskService {
      * CAPAs raised in the same millisecond by different threads still differ.
      */
     private String generateExternalId() {
-        return String.format("CAPA-%d-%s%04X",
-            LocalDateTime.now().getYear(),
-            Long.toHexString(System.currentTimeMillis()).toUpperCase(),
-            ThreadLocalRandom.current().nextInt(0x10000));
+        return ExternalIds.generate("CAPA");
     }
 }

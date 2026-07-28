@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.tss.grc.module.bcm_lc.dto.InvocationDto;
 import com.tss.grc.module.bcm_lc.entity.Invocation;
 import com.tss.grc.module.bcm_lc.repository.InvocationRepository;
+import com.tss.grc.common.util.ExternalIds;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -146,8 +147,9 @@ public class InvocationService {
     }
 
     private String generateExternalId() {
-        return String.format("INV-%d-%s",
-            LocalDateTime.now().getYear(),
-            Long.toHexString(System.currentTimeMillis()).toUpperCase().substring(0, 6));
+        // F2-48: substring(0, 6) kept the HIGH-ORDER hex digits, so this id changed once
+        // per 2^20 ms (~17.5 min) and every INV raised in one window collided on the unique
+        // index. Shared generator now, so the tenth copy cannot reintroduce it.
+        return ExternalIds.generate("INV");
     }
 }

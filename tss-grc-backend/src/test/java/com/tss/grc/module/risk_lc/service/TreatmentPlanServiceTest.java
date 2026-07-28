@@ -7,6 +7,10 @@ import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.risk_lc.dto.TreatmentPlanDto;
 import com.tss.grc.module.risk_lc.entity.TreatmentPlan;
 import com.tss.grc.module.risk_lc.repository.TreatmentPlanRepository;
+import com.tss.grc.security.GrcUserDetails;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -48,11 +53,20 @@ class TreatmentPlanServiceTest {
     @Mock private ApplicationEventPublisher publisher;
     @InjectMocks private TreatmentPlanService service;
 
+    /** F2-22b(vi) — APPROVED stamps the approver from the security context, so present one. */
     @BeforeEach
-    void setUp() { TenantContext.setCurrentTenant(ORG_ID); }
+    void setUp() {
+        TenantContext.setCurrentTenant(ORG_ID);
+        GrcUserDetails p = new GrcUserDetails(9L, ORG_ID, "the_real_cro", "x", true, true, List.of());
+        Authentication a = new UsernamePasswordAuthenticationToken(p, "x", p.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(a);
+    }
 
     @AfterEach
-    void tearDown() { TenantContext.clear(); }
+    void tearDown() {
+        TenantContext.clear();
+        SecurityContextHolder.clearContext();
+    }
 
     private static TreatmentPlan plan(String status) {
         TreatmentPlan p = new TreatmentPlan();
@@ -87,11 +101,13 @@ class TreatmentPlanServiceTest {
         when(repo.save(any(TreatmentPlan.class))).thenAnswer(inv -> inv.getArgument(0));
 
         TreatmentPlanDto.TransitionRequest r = req("APPROVED");
-        r.setApprovedBy("CRO");
         TreatmentPlanDto result = service.transition(EXT_ID, r);
 
         assertThat(result.getStatus()).isEqualTo("APPROVED");
-        assertThat(result.getApprovedBy()).isEqualTo("CRO");
+        // F2-22b(vi): the approver is the authenticated principal. Previously this line read
+        // isEqualTo("CRO") — the value the request had supplied — while the SPA never sent the
+        // field at all, so every real approval stored NULL.
+        assertThat(result.getApprovedBy()).isEqualTo("the_real_cro");
         assertThat(result.getApprovedAt()).isNotNull();
     }
 

@@ -59,7 +59,8 @@ public class CapaTaskDto {
     public static class TransitionRequest {
         @NotBlank @Pattern(regexp = "OPEN|IN_PROGRESS|AWAITING_VERIFICATION|CLOSED|CANCELLED")
         private String status;
-        private String verifiedBy;
+        // F2-22b(vi): verifiedBy removed — it is stamped from the authenticated principal.
+        // Leaving it declared would advertise a field the service ignores.
         private String cancellationReasonEn;
         private String progressNotesEn;
         private String progressNotesAr;
