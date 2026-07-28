@@ -11,6 +11,7 @@ import com.tss.grc.module.privacy.repository.DpiaMitigationRepository;
 import com.tss.grc.module.privacy.repository.DpiaQuestionRepository;
 import com.tss.grc.module.privacy.repository.DpiaRepository;
 import com.tss.grc.module.privacy.repository.DpiaReviewRepository;
+import com.tss.grc.common.security.CurrentActor;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -200,17 +201,46 @@ public class DpiaService {
         return questionRepo.save(req);
     }
 
+    /**
+     * F2-22b(vii) — {@code verifiedAt} is stamped when the mitigation is marked VERIFIED.
+     *
+     * <p>{@code status} is deliberately left caller-set: there is no verify endpoint, so this call
+     * <em>is</em> how a mitigation's progress is recorded, and PLANNED → IN_PROGRESS → IMPLEMENTED →
+     * VERIFIED has no state machine to bypass. What is not the caller's is <em>when</em> the
+     * verification happened — a posted timestamp asserts a verification date that nothing observed.
+     */
     @Transactional
     public DpiaMitigation addMitigation(Long dpiaId, DpiaMitigation req) {
         mustGet(dpiaId);
         req.setDpiaId(dpiaId);
+        req.setVerifiedAt("VERIFIED".equals(req.getStatus()) ? LocalDateTime.now() : null);
         return mitigationRepo.save(req);
     }
 
+    /**
+     * F2-22b(vii) — the reviewer is whoever is authenticated, because this call IS the review.
+     *
+     * <p>There is no separate decide endpoint on a DPIA review: {@code addReview} records the
+     * decision, so the actor performing it is the reviewer by definition. Accepting
+     * {@code reviewerId}/{@code reviewerName} from the body let a caller file a privacy review in
+     * someone else's name — DF-3 on the PDPL Art. 25 record that a regulator reads to see who signed
+     * off on a high-risk processing activity. {@code decidedAt} is stamped for the same reason; the
+     * entity's {@code = LocalDateTime.now()} default only covered the omitted case, not a supplied
+     * (back-dated) one.
+     */
     @Transactional
     public DpiaReview addReview(Long dpiaId, DpiaReview req) {
         mustGet(dpiaId);
         req.setDpiaId(dpiaId);
+        String actor = CurrentActor.username();
+        if (actor == null || actor.isBlank()) {
+            throw new IllegalStateException(
+                "No authenticated principal to record as the reviewer of DPIA " + dpiaId
+                + ". A privacy review with no reviewer is not a review.");
+        }
+        req.setReviewerId(CurrentActor.userId());
+        req.setReviewerName(actor);
+        req.setDecidedAt(LocalDateTime.now());
         return reviewRepo.save(req);
     }
 

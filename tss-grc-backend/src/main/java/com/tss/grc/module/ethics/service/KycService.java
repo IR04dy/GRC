@@ -5,6 +5,7 @@ import com.tss.grc.module.ethics.entity.KycSubject;
 import com.tss.grc.module.ethics.entity.ScreeningHit;
 import com.tss.grc.module.ethics.repository.KycSubjectRepository;
 import com.tss.grc.module.ethics.repository.ScreeningHitRepository;
+import com.tss.grc.common.security.CurrentActor;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -107,6 +108,25 @@ public class KycService {
     public ScreeningHit recordHit(Long subjectId, ScreeningHit body) {
         KycSubject s = require(subjectId);
         body.setSubjectId(subjectId);
+        body.setId(null);
+        // F2-22b(vii) — a newly reported screening hit has NOT been adjudicated.
+        //
+        // This saved the body wholesale, so a caller could create a sanctions/PEP hit that already
+        // carried a decision: `decidedAt`, `decidedByName`, `dispositionNotes` — and
+        // `sarFiled`/`sarReference`, which assert that a **Suspicious Activity Report was filed
+        // with the regulator**. On a SAMA/AML screening register that is the highest-value forgery
+        // in the platform: the whole point of the register is to show which matches were reviewed,
+        // by whom, when, and what was reported.
+        //
+        // `disposition` itself stays caller-set on purpose. The screening feed is what classifies a
+        // match (TRUE_MATCH / NEEDS_REVIEW / FALSE_POSITIVE) and the service *reacts* to it below by
+        // flagging the subject sanctioned or PEP — refusing it would break the mechanism, which is
+        // the F2-40 trap. What is refused is the claim to have already *decided* about it.
+        body.setDecidedAt(null);
+        body.setDecidedByName(null);
+        body.setDispositionNotes(null);
+        body.setSarFiled(false);
+        body.setSarReference(null);
         if (body.getDisposition() == null) body.setDisposition("NEEDS_REVIEW");
         if ("TRUE_MATCH".equals(body.getDisposition())
             && List.of("OFAC_SDN", "UN_CONSOLIDATED", "EU_CONSOLIDATED", "SAMA_LOCAL").contains(body.getListSource())) {
@@ -123,13 +143,28 @@ public class KycService {
         return hitRepo.save(body);
     }
 
+    /**
+     * F2-22b(vii) — who cleared a sanctions match is recorded from the security context.
+     *
+     * <p>The {@code decidedBy} parameter is retained so the controller's shape does not change, but
+     * it is <b>ignored</b>: it came straight from the request body, which is DF-3's defect on the one
+     * register where "who decided" is the entire audit question. No UI ever sent it —
+     * {@code kycApi.disposition} declares the field and no page calls it — so nothing depended on
+     * naming a third party.
+     */
     @Transactional
     public ScreeningHit disposition(Long hitId, String disposition, String notes, String decidedBy, Boolean sarFiled, String sarRef) {
         ScreeningHit h = hitRepo.findById(hitId).orElseThrow(() -> new EntityNotFoundException("Hit not found: " + hitId));
         require(h.getSubjectId());
+        String actor = CurrentActor.username();
+        if (actor == null || actor.isBlank()) {
+            throw new IllegalStateException(
+                "No authenticated principal to record as the decision-maker on screening hit "
+                + hitId + ". An AML disposition with no decider is not a disposition.");
+        }
         h.setDisposition(disposition);
         if (notes      != null) h.setDispositionNotes(notes);
-        if (decidedBy  != null) h.setDecidedByName(decidedBy);
+        h.setDecidedByName(actor);
         h.setDecidedAt(LocalDateTime.now());
         if (sarFiled != null) h.setSarFiled(sarFiled);
         if (sarRef   != null) h.setSarReference(sarRef);

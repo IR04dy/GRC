@@ -1096,6 +1096,32 @@ Start-Service TssGrcBackend
 
 ---
 
+## F2-22b(vii) · A sanctions hit could arrive already cleared, with a SAR reference
+
+| Field | Content |
+|---|---|
+| **ID** | F2-22b(vii) — seventh tranche, **the last ranked tier (3 HIGH + 4 STATE)**, and it retires the ranking as a progress metric |
+| **Category** | Forged decision provenance / regulatory-filing assertion |
+| **Severity** | **P1 High** — on the AML sanctions-screening register, plus the PDPL Art. 25 DPIA review record |
+| **Provenance** | The last two tiers of F2-22b's ranking, read service-by-service like (iv)–(vi) |
+| **Current State** | **`KycService.recordHit` saved the request body wholesale.** So a caller could create an OFAC/PEP screening hit that already carried a decision — `decidedAt`, `decidedByName`, `dispositionNotes` — and `sarFiled` + `sarReference`, which assert that a **Suspicious Activity Report was filed with the regulator**. Separately, `/hits/{id}/disposition` read `decidedBy` **from the request body**: DF-3's defect on the one register where "who cleared this match" is the entire audit question. On the privacy side, `DpiaService.addReview` accepted `reviewerId`/`reviewerName`/`decidedAt` from the body — and since there is **no separate decide endpoint**, `addReview` *is* the review, so the actor performing it is the reviewer by definition. `addMitigation` accepted `verifiedAt` |
+| **Problem** | A sanctions register whose entries can arrive pre-cleared inverts its own purpose: the register exists to show which matches were reviewed, by whom, when, and what was reported. `sarFiled` is the sharpest of them — a claim about a filing made to a regulator. The DPIA review is the record a PDPL regulator reads to see who signed off on high-risk processing |
+| **Root Cause** | Same as tranches (ii)–(vi): a `save(body)` on a register that also has a decision path, and attribution treated as request data |
+| **Business Impact** | SAMA/AML and PDPL Art. 25 — the two registers in this tranche are both externally examined |
+| **Technical Impact** | `recordHit` scrubs the whole decision block and forces `sarFiled = false`; `disposition` records `CurrentActor.username()` and refuses when unauthenticated; `addReview` stamps reviewer id, name and `decidedAt`; `addMitigation` stamps `verifiedAt` only when the status is VERIFIED, and clears it otherwise. **`disposition` (the classification itself) stays caller-set on purpose** — the screening feed is what classifies a match, and `recordHit` *reacts* to `TRUE_MATCH` by flagging the subject sanctioned/PROHIBITED. Refusing it would break the mechanism: the F2-40 trap |
+| **UX Impact** | None — `kycApi.disposition` declares `decidedBy` and **no page calls it**; no FE reaches the DPIA sub-record endpoints either |
+| **Recommendation** | 1. As shipped. 2. **`NdiGap.riskScore` is stale by construction** and worth a separate look: nothing in the platform ever computes *or* updates it — `updateGap`'s whitelist omits it — so a gap's risk score is frozen at whatever the create supplied even as `severity`/`likelihood` change. Not a bypass, a dead number in a register. 3. `CptyService`'s asserted approvals (from tranche vi) still want an F2-40 provenance label |
+| **Alternatives** | Refuse a `recordHit` that carries decision fields, rather than scrubbing — rejected: the screening feed is machine-generated and may echo a fuller schema; scrubbing what it cannot know is kinder than a 400, and unlike F2-44's case nothing is silently *lost* (an undecided hit is the truthful state) |
+| **Trade-offs** | `disposition()` keeps its `decidedBy` parameter so the controller's shape is unchanged; it is documented as ignored rather than deleted, because removing it would churn a signature for no gain |
+| **Effort** | **S** |
+| **Priority** | **Done** |
+| **Verification** | Live **17/17**, subjects and DPIAs created by `admin`, decisions taken by `compliance`, every body carrying `"the_mlro_who_never_saw_this"`: the hit lands with `decided_at`, `decided_by_name`, `disposition_notes`, `sar_reference` all NULL and `sar_filed = false`, **while `TRUE_MATCH` on OFAC_SDN still flags the subject sanctioned + PROHIBITED**; `/disposition` records `compliance`; the DPIA review records `compliance` with the caller's `reviewerId: 9999` and 2001 timestamp both discarded; a PLANNED mitigation has no verification date and a VERIFIED one is stamped now. The by-design verdict is **asserted too** — a `BiaRecord` created with `status=APPROVED` still succeeds. Suite **2,586/0/0** |
+| **Status** | ✅ **CLOSED 2026-07-28.** F2-22b's ranked work is complete: every CRIT/HIGH/STATE endpoint now carries a recorded verdict |
+| **References** | `KycService#recordHit`, `#disposition`, `DpiaService#addReview`, `#addMitigation`, `MassAssignmentRatchetTest#ADJUDICATED`. Deliberately unchanged: `BcmController#createBia`/`#updateBia`, `ChangeManagementController#addTask`/`#updateTask` |
+| **Lesson** | **The ratchet's tier count was never a progress metric, and I had been quoting it as one.** It measures what *Jackson will bind*, not what the *service will write* — so tranches (ii)–(iv), which used `@JsonProperty(READ_ONLY)`, moved CRIT 54 → 18, while (v)–(vii), which fixed theirs with a service-side whitelist, scrub or reject, moved it **not at all**. `EthicsCaseController` still reads CRIT with the bypass closed. Fixed by making the census durable instead of re-deriving it: `ADJUDICATED` records the verdict for all 18 CRIT endpoints (**4 CLOSED, 5 INERT, 9 BY DESIGN**), the emitted file carries it as a column with a header explaining why the count lies, and a **new unadjudicated CRIT row now fails the build** — so the next entity-bound write gets read rather than annotated blind |
+
+---
+
 ## F2-22b(vi) · The DTO paths a DTO was supposed to fix — eight attribution fields the caller named
 
 | Field | Content |
