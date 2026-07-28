@@ -40,7 +40,7 @@ reviewer.
 
 | ID | Report severity | My verdict | Confidence | Note |
 |---|---|---|---|---|
-| SCR-001 | Critical | **UPHELD** | **REPRODUCED** | Reproduced end to end, including the revocation bypass. See §2 |
+| SCR-001 | Critical | **UPHELD → FIXED (interim)** | **REPRODUCED, then closed** | Reproduced end to end; slice 1 shipped 2026-07-28. See §2 |
 | SCR-002 | High | **UPHELD, description wrong** | **PARTLY** | Effect is real; the report implies authorities are stale — they are re-loaded live. See §2 |
 | SCR-003 | High | **UPHELD, scope narrower** | **PARTLY** | Overlaps F2-29, already in the plan. See §4 |
 | SCR-004 | High | **UPHELD** | **CODE-CONFIRMED** | `/{id}/download` carries only `EVIDENCE:READ` |
@@ -64,12 +64,21 @@ managed, and it is the main reason to take the report seriously.
 
 Reproduced against the running dev stack, printing status codes only and retaining no token:
 
-| Leg | Result |
-|---|---|
-| Access token as bearer (control) | **200** |
-| **Refresh token as bearer** | **200** — should be 401 |
-| Logout (`204`), then the **revoked** refresh token as bearer | **200** — revocation bypassed |
-| The revoked token against `/api/auth/refresh` | **401** — revocation *is* enforced, but only there |
+| Leg | Before | After slice 1 |
+|---|---|---|
+| Access token as bearer (control) | **200** | **200** — unchanged |
+| **Refresh token as bearer** | **200** — should be 401 | **401** |
+| Logout (`204`), then the **revoked** refresh token as bearer | **200** — revocation bypassed | **401** |
+| The revoked token against `/api/auth/refresh` | 401 | 401 |
+
+⚠ **Correction to the original validation.** That last row was reported as "revocation *is* enforced, but
+only there". It proved nothing at the time: the pre-fix probe used Python's `http.cookiejar`, and the
+refresh cookie is set `HttpOnly; Secure; Path=/api/auth/refresh`, so a Secure cookie is **never sent over
+`http://localhost`** — the 401 was an absent cookie, not a rejected token. The same artifact then made the
+post-fix probe look like a refresh-flow regression. Re-run with the cookie parsed from `Set-Cookie` and
+sent by hand, rolling revocation is now genuinely proven (a superseded token is refused at the refresh
+endpoint, and so is a logged-out one). **The three legs that mattered were never affected** — they used the
+`Authorization` header, which works fine over HTTP, and the refresh-token-as-bearer defect was real.
 
 Cause, read at HEAD: `JwtTokenProvider.buildToken` and `buildTokenFromIds` mint access and refresh tokens
 through the same builder, differing only in `expiryMs`. `validateToken` returns true for any correctly
@@ -155,7 +164,7 @@ live-probed per house rule 4.
 
 | # | Slice | Covers | Size | Migration | Depends on |
 |---|---|---|---|---|---|
-| 1 | **Reject `jti`-bearing tokens on the bearer path** + close `AuthController:188`'s jti-less mint | SCR-001 interim | XS | — | — |
+| 1 | ✅ **DONE 2026-07-28** — **reject `jti`-bearing tokens on the bearer path** + close `AuthController`'s jti-less mint. `JwtTokenProvider.isRefreshToken`, a guard in `JwtAuthenticationFilter` (401, logged at WARN, no distinct status code), the store-absent rotation branch now mints a UUID `jti`, and `generateRefreshTokenFromClaims` **deleted** rather than deprecated — it was a one-line way back to the vulnerability. `JwtTokenPurposeTest` 7/7 pins the invariant in **both** directions (every refresh path marks, no access path does). Live **16/16**: the attack returns 401, and the refresh flow still rotates and chains twice. **No forced re-login, no token-format change** | XS | — | — |
 | 2 | **Enforce `enabled`/`accountNonLocked` in the filter; tenant from the loaded user** | SCR-002 | S | — | 1 (same file) |
 | 3 | **Object-level authorization on attachment download** — caller must be able to read the parent entity; carry classification | SCR-004 | M | — | — |
 | 4 | **Public-token hygiene** — hash tokens at rest, strip query-string credentials from nginx logs, add expiry | SCR-005 | M | **V324** | verify first |
@@ -225,5 +234,5 @@ V324** and nothing is blocked.
 | Findings refuted | **0** |
 | Corrections made to the report | 3 — SCR-001's rollout cost, SCR-002's mechanism, SCR-006's severity |
 | Second opinion | **NOT OBTAINED** — Fable 5 blocked by cyber safeguards, twice |
-| Code changed | **None.** This is a plan; no remediation has been implemented |
-| Next action | Slice 1 (SCR-001 interim), pending the user's go-ahead on sequencing |
+| Code changed | **Slice 1 shipped 2026-07-28** — SCR-001's reproduced attack is closed. Slices 2–12 not started |
+| Next action | Slice 2 (enforce `enabled`/`accountNonLocked` in the filter, tenant from the loaded user) — same file as slice 1 |

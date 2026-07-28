@@ -240,10 +240,14 @@ public class JwtTokenProvider {
         return buildTokenFromIds(userId, organisationId, accessTokenExpiryMs, null);
     }
 
-    /** Generate a refresh token directly from stored claims (token rotation). */
-    public String generateRefreshTokenFromClaims(Long userId, Long organisationId) {
-        return buildTokenFromIds(userId, organisationId, refreshTokenExpiryMs, null);
-    }
+    // SCR-001 — generateRefreshTokenFromClaims(userId, org) was REMOVED here, not deprecated.
+    //
+    // It minted a refresh token with a null jti, and after this commit that is not a lesser
+    // variant, it is a broken one: the bearer filter identifies a refresh token by its jti, so a
+    // jti-less refresh token would be accepted as an API bearer credential — the exact defect being
+    // closed. Its only caller was AuthController's store-absent rotation branch, which now supplies
+    // a random jti. Leaving the method behind as @Deprecated would leave a one-line way to
+    // reintroduce the vulnerability; use {@link #generateRefreshTokenFromClaimsWithJti} instead.
 
     /**
      * Rolling-refresh path: mint a new refresh token from the previous token's
@@ -283,6 +287,40 @@ public class JwtTokenProvider {
         } catch (Exception ex) {
             return null;
         }
+    }
+
+    /**
+     * SCR-001 — is this token a <b>refresh</b> token, and therefore not usable as a bearer?
+     *
+     * <p><b>The defect.</b> {@link #buildToken} and {@link #buildTokenFromIds} mint access and
+     * refresh tokens through the same builder, differing only in expiry. Neither carried a purpose
+     * claim, {@link #validateToken} accepts any correctly signed unexpired JWT, and
+     * {@code JwtAuthenticationFilter} authenticated whatever it approved. So a refresh token worked
+     * as an API bearer token — reproduced live, including <b>after logout revoked it</b>, because
+     * revocation is checked only by {@code /api/auth/refresh}. A seven-day token became a de facto
+     * seven-day access token.
+     *
+     * <p><b>Why {@code jti} and not a new claim.</b> Refresh tokens already carry a server-issued
+     * {@code jti} and access tokens do not — measured on the running application:
+     * <pre>
+     * access : enabled_modules, exp, iat, lod_band, org, roles, sub, usr
+     * refresh: enabled_modules, exp, iat, lod_band, org, roles, sub, usr, jti
+     * </pre>
+     * So the discriminator already exists. Using it closes the reproduced attack <b>without a token
+     * format change and without invalidating a single existing session</b>, which is what the review
+     * assumed would be necessary. Every mint path is now jti-bearing for refresh and jti-free for
+     * access, including the store-absent fallback in {@code AuthController} that this commit closed.
+     *
+     * <p><b>This is the interim layer, not the destination.</b> The durable fix is an explicit
+     * immutable {@code typ} claim ({@code ACCESS}/{@code REFRESH}) with separate validation entry
+     * points, per the remediation plan's slice 5 — that one forces re-login, so it belongs to a
+     * release rather than a hotfix. Until then, treat "carries a jti" as "is a refresh token": that
+     * invariant is asserted by {@code JwtTokenPurposeTest} in both directions so a future mint path
+     * cannot quietly break it.
+     */
+    public boolean isRefreshToken(String token) {
+        String jti = getJtiFromToken(token);
+        return jti != null && !jti.isBlank();
     }
 
     /** Compute the expiry timestamp of a token (for store persistence). */

@@ -1044,6 +1044,32 @@ Start-Service TssGrcBackend
 
 ---
 
+## SCR-001 · A refresh token authenticated any API request, and survived logout
+
+| Field | Content |
+|---|---|
+| **ID** | SCR-001 (external secure code review; interim fix = slice 1 of `SECURE_CODE_REVIEW_REMEDIATION_PLAN.md`) |
+| **Category** | Authentication / session management — token purpose confusion |
+| **Severity** | **P0 Critical** — account takeover with a seven-day window that logout could not end |
+| **Provenance** | Reported by the external review that appeared in the tree on 2026-07-26; **independently reproduced** by me on the running application before any code was written, then reproduced again as a regression check after the fix |
+| **Current State** | `JwtTokenProvider.buildToken` and `buildTokenFromIds` mint access and refresh tokens through the same builder, differing only in expiry. Neither carried a purpose claim. `validateToken` returns true for any correctly signed, unexpired JWT, and `JwtAuthenticationFilter` authenticated anything it approved. Refresh-token revocation is checked only by `/api/auth/refresh`. Measured claim sets: access = `enabled_modules, exp, iat, lod_band, org, roles, sub, usr`; refresh = the same **plus `jti`** |
+| **Problem** | A refresh token taken from the cookie, a host, a backup, telemetry or another defect could be sent as `Authorization: Bearer` and receive the user's full authority set — reproduced: **200**. After `POST /api/auth/logout` returned 204, the same revoked token still returned **200**. The documented 15-minute access-token lifetime and every revocation control were bypassed; a GRC audit trail would attribute the attacker's actions to the victim |
+| **Root Cause** | Signature validity treated as authorisation to use a token in *any* authentication context. Token purpose was never expressed, so there was nothing for the bearer path to check |
+| **Business Impact** | Approvals, risk acceptances, regulatory submissions, evidence and personal data are all reachable under a victim identity, and logout gives users and administrators a false assurance that access ended. Production-blocking for government, banking and listed-company buyers |
+| **Technical Impact** | **The review's prescribed rollout was more expensive than necessary, and that is this entry's most useful conclusion.** It called for an immutable `typ` claim plus invalidating all existing sessions. But the discriminator already existed — refresh tokens carry a server-issued `jti`, access tokens do not — so `JwtTokenProvider.isRefreshToken` plus a guard in the filter closes the reproduced attack with **no token-format change and no forced re-login**. Shipped alongside: `AuthController`'s store-absent rotation branch now mints a UUID `jti` (it previously minted a **jti-less** refresh token, which would have punched a hole straight through the fix), and `generateRefreshTokenFromClaims` was **deleted rather than deprecated** — leaving it would leave a one-line way to reintroduce the vulnerability |
+| **UX Impact** | None. Every existing session keeps working; the SPA's access token is unaffected and its auto-refresh path still rotates |
+| **Recommendation** | 1. Slice 1 as shipped. 2. **Slice 5 remains necessary** — the explicit `typ` claim with separate validation entry points is the durable fix; the `jti` heuristic is a correct-but-incidental property that a future mint path could break, which is why the test asserts it in both directions. Slice 5 forces re-login, so it belongs to a release. 3. Slice 2 (enforce `enabled`/`accountNonLocked`, tenant from the loaded user) is the same file and should follow immediately |
+| **Alternatives** | (a) Opaque server-side access sessions — immediate revocation, at the cost of a lookup on every request. (b) An OAuth 2.1/OIDC authorization server — right long-term, far beyond this fix. (c) Reject refresh tokens by *expiry length* — rejected: brittle, and a config change would silently break it |
+| **Trade-offs** | The interim fix depends on an invariant that is true but not self-evident ("carries a jti" ⇒ "is a refresh token"). That is a real fragility, accepted deliberately because it buys a same-day close of a reproduced account-takeover path, and mitigated by pinning it in tests until slice 5 replaces it |
+| **Effort** | **XS** for the interim; the review's 2–4 days applies to slice 5 |
+| **Priority** | **Interim done.** Slice 5 with the next release |
+| **Verification** | Before: access-as-bearer 200 (control), refresh-as-bearer **200**, revoked-refresh-as-bearer **200**. After: control still 200, both attack legs **401**. Live **16/16** including the regression that mattered — `/api/auth/refresh` still returns a new access token, the cookie rotates, a **second** hop works (a chain that broke on the second rotation would pass a single-shot probe), a superseded token is refused, and logout refuses the token on both surfaces. `JwtTokenPurposeTest` 7/7 |
+| **Status** | ✅ **INTERIM CLOSED 2026-07-28.** SCR-001 stays open in the plan until slice 5 lands the `typ` claim |
+| **References** | `JwtTokenProvider#isRefreshToken`, `JwtAuthenticationFilter#isRefreshTokenPresentedAsBearer`, `AuthController` rotation fallback, `JwtTokenPurposeTest`, `SECURE_CODE_REVIEW_REMEDIATION_PLAN.md` §2 and slice 1 |
+| **Lesson** | **A `Secure` cookie is never sent over `http://`, and that silently invalidated one of my own verification legs.** My pre-fix probe used `http.cookiejar` and reported "the refresh endpoint rejects the revoked token, so revocation works" — that 401 was an *absent cookie*, not a rejected token. The same artifact then made the post-fix probe look like a refresh-flow regression, which cost a round to diagnose. Two rules: **when a probe's negative result is the evidence for a claim, check that the request carried what you think it carried**; and prefer parsing `Set-Cookie` by hand over a cookie jar when probing `Secure` cookies on localhost. The three legs that carried the actual finding were unaffected — they used the `Authorization` header — so the finding stands, but one sentence of my validation did not |
+
+---
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

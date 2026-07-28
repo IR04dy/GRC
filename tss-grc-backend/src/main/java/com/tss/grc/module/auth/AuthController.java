@@ -185,7 +185,15 @@ public class AuthController {
                     "message", "Unable to rotate refresh token — please retry."));
             }
         } else {
-            newRefreshToken = tokenProvider.generateRefreshTokenFromClaims(userId, orgId);
+            // SCR-001 — this fallback used to mint a refresh token with NO jti, and that would have
+            // punched a hole straight through the interim fix: the bearer filter identifies a refresh
+            // token by the presence of a jti, so a jti-less refresh token would still have been
+            // accepted as an API bearer credential. The store being absent is a reason not to
+            // *persist* the id, never a reason to leave the token unmarked. The jti is random and
+            // unverifiable here, which is exactly as much as this branch can promise — rotation
+            // revocation needs the store; marking the token's purpose does not.
+            newRefreshToken = tokenProvider.generateRefreshTokenFromClaimsWithJti(
+                userId, orgId, java.util.UUID.randomUUID().toString());
         }
         setRefreshTokenCookie(response, newRefreshToken);
 

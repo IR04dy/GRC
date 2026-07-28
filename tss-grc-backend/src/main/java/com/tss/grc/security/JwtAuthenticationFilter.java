@@ -45,7 +45,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         try {
             String token = extractBearerToken(request);
-            if (StringUtils.hasText(token) && tokenProvider.validateToken(token)) {
+            if (StringUtils.hasText(token) && tokenProvider.validateToken(token)
+                    && !isRefreshTokenPresentedAsBearer(token, request)) {
 
                 Long userId  = tokenProvider.getUserIdFromToken(token);
                 Long orgId   = tokenProvider.getOrganisationIdFromToken(token);
@@ -72,6 +73,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // Always clear tenant context to prevent thread-local leakage in thread pools
             TenantContext.clear();
         }
+    }
+
+    /**
+     * SCR-001 — a refresh token must never authenticate an API request.
+     *
+     * <p>A signed, unexpired refresh token used to pass this filter and receive the user's full
+     * authority set, and it kept working after logout because refresh-token revocation is checked
+     * only by {@code /api/auth/refresh}. Reproduced live before this fix: the access token returned
+     * 200 (control), the refresh token returned 200, and the <em>revoked</em> refresh token returned
+     * 200 while the refresh endpoint correctly rejected the same token with 401.
+     *
+     * <p>Returning true here leaves the security context empty, so the request continues unauthenticated
+     * and Spring Security answers 401 — the same shape as an absent or malformed token, and
+     * deliberately not a distinct code: a caller presenting the wrong token kind learns only that it
+     * was not accepted.
+     *
+     * <p>Logged at WARN with the path, because there is no legitimate client that does this. The SPA
+     * keeps the access token in {@code sessionStorage} and never sees the refresh cookie, which is
+     * {@code HttpOnly} — so a hit here is either an integration using the wrong token or someone
+     * replaying a stolen one. The token itself is never logged.
+     */
+    private boolean isRefreshTokenPresentedAsBearer(String token, HttpServletRequest request) {
+        if (!tokenProvider.isRefreshToken(token)) {
+            return false;
+        }
+        log.warn("Refresh token presented as a bearer credential on {} {} — rejected (SCR-001). "
+                 + "Refresh tokens are only valid at /api/auth/refresh.",
+                 request.getMethod(), request.getRequestURI());
+        return true;
     }
 
     private String extractBearerToken(HttpServletRequest request) {
