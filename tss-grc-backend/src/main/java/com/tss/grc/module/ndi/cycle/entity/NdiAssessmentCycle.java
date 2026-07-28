@@ -59,7 +59,42 @@ public class NdiAssessmentCycle {
     @Column(nullable = false, length = 40) private String status = "DRAFT";
 
     @Column(name = "maturity_score",                precision = 5, scale = 2) private BigDecimal maturityScore;
+
+    /**
+     * F2-46 — derived from this cycle's {@code ndi.compliance_assessment} rows, never posted.
+     *
+     * <p>Nothing in the codebase set this column. It was written only by whatever arrived in a
+     * request body, because {@code NdiAssessmentCycleService.create()} saves the bound entity
+     * ({@code update()} uses a field whitelist and never copied it, so create was the only way in).
+     * Meanwhile four consumers read it: the NDI dashboard, the governance-domain rollup, the NDI
+     * report, and {@code NdiSubmissionPackageService} — <b>the artefact submitted to the
+     * regulator</b>.
+     *
+     * <p>Measured on the dev tenant before this fix: cycle 2 asserted <b>68.00</b> while its seven
+     * child assessments averaged <b>66.43</b>. The figure submitted upward disagreed with the
+     * assessment it claimed to summarise, and nothing reconciled the two. (The children are seeded
+     * values that never passed through {@code scoreFor} either, so the derivation added here is
+     * sound going forward while today's inputs are themselves asserted — the defect fixed is that
+     * the roll-up had no derivation at all.)
+     *
+     * <p>{@code READ_ONLY} because a compliance percentage a caller can type is not a measurement.
+     * Still serialised — every consumer above reads it, and hiding it would be the F2-22a trap.
+     */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "compliance_score",              precision = 5, scale = 2) private BigDecimal complianceScore;
+
+    /**
+     * {@code COMPUTED} — derived from the assessment rows by
+     * {@code NdiComplianceAssessmentService.recomputeCycleComplianceScore}. {@code ASSERTED_LEGACY}
+     * — a pre-V323 value of unknown origin, kept rather than restated: a migration is the wrong
+     * place to change a governance figure that may already have been reported. {@code NULL} — never
+     * scored, which stays distinguishable from "computed as zero". Same stance as V315/V316/V319/V322.
+     */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @Column(name = "score_source", length = 20) private String scoreSource;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @Column(name = "score_computed_at") private LocalDateTime scoreComputedAt;
     @Column(name = "operational_excellence_score",  precision = 5, scale = 2) private BigDecimal operationalExcellenceScore;
     @Column(name = "overall_score",                 precision = 5, scale = 2) private BigDecimal overallScore;
     @Column(name = "evidence_completion_percent",   precision = 5, scale = 2) private BigDecimal evidenceCompletionPercent;

@@ -993,6 +993,57 @@ Start-Service TssGrcBackend
 
 ---
 
+## F2-46 · The NDI compliance score reaches the regulator with nothing computing it
+
+| Field | Content |
+|---|---|
+| **ID** | F2-46 |
+| **Category** | Fabricated metric / missing derivation — **F2-40's shape, on a regulator-facing figure** |
+| **Severity** | **P1 High** — the number is in the NDI submission package, and it disagreed with the assessment it claimed to summarise |
+| **Provenance** | Found 2026-07-27 while working F2-22b's CRIT tier. `complianceScore` appeared in the risk ranking as a caller-settable field; grepping for its setter returned **nothing**, which is what made it interesting |
+| **Current State** | `ndi.assessment_cycle.compliance_score` had **no setter anywhere in the codebase**. It was written only by whatever arrived in a request body, because `NdiAssessmentCycleService.create()` saves the bound entity (`update()` whitelists fields and never copied it, so create was the only way in). Four consumers read it: `NdiDashboardService` (executive tile), `NdiGovernanceDomainService` (rollup), `NdiReportService`, and **`NdiSubmissionPackageService` — the artefact submitted to the regulator**. Measured: cycle 2 asserted **68.00**; its seven child assessments average **66.43** |
+| **Problem** | A compliance percentage that a caller types, flowing into a regulatory submission, with no derivation and no provenance marker — and disagreeing with the platform's own child data by 1.57 points. Nothing anywhere reconciled the two numbers, so neither the dashboard nor the submission could be checked against the assessment |
+| **Root Cause** | The roll-up column was created (V-era NDI slice 1's javadoc even says "Recompute from child tables after each transition") and the recompute was never written. The same shape as F2-28 (attendance table, zero rows) and F2-40 (tally, no provenance): **the mechanism was specified and its implementation never existed** — the seventh instance |
+| **Business Impact** | NDI / نضيء submissions go to SDAIA. A percentage the platform cannot derive is a number the tenant cannot defend, and the platform presents it as measured |
+| **Technical Impact** | `recomputeCycleComplianceScore(cycleId)` derives the mean of the scored children, stamps `COMPUTED` + `score_computed_at`, and runs from both paths that can move a child's score (`setStatus`, `update`). `complianceScore`/`scoreSource`/`scoreComputedAt` are `@JsonProperty(READ_ONLY)` — still serialised, asserted, because all four consumers read them. Unscored children (`NOT_APPLICABLE`, `EVIDENCE_REQUIRED`, `UNDER_REVIEW` → `scoreFor` returns null) are excluded from **both** numerator and denominator, matching how the dashboard and submission package already average the column. **V323** adds the provenance columns and labels the one asserted row `ASSERTED_LEGACY` without restating it |
+| **UX Impact** | The score now moves as assessors answer items, instead of sitting at whatever was typed at creation |
+| **Recommendation** | 1. As shipped. 2. ⚠ **The claim this slice can make is narrower than it first appeared** — the child scores are *also* seeded values that never passed through `scoreFor` (they read 100/55/60/50/95/65/40, while `scoreFor` yields only 100/50/0). The derivation is correct going forward; today's inputs are themselves asserted. A follow-up should decide whether to recompute the children too, which would restate a governance figure and therefore needs the same care V319/V322/V323 took. 3. `maturityScore`, `operationalExcellenceScore`, `overallScore` and `evidenceCompletionPercent` sit in the same entity and want the same audit |
+| **Alternatives** | (a) Compute on read in each consumer — rejected: four consumers, four chances to diverge, and the submission package needs a persisted figure. (b) Label it and leave it asserted (F2-40's disposition) — rejected here because a derivation exists and its inputs are the assessment itself. (c) Recompute in a scheduler — rejected: the score would lag the assessment that produced it |
+| **Trade-offs** | The roll-up now writes on every child status change, so a bulk assessment run does N cycle updates. At 7–200 items per cycle that is irrelevant; if a bulk-import path is ever added it should recompute once at the end |
+| **Effort** | **S** |
+| **Priority** | **Done** |
+| **Verification** | V323 applied twice to dev, second pass identical; cycle 2's 68.00 preserved and labelled, nothing restated. Live **15/15** on a cycle the probe created (cycle 2's children are all lifecycle `APPROVED` and read-only, so mutating them to make a probe pass would have been the wrong trade): a create posting `complianceScore: 99.99` + `scoreSource` + a 2001 timestamp bound **none** of the three; one COMPLIANT child → cycle **100.00 COMPUTED** with a timestamp; adding a NON_COMPLIANT child → **50.00**, with the 5 unassessed children excluded from the denominator; `complianceScore` still serialised; **cycle 2 untouched**; cycle count back to baseline. `NdiCycleScoreProvenanceTest` 8/8, suite **2,565/0/0** |
+| **Status** | ✅ **CLOSED 2026-07-28** — V323 |
+| **References** | `V323__ndi_cycle_score_provenance.sql`, `NdiComplianceAssessmentService#recomputeCycleComplianceScore`, `NdiAssessmentCycle`, `NdiCycleScoreProvenanceTest`. Same class as **F2-40**, **F2-28**; found via **F2-22b**'s ranking; unblocks `SECURE_CODE_REVIEW_REMEDIATION_PLAN.md` §6 |
+| **Lesson** | **My first fixture was invented and the test caught it.** I asserted the children averaged 66.43 from a score set I made up (100/100/100/100/50/50/65 — which averages 80.71). Reading the real rows both fixed the test *and* revealed that the children are seeded rather than computed, which narrowed the finding's claim. **A fixture that encodes a measured number must be built from the measurement, not from a plausible reconstruction of it** — otherwise the test passes on fiction or, as here, fails and tells you your premise was wrong |
+
+---
+
+## F2-47 · An omitted `status` returned 500 instead of 400
+
+| Field | Content |
+|---|---|
+| **ID** | F2-47 |
+| **Category** | Error handling / input validation |
+| **Severity** | **P3 Low** — no data exposure; a malformed request got the wrong status code |
+| **Provenance** | Found 2026-07-28 by my own F2-46 probe sending the wrong body key. **I spent three diagnostic rounds treating the 500 as a pre-existing platform defect before reading the controller** — including disabling my own new code to prove it was not the cause, which it was not. The bug was real, just not the one I thought I had found |
+| **Current State** | `NdiComplianceAssessmentController#setStatus` reads `body.get("status")`. `NdiComplianceAssessmentService.setStatus` then called `COMPLIANCE_STATUSES.contains(newStatus)` — and `COMPLIANCE_STATUSES` is an immutable `Set.of(...)`, whose `contains(null)` **throws NullPointerException** rather than returning false. So any request omitting `status`, or using a different key, produced a **500** with `detail: "NullPointerException"` and no indication of what was wrong |
+| **Problem** | The caller cannot tell a malformed request from a server fault, and neither can anyone watching the 500 rate. It also makes the endpoint look broken to whoever probes it first — which is exactly what happened to me |
+| **Root Cause** | `Set.of()` is null-hostile, a detail easy to miss when the value can only be null via a path the author did not expect. Compounded because every seeded NDI assessment is lifecycle `APPROVED` and therefore rejected earlier, so this endpoint had **never been exercised on a fresh row** |
+| **Business Impact** | Minor in itself; matters because this is the endpoint an assessor uses to record every compliance answer in the NDI module, and it is the first thing an integration would hit |
+| **Technical Impact** | Explicit null check first, and the message now names the required field and the permitted vocabulary. One line plus a test |
+| **UX Impact** | A missing field now returns a 400 that says what was expected instead of a correlation reference |
+| **Recommendation** | 1. As shipped. 2. Worth a sweep: `Set.of(...).contains(x)` where `x` comes from a `Map<String,String>` body is the same trap wherever it appears |
+| **Alternatives** | Switch the constants to `HashSet` — rejected: it hides the null instead of rejecting it, and immutability is worth keeping |
+| **Effort** | **XS** |
+| **Priority** | **Done** — fixed in passing |
+| **Verification** | Live: the same call that returned 500 now returns the F2-46 probe's 200 with the correct key, and `anOmittedStatusIsABadRequestNotAServerError` pins the null path. Suite **2,565/0/0** |
+| **Status** | ✅ **CLOSED 2026-07-28** |
+| **References** | `NdiComplianceAssessmentService#setStatus`, `NdiComplianceAssessmentController#setStatus`, `NdiCycleScoreProvenanceTest` |
+| **Lesson** | **Third time this session a probe's own bug looked like a finding** (after the mutation probe that "showed" the insert guard was dead, and the BIA 400 that came from `validateScope`). The pattern is now explicit enough to state as a rule: *before believing a probe's failure is a platform defect, check the contract the endpoint actually publishes* — the controller's expected body key, the parameter name, the ordering of its validators. Disabling my own code to isolate the cause was the right instinct and it worked; reading the controller first would have been faster |
+
+---
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

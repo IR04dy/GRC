@@ -4,7 +4,7 @@
 **Report baseline:** `695c907c` · **Validated at:** `fc0cd300` (master, 2026-07-27)
 **Validator:** independent re-verification against the running dev stack and the source at HEAD
 **Governing plan:** `UNIFIED_IMPLEMENTATION_PLAN.md` — this document is subordinate to it and slots into its §8 ordering
-**Next free migration:** **V324** (V323 is claimed by uncommitted F2-46 work; see §6)
+**Next free migration:** **V324** (V323 belongs to F2-46, now finished and committed; see §6)
 
 ---
 
@@ -209,11 +209,11 @@ environments.
 
 ## §6 Migration numbering
 
-`V323__ndi_cycle_score_provenance.sql` exists on disk, is **applied to the dev database twice**, and is
-**not committed** — it belongs to an unfinished F2-46 slice (the NDI cycle compliance score is caller-supplied
-and reaches the regulator submission package; asserted 68.00 against a derivable 66.43). Its columns are
-additive and nullable, so it is safe where it is. **SCR work starts at V324.** Either finish F2-46 or
-renumber it before this plan's slice 4.
+**Resolved 2026-07-28.** `V323__ndi_cycle_score_provenance.sql` was applied to dev but uncommitted when this
+plan was written, belonging to an unfinished F2-46 slice. **F2-46 is now finished and committed** — the NDI
+cycle compliance score is derived from its assessment rows, stamped `COMPUTED`, and `READ_ONLY` on the entity,
+with the one pre-existing asserted value (68.00) kept and labelled `ASSERTED_LEGACY`. **SCR work starts at
+V324** and nothing is blocked.
 
 ---
 

@@ -46,6 +46,8 @@ public class NdiComplianceAssessmentService {
         "DRAFT", "IN_PROGRESS", "SUBMITTED", "UNDER_REVIEW", "RETURNED", "APPROVED");
 
     private final NdiComplianceAssessmentRepository repo;
+    /** F2-46 — the cycle roll-up is written here, because this is where a child score changes. */
+    private final com.tss.grc.module.ndi.cycle.repository.NdiAssessmentCycleRepository cycleRepo;
     private final NdiFrameworkItemRepository frameworkRepo;
     private final com.tss.grc.module.ndi.audit.service.NdiAuditPublisher audit;
     private final com.tss.grc.module.ndi.integration.NdiCrossLinkService crossLink;
@@ -130,8 +132,13 @@ public class NdiComplianceAssessmentService {
         if ("APPROVED".equals(cur.getLifecycleStatus())) {
             throw new IllegalStateException("Approved item is read-only. Reopen first.");
         }
-        if (!COMPLIANCE_STATUSES.contains(newStatus)) {
-            throw new IllegalArgumentException("Invalid compliance_status: " + newStatus);
+        // F2-47 — an omitted status used to reach Set.of(...).contains(null), which THROWS, so a
+        // request missing the field returned 500 instead of 400. Found while probing F2-46 with the
+        // wrong body key: the controller reads body.get("status"), and any other key yields null.
+        if (newStatus == null || !COMPLIANCE_STATUSES.contains(newStatus)) {
+            throw new IllegalArgumentException(
+                "status is required and must be one of " + new java.util.TreeSet<>(COMPLIANCE_STATUSES)
+                + " (received: " + newStatus + ")");
         }
         // Rule 5 — NOT_APPLICABLE requires justification.
         if ("NOT_APPLICABLE".equals(newStatus)) {
@@ -146,7 +153,10 @@ public class NdiComplianceAssessmentService {
         cur.setComplianceStatus(newStatus);
         applyRules(cur);
         if ("DRAFT".equals(cur.getLifecycleStatus())) cur.setLifecycleStatus("IN_PROGRESS");
-        return repo.save(cur);
+        NdiComplianceAssessment saved = repo.save(cur);
+        // F2-46 — applyRules() just moved this row's score, so the cycle roll-up is now stale.
+        recomputeCycleComplianceScore(saved.getCycleId());
+        return saved;
     }
 
     @Transactional
@@ -176,7 +186,10 @@ public class NdiComplianceAssessmentService {
             && (cur.getResponseTextEn() != null || cur.getEvidenceRef() != null)) {
             cur.setLifecycleStatus("IN_PROGRESS");
         }
-        return repo.save(cur);
+        NdiComplianceAssessment saved = repo.save(cur);
+        // F2-46 — this path can change complianceStatus, so it can change the row's score too.
+        recomputeCycleComplianceScore(saved.getCycleId());
+        return saved;
     }
 
     /**
@@ -411,5 +424,59 @@ public class NdiComplianceAssessmentService {
 
         // Recompute score for the row.
         a.setComplianceScore(scoreFor(s));
+    }
+
+    // ── F2-46: the cycle's compliance score is derived, not declared ──────────────────
+
+    /**
+     * Re-derive {@code ndi.assessment_cycle.compliance_score} from this cycle's assessment rows.
+     *
+     * <p><b>Why this method did not exist.</b> The per-item score has always been computed
+     * ({@link #scoreFor}), but the cycle-level roll-up had <em>no setter anywhere in the
+     * codebase</em> — the column was written only by whatever arrived in
+     * {@code NdiAssessmentCycleService.create()}'s request body. Four consumers read it, and one of
+     * them is {@code NdiSubmissionPackageService}, the package submitted to the regulator. Measured
+     * before this fix: cycle 2 asserted 68.00 against a derivable 66.43.
+     *
+     * <p><b>What counts.</b> The mean of the child rows that carry a score. {@code scoreFor} returns
+     * {@code null} for {@code NOT_APPLICABLE}, {@code EVIDENCE_REQUIRED} and {@code UNDER_REVIEW},
+     * so those are excluded from both numerator and denominator — an item nobody has assessed yet
+     * must not drag the percentage down, and an N/A item is not a failure. That matches how
+     * {@code NdiDashboardService} and {@code NdiSubmissionPackageService} already average the column.
+     *
+     * <p><b>No scored rows leaves the score untouched</b> rather than writing zero: "nothing assessed
+     * yet" and "assessed at zero" are different facts, and the submission package distinguishes them
+     * by NULL. Consistent with V323 leaving unscored cycles unlabelled.
+     *
+     * @return the cycle as persisted, or {@code null} if the cycle is absent or has no scored rows
+     */
+    @Transactional
+    public com.tss.grc.module.ndi.cycle.entity.NdiAssessmentCycle recomputeCycleComplianceScore(
+            Long cycleId) {
+        if (cycleId == null) {
+            return null;
+        }
+        com.tss.grc.module.ndi.cycle.entity.NdiAssessmentCycle cycle = cycleRepo.findById(cycleId)
+            .filter(c -> c.getOrganisationId().equals(org()))
+            .orElse(null);
+        if (cycle == null) {
+            return null;
+        }
+        List<NdiComplianceAssessment> rows = repo.findByOrganisationIdAndCycleId(org(), cycleId);
+        BigDecimal sum = BigDecimal.ZERO;
+        int n = 0;
+        for (NdiComplianceAssessment a : rows) {
+            if (a.getComplianceScore() != null) {
+                sum = sum.add(a.getComplianceScore());
+                n++;
+            }
+        }
+        if (n == 0) {
+            return cycle;
+        }
+        cycle.setComplianceScore(sum.divide(BigDecimal.valueOf(n), 2, RoundingMode.HALF_UP));
+        cycle.setScoreSource("COMPUTED");
+        cycle.setScoreComputedAt(LocalDateTime.now());
+        return cycleRepo.save(cycle);
     }
 }
