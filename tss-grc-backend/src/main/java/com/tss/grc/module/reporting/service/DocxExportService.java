@@ -21,6 +21,7 @@ import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.kri.repository.KriDefinitionRepository;
 import com.tss.grc.module.risk.kri.repository.KriMeasurementRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
+import com.tss.grc.module.platform.export.ExportAuditContext;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.xwpf.usermodel.*;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRPr;
@@ -69,6 +70,7 @@ public class DocxExportService {
         boolean ar = "ar".equalsIgnoreCase(lang);
 
         List<Risk> risks = riskRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
+        ExportAuditContext.record(risks.size(), 1, "DocxExportService.riskRegister");   // F2-41
         long critical = risks.stream().filter(r -> "CRITICAL".equalsIgnoreCase(r.getRiskLevel())).count();
         long high     = risks.stream().filter(r -> "HIGH".equalsIgnoreCase(r.getRiskLevel())).count();
         long open     = risks.stream().filter(r -> "OPEN".equalsIgnoreCase(r.getStatus())).count();
@@ -117,6 +119,7 @@ public class DocxExportService {
 
         List<ChangeRequest> changes = changeRepo
             .findByOrganisationIdOrderByCreatedAtDesc(org, PageRequest.of(0, 1000)).getContent();
+        ExportAuditContext.record(changes.size(), 1, "DocxExportService.changeRegister");   // F2-41
         long emergency = changes.stream().filter(c -> "EMERGENCY".equalsIgnoreCase(c.getChangeType())).count();
         long open = changes.stream().filter(c ->
             !"CLOSED".equalsIgnoreCase(c.getStatus()) && !"CANCELLED".equalsIgnoreCase(c.getStatus())).count();
@@ -165,6 +168,7 @@ public class DocxExportService {
         boolean ar = "ar".equalsIgnoreCase(lang);
 
         List<AuditFinding> findings = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
+        ExportAuditContext.record(findings.size(), 1, "DocxExportService.findingsAging");   // F2-41
         LocalDate today = LocalDate.now();
         long open  = findings.stream().filter(f -> !"CLOSED".equalsIgnoreCase(f.getStatus())).count();
         long past30 = 0, past90 = 0;
@@ -222,6 +226,7 @@ public class DocxExportService {
         boolean ar = "ar".equalsIgnoreCase(lang);
 
         List<KriDefinition> kris = kriRepo.findByOrganisationIdAndIsDeletedFalseOrderByKriCodeAsc(org);
+        ExportAuditContext.record(kris.size(), 1, "DocxExportService.kriDashboard");   // F2-41
         long green = 0, amber = 0, red = 0, noData = 0;
         for (KriDefinition k : kris) {
             String band = measRepo.findFirstByOrganisationIdAndKriIdAndIsDeletedFalseOrderByMeasuredAtDesc(org, k.getId())

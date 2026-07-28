@@ -99,6 +99,7 @@ public class TabularExportService {
             if (budgetHit) log.warn("Tabular XLSX truncated at the {}-cell budget (module={}, type={})",
                 MAX_CELLS, req.module(), req.exportType());
 
+            recordRowCount(req, "TabularExportService.xlsx");
             wb.write(baos);
             return baos.toByteArray();
         } catch (IOException e) {
@@ -161,6 +162,7 @@ public class TabularExportService {
             }
             if (budgetHit) log.warn("Tabular DOCX truncated at the {}-cell budget (module={}, type={})",
                 MAX_CELLS, req.module(), req.exportType());
+            recordRowCount(req, "TabularExportService.docx");
             return DocxKit.bytes(doc);
         } finally {
             try { doc.close(); } catch (IOException ignored) { /* best-effort */ }
@@ -179,5 +181,24 @@ public class TabularExportService {
             name = trimmed + suffix;
         }
         return name;
+    }
+
+    /**
+     * F2-41 — hand the row count to {@link ExportAuditContext} so the export audit row can answer
+     * "how much left the building". Counted from the request rather than from the cells actually
+     * written, deliberately: {@code MAX_CELLS} truncation is logged as a warning and the audit trail
+     * should record what was <em>asked for</em>, since that is what the caller believes it received.
+     *
+     * <p>Instrumenting here covers every caller of this service at once — the alternative was
+     * threading a count through 40 controllers.
+     */
+    private static void recordRowCount(TabularExportRequest req, String generator) {
+        long rows = 0;
+        int sheets = 0;
+        for (TabularExportRequest.Sheet s : req.sheets()) {
+            sheets++;
+            if (s.rows() != null) rows += s.rows().size();
+        }
+        ExportAuditContext.record(rows, sheets, generator);
     }
 }

@@ -1096,6 +1096,32 @@ Start-Service TssGrcBackend
 
 ---
 
+## F2-41 · The export audit trail recorded that data left, not how much
+
+| Field | Content |
+|---|---|
+| **ID** | F2-41 (carried from F2-27 recommendation #4) |
+| **Category** | Audit completeness / DLP + PDPL evidence |
+| **Severity** | **P2 Medium** — no exposure created; the control that is supposed to *detect* exposure could not quantify it |
+| **Provenance** | Deliberately unbundled from F2-27, which enforced `MODULE:EXPORT` on all 40 file-returning endpoints. Authorisation and volume are separate concerns, and the volume half needs the *generator's* knowledge, not the interceptor's |
+| **Current State** | `ExportAuditInterceptor` fires on every response carrying `Content-Disposition: attachment` and records who exported what, when, in which format and language. It captured **no row count and no byte size**, so the trail could not answer either question a DLP or PDPL enquiry asks: *how much was extracted*, and *how sensitive was it* |
+| **Problem** | "User X exported the risk register" is a materially different event depending on whether it was 3 rows or 30,000, and the audit row could not distinguish them. An export-monitoring control that cannot express volume cannot raise a threshold alert, which is most of what such a control is for |
+| **Root Cause** | The interceptor sees a byte stream. Only the generator that built the file knows it wrote 12 rows or 12,000, and there was no channel between them |
+| **Business Impact** | PDPL and SAMA both expect an organisation to be able to say what left, at what scale. This is also the audit trail a customer's own DLP review would ask to see |
+| **Technical Impact** | Three parts. **(1)** `ExportAuditContext` — a request-thread channel the generator writes and the interceptor reads. **(2)** The interceptor now records `bytes` (from `Content-Length`, so it costs nothing and covers **every** endpoint), plus `rowCount`, `sheetCount` and `rowCountSource`. **(3)** Instrumentation at the generators rather than the 40 controllers: `TabularExportService` (xlsx + docx), `RegisterExport` (xlsx + pdf), and the row-loads in `ExportService` and `DocxExportService` — 16 insertions total, no controller touched |
+| **UX Impact** | None. The audit-log screen gains volume detail in the `EXPORT` row's JSON |
+| **Recommendation** | 1. As shipped. 2. **The classification half is NOT done and should not be guessed.** `module/dataclass` already defines the NDMO 4-level scheme (PUBLIC/INTERNAL/CONFIDENTIAL/TOP_SECRET) but applies it to `DataAsset` rows, not to modules — so labelling an export requires a **module → level policy map, which is the customer's classification policy, not an engineering default**. The plumbing is in place; the map is a decision for you. Inventing a mapping would be exactly the F2-40 mistake of asserting a value the platform cannot derive. 3. A volume threshold alert (e.g. > 10,000 rows) is now expressible and would be the natural next step |
+| **Alternatives** | Wrap the response to count bytes as they stream — rejected: `Content-Length` already carries it for the `byte[]` returns these endpoints use. Thread a count through 40 controller signatures — rejected as the plan itself anticipated; the generator seam does the same job in 16 lines |
+| **Trade-offs** | A thread-local is the one risky part: a value left behind would be attributed to the *next* request on that pooled thread. The interceptor clears in a `finally` that runs on every path including the early returns, and both a unit test and a live probe leg pin it |
+| **Effort** | **S** |
+| **Priority** | **Done** (volume) · **Open, needs your decision** (classification map) |
+| **Verification** | Live **11/11**, and the coverage is **measured rather than claimed** — the probe hits 20 real export endpoints enumerated from the controllers (the first version guessed paths and 7 of 10 404'd) and reads back what `platform.audit_log` stored. **Row-count coverage 4/21 → 16/21**; `bytes` **21/21**. The 5 uncounted are asserted to be board packs and ZIP bundles — documents, not row registers, where rows are not the unit. `rowCount=10, sheetCount=2` for a request carrying 7 + 3 rows. The leak guard is proven end-to-end: a counted export followed by an uncounted one leaves the second reporting `null`/`UNINSTRUMENTED`, not an inherited 10. `ExportAuditInterceptorTest` 8/8 (5 new), suite **2,590/0/0** |
+| **Status** | ✅ **CLOSED 2026-07-28** for volume; classification tracked as an open decision |
+| **References** | `ExportAuditContext` (new), `ExportAuditInterceptor`, `TabularExportService`, `RegisterExport`, `ExportService`, `DocxExportService`, `ExportAuditInterceptorTest` |
+| **Lesson** | **Absent is not zero, and this is the third finding in a week to turn on that distinction** (after F2-40's tally and F2-46's score). An uninstrumented export reports `rowCount: null` with `rowCountSource: "UNINSTRUMENTED"` rather than `0`, because to a DLP enquiry "exported nothing" and "we did not measure" are opposite answers and a plausible zero is worse than an honest gap. Second lesson, on method: I guessed ten endpoint paths for the coverage probe and seven of them 404'd, which would have reported a flattering 1-of-3 coverage. Enumerating the real handlers from the controllers turned the figure from an artefact of my guessing into a measurement — **a coverage number is only as good as the denominator, and a guessed denominator flatters** |
+
+---
+
 ## F2-22b(vii) · A sanctions hit could arrive already cleared, with a SAR reference
 
 | Field | Content |

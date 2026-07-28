@@ -54,6 +54,9 @@ public final class RegisterExport {
     // ── XLSX ─────────────────────────────────────────────────────────────
 
     public static <T> byte[] xlsx(String sheetName, List<Col<T>> cols, List<T> rows, boolean ar) {
+        // F2-41 — see ExportAuditContext: the generator is the only place that knows the row count,
+        // and instrumenting the shared generator covers all of its callers at once.
+        ExportAuditContext.record(rows == null ? 0 : rows.size(), 1, "RegisterExport.xlsx");
         try (Workbook wb = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
@@ -97,6 +100,7 @@ public final class RegisterExport {
                                  String eyebrowEn, String eyebrowAr,
                                  String titleEn, String titleAr,
                                  List<PdfTheme.Kpi> kpis, List<Col<T>> cols, List<T> rows, boolean ar) {
+        ExportAuditContext.record(rows == null ? 0 : rows.size(), 1, "RegisterExport.pdf");
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document doc = new Document(PageSize.A4.rotate(), 36, 36, 60, 60);
             PdfWriter writer = PdfWriter.getInstance(doc, out);

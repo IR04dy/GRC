@@ -2,6 +2,7 @@ package com.tss.grc.config;
 
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService.AuditEventBuilder;
+import com.tss.grc.module.platform.export.ExportAuditContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -43,11 +44,27 @@ public class ExportAuditInterceptor implements HandlerInterceptor {
             String module   = moduleFromPath(path);
             String type     = typeFromPath(path, fileName);
 
+            // F2-41 — the volume half of the audit trail. A DLP or PDPL enquiry asks two things:
+            // how much left, and how sensitive was it. Until now this row answered neither.
+            //
+            // `bytes` comes from Content-Length and therefore costs nothing and covers EVERY
+            // file-returning endpoint. `rowCount` can only come from the generator that built the
+            // file (ExportAuditContext), so it is present for exports routed through the shared
+            // generators and absent otherwise — and absent is reported as null with
+            // rowCountSource=UNINSTRUMENTED, never as 0. "Exported nothing" and "we did not measure"
+            // are opposite answers to a DLP question, so a lying zero would be worse than a gap.
+            ExportAuditContext.Counted counted = ExportAuditContext.rowCount();
+            long bytes = contentLength(res);
+
             String detail = "{"
                 + "\"format\":\"" + esc(format) + "\","
                 + "\"language\":\"" + esc(lang == null ? "" : lang) + "\","
                 + "\"fileName\":\"" + esc(fileName) + "\","
                 + "\"path\":\"" + esc(path) + "\","
+                + "\"bytes\":" + (bytes >= 0 ? bytes : "null") + ","
+                + "\"rowCount\":" + (counted != null ? String.valueOf(counted.rows()) : "null") + ","
+                + "\"sheetCount\":" + (counted != null ? String.valueOf(counted.sheets()) : "null") + ","
+                + "\"rowCountSource\":\"" + (counted != null ? esc(counted.generator()) : "UNINSTRUMENTED") + "\","
                 + "\"status\":" + res.getStatus()
                 + "}";
 
@@ -58,10 +75,29 @@ public class ExportAuditInterceptor implements HandlerInterceptor {
                 .entityCode(type)
                 .newValueJson(detail)
                 .message("Exported " + type + " (" + format
-                    + (lang != null && !lang.isBlank() ? ", " + lang : "") + ")"));
+                    + (lang != null && !lang.isBlank() ? ", " + lang : "")
+                    + (counted != null ? ", " + counted.rows() + " rows" : "")
+                    + (bytes >= 0 ? ", " + bytes + " bytes" : "") + ")"));
         } catch (RuntimeException e) {
             // An audit-write failure must never break a user's download.
             log.debug("export audit skipped for {}: {}", req.getRequestURI(), e.getMessage());
+        } finally {
+            // MUST run on every request, including the early returns and the error path above.
+            // Servlet threads are pooled, so a leaked count would be attributed to whatever request
+            // ran next on this thread — an audit trail that is confidently wrong about volume is
+            // worse than one that is silent.
+            ExportAuditContext.clear();
+        }
+    }
+
+    /** @return the response's {@code Content-Length}, or {@code -1} when absent or unparseable. */
+    private static long contentLength(HttpServletResponse res) {
+        String v = res.getHeader(HttpHeaders.CONTENT_LENGTH);
+        if (v == null || v.isBlank()) return -1;
+        try {
+            return Long.parseLong(v.trim());
+        } catch (NumberFormatException e) {
+            return -1;
         }
     }
 

@@ -36,6 +36,7 @@ import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.kri.repository.KriDefinitionRepository;
 import com.tss.grc.module.risk.kri.repository.KriMeasurementRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
+import com.tss.grc.module.platform.export.ExportAuditContext;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -100,6 +101,7 @@ public class ExportService {
         boolean ar = "ar".equalsIgnoreCase(lang);
 
         List<Risk> risks = riskRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
+        ExportAuditContext.record(risks.size(), 1, "ExportService.riskRegister");   // F2-41
 
         // KPI counts — surfaced on the cover so a reader sees the headline
         // numbers before paging into the row dump.
@@ -156,6 +158,7 @@ public class ExportService {
 
         List<ChangeRequest> changes = changeRepo
             .findByOrganisationIdOrderByCreatedAtDesc(org, PageRequest.of(0, 1000)).getContent();
+        ExportAuditContext.record(changes.size(), 1, "ExportService.changeRegister");   // F2-41
         long total     = changes.size();
         long emergency = changes.stream().filter(c -> "EMERGENCY".equalsIgnoreCase(c.getChangeType())).count();
         long open      = changes.stream().filter(c ->
@@ -202,6 +205,7 @@ public class ExportService {
         Long org = TenantContext.getCurrentTenant();
         List<ChangeRequest> changes = changeRepo
             .findByOrganisationIdOrderByCreatedAtDesc(org, PageRequest.of(0, 1000)).getContent();
+        ExportAuditContext.record(changes.size(), 1, "ExportService.changeRegister");   // F2-41
 
         try (Workbook wb = new XSSFWorkbook()) {
             Sheet sheet = wb.createSheet("Change Register");
@@ -521,6 +525,7 @@ public class ExportService {
         boolean ar = "ar".equalsIgnoreCase(lang);
 
         List<AuditFinding> findings = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
+        ExportAuditContext.record(findings.size(), 1, "ExportService.findingsAging");   // F2-41
         LocalDate today = LocalDate.now();
 
         // KPI counts — total, open, past-30d, past-90d (escalation tier triggers)
@@ -584,6 +589,7 @@ public class ExportService {
         boolean ar = "ar".equalsIgnoreCase(lang);
 
         List<KriDefinition> kris = kriRepo.findByOrganisationIdAndIsDeletedFalseOrderByKriCodeAsc(org);
+        ExportAuditContext.record(kris.size(), 1, "ExportService.kriDashboard");   // F2-41
 
         // QUAL-BCMP-006: one query for each KRI's latest reading instead of a
         // per-KRI N+1 loop. Key present ⇒ a reading exists; value [0]=band (may
@@ -777,6 +783,7 @@ public class ExportService {
     public byte[] riskRegisterXlsx() {
         Long org = TenantContext.getCurrentTenant();
         List<Risk> risks = riskRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
+        ExportAuditContext.record(risks.size(), 1, "ExportService.riskRegister");   // F2-41
 
         try (Workbook wb = new XSSFWorkbook()) {
             Sheet sheet = wb.createSheet("Risk Register");
@@ -840,6 +847,7 @@ public class ExportService {
     public byte[] findingsXlsx() {
         Long org = TenantContext.getCurrentTenant();
         List<AuditFinding> findings = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
+        ExportAuditContext.record(findings.size(), 1, "ExportService.findingsAging");   // F2-41
         LocalDate today = LocalDate.now();
 
         try (Workbook wb = new XSSFWorkbook()) {
@@ -892,6 +900,7 @@ public class ExportService {
     public byte[] kriDashboardXlsx() {
         Long org = TenantContext.getCurrentTenant();
         List<KriDefinition> kris = kriRepo.findByOrganisationIdAndIsDeletedFalseOrderByKriCodeAsc(org);
+        ExportAuditContext.record(kris.size(), 1, "ExportService.kriDashboard");   // F2-41
         // QUAL-BCMP-006: one query for each KRI's latest reading instead of a
         // per-KRI N+1 loop. Key present ⇒ a reading exists; value [0]=band (may
         // be null), [1]=readingValue.
