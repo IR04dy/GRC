@@ -235,19 +235,44 @@ class EthicsCaseServiceTest {
         assertThat(saved.getIntakeChannel()).isEqualTo("HOTLINE");
     }
 
+    /**
+     * F2-22b(v) — <b>deliberate behaviour change, recorded rather than quietly dropped.</b>
+     *
+     * <p>This test used to be {@code create_respects_explicit_status_severity_intake} and asserted
+     * that a create supplying {@code status="TRIAGE"} was honoured — a case "arriving already
+     * triaged", presumably from an external hotline provider. That intent is real, but it is in
+     * direct tension with lifecycle integrity, because {@code transition()} is the only thing that
+     * stamps {@code triagedAt}: a pre-triaged create produced a case claiming TRIAGE with <b>no
+     * triage timestamp</b>. The same tension was resolved the same way for {@code ChangeRequest} by
+     * CM-C3.
+     *
+     * <p>The pre-triaged flow is still available and now yields <em>better</em> data: create (lands
+     * INTAKE) then {@code POST /transition {"target":"TRIAGE"}}, which stamps the timestamp. Two
+     * calls instead of one, and the record is complete.
+     *
+     * <p>{@code severity} and {@code intakeChannel} were never the problem — they are ordinary form
+     * fields and are still respected, which is what the rest of this test asserts.
+     */
     @Test
-    void create_respects_explicit_status_severity_intake() {
+    void create_respects_explicit_severity_and_channel_but_not_status() {
         EthicsCase req = new EthicsCase();
         req.setTitleEn("Pre-triaged");
-        req.setStatus("TRIAGE");
         req.setSeverity("CRITICAL");
         req.setIntakeChannel("EMAIL");
         when(caseRepo.save(any(EthicsCase.class))).thenAnswer(inv -> inv.getArgument(0));
 
         EthicsCase saved = service.create(req);
-        assertThat(saved.getStatus()).isEqualTo("TRIAGE");
+        assertThat(saved.getStatus()).isEqualTo("INTAKE");
         assertThat(saved.getSeverity()).isEqualTo("CRITICAL");
         assertThat(saved.getIntakeChannel()).isEqualTo("EMAIL");
+
+        // ...and asking for TRIAGE at create time is now refused, with the two-call route named.
+        EthicsCase preTriaged = new EthicsCase();
+        preTriaged.setTitleEn("Pre-triaged");
+        preTriaged.setStatus("TRIAGE");
+        assertThatThrownBy(() -> service.create(preTriaged))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("/transition");
     }
 
     // ─── Soft delete ─────────────────────────────────────────────────
@@ -324,5 +349,81 @@ class EthicsCaseServiceTest {
             .hasMessageContaining("entityType and entityId");
 
         verify(linkRepo, never()).save(any());
+    }
+
+    // ─── F2-22b(v): the lifecycle belongs to transition(), not the body ──────
+    //
+    // The topology tests above prove transition() is correct. These prove it is the ONLY
+    // way in. `apply` used to copy `status` and `outcome` straight from the request body on
+    // both create and update, so the whole chain — and every timestamp only transition()
+    // stamps — could be skipped in one call.
+
+    @Test
+    void create_cannot_file_a_case_that_is_already_closed() {
+        EthicsCase body = new EthicsCase();
+        body.setTitleEn("Reported retaliation");
+        body.setStatus("CLOSED");
+
+        assertThatThrownBy(() -> service.create(body))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("starts at INTAKE")
+            .hasMessageContaining("/transition");
+
+        verify(caseRepo, never()).save(any());
+    }
+
+    @Test
+    void create_cannot_declare_an_outcome_no_investigation_produced() {
+        EthicsCase body = new EthicsCase();
+        body.setTitleEn("Reported retaliation");
+        body.setOutcome("SUBSTANTIATED");
+
+        assertThatThrownBy(() -> service.create(body))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("REMEDIATION");
+
+        verify(caseRepo, never()).save(any());
+    }
+
+    @Test
+    void update_cannot_move_the_case_and_says_what_would_be_legal() {
+        when(caseRepo.findById(ID)).thenReturn(Optional.of(ethicsCase("INTAKE")));
+
+        EthicsCase body = new EthicsCase();
+        body.setStatus("CLOSED");
+
+        assertThatThrownBy(() -> service.update(ID, body))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("is at INTAKE")
+            // the message must be actionable: name the endpoint AND the legal targets
+            .hasMessageContaining("/transition")
+            .hasMessageContaining("TRIAGE");
+
+        verify(caseRepo, never()).save(any());
+    }
+
+    /**
+     * The leg that a careless fix breaks. {@code EthicsPage}'s edit modal seeds itself from
+     * {@code reqFromDto(c) = { ...c }} — the whole DTO — so an ordinary metadata edit PUTs the
+     * case's <em>current</em> status and outcome straight back. Rejecting any present value
+     * would 400 every edit on every case past INTAKE. An unchanged value is ignored.
+     */
+    @Test
+    void update_still_accepts_the_edit_forms_unchanged_status_echo() {
+        EthicsCase existing = ethicsCase("INVESTIGATION");
+        existing.setOutcome("PENDING");
+        when(caseRepo.findById(ID)).thenReturn(Optional.of(existing));
+        when(caseRepo.save(any(EthicsCase.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        EthicsCase body = new EthicsCase();
+        body.setStatus("INVESTIGATION");   // echoed, not changed
+        body.setOutcome("PENDING");        // echoed, not changed
+        body.setLocation("Riyadh");        // the actual edit
+
+        EthicsCase saved = service.update(ID, body);
+
+        assertThat(saved.getLocation()).isEqualTo("Riyadh");
+        assertThat(saved.getStatus()).isEqualTo("INVESTIGATION");
+        assertThat(saved.getOutcome()).isEqualTo("PENDING");
     }
 }

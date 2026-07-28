@@ -563,7 +563,7 @@ def main() -> None:
     # =======================================================================
     AF_COMMITTEE = "Anti-Fraud & Integrity Committee / لجنة مكافحة الاحتيال والنزاهة"
     CASES = [
-        dict(code="ETH-2026-011", cat="ABUSE_OF_OFFICE", sev="HIGH", status="INVESTIGATING",
+        dict(code="ETH-2026-011", cat="ABUSE_OF_OFFICE", sev="HIGH", status="INVESTIGATION",
              ch="PORTAL", inv=U_AUDITOR,
              ten="Abuse of office to favour a related party",
              tar="استغلال المنصب لمحاباة طرف ذي علاقة",
@@ -577,19 +577,19 @@ def main() -> None:
              desc="Operational expenditure was diverted from its approved purpose; "
                   "substantiated by audit review.",
              dar="حُوّل إنفاق تشغيلي عن غرضه المعتمد؛ وثبت ذلك بمراجعة التدقيق."),
-        dict(code="ETH-2026-013", cat="BRIBERY", sev="CRITICAL", status="INVESTIGATING",
+        dict(code="ETH-2026-013", cat="BRIBERY", sev="CRITICAL", status="INVESTIGATION",
              ch="PORTAL", inv=U_AUDITOR,
              ten="Bribery in a licensing decision",
              tar="رشوة في قرار ترخيص",
              desc="Allegation that a facilitation payment influenced a licensing decision.",
              dar="ادعاء بأن دفعة تيسير أثّرت في قرار ترخيص."),
-        dict(code="ETH-2026-014", cat="CONFLICT_OF_INTEREST", sev="MEDIUM", status="TRIAGED",
+        dict(code="ETH-2026-014", cat="CONFLICT_OF_INTEREST", sev="MEDIUM", status="TRIAGE",
              ch="EMAIL", inv=U_COMPLIANCE,
              ten="Nepotism / wasta in a hiring decision",
              tar="محاباة (واسطة) في قرار توظيف",
              desc="Concern that a hiring decision favoured a relative of a hiring-panel member.",
              dar="مخاوف من أن قرار توظيف حابى قريباً لأحد أعضاء لجنة التوظيف."),
-        dict(code="ETH-2026-015", cat="POLICY_VIOLATION", sev="HIGH", status="INVESTIGATING",
+        dict(code="ETH-2026-015", cat="POLICY_VIOLATION", sev="HIGH", status="INVESTIGATION",
              ch="HOTLINE", inv=U_AUDITOR,
              ten="Leaking confidential tender information",
              tar="تسريب معلومات سرية عن منافسة",

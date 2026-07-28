@@ -73,6 +73,7 @@ public class EthicsCaseService {
     public EthicsCase create(EthicsCase req) {
         EthicsCase c = new EthicsCase();
         c.setOrganisationId(TenantContext.getCurrentTenant());
+        requireLifecycleIsNotBodySet(c, req, true);
         apply(c, req);
         if (c.getStatus()        == null) c.setStatus("INTAKE");
         if (c.getSeverity()      == null) c.setSeverity("MEDIUM");
@@ -85,6 +86,7 @@ public class EthicsCaseService {
     @Transactional
     public EthicsCase update(Long id, EthicsCase req) {
         EthicsCase c = require(id);
+        requireLifecycleIsNotBodySet(c, req, false);
         apply(c, req);
         EthicsCase saved = caseRepo.save(c);
         emit(saved);
@@ -262,11 +264,66 @@ public class EthicsCaseService {
         if (src.getClauseRef()          != null) target.setClauseRef(src.getClauseRef());
         if (src.getInvestigatorName()   != null) target.setInvestigatorName(src.getInvestigatorName());
         if (src.getCommitteeName()      != null) target.setCommitteeName(src.getCommitteeName());
-        if (src.getOutcome()            != null) target.setOutcome(src.getOutcome());
         if (src.getOutcomeSummary()     != null) target.setOutcomeSummary(src.getOutcomeSummary());
         if (src.getRegulatorReference() != null) target.setRegulatorReference(src.getRegulatorReference());
         if (src.getRetaliationObserved()!= null) target.setRetaliationObserved(src.getRetaliationObserved());
-        if (src.getStatus()             != null) target.setStatus(src.getStatus());
+        // F2-22b(v): `status` and `outcome` are DELIBERATELY not copied here — they belong to
+        // transition(). Same decision CM-C3 made for ChangeRequest#apply, and for the same reason.
+        // See requireLifecycleIsNotBodySet for what the callers enforce instead.
+    }
+
+    /**
+     * F2-22b(v) — the case lifecycle belongs to {@code transition()}, not to the request body.
+     *
+     * <p>{@code apply} used to copy {@code status} and {@code outcome} straight from the body on both
+     * create and update, so {@code POST /api/v1/ethics/cases {"status":"CLOSED",
+     * "outcome":"UNSUBSTANTIATED"}} filed a whistleblower report that was already investigated and
+     * dismissed, and a {@code PUT} could move any case to any state at any time. That skipped the
+     * whole chain (INTAKE → TRIAGE → INVESTIGATION → SUBSTANTIATED/UNSUBSTANTIATED/NO_VIOLATION →
+     * REMEDIATION → CLOSED) — but the sharper loss is the **timestamps**, because
+     * {@code transition()} is the only thing that stamps {@code triagedAt},
+     * {@code investigationStarted}, {@code investigationEnded}, {@code closureDate} and
+     * {@code regulatorNotified}. A case closed through the body therefore carries a verdict with no
+     * triage date, no investigation window and no closure date: on a whistleblowing register that is
+     * indistinguishable from a report that was quietly made to go away.
+     *
+     * <p><b>Why this rejects a CHANGE but tolerates an ECHO.</b> `EthicsPage`'s edit modal seeds
+     * itself with {@code reqFromDto(c) = { ...c }} — the whole DTO — so an ordinary metadata edit
+     * PUTs the case's <em>current</em> status and outcome straight back. Refusing any present value
+     * would break the edit form on every case past INTAKE. This is the standing lesson from tranche
+     * (ii) that <b>the UI is what falsifies a "just refuse the caller's value" fix</b>, so: an
+     * unchanged value is ignored, a different one is refused and names the endpoint that owns it.
+     *
+     * <p>(READ_ONLY on the entity would also have tolerated the echo, and is the right tool for a
+     * field the UI merely round-trips — it is what tranches (ii)–(iv) used. It is wrong <em>here</em>
+     * because {@code status} must still be settable on the way in for an integration that legitimately
+     * opens a case at INTAKE, and because a silent drop would leave a caller believing it had closed
+     * a case. F2-44's rule: say so.)
+     */
+    private void requireLifecycleIsNotBodySet(EthicsCase current, EthicsCase src, boolean isCreate) {
+        String curStatus  = isCreate ? "INTAKE" : current.getStatus();
+        String curOutcome = isCreate ? null     : current.getOutcome();
+
+        if (src.getStatus() != null && !src.getStatus().equals(curStatus)) {
+            throw new IllegalArgumentException(
+                (isCreate
+                    ? "A new ethics case starts at INTAKE (received: " + src.getStatus() + ")."
+                    : "Case " + current.getId() + " is at " + curStatus + " and cannot be moved to "
+                      + src.getStatus() + " by an update.")
+                + " Status changes go through POST /api/v1/ethics/cases/"
+                + (isCreate ? "{id}" : current.getId()) + "/transition, which enforces the chain and"
+                + " stamps triagedAt / investigationStarted / investigationEnded / closureDate."
+                + " Allowed from " + curStatus + ": " + new java.util.TreeSet<>(
+                    TRANSITIONS.getOrDefault(curStatus, Set.of())) + ".");
+        }
+        if (src.getOutcome() != null && !src.getOutcome().equals(curOutcome)) {
+            throw new IllegalArgumentException(
+                (isCreate ? "A new ethics case has no outcome" : "The outcome of case "
+                    + current.getId() + " is not editable")
+                + " — it is recorded by the REMEDIATION transition (received: "
+                + src.getOutcome() + "). An outcome that did not come from an investigation is"
+                + " not a finding.");
+        }
     }
 
     private EthicsCase require(Long id) {
