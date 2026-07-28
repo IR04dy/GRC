@@ -72,7 +72,7 @@ export function ProcessorAssessmentsPage() {
 
   async function onApprove(id: number) {
     setBusyId(id);
-    try { await approveProcessorAssessment(id, 'admin'); toast.success(t('procApproved')); await reload(); }
+    try { await approveProcessorAssessment(id); toast.success(t('procApproved')); await reload(); }
     catch { toast.danger(t('procActionFailed')); }
     finally { setBusyId(null); }
   }

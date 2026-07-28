@@ -47,8 +47,14 @@ export function listProcessorAssessments(status?: ProcStatus, page = 0, size = 2
   const qs = status ? `&status=${status}` : '';
   return api.get(`${BASE}?page=${page}&size=${size}${qs}`);
 }
-export function approveProcessorAssessment(id: number, approverName: string) {
-  return api.post<ProcessorAssessment>(`${BASE}/${id}/approve`, { approverName });
+/**
+ * F2-22b(iv) — the approver is whoever is authenticated, so no name is sent.
+ *
+ * This used to take an `approverName` and the only caller passed the literal `'admin'`, which
+ * is what the PDPL Art. 28 register then showed as the approver of every processor.
+ */
+export function approveProcessorAssessment(id: number) {
+  return api.post<ProcessorAssessment>(`${BASE}/${id}/approve`, {});
 }
 export function rejectProcessorAssessment(id: number) {
   return api.post<ProcessorAssessment>(`${BASE}/${id}/reject`);

@@ -95,7 +95,50 @@ public class TprmService {
     public VendorAssessment createAssessment(VendorAssessment req) {
         Vendor v = getVendor(req.getVendorId()); // verify org ownership
         req.setOrganisationId(v.getOrganisationId()); // PERF-PG-002: denormalised tenant anchor
+        // F2-22b(iv): this saved the request body wholesale. The five questionnaire-engine
+        // fields are now READ_ONLY on the entity so they cannot arrive at all; belt-and-braces,
+        // force them to their initial values here too, because a future DTO or an internal
+        // caller passing an entity would not go through Jackson. A brand-new assessment has
+        // answered nothing.
+        req.setId(null);
+        req.setTemplateId(null);
+        req.setWorkflowStatus("NOT_STARTED");
+        req.setAnsweredCount(0);
+        req.setTotalQuestions(0);
+        req.setComputedScorePct(null);
         return assessmentRepo.save(req);
+    }
+
+    /**
+     * F2-22b(iv) — refuse a manual score/rating on an assessment the questionnaire owns.
+     *
+     * <p>{@code templateId != null} is the ownership marker: {@code assign-template} sets it and
+     * {@code recompute()} then derives {@code computedScorePct}, mirrors it to the legacy
+     * {@code riskScore} column and bands {@code riskRating} from the template thresholds. A
+     * manual value here is not a smaller edit — it is a claim that contradicts the responses on
+     * file, which is precisely the evidence a SAMA outsourcing review asks for.
+     *
+     * <p>Deliberately narrow: it fires only when the caller supplies a value that <em>differs</em>
+     * from what is stored, so an ordinary round-trip PUT (read, change the findings text, send it
+     * all back) still works.
+     */
+    private void requireScoreIsNotQuestionnaireOwned(VendorAssessment existing, VendorAssessment req) {
+        if (existing.getTemplateId() == null) return; // manual assessment — free-form by design
+        boolean scoreDiffers  = req.getRiskScore() != null
+            && (existing.getRiskScore() == null
+                || existing.getRiskScore().compareTo(req.getRiskScore()) != 0);
+        boolean ratingDiffers = req.getRiskRating() != null
+            && !req.getRiskRating().equals(existing.getRiskRating());
+        if (scoreDiffers || ratingDiffers) {
+            throw new IllegalStateException(
+                "Assessment " + existing.getId() + " is scored by questionnaire template "
+                + existing.getTemplateId() + ", so riskScore/riskRating are derived from the "
+                + "responses (computedScorePct=" + existing.getComputedScorePct() + ", rating="
+                + existing.getRiskRating() + "). Change an answer via POST "
+                + "/api/tprm/assessments/" + existing.getId() + "/responses, or complete the "
+                + "assessment, to move the score. Received riskScore=" + req.getRiskScore()
+                + ", riskRating=" + req.getRiskRating() + ".");
+        }
     }
 
     @Transactional
@@ -106,10 +149,20 @@ public class TprmService {
         // ownership is enforced via the parent vendor — getVendor throws if the
         // vendor is not in the caller's org, blocking cross-tenant tampering.
         getVendor(existing.getVendorId());
+        // F2-22b(iv): riskScore/riskRating are the "legacy free-form" columns and stay
+        // caller-supplied for a MANUAL assessment — that is a real path and refusing it
+        // outright would be the F2-40 trap (mistaking a designed assertion for a bypass).
+        // But once a questionnaire owns the row, QuestionnaireService.recompute() derives
+        // both from the weighted responses, and letting a plain PUT overwrite them let a
+        // vendor be re-banded without touching a single answer: live-proven, risk_score went
+        // 17.31 → 1.00 while computed_score_pct stayed 17.31, so the register and the rubric
+        // disagreed with no trace of which was which. Reject, naming the path that owns it —
+        // never silently drop the value (F2-44).
+        requireScoreIsNotQuestionnaireOwned(existing, req);
         existing.setAssessmentDate(req.getAssessmentDate());
         existing.setAssessor(req.getAssessor());
-        existing.setRiskScore(req.getRiskScore());
-        existing.setRiskRating(req.getRiskRating());
+        if (req.getRiskScore()  != null) existing.setRiskScore(req.getRiskScore());
+        if (req.getRiskRating() != null) existing.setRiskRating(req.getRiskRating());
         existing.setStatus(req.getStatus());
         existing.setFindings(req.getFindings());
         existing.setNextReviewDate(req.getNextReviewDate());

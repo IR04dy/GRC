@@ -51,15 +51,36 @@ public class ProcessorAssessment {
     @Column(name = "recommendations_en",  columnDefinition = "NVARCHAR(MAX)") private String recommendationsEn;
     @Column(name = "recommendations_ar",  columnDefinition = "NVARCHAR(MAX)") private String recommendationsAr;
 
+    // F2-22b(iv): the outcome and the score are DERIVED by scoreAndComplete() from the eight
+    // c1..c8 control outcomes — FAIL anywhere ⇒ FAIL/8.0, otherwise 1.0 + 1.5 per condition.
+    // Until this fix POST /api/privacy/processor-assessments saved the body wholesale, so a
+    // caller could file a processor as PASS with a 1.0 risk score while every one of the eight
+    // controls was still null: live-proven (201, status=APPROVED, outcome=PASS, c1=NULL).
+    // That is the PDPL Art. 28 due-diligence record for a data processor, so the outcome has to
+    // come from the assessment or it means nothing. Still serialised — the register renders both.
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "overall_outcome", length = 25) private String overallOutcome;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "risk_score", precision = 4, scale = 1) private BigDecimal riskScore;
     @Column(name = "next_assessment_due") private LocalDate nextAssessmentDue;
 
+    // F2-22b(iv): who assessed, who approved, and when — all stamped from the authenticated
+    // principal by scoreAndComplete()/approve(). assessedBy and assessorName had NO setter
+    // anywhere in the platform before this slice, which is why the register's
+    // "assessed on <date> (<assessor>)" line always rendered "—".
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "assessed_at")     private LocalDateTime assessedAt;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "assessed_by")     private Long          assessedBy;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "assessor_name", length = 255) private String assessorName;
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_at")     private LocalDateTime approvedAt;
+    // The companion of approvedAt, and the field that actually appears in the register.
+    // approvedAt was made READ_ONLY by tranche (ii) while this one was left bindable — the same
+    // miss as decidedByName in tranche (iii). A display name is easier to forge convincingly
+    // than a user id, so the name is the more important half, not the lesser one.
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approver_name", length = 255) private String approverName;
 
     @Column(nullable = false, length = 20) private String status = "IN_PROGRESS";

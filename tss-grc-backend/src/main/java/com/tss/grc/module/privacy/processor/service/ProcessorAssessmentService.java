@@ -52,12 +52,30 @@ public class ProcessorAssessmentService {
     public ProcessorAssessment create(ProcessorAssessment req) {
         req.setOrganisationId(TenantContext.getCurrentTenant());
         req.setId(null);
+        // F2-22b(iv) — the same defect as F2-22b(ii)'s BCM cycle, in privacy: `if (status ==
+        // null) IN_PROGRESS` let every OTHER status through, so a create could file a processor
+        // as APPROVED without ever passing /score (which derives the outcome from the eight
+        // controls) or /approve (which stamps the approver). Reject and name the path that owns
+        // the state — do not silently force DRAFT, because a silent drop is F2-44's defect.
         if (req.getStatus() == null) req.setStatus("IN_PROGRESS");
+        else if (!"IN_PROGRESS".equals(req.getStatus())) {
+            throw new IllegalArgumentException(
+                "A new processor assessment starts IN_PROGRESS (received: " + req.getStatus()
+                + "). Score it via POST /api/privacy/processor-assessments/{id}/score, then "
+                + "approve or reject it — those transitions derive the outcome and risk score "
+                + "from the eight Art. 28 controls and stamp the approver.");
+        }
         return repo.save(req);
     }
 
     @Transactional
     public ProcessorAssessment scoreAndComplete(Long id, Map<String, String> controls) {
+        return scoreAndComplete(id, controls, null, null);
+    }
+
+    @Transactional
+    public ProcessorAssessment scoreAndComplete(Long id, Map<String, String> controls,
+                                                Long assessorId, String assessorName) {
         ProcessorAssessment a = get(id);
         controls.forEach((k, v) -> {
             if (v != null && !CONTROL_OUTCOMES.contains(v))
@@ -93,6 +111,10 @@ public class ProcessorAssessmentService {
                 .setScale(1, java.math.RoundingMode.HALF_UP));
         a.setStatus("COMPLETED");
         a.setAssessedAt(LocalDateTime.now());
+        // F2-22b(iv): stamp WHO scored it. Nothing set these before, so the register's
+        // "assessed on <date> (<assessor>)" line rendered a date next to an em dash.
+        if (assessorId   != null) a.setAssessedBy(assessorId);
+        if (assessorName != null) a.setAssessorName(assessorName);
         ProcessorAssessment saved = repo.save(a);
         // Enhancement E: auto-CAPA on FAIL outcome.
         if ("FAIL".equals(saved.getOverallOutcome()) && automation != null) {
@@ -101,8 +123,22 @@ public class ProcessorAssessmentService {
         return saved;
     }
 
+    /**
+     * F2-22b(iv) — {@code approverName} is the authenticated principal, never a request field.
+     *
+     * <p>It used to come from the body, and the caller was the SPA sending the literal string
+     * {@code 'admin'} for every approval, with the controller defaulting to {@code "admin"} when
+     * the key was absent. So the PDPL Art. 28 register recorded "admin" as the approver of every
+     * processor regardless of who clicked, and any caller could name anyone. DF-3's rule: a field
+     * that records who did something is never the caller's to set.
+     */
     @Transactional
     public ProcessorAssessment approve(Long id, String approverName) {
+        if (approverName == null || approverName.isBlank()) {
+            throw new IllegalStateException(
+                "No authenticated principal to record as the approver of processor assessment "
+                + id + ". Approval attribution is the record's whole value.");
+        }
         ProcessorAssessment a = get(id);
         a.setStatus("APPROVED");
         a.setApprovedAt(LocalDateTime.now());

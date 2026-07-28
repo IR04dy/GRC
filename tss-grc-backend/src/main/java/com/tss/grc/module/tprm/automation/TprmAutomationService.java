@@ -8,6 +8,7 @@ import com.tss.grc.module.scm.resilience.entity.SupplierResilienceTest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -31,6 +32,27 @@ import java.time.LocalDate;
  *
  * <p>All hooks are best-effort: if the CAPA service fails (e.g. validation),
  * we log and continue rather than rolling back the original transition.
+ *
+ * <p><b>F2-22b(iv) — and until this fix that sentence was not true.</b> Each hook was plain
+ * {@code @Transactional}, i.e. {@code REQUIRED}, so it <em>joined</em> the caller's transaction.
+ * When {@code capaService.create} threw, Spring had already marked that shared transaction
+ * rollback-only; catching the exception and logging a warning does not clear the flag, so the
+ * <em>caller's</em> commit then failed with {@code UnexpectedRollbackException} — surfaced to the
+ * client as a 503 "Transaction rolled back". The best-effort hook was silently fatal to the thing
+ * it was decorating.
+ *
+ * <p>Live-proven on the PDPL Art. 28 path: {@code POST /processor-assessments/{id}/score} with all
+ * controls PASS returned 200, and the same call with one FAIL returned <b>503 and saved nothing</b>
+ * — so a processor assessment could never be recorded as failing, which is the only outcome that
+ * matters for compliance. {@code REQUIRES_NEW} gives each hook its own transaction, so a CAPA
+ * failure rolls back only the CAPA and the assessment still commits.
+ *
+ * <p>This is the engine-wiring rule the platform already documents (per-call {@code REQUIRES_NEW};
+ * joined-transaction failures poison commits). ⚠ <b>The underlying CAPA break is a separate,
+ * wider finding:</b> {@code POST /api/capa/tasks} returns 500 for <em>every</em> payload
+ * (reproduced with {@code audit_finding}, {@code processor_assessment} and {@code incident}), while
+ * a raw INSERT into {@code capa.tasks} with the same values succeeds — so every auto-CAPA hook in
+ * the platform is currently a no-op that only logs. Recorded as F2-48; not fixed here.
  */
 @Service
 @RequiredArgsConstructor
@@ -39,7 +61,7 @@ public class TprmAutomationService {
 
     private final CapaTaskService capaService;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onFourthPartyHighConcentration(FourthPartyExposure ex) {
         if (ex == null || !"HIGH".equals(ex.getConcentrationRisk())) return;
         try {
@@ -62,7 +84,7 @@ public class TprmAutomationService {
         }
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onProcessorAssessmentFailed(ProcessorAssessment a) {
         if (a == null || !"FAIL".equals(a.getOverallOutcome())) return;
         try {
@@ -85,7 +107,7 @@ public class TprmAutomationService {
         }
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onResilienceTestFailed(SupplierResilienceTest t) {
         if (t == null || !"FAIL".equals(t.getOutcome())) return;
         try {

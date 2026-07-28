@@ -287,6 +287,31 @@ public class QuestionnaireService {
         BigDecimal maxPoints = maxPointsFor(q);
         r.setMaxPoints(maxPoints);
 
+        // F2-22b(iv) — bound the manual override.
+        //
+        // computeScoredPoints() validates every DERIVED path with care (SCALE_1_5 must be 1..5,
+        // BOOLEAN must be a known token, SELECT must be a listed option), but the manual override
+        // above skipped all of it: whatever number arrived was stored, while maxPoints came from
+        // the QUESTION. Live-proven — scoredPoints=5 on a BOOLEAN question (max 1.00) gave a 500%
+        // posture, so recomputeAssessment() produced computedScorePct = -400.00 and bandFor()
+        // duly called it LOW, because -400 ≤ thresholdLowMax.
+        //
+        // This matters more than an out-of-range number in a column: it is the same defect as the
+        // one this tranche closes, one layer in. Making computedScorePct READ_ONLY stops a caller
+        // asserting the score directly, but it is worth nothing if the sanctioned path can drive
+        // the same score anywhere. A derivation is only as trustworthy as its inputs.
+        if (r.getScoredPoints() != null
+            && (r.getScoredPoints().compareTo(BigDecimal.ZERO) < 0
+                || r.getScoredPoints().compareTo(maxPoints) > 0)) {
+            throw new IllegalArgumentException(
+                "scoredPoints must be between 0 and " + maxPoints.stripTrailingZeros().toPlainString()
+                + " for question " + q.getQuestionCode() + " (answerType " + q.getAnswerType()
+                + "), received " + r.getScoredPoints().stripTrailingZeros().toPlainString()
+                + ". An out-of-range answer skews the whole assessment: the weighted total is "
+                + "divided by the questions' maxPoints, so over-scoring one answer moves "
+                + "computedScorePct outside 0..100 and mis-bands the risk rating.");
+        }
+
         if (Boolean.TRUE.equals(r.getNotApplicable())) {
             if (r.getNaJustification() == null || r.getNaJustification().isBlank())
                 throw new IllegalArgumentException("naJustification is required when notApplicable = true");

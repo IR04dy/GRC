@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
@@ -231,9 +232,34 @@ public class CapaTaskService {
             "CAPA " + t.getExternalId() + " soft-deleted (status=" + t.getStatus() + ")");
     }
 
+    /**
+     * F2-48 — this generator collided with itself, so a tenant could open ONE CAPA every ~17½
+     * minutes and every other attempt failed.
+     *
+     * <p>It was {@code Long.toHexString(currentTimeMillis()).substring(0, 6)}. The epoch in hex is
+     * 11 digits, so taking the first six keeps the <b>high-order</b> digits and throws away the low
+     * five: the value only changes when bit 20 rolls over, i.e. once per 2²⁰ ms ≈ 17.5 minutes.
+     * Every CAPA created inside one window got the identical {@code external_id} and violated
+     * {@code uk_capa_external (organisation_id, external_id)}.
+     *
+     * <p>The symptom did not look like an id problem. The insert fails after {@code repo.save},
+     * so callers saw "an unexpected database error" (500), and any caller that had joined its
+     * transaction to a {@code @Transactional} auto-CAPA hook got a 503 "Transaction rolled back"
+     * on a completely unrelated operation. Measured live: six consecutive scores of a failing
+     * processor assessment returned 200, 503, 503, 503, 503, 503 — the first in the window worked.
+     *
+     * <p>Why it stayed hidden: all 16 seeded rows carry hand-written {@code CAPA-GOV-2026-NNN}
+     * ids, so the generator was never exercised twice in a window by anything but a real user, and
+     * every auto-CAPA hook swallows its exception and logs a warning. So each module's automation
+     * appeared wired while creating nothing.
+     *
+     * <p>Now: full millisecond precision (nothing truncated) plus 4 random hex digits, so two
+     * CAPAs raised in the same millisecond by different threads still differ.
+     */
     private String generateExternalId() {
-        return String.format("CAPA-%d-%s",
+        return String.format("CAPA-%d-%s%04X",
             LocalDateTime.now().getYear(),
-            Long.toHexString(System.currentTimeMillis()).toUpperCase().substring(0, 6));
+            Long.toHexString(System.currentTimeMillis()).toUpperCase(),
+            ThreadLocalRandom.current().nextInt(0x10000));
     }
 }
