@@ -1070,6 +1070,32 @@ Start-Service TssGrcBackend
 
 ---
 
+## F2-22b(iii) · Decision, verification and signature provenance was settable — with no live bypass
+
+| Field | Content |
+|---|---|
+| **ID** | F2-22b(iii) — third tranche of F2-22b |
+| **Category** | Mass assignment / provenance hardening — **defence in depth, not a closed hole** |
+| **Severity** | **P3 Low as it stands.** Every service on these paths already defends; the exposure is that the guarantee lives in five services rather than in the type |
+| **Provenance** | Found 2026-07-28 continuing F2-22b's CRIT tier in order, after (ii) took the approval fields |
+| **Current State** | `decidedBy`, `decidedByName`, `decidedAt`, `verifiedBy`, `verifiedAt` and `signedAt` were deserialisable on five entity-bound types: `AmlAlert`, `CrisisDecision`, `Disclosure`, `CorrectiveAction`, `DataSharingAgreement`. **But measurement found no live bypass** — every `setDecidedBy`/`setDecidedAt`/`setSignedAt` call in the platform takes its value from an authenticated actor or from `now()`, and `CorrectiveActionService` is explicit: create scrubs `verifiedBy`/`verifiedAt` (SEC-ESG-003 did this deliberately), `update()` whitelists around them, and only `transition()` sets them, from the verifier |
+| **Problem** | Nothing is currently exploitable, and stating that plainly matters — the register would otherwise imply five new bypasses. The real problem is structural: five services each remember to defend, and the sixth endpoint added to any of these entities will not. That is precisely the argument F2-22a made for `BaseEntity`'s nine fields, and the reason DF-3 and DF-4 both happened in the first place |
+| **Root Cause** | The rule "a field recording who did something, or when, is not the caller's to set" was applied per-incident (DF-3 for a committee vote, DF-4 for a CAB approval, SEC-ESG-003 for CAPA verification) and never generalised to the type system |
+| **Business Impact** | Latent. The fields concerned are the audit answers to "who cleared this AML alert", "who took this crisis decision", "who verified this remediation", "when was this data-sharing agreement signed" |
+| **Technical Impact** | `@JsonProperty(READ_ONLY)` on all six field names across the five entities, still serialised (asserted — every one is displayed or exported). **CRIT 28 → 19** in the risk ranking; cumulative 54 → 28 → 19 |
+| **UX Impact** | None |
+| **Recommendation** | 1. As shipped. 2. **The follow-up list is now five DTO paths, and it is the more interesting problem**: `CapaTaskService.transition` sets `verifiedBy` from `CapaTaskDto.TransitionRequest` on its CLOSED branch, `VulnerabilityService` does the same, and `BoardPackService`, `CptyService`, `TreatmentPlanService` each accept a caller-supplied approver. Entity annotations do not reach any of them |
+| **Alternatives** | (a) Move these fields to a mapped superclass like `BaseEntity` — cleaner in principle, but they appear on a minority of entities with inconsistent types (`decidedBy` is a `Long` on `CrisisDecision`, a name elsewhere), so the superclass would be a poor fit. (b) Do nothing, since nothing is exploitable — rejected on the F2-22a argument |
+| **Trade-offs** | Six field names are now un-postable platform-wide on these types. If a future flow genuinely needs to record a historical decision made outside the platform, it needs the F2-40 treatment — an explicit asserted-vs-computed provenance marker — not a re-opened field |
+| **Effort** | **XS** |
+| **Priority** | **Done** |
+| **Verification** | Sweep verified purely additive (`git diff` shows **0** deleted lines). `DecisionProvenanceBindingTest` 5/5: one hostile body naming all six fields binds none of them on any of the four entities checked, and all of it still serialises. Suite green |
+| **Status** | ✅ **CLOSED 2026-07-28** |
+| **References** | `AmlAlert`, `CrisisDecision`, `Disclosure`, `CorrectiveAction`, `DataSharingAgreement`; `DecisionProvenanceBindingTest`; `MassAssignmentRatchetTest` risk profile. Same rule as **DF-3**, **DF-4**, **F2-22a**, **F2-22b(ii)** |
+| **Lesson** | Two, both about the tools rather than the code. **(a) The first sweep missed `decidedByName`** because my target list held `decidedBy` and not its display-name companion — and the *name* is the field DF-3 was actually about, since a name in a decision log forges more convincingly than a user id. A field-name list is a guess about naming conventions; check the entity. **(b) A bare `ObjectMapper` is not the application's `ObjectMapper`.** Three defaults differ from Spring Boot's and all three produced false failures: no JSR-310 (the trap F2-22a already documented), *throwing* on unknown properties where Boot ignores them, and writing dates as numeric arrays rather than ISO strings. A test asserting Jackson behaviour must configure Jackson the way the application does, or it is testing a different mapper than the one that runs |
+
+---
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

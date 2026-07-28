@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.dsa.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -92,6 +93,7 @@ public class DataSharingAgreement {
     private LocalDate effectiveTo;
 
     @Column(name = "signed_at")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private LocalDateTime signedAt;
 
     @Column(name = "signer_name", length = 255)

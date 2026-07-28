@@ -1,5 +1,6 @@
 package com.tss.grc.module.ethics.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -87,9 +88,11 @@ public class Disclosure {
     private String decisionNotes;
 
     @Column(name = "decided_by_name", length = 255)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String decidedByName;
 
     @Column(name = "decided_at")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private LocalDateTime decidedAt;
 
     @Column(name = "framework_id")

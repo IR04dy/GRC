@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -33,13 +34,16 @@ public class CrisisDecision {
     private Long crisisEventId;
 
     @Column(name = "decided_at", nullable = false)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private LocalDateTime decidedAt = LocalDateTime.now();
 
     @Column(name = "decided_by")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long decidedBy;
 
     /** Denormalised name so the after-action PDF doesn't need a user join. */
     @Column(name = "decided_by_name", length = 255)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String decidedByName;
 
     @Column(name = "decision_text", nullable = false, columnDefinition = "NVARCHAR(MAX)")

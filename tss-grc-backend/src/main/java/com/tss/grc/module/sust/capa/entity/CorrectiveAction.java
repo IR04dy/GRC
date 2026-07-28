@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.capa.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Where;
@@ -64,7 +65,9 @@ public class CorrectiveAction {
     @Column(name = "target_date")     private LocalDate     targetDate;
     @Column(name = "started_at")      private LocalDateTime startedAt;
     @Column(name = "completed_at")    private LocalDateTime completedAt;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "verified_by", length = 255) private String verifiedBy;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "verified_at")     private LocalDateTime verifiedAt;
     @Column(name = "closed_at")       private LocalDateTime closedAt;
 
