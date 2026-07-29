@@ -1096,6 +1096,32 @@ Start-Service TssGrcBackend
 
 ---
 
+## W2-1b · Demo data substitutes for a customer's own empty register — disclosed, and a decision you own
+
+| Field | Content |
+|---|---|
+| **ID** | W2-1b (CI rule + backend-down acceptance test) |
+| **Category** | Data provenance in the UI / test coverage |
+| **Severity** | **P3 Low as implemented — but it hides a product question that is not mine to answer** |
+| **Provenance** | Working W2-1b after W2-1a-i (Cmd+K palette off 8 mock datasets) and W2-1a-ii (dashboard off 3 fabrications). I expected a third instance of silent fabrication and **did not find one** |
+| **Current State** | `useApiResource` substitutes a page's demo dataset in **two** situations: when the API call throws, and — this is the one worth naming — when it **succeeds and returns zero rows**, documented in the hook as "prefer the rich demo set so the UI never looks broken on a fresh tenant". **It is disclosed:** the hook raises `isDemo: true`, and measurement found **10 of 10 real consumers reference it**, rendering a warning `Demo mode` badge and disabling live refresh (`enabled: !isDemo`). The eleventh apparent consumer, `lib/promotedAdapters.ts`, names the hook only in a comment |
+| **Problem** | Two things, and only the second is a defect I can act on. **(a) A product question:** a genuinely empty register — a fresh tenant, or one whose rows were deleted — shows *another organisation's demo incidents, vendors or evidence* rather than its own empty state. Badged, but a screenshot of it lands in an audit pack with no badge in the crop, and an operator cannot distinguish "no incidents" from "demo" by the table alone. W2-1b's own plan text asks for the opposite behaviour ("every register → error state, **zero rows**"), so the plan and the platform disagree. **(b) An engineering gap:** nothing prevented the *next* page from consuming the hook without disclosing `isDemo`, which is exactly how W2-1a-i/ii happened |
+| **Root Cause** | "The UI must never look broken" is a demo instinct; for a compliance register the empty state *is* the truthful answer. The behaviour was implemented carefully and consistently — it is a deliberate choice, not an oversight |
+| **Business Impact** | Bounded by the badge today. Unbounded if a page forgets the badge, which is what (b) now prevents |
+| **Technical Impact** | Two static/runtime guards, no behaviour change. **`demoFallbackContract.test.ts`** — (i) a **ratchet** on mock imports outside tests at the measured baseline of **33 imports across 27 files** (a hard ban was impossible: those 33 exist, and F2-15 is the row that drives them down), and (ii) **every consumer of `useApiList`/`useApiResource` must reference `isDemo`**. **`useApiResource.test.ts`** — 5 runtime tests pinning the real contract via `renderHook`: error → `error` set + `isDemo` + demo rows; empty success → `isDemo` with **no** error; real rows → no substitution; unauthenticated → demo without an error and **without calling the fetcher** |
+| **UX Impact** | None — no behaviour changed |
+| **Recommendation** | 1. As shipped (the guards). 2. ⚠ **Needs your decision:** should an empty-but-healthy register show the customer's empty state instead of demo rows? The plan says yes; the platform says no. I did **not** change it, because "how the product presents itself to a prospect" is a commercial call and the current behaviour is disclosed and deliberate — overriding it on the strength of a plan line would be the F2-40 mistake of treating a designed assertion as a defect. If you want the plan's version, the change is small and localised to `useApiResource`'s `list.length === 0` branch. 3. F2-15 remains the row that reduces the 33 |
+| **Alternatives** | Assert the plan's "zero rows" and delete the substitution — rejected as above, it is not an engineering decision. Ban mock imports outright — impossible today; a ratchet is the honest form |
+| **Trade-offs** | The ratchet's baseline is a number that must be lowered by F2-15, not a target. Pinning current behaviour in tests makes changing it slightly more work — which is the point: it should be a decision, not a drift |
+| **Effort** | **S** |
+| **Priority** | **Done** (guards) · **Open, needs your decision** (empty-register behaviour) |
+| **Verification** | FE suite **63/63** (was 54; 9 new), `npx tsc --noEmit` clean. **Both guards mutation-proven:** stripping `isDemo` from `IncidentsPage` fails the disclosure test naming the file, and adding one new mock-importing file fails the ratchet naming the growth — both mutations reverted and `git diff` confirmed empty. The ratchet also has an anti-vacuity test asserting the scan finds >20 known sites, because a scan that silently matches nothing would be green for the wrong reason — the failure mode that let four backend regex scans under-count this month |
+| **Status** | ✅ **CLOSED 2026-07-29** for the guards; the empty-register question is tracked as an open decision |
+| **References** | `src/__tests__/demoFallbackContract.test.ts`, `src/lib/useApiResource.test.ts`, `lib/useApiResource.ts`. Related: **W2-1a-i**, **W2-1a-ii**, **F2-15** (drives the 33 down), **F2-42** (the other "two versions of the truth" decision waiting on you) |
+| **Lesson** | **I went looking for a third fabrication defect and the measurement said no.** 10 of 10 consumers disclose the substitution, so what looked like W2-1a's pattern was a disclosed feature — and the honest output was a *guard* plus a question for the owner, not a fix. Writing the fix I had expected would have removed working, deliberate behaviour on the authority of a plan line. Second lesson, on ratchets: the plan asked for a CI **ban** and the codebase has 33 violations, so a ban would either not land or land red. **A ratchet at the measured baseline is what a ban becomes when you count first** |
+
+---
+
 ## F2-41 · The export audit trail recorded that data left, not how much
 
 | Field | Content |
