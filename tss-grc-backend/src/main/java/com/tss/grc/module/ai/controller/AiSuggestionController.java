@@ -74,14 +74,51 @@ public class AiSuggestionController {
         return service.suggestWorkflowSubmissionReview(body);
     }
 
+    /**
+     * List this tenant's suggestions for one feature.
+     *
+     * <p><b>Guard was {@code isAuthenticated()}.</b> Every write on this controller asks for
+     * {@code AI:WRITE}, and {@code AI:READ} exists in the catalogue and is granted to 41 of 57
+     * roles — so the platform already had a stated answer for who may read AI output, and these
+     * two reads were the only ones not asking it. Measured live before the change, as
+     * {@code viewer}, a persona holding <b>no AI permission of any kind</b>:
+     *
+     * <pre>
+     *   POST /api/v1/ai/board-summary                    -> 403   writes were guarded
+     *   GET  /api/v1/ai/suggestions?feature=BOARD_SUMMARY -> 200   10 rows, full outputJson
+     *        ...containing open HIGH-risk counts, overdue CAPA, NCA and PDPL compliance
+     *        percentages, BCM readiness — the executive posture summary.
+     *   GET  /api/v1/ai/suggestions/entity/CrisisEvent/1  -> 200   1 row
+     * </pre>
+     *
+     * <p>The 16 roles without {@code AI:READ} are exactly the set this content should not reach:
+     * {@code VIEWER}, {@code EXTERNAL_AUDITOR}, {@code REGULATOR_VIEWER}, {@code SUPPLIER_USER},
+     * and the eight {@code *_INGEST} machine accounts (plus {@code AUDITOR},
+     * {@code INTERNAL_AUDITOR}, {@code CHANGE_MANAGER}, {@code EMERGENCY_RESPONDER}). Tenant
+     * scoping was never the problem — both queries already filter {@code organisation_id}; the
+     * gap was *within* a tenant.
+     *
+     * <p>No migration: {@code AI:READ} already exists and every intended reader already holds it.
+     *
+     * <p>⚠ <b>What this does NOT do, deliberately.</b> A suggestion records the record it was
+     * derived from ({@code relatedEntity}/{@code relatedEntityId}), so the stricter SCR-004 rule
+     * would be to inherit *that record's* read guard — an {@code INCIDENT_ROOT_CAUSE} draft would
+     * then need the incident's own permission, not merely {@code AI:READ}. That is a real gap and
+     * it is recorded as a follow-up rather than invented here, because it cannot simply reuse
+     * {@code AttachmentAccessPolicy}: {@code relatedEntity} takes values like {@code "Dashboard"}
+     * that are not records at all and appear in no parent registry, so a naive reuse would 403
+     * everyone on the board summary. Inventing the rule is how six of seven prescriptions in this
+     * programme got falsified.
+     */
     @GetMapping("/suggestions")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AI','READ')")
     public List<AiSuggestion> listByFeature(@RequestParam String feature) {
         return service.listByFeature(feature);
     }
 
+    /** See {@link #listByFeature} — same finding, same guard. {@code entity} is client-supplied. */
     @GetMapping("/suggestions/entity/{entity}/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasPermission('AI','READ')")
     public List<AiSuggestion> listByEntity(@PathVariable String entity, @PathVariable Long id) {
         return service.listByEntity(entity, id);
     }
