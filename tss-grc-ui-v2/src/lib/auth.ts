@@ -83,3 +83,21 @@ export function hasAnyRole(...roles: string[]): boolean {
 export function canExport(module: string): boolean {
   return hasAnyRole('PLATFORM_ADMIN', `${module.toUpperCase()}_EXPORT`);
 }
+
+/**
+ * F2-29 — may the current user *decide*, as opposed to author, this module's records?
+ *
+ * The same lookup as {@link canExport}, against `MODULE_APPROVE`. It exists because
+ * approval authority is where the grant genuinely diverges from write: for CHANGE the
+ * measured split is 42 of 57 roles holding `CHANGE:WRITE` against 9 holding
+ * `CHANGE:APPROVE`, so 33 roles can raise a change and must not be shown a control that
+ * decides one. (Contrast READ vs EXPORT, which are granted to near-identical role sets —
+ * which is why `canExport`'s own comment calls gating most modules cosmetic.)
+ *
+ * `PLATFORM_ADMIN` is honoured for the same reason as in `canExport`: it bypasses in
+ * `ModulePermissionEvaluator`, and hiding a control the server would allow is the same
+ * defect pointing the other way.
+ */
+export function canApprove(module: string): boolean {
+  return hasAnyRole('PLATFORM_ADMIN', `${module.toUpperCase()}_APPROVE`);
+}

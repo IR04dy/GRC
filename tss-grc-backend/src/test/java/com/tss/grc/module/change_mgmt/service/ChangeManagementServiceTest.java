@@ -18,6 +18,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.HashMap;
 import java.util.List;
@@ -68,8 +71,22 @@ class ChangeManagementServiceTest {
     @Mock private ApplicationEventPublisher publisher;
     @InjectMocks private ChangeManagementService service;
 
-    @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
-    @AfterEach  void tearDown() { TenantContext.clear(); }
+    @BeforeEach void setUp() {
+        TenantContext.setCurrentTenant(ORG_ID);
+        // F2-29: CAB-decision targets (EMERGENCY_APPROVED / CAB_APPROVED / CAB_REJECTED) now require
+        // CHANGE:APPROVE. This class tests the ITIL lifecycle, not authorisation — that is
+        // ChangeDecisionAuthorityTest's job — so it runs as a persona holding both, which is what the
+        // five decision-target tests below always implicitly assumed.
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken("cab-member", "n/a",
+                List.of(new SimpleGrantedAuthority("CHANGE_WRITE"),
+                        new SimpleGrantedAuthority("CHANGE_APPROVE"))));
+    }
+
+    @AfterEach void tearDown() {
+        TenantContext.clear();
+        SecurityContextHolder.clearContext();
+    }
 
     private static ChangeRequest change(String status, String type) {
         ChangeRequest c = new ChangeRequest();

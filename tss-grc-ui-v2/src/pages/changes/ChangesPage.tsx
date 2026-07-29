@@ -31,7 +31,7 @@ import {
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
-import { isAuthenticated, getUser, canExport } from '../../lib/auth';
+import { isAuthenticated, getUser, canExport, canApprove } from '../../lib/auth';
 import { CHANGE_REQUESTS, CHANGE_ANALYTICS } from './mockChanges';
 import { CHANGE_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
@@ -400,7 +400,9 @@ function KanbanBoard({ items, onTransition, onOpen, t, lang }: {
                     {c.riskLevel && <Badge tone={RISK_TONE[c.riskLevel] ?? 'neutral'} dot>{c.riskLevel}</Badge>}
                     {c.scheduledStart && <span className="mono changes-kanban__card-date">{new Date(c.scheduledStart).toLocaleDateString()}</span>}
                     <button onClick={(e) => { e.stopPropagation(); void onTransition(c, nextStatus(c) ?? c.status); }}
-                            disabled={!nextStatus(c)}
+                            disabled={!mayTransitionTo(nextStatus(c))}
+                            title={nextStatus(c) && !mayTransitionTo(nextStatus(c))
+                              ? t('changeNeedsApprovePerm') : undefined}
                             className="changes-kanban__transition-btn">
                       {nextStatus(c) ? `→ ${nextStatus(c)?.replace(/_/g, ' ')}` : t('changeKanbanDone')}
                     </button>
@@ -413,6 +415,30 @@ function KanbanBoard({ items, onTransition, onOpen, t, lang }: {
       })}
     </div>
   );
+}
+
+/**
+ * F2-29 — the transition targets the server treats as CAB *decisions*, requiring
+ * `CHANGE:APPROVE` on top of `CHANGE:WRITE`. Mirrors
+ * `ChangeManagementService.DECISION_TARGETS`; if that set changes, this one must follow —
+ * the backend's `ChangeDecisionAuthorityTest` ratchet forces the question to be asked there,
+ * and this comment is the pointer back.
+ *
+ * `CAB_REJECTED` is in the set for completeness even though this page never offers it: the
+ * UI has no reject control at all today, only a `CAB_REJECTED` status label and column. The
+ * API accepts it, so a future reject button inherits the gate rather than rediscovering it.
+ */
+const DECISION_TARGETS = new Set(['CAB_APPROVED', 'CAB_REJECTED', 'EMERGENCY_APPROVED']);
+
+/**
+ * Can the signed-in user actually perform this transition? Used to *disable* rather than
+ * hide the advance control: `nextStatus` returns the single forward move for a change, so
+ * hiding it would leave a card that looks stuck with nothing saying why. Disabled + a title
+ * naming the missing permission is the honest version.
+ */
+function mayTransitionTo(target: string | null): boolean {
+  if (!target) return false;
+  return !DECISION_TARGETS.has(target) || canApprove('CHANGE');
 }
 
 function nextStatus(c: ChangeRequestDto): string | null {
@@ -584,7 +610,9 @@ function WorkflowPanel({ items, detailId, setDetailId, onTransition, onChanged, 
           </div>
 
           <div className="changes-actions-row">
-            {next && <Button variant="primary" Icon={ArrowRight} onClick={() => onTransition(change, next)}>{t('changeAdvanceTo')} {next.replace(/_/g, ' ')}</Button>}
+            {next && <Button variant="primary" Icon={ArrowRight} disabled={!mayTransitionTo(next)}
+                             title={!mayTransitionTo(next) ? t('changeNeedsApprovePerm') : undefined}
+                             onClick={() => onTransition(change, next)}>{t('changeAdvanceTo')} {next.replace(/_/g, ' ')}</Button>}
             {change.status === 'CAB_PENDING' && (
               <>
                 <Button variant="secondary" Icon={CheckCheck} onClick={() => castVote('APPROVE')}>{t('changeVoteApprove')}</Button>

@@ -302,6 +302,8 @@ export const ar = {
   changeFilterClear:         'مسح التصفية',
   changeKanbanDone:          'مكتمل',
   changeAdvanceTo:           'انتقل إلى',
+  // F2-29: shown on a disabled advance control whose next step is a CAB decision.
+  changeNeedsApprovePerm:    'هذه الخطوة تُسجّل قرار لجنة التغيير وتتطلب صلاحية الموافقة على التغييرات',
   changeRollback:            'تراجع',
   changeVoteApprove:         'موافقة',
   changeVoteReject:          'رفض',

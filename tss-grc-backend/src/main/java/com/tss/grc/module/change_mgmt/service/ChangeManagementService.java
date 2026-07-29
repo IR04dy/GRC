@@ -2,6 +2,9 @@ package com.tss.grc.module.change_mgmt.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.repository.*;
@@ -65,6 +68,59 @@ public class ChangeManagementService {
 
     /** DF-4: CAB decisions a vote may carry. */
     private static final Set<String> CAB_DECISIONS = Set.of("APPROVE", "REJECT", "DEFER", "ABSTAIN");
+
+    /**
+     * F2-29 — the transition targets that <b>are CAB decisions</b> rather than operational moves.
+     *
+     * <p>Raising a change and authorising one are different privileges. {@code POST /{id}/approvals}
+     * has always said so ({@code CHANGE:APPROVE}); {@code POST /{id}/transition} did not, and it can
+     * reach the same outcome. <b>Measured before the fix</b> with {@code ranalyst} — a persona holding
+     * {@code CHANGE:WRITE} and <em>not</em> {@code CHANGE:APPROVE} (read off {@code iam.role_permissions},
+     * not inferred from the username), against the running stack:
+     *
+     * <pre>
+     *   POST /api/v1/changes/{id}/approvals            -> 403  "you may not decide this change"
+     *   POST /api/v1/changes  {changeType: EMERGENCY}  -> 201  DRAFT
+     *   POST /api/v1/changes/{id}/transition
+     *        {"target":"EMERGENCY_APPROVED"}           -> 200  status=EMERGENCY_APPROVED,
+     *                                                          cabDecisionAt stamped
+     *   POST /api/v1/changes/{id}/transition
+     *        {"target":"IMPLEMENTING"}                 -> 200  ...and on into implementation
+     * </pre>
+     *
+     * <p>Same actor, same privileges, two routes to a CAB decision: one refused it, the other took it.
+     * The raiser approved their own emergency change in one hop from {@code DRAFT}, with zero recorded
+     * votes and no committee — and the row then <em>claims</em> a CAB decision, because
+     * {@code cabDecisionAt} is stamped either way. {@code CAB_REJECTED} behaved the same way: a change
+     * killed at CAB with no votes on record.
+     *
+     * <p><b>How wide.</b> 33 of 57 roles hold {@code CHANGE:WRITE} without {@code CHANGE:APPROVE} —
+     * among them {@code DPO}, {@code HR_LEAD}, {@code DLP_REVIEWER}, {@code EVIDENCE_OWNER} and
+     * {@code BRAND_MONITORING}. Nine roles hold {@code CHANGE:APPROVE}, and every one of them also
+     * holds {@code WRITE} and {@code READ}, so this needed <b>no migration</b>: the V301 grant matrix
+     * was already right, only the endpoint disagreed with it.
+     *
+     * <p><b>Why {@code CAB_APPROVED} is in this set even though it was already protected.</b> Its
+     * second leg held up when probed — a no-votes attempt returns 409 ("requires at least 2 recorded
+     * APPROVE vote(s)"), because CM-C2 demands recorded votes or a carried committee resolution, and
+     * those are cast through {@code APPROVE}-guarded endpoints. So the *decision* was sound; what was
+     * missing is that the actor who flips the status also authors {@code cabDecisionNotes}. It is
+     * listed for that reason, and because the plan row names all three.
+     * ⚠ <b>One operational consequence to be aware of:</b> a clerk who merely records an already-taken
+     * committee decision now needs {@code CHANGE:APPROVE}. {@code BOARD_SECRETARY} is exactly that
+     * persona and is currently {@code WRITE}-only. If a tenant wants that split, the answer is a
+     * recording endpoint, not a broader {@code APPROVE} grant.
+     *
+     * <p><b>What is deliberately NOT here.</b> {@code SUBMITTED}, {@code IMPACT_ASSESSED},
+     * {@code CAB_PENDING}, {@code SCHEDULED}, {@code IMPLEMENTING}, {@code IMPLEMENTED},
+     * {@code ROLLED_BACK}, {@code POST_REVIEW}, {@code CLOSED}, {@code CANCELLED} and the
+     * {@code CAB_REJECTED → DRAFT} rework hop. Those are operational moves — advancing, executing,
+     * withdrawing or documenting a change, not deciding it — and they keep {@code CHANGE:WRITE}. This
+     * mirrors the F2-13b call to leave the workflow engine's {@code /review} and finalising endpoints
+     * on {@code WRITE}: over-tightening 403s people on their own screens.
+     */
+    private static final Set<String> DECISION_TARGETS =
+        Set.of("CAB_APPROVED", "CAB_REJECTED", "EMERGENCY_APPROVED");
 
     private final ChangeRequestRepository changeRepo;
     private final ChangeApprovalRepository approvalRepo;
@@ -215,6 +271,9 @@ public class ChangeManagementService {
     @Transactional
     public ChangeRequest transition(Long id, String target, Map<String, Object> body) {
         ChangeRequest c = require(id);
+        // F2-29: authority BEFORE the state machine, so an unauthorised caller learns nothing
+        // about which transitions would have been legal for this change.
+        requireDecisionAuthority(target);
         guard(c, target);
         switch (target) {
             case "EMERGENCY_APPROVED" -> {
@@ -613,6 +672,40 @@ public class ChangeManagementService {
         Set<String> allowed = NORMAL_TRANSITIONS.getOrDefault(c.getStatus(), Set.of());
         if (!allowed.contains(target))
             throw new IllegalArgumentException("Cannot transition from " + c.getStatus() + " to " + target);
+    }
+
+    /**
+     * F2-29 — a {@link #DECISION_TARGETS} transition requires {@code CHANGE:APPROVE}.
+     *
+     * <p>The check lives here rather than in a {@code @PreAuthorize} because the target arrives in the
+     * request body, and a SpEL expression indexing into a {@code Map} would be neither readable nor
+     * verifiable by a reviewer. It follows the {@code AttachmentAccessPolicy} precedent (SCR-004),
+     * where the coarse annotation stays on the endpoint and the finer, argument-dependent rule runs
+     * inside. ⚠ <b>The cost of that choice:</b> a scan of {@code @PreAuthorize} annotations — including
+     * the authorization ratchet and my own guard scanner — sees only {@code CHANGE:WRITE} on
+     * {@code /transition} and will under-report. That is why
+     * {@code ChangeDecisionAuthorityTest} pins this behaviour: the annotation cannot tell the reader
+     * the whole rule, so a test has to.
+     *
+     * <p>No authentication in context is <b>refused</b>, not waved through. {@code transition()} has
+     * exactly one caller today (the controller, over HTTP) and no scheduler or committee write-back
+     * path — verified by grep across the whole backend — so there is no legitimate off-request caller
+     * to exempt. A future automated approver should carry its own identity rather than inherit an
+     * implicit exemption from an empty {@code SecurityContext}.
+     */
+    private void requireDecisionAuthority(String target) {
+        if (target == null || !DECISION_TARGETS.contains(target)) return;
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated())
+            throw new AccessDeniedException(
+                "A CAB decision must be recorded by an identified user.");
+        boolean authorised = auth.getAuthorities().stream()
+            .map(GrantedAuthority::getAuthority)
+            .anyMatch(a -> "CHANGE_APPROVE".equals(a) || "ROLE_PLATFORM_ADMIN".equals(a));
+        if (!authorised)
+            throw new AccessDeniedException(
+                "Recording the CAB decision '" + target + "' requires CHANGE:APPROVE. "
+              + "CHANGE:WRITE authorises raising and editing a change, not deciding it.");
     }
 
     private ChangeRequest require(Long id) {

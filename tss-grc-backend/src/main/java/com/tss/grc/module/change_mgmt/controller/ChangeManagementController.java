@@ -91,9 +91,27 @@ public class ChangeManagementController {
 
     // ── Lifecycle transition ────────────────────────────────────────────────
 
+    /**
+     * Move a change to a target status.
+     *
+     * <p><b>F2-29 — the annotation below is the baseline, not the whole rule.</b> {@code CHANGE:WRITE}
+     * authorises the operational moves (submit, assess, schedule, implement, review, close, cancel).
+     * The three targets that <em>are</em> CAB decisions — {@code EMERGENCY_APPROVED},
+     * {@code CAB_APPROVED}, {@code CAB_REJECTED} — additionally require {@code CHANGE:APPROVE},
+     * enforced in {@code ChangeManagementService.requireDecisionAuthority} because the target arrives
+     * in the body and cannot be read by a legible SpEL expression. See that method for the
+     * measurement: a {@code WRITE}-only persona could raise an EMERGENCY change and approve it
+     * itself in one hop, while the same persona was correctly refused by {@code POST /{id}/approvals}.
+     *
+     * <p>F2-29's remaining half is presentational — splitting this endpoint into named commands
+     * ({@code /approve-emergency}, {@code /cab-decide}) so the URL states the privilege and a
+     * {@code @PreAuthorize} scan can see it. That is an API change with FE churn and no additional
+     * authorisation value, so it stayed out of this slice.
+     */
     @PostMapping("/{id}/transition")
     @PreAuthorize("hasPermission('CHANGE','WRITE')")
-    @Operation(summary = "Move a change request to a target status; validates ITIL v4 transitions.")
+    @Operation(summary = "Move a change request to a target status; validates ITIL v4 transitions. "
+        + "CAB-decision targets (EMERGENCY_APPROVED / CAB_APPROVED / CAB_REJECTED) also require CHANGE:APPROVE.")
     public ChangeRequest transition(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         String target = body.get("target") != null ? body.get("target").toString() : null;
         if (target == null) throw new IllegalArgumentException("target is required");
