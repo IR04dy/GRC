@@ -94,21 +94,47 @@ public class WorkflowRequestController {
         return svc.submit(id, body == null ? null : body.note());
     }
 
-    /** Reviewer gate — body.outcome = APPROVE | RETURN. */
+    /**
+     * Reviewer gate — body.outcome = APPROVE | RETURN.
+     *
+     * <p>Deliberately still {@code WORKFLOW:WRITE} after F2-13b, even though it accepts an
+     * {@code APPROVE} outcome. {@code workflow.requests} carries {@code reviewer_id} and
+     * {@code approver_id} as <b>separate columns</b>, so reviewer and approver are separate roles by
+     * design; requiring approval authority to review would collapse a two-stage gate into one.
+     * {@code /close} and {@code /reopen} likewise stay on WRITE — whether finalising should need
+     * approval authority is a fair question, but it is not the reported defect, and widening a fix to
+     * answer it is how fixes start breaking flows.
+     */
     @PostMapping("/{id}/review")
     @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
     public RequestResponse review(@PathVariable Long id, @RequestBody ActionRequest body) {
         return svc.review(id, body.outcome(), body.note());
     }
 
+    /**
+     * F2-13b — approving needs approval authority, not participation.
+     *
+     * <p>This was {@code WORKFLOW:WRITE}, which <b>55 of 57 roles hold</b> — including VIEWER,
+     * REGULATOR_VIEWER, EXTERNAL_AUDITOR, SUPPLIER_USER and all eight {@code *_INGEST} machine
+     * accounts. The engine is adopted by 14 modules, so it was the permissive path most module
+     * approvals route through. {@code WORKFLOW:APPROVE} exists and was held by 3 roles; the engine's
+     * own siblings ({@code ApprovalRequestController#transition}, both {@code ApprovalChainController}
+     * decisions, {@code WorkflowSubmissionController}) already guard the same act with it. Only the
+     * request lifecycle did not, which makes this an inconsistency rather than a missing feature.
+     *
+     * <p>V324 grants {@code WORKFLOW:APPROVE} to the 18 roles that already hold some module's
+     * APPROVE — derived from the platform's own grants, not chosen — so approval goes from 55 roles
+     * to 18 without breaking the documented four-eyes flows, whose second approver is a CISO.
+     */
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
+    @PreAuthorize("hasPermission('WORKFLOW','APPROVE')")
     public RequestResponse approve(@PathVariable Long id, @RequestBody(required = false) ActionRequest body) {
         return svc.approve(id, body == null ? null : body.note());
     }
 
+    /** Rejecting is the same decision with the opposite outcome — see {@link #approve}. */
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasPermission('WORKFLOW','WRITE')")
+    @PreAuthorize("hasPermission('WORKFLOW','APPROVE')")
     public RequestResponse reject(@PathVariable Long id, @RequestBody(required = false) ActionRequest body) {
         return svc.reject(id, body == null ? null : body.note());
     }
