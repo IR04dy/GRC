@@ -90,6 +90,11 @@ def main():
     role_sites = [s for s in sites if s[2] in ("PURE", "COMPOSED")]
     pure = [s for s in role_sites if s[2] == "PURE"]
     raw = [s for s in sites if s[2] == "RAW_AUTHORITY"]
+    # One guard can emit both a role entry and a raw-authority entry (two legs, two spellings), so
+    # the two buckets are joined by site to judge whether the whole expression is satisfiable.
+    raw_by_site = collections.defaultdict(list)
+    for bucket, site, _, names in raw:
+        raw_by_site[(bucket, site)].extend(names)
 
     named = collections.Counter()
     for _, _, _, names in role_sites:
@@ -114,11 +119,19 @@ def main():
         else:
             live.append((bucket, site, names, alive))
         if alive and not [n for n in alive if n != "PLATFORM_ADMIN"]:
-            if len(names) == 1 and names[0] == "PLATFORM_ADMIN":
+            # A guard can also reach for a second leg spelled as a raw authority rather than a role
+            # name — `hasRole('PLATFORM_ADMIN') or hasAuthority('KB_WRITE')`. If that authority is
+            # uncatalogued or held by nobody it is just as dead as a ghost role, and the endpoint is
+            # administrator-only by attrition, not by decision. Counting it as deliberate because
+            # the unsatisfiable name happened to be an authority is the same miscount this report
+            # exists to prevent, one bucket over.
+            dead_authority = [a for a in raw_by_site.get((bucket, site), [])
+                              if authority_holders.get(a, 0) == 0]
+            if len(names) == 1 and names[0] == "PLATFORM_ADMIN" and not dead_authority:
                 admin_deliberate.append((bucket, site, names))
             else:
                 admin_attrition.append((bucket, site, names,
-                                        [n for n in names if n not in existing]))
+                                        [n for n in names if n not in existing] + dead_authority))
 
     by_module = collections.Counter(b for b, _, _, _ in pure)
 
@@ -205,7 +218,7 @@ def main():
     if not admin_attrition:
         emit("None.")
     else:
-        emit("| Module | Guard site | Roles named | Of those, absent from `iam.roles` |")
+        emit("| Module | Guard site | Roles named | Unsatisfiable legs (absent role, or dead authority) |")
         emit("|---|---|---|---|")
         for bucket, site, names, ghosts in sorted(admin_attrition):
             emit("| `%s` | `%s` | %s | %s |" % (

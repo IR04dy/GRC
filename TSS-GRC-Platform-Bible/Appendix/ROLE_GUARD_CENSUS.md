@@ -22,8 +22,8 @@ guard names none of.
 | Distinct role names recited by any role guard | 72 |
 | … **that do not exist in `iam.roles`** | **38** |
 | Pure guards **closed to everyone** (no named role exists) | **0** |
-| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **29** |
-| … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 31 |
+| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **32** |
+| … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
 | Pure guards whose surviving roles are held by no user | 0 |
 | Pure guards reachable by at least one seeded user | 621 |
 | `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 9 |
@@ -90,7 +90,7 @@ decision (settings reset, token revocation, platform administration) and belongs
 different conversation. The distinction is invisible in the code, which is why it is
 computed here rather than eyeballed.
 
-| Module | Guard site | Roles named | Of those, absent from `iam.roles` |
+| Module | Guard site | Roles named | Unsatisfiable legs (absent role, or dead authority) |
 |---|---|---|---|
 | `module.aml` | `SanctionsScreeningController#refreshList` | `PLATFORM_ADMIN`, `AML_OFFICER` | `AML_OFFICER` |
 | `module.audit_committee` | `AuditCommitteeDashboardController#finalizeSnapshot` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY`, `PLATFORM_ADMIN` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY` |
@@ -110,6 +110,9 @@ computed here rather than eyeballed.
 | `module.integrations` | `ServiceNowWebhookController#incidentUpdated` | `PLATFORM_ADMIN`, `SOC_AUTOMATION`, `INTEGRATION_SERVICE` | `SOC_AUTOMATION`, `INTEGRATION_SERVICE` |
 | `module.integrations` | `SplunkWebhookController#alertReceived` | `PLATFORM_ADMIN`, `SOC_AUTOMATION`, `INTEGRATION_SERVICE` | `SOC_AUTOMATION`, `INTEGRATION_SERVICE` |
 | `module.integrations` | `TenableController#manualPoll` | `PLATFORM_ADMIN`, `SOC_AUTOMATION` | `SOC_AUTOMATION` |
+| `module.knowledge` | `KbArticleController#create` | `PLATFORM_ADMIN` | `KB_WRITE` |
+| `module.knowledge` | `KbArticleController#transition` | `PLATFORM_ADMIN` | `KB_WRITE` |
+| `module.knowledge` | `KbArticleController#update` | `PLATFORM_ADMIN` | `KB_WRITE` |
 | `module.platform` | `HelpController#create` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
 | `module.platform` | `HelpController#delete` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
 | `module.platform` | `HelpController#update` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
