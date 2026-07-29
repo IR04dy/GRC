@@ -231,6 +231,23 @@ curl.exe -s -X POST http://127.0.0.1:8084/api/auth/login -H "Content-Type: appli
 # expect a JSON body containing accessToken
 ```
 
+**Then confirm the box is running the jar you think it is (W0-7).** This step exists because the
+alternative has already happened: master carried a fix for a defect failing 33-35x/day in production
+while production served a jar from six days earlier, and nothing anyone could query would have said
+so. `/actuator/info` now answers with the build (version, timestamp, commit when the release script
+passes `-Dgit.commit=$(git rev-parse HEAD)`), the runtime JDK, and the migration state — the head
+packaged in *this artifact*, the head applied to *this database*, and the list in between.
+
+```powershell
+# From a checkout of the commit you deployed. Exit 0 = match, 1 = mismatch, 2 = unreachable.
+py TSS-GRC-Platform-Bible\Appendix\scripts\deployment_identity.py --url http://127.0.0.1:8091 --expect-commit (git rev-parse HEAD)
+```
+
+A non-empty `pending` list is the deployment gap stated as fact: those migrations apply on the next
+start and have not applied yet. `build.commit = unknown` means the jar was built without the flag and
+**cannot** be identified — treat that as a failed check, not a pass.
+
+
 ---
 
 ## 5. Firewall — expose only port 80
