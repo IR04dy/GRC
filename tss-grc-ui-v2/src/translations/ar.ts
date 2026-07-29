@@ -32,6 +32,10 @@ export const ar = {
   rcfPivotSidebar:      'محور المخاطر والضوابط والنتائج',
   navMyWork:            'عملي',
   navRisk:              'إدارة المخاطر',
+  // CE-0 — تمكين التغيير مجموعة مستقلة، وليس أسلوبًا من أساليب المخاطر.
+  navChange:            'تمكين التغيير',
+  ceNavRegister:        'سجل التغييرات',
+  ceNavCalendarFsc:     'التقويم ونوافذ التجميد',
   navCompliancePolicy:  'الامتثال والسياسات',
   navAudit:             'التدقيق الداخلي',
   navAiGovernance:      'مخاطر الذكاء الاصطناعي والنماذج',

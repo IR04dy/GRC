@@ -34,6 +34,10 @@ export const en = {
   rcfPivotSidebar:      'Risk-Control-Finding Pivot',
   navMyWork:            'My Work',
   navRisk:              'Risk Management',
+  // CE-0 — Change Enablement is its own group, not a risk technique.
+  navChange:            'Change Enablement',
+  ceNavRegister:        'Change register',
+  ceNavCalendarFsc:     'Calendar & freeze windows',
   navCompliancePolicy:  'Compliance & Policy',
   navAudit:             'Internal Audit',
   navAiGovernance:      'AI & Model Risk',
