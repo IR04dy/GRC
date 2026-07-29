@@ -77,6 +77,31 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 | **Status** | 🟡 **CLAIM CLOSED 2026-07-29** · capability open as **D-4** |
 | **References** | `pages/onboarding/OnboardingPage.tsx#Step3Invites`, `lib/onboarding.ts`, `iam/controller/UserController#create`, `iam/dto/UserRequest`, `__tests__/onboardingInviteHonesty.test.ts` |
 | **Lesson** | **A detector that cannot tell a promise from its denial fails on the sentence it is meant to protect.** The first version of the wording ratchet flagged my own corrected copy, because `/email (?:is\|will be) sent/` matches "no email **is sent** from here". Negation-aware patterns fixed it, and the test now self-checks against the four sentences that actually shipped — because a wording ratchet whose patterns no longer match anything passes forever while protecting nothing. Second: **W2-1b's `/mock/i` CI rule cannot see this class at all.** Nothing is imported and no fake data appears; a screen simply asserts something false about the world. Fabrication in *copy* needs its own guard |
+---
+
+## F2-49 · Two migration files have never been applied, and never will be
+
+| Field | Content |
+|---|---|
+| **ID** | F2-49 (found while building W0-7, 2026-07-29) |
+| **Category** | Schema management — a file that looks like a migration and is not one |
+| **Severity** | **P3 by impact, worth recording for its class.** Both files are seed/demo data, not schema, so nothing is structurally missing. What earns the entry is the failure mode: a `.sql` file in the migration folder, named like a migration, tracked in git, packaged in the deployed jar, that no environment has ever executed |
+| **Provenance** | Not reported by anyone. Found because `/actuator/info` reported **311** packaged migrations while `ls` counts **313**, and the two-file gap had to be explained before the probe could compare counts. The discrepancy was the finding |
+| **Current State** | `V46a__cyber_pdpl_bridge_seed_fix.sql` and `V47a__evidence_chain_broken_demo.sql`. A Flyway version admits only digits separated by `.` or `_`, so `46a` and `47a` do not parse. Flyway **skips** a name it cannot parse rather than failing — which is precisely why this survived 2.5 months unnoticed |
+| **Problem** | Their contents have never been applied anywhere Flyway runs. V46a back-fills `INC-{id}` cross-references for the cyber→PDPL breach bridge ("Seed fix for V46"); V47a injects a second evidence version plus a deliberately corrupted `content_hash` so the chain-of-custody demo has a broken chain to show. In any Flyway-managed environment, neither happened |
+| **Root Cause** | A hotfix naming habit from other tools (`46a` as "the fix that goes with 46") applied to a versioning scheme that rejects it — silently, because Flyway's skip is a warning rather than an error |
+| **Business Impact** | The chain-of-custody demo shows an unbroken chain where a broken one was intended, which is a demo that fails to demonstrate its own control. Low, but it is a *sales* surface |
+| **Technical Impact** | **Proof that they never ran, rather than an assumption:** both were added 2026-05-11 (`de3d7452`), and migrations up to **V312** have applied since (2026-07-23). Had Flyway failed on an unparseable name, no migration after V47 could ever have applied. They are also present in the **deployed** jar — 302 migrations in `D:\Deployment\tss-grc\app\tss-grc-platform-0.1.0-SNAPSHOT.jar`, including both files |
+| **UX Impact** | None directly |
+| **Recommendation** | A decision, not a rename in place: **(a)** renumber to the next free versions (**V324/V325**) so they run once — note V46/V47 are long applied and Flyway will not re-run history out of order, so the SQL must be idempotent, which both already are; or **(b)** delete them as spent demo seed. Prefer (a) for V46a if the `INC-{id}` back-fill still matters to the bridge, and (b) for V47a if the chain-of-custody demo has since been reseeded another way |
+| **Alternatives** | `spring.flyway.out-of-order=true` plus valid versions — rejected: the setting is off deliberately and turning it on globally to rescue two seed files trades a broad guarantee for a narrow fix |
+| **Trade-offs** | Renumbering changes what a fresh database does versus an existing one (fresh gets them in order; existing gets them at the end). Both files are idempotent, which is what makes that acceptable |
+| **Effort** | **XS** — but it needs the owner's call on renumber-versus-delete |
+| **Priority** | ⬜ **Open** — the *visibility* shipped with W0-7; the disposition has not |
+| **Verification** | `/actuator/info` reports them under `migrations.unversionedFiles` with a note that Flyway skips them, and `deployment_identity.py` **fails** when the artifact's and the tree's unversioned sets disagree — mutation-proven by adding `V300a__probe_dead_file.sql` to the tree, which the probe caught. `DeploymentInfoContributorTest` pins both filenames by name, so a rename or deletion fails the build and forces the expectation to be updated deliberately |
+| **Status** | 🟡 **VISIBLE, disposition open** |
+| **References** | `db/migration/sqlserver/V46a__*.sql`, `V47a__*.sql`, `config/DeploymentInfoContributor#unparseableMigrationFiles`, `Appendix/scripts/deployment_identity.py` |
+| **Lesson** | **Two counts that should agree and do not is a finding, not a rounding error.** The gap was 311 vs 313 — small enough to wave through as "probably the regex", and the regex *was* the proximate cause, but chasing it surfaced two files nobody had executed in two and a half months. Also: **a mutation test can prove nothing and look like it proved something.** My first attempt to demonstrate the count check used `V300a__…`, which is invisible on *both* sides, so the probe correctly reported MATCH and I nearly recorded that as a passing mutation. Redoing it with a *valid* version (`V300_1__…`) produced the real failure — and the invisible case became its own check |
 
 ---
 

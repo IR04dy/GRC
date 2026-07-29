@@ -28,6 +28,10 @@
 
     <properties>
         <java.version>17</java.version>
+        <!-- W0-7: overridden by the release script / CI with the real values; the defaults are
+             deliberately the string "unknown" so an unidentified build says so out loud. -->
+        <git.commit>unknown</git.commit>
+        <git.branch>unknown</git.branch>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <!-- Sprint 4 §4.3 — patch-level bumps for CVE coverage. Major versions held. -->
         <lombok.version>1.18.34</lombok.version>      <!-- was 1.18.30 -->
@@ -293,6 +297,31 @@
                         </exclude>
                     </excludes>
                 </configuration>
+                <executions>
+                    <!-- W0-7: write META-INF/build-info.properties so /actuator/info can say WHICH
+                         jar is running. Before this, that endpoint returned `{}` and a deployment
+                         could only be identified by trusting whoever last copied a file.
+
+                         Goal of the plugin already on the build — deliberately no new dependency,
+                         because this project builds offline (`mvn -o`) and a plugin that is not in
+                         the local repository turns a one-line change into a broken build. That is
+                         also why the commit id arrives as a property instead of via
+                         git-commit-id-maven-plugin: pass a -Dgit.commit=$(git rev-parse HEAD)
+                         from CI or the release script, and it lands in the jar. Unset, it reads
+                         "unknown", which is honest — an absent value must not look like a real one. -->
+                    <execution>
+                        <id>build-info</id>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                        <configuration>
+                            <additionalProperties>
+                                <commit>${git.commit}</commit>
+                                <branch>${git.branch}</branch>
+                            </additionalProperties>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

@@ -132,6 +132,19 @@ management:
     health:
       show-details: when_authorized
   info:
+    # W0-7. Without `env.enabled` the `app:` block below is DEAD CONFIG and /actuator/info answers
+    # `{}` — measured, not assumed: Spring Boot 3 ships the env contributor disabled, so the one
+    # endpoint whose job is to say what this deployment is had been saying nothing since the upgrade.
+    env:
+      enabled: true
+    # `build` comes from META-INF/build-info.properties (spring-boot-maven-plugin build-info goal,
+    # wired in pom.xml) — version, timestamp, and the commit when the build passes -Dgit.commit.
+    build:
+      enabled: true
+    # The runtime JDK, because "release 17 not supported" is landmine #1 in this repo and a jar
+    # built for 17 started under 11 should be visible from outside rather than only in a stack trace.
+    java:
+      enabled: true
     app:
       name: TSS GRC Platform
       version: ${project.version:0.1.0}
