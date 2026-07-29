@@ -98,9 +98,18 @@ let prod pick them up via Flyway (baseline 292 on the deployed server).
 
 `admin/Admin@12345` (PLATFORM_ADMIN) · `so_officer/Admin@12345` (CISO +
 SUSTAINABILITY_OFFICER — the standard second approver for 4-eyes flows) ·
-`compliance/Admin@12345` (GRC_ADMINISTRATOR) · `auditor`, `ranalyst`
-(=Admin@12345) · `rmanager/Risk@12345` · `viewer/Viewer@12345`.
+`compliance/Admin@12345` (GRC_ADMINISTRATOR) · `auditor/Admin@12345` ·
+**`ranalyst/Analyst@12345`** (corrected 2026-07-29 — this file said `Admin@12345`;
+that password 401s, and a login attempt costs a lockout counter) ·
+`rmanager/Risk@12345` · `viewer/Viewer@12345`.
 Full persona list: PROJECT_CHRONICLE §4.
+
+Grants matter as much as passwords when probing authorization. Read them from
+`iam.role_permissions` rather than inferring from the username — the useful shapes
+are `so_officer` (EVIDENCE_READ+WRITE, RISK_READ, CYBER_READ, **no** COMPLIANCE/BCM;
+ROLE_CISO), `ranalyst` (EVIDENCE+RISK+COMPLIANCE reads, **no** BCM/CYBER/PRIVACY/TPRM)
+and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them they cover
+"holds the module permission", "holds the role but not the permission", and neither.
 
 ---
 
