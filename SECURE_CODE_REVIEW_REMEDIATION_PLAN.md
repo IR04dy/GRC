@@ -165,7 +165,7 @@ live-probed per house rule 4.
 | # | Slice | Covers | Size | Migration | Depends on |
 |---|---|---|---|---|---|
 | 1 | ✅ **DONE 2026-07-28** — **reject `jti`-bearing tokens on the bearer path** + close `AuthController`'s jti-less mint. `JwtTokenProvider.isRefreshToken`, a guard in `JwtAuthenticationFilter` (401, logged at WARN, no distinct status code), the store-absent rotation branch now mints a UUID `jti`, and `generateRefreshTokenFromClaims` **deleted** rather than deprecated — it was a one-line way back to the vulnerability. `JwtTokenPurposeTest` 7/7 pins the invariant in **both** directions (every refresh path marks, no access path does). Live **16/16**: the attack returns 401, and the refresh flow still rotates and chains twice. **No forced re-login, no token-format change** | XS | — | — |
-| 2 | **Enforce `enabled`/`accountNonLocked` in the filter; tenant from the loaded user** | SCR-002 | S | — | 1 (same file) |
+| 2 | ✅ **DONE 2026-07-29** — **the tenant half is now REPRODUCED, not merely upheld.** A `viewer` token re-signed with `org=2` (HS384, dev secret — a *correctly signed* claim the server cannot distinguish from one it issued) read **another tenant's risk register: 200**. Mutation-proven both ways: restore `tenantId = orgId` and the forged token is 200; with `resolveTenant` it is 401. Liveness likewise live-proven — deactivate or lock the account mid-session and the **same** token flips 200 → 401, where it previously worked until expiry (up to an hour). ⚠ **The org-switcher trap in the finding was real and is why this was not a one-liner:** `POST /api/v1/platform/organisations/switch/{id}` is `hasRole('PLATFORM_ADMIN')`, re-issues a token with a different `org` and deliberately never touches the user row — so the obvious "token org must equal user org → 401" would have 401'd the first request after every switch. The rule shipped is *tenant from the loaded user, except a PLATFORM_ADMIN, for whom the claim is an authorised override logged at INFO; any other mismatch 401s*. Both branches asserted. Rejects go through one `reject()` that clears the SecurityContext **and** TenantContext — the early `return` skips the `finally` that normally clears the tenant, and servlet threads are pooled. `JwtFilterLivenessTest` 6/6, live **8/8** | S | — | 1 (same file) |
 | 3 | **Object-level authorization on attachment download** — caller must be able to read the parent entity; carry classification | SCR-004 | M | — | — |
 | 4 | **Public-token hygiene** — hash tokens at rest, strip query-string credentials from nginx logs, add expiry | SCR-005 | M | **V324** | verify first |
 | 5 | **`typ` claim + split validation entry points** | SCR-001 durable | M | — | 1, 2 |
@@ -230,9 +230,9 @@ V324** and nothing is blocked.
 
 | | |
 |---|---|
-| Report validated | **4 of 12 findings verified first-hand** (1 reproduced live, 3 code-confirmed), 4 partly, 8 unverified |
+| Report validated | **4 of 12 findings verified first-hand** — now **2 reproduced live** (SCR-001, and SCR-002's tenant half as of slice 2), 2 code-confirmed, 4 partly, 8 unverified |
 | Findings refuted | **0** |
 | Corrections made to the report | 3 — SCR-001's rollout cost, SCR-002's mechanism, SCR-006's severity |
 | Second opinion | **NOT OBTAINED** — Fable 5 blocked by cyber safeguards, twice |
-| Code changed | **Slice 1 shipped 2026-07-28** — SCR-001's reproduced attack is closed. Slices 2–12 not started |
-| Next action | Slice 2 (enforce `enabled`/`accountNonLocked` in the filter, tenant from the loaded user) — same file as slice 1 |
+| Code changed | **Slices 1–2 shipped.** Slice 1 (2026-07-28) closed SCR-001's reproduced attack; slice 2 (2026-07-29) closed SCR-002 — account liveness on the bearer path and the tenant bound to the loaded user. ⚠ Slice 2 is **committed on `fix/scr002-filter-liveness`, NOT merged** (the `/loop` that requested it omitted "then merge", so house rule 2 applies). Slices 3–12 not started |
+| Next action | **Merge slice 2** when the user says so, then slice 3 (object-level authorisation on attachment download — SCR-004, the one F2-27 explicitly allow-listed on the assumption that "a single object" was the relevant question rather than *whose* object) |

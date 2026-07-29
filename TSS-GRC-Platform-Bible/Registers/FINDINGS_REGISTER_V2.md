@@ -1225,6 +1225,32 @@ Start-Service TssGrcBackend
 
 ---
 
+## SCR-002 · A signed `org` claim was taken at face value, so a viewer could read another tenant
+
+| Field | Content |
+|---|---|
+| **ID** | SCR-002 (external secure code review; slice 2 of `SECURE_CODE_REVIEW_REMEDIATION_PLAN.md`) |
+| **Category** | Authentication — session liveness + tenant binding |
+| **Severity** | **P1 High.** The tenant half is now **reproduced live**, not merely upheld: a non-admin read another organisation's risk register |
+| **Provenance** | The report claimed bearer auth "ignores disabled/locked state and does not bind the JWT tenant to the live user". My validation upheld it while **correcting the mechanism**, and that correction decided the fix |
+| **Current State** | Two defects, one file. **(a) Liveness:** authorities were always re-loaded from the database each request, so a revoked *role* already took effect immediately — that half of the report was wrong, and a fix premised on "stale roles" would have solved nothing. `CustomUserDetailsService` also computed the lock state correctly, honouring `lockedUntil`. **The defect was that nothing consumed it:** the filter built a `UsernamePasswordAuthenticationToken` by hand, skipping the `enabled`/`accountNonLocked` checks a `DaoAuthenticationProvider` applies at login. **(b) Tenant:** `TenantContext.setCurrentTenant(orgId)` took the token's `org` claim at face value — the single most load-bearing value in a request, since every repository query filters on it |
+| **Problem** | A user deactivated or locked out mid-session kept working until their access token expired — up to an hour — and lockout is the control that answers a brute-force. Worse, the tenant came from the client: a **correctly signed** token naming another org bound that org, and the server could not tell it from one it had issued |
+| **Root Cause** | Hand-rolling the authentication object skips the provider's account-status checks. For the tenant, a signed claim was treated as authoritative about *who the user is* rather than merely about what the token says |
+| **Business Impact** | Cross-tenant read on a multi-tenant GRC platform — the risk register of another customer. Plus a revocation control (deactivate / lock) that did not take effect for up to an hour |
+| **Technical Impact** | `enabled`/`accountNonLocked` now gate the bearer path, and the tenant comes from the loaded user. One `reject()` helper clears the `SecurityContext` **and** `TenantContext` and returns 401 without touching the chain — both clears matter, because the early `return` skips the `finally` that normally clears the tenant and servlet threads are pooled |
+| **UX Impact** | None for healthy sessions. A deactivated or locked user now gets 401 immediately instead of continuing until token expiry |
+| **Recommendation** | 1. As shipped. 2. Slice 5 (an explicit `typ` claim + split validation entry points) remains the durable SCR-001 fix and would also let the tenant rule be expressed on the token rather than inferred. 3. The 401 is bare, matching slice 1 — deliberately uninformative, so a probe with a stolen token cannot tell disabled from locked from wrong-tenant |
+| **Alternatives** | Wire a real `DaoAuthenticationProvider` (a `PreAuthenticatedAuthenticationProvider` with a checker) — the "correct" Spring shape, rejected here as a much larger change to the security config for the same effect; worth revisiting at slice 5. Blanket "token org must equal user org" — **rejected because it breaks the org-switcher**, see the trade-off |
+| **Trade-offs** | **The org-switcher is a real, authorised exception and finding it was the substance of this slice.** `POST /api/v1/platform/organisations/switch/{id}` is `hasRole('PLATFORM_ADMIN')`, re-issues a token with a different `org`, and deliberately never updates the user row — that is how a platform admin operates a customer tenant. So the naive rule would have 401'd the first request after every switch. Shipped rule: *tenant from the loaded user, except a PLATFORM_ADMIN, for whom the claim is an authorised override, logged at INFO because a privileged cross-tenant session belongs in the record even when legitimate.* Any other mismatch 401s |
+| **Effort** | **S** |
+| **Priority** | **Done** — ⚠ committed on `fix/scr002-filter-liveness`, **not merged** (the `/loop` requesting it omitted "then merge") |
+| **Verification** | Live **8/8** with every DB mutation captured and restored in a `finally`. Deactivate the account → the **same** token flips 200 → 401, and reactivating restores access with no new login. Lock it → 401; let the window elapse → 200, so SEC-AUTH-001's auto-unlock still holds. **The headline:** a `viewer` token re-signed with `org=2` (HS384, dev secret) returns **401** — and **mutation-proven**, restoring `tenantId = orgId` makes that same forged token return **200** against another tenant's risk register. The org-switcher still works end-to-end and its token really carries `org=2`. `JwtFilterLivenessTest` 6/6, suite **2,596/0/0** |
+| **Status** | ✅ **CLOSED 2026-07-29** (unmerged) |
+| **References** | `JwtAuthenticationFilter#resolveTenant`, `#reject`, `CustomUserDetailsService#buildUserDetails`, `OrganisationController#switchOrg`, `JwtFilterLivenessTest`. Complementary to **F2-22b(i)** (which guards cross-tenant *writes* at the Hibernate layer — neither substitutes for the other) |
+| **Lesson** | **A probe's fabricated timestamp is a fixture, and fixtures have clocks.** My first elapsed-lock leg failed, and I nearly recorded it as a regression in the auto-unlock. It was my own fixture: **the JVM stores and reads `LocalDateTime` in UTC while the DB's `GETDATE()` is Riyadh local (+3h)**, so a Python-local `locked_until` landed three hours in the JVM's *future* and the lock read as still open. What settled it was checking whether **login** — which shares `buildUserDetails` — failed the same way. It did, which proved the behaviour was not mine. *When a probe leg fails, first ask whether an untouched path fails identically; if it does, the fault is in the fixture or the shared code, not in the change.* Anchor fabricated times on `GETUTCDATE()` |
+
+---
+
 ## SCR-001 · A refresh token authenticated any API request, and survived logout
 
 | Field | Content |
