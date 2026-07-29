@@ -246,3 +246,28 @@ half-grant gets created, so V324 now throws if any holder lacks the module's REA
   changes no behaviour and only shrinks a checkbox list; each needs the endpoint question
   answered first — is the permission dead, or is the *feature* missing its guard? That is
   the A1/F2-23 failure mode in reverse.
+
+**The second B1 row, same day — F2-29, and it needed no grant change at all.**
+`CHANGE:WRITE` at 42 of 57 was the next row down. Following F2-13b's rule — *verify the
+endpoint reaches a decision before treating B1 membership as a defect* — it did:
+`POST /api/v1/changes/{id}/transition` was guarded by `CHANGE:WRITE` for **every** target
+status, including `EMERGENCY_APPROVED`, which is reachable in a single legal hop from
+`DRAFT`. Live as `ranalyst`: refused **403** by `POST /{id}/approvals`, granted **200** by
+the transition to `EMERGENCY_APPROVED` — the raiser approving their own emergency change,
+`cabDecisionAt` stamped, no votes, no committee. Fixed in code
+(`ChangeManagementService.DECISION_TARGETS`), and **no migration was needed**: all 9
+`CHANGE:APPROVE` roles already held `WRITE` and `READ`, so V301's matrix was right and only
+the endpoint disagreed with it.
+
+Two things worth carrying to the third row (`AI:WRITE`, 41 of 57):
+
+- **This report cannot see the fix.** The guard is enforced in the service, because the
+  target arrives in the request body and no legible `@PreAuthorize` can read it. So the
+  `CHANGE:WRITE` guarded-site count above still includes `/transition` and the B1 row still
+  reads 42 of 57. That is not drift — it is the limit of an annotation scan, and the reason
+  `ChangeDecisionAuthorityTest` exists. **A tight grant table is not the same as a tight
+  platform**, in either direction.
+- **A row's width did not predict the defect; the endpoint did.** `CHANGE:WRITE` at 42/57 is
+  *narrower* than `WORKFLOW:WRITE` at 55/57 and carried the worse hole, because the question
+  is never how many roles hold a permission — it is what passing that guard lets them
+  decide. Ranking B1 by count puts these rows in the wrong order.

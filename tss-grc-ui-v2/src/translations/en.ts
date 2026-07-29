@@ -304,6 +304,8 @@ export const en = {
   changeFilterClear:         'Clear filter',
   changeKanbanDone:          'Done',
   changeAdvanceTo:           'Advance to',
+  // F2-29: shown on a disabled advance control whose next step is a CAB decision.
+  changeNeedsApprovePerm:    'This step records a CAB decision and requires the CHANGE approve permission',
   changeRollback:            'Roll back',
   changeVoteApprove:         'Approve',
   changeVoteReject:          'Reject',
