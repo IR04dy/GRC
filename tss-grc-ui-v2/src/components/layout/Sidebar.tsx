@@ -182,6 +182,19 @@ const NAV_GROUPS: NavGroup[] = [
           { id: 'socops-pentest', to: '/socops/pentests',        Icon: ShieldCheck, labelKey: 'socopsPentestsSidebar' },
           { id: 'socops-regexam', to: '/socops/regulator-exams', Icon: LockKeyhole, labelKey: 'socopsRegulatorsSidebar' },
           { id: 'socops-ot',      to: '/socops/ot-assets',       Icon: Server,      labelKey: 'socopsOtSidebar' },
+          // F2-07b: these eight were fully built — real API wiring, tables, detail links — and
+          // reachable from NOWHERE in the UI. Their sibling /socops/awareness was in the nav,
+          // which is what shows the omission was an oversight rather than a decision: someone
+          // added the routes and the pages and wired only one of nine into the sidebar.
+          // Labels are each page's own bilingual title, so the nav matches the screen.
+          { id: 'socops-appsec',  to: '/socops/appsec',            Icon: ShieldCheck, labelKey: 'socopsAppsecSidebar' },
+          { id: 'socops-dlp',     to: '/socops/dlp',               Icon: ScanSearch,  labelKey: 'socopsDlpSidebar' },
+          { id: 'socops-forensic',to: '/socops/forensics',         Icon: ScanSearch,  labelKey: 'socopsForensicsSidebar' },
+          { id: 'socops-iamjml',  to: '/socops/iam-jml',           Icon: Users,       labelKey: 'socopsIamJmlSidebar' },
+          { id: 'socops-zt',      to: '/socops/zt-maturity',       Icon: TrendingUp,  labelKey: 'socopsZtSidebar' },
+          { id: 'socops-brand',   to: '/socops/brand-monitoring',  Icon: ScanSearch,  labelKey: 'socopsBrandSidebar' },
+          { id: 'socops-ins',     to: '/socops/cyber-insurance',   Icon: LockKeyhole, labelKey: 'socopsInsuranceSidebar' },
+          { id: 'socops-madd',    to: '/socops/ma-due-diligence',  Icon: ShieldCheck, labelKey: 'socopsMaDdSidebar' },
         ],
       },
       {

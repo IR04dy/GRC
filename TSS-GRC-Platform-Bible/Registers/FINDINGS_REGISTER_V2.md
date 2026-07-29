@@ -1096,6 +1096,30 @@ Start-Service TssGrcBackend
 
 ---
 
+## F2-07b · Eight SOC-Ops screens were built, wired and shipped unreachable
+
+| Field | Content |
+|---|---|
+| **ID** | F2-07b (route/nav CI test) |
+| **Category** | Information architecture / shipped-but-invisible feature |
+| **Severity** | **P2 Medium** — no data risk; eight paid capabilities a customer could not open |
+| **Provenance** | Building the CI test F2-07b asks for ("every route has a nav path or explicit `detailOnly: true`") and reading the output rather than just counting it |
+| **Current State** | `App.tsx` declares **263 static routes**. Eight had no link from anywhere in the application: `/socops/appsec`, `/dlp`, `/forensics`, `/iam-jml`, `/zt-maturity`, `/brand-monitoring`, `/cyber-insurance`, `/ma-due-diligence`. Each is a full page — its own API calls, KPI cards, tables and detail-route links — not a stub. **Their sibling `/socops/awareness` *was* in the sidebar**, which is what identifies this as an oversight rather than a decision: someone added nine routes and nine pages and wired one of them into the nav |
+| **Problem** | A route with no link is a feature that was paid for twice — once to build, once to not use. Application security findings, DLP events, forensics chain-of-custody, JML access review, Zero-Trust maturity, brand/dark-web monitoring, cyber insurance and M&A due diligence are all NCA-ECC-relevant capabilities that no user could reach |
+| **Root Cause** | Routes and nav are maintained in two files with nothing tying them together, so a route can be added without a nav entry and nothing notices |
+| **Business Impact** | Eight capabilities invisible to every customer. Two of them (forensics chain-of-custody, JML "who-had-what") are the ones an ECC assessor asks for by name |
+| **Technical Impact** | All eight added to the existing SOC-Ops nav group — **completing a group, not designing IA**, so it does not pre-empt F2-07c's workspace restructure. Labels are each page's **own bilingual title**, so the nav matches the screen and no Arabic was invented (house rule 7): 8 keys × EN + AR. `routeReachability.test.ts` then holds the invariant, with an `INTENTIONALLY_OFF_NAV` map where every entry carries its **reason** |
+| **UX Impact** | Eight new SOC-Ops sidebar entries. Browser-verified: all eight render in the nav with correct Arabic labels, and the pages load with their own titles and KPI cards, clean console |
+| **Recommendation** | 1. As shipped. 2. **The sidebar does not filter by permission** — these eight are guarded by `hasAnyRole('CISO','FORENSICS_LEAD',…)`, so a `GRC_ADMINISTRATOR` now sees eight entries that 403. That is pre-existing platform-wide behaviour (184 entries shown regardless of grant), not introduced here, and F2-07c owns it — but it is worth fixing there. 3. The nine legitimately-off-nav routes are documented in the test rather than deleted |
+| **Alternatives** | Leave them out until F2-07c restructures the IA — rejected: F2-07c is an L and these are working features hidden today. Add a `detailOnly: true` flag to the route table as the plan suggests — rejected: it would mean touching 263 route declarations to express what a 12-entry allow-list says more clearly |
+| **Trade-offs** | Eight more entries in a sidebar F2-07c already criticises as too flat. Accepted: an unreachable feature is worse than a long menu, and F2-07c will regroup them anyway |
+| **Verification** | FE suite **67/67** (was 63; 4 new), `tsc` clean. **Mutation-proven:** removing the forensics nav entry fails **both** the orphan test (naming `/socops/forensics`) and the regression pin; reverted, `git diff` clean. **Browser-verified** all eight sidebar entries with their Arabic labels, and two pages rendered end-to-end with no console errors. **Live RBAC check:** all eight endpoints return **200 for `so_officer` (CISO)** and **403 for `compliance`** — so the pages are genuinely usable by the intended persona, and the 403 seen in the browser was correct authorisation rather than a defect |
+| **Status** | ✅ **CLOSED 2026-07-29** |
+| **References** | `src/__tests__/routeReachability.test.ts`, `components/layout/Sidebar.tsx`, `translations/en.ts` + `ar.ts`, the eight `pages/socops/*Page.tsx`. Related: **F2-07c** (workspace IA + permission-filtered nav) |
+| **Lesson** | **A scan that matches too little does not under-report — it invents defects.** My first version checked `to:`, `href:`, `to=` and `navigate(` and reported **45** unreachable routes. Twenty-two of those were the per-workflow screens, reached through a `route:` key in `lib/workflowCatalog.ts` that the scan did not know about; adding the missing key shapes took the figure to **17**, of which 9 are deliberately off-nav and **8 were the real finding**. Four backend regex scans under-counted this month and hid real problems; this one over-counted and would have sent me rewiring navigation that already worked. Both failures have the same fix — **validate the scan against something you already know before believing its output** (which is why this test asserts it finds >200 routes, >300 link targets, and specifically the `route:`-keyed `/workflows/pdpl/ropa`) |
+
+---
+
 ## W2-1b · Demo data substitutes for a customer's own empty register — disclosed, and a decision you own
 
 | Field | Content |
