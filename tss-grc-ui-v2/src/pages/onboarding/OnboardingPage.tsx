@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Building2, ListChecks, Users, Compass, Check, ChevronLeft, ChevronRight,
-  Trash2, UserPlus, Sparkles, RefreshCw, type LucideIcon,
+  Trash2, UserPlus, Sparkles, RefreshCw, ClipboardCopy, type LucideIcon,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -338,10 +338,58 @@ function Step2Frameworks({ state, patch, lang, t }: {
 
 // ─── STEP 3: Invites ────────────────────────────────────────────────────────
 
+/**
+ * F2-33 — this step collects a list; it does not invite anyone, and it now says so.
+ *
+ * <p>Two claims were removed because they were false. The step read *"They will receive an email
+ * with a one-time sign-in link"*, and the hint read *"In production they trigger an email via your
+ * configured provider (AWS SES / SendGrid)"*. Measured: no invitation path exists anywhere — no
+ * token, no accept flow, nothing that calls a sender. The platform genuinely can send email (BCM
+ * crisis comms and scheduled reports go through {@code JavaMailSender}), which makes the second
+ * claim the more misleading of the two: it describes a config toggle that does not exist, in a
+ * screen a prospect is likely to be shown.
+ *
+ * <p>And it cannot simply be wired up. {@code POST /api/v1/admin/users} is
+ * {@code hasRole('PLATFORM_ADMIN')} — not a tenant admin — and {@code UserRequest} requires a
+ * username, a {@code @NotBlank} full name and a {@code @StrongPassword} initial password on create.
+ * This step collects an email and a role slug. Bridging that gap means either a real invitation
+ * subsystem (token + email + accept + set-password) or generating other people's passwords and
+ * displaying them, which is a decision about credentials, not a UI fix. Recorded for the owner.
+ *
+ * <p>So the honest version: keep the checklist, state what it is, and give it the two things that
+ * make it useful — a route to where accounts are actually created, and a way to carry the list
+ * there. The alternative in the plan was to cut the step, which would have thrown away work the
+ * operator had already done.
+ */
 function Step3Invites({ state, patch, t }: {
   state: OnboardingState; patch: (p: Partial<OnboardingState>) => void;
   t: (k: string) => string;
 }) {
+  const toast = useToast();
+  const filled = state.invites.filter(i => i.email.trim().length > 0);
+
+  async function copyList() {
+    const text = filled.map(i => `${i.email.trim()},${i.role}`).join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t('onbInviteCopied'));
+      return;
+    } catch {
+      // Fall through. `navigator.clipboard` needs a SECURE CONTEXT, and this platform is served
+      // over plain http on port 80 behind nginx (DEPLOYMENT.md), so on the real deployment the
+      // async API is unavailable to every user — not an edge case. Measured here: it threw
+      // NotAllowedError in the browser and the UI correctly said the copy had failed, which is
+      // honest but useless if it is the only path.
+    }
+    if (legacyCopy(text)) {
+      toast.success(t('onbInviteCopied'));
+    } else {
+      // Both paths refused. Say so — reporting a success that did not happen is the exact defect
+      // this slice exists to remove.
+      toast.danger(t('onbInviteCopyFailed'));
+    }
+  }
+
   function addRow() {
     patch({ invites: [...state.invites, { email: '', role: 'risk-manager' }] });
   }
@@ -398,11 +446,49 @@ function Step3Invites({ state, patch, t }: {
           </table>
         )}
 
+      {/* The two actions that make the list worth collecting: where accounts are really created,
+          and carrying the rows there. /admin opens on its Users tab. */}
+      <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Link to="/admin" style={{ textDecoration: 'none' }}>
+          <Button variant="secondary" Icon={UserPlus}>{t('onbInviteOpenAdmin')}</Button>
+        </Link>
+        {filled.length > 0 && (
+          <Button variant="ghost" Icon={ClipboardCopy} onClick={() => { void copyList(); }}>
+            {t('onbInviteCopy')}
+          </Button>
+        )}
+      </div>
+
       <div style={{ marginTop: 12, fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5 }}>
         {t('onbInviteHint')}
       </div>
     </Card>
   );
+}
+
+/**
+ * Clipboard write that works without a secure context, for the http deployment.
+ * Deprecated but still implemented everywhere, and the only path available when
+ * `navigator.clipboard` is absent or refuses. Returns whether it actually copied.
+ */
+function legacyCopy(text: string): boolean {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    // Off-screen but focusable — `display:none` would make the selection fail.
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
 }
 
 function EmptyInvites({ t }: { t: (k: string) => string }) {

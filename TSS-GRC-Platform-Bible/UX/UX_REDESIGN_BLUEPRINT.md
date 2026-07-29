@@ -65,7 +65,16 @@ licensing and the datasheet share one taxonomy:
 | 9 | **Sustainability** | `sust` |
 | 10 | **Ethics & Conduct** | `ethics`, `consumer` |
 | 11 | **Financial-Sector Regulatory** | `openbanking`, `rrp`, `regreporting`, `reginspect`, `sharia`, `aml`, `fraud` |
-| 12 | **Governance & Administration** | committees, `governance`, `board_pack`, `admin`, `iam`, `ai`, `change_mgmt` |
+| 12 | **Governance & Administration** | committees, `governance`, `board_pack`, `admin`, `iam`, `ai` |
+| 13 | **Change Enablement** | `change_mgmt` (CAB, change calendar / freeze windows, decision register) |
+
+⚠ **Row 13 is not cosmetic.** `change_mgmt` sat inside row 12 while the owner's direction is that Change
+is not under Risk and not an admin function. Because navigation here is **generated from the module
+registry**, leaving it in row 12 would have made Wave 4 silently delete CE-0's sidebar group and re-file
+Change under an administrative catch-all — a documented plan reversing a shipped decision, with no code
+change to notice. Amended in the same commit as CE-0 (2026-07-29), which is the only reason the two agree.
+Row 13 lists the CAB and decision register as *contents*, not as shipped screens: they land with S7/CE-13,
+and the sidebar deliberately does not link them until they resolve.
 
 **Rules.** Each workspace has one landing page (KPIs → registers → my items → what needs me).
 Navigation is **generated** from the module registry filtered by entitlement (F2-01, F2-04), so an

@@ -103,7 +103,8 @@ const NAV_GROUPS: NavGroup[] = [
           { id: 'rca', to: '/rca', Icon: Microscope, labelKey: 'rcaSidebar' },
         ],
       },
-      { id: 'changes',   to: '/changes',            Icon: GitBranch,       labelKey: 'modChanges' },
+      // CE-0: `changes` used to sit here. Change Enablement is its own discipline with its own
+      // authority (CAB), not a risk technique — see the group below and §6c of the plan.
       { id: 'cpty',      to: '/cpty/dashboard',     Icon: Users,           labelKey: 'cpty.sidebar' },
       // Risk-analysis techniques nested under one hub (ISO 31010).
       {
@@ -114,6 +115,25 @@ const NAV_GROUPS: NavGroup[] = [
         ],
       },
       { id: 'risk-lc',   to: '/risk-lifecycle',     Icon: GitBranch,       labelKey: 'rlcSidebar' },
+    ],
+  },
+
+  // ─── 1b. Change Enablement (CAB) ────────────────────────────────────
+  // CE-0. Change was nested inside Risk Management, which is the wrong reading of what it is: a
+  // change is authorised by the CAB under its own policy, and the backend was never under risk
+  // (module/change_mgmt is its own package). The nav was the only place the two were conflated.
+  //
+  // ⚠ Only the entries that resolve TODAY are listed. The CAB queue and the decision register are
+  // S7/CE-13 work and have no route yet; adding them now would be nav-to-nowhere, which is the
+  // F2-02 defect this programme has spent two slices removing. They join this group as they land.
+  {
+    id: 'change', titleKey: 'navChange',
+    items: [
+      { id: 'changes',   to: '/changes',                Icon: GitBranch, labelKey: 'ceNavRegister' },
+      // The calendar and freeze/blackout windows (FSC) are a tab of the same page, so this is a
+      // query link — the pattern the NDI group established. `queryAwareActive` below is what
+      // keeps only one of the two rows highlighted.
+      { id: 'change-gov', to: '/changes?tab=governance', Icon: Calendar,  labelKey: 'ceNavCalendarFsc' },
     ],
   },
 
@@ -182,6 +202,19 @@ const NAV_GROUPS: NavGroup[] = [
           { id: 'socops-pentest', to: '/socops/pentests',        Icon: ShieldCheck, labelKey: 'socopsPentestsSidebar' },
           { id: 'socops-regexam', to: '/socops/regulator-exams', Icon: LockKeyhole, labelKey: 'socopsRegulatorsSidebar' },
           { id: 'socops-ot',      to: '/socops/ot-assets',       Icon: Server,      labelKey: 'socopsOtSidebar' },
+          // F2-07b: these eight were fully built — real API wiring, tables, detail links — and
+          // reachable from NOWHERE in the UI. Their sibling /socops/awareness was in the nav,
+          // which is what shows the omission was an oversight rather than a decision: someone
+          // added the routes and the pages and wired only one of nine into the sidebar.
+          // Labels are each page's own bilingual title, so the nav matches the screen.
+          { id: 'socops-appsec',  to: '/socops/appsec',            Icon: ShieldCheck, labelKey: 'socopsAppsecSidebar' },
+          { id: 'socops-dlp',     to: '/socops/dlp',               Icon: ScanSearch,  labelKey: 'socopsDlpSidebar' },
+          { id: 'socops-forensic',to: '/socops/forensics',         Icon: ScanSearch,  labelKey: 'socopsForensicsSidebar' },
+          { id: 'socops-iamjml',  to: '/socops/iam-jml',           Icon: Users,       labelKey: 'socopsIamJmlSidebar' },
+          { id: 'socops-zt',      to: '/socops/zt-maturity',       Icon: TrendingUp,  labelKey: 'socopsZtSidebar' },
+          { id: 'socops-brand',   to: '/socops/brand-monitoring',  Icon: ScanSearch,  labelKey: 'socopsBrandSidebar' },
+          { id: 'socops-ins',     to: '/socops/cyber-insurance',   Icon: LockKeyhole, labelKey: 'socopsInsuranceSidebar' },
+          { id: 'socops-madd',    to: '/socops/ma-due-diligence',  Icon: ShieldCheck, labelKey: 'socopsMaDdSidebar' },
         ],
       },
       {
@@ -521,13 +554,18 @@ function pathMatches(pathname: string, to: string): boolean {
   return pathname.startsWith(to + '/');
 }
 
-/** Active-state for a child whose sibling set uses query-string tabs
+/** Active-state for a row whose sibling set uses query-string tabs
  *  (e.g. /ndi?tab=cycles). NavLink matches on pathname only and ignores
  *  the query string, so without this every NDI tab — plus the bare /ndi
- *  link — highlighted simultaneously. A query child is active iff the path
+ *  link — highlighted simultaneously. A query row is active iff the path
  *  matches AND all of its query params equal the current location's; a
- *  bare-path child (no query) is active only when no query is present. */
-function queryAwareChildActive(to: string, pathname: string, search: string): boolean {
+ *  bare-path row (no query) is active only when no query is present.
+ *
+ *  CE-0 lifted this from children to rows of either level: the Change group lists `/changes` and
+ *  `/changes?tab=governance` as **top-level** siblings, and both highlighted at once — the same wart
+ *  one level up. Applied only where a sibling set actually mixes query and bare paths, so no
+ *  existing group's behaviour changes. */
+function queryAwareActive(to: string, pathname: string, search: string): boolean {
   const qIdx = to.indexOf('?');
   const path = qIdx >= 0 ? to.slice(0, qIdx) : to;
   if (pathname !== path && !pathname.startsWith(path + '/')) return false;
@@ -679,6 +717,7 @@ export function Sidebar({ open = false }: { open?: boolean }) {
                     badge={badgeFor(it.id)}
                     pathname={pathname}
                     search={search}
+                    siblingsUseQuery={group.items.some(s => s.to.includes('?'))}
                     expandedItems={expandedItems}
                     autoExpandItems={autoExpandItems}
                     onToggleChildren={toggleItem}
@@ -700,13 +739,17 @@ interface NavBadge { value: number; title: string; tone?: 'danger'; }
  *  with a vertical guide line + reduced size so the hierarchy reads at
  *  a glance. */
 function NavRowWithChildren({
-  item, t, badge, pathname, search, expandedItems, autoExpandItems, onToggleChildren,
+  item, t, badge, pathname, search, siblingsUseQuery, expandedItems, autoExpandItems,
+  onToggleChildren,
 }: {
   item: NavItem;
   t: (k: string) => string;
   badge: NavBadge | null;
   pathname: string;
   search: string;
+  /** CE-0: true when this row's own group mixes query-tab and bare paths, so its highlight has to
+   *  respect the query the way children already did. */
+  siblingsUseQuery: boolean;
   expandedItems: Set<string>;
   autoExpandItems: Set<string>;
   onToggleChildren: (id: string) => void;
@@ -716,11 +759,12 @@ function NavRowWithChildren({
   const childrenOpen = hasChildren && (
     expandedItems.has(item.id) || autoExpandItems.has(item.id) || pathMatches(pathname, item.to)
   );
+  const forcedSelf = siblingsUseQuery ? queryAwareActive(item.to, pathname, search) : null;
 
   return (
     <>
       <div className="sb-item-wrap">
-        <NavLink to={item.to} className={({ isActive }) => cn('sb-item', isActive && 'active', hasChildren && 'sb-item-has-children')}>
+        <NavLink to={item.to} className={({ isActive }) => cn('sb-item', (forcedSelf ?? isActive) && 'active', hasChildren && 'sb-item-has-children')}>
           <item.Icon size={18} strokeWidth={1.8} />
           <span>{t(item.labelKey)}</span>
           {badge && (
@@ -747,7 +791,7 @@ function NavRowWithChildren({
             // When a parent's children use query-string tabs (NDI), match on
             // path+query so only the active tab highlights — not all of them.
             const forced = childrenUseQuery
-              ? queryAwareChildActive(child.to, pathname, search)
+              ? queryAwareActive(child.to, pathname, search)
               : null;
             return (
               <NavLink key={child.id} to={child.to}

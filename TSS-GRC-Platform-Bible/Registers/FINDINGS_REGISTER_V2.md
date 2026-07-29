@@ -54,6 +54,32 @@ document disagree, this one cites a reproducible number; see `Governance/BIBLE_V
 
 ---
 
+## F2-33 · Onboarding promised an invitation email the platform cannot send
+
+| Field | Content |
+|---|---|
+| **ID** | F2-33 (unified plan §6b; honesty fixed 2026-07-29, delivery deferred to **D-4**) |
+| **Category** | Truthful UI — first-run journey |
+| **Severity** | **P2.** Nothing downstream consumes it as evidence, which is why the council moved it down from P1. It rises again if onboarding sits in a sales-demo path, because two of the sentences were about *product capability*, not about data |
+| **Provenance** | Plan row said "invited users are never created". True, and the copy was worse than the row: reading it is what escalated this from a dead-state bug to a false capability claim |
+| **Current State** | Step 3 collected `{email, role}` rows into `grc.onboarding.v1` in `localStorage` and nothing else. The done card reported the count as "Invites queued". The step's own text said *"They will receive an email with a one-time sign-in link"*; the hint said *"Invitations are stored locally in this demo. In production they trigger an email via your configured provider (AWS SES / SendGrid)."* |
+| **Problem** | Neither claim is true. There is no invitation path anywhere — no token, no accept flow, nothing that calls a sender — and no SES/SendGrid integration; those would be SMTP relays behind `spring.mail.*` if configured. The platform *can* send mail (BCM crisis comms, scheduled reports, both `JavaMailSender`), which makes the production claim credible enough to be believed |
+| **Root Cause** | A wizard step built ahead of the subsystem it fronts, described in the future tense and shipped in the present |
+| **Business Impact** | An operator finishes onboarding believing their team has been invited, and waits. In a demo, a prospect is told a capability exists behind configuration. That is a sales-integrity problem, not a UI polish problem |
+| **Technical Impact** | **Wiring it up is not available as a fix, and this is the transferable part.** `POST /api/v1/admin/users` is `hasRole('PLATFORM_ADMIN')` — so the tenant admin who runs onboarding would be 403'd — and `UserRequest` requires `username`, a `@NotBlank fullNameEn` and a `@StrongPassword` password on create. The step collects an email and a role slug. The gap is not plumbing; it is (a) a missing invitation subsystem or (b) issuing other people's credentials |
+| **UX Impact** | The step now says what it is: a checklist, with nothing created and nothing sent. It gained the two things that make a checklist worth keeping — a link to `/admin` (which opens on its Users tab) and a copy-list action that emits `email,role` lines |
+| **Recommendation** | 1. As shipped. 2. **D-4 needs the owner:** build a real invitation subsystem (token + mail + accept + set-password, plus a decision on who may invite, since user creation is currently platform-admin-only), or accept the checklist as the product. 3. Do **not** resolve it by generating passwords for other people and displaying them |
+| **Alternatives** | The plan's other branch was to cut the step. Rejected: the collected list is the only artefact of a real intent the operator expressed, and deleting it to avoid a false sentence trades one bad outcome for another |
+| **Trade-offs** | The copy action needs a clipboard. `navigator.clipboard` requires a **secure context**, and this platform is served over plain http on :80 behind nginx — so on the deployment the async API is unavailable to *every* user, not to an edge case. A `document.execCommand('copy')` fallback carries it, and only if both refuse does the UI say the copy failed |
+| **Effort** | **S** (honesty) · **M–L** (D-4, the subsystem) |
+| **Priority** | **Done** for the claim; **open** for the capability — ⚠ committed on `feat/ce0-change-nav-group`, **not merged** |
+| **Verification** | Browser-verified in Arabic with two seeded rows: the corrected copy renders, both actions appear, and the Admin link resolves to `/admin`. The copy action assembled exactly `ayman@example.sa,risk-manager\nnoura@example.sa,auditor`, and when the clipboard write was refused (`NotAllowedError`) the UI showed *"تعذّر النسخ — حدّد الصفوف وانسخها يدوياً"* — the truthful-failure leg proven live, which is the whole point of the slice. ⚠ **The success leg could not be proven:** both clipboard APIs require user activation, and a synthetic click from an injected script is not a trusted gesture, so `execCommand` returned `false` here too. The fallback is reasoned from `isSecureContext`, not demonstrated. `onboardingInviteHonesty.test.ts` 5/5, FE suite **76/76**, `tsc` clean, `vite build` clean |
+| **Status** | 🟡 **CLAIM CLOSED 2026-07-29** · capability open as **D-4** |
+| **References** | `pages/onboarding/OnboardingPage.tsx#Step3Invites`, `lib/onboarding.ts`, `iam/controller/UserController#create`, `iam/dto/UserRequest`, `__tests__/onboardingInviteHonesty.test.ts` |
+| **Lesson** | **A detector that cannot tell a promise from its denial fails on the sentence it is meant to protect.** The first version of the wording ratchet flagged my own corrected copy, because `/email (?:is\|will be) sent/` matches "no email **is sent** from here". Negation-aware patterns fixed it, and the test now self-checks against the four sentences that actually shipped — because a wording ratchet whose patterns no longer match anything passes forever while protecting nothing. Second: **W2-1b's `/mock/i` CI rule cannot see this class at all.** Nothing is imported and no fake data appears; a screen simply asserts something false about the world. Fabrication in *copy* needs its own guard |
+
+---
+
 ## F2-24 · CAB approvals carry a caller-supplied approver name — DF-3's twin
 
 | Field | Content |
@@ -1093,6 +1119,30 @@ Start-Service TssGrcBackend
 | **Status** | ✅ **CLOSED 2026-07-28.** **F2-22b's CRIT tier is now exhausted** — the remaining 17 are measured as inert or by design, so the row's remaining work is the 3 HIGH / 4 STATE tiers and the five DTO paths |
 | **References** | `EthicsCaseService#requireLifecycleIsNotBodySet`, `#apply`, `EthicsCaseServiceTest`, `seed_real_data.py`, `seed_gov_ethics.py`. Same class as **DF-3**, **DF-4**, **F2-40**, **F2-22b(ii)**, **F2-22b(iv)**; precedent **CM-C3** |
 | **Lesson** | **A ranking tells you where to look, never what is wrong.** Eighteen CRIT rows yielded one defect; the other seventeen were inert or deliberate, and every one of those verdicts required reading a service — a whitelist, a recompute call, or a comment explaining that the field is an assessor's judgement. Annotating the list would have produced seventeen fake fixes and one real one, and the fake ones would have broken working features (the F2-40 trap, four times over). Second lesson: **a fix can close the only route that repaired bad data.** The 11 stuck cases were already unadvanceable through `/transition`; the bypass was hiding it. Closing a hole means checking what was reaching through it |
+
+---
+
+## F2-07b · Eight SOC-Ops screens were built, wired and shipped unreachable
+
+| Field | Content |
+|---|---|
+| **ID** | F2-07b (route/nav CI test) |
+| **Category** | Information architecture / shipped-but-invisible feature |
+| **Severity** | **P2 Medium** — no data risk; eight paid capabilities a customer could not open |
+| **Provenance** | Building the CI test F2-07b asks for ("every route has a nav path or explicit `detailOnly: true`") and reading the output rather than just counting it |
+| **Current State** | `App.tsx` declares **263 static routes**. Eight had no link from anywhere in the application: `/socops/appsec`, `/dlp`, `/forensics`, `/iam-jml`, `/zt-maturity`, `/brand-monitoring`, `/cyber-insurance`, `/ma-due-diligence`. Each is a full page — its own API calls, KPI cards, tables and detail-route links — not a stub. **Their sibling `/socops/awareness` *was* in the sidebar**, which is what identifies this as an oversight rather than a decision: someone added nine routes and nine pages and wired one of them into the nav |
+| **Problem** | A route with no link is a feature that was paid for twice — once to build, once to not use. Application security findings, DLP events, forensics chain-of-custody, JML access review, Zero-Trust maturity, brand/dark-web monitoring, cyber insurance and M&A due diligence are all NCA-ECC-relevant capabilities that no user could reach |
+| **Root Cause** | Routes and nav are maintained in two files with nothing tying them together, so a route can be added without a nav entry and nothing notices |
+| **Business Impact** | Eight capabilities invisible to every customer. Two of them (forensics chain-of-custody, JML "who-had-what") are the ones an ECC assessor asks for by name |
+| **Technical Impact** | All eight added to the existing SOC-Ops nav group — **completing a group, not designing IA**, so it does not pre-empt F2-07c's workspace restructure. Labels are each page's **own bilingual title**, so the nav matches the screen and no Arabic was invented (house rule 7): 8 keys × EN + AR. `routeReachability.test.ts` then holds the invariant, with an `INTENTIONALLY_OFF_NAV` map where every entry carries its **reason** |
+| **UX Impact** | Eight new SOC-Ops sidebar entries. Browser-verified: all eight render in the nav with correct Arabic labels, and the pages load with their own titles and KPI cards, clean console |
+| **Recommendation** | 1. As shipped. 2. **The sidebar does not filter by permission** — these eight are guarded by `hasAnyRole('CISO','FORENSICS_LEAD',…)`, so a `GRC_ADMINISTRATOR` now sees eight entries that 403. That is pre-existing platform-wide behaviour (184 entries shown regardless of grant), not introduced here, and F2-07c owns it — but it is worth fixing there. 3. The nine legitimately-off-nav routes are documented in the test rather than deleted |
+| **Alternatives** | Leave them out until F2-07c restructures the IA — rejected: F2-07c is an L and these are working features hidden today. Add a `detailOnly: true` flag to the route table as the plan suggests — rejected: it would mean touching 263 route declarations to express what a 12-entry allow-list says more clearly |
+| **Trade-offs** | Eight more entries in a sidebar F2-07c already criticises as too flat. Accepted: an unreachable feature is worse than a long menu, and F2-07c will regroup them anyway |
+| **Verification** | FE suite **67/67** (was 63; 4 new), `tsc` clean. **Mutation-proven:** removing the forensics nav entry fails **both** the orphan test (naming `/socops/forensics`) and the regression pin; reverted, `git diff` clean. **Browser-verified** all eight sidebar entries with their Arabic labels, and two pages rendered end-to-end with no console errors. **Live RBAC check:** all eight endpoints return **200 for `so_officer` (CISO)** and **403 for `compliance`** — so the pages are genuinely usable by the intended persona, and the 403 seen in the browser was correct authorisation rather than a defect |
+| **Status** | ✅ **CLOSED 2026-07-29** |
+| **References** | `src/__tests__/routeReachability.test.ts`, `components/layout/Sidebar.tsx`, `translations/en.ts` + `ar.ts`, the eight `pages/socops/*Page.tsx`. Related: **F2-07c** (workspace IA + permission-filtered nav) |
+| **Lesson** | **A scan that matches too little does not under-report — it invents defects.** My first version checked `to:`, `href:`, `to=` and `navigate(` and reported **45** unreachable routes. Twenty-two of those were the per-workflow screens, reached through a `route:` key in `lib/workflowCatalog.ts` that the scan did not know about; adding the missing key shapes took the figure to **17**, of which 9 are deliberately off-nav and **8 were the real finding**. Four backend regex scans under-counted this month and hid real problems; this one over-counted and would have sent me rewiring navigation that already worked. Both failures have the same fix — **validate the scan against something you already know before believing its output** (which is why this test asserts it finds >200 routes, >300 link targets, and specifically the `route:`-keyed `/workflows/pdpl/ropa`) |
 
 ---
 
