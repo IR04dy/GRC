@@ -39,6 +39,25 @@ public class AttachmentService {
 
     private final AttachmentRepository repository;
     private final AttachmentStorageService storage;
+    private final AttachmentAccessPolicy access;
+
+    /**
+     * SCR-004 — the id-keyed operations resolve the parent's entity type from the row and then
+     * require that the caller can see that parent, exactly as
+     * {@link com.tss.grc.module.attachment.controller.AttachmentController} does for the two
+     * path-keyed ones. An attachment id was previously a tenant-global object reference protected
+     * only by the coarse {@code EVIDENCE} permission, so {@code /{id}/download} handed over the
+     * bytes of records the caller could not open.
+     *
+     * <p>{@link #list} is deliberately NOT checked here: it is called internally by
+     * {@code ObligationController} and {@code PolicyController} from endpoints that already gate the
+     * parent, one of them by role rather than by {@code COMPLIANCE:READ}. The generic HTTP path into
+     * {@code list} is checked in the controller instead, so both callers get the authority they
+     * should and neither gets one it should not.
+     */
+    private void requireParentVisible(Attachment a, String operation) {
+        access.requireAccess(a.getEntityType(), operation);
+    }
 
     @Transactional(readOnly = true)
     public List<AttachmentResponse> list(String entityType, Long entityId) {
@@ -91,6 +110,7 @@ public class AttachmentService {
                                              LocalDate validTo, String classification,
                                              MultipartFile file, Long userId) {
         Attachment old = mustGet(oldId);
+        requireParentVisible(old, "new version");
         Long orgId = old.getOrganisationId();
         String type = (docType == null || docType.isBlank()) ? old.getDocType() : docType.toUpperCase();
         if (!DOC_TYPES.contains(type)) {
@@ -126,6 +146,7 @@ public class AttachmentService {
     @Transactional(readOnly = true)
     public List<AttachmentResponse> history(Long id) {
         Attachment a = mustGet(id);
+        requireParentVisible(a, "history");
         Long group = a.getVersionGroupId() != null ? a.getVersionGroupId() : a.getId();
         return repository.findByOrganisationIdAndVersionGroupIdOrderByVersionDesc(a.getOrganisationId(), group)
             .stream().map(this::toResponse).toList();
@@ -140,6 +161,7 @@ public class AttachmentService {
     public AttachmentResponse update(Long id, String docType, String titleEn, LocalDate validTo,
                                      String classification) {
         Attachment a = mustGet(id);
+        requireParentVisible(a, "metadata edit");
         if (docType != null && !docType.isBlank()) {
             String type = docType.toUpperCase();
             if (!DOC_TYPES.contains(type)) {
@@ -160,6 +182,7 @@ public class AttachmentService {
     @Transactional(readOnly = true)
     public DownloadPayload download(Long id) {
         Attachment a = mustGet(id);
+        requireParentVisible(a, "download");
         return new DownloadPayload(a.getFileName(),
             a.getMimeType() == null ? "application/octet-stream" : a.getMimeType(),
             storage.load(a.getFilePath()));
@@ -168,6 +191,7 @@ public class AttachmentService {
     @Transactional
     public void delete(Long id) {
         Attachment a = mustGet(id);
+        requireParentVisible(a, "delete");
         a.setIsDeleted(true);
         repository.save(a);
     }
