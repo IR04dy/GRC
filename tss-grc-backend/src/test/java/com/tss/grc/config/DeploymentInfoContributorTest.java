@@ -103,25 +103,39 @@ class DeploymentInfoContributorTest {
     }
 
     @Test
-    void filesThatLookLikeMigrationsButCannotBeVersionedAreNamed() {
-        // Found by building the contributor, not by reading: V46a__ and V47a__ sit in the migration
-        // folder, and a Flyway version admits only digits separated by '.' or '_'. Flyway skips an
-        // unparseable name rather than failing — proven by the dates: those two landed 2026-05-11 and
-        // migrations through V312 have applied since, so no boot ever choked on them. Which means
-        // their contents have never been applied anywhere Flyway runs, and never will be.
+    void noFileInTheMigrationFolderIsOneFlywayCannotVersion() {
+        // ── This assertion was inverted on 2026-07-30, exactly as its previous form instructed. ──
         //
-        // Pinned so the *class* of defect stays visible. If the two files are renamed or deleted this
-        // fails, and the right response is to update the expectation — not to drop the check, which is
-        // the only thing standing between "a file that looks like a migration" and "a migration".
+        // It used to assert that `unversionedFiles` containsExactly V46a__cyber_pdpl_bridge_seed_fix.sql
+        // and V47a__evidence_chain_broken_demo.sql — pinning the *presence* of F2-49 so the defect class
+        // stayed visible while the disposition was an open owner decision. Its own comment said: "If the
+        // two files are renamed or deleted this fails, and the right response is to update the
+        // expectation — not to drop the check." That is what happened, so that is what was done.
+        //
+        // ADR-017 D-6 closed the decision: both files were DELETED, not renumbered. Measured first, in
+        // both databases — dev TSS_GRC and the deployed TSS_GRC_Deployment each already held the rows
+        // both files would have inserted, so nothing was lost. And renumbering would have been worse
+        // than leaving them: both are demo seed data, so a valid version would have made Flyway inject
+        // fabricated PDPL breach records and a deliberately corrupted chain of custody into every
+        // future production database. The broken filename was accidentally load-bearing.
+        //
+        // ⚠ The positive path — "the detector fires when a bad file exists" — is NOT exercised here and
+        // cannot be: this contributor scans the real classpath, so proving it fires needs a bad file in
+        // the tree. That proof lives in MigrationFilenameRatchetTest, which is mutation-proven by
+        // adding V99z__mutation_probe.sql and confirming the failure names it. This test now guards the
+        // other direction: that the folder stays clean, reported through the endpoint an operator reads.
         Map<String, Object> m = migrationsFrom(historyMissing(), true);
 
-        @SuppressWarnings("unchecked")
-        List<String> unversioned = (List<String>) m.get("unversionedFiles");
-        assertThat(unversioned)
-            .as("the two known-dead migration files must be reported, not silently skipped")
-            .containsExactly("V46a__cyber_pdpl_bridge_seed_fix.sql",
-                             "V47a__evidence_chain_broken_demo.sql");
-        assertThat((String) m.get("unversionedNote")).contains("never been applied");
+        assertThat(m.get("unversionedFiles"))
+            .as("the contributor omits this key entirely when every file is versioned; a non-null value "
+                + "means a file is shipping in the jar that Flyway will silently never apply (F2-49)")
+            .isNull();
+        assertThat(m.get("unversionedNote")).isNull();
+        // Anti-vacuity: prove the scan actually resolved the migration folder rather than finding
+        // nothing and reporting a clean folder because it looked in the wrong place.
+        assertThat((Integer) m.get("packagedCount"))
+            .as("packagedCount must be real, or 'no unversioned files' means 'no files found'")
+            .isGreaterThan(250);
     }
 
     @Test
