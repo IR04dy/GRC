@@ -96,16 +96,29 @@ requested date and no escalation. This table is that view.
 | # | Action needed from the owner | Blocks | Requested | Notes |
 |---|---|---|---|---|
 | **O-1** | **Elevated restart** (`Stop-Service` → `Move-Item` → `Start-Service`) | DF-1 (33–35 failures/day), DF-2, W0-3 | 2026-07-25 | Attempted and refused this session — needs an elevated shell. **Delivers DF-1/DF-2 only** (§1) |
-| **O-2** | **`merge` authorisation** for `feat/change-policy-remediation` (20 commits) | DF-3, DF-4, D-7/D-8, V313–V317, the ratchet 44→21 guard sweeps — *everything provenance-related reaching production* | 2026-07-25 | House rule 2 forbids merging without the explicit word. Then rebuild → restage → **O-1 again** (W0-2b) |
-| **O-3** | **F2-35** — ratify ONE SKU catalogue; specifically, are committee/board governance and access governance **paid** or **free Base**? | **All of Wave 2** (W2-0, F2-04) | 2026-07-25 | Both advocates argued it in §6d; recommendation on the record. ~$0.5M–2.7M/yr either way on the reviewer's price anchors |
-| **O-4** | **D-1** — which committee constitutes each tenant's CAB / ECAB | **S6** (and therefore S7, S8, CE-13) | earlier | Per-tenant charter fact; orgs 2/3 have no committees. Deliberately not fabricated |
-| **O-5** | **D-2** — ECAB ratification SLA (default 5 business days) | **S7** | earlier | Per-tenant |
-| **O-6** | **D-9** — SKU shelf name for Change Enablement | nothing (cosmetic) | 2026-07-25 | **Recommendation withdrawn** — round 2 showed "Change Enablement" is ITIL 4's own practice name. Defer to pricing time |
-| **O-7** | Commission the **independent penetration test**, **witnessed restore/failover**, and **WCAG conformance statement** | 3 of the audit's own §11 acceptance gates | not yet | §7 calls these out of scope, which reads as a silent rejection of three gates unless an owner is named |
+| ~~**O-2**~~ ✅ | ~~**`merge` authorisation**~~ **CLOSED 2026-07-30** — `merge` given five times, `merge all` once, then **`push all`**; master `46e95666` is on origin with V313–V328. | DF-3, DF-4, D-7/D-8, V313–V317, the ratchet 44→21 guard sweeps — *everything provenance-related reaching production* | 2026-07-25 | House rule 2 forbids merging without the explicit word. Then rebuild → restage → **O-1 again** (W0-2b) |
+| ~~**O-3**~~ ✅ | **F2-35 ANSWERED — [ADR-017](TSS-GRC-Platform-Bible/Decisions/ADR-017-OWNER-DELEGATED-DECISIONS.md) D-1: both are PAID SKUs.** Delegated to the engineer on the owner's instruction to decide on best-practice/market-leader/Saudi grounds. Board governance is a standalone product category everywhere (Diligent, Boardvantage, Computershare — per-director-seat) and access governance is never bundled free (SailPoint, Saviynt — per identity); both are **regulator-mandated in KSA** (CMA CG + SAMA banking CG; NCA ECC 2-2 + SAMA CSF 3.3.5), which is a stronger position than elsewhere. Base = platform only. ⚠ Pricing still owner-only; the three contradictory catalogue lists reconcile into the module registry, not a fourth list | **All of Wave 2** (W2-0, F2-04) | 2026-07-25 | Both advocates argued it in §6d; recommendation on the record. ~$0.5M–2.7M/yr either way on the reviewer's price anchors |
+| **O-4** 🔶 | **D-1 MECHANISED — [ADR-017](TSS-GRC-Platform-Bible/Decisions/ADR-017-OWNER-DELEGATED-DECISIONS.md) D-2.** Still a per-tenant charter fact and deliberately **not** invented — but what blocked code was the missing *rule for its absence*, which is now decided: per-tenant config, **no default**, CAB transitions **fail closed** with an actionable ProblemDetail, and setting it is a required onboarding step gating SKU activation. ITIL 4 backs it (the CAB is a role, not necessarily a committee). **S6 is unblocked for engineering** | **S6** (and therefore S7, S8, CE-13) | earlier | Per-tenant charter fact; orgs 2/3 have no committees. Deliberately not fabricated |
+| ~~**O-5**~~ ✅ | **D-2 DECIDED — [ADR-017](TSS-GRC-Platform-Bible/Decisions/ADR-017-OWNER-DELEGATED-DECISIONS.md) D-3: 5 business days**, per-tenant overridable. Matches ITIL 4 ("next scheduled CAB") at the market-norm weekly cadence, and SAMA CSF's post-implementation review of emergency changes. Two details decided with it: the clock starts at **implementation**, not at raise; breach escalates to the CISO **and** lands in the unauthorised-change register | **S7** | earlier | Per-tenant |
+| ~~**O-6**~~ ✅ | **D-9 DECIDED — [ADR-017](TSS-GRC-Platform-Bible/Decisions/ADR-017-OWNER-DELEGATED-DECISIONS.md) D-4: shelf name `Change Governance & CAB`**; `change_mgmt` stays the package name and "Change Enablement" the internal ITIL practice name. Under the ITSM name it competes with ServiceNow/Jira on CMDB and release pipelines and loses on brand | nothing (cosmetic) | 2026-07-25 | **Recommendation withdrawn** — round 2 showed "Change Enablement" is ITIL 4's own practice name. Defer to pricing time |
+| **O-7** 🔶 | Commission the **independent penetration test**, **witnessed restore/failover** and **WCAG conformance statement** | 3 of the audit's own §11 acceptance gates | 2026-07-30 | **§7's "out of scope" is WITHDRAWN** ([ADR-017](TSS-GRC-Platform-Bible/Decisions/ADR-017-OWNER-DELEGATED-DECISIONS.md)): NCA ECC requires penetration testing, SAMA + NCEMA require BCM restore evidence, and a WCAG statement is table stakes for Saudi public-sector procurement — so excluding them was a silent rejection of three gates. Commissioning stays owner-only, but engineering will produce the **three specifications** (pen-test scope + RoE; restore-drill runbook + evidence template; WCAG 2.2 AA statement over the axe evidence already in `audit/`), leaving the owner to sign a vendor rather than scope a project |
 
-**Why this table earns its place:** if owner latency stays at its demonstrated level, Wave 2 cannot start
-(O-3), Wave 3 cannot pass S6 (O-4), and **nothing new reaches production at all** (O-2) — while the
-engineering loop keeps producing verified commits that accumulate on an unmerged branch. The programme's
+**Why this table earned its place — and what happened once it existed.** The prediction was that owner
+latency, not engineering throughput, set the programme's end date: Wave 2 could not start (O-3), Wave 3
+could not pass S6 (O-4), and nothing new reached production at all (O-2). **Making the constraint visible
+is what cleared it.** On 2026-07-30 the owner closed O-2 outright (`merge` ×5, `merge all`, then
+`push all` — master is on origin), and **delegated the decision content of O-3, O-5, O-6 and the
+per-finding product tail** with a standard to apply: best practice, market leaders, Saudi suitability.
+[ADR-017](TSS-GRC-Platform-Bible/Decisions/ADR-017-OWNER-DELEGATED-DECISIONS.md) is that delegation
+discharged — twelve decisions, each anchored to a named CMA/SAMA/NCA/PDPL control and a market-leader
+precedent. **Four of the seven owner actions are now closed and two are mechanised**, leaving exactly two
+things that genuinely cannot be delegated: an elevated shell (O-1) and a purchase order (O-7).
+
+⚠ **The lesson is narrower than "delegate more".** Two items were *not* decided, on purpose: which
+committee is a tenant's CAB (a charter fact — inventing it is the W2-1a-ii fabrication defect) and every
+price. What was decidable in both cases was the *mechanism*: fail-closed configuration for the first,
+paid-vs-Base for the second. **The blocker was rarely the fact; it was the absence of a rule for the fact's
+absence** — and that rule was always the engineer's to write. The programme's
 end date becomes independent of engineering pace, and §1's "where we actually are" keeps meaning *where the
 branch is*, which is not where the product is. Finding 1 (the staged jar) is that gap's first casualty.
 
