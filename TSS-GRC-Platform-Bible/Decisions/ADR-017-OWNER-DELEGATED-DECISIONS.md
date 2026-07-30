@@ -376,6 +376,50 @@ non-members, with `ORG_ADMIN`/`PLATFORM_ADMIN` retaining full visibility for adm
 P1 finding rather than folded into an authorisation slice, because it changes what a list endpoint returns
 and needs its own probe.
 
+> ### ⚠ Amendment, 2026-07-30 — **this decision does not survive its own impact query. Enforcement is deferred; the prerequisite shipped as V331.**
+>
+> Measuring what "default deny for non-members" would actually do, before building it:
+>
+> | audience | packs | resolves to `committee_type` | linked platform users |
+> |---|---:|---|---:|
+> | `AUDIT_COMMITTEE` | 1 | `AUDIT_COMMITTEE` | **0** |
+> | `BOARD` | 7 | `BOARD` | **0** |
+> | `CYBER_COMMITTEE` | 1 | *(nothing — real type is `CYBER_SECURITY`)* | **0** |
+> | `EXEC` | 4 | *(nothing — real type is `EXEC_COMMITTEE`)* | **0** |
+> | `RISK_COMMITTEE` | 3 | `RISK_COMMITTEE` | 2 |
+>
+> **13 of 16 packs would have become unreadable by any non-admin principal — all 7 BOARD packs among
+> them.** The decision would have locked the board out of board packs. Only **5 of 31** committee member
+> terms are linked to a platform user, and **zero** on the Board and the Audit Committee.
+>
+> That is not a data-quality accident to be waited out. **F2-26 deliberately supports directors who will
+> never have a login** (`no_platform_user` + a declared-EXTERNAL state), so membership-by-platform-login
+> is *structurally* incapable of being the whole control for this record type. Any design that treats it
+> as authoritative is wrong in principle, not just early.
+>
+> ➕ **And the join it depended on was broken anyway** — three vocabularies, two of them wrong:
+> `BoardPackDto`'s `@Pattern` accepted 4 values, the table held 5, and `admin.committees.committee_type`
+> has 17. One pack held `CYBER_COMMITTEE`, **which the API could no longer create**, and neither
+> `CYBER_COMMITTEE` nor `EXEC` matched any committee — so `audience = committee_type` resolved **3 of 5**
+> and would have silently mis-scoped the rest. Silently is the whole problem: no error, no log line, just
+> a governance pack visible to the wrong set or to nobody.
+>
+> **What shipped instead (V331):** the two drifted values are re-pointed onto the committee vocabulary,
+> the DTO pattern is widened to that vocabulary, and the migration **throws if any stored audience fails
+> to resolve to a real `committee_type`** — so the drift cannot recur unnoticed and the join D-11 needs
+> is now sound. `BoardPackGuardTest` pins both directions, including that the two dead spellings stay
+> refused. No read behaviour changed; `unresolved` went 5 → 0.
+>
+> **Enforcement is gated on a stated readiness condition, not a hope.** Before the read filter lands it
+> needs (a) a cross-module committee lookup behind a port, because validating and joining against live
+> committees from `board_pack` is a boundary crossing ADR-012 governs — and notably **no architecture
+> test enforces ADR-012 today**, so the boundary is a decision without a control; and (b) a resolution
+> of who reads a pack when its committee has no linked members, which cannot be "nobody". The likely
+> answer is *secretariat + linked members* — `BOARD_SECRETARY` already holds `ADMIN:READ` and is the
+> persona that circulates packs — but that narrows 21 roles to roughly 3 and is a product call, not a
+> fix. **This is the F2-27 lesson repeating: the impact query falsified the design the plan had
+> pre-committed to, and the right response was to ship the measurement rather than the guess.**
+
 ---
 
 ## D-12 — Authorship attribution: **do not backfill**, and `nca_ecc` is a different question
