@@ -188,7 +188,22 @@ used by 22 generators. It belongs in the kernel on merit, not only for graph hyg
 
 ---
 
-## 6. Proposed SKU catalogue
+## 6. Proposed SKU catalogue — ⚠ SUPERSEDED
+
+> **This section is history. The catalogue is [`Product/SKU_CATALOGUE.md`](../Product/SKU_CATALOGUE.md),
+> ratified 2026-07-30 by [ADR-018](../Decisions/ADR-018-SKU-CATALOGUE-RATIFICATION.md) (finding F2-35).**
+>
+> This table's *grain* was adopted — it derived its list from measured coupling, which is why it won
+> against the product doc's 18 packages. Four things in it changed:
+>
+> | Changed | Now |
+> |---|---|
+> | Tier K put committees, board packs, signatures and access governance in the **free** Base | **`BOARD` and `ACCESS_GOV` are paid SKUs** — ADR-017 D-1. Both are regulator-mandated in KSA (CMA CG / SAMA CG; NCA ECC 2-2 / SAMA CSF 3.3.5) and standalone product categories everywhere |
+> | "Cyber & SOC" as one SKU | **Split.** `CYBER` (governance) and `SOCOPS` (operations) — different buyers, different regulator instruments, and `SOCOPS` is the only code the platform actually enforces (22 annotations, 3 tenants) |
+> | Financial-Crime as its own SKU; `cpty` under Third-Party | `aml`/`fraud` merge into **`ETHICS`** (one investigator persona, one case model); **`cpty` moves to `SAUDI_FS`** — counterparty exposure is a SAMA large-exposure instrument, not vendor management |
+> | Seven packages appeared nowhere, incl. `ndi` (7,717 LoC) | **`DATA_AI_GOV`** = `ndi` + `ai`. The rest are Base or explicitly unassigned; the catalogue's R1 is total and disjoint over all 58 |
+>
+> §3's separability tiers, §4's blocker ranking and §5's export-toolkit win are **not** superseded.
 
 Derived from the tiers, not invented. Every SKU includes the **Base Platform**.
 

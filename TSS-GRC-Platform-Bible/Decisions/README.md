@@ -37,10 +37,19 @@ rather than leaving a third of the plan blocked.
 | [ADR-014](ADR-014-COMMITTEE-VOTING-RIGHTS.md) | Committee Voting Rights: Roster Confers the Vote, Grants Open the Door | **D-7** | Accepted — **implemented**, V317 |
 | [ADR-015](ADR-015-CHANGE-AUTHORITY-AND-CAB-VOTING.md) | Change Authority: a Dedicated CAB-Approver Capability and a Change Manager Role | **D-8** | Accepted — **implemented**, V317 |
 | [ADR-016](ADR-016-DOCUMENTATION-GOVERNANCE.md) | Documentation Governance: Status Headers, Supersession, and a CI-Enforced Register | the provisional doc-governance arrangement; makes **D-5** mechanical | Accepted |
+| [ADR-017](ADR-017-OWNER-DELEGATED-DECISIONS.md) | Owner-Delegated Decisions: Twelve Answers on Best-Practice, Market-Leader and Saudi Grounds | **O-3/O-5/O-6** and the per-finding product tail; **mechanises** D-1 (CAB identity: per-tenant, no default, fail closed) | Accepted — 5 items amended 2026-07-30 |
+| [ADR-018](ADR-018-SKU-CATALOGUE-RATIFICATION.md) | One Ratified SKU Catalogue: 15 Products, a Mandatory Base, and Content on Its Own Clock | **F2-35**; unblocks all of Wave 2 (W2-0, F2-04); opens **F2-57** | Accepted — pinned by `SkuCatalogueRatchetTest` |
 
-Only **D-1** and **D-2** remain open, and deliberately: which committee constitutes each tenant's CAB and
-ECAB, and the ECAB ratification SLA, are per-customer charter facts. Defaulting them would be fabricating
-governance data — the defect `F2-02` exists to record.
+**Nothing in the D-series remains blocked.** The two that looked permanent were resolved by deciding the
+*mechanism* rather than inventing the *fact*: **D-1** (which committee constitutes each tenant's CAB) stays
+a per-customer charter fact and is now per-tenant configuration with **no default**, CAB transitions failing
+closed with an actionable ProblemDetail — because defaulting it would be fabricating governance data, the
+defect `F2-02` exists to record. **D-2** (ECAB ratification SLA) is **5 business days**, per-tenant
+overridable, clock starting at implementation. Both in ADR-017.
+
+⚠ This index omitted ADR-017 entirely until 2026-07-30 — **the decision register that ADR-016 mandates was
+itself behind its own contents**, and the ADR it was missing is the one that closed four owner-blocked items.
+Add the row in the same commit as the ADR; ADR-016's CI check is what should have caught this.
 
 **ADR-014 reverses a decision taken inside its own first draft.** `INTERNAL_AUDITOR` was in the
 committee-vote grant set until the applied grants were checked against real users; IIA Standard 1110 has
