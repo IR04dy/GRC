@@ -185,21 +185,65 @@ is deleted.
 
 ---
 
-## D-7 — F2-53: catalogue **`KB:READ` / `KB:WRITE`** (closes F2-53)
+## D-7 — F2-53: catalogue **`KB:WRITE` only** (closes F2-53) — ⚠ **amended on implementation, same day**
 
-The knowledge base is administrator-only because `KB` is not a catalogued module, so its guards fall back
-to identity.
+The knowledge base's *writes* are administrator-only because `KB` is not a catalogued module, so
+`hasAuthority('KB_WRITE')` names a permission nobody can hold and the guard collapses to
+`hasRole('PLATFORM_ADMIN')`.
 
-**Decision: give it its own permission pair.** Not folded into `ADMIN` (whose READ excludes operational
+**Decision: give writes their own permission.** Not folded into `ADMIN` (whose READ excludes operational
 personas who are the main *readers* of a KB) and not into `COMPLIANCE` (which misattributes ownership and
 would deny cyber/BCM authors). Market precedent: ServiceNow Knowledge Management carries its own roles
 (`knowledge`, `knowledge_admin`) for the same reason — the read and write populations of a KB are shaped
 unlike any other module's, wide and narrow respectively.
 
-Grant shape: **`KB:READ` to every internal role** (a knowledge base nobody can read has no purpose),
-**`KB:WRITE` to `GRC_ADMINISTRATOR`, `ORG_ADMIN`, `COMPLIANCE_OFFICER`**. External and machine personas
-(`SUPPLIER_USER`, `REGULATOR_VIEWER`, the eight `*_INGEST` accounts) get neither — an internal KB may
-quote regulator correspondence and vendor assessments.
+**`KB:WRITE` → `GRC_ADMINISTRATOR`, `ORG_ADMIN`, `COMPLIANCE_OFFICER`** (shipped as **V329**). The third
+grant is the one that matters: without it the fix merely moves authoring from the *platform* administrator
+to the *tenant* administrator, and neither is the author of PDPL/ECC/NDMO/Nazaha/NCEMA guidance.
+
+> ### ⚠ Amendment — the read half of this decision was wrong, and implementing it is what showed that
+>
+> This section originally said *"catalogue `KB:READ`/`KB:WRITE`"* and *"`KB:READ` to every internal role …
+> external and machine personas get neither, an internal KB may quote regulator correspondence and vendor
+> assessments."* **That was reasoned from the finding's framing rather than from the corpus, and reading
+> the corpus refuted it.** All 22 articles are `status='PUBLISHED'`, `visibility='INTERNAL'`, and they are
+> staff operational guidance: *"Whistleblowing Channel — How to Report"*, *"Disclosing a Conflict of
+> Interest (Nazaha)"*, *"Handling Data-Subject Requests under PDPL"*, *"Business Continuity Activation
+> Steps (NCEMA)"*, *"Delegating approvals when you're away"*, *"Employee Onboarding & Offboarding Access"*.
+>
+> **A whistleblowing procedure readable only by permission-holders is worse than no procedure.** Under
+> Nazaha-aligned disclosure practice — and under this platform's own ethics module, which exists to receive
+> those reports — every employee must be able to find out how to report. The same holds for the
+> conflict-of-interest and DSR walkthroughs. The existing guard, `isAuthenticated()`, **cannot** wrongly
+> exclude an employee; a grant list **can only ever** wrongly exclude one. So granting `KB:READ` is not
+> merely unnecessary — it is worse than the guard it would have replaced.
+>
+> **`KB:READ` is therefore not created**, and V329's fourth verification `THROW`s if it ever appears,
+> because a catalogued permission that guards no endpoint is F2-13b's documented anti-pattern (15 already
+> exist) and a later symmetry-minded migration must not add one without amending this ADR too.
+> `KbArticleGuardTest` pins both reads as `isAuthenticated()` for the same reason.
+>
+> **The transferable point, and why this amendment earns its space:** *"convert role guards to
+> permissions"* is a strong default, not a law. This is the counter-example — and the only way to find it
+> was to read what the endpoint actually serves rather than what its guard looked like. The same discipline
+> corrected D-11's `board_pack` reading and the census instrument itself, all on the same day.
+>
+> ➕ **Measuring it also found a defect neither the finding nor this ADR mentioned.** `listPublished`
+> filters `status='PUBLISHED'`, but the by-slug route resolved on slug alone with **no status filter** — so
+> any authenticated caller who knew or guessed a slug could read an article that had never been published.
+> Slugs here are guessable by construction (`whistleblowing-channel-how-to-report`), so an author's
+> in-progress revision of exactly that procedure was readable before anyone reviewed it. The list endpoint
+> hid it: a draft never appeared there, so nothing advertised the slug. Fixed in the same slice —
+> unpublished articles now **404** for everyone except `KB:WRITE` holders, who must be able to open their
+> own drafts. 404 rather than 403, because *whether an unpublished slug exists* is itself information.
+> Live-proven: `viewer` 200 → 404 on a draft, then 200 once published, which is what shows the 404 was
+> status and not authorisation.
+>
+> ⬜ **Raised, not built:** `visibility` is stored on every article and settable through the API
+> (`@Pattern(INTERNAL|PUBLIC|RESTRICTED)`), and **nothing anywhere reads it** — the same shape as
+> `board_pack`'s `audience` in D-11, found independently in a second module the same day. All 22 rows are
+> INTERNAL so there is no live exposure, but deciding what `PUBLIC` and `RESTRICTED` mean for a GRC
+> knowledge base is a product call, and half-building it would be worse than naming it.
 
 ---
 
