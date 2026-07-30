@@ -15,7 +15,28 @@ Identity, tenant/org model, permissions, audit ledger, evidence metadata, workfl
 
 The kernel must not include commercial domain screens or silently require a commercial package.
 
-### Sellable packages
+### Sellable packages — ⚠ SUPERSEDED
+
+> **This list is history. The catalogue is [`SKU_CATALOGUE.md`](SKU_CATALOGUE.md), ratified
+> 2026-07-30 by [ADR-018](../Decisions/ADR-018-SKU-CATALOGUE-RATIFICATION.md) (finding F2-35) —
+> 15 SKUs, not 18.**
+>
+> **What this list got right, and won on:** `ACCESS_GOV` and `GOVERNANCE`→`BOARD` are **paid**, against
+> two architecture documents that put them in the free Base (ADR-017 D-1 settled it this way);
+> `DATA_AI_GOV` exists; `SOCOPS` sells apart from cyber governance; `cpty` belongs with Saudi FS; and
+> content packs version independently of code — carried forward verbatim as rule R7.
+>
+> **What was rejected:** four splits. `POLICY` apart from `COMPLIANCE` is a grain no leader sells
+> (ServiceNow ships Policy *and* Compliance as one product); `REGULATORY` folds in with it;
+> `SAMA_RESILIENCE` was assembled from outsourcing + operational resilience + recovery planning and
+> then had to declare "optional TPRM/BCM". **Five of the 18 rows below carry an "optional X"
+> dependency — that is the over-splitting tell**, and a catalogue whose rows need each other is a
+> sales problem, not a product line. The ratified answer keeps the sellable surface at 15 and moves
+> navigability into **three buyer bundles** (Financial Institution / Government & Public Entity /
+> Listed Company), which is how ServiceNow and Archer sell many products as few offers.
+>
+> The kernel list above, the packaging rules, the pricing hypothesis, the demo architecture and the
+> sales blockers are **not** superseded.
 
 | Package | Code | Buyer outcome | Required dependency |
 |---|---|---|---|

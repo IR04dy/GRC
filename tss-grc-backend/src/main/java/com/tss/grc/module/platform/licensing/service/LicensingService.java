@@ -42,11 +42,24 @@ public class LicensingService {
     private final OrganisationLicenseRepository repo;
     private final AuditLogService audit;
 
-    /** Master list of canonical module codes — kept in sync with the V97 seed
-     *  and any subsequent migration that introduces a new module (SOCOPS in
-     *  V150). The {@link LicensingService#assign(...)} validation rejects
-     *  unknown codes, so this list is the source of truth for "what modules
-     *  can a platform admin entitle a tenant to". */
+    /** <b>Legacy module codes — NOT the SKU catalogue.</b> These 20 strings are the codes the
+     *  V97 seed and later migrations (SOCOPS in V150) actually created rows for, and
+     *  {@link LicensingService#assign} rejects anything outside the set — so the set governs
+     *  <em>what can be assigned today</em>, which is not the same question as <em>what the
+     *  business sells</em>.
+     *
+     *  <p>This comment used to call itself "the source of truth". It was not: seven of these
+     *  codes ({@code EVIDENCE}, {@code REPORTING}, {@code AUDIT_LOG}, {@code PLATFORM_ADMIN},
+     *  {@code CONTROL_LIB}, {@code POSTURE}, {@code AUTOMATION}) price capabilities that belong
+     *  to the mandatory Base Platform, and seven packages that <em>are</em> sellable — including
+     *  {@code ndi} at 7,717 LoC — had no code at all. That was finding <b>F2-35</b>.
+     *
+     *  <p>The catalogue is {@code TSS-GRC-Platform-Bible/Product/SKU_CATALOGUE.md}, ratified by
+     *  <b>ADR-018</b>: 15 product SKUs plus a non-licensable Base. Its §5 maps every code below
+     *  to a destination. Do not add a code here without amending that file and the ADR in the
+     *  same commit — {@code SkuCatalogueRatchetTest} fails if you do. Do not remove a
+     *  carried-forward code at all: rows already name them, and ADR-018 R3 requires a migration
+     *  that grants the successor to every holder first. */
     public static final Set<String> KNOWN_MODULES = Set.of(
         "RISK", "BCM", "SCM", "CYBER", "PDPL", "TPRM",
         "POLICY", "NDI", "COMPLIANCE", "AUDIT_LC",
