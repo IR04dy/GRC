@@ -14,8 +14,32 @@
 
    Among the 24: VIEWER, SUPPLIER_MANAGER, MA_LEAD, EMERGENCY_RESPONDER,
    REGULATOR_VIEWER, PRIVACY_MANAGER, SUSTAINABILITY_OFFICER, DPO, RISK_ANALYST.
-   A board pack carries up to 200 itemised risks and 1,000 itemised audit
-   findings per call (F2-55), so "who may pull it" is not a cosmetic question.
+   A board pack is the platform's most sensitive single document — it combines
+   ranked enterprise risk, audit-finding aging, KRI breaches, framework coverage,
+   change posture and ethics/AML highlights in one file, and it renders as
+   "Confidential" by its own page event. So "who may pull it" is not a cosmetic
+   question.
+
+   ⚠ CORRECTION, 2026-07-31, to the sentence this comment carried when it was
+   first committed. It said the pack "carries up to 200 itemised risks and 1,000
+   itemised audit findings per call", citing F2-55. That was wrong, and F2-55 is
+   wrong: those are the PAGE SIZES FETCHED, not the payload. Measured in
+   BoardPackService: 200 risks are fetched, sorted by inherent score, and
+   `subList(0, 20)` renders TWENTY; 1,000 findings are fetched and reduced to four
+   aging counters plus a table that breaks at `++rowCount >= 15`. So the pack
+   renders 20 risks and 15 findings — bounded board MI, which is what F2-55 said a
+   board pack ought to be.
+
+   Both the original claim and F2-55 measured the query and reported it as the
+   document. The narrowing below is unaffected: it rests on 24 of 57 PRODUCTION
+   roles holding a board-confidential document, which is true irrespective of how
+   many rows that document prints. Recording the correction here rather than
+   quietly restating it, because the overstatement travelled into two commit
+   messages before anyone checked what happened to the rows after the fetch.
+
+   This edit is safe: Flyway has NOT applied V332 to production yet (prod is
+   pending the merge), so no checksum exists for it to invalidate. Editing an
+   applied migration's file — comment or not — breaks `flyway:validate`.
 
    ── WHY THIS IS NOT A GRANT REVOCATION, WHICH IS WHAT D-10a ASKED FOR ──────
    D-10a said: strip the four grants with no colourable claim. Measurement says
