@@ -115,13 +115,22 @@ class RoleGuardConversionRatchetTest {
      * a newly catalogued {@code TPRM:APPROVE} granted to exactly the two real roles its approval
      * guard named (V327).
      *
+     * <p><b>572</b> after the third: {@code fraud}'s 10 endpoints moved to {@code FRAUD:READ/WRITE},
+     * a permission that <em>did not exist</em> until V328 catalogued it — the first slice with no
+     * target to inherit. Its two guards were constants naming {@code FRAUD_OFFICER} and
+     * {@code FRAUD_INVESTIGATOR}, and on the write constant those ghosts were the only non-admin
+     * legs, so the entire case lifecycle was PLATFORM_ADMIN-only. The same two names also sat in
+     * {@code AttachmentAccessPolicy}'s {@code FRAUD_CASE} entry, faithfully mirrored there from this
+     * guard — a reminder that converting a controller is not finished until every route that serves
+     * the record agrees.
+     *
      * <p>Raising this number means adding an endpoint that authorises by identity in a platform
      * whose authorisation model is permissions, and whose role names have a 54% miss rate. Convert
      * instead. Where a role genuinely is the right unit — {@code PLATFORM_ADMIN}-only platform
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 582;
+    private static final int BASELINE_PURE_ROLE_SITES = 572;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"

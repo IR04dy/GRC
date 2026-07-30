@@ -223,9 +223,15 @@ public class AttachmentAccessPolicy {
             "PLATFORM_ADMIN", "ETHICS_OFFICER", "BOARD_SECRETARY", "COMPLIANCE_OFFICER"));
         DECLARED.put("COMPLAINT", ParentGuard.roles(
             "PLATFORM_ADMIN", "CONSUMER_PROTECTION_OFFICER", "COMPLIANCE_OFFICER"));
-        DECLARED.put("FRAUD_CASE", ParentGuard.roles(
-            "PLATFORM_ADMIN", "FRAUD_OFFICER", "FRAUD_INVESTIGATOR", "COMPLIANCE_OFFICER",
-            "INTERNAL_AUDITOR", "RISK_MANAGER"));
+        // FRAUD_CASE moved from roles to the permission when F2-05 converted FraudController
+        // (V328 catalogued FRAUD). It has to move WITH the parent, not later: the parent's read is
+        // now FRAUD:READ, which V328 grants to GRC_ADMINISTRATOR and ORG_ADMIN as well as the three
+        // real roles the old guard named — so leaving this as a role list would let those two open a
+        // fraud case and then 403 on its attachments, the exact failure this class's union rule
+        // warns about. Nothing real is lost: the two names dropped here, FRAUD_OFFICER and
+        // FRAUD_INVESTIGATOR, are absent from iam.roles, and PLATFORM_ADMIN keeps access via the
+        // bypass above rather than via the list.
+        DECLARED.put("FRAUD_CASE", ParentGuard.perm("FRAUD"));
         DECLARED.put("SANCTIONS_CHECK", ParentGuard.roles(
             "PLATFORM_ADMIN", "AML_OFFICER", "COMPLIANCE_OFFICER", "CISO", "INTERNAL_AUDITOR",
             "AUDIT_COMMITTEE_MEMBER", "KYC_OFFICER", "ONBOARDING_AGENT", "AUDITOR"));
