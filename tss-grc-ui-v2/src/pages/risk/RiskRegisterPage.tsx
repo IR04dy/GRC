@@ -48,6 +48,8 @@ import { RISK_ANCHORS } from '../../lib/moduleAnchors';
 import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
 
 type TabId = 'register' | 'heatmap' | 'kri' | 'appetite' | 'workflows' | 'alignment';
+/** Every TabId, in one place, so a deep-link check cannot drift from the union it validates. */
+const VALID_TABS: TabId[] = ['register', 'heatmap', 'kri', 'appetite', 'workflows', 'alignment'];
 
 interface RiskFilters {
   l?: number; i?: number;       // heatmap drill-down
@@ -127,11 +129,21 @@ export function RiskRegisterPage() {
   const toast = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as TabId | null) ?? 'register';
-  const [tab, setTabState] = useState<TabId>(initialTab === 'register' || initialTab === 'heatmap' || initialTab === 'kri' || initialTab === 'appetite' ? initialTab : 'register');
+  // Derived from the URL, not latched from it. The previous form read ?tab= into `useState`, whose
+  // initialiser runs once — and React Router does not remount on a query-string-only change, so a
+  // deep link arriving while this page was already open was read and thrown away. `/risk?tab=appetite`
+  // is linked from the approvals queue and from appetite-breach notifications, so the click looked
+  // dead whenever the user was already on the risk register. Same defect and same fix as
+  // ChangesPage; PrivacyPage has always derived, which is the convention being restored here.
+  //
+  // ⚠ The old validation listed only four of the six TabIds, so `/risk?tab=workflows` and
+  // `?tab=alignment` were rejected on arrival and fell back to the register — even on a fresh load,
+  // and even though both tabs exist and `moduleLifecycles.ts` links to the first. Validating against
+  // the declared union instead of a hand-copied subset is why VALID_TABS is derived from one list.
+  const urlTab = searchParams.get('tab') as TabId | null;
+  const tab: TabId = urlTab && VALID_TABS.includes(urlTab) ? urlTab : 'register';
   const [filters, setFiltersState] = useState<RiskFilters>(() => readFiltersFromQs(searchParams));
   function setTab(next: TabId) {
-    setTabState(next);
     setSearchParams(writeFiltersToQs(searchParams, filters, next), { replace: true });
   }
   function setFilters(updater: (prev: RiskFilters) => RiskFilters) {
@@ -156,10 +168,9 @@ export function RiskRegisterPage() {
     setActiveViewId(v.id);
     const params = new URLSearchParams(v.urlQuery ?? '');
     setSearchParams(params, { replace: true });
-    // Re-sync local state because setSearchParams only rewrites the URL.
-    const restoredTab = (params.get('tab') as TabId | null) ?? 'register';
-    setTabState(restoredTab === 'register' || restoredTab === 'heatmap' || restoredTab === 'kri' || restoredTab === 'appetite' || restoredTab === 'workflows' || restoredTab === 'alignment'
-      ? restoredTab : 'register');
+    // No tab re-sync needed: `tab` is derived from the URL, so rewriting the URL *is* the update.
+    // The old comment here ("setSearchParams only rewrites the URL") described the bug rather than
+    // a constraint — a saved view had to hand-restore the tab because the tab was latched in state.
     setFiltersState(readFiltersFromQs(params));
   }
 

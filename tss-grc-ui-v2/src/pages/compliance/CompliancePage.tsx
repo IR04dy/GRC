@@ -254,14 +254,17 @@ export function CompliancePage() {
   const dialog = useDialog();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab');
   // C-4: the legacy "Policies" tab is retired (canonical register moved to
   // /policy-management). 'policies' is no longer a known TabId, so a stale
   // ?tab=policies deep link fails isTabId() and falls back to the overview.
-  const [tab, setTabState] = useState<TabId>(
-    isTabId(initialTab) ? initialTab : 'overview');
+  //
+  // Derived from the URL rather than latched into state: a `useState` initialiser runs once, and
+  // React Router does not remount on a query-string-only change, so `/compliance?tab=findings` and
+  // `?tab=workflows` (both linked from the module-lifecycle cards) were silently ignored whenever
+  // the user was already on this page. Same defect and fix as ChangesPage and RiskRegisterPage.
+  const urlTab = searchParams.get('tab');
+  const tab: TabId = isTabId(urlTab) ? urlTab : 'overview';
   function setTab(next: TabId) {
-    setTabState(next);
     const qs = new URLSearchParams(searchParams);
     if (next === 'overview') qs.delete('tab'); else qs.set('tab', next);
     setSearchParams(qs, { replace: true });
