@@ -8,25 +8,34 @@ Narrative belongs in the script.
 `hasAnyRole('X')` tests for the granted authority `ROLE_X`. There is no fallback and no
 PLATFORM_ADMIN bypass — `ModulePermissionEvaluator` is never called, so the platform
 administrator passes a role guard only when the guard names a role they hold. A guard
-whose every named role is absent from `iam.roles` is therefore not tight; it is closed to
-everyone. Neither existing measurement can see that: the authorization ratchet counts a
-role guard as guarded, and `GRANT_TIGHTNESS.md` joins permissions, which a role-only
-guard names none of.
+whose every named role is absent from `iam.roles` is therefore not tight; if that is the
+whole expression it is closed to everyone. Neither existing measurement can see that: the
+authorization ratchet counts a role guard as guarded, and `GRANT_TIGHTNESS.md` joins
+permissions, which a role-only guard names none of.
+
+⚠ **Ghost roles cut both ways, and this report used to report only one of them.** When the
+guard is `hasAnyRole(…dead names…) or hasAuthority('MODULE_ACTION')`, the dead names close
+nothing — every caller arrives through the authority leg, and the endpoint is exactly as
+wide as that permission. The ghosts then act as *camouflage*: the source reads like a
+narrow, named audience while the real population may be twenty roles. Section B2 lists
+these separately because they need the **opposite** fix from an attrition site — tighten,
+do not open up. Read section B and B2 together before choosing a conversion target.
 
 | Measure | Count |
 |---|---|
-| Guard sites with a role leg | 641 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **568** |
+| Guard sites with a role leg | 637 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **564** |
 | … composed (role leg ANDed onto a permission — already tight) | 73 |
 | Module packages holding pure role guards | 35 |
 | Distinct role names recited by any role guard | 66 |
 | … **that do not exist in `iam.roles`** | **32** |
-| Pure guards **closed to everyone** (no named role exists) | **0** |
-| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **15** |
+| Pure guards **closed to everyone** (no named role exists, no live authority leg) | **0** |
+| Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
+| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **11** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user | 568 |
-| `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 9 |
+| Pure guards reachable by at least one seeded user | 564 |
+| `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 5 |
 
 ## A. Role names no role table contains
 
@@ -35,24 +44,24 @@ shows what that closes.
 
 | Role name recited in a guard | Guard sites naming it |
 |---|---|
-| `CRO` | 72 |
+| `CRO` | 68 |
 | `CIO` | 41 |
 | `SOC_LEAD` | 31 |
 | `ETHICS_OFFICER` | 23 |
-| `AUDIT_COMMITTEE_MEMBER` | 22 |
 | `SHARIA_OFFICER` | 21 |
-| `BOARD_MEMBER` | 20 |
+| `AUDIT_COMMITTEE_MEMBER` | 20 |
+| `BOARD_MEMBER` | 18 |
 | `FACILITATOR` | 18 |
 | `SHARIA_AUDITOR` | 17 |
-| `AUDIT_COMMITTEE_CHAIR` | 15 |
 | `OPEN_BANKING_OFFICER` | 15 |
 | `AML_OFFICER` | 14 |
 | `MODEL_OWNER` | 14 |
+| `AUDIT_COMMITTEE_CHAIR` | 13 |
 | `CREDIT_OFFICER` | 12 |
 | `COMMS_LEAD` | 9 |
-| `COMPANY_SECRETARY` | 9 |
 | `CONSUMER_PROTECTION_OFFICER` | 9 |
 | `TPRM_LEAD` | 8 |
+| `COMPANY_SECRETARY` | 7 |
 | `CRISIS_COMMANDER` | 7 |
 | `HR_DIRECTOR` | 6 |
 | `KYC_OFFICER` | 6 |
@@ -91,16 +100,34 @@ computed here rather than eyeballed.
 | `module.audit_committee` | `AuditCommitteeDashboardController#generate` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY`, `PLATFORM_ADMIN` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY` |
 | `module.audit_committee` | `AuditCommitteeDashboardController#recordResolution` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY`, `PLATFORM_ADMIN` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY` |
 | `module.bcm` | `BiaQuantitativeController#boardApprove` | `BOARD_MEMBER`, `PLATFORM_ADMIN` | `BOARD_MEMBER` |
-| `module.board_pack` | `BoardPackController#create` | `PLATFORM_ADMIN`, `CRO` | `CRO` |
-| `module.board_pack` | `BoardPackController#get` | `PLATFORM_ADMIN`, `CRO`, `BOARD_MEMBER`, `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `COMPANY_SECRETARY` | `CRO`, `BOARD_MEMBER`, `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `COMPANY_SECRETARY` |
-| `module.board_pack` | `BoardPackController#list` | `PLATFORM_ADMIN`, `CRO`, `BOARD_MEMBER`, `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `COMPANY_SECRETARY` | `CRO`, `BOARD_MEMBER`, `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `COMPANY_SECRETARY` |
-| `module.board_pack` | `BoardPackController#transition` | `PLATFORM_ADMIN`, `CRO` | `CRO` |
 | `module.knowledge` | `KbArticleController#create` | `PLATFORM_ADMIN` | `KB_WRITE` |
 | `module.knowledge` | `KbArticleController#transition` | `PLATFORM_ADMIN` | `KB_WRITE` |
 | `module.knowledge` | `KbArticleController#update` | `PLATFORM_ADMIN` | `KB_WRITE` |
 | `module.platform` | `HelpController#create` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
 | `module.platform` | `HelpController#delete` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
 | `module.platform` | `HelpController#update` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
+
+## B3. Wide despite dead role names — the camouflage sites
+
+The inverse of B2, and the reason this report now prints both. Every site here recites at
+least one role that cannot be granted, yet is fully reachable, because a
+`hasAuthority('MODULE_ACTION')` leg admits everyone holding that permission. The role names
+contribute nothing except a misleading impression of narrowness. **The holder count is the
+real audience** — compare it against what the endpoint's own comment claims, because that
+is where the two disagree.
+
+None. *(This bucket has fired before — see the note below — so an empty section here
+means the pattern is absent, not that the detector is broken.)*
+
+**Provenance of this section.** `BoardPackController#list`/`#get` (F2-05 slice 5) were the
+first instance: five ghost roles plus `REPORTING_READ`, an authority **20 roles hold,
+including `VIEWER`** — directly beneath a comment stating reads are for "a board/governance
+audience, not any authenticated principal". Live: `viewer` read all 16 board packs, 200.
+Until that slice this script bucketed those sites as *PLATFORM_ADMIN-only by attrition* —
+it checked whether an authority leg was **dead** but never whether one was **alive** — and
+that miscount is what sent the slice in expecting a lockout. Fixed to
+`ADMIN:READ`/`ADMIN:WRITE`; the detector was re-verified by replaying the pre-fix guard
+through it, which is why the count below can be trusted when it reads zero.
 
 ## C. Pure role guards whose roles exist but nobody holds
 
@@ -138,11 +165,11 @@ closed guards is a correctness fix, not only a modelling one.
 | `module.platform` | 8 |  |
 | `module.audit_committee` | 7 |  |
 | `module.governance` | 7 |  |
-| `module.board_pack` | 5 |  |
 | `module.iam` | 4 |  |
 | `module.knowledge` | 4 |  |
 | `module.approvals` | 1 |  |
 | `module.auth` | 1 |  |
+| `module.board_pack` | 1 |  |
 | `module.capa` | 1 |  |
 | `module.incident` | 1 |  |
 | `module.nca_ecc` | 1 |  |
@@ -159,10 +186,6 @@ permission as an actual grant row — which is a different question from the one
 
 | Module | Guard site | Authority | Catalogued | Role holders | PLATFORM_ADMIN holds it |
 |---|---|---|---|---|---|
-| `module.board_pack` | `BoardPackController#create` | `REPORTING_WRITE` | yes | 2 | **no** |
-| `module.board_pack` | `BoardPackController#get` | `REPORTING_READ` | yes | 20 | **no** |
-| `module.board_pack` | `BoardPackController#list` | `REPORTING_READ` | yes | 20 | **no** |
-| `module.board_pack` | `BoardPackController#transition` | `REPORTING_WRITE` | yes | 2 | **no** |
 | `module.dashboard` | `DashboardController#kpiTrend` | `RISK_READ` | yes | 20 | **no** |
 | `module.dashboard` | `DashboardController#kpiTrend` | `INCIDENT_READ` | yes | 29 | **no** |
 | `module.dashboard` | `DashboardController#kpiTrend` | `COMPLIANCE_READ` | yes | 32 | yes |

@@ -133,13 +133,24 @@ class RoleGuardConversionRatchetTest {
      * VIEWER/REGULATOR_VIEWER via {@code CYBER:READ} or drop CISO via {@code PLATFORM:WRITE}. Naming
      * the owner of integration administration is a product decision, not a conversion.
      *
+     * <p><b>564</b> after the fifth: {@code board_pack}'s 4 read/write sites moved to
+     * {@code ADMIN:READ}/{@code ADMIN:WRITE} — already granted, so <b>no migration</b>. This one
+     * inverts the pattern. Five of the read guard's six role names were ghosts (CRO, BOARD_MEMBER,
+     * AUDIT_COMMITTEE_CHAIR, AUDIT_COMMITTEE_MEMBER, COMPANY_SECRETARY), but the guard ended
+     * {@code or hasAuthority('REPORTING_READ')} — so instead of leaving the endpoint admin-only, the
+     * dead names made a <em>wide</em> guard look narrow: REPORTING:READ is 20 roles including
+     * VIEWER, which the guard's own comment excludes by name. {@code viewer} read all 16 board packs,
+     * 200. <b>A ghost role is not always a lockout; sometimes it is camouflage.</b> The 5th site,
+     * {@code delete}, stays {@code hasRole('PLATFORM_ADMIN')} on purpose — the ADMIN module
+     * catalogues only APPROVE/EXPORT/READ/WRITE, so there is no ADMIN:DELETE to convert to.
+     *
      * <p>Raising this number means adding an endpoint that authorises by identity in a platform
      * whose authorisation model is permissions, and whose role names have a 54% miss rate. Convert
      * instead. Where a role genuinely is the right unit — {@code PLATFORM_ADMIN}-only platform
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 568;
+    private static final int BASELINE_PURE_ROLE_SITES = 564;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"

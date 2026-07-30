@@ -1,5 +1,6 @@
 package com.tss.grc.module.board_pack.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.tss.grc.module.board_pack.entity.BoardPack;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -25,7 +26,21 @@ public class BoardPackDto {
     private String slaSummaryJson;
     private String customSectionsJson;
     private String status;
-    @NotBlank private String draftedBy;
+    /**
+     * F2-22b(vi) missed this one. That slice stamped {@code reviewedBy} and {@code approvedBy}
+     * from the principal — and the note explaining why sits in {@code TransitionRequest} just
+     * below — but {@code draftedBy} stayed {@code @NotBlank} on the CREATE path, so the drafter
+     * of the board's governance artefact was whatever the caller typed. Live-proven forgeable:
+     * a pack was created with {@code draftedBy="IMPERSONATED-admin"} and stored it verbatim.
+     * The field is real and in use (4 of 16 packs name the board secretary), which is what made
+     * the forgery worth something.
+     *
+     * <p>{@code READ_ONLY}, not {@code @JsonIgnore} — the same choice {@code BaseEntity} makes
+     * for F2-22a: Jackson must keep serialising the drafter OUT (every list row shows it) while
+     * refusing to bind it IN.
+     */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String draftedBy;
     private LocalDateTime draftedAt;
     private LocalDateTime submittedForReviewAt;
     private LocalDateTime reviewedAt;
