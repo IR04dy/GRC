@@ -15,17 +15,17 @@ guard names none of.
 
 | Measure | Count |
 |---|---|
-| Guard sites with a role leg | 694 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **621** |
+| Guard sites with a role leg | 655 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **582** |
 | … composed (role leg ANDed onto a permission — already tight) | 73 |
-| Module packages holding pure role guards | 37 |
-| Distinct role names recited by any role guard | 72 |
-| … **that do not exist in `iam.roles`** | **38** |
+| Module packages holding pure role guards | 36 |
+| Distinct role names recited by any role guard | 69 |
+| … **that do not exist in `iam.roles`** | **35** |
 | Pure guards **closed to everyone** (no named role exists) | **0** |
-| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **32** |
+| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **24** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user | 621 |
+| Pure guards reachable by at least one seeded user | 582 |
 | `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 9 |
 
 ## A. Role names no role table contains
@@ -36,13 +36,12 @@ shows what that closes.
 | Role name recited in a guard | Guard sites naming it |
 |---|---|
 | `CRO` | 72 |
-| `TPRM_LEAD` | 45 |
 | `CIO` | 41 |
-| `AUDIT_COMMITTEE_MEMBER` | 33 |
-| `BOARD_MEMBER` | 31 |
 | `SOC_LEAD` | 31 |
 | `ETHICS_OFFICER` | 23 |
+| `AUDIT_COMMITTEE_MEMBER` | 22 |
 | `SHARIA_OFFICER` | 21 |
+| `BOARD_MEMBER` | 20 |
 | `FACILITATOR` | 18 |
 | `SHARIA_AUDITOR` | 17 |
 | `AUDIT_COMMITTEE_CHAIR` | 15 |
@@ -52,16 +51,16 @@ shows what that closes.
 | `CREDIT_OFFICER` | 12 |
 | `FRAUD_INVESTIGATOR` | 10 |
 | `FRAUD_OFFICER` | 10 |
-| `PROCUREMENT` | 10 |
 | `COMMS_LEAD` | 9 |
 | `COMPANY_SECRETARY` | 9 |
 | `CONSUMER_PROTECTION_OFFICER` | 9 |
 | `SOC_AUTOMATION` | 8 |
+| `TPRM_LEAD` | 8 |
 | `CRISIS_COMMANDER` | 7 |
-| `INCIDENT_COMMANDER` | 7 |
 | `HR_DIRECTOR` | 6 |
 | `KYC_OFFICER` | 6 |
 | `CONTENT_EDITOR` | 5 |
+| `INCIDENT_COMMANDER` | 5 |
 | `ONBOARDING_AGENT` | 5 |
 | `PRIVACY_OFFICER` | 5 |
 | `SHARIA_BOARD_CHAIR` | 4 |
@@ -70,9 +69,7 @@ shows what that closes.
 | `CISO_GOVERNANCE` | 3 |
 | `SOC_TIER_2` | 3 |
 | `INTEGRATION_SERVICE` | 2 |
-| `OPS_MANAGER` | 2 |
 | `USER` | 1 |
-| `VENDOR_CONTACT` | 1 |
 
 ## B. Pure role guards closed to everyone
 
@@ -116,14 +113,6 @@ computed here rather than eyeballed.
 | `module.platform` | `HelpController#create` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
 | `module.platform` | `HelpController#delete` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
 | `module.platform` | `HelpController#update` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
-| `module.tprm` | `OutsourcingController#delete` | `TPRM_LEAD`, `PLATFORM_ADMIN` | `TPRM_LEAD` |
-| `module.tprm` | `OutsourcingController#recordEvent` | `TPRM_LEAD`, `OPS_MANAGER`, `INCIDENT_COMMANDER`, `PLATFORM_ADMIN` | `TPRM_LEAD`, `OPS_MANAGER`, `INCIDENT_COMMANDER` |
-| `module.tprm` | `OutsourcingController#resolveEvent` | `TPRM_LEAD`, `OPS_MANAGER`, `INCIDENT_COMMANDER`, `PLATFORM_ADMIN` | `TPRM_LEAD`, `OPS_MANAGER`, `INCIDENT_COMMANDER` |
-| `module.tprm` | `VendorBcpAttestationController#submit` | `VENDOR_CONTACT`, `TPRM_LEAD`, `PLATFORM_ADMIN` | `VENDOR_CONTACT`, `TPRM_LEAD` |
-| `module.tprm` | `VendorBcpCampaignController#cancel` | `TPRM_LEAD`, `PLATFORM_ADMIN` | `TPRM_LEAD` |
-| `module.tprm` | `VendorBcpCampaignController#close` | `TPRM_LEAD`, `PLATFORM_ADMIN` | `TPRM_LEAD` |
-| `module.tprm` | `VendorBcpCampaignController#open` | `TPRM_LEAD`, `PLATFORM_ADMIN` | `TPRM_LEAD` |
-| `module.tprm` | `VendorBcpCampaignController#sendReminders` | `TPRM_LEAD`, `PLATFORM_ADMIN` | `TPRM_LEAD` |
 
 ## C. Pure role guards whose roles exist but nobody holds
 
@@ -138,7 +127,6 @@ closed guards is a correctness fix, not only a modelling one.
 |---|---|---|
 | `module.socops` | 110 |  |
 | `module.bcm` | 65 |  |
-| `module.tprm` | 39 |  |
 | `module.cyber` | 31 |  |
 | `module.risk` | 28 |  |
 | `module.ethics` | 27 |  |

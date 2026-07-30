@@ -90,7 +90,7 @@ public class OutsourcingController {
     // ─── Arrangements ───────────────────────────────────────────────
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','PROCUREMENT','CISO','AUDITOR','BOARD_MEMBER','AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN','BCM_MANAGER')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public List<ArrangementResponse> list(
             @RequestParam(value = "stage", required = false) String stage,
             @RequestParam(value = "material", required = false) Boolean material,
@@ -108,34 +108,34 @@ public class OutsourcingController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','PROCUREMENT','CISO','AUDITOR','BOARD_MEMBER','AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN','BCM_MANAGER')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public ArrangementResponse get(@PathVariable Long id) {
         return arrangements.get(id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','PROCUREMENT','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public ArrangementResponse create(@RequestBody @Valid ArrangementCreateRequest req) {
         return arrangements.create(req);
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','PROCUREMENT','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public ArrangementResponse update(@PathVariable Long id,
                                        @RequestBody @Valid ArrangementUpdateRequest req) {
         return arrangements.update(id, req);
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public ArrangementResponse transition(@PathVariable Long id,
                                             @RequestBody @Valid ArrangementTransitionRequest req) {
         return arrangements.transition(id, req);
     }
 
     @PostMapping("/{id}/record-review")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public ArrangementResponse recordReview(@PathVariable Long id) {
         Long userId = currentUserIdOrNull();
         return arrangements.recordReview(id, userId);
@@ -143,31 +143,31 @@ public class OutsourcingController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','DELETE')")
     public void delete(@PathVariable Long id) {
         arrangements.softDelete(id);
     }
 
     @GetMapping("/{id}/materiality-assessment")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','PROCUREMENT','CISO','AUDITOR','BOARD_MEMBER','AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN','BCM_MANAGER')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public MaterialityAssessment materialityAssessment(@PathVariable Long id) {
         return arrangements.materialityAssessment(id);
     }
 
     @GetMapping("/admin/sama-pending")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','AUDITOR','BOARD_MEMBER','AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public List<ArrangementResponse> samaPending() {
         return arrangements.listAwaitingSamaNonObjection();
     }
 
     @GetMapping("/admin/overdue-reviews")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','AUDITOR','BOARD_MEMBER','AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public List<ArrangementResponse> overdueReviews() {
         return arrangements.listOverdueForReview();
     }
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','PROCUREMENT','CISO','AUDITOR','BOARD_MEMBER','AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN','BCM_MANAGER')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public DashboardResponse dashboard() {
         return arrangements.dashboard();
     }
@@ -175,14 +175,14 @@ public class OutsourcingController {
     // ─── Due Diligence ──────────────────────────────────────────────
 
     @GetMapping("/{id}/due-diligence")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','PROCUREMENT','CISO','AUDITOR','BOARD_MEMBER','AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN','BCM_MANAGER')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public List<DueDiligenceResponse> dueDiligenceFor(@PathVariable("id") Long arrangementId) {
         return dueDiligence.listForArrangement(arrangementId);
     }
 
     @PostMapping("/due-diligence")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public DueDiligenceResponse recordDueDiligence(@RequestBody @Valid DueDiligenceCreateRequest req) {
         return dueDiligence.record(req);
     }
@@ -190,26 +190,26 @@ public class OutsourcingController {
     // ─── Monitoring ─────────────────────────────────────────────────
 
     @GetMapping("/{id}/monitoring-events")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','PROCUREMENT','CISO','AUDITOR','BOARD_MEMBER','AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN','BCM_MANAGER')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public List<MonitoringEventResponse> eventsFor(@PathVariable("id") Long arrangementId) {
         return monitoring.listForArrangement(arrangementId);
     }
 
     @GetMapping("/monitoring-events/open")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','PROCUREMENT','CISO','AUDITOR','BOARD_MEMBER','AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN','BCM_MANAGER')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public List<MonitoringEventResponse> openEvents() {
         return monitoring.listOpen();
     }
 
     @PostMapping("/monitoring-events")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','OPS_MANAGER','INCIDENT_COMMANDER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public MonitoringEventResponse recordEvent(@RequestBody @Valid MonitoringEventCreateRequest req) {
         return monitoring.record(req);
     }
 
     @PostMapping("/monitoring-events/{eventId}/resolve")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','OPS_MANAGER','INCIDENT_COMMANDER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public MonitoringEventResponse resolveEvent(@PathVariable Long eventId,
                                                   @RequestBody(required = false) MonitoringEventResolveRequest req) {
         return monitoring.resolve(eventId, req);
@@ -218,33 +218,33 @@ public class OutsourcingController {
     // ─── Exit Plan ──────────────────────────────────────────────────
 
     @GetMapping("/{id}/exit-plan")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','PROCUREMENT','CISO','AUDITOR','BOARD_MEMBER','AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN','BCM_MANAGER')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public ExitPlanResponse exitPlanFor(@PathVariable("id") Long arrangementId) {
         return exitPlans.getForArrangement(arrangementId);
     }
 
     @GetMapping("/exit-plans/overdue-tests")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','COMPLIANCE_OFFICER','RISK_MANAGER','AUDITOR','BOARD_MEMBER','AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN','BCM_MANAGER')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public List<ExitPlanResponse> overdueExitTests() {
         return exitPlans.findOverdueTest();
     }
 
     @PostMapping("/exit-plans")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public ExitPlanResponse createExitPlan(@RequestBody @Valid ExitPlanCreateRequest req) {
         return exitPlans.create(req);
     }
 
     @PatchMapping("/exit-plans/{planId}")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public ExitPlanResponse updateExitPlan(@PathVariable Long planId,
                                              @RequestBody @Valid ExitPlanUpdateRequest req) {
         return exitPlans.update(planId, req);
     }
 
     @PostMapping("/exit-plans/{planId}/record-test")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public ExitPlanResponse recordExitTest(@PathVariable Long planId,
                                              @RequestParam(value = "testedOn", required = false) String testedOn) {
         LocalDate when = testedOn != null && !testedOn.isBlank() ? LocalDate.parse(testedOn) : null;

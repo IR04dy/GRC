@@ -44,7 +44,7 @@ public class VendorBcpAttestationController {
     private final VendorBcpAttestationService service;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','AUDITOR','CISO','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public List<AttestationResponse> list(@RequestParam("campaignId") Long campaignId,
                                             @RequestParam(value = "status", required = false) String status) {
         if (status != null && !status.isBlank()) {
@@ -54,7 +54,7 @@ public class VendorBcpAttestationController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','AUDITOR','CISO','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public AttestationResponse get(@PathVariable Long id) {
         return service.get(id);
     }
@@ -70,7 +70,7 @@ public class VendorBcpAttestationController {
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAnyRole('VENDOR_CONTACT','TPRM_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public AttestationResponse submit(@PathVariable Long id,
                                        @RequestBody @Valid AttestationSubmitRequest req) {
         return service.submitAttestation(id, req);
@@ -85,21 +85,21 @@ public class VendorBcpAttestationController {
     }
 
     @PostMapping("/{id}/accept")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public AttestationResponse accept(@PathVariable Long id,
                                        @RequestBody(required = false) AttestationReviewRequest req) {
         return service.acceptAttestation(id, req);
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public AttestationResponse reject(@PathVariable Long id,
                                        @RequestBody(required = false) AttestationReviewRequest req) {
         return service.rejectAttestation(id, req);
     }
 
     @PostMapping("/{id}/mark-out-of-scope")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public AttestationResponse markOutOfScope(@PathVariable Long id,
                                                 @RequestBody(required = false) AttestationReviewRequest req) {
         return service.markOutOfScope(id, req);

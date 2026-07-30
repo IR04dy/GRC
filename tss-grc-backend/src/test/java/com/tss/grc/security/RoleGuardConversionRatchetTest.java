@@ -110,13 +110,18 @@ class RoleGuardConversionRatchetTest {
      * <p><b>621</b> after the first module: {@code audit_lc/ia_plan}'s 26 endpoints moved to
      * {@code AUDIT:READ/WRITE/DELETE}, the permission its two sibling controllers already used.
      *
+     * <p><b>582</b> after the second: {@code tprm}'s 39 endpoints, every one of which named
+     * {@code TPRM_LEAD} — a role that does not exist — moved to {@code TPRM:READ/WRITE/DELETE} plus
+     * a newly catalogued {@code TPRM:APPROVE} granted to exactly the two real roles its approval
+     * guard named (V327).
+     *
      * <p>Raising this number means adding an endpoint that authorises by identity in a platform
      * whose authorisation model is permissions, and whose role names have a 54% miss rate. Convert
      * instead. Where a role genuinely is the right unit — {@code PLATFORM_ADMIN}-only platform
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 621;
+    private static final int BASELINE_PURE_ROLE_SITES = 582;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"
