@@ -73,7 +73,12 @@ public class BoardPackService {
         p.setCcmSummaryJson(req.getCcmSummaryJson());
         p.setSlaSummaryJson(req.getSlaSummaryJson());
         p.setCustomSectionsJson(req.getCustomSectionsJson());
-        p.setDraftedBy(req.getDraftedBy());
+        // F2-05 slice 5: the drafter is the authenticated principal, never the request body.
+        // F2-22b(vi) did this for reviewedBy/approvedBy on transition() below and stopped there,
+        // so create() still trusted req.getDraftedBy() — proven by creating a pack that claimed
+        // draftedBy="IMPERSONATED-admin". Same helper, same reasoning: a board pack drafted by
+        // nobody, or by whoever the caller named, is not a governance record.
+        p.setDraftedBy(actorOrFail(p.getExternalId()));
         p.setStatus("DRAFT");
         BoardPackDto out = BoardPackDto.from(repo.save(p));
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "board_pack", p.getExternalId(), out);
@@ -140,13 +145,17 @@ public class BoardPackService {
      *
      * <p>Refuses rather than recording an anonymous approval: this is the governance artefact the
      * board itself reads, and "approved by nobody" is what 7 of the 9 approved packs already said.
+     *
+     * <p>F2-05 slice 5 also routes {@link #create}'s drafter through here, so the message no
+     * longer says "approver" — the same helper now stamps three fields and must not describe
+     * itself as one of them.
      */
     private String actorOrFail(String externalId) {
         String actor = CurrentActor.username();
         if (actor == null || actor.isBlank()) {
             throw new IllegalStateException(
-                "No authenticated principal to record as the approver of board pack " + externalId
-                + ". An approval with no approver is not an approval.");
+                "No authenticated principal to attribute on board pack " + externalId
+                + ". A governance record attributed to nobody is not a governance record.");
         }
         return actor;
     }

@@ -110,14 +110,38 @@ def main():
     # names PLATFORM_ADMIN and nothing else is a decision; one that names four roles and keeps only
     # PLATFORM_ADMIN is attrition, and the module's own persona is locked out of its own feature.
     admin_deliberate, admin_attrition = [], []
+    # F2-05 slice 5 corrected this script. A guard whose only surviving ROLE is PLATFORM_ADMIN was
+    # reported as "administrator-only by attrition" even when it carried a LIVE authority leg — and
+    # `board_pack`'s read guard did exactly that: five ghost roles, PLATFORM_ADMIN, then
+    # `or hasAuthority('REPORTING_READ')`, an authority 20 roles hold INCLUDING VIEWER. The endpoint
+    # was not narrow at all; the dead names made a wide guard look narrow, and this report agreed
+    # with the appearance. It sent me into that slice believing reads were admin-only. So the live
+    # authority leg is now checked FIRST and such sites get their own bucket: they are the opposite
+    # defect and need the opposite fix (tighten, not open up).
+    camouflaged = []
     for bucket, site, kind, names in pure:
         alive = [n for n in names if n in existing]
-        if not alive:
+        live_authority = [a for a in raw_by_site.get((bucket, site), [])
+                          if authority_holders.get(a, 0) > 0]
+        if not alive and not live_authority:
             dead.append((bucket, site, names))
-        elif all(holders.get(n, 0) == 0 for n in alive):
+        elif not alive and live_authority:
+            # Every role name is a ghost, yet the guard is open — entirely via the authority leg.
+            camouflaged.append((bucket, site, names, live_authority,
+                                max(authority_holders.get(a, 0) for a in live_authority)))
+        elif all(holders.get(n, 0) == 0 for n in alive) and not live_authority:
             thin.append((bucket, site, names, alive))
         else:
             live.append((bucket, site, names, alive))
+        # Camouflage also covers the case where PLATFORM_ADMIN is the lone surviving role: the
+        # authority leg, not the role list, is what admits callers.
+        if live_authority and not [n for n in alive if n != "PLATFORM_ADMIN"] \
+                and any(n not in existing for n in names):
+            if (bucket, site, names, live_authority,
+                    max(authority_holders.get(a, 0) for a in live_authority)) not in camouflaged:
+                camouflaged.append((bucket, site, names, live_authority,
+                                    max(authority_holders.get(a, 0) for a in live_authority)))
+            continue
         if alive and not [n for n in alive if n != "PLATFORM_ADMIN"]:
             # A guard can also reach for a second leg spelled as a raw authority rather than a role
             # name — `hasRole('PLATFORM_ADMIN') or hasAuthority('KB_WRITE')`. If that authority is
@@ -151,10 +175,18 @@ def main():
     emit("`hasAnyRole('X')` tests for the granted authority `ROLE_X`. There is no fallback and no")
     emit("PLATFORM_ADMIN bypass — `ModulePermissionEvaluator` is never called, so the platform")
     emit("administrator passes a role guard only when the guard names a role they hold. A guard")
-    emit("whose every named role is absent from `iam.roles` is therefore not tight; it is closed to")
-    emit("everyone. Neither existing measurement can see that: the authorization ratchet counts a")
-    emit("role guard as guarded, and `GRANT_TIGHTNESS.md` joins permissions, which a role-only")
-    emit("guard names none of.")
+    emit("whose every named role is absent from `iam.roles` is therefore not tight; if that is the")
+    emit("whole expression it is closed to everyone. Neither existing measurement can see that: the")
+    emit("authorization ratchet counts a role guard as guarded, and `GRANT_TIGHTNESS.md` joins")
+    emit("permissions, which a role-only guard names none of.")
+    emit()
+    emit("⚠ **Ghost roles cut both ways, and this report used to report only one of them.** When the")
+    emit("guard is `hasAnyRole(…dead names…) or hasAuthority('MODULE_ACTION')`, the dead names close")
+    emit("nothing — every caller arrives through the authority leg, and the endpoint is exactly as")
+    emit("wide as that permission. The ghosts then act as *camouflage*: the source reads like a")
+    emit("narrow, named audience while the real population may be twenty roles. Section B2 lists")
+    emit("these separately because they need the **opposite** fix from an attrition site — tighten,")
+    emit("do not open up. Read section B and B2 together before choosing a conversion target.")
     emit()
     emit("| Measure | Count |")
     emit("|---|---|")
@@ -165,7 +197,10 @@ def main():
     emit("| Module packages holding pure role guards | %d |" % len(by_module))
     emit("| Distinct role names recited by any role guard | %d |" % len(named))
     emit("| … **that do not exist in `iam.roles`** | **%d** |" % len(ghost))
-    emit("| Pure guards **closed to everyone** (no named role exists) | **%d** |" % len(dead))
+    emit("| Pure guards **closed to everyone** (no named role exists, no live authority leg) | **%d** |"
+         % len(dead))
+    emit("| Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them "
+         "(⚠ camouflage) | **%d** |" % len(camouflaged))
     emit("| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **%d** |"
          % len(admin_attrition))
     emit("| … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | %d |"
@@ -225,6 +260,40 @@ def main():
                 bucket, site,
                 ", ".join("`%s`" % n for n in names),
                 ", ".join("`%s`" % g for g in ghosts)))
+    emit()
+
+    emit("## B3. Wide despite dead role names — the camouflage sites")
+    emit()
+    emit("The inverse of B2, and the reason this report now prints both. Every site here recites at")
+    emit("least one role that cannot be granted, yet is fully reachable, because a")
+    emit("`hasAuthority('MODULE_ACTION')` leg admits everyone holding that permission. The role names")
+    emit("contribute nothing except a misleading impression of narrowness. **The holder count is the")
+    emit("real audience** — compare it against what the endpoint's own comment claims, because that")
+    emit("is where the two disagree.")
+    emit()
+    if not camouflaged:
+        emit("None. *(This bucket has fired before — see the note below — so an empty section here")
+        emit("means the pattern is absent, not that the detector is broken.)*")
+    else:
+        emit("| Site | Roles recited | Live authority leg | Roles holding it |")
+        emit("|---|---|---|---|")
+        for bucket, site, names, auths, n in sorted(camouflaged, key=lambda x: -x[4]):
+            emit("| `%s` | %s | %s | **%d** |"
+                 % (site,
+                    ", ".join("`%s`%s" % (x, "" if x in existing else " ⚰") for x in names),
+                    ", ".join("`%s`" % a for a in auths), n))
+        emit()
+        emit("⚰ = absent from `iam.roles`.")
+    emit()
+    emit("**Provenance of this section.** `BoardPackController#list`/`#get` (F2-05 slice 5) were the")
+    emit("first instance: five ghost roles plus `REPORTING_READ`, an authority **20 roles hold,")
+    emit("including `VIEWER`** — directly beneath a comment stating reads are for \"a board/governance")
+    emit("audience, not any authenticated principal\". Live: `viewer` read all 16 board packs, 200.")
+    emit("Until that slice this script bucketed those sites as *PLATFORM_ADMIN-only by attrition* —")
+    emit("it checked whether an authority leg was **dead** but never whether one was **alive** — and")
+    emit("that miscount is what sent the slice in expecting a lockout. Fixed to")
+    emit("`ADMIN:READ`/`ADMIN:WRITE`; the detector was re-verified by replaying the pre-fix guard")
+    emit("through it, which is why the count below can be trusted when it reads zero.")
     emit()
 
     emit("## C. Pure role guards whose roles exist but nobody holds")
