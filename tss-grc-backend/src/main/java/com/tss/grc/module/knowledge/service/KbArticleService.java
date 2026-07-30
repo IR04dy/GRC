@@ -10,6 +10,9 @@ import com.tss.grc.common.util.ExternalIds;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,11 +53,43 @@ public class KbArticleService {
         return rows.stream().map(KbArticleDto::from).collect(Collectors.toList());
     }
 
+    /**
+     * F2-53 — an unpublished article used to be readable by anyone who knew the slug.
+     *
+     * <p>{@link #listPublished} has always filtered {@code status='PUBLISHED'}; this lookup resolved
+     * by slug alone, so a DRAFT or ARCHIVED article was served to any authenticated caller. The list
+     * endpoint is what hid it: a draft never appeared there, so nothing advertised the slug — but
+     * slugs in this corpus are guessable by construction ({@code whistleblowing-channel-how-to-report}),
+     * and an author's in-progress revision of exactly that procedure was readable before review.
+     *
+     * <p>Callers holding {@code KB:WRITE} still see every status, because an author has to be able to
+     * open their own draft. That check is the granted authority rather than a role name, so it agrees
+     * with the controller's {@code hasPermission('KB','WRITE')} guard instead of restating it as a
+     * list of identities — the F2-52 lesson applied one layer down.
+     */
     public KbArticleDto bySlug(String slug) {
         Long org = TenantContext.requireOrganisationId();
-        return repo.findByOrganisationIdAndSlug(org, slug)
-            .map(KbArticleDto::from)
+        KbArticle a = repo.findByOrganisationIdAndSlug(org, slug)
             .orElseThrow(() -> new EntityNotFoundException("KB article not found: " + slug));
+        if (!"PUBLISHED".equals(a.getStatus()) && !callerMayAuthor()) {
+            // 404, not 403: whether an unpublished slug exists is itself information, and the caller
+            // is not entitled to distinguish "not published yet" from "no such article".
+            throw new EntityNotFoundException("KB article not found: " + slug);
+        }
+        return KbArticleDto.from(a);
+    }
+
+    /**
+     * Whether the current principal may author knowledge-base content — the same authority
+     * {@code hasPermission('KB','WRITE')} resolves to, plus the PLATFORM_ADMIN bypass that
+     * {@code ModulePermissionEvaluator} applies for every other guard.
+     */
+    private boolean callerMayAuthor() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return false;
+        return auth.getAuthorities().stream()
+            .map(GrantedAuthority::getAuthority)
+            .anyMatch(a -> "KB_WRITE".equals(a) || "ROLE_PLATFORM_ADMIN".equals(a));
     }
 
     @Transactional

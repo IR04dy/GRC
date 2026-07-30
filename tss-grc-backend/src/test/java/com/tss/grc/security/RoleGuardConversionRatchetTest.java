@@ -144,13 +144,30 @@ class RoleGuardConversionRatchetTest {
      * {@code delete}, stays {@code hasRole('PLATFORM_ADMIN')} on purpose — the ADMIN module
      * catalogues only APPROVE/EXPORT/READ/WRITE, so there is no ADMIN:DELETE to convert to.
      *
+     * <p><b>561</b> after {@code knowledge}: {@code KbArticleController}'s three write guards were
+     * {@code hasRole('PLATFORM_ADMIN') or hasAuthority('KB_WRITE')}, and {@code KB} was absent from
+     * {@code iam.permissions} entirely — a ghost <em>permission</em> rather than a ghost role, failing
+     * identically and just as silently, so authoring every knowledge-base article was the platform
+     * administrator's job alone. Moved to {@code hasPermission('KB','WRITE')} + V329. ⚠ <b>The two
+     * READ guards were deliberately left as {@code isAuthenticated()}</b> and are pinned that way: the
+     * corpus is staff guidance including the whistleblowing and Nazaha conflict-of-interest
+     * procedures, and a grant list can only ever wrongly exclude an employee from finding out how to
+     * report. Not every role guard should become a permission — this is the counter-example.
+     *
+     * <p>⚠ <b>564 and 565 are both real, and neither is the merged number.</b> {@code board_pack} and
+     * {@code knowledge} were measured on branches that each forked from 568, so each reported only its
+     * own subtraction — 568−4 and 568−3. Merged together the count is <b>561</b>, which was
+     * <em>measured</em> after the merge rather than arithmetic'd: a per-branch baseline is only ever
+     * valid against that branch's fork point, so a ratchet like this must be re-derived whenever two
+     * conversions land together, never resolved by taking one side of the conflict.
+     *
      * <p>Raising this number means adding an endpoint that authorises by identity in a platform
      * whose authorisation model is permissions, and whose role names have a 54% miss rate. Convert
      * instead. Where a role genuinely is the right unit — {@code PLATFORM_ADMIN}-only platform
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 564;
+    private static final int BASELINE_PURE_ROLE_SITES = 561;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"

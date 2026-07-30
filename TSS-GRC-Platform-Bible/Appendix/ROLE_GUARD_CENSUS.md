@@ -23,19 +23,19 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 
 | Measure | Count |
 |---|---|
-| Guard sites with a role leg | 637 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **564** |
+| Guard sites with a role leg | 634 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **561** |
 | … composed (role leg ANDed onto a permission — already tight) | 73 |
 | Module packages holding pure role guards | 35 |
 | Distinct role names recited by any role guard | 66 |
 | … **that do not exist in `iam.roles`** | **32** |
 | Pure guards **closed to everyone** (no named role exists, no live authority leg) | **0** |
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
-| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **11** |
+| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **8** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user | 564 |
-| `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 5 |
+| Pure guards reachable by at least one seeded user | 561 |
+| `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 2 |
 
 ## A. Role names no role table contains
 
@@ -100,9 +100,6 @@ computed here rather than eyeballed.
 | `module.audit_committee` | `AuditCommitteeDashboardController#generate` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY`, `PLATFORM_ADMIN` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY` |
 | `module.audit_committee` | `AuditCommitteeDashboardController#recordResolution` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY`, `PLATFORM_ADMIN` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY` |
 | `module.bcm` | `BiaQuantitativeController#boardApprove` | `BOARD_MEMBER`, `PLATFORM_ADMIN` | `BOARD_MEMBER` |
-| `module.knowledge` | `KbArticleController#create` | `PLATFORM_ADMIN` | `KB_WRITE` |
-| `module.knowledge` | `KbArticleController#transition` | `PLATFORM_ADMIN` | `KB_WRITE` |
-| `module.knowledge` | `KbArticleController#update` | `PLATFORM_ADMIN` | `KB_WRITE` |
 | `module.platform` | `HelpController#create` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
 | `module.platform` | `HelpController#delete` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
 | `module.platform` | `HelpController#update` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
@@ -166,12 +163,12 @@ closed guards is a correctness fix, not only a modelling one.
 | `module.audit_committee` | 7 |  |
 | `module.governance` | 7 |  |
 | `module.iam` | 4 |  |
-| `module.knowledge` | 4 |  |
 | `module.approvals` | 1 |  |
 | `module.auth` | 1 |  |
 | `module.board_pack` | 1 |  |
 | `module.capa` | 1 |  |
 | `module.incident` | 1 |  |
+| `module.knowledge` | 1 |  |
 | `module.nca_ecc` | 1 |  |
 | `module.ndi` | 1 |  |
 | `module.signature` | 1 |  |
@@ -197,7 +194,4 @@ permission as an actual grant row — which is a different question from the one
 | `module.dashboard` | `DashboardController#stats` | `INCIDENT_READ` | yes | 29 | **no** |
 | `module.dashboard` | `DashboardController#stats` | `COMPLIANCE_READ` | yes | 32 | yes |
 | `module.dashboard` | `DashboardController#stats` | `CYBER_READ` | yes | 19 | yes |
-| `module.knowledge` | `KbArticleController#create` | `KB_WRITE` | **NO** | 0 | **no** |
-| `module.knowledge` | `KbArticleController#transition` | `KB_WRITE` | **NO** | 0 | **no** |
-| `module.knowledge` | `KbArticleController#update` | `KB_WRITE` | **NO** | 0 | **no** |
 
