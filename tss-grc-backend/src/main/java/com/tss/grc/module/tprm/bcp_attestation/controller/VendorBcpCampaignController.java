@@ -47,58 +47,58 @@ public class VendorBcpCampaignController {
     private final VendorBcpCampaignService service;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','AUDITOR','CISO','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public List<CampaignResponse> list() {
         return service.list();
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','AUDITOR','CISO','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public CampaignResponse get(@PathVariable Long id) {
         return service.get(id);
     }
 
     @GetMapping("/{id}/stats")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','AUDITOR','CISO','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','READ')")
     public CampaignStatsResponse stats(@PathVariable Long id) {
         return service.stats(id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','RISK_MANAGER','PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public CampaignResponse create(@RequestBody @Valid CampaignCreateRequest req) {
         return service.createCampaign(req);
     }
 
     @PostMapping("/{id}/open")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public CampaignResponse open(@PathVariable Long id) {
         return service.openCampaign(id);
     }
 
     @PostMapping("/{id}/send-reminders")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public CampaignResponse sendReminders(@PathVariable Long id,
                                            @RequestParam("round") int round) {
         return service.sendReminders(id, round);
     }
 
     @PostMapping("/{id}/escalate")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','CISO','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public CampaignResponse escalate(@PathVariable Long id) {
         return service.escalateOverdue(id);
     }
 
     @PostMapping("/{id}/close")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public CampaignResponse close(@PathVariable Long id,
                                    @RequestBody(required = false) CampaignCloseRequest req) {
         return service.closeCampaign(id, req);
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyRole('TPRM_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','WRITE')")
     public CampaignResponse cancel(@PathVariable Long id,
                                     @RequestBody(required = false) Map<String, String> body) {
         String reason = body == null ? null : body.get("reason");

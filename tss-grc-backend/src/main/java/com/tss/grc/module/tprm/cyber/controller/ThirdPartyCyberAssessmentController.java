@@ -55,7 +55,7 @@ public class ThirdPartyCyberAssessmentController {
     public ThirdPartyCyberAssessment submit(@PathVariable Long id) { return service.submit(id); }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','APPROVE')")
     public ThirdPartyCyberAssessment approve(@PathVariable Long id,
                                              @AuthenticationPrincipal GrcUserDetails principal) {
         // Approver identity is derived from the authenticated principal, never a client-supplied body field.
@@ -63,6 +63,6 @@ public class ThirdPartyCyberAssessmentController {
     }
 
     @PostMapping("/{id}/retire")
-    @PreAuthorize("hasAnyRole('CISO','RISK_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('TPRM','APPROVE')")
     public ThirdPartyCyberAssessment retire(@PathVariable Long id) { return service.retire(id); }
 }
