@@ -275,7 +275,7 @@ and its population question is different; it gets its own ADR when its slice is 
 
 ---
 
-## D-9 — Fraud: create a **`FRAUD_INVESTIGATOR`** role (closes the slice-3 open call)
+## D-9 — Fraud: create a **`FRAUD_INVESTIGATOR`** role (closes the slice-3 open call) — ✅ **SHIPPED V330**
 
 V328 catalogued `FRAUD:READ`/`FRAUD:WRITE` and deliberately declined to anoint an investigator, because
 `FORENSICS_LEAD`, `IR_LEAD` and `SECURITY_ANALYST` were all plausible and picking one would have been a
@@ -291,7 +291,40 @@ the assurance roles V328 named (`COMPLIANCE_OFFICER`, `INTERNAL_AUDITOR`, `RISK_
 *to make an unconverted guard work* — resurrecting `FRAUD_OFFICER` so a `hasAnyRole` leg fires. Here the
 guard is already a permission, the role is being created because **the business function exists in the
 regulation and currently has no home**, and the grant is a row in `iam.role_permissions` rather than a
-name in Java. Opposite direction, opposite reasoning.
+name in Java. Opposite direction, opposite reasoning. **One** role, not two — the old ghost guard named both
+`FRAUD_OFFICER` and `FRAUD_INVESTIGATOR` for the same function, and creating both would re-import the habit
+that produced 40 ghost names.
+
+> ### ✅ Shipped as V330, 2026-07-30 — and the measurement made the argument stronger than this section did
+>
+> The SoD claim above was reasoned from regulation. It is now **measured**: `FRAUD:WRITE` was held by exactly
+> `GRC_ADMINISTRATOR` and `ORG_ADMIN`, and those two hold **10 and 8 `APPROVE` permissions** respectively
+> (ADMIN, BCM, CAPA, CHANGE, IAM, NDI, RISK, SIGNATURE, SUST, WORKFLOW). So the only two roles that could
+> investigate a fraud case were also the platform's broadest approvers — not a theoretical conflict.
+>
+> The three rejected candidates were also checked rather than dismissed: `FORENSICS_LEAD` (15 perms),
+> `IR_LEAD` (17) and `SECURITY_ANALYST` (18) hold **zero** APPROVE permissions each, so all three are
+> correctly investigator-shaped — they were rejected purely because they are *cyber incident* personas and
+> fraud is financial crime. There is no `AML_OFFICER` role and no AML module in `iam.permissions`, so FRAUD is
+> the only financial-crime surface catalogued and it had no owner at all.
+>
+> ➕ **Three row-shape choices were measured, not assumed.** `organisation_id = NULL` (global) because **47 of
+> the 58 existing roles are scoped to `organisation_id = 1`** and therefore do not exist for orgs 2 and 3 — a
+> platform persona must not inherit that, and that 47 is its own finding. `is_privileged = 0` because the
+> **only** reader of that column anywhere is `BreakGlassEventRepository`: flagging it would file every fraud
+> investigator as a break-glass subject, which is the opposite of what the word suggests. And
+> `display_name_ar` is mandatory, because a role name is user-visible.
+>
+> ⚠ **What V330 does NOT do, stated so it is not assumed.** It makes SoD *possible*; it does not enforce it.
+> Measured: `FraudService` has no self-check and no four-eyes gate on `setOutcome`/`close`, so one principal
+> can still open, investigate and resolve the same case. V330 also deliberately does **not revoke**
+> `FRAUD:WRITE` from the two administrators — doing so would leave every tenant unable to work a fraud case
+> until someone assigns the new role, which is an outage rather than a control. **Maker-checker on fraud case
+> outcome is a separate slice**, and it is the control that actually closes the SoD gap.
+>
+> Live-proven **11/11**: a `FRAUD_INVESTIGATOR`-only account opened a case, triaged it, recorded a finding,
+> read it back and read the dashboard — the entire lifecycle that was PLATFORM_ADMIN-only before V328 and
+> administrator-only after it. `FORENSICS_LEAD` and `viewer` stay 403.
 
 ---
 
