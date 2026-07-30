@@ -34,14 +34,41 @@ import java.util.List;
  *
  * <p>All endpoints are tenant-scoped via the JWT-derived {@code TenantContext}.
  *
- * <h3>Role guards</h3>
- * <ul>
- *   <li>{@link #READ_GUARD} — case + dashboard reads: PLATFORM_ADMIN,
- *       FRAUD_OFFICER, FRAUD_INVESTIGATOR, COMPLIANCE_OFFICER,
- *       INTERNAL_AUDITOR.</li>
- *   <li>{@link #WRITE_GUARD} — case mutations: PLATFORM_ADMIN,
- *       FRAUD_OFFICER, FRAUD_INVESTIGATOR.</li>
- * </ul>
+ * <h3>Authorisation — {@code FRAUD:READ} / {@code FRAUD:WRITE} (F2-05, 2026-07-30)</h3>
+ *
+ * <p><b>These guards used to name roles, and two of them did not exist.</b> The previous form was
+ * two constants — {@code hasAnyRole('PLATFORM_ADMIN','FRAUD_OFFICER','FRAUD_INVESTIGATOR',
+ * 'COMPLIANCE_OFFICER','INTERNAL_AUDITOR','RISK_MANAGER')} for reads and the first three of those
+ * for writes. <b>{@code FRAUD_OFFICER} and {@code FRAUD_INVESTIGATOR} are absent from
+ * {@code iam.roles}</b>, and a role guard is not evaluated by {@code ModulePermissionEvaluator}, so
+ * it gets no PLATFORM_ADMIN bypass either — the population that passed was exactly the surviving
+ * real names. On the write guard those two ghosts were the <em>only</em> non-admin legs, so the
+ * whole case lifecycle (open, triage, update, outcome, close) was <b>PLATFORM_ADMIN-only</b>.
+ * Live before the change: {@code compliance} — COMPLIANCE_OFFICER + GRC_ADMINISTRATOR, 86 of 96
+ * permissions — got <b>403</b> opening a case.
+ *
+ * <p>⚠ The old javadoc listed READ_GUARD's roles and <b>omitted RISK_MANAGER, which the constant
+ * did include</b>. A guard described in prose beside itself still drifted from itself; that is part
+ * of why the census reads the compiled annotation rather than the documentation.
+ *
+ * <p><b>V328</b> catalogues {@code FRAUD:READ} and {@code FRAUD:WRITE} — this module had no entry in
+ * {@code iam.permissions} at all, so unlike the {@code audit_lc} and {@code tprm} conversions there
+ * was no existing target to inherit. Reads go to exactly the three real roles the old guard named
+ * (COMPLIANCE_OFFICER, INTERNAL_AUDITOR, RISK_MANAGER) plus the two administrators that must be able
+ * to read what they may write, so <b>the read population does not widen at all</b> — VIEWER holds no
+ * FRAUD permission, unlike AUDIT and TPRM where it already did.
+ *
+ * <p>Writes go to GRC_ADMINISTRATOR and ORG_ADMIN, derived rather than chosen: they are the only two
+ * roles holding ≥80% of the platform's module WRITE actions (measured — ORG_ADMIN 24 of 26,
+ * GRC_ADMINISTRATOR 21 of 26; the next is COMPLIANCE_OFFICER at 14).
+ *
+ * <p><b>Which persona investigates fraud is left open on purpose.</b> The ghost roles are not
+ * created and no existing role is anointed — FORENSICS_LEAD, IR_LEAD and SECURITY_ANALYST all exist
+ * and all are plausible, which is precisely why picking one here would be a guess dressed as a fix.
+ * What changed is that the answer is now a checkbox in the role editor rather than a Java edit and a
+ * jar: {@code FRAUD:WRITE} exists and can be granted. Before V328 that sentence was false.
+ *
+ * @see com.tss.grc.security.RoleGuardConversionRatchetTest the census that found this
  */
 @RestController
 @RequestMapping("/api/v1/fraud")
@@ -50,11 +77,8 @@ import java.util.List;
 @SecurityRequirement(name = "bearerAuth")
 public class FraudController {
 
-    private static final String READ_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','FRAUD_OFFICER','FRAUD_INVESTIGATOR',"
-            + "'COMPLIANCE_OFFICER','INTERNAL_AUDITOR','RISK_MANAGER')";
-    private static final String WRITE_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','FRAUD_OFFICER','FRAUD_INVESTIGATOR')";
+    private static final String READ_GUARD = "hasPermission('FRAUD','READ')";
+    private static final String WRITE_GUARD = "hasPermission('FRAUD','WRITE')";
 
     private final FraudService service;
 

@@ -15,17 +15,17 @@ guard names none of.
 
 | Measure | Count |
 |---|---|
-| Guard sites with a role leg | 655 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **582** |
+| Guard sites with a role leg | 645 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **572** |
 | … composed (role leg ANDed onto a permission — already tight) | 73 |
-| Module packages holding pure role guards | 36 |
-| Distinct role names recited by any role guard | 69 |
-| … **that do not exist in `iam.roles`** | **35** |
+| Module packages holding pure role guards | 35 |
+| Distinct role names recited by any role guard | 67 |
+| … **that do not exist in `iam.roles`** | **33** |
 | Pure guards **closed to everyone** (no named role exists) | **0** |
-| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **24** |
+| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **19** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user | 582 |
+| Pure guards reachable by at least one seeded user | 572 |
 | `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 9 |
 
 ## A. Role names no role table contains
@@ -49,8 +49,6 @@ shows what that closes.
 | `AML_OFFICER` | 14 |
 | `MODEL_OWNER` | 14 |
 | `CREDIT_OFFICER` | 12 |
-| `FRAUD_INVESTIGATOR` | 10 |
-| `FRAUD_OFFICER` | 10 |
 | `COMMS_LEAD` | 9 |
 | `COMPANY_SECRETARY` | 9 |
 | `CONSUMER_PROTECTION_OFFICER` | 9 |
@@ -98,11 +96,6 @@ computed here rather than eyeballed.
 | `module.board_pack` | `BoardPackController#get` | `PLATFORM_ADMIN`, `CRO`, `BOARD_MEMBER`, `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `COMPANY_SECRETARY` | `CRO`, `BOARD_MEMBER`, `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `COMPANY_SECRETARY` |
 | `module.board_pack` | `BoardPackController#list` | `PLATFORM_ADMIN`, `CRO`, `BOARD_MEMBER`, `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `COMPANY_SECRETARY` | `CRO`, `BOARD_MEMBER`, `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `COMPANY_SECRETARY` |
 | `module.board_pack` | `BoardPackController#transition` | `PLATFORM_ADMIN`, `CRO` | `CRO` |
-| `module.fraud` | `FraudController#close` | `PLATFORM_ADMIN`, `FRAUD_OFFICER`, `FRAUD_INVESTIGATOR` | `FRAUD_OFFICER`, `FRAUD_INVESTIGATOR` |
-| `module.fraud` | `FraudController#createCase` | `PLATFORM_ADMIN`, `FRAUD_OFFICER`, `FRAUD_INVESTIGATOR` | `FRAUD_OFFICER`, `FRAUD_INVESTIGATOR` |
-| `module.fraud` | `FraudController#recordUpdate` | `PLATFORM_ADMIN`, `FRAUD_OFFICER`, `FRAUD_INVESTIGATOR` | `FRAUD_OFFICER`, `FRAUD_INVESTIGATOR` |
-| `module.fraud` | `FraudController#setOutcome` | `PLATFORM_ADMIN`, `FRAUD_OFFICER`, `FRAUD_INVESTIGATOR` | `FRAUD_OFFICER`, `FRAUD_INVESTIGATOR` |
-| `module.fraud` | `FraudController#triage` | `PLATFORM_ADMIN`, `FRAUD_OFFICER`, `FRAUD_INVESTIGATOR` | `FRAUD_OFFICER`, `FRAUD_INVESTIGATOR` |
 | `module.integrations` | `CrowdStrikeController#manualPoll` | `PLATFORM_ADMIN`, `SOC_AUTOMATION` | `SOC_AUTOMATION` |
 | `module.integrations` | `ServiceNowWebhookController#incidentUpdated` | `PLATFORM_ADMIN`, `SOC_AUTOMATION`, `INTEGRATION_SERVICE` | `SOC_AUTOMATION`, `INTEGRATION_SERVICE` |
 | `module.integrations` | `SplunkWebhookController#alertReceived` | `PLATFORM_ADMIN`, `SOC_AUTOMATION`, `INTEGRATION_SERVICE` | `SOC_AUTOMATION`, `INTEGRATION_SERVICE` |
@@ -144,7 +137,6 @@ closed guards is a correctness fix, not only a modelling one.
 | `module.dataclass` | 13 |  |
 | `module.workflow` | 11 |  |
 | `module.ccm` | 10 |  |
-| `module.fraud` | 10 |  |
 | `module.reginspect` | 10 |  |
 | `module.consumer` | 9 |  |
 | `module.opres` | 9 |  |

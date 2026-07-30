@@ -147,7 +147,19 @@ class AttachmentAccessPolicyTest {
         assertThatThrownBy(() -> policy.requireAccess("COUNTERPARTY", "list"))
             .as("a fraud investigator is not on CptyController's read list")
             .isInstanceOf(AccessDeniedException.class);
+
+        // FRAUD_CASE used to be the second positive case here, satisfied by ROLE_FRAUD_INVESTIGATOR
+        // — a role that does not exist in iam.roles, so this assertion exercised a path no real
+        // token could take. F2-05 converted FraudController to FRAUD:READ (V328) and this registry
+        // entry with it, so the fraud leg now asserts what it always should have: the permission
+        // opens the attachments, and the ghost role does not.
+        assertThatThrownBy(() -> policy.requireAccess("FRAUD_CASE", "list"))
+            .as("FRAUD_INVESTIGATOR is absent from iam.roles; it must not be a way in")
+            .isInstanceOf(AccessDeniedException.class);
+
+        authenticateWith("EVIDENCE_READ", "FRAUD_READ");
         assertThatCode(() -> policy.requireAccess("FRAUD_CASE", "list"))
+            .as("the permission the parent controller now requires opens its attachments")
             .doesNotThrowAnyException();
     }
 
