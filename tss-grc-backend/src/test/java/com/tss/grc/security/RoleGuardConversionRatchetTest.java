@@ -124,13 +124,22 @@ class RoleGuardConversionRatchetTest {
      * guard — a reminder that converting a controller is not finished until every route that serves
      * the record agrees.
      *
+     * <p><b>568</b> after the fourth: the four inbound-integration endpoints in {@code integrations}
+     * whose guards named {@code SOC_AUTOMATION} and {@code INTEGRATION_SERVICE} — neither in
+     * {@code iam.roles} — moved to {@code CYBER:WRITE}, which the eight seeded {@code *_INGEST}
+     * machine roles already hold, so <b>no migration</b>. Only 4 of that package's 24 sites moved on
+     * purpose: the other 20 name roles that all exist, and no catalogued permission matches
+     * {@code {PLATFORM_ADMIN, CISO\}} — converting them would either widen integration config to
+     * VIEWER/REGULATOR_VIEWER via {@code CYBER:READ} or drop CISO via {@code PLATFORM:WRITE}. Naming
+     * the owner of integration administration is a product decision, not a conversion.
+     *
      * <p>Raising this number means adding an endpoint that authorises by identity in a platform
      * whose authorisation model is permissions, and whose role names have a 54% miss rate. Convert
      * instead. Where a role genuinely is the right unit — {@code PLATFORM_ADMIN}-only platform
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 572;
+    private static final int BASELINE_PURE_ROLE_SITES = 568;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"

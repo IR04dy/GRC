@@ -179,7 +179,7 @@ on poll. Tracked as a separate sprint — out of scope for slice 3.
 |--------|-----------------------------------------------------|-----------------------------------------------------------|
 | GET    | `/api/v1/integrations/crowdstrike/status`           | PLATFORM_ADMIN, CISO, SOC_ANALYST, SOC_TIER_2, SOC_AUTOMATION, INCIDENT_COMMANDER |
 | GET    | `/api/v1/integrations/crowdstrike/config`           | PLATFORM_ADMIN, CISO                                      |
-| POST   | `/api/v1/integrations/crowdstrike/poll`             | PLATFORM_ADMIN, SOC_AUTOMATION                            |
+| POST   | `/api/v1/integrations/crowdstrike/poll`             | **`CYBER:WRITE`** *(was PLATFORM_ADMIN, SOC_AUTOMATION — SOC_AUTOMATION does not exist, so this was admin-only; F2-05)* |
 | POST   | `/api/v1/integrations/crowdstrike/contain/{hostId}` | SOC_TIER_2, INCIDENT_COMMANDER, CISO, PLATFORM_ADMIN      |
 | POST   | `/api/v1/integrations/crowdstrike/lift/{hostId}`    | CISO, PLATFORM_ADMIN                                      |
 | GET    | `/api/v1/integrations/crowdstrike/stub/recorded-calls` | PLATFORM_ADMIN, CISO                                    |

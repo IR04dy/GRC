@@ -185,10 +185,19 @@ The webhook:
 
 Two layers — both must pass:
 
-1. **Role guard.** The endpoint is annotated
-   `@PreAuthorize("hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION','INTEGRATION_SERVICE')")`.
-   Splunk's webhook action must authenticate as a GRC service account
-   granted one of those roles. Same model as ServiceNow.
+1. **Permission guard.** The endpoint is annotated
+   `@PreAuthorize("hasPermission('CYBER','WRITE')")`.
+   Splunk's webhook action must authenticate as a GRC service account whose
+   role holds `CYBER:WRITE` — **`SIEM_INGEST` is the seeded machine role for
+   exactly this feed** and already holds it. Same model as ServiceNow.
+
+   > **Corrected 2026-07-30 (F2-05 / F2-52).** This previously read
+   > `hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION','INTEGRATION_SERVICE')` and
+   > told you to grant one of those roles. **Neither `SOC_AUTOMATION` nor
+   > `INTEGRATION_SERVICE` exists in `iam.roles`** — so the only grantable name
+   > was `PLATFORM_ADMIN`, and following this page meant handing your SIEM a
+   > platform-administrator token. Meanwhile `SIEM_INGEST` — provisioned by the
+   > platform for SIEM ingestion — was refused by this endpoint.
 2. **Optional HMAC.** When `grc.integrations.splunk.webhook-shared-secret`
    is non-empty, the request must carry
    `X-Splunk-Signature: <hex-HMAC-SHA256-of-raw-body>`. Otherwise the
