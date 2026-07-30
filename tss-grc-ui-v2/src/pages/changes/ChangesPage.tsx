@@ -109,10 +109,29 @@ export function ChangesPage() {
   // changes awaiting a post-implementation review; ?type= filters by change type.
   const reviewMode = searchParams.get('review') === '1';
   const typeParam = (searchParams.get('type') ?? '').toUpperCase();
-  const [tab, setTab] = useState<TabId>(() => {
-    const tp = searchParams.get('tab') as TabId | null;
-    return tp && TAB_IDS.includes(tp) ? tp : 'register';
-  });
+
+  // The URL is the source of truth for the active tab — deliberately, not incidentally.
+  //
+  // This was `useState(() => searchParams.get('tab'))`, whose initialiser runs exactly once. React
+  // Router does not remount this component when only the query string changes, so every deep-link
+  // that arrived while the page was already open was read and discarded. The visible symptom was the
+  // sidebar's "Calendar & freeze windows" row (it points at `/changes?tab=governance`): clicking it
+  // updated the address bar and left the register on screen, which reads as a frozen page rather
+  // than a dropped parameter. Reported from the running app, reproduced client-side, fixed here.
+  //
+  // Deriving instead of syncing also makes browser Back/Forward move between tabs, and makes any
+  // tab shareable as a link. `replace: true` keeps tab clicks out of the history stack, so Back
+  // still leaves the page rather than walking the tabs the user just visited.
+  const tabParam = searchParams.get('tab') as TabId | null;
+  const tab: TabId = tabParam && TAB_IDS.includes(tabParam) ? tabParam : 'register';
+  const setTab = (next: TabId) => {
+    const next_ = new URLSearchParams(searchParams);
+    // 'register' is the default, so it stays out of the URL — /changes and /changes?tab=register
+    // must not be two different-looking addresses for one screen.
+    if (next === 'register') next_.delete('tab');
+    else next_.set('tab', next);
+    setSearchParams(next_, { replace: true });
+  };
   const [apiItems, setItems] = useState<ChangeRequestDto[]>([]);
   // DD-71: include intake-promoted change requests in the visible register.
   const promotedChanges = usePromoted('CHANGE').map(toChangeRequestDto);
