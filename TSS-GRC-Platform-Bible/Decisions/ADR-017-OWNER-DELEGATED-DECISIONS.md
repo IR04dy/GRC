@@ -110,6 +110,33 @@ is decidable, and is decided:
 **Effect:** S6 is unblocked for engineering. The fact stays with the customer, where it belongs, and its
 absence is now visible instead of latent.
 
+> ### ⚠ Amended 2026-07-30 — **"read from per-tenant configuration" has nowhere to read from**
+>
+> Measured: **there is no per-tenant platform configuration table.** The only settings tables are
+> module-local — `bcm.settings`, `ndi.settings`, `risk.methodology_config`, `sust.organisation_settings`. So
+> the decision's first clause is not a column read; it is a **new config surface** — table, service, admin
+> screen, tenant-scoped. That makes D-2 the queue's long pole, and it is why D-2 sits fifth despite being the
+> highest-leverage item: nothing downstream of it is scheduled *because* it is unbuilt, which is a real
+> critical-path argument, but a spine-sized build does not become a decision-implementation slice by being
+> urgent.
+>
+> **Build it generically.** Tenant regulator identity, data-residency flags and outsourcing no-objection
+> references will all need the same home; a `cab_committee_id` column bolted somewhere convenient would have
+> to be moved to make room for them. The premise is confirmed by the data: **only org 1 has committees (17);
+> orgs 2 and 3 have zero** — so there is nothing to default *to*, and the two alternatives to failing closed
+> are inventing a committee (evidence pollution) or silently skipping the gate (the self-approval defect class
+> this programme exists to close).
+>
+> **Fail-closed is also the commercially correct call, against the ITSM precedent rather than with it.**
+> ServiceNow ships stock change models and approval policies referencing groups you populate, and an
+> unconfigured instance processes changes on day one; Jira Service Management treats approvals as optional and
+> proceeds. Both **fail open** — and get away with it because their buyer is IT ops, their instances are
+> effectively single-tenant, and change approval there is workflow plumbing rather than compliance evidence.
+> None of those three conditions holds here. The nearer precedent is the board-portal category — Diligent,
+> Boardvantage — which **never defaults committee composition**. Two conditions on the implementation, both
+> from the commercial seat: the failure must be a **guided onboarding moment that names the screen**, not a
+> dead-end error mid-demo; and the SKU-activation gate must mean no tenant ever meets it in normal operation.
+
 ---
 
 ## D-3 — ECAB retrospective ratification SLA: **5 business days**, per-tenant overridable (closes D-2 / O-5)
@@ -125,6 +152,29 @@ documented approval of changes. For a weekly CAB cadence — the market norm —
   from the raise timestamp would let a slow raise consume the ratification window.
 - **Breach escalates to the CISO and lands in the unauthorised-change register** (CE-11's surface) rather
   than merely turning a cell red. An SLA with no consequence is a report, not a control.
+
+> ### ⚠ Amended 2026-07-30 — **as specified this cannot be built; three amendments make it buildable**
+>
+> Measured before sequencing: `change_mgmt.change_requests` has `implementation_started` /
+> `implementation_ended`, so the clock **does** have a legitimate start — that half of the decision survives
+> contact with the schema. But there are **no ratification, SLA or escalation columns** (a migration is
+> required), and **the unauthorised-change register this decision escalates into does not exist as a table** —
+> CE-11 is an unbuilt item in an unstarted wave. The consequence half of the control has nowhere to land, and
+> by this decision's own sentence that makes it a report.
+>
+> 1. **Interim escalation destination.** CISO notification + an audit-ledger event, so the SLA is enforceable
+>    before CE-11. When CE-11 lands, the register becomes an additional sink, not a replacement.
+> 2. **Bound the per-tenant override.** "Overridable per tenant" with no ceiling is not a control — the first
+>    examiner question about any tenant-settable SLA is *what stops a tenant choosing 365 days?* Set a
+>    maximum, and make exceeding it a documented, approved deviation rather than a settings field.
+> 3. **Grandfather the existing row.** There is exactly **one** EMERGENCY change in the data, already
+>    `IMPLEMENTED` and never ratified. Without grandfathering, the feature's first act on deployment is a
+>    spurious escalation to the CISO about a historical seed row — the DF-3/V322 precedent applies: label
+>    legacy rows, do not retro-fabricate a clock they never ran under.
+>
+> **Re-homed:** D-3 belongs inside the S6/S7 change-governance rebuild that D-2 unblocks, where its columns
+> and its register both have somewhere to live. It stays last in the ADR-017 queue and is not a standalone
+> slice.
 
 ---
 
@@ -156,6 +206,30 @@ server logic and drifts — the PM-C1 façade lesson.
 Two things make this cheaper than when F2-42 was filed: F2-05 slice 5 gave `board_pack` a real
 authorisation model (`ADMIN:READ`/`ADMIN:WRITE`), so exposing an aggregate endpoint is now safe; and the
 sample-data banner already shipped, so there is no honesty regression while it is built.
+
+> ### ⚠ Amended 2026-07-30 — **the safety argument above names the wrong module**
+>
+> The sentence "F2-05 slice 5 gave `board_pack` a real authorisation model … so exposing an aggregate
+> endpoint is now safe" is **wrong**, and it is wrong in the direction that matters. There are **two** board
+> packs: `board_pack` is a curated CRUD entity (16 stored rows, tightened by slice 5 to `ADMIN:READ` = 21
+> roles / `ADMIN:WRITE` = 3 roles), while the **live aggregate this decision exposes** is
+> `reporting.BoardPackService`, built from 11 repositories. Slice 5 gave that nothing. Its sibling export
+> endpoints carry `hasPermission('REPORTING','EXPORT') or hasPermission('RISK','EXPORT')` — **24 of 59
+> roles**, including `VIEWER` and `SUPPLIER_MANAGER`.
+>
+> **Consequences, both binding:**
+>
+> 1. **D-5 must not ship before D-10a.** Doing so replaces a *labelled mock* with an *unlabelled leak* —
+>    real content rendered live to those 24 roles. The banner currently makes the page honest; removing the
+>    banner while the tier is still wide makes it dishonest in the other direction.
+> 2. **The JSON endpoint must write the same export-audit record as the PDF/PPTX paths.** JSON of an
+>    aggregate is an export in substance, and a read-shaped route that is an export in substance is exactly
+>    how a narrowed control acquires a side door. Nearly free: `ExportAuditInterceptor` is registered on
+>    `/api/**`, so coverage is automatic — only the `entity_code` extraction needs to name it.
+>
+> ➕ Found while checking a council claim: the aggregate pulls **200 itemised risks and 1,000 itemised audit
+> findings** per call. That is an operational extract, not board MI → **F2-55**. Re-tiering who may pull the
+> pack does not fix what is in it.
 
 ---
 
@@ -273,6 +347,29 @@ its own permission rather than a borrowed one.
 **`socops` (110 guards, no catalogued module) is explicitly NOT resolved here.** It is ten times the size
 and its population question is different; it gets its own ADR when its slice is scheduled.
 
+> ### ⚠ Amended 2026-07-30 — **this decision WIDENS access; it was being planned as a narrowing**
+>
+> The sequencing note that carried this into the plan described D-8 as narrowing a PDPL/ECC-2 surface. It is
+> the opposite, and the measurement says so plainly. The 20 remaining guards recite **nine role names, of
+> which six do not exist** in `iam.roles`: `SOC_AUTOMATION`, `INTEGRATION_SERVICE`, `SOC_ANALYST`,
+> `SOC_TIER_2`, `INCIDENT_COMMANDER`, `BOARD_MEMBER`. Because `hasAnyRole` never reaches
+> `ModulePermissionEvaluator` and so gets **no PLATFORM_ADMIN bypass**, a guard naming only ghosts admits
+> nobody. Net effect today: roughly **10 endpoints are PLATFORM_ADMIN-only by attrition** and the rest are
+> `PLATFORM_ADMIN + CISO`. Moving to `INTEGRATIONS:READ` (4 roles) / `WRITE` (2 roles) therefore **grants
+> access that nobody currently has**.
+>
+> The decision stands — accidental admin-only-ness is not a security model, and the grants named above are
+> the right ones. What changes is the **class of work**: this is a **re-grant**, so by the rule adopted in
+> D-10 it must be probed and justified as one, in the same commit. Specifically:
+>
+> - Record a **need-to-know rationale for `CYBER_MANAGER`** reading third-party egress logs, which may
+>   contain personal data (PDPL) — the widest of the four new grants and the only one that is not obviously
+>   an administrator.
+> - Probe each converted endpoint with a role that gains access and one that does not, and state the
+>   before/after population per endpoint rather than in aggregate.
+> - The ghost names must be **deleted, not seeded**. Seeding `SOC_ANALYST` to make an old guard work would
+>   make an absent control look present — §7's standing exclusion.
+
 ---
 
 ## D-9 — Fraud: create a **`FRAUD_INVESTIGATOR`** role (closes the slice-3 open call) — ✅ **SHIPPED V330**
@@ -353,6 +450,45 @@ rejected.
 re-grant decision.** F2-27 changed what `MODULE:EXPORT` *means* — it gated nothing before and gates 40 file
 endpoints after — and not one grant was re-reviewed. Any future slice that gives an existing permission new
 teeth must re-review its grants in the same commit.
+
+> ### ⚠ Amended 2026-07-30 — **split into D-10a and D-10b; the rule bundles two different sizes**
+>
+> This decision reads as one rule and implements as two pieces of work. *"EXPORT follows READ"* is a grant
+> edit. *"…except where EXPORT requires WRITE or **an explicit assurance mandate**"* invokes a mechanism
+> that **does not exist** — there is no mandate entity, no time-boxing, no engagement scope, nowhere to
+> minute it. Bundling them means either the narrowing waits on the mechanism, or the mechanism is faked.
+>
+> **D-10a — the measured narrowing (shippable now).** `REPORTING:EXPORT or RISK:EXPORT` gates the board pack
+> and is held by **24 of 59 roles**. Strip the four with no colourable claim: **`VIEWER`** (generic
+> read-only — fails ECC 2-2 / SAMA CSF 3.3.5 least-privilege on sight), **`SUPPLIER_MANAGER`** (the pack
+> carries counterparty risk about the very suppliers this role negotiates with — conflict of interest and
+> PDPL purpose limitation), **`MA_LEAD`** (concentrates price-sensitive MNPI — CMA market conduct), and
+> **`EMERGENCY_RESPONDER`** (needs BCM data, not the risk register). Re-review the wide baselines in the same
+> commit: `WORKFLOW:EXPORT` **55/59 including 8 machine accounts**, `CHANGE:EXPORT` 46/59, `AI:EXPORT` 42/59.
+> ➕ Measured, and it inverts this decision's own emphasis: the two named **exceptions are already tight**
+> (`PRIVACY:EXPORT` **8/59**, `IAM:EXPORT` **3/59**). The exceptions needed no work; the **baseline** needs
+> all of it. The rule was written pointing at the wrong end of the distribution.
+>
+> **D-10b — the assurance-mandate mechanism (the part that was hiding).** `EXTERNAL_AUDITOR` and
+> `REGULATOR_VIEWER` are **not** stripped by a grant edit, because Saudi law creates an *obligation to
+> furnish* — Banking Control Law art. 18, Capital Market Law inspection powers, Companies Law auditor access,
+> NCA ECC assessment. But every one of those is an obligation to produce **through a governed disclosure
+> channel**: scoped to the authority, time-boxed to the requisition or engagement, minuted, logged. None
+> creates a standing self-service credential inside the institution's systems. So a standing grant is the
+> wrong shape *and* deleting it with nothing in its place manufactures the inverse finding — inability to
+> furnish, or obstruction of an audit mid-engagement. `REGULATOR_VIEWER` fails specifically because one role
+> cannot encode per-authority scope: SAMA as AML supervisor, a CMA securities inspector and an NCA ECC
+> assessor are not entitled to the same material.
+>
+> **Ordering consequence:** D-10a first in the whole ADR-017 queue, D-10b third — after D-5, which depends on
+> D-10a's tier existing but not on the mandate mechanism.
+>
+> ➕ **Step 0 of D-10a is a look-back, and it is the step this ADR omitted entirely.** After "24 of 59", the
+> first question internal audit asks is *was it exercised?* — and any hit starts a PDPL art. 20 assessment
+> with a 72-hour SDAIA clock. Runnable, because `ExportAuditInterceptor` covers `/api/**`: dev shows **366
+> EXPORT events, 72 of them board-pack**, and the only low-privilege pulls trace to this programme's own
+> probing. **The same query has not been run on prod**, where the answer is unknown. Running it also found
+> **F2-54** — `platform.audit_log.user_role` records a *permission*, not a role, on all 5,801 rows.
 
 ---
 
