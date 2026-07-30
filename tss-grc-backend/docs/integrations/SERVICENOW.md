@@ -127,10 +127,20 @@ Expected body (subset of fields used):
 
 The platform does not yet have a dedicated machine-to-machine auth
 scheme. Until one lands, the webhook is guarded by
-`hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION','INTEGRATION_SERVICE')`.
+`hasPermission('CYBER','WRITE')`.
 Provision a dedicated SNow integration service account on the GRC side,
-grant it one of those roles, and have ServiceNow authenticate as that
-user when calling the webhook.
+grant it a role holding `CYBER:WRITE`, and have ServiceNow authenticate
+as that user when calling the webhook. The seeded machine roles
+(`SIEM_INGEST`, `SCANNER_INGEST`, … — all eight `*_INGEST` roles) already
+hold it, or create a role holding only `CYBER:WRITE` for this account.
+
+> **Corrected 2026-07-30 (F2-05 / F2-52).** This section previously said the
+> guard was `hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION','INTEGRATION_SERVICE')`
+> and told you to grant one of those roles. **`SOC_AUTOMATION` and
+> `INTEGRATION_SERVICE` do not exist in `iam.roles`**, so the only grantable
+> name in that list was `PLATFORM_ADMIN` — following these instructions meant
+> giving an external ITSM a platform-administrator token. Grant a
+> `CYBER:WRITE` role instead; it is a permission, so it can actually be issued.
 
 A shared HMAC header (`X-ServiceNow-Signature`) is the planned upgrade —
 tracked as a follow-up.

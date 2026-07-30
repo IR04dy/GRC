@@ -112,7 +112,11 @@ public class SplunkWebhookController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION','INTEGRATION_SERVICE')")
+    // F2-05 slice 4: was hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION','INTEGRATION_SERVICE') — the
+    // two service-account names do not exist in iam.roles, so the only grantable option in that list
+    // was PLATFORM_ADMIN. CYBER:WRITE is held by all eight seeded *_INGEST machine roles, SIEM_INGEST
+    // included, which is the account this webhook was built for.
+    @PreAuthorize("hasPermission('CYBER','WRITE')")
     @Operation(summary = "Splunk → GRC: alert webhook posted by a Splunk saved search")
     @Transactional
     public ResponseEntity<Map<String, Object>> alertReceived(

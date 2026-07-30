@@ -15,17 +15,17 @@ guard names none of.
 
 | Measure | Count |
 |---|---|
-| Guard sites with a role leg | 645 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **572** |
+| Guard sites with a role leg | 641 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **568** |
 | … composed (role leg ANDed onto a permission — already tight) | 73 |
 | Module packages holding pure role guards | 35 |
-| Distinct role names recited by any role guard | 67 |
-| … **that do not exist in `iam.roles`** | **33** |
+| Distinct role names recited by any role guard | 66 |
+| … **that do not exist in `iam.roles`** | **32** |
 | Pure guards **closed to everyone** (no named role exists) | **0** |
-| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **19** |
+| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **15** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user | 572 |
+| Pure guards reachable by at least one seeded user | 568 |
 | `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 9 |
 
 ## A. Role names no role table contains
@@ -52,7 +52,6 @@ shows what that closes.
 | `COMMS_LEAD` | 9 |
 | `COMPANY_SECRETARY` | 9 |
 | `CONSUMER_PROTECTION_OFFICER` | 9 |
-| `SOC_AUTOMATION` | 8 |
 | `TPRM_LEAD` | 8 |
 | `CRISIS_COMMANDER` | 7 |
 | `HR_DIRECTOR` | 6 |
@@ -63,10 +62,10 @@ shows what that closes.
 | `PRIVACY_OFFICER` | 5 |
 | `SHARIA_BOARD_CHAIR` | 4 |
 | `SOC_ANALYST` | 4 |
+| `SOC_AUTOMATION` | 4 |
 | `AUDIT_DIRECTOR` | 3 |
 | `CISO_GOVERNANCE` | 3 |
 | `SOC_TIER_2` | 3 |
-| `INTEGRATION_SERVICE` | 2 |
 | `USER` | 1 |
 
 ## B. Pure role guards closed to everyone
@@ -96,10 +95,6 @@ computed here rather than eyeballed.
 | `module.board_pack` | `BoardPackController#get` | `PLATFORM_ADMIN`, `CRO`, `BOARD_MEMBER`, `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `COMPANY_SECRETARY` | `CRO`, `BOARD_MEMBER`, `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `COMPANY_SECRETARY` |
 | `module.board_pack` | `BoardPackController#list` | `PLATFORM_ADMIN`, `CRO`, `BOARD_MEMBER`, `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `COMPANY_SECRETARY` | `CRO`, `BOARD_MEMBER`, `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `COMPANY_SECRETARY` |
 | `module.board_pack` | `BoardPackController#transition` | `PLATFORM_ADMIN`, `CRO` | `CRO` |
-| `module.integrations` | `CrowdStrikeController#manualPoll` | `PLATFORM_ADMIN`, `SOC_AUTOMATION` | `SOC_AUTOMATION` |
-| `module.integrations` | `ServiceNowWebhookController#incidentUpdated` | `PLATFORM_ADMIN`, `SOC_AUTOMATION`, `INTEGRATION_SERVICE` | `SOC_AUTOMATION`, `INTEGRATION_SERVICE` |
-| `module.integrations` | `SplunkWebhookController#alertReceived` | `PLATFORM_ADMIN`, `SOC_AUTOMATION`, `INTEGRATION_SERVICE` | `SOC_AUTOMATION`, `INTEGRATION_SERVICE` |
-| `module.integrations` | `TenableController#manualPoll` | `PLATFORM_ADMIN`, `SOC_AUTOMATION` | `SOC_AUTOMATION` |
 | `module.knowledge` | `KbArticleController#create` | `PLATFORM_ADMIN` | `KB_WRITE` |
 | `module.knowledge` | `KbArticleController#transition` | `PLATFORM_ADMIN` | `KB_WRITE` |
 | `module.knowledge` | `KbArticleController#update` | `PLATFORM_ADMIN` | `KB_WRITE` |
@@ -125,8 +120,8 @@ closed guards is a correctness fix, not only a modelling one.
 | `module.ethics` | 27 |  |
 | `module.compliance` | 26 |  |
 | `module.ai` | 25 |  |
-| `module.integrations` | 24 |  |
 | `module.sharia` | 21 |  |
+| `module.integrations` | 20 |  |
 | `module.openbanking` | 18 |  |
 | `module.outsourcing` | 17 |  |
 | `module.regreporting` | 17 |  |

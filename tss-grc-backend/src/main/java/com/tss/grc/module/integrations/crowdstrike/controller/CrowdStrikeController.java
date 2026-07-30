@@ -135,7 +135,10 @@ public class CrowdStrikeController {
     // ── /poll — manual poll trigger ───────────────────────────────────
 
     @PostMapping("/poll")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION')")
+    // F2-05 slice 4: was hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION') — SOC_AUTOMATION is absent
+    // from iam.roles, so a manual poll was administrator-only. A poll ingests detections, which is
+    // CYBER:WRITE; the seeded SOC personas (CISO, SECURITY_ANALYST, IR_LEAD, CYBER_MANAGER) hold it.
+    @PreAuthorize("hasPermission('CYBER','WRITE')")
     @Operation(summary = "Manual poll of the Falcon /detects endpoint — returns the number of new detections ingested")
     public Map<String, Object> manualPoll() {
         int ingested = inbound.pollDetections();

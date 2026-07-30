@@ -67,7 +67,9 @@ public class ServiceNowWebhookController {
     }
 
     @PostMapping("/incident-updated")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION','INTEGRATION_SERVICE')")
+    // F2-05 slice 4 — see SplunkWebhookController for the full reasoning; same guard, same two
+    // non-existent service-account roles, same fix.
+    @PreAuthorize("hasPermission('CYBER','WRITE')")
     @Operation(summary = "ServiceNow → GRC: incident state changed")
     @Transactional
     public ResponseEntity<Map<String, Object>> incidentUpdated(@RequestBody Map<String, Object> payload) {

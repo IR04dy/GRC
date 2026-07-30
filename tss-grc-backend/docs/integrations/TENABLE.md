@@ -222,7 +222,7 @@ right default.
 |--------|-----------------------------------------------------|------------------------------------------------------------------------|
 | GET    | `/api/v1/integrations/tenable/status`               | PLATFORM_ADMIN, CISO, RISK_MANAGER, SOC_ANALYST, SOC_TIER_2, SOC_AUTOMATION, INCIDENT_COMMANDER, BOARD_MEMBER |
 | GET    | `/api/v1/integrations/tenable/config`               | PLATFORM_ADMIN, CISO                                                   |
-| POST   | `/api/v1/integrations/tenable/poll`                 | PLATFORM_ADMIN, SOC_AUTOMATION                                         |
+| POST   | `/api/v1/integrations/tenable/poll`                 | **`CYBER:WRITE`** *(was PLATFORM_ADMIN, SOC_AUTOMATION — SOC_AUTOMATION does not exist, so this was admin-only; F2-05)* |
 | POST   | `/api/v1/integrations/tenable/recast/{pluginId}`    | CISO, RISK_MANAGER, PLATFORM_ADMIN                                     |
 | POST   | `/api/v1/integrations/tenable/accept-risk/{pluginId}`| CISO, RISK_MANAGER, PLATFORM_ADMIN, BOARD_MEMBER                       |
 | POST   | `/api/v1/integrations/tenable/remove-recast/{pluginId}` | CISO, PLATFORM_ADMIN                                                |

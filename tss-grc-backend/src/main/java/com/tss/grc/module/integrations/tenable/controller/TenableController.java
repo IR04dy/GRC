@@ -152,7 +152,10 @@ public class TenableController {
     // ── /poll — manual poll trigger ───────────────────────────────────
 
     @PostMapping("/poll")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','SOC_AUTOMATION')")
+    // F2-05 slice 4 — same as CrowdStrikeController#manualPoll: SOC_AUTOMATION does not exist, so
+    // pulling Tenable findings was administrator-only. SCANNER_INGEST, the seeded machine role for
+    // exactly this feed, holds CYBER:WRITE.
+    @PreAuthorize("hasPermission('CYBER','WRITE')")
     @Operation(summary = "Manual poll of the Tenable findings endpoint — returns the number of new findings ingested")
     public Map<String, Object> manualPoll() {
         int ingested = inbound.pollFindings();
