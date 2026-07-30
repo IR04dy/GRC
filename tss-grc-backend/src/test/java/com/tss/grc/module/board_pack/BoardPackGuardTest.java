@@ -160,6 +160,43 @@ class BoardPackGuardTest {
             .isEqualTo(JsonProperty.Access.READ_ONLY);
     }
 
+    /**
+     * V331 — the audience vocabulary must be able to express what the table already holds.
+     *
+     * <p>Before V331 the pattern was {@code BOARD|AUDIT_COMMITTEE|RISK_COMMITTEE|EXEC}: four values
+     * against five stored ones and seventeen real {@code committee_type}s. One pack held
+     * {@code CYBER_COMMITTEE} — <b>a record this API could not recreate</b> — and neither
+     * {@code CYBER_COMMITTEE} nor {@code EXEC} matched any committee, so joining audience to committee
+     * resolved 3 of 5 and silently mis-scoped the other 2.
+     *
+     * <p>This pins both directions: the aligned spellings are accepted, and the two drifted ones are
+     * refused so a well-meaning revert cannot reintroduce a value that resolves to no committee.
+     */
+    @Test
+    void theAudienceVocabularyMatchesTheCommitteeVocabulary() throws Exception {
+        java.lang.reflect.Field f = BoardPackDto.class.getDeclaredField("audience");
+        jakarta.validation.constraints.Pattern pat =
+            f.getAnnotation(jakarta.validation.constraints.Pattern.class);
+        assertThat(pat).as("audience must stay validated").isNotNull();
+        java.util.regex.Pattern re = java.util.regex.Pattern.compile(pat.regexp());
+
+        // Every audience actually present in the table must be expressible.
+        for (String aud : List.of("BOARD", "AUDIT_COMMITTEE", "RISK_COMMITTEE",
+                                  "EXEC_COMMITTEE", "CYBER_SECURITY")) {
+            assertThat(re.matcher(aud).matches())
+                .as("audience '%s' exists in board_pack.packs and is a real committee_type, so the "
+                  + "API must accept it — otherwise a stored pack cannot be recreated", aud)
+                .isTrue();
+        }
+        // The two pre-V331 spellings resolve to no committee and must not come back.
+        for (String dead : List.of("CYBER_COMMITTEE", "EXEC")) {
+            assertThat(re.matcher(dead).matches())
+                .as("'%s' matches no admin.committees.committee_type; accepting it would let a pack be "
+                  + "created that an audience-scoped read filter cannot place (V331)", dead)
+                .isFalse();
+        }
+    }
+
     @Test
     void everyEndpointStillCarriesAGuard() {
         Map<String, String> g = guards();

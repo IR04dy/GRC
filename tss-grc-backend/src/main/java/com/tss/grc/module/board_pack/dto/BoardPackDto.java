@@ -15,7 +15,26 @@ public class BoardPackDto {
     @NotBlank private String periodLabel;
     @NotNull private LocalDate periodStart;
     @NotNull private LocalDate periodEnd;
-    @NotBlank @Pattern(regexp = "BOARD|AUDIT_COMMITTEE|RISK_COMMITTEE|EXEC")
+    /**
+     * The committee this pack is for. ⚠ <b>The accepted set is a MIRROR of
+     * {@code admin.committees.committee_type}</b>, and mirrors go stale — that is exactly how
+     * {@code AttachmentAccessPolicy}'s {@code FRAUD_CASE} entry outlived the guard it copied. It is a
+     * mirror rather than a lookup because validating against the tenant's live committees needs a
+     * cross-module read, and ADR-012 wants that behind a port; building the port is the follow-up
+     * slice that also lands ADR-017 D-11's read filter.
+     *
+     * <p>What it replaced was worse than stale: {@code BOARD|AUDIT_COMMITTEE|RISK_COMMITTEE|EXEC},
+     * a four-value set against five stored values and seventeen real committee types. One pack held
+     * {@code CYBER_COMMITTEE}, <b>which this API could not recreate</b>, and neither
+     * {@code CYBER_COMMITTEE} nor {@code EXEC} matched any {@code committee_type} — so joining
+     * audience to committee resolved 3 of 5 and silently mis-scoped the rest. V331 re-points those two
+     * onto the real vocabulary and throws if any stored audience fails to resolve.
+     */
+    @NotBlank @Pattern(regexp = "BOARD|AUDIT_COMMITTEE|RISK_COMMITTEE|EXEC_COMMITTEE|CYBER_SECURITY"
+        + "|COMPLIANCE_COMMITTEE|BCM_COMMITTEE|CRISIS_MANAGEMENT|DATA_GOVERNANCE|PRIVACY_DPO"
+        + "|ESG_SUSTAINABILITY|INTERNAL_CONTROL|IT_STEERING|NOMINATION_REMUNERATION|AI_ETHICS"
+        + "|ANTI_FRAUD|TECH_COMMITTEE",
+        message = "audience must be an admin.committees.committee_type value")
     private String audience;
     private String riskSummaryJson;
     private String appetiteBreachesJson;
