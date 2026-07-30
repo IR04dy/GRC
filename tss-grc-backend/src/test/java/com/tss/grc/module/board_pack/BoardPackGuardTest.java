@@ -3,6 +3,7 @@ package com.tss.grc.module.board_pack;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.tss.grc.module.board_pack.controller.BoardPackController;
 import com.tss.grc.module.board_pack.dto.BoardPackDto;
+import com.tss.grc.module.reporting.controller.ExportController;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -60,7 +61,26 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <b>no catalogued permission's population is "the board"</b>, and choosing the grant list for a
  * new BOARD module is a product decision, not a fix. Recorded in the plan, not guessed here.
  *
+ * <h3>2026-07-30 — the product decision arrived, and it applies to the EXPORT tier</h3>
+ * <p>ADR-017 D-10a + <b>V332</b>: a <b>BOARD</b> permission module now exists, carrying exactly one
+ * action, and the two board-pack <em>export</em> handlers in {@code ExportController} moved onto it.
+ * They had been guarded by {@code hasPermission('REPORTING','EXPORT') or
+ * hasPermission('RISK','EXPORT')} — a disjunction satisfied by <b>24 of 59 roles in dev and 24 of
+ * 57 in production</b>, including VIEWER, SUPPLIER_MANAGER, MA_LEAD, EMERGENCY_RESPONDER,
+ * REGULATOR_VIEWER and RISK_ANALYST, for a file carrying up to 200 itemised risks and 1,000
+ * itemised audit findings (F2-55).
+ *
+ * <p><b>D-10a asked for grant revocation and measurement said no.</b> Because the guard is an OR,
+ * excluding a role means taking <em>both</em> permissions from it — and those two authorise every
+ * other export on the platform. The prod EXPORT ledger is risk-register 12, packet 7,
+ * evidence-package 7, ai-model-registry 3, regulator-package 2, cyber-incidents 1, board-pack 1: so
+ * the collateral of the strip is the most-used export and the beneficiary is the least-used one.
+ * The defect was in the guard, not the grant — the mirror of ADR-015, where the guard was right and
+ * the grant was the defect. The read tier below is unchanged and still on ADMIN:READ; re-homing it
+ * to BOARD:READ is a separate slice with its own grant question.
+ *
  * @see com.tss.grc.security.RoleGuardConversionRatchetTest the census and the platform-wide ratchet
+ * @see com.tss.grc.security.SkuCatalogueRatchetTest ADR-018, which made BOARD a ratified SKU
  */
 class BoardPackGuardTest {
 
@@ -101,6 +121,66 @@ class BoardPackGuardTest {
               + "— the drafter 4 of the 16 existing packs already name")
             .containsEntry("create", ADMIN_WRITE)
             .containsEntry("transition", ADMIN_WRITE);
+    }
+
+    /** The two board-pack <em>export</em> handlers live in {@code ExportController}, not here. */
+    private static Map<String, String> exportGuards() {
+        Map<String, String> found = new TreeMap<>();
+        for (Method m : ExportController.class.getDeclaredMethods()) {
+            GetMapping g = m.getAnnotation(GetMapping.class);
+            if (g == null) continue;
+            for (String path : g.value()) {
+                if (!path.contains("board-pack")) continue;
+                PreAuthorize pa = m.getAnnotation(PreAuthorize.class);
+                found.put(path, pa == null ? "<NO GUARD>" : pa.value());
+            }
+        }
+        return found;
+    }
+
+    /**
+     * ADR-017 D-10a / V332 — the pack's own permission, and the population it excludes.
+     *
+     * <p>The scan is asserted to find both handlers first: a path-matching test that quietly stops
+     * matching passes for the wrong reason, and "the board pack is guarded" is exactly the claim
+     * that must not be wrong.
+     */
+    @Test
+    void boardPackExportsRequireTheBoardExportPermission() {
+        Map<String, String> g = exportGuards();
+        assertThat(g.keySet())
+            .as("the board-pack export scan must still find both handlers in ExportController; if "
+              + "it finds none, every assertion below passes vacuously")
+            .containsExactlyInAnyOrder("/board-pack.pdf", "/board-pack.pptx");
+
+        g.forEach((path, guard) -> assertThat(guard)
+            .as("%s must authorise on BOARD:EXPORT — catalogued and granted to 8 roles by V332 "
+              + "BEFORE this annotation existed (F2-23's rule: never guard on a permission no role "
+              + "holds). Two of the 8 are GLOBAL roles, because F2-56 measured iam.roles as "
+              + "tenant-scoped in practice and an organisation-1-only grant list would ship a "
+              + "board pack tenants 2 and 3 can never download", path)
+            .isEqualTo("hasPermission('BOARD','EXPORT')"));
+    }
+
+    /**
+     * The specific regression. Restoring either disjunct re-admits 24 of 57 production roles to a
+     * file holding 1,000 itemised audit findings, and it would look like a widening of two lines.
+     */
+    @Test
+    void boardPackExportsDoNotFallBackToReportingOrRiskExport() {
+        exportGuards().forEach((path, guard) -> {
+            assertThat(guard)
+                .as("%s must not admit REPORTING:EXPORT — that disjunct is what let VIEWER, "
+                  + "MA_LEAD, EMERGENCY_RESPONDER and REGULATOR_VIEWER download the board pack", path)
+                .doesNotContain("'REPORTING','EXPORT'").doesNotContain("'REPORTING', 'EXPORT'");
+            assertThat(guard)
+                .as("%s must not admit RISK:EXPORT — that disjunct is what let RISK_ANALYST and "
+                  + "SUPPLIER_MANAGER download it. Note the fix does NOT revoke RISK:EXPORT from "
+                  + "them: they keep the risk register, which is the platform's most-used export "
+                  + "(12 of 33 prod EXPORT events). That is the whole reason this is a guard change "
+                  + "and not a grant revocation", path)
+                .doesNotContain("'RISK','EXPORT'").doesNotContain("'RISK', 'EXPORT'");
+        });
     }
 
     /**

@@ -162,9 +162,35 @@ public class ExportController {
     }
 
     // ── Board pack (S1) ───────────────────────────────────────────────────
+    //
+    // ADR-017 D-10a / V332 — these two handlers used to be guarded by
+    // `hasPermission('REPORTING','EXPORT') or hasPermission('RISK','EXPORT')`, a
+    // disjunction satisfied by 24 of 59 roles in dev and 24 of 57 in PRODUCTION —
+    // including VIEWER, SUPPLIER_MANAGER, MA_LEAD, EMERGENCY_RESPONDER,
+    // REGULATOR_VIEWER and RISK_ANALYST. A single call returns up to 200 itemised
+    // risks and 1,000 itemised audit findings (F2-55), so that was not a cosmetic
+    // over-grant.
+    //
+    // D-10a prescribed revoking the four indefensible grants. Measuring the guard
+    // rather than the grant table showed why that instrument does not fit: because
+    // the guard is an OR, stopping a role means taking BOTH permissions from it,
+    // and those two authorise every other export the platform has. On prod the
+    // EXPORT ledger is risk-register 12, packet 7, evidence-package 7,
+    // ai-model-registry 3, regulator-package 2, cyber-incidents 1, board-pack 1 —
+    // so the collateral of the strip is the most-used export and the beneficiary
+    // is the least-used one. Taking EXPORT from EXTERNAL_AUDITOR carries the
+    // inverse risk: inability to furnish under Banking Control Law art. 18.
+    //
+    // So the defect was in the guard, not the grant — the mirror of ADR-015. The
+    // pack now carries its own permission, catalogued and granted by V332 FIRST
+    // (F2-23's rule: never annotate against a permission no role holds), narrowed
+    // to 8 roles. Nothing else loses an export. Two of the 8 are GLOBAL roles
+    // (ORG_ADMIN, INTERNAL_AUDITOR) because F2-56 measured `iam.roles` as
+    // tenant-scoped in practice: a grant list of organisation-1 role names alone
+    // would ship a board pack that tenants 2 and 3 could never download.
 
     @GetMapping("/board-pack.pdf")
-    @PreAuthorize("hasPermission('REPORTING','EXPORT') or hasPermission('RISK','EXPORT')")
+    @PreAuthorize("hasPermission('BOARD','EXPORT')")
     @Operation(summary = "Multi-section board pack PDF combining risks, findings, KRIs, " +
         "framework coverage, change management and ethics highlights. Pass ?lang=ar for RTL.")
     public ResponseEntity<byte[]> boardPackPdf(@RequestParam(defaultValue = "en") String lang) {
@@ -173,7 +199,7 @@ public class ExportController {
     }
 
     @GetMapping("/board-pack.pptx")
-    @PreAuthorize("hasPermission('REPORTING','EXPORT') or hasPermission('RISK','EXPORT')")
+    @PreAuthorize("hasPermission('BOARD','EXPORT')")
     @Operation(summary = "Multi-slide 16:9 board pack PowerPoint deck. Pass ?lang=ar for RTL.")
     public ResponseEntity<byte[]> boardPackPptx(@RequestParam(defaultValue = "en") String lang) {
         byte[] body = boardPackPptxService.generatePptx(lang);
