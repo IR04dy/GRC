@@ -39,13 +39,13 @@ public class CrisisCommsDispatchController {
 
     @PostMapping("/dispatch")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('CISO','CRISIS_COMMANDER','COMMS_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('BCM','APPROVE')")
     public DispatchResult dispatch(@RequestBody @Valid DispatchRequest req) {
         return service.dispatch(req);
     }
 
     @GetMapping("/cascades")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','COMMS_LEAD','PLATFORM_ADMIN','AUDITOR','CRISIS_COMMANDER')")
+    @PreAuthorize("hasPermission('BCM','READ')")
     public List<CascadeResponse> list(
         @RequestParam(value = "crisisEventId", required = false) Long crisisEventId
     ) {
@@ -55,7 +55,7 @@ public class CrisisCommsDispatchController {
     }
 
     @GetMapping("/cascades/{externalId}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','COMMS_LEAD','PLATFORM_ADMIN','AUDITOR','CRISIS_COMMANDER')")
+    @PreAuthorize("hasPermission('BCM','READ')")
     public CascadeResponse get(@PathVariable UUID externalId) {
         return service.get(externalId);
     }

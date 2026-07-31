@@ -161,13 +161,24 @@ class RoleGuardConversionRatchetTest {
      * valid against that branch's fork point, so a ratchet like this must be re-derived whenever two
      * conversions land together, never resolved by taking one side of the conflict.
      *
+     * <p><b>552</b> after {@code bcm/comms}: the nine crisis-comms v2 endpoints, whose guards named
+     * {@code CRISIS_COMMANDER} and {@code COMMS_LEAD} — neither of which exists in {@code iam.roles}.
+     * Moved to {@code BCM:READ} (4 sites), {@code BCM:WRITE} (2), {@code BCM:APPROVE} (2 — dispatch
+     * and the template approval transition) and {@code BCM:DELETE} (archive), all already catalogued
+     * and granted, so no migration was needed for the guards. ⚠ <b>This one was found from the
+     * OPPOSITE direction to every conversion before it.</b> The others came from reading guards; this
+     * came from {@code schema_drift.py} noticing that the two tables these endpoints query exist in
+     * neither database — so the ghost roles were the second defect on a surface that could not have
+     * worked anyway (F2-64, V336). <b>A ghost role and a missing table hide each other: the 403 you
+     * would have got masks the 503 you would have got.</b>
+     *
      * <p>Raising this number means adding an endpoint that authorises by identity in a platform
      * whose authorisation model is permissions, and whose role names have a 54% miss rate. Convert
      * instead. Where a role genuinely is the right unit — {@code PLATFORM_ADMIN}-only platform
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 561;
+    private static final int BASELINE_PURE_ROLE_SITES = 552;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"
