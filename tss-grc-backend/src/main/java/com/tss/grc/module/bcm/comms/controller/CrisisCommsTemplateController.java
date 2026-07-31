@@ -45,7 +45,7 @@ public class CrisisCommsTemplateController {
     private final CrisisCommsTemplateService service;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','COMMS_LEAD','PLATFORM_ADMIN','AUDITOR','CRISIS_COMMANDER','LEGAL_COUNSEL')")
+    @PreAuthorize("hasPermission('BCM','READ')")
     public List<TemplateResponse> list(
         @RequestParam(value = "audience",         required = false) String audience,
         @RequestParam(value = "scenario",         required = false) String scenario,
@@ -64,34 +64,34 @@ public class CrisisCommsTemplateController {
     }
 
     @GetMapping("/{externalId}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','COMMS_LEAD','PLATFORM_ADMIN','AUDITOR','CRISIS_COMMANDER','LEGAL_COUNSEL')")
+    @PreAuthorize("hasPermission('BCM','READ')")
     public TemplateResponse get(@PathVariable UUID externalId) {
         return service.get(externalId);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('CISO','COMMS_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public TemplateResponse create(@RequestBody @Valid TemplateRequest req) {
         return service.create(req);
     }
 
     @PutMapping("/{externalId}")
-    @PreAuthorize("hasAnyRole('CISO','COMMS_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('BCM','WRITE')")
     public TemplateResponse update(@PathVariable UUID externalId,
                                     @RequestBody @Valid TemplateRequest req) {
         return service.update(externalId, req);
     }
 
     @PostMapping("/{externalId}/transition")
-    @PreAuthorize("hasAnyRole('CISO','COMMS_LEAD','PLATFORM_ADMIN','LEGAL_COUNSEL')")
+    @PreAuthorize("hasPermission('BCM','APPROVE')")
     public TemplateResponse transition(@PathVariable UUID externalId,
                                         @RequestBody @Valid ApprovalTransitionRequest req) {
         return service.transition(externalId, req);
     }
 
     @DeleteMapping("/{externalId}")
-    @PreAuthorize("hasAnyRole('CISO','COMMS_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasPermission('BCM','DELETE')")
     public ResponseEntity<TemplateResponse> archive(@PathVariable UUID externalId) {
         return ResponseEntity.ok(service.archive(externalId));
     }
