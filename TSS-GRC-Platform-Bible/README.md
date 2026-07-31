@@ -75,12 +75,12 @@ materially understated (`F-008` — the defect is platform-wide, not one endpoin
 
 | Area | Governing documents |
 |---|---|
-| Governance | [Evidence and maintenance standard](Governance/EVIDENCE_AND_MAINTENANCE_STANDARD.md), [assessment method](Governance/ASSESSMENT_METHOD.md) |
+| Governance | [Evidence and maintenance standard](Governance/EVIDENCE_AND_MAINTENANCE_STANDARD.md), [assessment method](Governance/ASSESSMENT_METHOD.md), [capability reachability and orphan discovery plan](Governance/PLATFORM_CAPABILITY_REACHABILITY_AND_ORPHAN_DISCOVERY_PLAN.md) |
 | Executive | [Executive verdict](Executive/EXECUTIVE_VERDICT.md), [acceptance opinion](Executive/GOVERNMENT_ACCEPTANCE_OPINION.md) |
 | Product | [Product constitution](Product/PRODUCT_CONSTITUTION.md), [DNA and philosophy](Product/PRODUCT_DNA_AND_PHILOSOPHY.md), [strategy and packaging](Product/PRODUCT_STRATEGY_PACKAGING_AND_SALES.md) |
 | Architecture | [Solution architecture](Architecture/SOLUTION_ARCHITECTURE.md), [principles](Architecture/ARCHITECTURE_PRINCIPLES.md), [module independence](Architecture/MODULE_INDEPENDENCE_AND_PACKAGING.md) |
 | UX | [UX architecture](UX/UX_ARCHITECTURE.md), [Arabic design system](UX/ARABIC_AND_SAUDI_UX_STANDARD.md), [journeys](UX/PERSONA_JOURNEYS.md) |
-| Modules | [PDS catalogue](Modules/PRODUCT_DESIGN_SPECIFICATION.md), [source-module inventory](Modules/SOURCE_MODULE_INVENTORY.md) |
+| Modules | [PDS catalogue](Modules/PRODUCT_DESIGN_SPECIFICATION.md), [source-module inventory](Modules/SOURCE_MODULE_INVENTORY.md), [CAB/ECAB/ECAP implementation plan](Modules/CHANGE_MANAGEMENT_CAB_ECAB_ECAP_IMPLEMENTATION_PLAN.md) |
 | Processes | [Business-process design](Process/BUSINESS_PROCESS_DESIGN.md), [state machines](Process/STATE_MACHINE_CATALOGUE.md) |
 | Data | [Data architecture](Data/DATA_ARCHITECTURE.md) |
 | Integration | [Integration architecture](Integration/INTEGRATION_ARCHITECTURE.md) |
