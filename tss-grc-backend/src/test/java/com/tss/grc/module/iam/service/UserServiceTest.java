@@ -140,6 +140,58 @@ class UserServiceTest {
         assertThat(saved.getRoles()).extracting(Role::getRoleName).containsExactly("RISK_MANAGER");
     }
 
+    // ─── F2-62: an inactive role grants nothing, so it must not be assignable ──
+    //
+    // Silently storing the grant would move the original defect rather than fix it: the admin
+    // would be shown a saved user whose listed role confers no access. Refusing names the role.
+
+    @Test
+    void create_withInactiveRole_isRefused_byName() {
+        Role dormant = role(7L, "RISK_MANAGER", ORG_ID);
+        dormant.setIsActive(false);
+        when(userRepository.existsByUsernameAndOrganisationId("alice", ORG_ID)).thenReturn(false);
+        when(userRepository.existsByEmailAndOrganisationId("alice@tss.example", ORG_ID)).thenReturn(false);
+        when(roleRepository.findByOrganisationIdOrOrganisationIdIsNull(ORG_ID)).thenReturn(List.of(dormant));
+
+        assertThatThrownBy(() -> service.create(createReq()))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("inactive role")
+            .hasMessageContaining("RISK_MANAGER");
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void create_withInactiveRole_isRefused_byLegacyIdPath() {
+        // The roleIds branch is the legacy caller path and bypasses the name lookup entirely,
+        // so it needs its own guard — an unguarded fallback is still an unguarded grant.
+        Role dormant = role(7L, "RISK_MANAGER", ORG_ID);
+        dormant.setIsActive(false);
+        UserRequest byId = new UserRequest(
+            "alice", "alice@tss.example", "Sup3rSecret!", "Alice Example", "أليس",
+            "Engineer", null, true, null, Set.of(7L));
+        when(userRepository.existsByUsernameAndOrganisationId("alice", ORG_ID)).thenReturn(false);
+        when(userRepository.existsByEmailAndOrganisationId("alice@tss.example", ORG_ID)).thenReturn(false);
+        when(roleRepository.findAllById(Set.of(7L))).thenReturn(List.of(dormant));
+
+        assertThatThrownBy(() -> service.create(byId))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("RISK_MANAGER");
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void update_cannotSwapInActiveRoleForAnInactiveOne() {
+        Role dormant = role(7L, "RISK_MANAGER", ORG_ID);
+        dormant.setIsActive(false);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user(USER_ID, ORG_ID)));
+        when(roleRepository.findByOrganisationIdOrOrganisationIdIsNull(ORG_ID)).thenReturn(List.of(dormant));
+
+        assertThatThrownBy(() -> service.update(USER_ID, createReq()))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("RISK_MANAGER");
+        verify(userRepository, never()).save(any(User.class));
+    }
+
     @Test
     void create_duplicate_username_in_same_org_throws() {
         when(userRepository.existsByUsernameAndOrganisationId("alice", ORG_ID)).thenReturn(true);
