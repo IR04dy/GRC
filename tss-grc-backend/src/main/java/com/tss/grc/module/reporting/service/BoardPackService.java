@@ -27,6 +27,7 @@ import com.tss.grc.module.risk.repository.RiskRepository;
 import com.tss.grc.module.sust.dashboard.service.SustainabilityDashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -239,12 +240,26 @@ public class BoardPackService {
 
     // ── Section: Risk Register top 20 ──────────────────────────────────────
     private void renderRiskRegister(Document doc, Long org, boolean ar) throws DocumentException {
-        // Page.getContent() is immutable — copy into a mutable list before sorting
-        // (the in-place sort below otherwise throws UnsupportedOperationException).
-        List<Risk> risks = new java.util.ArrayList<>(
-            riskRepo.findByOrganisationId(org, PageRequest.of(0, 200)).getContent());
-        risks.sort(Comparator.comparingInt((Risk r) -> r.getInherentScore() == null ? 0 : r.getInherentScore()).reversed());
-        if (risks.size() > 20) risks = risks.subList(0, 20);
+        // F2-58 — rank in the database, not over a page of it.
+        //
+        // This was: fetch PageRequest.of(0, 200) with NO Sort, sort that page by inherent score in
+        // memory, subList(0, 20). Because the page carried no ORDER BY, its 200 rows were whatever
+        // order SQL Server happened to return — so "Top 20" was the top 20 of an arbitrary
+        // 200-row sample of the register, and a board reading it had no way to tell. Latent when
+        // found (largest tenant: 51 risks on both dev and prod), and it would have started lying
+        // silently at risk 201.
+        //
+        // Equivalence on today's data was checked before changing it, not assumed: 2 risks carry a
+        // null inherent_score and SQL Server sorts NULLs last under DESC, which is where the old
+        // comparator's null -> 0 mapping also put them; no risk has a negative score, which is the
+        // only case where that mapping and a NULLS-LAST sort would disagree.
+        //
+        // The id tiebreaker is new and deliberate: several risks share a score, and the old
+        // in-memory sort broke those ties by the arbitrary page order, so the pack could name a
+        // different 20th risk on two consecutive runs over unchanged data.
+        List<Risk> risks = riskRepo.findByOrganisationId(org, PageRequest.of(0, 20,
+            Sort.by(Sort.Direction.DESC, "inherentScore").and(Sort.by(Sort.Direction.ASC, "id"))))
+            .getContent();
 
         float[] widths = ar ? new float[]{ 1f, 4.5f, 1f, 1f, 1.5f } : new float[]{ 1f, 4.5f, 1f, 1f, 1.5f };
         PdfPTable t = buildTable(widths, ar);
@@ -265,29 +280,33 @@ public class BoardPackService {
 
     // ── Section: Findings ───────────────────────────────────────────────────
     private void renderFindings(Document doc, Long org, boolean ar) throws DocumentException {
-        // Page.getContent() is immutable — copy before the in-place sort below.
-        List<AuditFinding> findings = new java.util.ArrayList<>(
-            findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent());
+        // F2-58 — count the tiers in the database over EVERY open finding.
+        //
+        // This was: fetch PageRequest.of(0, 1000) and bucket in a Java loop, so the tiers a board
+        // sees were computed over at most the first 1,000 findings. `cutoff(N)` reproduces the
+        // loop's day-granularity predicate exactly (see the repository Javadoc); the subtractions
+        // turn three cumulative counts into four disjoint tiers, and null-dated findings fall into
+        // the on-track remainder just as `days = 0` used to put them there.
         LocalDate today = LocalDate.now();
-
-        long onTrack = 0, mgr = 0, dir = 0, exec = 0;
-        for (AuditFinding f : findings) {
-            if ("CLOSED".equals(f.getStatus())) continue;
-            LocalDateTime created = f.getCreatedAt();
-            long days = created != null ? ChronoUnit.DAYS.between(created.toLocalDate(), today) : 0;
-            if (days >= 90) exec++;
-            else if (days >= 60) dir++;
-            else if (days >= 30) mgr++;
-            else onTrack++;
-        }
+        long totalOpen  = findingRepo.countOpenByOrganisationId(org);
+        long exec       = findingRepo.countOpenByOrganisationIdOlderThan(org, cutoff(today, 90));
+        long dirOrWorse = findingRepo.countOpenByOrganisationIdOlderThan(org, cutoff(today, 60));
+        long mgrOrWorse = findingRepo.countOpenByOrganisationIdOlderThan(org, cutoff(today, 30));
+        long dir     = dirOrWorse - exec;
+        long mgr     = mgrOrWorse - dirOrWorse;
+        long onTrack = totalOpen  - mgrOrWorse;
         // Shaping-aware line — plain paragraphs never shape Arabic.
         PdfTheme.line(doc,
             ar ? "تقادم الملاحظات: في المسار " + onTrack + " · مدير " + mgr + " · مدير عام " + dir + " · تنفيذي " + exec
                : "Aging tiers: On Track " + onTrack + " · Manager " + mgr + " · Director " + dir + " · Exec " + exec,
             PdfFonts.normal(11), ar, 0, 10);
 
-        // Open findings table — top 15 oldest first
-        findings.sort(Comparator.comparing((AuditFinding f) -> f.getCreatedAt() == null ? LocalDateTime.MAX : f.getCreatedAt()));
+        // Open findings table — the 15 oldest, ordered and limited in SQL (F2-58). The old code
+        // paged 1,000 rows including closed ones and counted only open rows toward its limit, so a
+        // tenant whose first 1,000 findings were largely closed could render fewer than 15 open
+        // findings while older open ones sat unlisted.
+        List<AuditFinding> findings =
+            findingRepo.findOldestOpenByOrganisationId(org, PageRequest.of(0, 15));
         int rowCount = 0;
         float[] widths = new float[]{ 4f, 1.3f, 1.5f, 1f, 1.3f };
         PdfPTable t = buildTable(widths, ar);
@@ -296,7 +315,7 @@ public class BoardPackService {
             : new String[]{ "Finding",  "Severity", "Owner",  "Days",   "Status" };
         for (String h : hdr) t.addCell(headerCell(h, ar));
         for (AuditFinding f : findings) {
-            if ("CLOSED".equals(f.getStatus())) continue;
+            // No CLOSED skip: the query already excludes them, so every row here is rendered.
             LocalDateTime created = f.getCreatedAt();
             long days = created != null ? ChronoUnit.DAYS.between(created.toLocalDate(), today) : 0;
             t.addCell(bodyCell(safe(f.getTitle()), ar));
@@ -307,6 +326,19 @@ public class BoardPackService {
             if (++rowCount >= 15) break;
         }
         doc.add(t);
+    }
+
+    /**
+     * F2-58 — the timestamp boundary that makes a SQL {@code createdAt < cutoff} count identical to
+     * the Java loop's {@code ChronoUnit.DAYS.between(createdAt.toLocalDate(), today) >= days}.
+     *
+     * <p>That predicate holds iff the creation date is on or before {@code today - days}, which is
+     * iff the timestamp precedes the start of day {@code today - (days - 1)}. The off-by-one
+     * matters: {@code LocalDateTime.now().minusDays(90)} would exclude a finding created 90 days
+     * ago at 15:00 from a report run at 10:00, while the loop counts it.
+     */
+    static LocalDateTime cutoff(LocalDate today, int days) {
+        return today.minusDays(days - 1L).atStartOfDay();
     }
 
     // ── Section: KRIs ───────────────────────────────────────────────────────
