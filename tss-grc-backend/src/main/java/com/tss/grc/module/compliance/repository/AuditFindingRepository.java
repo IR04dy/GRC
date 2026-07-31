@@ -49,6 +49,54 @@ public interface AuditFindingRepository extends JpaRepository<AuditFinding, Long
         """)
     long countOpenByOrganisationId(@Param("orgId") Long orgId);
 
+    /**
+     * F2-58 — open findings created strictly before {@code cutoff}, counted in the database.
+     *
+     * <p>Both board-pack renderers built their aging tiers by fetching 1,000 findings and
+     * bucketing them in a Java loop. That is the same defect {@link #countOpenByOrganisationId}
+     * was added to fix (QUAL-BCMP-006), one layer along: correct only while a tenant stays under
+     * the page size, and silently wrong above it — a board would be shown aging tiers computed
+     * over an arbitrary 1,000-row subset with no error and no log line.
+     *
+     * <p>Callers pass {@code LocalDate.now().minusDays(N - 1).atStartOfDay()} to reproduce the
+     * loop's {@code ChronoUnit.DAYS.between(createdAt.toLocalDate(), today) >= N} exactly: that
+     * predicate is true iff the creation <em>date</em> is on or before {@code today - N}, i.e. iff
+     * the timestamp falls before the start of day {@code today - (N - 1)}. Using
+     * {@code now().minusDays(N)} instead would be off by one for any finding created later in the
+     * day than the moment the report runs.
+     *
+     * <p>{@code createdAt IS NULL} never satisfies {@code <}, so null-dated findings fall out of
+     * every tier and land in the on-track remainder — which is what the loop did with
+     * {@code days = 0}. Measured 2026-07-31: zero findings have a null {@code created_at}, so the
+     * clause is a guard rather than a live path.
+     */
+    @Query("""
+        SELECT COUNT(f) FROM AuditFinding f
+        WHERE f.organisationId = :orgId
+          AND (f.status IS NULL OR f.status <> 'CLOSED')
+          AND f.createdAt < :cutoff
+        """)
+    long countOpenByOrganisationIdOlderThan(@Param("orgId") Long orgId,
+                                            @Param("cutoff") java.time.LocalDateTime cutoff);
+
+    /**
+     * F2-58 — the oldest open findings, ordered and limited by the database.
+     *
+     * <p>Replaces "fetch 1,000, sort in memory, break at 15". Pass
+     * {@code PageRequest.of(0, 15)}. Closed findings are excluded in SQL, so the page size is the
+     * number of rows rendered — the previous code counted only non-closed rows toward its limit
+     * but paged over both, so a tenant whose first 1,000 findings were mostly closed could render
+     * fewer than 15 open ones while older open findings existed.
+     */
+    @Query("""
+        SELECT f FROM AuditFinding f
+        WHERE f.organisationId = :orgId
+          AND (f.status IS NULL OR f.status <> 'CLOSED')
+        ORDER BY f.createdAt ASC
+        """)
+    java.util.List<AuditFinding> findOldestOpenByOrganisationId(@Param("orgId") Long orgId,
+                                                                Pageable pageable);
+
     /** Tenant findings tagged to a framework — org + framework filtered in SQL
      *  (QUAL-RC-006, replaces fetch-1000-then-filter). */
     java.util.List<AuditFinding> findByOrganisationIdAndFrameworkId(

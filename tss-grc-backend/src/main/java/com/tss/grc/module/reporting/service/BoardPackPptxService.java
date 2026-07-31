@@ -20,6 +20,7 @@ import org.apache.poi.sl.usermodel.TextParagraph;
 import org.apache.poi.sl.usermodel.VerticalAlignment;
 import org.apache.poi.xslf.usermodel.*;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -120,10 +121,12 @@ public class BoardPackPptxService {
         XSLFSlide s = ppt.createSlide();
         slideHeader(s, ar ? "ملخص تنفيذي" : "Executive Summary", ar);
 
-        long totalRisks    = riskRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getTotalElements();
+        // F2-58 — count in the database. `totalRisks` used to issue a 1,000-row page purely to read
+        // getTotalElements(), and `openFindings` fetched 1,000 rows to filter them in Java, so it
+        // under-reported for any tenant past the page size.
+        long totalRisks    = riskRepo.countByOrganisationId(org);
         long criticalRisks = riskRepo.countByOrganisationIdAndRiskLevel(org, "CRITICAL");
-        long openFindings  = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent()
-            .stream().filter(f -> !"CLOSED".equals(f.getStatus())).count();
+        long openFindings  = findingRepo.countOpenByOrganisationId(org);
         long totalKris     = kriRepo.countByOrganisationIdAndIsDeletedFalse(org);
         long totalCases    = caseRepo.countByOrganisationId(org);
         long strs          = amlRepo.countByOrganisationIdAndStrFiled(org, true);
@@ -151,11 +154,13 @@ public class BoardPackPptxService {
         XSLFSlide s = ppt.createSlide();
         slideHeader(s, ar ? "أعلى ١٠ مخاطر" : "Top 10 Risks", ar);
 
-        // Page.getContent() is immutable — copy before the in-place sort below.
-        List<Risk> risks = new java.util.ArrayList<>(
-            riskRepo.findByOrganisationId(org, PageRequest.of(0, 200)).getContent());
-        risks.sort(Comparator.comparingInt((Risk r) -> r.getInherentScore() == null ? 0 : r.getInherentScore()).reversed());
-        if (risks.size() > 10) risks = risks.subList(0, 10);
+        // F2-58 — rank in the database. Same defect as the PDF renderer, independently written:
+        // a 200-row page with no Sort, ranked in memory, trimmed to 10. The deck's top 10 and the
+        // PDF's top 20 were each drawn from an arbitrary sample of the same register, so the two
+        // documents in one board pack could disagree about which risks are the worst.
+        List<Risk> risks = riskRepo.findByOrganisationId(org, PageRequest.of(0, 10,
+            Sort.by(Sort.Direction.DESC, "inherentScore").and(Sort.by(Sort.Direction.ASC, "id"))))
+            .getContent();
 
         String[][] rows = new String[risks.size() + 1][4];
         rows[0] = ar
@@ -178,18 +183,17 @@ public class BoardPackPptxService {
         XSLFSlide s = ppt.createSlide();
         slideHeader(s, ar ? "ملاحظات التدقيق" : "Audit Findings", ar);
 
-        List<AuditFinding> findings = findingRepo.findByOrganisationId(org, PageRequest.of(0, 1000)).getContent();
+        // F2-58 — the same tier counts as the PDF, from the same queries, over every open finding
+        // rather than the first 1,000. `closed` was also capped by that page.
         LocalDate today = LocalDate.now();
-        long onTrack = 0, mgr = 0, dir = 0, exec = 0, closed = 0;
-        for (AuditFinding f : findings) {
-            if ("CLOSED".equals(f.getStatus())) { closed++; continue; }
-            LocalDateTime created = f.getCreatedAt();
-            long days = created != null ? ChronoUnit.DAYS.between(created.toLocalDate(), today) : 0;
-            if (days >= 90) exec++;
-            else if (days >= 60) dir++;
-            else if (days >= 30) mgr++;
-            else onTrack++;
-        }
+        long totalOpen  = findingRepo.countOpenByOrganisationId(org);
+        long exec       = findingRepo.countOpenByOrganisationIdOlderThan(org, BoardPackService.cutoff(today, 90));
+        long dirOrWorse = findingRepo.countOpenByOrganisationIdOlderThan(org, BoardPackService.cutoff(today, 60));
+        long mgrOrWorse = findingRepo.countOpenByOrganisationIdOlderThan(org, BoardPackService.cutoff(today, 30));
+        long dir     = dirOrWorse - exec;
+        long mgr     = mgrOrWorse - dirOrWorse;
+        long onTrack = totalOpen  - mgrOrWorse;
+        long closed  = findingRepo.countByOrganisationIdAndStatus(org, "CLOSED");
         String[][] rows = new String[][]{
             ar ? new String[]{ "التصعيد", "العدد" } : new String[]{ "Tier", "Count" },
             { ar ? "في المسار" : "On Track",     String.valueOf(onTrack) },
@@ -403,4 +407,5 @@ public class BoardPackPptxService {
     }
 
     private static String safe(String s) { return s == null ? "—" : s; }
+
 }
