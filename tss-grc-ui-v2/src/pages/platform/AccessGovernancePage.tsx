@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ShieldCheck, KeyRound, Grid3X3, UserSearch, Plus, Save, Trash2, RefreshCw,
-  Inbox, ClipboardCheck, Scale, Siren, BarChart3,
+  Inbox, ClipboardCheck, Scale, Siren, BarChart3, Copy,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -15,6 +15,7 @@ import {
   governanceApi, adminApi, ApiError,
   type GovRoleDto, type GovMatrixDto, type GovEffectiveAccessDto, type AdminUserDto,
 } from '../../lib/api';
+import { hasAnyRole } from '../../lib/auth';
 import { RequestsTab, CampaignsTab, SodTab, BreakGlassTab, AnalyticsTab } from './AccessAssuranceTabs';
 
 type TabId = 'roles' | 'matrix' | 'access' | 'requests' | 'campaigns' | 'sod' | 'breakglass' | 'analytics';
@@ -119,6 +120,34 @@ function RolesTab({ roles, loading, reload }: { roles: GovRoleDto[]; loading: bo
     } catch (e) { toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل الإيقاف' : 'Retire failed')); }
   }
 
+  /**
+   * F2-56 — clone a shared role into this tenant. The new name must be supplied because the
+   * source's name is taken (by the source), and both display names are backend-mandatory,
+   * so they are gated here rather than surfaced as a validation 400.
+   */
+  async function clone(r: GovRoleDto) {
+    if (!form.roleName || !form.displayNameEn || !form.displayNameAr) {
+      toast.danger(isAr
+        ? 'املأ اسم الدور والاسمين المعروضين (EN وAR) أعلاه، ثم انسخ'
+        : 'Fill the role name and both display names (EN and AR) above, then clone');
+      return;
+    }
+    setBusy(true);
+    try {
+      const made = await governanceApi.cloneRole(r.id, {
+        roleName: form.roleName.toUpperCase(),
+        displayNameEn: form.displayNameEn,
+        displayNameAr: form.displayNameAr,
+      });
+      toast.success(isAr
+        ? `نُسخ ${r.roleName} إلى ${made.roleName}`
+        : `Cloned ${r.roleName} to ${made.roleName}`);
+      setForm({ roleName: '', displayNameEn: '', displayNameAr: '' });
+      await reload();
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : (isAr ? 'فشل النسخ' : 'Clone failed')); }
+    finally { setBusy(false); }
+  }
+
   return (
     <Card title={isAr ? 'كتالوج الأدوار' : 'Role catalogue'} Icon={KeyRound}
       action={
@@ -143,6 +172,7 @@ function RolesTab({ roles, loading, reload }: { roles: GovRoleDto[]; loading: bo
               <th>{isAr ? 'الاسم (EN)' : 'Display (EN)'}</th>
               <th>{isAr ? 'الاسم (AR)' : 'Display (AR)'}</th>
               <th>{isAr ? 'النوع' : 'Type'}</th>
+              <th>{isAr ? 'النطاق' : 'Scope'}</th>
               <th>{isAr ? 'الحالة' : 'Status'}</th>
               <th></th>
             </tr></thead>
@@ -153,8 +183,17 @@ function RolesTab({ roles, loading, reload }: { roles: GovRoleDto[]; loading: bo
                   <td className="text-2xs">{r.displayNameEn}</td>
                   <td className="text-2xs" dir="rtl">{r.displayNameAr ?? '—'}</td>
                   <td><Badge tone={r.systemRole ? 'info' : 'neutral'} dot>{r.systemRole ? (isAr ? 'نظامي' : 'System') : (isAr ? 'مخصص' : 'Custom')}</Badge></td>
+                  <td>
+                    <Badge tone={r.organisationId == null ? 'info' : 'neutral'} dot>
+                      {r.organisationId == null ? (isAr ? 'مشترك' : 'Shared') : (isAr ? 'خاص بالمستأجر' : 'Tenant')}
+                    </Badge>
+                  </td>
                   <td><Badge tone={r.active ? 'success' : 'warning'} dot>{r.active ? (isAr ? 'نشط' : 'Active') : (isAr ? 'موقوف' : 'Inactive')}</Badge></td>
                   <td>
+                    <Button size="sm" variant="ghost" Icon={Copy} onClick={() => void clone(r)} disabled={busy}
+                      title={isAr
+                        ? 'انسخ إلى هذا المستأجر (املأ الأسماء أعلاه أولاً)'
+                        : 'Clone into this tenant (fill the names above first)'} />
                     {!r.systemRole && (
                       <Button size="sm" variant="ghost" Icon={Trash2} onClick={() => void retire(r)}
                         title={isAr ? 'إيقاف' : 'Retire'} />
@@ -233,7 +272,14 @@ function MatrixTab({ roles }: { roles: GovRoleDto[] }) {
     finally { setBusy(false); }
   }
 
-  const editable = matrix != null && roles.find(r => r.id === roleId)?.organisationId != null;
+  // F2-56 — a shared (global) role is one row for every tenant, so editing it from inside a
+  // tenant would rewrite authorisation for the others. Platform scope may; a tenant may not,
+  // and clones instead. Before V334 only 12 roles were global and this read `organisationId
+  // != null` alone, which meant the editor was dead for all 12 even for PLATFORM_ADMIN.
+  const selected = roles.find(r => r.id === roleId);
+  const shared = selected != null && selected.organisationId == null;
+  const platformScope = hasAnyRole('PLATFORM_ADMIN');
+  const editable = matrix != null && (!shared || platformScope);
 
   return (
     <Card title={isAr ? 'مصفوفة وحدة × إجراء' : 'Module × action matrix'} Icon={Grid3X3}
@@ -256,7 +302,9 @@ function MatrixTab({ roles }: { roles: GovRoleDto[] }) {
         : <>
             {!editable && (
               <div style={{ ...EMPTY, paddingTop: 0 }}>
-                {isAr ? 'الأدوار العامة للقراءة فقط هنا.' : 'Global roles are read-only here.'}
+                {isAr
+                  ? 'هذا دور مشترك بين جميع المستأجرين، ولا يمكن تعديله من داخل مستأجر واحد. انسخه من كتالوج الأدوار للحصول على نسخة خاصة بك يمكنك تعديلها.'
+                  : 'This role is shared by every tenant, so it cannot be edited from inside one. Clone it from the Role catalogue to get a copy of your own that you can tune.'}
               </div>
             )}
             <table className="grc-table">
