@@ -1,10 +1,51 @@
 # Enterprise Table, Page, Process and Workflow Completeness Audit Plan
 
 **Document type:** Enterprise product-operability, UX, data and process audit plan  
-**Status:** `TARGET` — methodology and execution plan; findings are produced only after execution  
+**Status:** `DISPOSITIONED (reduced to four keepers)` — see §0. Not executed as written.  
 **Baseline date:** 2026-07-31  
 **Scope:** Every SQL Server object, managed business object, backend command/API, workflow, frontend page and module in the TSS GRC Platform  
 **Companion:** [Platform Capability Reachability and Orphan Discovery Plan](PLATFORM_CAPABILITY_REACHABILITY_AND_ORPHAN_DISCOVERY_PLAN.md)  
+
+---
+
+## §0 Disposition — 2026-08-01
+
+**This document is not scheduled as written, and the reason is the finding.** It appeared in the tree
+on 2026-07-31, 1,173 lines, scoped to *"every SQL Server object, managed business object, backend
+command/API, workflow, frontend page and module"* — while its own companion, the
+[Reachability and Orphan Discovery Plan](PLATFORM_CAPABILITY_REACHABILITY_AND_ORPHAN_DISCOVERY_PLAN.md),
+was already **rescoped and half-executed** as F2-68 in the governing backlog. Two documents proposing
+overlapping census machinery, days apart, is the duplication F2-68 exists to prevent — **occurring
+while F2-68 was being written.** So this gets the treatment
+[`UNIFIED_IMPLEMENTATION_PLAN.md`](../../UNIFIED_IMPLEMENTATION_PLAN.md) prescribes for a plan that
+arrives beside an active programme: a disposition at the top, its keepers filed as `F2-*` ids in the
+governing backlog, and **no numbering scheme of its own**.
+
+**Reviewed in full against the instruments that already exist** (`table_xref.py`, `schema_drift.py`,
+`grant_tightness.py`, `deployment_identity.py`, `SchemaContractRatchetTest`,
+`RoleGuardConversionRatchetTest`, `routeReachability.test.ts`). Verdict: **one genuinely new idea plus
+three small pairwise joins — roughly 3–4 engineer-weeks — inside ~1,100 lines that re-derive
+instruments already running.** The bulk is not wrong; it is *already built*, and re-inflates the
+8-role pod, four councils, master graph and ten hand-maintained registers that the companion's adopted
+rescope deliberately cut. One measured example of the cost of not checking: its §6.1 proposes a
+stored-procedure and view universe for a database the companion measured at **1 view, 0 procedures,
+1 trigger**.
+
+### The four keepers
+
+| # | Keep | Where it is here | Why it survives | Size |
+|---|---|---|---|---|
+| **K-1** | **Interaction-archetype / expected-surface classification** | §5, TPC-001 | The only novel *idea* in the document. `table_xref.py` classifies **liveness** — operating, seed-only, orphaned. Nothing classifies what surface a table *ought* to have, so "this table has no page" cannot currently be distinguished from "this table must never have one". Two columns on the existing register + exceptions pattern, adjudicated **only for tables already under disposition** | days |
+| **K-2** | **Status-transition reachability scan** | §9.2 | States with no incoming or no outgoing command; backend states absent from the FE; two state machines over one record. No instrument does this, and F2-22b and F2-29 already supply the known positives to anchor it against vacuity. Workflow-adopting modules first | 1–2 wk |
+| **K-3** | **Multi-write-path (dual-lineage) detector** | §7.3 | A detector for this platform's historically worst shape — CH-6/CH-9's two policy backends, DF-3 — currently found only by hand, and only after it has shipped. Sits on top of `table_xref.py`'s existing reference collection | days |
+| **K-4** | **Workflow definition-vs-actor reachability** | §10.1–10.2 | Template with no publisher; task role with no users in the tenant. Folds into **F2-66**'s clean-tenant probe rather than standing alone — F2-66 already has to exercise the engine end to end | 1–2 d |
+
+⚠ **K-1 through K-4 are filed as backlog candidates, not as a plan.** They enter the queue through
+`UNIFIED_IMPLEMENTATION_PLAN.md` §8 like anything else, behind the schema spine — because a
+classification of what surface a table *should* have is worth little while 67 mapped tables and 11 of
+their schemas cannot be created by a migration at all (RC-A / F2-70).
+
+**Everything below this section is retained as reference, not as scope.**
 
 ---
 
