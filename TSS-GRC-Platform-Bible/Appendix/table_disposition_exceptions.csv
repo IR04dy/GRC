@@ -1,0 +1,10 @@
+schema,table,code,reason,owner,date
+iam,break_glass_events,DORMANT,"Emergency access is a rare event by design. 0 rows means it has never been needed, not that it is unwired — BreakGlassService is live and its self-review 409 is tested. ADR-017 D-10b notes the deeper point: this door stays unused because the roles that would need it hold everything permanently.",engineering,2026-07-31
+platform,crowdstrike_action_log,DORMANT,"Connector ingress staging. Empty until a tenant configures the CrowdStrike integration; a row would mean the connector fired.",engineering,2026-07-31
+platform,crowdstrike_detection_log,DORMANT,"Connector ingress staging — see crowdstrike_action_log.",engineering,2026-07-31
+platform,tenable_recast_log,DORMANT,"Connector ingress staging. Empty until a tenant configures Tenable.",engineering,2026-07-31
+platform,flyway_schema_history,INTENTIONAL_TECHNICAL,"Flyway's own bookkeeping. Present in prod only because dev runs with Flyway off and a Python-bootstrapped schema.",engineering,2026-07-31
+iam,access_review_items,DORMANT,"Snapshotted from iam.user_roles when a recertification campaign is created. 0 rows means no campaign has been run in either database, which is a usage fact rather than a wiring fact — AccessReviewItemRepository is live and its closure gate is tested.",engineering,2026-07-31
+privacy_lc,ropa_activities,ORPHAN_CONFIRMED,"Documented orphan. The privacy_lc schema was created ahead of a lifecycle module that was never wired; the live privacy capability (RoPA/DPIA/DSR/breach) lives in the privacy schema. CLAUDE.md's landmine list says explicitly: do not seed these before checking they are wired.",product,2026-07-31
+privacy_lc,dpia_assessments,ORPHAN_CONFIRMED,"Documented orphan — see privacy_lc.ropa_activities.",product,2026-07-31
+privacy_lc,cross_border_transfers,ORPHAN_CONFIRMED,"Documented orphan — see privacy_lc.ropa_activities.",product,2026-07-31

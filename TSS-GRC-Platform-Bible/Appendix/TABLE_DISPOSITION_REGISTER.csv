@@ -1,0 +1,465 @@
+schema,table,code,source,rows_dev,rows_prod,jpa_files,code_refs,test_refs,migrations,mig_inserts,py_refs,py_inserts,reason
+admin,committee_action_items,OPERATING,generated,33,33,1,0,0,3,2,1,1,mapped and carrying data
+admin,committee_form_templates,OPERATING,generated,10,10,1,1,0,2,1,2,0,mapped and carrying data
+admin,committee_gate_map,OPERATING,generated,2,2,1,1,0,2,1,0,0,mapped and carrying data
+admin,committee_meeting_attendee,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+admin,committee_meeting_papers,OPERATING,generated,21,21,1,0,0,1,0,1,1,mapped and carrying data
+admin,committee_meetings,OPERATING,generated,32,32,1,1,0,4,2,3,2,mapped and carrying data
+admin,committee_member_skills,OPERATING,generated,31,31,1,0,0,1,0,1,1,mapped and carrying data
+admin,committee_member_terms,OPERATING,generated,31,31,1,0,0,3,0,3,2,mapped and carrying data
+admin,committee_referral,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+admin,committee_resolution_vote,WIRED_UNPROVEN,generated,0,0,1,0,0,3,0,1,0,"mapped, 0 rows in both databases — shipped, never exercised"
+admin,committee_resolutions,OPERATING,generated,20,20,1,0,0,4,2,2,2,mapped and carrying data
+admin,committee_standing_items,OPERATING,generated,148,148,1,0,0,2,1,1,0,mapped and carrying data
+admin,committee_templates,OPERATING,generated,19,19,1,1,1,1,1,1,0,mapped and carrying data
+admin,committees,OPERATING,generated,17,17,1,2,2,6,2,9,1,mapped and carrying data
+ai,ai_suggestions,OPERATING,generated,43,32,1,0,0,2,1,1,1,mapped and carrying data
+ai_governance,ai_lifecycle_event,OPERATING,generated,13,13,1,0,0,0,0,2,1,mapped and carrying data
+ai_governance,ml_model,OPERATING,generated,25,25,1,0,0,2,1,2,2,mapped and carrying data
+ai_governance,ml_model_audit,OPERATING,generated,24,24,1,0,0,2,1,1,1,mapped and carrying data
+ai_governance,ml_model_drift_observation,OPERATING,generated,26,26,1,0,0,2,1,1,1,mapped and carrying data
+ai_governance,model_validation,OPERATING,generated,16,16,1,0,0,0,0,3,2,mapped and carrying data
+ai_governance,recertification,OPERATING,generated,13,13,1,0,0,0,0,3,2,mapped and carrying data
+ai_governance,retraining_event,OPERATING,generated,11,11,1,0,0,0,0,3,2,mapped and carrying data
+aml,sanctions_list,OPERATING,generated,5,5,1,0,0,1,1,1,0,mapped and carrying data
+aml,sanctions_list_entry,OPERATING,generated,15,15,1,0,0,2,1,1,0,mapped and carrying data
+aml,screening_check,OPERATING,generated,8,8,1,0,0,1,1,1,0,mapped and carrying data
+aml,screening_hit,OPERATING,generated,3,3,1,0,0,2,1,1,0,mapped and carrying data
+approvals,requests,OPERATING,generated,22,21,1,0,0,1,0,2,2,mapped and carrying data
+audit,audit_logs,LEGACY,generated,14,14,0,0,0,1,0,1,0,"no JPA mapping, no Java reference and no seed insert, yet 28 row(s) — rows arrived from a migration or by hand"
+audit_committee,dashboard_attestation,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+audit_committee,dashboard_snapshot,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+audit_eng,engagements,OPERATING,generated,1,1,1,0,0,1,0,1,1,mapped and carrying data
+audit_lc,annual_plans,OPERATING,generated,2,2,1,0,0,2,0,3,2,mapped and carrying data
+audit_lc,capa_tasks,OPERATING,generated,12,12,1,0,0,1,0,2,1,mapped and carrying data
+audit_lc,findings,OPERATING,generated,20,20,1,0,0,2,0,4,3,mapped and carrying data
+audit_lc,ia_annual_plan,OPERATING,generated,1,1,1,0,0,1,1,1,1,mapped and carrying data
+audit_lc,ia_audit_universe_entry,OPERATING,generated,20,20,1,0,0,2,1,1,1,mapped and carrying data
+audit_lc,ia_engagement,OPERATING,generated,5,5,1,0,0,2,1,1,1,mapped and carrying data
+audit_lc,ia_engagement_milestone,OPERATING,generated,25,25,1,0,0,2,1,1,1,mapped and carrying data
+audit_lc,working_papers,OPERATING,generated,12,12,1,0,0,1,0,2,1,mapped and carrying data
+bcm,assessment_cycles,OPERATING,generated,2,2,1,0,0,2,2,0,0,mapped and carrying data
+bcm,bcm_exercises,SEED_ONLY,generated,14,14,0,0,0,2,0,2,2,"no JPA mapping and no Java reference; the only writer is a seed script (seed_real_data.py, setup_bcm_db.py) — 28 row(s) of ballast, present in prod because it was restored from a dev dump"
+bcm,bcm_plans,OPERATING,generated,10,10,1,0,0,3,0,2,1,mapped and carrying data
+bcm,bcm_risks,OPERATING,generated,12,12,1,0,0,2,1,0,0,mapped and carrying data
+bcm,bcp_binder_export,OPERATING,generated,4,4,1,0,0,1,0,1,0,mapped and carrying data
+bcm,bcp_plans,OPERATING,generated,10,10,1,0,0,5,1,1,0,mapped and carrying data
+bcm,bcp_sections,OPERATING,generated,120,120,1,0,0,3,1,0,0,mapped and carrying data
+bcm,bcp_versions,OPERATING,generated,7,7,1,0,0,3,1,0,0,mapped and carrying data
+bcm,bia_assessments,OPERATING,generated,8,8,1,0,0,6,1,0,0,mapped and carrying data
+bcm,bia_quantitative,OPERATING,generated,1,1,1,0,0,2,1,0,0,mapped and carrying data
+bcm,bia_quantitative_loss_line,OPERATING,generated,40,40,1,0,0,1,1,0,0,mapped and carrying data
+bcm,bia_records,OPERATING,generated,10,10,1,0,0,5,0,2,2,mapped and carrying data
+bcm,communication_contacts,OPERATING,generated,19,19,1,0,0,1,1,1,1,mapped and carrying data
+bcm,compliance_mappings,OPERATING,generated,412,412,1,0,0,2,1,3,3,mapped and carrying data
+bcm,continuity_strategies,OPERATING,generated,8,8,1,0,0,3,1,0,0,mapped and carrying data
+bcm,corrective_actions,OPERATING,generated,10,10,1,0,0,3,1,0,0,mapped and carrying data
+bcm,crisis_aar,OPERATING,generated,5,5,1,0,0,3,1,1,1,mapped and carrying data
+bcm,crisis_comms_audiences,OPERATING,generated,4,4,1,0,0,2,0,0,0,mapped and carrying data
+bcm,crisis_comms_cascade,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,2,0,"mapped, 0 rows in both databases — shipped, never exercised"
+bcm,crisis_comms_distributions,OPERATING,generated,2,2,1,0,0,2,0,0,0,mapped and carrying data
+bcm,crisis_comms_template_v2,OPERATING,generated,20,20,1,0,0,2,2,0,0,mapped and carrying data
+bcm,crisis_comms_templates,OPERATING,generated,5,5,1,0,0,1,0,0,0,mapped and carrying data
+bcm,crisis_decisions,OPERATING,generated,10,10,1,0,0,3,1,0,0,mapped and carrying data
+bcm,crisis_events,OPERATING,generated,7,7,1,0,0,10,1,2,1,mapped and carrying data
+bcm,crisis_regulatory_notifications,OPERATING,generated,6,6,1,0,0,3,1,0,0,mapped and carrying data
+bcm,crisis_situation_reports,OPERATING,generated,12,12,1,0,0,3,1,0,0,mapped and carrying data
+bcm,critical_processes,OPERATING,generated,10,10,1,0,0,4,1,4,2,mapped and carrying data
+bcm,critical_resources,SEED_ONLY,generated,6,6,0,0,0,2,0,1,1,"no JPA mapping and no Java reference; the only writer is a seed script (setup_bcm_db.py) — 12 row(s) of ballast, present in prod because it was restored from a dev dump"
+bcm,dr_plans,OPERATING,generated,17,17,1,0,0,3,1,1,1,mapped and carrying data
+bcm,exercise_observation,OPERATING,generated,10,10,1,0,0,3,0,1,0,mapped and carrying data
+bcm,exercise_observer_assignment,OPERATING,generated,6,6,1,0,0,1,0,1,0,mapped and carrying data
+bcm,exercise_run,OPERATING,generated,4,4,1,0,0,3,0,1,0,mapped and carrying data
+bcm,exercise_run_inject,OPERATING,generated,9,9,1,0,0,3,0,1,0,mapped and carrying data
+bcm,exercise_run_response,OPERATING,generated,9,9,1,0,0,2,0,1,0,mapped and carrying data
+bcm,exercise_scenario_inject,OPERATING,generated,30,30,1,0,0,2,1,0,0,mapped and carrying data
+bcm,exercise_scenarios,OPERATING,generated,52,52,1,0,0,2,2,1,1,mapped and carrying data
+bcm,exercises,OPERATING,generated,13,13,1,1,0,5,0,1,0,mapped and carrying data
+bcm,gaps,OPERATING,generated,12,12,1,0,0,5,1,0,0,mapped and carrying data
+bcm,governance_records,OPERATING,generated,1,1,1,0,0,1,1,0,0,mapped and carrying data
+bcm,lessons_learned,OPERATING,generated,8,8,1,0,0,3,1,0,0,mapped and carrying data
+bcm,management_reviews,OPERATING,generated,3,3,1,0,0,1,1,1,1,mapped and carrying data
+bcm,mtpd_inheritance_assessment,OPERATING,generated,2,2,1,0,0,1,0,1,0,mapped and carrying data
+bcm,mtpd_inheritance_finding,OPERATING,generated,8,8,1,0,0,2,0,1,0,mapped and carrying data
+bcm,peak_seasons,OPERATING,generated,6,6,1,0,0,1,1,0,0,mapped and carrying data
+bcm,plan_acknowledgements,OPERATING,generated,8,8,1,0,0,1,1,0,0,mapped and carrying data
+bcm,plan_review_attestations,OPERATING,generated,5,5,1,0,0,1,1,0,0,mapped and carrying data
+bcm,plan_templates,OPERATING,generated,8,8,1,0,0,1,1,0,0,mapped and carrying data
+bcm,process_dependencies,OPERATING,generated,9,9,1,0,0,2,0,1,1,mapped and carrying data
+bcm,process_vendor_dependency,OPERATING,generated,12,12,1,0,0,1,1,1,1,mapped and carrying data
+bcm,recovery_operations,SEED_ONLY,generated,11,11,0,0,0,2,0,2,2,"no JPA mapping and no Java reference; the only writer is a seed script (seed_real_data.py, setup_bcm_db.py) — 22 row(s) of ballast, present in prod because it was restored from a dev dump"
+bcm,settings,OPERATING,generated,1,1,1,0,0,2,1,0,0,mapped and carrying data
+bcm,siem_inbound_events,OPERATING,generated,9,9,1,0,0,1,1,1,1,mapped and carrying data
+bcm,strategy_roi_analysis,OPERATING,generated,3,3,1,0,0,2,1,0,0,mapped and carrying data
+bcm_lc,bia_records,LEGACY,generated,8,8,0,0,0,2,1,2,0,"no JPA mapping, no Java reference and no seed insert, yet 16 row(s) — rows arrived from a migration or by hand"
+bcm_lc,drills,LEGACY,generated,5,5,0,0,0,2,1,2,0,"no JPA mapping, no Java reference and no seed insert, yet 10 row(s) — rows arrived from a migration or by hand"
+bcm_lc,invocations,OPERATING,generated,3,3,1,0,0,1,0,3,1,mapped and carrying data
+bcm_lc,recovery_strategies,LEGACY,generated,8,8,0,0,0,2,1,2,0,"no JPA mapping, no Java reference and no seed insert, yet 16 row(s) — rows arrived from a migration or by hand"
+board_pack,packs,OPERATING,generated,16,16,1,0,1,4,2,2,2,mapped and carrying data
+capa,tasks,OPERATING,generated,14,15,1,0,0,1,0,1,1,mapped and carrying data
+ccm,control_test_definition,OPERATING,generated,10,10,1,0,0,1,1,0,0,mapped and carrying data
+ccm,control_test_run,OPERATING,generated,3,3,1,0,0,2,0,0,0,mapped and carrying data
+change_mgmt,change_approvals,OPERATING,generated,31,31,1,0,0,2,0,1,1,mapped and carrying data
+change_mgmt,change_authorisation_matrix,OPERATING,generated,36,36,1,1,0,2,1,0,0,mapped and carrying data
+change_mgmt,change_comments,OPERATING,generated,45,46,1,0,0,1,0,0,0,mapped and carrying data
+change_mgmt,change_freeze_window,OPERATING,generated,3,3,1,0,0,1,1,0,0,mapped and carrying data
+change_mgmt,change_links,OPERATING,generated,46,45,1,0,0,1,0,0,0,mapped and carrying data
+change_mgmt,change_requests,OPERATING,generated,15,15,1,0,0,3,0,1,0,mapped and carrying data
+change_mgmt,change_tasks,OPERATING,generated,41,41,1,0,0,1,0,1,1,mapped and carrying data
+compliance,assessments,OPERATING,generated,4,4,1,0,0,3,1,1,0,mapped and carrying data
+compliance,audit_engagements,OPERATING,generated,12,12,1,0,0,0,0,1,1,mapped and carrying data
+compliance,compliance_assessments,SEED_ONLY,generated,10,10,0,0,0,3,1,1,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_gov_compliance.py) — 20 row(s) of ballast, present in prod because it was restored from a dev dump"
+compliance,compliance_findings,SEED_ONLY,generated,18,18,0,0,0,2,1,1,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_gov_compliance.py) — 36 row(s) of ballast, present in prod because it was restored from a dev dump"
+compliance,controls,OPERATING,generated,35,35,1,0,0,6,1,2,1,mapped and carrying data
+compliance,evidence_items,SEED_ONLY,generated,83,83,0,0,0,2,0,2,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_gov_compliance.py) — 166 row(s) of ballast, present in prod because it was restored from a dev dump"
+compliance,findings,OPERATING,generated,41,41,1,1,0,3,1,2,1,mapped and carrying data
+compliance,frameworks,OPERATING,generated,24,24,1,0,0,4,0,1,0,mapped and carrying data
+compliance,obligation,OPERATING,generated,47,47,1,16,5,3,2,2,1,mapped and carrying data
+compliance,obligation_attestation,OPERATING,generated,12,12,1,0,0,2,0,1,1,mapped and carrying data
+compliance,obligation_attestation_campaign,OPERATING,generated,4,4,1,0,0,1,0,1,1,mapped and carrying data
+compliance,policies,OPERATING,generated,17,17,1,0,0,2,0,1,1,mapped and carrying data
+compliance,policy_framework_mappings,OPERATING,generated,15,15,1,0,0,2,0,1,1,mapped and carrying data
+compliance,regulatory_changes,OPERATING,generated,35,35,1,0,0,0,0,2,2,mapped and carrying data
+consumer,complaint,OPERATING,generated,12,12,1,0,0,1,1,1,0,mapped and carrying data
+consumer,complaint_aggregate_report,OPERATING,generated,1,1,1,0,0,1,1,0,0,mapped and carrying data
+consumer,complaint_update,OPERATING,generated,28,28,1,0,0,1,0,1,1,mapped and carrying data
+cpty,counterparty,OPERATING,generated,33,33,1,0,0,0,0,3,1,mapped and carrying data
+cpty,cpty_event,OPERATING,generated,75,75,1,0,0,0,0,2,1,mapped and carrying data
+cpty,credit_rating,OPERATING,generated,108,108,1,0,0,0,0,3,1,mapped and carrying data
+cpty,large_exposure_limit,OPERATING,generated,74,74,1,0,0,0,0,3,1,mapped and carrying data
+cpty,rating_action,OPERATING,generated,14,14,1,0,0,0,0,3,2,mapped and carrying data
+cyber,attack_surface_asset,OPERATING,generated,20,20,1,0,0,2,1,1,1,mapped and carrying data
+cyber,attack_surface_finding,OPERATING,generated,14,14,1,0,0,2,1,1,1,mapped and carrying data
+cyber,attack_surface_shadow_it,OPERATING,generated,4,4,1,0,0,2,1,1,0,mapped and carrying data
+cyber,cloud_services,OPERATING,generated,15,15,1,0,0,3,1,1,1,mapped and carrying data
+cyber,control_assessments,OPERATING,generated,21,21,1,0,0,3,0,2,2,mapped and carrying data
+cyber,cyber_action_plans,OPERATING,generated,17,17,1,0,0,4,0,2,2,mapped and carrying data
+cyber,cyber_assets,OPERATING,generated,61,61,1,0,0,4,0,4,3,mapped and carrying data
+cyber,cyber_controls,OPERATING,generated,154,154,1,0,0,9,4,3,2,mapped and carrying data
+cyber,cyber_evidence,OPERATING,generated,12,12,1,0,0,5,0,2,2,mapped and carrying data
+cyber,cyber_frameworks,OPERATING,generated,6,6,1,0,0,3,1,3,2,mapped and carrying data
+cyber,cyber_incidents,OPERATING,generated,26,26,1,0,0,6,0,3,3,mapped and carrying data
+cyber,cyber_sub_controls,OPERATING,generated,529,529,1,0,0,2,0,3,2,mapped and carrying data
+cyber,incidents,OPERATING,generated,48,48,1,2,0,12,2,2,1,mapped and carrying data
+cyber,root_cause_analyses,OPERATING,generated,12,12,1,0,0,4,2,1,1,mapped and carrying data
+cyber,vuln_exceptions,OPERATING,generated,3,3,1,0,0,3,0,2,1,mapped and carrying data
+cyber,vulnerabilities,OPERATING,generated,21,21,1,0,0,4,0,2,2,mapped and carrying data
+cyber,vulnerability_sla_finding,OPERATING,generated,11,11,1,0,0,2,0,1,1,mapped and carrying data
+cyber,vulnerability_sla_policy,OPERATING,generated,4,4,1,0,0,1,1,1,0,mapped and carrying data
+cyber_lc,assets,SEED_ONLY,generated,14,14,0,0,0,2,1,2,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_gov_cyber.py) — 28 row(s) of ballast, present in prod because it was restored from a dev dump"
+cyber_lc,cyber_incidents,SEED_ONLY,generated,10,10,0,0,0,3,2,2,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_gov_cyber.py) — 20 row(s) of ballast, present in prod because it was restored from a dev dump"
+cyber_lc,threat_intel,SEED_ONLY,generated,12,12,0,0,0,4,2,2,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_gov_cyber.py) — 24 row(s) of ballast, present in prod because it was restored from a dev dump"
+cyber_lc,vulnerabilities,OPERATING,generated,36,36,1,0,0,1,0,3,2,mapped and carrying data
+data_officer,breach,OPERATING,generated,6,6,1,0,0,0,0,2,0,mapped and carrying data
+data_officer,catalog_entry,OPERATING,generated,20,20,1,0,0,0,0,3,0,mapped and carrying data
+data_officer,catalog_lineage,OPERATING,generated,16,16,1,0,0,1,0,3,2,mapped and carrying data
+data_officer,consent_record,OPERATING,generated,22,22,1,0,0,0,0,2,0,mapped and carrying data
+data_officer,disposal_job,OPERATING,generated,8,8,1,0,0,0,0,2,0,mapped and carrying data
+data_officer,do_event,OPERATING,generated,16,16,1,0,0,0,0,2,1,mapped and carrying data
+data_officer,dpia,OPERATING,generated,10,10,1,0,0,0,0,2,0,mapped and carrying data
+data_officer,dsr_request,OPERATING,generated,17,17,1,0,0,0,0,2,0,mapped and carrying data
+data_officer,ethics_review,OPERATING,generated,8,8,1,0,0,0,0,2,0,mapped and carrying data
+data_officer,ndr_submission,OPERATING,generated,3,3,1,0,0,0,0,2,0,mapped and carrying data
+data_officer,privacy_notice,OPERATING,generated,11,11,1,0,0,0,0,2,0,mapped and carrying data
+data_officer,quality_rule,OPERATING,generated,16,16,1,0,0,0,0,3,0,mapped and carrying data
+data_officer,quality_run,OPERATING,generated,24,24,1,0,0,1,0,3,2,mapped and carrying data
+data_officer,retention_rule,OPERATING,generated,16,16,1,0,0,0,0,3,0,mapped and carrying data
+dataclass,data_asset,OPERATING,generated,26,26,1,0,0,0,0,3,1,mapped and carrying data
+dataclass,data_exception,OPERATING,generated,7,7,1,0,0,0,0,3,1,mapped and carrying data
+dataclass,data_flow,OPERATING,generated,12,12,1,0,0,0,0,3,1,mapped and carrying data
+dataclass,dataclass_event,WIRED_UNPROVEN,generated,0,0,1,0,0,0,0,2,0,"mapped, 0 rows in both databases — shipped, never exercised"
+ethics,aml_alerts,OPERATING,generated,10,10,1,0,0,2,0,1,0,mapped and carrying data
+ethics,case_actions,OPERATING,generated,15,15,1,0,0,1,0,1,1,mapped and carrying data
+ethics,case_links,OPERATING,generated,53,53,1,0,0,1,0,1,1,mapped and carrying data
+ethics,cases,OPERATING,generated,30,30,1,0,0,2,0,2,2,mapped and carrying data
+ethics,coi_declaration,OPERATING,generated,20,20,1,0,0,2,1,1,1,mapped and carrying data
+ethics,coi_declaration_campaign,OPERATING,generated,3,3,1,0,0,1,1,1,1,mapped and carrying data
+ethics,coi_disclosed_item,OPERATING,generated,19,19,1,0,0,1,1,1,1,mapped and carrying data
+ethics,coi_recusal_event,OPERATING,generated,8,8,1,0,0,2,1,1,1,mapped and carrying data
+ethics,disclosures,OPERATING,generated,18,18,1,0,0,2,0,1,1,mapped and carrying data
+ethics,kyc_subjects,OPERATING,generated,16,16,1,0,0,2,0,1,1,mapped and carrying data
+ethics,screening_hits,OPERATING,generated,12,12,1,0,0,1,0,1,0,mapped and carrying data
+ethics,whistleblower_case,OPERATING,generated,9,9,1,0,0,1,1,2,1,mapped and carrying data
+ethics,whistleblower_case_update,OPERATING,generated,17,17,1,0,0,2,1,1,1,mapped and carrying data
+ethics,whistleblower_retaliation_complaint,OPERATING,generated,6,6,1,0,0,2,0,2,2,mapped and carrying data
+evidence,connector_definitions,OPERATING,generated,4,4,1,0,0,0,0,0,0,mapped and carrying data
+evidence,control_links,OPERATING,generated,1147,1147,1,0,0,2,0,1,0,mapped and carrying data
+evidence,controls,OPERATING,generated,174,174,1,0,0,2,1,12,10,mapped and carrying data
+evidence,evidence_connectors,OPERATING,generated,11,11,1,0,0,1,1,0,0,mapped and carrying data
+evidence,evidence_items,OPERATING,generated,104,104,1,1,0,11,0,3,0,mapped and carrying data
+evidence,evidence_links,OPERATING,generated,21,21,1,0,0,3,0,1,1,mapped and carrying data
+evidence,evidence_request_comments,OPERATING,generated,7,7,1,0,0,1,0,0,0,mapped and carrying data
+evidence,evidence_requests,OPERATING,generated,44,44,1,0,0,7,0,2,0,mapped and carrying data
+evidence,evidence_reviews,OPERATING,generated,19,19,1,0,0,3,0,0,0,mapped and carrying data
+evidence,evidence_versions,OPERATING,generated,60,60,1,1,0,1,0,0,0,mapped and carrying data
+evidence,frameworks,OPERATING,generated,16,16,1,0,0,2,1,11,10,mapped and carrying data
+evidence,sub_controls,OPERATING,generated,654,654,1,0,0,2,1,12,10,mapped and carrying data
+fraud,fraud_case,OPERATING,generated,22,22,1,0,0,1,0,3,2,mapped and carrying data
+fraud,fraud_case_update,OPERATING,generated,16,16,1,0,0,1,0,2,1,mapped and carrying data
+fraud,fraud_typology,OPERATING,generated,19,19,1,0,0,0,0,3,2,mapped and carrying data
+iam,access_requests,OPERATING,generated,6,6,1,1,0,2,0,0,0,mapped and carrying data
+iam,access_review_campaigns,OPERATING,generated,2,2,1,0,0,2,0,0,0,mapped and carrying data
+iam,access_review_items,DORMANT,exceptions-file,0,0,1,1,0,1,0,0,0,"Snapshotted from iam.user_roles when a recertification campaign is created. 0 rows means no campaign has been run in either database, which is a usage fact rather than a wiring fact — AccessReviewItemRepository is live and its closure gate is tested."
+iam,break_glass_events,DORMANT,exceptions-file,0,0,1,1,0,1,0,0,0,"Emergency access is a rare event by design. 0 rows means it has never been needed, not that it is unwired — BreakGlassService is live and its self-review 409 is tested. ADR-017 D-10b notes the deeper point: this door stays unused because the roles that would need it hold everything permanently."
+iam,permissions,OPERATING,generated,112,112,1,2,0,28,19,2,0,mapped and carrying data
+iam,role_permissions,OPERATING,generated,1486,1486,1,4,0,30,25,3,0,mapped and carrying data
+iam,roles,OPERATING,generated,59,59,1,5,7,34,7,2,0,mapped and carrying data
+iam,sod_rules,OPERATING,generated,8,8,1,0,0,1,1,0,0,mapped and carrying data
+iam,sod_violations,OPERATING,generated,9,4,1,0,0,1,0,0,0,mapped and carrying data
+iam,user_roles,OPERATING,generated,11,11,1,4,0,8,2,1,0,mapped and carrying data
+iam,users,OPERATING,generated,7,7,1,4,1,10,1,15,0,mapped and carrying data
+intake,intake_events,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+intake,intake_records,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+kb,articles,OPERATING,generated,22,22,1,0,0,3,1,1,1,mapped and carrying data
+kb,categories,SEED_ONLY,generated,10,10,0,0,0,2,1,1,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_gov_govdocs.py) — 20 row(s) of ballast, present in prod because it was restored from a dev dump"
+nca_ecc,filings,OPERATING,generated,4,4,1,0,0,3,2,2,0,mapped and carrying data
+ndi,assessment_cycle,OPERATING,generated,2,2,1,0,0,3,1,2,0,mapped and carrying data
+ndi,audit_event,OPERATING,generated,38,33,1,0,0,1,1,1,1,mapped and carrying data
+ndi,compliance_assessment,OPERATING,generated,14,14,1,0,0,3,0,1,0,mapped and carrying data
+ndi,corrective_action,OPERATING,generated,17,17,1,0,0,2,1,1,0,mapped and carrying data
+ndi,evidence_item,OPERATING,generated,18,18,1,0,0,3,1,1,0,mapped and carrying data
+ndi,framework_item,OPERATING,generated,20,20,1,0,0,1,1,1,0,mapped and carrying data
+ndi,gap,OPERATING,generated,18,18,1,10,1,3,1,2,1,mapped and carrying data
+ndi,governance_domain,OPERATING,generated,8,8,1,0,0,1,1,1,0,mapped and carrying data
+ndi,improvement_plan,OPERATING,generated,2,2,1,0,0,1,1,1,0,mapped and carrying data
+ndi,improvement_plan_item,OPERATING,generated,15,15,1,0,0,2,1,1,1,mapped and carrying data
+ndi,maturity_assessment,OPERATING,generated,16,16,1,0,0,2,0,1,0,mapped and carrying data
+ndi,operational_excellence_kpi,OPERATING,generated,15,15,1,0,0,2,1,1,0,mapped and carrying data
+ndi,report_definition,OPERATING,generated,12,12,1,0,0,1,1,1,0,mapped and carrying data
+ndi,settings,OPERATING,generated,12,12,1,4,0,1,1,1,0,mapped and carrying data
+ndi,submission_package,OPERATING,generated,2,2,1,0,0,1,0,1,0,mapped and carrying data
+openbanking,ob_api_call,OPERATING,generated,12,12,1,0,0,0,0,3,1,mapped and carrying data
+openbanking,ob_consent,OPERATING,generated,25,25,1,0,0,0,0,3,1,mapped and carrying data
+openbanking,ob_event,OPERATING,generated,6,6,1,0,0,0,0,3,1,mapped and carrying data
+openbanking,ob_incident,OPERATING,generated,3,3,1,0,0,0,0,3,1,mapped and carrying data
+openbanking,ob_tpp,OPERATING,generated,11,11,1,0,0,0,0,3,1,mapped and carrying data
+opres,opres_assessment,OPERATING,generated,7,7,1,0,0,0,0,3,1,mapped and carrying data
+opres,opres_assessment_cell,OPERATING,generated,26,26,1,0,0,1,0,3,1,mapped and carrying data
+opres,opres_pillar,OPERATING,generated,5,5,1,0,0,0,0,2,1,mapped and carrying data
+outsourcing,cloud_service,OPERATING,generated,16,16,1,0,0,0,0,3,2,mapped and carrying data
+outsourcing,exit_plan,OPERATING,generated,7,7,1,0,0,0,0,3,2,mapped and carrying data
+outsourcing,ongoing_review,OPERATING,generated,7,7,1,0,0,0,0,3,2,mapped and carrying data
+outsourcing,outsourcing_arrangement,OPERATING,generated,20,20,1,0,0,0,0,3,2,mapped and carrying data
+outsourcing,outsourcing_event,OPERATING,generated,10,10,1,0,0,0,0,2,1,mapped and carrying data
+platform,attachments,OPERATING,generated,20,18,1,0,0,5,0,1,0,mapped and carrying data
+platform,audit_log,OPERATING,generated,6002,3934,1,1,0,8,1,0,0,mapped and carrying data
+platform,authority_document_citations,OPERATING,generated,214,214,1,0,0,6,4,0,0,mapped and carrying data
+platform,authority_documents,OPERATING,generated,19,19,1,0,0,7,1,0,0,mapped and carrying data
+platform,automation_rule_runs,OPERATING,generated,252,157,1,0,0,1,0,0,0,mapped and carrying data
+platform,automation_rules,OPERATING,generated,211,211,1,0,0,41,41,11,0,mapped and carrying data
+platform,brand_theme,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
+platform,business_units,LEGACY,generated,10,10,0,0,0,3,0,0,0,"no JPA mapping, no Java reference and no seed insert, yet 20 row(s) — rows arrived from a migration or by hand"
+platform,calendar_events,OPERATING,generated,10,10,1,0,0,2,1,0,0,mapped and carrying data
+platform,control_assessments,OPERATING,generated,16,16,1,0,0,4,1,0,0,mapped and carrying data
+platform,control_frameworks,LEGACY,generated,6,6,0,0,0,1,0,1,0,"no JPA mapping, no Java reference and no seed insert, yet 12 row(s) — rows arrived from a migration or by hand"
+platform,control_mappings,OPERATING,generated,5,5,1,0,0,2,2,0,0,mapped and carrying data
+platform,control_objectives,OPERATING,generated,1,1,1,0,0,3,1,0,0,mapped and carrying data
+platform,controls,OPERATING,generated,32,32,1,16,3,7,3,2,1,mapped and carrying data
+platform,crowdstrike_action_log,DORMANT,exceptions-file,0,0,1,0,0,2,0,0,0,Connector ingress staging. Empty until a tenant configures the CrowdStrike integration; a row would mean the connector fired.
+platform,crowdstrike_detection_log,DORMANT,exceptions-file,0,0,1,0,0,2,0,0,0,Connector ingress staging — see crowdstrike_action_log.
+platform,departments,OPERATING,generated,34,34,1,0,0,3,1,5,1,mapped and carrying data
+platform,flyway_schema_history,INTENTIONAL_TECHNICAL,exceptions-file,ABSENT,45,0,0,0,0,0,1,0,Flyway's own bookkeeping. Present in prod only because dev runs with Flyway off and a Python-bootstrapped schema.
+platform,help_topic,OPERATING,generated,30,30,1,0,0,1,1,0,0,mapped and carrying data
+platform,integration_external_link,OPERATING,generated,7,7,1,0,0,1,0,0,0,mapped and carrying data
+platform,issues,OPERATING,generated,13,13,1,0,0,3,1,0,0,mapped and carrying data
+platform,lookup_tables,ORPHAN_CONFIRMED,generated,0,0,0,0,0,1,0,0,0,"no JPA mapping, no Java reference, 0 rows in both databases"
+platform,notifications,OPERATING,generated,390,361,1,0,0,2,0,0,0,mapped and carrying data
+platform,organisation_licenses,OPERATING,generated,22,22,1,0,0,2,2,1,1,mapped and carrying data
+platform,organisations,OPERATING,generated,3,3,1,0,0,7,1,1,0,mapped and carrying data
+platform,refresh_token,OPERATING,generated,1819,1058,1,0,0,1,0,0,0,mapped and carrying data
+platform,risk_control_links,OPERATING,generated,24,24,1,0,0,3,1,0,0,mapped and carrying data
+platform,saved_views,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+platform,signatures,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
+platform,splunk_hec_outbound_log,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
+platform,tenable_finding_log,OPERATING,generated,5,5,1,0,0,1,0,0,0,mapped and carrying data
+platform,tenable_recast_log,DORMANT,exceptions-file,0,0,1,0,0,1,0,0,0,Connector ingress staging. Empty until a tenant configures Tenable.
+platform,three_lines_role_mapping,OPERATING,generated,25,25,1,0,0,1,1,0,0,mapped and carrying data
+platform,translations,ORPHAN_CONFIRMED,generated,0,0,0,0,0,1,0,0,0,"no JPA mapping, no Java reference, 0 rows in both databases"
+platform,web_push_subscription,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+policy,attestations,OPERATING,generated,18,18,1,0,0,1,1,1,1,mapped and carrying data
+policy,document_control_links,OPERATING,generated,2,2,1,0,0,1,1,0,0,mapped and carrying data
+policy,document_framework_mappings,OPERATING,generated,15,15,1,0,0,2,1,0,0,mapped and carrying data
+policy,documents,OPERATING,generated,51,47,1,0,0,6,2,1,1,mapped and carrying data
+policy,exceptions,OPERATING,generated,9,9,1,0,0,1,1,1,1,mapped and carrying data
+privacy,consent_records,OPERATING,generated,10,10,1,0,0,2,1,1,0,mapped and carrying data
+privacy,consents,SEED_ONLY,generated,36,36,0,0,0,3,0,2,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_real_data.py) — 72 row(s) of ballast, present in prod because it was restored from a dev dump"
+privacy,cross_border_transfers,OPERATING,generated,9,9,1,0,0,4,2,1,0,mapped and carrying data
+privacy,cyber_breach_bridge_log,OPERATING,generated,8,8,1,0,0,2,2,0,0,mapped and carrying data
+privacy,data_breaches,OPERATING,generated,18,18,1,2,0,4,1,2,1,mapped and carrying data
+privacy,data_flows,LEGACY,generated,5,5,0,0,0,2,0,0,0,"no JPA mapping, no Java reference and no seed insert, yet 10 row(s) — rows arrived from a migration or by hand"
+privacy,data_sharing_agreements,OPERATING,generated,8,8,1,0,0,1,1,1,0,mapped and carrying data
+privacy,data_subject_requests,OPERATING,generated,20,20,1,1,0,2,0,2,1,mapped and carrying data
+privacy,disposal_certificates,OPERATING,generated,7,7,1,0,0,3,1,1,0,mapped and carrying data
+privacy,dpia,OPERATING,generated,6,5,1,0,0,3,1,2,0,mapped and carrying data
+privacy,dpia_mitigation,OPERATING,generated,8,8,1,0,0,1,0,1,0,mapped and carrying data
+privacy,dpia_question,OPERATING,generated,12,12,1,0,0,1,0,1,0,mapped and carrying data
+privacy,dpia_review,OPERATING,generated,7,6,1,0,0,1,0,1,0,mapped and carrying data
+privacy,privacy_actions,LEGACY,generated,6,6,0,0,0,2,0,1,0,"no JPA mapping, no Java reference and no seed insert, yet 12 row(s) — rows arrived from a migration or by hand"
+privacy,privacy_assessments,LEGACY,generated,6,6,0,0,0,2,0,1,0,"no JPA mapping, no Java reference and no seed insert, yet 12 row(s) — rows arrived from a migration or by hand"
+privacy,privacy_notices,OPERATING,generated,7,7,1,0,0,4,2,1,0,mapped and carrying data
+privacy,processing_activities,OPERATING,generated,11,11,1,0,0,5,1,2,0,mapped and carrying data
+privacy,processor_assessments,OPERATING,generated,8,8,1,0,0,1,1,1,0,mapped and carrying data
+privacy,subprocessor,OPERATING,generated,8,8,1,10,4,2,1,1,0,mapped and carrying data
+privacy,subprocessor_event,OPERATING,generated,8,8,1,0,0,2,1,1,0,mapped and carrying data
+privacy_lc,cross_border_transfers,ORPHAN_CONFIRMED,exceptions-file,0,0,0,0,0,3,2,1,0,Documented orphan — see privacy_lc.ropa_activities.
+privacy_lc,dpia_assessments,ORPHAN_CONFIRMED,exceptions-file,0,0,0,0,0,4,2,1,0,Documented orphan — see privacy_lc.ropa_activities.
+privacy_lc,dsr_cases,OPERATING,generated,12,12,1,0,0,3,1,4,1,mapped and carrying data
+privacy_lc,ropa_activities,ORPHAN_CONFIRMED,exceptions-file,0,0,0,0,0,4,2,1,0,Documented orphan. The privacy_lc schema was created ahead of a lifecycle module that was never wired; the live privacy capability (RoPA/DPIA/DSR/breach) lives in the privacy schema. CLAUDE.md's landmine list says explicitly: do not seed these before checking they are wired.
+regchange,changes,OPERATING,generated,14,14,1,0,0,2,1,1,1,mapped and carrying data
+reginspect,reginspect_document_request,OPERATING,generated,38,38,1,0,0,0,0,3,2,mapped and carrying data
+reginspect,reginspect_inspection,OPERATING,generated,9,9,1,0,0,0,0,3,2,mapped and carrying data
+reginspect,reginspect_inspection_update,OPERATING,generated,20,20,1,0,0,0,0,3,2,mapped and carrying data
+regreporting,regreport_event,OPERATING,generated,51,51,1,0,0,0,0,3,2,mapped and carrying data
+regreporting,regreport_filing,OPERATING,generated,38,38,1,0,0,0,0,3,2,mapped and carrying data
+regreporting,regreport_obligation,OPERATING,generated,19,19,1,0,0,0,0,3,2,mapped and carrying data
+reporting,report_definitions,SEED_ONLY,generated,20,20,0,0,0,3,0,2,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_real_data.py) — 40 row(s) of ballast, present in prod because it was restored from a dev dump"
+reporting,report_executions,ORPHAN_CONFIRMED,generated,0,0,0,0,0,2,0,1,0,"no JPA mapping, no Java reference, 0 rows in both databases"
+reporting,report_runs,OPERATING,generated,60,60,1,0,0,2,0,1,1,mapped and carrying data
+reporting,report_schedules,OPERATING,generated,12,12,1,0,0,2,0,1,1,mapped and carrying data
+risk,appetite_breach_events,OPERATING,generated,5,5,1,0,0,1,0,0,0,mapped and carrying data
+risk,bowtie_analysis,OPERATING,generated,2,2,1,0,0,1,1,0,0,mapped and carrying data
+risk,bowtie_consequence,OPERATING,generated,5,5,1,0,0,2,1,0,0,mapped and carrying data
+risk,bowtie_mitigating_control,OPERATING,generated,5,5,1,0,0,3,1,0,0,mapped and carrying data
+risk,bowtie_preventive_control,OPERATING,generated,5,5,1,0,0,3,1,0,0,mapped and carrying data
+risk,bowtie_threat,OPERATING,generated,4,4,1,0,0,2,1,0,0,mapped and carrying data
+risk,emerging_risks,OPERATING,generated,10,10,1,0,0,1,1,0,0,mapped and carrying data
+risk,kri_breach,OPERATING,generated,32,32,1,0,0,3,1,1,0,mapped and carrying data
+risk,kri_breach_events,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,5,0,1,0,"absent from dev, 0 row(s) in prod; no migration removes it"
+risk,kri_definition,OPERATING,generated,21,21,1,0,0,4,2,1,0,mapped and carrying data
+risk,kri_definitions,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,7,0,1,0,"absent from dev, 0 row(s) in prod; no migration removes it"
+risk,kri_measurement,OPERATING,generated,155,155,1,0,0,3,1,2,1,mapped and carrying data
+risk,kri_readings,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,5,1,1,0,"absent from dev, 0 row(s) in prod; no migration removes it"
+risk,methodology_config,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
+risk,risk_acceptances,OPERATING,generated,5,5,1,0,0,1,0,0,0,mapped and carrying data
+risk,risk_appetite_statements,OPERATING,generated,9,9,1,1,0,1,0,0,0,mapped and carrying data
+risk,risk_assessments,OPERATING,generated,51,51,1,0,0,3,0,0,0,mapped and carrying data
+risk,risk_attestations,OPERATING,generated,32,32,1,0,0,3,1,0,0,mapped and carrying data
+risk,risk_categories,OPERATING,generated,38,38,1,0,0,3,0,0,0,mapped and carrying data
+risk,risk_controls,OPERATING,generated,32,32,1,0,0,4,1,0,0,mapped and carrying data
+risk,risk_impact_ratings,OPERATING,generated,19,12,1,0,0,1,0,0,0,mapped and carrying data
+risk,risk_indicators,LEGACY,generated,8,8,0,0,0,3,0,0,0,"no JPA mapping, no Java reference and no seed insert, yet 16 row(s) — rows arrived from a migration or by hand"
+risk,risk_links,OPERATING,generated,19,19,1,0,0,1,0,0,0,mapped and carrying data
+risk,risk_reviews,OPERATING,generated,6,4,1,0,0,1,0,0,0,mapped and carrying data
+risk,risk_treatments,OPERATING,generated,54,54,1,0,0,4,0,0,0,mapped and carrying data
+risk,risks,OPERATING,generated,131,132,1,2,0,14,0,3,1,mapped and carrying data
+risk,scenarios,OPERATING,generated,11,11,1,0,0,3,2,0,0,mapped and carrying data
+risk_lc,acceptance_requests,ORPHAN_CONFIRMED,generated,0,0,0,0,0,2,1,1,0,"no JPA mapping, no Java reference, 0 rows in both databases"
+risk_lc,activity_log,ORPHAN_CONFIRMED,generated,0,0,0,0,0,3,2,1,0,"no JPA mapping, no Java reference, 0 rows in both databases"
+risk_lc,kri_breaches,SEED_ONLY,generated,12,12,0,0,0,3,2,2,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_real_data.py) — 24 row(s) of ballast, present in prod because it was restored from a dev dump"
+risk_lc,kri_escalation_log,ORPHAN_CONFIRMED,generated,0,0,0,0,0,1,0,1,0,"no JPA mapping, no Java reference, 0 rows in both databases"
+risk_lc,notification_outbox,ORPHAN_CONFIRMED,generated,0,0,0,0,0,1,0,1,0,"no JPA mapping, no Java reference, 0 rows in both databases"
+risk_lc,treatment_actions,OPERATING,generated,10,10,1,0,0,2,1,2,1,mapped and carrying data
+risk_lc,treatment_plans,OPERATING,generated,11,11,1,1,0,2,1,3,1,mapped and carrying data
+rrp,rrp_critical_function,OPERATING,generated,46,46,1,0,0,0,0,3,1,mapped and carrying data
+rrp,rrp_cycle,OPERATING,generated,5,5,1,0,0,0,0,3,1,mapped and carrying data
+rrp,rrp_event,OPERATING,generated,14,14,1,0,0,0,0,2,0,mapped and carrying data
+rrp,rrp_indicator,OPERATING,generated,31,31,1,0,0,0,0,3,1,mapped and carrying data
+rrp,rrp_recovery_option,OPERATING,generated,32,32,1,0,0,0,0,3,1,mapped and carrying data
+scm,alternate_suppliers,OPERATING,generated,16,16,1,0,0,2,2,1,1,mapped and carrying data
+scm,contract_clauses,OPERATING,generated,28,28,1,0,0,1,1,1,1,mapped and carrying data
+scm,contracts,OPERATING,generated,18,18,1,0,0,2,0,1,1,mapped and carrying data
+scm,dependencies,OPERATING,generated,18,18,1,0,0,3,0,1,1,mapped and carrying data
+scm,exit_plans,OPERATING,generated,13,13,1,0,0,2,2,1,1,mapped and carrying data
+scm,fourth_party_exposures,OPERATING,generated,13,13,1,0,0,1,1,1,1,mapped and carrying data
+scm,slas,OPERATING,generated,14,14,1,0,0,3,0,1,1,mapped and carrying data
+scm,supplier_incidents,OPERATING,generated,11,11,1,0,0,2,0,1,1,mapped and carrying data
+scm,supplier_resilience_tests,OPERATING,generated,11,11,1,0,0,1,1,1,1,mapped and carrying data
+scm,vendor_assessments,OPERATING,generated,15,15,1,0,0,2,0,1,1,mapped and carrying data
+scm,vendor_onboarding,OPERATING,generated,17,17,1,0,0,2,0,2,2,mapped and carrying data
+scm,vendors,OPERATING,generated,51,51,1,1,0,3,1,2,1,mapped and carrying data
+sharia,sharia_audit_finding,OPERATING,generated,3,3,1,0,0,0,0,3,1,mapped and carrying data
+sharia,sharia_event,OPERATING,generated,30,30,1,0,0,0,0,3,1,mapped and carrying data
+sharia,sharia_nc_event,OPERATING,generated,2,2,1,0,0,0,0,3,1,mapped and carrying data
+sharia,sharia_product_approval,OPERATING,generated,5,5,1,0,0,0,0,3,1,mapped and carrying data
+sharia,sharia_resolution,OPERATING,generated,5,5,1,0,0,0,0,3,1,mapped and carrying data
+sharia,sharia_scholar,OPERATING,generated,5,5,1,0,0,0,0,3,1,mapped and carrying data
+signature,digital_signature_transactions,OPERATING,generated,19,19,1,0,0,3,2,1,1,mapped and carrying data
+socops,appsec_finding,OPERATING,generated,10,10,1,0,0,1,0,1,1,mapped and carrying data
+socops,awareness_campaign,OPERATING,generated,6,6,1,0,0,1,0,1,1,mapped and carrying data
+socops,brand_monitoring,OPERATING,generated,8,8,1,0,0,1,0,1,1,mapped and carrying data
+socops,crypto_asset,OPERATING,generated,10,10,1,0,0,1,0,1,1,mapped and carrying data
+socops,cyber_insurance,OPERATING,generated,2,2,1,0,0,1,1,1,1,mapped and carrying data
+socops,detection_rule,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+socops,dlp_event,OPERATING,generated,12,12,1,0,0,1,0,1,1,mapped and carrying data
+socops,forensics_artefact,OPERATING,generated,4,4,1,0,0,2,0,1,1,mapped and carrying data
+socops,forensics_custody_event,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+socops,iam_jml_event,OPERATING,generated,11,11,1,1,0,1,1,2,1,mapped and carrying data
+socops,ir_playbook,OPERATING,generated,36,36,1,0,0,2,1,2,2,mapped and carrying data
+socops,ir_playbook_run,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+socops,ir_playbook_run_task,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+socops,ir_playbook_step,OPERATING,generated,63,63,1,0,0,2,1,2,2,mapped and carrying data
+socops,ma_due_diligence,OPERATING,generated,1,1,1,0,0,1,0,1,1,mapped and carrying data
+socops,ot_asset,OPERATING,generated,8,8,1,0,0,1,1,1,1,mapped and carrying data
+socops,pentest_engagement,OPERATING,generated,4,4,1,0,0,1,0,1,1,mapped and carrying data
+socops,regulator_examination,OPERATING,generated,4,4,1,0,0,1,0,1,1,mapped and carrying data
+socops,sbom_component,OPERATING,generated,20,20,1,0,0,1,0,1,1,mapped and carrying data
+socops,scanner_run,OPERATING,generated,8,8,1,0,0,1,0,1,1,mapped and carrying data
+socops,seasonal_overlay,OPERATING,generated,12,12,1,0,0,1,1,1,1,mapped and carrying data
+socops,security_event,OPERATING,generated,15,20,1,1,1,2,0,1,1,mapped and carrying data
+socops,threat_intel,OPERATING,generated,10,10,1,0,0,2,0,1,1,mapped and carrying data
+socops,threat_intel_action,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+socops,zt_maturity,OPERATING,generated,7,7,1,0,0,1,0,1,1,mapped and carrying data
+sust,allocation_reports,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
+sust,carbon_credits,OPERATING,generated,2,1,1,1,0,2,0,0,0,mapped and carrying data
+sust,cbam_lines,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+sust,climate_report,OPERATING,generated,10,3,1,0,0,1,0,0,0,mapped and carrying data
+sust,climate_risk_opportunity,OPERATING,generated,20,20,1,0,0,4,1,2,2,mapped and carrying data
+sust,cma_disclosure,OPERATING,generated,91,91,1,1,0,4,1,1,1,mapped and carrying data
+sust,corrective_action,OPERATING,generated,32,32,1,0,0,7,1,1,1,mapped and carrying data
+sust,emission_factor,OPERATING,generated,6,6,1,0,0,1,0,0,0,mapped and carrying data
+sust,env_permit_violations,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+sust,env_permits,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+sust,esg_metric,OPERATING,generated,26,26,1,1,0,6,1,2,1,mapped and carrying data
+sust,esg_metric_reading,OPERATING,generated,48,48,1,1,0,1,0,1,1,mapped and carrying data
+sust,esg_target_actuals,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+sust,esg_target_milestones,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+sust,esg_targets,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+sust,evidence,OPERATING,generated,21,21,1,12,3,1,1,1,1,mapped and carrying data
+sust,financed_emissions_record,OPERATING,generated,8,8,1,0,0,2,1,0,0,mapped and carrying data
+sust,financed_emissions_target,OPERATING,generated,2,2,1,0,0,1,1,0,0,mapped and carrying data
+sust,ghg_emission_record,OPERATING,generated,41,40,1,1,0,4,1,1,1,mapped and carrying data
+sust,green_instruments,OPERATING,generated,2,1,1,0,0,2,0,0,0,mapped and carrying data
+sust,green_projects,OPERATING,generated,2,2,1,1,0,3,0,0,0,mapped and carrying data
+sust,ifrs_s_requirements,OPERATING,generated,14,14,1,0,0,1,1,0,0,mapped and carrying data
+sust,instrument_allocations,OPERATING,generated,2,2,1,0,0,2,0,0,0,mapped and carrying data
+sust,material_topic,OPERATING,generated,28,28,1,0,0,3,1,2,2,mapped and carrying data
+sust,organisation_settings,OPERATING,generated,1,1,1,0,0,3,1,0,0,mapped and carrying data
+sust,portfolio_assets,OPERATING,generated,3,3,1,0,0,2,0,0,0,mapped and carrying data
+sust,reporting_year,OPERATING,generated,8,8,1,0,0,1,1,1,1,mapped and carrying data
+sust,sgi_commitment,OPERATING,generated,17,17,1,1,0,3,1,1,1,mapped and carrying data
+sust,sustainability_report,OPERATING,generated,6,6,1,0,0,3,0,1,1,mapped and carrying data
+sust,taxonomy_entries,OPERATING,generated,10,10,1,0,0,1,1,0,0,mapped and carrying data
+sust,tcfd_climate_scenario,OPERATING,generated,8,8,1,0,0,2,1,1,1,mapped and carrying data
+sust,tcfd_item,OPERATING,generated,85,85,1,1,0,2,1,1,1,mapped and carrying data
+sust,tcfd_sector_impact,OPERATING,generated,20,20,1,0,0,2,1,0,0,mapped and carrying data
+sust,vendor_esg_survey,OPERATING,generated,5,5,1,1,0,1,0,0,0,mapped and carrying data
+tprm,outsourcing_arrangement,OPERATING,generated,14,14,1,0,0,2,1,1,1,mapped and carrying data
+tprm,outsourcing_due_diligence,OPERATING,generated,13,13,1,0,0,2,1,1,1,mapped and carrying data
+tprm,outsourcing_exit_plan,OPERATING,generated,9,9,1,0,0,2,1,1,1,mapped and carrying data
+tprm,outsourcing_monitoring_event,OPERATING,generated,11,11,1,0,0,2,1,1,1,mapped and carrying data
+tprm,questionnaire_questions,OPERATING,generated,23,23,1,0,0,2,1,1,1,mapped and carrying data
+tprm,questionnaire_responses,OPERATING,generated,22,22,1,0,0,2,0,1,1,mapped and carrying data
+tprm,questionnaire_templates,OPERATING,generated,3,3,1,0,0,1,1,1,1,mapped and carrying data
+tprm,third_party_cyber_assessments,OPERATING,generated,16,16,1,0,0,1,1,1,1,mapped and carrying data
+tprm,vendor_assessments,OPERATING,generated,19,19,1,0,0,4,0,1,1,mapped and carrying data
+tprm,vendor_bcp_attestation,OPERATING,generated,12,12,1,0,0,2,0,2,2,mapped and carrying data
+tprm,vendor_bcp_campaign,OPERATING,generated,2,2,1,0,0,1,1,2,1,mapped and carrying data
+tprm,vendors,OPERATING,generated,28,28,1,0,0,7,1,2,1,mapped and carrying data
+workflow,action_log,OPERATING,generated,17,17,1,0,0,1,0,1,1,mapped and carrying data
+workflow,approval_chain_action,OPERATING,generated,10,10,1,0,0,2,0,1,1,mapped and carrying data
+workflow,approval_chain_instance,OPERATING,generated,6,6,1,0,0,2,0,1,1,mapped and carrying data
+workflow,approval_chain_step,OPERATING,generated,24,24,1,0,0,1,1,1,1,mapped and carrying data
+workflow,approval_chain_template,OPERATING,generated,6,6,1,0,0,1,1,1,1,mapped and carrying data
+workflow,definitions,OPERATING,generated,6,6,1,0,0,2,1,1,0,mapped and carrying data
+workflow,instances,OPERATING,generated,12,12,1,0,0,3,0,1,1,mapped and carrying data
+workflow,recipient_list_members,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+workflow,recipient_lists,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+workflow,request_events,OPERATING,generated,8,0,1,0,0,1,0,0,0,mapped and carrying data
+workflow,request_recipients,OPERATING,generated,1,0,1,0,0,3,0,0,0,mapped and carrying data
+workflow,requests,OPERATING,generated,1,0,1,19,5,6,0,0,0,mapped and carrying data
+workflow,states,OPERATING,generated,34,34,1,0,0,2,1,1,0,mapped and carrying data
+workflow,transitions,OPERATING,generated,32,32,1,0,0,3,1,1,0,mapped and carrying data
+workflow,workflow_definitions,SEED_ONLY,generated,20,20,0,0,0,2,0,2,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_real_data.py) — 40 row(s) of ballast, present in prod because it was restored from a dev dump"
+workflow,workflow_instances,SEED_ONLY,generated,14,14,0,0,0,3,0,1,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_gov_reporting_wf.py) — 28 row(s) of ballast, present in prod because it was restored from a dev dump"
+workflow,workflow_submissions,OPERATING,generated,32,32,1,0,0,3,1,1,1,mapped and carrying data
+workflow,workflow_tasks,SEED_ONLY,generated,15,15,0,0,0,2,0,1,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_gov_reporting_wf.py) — 30 row(s) of ballast, present in prod because it was restored from a dev dump"
