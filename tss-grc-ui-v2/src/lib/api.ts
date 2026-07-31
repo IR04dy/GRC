@@ -2970,6 +2970,11 @@ export const governanceApi = {
   updateRole:      (id: number, b: { roleName: string; displayNameEn: string; displayNameAr?: string; isActive?: boolean }) =>
     api.put<GovRoleDto>(`/api/v1/iam/governance/roles/${id}`, b),
   deleteRole:      (id: number) => api.delete<void>(`/api/v1/iam/governance/roles/${id}`),
+  // F2-56 — copies a shared (global) role into the tenant under a new name, carrying its
+  // grants. Shared roles are one row for every tenant, so a tenant may not edit one; this
+  // is how it gets a variant it owns and can tune.
+  cloneRole:       (id: number, b: { roleName: string; displayNameEn: string; displayNameAr: string }) =>
+    api.post<GovRoleDto>(`/api/v1/iam/governance/roles/${id}/clone`, b),
   matrix:          (id: number) => api.get<GovMatrixDto>(`/api/v1/iam/governance/roles/${id}/matrix`),
   saveMatrix:      (id: number, grants: { module: string; action: string }[]) =>
     api.put<GovMatrixDto>(`/api/v1/iam/governance/roles/${id}/matrix`, { grants }),

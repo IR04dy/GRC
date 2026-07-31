@@ -65,6 +65,19 @@ public class AccessGovernanceController {
         return service.updateRole(id, r);
     }
 
+    /**
+     * Copies a role — usually a shared global template — into the calling tenant under a new
+     * name (F2-56). This is the escape hatch the write guard points at: shared roles are
+     * platform-scope and a tenant may not edit them, so it clones one instead. Guarded by
+     * {@code IAM:WRITE} like every other role mutation, because the result is a new
+     * tenant-owned role.
+     */
+    @PostMapping("/roles/{id}/clone")
+    @PreAuthorize(WRITE_GUARD)
+    public RoleSummary cloneRole(@PathVariable Long id, @Valid @RequestBody RoleUpsertRequest r) {
+        return service.cloneRole(id, r);
+    }
+
     @DeleteMapping("/roles/{id}")
     @PreAuthorize(DELETE_GUARD)
     public ResponseEntity<Void> deleteRole(@PathVariable Long id) {
