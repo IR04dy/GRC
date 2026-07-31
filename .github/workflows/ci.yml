@@ -69,6 +69,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The frontend guards this programme built to stop specific defect classes were
+      # not enforced anywhere: `vitest` was absent from CI, so routeReachability.test.ts
+      # (F2-07b — it found 8 shipped-but-unreachable screens) and
+      # demoFallbackContract.test.ts (W2-1b — the mock-import ratchet, mutation-proven)
+      # only ran when someone remembered. A ratchet nobody runs is a comment.
+      - name: Vitest (route reachability + demo-fallback ratchets)
+        run: npx vitest run
+
       # `vite build` succeeds today; `tsc -b` still has cosmetic noise (unused
       # imports, ~45 errors). Track separately — don't fail CI on it yet.
       - name: Vite build
