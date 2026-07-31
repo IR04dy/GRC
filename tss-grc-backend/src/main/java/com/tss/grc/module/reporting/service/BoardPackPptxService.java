@@ -1,37 +1,20 @@
 package com.tss.grc.module.reporting.service;
 
 import com.tss.grc.common.exception.ExportException;
-import com.tss.grc.common.tenant.TenantContext;
-import com.tss.grc.module.change_mgmt.repository.ChangeRequestRepository;
-import com.tss.grc.module.compliance.entity.AuditFinding;
-import com.tss.grc.module.compliance.repository.AuditFindingRepository;
-import com.tss.grc.module.ethics.repository.AmlAlertRepository;
-import com.tss.grc.module.ethics.repository.EthicsCaseRepository;
-import com.tss.grc.module.platform.entity.Organisation;
-import com.tss.grc.module.platform.repository.OrganisationRepository;
-import com.tss.grc.module.risk.kri.entity.KriDefinition;
-import com.tss.grc.module.risk.kri.entity.KriMeasurement;
-import com.tss.grc.module.risk.entity.Risk;
-import com.tss.grc.module.risk.kri.repository.KriDefinitionRepository;
-import com.tss.grc.module.risk.kri.repository.KriMeasurementRepository;
-import com.tss.grc.module.risk.repository.RiskRepository;
+import com.tss.grc.module.reporting.dto.BoardPackAggregate;
+import com.tss.grc.module.reporting.dto.BoardPackAggregate.Scope;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.sl.usermodel.TextParagraph;
 import org.apache.poi.sl.usermodel.VerticalAlignment;
 import org.apache.poi.xslf.usermodel.*;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.awt.Color;
 import java.awt.Rectangle;
 import java.io.ByteArrayOutputStream;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -46,7 +29,19 @@ import java.util.List;
  *  4. Findings aging snapshot
  *  5. KRI band summary
  *  6. Change management snapshot
- *  7. Ethics & Compliance highlights
+ *  7. Ethics &amp; Compliance highlights
+ *
+ * <p><b>D-5 — "sister to" used to mean "second implementation of".</b> This class held its own 32
+ * repository call sites and computed the same board pack independently of the PDF, with different
+ * queries for several of the same numbers; see {@link BoardPackAggregate} for the list. It now
+ * renders {@link BoardPackAggregateService#build(Scope)} under {@link Scope#DECK}, which skips the
+ * framework-coverage and ESG sections the deck does not show — so the collapse did not make this
+ * endpoint pay for work it throws away.
+ *
+ * <p>The deck renders <em>subsets</em> of the aggregate's lists (10 risks, 10 KRIs) rather than
+ * asking for smaller ones. For risks that is exact rather than approximate: the aggregate's order is
+ * total — inherent score descending, id ascending — so the first 10 of the top 20 are the top 10.
+ * Under the pre-F2-58 score-only in-memory sort that argument would not have held.
  */
 @Service
 @RequiredArgsConstructor
@@ -58,38 +53,29 @@ public class BoardPackPptxService {
     private static final Color INK_3   = new Color(0x5C, 0x6A, 0x65);
     private static final Color SURFACE = new Color(0xFA, 0xF8, 0xF4);
 
-    private final OrganisationRepository orgRepo;
-    private final RiskRepository riskRepo;
-    private final AuditFindingRepository findingRepo;
-    private final KriDefinitionRepository kriRepo;
-    private final KriMeasurementRepository measRepo;
-    private final ChangeRequestRepository changeRepo;
-    private final EthicsCaseRepository caseRepo;
-    private final AmlAlertRepository amlRepo;
+    /** Rows the deck shows from the aggregate's lists — a slide holds fewer than a page. */
+    private static final int DECK_RISKS = 10, DECK_KRIS = 10;
+
+    /** What an absent value looks like on a slide. The aggregate carries null. */
+    private static final String NONE = "—";
+
+    private final BoardPackAggregateService aggregateService;
 
     @Transactional(readOnly = true)
     public byte[] generatePptx(String lang) {
-        Long org = TenantContext.getCurrentTenant();
-        Organisation o = orgRepo.findById(org).orElse(null);
+        BoardPackAggregate pack = aggregateService.build(Scope.DECK);
         boolean ar = "ar".equalsIgnoreCase(lang);
 
         try (XMLSlideShow ppt = new XMLSlideShow()) {
             ppt.setPageSize(new java.awt.Dimension(960, 540)); // 16:9 standard
 
-            // 1. Title
-            slideTitle(ppt, o, ar);
-            // 2. Exec summary
-            slideExecSummary(ppt, org, ar);
-            // 3. Top risks
-            slideTopRisks(ppt, org, ar);
-            // 4. Findings aging
-            slideFindings(ppt, org, ar);
-            // 5. KRI bands
-            slideKris(ppt, org, ar);
-            // 6. Change snapshot
-            slideChanges(ppt, org, ar);
-            // 7. Ethics highlights
-            slideEthics(ppt, org, ar);
+            slideTitle(ppt, pack.header(), ar);
+            slideExecSummary(ppt, pack.executive(), ar);
+            slideTopRisks(ppt, pack.topRisks(), ar);
+            slideFindings(ppt, pack.aging(), ar);
+            slideKris(ppt, pack.kris(), ar);
+            slideChanges(ppt, pack.changes(), ar);
+            slideEthics(ppt, pack.ethics(), ar);
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ppt.write(baos);
@@ -101,11 +87,11 @@ public class BoardPackPptxService {
 
     // ── Slide builders ──────────────────────────────────────────────────────
 
-    private void slideTitle(XMLSlideShow ppt, Organisation o, boolean ar) {
+    private void slideTitle(XMLSlideShow ppt, BoardPackAggregate.Header h, boolean ar) {
         XSLFSlide s = ppt.createSlide();
         background(s, SURFACE);
 
-        String orgName = o == null ? "—" : (ar && o.getNameAr() != null ? o.getNameAr() : o.getNameEn());
+        String orgName = h.name(ar) == null ? NONE : h.name(ar);
         addText(s, ar ? "حزمة الإدارة الفصلية" : "Quarterly Board Pack",
             new Rectangle(60, 140, 840, 30), 18, false, INK_3, ar);
         addText(s, orgName,
@@ -113,32 +99,22 @@ public class BoardPackPptxService {
         addText(s, ar ? "نظرة شاملة على المخاطر والامتثال والاستمرارية"
                      : "Risk · Compliance · Continuity Snapshot",
             new Rectangle(60, 270, 840, 30), 18, false, INK, ar);
-        addText(s, (ar ? "تم الإنشاء: " : "Generated: ") + LocalDateTime.now().format(DT_FMT),
+        addText(s, (ar ? "تم الإنشاء: " : "Generated: ") + h.generatedAt().format(DT_FMT),
             new Rectangle(60, 470, 840, 24), 11, false, INK_3, ar);
     }
 
-    private void slideExecSummary(XMLSlideShow ppt, Long org, boolean ar) {
+    private void slideExecSummary(XMLSlideShow ppt, BoardPackAggregate.Executive e, boolean ar) {
         XSLFSlide s = ppt.createSlide();
         slideHeader(s, ar ? "ملخص تنفيذي" : "Executive Summary", ar);
 
-        // F2-58 — count in the database. `totalRisks` used to issue a 1,000-row page purely to read
-        // getTotalElements(), and `openFindings` fetched 1,000 rows to filter them in Java, so it
-        // under-reported for any tenant past the page size.
-        long totalRisks    = riskRepo.countByOrganisationId(org);
-        long criticalRisks = riskRepo.countByOrganisationIdAndRiskLevel(org, "CRITICAL");
-        long openFindings  = findingRepo.countOpenByOrganisationId(org);
-        long totalKris     = kriRepo.countByOrganisationIdAndIsDeletedFalse(org);
-        long totalCases    = caseRepo.countByOrganisationId(org);
-        long strs          = amlRepo.countByOrganisationIdAndStrFiled(org, true);
-
         // 6 KPI cards in a 3x2 grid
         String[][] kpis = {
-            { ar ? "المخاطر"          : "Risks",          String.valueOf(totalRisks) },
-            { ar ? "حرجة"              : "Critical",      String.valueOf(criticalRisks) },
-            { ar ? "ملاحظات مفتوحة"   : "Open Findings",  String.valueOf(openFindings) },
-            { ar ? "مؤشرات المخاطر"  : "KRIs",            String.valueOf(totalKris) },
-            { ar ? "قضايا أخلاقيات"  : "Ethics Cases",    String.valueOf(totalCases) },
-            { ar ? "تقارير STR"       : "STRs Filed",      String.valueOf(strs) },
+            { ar ? "المخاطر"          : "Risks",          String.valueOf(e.totalRisks()) },
+            { ar ? "حرجة"              : "Critical",      String.valueOf(e.criticalRisks()) },
+            { ar ? "ملاحظات مفتوحة"   : "Open Findings",  String.valueOf(e.openFindings()) },
+            { ar ? "مؤشرات المخاطر"  : "KRIs",            String.valueOf(e.totalKris()) },
+            { ar ? "قضايا أخلاقيات"  : "Ethics Cases",    String.valueOf(e.totalEthicsCases()) },
+            { ar ? "تقارير STR"       : "STRs Filed",      String.valueOf(e.strsFiled()) },
         };
         int cardW = 280, cardH = 110, gapX = 20, gapY = 20;
         int startX = 60, startY = 110;
@@ -150,83 +126,58 @@ public class BoardPackPptxService {
         }
     }
 
-    private void slideTopRisks(XMLSlideShow ppt, Long org, boolean ar) {
+    private void slideTopRisks(XMLSlideShow ppt, List<BoardPackAggregate.RiskRow> allRisks, boolean ar) {
         XSLFSlide s = ppt.createSlide();
         slideHeader(s, ar ? "أعلى ١٠ مخاطر" : "Top 10 Risks", ar);
 
-        // F2-58 — rank in the database. Same defect as the PDF renderer, independently written:
-        // a 200-row page with no Sort, ranked in memory, trimmed to 10. The deck's top 10 and the
-        // PDF's top 20 were each drawn from an arbitrary sample of the same register, so the two
-        // documents in one board pack could disagree about which risks are the worst.
-        List<Risk> risks = riskRepo.findByOrganisationId(org, PageRequest.of(0, 10,
-            Sort.by(Sort.Direction.DESC, "inherentScore").and(Sort.by(Sort.Direction.ASC, "id"))))
-            .getContent();
+        // Exact, not a sample: the aggregate ranks by (inherent score DESC, id ASC), a total order,
+        // so the first 10 of the top 20 are the top 10. See the class note.
+        List<BoardPackAggregate.RiskRow> risks =
+            allRisks.subList(0, Math.min(DECK_RISKS, allRisks.size()));
 
         String[][] rows = new String[risks.size() + 1][4];
         rows[0] = ar
             ? new String[]{ "الرقم", "المخاطرة", "النتيجة", "الحالة" }
             : new String[]{ "ID",    "Risk",      "Score",   "Status" };
         for (int i = 0; i < risks.size(); i++) {
-            Risk r = risks.get(i);
-            String name = ar && r.getTitleAr() != null ? r.getTitleAr() : r.getTitleEn();
+            BoardPackAggregate.RiskRow r = risks.get(i);
             rows[i + 1] = new String[]{
-                "R-" + String.format("%05d", r.getId()),
-                name,
-                String.valueOf(r.getInherentScore() == null ? 0 : r.getInherentScore()),
-                safe(r.getStatus()),
+                r.reference(),
+                r.title(ar),
+                String.valueOf(r.inherentScore() == null ? 0 : r.inherentScore()),
+                safe(r.status()),
             };
         }
         addTable(s, rows, new double[]{ 0.10, 0.65, 0.10, 0.15 }, new Rectangle(60, 110, 840, 380), ar);
     }
 
-    private void slideFindings(XMLSlideShow ppt, Long org, boolean ar) {
+    private void slideFindings(XMLSlideShow ppt, BoardPackAggregate.Aging aging, boolean ar) {
         XSLFSlide s = ppt.createSlide();
         slideHeader(s, ar ? "ملاحظات التدقيق" : "Audit Findings", ar);
 
-        // F2-58 — the same tier counts as the PDF, from the same queries, over every open finding
-        // rather than the first 1,000. `closed` was also capped by that page.
-        LocalDate today = LocalDate.now();
-        long totalOpen  = findingRepo.countOpenByOrganisationId(org);
-        long exec       = findingRepo.countOpenByOrganisationIdOlderThan(org, BoardPackService.cutoff(today, 90));
-        long dirOrWorse = findingRepo.countOpenByOrganisationIdOlderThan(org, BoardPackService.cutoff(today, 60));
-        long mgrOrWorse = findingRepo.countOpenByOrganisationIdOlderThan(org, BoardPackService.cutoff(today, 30));
-        long dir     = dirOrWorse - exec;
-        long mgr     = mgrOrWorse - dirOrWorse;
-        long onTrack = totalOpen  - mgrOrWorse;
-        long closed  = findingRepo.countByOrganisationIdAndStatus(org, "CLOSED");
         String[][] rows = new String[][]{
             ar ? new String[]{ "التصعيد", "العدد" } : new String[]{ "Tier", "Count" },
-            { ar ? "في المسار" : "On Track",     String.valueOf(onTrack) },
-            { ar ? "تصعيد للمدير" : "Manager",  String.valueOf(mgr) },
-            { ar ? "تصعيد للمدير العام" : "Director", String.valueOf(dir) },
-            { ar ? "تصعيد تنفيذي" : "Executive", String.valueOf(exec) },
-            { ar ? "مغلقة" : "Closed",            String.valueOf(closed) },
+            { ar ? "في المسار" : "On Track",           String.valueOf(aging.onTrack()) },
+            { ar ? "تصعيد للمدير" : "Manager",         String.valueOf(aging.manager()) },
+            { ar ? "تصعيد للمدير العام" : "Director",  String.valueOf(aging.director()) },
+            { ar ? "تصعيد تنفيذي" : "Executive",       String.valueOf(aging.executive()) },
+            { ar ? "مغلقة" : "Closed",                 String.valueOf(aging.closed()) },
         };
         addTable(s, rows, new double[]{ 0.7, 0.3 }, new Rectangle(60, 110, 480, 320), ar);
 
-        // Summary callout
-        addText(s, ar
-                ? "إجمالي ملاحظات مفتوحة: " + (onTrack + mgr + dir + exec)
-                : "Total open findings: " + (onTrack + mgr + dir + exec),
+        // Summary callout. The four tiers partition the open population by construction, so this is
+        // their sum — pinned by BoardPackAgingCutoffTest so the slide can state it as one number.
+        addText(s, (ar ? "إجمالي ملاحظات مفتوحة: " : "Total open findings: ") + aging.totalOpen(),
             new Rectangle(580, 110, 320, 40), 18, true, PRIMARY, ar);
     }
 
-    private void slideKris(XMLSlideShow ppt, Long org, boolean ar) {
+    private void slideKris(XMLSlideShow ppt, BoardPackAggregate.Kris kris, boolean ar) {
         XSLFSlide s = ppt.createSlide();
         slideHeader(s, ar ? "مؤشرات المخاطر" : "Key Risk Indicators", ar);
 
-        List<KriDefinition> kris = kriRepo.findByOrganisationIdAndIsDeletedFalseOrderByKriCodeAsc(org);
-        long green = 0, amber = 0, red = 0, noData = 0;
-        for (KriDefinition k : kris) {
-            String latestBand = measRepo.findFirstByOrganisationIdAndKriIdAndIsDeletedFalseOrderByMeasuredAtDesc(org, k.getId())
-                .map(KriMeasurement::getStatus).orElse(null);
-            if (latestBand == null) noData++;
-            else if ("GREEN".equals(latestBand)) green++;
-            else if ("AMBER".equals(latestBand)) amber++;
-            else if ("RED".equals(latestBand)) red++;
-        }
         // Bar-style summary across the slide
-        int total = (int) (green + amber + red + noData);
+        long green = kris.green(), amber = kris.amber(), red = kris.red(), noData = kris.noData();
+        int total = (int) kris.total();
         int barTop = 130, barH = 40;
         addText(s, ar ? "نطاقات المؤشرات" : "KRI Band Distribution",
             new Rectangle(60, 100, 840, 28), 14, true, INK, ar);
@@ -247,75 +198,52 @@ public class BoardPackPptxService {
                 : "Green " + green + " · Amber " + amber + " · Red " + red + " · No Data " + noData,
             new Rectangle(60, barTop + barH + 12, 840, 24), 13, false, INK, ar);
 
-        // KRI list (top 10)
-        int rowCount = Math.min(kris.size(), 10);
+        // KRI list (first 10 of the code-ordered list)
+        int rowCount = Math.min(kris.rows().size(), DECK_KRIS);
         String[][] rows = new String[rowCount + 1][4];
         rows[0] = ar
             ? new String[]{ "الرمز", "المؤشر", "نطاق", "آخر قراءة" }
             : new String[]{ "Code", "KRI",    "Band",   "Latest" };
         for (int i = 0; i < rowCount; i++) {
-            KriDefinition k = kris.get(i);
-            KriMeasurement latest = measRepo.findFirstByOrganisationIdAndKriIdAndIsDeletedFalseOrderByMeasuredAtDesc(org, k.getId()).orElse(null);
+            BoardPackAggregate.KriRow k = kris.rows().get(i);
             rows[i + 1] = new String[]{
-                safe(k.getKriCode()),
-                ar && k.getTitleAr() != null ? k.getTitleAr() : k.getTitleEn(),
-                latest != null ? safe(latest.getStatus()) : "—",
-                latest != null ? latest.getValue().toPlainString() : "—",
+                safe(k.code()),
+                k.title(ar),
+                safe(k.band()),
+                plain(k.latestValue()),
             };
         }
         addTable(s, rows, new double[]{ 0.15, 0.55, 0.15, 0.15 }, new Rectangle(60, 240, 840, 250), ar);
     }
 
-    private void slideChanges(XMLSlideShow ppt, Long org, boolean ar) {
+    private void slideChanges(XMLSlideShow ppt, BoardPackAggregate.Changes c, boolean ar) {
         XSLFSlide s = ppt.createSlide();
         slideHeader(s, ar ? "إدارة التغيير" : "Change Management", ar);
 
-        long total      = changeRepo.countByOrganisationId(org);
-        long inFlight   = changeRepo.countByOrganisationIdAndStatus(org, "IMPLEMENTING")
-                        + changeRepo.countByOrganisationIdAndStatus(org, "SCHEDULED")
-                        + changeRepo.countByOrganisationIdAndStatus(org, "CAB_PENDING")
-                        + changeRepo.countByOrganisationIdAndStatus(org, "IMPACT_ASSESSED")
-                        + changeRepo.countByOrganisationIdAndStatus(org, "EMERGENCY_APPROVED");
-        long success    = changeRepo.countByOrganisationIdAndOutcome(org, "SUCCESS");
-        long rolledBack = changeRepo.countByOrganisationIdAndOutcome(org, "ROLLED_BACK");
-        long emergency  = changeRepo.countByOrganisationIdAndChangeType(org, "EMERGENCY");
-
         String[][] rows = new String[][]{
             ar ? new String[]{ "المقياس", "القيمة" } : new String[]{ "Metric", "Value" },
-            { ar ? "الإجمالي" : "Total",          String.valueOf(total) },
-            { ar ? "قيد التنفيذ" : "In-flight",   String.valueOf(inFlight) },
-            { ar ? "ناجحة" : "Success",            String.valueOf(success) },
-            { ar ? "تراجع" : "Rolled-back",       String.valueOf(rolledBack) },
-            { ar ? "طارئة" : "Emergency",         String.valueOf(emergency) },
+            { ar ? "الإجمالي" : "Total",          String.valueOf(c.total()) },
+            { ar ? "قيد التنفيذ" : "In-flight",   String.valueOf(c.inFlight()) },
+            { ar ? "ناجحة" : "Success",            String.valueOf(c.success()) },
+            { ar ? "تراجع" : "Rolled-back",       String.valueOf(c.rolledBack()) },
+            { ar ? "طارئة" : "Emergency",         String.valueOf(c.emergency()) },
         };
         addTable(s, rows, new double[]{ 0.65, 0.35 }, new Rectangle(60, 110, 480, 320), ar);
     }
 
-    private void slideEthics(XMLSlideShow ppt, Long org, boolean ar) {
+    private void slideEthics(XMLSlideShow ppt, BoardPackAggregate.Ethics e, boolean ar) {
         XSLFSlide s = ppt.createSlide();
         slideHeader(s, ar ? "الأخلاقيات والامتثال" : "Ethics & Compliance", ar);
 
-        long total      = caseRepo.countByOrganisationId(org);
-        long openCases  = caseRepo.countByOrganisationIdAndStatus(org, "INTAKE")
-                        + caseRepo.countByOrganisationIdAndStatus(org, "TRIAGE")
-                        + caseRepo.countByOrganisationIdAndStatus(org, "INVESTIGATION");
-        long substantiated = caseRepo.countByOrganisationIdAndStatus(org, "SUBSTANTIATED")
-                           + caseRepo.countByOrganisationIdAndStatus(org, "REMEDIATION");
-        long bribery       = caseRepo.countByOrganisationIdAndCategory(org, "BRIBERY")
-                           + caseRepo.countByOrganisationIdAndCategory(org, "KICKBACK");
-        long amlSusp       = caseRepo.countByOrganisationIdAndCategory(org, "AML_SUSPICION");
-        long retal         = caseRepo.countByOrganisationIdAndCategory(org, "RETALIATION");
-        long strs          = amlRepo.countByOrganisationIdAndStrFiled(org, true);
-
         String[][] rows = new String[][]{
             ar ? new String[]{ "المقياس", "القيمة" } : new String[]{ "Metric", "Value" },
-            { ar ? "إجمالي القضايا" : "Total cases",    String.valueOf(total) },
-            { ar ? "مفتوحة" : "Open",                    String.valueOf(openCases) },
-            { ar ? "مُثبتة" : "Substantiated",           String.valueOf(substantiated) },
-            { ar ? "رشاوى/عمولات" : "Bribery / Kickback", String.valueOf(bribery) },
-            { ar ? "اشتباه غسل أموال" : "AML suspicion", String.valueOf(amlSusp) },
-            { ar ? "انتقام" : "Retaliation",             String.valueOf(retal) },
-            { ar ? "STR مُرفعة" : "STRs filed",          String.valueOf(strs) },
+            { ar ? "إجمالي القضايا" : "Total cases",     String.valueOf(e.totalCases()) },
+            { ar ? "مفتوحة" : "Open",                    String.valueOf(e.open()) },
+            { ar ? "مُثبتة" : "Substantiated",           String.valueOf(e.substantiated()) },
+            { ar ? "رشاوى/عمولات" : "Bribery / Kickback", String.valueOf(e.briberyOrKickback()) },
+            { ar ? "اشتباه غسل أموال" : "AML suspicion", String.valueOf(e.amlSuspicion()) },
+            { ar ? "انتقام" : "Retaliation",             String.valueOf(e.retaliation()) },
+            { ar ? "STR مُرفعة" : "STRs filed",          String.valueOf(e.strsFiled()) },
         };
         addTable(s, rows, new double[]{ 0.65, 0.35 }, new Rectangle(60, 110, 480, 380), ar);
     }
@@ -406,6 +334,7 @@ public class BoardPackPptxService {
         }
     }
 
-    private static String safe(String s) { return s == null ? "—" : s; }
+    private static String safe(String s) { return s == null ? NONE : s; }
 
+    private static String plain(BigDecimal v) { return v == null ? NONE : v.toPlainString(); }
 }

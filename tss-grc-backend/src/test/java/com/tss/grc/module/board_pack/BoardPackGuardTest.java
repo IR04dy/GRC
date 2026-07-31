@@ -4,7 +4,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.tss.grc.module.board_pack.controller.BoardPackController;
 import com.tss.grc.module.board_pack.dto.BoardPackDto;
 import com.tss.grc.module.reporting.controller.ExportController;
+import com.tss.grc.module.reporting.dto.BoardPackAggregate;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.Resource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -79,6 +81,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * the grant was the defect. The read tier below is unchanged and still on ADMIN:READ; re-homing it
  * to BOARD:READ is a separate slice with its own grant question.
  *
+ * <h3>2026-07-31 — D-5 added a third way to obtain the pack</h3>
+ * <p>{@code GET /api/v1/reporting/board-pack.json} returns the same aggregate the PDF and the deck
+ * render. The export-route population assertion below was pinned at two and <b>failed on it</b>,
+ * which is the anti-vacuity floor working as intended: a new egress path for the platform's most
+ * sensitive aggregate could not be added without a test asking how it is authorised. It matters more
+ * here than for the file routes, because {@code ExportAuthorizationRatchetTest} is structurally blind
+ * to a handler that returns an object rather than bytes — so for that route this class is the only
+ * cover there is. See
+ * {@link #theJsonAggregateRouteIsInvisibleToTheExportRatchetSoThisClassIsItsOnlyCover()}.
+ *
  * @see com.tss.grc.security.RoleGuardConversionRatchetTest the census and the platform-wide ratchet
  * @see com.tss.grc.security.SkuCatalogueRatchetTest ADR-018, which made BOARD a ratified SKU
  */
@@ -123,7 +135,7 @@ class BoardPackGuardTest {
             .containsEntry("transition", ADMIN_WRITE);
     }
 
-    /** The two board-pack <em>export</em> handlers live in {@code ExportController}, not here. */
+    /** The board-pack <em>export</em> handlers live in {@code ExportController}, not here. */
     private static Map<String, String> exportGuards() {
         Map<String, String> found = new TreeMap<>();
         for (Method m : ExportController.class.getDeclaredMethods()) {
@@ -141,17 +153,24 @@ class BoardPackGuardTest {
     /**
      * ADR-017 D-10a / V332 — the pack's own permission, and the population it excludes.
      *
-     * <p>The scan is asserted to find both handlers first: a path-matching test that quietly stops
+     * <p>The scan is asserted to find every handler first: a path-matching test that quietly stops
      * matching passes for the wrong reason, and "the board pack is guarded" is exactly the claim
      * that must not be wrong.
+     *
+     * <p><b>D-5 added a third route and this assertion is what caught it.</b> The population was
+     * pinned at the two file exports; {@code GET /board-pack.json} tripped it on the first full-suite
+     * run, which is the anti-vacuity floor doing its job — a new way to obtain the board pack cannot
+     * be added without a test asking how it is authorised. The count is deliberately exact rather
+     * than a minimum for that reason: a fourth format must fail here too.
      */
     @Test
     void boardPackExportsRequireTheBoardExportPermission() {
         Map<String, String> g = exportGuards();
         assertThat(g.keySet())
-            .as("the board-pack export scan must still find both handlers in ExportController; if "
-              + "it finds none, every assertion below passes vacuously")
-            .containsExactlyInAnyOrder("/board-pack.pdf", "/board-pack.pptx");
+            .as("the board-pack export scan must find every handler in ExportController; if it "
+              + "finds none, every assertion below passes vacuously — and if it finds a new one, "
+              + "say so here deliberately rather than letting a format arrive unexamined")
+            .containsExactlyInAnyOrder("/board-pack.pdf", "/board-pack.pptx", "/board-pack.json");
 
         g.forEach((path, guard) -> assertThat(guard)
             .as("%s must authorise on BOARD:EXPORT — catalogued and granted to 8 roles by V332 "
@@ -181,6 +200,39 @@ class BoardPackGuardTest {
                   + "and not a grant revocation", path)
                 .doesNotContain("'RISK','EXPORT'").doesNotContain("'RISK', 'EXPORT'");
         });
+    }
+
+    /**
+     * D-5 — the JSON aggregate route is covered by <em>this class and nothing else</em>, deliberately.
+     *
+     * <p>{@code ExportAuthorizationRatchetTest} enforces "a handler that hands the caller a file must
+     * require {@code MODULE:EXPORT}", and decides what a file is from the return type —
+     * {@code byte[]}, {@code Resource}, {@code StreamingResponseBody}. {@code GET /board-pack.json}
+     * returns every figure in the board pack as an object, so that ratchet does not see it and
+     * reports 0 offenders across 40 endpoints whether this route is guarded or not. Generalising the
+     * ratchet to "JSON is an export" is not available: nearly every read endpoint returns JSON, and
+     * the line between one record and the whole register is a judgement, not a return type.
+     *
+     * <p>So the assertion is the return type itself. If this route ever streams a file, the ratchet
+     * begins covering it and the reasoning above stops being true — better to fail here and have
+     * someone reconcile the two tests than to have each quietly assume the other has it. That
+     * assumption is what F2-27 was.
+     */
+    @Test
+    void theJsonAggregateRouteIsInvisibleToTheExportRatchetSoThisClassIsItsOnlyCover() throws Exception {
+        Method json = ExportController.class.getDeclaredMethod("boardPackJson");
+
+        assertThat(json.getReturnType())
+            .as("board-pack.json must return the aggregate object. If it now streams a file, "
+              + "ExportAuthorizationRatchetTest covers it too — update both, do not delete either")
+            .isEqualTo(BoardPackAggregate.class);
+
+        assertThat(byte[].class.isAssignableFrom(json.getReturnType())
+                || Resource.class.isAssignableFrom(json.getReturnType())
+                || json.getGenericReturnType().getTypeName().contains("byte[]"))
+            .as("mirror of the export ratchet's own file test — if this turns true, that ratchet now "
+              + "sees this endpoint and this test's justification has changed")
+            .isFalse();
     }
 
     /**
