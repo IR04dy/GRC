@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ShieldCheck, KeyRound, Grid3X3, UserSearch, Plus, Save, Trash2, RefreshCw,
-  Inbox, ClipboardCheck, Scale, Siren, BarChart3, Copy,
+  Inbox, ClipboardCheck, Scale, Siren, BarChart3, Copy, Lock,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -26,6 +26,11 @@ type TabId = 'roles' | 'matrix' | 'access' | 'requests' | 'campaigns' | 'sod' | 
  * are protected templates), the role × module × action permission-matrix editor
  * (structural rules enforced server-side: APPROVE⇒READ, DELETE⇒WRITE), and the
  * per-user effective-access view (which role delivers which grant).
+ *
+ * <p>F2-63 — the matrix renders a column for <em>every</em> action the catalogue returns,
+ * derived from the response rather than declared, because a screen that claims to answer
+ * "who can do what" must not silently omit an action class. Two of the seven are disclosed
+ * read-only rather than grantable here; see {@link ACTION_POLICY} for which and why.
  */
 export function AccessGovernancePage() {
   const { lang } = useI18n();
@@ -74,7 +79,7 @@ export function AccessGovernancePage() {
       />
       <div style={{ marginTop: 16 }}>
         {tab === 'roles'      && <RolesTab roles={roles} loading={loading} reload={loadRoles} />}
-        {tab === 'matrix'     && <MatrixTab roles={roles} />}
+        {tab === 'matrix'     && <MatrixTab roles={roles} goTo={setTab} />}
         {tab === 'access'     && <AccessTab />}
         {tab === 'requests'   && <RequestsTab roles={roles} users={users} />}
         {tab === 'campaigns'  && <CampaignsTab users={users} />}
@@ -209,9 +214,85 @@ function RolesTab({ roles, loading, reload }: { roles: GovRoleDto[]; loading: bo
 
 // ─── Matrix tab ──────────────────────────────────────────────────────────────
 
-const ACTIONS = ['READ', 'WRITE', 'APPROVE', 'DELETE', 'TRIAGE'] as const;
+/**
+ * F2-63 — per-action policy for this screen: the bilingual label, and whether the
+ * matrix may *grant* the action as opposed to merely *show* it.
+ *
+ * <p>The two are different questions and were previously conflated into one
+ * hardcoded five-element list, which answered "show" with "no" for the two actions
+ * it omitted. For role `CISO` that hid **14 of 40 grants (35%)** — 13 `*:EXPORT`
+ * and 1 `IAM:BREAK_GLASS` — on the screen whose stated job is "who can do what".
+ * Save always round-tripped them, so nothing was lost; it was simply not disclosed.
+ */
+type ActionPolicy = {
+  /** May this screen toggle the grant? `false` ⇒ shown, disclosed, and not editable here. */
+  editable: boolean;
+  labelEn: string;
+  labelAr: string;
+  /** Why it is not editable here. Required whenever `editable` is false. */
+  whyEn?: string;
+  whyAr?: string;
+};
 
-function MatrixTab({ roles }: { roles: GovRoleDto[] }) {
+const ACTION_POLICY: Record<string, ActionPolicy> = {
+  READ:    { editable: true, labelEn: 'Read',    labelAr: 'قراءة' },
+  WRITE:   { editable: true, labelEn: 'Write',   labelAr: 'كتابة' },
+  APPROVE: { editable: true, labelEn: 'Approve', labelAr: 'اعتماد' },
+  DELETE:  { editable: true, labelEn: 'Delete',  labelAr: 'حذف' },
+  TRIAGE:  { editable: true, labelEn: 'Triage',  labelAr: 'فرز' },
+
+  // Disclosed but not grantable here — each for a reason recorded in the programme,
+  // not for tidiness. Both are still saved back exactly as loaded.
+  EXPORT: {
+    editable: false, labelEn: 'Export', labelAr: 'تصدير',
+    whyEn: 'Shown, not editable. Which personas may extract a whole register as a file is an '
+      + 'open policy decision (F2-61) — F2-27 made these 26 permissions enforce, and the grants '
+      + 'behind them have not been re-reviewed since. Existing grants are preserved on save.',
+    whyAr: 'معروضة وغير قابلة للتعديل. تحديد الجهات التي يحق لها تصدير سجل كامل كملف قرارٌ '
+      + 'سياسي لم يُحسم بعد (F2-61) — إذ فعّل F2-27 إنفاذ هذه الصلاحيات الست والعشرين دون '
+      + 'إعادة مراجعة منحها. وتُحفظ الصلاحيات القائمة كما هي.',
+  },
+  BREAK_GLASS: {
+    editable: false, labelEn: 'Break-glass', labelAr: 'وصول الطوارئ',
+    whyEn: 'Shown, not editable. Emergency access is not an ordinary grant: it is activated per '
+      + 'incident from the Break-glass tab, time-boxed to 24 h, and gated by four-eyes review. '
+      + 'Held today by 3 roles. Existing grants are preserved on save.',
+    whyAr: 'معروضة وغير قابلة للتعديل. وصول الطوارئ ليس منحاً اعتيادياً: يُنشَّط لكل حادثة من '
+      + 'تبويب «وصول الطوارئ»، ومحدَّد بمدة أقصاها ٢٤ ساعة، وخاضع لمراجعة مبدأ الأربع أعين. '
+      + 'تحمله اليوم ٣ أدوار. وتُحفظ الصلاحيات القائمة كما هي.',
+  },
+};
+
+/** Canonical column order. An action absent from this map is appended, never dropped. */
+export const ACTION_ORDER = Object.keys(ACTION_POLICY);
+
+/**
+ * The rendered column set, **derived from the response** rather than declared.
+ *
+ * <p>This is the structural half of F2-63: the previous code declared its columns, so a
+ * catalogued action the list did not mention could not be displayed and nothing failed.
+ * Deriving them means the screen shows every action the catalogue returns — known ones in
+ * a legible order, then anything unrecognised, appended so it is visible on the day it is
+ * catalogued rather than on the day someone notices.
+ *
+ * <p>An unrecognised action is shown **read-only** (see {@link isActionEditable}): being
+ * displayed is the floor, being grantable is a decision, and fail-closed is the right
+ * default for an action class nobody has classified yet.
+ */
+export function matrixColumns(cells: { action: string }[]): string[] {
+  const present = new Set(cells.map(c => c.action));
+  return [
+    ...ACTION_ORDER.filter(a => present.has(a)),
+    ...[...present].filter(a => !(a in ACTION_POLICY)).sort(),
+  ];
+}
+
+/** Fail closed: an action with no policy entry is disclosed but not grantable. */
+export function isActionEditable(action: string): boolean {
+  return ACTION_POLICY[action]?.editable ?? false;
+}
+
+export function MatrixTab({ roles, goTo }: { roles: GovRoleDto[]; goTo?: (t: TabId) => void }) {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
   const toast = useToast();
@@ -281,6 +362,25 @@ function MatrixTab({ roles }: { roles: GovRoleDto[] }) {
   const platformScope = hasAnyRole('PLATFORM_ADMIN');
   const editable = matrix != null && (!shared || platformScope);
 
+  /** F2-63 — columns come from the response, so a newly catalogued action cannot go missing. */
+  const actions = useMemo(() => matrixColumns(matrix?.cells ?? []), [matrix]);
+
+  /**
+   * F2-63 — two independent gates, and they answer different questions. `editable` is about the
+   * *role* (F2-56: may this scope rewrite this row at all); {@link isActionEditable} is about the
+   * *action* (may this screen grant this class of authority). A cell needs both.
+   */
+  const canToggle = (action: string) => editable && isActionEditable(action);
+
+  /** Read-only action classes actually present, with how many grants each one holds. */
+  const disclosedOnly = useMemo(
+    () => actions.filter(a => !isActionEditable(a)).map(a => ({
+      action: a,
+      held: [...granted].filter(k => k.split('/')[1] === a).length,
+    })),
+    [actions, granted],
+  );
+
   return (
     <Card title={isAr ? 'مصفوفة وحدة × إجراء' : 'Module × action matrix'} Icon={Grid3X3}
       action={
@@ -307,28 +407,75 @@ function MatrixTab({ roles }: { roles: GovRoleDto[] }) {
                   : 'This role is shared by every tenant, so it cannot be edited from inside one. Clone it from the Role catalogue to get a copy of your own that you can tune.'}
               </div>
             )}
-            <table className="grc-table">
+            <table className="grc-table" data-testid="matrix-table">
               <thead><tr>
                 <th>{isAr ? 'الوحدة' : 'Module'}</th>
-                {ACTIONS.map(a => <th key={a} style={{ textAlign: 'center' }}>{a}</th>)}
+                {actions.map(a => {
+                  const p = ACTION_POLICY[a];
+                  const label = (isAr ? p?.labelAr : p?.labelEn) ?? a;
+                  const why = isAr ? p?.whyAr : p?.whyEn;
+                  return (
+                    <th key={a} data-action={a} style={{ textAlign: 'center', whiteSpace: 'nowrap' }}
+                      title={why ? `${label} — ${why}` : label}>
+                      {a}
+                      {!isActionEditable(a) && (
+                        <Lock size={11} aria-hidden style={{ verticalAlign: -1, marginInlineStart: 4, color: 'var(--ink-3)' }} />
+                      )}
+                    </th>
+                  );
+                })}
               </tr></thead>
               <tbody>
-                {modules.map(({ module, actions }) => (
+                {modules.map(({ module, actions: present }) => (
                   <tr key={module}>
                     <td className="mono text-2xs">{module}</td>
-                    {ACTIONS.map(a => (
-                      <td key={a} style={{ textAlign: 'center' }}>
-                        {actions.has(a)
-                          ? <input type="checkbox" checked={granted.has(`${module}/${a}`)}
-                              disabled={!editable}
-                              onChange={() => toggle(module, a)} />
-                          : <span style={{ color: 'var(--ink-3)' }}>·</span>}
-                      </td>
-                    ))}
+                    {actions.map(a => {
+                      const key = `${module}/${a}`;
+                      return (
+                        <td key={a} style={{ textAlign: 'center' }}>
+                          {present.has(a)
+                            ? <input type="checkbox" checked={granted.has(key)}
+                                aria-label={key}
+                                disabled={!canToggle(a)}
+                                onChange={() => toggle(module, a)} />
+                            : <span style={{ color: 'var(--ink-3)' }}>·</span>}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
             </table>
+            {disclosedOnly.length > 0 && (
+              <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+                {disclosedOnly.map(({ action, held }) => {
+                  const p = ACTION_POLICY[action];
+                  const label = (isAr ? p?.labelAr : p?.labelEn) ?? action;
+                  const why = (isAr ? p?.whyAr : p?.whyEn)
+                    ?? (isAr
+                      ? 'إجراء غير مصنَّف في هذه الشاشة — يُعرض ولا يُمنح من هنا حتى تُقرَّر سياسته.'
+                      : 'Unclassified action — disclosed here, and not grantable until its policy is decided.');
+                  return (
+                    <div key={action} data-testid={`readonly-note-${action}`}
+                      style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'var(--ink-2)' }}>
+                      <Lock size={13} aria-hidden style={{ flexShrink: 0, marginTop: 2, color: 'var(--ink-3)' }} />
+                      <div>
+                        <Badge tone="neutral">{action}</Badge>
+                        <span style={{ marginInlineStart: 6 }}>
+                          {label} · {isAr ? `${held} صلاحية محفوظة` : `${held} grant${held === 1 ? '' : 's'} held`}
+                        </span>
+                        <div style={{ marginTop: 2 }}>{why}</div>
+                        {action === 'BREAK_GLASS' && goTo && (
+                          <Button size="sm" variant="ghost" Icon={Siren} onClick={() => goTo('breakglass')}>
+                            {isAr ? 'إلى تبويب وصول الطوارئ' : 'Go to the Break-glass tab'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {compareGrants != null && compareId !== '' && (() => {
               const compareName = roles.find(r => r.id === compareId)?.roleName ?? '';
               const onlyA = [...granted].filter(k => !compareGrants.has(k)).sort();
