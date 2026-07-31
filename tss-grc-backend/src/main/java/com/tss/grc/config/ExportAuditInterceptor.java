@@ -34,11 +34,18 @@ public class ExportAuditInterceptor implements HandlerInterceptor {
     public void afterCompletion(HttpServletRequest req, HttpServletResponse res, Object handler, Exception ex) {
         try {
             if (res.getStatus() >= 400) return;                     // only successful downloads
-            String cd = res.getHeader(HttpHeaders.CONTENT_DISPOSITION);
-            if (cd == null || !cd.toLowerCase().contains("attachment")) return;   // only file streams
 
-            String fileName = parseFilename(cd);
-            String format   = ext(fileName);
+            // Two ways to be an export. Either the response streamed a file, or the handler declared
+            // itself one (D-5): GET /reporting/board-pack.json returns every figure in the board pack
+            // as data, with no attachment header, and the Content-Disposition test alone would have
+            // let the platform's most sensitive aggregate leave with no audit row.
+            String cd = res.getHeader(HttpHeaders.CONTENT_DISPOSITION);
+            boolean streamed = cd != null && cd.toLowerCase().contains("attachment");
+            String declaredFormat = ExportAuditContext.declaredFormat();
+            if (!streamed && declaredFormat == null) return;
+
+            String fileName = streamed ? parseFilename(cd) : "";
+            String format   = streamed ? ext(fileName) : declaredFormat;
             String lang     = req.getParameter("lang");
             String path     = req.getRequestURI();
             String module   = moduleFromPath(path);

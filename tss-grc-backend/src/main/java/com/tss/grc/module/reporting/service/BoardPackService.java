@@ -6,45 +6,18 @@ import com.tss.grc.module.platform.export.PdfTheme;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
 import com.tss.grc.common.exception.ExportException;
-import com.tss.grc.common.tenant.TenantContext;
-import com.tss.grc.module.change_mgmt.repository.ChangeRequestRepository;
-import com.tss.grc.module.compliance.entity.AuditFinding;
-import com.tss.grc.module.compliance.entity.Framework;
-import com.tss.grc.module.policy.entity.PolicyDocumentFrameworkMapping;
-import com.tss.grc.module.compliance.repository.AuditFindingRepository;
-import com.tss.grc.module.compliance.repository.ControlRepository;
-import com.tss.grc.module.compliance.repository.FrameworkRepository;
-import com.tss.grc.module.policy.repository.PolicyDocumentFrameworkMappingRepository;
-import com.tss.grc.module.ethics.repository.AmlAlertRepository;
-import com.tss.grc.module.ethics.repository.EthicsCaseRepository;
-import com.tss.grc.module.platform.entity.Organisation;
-import com.tss.grc.module.platform.repository.OrganisationRepository;
-import com.tss.grc.module.risk.kri.entity.KriDefinition;
-import com.tss.grc.module.risk.entity.Risk;
-import com.tss.grc.module.risk.kri.repository.KriDefinitionRepository;
-import com.tss.grc.module.risk.kri.repository.KriMeasurementRepository;
-import com.tss.grc.module.risk.repository.RiskRepository;
-import com.tss.grc.module.sust.dashboard.service.SustainabilityDashboardService;
+import com.tss.grc.module.reporting.dto.BoardPackAggregate;
+import com.tss.grc.module.reporting.dto.BoardPackAggregate.Scope;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
- * S1 — One-click board reporting pack generator.
+ * S1 — One-click board reporting pack generator (PDF).
  *
  * Produces a multi-section PDF combining:
  *  1. Cover page (organisation + period + generated-on)
@@ -54,35 +27,32 @@ import java.util.Map;
  *  5. KRI dashboard (band counts + KRI table)
  *  6. Compliance framework coverage (per framework: policies/findings/controls)
  *  7. Change management snapshot (by status + by type)
- *  8. Ethics & Compliance highlights (cases by category + AML STR count)
- *  9. Closing notes
+ *  8. Ethics &amp; Compliance highlights (cases by category + AML STR count)
+ *  9. Sustainability &amp; ESG snapshot
+ * 10. Closing notes
  *
  * Bilingual: pass lang="ar" to flip to RTL throughout.
+ *
+ * <p><b>D-5 — this class renders; it no longer computes.</b> Every figure comes from
+ * {@link BoardPackAggregateService#build(Scope)}, which {@link BoardPackPptxService} and
+ * {@code GET /api/v1/reporting/board-pack.json} also call. It previously held 35 repository call
+ * sites and the deck held its own 32, so the PDF and the deck of one board pack were two
+ * implementations of one document; {@link BoardPackAggregate} records what they had already drifted
+ * on. The only remaining decisions here are presentation ones — which language to show, how to
+ * render an absent value, how many rows fit on a page.
  */
 @Service
 @RequiredArgsConstructor
 public class BoardPackService {
 
-    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    /** What an absent value looks like in a rendered pack. The aggregate carries null. */
+    private static final String NONE = "—";
 
-    private final OrganisationRepository orgRepo;
-    private final RiskRepository riskRepo;
-    private final AuditFindingRepository findingRepo;
-    private final KriDefinitionRepository kriRepo;
-    private final KriMeasurementRepository measRepo;
-    private final FrameworkRepository frameworkRepo;
-    private final PolicyDocumentFrameworkMappingRepository docMappingRepo; // CH-6: canonical register
-    private final ControlRepository controlRepo;
-    private final ChangeRequestRepository changeRepo;
-    private final EthicsCaseRepository caseRepo;
-    private final AmlAlertRepository amlRepo;
-    // S-N — the ESG/sustainability executive section pulls the composed dashboard aggregate.
-    private final SustainabilityDashboardService sustDashboard;
+    private final BoardPackAggregateService aggregateService;
 
     @Transactional(readOnly = true)
     public byte[] generatePdf(String lang) {
-        Long org = TenantContext.getCurrentTenant();
-        Organisation o = orgRepo.findById(org).orElse(null);
+        BoardPackAggregate pack = aggregateService.build(Scope.FULL);
         boolean ar = "ar".equalsIgnoreCase(lang);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -100,47 +70,47 @@ public class BoardPackService {
             doc.open();
 
             // 1. Cover
-            renderCover(doc, o, ar);
+            renderCover(doc, pack.header(), ar);
 
             // 2. Executive summary
             doc.newPage();
             renderSectionHeader(doc, ar ? "ملخص تنفيذي" : "Executive Summary", ar);
-            renderExecutiveSummary(doc, org, ar);
+            renderExecutiveSummary(doc, pack.executive(), ar);
 
             // 3. Risk Register
             doc.newPage();
             renderSectionHeader(doc, ar ? "سجل المخاطر — أعلى ٢٠" : "Risk Register — Top 20", ar);
-            renderRiskRegister(doc, org, ar);
+            renderRiskRegister(doc, pack.topRisks(), ar);
 
             // 4. Findings aging
             doc.newPage();
             renderSectionHeader(doc, ar ? "ملاحظات التدقيق وتقادمها" : "Audit Findings — Aging Snapshot", ar);
-            renderFindings(doc, org, ar);
+            renderFindings(doc, pack.aging(), pack.oldestOpenFindings(), ar);
 
             // 5. KRI dashboard
             doc.newPage();
             renderSectionHeader(doc, ar ? "لوحة مؤشرات المخاطر الرئيسية" : "Key Risk Indicators", ar);
-            renderKris(doc, org, ar);
+            renderKris(doc, pack.kris(), ar);
 
             // 6. Framework coverage
             doc.newPage();
             renderSectionHeader(doc, ar ? "تغطية الأطر التنظيمية" : "Regulatory Framework Coverage", ar);
-            renderFrameworks(doc, org, ar);
+            renderFrameworks(doc, pack.frameworkCoverage(), ar);
 
             // 7. Change management
             doc.newPage();
             renderSectionHeader(doc, ar ? "إدارة التغيير" : "Change Management", ar);
-            renderChanges(doc, org, ar);
+            renderChanges(doc, pack.changes(), ar);
 
             // 8. Ethics
             doc.newPage();
             renderSectionHeader(doc, ar ? "الأخلاقيات والامتثال" : "Ethics & Compliance", ar);
-            renderEthics(doc, org, ar);
+            renderEthics(doc, pack.ethics(), ar);
 
             // 9. Sustainability & ESG (S-N)
             doc.newPage();
             renderSectionHeader(doc, ar ? "الاستدامة والحوكمة البيئية والاجتماعية" : "Sustainability & ESG", ar);
-            renderSustainability(doc, org, ar);
+            renderSustainability(doc, pack.sustainability(), ar);
 
             // 10. Closing
             doc.newPage();
@@ -155,7 +125,7 @@ public class BoardPackService {
     }
 
     // ── Section: Cover ─────────────────────────────────────────────────────
-    private void renderCover(Document doc, Organisation o, boolean ar) throws DocumentException {
+    private void renderCover(Document doc, BoardPackAggregate.Header h, boolean ar) throws DocumentException {
         // Shared executive cover hero — brand band + eyebrow + bilingual
         // organisation name as the title + tagline + Hijri+Gregorian stamp
         // + Confidential badge. Identical look across BCP/Crisis/NDI/board
@@ -163,8 +133,8 @@ public class BoardPackService {
         PdfTheme.Cover cv = new PdfTheme.Cover();
         cv.eyebrow    = "Quarterly Board Pack";
         cv.eyebrowAr  = "حزمة الإدارة الفصلية";
-        cv.titleEn    = o == null ? "—" : o.getNameEn();
-        cv.titleAr    = o == null ? null : o.getNameAr();
+        cv.titleEn    = h.organisationNameEn() == null ? NONE : h.organisationNameEn();
+        cv.titleAr    = h.organisationNameAr();
         cv.subtitle   = "Risk · Compliance · Continuity Snapshot";
         cv.subtitleAr = "نظرة شاملة على المخاطر والامتثال والاستمرارية";
         cv.classification = "Confidential";
@@ -180,30 +150,20 @@ public class BoardPackService {
     }
 
     // ── Section: Executive Summary ──────────────────────────────────────────
-    private void renderExecutiveSummary(Document doc, Long org, boolean ar) throws DocumentException {
-        long totalRisks    = riskRepo.countByOrganisationId(org);
-        long criticalRisks = riskRepo.countByOrganisationIdAndRiskLevel(org, "CRITICAL");
-        long openRisks     = riskRepo.countByOrganisationIdAndStatus(org, "OPEN");
-
-        long openFindings  = findingRepo.countOpenByOrganisationId(org);
-        long totalFindings = findingRepo.countByOrganisationId(org);
-
-        long totalKris = kriRepo.countByOrganisationIdAndIsDeletedFalse(org);
-        long totalControls = controlRepo.countByOrganisationId(org);
-        long totalCases = caseRepo.countByOrganisationId(org);
-
+    private void renderExecutiveSummary(Document doc, BoardPackAggregate.Executive e, boolean ar)
+            throws DocumentException {
         PdfPTable t = new PdfPTable(4);
         t.setWidthPercentage(100);
         t.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
 
-        kpi(t, ar ? "المخاطر" : "Risks",         String.valueOf(totalRisks),    ar ? openRisks + " مفتوحة"  : openRisks + " open", ar);
-        kpi(t, ar ? "حرجة"   : "Critical",       String.valueOf(criticalRisks), ar ? "تتطلب اهتمام"        : "Need attention",      ar);
-        kpi(t, ar ? "ملاحظات مفتوحة" : "Open Findings", String.valueOf(openFindings),  ar ? "من إجمالي " + totalFindings : "of " + totalFindings + " total", ar);
-        kpi(t, ar ? "ضوابط"  : "Controls",       String.valueOf(totalControls), "—", ar);
-        kpi(t, ar ? "مؤشرات المخاطر" : "KRIs",  String.valueOf(totalKris),     "—", ar);
-        kpi(t, ar ? "قضايا أخلاقيات" : "Ethics Cases", String.valueOf(totalCases), "—", ar);
-        kpi(t, ar ? "تقارير STR" : "STRs Filed",   String.valueOf(amlRepo.countByOrganisationIdAndStrFiled(org, true)), "—", ar);
-        kpi(t, ar ? "تنبيهات AML" : "AML Alerts", String.valueOf(amlRepo.countByOrganisationId(org)),   "—", ar);
+        kpi(t, ar ? "المخاطر" : "Risks",         String.valueOf(e.totalRisks()),    ar ? e.openRisks() + " مفتوحة"  : e.openRisks() + " open", ar);
+        kpi(t, ar ? "حرجة"   : "Critical",       String.valueOf(e.criticalRisks()), ar ? "تتطلب اهتمام"        : "Need attention",      ar);
+        kpi(t, ar ? "ملاحظات مفتوحة" : "Open Findings", String.valueOf(e.openFindings()),  ar ? "من إجمالي " + e.totalFindings() : "of " + e.totalFindings() + " total", ar);
+        kpi(t, ar ? "ضوابط"  : "Controls",       String.valueOf(e.totalControls()), NONE, ar);
+        kpi(t, ar ? "مؤشرات المخاطر" : "KRIs",  String.valueOf(e.totalKris()),     NONE, ar);
+        kpi(t, ar ? "قضايا أخلاقيات" : "Ethics Cases", String.valueOf(e.totalEthicsCases()), NONE, ar);
+        kpi(t, ar ? "تقارير STR" : "STRs Filed",   String.valueOf(e.strsFiled()), NONE, ar);
+        kpi(t, ar ? "تنبيهات AML" : "AML Alerts", String.valueOf(e.amlAlerts()),   NONE, ar);
 
         doc.add(t);
     }
@@ -239,134 +199,61 @@ public class BoardPackService {
     }
 
     // ── Section: Risk Register top 20 ──────────────────────────────────────
-    private void renderRiskRegister(Document doc, Long org, boolean ar) throws DocumentException {
-        // F2-58 — rank in the database, not over a page of it.
-        //
-        // This was: fetch PageRequest.of(0, 200) with NO Sort, sort that page by inherent score in
-        // memory, subList(0, 20). Because the page carried no ORDER BY, its 200 rows were whatever
-        // order SQL Server happened to return — so "Top 20" was the top 20 of an arbitrary
-        // 200-row sample of the register, and a board reading it had no way to tell. Latent when
-        // found (largest tenant: 51 risks on both dev and prod), and it would have started lying
-        // silently at risk 201.
-        //
-        // Equivalence on today's data was checked before changing it, not assumed: 2 risks carry a
-        // null inherent_score and SQL Server sorts NULLs last under DESC, which is where the old
-        // comparator's null -> 0 mapping also put them; no risk has a negative score, which is the
-        // only case where that mapping and a NULLS-LAST sort would disagree.
-        //
-        // The id tiebreaker is new and deliberate: several risks share a score, and the old
-        // in-memory sort broke those ties by the arbitrary page order, so the pack could name a
-        // different 20th risk on two consecutive runs over unchanged data.
-        List<Risk> risks = riskRepo.findByOrganisationId(org, PageRequest.of(0, 20,
-            Sort.by(Sort.Direction.DESC, "inherentScore").and(Sort.by(Sort.Direction.ASC, "id"))))
-            .getContent();
-
-        float[] widths = ar ? new float[]{ 1f, 4.5f, 1f, 1f, 1.5f } : new float[]{ 1f, 4.5f, 1f, 1f, 1.5f };
+    private void renderRiskRegister(Document doc, List<BoardPackAggregate.RiskRow> risks, boolean ar)
+            throws DocumentException {
+        float[] widths = new float[]{ 1f, 4.5f, 1f, 1f, 1.5f };
         PdfPTable t = buildTable(widths, ar);
         String[] hdr = ar
             ? new String[]{ "رقم", "المخاطرة", "النتيجة", "المتبقية", "الحالة" }
             : new String[]{ "ID",  "Risk",     "Score",   "Residual", "Status" };
         for (String h : hdr) t.addCell(headerCell(h, ar));
-        for (Risk r : risks) {
-            String name = ar && r.getTitleAr() != null ? r.getTitleAr() : r.getTitleEn();
-            t.addCell(bodyCell("R-" + String.format("%05d", r.getId()), false));
-            t.addCell(bodyCell(safe(name), ar));
-            t.addCell(bodyCell(String.valueOf(r.getInherentScore() == null ? 0 : r.getInherentScore()), false));
-            t.addCell(bodyCell(r.getResidualScore() == null ? "—" : String.valueOf(r.getResidualScore()), false));
-            t.addCell(bodyCell(safe(r.getStatus()), false));
+        for (BoardPackAggregate.RiskRow r : risks) {
+            t.addCell(bodyCell(r.reference(), false));
+            t.addCell(bodyCell(safe(r.title(ar)), ar));
+            // A null inherent score renders as 0, not as an em-dash: the column is the ranking key,
+            // and SQL Server sorts NULLs last under DESC, which is where a 0 belongs anyway.
+            t.addCell(bodyCell(String.valueOf(r.inherentScore() == null ? 0 : r.inherentScore()), false));
+            t.addCell(bodyCell(r.residualScore() == null ? NONE : String.valueOf(r.residualScore()), false));
+            t.addCell(bodyCell(safe(r.status()), false));
         }
         doc.add(t);
     }
 
     // ── Section: Findings ───────────────────────────────────────────────────
-    private void renderFindings(Document doc, Long org, boolean ar) throws DocumentException {
-        // F2-58 — count the tiers in the database over EVERY open finding.
-        //
-        // This was: fetch PageRequest.of(0, 1000) and bucket in a Java loop, so the tiers a board
-        // sees were computed over at most the first 1,000 findings. `cutoff(N)` reproduces the
-        // loop's day-granularity predicate exactly (see the repository Javadoc); the subtractions
-        // turn three cumulative counts into four disjoint tiers, and null-dated findings fall into
-        // the on-track remainder just as `days = 0` used to put them there.
-        LocalDate today = LocalDate.now();
-        long totalOpen  = findingRepo.countOpenByOrganisationId(org);
-        long exec       = findingRepo.countOpenByOrganisationIdOlderThan(org, cutoff(today, 90));
-        long dirOrWorse = findingRepo.countOpenByOrganisationIdOlderThan(org, cutoff(today, 60));
-        long mgrOrWorse = findingRepo.countOpenByOrganisationIdOlderThan(org, cutoff(today, 30));
-        long dir     = dirOrWorse - exec;
-        long mgr     = mgrOrWorse - dirOrWorse;
-        long onTrack = totalOpen  - mgrOrWorse;
+    private void renderFindings(Document doc, BoardPackAggregate.Aging aging,
+                                List<BoardPackAggregate.FindingRow> findings, boolean ar)
+            throws DocumentException {
         // Shaping-aware line — plain paragraphs never shape Arabic.
         PdfTheme.line(doc,
-            ar ? "تقادم الملاحظات: في المسار " + onTrack + " · مدير " + mgr + " · مدير عام " + dir + " · تنفيذي " + exec
-               : "Aging tiers: On Track " + onTrack + " · Manager " + mgr + " · Director " + dir + " · Exec " + exec,
+            ar ? "تقادم الملاحظات: في المسار " + aging.onTrack() + " · مدير " + aging.manager()
+                 + " · مدير عام " + aging.director() + " · تنفيذي " + aging.executive()
+               : "Aging tiers: On Track " + aging.onTrack() + " · Manager " + aging.manager()
+                 + " · Director " + aging.director() + " · Exec " + aging.executive(),
             PdfFonts.normal(11), ar, 0, 10);
 
-        // Open findings table — the 15 oldest, ordered and limited in SQL (F2-58). The old code
-        // paged 1,000 rows including closed ones and counted only open rows toward its limit, so a
-        // tenant whose first 1,000 findings were largely closed could render fewer than 15 open
-        // findings while older open ones sat unlisted.
-        List<AuditFinding> findings =
-            findingRepo.findOldestOpenByOrganisationId(org, PageRequest.of(0, 15));
-        int rowCount = 0;
         float[] widths = new float[]{ 4f, 1.3f, 1.5f, 1f, 1.3f };
         PdfPTable t = buildTable(widths, ar);
         String[] hdr = ar
             ? new String[]{ "الملاحظة", "الأهمية", "المالك", "الأيام", "الحالة" }
             : new String[]{ "Finding",  "Severity", "Owner",  "Days",   "Status" };
         for (String h : hdr) t.addCell(headerCell(h, ar));
-        for (AuditFinding f : findings) {
-            // No CLOSED skip: the query already excludes them, so every row here is rendered.
-            LocalDateTime created = f.getCreatedAt();
-            long days = created != null ? ChronoUnit.DAYS.between(created.toLocalDate(), today) : 0;
-            t.addCell(bodyCell(safe(f.getTitle()), ar));
-            t.addCell(bodyCell(safe(f.getSeverity()), false));
-            t.addCell(bodyCell(safe(f.getOwner()), ar));
-            t.addCell(bodyCell(String.valueOf(days), false));
-            t.addCell(bodyCell(safe(f.getStatus()), false));
-            if (++rowCount >= 15) break;
+        for (BoardPackAggregate.FindingRow f : findings) {
+            t.addCell(bodyCell(safe(f.title()), ar));
+            t.addCell(bodyCell(safe(f.severity()), false));
+            t.addCell(bodyCell(safe(f.owner()), ar));
+            t.addCell(bodyCell(String.valueOf(f.daysOpen() == null ? 0 : f.daysOpen()), false));
+            t.addCell(bodyCell(safe(f.status()), false));
         }
         doc.add(t);
     }
 
-    /**
-     * F2-58 — the timestamp boundary that makes a SQL {@code createdAt < cutoff} count identical to
-     * the Java loop's {@code ChronoUnit.DAYS.between(createdAt.toLocalDate(), today) >= days}.
-     *
-     * <p>That predicate holds iff the creation date is on or before {@code today - days}, which is
-     * iff the timestamp precedes the start of day {@code today - (days - 1)}. The off-by-one
-     * matters: {@code LocalDateTime.now().minusDays(90)} would exclude a finding created 90 days
-     * ago at 15:00 from a report run at 10:00, while the loop counts it.
-     */
-    static LocalDateTime cutoff(LocalDate today, int days) {
-        return today.minusDays(days - 1L).atStartOfDay();
-    }
-
     // ── Section: KRIs ───────────────────────────────────────────────────────
-    private void renderKris(Document doc, Long org, boolean ar) throws DocumentException {
-        List<KriDefinition> kris = kriRepo.findByOrganisationIdAndIsDeletedFalseOrderByKriCodeAsc(org);
-
-        // one query for each KRI's latest measurement instead of a per-KRI N+1
-        // loop. Key present ⇒ a measurement exists; value [0]=status, [1]=value.
-        Map<Long, Object[]> latestByKri = new HashMap<>();
-        List<Long> kriIds = kris.stream().map(KriDefinition::getId).toList();
-        if (!kriIds.isEmpty()) {
-            for (Object[] row : measRepo.findLatestPerKriIn(kriIds)) {
-                latestByKri.put((Long) row[0], new Object[]{ row[1], row[2] });
-            }
-        }
-
-        long green = 0, amber = 0, red = 0, noData = 0;
-        for (KriDefinition k : kris) {
-            Object[] latest = latestByKri.get(k.getId());
-            String latestBand = latest == null ? null : (String) latest[0];
-            if (latestBand == null) noData++;
-            else if ("GREEN".equals(latestBand)) green++;
-            else if ("AMBER".equals(latestBand)) amber++;
-            else if ("RED".equals(latestBand)) red++;
-        }
+    private void renderKris(Document doc, BoardPackAggregate.Kris kris, boolean ar) throws DocumentException {
         PdfTheme.line(doc,
-            ar ? "نطاقات: أخضر " + green + " · أصفر " + amber + " · أحمر " + red + " · بدون بيانات " + noData
-               : "Bands: Green " + green + " · Amber " + amber + " · Red " + red + " · No Data " + noData,
+            ar ? "نطاقات: أخضر " + kris.green() + " · أصفر " + kris.amber() + " · أحمر " + kris.red()
+                 + " · بدون بيانات " + kris.noData()
+               : "Bands: Green " + kris.green() + " · Amber " + kris.amber() + " · Red " + kris.red()
+                 + " · No Data " + kris.noData(),
             PdfFonts.normal(11), ar, 0, 10);
 
         float[] widths = new float[]{ 1.2f, 4f, 1f, 1.2f, 1.2f, 1.4f };
@@ -375,23 +262,20 @@ public class BoardPackService {
             ? new String[]{ "الرمز", "اسم المؤشر", "نطاق", "آخر قراءة", "أخضر ≤", "أصفر ≤" }
             : new String[]{ "Code", "KRI",        "Band",  "Latest",     "Green ≤", "Amber ≤" };
         for (String h : hdr) t.addCell(headerCell(h, ar));
-        for (KriDefinition k : kris) {
-            Object[] latest = latestByKri.get(k.getId());
-            String name = ar && k.getTitleAr() != null ? k.getTitleAr() : k.getTitleEn();
-            t.addCell(bodyCell(safe(k.getKriCode()), false));
-            t.addCell(bodyCell(safe(name), ar));
-            t.addCell(bodyCell(latest != null ? safe((String) latest[0]) : "—", false));
-            t.addCell(bodyCell(latest != null ? ((BigDecimal) latest[1]).toPlainString() : "—", false));
-            t.addCell(bodyCell(k.getGreenThreshold() != null ? k.getGreenThreshold().toPlainString() : "—", false));
-            t.addCell(bodyCell(k.getAmberThreshold() != null ? k.getAmberThreshold().toPlainString() : "—", false));
+        for (BoardPackAggregate.KriRow k : kris.rows()) {
+            t.addCell(bodyCell(safe(k.code()), false));
+            t.addCell(bodyCell(safe(k.title(ar)), ar));
+            t.addCell(bodyCell(safe(k.band()), false));
+            t.addCell(bodyCell(plain(k.latestValue()), false));
+            t.addCell(bodyCell(plain(k.greenThreshold()), false));
+            t.addCell(bodyCell(plain(k.amberThreshold()), false));
         }
         doc.add(t);
     }
 
     // ── Section: Framework coverage ─────────────────────────────────────────
-    private void renderFrameworks(Document doc, Long org, boolean ar) throws DocumentException {
-        List<Framework> frameworks = frameworkRepo.findByIsActiveTrueOrderByFamilyAscCodeAsc();
-
+    private void renderFrameworks(Document doc, List<BoardPackAggregate.FrameworkRow> frameworks, boolean ar)
+            throws DocumentException {
         float[] widths = new float[]{ 1.3f, 4f, 1f, 1f, 1.3f, 1.3f };
         PdfPTable t = buildTable(widths, ar);
         String[] hdr = ar
@@ -399,31 +283,18 @@ public class BoardPackService {
             : new String[]{ "Code", "Framework","Ctrls", "Polcs",  "Full %",      "Open Findings" };
         for (String h : hdr) t.addCell(headerCell(h, ar));
 
-        for (Framework f : frameworks) {
-            // CH-6: canonical mapping table, org-scoped by its own organisation_id.
-            List<PolicyDocumentFrameworkMapping> rows = docMappingRepo.findByOrganisationIdAndFrameworkId(org, f.getId());
-            long full = 0;
-            for (PolicyDocumentFrameworkMapping m : rows) {
-                if ("FULL".equals(m.getSatisfaction())) full++;
-            }
-            int policyCount = rows.size();
-            long controlCount = controlRepo.countByOrganisationIdAndFrameworkId(org, f.getId());
-            long openFw = findingRepo.countOpenByOrganisationIdAndFrameworkId(org, f.getId());
-            String fullPct = policyCount == 0 ? "—" : Math.round(((double) full / policyCount) * 100) + "%";
-
-            // Skip frameworks with zero footprint to keep the page readable
-            if (policyCount == 0 && controlCount == 0 && openFw == 0) continue;
-
-            t.addCell(bodyCell(safe(f.getCode()), false));
-            t.addCell(bodyCell(ar && f.getNameAr() != null ? f.getNameAr() : f.getNameEn(), ar));
-            t.addCell(bodyCell(String.valueOf(controlCount), false));
-            t.addCell(bodyCell(String.valueOf(policyCount), false));
-            t.addCell(bodyCell(fullPct, false));
-            t.addCell(bodyCell(String.valueOf(openFw), false));
+        for (BoardPackAggregate.FrameworkRow f : frameworks) {
+            t.addCell(bodyCell(safe(f.code()), false));
+            t.addCell(bodyCell(f.name(ar), ar));
+            t.addCell(bodyCell(String.valueOf(f.controls()), false));
+            t.addCell(bodyCell(String.valueOf(f.policies()), false));
+            t.addCell(bodyCell(f.fullPct() == null ? NONE : f.fullPct() + "%", false));
+            t.addCell(bodyCell(String.valueOf(f.openFindings()), false));
         }
         doc.add(t);
 
-        // Small-print attribution (shaping-aware)
+        // Small-print attribution (shaping-aware). The omission happens in the aggregate — a
+        // framework with no footprint tells a board nothing — so every consumer sees the same list.
         PdfTheme.line(doc,
             ar ? "* لا تظهر الأطر الخالية تمامًا من السياسات والضوابط والملاحظات."
                : "* Frameworks with zero policies, controls and findings are omitted.",
@@ -431,109 +302,51 @@ public class BoardPackService {
     }
 
     // ── Section: Change Mgmt ────────────────────────────────────────────────
-    private void renderChanges(Document doc, Long org, boolean ar) throws DocumentException {
-        long total      = changeRepo.countByOrganisationId(org);
-        // QUAL-BCMP-006: one GROUP BY status query instead of five per-status counts.
-        Map<String, Long> changeByStatus = new HashMap<>();
-        for (Object[] row : changeRepo.countByStatusGrouped(org)) {
-            changeByStatus.put((String) row[0], (Long) row[1]);
-        }
-        long inFlight   = changeByStatus.getOrDefault("IMPLEMENTING", 0L)
-                        + changeByStatus.getOrDefault("SCHEDULED", 0L)
-                        + changeByStatus.getOrDefault("CAB_PENDING", 0L)
-                        + changeByStatus.getOrDefault("IMPACT_ASSESSED", 0L)
-                        + changeByStatus.getOrDefault("EMERGENCY_APPROVED", 0L);
-        long success    = changeRepo.countByOrganisationIdAndOutcome(org, "SUCCESS");
-        long rolledBack = changeRepo.countByOrganisationIdAndOutcome(org, "ROLLED_BACK");
-        long emergency  = changeRepo.countByOrganisationIdAndChangeType(org, "EMERGENCY");
-
+    private void renderChanges(Document doc, BoardPackAggregate.Changes c, boolean ar) throws DocumentException {
         PdfTheme.line(doc,
             ar
-              ? "إجمالي " + total + " · قيد التنفيذ " + inFlight + " · ناجحة " + success
-                + " · تراجع " + rolledBack + " · طارئة " + emergency
-              : "Total " + total + " · In-flight " + inFlight + " · Success " + success
-                + " · Rolled-back " + rolledBack + " · Emergency " + emergency,
+              ? "إجمالي " + c.total() + " · قيد التنفيذ " + c.inFlight() + " · ناجحة " + c.success()
+                + " · تراجع " + c.rolledBack() + " · طارئة " + c.emergency()
+              : "Total " + c.total() + " · In-flight " + c.inFlight() + " · Success " + c.success()
+                + " · Rolled-back " + c.rolledBack() + " · Emergency " + c.emergency(),
             PdfFonts.normal(11), ar, 0, 0);
     }
 
     // ── Section: Ethics & Compliance ───────────────────────────────────────
-    private void renderEthics(Document doc, Long org, boolean ar) throws DocumentException {
-        long total      = caseRepo.countByOrganisationId(org);
-        long openCases  = caseRepo.countByOrganisationIdAndStatus(org, "INTAKE")
-                        + caseRepo.countByOrganisationIdAndStatus(org, "TRIAGE")
-                        + caseRepo.countByOrganisationIdAndStatus(org, "INVESTIGATION");
-        long substantiated = caseRepo.countByOrganisationIdAndStatus(org, "SUBSTANTIATED")
-                           + caseRepo.countByOrganisationIdAndStatus(org, "REMEDIATION");
-        long bribery       = caseRepo.countByOrganisationIdAndCategory(org, "BRIBERY")
-                           + caseRepo.countByOrganisationIdAndCategory(org, "KICKBACK");
-        long amlSusp       = caseRepo.countByOrganisationIdAndCategory(org, "AML_SUSPICION");
-        long retal         = caseRepo.countByOrganisationIdAndCategory(org, "RETALIATION");
-        long strs          = amlRepo.countByOrganisationIdAndStrFiled(org, true);
-
+    private void renderEthics(Document doc, BoardPackAggregate.Ethics e, boolean ar) throws DocumentException {
         PdfTheme.line(doc,
             ar
-              ? "قضايا: " + total + " · مفتوحة " + openCases + " · مُثبتة " + substantiated
-                + " · رشاوى/عمولات " + bribery + " · غسل أموال " + amlSusp + " · انتقام " + retal
-                + " · STR مُرفعة " + strs
-              : "Cases: " + total + " · Open " + openCases + " · Substantiated " + substantiated
-                + " · Bribery/Kickback " + bribery + " · AML suspicion " + amlSusp + " · Retaliation " + retal
-                + " · STRs filed " + strs,
+              ? "قضايا: " + e.totalCases() + " · مفتوحة " + e.open() + " · مُثبتة " + e.substantiated()
+                + " · رشاوى/عمولات " + e.briberyOrKickback() + " · غسل أموال " + e.amlSuspicion()
+                + " · انتقام " + e.retaliation() + " · STR مُرفعة " + e.strsFiled()
+              : "Cases: " + e.totalCases() + " · Open " + e.open() + " · Substantiated " + e.substantiated()
+                + " · Bribery/Kickback " + e.briberyOrKickback() + " · AML suspicion " + e.amlSuspicion()
+                + " · Retaliation " + e.retaliation() + " · STRs filed " + e.strsFiled(),
             PdfFonts.normal(11), ar, 0, 0);
     }
 
     // ── Section: Sustainability & ESG (S-N) ────────────────────────────────
     /**
-     * ESG executive snapshot pulled from the composed sustainability dashboard
-     * (overall readiness score + band, GHG inventory, CMA/TCFD disclosure
-     * readiness, SGI on-track, open corrective actions, top gaps). Wrapped
-     * defensively so a sustainability-data hiccup never breaks the board pack.
+     * ESG executive snapshot (overall readiness score + band, GHG inventory, CMA/TCFD disclosure
+     * readiness, SGI on-track, open corrective actions, top gaps). The defensive wrapping now lives
+     * in the aggregate builder, which reports {@code available=false} if the sustainability
+     * subsystem did not answer — so a board sees em-dashes rather than a page of confident zeros.
      */
-    @SuppressWarnings("unchecked")
-    private void renderSustainability(Document doc, Long org, boolean ar) throws DocumentException {
-        Map<String, Object> d;
-        try {
-            d = sustDashboard.dashboard((short) java.time.Year.now().getValue());
-        } catch (RuntimeException ex) {
-            d = java.util.Collections.emptyMap();
-        }
-        Map<String, Object> overall = asMap(d.get("overall"));
-        Map<String, Object> ghg     = asMap(d.get("ghg"));
-        Map<String, Object> cma     = asMap(d.get("cma"));
-        Map<String, Object> tcfd    = asMap(d.get("tcfd"));
-        Map<String, Object> byTier  = asMap(asMap(d.get("sgi")).get("byTier"));
-        Map<String, Object> capa    = asMap(d.get("capa"));
-        int onTrack  = intOf(byTier.get("ON_TRACK"));
-        int sgiTotal = onTrack + intOf(byTier.get("AT_RISK")) + intOf(byTier.get("DELAYED"));
-        Object gaps  = d.get("topGaps");
-        int gapCount = (gaps instanceof java.util.List<?> l) ? l.size() : 0;
-
+    private void renderSustainability(Document doc, BoardPackAggregate.Sustainability s, boolean ar)
+            throws DocumentException {
         PdfPTable t = new PdfPTable(4);
         t.setWidthPercentage(100);
         t.setRunDirection(ar ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR);
-        kpi(t, ar ? "درجة ESG"        : "ESG Score",         numOf(overall.get("score")),      str(overall.get("band")),                         ar);
-        kpi(t, ar ? "إجمالي الانبعاثات" : "GHG Total (tCO2e)", numOf(ghg.get("grandTotal")),     ar ? "النطاقات 1-3" : "Scopes 1-3",               ar);
-        kpi(t, ar ? "إفصاح CMA"        : "CMA Readiness",     numOf(cma.get("readinessPct")) + "%", ar ? "المواد 91-94" : "Art. 91-94",           ar);
-        kpi(t, ar ? "توافق TCFD"       : "TCFD Alignment",    numOf(tcfd.get("alignmentPct")) + "%", "—",                                          ar);
-        kpi(t, ar ? "المبادرة الخضراء"  : "SGI On-Track",      onTrack + " / " + sgiTotal,       ar ? "التزامات نشطة" : "Active commitments",       ar);
-        kpi(t, ar ? "إجراءات مفتوحة"    : "Open CAPAs",        numOf(capa.get("open")),          "—",                                              ar);
-        kpi(t, ar ? "أعلى الفجوات"      : "Top ESG Gaps",      String.valueOf(gapCount),          "—",                                              ar);
-        kpi(t, ar ? "النطاق 3"          : "Scope 3 (tCO2e)",   numOf(ghg.get("scope3Total")),    "—",                                              ar);
+        kpi(t, ar ? "درجة ESG"        : "ESG Score",         num(s.esgScore()),               safe(s.esgBand()),                          ar);
+        kpi(t, ar ? "إجمالي الانبعاثات" : "GHG Total (tCO2e)", num(s.ghgTotal()),               ar ? "النطاقات 1-3" : "Scopes 1-3",         ar);
+        kpi(t, ar ? "إفصاح CMA"        : "CMA Readiness",     num(s.cmaReadinessPct()) + "%",  ar ? "المواد 91-94" : "Art. 91-94",         ar);
+        kpi(t, ar ? "توافق TCFD"       : "TCFD Alignment",    num(s.tcfdAlignmentPct()) + "%", NONE,                                       ar);
+        kpi(t, ar ? "المبادرة الخضراء"  : "SGI On-Track",      s.sgiOnTrack() + " / " + s.sgiTotal(), ar ? "التزامات نشطة" : "Active commitments", ar);
+        kpi(t, ar ? "إجراءات مفتوحة"    : "Open CAPAs",        num(s.openCapas()),              NONE,                                       ar);
+        kpi(t, ar ? "أعلى الفجوات"      : "Top ESG Gaps",      String.valueOf(s.topGapCount()), NONE,                                       ar);
+        kpi(t, ar ? "النطاق 3"          : "Scope 3 (tCO2e)",   num(s.scope3Total()),            NONE,                                       ar);
         doc.add(t);
     }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> asMap(Object o) {
-        return (o instanceof Map<?, ?> m) ? (Map<String, Object>) m : java.util.Collections.emptyMap();
-    }
-    private static int intOf(Object o) { return (o instanceof Number n) ? n.intValue() : 0; }
-    private static String numOf(Object o) {
-        if (o instanceof Number n) {
-            double v = n.doubleValue();
-            return v == Math.floor(v) ? String.valueOf((long) v) : String.valueOf(v);
-        }
-        return o == null ? "—" : o.toString();
-    }
-    private static String str(Object o) { return (o == null || o.toString().isBlank()) ? "—" : o.toString(); }
 
     private void renderClosing(Document doc, boolean ar) throws DocumentException {
         PdfTheme.centeredLine(doc,
@@ -582,5 +395,13 @@ public class BoardPackService {
         return c;
     }
 
-    private static String safe(String s) { return s == null ? "—" : s; }
+    private static String safe(String s) { return s == null ? NONE : s; }
+
+    private static String plain(BigDecimal v) { return v == null ? NONE : v.toPlainString(); }
+
+    /** Whole numbers print without a decimal point, matching what the ESG tiles showed before D-5. */
+    private static String num(Double v) {
+        if (v == null) return NONE;
+        return v == Math.floor(v) && !v.isInfinite() ? String.valueOf(v.longValue()) : String.valueOf(v);
+    }
 }

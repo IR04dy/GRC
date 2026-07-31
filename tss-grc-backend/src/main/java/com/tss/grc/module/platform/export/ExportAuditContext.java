@@ -29,6 +29,9 @@ public final class ExportAuditContext {
     /** Set by a generator; read once by the interceptor, which then clears it. */
     private static final ThreadLocal<Counted> CURRENT = new ThreadLocal<>();
 
+    /** Set by a handler that hands the caller an aggregate as data rather than as a file. */
+    private static final ThreadLocal<String> DECLARED_FORMAT = new ThreadLocal<>();
+
     private ExportAuditContext() {}
 
     /**
@@ -48,8 +51,36 @@ public final class ExportAuditContext {
         return CURRENT.get();
     }
 
+    /**
+     * D-5 — declare that this response is an export even though it streams no file.
+     *
+     * <p>{@code ExportAuditInterceptor} decides what to audit by looking for
+     * {@code Content-Disposition: attachment}, which is a sound test for the 40 endpoints that hand
+     * back a PDF or a spreadsheet and useless for one that hands back the same aggregate as JSON.
+     * {@code GET /api/v1/reporting/board-pack.json} returns every figure in the board pack — the
+     * platform's most sensitive export — with no attachment header, so without this declaration it
+     * would have been the one board-pack route that left <b>no audit row at all</b>. A DLP or PDPL
+     * enquiry that can see two of three egress paths is worse than one that can see none, because it
+     * reads as complete.
+     *
+     * <p>Marking the response {@code attachment} would have tripped the interceptor with no code
+     * change, and was rejected: it is a lie about the response — the SPA consumes this endpoint to
+     * render a screen — and it would make a browser download the JSON on navigation.
+     *
+     * @param format the format to record in the audit row, e.g. {@code "json"}
+     */
+    public static void declareExport(String format) {
+        DECLARED_FORMAT.set(format);
+    }
+
+    /** @return the declared format, or {@code null} when this response did not declare itself one. */
+    public static String declaredFormat() {
+        return DECLARED_FORMAT.get();
+    }
+
     /** Must be called by the interceptor on every request, success or failure. See the class note. */
     public static void clear() {
         CURRENT.remove();
+        DECLARED_FORMAT.remove();
     }
 }

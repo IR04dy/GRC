@@ -2,9 +2,12 @@ package com.tss.grc.module.reporting.controller;
 
 import com.tss.grc.module.platform.export.XlsxStyler;
 
+import com.tss.grc.module.reporting.dto.BoardPackAggregate;
+import com.tss.grc.module.reporting.service.BoardPackAggregateService;
 import com.tss.grc.module.reporting.service.BoardPackPptxService;
 import com.tss.grc.module.reporting.service.BoardPackService;
 import com.tss.grc.module.reporting.service.DocxExportService;
+import com.tss.grc.module.platform.export.ExportAuditContext;
 import com.tss.grc.module.platform.export.ExportNaming;
 import com.tss.grc.module.reporting.service.ExportService;
 import com.tss.grc.module.reporting.service.RegulatorPackageService;
@@ -37,6 +40,7 @@ public class ExportController {
     private final ExportService exportService;
     private final BoardPackService boardPackService;
     private final BoardPackPptxService boardPackPptxService;
+    private final BoardPackAggregateService boardPackAggregateService;
     private final DocxExportService docxExportService;
     private final RegulatorPackageService regulatorPackageService;
     private final TabularExportService tabularExportService;
@@ -204,6 +208,37 @@ public class ExportController {
     public ResponseEntity<byte[]> boardPackPptx(@RequestParam(defaultValue = "en") String lang) {
         byte[] body = boardPackPptxService.generatePptx(lang);
         return pptx(body, ExportNaming.build("BoardPack", "BoardPack", lang, "pptx"));
+    }
+
+    /**
+     * D-5 — the board pack as data, so a screen can render what the PDF and the deck render.
+     *
+     * <p>Three things about this endpoint were decided before it was written, and each is a
+     * constraint rather than a preference:
+     *
+     * <p><b>It carries the same permission as the PDF and the deck.</b> The same figures leave the
+     * building either way, so a JSON aggregate authorised more loosely than its own PDF would be a
+     * hole with a content-type in front of it. {@code BoardPackGuardTest} asserts all three routes
+     * carry the identical guard — and it is the <em>only</em> test that can, because the export
+     * ratchet cannot see this route: its rule keys on a {@code byte[]}/{@code Resource} return type,
+     * and this returns an object.
+     *
+     * <p><b>It is audited like an export</b> — {@code ExportAuditContext.declareExport} makes the
+     * interceptor record it, since a response with no {@code Content-Disposition} was invisible to
+     * it. JSON of an aggregate is an export in substance.
+     *
+     * <p><b>It takes no {@code lang}.</b> Every name in the aggregate is carried in both languages
+     * and the consumer chooses, which is what lets one build serve an Arabic PDF and an English
+     * deck. A language parameter here would imply a choice the response does not make.
+     */
+    @GetMapping("/board-pack.json")
+    @PreAuthorize("hasPermission('BOARD','EXPORT')")
+    @Operation(summary = "Board pack as a bilingual JSON aggregate — the same figures the PDF and "
+        + "PPTX render, computed by the same builder. Board-confidential: requires BOARD:EXPORT.")
+    public BoardPackAggregate boardPackJson() {
+        BoardPackAggregate pack = boardPackAggregateService.build(BoardPackAggregate.Scope.FULL);
+        ExportAuditContext.declareExport("json");
+        return pack;
     }
 
     // ── Regulator / audit evidence package (P2/P3) ────────────────────────

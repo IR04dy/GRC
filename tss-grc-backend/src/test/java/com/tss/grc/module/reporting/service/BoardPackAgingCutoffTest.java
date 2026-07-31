@@ -55,7 +55,7 @@ class BoardPackAgingCutoffTest {
         LocalDate today = LocalDate.of(2026, 7, 31);
 
         for (int tier : TIERS) {
-            LocalDateTime cutoff = BoardPackService.cutoff(today, tier);
+            LocalDateTime cutoff = BoardPackAggregateService.cutoff(today, tier);
             for (int age = 0; age <= 130; age++) {
                 for (int hour : new int[] { 0, 9, 15, 23 }) {
                     LocalDateTime createdAt = today.minusDays(age).atTime(hour, 30);
@@ -85,11 +85,11 @@ class BoardPackAgingCutoffTest {
         // 2026-07-31 minus 89 / 59 / 29 days. Written out because the point of this test is that a
         // reader can see the value without re-deriving it — and because getting these three wrong
         // by hand on the first attempt is precisely why the property test above exists to arbitrate.
-        assertThat(BoardPackService.cutoff(today, 90)).isEqualTo(LocalDate.of(2026, 5, 3).atStartOfDay());
-        assertThat(BoardPackService.cutoff(today, 60)).isEqualTo(LocalDate.of(2026, 6, 2).atStartOfDay());
-        assertThat(BoardPackService.cutoff(today, 30)).isEqualTo(LocalDate.of(2026, 7, 2).atStartOfDay());
+        assertThat(BoardPackAggregateService.cutoff(today, 90)).isEqualTo(LocalDate.of(2026, 5, 3).atStartOfDay());
+        assertThat(BoardPackAggregateService.cutoff(today, 60)).isEqualTo(LocalDate.of(2026, 6, 2).atStartOfDay());
+        assertThat(BoardPackAggregateService.cutoff(today, 30)).isEqualTo(LocalDate.of(2026, 7, 2).atStartOfDay());
 
-        assertThat(BoardPackService.cutoff(today, 90))
+        assertThat(BoardPackAggregateService.cutoff(today, 90))
             .as("a naive now().minusDays(90) would land a full day earlier (2026-05-02) and, with a "
               + "time component, would exclude findings created late that day from the Executive tier")
             .isNotEqualTo(today.minusDays(90).atStartOfDay());
