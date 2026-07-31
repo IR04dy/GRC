@@ -424,8 +424,8 @@ Scale: **A** hardened (deep-reviewed + remediated + live-probed) · **B** functi
 
 | ID | Defect | Evidence | Severity |
 |---|---|---|---|
-| DF-1 | **Break-glass expiry sweep fails every ~30 min in prod** — `WARN BreakGlassService: break-glass expiry sweep failed: Executing an update/delete query` (a `@Modifying` JPQL running without a transaction in the scheduled sweep — off-request TX landmine class) — **fixed in code** (`5dd05fde` on `fix/break-glass-sweep-tx`, 2026-07-25: per-org REQUIRES_NEW `TransactionTemplate` + explicit `TenantContext` + org-scoped native update + 6-test regression class; suite 2322/0/0, live-proven on dev incl. per-org audit rows + viewer 403); **MERGED to master (via `d82cb570`) + on origin/master — verified 2026-07-31; prod jar still NOT rebuilt/restarted** (WARN still firing every 30 min: 48/day through 2026-07-30, 32 on 2026-07-31) | prod log 2026-07-23 → still daily through 2026-07-31 | **High until deploy** (expired grants may outlive their window on the running jar) |
-| DF-2 | Auth-refresh 500 on stale cookies — **fixed in code** (`00ba890e`, ADR-022) but the fixed jar is **staged, not yet activated** on :80 | this session | High until service restart |
+| DF-1 | **Break-glass expiry sweep fails every ~30 min in prod** — `WARN BreakGlassService: break-glass expiry sweep failed: Executing an update/delete query` (a `@Modifying` JPQL running without a transaction in the scheduled sweep — off-request TX landmine class) — **fixed in code** (`5dd05fde` on `fix/break-glass-sweep-tx`, 2026-07-25: per-org REQUIRES_NEW `TransactionTemplate` + explicit `TenantContext` + org-scoped native update + 6-test regression class; suite 2322/0/0, live-proven on dev incl. per-org audit rows + viewer 403); **MERGED to master (via `d82cb570`) — verified 2026-07-31; fix now in the STAGED jar** (`jar.new` rebuilt 2026-07-31 from `89502407`, head V334, smoke-proven) — **WARN keeps firing every 30 min (48/day) until the elevated swap runs** | prod log 2026-07-23 → still daily through 2026-07-31 | **High until the swap** (expired grants may outlive their window on the running jar) |
+| DF-2 | Auth-refresh 500 on stale cookies — **fixed in code** (`00ba890e`, ADR-022); fix rides the **2026-07-31 staged jar** (same `jar.new` as DF-1), **not yet activated** on :80 | this session | High until service restart |
 | DF-3 | Service worker serves the stale shell after redeploy (one hard refresh needed) | deploy verification | Medium |
 | DF-4 | Dev-only: `CommitteesPage` HMR ToastProvider artifact; DevTools transient `APPLICATION FAILED TO START` on recompile | dev logs | Low |
 | DF-5 | No SMTP relay — notification emails silently absent | chronicle §19 | Medium (ops) |
@@ -452,7 +452,7 @@ Scale: **A** hardened (deep-reviewed + remediated + live-probed) · **B** functi
 | ID | Item |
 |---|---|
 | BL-C1 | ~~**Fix DF-1**: wrap the break-glass expiry sweep in an explicit transaction (`TransactionTemplate`/`@Transactional` on the sweep path) + regression test~~ **DONE + MERGED** — `5dd05fde` on `fix/break-glass-sweep-tx` (2026-07-25), in master via `d82cb570` + pushed (verified 2026-07-31); awaits ONLY the prod jar rebuild + elevated WinSW restart (WARN still firing in prod daily) |
-| BL-C2 | **Activate DF-2**: elevated jar swap on :80 (staged `jar.new`, idempotent snippet ready) |
+| BL-C2 | **Activate DF-1 + DF-2 + V313–V334**: elevated jar swap on :80 — `jar.new` restaged 2026-07-31 from master `89502407` (322 packaged migrations, head **V334**, smoke-booted UP with W0-7 answering `packagedHead 334`), `ui.new` rebuilt same tip (935 files), fresh pre-deploy backup `TSS_GRC_Deployment_20260731_prestage_V334.bak` (VERIFYONLY OK). The swap applies **22 migrations** on prod's V312 and stops the DF-1 WARN |
 | BL-C3 | SW update strategy (versioned SW / skipWaiting+clients.claim) |
 | BL-C4 | Delete `mockChanges.ts` once CE-13 lands; archive `tss-grc-ui/` |
 | BL-C5 | Code-split the 534 kB main chunk |
