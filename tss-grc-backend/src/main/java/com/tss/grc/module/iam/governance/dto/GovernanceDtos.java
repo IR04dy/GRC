@@ -54,8 +54,14 @@ public final class GovernanceDtos {
     /** One resolved grant of a user, with the role(s) that deliver it. */
     public record EffectiveGrant(String module, String action, List<String> viaRoles) {}
 
+    /**
+     * @param roles         every assigned role name — deactivating a role does not un-assign it
+     * @param inactiveRoles F2-62: the subset of {@code roles} that is deactivated and therefore
+     *                      delivers no {@code grants} and no PLATFORM_ADMIN bypass
+     */
     public record EffectiveAccessResponse(Long userId, String username, boolean platformAdmin,
-                                          List<String> roles, List<EffectiveGrant> grants) {}
+                                          List<String> roles, List<String> inactiveRoles,
+                                          List<EffectiveGrant> grants) {}
 
     // ── P2: SoD + recertification (plan §6.4/§6.5) ───────────────────────
 

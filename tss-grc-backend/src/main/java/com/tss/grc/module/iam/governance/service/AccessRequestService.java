@@ -84,6 +84,14 @@ public class AccessRequestService {
             .filter(x -> !Boolean.TRUE.equals(x.getIsDeleted()))
             .filter(x -> x.getOrganisationId() == null || x.getOrganisationId().equals(org))
             .orElseThrow(() -> new EntityNotFoundException("Role not found: " + r.roleId()));
+        // F2-62: an inactive role confers no authorities, so requesting one would send a
+        // maker-checker request through approval to provision a grant that does nothing.
+        // Refused here rather than filtered into the "Role not found" above, because the
+        // requester needs to know the role exists and must be activated.
+        if (!role.grantsAuthority()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Role is inactive and grants no access: " + role.getRoleName());
+        }
         if (r.validTo() != null && r.validFrom() != null && !r.validTo().isAfter(r.validFrom())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "validTo must be after validFrom");
         }

@@ -67,6 +67,15 @@ public class BreakGlassService {
             .findFirst()
             .orElseThrow(() -> new IllegalStateException(
                 "EMERGENCY_RESPONDER role not provisioned (V284 missing?)"));
+        // F2-62: break-glass is the one path where silently granting nothing is worst — an
+        // operator would be told the emergency access is ACTIVE, mid-incident, while holding no
+        // authority at all. Checked separately from the lookup above so the message names the
+        // real cause instead of claiming the role is missing.
+        if (!emergency.grantsAuthority()) {
+            throw new IllegalStateException(
+                "EMERGENCY_RESPONDER role is deactivated — break-glass would grant no access. "
+                    + "Reactivate the role before activating break-glass.");
+        }
 
         LocalDateTime expires = LocalDateTime.now().plusHours(hours);
         int inserted = events.insertBreakGlassAssignment(activator, emergency.getId(), expires,

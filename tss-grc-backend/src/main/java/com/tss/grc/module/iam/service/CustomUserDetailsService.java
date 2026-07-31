@@ -42,6 +42,14 @@ public class CustomUserDetailsService implements UserDetailsService {
     private GrcUserDetails buildUserDetails(User user) {
         Set<GrantedAuthority> authorities = new HashSet<>();
         for (Role role : user.getRoles()) {
+            // F2-62: an inactive role confers nothing — not its ROLE_ marker and not its
+            // permissions. This method is the platform's only authority mint (the sole
+            // `new SimpleGrantedAuthority` site outside tests), and ModulePermissionEvaluator
+            // resolves both hasPermission() and the ROLE_PLATFORM_ADMIN bypass purely from the
+            // Authentication it produces — so this single `continue` is the whole enforcement.
+            // JwtAuthenticationFilter reloads the user per request, so a deactivation takes
+            // effect on the next request, with no re-login and no token invalidation.
+            if (!role.grantsAuthority()) continue;
             authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getRoleName()));
             for (Permission perm : role.getPermissions()) {
                 authorities.add(new SimpleGrantedAuthority(perm.getPermissionName()));
