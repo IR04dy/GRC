@@ -306,14 +306,28 @@ class SchemaContractRatchetTest {
         return out;
     }
 
+    /**
+     * {@code spring.jpa.properties.hibernate.default_schema} in {@code application.yml}. A
+     * {@code @Table} that omits {@code schema=} resolves to this at runtime.
+     */
+    private static final String DEFAULT_SCHEMA = "platform";
+
     private static void put(Map<String, String> out, String schema, String name, String where) {
-        // A mapping without an explicit schema resolves against the connection's default at
-        // runtime, so this class cannot say which table it means. Skipping is honest; guessing
-        // "platform" would invent both false passes and false failures.
-        if (schema == null || schema.isBlank() || name == null || name.isBlank()) {
+        // ⚠ The first version of this method skipped mappings with no explicit schema, with a
+        // comment calling that "honest" because the schema resolves at runtime. It was not
+        // honest — application.yml states the default outright, so the mapping IS knowable, and
+        // skipping it made this class blind to exactly the defect it was written to catch.
+        // Four entities declare only name=: platform.file_metadata, persistence_row,
+        // sso_provider_config and nafath_transaction. All four were absent from every schema of
+        // both databases, behind live controllers (/api/v1/files, /api/v1/persistence) and two
+        // shipped FE adapters, with DDL at V12/V13/V14 — below the baseline, so unrunnable.
+        // A second-model review found them; this gate had already declared itself green.
+        // Resolving the default costs one line and removes the blind spot.
+        if (name == null || name.isBlank()) {
             return;
         }
-        out.putIfAbsent(key(schema, name), where);
+        String resolved = (schema == null || schema.isBlank()) ? DEFAULT_SCHEMA : schema;
+        out.putIfAbsent(key(resolved, name), where);
     }
 
     /** Table -> the migration versions whose DDL creates it. */

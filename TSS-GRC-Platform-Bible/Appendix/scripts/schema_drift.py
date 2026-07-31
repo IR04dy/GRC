@@ -53,6 +53,8 @@ REPORT = os.path.join(ROOT, "TSS-GRC-Platform-Bible", "Appendix", "SCHEMA_DRIFT.
 
 CONN = ("DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=%s;"
         "UID=sa;PWD=tss.123;TrustServerCertificate=yes")
+# Flyway/Hibernate default schema: an unqualified CREATE/DROP resolves here.
+DEFAULT_SCHEMA = "platform"
 DEV = "TSS_GRC"
 # FLYWAY_BASELINE_VERSION in the deployed external.properties. Anything at or below this is
 # recorded as applied whether it ever executed.
@@ -220,9 +222,17 @@ def main():
         emit("checked against both databases. A row here is a migration that believes something about")
         emit("the schema which is not true — the only subset worth a human's time.")
         emit()
-        creates = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?\[?(\w+)\]?\.\[?(\w+)\]?",
-                             re.I)
-        drops = re.compile(r"DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?\[?(\w+)\]?\.\[?(\w+)\]?", re.I)
+        # ⚠ These used to require `schema.table`, which made every UNQUALIFIED statement
+        # invisible — and V12/V13/V14 are entirely unqualified (`CREATE TABLE persistence_row`).
+        # So §3b silently under-reported: it listed V247's DROP contradictions and missed three
+        # CREATE contradictions for tables absent from both databases. table_xref.py had the
+        # same hole, so the two scanners could not cross-check each other out of it. An
+        # unqualified name resolves to Flyway's default schema, which is `platform` here.
+        creates = re.compile(
+            r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:\[?(\w+)\]?\s*\.\s*)?\[?(\w+)\]?",
+            re.I)
+        drops = re.compile(
+            r"DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:\[?(\w+)\]?\s*\.\s*)?\[?(\w+)\]?", re.I)
         contradictions = []
         for v in below:
             path = os.path.join(MIGRATIONS, disk[v])
@@ -233,8 +243,10 @@ def main():
                 continue
             dev_keys = {k.lower() for k in dev}
             prod_keys = {k.lower() for k in prod}
-            created_here = {"%s.%s" % (s.lower(), t.lower()) for s, t in creates.findall(body)}
-            dropped_here = {"%s.%s" % (s.lower(), t.lower()) for s, t in drops.findall(body)}
+            created_here = {"%s.%s" % ((s or DEFAULT_SCHEMA).lower(), t.lower())
+                            for s, t in creates.findall(body)}
+            dropped_here = {"%s.%s" % ((s or DEFAULT_SCHEMA).lower(), t.lower())
+                            for s, t in drops.findall(body)}
 
             for key in created_here:
                 if key not in dev_keys and key not in prod_keys:

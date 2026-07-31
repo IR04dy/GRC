@@ -75,7 +75,7 @@ materially understated (`F-008` — the defect is platform-wide, not one endpoin
 
 | Area | Governing documents |
 |---|---|
-| Governance | [Evidence and maintenance standard](Governance/EVIDENCE_AND_MAINTENANCE_STANDARD.md), [assessment method](Governance/ASSESSMENT_METHOD.md), [capability reachability and orphan discovery plan](Governance/PLATFORM_CAPABILITY_REACHABILITY_AND_ORPHAN_DISCOVERY_PLAN.md) |
+| Governance | [Evidence and maintenance standard](Governance/EVIDENCE_AND_MAINTENANCE_STANDARD.md), [assessment method](Governance/ASSESSMENT_METHOD.md), [capability reachability and orphan discovery plan](Governance/PLATFORM_CAPABILITY_REACHABILITY_AND_ORPHAN_DISCOVERY_PLAN.md), [table/page/process completeness audit plan](Governance/ENTERPRISE_TABLE_PAGE_PROCESS_COMPLETENESS_AUDIT_PLAN.md) |
 | Executive | [Executive verdict](Executive/EXECUTIVE_VERDICT.md), [acceptance opinion](Executive/GOVERNMENT_ACCEPTANCE_OPINION.md) |
 | Product | [Product constitution](Product/PRODUCT_CONSTITUTION.md), [DNA and philosophy](Product/PRODUCT_DNA_AND_PHILOSOPHY.md), [strategy and packaging](Product/PRODUCT_STRATEGY_PACKAGING_AND_SALES.md) |
 | Architecture | [Solution architecture](Architecture/SOLUTION_ARCHITECTURE.md), [principles](Architecture/ARCHITECTURE_PRINCIPLES.md), [module independence](Architecture/MODULE_INDEPENDENCE_AND_PACKAGING.md) |

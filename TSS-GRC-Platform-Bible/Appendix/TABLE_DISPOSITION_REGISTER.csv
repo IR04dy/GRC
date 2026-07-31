@@ -2,13 +2,13 @@ schema,table,code,source,rows_dev,rows_prod,jpa_files,code_refs,test_refs,migrat
 admin,committee_action_items,OPERATING,generated,33,33,1,0,0,3,2,1,1,mapped and carrying data
 admin,committee_form_templates,OPERATING,generated,10,10,1,1,0,2,1,2,0,mapped and carrying data
 admin,committee_gate_map,OPERATING,generated,2,2,1,1,0,2,1,0,0,mapped and carrying data
-admin,committee_meeting_attendee,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+admin,committee_meeting_attendee,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 admin,committee_meeting_papers,OPERATING,generated,21,21,1,0,0,1,0,1,1,mapped and carrying data
 admin,committee_meetings,OPERATING,generated,32,32,1,1,0,4,2,3,2,mapped and carrying data
 admin,committee_member_skills,OPERATING,generated,31,31,1,0,0,1,0,1,1,mapped and carrying data
 admin,committee_member_terms,OPERATING,generated,31,31,1,0,0,3,0,3,2,mapped and carrying data
-admin,committee_referral,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
-admin,committee_resolution_vote,WIRED_UNPROVEN,generated,0,0,1,0,0,3,0,1,0,"mapped, 0 rows in both databases — shipped, never exercised"
+admin,committee_referral,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
+admin,committee_resolution_vote,WIRED_UNPROVEN,generated,0,0,1,0,0,3,0,1,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 admin,committee_resolutions,OPERATING,generated,20,20,1,0,0,4,2,2,2,mapped and carrying data
 admin,committee_standing_items,OPERATING,generated,148,148,1,0,0,2,1,1,0,mapped and carrying data
 admin,committee_templates,OPERATING,generated,19,19,1,1,1,1,1,1,0,mapped and carrying data
@@ -27,8 +27,8 @@ aml,screening_check,OPERATING,generated,8,8,1,0,0,1,1,1,0,mapped and carrying da
 aml,screening_hit,OPERATING,generated,3,3,1,0,0,2,1,1,0,mapped and carrying data
 approvals,requests,OPERATING,generated,22,21,1,0,0,1,0,2,2,mapped and carrying data
 audit,audit_logs,LEGACY,generated,14,14,0,0,0,1,0,1,0,"no JPA mapping, no Java reference and no seed insert, yet 28 row(s) — rows arrived from a migration or by hand"
-audit_committee,dashboard_attestation,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
-audit_committee,dashboard_snapshot,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+audit_committee,dashboard_attestation,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
+audit_committee,dashboard_snapshot,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 audit_eng,engagements,OPERATING,generated,1,1,1,0,0,1,0,1,1,mapped and carrying data
 audit_lc,annual_plans,OPERATING,generated,2,2,1,0,0,2,0,3,2,mapped and carrying data
 audit_lc,capa_tasks,OPERATING,generated,12,12,1,0,0,1,0,2,1,mapped and carrying data
@@ -56,7 +56,7 @@ bcm,continuity_strategies,OPERATING,generated,8,8,1,0,0,3,1,0,0,mapped and carry
 bcm,corrective_actions,OPERATING,generated,10,10,1,0,0,3,1,0,0,mapped and carrying data
 bcm,crisis_aar,OPERATING,generated,5,5,1,0,0,3,1,1,1,mapped and carrying data
 bcm,crisis_comms_audiences,OPERATING,generated,4,4,1,0,0,2,0,0,0,mapped and carrying data
-bcm,crisis_comms_cascade,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,2,0,"mapped, 0 rows in both databases — shipped, never exercised"
+bcm,crisis_comms_cascade,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,2,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 bcm,crisis_comms_distributions,OPERATING,generated,2,2,1,0,0,2,0,0,0,mapped and carrying data
 bcm,crisis_comms_template_v2,OPERATING,generated,20,20,1,0,0,2,2,0,0,mapped and carrying data
 bcm,crisis_comms_templates,OPERATING,generated,5,5,1,0,0,1,0,0,0,mapped and carrying data
@@ -167,7 +167,7 @@ data_officer,retention_rule,OPERATING,generated,16,16,1,0,0,0,0,3,0,mapped and c
 dataclass,data_asset,OPERATING,generated,26,26,1,0,0,0,0,3,1,mapped and carrying data
 dataclass,data_exception,OPERATING,generated,7,7,1,0,0,0,0,3,1,mapped and carrying data
 dataclass,data_flow,OPERATING,generated,12,12,1,0,0,0,0,3,1,mapped and carrying data
-dataclass,dataclass_event,WIRED_UNPROVEN,generated,0,0,1,0,0,0,0,2,0,"mapped, 0 rows in both databases — shipped, never exercised"
+dataclass,dataclass_event,WIRED_UNPROVEN,generated,0,0,1,0,0,0,0,2,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 ethics,aml_alerts,OPERATING,generated,10,10,1,0,0,2,0,1,0,mapped and carrying data
 ethics,case_actions,OPERATING,generated,15,15,1,0,0,1,0,1,1,mapped and carrying data
 ethics,case_links,OPERATING,generated,53,53,1,0,0,1,0,1,1,mapped and carrying data
@@ -203,13 +203,13 @@ iam,access_review_items,DORMANT,exceptions-file,0,0,1,1,0,1,0,0,0,"Snapshotted f
 iam,break_glass_events,DORMANT,exceptions-file,0,0,1,1,0,1,0,0,0,"Emergency access is a rare event by design. 0 rows means it has never been needed, not that it is unwired — BreakGlassService is live and its self-review 409 is tested. ADR-017 D-10b notes the deeper point: this door stays unused because the roles that would need it hold everything permanently."
 iam,permissions,OPERATING,generated,112,112,1,2,0,28,19,2,0,mapped and carrying data
 iam,role_permissions,OPERATING,generated,1486,1486,1,4,0,30,25,3,0,mapped and carrying data
-iam,roles,OPERATING,generated,59,59,1,5,7,34,7,2,0,mapped and carrying data
+iam,roles,OPERATING,generated,59,59,1,5,7,34,7,3,0,mapped and carrying data
 iam,sod_rules,OPERATING,generated,8,8,1,0,0,1,1,0,0,mapped and carrying data
 iam,sod_violations,OPERATING,generated,9,4,1,0,0,1,0,0,0,mapped and carrying data
 iam,user_roles,OPERATING,generated,11,11,1,4,0,8,2,1,0,mapped and carrying data
 iam,users,OPERATING,generated,7,7,1,4,1,10,1,15,0,mapped and carrying data
-intake,intake_events,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
-intake,intake_records,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+intake,intake_events,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
+intake,intake_records,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 kb,articles,OPERATING,generated,22,22,1,0,0,3,1,1,1,mapped and carrying data
 kb,categories,SEED_ONLY,generated,10,10,0,0,0,2,1,1,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_gov_govdocs.py) — 20 row(s) of ballast, present in prod because it was restored from a dev dump"
 nca_ecc,filings,OPERATING,generated,4,4,1,0,0,3,2,2,0,mapped and carrying data
@@ -242,7 +242,7 @@ outsourcing,ongoing_review,OPERATING,generated,7,7,1,0,0,0,0,3,2,mapped and carr
 outsourcing,outsourcing_arrangement,OPERATING,generated,20,20,1,0,0,0,0,3,2,mapped and carrying data
 outsourcing,outsourcing_event,OPERATING,generated,10,10,1,0,0,0,0,2,1,mapped and carrying data
 platform,attachments,OPERATING,generated,20,18,1,0,0,5,0,1,0,mapped and carrying data
-platform,audit_log,OPERATING,generated,6002,3934,1,1,0,8,1,0,0,mapped and carrying data
+platform,audit_log,OPERATING,generated,6005,3934,1,1,0,8,1,1,0,mapped and carrying data
 platform,authority_document_citations,OPERATING,generated,214,214,1,0,0,6,4,0,0,mapped and carrying data
 platform,authority_documents,OPERATING,generated,19,19,1,0,0,7,1,0,0,mapped and carrying data
 platform,automation_rule_runs,OPERATING,generated,252,157,1,0,0,1,0,0,0,mapped and carrying data
@@ -258,24 +258,28 @@ platform,controls,OPERATING,generated,32,32,1,16,3,7,3,2,1,mapped and carrying d
 platform,crowdstrike_action_log,DORMANT,exceptions-file,0,0,1,0,0,2,0,0,0,Connector ingress staging. Empty until a tenant configures the CrowdStrike integration; a row would mean the connector fired.
 platform,crowdstrike_detection_log,DORMANT,exceptions-file,0,0,1,0,0,2,0,0,0,Connector ingress staging — see crowdstrike_action_log.
 platform,departments,OPERATING,generated,34,34,1,0,0,3,1,5,1,mapped and carrying data
+platform,file_metadata,WIRED_UNPROVEN,generated,0,ABSENT,1,0,0,1,0,1,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 platform,flyway_schema_history,INTENTIONAL_TECHNICAL,exceptions-file,ABSENT,45,0,0,0,0,0,1,0,Flyway's own bookkeeping. Present in prod only because dev runs with Flyway off and a Python-bootstrapped schema.
 platform,help_topic,OPERATING,generated,30,30,1,0,0,1,1,0,0,mapped and carrying data
 platform,integration_external_link,OPERATING,generated,7,7,1,0,0,1,0,0,0,mapped and carrying data
 platform,issues,OPERATING,generated,13,13,1,0,0,3,1,0,0,mapped and carrying data
 platform,lookup_tables,ORPHAN_CONFIRMED,generated,0,0,0,0,0,1,0,0,0,"no JPA mapping, no Java reference, 0 rows in both databases"
+platform,nafath_transaction,WIRED_UNPROVEN,generated,0,ABSENT,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 platform,notifications,OPERATING,generated,390,361,1,0,0,2,0,0,0,mapped and carrying data
 platform,organisation_licenses,OPERATING,generated,22,22,1,0,0,2,2,1,1,mapped and carrying data
 platform,organisations,OPERATING,generated,3,3,1,0,0,7,1,1,0,mapped and carrying data
-platform,refresh_token,OPERATING,generated,1819,1058,1,0,0,1,0,0,0,mapped and carrying data
+platform,persistence_row,WIRED_UNPROVEN,generated,0,ABSENT,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
+platform,refresh_token,OPERATING,generated,1822,1058,1,0,0,1,0,0,0,mapped and carrying data
 platform,risk_control_links,OPERATING,generated,24,24,1,0,0,3,1,0,0,mapped and carrying data
-platform,saved_views,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+platform,saved_views,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 platform,signatures,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
 platform,splunk_hec_outbound_log,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
+platform,sso_provider_config,WIRED_UNPROVEN,generated,0,ABSENT,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 platform,tenable_finding_log,OPERATING,generated,5,5,1,0,0,1,0,0,0,mapped and carrying data
 platform,tenable_recast_log,DORMANT,exceptions-file,0,0,1,0,0,1,0,0,0,Connector ingress staging. Empty until a tenant configures Tenable.
 platform,three_lines_role_mapping,OPERATING,generated,25,25,1,0,0,1,1,0,0,mapped and carrying data
 platform,translations,ORPHAN_CONFIRMED,generated,0,0,0,0,0,1,0,0,0,"no JPA mapping, no Java reference, 0 rows in both databases"
-platform,web_push_subscription,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+platform,web_push_subscription,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 policy,attestations,OPERATING,generated,18,18,1,0,0,1,1,1,1,mapped and carrying data
 policy,document_control_links,OPERATING,generated,2,2,1,0,0,1,1,0,0,mapped and carrying data
 policy,document_framework_mappings,OPERATING,generated,15,15,1,0,0,2,1,0,0,mapped and carrying data
@@ -324,11 +328,11 @@ risk,bowtie_preventive_control,OPERATING,generated,5,5,1,0,0,3,1,0,0,mapped and 
 risk,bowtie_threat,OPERATING,generated,4,4,1,0,0,2,1,0,0,mapped and carrying data
 risk,emerging_risks,OPERATING,generated,10,10,1,0,0,1,1,0,0,mapped and carrying data
 risk,kri_breach,OPERATING,generated,32,32,1,0,0,3,1,1,0,mapped and carrying data
-risk,kri_breach_events,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,5,0,1,0,"absent from dev, 0 row(s) in prod; no migration removes it"
+risk,kri_breach_events,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,5,0,1,0,"absent from dev, 0 row(s) in prod; a drop migration exists (V247__drop_legacy_kri_tables.sql, V337__drop_legacy_kri_tables_reissue.sql) and applies on the next Flyway run"
 risk,kri_definition,OPERATING,generated,21,21,1,0,0,4,2,1,0,mapped and carrying data
-risk,kri_definitions,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,7,0,1,0,"absent from dev, 0 row(s) in prod; no migration removes it"
+risk,kri_definitions,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,7,0,1,0,"absent from dev, 0 row(s) in prod; a drop migration exists (V247__drop_legacy_kri_tables.sql, V337__drop_legacy_kri_tables_reissue.sql) and applies on the next Flyway run"
 risk,kri_measurement,OPERATING,generated,155,155,1,0,0,3,1,2,1,mapped and carrying data
-risk,kri_readings,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,5,1,1,0,"absent from dev, 0 row(s) in prod; no migration removes it"
+risk,kri_readings,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,5,1,1,0,"absent from dev, 0 row(s) in prod; a drop migration exists (V247__drop_legacy_kri_tables.sql, V337__drop_legacy_kri_tables_reissue.sql) and applies on the next Flyway run"
 risk,methodology_config,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
 risk,risk_acceptances,OPERATING,generated,5,5,1,0,0,1,0,0,0,mapped and carrying data
 risk,risk_appetite_statements,OPERATING,generated,9,9,1,1,0,1,0,0,0,mapped and carrying data
@@ -379,14 +383,14 @@ socops,awareness_campaign,OPERATING,generated,6,6,1,0,0,1,0,1,1,mapped and carry
 socops,brand_monitoring,OPERATING,generated,8,8,1,0,0,1,0,1,1,mapped and carrying data
 socops,crypto_asset,OPERATING,generated,10,10,1,0,0,1,0,1,1,mapped and carrying data
 socops,cyber_insurance,OPERATING,generated,2,2,1,0,0,1,1,1,1,mapped and carrying data
-socops,detection_rule,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+socops,detection_rule,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 socops,dlp_event,OPERATING,generated,12,12,1,0,0,1,0,1,1,mapped and carrying data
 socops,forensics_artefact,OPERATING,generated,4,4,1,0,0,2,0,1,1,mapped and carrying data
-socops,forensics_custody_event,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+socops,forensics_custody_event,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 socops,iam_jml_event,OPERATING,generated,11,11,1,1,0,1,1,2,1,mapped and carrying data
 socops,ir_playbook,OPERATING,generated,36,36,1,0,0,2,1,2,2,mapped and carrying data
-socops,ir_playbook_run,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
-socops,ir_playbook_run_task,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+socops,ir_playbook_run,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
+socops,ir_playbook_run_task,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 socops,ir_playbook_step,OPERATING,generated,63,63,1,0,0,2,1,2,2,mapped and carrying data
 socops,ma_due_diligence,OPERATING,generated,1,1,1,0,0,1,0,1,1,mapped and carrying data
 socops,ot_asset,OPERATING,generated,8,8,1,0,0,1,1,1,1,mapped and carrying data
@@ -397,23 +401,23 @@ socops,scanner_run,OPERATING,generated,8,8,1,0,0,1,0,1,1,mapped and carrying dat
 socops,seasonal_overlay,OPERATING,generated,12,12,1,0,0,1,1,1,1,mapped and carrying data
 socops,security_event,OPERATING,generated,15,20,1,1,1,2,0,1,1,mapped and carrying data
 socops,threat_intel,OPERATING,generated,10,10,1,0,0,2,0,1,1,mapped and carrying data
-socops,threat_intel_action,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+socops,threat_intel_action,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 socops,zt_maturity,OPERATING,generated,7,7,1,0,0,1,0,1,1,mapped and carrying data
 sust,allocation_reports,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
 sust,carbon_credits,OPERATING,generated,2,1,1,1,0,2,0,0,0,mapped and carrying data
-sust,cbam_lines,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+sust,cbam_lines,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 sust,climate_report,OPERATING,generated,10,3,1,0,0,1,0,0,0,mapped and carrying data
 sust,climate_risk_opportunity,OPERATING,generated,20,20,1,0,0,4,1,2,2,mapped and carrying data
 sust,cma_disclosure,OPERATING,generated,91,91,1,1,0,4,1,1,1,mapped and carrying data
 sust,corrective_action,OPERATING,generated,32,32,1,0,0,7,1,1,1,mapped and carrying data
 sust,emission_factor,OPERATING,generated,6,6,1,0,0,1,0,0,0,mapped and carrying data
-sust,env_permit_violations,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
-sust,env_permits,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+sust,env_permit_violations,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
+sust,env_permits,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 sust,esg_metric,OPERATING,generated,26,26,1,1,0,6,1,2,1,mapped and carrying data
 sust,esg_metric_reading,OPERATING,generated,48,48,1,1,0,1,0,1,1,mapped and carrying data
-sust,esg_target_actuals,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
-sust,esg_target_milestones,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
-sust,esg_targets,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+sust,esg_target_actuals,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
+sust,esg_target_milestones,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
+sust,esg_targets,WIRED_UNPROVEN,generated,0,0,1,0,0,2,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 sust,evidence,OPERATING,generated,21,21,1,12,3,1,1,1,1,mapped and carrying data
 sust,financed_emissions_record,OPERATING,generated,8,8,1,0,0,2,1,0,0,mapped and carrying data
 sust,financed_emissions_target,OPERATING,generated,2,2,1,0,0,1,1,0,0,mapped and carrying data
@@ -452,8 +456,8 @@ workflow,approval_chain_step,OPERATING,generated,24,24,1,0,0,1,1,1,1,mapped and 
 workflow,approval_chain_template,OPERATING,generated,6,6,1,0,0,1,1,1,1,mapped and carrying data
 workflow,definitions,OPERATING,generated,6,6,1,0,0,2,1,1,0,mapped and carrying data
 workflow,instances,OPERATING,generated,12,12,1,0,0,3,0,1,1,mapped and carrying data
-workflow,recipient_list_members,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
-workflow,recipient_lists,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped, 0 rows in both databases — shipped, never exercised"
+workflow,recipient_list_members,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
+workflow,recipient_lists,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 workflow,request_events,OPERATING,generated,8,0,1,0,0,1,0,0,0,mapped and carrying data
 workflow,request_recipients,OPERATING,generated,1,0,1,0,0,3,0,0,0,mapped and carrying data
 workflow,requests,OPERATING,generated,1,0,1,19,5,6,0,0,0,mapped and carrying data

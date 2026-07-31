@@ -75,15 +75,48 @@ NOT_ASSIGNABLE_HERE = ("DARK_UI", "DARK_API", "BROKEN_CHAIN")
 
 # Known positives the scan MUST rediscover, or it does not work. Anti-vacuity in the house
 # style: a green scan that found nothing is indistinguishable from a broken one.
+# Anchors must be STABLE. `risk.kri_definitions` was an anchor until it was pointed out that
+# V337 drops it on the next prod restart — after which the table leaves the register, the anchor
+# misses, and the scan fails forever for a reason that is not a defect. An anti-vacuity check
+# that expires is worse than none, because it trains people to ignore a red scan.
 MUST_FIND = {
-    "privacy_lc": "the documented orphan family (0 rows, orphaned schema)",
-    "risk.kri_definitions": "prod-only legacy leftover V247 can never drop (F2-65)",
-    "bcm.crisis_comms_cascade": "was MAPPED_NO_TABLE until V336 created it (F2-64)",
+    "privacy_lc": "the documented orphan family — 0 rows, orphaned schema, not scheduled to change",
+    "platform.audit_log": "the busiest table in the platform; if this is missing the census failed",
+    "iam.roles": "authorisation core; present in every environment by definition",
 }
 
-ANN = re.compile(r"@(Table|JoinTable|CollectionTable|SecondaryTable)\s*\(([^)]*)\)", re.S)
+ANN_START = re.compile(r"@(Table|JoinTable|CollectionTable|SecondaryTable)\s*\(")
 NAME = re.compile(r'\bname\s*=\s*"([^"]+)"')
 SCHEMA_ATTR = re.compile(r'\bschema\s*=\s*"([^"]+)"')
+
+# `spring.jpa.properties.hibernate.default_schema` in application.yml. A @Table that omits
+# schema= resolves to this at runtime, so the mapping IS knowable — the schema is simply
+# declared in configuration instead of in the annotation.
+DEFAULT_SCHEMA = "platform"
+
+
+def annotation_bodies(text):
+    """Yield the body of every @Table-family annotation, matching parentheses properly.
+
+    The first version of this used `\\(([^)]*)\\)`, which stops at the first ')' — so
+    `@Table(name = "x", indexes = @Index(...))` was truncated at the inner ')' and any
+    schema= after it was lost. Combined with requiring schema= to be present, that skipped
+    four entities entirely and reported MAPPED_NO_TABLE = 0 when the true answer was 4:
+    platform.file_metadata, persistence_row, nafath_transaction and sso_provider_config are
+    absent from EVERY schema in BOTH databases, their DDL is V12/V13/V14 (below the Flyway
+    baseline, so it can never run), and /api/v1/files and /api/v1/persistence are live
+    controllers over them. The scanner built to find F2-64 had F2-64's own blind spot.
+    """
+    for m in ANN_START.finditer(text):
+        depth, i, n = 1, m.end(), len(text)
+        while i < n and depth:
+            ch = text[i]
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            i += 1
+        yield text[m.end():i - 1]
 BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.S)
 LINE_COMMENT = re.compile(r"//[^\n]*")
 
@@ -153,17 +186,18 @@ def main():
     for path in java:
         raw = open(path, encoding="utf-8", errors="replace").read()
         rel = os.path.relpath(path, ROOT).replace("\\", "/")
-        for m in ANN.finditer(raw):          # annotations are not comments; use the raw text
-            nm, sc = NAME.search(m.group(2)), SCHEMA_ATTR.search(m.group(2))
-            if not (nm and sc):
-                continue
-            k = (sc.group(1).lower(), nm.group(1).lower())
+        for body in annotation_bodies(raw):   # annotations are not comments; use the raw text
+            nm, sc = NAME.search(body), SCHEMA_ATTR.search(body)
+            if not nm:
+                continue                       # no table name: nothing to resolve
+            schema = sc.group(1) if sc else DEFAULT_SCHEMA
+            k = (schema.lower(), nm.group(1).lower())
             if k not in rec:                  # mapped in code, absent from BOTH databases
-                rec[k] = {"schema": sc.group(1), "table": nm.group(1),
+                rec[k] = {"schema": schema, "table": nm.group(1),
                           "rows_dev": None, "rows_prod": None,
                           "jpa": [], "code_ref": [], "test_ref": [], "mig": [],
                           "mig_insert": [], "py": [], "py_insert": []}
-                schemas.add(sc.group(1).lower())
+                schemas.add(schema.lower())
             if rel not in rec[k]["jpa"]:
                 rec[k]["jpa"].append(rel)
 
@@ -231,11 +265,26 @@ def main():
             t["code"] = "INTENTIONAL_TECHNICAL"; t["reason"] = "Flyway bookkeeping"
         elif dev_rows is None:
             t["code"] = "PROD_ONLY_LEFTOVER"
-            t["reason"] = "absent from dev, %d row(s) in prod; no migration removes it" % (prod_rows or 0)
+            # This used to assert "no migration removes it", which was already false when it was
+            # first printed: V337 was on disk dropping all three risk.kri_* tables, and the
+            # scanner even collects the reference that proves it. A reason string must be derived,
+            # not asserted — otherwise the report is confidently wrong about its own evidence.
+            drops = [m for m in t["mig"] if "drop" in m.lower()]
+            t["reason"] = ("absent from dev, %d row(s) in prod; %s"
+                           % (prod_rows or 0,
+                              ("a drop migration exists (%s) and applies on the next Flyway run"
+                               % ", ".join(drops)) if drops
+                              else "no migration in this repo removes it"))
         elif t["jpa"]:
             t["code"] = "OPERATING" if rows else "WIRED_UNPROVEN"
+            # NOT "never exercised". House rule 5 deletes test rows with CHARINDEX after every
+            # probe, so an exercised table reads 0 afterwards — bcm.crisis_comms_cascade was
+            # dispatched twice today and cleaned up. And prod is a restore of dev, so the two row
+            # counts are ONE observation, not two. Only a clean-tenant probe settles usage.
             t["reason"] = ("mapped and carrying data" if rows
-                           else "mapped, 0 rows in both databases — shipped, never exercised")
+                           else "mapped; no rows in either database today (probes clean up after "
+                                "themselves and prod is a restore of dev, so this is one "
+                                "observation, not two)")
         elif seeded_only:
             t["code"] = "SEED_ONLY"
             t["reason"] = ("no JPA mapping and no Java reference; the only writer is a seed script "
