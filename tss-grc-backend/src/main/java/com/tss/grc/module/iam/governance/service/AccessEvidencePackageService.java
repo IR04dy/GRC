@@ -100,18 +100,28 @@ public class AccessEvidencePackageService {
                 nz(r.getRoleName()), nz(r.getDisplayNameEn()), nz(r.getDisplayNameAr()),
                 r.getOrganisationId() == null ? "GLOBAL TEMPLATE" : "TENANT",
                 Boolean.TRUE.equals(r.getIsSystemRole()) ? "YES" : "NO",
-                Boolean.TRUE.equals(r.getIsActive()) ? "ACTIVE" : "INACTIVE",
+                // F2-62: shares Role#grantsAuthority with the authority mint, so this column is
+                // now a statement about access rather than a stored flag nothing consulted. The
+                // predicate is unchanged (Boolean.TRUE.equals) — what changed is that it is true.
+                r.grantsAuthority() ? "ACTIVE" : "INACTIVE",
                 String.valueOf(r.getPermissions().size())
             });
 
+        // F2-62: the Status column carries onto every matrix row. Without it the two sheets
+        // disagree — sheet 1 calls a role INACTIVE while sheet 2 lists its module/action grants
+        // in the same shape as a live role's, and the matrix is the sheet an assessor reads as
+        // "who can do what". The catalogue's Grants count stays the configured count, which is
+        // what it has always measured; INACTIVE is what tells the reader it buys nothing.
         List<String[]> matrixRows = new ArrayList<>();
         for (Role r : roles) {
+            String status = r.grantsAuthority() ? "ACTIVE" : "INACTIVE";
             r.getPermissions().stream()
                 .sorted(Comparator.comparing(Permission::getModule).thenComparing(Permission::getAction))
-                .forEach(p -> matrixRows.add(new String[]{r.getRoleName(), p.getModule(), p.getAction()}));
+                .forEach(p -> matrixRows.add(
+                    new String[]{r.getRoleName(), p.getModule(), p.getAction(), status}));
         }
         byte[] matrix = writeXlsx(brandColor, "Permission Matrix",
-            new String[]{"Role", "Module", "Action"},
+            new String[]{"Role", "Module", "Action", "Role Status"},
             matrixRows, x -> x);
 
         byte[] userAssignments = writeXlsx(brandColor, "User Assignments",

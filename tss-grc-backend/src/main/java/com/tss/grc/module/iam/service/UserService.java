@@ -117,11 +117,33 @@ public class UserService {
             Set<Role> matched = allRoles.stream()
                 .filter(r -> roleNames.contains(r.getRoleName()))
                 .collect(Collectors.toSet());
-            user.setRoles(matched);
+            user.setRoles(rejectInactive(matched));
         } else if (roleIds != null && !roleIds.isEmpty()) {
             Set<Role> roles = new HashSet<>(roleRepository.findAllById(roleIds));
-            user.setRoles(roles);
+            user.setRoles(rejectInactive(roles));
         }
+    }
+
+    /**
+     * F2-62 — refuse to assign a role that confers nothing, rather than silently storing a
+     * grant with no effect.
+     *
+     * <p>Since an inactive role now contributes no authorities, assigning one would leave the
+     * admin looking at a saved user whose listed role grants nothing — the same
+     * report-disagrees-with-reality shape as the defect this fix closes, just relocated to the
+     * user editor. Failing names the offending roles so the caller can activate them first.
+     */
+    private static Set<Role> rejectInactive(Set<Role> roles) {
+        List<String> inactive = roles.stream()
+            .filter(r -> !r.grantsAuthority())
+            .map(Role::getRoleName)
+            .sorted()
+            .toList();
+        if (!inactive.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Cannot assign inactive role(s) — they grant no access: " + String.join(", ", inactive));
+        }
+        return roles;
     }
 
     private UserResponse toResponse(User u) {

@@ -202,12 +202,24 @@ public class AccessGovernanceService {
             .filter(x -> org.equals(x.getOrganisationId()))
             .orElseThrow(() -> new EntityNotFoundException("User not found in this organisation: " + userId));
 
+        // F2-62 — this endpoint is named "effective access", so it must report what the auth
+        // path would actually mint, not what is merely assigned. An inactive role confers no
+        // authorities (see Role#grantsAuthority), so it delivers no grants here and does not
+        // confer the PLATFORM_ADMIN bypass either. `roles` still lists every assignment —
+        // deactivation does not un-assign, and an admin needs to see the row exists — with
+        // `inactiveRoles` naming the subset that grants nothing, so the caller can tell a
+        // granting assignment from an inert one instead of inferring it from an empty table.
         List<String> roleNames = u.getRoles().stream().map(Role::getRoleName).sorted().toList();
-        boolean platformAdmin = roleNames.contains("PLATFORM_ADMIN");
+        List<String> inactiveRoles = u.getRoles().stream()
+            .filter(r -> !r.grantsAuthority())
+            .map(Role::getRoleName).sorted().toList();
+        boolean platformAdmin = u.getRoles().stream()
+            .anyMatch(r -> r.grantsAuthority() && "PLATFORM_ADMIN".equals(r.getRoleName()));
 
         // module/action → set of delivering roles
         Map<String, Set<String>> via = new TreeMap<>();
         for (Role r : u.getRoles()) {
+            if (!r.grantsAuthority()) continue;
             for (Permission p : r.getPermissions()) {
                 via.computeIfAbsent(p.getModule() + "/" + p.getAction(), k -> new HashSet<>())
                     .add(r.getRoleName());
@@ -218,7 +230,8 @@ public class AccessGovernanceService {
             String[] ma = key.split("/", 2);
             grants.add(new EffectiveGrant(ma[0], ma[1], rs.stream().sorted().toList()));
         });
-        return new EffectiveAccessResponse(u.getId(), u.getUsername(), platformAdmin, roleNames, grants);
+        return new EffectiveAccessResponse(u.getId(), u.getUsername(), platformAdmin, roleNames,
+            inactiveRoles, grants);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────

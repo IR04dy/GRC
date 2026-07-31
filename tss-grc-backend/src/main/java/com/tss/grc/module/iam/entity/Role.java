@@ -44,4 +44,31 @@ public class Role extends BaseEntity {
         inverseJoinColumns = @JoinColumn(name = "permission_id")
     )
     private Set<Permission> permissions = new HashSet<>();
+
+    /**
+     * F2-62 — the one predicate that decides whether this role confers access.
+     *
+     * <p>{@code is_active} used to be a <b>dead control</b>: five code paths wrote it and two
+     * read it, but nothing enforced it. In particular {@code CustomUserDetailsService} minted
+     * {@code ROLE_<name>} plus every permission of every assigned role without consulting it,
+     * so deactivating a role removed no access at all — while the access-governance evidence
+     * package handed an auditor a "Status: INACTIVE" row for that same role. The report and
+     * the reality disagreed, and the report was the artefact leaving the building.
+     *
+     * <p>Callers share this method rather than re-deriving the test, because the two that
+     * mattered were the enforcement path and the evidence pack: if those two ever disagree
+     * again the defect is invisible from either side alone. {@code RoleIsActiveEnforcementTest}
+     * pins their agreement.
+     *
+     * <p>Deliberately {@code Boolean.TRUE.equals} — identical to the predicate the evidence
+     * pack already used, so NULL reads as INACTIVE. The column is {@code NOT NULL DEFAULT 1}
+     * and measured zero NULLs in both databases, so this only ever concerns a transient
+     * in-memory entity, whose field initialiser above is {@code true}.
+     *
+     * <p>Not a JavaBean accessor by design: {@code Role} maps by field access, and a
+     * {@code getX}/{@code isX} name here would invite Hibernate to treat it as a property.
+     */
+    public boolean grantsAuthority() {
+        return Boolean.TRUE.equals(isActive);
+    }
 }

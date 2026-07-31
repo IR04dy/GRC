@@ -348,7 +348,12 @@ function AccessTab() {
         : <>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '4px 0 12px' }}>
               {ea.platformAdmin && <Badge tone="danger" dot>{isAr ? 'تجاوز مدير المنصّة' : 'PLATFORM_ADMIN bypass'}</Badge>}
-              {ea.roles.map(r => <Badge key={r} tone="info">{r}</Badge>)}
+              {/* F2-62: an inactive role is still assigned but grants nothing. Rendering it as a
+                  plain info badge would make an inert assignment look like a live one and leave
+                  its absence from the grants table below looking like a bug. */}
+              {ea.roles.map(r => (ea.inactiveRoles ?? []).includes(r)
+                ? <Badge key={r} tone="warning">{r} · {isAr ? 'غير مفعّل — لا يمنح صلاحيات' : 'inactive — grants nothing'}</Badge>
+                : <Badge key={r} tone="info">{r}</Badge>)}
             </div>
             <table className="grc-table">
               <thead><tr>

@@ -2961,7 +2961,10 @@ export interface GovMatrixCell { module: string; action: string; permissionName:
 export interface GovMatrixDto { roleId: number; roleName: string; systemRole: boolean; cells: GovMatrixCell[]; }
 export interface GovEffectiveGrant { module: string; action: string; viaRoles: string[]; }
 export interface GovEffectiveAccessDto {
-  userId: number; username: string; platformAdmin: boolean; roles: string[]; grants: GovEffectiveGrant[];
+  userId: number; username: string; platformAdmin: boolean; roles: string[];
+  /** F2-62 — subset of `roles` that is deactivated: contributes no grants, no admin bypass. */
+  inactiveRoles?: string[];
+  grants: GovEffectiveGrant[];
 }
 export const governanceApi = {
   roles:           () => api.get<GovRoleDto[]>('/api/v1/iam/governance/roles'),
