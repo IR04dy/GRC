@@ -1,10 +1,199 @@
 # Platform Capability Reachability and Orphan Discovery Plan
 
 **Document type:** Enterprise capability archaeology, operability audit and remediation plan  
-**Status:** `TARGET` — discovery methodology; the full audit has not yet been executed  
+**Status:** `ADOPTED (rescoped)` — see **§0 Disposition** (2026-07-31): reviewed, second-model consulted, rescoped from a 7-person programme to a one-engineer audit; 2 of its 5 scans shipped and 5 findings raised. **§0 governs.**  
 **Baseline date:** 2026-07-31  
 **Scope:** Entire TSS GRC Platform — database, backend, workflows, events, permissions, entitlements, integrations, frontend, reports, scheduled jobs, demo/seed data and operating documentation  
 **Primary question:** Can every claimed capability be legitimately started, progressed, completed and evidenced by an authorised persona in a licensed tenant?  
+
+---
+
+## 0. Disposition — reviewed, second-model consulted, rescoped, partly executed
+
+> **Added 2026-07-31.** The plan was tracked as received (`31ccfaa4`), reviewed by me, put to a
+> **Fable 5** seat briefed to attack it, and then rescoped. Every load-bearing claim in the review
+> was re-measured against both databases before being accepted. **This section governs; §§1–18 are
+> the source material it dispositions.**
+
+### 0.1 Verdict
+
+**RESCOPE — do not execute as written; do not discard.** The thesis is right and it was proved the
+hard way: running a compressed version of the plan's own §8.2/§8.3 logic found a **shipped,
+sidebar-linked capability whose tables exist in neither database**, plus a *fixed* finding that is
+still open in production. Both were invisible to every existing ratchet.
+
+But three things about the document as written would waste the effort:
+
+1. **It is sized for a team that does not exist.** §14 asks for **7 people over 8–10 weeks**. There
+   is one engineer. The core of workstreams B, C and E was executed in under a day during this
+   review — because the findings come from *pairwise joins*, not from apparatus.
+2. **Roughly 40% of the machinery it proposes already exists in this repo** (§0.4), including
+   §13.3's anti-vacuity idea, which caught a real miss in `BoardPackGuardTest` on 2026-07-31.
+3. **Its deliverable is an apparatus; the need is a list.** A 21-node/20-edge graph, 8 registers,
+   12 CI invariants and a 20-field hand-maintained Master Register — when what the platform needs
+   is ~75 tables triaged and an owner disposition. ⚠ **And a hand-maintained register is the
+   stale-ledger factory this repo has already measured**: `UNIFIED_IMPLEMENTATION_PLAN.md` §4 was
+   *"renumbered by delivery ten times"* while being actively maintained, and stopped reserving
+   numbers on the same day this was written. **The register must be generated.**
+
+### 0.2 What the taxonomy cannot say, and the worst defect is in that gap
+
+§5.2 defines 17 classification codes. The single worst defect actually present — **a JPA entity,
+two controllers and three routed UI pages over a table that exists in no database** — has **no code
+in the taxonomy**. Meanwhile `EXTERNAL_EGRESS` matched nothing, because no delivery/reconciliation
+evidence plane exists in this platform.
+
+**Add `MAPPED_NO_TABLE`. Delete `EXTERNAL_EGRESS`.** Collapse the four
+`PROCESS/WORKFLOW/PRODUCER/CONSUMER_ORPHAN` codes into one `BROKEN_CHAIN` plus §6.4's
+`first_break` column — the four codes only restate *where* the break is, which the column already
+carries. Merge `EXTERNAL_INGRESS`+`DORMANT_CONFIG` → `DORMANT` with a reason, and
+`LEGACY_READ_ONLY`+`DUPLICATE_LINEAGE` → `LEGACY` with a `canonical` pointer. **17 → 12.**
+
+### 0.3 Findings, evidenced — and one severity correction
+
+| # | Finding | Verified how | Severity |
+|---|---|---|---|
+| **F-1** | **`bcm.crisis_comms_cascade` and `bcm.crisis_comms_template_v2` exist in NEITHER database**, while JPA entities, `CrisisCommsDispatchService`/`CrisisCommsTemplateService`, two controllers at `/api/v1/bcm/comms/v2*` and three routed pages reached from `Sidebar.tsx` sit on top of them. `V172` creates them idempotently — but dev never runs Flyway, and prod baselined at 292, so **`V172 < 292` will never execute**. Two of the guard's roles (`CRISIS_COMMANDER`, `COMMS_LEAD`) do not exist in `iam.roles` either; `CISO`/`BCM_MANAGER` do. Zero mentions in any `.md` in the repo | `sys.tables` in both DBs + the full static chain, **then live** | **P2** |
+| **F-2** | **The prod grant surface is 22 migrations stale, so two CLOSED findings are still open in production.** `REPORTING:WRITE` is held by **2 roles in dev and 0 in prod** (F2-43's V321 packaged, unapplied); `VIEWER` holds **16 `*:EXPORT` in dev and 17 in prod** (V333 likewise). Any audit reading dev reports both fixed | grant joins on both DBs | **P1** |
+| **F-3** | **Three legacy plural KRI tables exist in prod only and Flyway will never drop them.** `risk.kri_definitions`/`kri_readings`/`kri_breach_events` — 0 rows, created **2026-07-11 17:05** (43 min after the 16:22 restore, so an out-of-band script), absent from dev. `V247__drop_legacy_kri_tables.sql` is packaged but below baseline. Canonical singular tables live in both | `sys.tables` + `create_date` + Flyway history | **P2** |
+| **F-4** | **The old workflow tables are seeded ballast in production; the real engine is unused there.** `workflow.workflow_definitions/instances/tasks` hold 20/14/15 rows in **both** DBs with no JPA mapping and no Java reference — only Python seed and old migrations touch them. The actual engine (`workflow.requests`) holds **1 row in dev and 0 in prod**. So "workflow engine adopted by 14 modules" is `WIRED_UNPROVEN` in production | row counts + grep | **P2** |
+| **F-5** | **~20 pre-V2 module table families are seed-only ballast in both DBs**, JPA-unmapped and Java-unreferenced, with identical dev/prod counts: `compliance.compliance_assessments/compliance_findings/evidence_items` (10/18/**83** rows), `bcm.bcm_exercises/…`, `cyber_lc.*`, `bcm_lc.*`, `risk_lc.kri_breaches`, `privacy.consents`(36)`/…`, `audit.audit_logs`(14 — schema `audit` is the one DB schema JPA does not know at all), `reporting.report_definitions`(20), `platform.business_units`(10)… Only `privacy_lc` was previously documented; the scan generalised that known positive to its whole class | census + xref | **P2** |
+
+⚠ **Severity correction to F-1, and it matters.** The review predicted an authorised persona would
+hit a **guaranteed 500**. It could not log in (its constraints forbade writes, and a login writes
+refresh-token and audit rows), so it proved the chain statically. **I logged in and observed a
+`503`, not a `500`** — and a purpose-built one: RFC-7807 `https://grc.tss.com/errors/db-object-missing`,
+title *"Module not yet bootstrapped"*. `GlobalExceptionHandler` has a dedicated missing-table branch
+carrying a SEC-CFG-001 note about not leaking schema names outside dev. **So the platform anticipated
+this failure and degrades gracefully.** The capability is still dead and still sidebar-linked, but it
+announces itself rather than crashing — **P1 → P2**. The lesson is the one this programme keeps
+relearning: *a static chain predicts the failure, not its severity; only the running system reports that.*
+
+✅ **Correctly NOT flagged (§5.3's discipline works, and was validated live):** `iam.break_glass_events`
+(0 rows by design — rare-event), `platform.crowdstrike_*`/`tenable_recast_log` (connector ingress
+awaiting config), `platform.flyway_schema_history`, `iam.user_roles` (ORM join table, caught via the
+`@JoinTable` parse), `module/datagov` (**F2-20: registered `PLANNED`, do not delete** — add it to §5.3).
+⚠ One §5.3 example is already stale: `sust.esg_metric` is now **26 definitions / 48 readings**, not
+26/0 — which is itself the argument for generating the register rather than typing it.
+
+### 0.4 What already exists (do not rebuild)
+
+| Plan proposal | Existing artifact |
+|---|---|
+| §3 measured baseline | `Appendix/MEASURED_BASELINE.md` + `scripts/coupling.py`, `verify.py` — generated, dated, under the standing "no claim without provenance" rule |
+| §8.5 dead/cosmetic permission report | `scripts/grant_tightness.py` → `Appendix/GRANT_TIGHTNESS.md` (its classes A/B/C **are** the plan's dead/over-broad/cosmetic), fed by `PermissionCatalogueUsageTest` **by reflection, not regex** |
+| §8.5 role/actor eligibility | `scripts/role_guard_census.py` + `RoleGuardConversionRatchetTest` (647 role-name guards, 40 ghost roles) |
+| §8.5 entitlement plane | `SkuCatalogueRatchetTest` + ADR-018 (15 ratified SKUs); W2-0 backfill queued |
+| §8.6 route/nav reachability | `routeReachability.test.ts` (F2-07b — **found the 8 dark SOC Ops pages**), with `INTENTIONALLY_OFF_NAV` reasons |
+| §8.6 mock/demo discipline | `demoFallbackContract.test.ts` (W2-1b) + mock debt counted in MEASURED_BASELINE + F2-15 |
+| §13.2 #12 (half) | `scripts/deployment_identity.py` (W0-7) — packaged-vs-applied migration head |
+| §13.2 #6 | `ControllerAuthorizationRatchetTest`, `ExportAuthorizationRatchetTest`, `MassAssignmentRatchetTest` |
+| §13.3 anti-vacuity | Already house culture — floors in ≥4 ratchets; one caught a real miss on 2026-07-31 |
+| Migration hygiene | `MigrationFilenameRatchetTest` (born from F2-49) |
+
+**And the backlog is already remediating this plan's own failure classes one at a time** — F2-43
+(`REPORTING:WRITE` held by nobody), F2-07b (8 dark pages), F2-27 (`AI:EXPORT`), F2-23
+(`ADMIN:APPROVE`), F2-49 (never-applied migrations), F2-56 (roles unreachable outside tenant 1),
+F2-60/F2-61. The plan's value is not a new programme; it is **the two joins nobody had run**.
+
+### 0.5 Section verdicts
+
+| § | Verdict | Reason |
+|---|---|---|
+| 5.2 codes | **SIMPLIFY 17 → 12, ADD `MAPPED_NO_TABLE`, DROP `EXTERNAL_EGRESS`** | §0.2 |
+| 5.3 do-not-misclassify | **KEEP VERBATIM** (+ `datagov`) | Validated live; without it every finding above is a false positive |
+| 6.1–6.3 graph | **DROP** | Every finding came from pairwise joins. A 21×20 emitted graph is machinery nobody queries |
+| 6.4 break-point rule | **KEEP** — as two register columns | Genuinely good |
+| 7 planes/confidence | **SIMPLIFY** — keep two-planes-before-a-finding; 5 confidence levels → 3 | `VERIFIED_INTENTIONAL` conflates classification with confidence |
+| 8.1 charter | **DROP as a workstream** | One engineer, one owner; the safety rules are already house rules |
+| 8.2 DB archaeology | **KEEP, halved** | It found nearly everything. Cut views/procs/triggers/synonyms — measured **1 view, 0 procedures, 1 trigger** in the whole database |
+| 8.3 backend graph | **SIMPLIFY** | Entity↔table join: keep. Per-aggregate command/state matrices for 413 entities: drop until a break is suspected |
+| 8.4 workflow/event | **KEEP, scoped** | Drop the "stuck-state heatmap" — `workflow.requests` has 1 row in dev, 0 in prod. **That is the finding** |
+| 8.5 security reachability | **KEEP = run what exists**, + the prod flag | Built. The gap was that it could only read dev — fixed today |
+| 8.6 frontend | **SIMPLIFY** | Route reachability exists and is mutation-proven. New: unused API-client exports |
+| 8.7 demo provenance | **REDUCE to the clean-tenant test** | **Prod is a dev-dump restore** (§0.6), so per-row provenance proves nothing. Also: `demoFallbackContract.test.ts` pins the *disclosed* `isDemo` contract and W2-1b is an **open owner decision** — §8.7 as written contradicts a deliberate, tested behaviour |
+| 8.8 runtime probes | **KEEP** | This is the existing live-probe discipline; scope to corroborated candidates |
+| 8.9 owner validation | **KEEP, renamed** | It is one person reviewing a CSV. Make the 10 questions register columns |
+| 9 root causes | **KEEP as vocabulary, not as process** | Matches measured history (RC-06 = the ledger drift; RC-20 = the regex incidents). Do not mandate a full history investigation per finding |
+| 10.2 weighted score | **DROP** | Arbitrary weights, double-counted signals. Two-of-three signals ⇒ `CORROBORATED` |
+| 11.1 Master Register | **DROP as specified — GENERATE it** | §0.1(3) |
+| 13.1 capability manifest | **DROP** | Another unchecked registry. The working pattern here is scanner + in-code exceptions with reasons |
+| 13.2 12 invariants | **KEEP 2, note 3 exist, DEFER 7** | Build #1/#2 (every table mapped or excepted-with-reason) and #12's schema-diff half — **#12's half shipped today** |
+| 13.3 anti-vacuity · 13.4 DoD | **KEEP** | Cheap, cultural, already working |
+| 14 team/schedule | **REPLACE** with §0.7 | 7 people → 1–2 weeks solo. Keep the module-wave ordering |
+| 16 acceptance criteria | **REPLACE** | Five "100% of everything" criteria are the team-of-7 version |
+| 18 first wave | **KEEP, amended** | Run the two platform-wide scans FIRST — the biggest finding is in `bcm`, which §18's wave excludes |
+
+### 0.6 Baseline corrections (§3)
+
+§3's figures were re-measured. **All but one are exact**: 50 JPA schemas, 422 repositories, 255
+controllers, 320 services, 36 schedulers/listeners, 321 migration files (+V334 since), 132–133 FE
+API callers. Two corrections and one addition:
+
+* **"418 entity files" over-counts by 5 — the real number is 413.** The 5 phantoms are
+  `@EntityListeners`, `@EntityGraph` and Javadoc prose. `MEASURED_BASELINE.md` says 417. **Three
+  sources, three numbers, and only the strict one is right** — RC-20 again, inside the baseline
+  document whose own rule is that nothing enters unmeasured.
+* **The database has 51 schemas, not 50.** The extra is `audit`, whose only table is itself an orphan.
+* **Prod is a 2026-07-11 restore of a dev dump.** 428 of 458 shared tables carry identical row
+  counts, there are **zero dev-only tables**, and the 4 prod-only ones are `flyway_schema_history`
+  plus F-3's KRI leftovers. **This reframes all of §8.7:** prod's data *is* the demo data.
+
+### 0.7 Minimum viable audit — one engineer
+
+**Scans, all validated against the known positives** (`privacy_lc` orphaned, `REPORTING:WRITE` held
+by nobody, 8 unrouted SOC Ops pages, `REGULATORY:EXPORT` guarding nothing until 2026-07-31). *A
+scanner that cannot rediscover those does not work.*
+
+1. **`schema_drift.py`** — ✅ **SHIPPED 2026-07-31** (`Appendix/scripts/`). dev↔prod table/row diff +
+   Flyway-history-vs-disk, reporting only the never-running migrations **whose intent the schema
+   contradicts** (5 rows across 2 files, from 279 candidates). Found F-1 and F-3. ⚠ Its own first run
+   produced a false positive — `V93` drops `platform.controls` *and re-creates it*, so presence is the
+   intended end state; retirement is now defined as DROP with no matching CREATE. **A regex that reads
+   a verb without its context invents defects.**
+2. **`grant_tightness.py --database`** — ✅ **SHIPPED 2026-07-31.** It was hardcoded to dev, so every
+   report it ever produced described a laptop. Found F-2.
+3. **`table_xref.py`** — ⬜ next. Table census joined to a reflection-grade `@Table`/`@JoinTable`/
+   `@CollectionTable` parse plus `schema.table` string references across Java, tests, migrations and
+   the Python seed scripts. Emits the register. Prototype validated during the review (found 40
+   unmapped tables, 38 zero-row-in-both, 6 reference-free, **2 mapped-but-absent**).
+4. **Route/API dead-ends** — extend `routeReachability.test.ts`; add an unused-API-client-export scan.
+5. **Clean-tenant probe** — manual, two personas, wave-1 modules. Given §0.6, **the only trustworthy
+   provenance evidence there is.**
+
+**One register, generated:** `TABLE_DISPOSITION_REGISTER.csv`, rebuilt by scan 3 on every run and
+joined to a small hand-curated **exceptions file** (`schema.table → code, reason, owner, date`) that
+the generator validates **both ways** — an unknown table becomes an `UNKNOWN` row, and an exception
+naming a vanished table is an error. That is the `INTENTIONALLY_OFF_NAV` pattern this repo has
+already proven. **Nothing else is hand-maintained.**
+
+**Order:** (1) the two shipped scans, platform-wide — done; (2) F-1's disposition + F-4's workflow
+reality + F-5's ~20 legacy families, with the owner; (3) §18's wave, mostly confirming zeros and
+writing the exceptions file; (4) clean-tenant probes; (5) the two new ratchets.
+
+### 0.8 Open for the owner
+
+1. **F-1 — activate or retire crisis-comms v2?** Activate = an idempotent `≥V335` re-issue of V172's
+   DDL, applied to dev twice per convention. Retire = remove 3 pages, the nav entry and 2 controllers.
+   **This is the difference between a migration slice and a deletion slice**, and nothing else in the
+   plan is blocked on it.
+2. **F-5 — retirement authority for ~20 legacy seed families.** Destructive, so it needs the explicit
+   OK (house rule 6), plus a call on whether prod's copies need retention review first given they
+   shipped inside the restore.
+3. **Prod scans before or after the deployment?** F-2's findings **evaporate** the moment the pending
+   rebuild/restage/restart applies V313–V334. Run them before *and* after to prove the diff, or only
+   after?
+4. **W2-1b** (badged demo rows vs hard zeros) — already open; it decides whether §8.7 has any
+   remaining work.
+5. **Where does the exceptions file live** — Bible (visible to audit) or backend test tree (enforced
+   by CI)? *Recommendation: test tree, mirrored into the generated register.*
+
+### 0.9 Status change
+
+**`TARGET` → `ADOPTED (rescoped)`.** §§1–5.3, 6.4, 8.2, 8.4–8.9, 9, 12, 13.2–13.4 and 14.2 survive
+as written or simplified above. §§6.1–6.3, 10.2, 11.1, 11.4 and 13.1 are **dropped**. §14's team and
+schedule are **replaced** by §0.7. Two of §0.7's five scans **shipped the same day this section was
+written**; the findings they produced are F-1…F-5 above.
 
 ---
 
