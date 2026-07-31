@@ -243,10 +243,41 @@ public class ExportController {
 
     // ── Regulator / audit evidence package (P2/P3) ────────────────────────
 
+    /**
+     * F2-60 / ADR-017 D-10b — the assurance position of the tenant, narrowed from 37 roles to 13.
+     *
+     * <p>This was guarded by {@code hasPermission('COMPLIANCE','EXPORT') or
+     * hasPermission('REPORTING','EXPORT')}: a disjunction satisfied by <b>37 of 59 roles in dev and
+     * 37 of 57 in production</b>, including ASSET_OWNER, PROCUREMENT_OWNER, SUPPLIER_MANAGER,
+     * EMERGENCY_RESPONDER, MA_LEAD, DR_OWNER, BIA_OWNER, VULN_MANAGER and VIEWER. What they could
+     * take is not a register extract — it is the requirement-to-control mapping, the evidence index
+     * <em>and</em> the audit trail, hash-manifested so a recipient can prove it was not altered.
+     *
+     * <p>Third instance of D-10a's shape, so the instrument is the same and for the same measured
+     * reason: because the guard is an OR, narrowing it by revoking grants would mean taking
+     * COMPLIANCE:EXPORT and REPORTING:EXPORT from 24 roles, and those two authorise the
+     * findings-aging export, the policy-document PDF, the KRI dashboard, the packet builder and the
+     * risk register. The collateral would dwarf the fix. The defect is in the guard.
+     *
+     * <p>{@code REGULATORY:EXPORT} is the destination because it was <em>measured</em> to fit, not
+     * because it reads well: it is already catalogued and already held by 14 roles that are almost
+     * exactly the assurance audience, so no role needed granting for the new guard to be satisfiable
+     * (F2-23's rule). ⚠ And it previously guarded <b>nothing</b> — zero {@code @PreAuthorize} uses
+     * anywhere in the backend — so it was a catalogued permission enforcing nothing, the F2-23 shape
+     * again. That makes it a safe destination and makes this change also give it a job.
+     *
+     * <p>V333 removes the one grant row that would otherwise have survived the narrowing: VIEWER,
+     * the generic read-only persona, held {@code REGULATORY:EXPORT} too. VIEWER holds <b>17
+     * {@code *:EXPORT} permissions</b> in dev and in production, which is F2-27's grant side never
+     * having been reviewed after its guard side was fixed — that whole population is F2-61 and needs
+     * a stated policy, not a sweep here. Exactly one row moves, and because this endpoint is now the
+     * only consumer of {@code REGULATORY:EXPORT}, its blast radius is exactly this endpoint.
+     */
     @GetMapping("/regulator-package.zip")
-    @PreAuthorize("hasPermission('COMPLIANCE','EXPORT') or hasPermission('REPORTING','EXPORT')")
+    @PreAuthorize("hasPermission('REGULATORY','EXPORT')")
     @Operation(summary = "Regulator/audit evidence package (ZIP): branded README.pdf + " +
-        "Requirement_Mapping.xlsx + Evidence_Index.xlsx + Audit_Trail.xlsx + manifest.json (SHA-256).")
+        "Requirement_Mapping.xlsx + Evidence_Index.xlsx + Audit_Trail.xlsx + manifest.json (SHA-256). " +
+        "Assurance-confidential: requires REGULATORY:EXPORT.")
     public ResponseEntity<byte[]> regulatorPackage() {
         var auth = org.springframework.security.core.context.SecurityContextHolder
             .getContext().getAuthentication();
