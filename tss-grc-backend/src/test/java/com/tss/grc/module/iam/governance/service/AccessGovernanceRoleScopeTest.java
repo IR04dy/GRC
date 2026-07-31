@@ -253,4 +253,95 @@ class AccessGovernanceRoleScopeTest {
         assertThat(service.listRoles()).extracting(RoleSummary::roleName)
             .containsExactly("CISO", "CISO_VARIANT");
     }
+
+    // ── F2-67: template lifecycle protection must cover DEACTIVATION too ─────
+    //
+    // `deleteRole` refuses a system role outright and implements retirement as
+    // `setIsActive(false)` + `softDelete`. F2-62 made `is_active` enforce, so the first half of
+    // that pair — reachable through `updateRole` — acquired nearly the whole blast radius of the
+    // second: every holder loses the ROLE_ marker and every permission on the next request.
+    //
+    // These use a TENANT-SCOPED system role deliberately. A global one is stopped earlier by
+    // `mustOwnRole`, so it could never reach the guard and would make these tests vacuous. The
+    // tenant-scoped shape is also not invented: production carried 46 such rows until V334 ran,
+    // having acquired them from a dev-dump restore, which a future restore can repeat.
+
+    @Test
+    void aSystemRoleCannotBeDeactivated_becauseThatIsRetirementByAnotherName() {
+        Role tenantScopedTemplate = role(33L, "CISO", TENANT, true);
+        when(roles.findById(33L)).thenReturn(Optional.of(tenantScopedTemplate));
+        asTenantAdmin();
+
+        assertThatThrownBy(() -> service.updateRole(33L,
+                new RoleUpsertRequest("CISO", "CISO", "مدير الأمن", false)))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("cannot be deactivated");
+
+        // The refusal must precede persistence — and the flag must be untouched in memory too,
+        // since a saved-elsewhere entity in the same transaction would still flush.
+        verify(roles, never()).save(any(Role.class));
+        assertThat(tenantScopedTemplate.grantsAuthority()).isTrue();
+    }
+
+    @Test
+    void deleteRoleRefusesTheSameTemplate_whichIsWhyDeactivationHadToBeRefusedAsWell() {
+        // Pins the pairing rather than restating one half: if a future change makes system roles
+        // deletable, this fails and whoever makes it has to decide about deactivation too.
+        Role tenantScopedTemplate = role(33L, "CISO", TENANT, true);
+        when(roles.findById(33L)).thenReturn(Optional.of(tenantScopedTemplate));
+        asTenantAdmin();
+
+        assertThatThrownBy(() -> service.deleteRole(33L, 7L))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("cannot be deleted");
+        verify(roles, never()).save(any(Role.class));
+    }
+
+    @Test
+    void aTenantOwnedRoleIsStillDeactivatable_whichIsTheWholePopulationF262IsFor() {
+        // The guard must not cost F2-62 its purpose: a role the tenant created is exactly what
+        // deactivation is meant to act on, and `cloneRole` produces non-system copies for this.
+        Role own = role(90L, "CISO_VARIANT", TENANT, false);
+        when(roles.findById(90L)).thenReturn(Optional.of(own));
+        when(roles.save(any(Role.class))).thenAnswer(inv -> inv.getArgument(0));
+        asTenantAdmin();
+
+        RoleSummary saved = service.updateRole(90L,
+            new RoleUpsertRequest("CISO_VARIANT", "CISO variant", "نسخة", false));
+
+        assertThat(saved.active()).isFalse();
+        assertThat(own.grantsAuthority()).isFalse();
+    }
+
+    @Test
+    void reactivatingASystemRoleIsAllowed_becauseRefusingItWouldMakeAnInactiveTemplateUnrecoverable() {
+        Role inactiveTemplate = role(33L, "CISO", TENANT, true);
+        inactiveTemplate.setIsActive(false);
+        when(roles.findById(33L)).thenReturn(Optional.of(inactiveTemplate));
+        when(roles.save(any(Role.class))).thenAnswer(inv -> inv.getArgument(0));
+        asTenantAdmin();
+
+        RoleSummary saved = service.updateRole(33L,
+            new RoleUpsertRequest("CISO", "CISO", "مدير الأمن", true));
+
+        assertThat(saved.active()).isTrue();
+        assertThat(inactiveTemplate.grantsAuthority()).isTrue();
+    }
+
+    @Test
+    void omittingTheFlagOnASystemRoleUpdateIsNotADeactivation() {
+        // `isActive` is nullable in the request and means "leave it alone". Guarding on
+        // `!Boolean.TRUE.equals(...)` instead of `Boolean.FALSE.equals(...)` would have turned
+        // every ordinary display-name edit on a template into a 400.
+        Role template = role(33L, "CISO", TENANT, true);
+        when(roles.findById(33L)).thenReturn(Optional.of(template));
+        when(roles.save(any(Role.class))).thenAnswer(inv -> inv.getArgument(0));
+        asTenantAdmin();
+
+        RoleSummary saved = service.updateRole(33L,
+            new RoleUpsertRequest("CISO", "Chief Information Security Officer", "مدير الأمن", null));
+
+        assertThat(saved.displayNameEn()).isEqualTo("Chief Information Security Officer");
+        assertThat(saved.active()).isTrue();
+    }
 }

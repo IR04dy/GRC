@@ -167,6 +167,34 @@ public class AccessGovernanceService {
         if (Boolean.TRUE.equals(e.getIsSystemRole()) && !e.getRoleName().equals(r.roleName())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "System roles cannot be renamed");
         }
+        // F2-67 — a platform-shipped role cannot be DEACTIVATED either, and until F2-62 that
+        // omission cost nothing.
+        //
+        // `deleteRole` below refuses a system role outright ("templates cannot be deleted") and
+        // implements retirement as `setIsActive(false)` + `softDelete`. Since F2-62 made
+        // `is_active` enforce, the first half of that pair — reachable from here — has nearly the
+        // whole blast radius of the second: every holder of the role loses its ROLE_ marker and
+        // every permission on the next request. So deactivation was the **unguarded half of an
+        // operation whose other half is explicitly forbidden**, and the lifecycle protection on
+        // templates was one method wide.
+        //
+        // Not currently exploitable, and the reason is worth stating because it is not a defence:
+        // every system role is global (V334/F2-56) and `mustOwnRole` rejects global roles before
+        // this line, so today the guard is unreachable. That is defence by the *shape of the data*,
+        // not by design — production carried 46 tenant-scoped system roles until V334 ran, and it
+        // acquired them by being restored from a dev dump, which a future restore can repeat.
+        // Deactivating PLATFORM_ADMIN under that shape would have stripped the admin bypass from
+        // every holder, with no administrator left to reverse it.
+        //
+        // Reactivation stays allowed: `isActive = true` can only ever restore access, and refusing
+        // it would make a template that somehow became inactive unrecoverable through the API.
+        // A tenant that wants a disableable variant clones the role ({@link #cloneRole}) — the copy
+        // is deliberately non-system, which is exactly the population F2-62's semantics are for.
+        if (Boolean.TRUE.equals(e.getIsSystemRole()) && Boolean.FALSE.equals(r.isActive())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "System roles are templates and cannot be deactivated — they would grant nothing to "
+                    + "every holder. Clone the role into this tenant and deactivate the copy instead.");
+        }
         e.setRoleName(r.roleName());
         e.setDisplayNameEn(r.displayNameEn());
         e.setDisplayNameAr(r.displayNameAr());
