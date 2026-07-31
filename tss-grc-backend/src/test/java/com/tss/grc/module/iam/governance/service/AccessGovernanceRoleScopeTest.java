@@ -329,6 +329,44 @@ class AccessGovernanceRoleScopeTest {
     }
 
     @Test
+    void theReviveBranchCannotDeactivateATemplateEither_theInvariantHoldsAtEveryWriter() {
+        // Third writer of the flag. Unreachable through the API — `deleteRole` refuses to retire a
+        // template, so no retired system role can exist, and none does in either database — but
+        // "unreachable given today's rows" is exactly the reasoning that left `updateRole` open,
+        // so the invariant is enforced here too rather than argued about.
+        Role retiredTemplate = role(33L, "CISO", TENANT, true);
+        when(roles.findByOrganisationIdOrOrganisationIdIsNull(TENANT)).thenReturn(List.of());
+        when(roles.findRetiredRoleId(TENANT, "CISO")).thenReturn(Optional.of(33L));
+        when(roles.findById(33L)).thenReturn(Optional.of(retiredTemplate));
+        asTenantAdmin();
+
+        assertThatThrownBy(() -> service.createRole(
+                new RoleUpsertRequest("CISO", "CISO", "مدير الأمن", false)))
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("cannot be deactivated");
+        verify(roles, never()).save(any(Role.class));
+    }
+
+    @Test
+    void reviveStillHonoursTheFlagForANonTemplate_soTheGuardDidNotChangeOrdinaryBehaviour() {
+        // The guard rewrote the isActive expression; this pins that the rewrite is behaviour-
+        // preserving for the population that actually reaches this branch.
+        Role retiredOwn = role(90L, "CISO_VARIANT", TENANT, false);
+        when(roles.findByOrganisationIdOrOrganisationIdIsNull(TENANT)).thenReturn(List.of());
+        when(roles.findRetiredRoleId(TENANT, "CISO_VARIANT")).thenReturn(Optional.of(90L));
+        when(roles.findById(90L)).thenReturn(Optional.of(retiredOwn));
+        when(roles.save(any(Role.class))).thenAnswer(inv -> inv.getArgument(0));
+        asTenantAdmin();
+
+        assertThat(service.createRole(
+            new RoleUpsertRequest("CISO_VARIANT", "v", "نسخة", false)).active()).isFalse();
+        assertThat(service.createRole(
+            new RoleUpsertRequest("CISO_VARIANT", "v", "نسخة", null)).active()).isTrue();
+        assertThat(service.createRole(
+            new RoleUpsertRequest("CISO_VARIANT", "v", "نسخة", true)).active()).isTrue();
+    }
+
+    @Test
     void omittingTheFlagOnASystemRoleUpdateIsNotADeactivation() {
         // `isActive` is nullable in the request and means "leave it alone". Guarding on
         // `!Boolean.TRUE.equals(...)` instead of `Boolean.FALSE.equals(...)` would have turned

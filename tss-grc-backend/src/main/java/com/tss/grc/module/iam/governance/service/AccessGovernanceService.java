@@ -95,7 +95,22 @@ public class AccessGovernanceService {
                 .orElseThrow(() -> new IllegalStateException("Revived role not visible: " + retiredId));
             revived.setDisplayNameEn(r.displayNameEn());
             revived.setDisplayNameAr(r.displayNameAr());
-            revived.setIsActive(r.isActive() == null || r.isActive());
+            // F2-67 — the invariant is "a system role is never inactive", and it has to hold at
+            // every writer of the flag, not just the reachable one. This branch is the third:
+            // `updateRole` is guarded above, the fresh-role path below cannot break it because it
+            // forces `isSystemRole = false`, and this one would honour a caller's `isActive=false`
+            // on whatever it revived. Reaching it needs a *retired system role*, which no API path
+            // can create (`deleteRole` refuses to retire a template) and which exists in neither
+            // database — so this is belt-and-braces for a shape only a direct DB write produces.
+            // It is here anyway because "unreachable given today's rows" is the reasoning that left
+            // the updateRole hole open in the first place.
+            boolean requestedInactive = r.isActive() != null && !r.isActive();
+            if (Boolean.TRUE.equals(revived.getIsSystemRole()) && requestedInactive) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "System roles are templates and cannot be deactivated — revive it active, or "
+                        + "clone it into this tenant and deactivate the copy instead.");
+            }
+            revived.setIsActive(!requestedInactive);
             Role saved = roles.save(revived);
             audit.log("CREATE", "Role", saved.getId(), "Role revived: " + saved.getRoleName());
             return toSummary(saved);
