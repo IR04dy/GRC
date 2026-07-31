@@ -92,6 +92,17 @@ SCHEMA_ATTR = re.compile(r'\bschema\s*=\s*"([^"]+)"')
 # `spring.jpa.properties.hibernate.default_schema` in application.yml. A @Table that omits
 # schema= resolves to this at runtime, so the mapping IS knowable — the schema is simply
 # declared in configuration instead of in the annotation.
+# Flyway's baseline on the deployed server: anything at or below it is recorded as applied
+# whether it ever ran. A DROP down there retires a table on paper only — see F2-65.
+FLYWAY_BASELINE = 292
+
+
+def mig_version(filename):
+    """V337__x.sql -> 337; anything unparseable sorts below the baseline (fail safe)."""
+    m = re.match(r"V(\d+)__", filename)
+    return int(m.group(1)) if m else -1
+
+
 DEFAULT_SCHEMA = "platform"
 
 
@@ -174,7 +185,7 @@ def main():
                   "rows_dev": dev[k]["rows"] if k in dev else None,
                   "rows_prod": prod[k]["rows"] if k in prod else None,
                   "jpa": [], "code_ref": [], "test_ref": [], "mig": [], "mig_insert": [],
-                  "py": [], "py_insert": []}
+                  "mig_drop": [], "py": [], "py_insert": []}
 
     # ── JPA mappings (@Table / @JoinTable / @CollectionTable / @SecondaryTable) ──
     java = []
@@ -196,7 +207,7 @@ def main():
                 rec[k] = {"schema": schema, "table": nm.group(1),
                           "rows_dev": None, "rows_prod": None,
                           "jpa": [], "code_ref": [], "test_ref": [], "mig": [],
-                          "mig_insert": [], "py": [], "py_insert": []}
+                          "mig_insert": [], "mig_drop": [], "py": [], "py_insert": []}
                 schemas.add(schema.lower())
             if rel not in rec[k]["jpa"]:
                 rec[k]["jpa"].append(rel)
@@ -205,6 +216,9 @@ def main():
     REF = re.compile(r"\b(" + "|".join(sorted(schemas)) + r")\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)", re.I)
     INS = re.compile(r"INSERT\s+INTO\s+\[?(" + "|".join(sorted(schemas))
                      + r")\]?\s*\.\s*\[?([A-Za-z_][A-Za-z0-9_]*)\]?", re.I)
+    # A real DROP, from the statement -- not from the filename. See DROP_APPLIES below.
+    DROP = re.compile(r"DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?\[?(" + "|".join(sorted(schemas))
+                      + r")\]?\s*\.\s*\[?([A-Za-z_][A-Za-z0-9_]*)\]?", re.I)
 
     def note(k, bucket, rel):
         if k in rec and rel not in rec[k][bucket]:
@@ -225,6 +239,8 @@ def main():
             note((m.group(1).lower(), m.group(2).lower()), "mig", fn)
         for m in INS.finditer(body):
             note((m.group(1).lower(), m.group(2).lower()), "mig_insert", fn)
+        for m in DROP.finditer(strip_comments(body)):
+            note((m.group(1).lower(), m.group(2).lower()), "mig_drop", fn)
 
     py_files = []
     for d in (ROOT, os.path.join(APPENDIX, "scripts")):
@@ -265,16 +281,33 @@ def main():
             t["code"] = "INTENTIONAL_TECHNICAL"; t["reason"] = "Flyway bookkeeping"
         elif dev_rows is None:
             t["code"] = "PROD_ONLY_LEFTOVER"
-            # This used to assert "no migration removes it", which was already false when it was
-            # first printed: V337 was on disk dropping all three risk.kri_* tables, and the
-            # scanner even collects the reference that proves it. A reason string must be derived,
-            # not asserted — otherwise the report is confidently wrong about its own evidence.
-            drops = [m for m in t["mig"] if "drop" in m.lower()]
-            t["reason"] = ("absent from dev, %d row(s) in prod; %s"
-                           % (prod_rows or 0,
-                              ("a drop migration exists (%s) and applies on the next Flyway run"
-                               % ", ".join(drops)) if drops
-                              else "no migration in this repo removes it"))
+            # ⚠ TWO generations of wrongness here, both worth keeping as a comment because the
+            # second looked like the fix for the first.
+            #   (1) It asserted "no migration removes it" — already false when first printed:
+            #       V337 was on disk dropping all three risk.kri_* tables.
+            #   (2) The repair derived the answer from the migration FILENAME (`"drop" in name`),
+            #       which credits any file whose name happens to contain "drop" and misses
+            #       `V340__retire_legacy.sql`; and it then said the drop "applies on the next
+            #       Flyway run" while listing **V247**, which is numbered below the baseline and
+            #       therefore can NEVER apply. That is F2-65 itself, restated wrongly by the
+            #       scanner that reports F2-65.
+            # Now: real DROP TABLE statements, split by the baseline, because only one side of
+            # that line is a pending retirement — the other is the defect.
+            will = sorted(m for m in t["mig_drop"] if mig_version(m) > FLYWAY_BASELINE)
+            never = sorted(m for m in t["mig_drop"] if mig_version(m) <= FLYWAY_BASELINE)
+            if will:
+                how = ("dropped by %s, above the V%d baseline, so it applies on the next Flyway run"
+                       % (", ".join(will), FLYWAY_BASELINE))
+                if never:
+                    how += (" (%s also drops it but is at or below the baseline and can never run)"
+                            % ", ".join(never))
+            elif never:
+                how = ("the only DROP is %s, at or below the V%d baseline — Flyway records it as "
+                       "applied without running it, so this table is retired on paper only (F2-65)"
+                       % (", ".join(never), FLYWAY_BASELINE))
+            else:
+                how = "no migration in this repo drops it"
+            t["reason"] = "absent from dev, %d row(s) in prod; %s" % (prod_rows or 0, how)
         elif t["jpa"]:
             t["code"] = "OPERATING" if rows else "WIRED_UNPROVEN"
             # NOT "never exercised". House rule 5 deletes test rows with CHARINDEX after every

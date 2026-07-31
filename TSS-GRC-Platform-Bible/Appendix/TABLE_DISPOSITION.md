@@ -14,8 +14,8 @@ input is `table_disposition_exceptions.csv`, validated in both directions.
 | `OPERATING` | 395 | mapped and carrying data |
 | `WIRED_UNPROVEN` | 28 | mapped, 0 rows in both — shipped, never exercised |
 | `SEED_ONLY` | 16 | **the only writer is a seed script** — ballast, shipped to prod by the restore |
-| `ORPHAN_CONFIRMED` | 10 | no mapping, no reference, no rows |
 | `LEGACY` | 10 | no mapping, no Java reference, no seed insert, yet holds rows |
+| `ORPHAN_CONFIRMED` | 10 | no mapping, no reference, no rows |
 | `DORMANT` | 5 | empty by design (rare-event or awaiting connector config) |
 | `PROD_ONLY_LEFTOVER` | 3 | in prod only; no migration will remove it |
 | `INTENTIONAL_TECHNICAL` | 1 | infrastructure by design |
@@ -28,9 +28,9 @@ them: `DARK_UI`, `DARK_API`, `BROKEN_CHAIN`. The route plane is owned by
 
 | table | dev | prod | jpa | code refs | reason |
 |---|---|---|---|---|---|
-| `risk.kri_breach_events` | ABSENT | 0 | 0 | 0 | absent from dev, 0 row(s) in prod; a drop migration exists (V247__drop_legacy_kri_tables.sql, V337__drop_legacy_kri_tables_reissue.sql) and applies on the next Flyway run |
-| `risk.kri_definitions` | ABSENT | 0 | 0 | 0 | absent from dev, 0 row(s) in prod; a drop migration exists (V247__drop_legacy_kri_tables.sql, V337__drop_legacy_kri_tables_reissue.sql) and applies on the next Flyway run |
-| `risk.kri_readings` | ABSENT | 0 | 0 | 0 | absent from dev, 0 row(s) in prod; a drop migration exists (V247__drop_legacy_kri_tables.sql, V337__drop_legacy_kri_tables_reissue.sql) and applies on the next Flyway run |
+| `risk.kri_breach_events` | ABSENT | 0 | 0 | 0 | absent from dev, 0 row(s) in prod; dropped by V337__drop_legacy_kri_tables_reissue.sql, above the V292 baseline, so it applies on the next Flyway run (V247__drop_legacy_kri_tables.sql also drops it but is at or below the baseline and can never run) |
+| `risk.kri_definitions` | ABSENT | 0 | 0 | 0 | absent from dev, 0 row(s) in prod; dropped by V337__drop_legacy_kri_tables_reissue.sql, above the V292 baseline, so it applies on the next Flyway run (V247__drop_legacy_kri_tables.sql also drops it but is at or below the baseline and can never run) |
+| `risk.kri_readings` | ABSENT | 0 | 0 | 0 | absent from dev, 0 row(s) in prod; dropped by V337__drop_legacy_kri_tables_reissue.sql, above the V292 baseline, so it applies on the next Flyway run (V247__drop_legacy_kri_tables.sql also drops it but is at or below the baseline and can never run) |
 
 ## ORPHAN_CONFIRMED (10)
 

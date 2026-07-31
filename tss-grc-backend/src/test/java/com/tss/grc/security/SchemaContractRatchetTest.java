@@ -126,16 +126,49 @@ class SchemaContractRatchetTest {
     private static final int BASELINE_MAPPED_WITHOUT_MIGRATION = 67;
 
     /**
+     * <b>11, measured 2026-07-31, and it must only ever decrease.</b>
+     *
+     * <p>Mapped <em>schemas</em> that no migration creates: {@code cpty, data_officer, dataclass,
+     * fraud, openbanking, opres, outsourcing, reginspect, regreporting, rrp, sharia}. Forty schemas
+     * have a {@code CREATE SCHEMA}; these eleven exist only because the Python bootstrap made them.
+     *
+     * <p><b>Why this needs its own ratchet:</b> a second-model review pointed out that
+     * {@link #BASELINE_MAPPED_WITHOUT_MIGRATION} could be driven to <em>zero</em> while
+     * {@code flyway:migrate} on an empty database still died on the first
+     * {@code CREATE TABLE sharia.…}, because the schema it belongs to would not exist. The table
+     * ratchet would read 0 and the claim "the migrations can build the platform" would still be
+     * false. A gate that can reach green while the property it stands for is broken is not a gate.
+     */
+    private static final int BASELINE_MAPPED_SCHEMAS_WITHOUT_MIGRATION = 11;
+
+    /**
      * Mapped tables deliberately not created by any migration in this repo, with the reason.
      * Empty today — and that is the point: an entry here is a documented exception, not a
      * silent pass. If something lands here, the reason must survive a reader who was not present.
      */
     private static final Map<String, String> NOT_MIGRATION_CREATED = Map.of();
 
+    /**
+     * The register's exact column order, asserted rather than assumed.
+     *
+     * <p>The F2-64 gate reads {@code rows_dev} and {@code rows_prod} positionally. If
+     * {@code table_xref.py} ever reorders or renames a column, those indices would silently read
+     * the wrong fields, no row would ever match {@code ABSENT}/{@code ABSENT}, and the gate would go
+     * <b>permanently green</b> while checking nothing. Positional reads need a pinned header.
+     */
+    private static final List<String> REGISTER_HEADER = List.of(
+        "schema", "table", "code", "source", "rows_dev", "rows_prod", "jpa_files", "code_refs",
+        "test_refs", "migrations", "mig_inserts", "py_refs", "py_inserts", "reason");
+
+    /** 468 rows today. A register that shrank by a tenth is a broken scan, not a smaller platform. */
+    private static final int MIN_REGISTER_ROWS = 400;
+
     private static final Pattern CREATE_TABLE = Pattern.compile(
         "CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?\\[?(\\w+)\\]?\\s*\\.\\s*\\[?(\\w+)\\]?",
         Pattern.CASE_INSENSITIVE);
     private static final Pattern MIGRATION_NAME = Pattern.compile("^V(\\d+)__.*\\.sql$");
+    private static final Pattern CREATE_SCHEMA = Pattern.compile(
+        "CREATE\\s+SCHEMA\\s+\\[?(\\w+)\\]?", Pattern.CASE_INSENSITIVE);
 
     // ── the assertions ───────────────────────────────────────────────────────
 
@@ -191,21 +224,10 @@ class SchemaContractRatchetTest {
      */
     @Test
     void noMappedTableIsUncreatableAndAbsentFromBothDatabases() throws IOException {
-        Path register = Paths.get("..", "TSS-GRC-Platform-Bible", "Appendix",
-                                  "TABLE_DISPOSITION_REGISTER.csv").toAbsolutePath().normalize();
-        assertThat(Files.exists(register)).as(
-            "The committed table register is missing at %s. Regenerate it with "
-            + "`py TSS-GRC-Platform-Bible/Appendix/scripts/table_xref.py`. This test refuses to pass "
-            + "without it rather than degrade into a no-op.", register)
-            .isTrue();
+        List<String[]> rows = registerRows();
 
         Set<String> absentFromBoth = new LinkedHashSet<>();
-        List<String> lines = Files.readAllLines(register);
-        for (String line : lines.subList(1, lines.size())) {
-            String[] f = line.split(",", -1);
-            if (f.length < 6) {
-                continue;
-            }
+        for (String[] f : rows) {
             if ("ABSENT".equalsIgnoreCase(f[4].trim()) && "ABSENT".equalsIgnoreCase(f[5].trim())) {
                 absentFromBoth.add(key(f[0].trim(), f[1].trim()));
             }
@@ -241,6 +263,105 @@ class SchemaContractRatchetTest {
 
             %s""".formatted(FLYWAY_BASELINE, String.join("\n            ", broken)))
             .isEmpty();
+    }
+
+    /**
+     * The register is evidence, so its own integrity is part of the contract.
+     *
+     * <p>⚠ <b>A second-model review found that
+     * {@link #noMappedTableIsUncreatableAndAbsentFromBothDatabases} is vacuously green today.</b>
+     * Not broken — <em>empty</em>: every {@code ABSENT} row in the committed register is one-sided
+     * (three prod-only KRI leftovers), so the loop that looks for absent-from-<em>both</em> iterates
+     * zero rows and the assertion holds without examining anything. That is fine as a statement
+     * about today, and useless as a gate, because the register only changes when a human runs
+     * {@code table_xref.py} against two live databases. A new F2-64 — an entity mapped over a table
+     * in neither database — would stay invisible until someone regenerated it.
+     *
+     * <p>So the gate is completed here, DB-free, by the one thing the source tree <em>can</em>
+     * settle: <b>the register must account for every table JPA maps.</b> Add an entity whose table
+     * is not in the register and this fails, telling you to regenerate — which is precisely the act
+     * that would surface the absent-from-both case. Plus the mechanical checks that stop the
+     * positional reads above from rotting: exact header, a row floor, and malformed rows failing
+     * instead of being skipped. The old loop skipped short rows with a bare {@code continue}; a
+     * truncated register would have quietly reduced the population to nothing.
+     */
+    @Test
+    void theRegisterIsWellFormedAndAccountsForEveryMappedTable() throws IOException {
+        List<String[]> rows = registerRows();
+
+        assertThat(rows.size()).as(
+            "The committed register has %d data rows. Under %d means a truncated or half-written "
+            + "file, and every positional check that reads it would narrow silently.",
+            rows.size(), MIN_REGISTER_ROWS)
+            .isGreaterThanOrEqualTo(MIN_REGISTER_ROWS);
+
+        Set<String> registered = new LinkedHashSet<>();
+        for (String[] f : rows) {
+            registered.add(key(f[0].trim(), f[1].trim()));
+        }
+
+        List<String> unregistered = new ArrayList<>();
+        for (var e : mappedTables().entrySet()) {
+            if (!registered.contains(e.getKey())) {
+                unregistered.add("%s  (mapped by %s)".formatted(e.getKey(), e.getValue()));
+            }
+        }
+        unregistered.sort(null);
+
+        assertThat(unregistered).as("""
+            %d JPA-mapped tables have no row in the committed register, so the register is STALE and \
+            the F2-64 gate cannot see them. Regenerate it:
+
+              py TSS-GRC-Platform-Bible/Appendix/scripts/table_xref.py
+
+            That needs both databases. It is the only step in this class that does — and it is the \
+            step that turns "a table exists on my machine" into checked-in evidence. Until it runs, \
+            an entity mapped over a table that exists nowhere reads as clean.
+
+            %s""".formatted(unregistered.size(), String.join("\n            ", unregistered)))
+            .isEmpty();
+    }
+
+    /**
+     * The companion ratchet to {@link #BASELINE_MAPPED_WITHOUT_MIGRATION}: schemas, not tables.
+     * Without it the table ratchet can reach zero while an empty-database build still fails on the
+     * first {@code CREATE TABLE} in a schema no migration declares.
+     */
+    @Test
+    void mappedSchemasWithNoCreateSchemaMigrationOnlyEverDecrease() throws IOException {
+        Set<String> created = new LinkedHashSet<>();
+        try (Stream<Path> files = Files.list(migrationDir())) {
+            for (Path p : files.filter(f -> f.getFileName().toString().endsWith(".sql")).toList()) {
+                Matcher m = CREATE_SCHEMA.matcher(Files.readString(p));
+                while (m.find()) {
+                    created.add(m.group(1).toLowerCase(Locale.ROOT));
+                }
+            }
+        }
+
+        assertThat(created).as(
+            "Parsed CREATE SCHEMA for %d schemas. Near-zero means the pattern stopped matching, "
+            + "which would turn this check green while checking nothing.", created.size())
+            .hasSizeGreaterThanOrEqualTo(20);
+
+        Set<String> mappedSchemas = new LinkedHashSet<>();
+        for (String table : mappedTables().keySet()) {
+            mappedSchemas.add(table.substring(0, table.indexOf('.')));
+        }
+        List<String> uncreated = mappedSchemas.stream().filter(s -> !created.contains(s)).sorted()
+            .toList();
+
+        assertThat(uncreated.size()).as("""
+            %d schemas hold JPA-mapped tables and are created by no migration (baseline %d):
+            %s
+
+            If this went UP, an entity was added in a schema the migrations never declare. Driving \
+            the TABLE ratchet to zero does not help: flyway:migrate on an empty database fails on \
+            the first CREATE TABLE in a schema that does not exist. Add CREATE SCHEMA above the \
+            Flyway baseline in the same migration as the tables.""".formatted(
+                uncreated.size(), BASELINE_MAPPED_SCHEMAS_WITHOUT_MIGRATION,
+                String.join(", ", uncreated)))
+            .isLessThanOrEqualTo(BASELINE_MAPPED_SCHEMAS_WITHOUT_MIGRATION);
     }
 
     @Test
@@ -350,6 +471,90 @@ class SchemaContractRatchetTest {
                 }
             }
         }
+        return out;
+    }
+
+    /**
+     * The committed register's data rows, header verified and quoting honoured.
+     *
+     * <p>The {@code reason} column contains commas, so a naive {@code split(",")} only worked by
+     * luck — the first six fields happen to be comma-free. Relying on that is how a positional read
+     * turns into a silent no-op after one generator change, so the header is pinned and the split
+     * respects quotes.
+     */
+    private static List<String[]> registerRows() throws IOException {
+        Path register = Paths.get("..", "TSS-GRC-Platform-Bible", "Appendix",
+                                  "TABLE_DISPOSITION_REGISTER.csv").toAbsolutePath().normalize();
+        assertThat(Files.exists(register)).as(
+            "The committed table register is missing at %s. Regenerate it with "
+            + "`py TSS-GRC-Platform-Bible/Appendix/scripts/table_xref.py`. This test refuses to pass "
+            + "without it rather than degrade into a no-op.", register)
+            .isTrue();
+
+        List<String> lines = Files.readAllLines(register);
+        assertThat(lines).as("The register at %s is empty.", register).isNotEmpty();
+
+        String head = lines.get(0).startsWith("﻿") ? lines.get(0).substring(1) : lines.get(0);
+        assertThat(splitCsv(head)).as(
+            "The register's columns changed. The F2-64 gate reads rows_dev/rows_prod by position, "
+            + "so a reordered or renamed column would make it read the wrong fields and pass "
+            + "forever. Update REGISTER_HEADER deliberately, together with the indices below it.")
+            .containsExactlyElementsOf(REGISTER_HEADER);
+
+        List<String[]> rows = new ArrayList<>();
+        List<String> malformed = new ArrayList<>();
+        for (int i = 1; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (line.isBlank()) {
+                continue;
+            }
+            List<String> f = splitCsv(line);
+            if (f.size() != REGISTER_HEADER.size()) {
+                malformed.add("line %d: %d fields, expected %d — %.80s"
+                    .formatted(i + 1, f.size(), REGISTER_HEADER.size(), line));
+                continue;
+            }
+            rows.add(f.toArray(new String[0]));
+        }
+
+        // The previous version skipped short rows with a bare `continue`, so a truncated register
+        // reduced the checked population toward zero without saying a word.
+        assertThat(malformed).as(
+            "Malformed register rows — a check that silently skips them is a check that shrinks "
+            + "its own population:\n  %s", String.join("\n  ", malformed))
+            .isEmpty();
+
+        return rows;
+    }
+
+    /** Minimal RFC-4180 field split: honours double quotes and doubled escapes. */
+    private static List<String> splitCsv(String line) {
+        List<String> out = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        boolean quoted = false;
+        for (int i = 0; i < line.length(); i++) {
+            char ch = line.charAt(i);
+            if (quoted) {
+                if (ch == '"') {
+                    if (i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                        cur.append('"');
+                        i++;
+                    } else {
+                        quoted = false;
+                    }
+                } else {
+                    cur.append(ch);
+                }
+            } else if (ch == '"') {
+                quoted = true;
+            } else if (ch == ',') {
+                out.add(cur.toString());
+                cur.setLength(0);
+            } else {
+                cur.append(ch);
+            }
+        }
+        out.add(cur.toString());
         return out;
     }
 

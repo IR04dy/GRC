@@ -242,7 +242,7 @@ outsourcing,ongoing_review,OPERATING,generated,7,7,1,0,0,0,0,3,2,mapped and carr
 outsourcing,outsourcing_arrangement,OPERATING,generated,20,20,1,0,0,0,0,3,2,mapped and carrying data
 outsourcing,outsourcing_event,OPERATING,generated,10,10,1,0,0,0,0,2,1,mapped and carrying data
 platform,attachments,OPERATING,generated,20,18,1,0,0,5,0,1,0,mapped and carrying data
-platform,audit_log,OPERATING,generated,6005,3934,1,1,0,8,1,1,0,mapped and carrying data
+platform,audit_log,OPERATING,generated,6009,3934,1,1,0,8,1,1,0,mapped and carrying data
 platform,authority_document_citations,OPERATING,generated,214,214,1,0,0,6,4,0,0,mapped and carrying data
 platform,authority_documents,OPERATING,generated,19,19,1,0,0,7,1,0,0,mapped and carrying data
 platform,automation_rule_runs,OPERATING,generated,252,157,1,0,0,1,0,0,0,mapped and carrying data
@@ -269,7 +269,7 @@ platform,notifications,OPERATING,generated,390,361,1,0,0,2,0,0,0,mapped and carr
 platform,organisation_licenses,OPERATING,generated,22,22,1,0,0,2,2,1,1,mapped and carrying data
 platform,organisations,OPERATING,generated,3,3,1,0,0,7,1,1,0,mapped and carrying data
 platform,persistence_row,WIRED_UNPROVEN,generated,0,ABSENT,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
-platform,refresh_token,OPERATING,generated,1822,1058,1,0,0,1,0,0,0,mapped and carrying data
+platform,refresh_token,OPERATING,generated,1824,1058,1,0,0,1,0,0,0,mapped and carrying data
 platform,risk_control_links,OPERATING,generated,24,24,1,0,0,3,1,0,0,mapped and carrying data
 platform,saved_views,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 platform,signatures,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
@@ -328,11 +328,11 @@ risk,bowtie_preventive_control,OPERATING,generated,5,5,1,0,0,3,1,0,0,mapped and 
 risk,bowtie_threat,OPERATING,generated,4,4,1,0,0,2,1,0,0,mapped and carrying data
 risk,emerging_risks,OPERATING,generated,10,10,1,0,0,1,1,0,0,mapped and carrying data
 risk,kri_breach,OPERATING,generated,32,32,1,0,0,3,1,1,0,mapped and carrying data
-risk,kri_breach_events,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,5,0,1,0,"absent from dev, 0 row(s) in prod; a drop migration exists (V247__drop_legacy_kri_tables.sql, V337__drop_legacy_kri_tables_reissue.sql) and applies on the next Flyway run"
+risk,kri_breach_events,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,5,0,1,0,"absent from dev, 0 row(s) in prod; dropped by V337__drop_legacy_kri_tables_reissue.sql, above the V292 baseline, so it applies on the next Flyway run (V247__drop_legacy_kri_tables.sql also drops it but is at or below the baseline and can never run)"
 risk,kri_definition,OPERATING,generated,21,21,1,0,0,4,2,1,0,mapped and carrying data
-risk,kri_definitions,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,7,0,1,0,"absent from dev, 0 row(s) in prod; a drop migration exists (V247__drop_legacy_kri_tables.sql, V337__drop_legacy_kri_tables_reissue.sql) and applies on the next Flyway run"
+risk,kri_definitions,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,7,0,1,0,"absent from dev, 0 row(s) in prod; dropped by V337__drop_legacy_kri_tables_reissue.sql, above the V292 baseline, so it applies on the next Flyway run (V247__drop_legacy_kri_tables.sql also drops it but is at or below the baseline and can never run)"
 risk,kri_measurement,OPERATING,generated,155,155,1,0,0,3,1,2,1,mapped and carrying data
-risk,kri_readings,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,5,1,1,0,"absent from dev, 0 row(s) in prod; a drop migration exists (V247__drop_legacy_kri_tables.sql, V337__drop_legacy_kri_tables_reissue.sql) and applies on the next Flyway run"
+risk,kri_readings,PROD_ONLY_LEFTOVER,generated,ABSENT,0,0,0,0,5,1,1,0,"absent from dev, 0 row(s) in prod; dropped by V337__drop_legacy_kri_tables_reissue.sql, above the V292 baseline, so it applies on the next Flyway run (V247__drop_legacy_kri_tables.sql also drops it but is at or below the baseline and can never run)"
 risk,methodology_config,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
 risk,risk_acceptances,OPERATING,generated,5,5,1,0,0,1,0,0,0,mapped and carrying data
 risk,risk_appetite_statements,OPERATING,generated,9,9,1,1,0,1,0,0,0,mapped and carrying data
