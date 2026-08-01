@@ -117,9 +117,14 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 
 1. **Commit per verified slice**; work on a feature/fix branch.
 2. **Never merge to master without the user's explicit "merge"** command.
-3. **Authorization ratchet ≤ 62** — the suite enforces the count of unguarded
-   write endpoints; every new write endpoint needs a real
-   `hasPermission('MODULE','ACTION')` guard.
+3. **Authorization ratchet ≤ 21** — the suite enforces the count of unguarded
+   write endpoints (`ControllerAuthorizationRatchetTest.BASELINE_UNGUARDED_WRITE_ENDPOINTS`);
+   every new write endpoint needs a real `hasPermission('MODULE','ACTION')` guard.
+   ⚠ **This line said "≤ 62" for months** — three times the enforced ceiling, so it
+   invited waving through 41 unguarded endpoints the build in fact rejects. No ratchet
+   in the suite has ever been 62 (F2-69). The other enforced ceilings, for reference:
+   `BARE_EXPORT_CEILING` 32, `BASELINE_ENTITY_BOUND_WRITES` 214,
+   `BASELINE_PURE_ROLE_SITES` 537 — read the constant, never a prose summary of it.
 4. **Live-probe every slice** against the running stack (Python urllib + pyodbc),
    including guard 403s and SoD 409s; probe through the Vite proxy (:5173) when
    verifying what the browser does; use `admin` + `so_officer` for 4-eyes paths.

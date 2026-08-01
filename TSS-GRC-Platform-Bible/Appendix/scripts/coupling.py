@@ -1,6 +1,16 @@
 # Measure the real module graph of the TSS GRC backend + FE mock debt.
 # Output: JSON + markdown tables for the Bible's Module Independence Matrix.
+#
+# ⚠ F2-69 corrected the entity count here. This script used to detect entities with
+# `if "@Entity" in src` — a SUBSTRING test over RAW source, so `@EntityListeners`, `@EntityGraph` and
+# Javadoc prose all counted, and MEASURED_BASELINE.md published 417 for a tree with 413. It now uses
+# the strict, comment-stripped predicate from baseline_census.py, and reports entity CLASSES as well
+# as entity FILES — one `@Entity` per file is not one entity per file (`data_officer/entity/Entities.java`
+# declares 14). Prefer `baseline_census.py` for headline figures; this script exists for the coupling
+# graph and for `coupling.json`, which verify2.py consumes.
 import os, re, json, collections
+
+from baseline_census import strip_java, ENTITY_STRICT
 
 ROOT = r"D:\AYMAN\GRC"
 MOD  = os.path.join(ROOT, r"tss-grc-backend\src\main\java\com\tss\grc\module")
@@ -15,7 +25,7 @@ PREAUTH  = re.compile(r"hasPermission\(\s*'([A-Z_]+)'\s*,\s*'([A-Z_]+)'\s*\)")
 TESTM    = re.compile(r'@(Test|ParameterizedTest|RepeatedTest)\b')
 
 mods = sorted(d for d in os.listdir(MOD) if os.path.isdir(os.path.join(MOD, d)))
-stat = {m: dict(loc=0, files=0, entities=0, controllers=0, endpoints=0, repos=0,
+stat = {m: dict(loc=0, files=0, entities=0, entity_classes=0, controllers=0, endpoints=0, repos=0,
                 services=0, schemas=set(), perms=set(), out=collections.Counter(),
                 tests=0, testfiles=0) for m in mods}
 
@@ -25,11 +35,14 @@ for m in mods:
         for fn in fns:
             if not fn.endswith(".java"): continue
             p = os.path.join(dp, fn)
-            src = open(p, encoding="utf-8", errors="replace").read()
+            raw = open(p, encoding="utf-8", errors="replace").read()
+            src = strip_java(raw)          # F2-69: every annotation predicate below is code-only now
             s = stat[m]
-            s["loc"] += src.count("\n") + 1
+            s["loc"] += raw.count("\n") + 1                 # LoC is deliberately raw (documented rule)
             s["files"] += 1
-            if "@Entity" in src: s["entities"] += 1
+            n_ent = len(ENTITY_STRICT.findall(src))
+            if n_ent: s["entities"] += 1                    # files declaring an entity
+            s["entity_classes"] += n_ent                    # entity classes declared
             if "@RestController" in src or "@Controller" in src: s["controllers"] += 1
             if "@Repository" in src or "extends JpaRepository" in src: s["repos"] += 1
             if "@Service" in src: s["services"] += 1
@@ -75,6 +88,7 @@ for m in mods:
     s = stat[m]
     peers = {k: v for k, v in s["out"].items() if k != "<kernel>"}
     rows.append(dict(module=m, loc=s["loc"], files=s["files"], entities=s["entities"],
+                     entity_classes=s["entity_classes"],
                      controllers=s["controllers"], endpoints=s["endpoints"], repos=s["repos"],
                      services=s["services"], schemas=sorted(s["schemas"]),
                      perms=sorted(s["perms"]), tests=s["tests"], testfiles=s["testfiles"],
@@ -108,8 +122,9 @@ print(f"{'module':22} {'LoC':>6} {'ent':>4} {'ep':>4} {'tests':>6} {'out':>4} {'
 for r in sorted(rows, key=lambda r: -r["loc"]):
     print(f"{r['module']:22} {r['loc']:6} {r['entities']:4} {r['endpoints']:4} {r['tests']:6} "
           f"{r['fan_out']:4} {r['fan_out_edges']:6} {r['fan_in']:3}  {','.join(r['schemas'])[:46]}")
-print("\nTOTALS  LoC=%d entities=%d endpoints=%d tests=%d" % (
+print("\nTOTALS  LoC=%d entity-files=%d entity-classes=%d endpoints=%d tests=%d" % (
     sum(r['loc'] for r in rows), sum(r['entities'] for r in rows),
+    sum(r['entity_classes'] for r in rows),
     sum(r['endpoints'] for r in rows), sum(r['tests'] for r in rows)))
 print("zero-test modules: %d -> %s" % (
     sum(1 for r in rows if r['tests'] == 0),

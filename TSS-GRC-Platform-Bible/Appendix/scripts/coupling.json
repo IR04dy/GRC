@@ -2,11 +2,12 @@
  "modules": [
   {
    "module": "admin",
-   "loc": 4919,
-   "files": 48,
+   "loc": 6116,
+   "files": 52,
    "entities": 14,
+   "entity_classes": 14,
    "controllers": 7,
-   "endpoints": 59,
+   "endpoints": 62,
    "repos": 14,
    "services": 9,
    "schemas": [
@@ -15,22 +16,24 @@
    "perms": [
     "ADMIN"
    ],
-   "tests": 90,
-   "testfiles": 5,
-   "fan_out": 2,
-   "fan_out_edges": 19,
+   "tests": 165,
+   "testfiles": 9,
+   "fan_out": 3,
+   "fan_out_edges": 29,
    "fan_in": 5,
    "peers": {
-    "platform": 18,
+    "platform": 26,
+    "iam": 2,
     "signature": 1
    },
-   "kernel": 13
+   "kernel": 14
   },
   {
    "module": "ai",
-   "loc": 3758,
+   "loc": 3821,
    "files": 32,
    "entities": 8,
+   "entity_classes": 8,
    "controllers": 5,
    "endpoints": 35,
    "repos": 8,
@@ -42,22 +45,23 @@
    "perms": [
     "AI"
    ],
-   "tests": 48,
-   "testfiles": 5,
+   "tests": 51,
+   "testfiles": 6,
    "fan_out": 2,
-   "fan_out_edges": 14,
+   "fan_out_edges": 19,
    "fan_in": 1,
    "peers": {
-    "platform": 12,
+    "platform": 17,
     "intake": 2
    },
    "kernel": 17
   },
   {
    "module": "aml",
-   "loc": 2165,
+   "loc": 2167,
    "files": 16,
    "entities": 4,
+   "entity_classes": 4,
    "controllers": 1,
    "endpoints": 14,
    "repos": 4,
@@ -69,18 +73,19 @@
    "tests": 47,
    "testfiles": 4,
    "fan_out": 1,
-   "fan_out_edges": 6,
+   "fan_out_edges": 7,
    "fan_in": 0,
    "peers": {
-    "platform": 6
+    "platform": 7
    },
    "kernel": 6
   },
   {
    "module": "approvals",
-   "loc": 470,
+   "loc": 472,
    "files": 6,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 5,
    "repos": 1,
@@ -99,13 +104,14 @@
    "peers": {
     "platform": 2
    },
-   "kernel": 3
+   "kernel": 4
   },
   {
    "module": "attachment",
-   "loc": 509,
-   "files": 7,
+   "loc": 949,
+   "files": 8,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 7,
    "repos": 1,
@@ -116,19 +122,20 @@
    "perms": [
     "EVIDENCE"
    ],
-   "tests": 0,
-   "testfiles": 0,
+   "tests": 15,
+   "testfiles": 2,
    "fan_out": 0,
    "fan_out_edges": 0,
    "fan_in": 2,
    "peers": {},
-   "kernel": 3
+   "kernel": 4
   },
   {
    "module": "audit_committee",
-   "loc": 1581,
+   "loc": 1583,
    "files": 8,
    "entities": 2,
+   "entity_classes": 2,
    "controllers": 1,
    "endpoints": 7,
    "repos": 2,
@@ -140,27 +147,28 @@
    "tests": 26,
    "testfiles": 2,
    "fan_out": 10,
-   "fan_out_edges": 29,
+   "fan_out_edges": 30,
    "fan_in": 0,
    "peers": {
     "compliance": 6,
     "sust": 4,
     "tprm": 4,
+    "platform": 3,
     "ai": 3,
     "capa": 2,
     "ccm": 2,
     "governance": 2,
     "incident": 2,
-    "platform": 2,
     "risk": 2
    },
    "kernel": 4
   },
   {
    "module": "audit_eng",
-   "loc": 354,
+   "loc": 358,
    "files": 6,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 5,
    "repos": 1,
@@ -173,17 +181,20 @@
    ],
    "tests": 0,
    "testfiles": 0,
-   "fan_out": 0,
-   "fan_out_edges": 0,
+   "fan_out": 1,
+   "fan_out_edges": 1,
    "fan_in": 0,
-   "peers": {},
-   "kernel": 3
+   "peers": {
+    "platform": 1
+   },
+   "kernel": 4
   },
   {
    "module": "audit_lc",
-   "loc": 3177,
+   "loc": 3194,
    "files": 28,
    "entities": 8,
+   "entity_classes": 8,
    "controllers": 3,
    "endpoints": 50,
    "repos": 8,
@@ -194,21 +205,22 @@
    "perms": [
     "AUDIT"
    ],
-   "tests": 58,
-   "testfiles": 5,
+   "tests": 62,
+   "testfiles": 6,
    "fan_out": 1,
-   "fan_out_edges": 7,
+   "fan_out_edges": 10,
    "fan_in": 2,
    "peers": {
-    "platform": 7
+    "platform": 10
    },
-   "kernel": 10
+   "kernel": 11
   },
   {
    "module": "auth",
-   "loc": 894,
+   "loc": 902,
    "files": 6,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 2,
    "endpoints": 7,
    "repos": 1,
@@ -230,9 +242,10 @@
   },
   {
    "module": "bcm",
-   "loc": 25130,
+   "loc": 25305,
    "files": 198,
    "entities": 50,
+   "entity_classes": 50,
    "controllers": 37,
    "endpoints": 261,
    "repos": 50,
@@ -243,13 +256,13 @@
    "perms": [
     "BCM"
    ],
-   "tests": 395,
+   "tests": 400,
    "testfiles": 31,
    "fan_out": 6,
-   "fan_out_edges": 88,
+   "fan_out_edges": 125,
    "fan_in": 2,
    "peers": {
-    "platform": 76,
+    "platform": 113,
     "tprm": 6,
     "cyber": 2,
     "capa": 2,
@@ -260,9 +273,10 @@
   },
   {
    "module": "bcm_lc",
-   "loc": 391,
+   "loc": 395,
    "files": 6,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 5,
    "repos": 1,
@@ -275,17 +289,20 @@
    ],
    "tests": 6,
    "testfiles": 1,
-   "fan_out": 0,
-   "fan_out_edges": 0,
+   "fan_out": 1,
+   "fan_out_edges": 1,
    "fan_in": 0,
-   "peers": {},
-   "kernel": 3
+   "peers": {
+    "platform": 1
+   },
+   "kernel": 4
   },
   {
    "module": "board_pack",
-   "loc": 353,
+   "loc": 449,
    "files": 6,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 5,
    "repos": 1,
@@ -293,20 +310,25 @@
    "schemas": [
     "board_pack"
    ],
-   "perms": [],
-   "tests": 0,
-   "testfiles": 0,
-   "fan_out": 0,
-   "fan_out_edges": 0,
+   "perms": [
+    "ADMIN"
+   ],
+   "tests": 11,
+   "testfiles": 1,
+   "fan_out": 1,
+   "fan_out_edges": 1,
    "fan_in": 0,
-   "peers": {},
-   "kernel": 3
+   "peers": {
+    "platform": 1
+   },
+   "kernel": 4
   },
   {
    "module": "capa",
-   "loc": 464,
+   "loc": 512,
    "files": 6,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 6,
    "repos": 1,
@@ -325,13 +347,14 @@
    "peers": {
     "platform": 2
    },
-   "kernel": 3
+   "kernel": 5
   },
   {
    "module": "ccm",
-   "loc": 2031,
+   "loc": 2033,
    "files": 22,
    "entities": 2,
+   "entity_classes": 2,
    "controllers": 1,
    "endpoints": 10,
    "repos": 2,
@@ -343,18 +366,19 @@
    "tests": 39,
    "testfiles": 5,
    "fan_out": 1,
-   "fan_out_edges": 4,
+   "fan_out_edges": 5,
    "fan_in": 2,
    "peers": {
-    "platform": 4
+    "platform": 5
    },
    "kernel": 4
   },
   {
    "module": "change_mgmt",
-   "loc": 2022,
-   "files": 19,
+   "loc": 2290,
+   "files": 20,
    "entities": 7,
+   "entity_classes": 7,
    "controllers": 1,
    "endpoints": 30,
    "repos": 7,
@@ -365,23 +389,24 @@
    "perms": [
     "CHANGE"
    ],
-   "tests": 36,
-   "testfiles": 2,
+   "tests": 56,
+   "testfiles": 4,
    "fan_out": 3,
-   "fan_out_edges": 12,
+   "fan_out_edges": 13,
    "fan_in": 1,
    "peers": {
-    "platform": 6,
+    "platform": 7,
     "admin": 3,
     "incident": 3
    },
-   "kernel": 4
+   "kernel": 5
   },
   {
    "module": "compliance",
-   "loc": 5659,
+   "loc": 5723,
    "files": 52,
    "entities": 11,
+   "entity_classes": 11,
    "controllers": 8,
    "endpoints": 81,
    "repos": 11,
@@ -397,10 +422,10 @@
    "tests": 107,
    "testfiles": 9,
    "fan_out": 5,
-   "fan_out_edges": 27,
+   "fan_out_edges": 35,
    "fan_in": 4,
    "peers": {
-    "platform": 14,
+    "platform": 22,
     "policy": 5,
     "risk": 4,
     "attachment": 2,
@@ -410,9 +435,10 @@
   },
   {
    "module": "consumer",
-   "loc": 1420,
+   "loc": 1422,
    "files": 10,
    "entities": 3,
+   "entity_classes": 3,
    "controllers": 1,
    "endpoints": 11,
    "repos": 3,
@@ -424,10 +450,10 @@
    "tests": 20,
    "testfiles": 2,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 0,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
    "kernel": 6
   },
@@ -436,6 +462,7 @@
    "loc": 384,
    "files": 7,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 3,
    "repos": 1,
@@ -458,9 +485,10 @@
   },
   {
    "module": "cpty",
-   "loc": 1688,
+   "loc": 1690,
    "files": 14,
    "entities": 5,
+   "entity_classes": 5,
    "controllers": 1,
    "endpoints": 14,
    "repos": 5,
@@ -472,18 +500,19 @@
    "tests": 0,
    "testfiles": 0,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 0,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
    "kernel": 7
   },
   {
    "module": "cyber",
-   "loc": 7269,
+   "loc": 7285,
    "files": 68,
    "entities": 16,
+   "entity_classes": 16,
    "controllers": 7,
    "endpoints": 98,
    "repos": 16,
@@ -497,10 +526,10 @@
    "tests": 117,
    "testfiles": 20,
    "fan_out": 4,
-   "fan_out_edges": 29,
+   "fan_out_edges": 36,
    "fan_in": 3,
    "peers": {
-    "platform": 23,
+    "platform": 30,
     "evidence": 3,
     "policy": 2,
     "incident": 1
@@ -509,9 +538,10 @@
   },
   {
    "module": "cyber_lc",
-   "loc": 506,
+   "loc": 532,
    "files": 6,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 5,
    "repos": 1,
@@ -525,18 +555,19 @@
    "tests": 11,
    "testfiles": 1,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 0,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
-   "kernel": 3
+   "kernel": 5
   },
   {
    "module": "dashboard",
    "loc": 362,
    "files": 8,
    "entities": 0,
+   "entity_classes": 0,
    "controllers": 1,
    "endpoints": 8,
    "repos": 0,
@@ -563,9 +594,10 @@
   },
   {
    "module": "data_officer",
-   "loc": 2373,
+   "loc": 2375,
    "files": 23,
    "entities": 1,
+   "entity_classes": 14,
    "controllers": 1,
    "endpoints": 37,
    "repos": 14,
@@ -579,18 +611,19 @@
    "tests": 0,
    "testfiles": 0,
    "fan_out": 1,
-   "fan_out_edges": 1,
+   "fan_out_edges": 2,
    "fan_in": 0,
    "peers": {
-    "platform": 1
+    "platform": 2
    },
    "kernel": 2
   },
   {
    "module": "dataclass",
-   "loc": 988,
+   "loc": 990,
    "files": 12,
    "entities": 4,
+   "entity_classes": 4,
    "controllers": 1,
    "endpoints": 13,
    "repos": 4,
@@ -602,10 +635,10 @@
    "tests": 0,
    "testfiles": 0,
    "fan_out": 1,
-   "fan_out_edges": 1,
+   "fan_out_edges": 2,
    "fan_in": 0,
    "peers": {
-    "platform": 1
+    "platform": 2
    },
    "kernel": 6
   },
@@ -614,6 +647,7 @@
    "loc": 18,
    "files": 1,
    "entities": 0,
+   "entity_classes": 0,
    "controllers": 0,
    "endpoints": 0,
    "repos": 0,
@@ -630,9 +664,10 @@
   },
   {
    "module": "ethics",
-   "loc": 4841,
+   "loc": 4960,
    "files": 46,
    "entities": 14,
+   "entity_classes": 14,
    "controllers": 7,
    "endpoints": 72,
    "repos": 14,
@@ -643,21 +678,22 @@
    "perms": [
     "COMPLIANCE"
    ],
-   "tests": 83,
-   "testfiles": 6,
+   "tests": 92,
+   "testfiles": 7,
    "fan_out": 1,
-   "fan_out_edges": 8,
+   "fan_out_edges": 15,
    "fan_in": 1,
    "peers": {
-    "platform": 8
+    "platform": 15
    },
-   "kernel": 22
+   "kernel": 23
   },
   {
    "module": "evidence",
    "loc": 3683,
    "files": 55,
    "entities": 11,
+   "entity_classes": 11,
    "controllers": 7,
    "endpoints": 37,
    "repos": 11,
@@ -681,9 +717,10 @@
   },
   {
    "module": "fraud",
-   "loc": 1301,
+   "loc": 1327,
    "files": 10,
    "entities": 3,
+   "entity_classes": 3,
    "controllers": 1,
    "endpoints": 10,
    "repos": 3,
@@ -691,14 +728,16 @@
    "schemas": [
     "fraud"
    ],
-   "perms": [],
-   "tests": 0,
-   "testfiles": 0,
+   "perms": [
+    "FRAUD"
+   ],
+   "tests": 4,
+   "testfiles": 1,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 0,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
    "kernel": 5
   },
@@ -707,6 +746,7 @@
    "loc": 1857,
    "files": 13,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 2,
    "endpoints": 7,
    "repos": 1,
@@ -715,8 +755,8 @@
     "platform"
    ],
    "perms": [],
-   "tests": 30,
-   "testfiles": 4,
+   "tests": 43,
+   "testfiles": 6,
    "fan_out": 8,
    "fan_out_edges": 32,
    "fan_in": 1,
@@ -734,11 +774,12 @@
   },
   {
    "module": "iam",
-   "loc": 3913,
+   "loc": 4140,
    "files": 37,
-   "entities": 10,
+   "entities": 9,
+   "entity_classes": 9,
    "controllers": 4,
-   "endpoints": 36,
+   "endpoints": 37,
    "repos": 9,
    "services": 10,
    "schemas": [
@@ -747,21 +788,22 @@
    "perms": [
     "IAM"
    ],
-   "tests": 31,
-   "testfiles": 4,
+   "tests": 55,
+   "testfiles": 6,
    "fan_out": 1,
-   "fan_out_edges": 19,
-   "fan_in": 9,
+   "fan_out_edges": 21,
+   "fan_in": 10,
    "peers": {
-    "platform": 19
+    "platform": 21
    },
-   "kernel": 19
+   "kernel": 20
   },
   {
    "module": "incident",
-   "loc": 1585,
+   "loc": 1589,
    "files": 13,
    "entities": 2,
+   "entity_classes": 2,
    "controllers": 2,
    "endpoints": 22,
    "repos": 2,
@@ -776,11 +818,11 @@
    "tests": 31,
    "testfiles": 2,
    "fan_out": 2,
-   "fan_out_edges": 7,
+   "fan_out_edges": 9,
    "fan_in": 5,
    "peers": {
     "capa": 5,
-    "platform": 2
+    "platform": 4
    },
    "kernel": 6
   },
@@ -789,6 +831,7 @@
    "loc": 662,
    "files": 9,
    "entities": 2,
+   "entity_classes": 2,
    "controllers": 1,
    "endpoints": 4,
    "repos": 1,
@@ -809,9 +852,10 @@
   },
   {
    "module": "integrations",
-   "loc": 7568,
+   "loc": 7654,
    "files": 68,
    "entities": 6,
+   "entity_classes": 6,
    "controllers": 6,
    "endpoints": 24,
    "repos": 6,
@@ -819,9 +863,12 @@
    "schemas": [
     "platform"
    ],
-   "perms": [],
-   "tests": 119,
-   "testfiles": 15,
+   "perms": [
+    "CYBER",
+    "INTEGRATIONS"
+   ],
+   "tests": 127,
+   "testfiles": 17,
    "fan_out": 3,
    "fan_out_edges": 21,
    "fan_in": 0,
@@ -834,9 +881,10 @@
   },
   {
    "module": "knowledge",
-   "loc": 355,
+   "loc": 442,
    "files": 6,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 6,
    "repos": 1,
@@ -844,20 +892,23 @@
    "schemas": [
     "kb"
    ],
-   "perms": [],
-   "tests": 0,
-   "testfiles": 0,
+   "perms": [
+    "KB"
+   ],
+   "tests": 5,
+   "testfiles": 1,
    "fan_out": 0,
    "fan_out_edges": 0,
    "fan_in": 0,
    "peers": {},
-   "kernel": 3
+   "kernel": 4
   },
   {
    "module": "nca_ecc",
-   "loc": 368,
+   "loc": 370,
    "files": 6,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 6,
    "repos": 1,
@@ -871,17 +922,20 @@
    ],
    "tests": 0,
    "testfiles": 0,
-   "fan_out": 0,
-   "fan_out_edges": 0,
+   "fan_out": 1,
+   "fan_out_edges": 1,
    "fan_in": 0,
-   "peers": {},
+   "peers": {
+    "platform": 1
+   },
    "kernel": 3
   },
   {
    "module": "ndi",
-   "loc": 7717,
+   "loc": 7863,
    "files": 62,
    "entities": 15,
+   "entity_classes": 15,
    "controllers": 14,
    "endpoints": 127,
    "repos": 15,
@@ -892,22 +946,23 @@
    "perms": [
     "NDI"
    ],
-   "tests": 11,
-   "testfiles": 2,
+   "tests": 19,
+   "testfiles": 3,
    "fan_out": 2,
-   "fan_out_edges": 7,
+   "fan_out_edges": 21,
    "fan_in": 1,
    "peers": {
-    "platform": 5,
+    "platform": 19,
     "risk": 2
    },
    "kernel": 22
   },
   {
    "module": "openbanking",
-   "loc": 1913,
+   "loc": 1915,
    "files": 14,
    "entities": 5,
+   "entity_classes": 5,
    "controllers": 1,
    "endpoints": 18,
    "repos": 5,
@@ -919,18 +974,19 @@
    "tests": 0,
    "testfiles": 0,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 0,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
    "kernel": 7
   },
   {
    "module": "opres",
-   "loc": 950,
+   "loc": 952,
    "files": 10,
    "entities": 3,
+   "entity_classes": 3,
    "controllers": 1,
    "endpoints": 9,
    "repos": 3,
@@ -942,18 +998,19 @@
    "tests": 0,
    "testfiles": 0,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 0,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
    "kernel": 5
   },
   {
    "module": "outsourcing",
-   "loc": 1655,
+   "loc": 1657,
    "files": 14,
    "entities": 5,
+   "entity_classes": 5,
    "controllers": 1,
    "endpoints": 17,
    "repos": 5,
@@ -965,20 +1022,21 @@
    "tests": 0,
    "testfiles": 0,
    "fan_out": 1,
-   "fan_out_edges": 1,
+   "fan_out_edges": 2,
    "fan_in": 0,
    "peers": {
-    "platform": 1
+    "platform": 2
    },
    "kernel": 7
   },
   {
    "module": "platform",
-   "loc": 11701,
-   "files": 109,
+   "loc": 12904,
+   "files": 113,
    "entities": 24,
-   "controllers": 20,
-   "endpoints": 122,
+   "entity_classes": 24,
+   "controllers": 19,
+   "endpoints": 125,
    "repos": 22,
    "services": 21,
    "schemas": [
@@ -995,11 +1053,11 @@
     "REGULATORY",
     "RISK"
    ],
-   "tests": 169,
-   "testfiles": 21,
+   "tests": 246,
+   "testfiles": 31,
    "fan_out": 9,
    "fan_out_edges": 34,
-   "fan_in": 45,
+   "fan_in": 50,
    "peers": {
     "risk": 14,
     "evidence": 5,
@@ -1011,13 +1069,14 @@
     "privacy_lc": 2,
     "iam": 2
    },
-   "kernel": 41
+   "kernel": 42
   },
   {
    "module": "policy",
-   "loc": 1774,
+   "loc": 1778,
    "files": 13,
    "entities": 5,
+   "entity_classes": 5,
    "controllers": 1,
    "endpoints": 27,
    "repos": 5,
@@ -1031,10 +1090,10 @@
    "tests": 39,
    "testfiles": 1,
    "fan_out": 4,
-   "fan_out_edges": 14,
+   "fan_out_edges": 15,
    "fan_in": 5,
    "peers": {
-    "platform": 6,
+    "platform": 7,
     "attachment": 3,
     "admin": 3,
     "compliance": 2
@@ -1043,9 +1102,10 @@
   },
   {
    "module": "privacy",
-   "loc": 5804,
+   "loc": 5947,
    "files": 63,
    "entities": 16,
+   "entity_classes": 16,
    "controllers": 12,
    "endpoints": 99,
    "repos": 16,
@@ -1057,22 +1117,23 @@
     "CYBER",
     "PRIVACY"
    ],
-   "tests": 79,
-   "testfiles": 7,
+   "tests": 84,
+   "testfiles": 8,
    "fan_out": 2,
-   "fan_out_edges": 12,
+   "fan_out_edges": 24,
    "fan_in": 3,
    "peers": {
-    "platform": 11,
+    "platform": 23,
     "tprm": 1
    },
-   "kernel": 26
+   "kernel": 28
   },
   {
    "module": "privacy_lc",
-   "loc": 416,
+   "loc": 420,
    "files": 6,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 5,
    "repos": 1,
@@ -1086,18 +1147,19 @@
    "tests": 10,
    "testfiles": 1,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 2,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
-   "kernel": 3
+   "kernel": 4
   },
   {
    "module": "regchange",
-   "loc": 444,
+   "loc": 448,
    "files": 6,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 5,
    "repos": 1,
@@ -1111,18 +1173,19 @@
    "tests": 6,
    "testfiles": 1,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 0,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
-   "kernel": 3
+   "kernel": 4
   },
   {
    "module": "reginspect",
-   "loc": 1160,
+   "loc": 1162,
    "files": 10,
    "entities": 3,
+   "entity_classes": 3,
    "controllers": 1,
    "endpoints": 10,
    "repos": 3,
@@ -1134,18 +1197,19 @@
    "tests": 0,
    "testfiles": 0,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 0,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
    "kernel": 5
   },
   {
    "module": "regreporting",
-   "loc": 1628,
+   "loc": 1630,
    "files": 10,
    "entities": 3,
+   "entity_classes": 3,
    "controllers": 1,
    "endpoints": 17,
    "repos": 3,
@@ -1157,53 +1221,57 @@
    "tests": 0,
    "testfiles": 0,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 0,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
    "kernel": 5
   },
   {
    "module": "reporting",
-   "loc": 3610,
-   "files": 15,
+   "loc": 4193,
+   "files": 17,
    "entities": 2,
+   "entity_classes": 2,
    "controllers": 2,
-   "endpoints": 27,
+   "endpoints": 28,
    "repos": 2,
-   "services": 7,
+   "services": 8,
    "schemas": [
     "reporting"
    ],
    "perms": [
+    "BOARD",
     "CHANGE",
     "COMPLIANCE",
+    "REGULATORY",
     "REPORTING",
     "RISK"
    ],
    "tests": 26,
    "testfiles": 9,
    "fan_out": 8,
-   "fan_out_edges": 94,
+   "fan_out_edges": 85,
    "fan_in": 0,
    "peers": {
-    "platform": 35,
-    "risk": 22,
-    "compliance": 13,
-    "change_mgmt": 12,
-    "ethics": 4,
+    "platform": 37,
+    "risk": 16,
+    "change_mgmt": 11,
+    "compliance": 11,
     "policy": 4,
     "evidence": 3,
+    "ethics": 2,
     "sust": 1
    },
-   "kernel": 12
+   "kernel": 11
   },
   {
    "module": "risk",
-   "loc": 8955,
+   "loc": 8983,
    "files": 99,
    "entities": 23,
+   "entity_classes": 23,
    "controllers": 14,
    "endpoints": 101,
    "repos": 23,
@@ -1217,10 +1285,10 @@
    "tests": 147,
    "testfiles": 14,
    "fan_out": 5,
-   "fan_out_edges": 28,
+   "fan_out_edges": 42,
    "fan_in": 8,
    "peers": {
-    "platform": 21,
+    "platform": 35,
     "admin": 2,
     "policy": 2,
     "iam": 2,
@@ -1230,10 +1298,11 @@
   },
   {
    "module": "risk_lc",
-   "loc": 584,
+   "loc": 611,
    "files": 7,
-   "entities": 3,
-   "controllers": 2,
+   "entities": 2,
+   "entity_classes": 2,
+   "controllers": 1,
    "endpoints": 5,
    "repos": 1,
    "services": 1,
@@ -1246,18 +1315,19 @@
    "tests": 6,
    "testfiles": 1,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 1,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
-   "kernel": 3
+   "kernel": 4
   },
   {
    "module": "rrp",
-   "loc": 1910,
+   "loc": 1912,
    "files": 14,
    "entities": 5,
+   "entity_classes": 5,
    "controllers": 1,
    "endpoints": 17,
    "repos": 5,
@@ -1269,18 +1339,19 @@
    "tests": 0,
    "testfiles": 0,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 0,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
    "kernel": 7
   },
   {
    "module": "scm",
-   "loc": 3808,
+   "loc": 3818,
    "files": 46,
-   "entities": 14,
+   "entities": 12,
+   "entity_classes": 12,
    "controllers": 5,
    "endpoints": 66,
    "repos": 12,
@@ -1293,19 +1364,21 @@
    ],
    "tests": 15,
    "testfiles": 1,
-   "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out": 2,
+   "fan_out_edges": 7,
    "fan_in": 1,
    "peers": {
+    "platform": 5,
     "tprm": 2
    },
    "kernel": 12
   },
   {
    "module": "sharia",
-   "loc": 2234,
+   "loc": 2236,
    "files": 16,
    "entities": 6,
+   "entity_classes": 6,
    "controllers": 1,
    "endpoints": 21,
    "repos": 6,
@@ -1317,10 +1390,10 @@
    "tests": 0,
    "testfiles": 0,
    "fan_out": 1,
-   "fan_out_edges": 2,
+   "fan_out_edges": 3,
    "fan_in": 0,
    "peers": {
-    "platform": 2
+    "platform": 3
    },
    "kernel": 8
   },
@@ -1329,6 +1402,7 @@
    "loc": 811,
    "files": 12,
    "entities": 2,
+   "entity_classes": 2,
    "controllers": 2,
    "endpoints": 10,
    "repos": 2,
@@ -1352,9 +1426,10 @@
   },
   {
    "module": "socops",
-   "loc": 6787,
+   "loc": 6799,
    "files": 101,
    "entities": 25,
+   "entity_classes": 25,
    "controllers": 22,
    "endpoints": 111,
    "repos": 25,
@@ -1362,7 +1437,9 @@
    "schemas": [
     "socops"
    ],
-   "perms": [],
+   "perms": [
+    "CYBER"
+   ],
    "tests": 36,
    "testfiles": 6,
    "fan_out": 3,
@@ -1377,9 +1454,10 @@
   },
   {
    "module": "sust",
-   "loc": 16704,
+   "loc": 16776,
    "files": 140,
    "entities": 34,
+   "entity_classes": 34,
    "controllers": 21,
    "endpoints": 226,
    "repos": 34,
@@ -1393,10 +1471,10 @@
    "tests": 200,
    "testfiles": 25,
    "fan_out": 5,
-   "fan_out_edges": 55,
+   "fan_out_edges": 76,
    "fan_in": 2,
    "peers": {
-    "platform": 42,
+    "platform": 63,
     "risk": 5,
     "evidence": 4,
     "iam": 2,
@@ -1406,9 +1484,10 @@
   },
   {
    "module": "tprm",
-   "loc": 5399,
+   "loc": 5527,
    "files": 43,
    "entities": 12,
+   "entity_classes": 12,
    "controllers": 6,
    "endpoints": 70,
    "repos": 12,
@@ -1419,13 +1498,13 @@
    "perms": [
     "TPRM"
    ],
-   "tests": 109,
-   "testfiles": 10,
+   "tests": 115,
+   "testfiles": 11,
    "fan_out": 5,
-   "fan_out_edges": 18,
+   "fan_out_edges": 24,
    "fan_in": 5,
    "peers": {
-    "platform": 12,
+    "platform": 18,
     "capa": 2,
     "scm": 2,
     "privacy": 1,
@@ -1435,9 +1514,10 @@
   },
   {
    "module": "workflow",
-   "loc": 5127,
+   "loc": 5266,
    "files": 45,
    "entities": 14,
+   "entity_classes": 14,
    "controllers": 5,
    "endpoints": 44,
    "repos": 14,
@@ -1457,8 +1537,8 @@
     "SCM",
     "WORKFLOW"
    ],
-   "tests": 99,
-   "testfiles": 6,
+   "tests": 114,
+   "testfiles": 8,
    "fan_out": 4,
    "fan_out_edges": 26,
    "fan_in": 1,
@@ -1475,6 +1555,7 @@
    "loc": 494,
    "files": 4,
    "entities": 1,
+   "entity_classes": 1,
    "controllers": 1,
    "endpoints": 6,
    "repos": 1,
@@ -1497,13 +1578,12 @@
   }
  ],
  "fe": {
-  "pages": 329,
-  "api_files": 236,
-  "mock_sites": 97,
+  "pages": 330,
+  "api_files": 239,
+  "mock_sites": 69,
   "mock_files": [
    "lib/auditLifecycle.ts",
    "lib/bcmLifecycle.ts",
-   "lib/boardPack.ts",
    "lib/mockWorkflows.ts",
    "lib/paTriggers.ts",
    "lib/processMining.ts",
@@ -1520,7 +1600,6 @@
    "pages/changes/ChangesPage.tsx",
    "pages/compliance/CompliancePage.tsx",
    "pages/cyber/CyberPage.tsx",
-   "pages/dashboard/widgets.tsx",
    "pages/detail/ControlDetailPage.tsx",
    "pages/detail/DpiaDetailPage.tsx",
    "pages/detail/FindingDetailPage.tsx",

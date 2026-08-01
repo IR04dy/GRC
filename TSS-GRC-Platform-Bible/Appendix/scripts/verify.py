@@ -1,5 +1,11 @@
 # Verify the surprising measurements before they go into the Bible.
+#
+# ⚠ F2-69: pass 2 below used `if "@Entity" not in src: continue` — a substring test over raw source, so
+# a repository with an @EntityGraph or a DTO whose Javadoc says @Entity was treated as an entity file.
+# It now uses the strict, comment-stripped predicate from baseline_census.py.
 import os, re, json, collections
+
+from baseline_census import strip_java, ENTITY_STRICT
 ROOT = r"D:\AYMAN\GRC"
 MODJ = os.path.join(ROOT, r"tss-grc-backend\src\main\java\com\tss\grc\module")
 FE   = os.path.join(ROOT, r"tss-grc-ui-v2\src")
@@ -20,8 +26,8 @@ for m in sorted(os.listdir(MODJ)):
     for dp, _, fns in os.walk(os.path.join(MODJ, m)):
         for fn in fns:
             if not fn.endswith(".java"): continue
-            src = open(os.path.join(dp, fn), encoding="utf-8", errors="replace").read()
-            if "@Entity" not in src: continue
+            src = strip_java(open(os.path.join(dp, fn), encoding="utf-8", errors="replace").read())
+            if not ENTITY_STRICT.search(src): continue
             for sc in SCHEMA.findall(src): own[m][sc] += 1
 for m, c in sorted(own.items()):
     foreign = {s: n for s, n in c.items() if s != m and not s.startswith(m)}
