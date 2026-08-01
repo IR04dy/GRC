@@ -123,8 +123,14 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
    ⚠ **This line said "≤ 62" for months** — three times the enforced ceiling, so it
    invited waving through 41 unguarded endpoints the build in fact rejects. No ratchet
    in the suite has ever been 62 (F2-69). The other enforced ceilings, for reference:
-   `BARE_EXPORT_CEILING` 32, `BASELINE_ENTITY_BOUND_WRITES` 214,
-   `BASELINE_PURE_ROLE_SITES` 537 — read the constant, never a prose summary of it.
+   `BASELINE_ENTITY_BOUND_WRITES` 214, `BASELINE_PURE_ROLE_SITES` 537 — read the
+   constant, never a prose summary of it. ⚠ **`BARE_EXPORT_CEILING` 32 is GONE** — F2-61(c)
+   swept it to zero and replaced it with an invariant
+   (`ExportAuthorizationRatchetTest.everyExportHandlerAlsoDemandsARead`): every
+   file-returning handler guarded by `MODULE:EXPORT` must AND a `READ` permission, with
+   two named exceptions in `EXPORT_WIDER_THAN_READ`. **A ceiling and an invariant are not
+   the same test** — a ceiling tolerates the population it measures, so once a sweep lands,
+   leaving the ceiling in place makes a tolerated guard indistinguishable from a reviewed one.
 4. **Live-probe every slice** against the running stack (Python urllib + pyodbc),
    including guard 403s and SoD 409s; probe through the Vite proxy (:5173) when
    verifying what the browser does; use `admin` + `so_officer` for 4-eyes paths.

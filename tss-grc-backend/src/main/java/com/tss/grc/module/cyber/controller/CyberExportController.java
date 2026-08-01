@@ -40,8 +40,12 @@ public class CyberExportController {
 
     private final CyberExportService exportService;
 
+    // F2-61(c) / ADR-017 D-10c — EXPORT is a containment: the CYBER:EXPORT population must be a
+    // SUBSET of CYBER:READ, because a file is a superset of a screen. Measured EXPORT ⊆ READ in both
+    // databases before this landed, so the AND costs no live principal anything; it is here so that
+    // a later grant (the way V320 Part 3 inverted BCM) cannot re-open the class.
     @GetMapping
-    @PreAuthorize("hasPermission('CYBER', 'EXPORT')")
+    @PreAuthorize("hasPermission('CYBER', 'EXPORT') and hasPermission('CYBER', 'READ')")
     @Operation(summary = "Export a cyber register (controls | vulnerabilities | assessments | incidents | "
             + "action-plans | evidence) as an Excel workbook or an Arabic-capable executive PDF. lang=ar renders Arabic titles.")
     public ResponseEntity<byte[]> export(@RequestParam String register,

@@ -623,6 +623,69 @@ teeth must re-review its grants in the same commit.
 > whose `EXPORT` is legitimately wider would lose live access on the day the AND lands. Ceiling pinned at 32 in
 > `ExportAuthorizationRatchetTest`: it may fall and must never rise.
 >
+> ### ✅ Closed 2026-08-01 — **F2-61(c): all 32, in one change, and the paragraph above got the reason for slicing backwards**
+>
+> The remainder is discharged. **All 32 now AND a `READ` permission** (33 counting `/board-pack.json`, which is
+> not file-returning but carries the identical guard by `BoardPackGuardTest`'s own assertion), leaving **36 of
+> the 38** `EXPORT`-guarded file handlers composed and **exactly two** documented exceptions.
+>
+> ⚠ **It was one code change, not the module-at-a-time revocation the paragraph above prescribes — and that
+> paragraph had the argument inverted.** "Module-sized with a probe each" is the right shape for a *grant*
+> revocation, because a revocation removes access and the loss has to be argued per module. This slice moved
+> the enforcement to the *guard*, where the collateral is not argued but **proved**: `export_grant_policy.py`
+> measures every affected module as `EXPORT ⊆ READ` in dev **and** production, so every principal that
+> satisfied the old guard satisfies the new one — no revocation, nothing to slice. **The instrument chosen
+> determines whether a change needs slicing at all**, and the deferral inherited a granularity from an
+> instrument it had already replaced.
+>
+> **Live, and the probe manufactured the shape rather than waiting for it.** No live role was inverted for any
+> of the 32, so a persona probe could only have shown 200-before and 200-after. Instead a `[REVIEW-TEST]` role
+> was given **11 `*:EXPORT` grants and no `READ` anywhere** — the exact shape V320 Part 3 produced by accident
+> — and probed against every endpoint. **Before: 33 of 33 served 200 with real bytes** (31,404-byte risk
+> register PDF, 40,404-byte board pack, 34,903-byte deck, 53,139-byte regulator evidence ZIP, 68,686-byte IAM
+> access-governance ZIP, 44,995 bytes of the whole tenant calendar) while the same token was refused **403 on
+> all seven module screens that answer** — risk, findings, changes, board packs, cyber controls, NDI reports,
+> SGI commitments. **After: 0 of 33**, with `so_officer`, `compliance`, `rmanager` and `viewer` unchanged in
+> **all 164 remaining cells**.
+>
+> **Exception (i) resolved concretely.** The two board-pack exports compose **`ADMIN:READ`** — not because
+> `BOARD:READ` is missing and something had to be picked, but because `ADMIN:READ` is the guard
+> `BoardPackController`'s own screen already carries (F2-05 slice 5). That makes it the containment this clause
+> asks for rather than a stand-in: a principal refused the board workspace cannot take the pack as a file.
+> `BOARD:EXPORT` is 8 roles, `ADMIN:READ` is 21, and the 8 are a measured subset of the 21 in both databases.
+>
+> ⚠ **Exception (ii) was over-broad as written, and the ratchet's version of it was hiding a handler.** This
+> clause says *"a role list is a second gate, and two gates satisfy the intent of one containment"* — and the
+> ratchet implemented that as a pattern, so **any** `has(Any)?Role(` counted as sufficient narrowing.
+> `SecurityEventController#export` (`CYBER:EXPORT` + a four-role list) sat inside that exemption **with no
+> claim to it**: measured in both databases, none of its four named roles holds `CYBER:EXPORT` without
+> `CYBER:READ`, so it satisfied the containment for free and was excused from stating so. It now ANDs
+> `CYBER:READ`. **Clause (ii) is therefore narrowed: a role list is not a reason on its own. The bar is a
+> named role that ANDing `READ` would measurably revoke** — which is true of exactly two handlers,
+> `MlModelController#export` (`AUDITOR`) and `BcpBinderController#download` (`CISO`, `CFO`). Both are now
+> enumerated by name in `ExportAuthorizationRatchetTest.EXPORT_WIDER_THAN_READ` instead of matched by pattern,
+> because a pattern-based exemption also lets the next handler dodge the rule by adding a role list. *An
+> exemption that is easier to satisfy than the rule will be satisfied instead of the rule.*
+>
+> **The ceiling is retired, and that is a change of kind, not of number.** `BARE_EXPORT_CEILING = 32` is gone;
+> `everyExportHandlerAlsoDemandsARead` asserts the uncomposed set is **empty**, with an anti-vacuity floor of
+> 36 composed handlers and an assertion that both named exceptions still exist in the scanned surface. **A
+> ceiling tolerates the population it measures** — which is correct while a sweep is pending and wrong the
+> moment it lands, because after that a tolerated guard is indistinguishable from a reviewed one.
+> Mutation-proven twice: restoring one bare guard fails by handler name, and restoring it *with a role list*
+> — the form the old ceiling accepted — **still** fails.
+>
+> ➕ **Found in passing, and it is this clause's own lesson (b) recurring: four F2-27-era guard comments
+> asserted access-preservation in the direction that preserves nothing, and V335 falsified all four.** Each
+> said some variant of *"every role holding `MODULE:READ` also holds `MODULE:EXPORT`"* — the floor direction,
+> which rules out a harmless reader-who-cannot-export and says nothing about the exporter-who-cannot-read that
+> is the hole. And each was overtaken three days later when **F2-59/V335 revoked ten `*:EXPORT` grants from
+> `REGULATOR_VIEWER`**: `NdiReportController` ("32 of 58 — zero gap"), `ClimateReportController` and
+> `GreenFinanceController` ("all 33 roles — zero gap", now 31 of 32), and `BcmEvidencePackageController`
+> ("all 17 roles", now 16 of 17). All four corrected in place, because they are the notes a reviewer reads
+> when deciding whether an export guard is safe — and all four would have argued that this slice was
+> unnecessary.
+>
 > ➕ **A measurement worth keeping even though it changed nothing here.** The tier rule's *breadth* problem is
 > six modules, not twenty-four: `WORKFLOW` 54, `CHANGE` 45, `AI` 42, `SUST` 31, `NDI` 31, `COMPLIANCE` 31 of 58
 > roles, while 14 of the 26 sit at 14 roles or fewer. Any future narrowing should start there, and the

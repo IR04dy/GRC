@@ -31,8 +31,23 @@
 #   py TSS-GRC-Platform-Bible/Appendix/scripts/export_grant_policy.py
 #   py TSS-GRC-Platform-Bible/Appendix/scripts/export_grant_policy.py --database TSS_GRC_Deployment
 #
-# Read-only: SELECTs only. Revoking what it surfaces is F2-61(c), module-sized, with a before/after
-# probe each -- never one migration (ADR-017 D-10c).
+# Read-only: SELECTs only.
+#
+# F2-61(c), CLOSED 2026-08-01 -- and NOT the way this header used to prescribe. It said "revoking what
+# it surfaces is F2-61(c), module-sized, with a before/after probe each -- never one migration". The
+# revocation never happened, because the enforcement point is the GUARD: all 32 remaining bare export
+# handlers now AND their module's READ (33 counting board-pack.json), enforced by
+# ExportAuthorizationRatchetTest#everyExportHandlerAlsoDemandsARead. That inverts the argument for
+# slicing it. A grant revocation has to be argued per module because it removes access; a guard
+# composition only has to be MEASURED -- and what this script measures is exactly the precondition:
+# every affected module is EXPORT is a subset of READ in both databases, so every principal that
+# satisfied the old guard satisfies the new one. Live: 33 of 33 exports served real bytes to a
+# [REVIEW-TEST] role with 11 *:EXPORT grants and no READ before the change, 0 of 33 after, and four
+# real personas unchanged in all 164 remaining cells.
+#
+# So this script's job changed. It is no longer the worklist for a sweep; it is the check that the
+# GRANT table still satisfies what the guards now demand. The three asymmetries below are permitted
+# because the two code sites that could exercise them AND a role list naming the affected roles.
 
 import argparse
 import sys
@@ -66,7 +81,9 @@ DOCUMENTED = {
         "BcpBinderController#download, whose guard ANDs its own hasAnyRole list naming CFO. The "
         "grant is harmless now because every OTHER BCM export guard also demands BCM:READ "
         "(F2-61, 2026-08-01), so the permission cannot be exercised anywhere the tier rule "
-        "would be broken. The asymmetry survives in the grant table and is unreachable in code.",
+        "would be broken. The asymmetry survives in the grant table and is unreachable in code. "
+        "F2-61(c) made that platform-wide: 36 of the 38 EXPORT-guarded file handlers AND a READ, "
+        "and this endpoint is one of the two named exceptions in ExportAuthorizationRatchetTest.",
     ("BCM", "CISO"):
         "ADR-017 D-10c(iii) -- as CFO above. Live-proven 2026-08-01: so_officer (CISO) now gets 403 "
         "on all three composed BCM exports and the binder guard still admits it.",

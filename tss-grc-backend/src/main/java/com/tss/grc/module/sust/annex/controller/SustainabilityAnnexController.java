@@ -154,9 +154,13 @@ public class SustainabilityAnnexController {
             .body(body);
     }
 
+    // F2-61(c) / ADR-017 D-10c — EXPORT is a containment: the SUST:EXPORT population must be a
+    // SUBSET of SUST:READ, because a file is a superset of a screen. Measured EXPORT ⊆ READ in both
+    // databases before this landed, so the AND costs no live principal anything; it is here so that
+    // a later grant (the way V320 Part 3 inverted BCM) cannot re-open the class.
     /** S-I — Arabic-capable PDF export (OpenPDF) of the frozen annex snapshot. */
     @GetMapping("/api/sustainability/reports/{id}/export.pdf")
-    @PreAuthorize("hasPermission('SUST','EXPORT')")
+    @PreAuthorize("hasPermission('SUST','EXPORT') and hasPermission('SUST','READ')")
     public ResponseEntity<byte[]> exportPdf(@PathVariable Long id,
                                             @RequestParam(defaultValue = "en") String lang) {
         SustainabilityReport r = service.getReport(id);

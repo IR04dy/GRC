@@ -153,10 +153,14 @@ public class AccessAssuranceController {
 
     // ── access evidence pack (§6.7) — the EXPORT 6th-action pilot gate ───
 
+    // F2-61(c) / ADR-017 D-10c — EXPORT is a containment: the IAM:EXPORT population must be a
+    // SUBSET of IAM:READ, because a file is a superset of a screen. Measured EXPORT ⊆ READ in both
+    // databases before this landed, so the AND costs no live principal anything; it is here so that
+    // a later grant (the way V320 Part 3 inverted BCM) cannot re-open the class.
     /** Guarded by IAM/EXPORT (not READ): the P3 EXPORT rollout ships READ-parity
      *  grants, so behaviour is unchanged until a tenant tightens the matrix. */
     @GetMapping("/evidence-package.zip")
-    @PreAuthorize("hasPermission('IAM','EXPORT')")
+    @PreAuthorize("hasPermission('IAM','EXPORT') and hasPermission('IAM','READ')")
     public ResponseEntity<byte[]> evidencePackage() {
         String generatedBy = currentUsername();
         AccessEvidencePackageService.Package p = evidenceService.generate(generatedBy);

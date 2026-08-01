@@ -48,7 +48,9 @@ public class BcmEvidencePackageController {
     // illustration of the finding — its author reasoned explicitly about sensitivity, called
     // it the most sensitive export on the platform, and still reached for READ, because at
     // the time EXPORT enforced nothing anywhere in the codebase and so did not read as a real
-    // option. Access-preserving: all 17 roles holding BCM:READ also hold BCM:EXPORT.
+    // option. Access-preserving in the only direction that had been checked: 16 of the 17 roles
+    // holding BCM:READ also held BCM:EXPORT — and not 17, because V335 (F2-59) later revoked
+    // REGULATOR_VIEWER's. Which is the smaller of the two problems with that sentence:
     //
     // ⚠ F2-61, 2026-08-01: that last sentence was checked in ONE direction, and the migration
     // that made the claim broke the other one in the same file. V320 Part 3 granted BCM:EXPORT

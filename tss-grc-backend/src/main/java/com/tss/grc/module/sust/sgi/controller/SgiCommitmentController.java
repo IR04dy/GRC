@@ -112,9 +112,13 @@ public class SgiCommitmentController {
         return ResponseEntity.noContent().build();
     }
 
+    // F2-61(c) / ADR-017 D-10c — EXPORT is a containment: the SUST:EXPORT population must be a
+    // SUBSET of SUST:READ, because a file is a superset of a screen. Measured EXPORT ⊆ READ in both
+    // databases before this landed, so the AND costs no live principal anything; it is here so that
+    // a later grant (the way V320 Part 3 inverted BCM) cannot re-open the class.
     /** SGI-E — the whole SGI register as a branded XLSX (via the shared tabular engine). */
     @GetMapping("/export.xlsx")
-    @PreAuthorize("hasPermission('SUST','EXPORT')")
+    @PreAuthorize("hasPermission('SUST','EXPORT') and hasPermission('SUST','READ')")
     public org.springframework.http.ResponseEntity<byte[]> exportXlsx(
             @RequestParam(defaultValue = "en") String lang) {
         byte[] bytes = tabularExport.xlsx(service.exportPayload(lang));

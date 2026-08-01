@@ -47,10 +47,23 @@ public class ClimateReportController {
     private static final String READ_GUARD  = "hasPermission('SUST','READ')";
     /**
      * F2-27 — a separate constant for the two file-returning handlers, because READ_GUARD
-     * still guards this controller's JSON reads. Access-preserving: all 33 roles holding
-     * SUST:READ also hold SUST:EXPORT (measured — zero gap).
+     * still guards this controller's JSON reads.
+     *
+     * <p><b>F2-61(c) / ADR-017 D-10c — and the access-preservation sentence above was wrong twice
+     * over.</b> It stated the containment in the direction that protects nothing (a reader who
+     * cannot export is harmless; an <em>exporter who cannot read</em> is the hole), and its count
+     * was overtaken: <b>V335 (F2-59) revoked ten {@code *:EXPORT} grants from
+     * {@code REGULATOR_VIEWER}</b>, which holds {@code SUST:READ} and no longer holds
+     * {@code SUST:EXPORT}, so it is 31 of 32 and not 33 of 33 — in dev and in production.
+     *
+     * <p>The direction that matters is now enforced rather than asserted: {@code SUST:EXPORT}
+     * holders must be a <b>subset</b> of {@code SUST:READ} holders, because a file is a superset of
+     * a screen. Measured EXPORT ⊆ READ in both databases before this landed, so the AND costs no
+     * live principal anything — it is here so that a later grant cannot re-open the class the way
+     * V320 Part 3 inverted BCM.
      */
-    private static final String EXPORT_GUARD = "hasPermission('SUST','EXPORT')";
+    private static final String EXPORT_GUARD =
+        "hasPermission('SUST','EXPORT') and hasPermission('SUST','READ')";
     private static final String WRITE_GUARD = "hasPermission('SUST','WRITE')";
 
     private final TcfdReportService service;

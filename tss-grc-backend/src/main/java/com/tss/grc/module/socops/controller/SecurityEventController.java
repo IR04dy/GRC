@@ -59,7 +59,14 @@ public class SecurityEventController {
      * administrable. Converting the residual role check to a permission is F2-05's scope.
      */
     @GetMapping("/export")
-    @PreAuthorize("hasPermission('CYBER','EXPORT') and "
+    // F2-61(c) / ADR-017 D-10c — CYBER:READ ANDed in. This handler was NOT a genuine exception to
+    // the containment; it was exempt from the F2-61 ratchet only because a role list counted as
+    // "narrowed", and the ratchet no longer accepts that on its own. Measured in both databases:
+    // none of the four named roles holds CYBER:EXPORT without CYBER:READ, so the AND costs nobody
+    // access — the same standard the role list itself was added under. The two handlers that ARE
+    // exceptions (MlModelController#export, BcpBinderController#download) would each lose a named
+    // role, are named in ExportAuthorizationRatchetTest, and carry an ADR-017 clause.
+    @PreAuthorize("hasPermission('CYBER','EXPORT') and hasPermission('CYBER','READ') and "
         + "hasAnyRole('SECURITY_ANALYST','CISO','PLATFORM_ADMIN','AUDITOR')")
     public ResponseEntity<byte[]> export(@RequestParam(defaultValue = "XLSX") String format) {
         byte[] body = exportSvc.exportSecurityEvents(format);

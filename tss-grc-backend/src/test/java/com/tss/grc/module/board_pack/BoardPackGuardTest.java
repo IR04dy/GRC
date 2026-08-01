@@ -177,8 +177,23 @@ class BoardPackGuardTest {
               + "BEFORE this annotation existed (F2-23's rule: never guard on a permission no role "
               + "holds). Two of the 8 are GLOBAL roles, because F2-56 measured iam.roles as "
               + "tenant-scoped in practice and an organisation-1-only grant list would ship a "
-              + "board pack tenants 2 and 3 can never download", path)
-            .isEqualTo("hasPermission('BOARD','EXPORT')"));
+              + "board pack tenants 2 and 3 can never download. **F2-61(c) added the READ half**: "
+              + "ADMIN:READ, not BOARD:READ, because BOARD carries exactly one action (ADR-017 "
+              + "D-11(a)) so the same-module rule is UNSATISFIABLE here — and ADMIN:READ is the "
+              + "guard BoardPackController's own screen carries, so this is the containment D-10c "
+              + "asks for rather than a substitute chosen for looking right. BOARD:EXPORT is 8 "
+              + "roles, ADMIN:READ is 21, and the 8 are a measured subset of the 21 in dev AND "
+              + "production, so no holder lost the pack", path)
+            .isEqualTo("hasPermission('BOARD','EXPORT') and hasPermission('ADMIN','READ')"));
+
+        assertThat(new java.util.HashSet<>(g.values()))
+            .as("all three board-pack routes must carry the IDENTICAL guard. The same figures leave "
+              + "the building either way, so a JSON aggregate authorised differently from its own "
+              + "PDF is a hole with a content-type in front of it. Asserted as a set rather than "
+              + "left implied by three equal comparisons, because that is the property being "
+              + "protected — and F2-61(c) is precisely the kind of change that could have composed "
+              + "READ onto two of the three")
+            .hasSize(1);
     }
 
     /**

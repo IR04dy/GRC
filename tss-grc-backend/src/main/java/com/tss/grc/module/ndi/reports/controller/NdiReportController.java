@@ -30,10 +30,24 @@ public class NdiReportController {
     /**
      * F2-27 — running a report and streaming it as a file is an extraction, not a view.
      * A separate constant rather than a lift of {@link #READ}, because READ still guards the
-     * JSON list/detail endpoints in this controller. Access-preserving: every role holding
-     * NDI:READ also holds NDI:EXPORT (32 of 58, measured — zero gap).
+     * JSON list/detail endpoints in this controller.
+     *
+     * <p><b>F2-61(c) / ADR-017 D-10c — and the sentence this replaces was measurably wrong.</b> It
+     * read <i>"Access-preserving: every role holding NDI:READ also holds NDI:EXPORT (32 of 58,
+     * measured — zero gap)"</i>. That is the containment stated in the direction that protects
+     * nothing: it rules out a reader who cannot export, which is harmless, and says nothing about
+     * an exporter who cannot read, which is the hole. It was also falsified after it was written —
+     * <b>V335 (F2-59) revoked ten {@code *:EXPORT} grants from {@code REGULATOR_VIEWER}</b>, which
+     * holds {@code NDI:READ} and no longer holds {@code NDI:EXPORT}, in dev and in production.
+     *
+     * <p>The direction that matters is the other one, and it is now enforced rather than asserted:
+     * {@code NDI:EXPORT} holders must be a <b>subset</b> of {@code NDI:READ} holders, because a file
+     * is a superset of a screen. Measured EXPORT ⊆ READ in both databases before this landed, so the
+     * AND costs no live principal anything — it is here so that a later grant cannot re-open the
+     * class the way V320 Part 3 inverted BCM.
      */
-    private static final String EXPORT = "hasPermission('NDI','EXPORT')";
+    private static final String EXPORT =
+        "hasPermission('NDI','EXPORT') and hasPermission('NDI','READ')";
 
     private final NdiReportService service;
     private final NdiReportExporter exporter;

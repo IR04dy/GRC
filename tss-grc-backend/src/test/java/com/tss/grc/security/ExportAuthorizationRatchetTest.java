@@ -107,8 +107,45 @@ class ExportAuthorizationRatchetTest {
     private static final Pattern READ_GUARD =
         Pattern.compile("hasPermission\\(\\s*'[A-Z_]+'\\s*,\\s*'READ'\\s*\\)");
 
-    /** A role list narrows an export guard by a second, independent axis. */
-    private static final Pattern ROLE_NARROWING = Pattern.compile("has(Any)?Role\\(");
+    /**
+     * The only two file-returning handlers whose {@code MODULE:EXPORT} is allowed to stand without
+     * the module's own {@code READ} — because ANDing {@code READ} would <b>revoke access from a
+     * role the guard names by hand</b>, measured in dev and in production. Each carries an ADR-017
+     * clause and each is narrowed by a role list on a second, independent axis.
+     *
+     * <ul>
+     *   <li><b>{@code MlModelController#export}</b> — {@code AI:EXPORT and hasAnyRole(…,'AUDITOR',…)}.
+     *       ADR-017 D-10c(ii): {@code AUDITOR} holds {@code AI:EXPORT} and not {@code AI:READ}, and
+     *       V320 granted it deliberately so the endpoint would not start 403'ing a role it had always
+     *       allowed. ANDing {@code AI:READ} would take the model registry from the auditor.</li>
+     *   <li><b>{@code BcpBinderController#download}</b> —
+     *       {@code BCM:EXPORT and hasAnyRole(…,'CISO',…,'CFO')}. ADR-017 D-10c(iii): {@code CISO} and
+     *       {@code CFO} hold {@code BCM:EXPORT} and not {@code BCM:READ} — V320 Part 3 granted it for
+     *       exactly this endpoint, whose author listed both roles. This is the one asymmetry that
+     *       survives in the grant table, and it is unreachable anywhere else because every other BCM
+     *       export now demands {@code BCM:READ}.</li>
+     * </ul>
+     *
+     * <p>⚠ <b>Why this is a named list and not the {@code has(Any)?Role(} pattern it replaces.</b>
+     * The F2-61 ceiling treated <em>any</em> role list as sufficient narrowing, and that exemption
+     * was doing the work of a finding: {@code SecurityEventController#export} sat behind it with no
+     * claim to it at all — measured, none of its four named roles held {@code CYBER:EXPORT} without
+     * {@code CYBER:READ}, so it was exempt from an invariant it already satisfied for free. It now
+     * ANDs {@code CYBER:READ}. A pattern-based exemption also lets the next handler dodge the rule by
+     * adding a role list; a named one has to be argued.
+     */
+    private static final Set<String> EXPORT_WIDER_THAN_READ = Set.of(
+        "MlModelController#export",
+        "BcpBinderController#download"
+    );
+
+    /**
+     * Anti-vacuity floor for {@link #everyExportHandlerAlsoDemandsARead}. 36 handlers compose a
+     * {@code READ} permission as of 2026-08-01 (32 swept by F2-61(c), 3 BCM by F2-61(a), plus
+     * {@code SecurityEventController#export}); the assertion is a floor, so adding exports is fine
+     * and a scan that stops seeing composed guards is not.
+     */
+    private static final int MIN_COMPOSED_EXPORTS = 36;
 
     /** The three BCM exports F2-61 composed with {@code BCM:READ}. Pinned by name, not counted. */
     private static final List<String> BCM_COMPOSED = List.of(
@@ -116,17 +153,6 @@ class ExportAuthorizationRatchetTest {
         "BcpPlanController#exportPdf",
         "CrisisEventController#exportPdf"
     );
-
-    /**
-     * Measured 2026-08-01 with the three BCM guards composed: <b>32</b> of the 40 file-returning
-     * handlers authorise on {@code EXPORT} and nothing else. Lower it as F2-61(c) lands modules;
-     * never raise it.
-     *
-     * <p>This constant was first written as 26 from an estimate and the assertion failed on the
-     * measurement — which is the ratchet doing its job on its own author. A ceiling guessed high
-     * enough to pass is not a ceiling.
-     */
-    private static final int BARE_EXPORT_CEILING = 32;
 
     @Test
     void everyFileReturningEndpointRequiresModuleExport() {
@@ -161,8 +187,13 @@ class ExportAuthorizationRatchetTest {
      */
     @Test
     void theScanStillFindsTheExportSurface() {
-        int found = scanFileReturningEndpoints().size();
+        List<String[]> hits = scanFileReturningEndpoints();
+        int found = hits.size();
         System.out.println("[F2-27 export ratchet] file-returning endpoints discovered = " + found);
+        hits.stream()
+            .map(h -> String.format("  %-46s %s", h[0], h[1] == null ? "(none)" : h[1]))
+            .sorted()
+            .forEach(System.out::println);
         assertThat(found)
             .as("The export scan found %d file-returning handlers; 40 were measured when F2-27 "
                 + "shipped. A sharp drop means the detector broke, not that the exports left — "
@@ -211,45 +242,74 @@ class ExportAuthorizationRatchetTest {
     }
 
     /**
-     * F2-61 ratchet — how many file-returning handlers authorise on {@code EXPORT} and nothing
-     * else. Such a guard is satisfiable by a principal who cannot read the module, which is only
-     * harmless while the grant table happens to keep {@code EXPORT ⊆ READ} by hand. It did not:
-     * BCM inverted the moment V320 granted one permission to satisfy one endpoint.
+     * F2-61(c) — <b>every</b> file-returning handler that authorises with {@code MODULE:EXPORT} must
+     * AND a {@code READ} permission, with exactly two named exceptions. ADR-017 D-10c states the
+     * export tier as a <em>containment</em> — the {@code EXPORT} population must be a subset of the
+     * population allowed to read the same records — and this is where it is enforced.
      *
-     * <p>A ceiling, not zero. Composing {@code READ} onto the remaining handlers is F2-61(c),
-     * module-sized with a before/after probe each, because a module whose {@code EXPORT} is
-     * currently <em>wider</em> than its {@code READ} would lose real access on the day the AND
-     * lands — and that is a decision per module, not a sweep. The number may fall and must never
-     * rise: a new export handler that composes with nothing re-opens the class.
+     * <p><b>This was a ceiling of 32 and is now an invariant, which is a different kind of test.</b>
+     * A ceiling tolerates the population it measures; it only refuses growth. That is right while a
+     * sweep is pending and wrong once it lands, because a tolerated guard is indistinguishable from
+     * a reviewed one. The 32 were swept on 2026-08-01 in one code change rather than the
+     * module-at-a-time revocation F2-61 originally proposed — because the enforcement point moved to
+     * the guard, where the collateral is *provable* instead of estimated: {@code export_grant_policy.py}
+     * measures every affected module as {@code EXPORT ⊆ READ} in dev and in production, so every
+     * principal that satisfied the old guard satisfies the new one. A grant-table sweep would have
+     * had to be argued per module; a guard composition only has to be measured.
+     *
+     * <p><b>Live before/after, 33 endpoint-probes each, on a {@code [REVIEW-TEST]} role holding 11
+     * {@code *:EXPORT} grants and no {@code READ} anywhere</b> — the shape BCM proved is one grant
+     * row away. Before: <b>33 of 33 served 200 with real bytes</b> (31,404-byte risk-register PDF,
+     * 40,404-byte board pack, 34,903-byte deck, 53,139-byte regulator ZIP, 68,686-byte IAM
+     * access-governance ZIP, 44,995-byte tenant calendar) while the same token got <b>403 on all
+     * seven module screens</b> that answer — risk, findings, changes, board packs, cyber controls,
+     * NDI reports, SGI commitments. After: <b>0 of 33</b>, with {@code so_officer}, {@code compliance},
+     * {@code rmanager} and {@code viewer} unchanged in <b>all 164 remaining cells</b>.
      */
     @Test
-    void exportsAuthorisedByExportAloneOnlyEverFall() {
+    void everyExportHandlerAlsoDemandsARead() {
         List<String> bare = new ArrayList<>();
+        List<String> composed = new ArrayList<>();
         for (String[] hit : scanFileReturningEndpoints()) {
             String guard = hit[1] == null ? "" : hit[1];
             if (!EXPORT_GUARD.matcher(guard).find()) {
                 continue;                       // F2-27's own test owns that failure
             }
-            if (READ_GUARD.matcher(guard).find() || ROLE_NARROWING.matcher(guard).find()) {
-                continue;
+            if (READ_GUARD.matcher(guard).find()) {
+                composed.add(hit[0]);
+            } else if (!EXPORT_WIDER_THAN_READ.contains(hit[0])) {
+                bare.add(hit[0]);
             }
-            bare.add(hit[0]);
         }
         Collections.sort(bare);
-        System.out.println("[F2-61 ratchet] exports authorised by EXPORT alone = " + bare.size());
+        Collections.sort(composed);
+        System.out.println("[F2-61(c)] exports composed with a READ = " + composed.size()
+            + ", documented wider-than-READ = " + EXPORT_WIDER_THAN_READ.size()
+            + ", UNCOMPOSED = " + bare.size());
         bare.forEach(s -> System.out.println("  - " + s));
-        assertThat(bare.size())
-            .as("A file-returning handler authorises on MODULE:EXPORT with no READ and no role "
-                + "narrowing, and the count rose above the %d measured when F2-61 shipped. Every "
-                + "one of these is satisfiable by a principal the module's own screens refuse. "
-                + "Compose hasPermission('MODULE','READ') in, or state in the guard's javadoc why "
-                + "this module's export is legitimately wider than its screen.", BARE_EXPORT_CEILING)
-            .isLessThanOrEqualTo(BARE_EXPORT_CEILING);
-        assertThat(bare.size())
-            .as("Anti-vacuity: F2-61 measured a real population of bare export guards. Zero means "
-                + "the scan or the pattern broke, not that the sweep finished — when F2-61(c) "
-                + "genuinely finishes, lower the ceiling to 0 and delete this floor deliberately.")
-            .isGreaterThan(0);
+
+        assertThat(bare)
+            .as("A file-returning handler authorises on MODULE:EXPORT without ANDing any READ "
+                + "permission, so it is satisfiable by a principal the module's own screens refuse "
+                + "— F2-61, ADR-017 D-10c. Compose hasPermission('MODULE','READ') in. If the "
+                + "module's EXPORT is legitimately wider, the bar is the one the two entries in "
+                + "EXPORT_WIDER_THAN_READ meet: a named role that ANDing READ would measurably "
+                + "revoke, in BOTH databases, plus an ADR-017 clause. A role list is NOT a reason "
+                + "on its own — that exemption was already hiding a handler which satisfied this "
+                + "rule for free (SecurityEventController#export).")
+            .isEmpty();
+
+        assertThat(composed.size())
+            .as("Anti-vacuity: %d file-returning handlers compose EXPORT with a READ permission. A "
+                + "drop means the scan or the READ_GUARD pattern broke, not that the exports left.",
+                composed.size())
+            .isGreaterThanOrEqualTo(MIN_COMPOSED_EXPORTS);
+
+        assertThat(EXPORT_WIDER_THAN_READ)
+            .as("Both documented exceptions must still exist in the scanned surface; a rename would "
+                + "otherwise silently exempt nothing while looking like it exempts something.")
+            .allSatisfy(id -> assertThat(scanFileReturningEndpoints())
+                .anyMatch(h -> h[0].equals(id)));
     }
 
     static List<String> scanExportsWithoutExportPermission() {

@@ -45,6 +45,10 @@ public class CalendarController {
         return service.listInWindow(from, to, typeFilter);
     }
 
+    // F2-61(c) / ADR-017 D-10c — EXPORT is a containment: the PLATFORM:EXPORT population must be a
+    // SUBSET of PLATFORM:READ, because a file is a superset of a screen. Measured EXPORT ⊆ READ in both
+    // databases before this landed, so the AND costs no live principal anything; it is here so that
+    // a later grant (the way V320 Part 3 inverted BCM) cannot re-open the class.
     /**
      * iCalendar (.ics) feed for the same window. Buyers point Outlook
      * (File → Account Settings → Internet Calendars) or Google
@@ -55,7 +59,7 @@ public class CalendarController {
      * browser download saves a sensibly-named .ics file too.
      */
     @GetMapping(value = "/events.ics", produces = "text/calendar; charset=UTF-8")
-    @PreAuthorize("hasPermission('PLATFORM','EXPORT')")
+    @PreAuthorize("hasPermission('PLATFORM','EXPORT') and hasPermission('PLATFORM','READ')")
     public ResponseEntity<byte[]> exportIcs(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate to,

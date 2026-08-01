@@ -45,6 +45,53 @@ public class ExportController {
     private final RegulatorPackageService regulatorPackageService;
     private final TabularExportService tabularExportService;
 
+    // ── F2-61(c) / ADR-017 D-10c — EXPORT is a containment, not a comparison ──────────────────────
+    //
+    // Every guard below ANDs the module's own READ. The rule is that the `MODULE:EXPORT` population
+    // must be a SUBSET of the population allowed to read the same records on screen — because a file
+    // is a superset of a screen, and F2-27's ratified premise ("viewing one record does not confer
+    // extracting the register") has a converse that nothing was checking.
+    //
+    // ⚠ These 19 handlers were satisfiable by a principal the module's own screens refuse. Measured
+    // live before this change with a [REVIEW-TEST] role holding 11 `*:EXPORT` grants and NO READ
+    // anywhere: 200 + 31,404 bytes of risk-register PDF, 40,404 of board pack, 53,139 of the
+    // regulator evidence ZIP — while GET /api/v1/risk/risks, /api/v1/changes,
+    // /api/v1/compliance/findings and /api/board-pack/packs all returned 403 to the same token.
+    // No live role held that shape; BCM proved it is one grant row away (V320 Part 3 granted
+    // BCM:EXPORT to CISO/CFO for ONE endpoint and silently widened three others), so the invariant
+    // belongs in the guard, where a later migration cannot undo it, and not in the grant table.
+    //
+    // Zero collateral, and provable rather than hoped: export_grant_policy.py measures every one of
+    // these modules as EXPORT ⊆ READ in BOTH databases, so every principal that satisfied the old
+    // guard satisfies the new one.
+    private static final String RISK_EXPORT =
+        "hasPermission('RISK','EXPORT') and hasPermission('RISK','READ')";
+    private static final String COMPLIANCE_EXPORT =
+        "hasPermission('COMPLIANCE','EXPORT') and hasPermission('COMPLIANCE','READ')";
+    private static final String CHANGE_EXPORT =
+        "hasPermission('CHANGE','EXPORT') and hasPermission('CHANGE','READ')";
+    private static final String REGULATORY_EXPORT =
+        "hasPermission('REGULATORY','EXPORT') and hasPermission('REGULATORY','READ')";
+    private static final String REPORTING_EXPORT =
+        "hasPermission('REPORTING','EXPORT') and hasPermission('REPORTING','READ')";
+
+    /**
+     * The BOARD tier's READ half is {@code ADMIN:READ}, not {@code BOARD:READ} — and that is a
+     * measurement, not a shortcut. ADR-017 D-11(a): {@code BOARD} carries exactly one action, so
+     * {@code BOARD:READ} is not catalogued and the same-module rule is <em>unsatisfiable</em> here
+     * rather than merely unsatisfied. ANDing a permission no tenant holds would 403 all eight
+     * holders — the F2-23 trap.
+     *
+     * <p>{@code ADMIN:READ} is the right substitute because it is the guard the board-pack
+     * <em>screen</em> already carries: {@code BoardPackController}'s {@code READ_GUARD} is
+     * {@code hasPermission('ADMIN','READ')} (F2-05 slice 5). So this states exactly the containment
+     * D-10c asks for — a principal refused the board workspace cannot extract the board pack as a
+     * file. {@code BOARD:EXPORT} is 8 roles and {@code ADMIN:READ} is 21, and the 8 are a measured
+     * subset of the 21 in dev <em>and</em> production, so nothing loses access.
+     */
+    private static final String BOARD_EXPORT =
+        "hasPermission('BOARD','EXPORT') and hasPermission('ADMIN','READ')";
+
     private static final MediaType XLSX_TYPE =
         MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     private static final MediaType ZIP_TYPE = MediaType.parseMediaType("application/zip");
@@ -56,7 +103,7 @@ public class ExportController {
     // ── PDF (Q1) ──────────────────────────────────────────────────────────
 
     @GetMapping("/risk-register.pdf")
-    @PreAuthorize("hasPermission('RISK','EXPORT')")
+    @PreAuthorize(RISK_EXPORT)
     @Operation(summary = "Risk register PDF — pass ?lang=ar for Arabic RTL")
     public ResponseEntity<byte[]> riskRegisterPdf(@RequestParam(defaultValue = "en") String lang) {
         byte[] body = exportService.riskRegisterPdf(lang);
@@ -64,14 +111,14 @@ public class ExportController {
     }
 
     @GetMapping("/findings-aging.pdf")
-    @PreAuthorize("hasPermission('COMPLIANCE','EXPORT')")
+    @PreAuthorize(COMPLIANCE_EXPORT)
     public ResponseEntity<byte[]> findingsAgingPdf(@RequestParam(defaultValue = "en") String lang) {
         byte[] body = exportService.findingsAgingPdf(lang);
         return pdf(body, ExportNaming.build("Compliance", "FindingsAging", lang, "pdf"));
     }
 
     @GetMapping("/kri-dashboard.pdf")
-    @PreAuthorize("hasPermission('RISK','EXPORT')")
+    @PreAuthorize(RISK_EXPORT)
     public ResponseEntity<byte[]> kriDashboardPdf(@RequestParam(defaultValue = "en") String lang) {
         byte[] body = exportService.kriDashboardPdf(lang);
         return pdf(body, ExportNaming.build("ERM", "KRIDashboard", lang, "pdf"));
@@ -80,21 +127,21 @@ public class ExportController {
     // ── Excel (Q2) ────────────────────────────────────────────────────────
 
     @GetMapping("/risk-register.xlsx")
-    @PreAuthorize("hasPermission('RISK','EXPORT')")
+    @PreAuthorize(RISK_EXPORT)
     @Operation(summary = "Risk register XLSX with live residual-score formulas")
     public ResponseEntity<byte[]> riskRegisterXlsx() {
         return xlsx(exportService.riskRegisterXlsx(), ExportNaming.build("ERM", "RiskRegister", "en", "xlsx"));
     }
 
     @GetMapping("/findings-aging.xlsx")
-    @PreAuthorize("hasPermission('COMPLIANCE','EXPORT')")
+    @PreAuthorize(COMPLIANCE_EXPORT)
     @Operation(summary = "Findings aging XLSX with live TODAY()-based days-open formula")
     public ResponseEntity<byte[]> findingsXlsx() {
         return xlsx(exportService.findingsXlsx(), ExportNaming.build("Compliance", "FindingsAging", "en", "xlsx"));
     }
 
     @GetMapping("/kri-dashboard.xlsx")
-    @PreAuthorize("hasPermission('RISK','EXPORT')")
+    @PreAuthorize(RISK_EXPORT)
     @Operation(summary = "KRI dashboard XLSX with COUNTIF summary sheet")
     public ResponseEntity<byte[]> kriXlsx() {
         return xlsx(exportService.kriDashboardXlsx(), ExportNaming.build("ERM", "KRIDashboard", "en", "xlsx"));
@@ -103,7 +150,7 @@ public class ExportController {
     // ── Word (.docx) ──────────────────────────────────────────────────────
 
     @GetMapping("/risk-register.docx")
-    @PreAuthorize("hasPermission('RISK','EXPORT')")
+    @PreAuthorize(RISK_EXPORT)
     @Operation(summary = "Risk register DOCX — pass ?lang=ar for Arabic RTL")
     public ResponseEntity<byte[]> riskRegisterDocx(@RequestParam(defaultValue = "en") String lang) {
         return docx(docxExportService.riskRegisterDocx(lang),
@@ -111,7 +158,7 @@ public class ExportController {
     }
 
     @GetMapping("/findings-aging.docx")
-    @PreAuthorize("hasPermission('COMPLIANCE','EXPORT')")
+    @PreAuthorize(COMPLIANCE_EXPORT)
     @Operation(summary = "Findings aging DOCX — pass ?lang=ar for Arabic RTL")
     public ResponseEntity<byte[]> findingsAgingDocx(@RequestParam(defaultValue = "en") String lang) {
         return docx(docxExportService.findingsAgingDocx(lang),
@@ -119,7 +166,7 @@ public class ExportController {
     }
 
     @GetMapping("/kri-dashboard.docx")
-    @PreAuthorize("hasPermission('RISK','EXPORT')")
+    @PreAuthorize(RISK_EXPORT)
     @Operation(summary = "KRI dashboard DOCX — pass ?lang=ar for Arabic RTL")
     public ResponseEntity<byte[]> kriDashboardDocx(@RequestParam(defaultValue = "en") String lang) {
         return docx(docxExportService.kriDashboardDocx(lang),
@@ -129,28 +176,28 @@ public class ExportController {
     // ── Change register (CH-4) ────────────────────────────────────────────
 
     @GetMapping("/change-register.pdf")
-    @PreAuthorize("hasPermission('CHANGE','EXPORT')")
+    @PreAuthorize(CHANGE_EXPORT)
     @Operation(summary = "Change register PDF — pass ?lang=ar for Arabic RTL")
     public ResponseEntity<byte[]> changeRegisterPdf(@RequestParam(defaultValue = "en") String lang) {
         return pdf(exportService.changeRegisterPdf(lang), ExportNaming.build("Change", "ChangeRegister", lang, "pdf"));
     }
 
     @GetMapping("/change-register.xlsx")
-    @PreAuthorize("hasPermission('CHANGE','EXPORT')")
+    @PreAuthorize(CHANGE_EXPORT)
     @Operation(summary = "Change register XLSX")
     public ResponseEntity<byte[]> changeRegisterXlsx() {
         return xlsx(exportService.changeRegisterXlsx(), ExportNaming.build("Change", "ChangeRegister", "en", "xlsx"));
     }
 
     @GetMapping("/change-register.docx")
-    @PreAuthorize("hasPermission('CHANGE','EXPORT')")
+    @PreAuthorize(CHANGE_EXPORT)
     @Operation(summary = "Change register DOCX — pass ?lang=ar for Arabic RTL")
     public ResponseEntity<byte[]> changeRegisterDocx(@RequestParam(defaultValue = "en") String lang) {
         return docx(docxExportService.changeRegisterDocx(lang), ExportNaming.build("Change", "ChangeRegister", lang, "docx"));
     }
 
     @GetMapping("/change/{id}/cab-pack.pdf")
-    @PreAuthorize("hasPermission('CHANGE','EXPORT')")
+    @PreAuthorize(CHANGE_EXPORT)
     @Operation(summary = "CH-11: consolidated CAB pack for one change (details, plans, votes, "
         + "tasks, links, PIR). Pass ?lang=ar for Arabic RTL.")
     public ResponseEntity<byte[]> cabPackPdf(@PathVariable Long id, @RequestParam(defaultValue = "en") String lang) {
@@ -158,7 +205,7 @@ public class ExportController {
     }
 
     @GetMapping("/policy/{id}/document.pdf")
-    @PreAuthorize("hasPermission('COMPLIANCE','EXPORT')")
+    @PreAuthorize(COMPLIANCE_EXPORT)
     @Operation(summary = "CH-10: controlled policy document PDF rendered from the authored inline "
         + "content (content_md). Pass ?lang=ar for Arabic RTL.")
     public ResponseEntity<byte[]> policyDocumentPdf(@PathVariable Long id, @RequestParam(defaultValue = "en") String lang) {
@@ -194,7 +241,7 @@ public class ExportController {
     // would ship a board pack that tenants 2 and 3 could never download.
 
     @GetMapping("/board-pack.pdf")
-    @PreAuthorize("hasPermission('BOARD','EXPORT')")
+    @PreAuthorize(BOARD_EXPORT)
     @Operation(summary = "Multi-section board pack PDF combining risks, findings, KRIs, " +
         "framework coverage, change management and ethics highlights. Pass ?lang=ar for RTL.")
     public ResponseEntity<byte[]> boardPackPdf(@RequestParam(defaultValue = "en") String lang) {
@@ -203,7 +250,7 @@ public class ExportController {
     }
 
     @GetMapping("/board-pack.pptx")
-    @PreAuthorize("hasPermission('BOARD','EXPORT')")
+    @PreAuthorize(BOARD_EXPORT)
     @Operation(summary = "Multi-slide 16:9 board pack PowerPoint deck. Pass ?lang=ar for RTL.")
     public ResponseEntity<byte[]> boardPackPptx(@RequestParam(defaultValue = "en") String lang) {
         byte[] body = boardPackPptxService.generatePptx(lang);
@@ -232,7 +279,7 @@ public class ExportController {
      * deck. A language parameter here would imply a choice the response does not make.
      */
     @GetMapping("/board-pack.json")
-    @PreAuthorize("hasPermission('BOARD','EXPORT')")
+    @PreAuthorize(BOARD_EXPORT)
     @Operation(summary = "Board pack as a bilingual JSON aggregate — the same figures the PDF and "
         + "PPTX render, computed by the same builder. Board-confidential: requires BOARD:EXPORT.")
     public BoardPackAggregate boardPackJson() {
@@ -274,7 +321,7 @@ public class ExportController {
      * only consumer of {@code REGULATORY:EXPORT}, its blast radius is exactly this endpoint.
      */
     @GetMapping("/regulator-package.zip")
-    @PreAuthorize("hasPermission('REGULATORY','EXPORT')")
+    @PreAuthorize(REGULATORY_EXPORT)
     @Operation(summary = "Regulator/audit evidence package (ZIP): branded README.pdf + " +
         "Requirement_Mapping.xlsx + Evidence_Index.xlsx + Audit_Trail.xlsx + manifest.json (SHA-256). " +
         "Assurance-confidential: requires REGULATORY:EXPORT.")
@@ -292,7 +339,7 @@ public class ExportController {
     // ── Tabular XLSX from client-supplied data (P5) ─────────────────────────
 
     @PostMapping("/packet.xlsx")
-    @PreAuthorize("hasPermission('REPORTING','EXPORT')")
+    @PreAuthorize(REPORTING_EXPORT)
     @Operation(summary = "Branded .xlsx from client-supplied tabular data (sheets/headers/rows). " +
         "Reuses the house XlsxStyler treatment + tenant BrandTheme; filename via ExportNaming.")
     public ResponseEntity<byte[]> packetXlsx(@Valid @RequestBody TabularExportRequest request) {
@@ -302,7 +349,7 @@ public class ExportController {
     }
 
     @PostMapping("/packet.docx")
-    @PreAuthorize("hasPermission('REPORTING','EXPORT')")
+    @PreAuthorize(REPORTING_EXPORT)
     @Operation(summary = "Branded .docx from client-supplied tabular data (title + heading+table per " +
         "sheet). Reuses the tenant BrandTheme + ExportNaming filename; RTL when lang=ar.")
     public ResponseEntity<byte[]> packetDocx(@Valid @RequestBody TabularExportRequest request) {
