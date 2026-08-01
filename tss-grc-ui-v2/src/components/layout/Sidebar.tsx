@@ -20,6 +20,7 @@ import { useI18n } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
 import { capaTaskApi, notificationApi, workflowSubmissionApi } from '../../lib/api';
 import { filterNavByEntitlement, useEntitlement } from '../../lib/entitlement';
+import { canExport } from '../../lib/auth';
 
 interface NavItem {
   id: string;
@@ -29,6 +30,13 @@ interface NavItem {
   /** Sub-items rendered indented under the parent when the parent's path
    *  prefix is on the active route or the user has expanded the parent. */
   children?: NavItem[];
+  /**
+   * Optional non-entitlement visibility check — a *permission*, not a licence.
+   * Applied by `filterNavByEntitlement` alongside the SKU gate. Use it only where
+   * the server would actually refuse: hiding a control the server permits is the
+   * defect `canExport`'s own comment warns about, pointing the other way.
+   */
+  gate?: () => boolean;
 }
 interface NavGroup {
   id: string;
@@ -433,7 +441,11 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'ac-dash',        to: '/audit-committee/dashboard', Icon: LayoutDashboard, labelKey: 'acDashSidebar' },
       { id: 'rcf-pivot',      to: '/governance/pivot/risk/1',   Icon: GitBranch,       labelKey: 'rcfPivotSidebar' },
-      { id: 'board-pack',     to: '/board-pack',                Icon: FileText,        labelKey: 'boardPackSidebar' },
+      // F2-42 — the pack is built from the live aggregate, guarded by
+      // BOARD:EXPORT (8 roles after ADR-017 D-10a). Offering the entry to the
+      // other 51 roles would be a link whose only outcome is a refusal.
+      { id: 'board-pack',     to: '/board-pack',                Icon: FileText,        labelKey: 'boardPackSidebar',
+        gate: () => canExport('BOARD') },
       { id: 'reports-centre', to: '/reports/centre',            Icon: Files,           labelKey: 'reportsCentreSidebar' },
       { id: 'schedules',      to: '/reports/schedules',         Icon: Calendar,        labelKey: 'rsTitle' },
       { id: 'capa',           to: '/capa',                      Icon: Wrench,          labelKey: 'modCapa' },

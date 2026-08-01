@@ -1,78 +1,134 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ShieldCheck, Printer, Activity, AlertOctagon, ClipboardCheck, Stamp,
-  Fingerprint, Server, GitBranch, Landmark, FileText, AlertTriangle,
+  Fingerprint, GitBranch, Landmark, FileText, AlertTriangle, Lock, Leaf,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
-import { buildBoardPack } from '../../lib/boardPack';
-import { APPROVER_REGISTRY } from '../../lib/approvals';
+import { fetchBoardPack, type BoardPackAggregate } from '../../lib/boardPackAggregate';
+import { ApiError } from '../../lib/api';
+import { canExport } from '../../lib/auth';
 import { formatHijri } from '../../lib/sla';
-import { appetiteSeverityLabel } from '../../lib/riskAppetiteSaudi';
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import './boardPack.css';
 
 /**
- * BoardPackPage — Sprint 5 Executive Board Pack export.
+ * BoardPackPage — the executive board pack, rendered from the server aggregate.
  *
- * Print-styled, bilingual artifact a CEO or board chair can carry to the
- * audit committee. Aggregates live signal from every Sprint 4-5 module:
- * appetite breaches, board approvals, audit engagements, PDPL posture,
- * CCM coverage, asset blast-radius hot-spots, recent chain fires, and a
- * regulator-coverage tally.
+ * <p>Print-styled bilingual artefact a board chair can carry to the audit
+ * committee. "Print" triggers {@code window.print()} with the {@code @media print}
+ * rules in boardPack.css that hide the chrome and lay sections out as A4 pages.
  *
- * "Download" triggers window.print() with @media print rules in
- * boardPack.css that hide the chrome and lay sections out as A4 pages.
+ * <h3>F2-42 / ADR-017 D-5 — what changed, and why the content is different</h3>
+ * <p>This page used to render {@code buildBoardPack()} from {@code lib/boardPack.ts},
+ * which assembled a pack client-side from <b>eight fabricated sources</b> — three
+ * named {@code mockCompliance}, {@code mockPrivacy}, {@code mockWorkflows}, one a
+ * function called {@code synthesiseAllBreaches()}. Meanwhile the server built a
+ * real pack from live repositories and served it as PDF and PPTX. <b>Two board
+ * packs existed and the PDF was the correct one.</b>
+ *
+ * <p>⚠ <b>The consolidation was not a swap, and the plan row assumed it was.</b>
+ * The two packs shared only <i>two</i> of ten sections. The fabricated page showed
+ * appetite breaches, board approvals, audit engagements, PDPL 72h posture, CCM
+ * freshness, asset blast-radius, chain fires and a regulator tally; the server
+ * aggregate carries top risks, findings aging, oldest open findings, KRI bands,
+ * framework coverage, change outcomes, ethics and sustainability. So the sections
+ * on this page are <b>different sections</b>, not the same ones re-sourced —
+ * because the fabricated eight had no real data behind them to re-source from.
+ * ADR-017 D-5 chose exactly this: "expose the server aggregate as JSON and render
+ * it; retire the fabricated page."
+ *
+ * <p>The sample-data banner is gone because the figures are now real. That is the
+ * only honest reason to remove it.
+ *
+ * <h3>Why the audience narrowed</h3>
+ * <p>The aggregate carries {@code hasPermission('BOARD','EXPORT')} — the same guard
+ * as the PDF and the deck, since the same figures leave the building either way.
+ * ADR-017 D-10a narrowed all three from 24 roles to 8. Anyone outside those 8 now
+ * sees an explicit "board-confidential" notice rather than a page of errors: a 403
+ * here is the control working, and it must not look like an outage.
+ *
+ * <p>⚠ Deliberately <b>not</b> fetched through {@code useApiList}: that hook
+ * substitutes supplied mock data whenever a request fails or returns nothing. On a
+ * board pack that is F2-42 rebuilt behind a different door.
  */
 export function BoardPackPage() {
   const { t, lang } = useI18n();
-  const pack = useMemo(() => buildBoardPack(), []);
+  const ar = lang === 'ar';
 
-  // Track A4 — pull tenant branding so the cover renders the customer's
-  // logo + organisation name in lieu of the default TSS shield.
+  const [pack, setPack] = useState<BoardPackAggregate | null>(null);
+  const [state, setState] = useState<'loading' | 'ready' | 'forbidden' | 'error'>('loading');
+  const [errMsg, setErrMsg] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    fetchBoardPack()
+      .then(p => { if (alive) { setPack(p); setState('ready'); } })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        // 403 is the BOARD:EXPORT guard, not a failure. Distinguishing them is the
+        // point: one is a permission conversation, the other is a bug report.
+        if (e instanceof ApiError && e.status === 403) { setState('forbidden'); return; }
+        setErrMsg(e instanceof ApiError ? e.message : String(e));
+        setState('error');
+      });
+    return () => { alive = false; };
+  }, []);
+
+  // Track A4 — tenant branding on the cover, in lieu of the default TSS shield.
   const [brand, setBrand] = useState(() => loadWhiteLabel());
   useEffect(() => subscribeWhiteLabel(() => setBrand(loadWhiteLabel())), []);
-  const orgName = lang === 'ar' ? brand.organisationNameAr : brand.organisationNameEn;
-  const orgTagline = lang === 'ar' ? brand.taglineAr : brand.taglineEn;
+  const brandName = ar ? brand.organisationNameAr : brand.organisationNameEn;
+
+  if (state === 'loading') {
+    return (
+      <Shell title={t('boardPackTitle')} sub={t('boardPackSub')}>
+        <div className="page" aria-busy="true" style={{ padding: 48, textAlign: 'center', opacity: 0.6 }}>
+          {ar ? 'جارٍ تحميل حزمة المجلس…' : 'Loading the board pack…'}
+        </div>
+      </Shell>
+    );
+  }
+
+  if (state === 'forbidden') {
+    return (
+      <Shell title={t('boardPackTitle')} sub={t('boardPackSub')}>
+        <div className="card" data-testid="board-pack-forbidden"
+             style={{ maxWidth: 620, margin: '48px auto', textAlign: 'center', padding: 32 }}>
+          <Lock size={40} style={{ opacity: 0.5, marginBottom: 16 }} aria-hidden="true" />
+          <h2 style={{ marginBottom: 12 }}>{t('boardPackForbiddenTitle')}</h2>
+          <p style={{ opacity: 0.8, marginBottom: 8 }}>{t('boardPackForbiddenBody')}</p>
+          <p style={{ opacity: 0.7, fontSize: 14 }}>{t('boardPackForbiddenHint')}</p>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (state === 'error' || !pack) {
+    return (
+      <Shell title={t('boardPackTitle')} sub={t('boardPackSub')}>
+        <div className="card" data-testid="board-pack-error"
+             style={{ maxWidth: 620, margin: '48px auto', textAlign: 'center', padding: 32 }}>
+          <AlertTriangle size={40} style={{ opacity: 0.5, marginBottom: 16 }} aria-hidden="true" />
+          <h2 style={{ marginBottom: 12 }}>{t('boardPackErrorTitle')}</h2>
+          {/* No fabricated fallback. A board pack that silently shows demo figures
+              on a failed request is the defect this slice removed. */}
+          <p style={{ opacity: 0.8, marginBottom: 8 }}>{t('boardPackErrorBody')}</p>
+          {errMsg && <p className="mono" style={{ opacity: 0.6, fontSize: 12 }}>{errMsg}</p>}
+        </div>
+      </Shell>
+    );
+  }
+
+  const h = pack.header;
+  const ex = pack.executive;
+  const orgName = (ar ? h?.organisationNameAr : h?.organisationNameEn) || brandName;
+  const generated = h?.generatedAt ? h.generatedAt.replace('T', ' ').slice(0, 16) : '—';
+  const asOf = h?.asOf ?? '';
 
   return (
     <Shell title={t('boardPackTitle')} sub={t('boardPackSub')}>
-      {/*
-        F2-42 — this page's figures are SAMPLE DATA, and until it is consolidated it must say
-        so on screen and in print.
-
-        The platform has two board packs. The real one is server-side: BoardPackService and
-        BoardPackPptxService read live repositories (organisation, risk, findings, KRI
-        definitions + measurements, changes, ethics cases, AML alerts) and are exported by
-        GET /api/v1/reporting/board-pack.pdf and .pptx — both verified returning real bytes,
-        and both already linked from the dashboard. This page renders a different thing:
-        buildBoardPack() in lib/boardPack.ts assembles its payload from eight hardcoded
-        arrays (SAUDI_APPETITES, APPROVAL_REQUESTS, CCM_CHECKS, ASSETS, CHAIN_RULES,
-        ALL_WORKFLOWS, AUDIT_ENGAGEMENTS, BREACHES). So the screen and the PDF disagree, and
-        the PDF is the correct one.
-
-        The fix is a consolidation decision, not a rewire — reconstructing on the client what
-        the server already computes would duplicate the logic and the two would drift. Until
-        that decision lands (F2-42), the honest interim measure is a banner: a board pack that
-        is unlabelled sample data is the actual defect, and labelling it costs nothing. It is
-        deliberately NOT hidden from print, because a printed pack is exactly the artefact
-        that gets quoted in a meeting.
-      */}
-      <div style={{
-        display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 16,
-        padding: '10px 14px', borderRadius: 'var(--r-sm)',
-        background: 'var(--warning-bg)', color: 'var(--warning-fg)',
-        border: '1px solid var(--warning-fg)', font: '600 12.5px var(--font-sans)',
-      }}>
-        <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-        <span>
-          {lang === 'ar'
-            ? 'بيانات نموذجية — الأرقام في هذه الصفحة توضيحية وليست بيانات مؤسستك. للحصول على حزمة المجلس الفعلية، نزّلها بصيغة PDF أو PowerPoint من لوحة المعلومات.'
-            : 'Sample data — the figures on this page are illustrative and are not your organisation’s. For the real board pack, download the PDF or PowerPoint from the dashboard.'}
-        </span>
-      </div>
-
       {/* Action bar — hidden during print */}
       <div className="bp-actions" style={{
         display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16,
@@ -82,25 +138,25 @@ export function BoardPackPage() {
         </Button>
       </div>
 
-      <div className="bp-document" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-        {/* ───── COVER ───── */}
+      <div className="bp-document" dir={ar ? 'rtl' : 'ltr'}>
+        {/* ───── 1. COVER ───── */}
         <section className="bp-page bp-cover">
           <div className="bp-cover-mark" style={brand.logoDataUrl ? { background: 'transparent', boxShadow: 'none' } : undefined}>
             {brand.logoDataUrl
-              ? <img src={brand.logoDataUrl} alt={orgName} style={{ width: 96, height: 96, objectFit: 'contain' }} />
+              ? <img src={brand.logoDataUrl} alt={orgName ?? ''} style={{ width: 96, height: 96, objectFit: 'contain' }} />
               : <ShieldCheck size={48} />}
           </div>
           <div className="bp-cover-eyebrow">{orgName}</div>
-          <h1 className="bp-cover-title">{lang === 'ar' ? pack.cover.titleAr : pack.cover.titleEn}</h1>
+          <h1 className="bp-cover-title">{t('boardPackTitle')}</h1>
           <div className="bp-cover-period">
-            {lang === 'ar' ? pack.cover.periodAr : pack.cover.periodEn}
+            {asOf ? `${t('boardPackAsOf')} ${asOf}` : ''}
           </div>
           <div className="bp-cover-meta">
             <div>
               <span className="bp-meta-label">{t('boardPackGenerated')}</span>
               <span className="bp-meta-value">
-                {pack.cover.generatedAt}
-                <span className="bp-meta-hijri"> · {pack.cover.generatedAtHijri}</span>
+                {generated}
+                {asOf && <span className="bp-meta-hijri"> · {formatHijri(asOf, lang)}</span>}
               </span>
             </div>
             <div>
@@ -108,250 +164,212 @@ export function BoardPackPage() {
               <span className="bp-meta-value">{t('boardPackConfidential')}</span>
             </div>
           </div>
-          <div className="bp-cover-tagline">
-            {orgTagline || t('boardPackCoverTagline')}
-          </div>
         </section>
 
-        {/* ───── SECTION 1: EXECUTIVE SUMMARY ───── */}
+        {/* ───── 2. EXECUTIVE SUMMARY ───── */}
         <section className="bp-page">
-          <SectionHeader idx={1} icon={Activity} title={t('boardPackS1Title')} sub={t('boardPackS1Sub')} />
+          <SectionHeader idx={2} icon={Activity} title={t('boardPackS1Title')} sub={t('boardPackS1Sub')} />
           <div className="bp-kpi-grid">
-            <KpiTile label={t('boardPackKpiActive')}     value={pack.executiveSummary.activeWorkflows}        tone="primary" />
-            <KpiTile label={t('boardPackKpiOverdue')}    value={pack.executiveSummary.overdueWorkflows}       tone={pack.executiveSummary.overdueWorkflows > 0 ? 'danger' : 'success'} />
-            <KpiTile label={t('boardPackKpiAppetite')}    value={pack.executiveSummary.appetiteBreaches}       tone={pack.executiveSummary.appetiteBreaches > 0 ? 'warning' : 'success'} />
-            <KpiTile label={t('boardPackKpiBoardApp')}    value={pack.executiveSummary.boardApprovalsPending}  tone="info" />
-            <KpiTile label={t('boardPackKpiPdpl')}        value={pack.executiveSummary.pdpl72hWindowOpen}      tone={pack.executiveSummary.pdpl72hWindowOpen > 0 ? 'warning' : 'success'} />
-            <KpiTile label={t('boardPackKpiCcm')}         value={`${pack.executiveSummary.ccmCoveragePct}%`}   tone={pack.executiveSummary.ccmCoveragePct >= 80 ? 'success' : 'warning'} />
+            <KpiTile label={t('bpKpiTotalRisks')}   value={ex?.totalRisks ?? 0}    tone="primary" />
+            <KpiTile label={t('bpKpiCriticalRisks')} value={ex?.criticalRisks ?? 0} tone={(ex?.criticalRisks ?? 0) > 0 ? 'danger' : 'success'} />
+            <KpiTile label={t('bpKpiOpenRisks')}    value={ex?.openRisks ?? 0}     tone="info" />
+            <KpiTile label={t('bpKpiOpenFindings')} value={ex?.openFindings ?? 0}  tone={(ex?.openFindings ?? 0) > 0 ? 'warning' : 'success'} />
+            <KpiTile label={t('bpKpiControls')}     value={ex?.totalControls ?? 0} tone="primary" />
+            <KpiTile label={t('bpKpiKris')}         value={ex?.totalKris ?? 0}     tone="info" />
+            <KpiTile label={t('bpKpiEthicsCases')}  value={ex?.totalEthicsCases ?? 0} tone="info" />
+            <KpiTile label={t('bpKpiStrs')}         value={ex?.strsFiled ?? 0}     tone={(ex?.strsFiled ?? 0) > 0 ? 'warning' : 'success'} />
+            <KpiTile label={t('bpKpiAmlAlerts')}    value={ex?.amlAlerts ?? 0}     tone={(ex?.amlAlerts ?? 0) > 0 ? 'warning' : 'success'} />
           </div>
         </section>
 
-        {/* ───── SECTION 2: APPETITE BREACHES ───── */}
+        {/* ───── 3. TOP RISKS ───── */}
         <section className="bp-page">
-          <SectionHeader idx={2} icon={AlertOctagon} title={t('boardPackS2Title')} sub={t('boardPackS2Sub')} />
-          {pack.appetiteBreaches.length === 0
-            ? <p className="bp-empty">{t('boardPackS2Empty')}</p>
+          <SectionHeader idx={3} icon={AlertOctagon} title={t('bpS3Title')} sub={t('bpS3Sub')} />
+          {!pack.topRisks?.length
+            ? <p className="bp-empty">{t('bpNoRows')}</p>
             : <table className="bp-table">
                 <thead>
                   <tr>
-                    <th>{t('boardPackTblStatement')}</th>
-                    <th>{t('boardPackTblSeverity')}</th>
-                    <th>{t('boardPackTblExposure')}</th>
-                    <th>{t('boardPackTblOwner')}</th>
-                    <th>{t('boardPackTblCitation')}</th>
+                    <th>{t('bpTblRef')}</th>
+                    <th>{t('bpTblRisk')}</th>
+                    <th>{t('bpTblInherent')}</th>
+                    <th>{t('bpTblResidual')}</th>
+                    <th>{t('bpTblStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pack.appetiteBreaches.map(({ statement, severity, workflow }) => (
-                    <tr key={statement.id}>
-                      <td><strong>{lang === 'ar' && statement.titleAr ? statement.titleAr : statement.titleEn}</strong></td>
-                      <td><span className={`bp-pill bp-pill-${severityClass(severity)}`}>
-                        {appetiteSeverityLabel(severity, lang)}
-                      </span></td>
-                      <td className="mono">{statement.currentExposure}{statement.unit ? ` ${statement.unit}` : ''} / {statement.toleranceUpper}{statement.unit ? ` ${statement.unit}` : ''}</td>
-                      <td>{statement.approvedBy ?? '—'}</td>
-                      <td className="bp-citation">{workflow.reason}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-          }
-        </section>
-
-        {/* ───── SECTION 3: BOARD-LEVEL APPROVALS ───── */}
-        <section className="bp-page">
-          <SectionHeader idx={3} icon={ClipboardCheck} title={t('boardPackS3Title')} sub={t('boardPackS3Sub')} />
-          {pack.boardApprovals.length === 0
-            ? <p className="bp-empty">{t('boardPackS3Empty')}</p>
-            : <table className="bp-table">
-                <thead>
-                  <tr>
-                    <th>{t('boardPackTblSubject')}</th>
-                    <th>{t('boardPackTblModule')}</th>
-                    <th>{t('boardPackTblNeedsApproval')}</th>
-                    <th>{t('boardPackTblDue')}</th>
-                    <th>{t('boardPackTblCitation')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pack.boardApprovals.map(req => {
-                    const outstandingBoardRoles = req.approverRoles.filter(role =>
-                      ['BOARD', 'AUDIT_COMMITTEE', 'RISK_COMMITTEE', 'SHARIA_COMMITTEE'].includes(role)
-                      && !req.decisions.some(d => d.role === role && d.decision === 'APPROVED'),
-                    );
-                    return (
-                      <tr key={req.id}>
-                        <td><strong>{lang === 'ar' ? req.titleAr : req.titleEn}</strong></td>
-                        <td>{req.module}</td>
-                        <td>{outstandingBoardRoles.map(r => {
-                          const p = APPROVER_REGISTRY[r];
-                          return lang === 'ar' ? p.titleAr : p.titleEn;
-                        }).join(', ')}</td>
-                        <td className="mono">{req.dueDate}<br /><span className="bp-meta-hijri">{formatHijri(req.dueDate, lang)}</span></td>
-                        <td className="bp-citation">{req.regulatorCitation ?? '—'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-          }
-        </section>
-
-        {/* ───── SECTION 4: AUDIT ENGAGEMENTS ───── */}
-        <section className="bp-page">
-          <SectionHeader idx={4} icon={Stamp} title={t('boardPackS4Title')} sub={t('boardPackS4Sub')} />
-          {pack.auditEngagements.length === 0
-            ? <p className="bp-empty">{t('boardPackS4Empty')}</p>
-            : <table className="bp-table">
-                <thead>
-                  <tr>
-                    <th>{t('boardPackTblEngagement')}</th>
-                    <th>{t('boardPackTblFramework')}</th>
-                    <th>{t('boardPackTblFirm')}</th>
-                    <th>{t('boardPackTblMilestone')}</th>
-                    <th>{t('boardPackTblDaysLeft')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pack.auditEngagements.map(e => (
-                    <tr key={e.code}>
-                      <td><strong>{e.titleEn}</strong><br /><span className="mono">{e.code}</span></td>
-                      <td>{e.framework.replace(/_/g, ' ')}</td>
-                      <td>{e.auditorFirm ?? '—'}<br /><span className="bp-meta-hijri">{e.leadAuditor ?? ''}</span></td>
-                      <td>{lang === 'ar' ? e.currentMilestoneAr : e.currentMilestoneEn}<br />
-                          {e.currentMilestoneDate && <span className="mono bp-meta-hijri">{e.currentMilestoneDate} · {formatHijri(e.currentMilestoneDate, lang)}</span>}</td>
+                  {pack.topRisks.map(r => (
+                    <tr key={r.id ?? r.reference}>
+                      <td className="mono">{r.reference ?? '—'}</td>
+                      <td>{(ar ? r.titleAr : r.titleEn) || r.titleEn || '—'}</td>
+                      <td className="mono">{r.inherentScore ?? '—'}</td>
                       <td className="mono">
-                        {e.daysRemaining != null
-                          ? <span className={e.daysRemaining < 0 ? 'bp-pill bp-pill-danger' : e.daysRemaining <= 5 ? 'bp-pill bp-pill-warning' : ''}>
-                              {e.daysRemaining < 0 ? `${-e.daysRemaining}d ${t('boardPackOverdue')}` : `${e.daysRemaining}d`}
-                            </span>
-                          : '—'}
+                        <span className={`bp-pill bp-pill-${scoreTone(r.residualScore)}`}>{r.residualScore ?? '—'}</span>
                       </td>
+                      <td>{r.status ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
-          }
+              </table>}
         </section>
 
-        {/* ───── SECTION 5: PDPL POSTURE ───── */}
+        {/* ───── 4. FINDINGS AGING ───── */}
         <section className="bp-page">
-          <SectionHeader idx={5} icon={Fingerprint} title={t('boardPackS5Title')} sub={t('boardPackS5Sub')} />
+          <SectionHeader idx={4} icon={ClipboardCheck} title={t('bpS4Title')} sub={t('bpS4Sub')} />
           <div className="bp-kpi-grid bp-kpi-grid-3">
-            <KpiTile label={t('boardPackPdplOpen')}     value={pack.pdpl.open}     tone="info" />
-            <KpiTile label={t('boardPackPdplInWindow')} value={pack.pdpl.in72hWindow} tone={pack.pdpl.in72hWindow > 0 ? 'warning' : 'success'} />
-            <KpiTile label={t('boardPackPdplBreached')} value={pack.pdpl.breached72h} tone={pack.pdpl.breached72h > 0 ? 'danger' : 'success'} />
+            <KpiTile label={t('bpAgingOpen')}      value={pack.aging?.totalOpen ?? 0}  tone="primary" />
+            <KpiTile label={t('bpAgingOnTrack')}   value={pack.aging?.onTrack ?? 0}    tone="success" />
+            <KpiTile label={t('bpAgingManager')}   value={pack.aging?.manager ?? 0}    tone="info" />
+            <KpiTile label={t('bpAgingDirector')}  value={pack.aging?.director ?? 0}   tone="warning" />
+            <KpiTile label={t('bpAgingExecutive')} value={pack.aging?.executive ?? 0}  tone={(pack.aging?.executive ?? 0) > 0 ? 'danger' : 'success'} />
+            <KpiTile label={t('bpAgingClosed')}    value={pack.aging?.closed ?? 0}     tone="success" />
           </div>
-          {pack.pdpl.sampleBreach && (
-            <div className="bp-callout">
-              <div className="bp-callout-title">{t('boardPackPdplActiveCase')}</div>
-              <div><strong>{pack.pdpl.sampleBreach.titleEn}</strong></div>
-              <div className="bp-callout-meta">
-                {t('boardPackPdplSeverity')}: {pack.pdpl.sampleBreach.severity} ·
-                {' '}{pack.pdpl.sampleBreach.hoursRemaining < 0
-                  ? `${Math.round(-pack.pdpl.sampleBreach.hoursRemaining)}h ${t('boardPackOverdue')}`
-                  : `${Math.round(pack.pdpl.sampleBreach.hoursRemaining)}h ${t('boardPackToSdaia')}`}
-              </div>
-            </div>
+        </section>
+
+        {/* ───── 5. OLDEST OPEN FINDINGS ───── */}
+        <section className="bp-page">
+          <SectionHeader idx={5} icon={Stamp} title={t('bpS5Title')} sub={t('bpS5Sub')} />
+          {!pack.oldestOpenFindings?.length
+            ? <p className="bp-empty">{t('bpNoRows')}</p>
+            : <table className="bp-table">
+                <thead>
+                  <tr>
+                    <th>{t('bpTblFinding')}</th>
+                    <th>{t('bpTblSeverity')}</th>
+                    <th>{t('bpTblOwner')}</th>
+                    <th>{t('bpTblDaysOpen')}</th>
+                    <th>{t('bpTblStatus')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pack.oldestOpenFindings.map(f => (
+                    <tr key={f.id ?? f.title}>
+                      <td>{f.title ?? '—'}</td>
+                      <td><span className={`bp-pill bp-pill-${severityTone(f.severity)}`}>{f.severity ?? '—'}</span></td>
+                      <td>{f.owner ?? '—'}</td>
+                      <td className="mono">{f.daysOpen ?? '—'}</td>
+                      <td>{f.status ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>}
+        </section>
+
+        {/* ───── 6. KRI BANDS ───── */}
+        <section className="bp-page">
+          <SectionHeader idx={6} icon={Fingerprint} title={t('bpS6Title')} sub={t('bpS6Sub')} />
+          <div className="bp-kpi-grid bp-kpi-grid-3">
+            <KpiTile label={t('bpKriGreen')}  value={pack.kris?.green ?? 0}  tone="success" />
+            <KpiTile label={t('bpKriAmber')}  value={pack.kris?.amber ?? 0}  tone="warning" />
+            <KpiTile label={t('bpKriRed')}    value={pack.kris?.red ?? 0}    tone={(pack.kris?.red ?? 0) > 0 ? 'danger' : 'success'} />
+            <KpiTile label={t('bpKriNoData')} value={pack.kris?.noData ?? 0} tone="info" />
+          </div>
+          {!!pack.kris?.rows?.length && (
+            <table className="bp-table" style={{ marginTop: 12 }}>
+              <thead>
+                <tr>
+                  <th>{t('bpTblKri')}</th>
+                  <th>{t('bpTblBand')}</th>
+                  <th>{t('bpTblLatest')}</th>
+                  <th>{t('bpTblGreen')}</th>
+                  <th>{t('bpTblAmber')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pack.kris.rows.map(k => (
+                  <tr key={k.id ?? k.code}>
+                    <td><strong className="mono">{k.code ?? '—'}</strong> — {(ar ? k.titleAr : k.titleEn) || k.titleEn || ''}</td>
+                    <td><span className={`bp-pill bp-pill-${bandTone(k.band)}`}>{k.band ?? '—'}</span></td>
+                    <td className="mono">{k.latestValue ?? '—'}</td>
+                    <td className="mono">{k.greenThreshold ?? '—'}</td>
+                    <td className="mono">{k.amberThreshold ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </section>
 
-        {/* ───── SECTION 6: CCM COVERAGE ───── */}
+        {/* ───── 7. FRAMEWORK COVERAGE ───── */}
         <section className="bp-page">
-          <SectionHeader idx={6} icon={FileText} title={t('boardPackS6Title')} sub={t('boardPackS6Sub')} />
-          <div className="bp-kpi-grid">
-            <KpiTile label={t('boardPackCcmTotal')}    value={pack.ccm.totalChecks}     tone="primary" />
-            <KpiTile label={t('boardPackCcmFresh')}    value={pack.ccm.fresh}            tone="success" />
-            <KpiTile label={t('boardPackCcmStale')}    value={pack.ccm.stale}            tone="warning" />
-            <KpiTile label={t('boardPackCcmExpired')}  value={pack.ccm.expired}          tone={pack.ccm.expired > 0 ? 'danger' : 'success'} />
-            <KpiTile label={t('boardPackCcmCoverage')}  value={`${pack.ccm.coveragePct}%`} tone={pack.ccm.coveragePct >= 80 ? 'success' : 'warning'} />
-            <KpiTile label={t('boardPackCcmControls')}  value={pack.ccm.controlsCovered}  tone="info" />
-          </div>
-        </section>
-
-        {/* ───── SECTION 7: ASSET HOT-SPOTS ───── */}
-        <section className="bp-page">
-          <SectionHeader idx={7} icon={Server} title={t('boardPackS7Title')} sub={t('boardPackS7Sub')} />
-          <table className="bp-table">
-            <thead>
-              <tr>
-                <th>{t('boardPackTblAsset')}</th>
-                <th>{t('boardPackTblType')}</th>
-                <th>{t('boardPackTblCriticality')}</th>
-                <th>{t('boardPackTblBlast')}</th>
-                <th>{t('boardPackTblResidency')}</th>
-                <th>{t('boardPackTblRegulators')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pack.topAssets.map(a => (
-                <tr key={a.code}>
-                  <td><strong>{lang === 'ar' ? a.nameAr : a.nameEn}</strong><br /><span className="mono">{a.code}</span></td>
-                  <td>{a.type.replace(/_/g, ' ')}</td>
-                  <td><span className={`bp-pill bp-pill-${critClass(a.criticality)}`}>{a.criticality}</span></td>
-                  <td className="mono">{a.transitiveImpact}</td>
-                  <td>{a.dataResidency}</td>
-                  <td>{a.regulatorScope.filter(r => r !== 'NONE').join(', ') || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-
-        {/* ───── SECTION 8: CHAIN FIRES ───── */}
-        <section className="bp-page">
-          <SectionHeader idx={8} icon={GitBranch} title={t('boardPackS8Title')} sub={t('boardPackS8Sub')} />
-          {pack.recentChainFires.length === 0
-            ? <p className="bp-empty">{t('boardPackS8Empty')}</p>
+          <SectionHeader idx={7} icon={FileText} title={t('bpS7Title')} sub={t('bpS7Sub')} />
+          {!pack.frameworkCoverage?.length
+            ? <p className="bp-empty">{t('bpNoRows')}</p>
             : <table className="bp-table">
                 <thead>
                   <tr>
-                    <th>{t('boardPackTblRule')}</th>
-                    <th>{t('boardPackTblFrom')}</th>
-                    <th>{t('boardPackTblTo')}</th>
-                    <th>{t('boardPackTblFiredAt')}</th>
+                    <th>{t('bpTblFramework')}</th>
+                    <th>{t('bpTblControls')}</th>
+                    <th>{t('bpTblPolicies')}</th>
+                    <th>{t('bpTblFullPct')}</th>
+                    <th>{t('bpTblOpenFindings')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pack.recentChainFires.slice(0, 10).map(f => (
-                    <tr key={f.id}>
-                      <td><strong>{lang === 'ar' ? f.ruleNameAr : f.ruleNameEn}</strong></td>
-                      <td className="mono">{f.triggerModule} · {f.triggerSourceRef}</td>
-                      <td className="mono">{f.spawnedModule} · {f.spawnedRef}</td>
-                      <td className="mono">{f.firedAt.slice(0, 16).replace('T', ' ')}</td>
+                  {pack.frameworkCoverage.map(f => (
+                    <tr key={f.code}>
+                      <td><strong>{f.code}</strong> — {(ar ? f.nameAr : f.nameEn) || f.nameEn || ''}</td>
+                      <td className="mono">{f.controls}</td>
+                      <td className="mono">{f.policies}</td>
+                      <td className="mono">
+                        <span className={`bp-pill bp-pill-${pctTone(f.fullPct)}`}>{f.fullPct == null ? '—' : `${f.fullPct}%`}</span>
+                      </td>
+                      <td className="mono">{f.openFindings}</td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
-          }
+              </table>}
         </section>
 
-        {/* ───── SECTION 9: REGULATORS ───── */}
+        {/* ───── 8. CHANGE OUTCOMES ───── */}
         <section className="bp-page">
-          <SectionHeader idx={9} icon={Landmark} title={t('boardPackS9Title')} sub={t('boardPackS9Sub')} />
-          <table className="bp-table">
-            <thead>
-              <tr>
-                <th>{t('boardPackTblRegulator')}</th>
-                <th>{t('boardPackTblItems')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pack.regulators.map(r => (
-                <tr key={r.code}>
-                  <td>
-                    <strong>{r.code}</strong> — {lang === 'ar' ? r.nameAr : r.nameEn}
-                  </td>
-                  <td className="mono">{r.activeItems}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <SectionHeader idx={8} icon={GitBranch} title={t('bpS8Title')} sub={t('bpS8Sub')} />
+          <div className="bp-kpi-grid bp-kpi-grid-3">
+            <KpiTile label={t('bpChgTotal')}      value={pack.changes?.total ?? 0}      tone="primary" />
+            <KpiTile label={t('bpChgInFlight')}   value={pack.changes?.inFlight ?? 0}   tone="info" />
+            <KpiTile label={t('bpChgSuccess')}    value={pack.changes?.success ?? 0}    tone="success" />
+            <KpiTile label={t('bpChgRolledBack')} value={pack.changes?.rolledBack ?? 0} tone={(pack.changes?.rolledBack ?? 0) > 0 ? 'warning' : 'success'} />
+            <KpiTile label={t('bpChgEmergency')}  value={pack.changes?.emergency ?? 0}  tone={(pack.changes?.emergency ?? 0) > 0 ? 'warning' : 'success'} />
+          </div>
+        </section>
+
+        {/* ───── 9. ETHICS & FINANCIAL CRIME ───── */}
+        <section className="bp-page">
+          <SectionHeader idx={9} icon={Landmark} title={t('bpS9Title')} sub={t('bpS9Sub')} />
+          <div className="bp-kpi-grid bp-kpi-grid-3">
+            <KpiTile label={t('bpEthTotal')}         value={pack.ethics?.totalCases ?? 0}        tone="primary" />
+            <KpiTile label={t('bpEthOpen')}          value={pack.ethics?.open ?? 0}              tone="info" />
+            <KpiTile label={t('bpEthSubstantiated')} value={pack.ethics?.substantiated ?? 0}     tone={(pack.ethics?.substantiated ?? 0) > 0 ? 'warning' : 'success'} />
+            <KpiTile label={t('bpEthBribery')}       value={pack.ethics?.briberyOrKickback ?? 0} tone={(pack.ethics?.briberyOrKickback ?? 0) > 0 ? 'danger' : 'success'} />
+            <KpiTile label={t('bpEthAml')}           value={pack.ethics?.amlSuspicion ?? 0}      tone={(pack.ethics?.amlSuspicion ?? 0) > 0 ? 'warning' : 'success'} />
+            <KpiTile label={t('bpEthRetaliation')}   value={pack.ethics?.retaliation ?? 0}       tone={(pack.ethics?.retaliation ?? 0) > 0 ? 'danger' : 'success'} />
+          </div>
+        </section>
+
+        {/* ───── 10. SUSTAINABILITY ───── */}
+        <section className="bp-page">
+          <SectionHeader idx={10} icon={Leaf} title={t('bpS10Title')} sub={t('bpS10Sub')} />
+          {/* `available: false` renders as unavailable, NOT as zeroes — a board pack
+              reporting 0 tCO2e reads as "we emit nothing", which is a different and
+              much worse claim than "this section could not be computed". */}
+          {!pack.sustainability?.available
+            ? <p className="bp-empty">{t('bpSustUnavailable')}</p>
+            : <div className="bp-kpi-grid bp-kpi-grid-3">
+                <KpiTile label={t('bpSustScore')}   value={fmt(pack.sustainability.esgScore)} tone="primary" />
+                <KpiTile label={t('bpSustBand')}    value={pack.sustainability.esgBand ?? '—'} tone="info" />
+                <KpiTile label={t('bpSustGhg')}     value={fmt(pack.sustainability.ghgTotal)} tone="info" />
+                <KpiTile label={t('bpSustScope3')}  value={fmt(pack.sustainability.scope3Total)} tone="info" />
+                <KpiTile label={t('bpSustCma')}     value={pct(pack.sustainability.cmaReadinessPct)} tone="primary" />
+                <KpiTile label={t('bpSustTcfd')}    value={pct(pack.sustainability.tcfdAlignmentPct)} tone="primary" />
+                <KpiTile label={t('bpSustSgi')}     value={`${pack.sustainability.sgiOnTrack}/${pack.sustainability.sgiTotal}`} tone="success" />
+                <KpiTile label={t('bpSustCapas')}   value={fmt(pack.sustainability.openCapas)} tone={(pack.sustainability.openCapas ?? 0) > 0 ? 'warning' : 'success'} />
+                <KpiTile label={t('bpSustGaps')}    value={pack.sustainability.topGapCount} tone={pack.sustainability.topGapCount > 0 ? 'warning' : 'success'} />
+              </div>}
         </section>
 
         {/* ───── SIGN-OFF ───── */}
         <section className="bp-page bp-signoff">
-          <SectionHeader idx={10} icon={AlertTriangle} title={t('boardPackS10Title')} sub={t('boardPackS10Sub')} />
+          <SectionHeader idx={11} icon={AlertTriangle} title={t('boardPackS10Title')} sub={t('boardPackS10Sub')} />
           <div className="bp-signoff-grid">
             <div className="bp-signoff-cell">
               <div className="bp-signoff-line"></div>
@@ -370,11 +388,16 @@ export function BoardPackPage() {
               <div className="bp-signoff-label">{t('boardPackSignCEO')}</div>
             </div>
           </div>
-          <p className="bp-methodology">{t('boardPackMethodology')}</p>
+          <p className="bp-methodology">{t('bpProvenance')}</p>
         </section>
       </div>
     </Shell>
   );
+}
+
+/** Does the current user hold BOARD:EXPORT? Used by the sidebar to hide the entry. */
+export function canSeeBoardPack(): boolean {
+  return canExport('BOARD');
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -400,9 +423,24 @@ function KpiTile({ label, value, tone }: { label: string; value: string | number
   );
 }
 
-function severityClass(s: string): string {
-  return s === 'CRITICAL' ? 'danger' : s === 'EXCEEDED' ? 'warning' : s === 'WARNING' ? 'info' : 'success';
+/** `null` renders as an em dash, never as 0 — an absent figure is not a zero one. */
+function fmt(v: number | null | undefined): string {
+  return v == null ? '—' : Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
-function critClass(c: string): string {
-  return c === 'CRITICAL' ? 'danger' : c === 'HIGH' ? 'warning' : c === 'MEDIUM' ? 'info' : 'success';
+function pct(v: number | null | undefined): string {
+  return v == null ? '—' : `${Math.round(v)}%`;
+}
+function scoreTone(s: number | null): string {
+  if (s == null) return 'info';
+  return s >= 20 ? 'danger' : s >= 12 ? 'warning' : s >= 6 ? 'info' : 'success';
+}
+function severityTone(s: string | null): string {
+  return s === 'CRITICAL' ? 'danger' : s === 'HIGH' ? 'warning' : s === 'MEDIUM' ? 'info' : 'success';
+}
+function bandTone(b: string | null): string {
+  return b === 'RED' ? 'danger' : b === 'AMBER' ? 'warning' : b === 'GREEN' ? 'success' : 'info';
+}
+function pctTone(p: number | null): string {
+  if (p == null) return 'info';
+  return p >= 80 ? 'success' : p >= 50 ? 'warning' : 'danger';
 }

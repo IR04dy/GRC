@@ -200,8 +200,21 @@ export function skuForPath(pathname: string): RatifiedSku | null {
 
 // ─── Navigation filtering ─────────────────────────────────────────────────
 
-/** Structural minimum this filter needs; Sidebar's `NavItem` satisfies it. */
-export interface GatedNavItem { to: string; children?: GatedNavItem[] }
+/**
+ * Structural minimum this filter needs; Sidebar's `NavItem` satisfies it.
+ *
+ * `gate` is an optional per-item predicate for concerns that are **not**
+ * entitlement — today only `BOARD:EXPORT` on the board pack (F2-42). It lives on
+ * the item rather than in a second parameter so there is one filter, one
+ * group-emptying rule, and the reason an entry can vanish is declared next to the
+ * entry. Entitlement asks *did this tenant buy it*; a gate asks *may this user see
+ * it*. Both can hide a row and they are not the same question.
+ */
+export interface GatedNavItem {
+  to: string;
+  children?: GatedNavItem[];
+  gate?: () => boolean;
+}
 /** Structural minimum this filter needs; Sidebar's `NavGroup` satisfies it. */
 export interface GatedNavGroup<I extends GatedNavItem> { items: I[] }
 
@@ -226,13 +239,17 @@ export function filterNavByEntitlement<I extends GatedNavItem, G extends GatedNa
   groups: readonly G[],
   isEnabled: (sku: RatifiedSku | null) => boolean,
 ): G[] {
-  const keep = (to: string) => isEnabled(skuForPath(to));
+  // `gate?.() !== false` rather than `gate?.() ?? true`: an item with no gate and
+  // an item whose gate says yes must behave identically, and only the !== form
+  // keeps a gate that throws or returns undefined from hiding the row.
+  const keep = (it: GatedNavItem) =>
+    isEnabled(skuForPath(it.to)) && it.gate?.() !== false;
   const out: G[] = [];
   for (const g of groups) {
     const items: I[] = [];
     for (const it of g.items) {
-      const children = it.children?.filter(c => keep(c.to)) as I['children'];
-      if (keep(it.to) || (children && children.length > 0)) {
+      const children = it.children?.filter(c => keep(c)) as I['children'];
+      if (keep(it) || (children && children.length > 0)) {
         items.push(children ? { ...it, children } : it);
       }
     }
