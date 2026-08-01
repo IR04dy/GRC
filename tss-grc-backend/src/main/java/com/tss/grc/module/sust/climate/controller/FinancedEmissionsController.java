@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.climate.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.FeLifecycleTransitionRequest;
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.FinancedEmissionsRequest;
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.FinancedEmissionsResponse;
@@ -29,6 +30,7 @@ import java.util.UUID;
 // S-M — canonical /api/v1/sustainability/*; legacy /api/v1/climate/* kept as alias.
 @RequestMapping({"/api/v1/sustainability/financed-emissions", "/api/v1/climate/financed-emissions"})
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Financed Emissions (PCAF)")
 @SecurityRequirement(name = "bearerAuth")
 public class FinancedEmissionsController {

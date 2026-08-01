@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.scenario.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.scenario.dto.RiskScenarioDtos.ArchiveRequest;
 import com.tss.grc.module.risk.scenario.dto.RiskScenarioDtos.CreateRequest;
 import com.tss.grc.module.risk.scenario.dto.RiskScenarioDtos.RejectRequest;
@@ -42,6 +43,7 @@ import java.util.List;
 // unversioned /api/risk/scenarios stays as a deprecated back-compat alias.
 @RequestMapping({"/api/v1/risk/scenarios", "/api/risk/scenarios"})
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "Risk Scenarios")
 @SecurityRequirement(name = "bearerAuth")
 public class RiskScenarioController {

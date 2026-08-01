@@ -2,6 +2,7 @@ package com.tss.grc.module.ndi.opex.controller;
 
 import com.tss.grc.module.ndi.opex.entity.NdiOperationalExcellenceKpi;
 import com.tss.grc.module.ndi.opex.service.NdiOperationalExcellenceKpiService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,6 +32,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ndi/opex")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "NDI — Operational Excellence KPIs")
 public class NdiOperationalExcellenceKpiController {
 

@@ -3,6 +3,7 @@ package com.tss.grc.module.ndi.domain.controller;
 import com.tss.grc.module.ndi.domain.entity.NdiGovernanceDomain;
 import com.tss.grc.module.ndi.domain.service.NdiGovernanceDomainService;
 import com.tss.grc.module.ndi.domain.service.NdiGovernanceDomainService.CycleRollup;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/ndi/domains")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "NDI — Governance Domains")
 public class NdiGovernanceDomainController {
 

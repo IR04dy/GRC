@@ -10,6 +10,7 @@ import com.tss.grc.module.ethics.whistleblower.dto.WhistleblowerDtos.ReporterRep
 import com.tss.grc.module.ethics.whistleblower.dto.WhistleblowerDtos.TriageRequest;
 import com.tss.grc.module.ethics.whistleblower.dto.WhistleblowerDtos.UpdateResponse;
 import com.tss.grc.module.ethics.whistleblower.service.WhistleblowerCaseService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -44,6 +45,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/ethics/whistleblower")
 @RequiredArgsConstructor
+@RequireModule("ETHICS")
 @Tag(name = "Ethics — Whistleblower Hotline (Sprint 13)")
 @SecurityRequirement(name = "bearerAuth")
 public class WhistleblowerCaseController {

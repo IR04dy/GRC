@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.dto.RiskRequest;
 import com.tss.grc.module.risk.dto.RiskResponse;
 import com.tss.grc.module.risk.service.RiskService;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/risk/risks")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "Risk Management")
 @SecurityRequirement(name = "bearerAuth")
 public class RiskController {

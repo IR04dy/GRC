@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.dto.RiskReportDtos.AppetiteBreachRow;
 import com.tss.grc.module.risk.dto.RiskReportDtos.AuditPackage;
 import com.tss.grc.module.risk.dto.RiskReportDtos.RegisterStats;
@@ -27,6 +28,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/risk/reports")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "Risk Management — Reports & Audit Package")
 @SecurityRequirement(name = "bearerAuth")
 public class RiskReportController {

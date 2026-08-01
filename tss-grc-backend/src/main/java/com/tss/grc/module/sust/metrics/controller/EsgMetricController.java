@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.metrics.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.metrics.dto.EsgMetricCreateRequest;
 import com.tss.grc.module.sust.metrics.entity.EsgMetric;
 import com.tss.grc.module.sust.metrics.service.EsgMetricService;
@@ -22,6 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sustainability/metrics")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — ESG Metrics (E/S/G)")
 public class EsgMetricController {
 

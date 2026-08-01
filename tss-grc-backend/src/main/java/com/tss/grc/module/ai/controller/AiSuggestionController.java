@@ -3,6 +3,7 @@ package com.tss.grc.module.ai.controller;
 import com.tss.grc.module.ai.entity.AiSuggestion;
 import com.tss.grc.module.ai.service.AiSuggestionService;
 import com.tss.grc.module.ai.service.AiSuggestionService.*;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,6 +34,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/ai")
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "AI-assisted features (Saudi GRC §27)")
 public class AiSuggestionController {
 

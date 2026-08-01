@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.fair;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.fair.FairCalculatorService.FairInputs;
 import com.tss.grc.module.risk.fair.FairCalculatorService.FairResult;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/risk/fair")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "Risk — FAIR calculator")
 public class FairCalculatorController {
 

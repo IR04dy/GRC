@@ -1,5 +1,6 @@
 package com.tss.grc.common.exception;
 
+import com.tss.grc.module.platform.licensing.guard.ModuleDisabledException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -147,6 +148,47 @@ public class GlobalExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         pd.setTitle("Resource Not Found");
         pd.setType(URI.create("https://grc.tss.com/errors/not-found"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /**
+     * <b>F2-84 — the entitlement guard had never once returned 403.</b>
+     *
+     * <p>{@link ModuleDisabledException} carries {@code @ResponseStatus(FORBIDDEN)} and no handler,
+     * which is resolved by Spring's {@code ResponseStatusExceptionResolver} — and that resolver runs
+     * <i>after</i> this {@code @RestControllerAdvice}, so {@link #handleGeneral} claimed it first and
+     * returned <b>500 {@code errors/internal}</b>. The mechanism is the one already documented three
+     * handlers below for {@link ResponseStatusException}; nobody connected it to the licence guard.
+     *
+     * <p>It stayed invisible because it was <em>unreachable</em>: entitlement covered only
+     * {@code socops}, every tenant holds {@code SOCOPS}, and there are no socops controller tests —
+     * so the guard's <b>failure</b> path had never executed. F2-04's sweep to 197 controllers turned
+     * that from latent into the platform's answer to "you have not bought this module".
+     *
+     * <p>Why a 500 here is worse than it looks. In dev, {@code grc.errors.verbose=true} leaked the
+     * exception class and root message, which is how the probe caught it. In <b>prod</b>
+     * SEC-CFG-001 strips both, so a customer who simply has not licensed a module received a bare
+     * {@code Internal Server Error} plus a correlation id — indistinguishable from an outage, and
+     * the support path is a bug report rather than a sales conversation. It also broke the claim in
+     * this exception's own javadoc ("Mapped to HTTP 403 Forbidden so the frontend can distinguish
+     * licensing failures"), ADR-013, and the SKU catalogue's "server-denied when unlicensed".
+     *
+     * <p>{@code moduleCode} is exposed as a structured property deliberately. A 403 whose body does
+     * not say <em>which</em> module is missing forces the frontend to guess, which is the F2-80 shape
+     * — a handler that discards what the thrower knew. The organisation id is the caller's own, taken
+     * from their JWT, so echoing it tells them nothing they did not send.
+     */
+    @ExceptionHandler(ModuleDisabledException.class)
+    public ProblemDetail handleModuleDisabled(ModuleDisabledException ex) {
+        log.info("[entitlement] org={} denied module={}", ex.getOrganisationId(), ex.getModuleCode());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN,
+            "Your organisation is not licensed for the " + ex.getModuleCode()
+            + " module. Contact your administrator to enable it.");
+        pd.setTitle("Module Not Licensed");
+        pd.setType(URI.create("https://grc.tss.com/errors/module-not-licensed"));
+        pd.setProperty("moduleCode", ex.getModuleCode());
+        pd.setProperty("organisationId", ex.getOrganisationId());
         pd.setProperty("timestamp", Instant.now());
         return pd;
     }

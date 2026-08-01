@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.climate.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.AnnualClimateReport;
 import com.tss.grc.module.sust.climate.entity.ClimateReport;
 import com.tss.grc.module.sust.climate.service.ClimateReportExportService;
@@ -38,6 +39,7 @@ import java.util.List;
 // S-M — canonical /api/v1/sustainability/*; legacy /api/v1/climate/* kept as alias.
 @RequestMapping({"/api/v1/sustainability/report", "/api/v1/climate/report"})
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Annual Climate Report (IFRS S2 / TCFD)")
 @SecurityRequirement(name = "bearerAuth")
 public class ClimateReportController {

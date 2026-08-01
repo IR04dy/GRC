@@ -2,6 +2,7 @@ package com.tss.grc.module.ethics.controller;
 
 import com.tss.grc.module.ethics.entity.Disclosure;
 import com.tss.grc.module.ethics.service.DisclosureService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/ethics/disclosures")
 @RequiredArgsConstructor
+@RequireModule("ETHICS")
 @Tag(name = "Ethics & Compliance — Disclosures (CoI / Gifts / Hospitality)")
 @SecurityRequirement(name = "bearerAuth")
 public class DisclosureController {

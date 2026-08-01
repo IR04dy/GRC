@@ -2,6 +2,7 @@ package com.tss.grc.module.dataclass.controller;
 
 import com.tss.grc.module.dataclass.dto.DataclassDtos.*;
 import com.tss.grc.module.dataclass.service.DataclassService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/dataclass")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 public class DataclassController {
 
     private static final String READ = "hasAnyRole('PLATFORM_ADMIN','COMPLIANCE_OFFICER','AUDITOR','DPO','CISO','CIO','RISK_MANAGER')";

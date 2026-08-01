@@ -11,6 +11,7 @@ import com.tss.grc.module.iam.governance.dto.GovernanceDtos.RoleMatrixResponse;
 import com.tss.grc.module.iam.governance.dto.GovernanceDtos.RoleSummary;
 import com.tss.grc.module.iam.governance.dto.GovernanceDtos.RoleUpsertRequest;
 import com.tss.grc.module.iam.governance.service.AccessGovernanceService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -38,6 +39,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/iam/governance")
 @RequiredArgsConstructor
+@RequireModule("ACCESS_GOV")
 @Tag(name = "IAM — Access governance (roles / matrix / effective access)")
 public class AccessGovernanceController {
 

@@ -3,6 +3,7 @@ package com.tss.grc.module.ai.governance.controller;
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.MlModelAuditRequest;
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.MlModelAuditResponse;
 import com.tss.grc.module.ai.governance.service.MlModelAuditService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,6 +27,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/ai/models/{externalId}/audits")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "AI/ML Model Audits")
 @SecurityRequirement(name = "bearerAuth")
 public class MlModelAuditController {

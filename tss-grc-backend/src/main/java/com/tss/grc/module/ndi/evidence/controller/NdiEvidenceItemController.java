@@ -3,6 +3,7 @@ package com.tss.grc.module.ndi.evidence.controller;
 import com.tss.grc.module.ndi.evidence.entity.NdiEvidenceItem;
 import com.tss.grc.module.ndi.evidence.service.NdiEvidenceItemService;
 import com.tss.grc.module.ndi.evidence.service.NdiEvidenceItemService.EvidenceAggregate;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,6 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ndi/evidence")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "NDI — Evidence Repository")
 public class NdiEvidenceItemController {
 

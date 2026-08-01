@@ -1,5 +1,6 @@
 package com.tss.grc.module.scm.resilience.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.TestCreateRequest;
 import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.TestResponse;
 import com.tss.grc.module.scm.resilience.entity.SupplierResilienceTest;
@@ -18,6 +19,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/scm/resilience/tests")
 @RequiredArgsConstructor
+@RequireModule("TPRM")
 @Tag(name = "Supplier resilience tests")
 public class SupplierResilienceTestController {
 

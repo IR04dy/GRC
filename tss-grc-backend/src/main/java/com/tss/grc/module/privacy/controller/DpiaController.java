@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.entity.Dpia;
 import com.tss.grc.module.privacy.entity.DpiaMitigation;
 import com.tss.grc.module.privacy.entity.DpiaQuestion;
@@ -20,6 +21,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/privacy/dpias")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "Privacy — DPIA")
 @SecurityRequirement(name = "bearerAuth")
 public class DpiaController {

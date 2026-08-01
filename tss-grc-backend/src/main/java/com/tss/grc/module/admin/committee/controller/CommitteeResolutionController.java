@@ -4,6 +4,7 @@ import com.tss.grc.module.admin.committee.dto.CommitteeDtos.ResolutionVoteReques
 import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolutionVote;
 import com.tss.grc.module.admin.committee.service.CommitteeResolutionService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/committees/resolutions")
 @RequiredArgsConstructor
+@RequireModule("BOARD")
 public class CommitteeResolutionController {
 
     private final CommitteeResolutionService service;

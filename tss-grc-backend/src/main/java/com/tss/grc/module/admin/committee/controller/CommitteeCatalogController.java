@@ -5,6 +5,7 @@ import com.tss.grc.module.admin.committee.entity.CommitteeStandingItem;
 import com.tss.grc.module.admin.committee.entity.CommitteeTemplate;
 import com.tss.grc.module.admin.committee.service.CommitteeCatalogService;
 import com.tss.grc.module.admin.committee.service.CommitteeFormExportService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -26,6 +27,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/committees/catalog")
 @RequiredArgsConstructor
+@RequireModule("BOARD")
 public class CommitteeCatalogController {
 
     private final CommitteeCatalogService    catalog;

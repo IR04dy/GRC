@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.sgi.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.sgi.dto.SgiCreateRequest;
 import com.tss.grc.module.sust.sgi.entity.SgiCommitment;
 import com.tss.grc.module.sust.sgi.service.SgiCommitmentService;
@@ -34,6 +35,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sustainability/sgi-commitments")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — SGI Commitments")
 public class SgiCommitmentController {
 

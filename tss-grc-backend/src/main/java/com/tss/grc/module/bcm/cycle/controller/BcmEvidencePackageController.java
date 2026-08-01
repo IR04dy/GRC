@@ -2,6 +2,7 @@ package com.tss.grc.module.bcm.cycle.controller;
 
 import com.tss.grc.module.bcm.cycle.service.BcmEvidencePackageService;
 import com.tss.grc.module.bcm.cycle.service.BcmEvidencePackageService.EvidencePackage;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/bcm/cycles")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM Audit Evidence Package")
 public class BcmEvidencePackageController {
 

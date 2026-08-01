@@ -1,5 +1,6 @@
 package com.tss.grc.module.scm.clauses.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.scm.clauses.dto.ContractClauseDtos.*;
 import com.tss.grc.module.scm.clauses.service.ContractClauseService;
 import com.tss.grc.security.GrcUserDetails;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/scm/contract-clauses")
 @RequiredArgsConstructor
+@RequireModule("TPRM")
 @Tag(name = "Contract Clauses")
 @SecurityRequirement(name = "bearerAuth")
 public class ContractClauseController {

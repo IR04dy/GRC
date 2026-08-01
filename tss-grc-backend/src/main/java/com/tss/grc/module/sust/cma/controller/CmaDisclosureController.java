@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.cma.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.cma.dto.CmaCreateRequest;
 import com.tss.grc.module.sust.cma.entity.CmaDisclosure;
 import com.tss.grc.module.sust.cma.service.CmaDisclosureService;
@@ -40,6 +41,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sustainability/cma-disclosures")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — CMA Disclosures (Articles 91-94)")
 public class CmaDisclosureController {
 

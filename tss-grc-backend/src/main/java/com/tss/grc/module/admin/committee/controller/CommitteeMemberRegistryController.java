@@ -7,6 +7,7 @@ import com.tss.grc.module.admin.committee.dto.SeatLinkageReport;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberSkill;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
 import com.tss.grc.module.admin.committee.service.CommitteeMemberRegistryService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/committees/registry")
 @RequiredArgsConstructor
+@RequireModule("BOARD")
 public class CommitteeMemberRegistryController {
 
     private final CommitteeMemberRegistryService service;

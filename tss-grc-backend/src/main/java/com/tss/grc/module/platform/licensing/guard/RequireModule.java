@@ -48,7 +48,16 @@ import java.lang.annotation.Target;
 public @interface RequireModule {
     /**
      * The module code that must be enabled for the current tenant. Required.
-     * Must match one of {@code LicensingService.KNOWN_MODULES}.
+     *
+     * <p>Must be one of the <b>15 ratified SKUs</b> in {@code LicensingService.SELLABLE_MODULES} —
+     * <i>not</i> {@code KNOWN_MODULES}, which this line used to say and which the class javadoc
+     * above spends a paragraph warning against. {@code KNOWN_MODULES} is the union of the sellable
+     * codes and the 12 retired ones licence rows still name; a guard against a retired code cannot
+     * be satisfied, because {@code upsert} refuses to create a new row for one.
+     *
+     * <p>Which SKU a given class must name is not a judgement call — it is
+     * {@code SkuRegistry.requiredSkuFor(type)}, derived from the package, and
+     * {@code EntitlementCoverageRatchetTest} fails the build on any disagreement.
      */
     String value();
 }

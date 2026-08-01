@@ -10,6 +10,7 @@ import com.tss.grc.module.audit_committee.dashboard.dto.AuditCommitteeDashboardD
 import com.tss.grc.module.audit_committee.dashboard.dto.AuditCommitteeDashboardDtos.SnapshotResponse;
 import com.tss.grc.module.audit_committee.dashboard.dto.AuditCommitteeDashboardDtos.SnapshotSummary;
 import com.tss.grc.module.audit_committee.dashboard.service.AuditCommitteeDashboardService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -50,6 +51,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/audit-committee/dashboard")
 @RequiredArgsConstructor
+@RequireModule("AUDIT_LC")
 @Tag(name = "Audit Committee — Dashboard")
 @SecurityRequirement(name = "bearerAuth")
 public class AuditCommitteeDashboardController {

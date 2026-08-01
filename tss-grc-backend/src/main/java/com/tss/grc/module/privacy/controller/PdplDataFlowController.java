@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.service.PdplDataFlowService;
 import com.tss.grc.module.privacy.service.PdplDataFlowService.DataFlowGraph;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/privacy/data-flow-graph")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "Privacy — PDPL Data Flow")
 public class PdplDataFlowController {
 

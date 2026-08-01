@@ -16,6 +16,7 @@ import com.tss.grc.module.aml.sanctions.service.SanctionsDashboardService;
 import com.tss.grc.module.aml.sanctions.service.SanctionsHitService;
 import com.tss.grc.module.aml.sanctions.service.SanctionsListService;
 import com.tss.grc.module.aml.sanctions.service.SanctionsScreeningService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -61,6 +62,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/aml/sanctions")
 @RequiredArgsConstructor
+@RequireModule("ETHICS")
 @Tag(name = "AML — Sanctions Screening (Sprint 13)")
 @SecurityRequirement(name = "bearerAuth")
 public class SanctionsScreeningController {

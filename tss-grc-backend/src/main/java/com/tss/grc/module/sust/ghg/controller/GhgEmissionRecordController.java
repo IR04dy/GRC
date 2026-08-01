@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.ghg.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.ghg.dto.GhgCreateRequest;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
 import com.tss.grc.module.sust.ghg.service.GhgEmissionRecordService;
@@ -34,6 +35,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sustainability/ghg")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — GHG Emission Inventory")
 public class GhgEmissionRecordController {
 

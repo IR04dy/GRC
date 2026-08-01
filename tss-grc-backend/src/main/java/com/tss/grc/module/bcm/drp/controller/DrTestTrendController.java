@@ -2,6 +2,7 @@ package com.tss.grc.module.bcm.drp.controller;
 
 import com.tss.grc.module.bcm.drp.service.DrTestTrendService;
 import com.tss.grc.module.bcm.drp.service.DrTestTrendService.TrendReport;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/bcm/dr-test-trend")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM DR-Test Trend")
 public class DrTestTrendController {
 

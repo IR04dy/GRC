@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.dto.RiskLinkDtos.CreateDto;
 import com.tss.grc.module.risk.dto.RiskLinkDtos.Response;
 import com.tss.grc.module.risk.service.RiskLinkService;
@@ -24,6 +25,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/risk")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "Risk register linkage (E-G)")
 public class RiskLinkController {
 

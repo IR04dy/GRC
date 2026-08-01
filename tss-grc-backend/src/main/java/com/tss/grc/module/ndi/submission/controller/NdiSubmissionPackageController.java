@@ -3,6 +3,7 @@ package com.tss.grc.module.ndi.submission.controller;
 import com.tss.grc.module.ndi.submission.entity.NdiSubmissionPackage;
 import com.tss.grc.module.ndi.submission.service.NdiSubmissionPackageService;
 import com.tss.grc.module.ndi.submission.service.NdiSubmissionPackageService.Preflight;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +34,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ndi/submission-package")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "NDI — Submission Package")
 public class NdiSubmissionPackageController {
 

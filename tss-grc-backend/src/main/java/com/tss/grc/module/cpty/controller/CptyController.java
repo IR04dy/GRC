@@ -13,6 +13,7 @@ import com.tss.grc.module.cpty.dto.CptyDtos.RecordUtilisationRequest;
 import com.tss.grc.module.cpty.dto.CptyDtos.UpdateCounterpartyRequest;
 import com.tss.grc.module.cpty.dto.CptyDtos.UpsertLimitRequest;
 import com.tss.grc.module.cpty.service.CptyService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,6 +41,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/cpty")
 @RequiredArgsConstructor
+@RequireModule("SAUDI_FS")
 @Tag(name = "Counterparty Credit Rating Registry (Sprint 18)")
 @SecurityRequirement(name = "bearerAuth")
 public class CptyController {

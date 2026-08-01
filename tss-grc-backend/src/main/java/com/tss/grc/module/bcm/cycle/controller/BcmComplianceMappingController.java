@@ -2,6 +2,7 @@ package com.tss.grc.module.bcm.cycle.controller;
 
 import com.tss.grc.module.bcm.cycle.entity.BcmComplianceMapping;
 import com.tss.grc.module.bcm.cycle.service.BcmComplianceMappingService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/bcm/compliance")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM Compliance Mapping")
 public class BcmComplianceMappingController {
 

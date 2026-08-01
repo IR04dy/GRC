@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.extensions.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.DisposalCompleteRequest;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.DisposalCreate;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.DisposalResponse;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/privacy/disposal-certificates")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "PDPL — Disposal certificate")
 @SecurityRequirement(name = "bearerAuth")
 public class DisposalCertificateController {

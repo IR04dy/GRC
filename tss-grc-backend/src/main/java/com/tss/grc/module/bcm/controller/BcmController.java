@@ -5,6 +5,7 @@ import com.tss.grc.module.bcm.entity.BcmPlan;
 import com.tss.grc.module.bcm.entity.BiaRecord;
 import com.tss.grc.module.bcm.entity.CriticalProcess;
 import com.tss.grc.module.bcm.service.BcmService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/bcm")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM (legacy)")
 @SecurityRequirement(name = "bearerAuth")
 public class BcmController {

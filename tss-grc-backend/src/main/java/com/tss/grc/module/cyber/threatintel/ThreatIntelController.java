@@ -2,6 +2,7 @@ package com.tss.grc.module.cyber.threatintel;
 
 import com.tss.grc.module.cyber.threatintel.ThreatIntelCorrelationService.CorrelationReport;
 import com.tss.grc.module.cyber.threatintel.ThreatIntelCorrelationService.CorrelationRequest;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController("cyberThreatIntelController")
 @RequestMapping("/api/v1/cyber/threat-intel")
 @RequiredArgsConstructor
+@RequireModule("CYBER")
 @Tag(name = "Cyber — Threat Intelligence")
 public class ThreatIntelController {
 

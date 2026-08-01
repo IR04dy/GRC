@@ -1,6 +1,7 @@
 package com.tss.grc.module.privacy.subprocessor.controller;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.LifecycleTransitionRequest;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.MaterialChangeRequest;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.PublicSubprocessorResponse;
@@ -47,6 +48,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/privacy/subprocessors")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "PDPL — Sub-processor Tracking")
 @SecurityRequirement(name = "bearerAuth")
 public class SubprocessorController {

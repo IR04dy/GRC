@@ -111,12 +111,22 @@ class SkuCatalogueRatchetTest {
     );
 
     /**
-     * 22 measured 2026-07-30, all class-level on {@code socops} controllers, and the count is a
-     * small lesson in its own right: a {@code grep} for {@code @RequireModule} returns 23,
-     * because {@code JwtTokenProvider}'s Javadoc mentions the annotation in prose. Reflection
-     * cannot make that mistake, and 22 is also what ADR-013 measured independently.
+     * <b>197</b> measured 2026-08-01, after F2-04 swept entitlement across the platform — all
+     * class-level, on every controller in a package ADR-018 sells, and no service-level sites at
+     * all. Was <b>22</b> (2026-07-30), all {@code socops}: F2-04's whole finding was that a complete
+     * subsystem had reached 8.6% of the surface.
+     *
+     * <p>The count remains a lesson about how it is measured. At 22, a {@code grep} for
+     * {@code @RequireModule} returned 23 because {@code JwtTokenProvider}'s javadoc names the
+     * annotation in prose. Sweeping to 197 produced <b>three more</b> phantoms of the same family,
+     * each by a different mechanism — {@code @RestControllerAdvice} containing the substring
+     * {@code @RestController}, a {@code package-info.java} describing its own layout, and
+     * {@code RequireModule}'s own usage example. <b>Four phantoms, four mechanisms, zero from
+     * reflection.</b> {@code EntitlementCoverageRatchetTest} holds the complementary assertion:
+     * this one says every code named is ratified, that one says every controller that should name
+     * one does.
      */
-    private static final int ENTITLEMENT_SURFACE_FLOOR = 22;
+    private static final int ENTITLEMENT_SURFACE_FLOOR = 197;
 
     @Test
     void everyRequireModuleValueIsARatifiedSkuCode() {

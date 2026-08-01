@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.security.core.Authentication;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
@@ -38,6 +39,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/changes")
 @RequiredArgsConstructor
+@RequireModule("CHANGE")
 @Tag(name = "Change Management — ITIL v4")
 @SecurityRequirement(name = "bearerAuth")
 public class ChangeManagementController {

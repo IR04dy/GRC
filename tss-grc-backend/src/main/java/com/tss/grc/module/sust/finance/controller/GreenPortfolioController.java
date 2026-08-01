@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.finance.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.finance.entity.CarbonCredit;
 import com.tss.grc.module.sust.finance.entity.PortfolioAsset;
 import com.tss.grc.module.sust.finance.entity.TaxonomyEntry;
@@ -32,6 +33,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/sustainability/portfolio")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — Green portfolio & carbon credits")
 public class GreenPortfolioController {
 

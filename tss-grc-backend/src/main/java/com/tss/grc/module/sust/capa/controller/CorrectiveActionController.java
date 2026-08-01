@@ -2,6 +2,7 @@ package com.tss.grc.module.sust.capa.controller;
 
 import com.tss.grc.module.platform.export.ExportNaming;
 import com.tss.grc.module.platform.export.TabularExportService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.capa.dto.CorrectiveActionCreateRequest;
 import com.tss.grc.module.sust.capa.entity.CorrectiveAction;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
@@ -44,6 +45,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sustainability/corrective-actions")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — Corrective Actions")
 public class CorrectiveActionController {
 

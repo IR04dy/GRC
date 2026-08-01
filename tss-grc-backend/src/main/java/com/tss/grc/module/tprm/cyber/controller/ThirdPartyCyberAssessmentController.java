@@ -1,5 +1,6 @@
 package com.tss.grc.module.tprm.cyber.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.tprm.cyber.entity.ThirdPartyCyberAssessment;
 import com.tss.grc.module.tprm.cyber.service.ThirdPartyCyberAssessmentService;
 import com.tss.grc.security.GrcUserDetails;
@@ -17,6 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/tprm/cyber-assessments")
 @RequiredArgsConstructor
+@RequireModule("TPRM")
 @Tag(name = "Third-party cyber risk")
 public class ThirdPartyCyberAssessmentController {
 

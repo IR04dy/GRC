@@ -4,6 +4,7 @@ import com.tss.grc.module.bcm.cycle.entity.BcpPlanAcknowledgement;
 import com.tss.grc.module.bcm.cycle.service.PlanDistributionService;
 import com.tss.grc.module.bcm.cycle.service.PlanDistributionService.DistributionStats;
 import com.tss.grc.module.bcm.cycle.service.PlanDistributionService.Recipient;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm/plans")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Plan distribution & acknowledgement (Tier-2 #11)")
 public class PlanDistributionController {
 

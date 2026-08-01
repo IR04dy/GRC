@@ -6,6 +6,7 @@ import com.tss.grc.module.incident.rca.dto.RcaDtos.RejectRequest;
 import com.tss.grc.module.incident.rca.dto.RcaDtos.Response;
 import com.tss.grc.module.incident.rca.dto.RcaDtos.UpdateRequest;
 import com.tss.grc.module.incident.rca.service.RootCauseAnalysisService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -24,6 +25,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/incident/rca")
 @RequiredArgsConstructor
+@RequireModule("SOCOPS")
 @Tag(name = "Root Cause Analysis")
 @SecurityRequirement(name = "bearerAuth")
 public class RootCauseAnalysisController {

@@ -4,6 +4,7 @@ import com.tss.grc.module.bcm.entity.CrisisCommsAudience;
 import com.tss.grc.module.bcm.entity.CrisisCommsDistribution;
 import com.tss.grc.module.bcm.entity.CrisisCommsTemplate;
 import com.tss.grc.module.bcm.service.CrisisCommsService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/bcm/comms")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Crisis Communication")
 @SecurityRequirement(name = "bearerAuth")
 public class CrisisCommsController {

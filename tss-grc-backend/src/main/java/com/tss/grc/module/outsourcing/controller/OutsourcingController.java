@@ -2,6 +2,7 @@ package com.tss.grc.module.outsourcing.controller;
 
 import com.tss.grc.module.outsourcing.dto.OutsourcingDtos.*;
 import com.tss.grc.module.outsourcing.service.OutsourcingService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import java.util.List;
 @RestController("outsourcingCloudController")
 @RequestMapping("/api/v1/outsourcing")
 @RequiredArgsConstructor
+@RequireModule("TPRM")
 public class OutsourcingController {
 
     private static final String READ_GUARD =

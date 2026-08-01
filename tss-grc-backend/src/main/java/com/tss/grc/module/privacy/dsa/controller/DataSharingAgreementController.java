@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.dsa.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.dsa.entity.DataSharingAgreement;
 import com.tss.grc.module.privacy.dsa.service.DataSharingAgreementService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +17,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/privacy/data-sharing")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "Data sharing agreements")
 public class DataSharingAgreementController {
 

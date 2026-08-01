@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.finance.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateInstrumentRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateProjectRequest;
 import com.tss.grc.module.sust.finance.dto.GreenFinanceDtos.CreateReportRequest;
@@ -35,6 +36,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/sustainability/finance")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — Green finance (sukuk / use-of-proceeds)")
 public class GreenFinanceController {
 

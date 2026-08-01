@@ -3,6 +3,7 @@ package com.tss.grc.module.ndi.audit.controller;
 import com.tss.grc.module.ndi.audit.entity.NdiAuditEvent;
 import com.tss.grc.module.ndi.audit.service.NdiAuditService;
 import com.tss.grc.module.ndi.audit.service.NdiAuditService.AuditAggregate;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/ndi/audit")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "NDI — Audit Trail")
 public class NdiAuditController {
 

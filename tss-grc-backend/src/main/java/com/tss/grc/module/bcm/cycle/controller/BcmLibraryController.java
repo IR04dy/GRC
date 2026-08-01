@@ -8,6 +8,7 @@ import com.tss.grc.module.bcm.cycle.entity.*;
 import com.tss.grc.module.bcm.cycle.repository.*;
 import com.tss.grc.module.bcm.cycle.service.BcpPlanService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/bcm/library")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM Library (templates · scenarios · peak seasons)")
 public class BcmLibraryController {
 

@@ -8,6 +8,7 @@ import com.tss.grc.module.bcm.cycle.repository.BcmBiaAssessmentRepository;
 import com.tss.grc.module.bcm.cycle.repository.BcpPlanRepository;
 import com.tss.grc.module.bcm.cycle.service.PlanReviewService;
 import com.tss.grc.module.bcm.cycle.service.PlanReviewService.SweepResult;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,6 +36,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/v1/bcm/plans")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Plan review attestation (Tier-2 #10)")
 public class PlanReviewController {
 

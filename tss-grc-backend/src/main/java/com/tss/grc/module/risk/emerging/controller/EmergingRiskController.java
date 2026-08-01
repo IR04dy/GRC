@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.emerging.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.emerging.dto.EmergingRiskDtos.*;
 import com.tss.grc.module.risk.emerging.service.EmergingRiskService;
 import com.tss.grc.security.GrcUserDetails;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 // unversioned /api/risk/emerging stays as a deprecated back-compat alias.
 @RequestMapping({"/api/v1/risk/emerging", "/api/risk/emerging"})
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "Emerging Risks")
 @SecurityRequirement(name = "bearerAuth")
 public class EmergingRiskController {

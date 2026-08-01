@@ -3,6 +3,7 @@ package com.tss.grc.module.ethics.whistleblower.controller;
 import com.tss.grc.module.ethics.whistleblower.dto.WhistleblowerDtos.RetaliationComplaintRequest;
 import com.tss.grc.module.ethics.whistleblower.dto.WhistleblowerDtos.RetaliationComplaintResponse;
 import com.tss.grc.module.ethics.whistleblower.service.WhistleblowerRetaliationService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -28,6 +29,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/ethics/whistleblower/retaliation")
 @RequiredArgsConstructor
+@RequireModule("ETHICS")
 @Tag(name = "Ethics — Whistleblower Retaliation Sub-flow (Sprint 13)")
 @SecurityRequirement(name = "bearerAuth")
 public class WhistleblowerRetaliationController {

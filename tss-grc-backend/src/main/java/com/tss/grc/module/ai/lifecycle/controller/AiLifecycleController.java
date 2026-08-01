@@ -2,6 +2,7 @@ package com.tss.grc.module.ai.lifecycle.controller;
 
 import com.tss.grc.module.ai.lifecycle.dto.AiLifecycleDtos.*;
 import com.tss.grc.module.ai.lifecycle.service.AiLifecycleService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/ai-lifecycle")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 public class AiLifecycleController {
 
     private static final String READ = "hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','COMPLIANCE_OFFICER','AUDITOR','CISO','DPO','CIO','CRO')";

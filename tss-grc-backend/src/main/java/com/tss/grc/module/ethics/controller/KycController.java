@@ -3,6 +3,7 @@ package com.tss.grc.module.ethics.controller;
 import com.tss.grc.module.ethics.entity.KycSubject;
 import com.tss.grc.module.ethics.entity.ScreeningHit;
 import com.tss.grc.module.ethics.service.KycService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/ethics/kyc")
 @RequiredArgsConstructor
+@RequireModule("ETHICS")
 @Tag(name = "Ethics & Compliance — Sanctions / PEP / CDD / EDD")
 @SecurityRequirement(name = "bearerAuth")
 public class KycController {

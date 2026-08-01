@@ -18,6 +18,7 @@ import com.tss.grc.module.cyber.asm.repository.AttackSurfaceShadowItRepository;
 import com.tss.grc.module.cyber.asm.service.AttackSurfaceAssetService;
 import com.tss.grc.module.cyber.asm.service.AttackSurfaceFindingService;
 import com.tss.grc.module.cyber.asm.service.ShadowItService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +44,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/asm")
 @RequiredArgsConstructor
+@RequireModule("CYBER")
 @Tag(name = "ASM — Attack Surface Management")
 @SecurityRequirement(name = "bearerAuth")
 public class AttackSurfaceController {

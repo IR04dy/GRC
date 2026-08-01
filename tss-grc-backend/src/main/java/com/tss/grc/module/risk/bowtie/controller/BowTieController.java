@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.bowtie.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.bowtie.dto.BowTieDtos.ApproveRequest;
 import com.tss.grc.module.risk.bowtie.dto.BowTieDtos.BowTieAnalysisRequest;
 import com.tss.grc.module.risk.bowtie.dto.BowTieDtos.BowTieAnalysisResponse;
@@ -33,6 +34,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/risk/bowtie")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "Risk Bow-Tie Analysis (ISO 31010)")
 @SecurityRequirement(name = "bearerAuth")
 public class BowTieController {

@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.materiality.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.materiality.dto.MaterialTopicCreateRequest;
 import com.tss.grc.module.sust.materiality.entity.MaterialTopic;
 import com.tss.grc.module.sust.materiality.service.MaterialTopicService;
@@ -21,6 +22,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sustainability/materiality")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — ESG Materiality")
 public class MaterialTopicController {
 

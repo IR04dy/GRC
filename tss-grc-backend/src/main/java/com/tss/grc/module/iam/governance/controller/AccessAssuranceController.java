@@ -16,6 +16,7 @@ import com.tss.grc.module.iam.governance.service.BreakGlassService;
 import com.tss.grc.module.iam.governance.service.RecertificationService;
 import com.tss.grc.module.iam.governance.service.RecertificationService.CampaignView;
 import com.tss.grc.module.iam.governance.service.SodService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -46,6 +47,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/iam/governance")
 @RequiredArgsConstructor
+@RequireModule("ACCESS_GOV")
 @Tag(name = "IAM — Access assurance (SoD / recertification / evidence)")
 public class AccessAssuranceController {
 

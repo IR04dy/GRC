@@ -4,6 +4,7 @@ import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.AttestationRe
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.AttestationResponse;
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.AttestationReviewRequest;
 import com.tss.grc.module.compliance.obligation.service.ObligationAttestationService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -29,6 +30,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/compliance/obligation-attestations")
 @RequiredArgsConstructor
+@RequireModule("COMPLIANCE")
 @Tag(name = "Compliance — Obligation Attestations (Sprint 11)")
 @SecurityRequirement(name = "bearerAuth")
 public class ObligationAttestationController {

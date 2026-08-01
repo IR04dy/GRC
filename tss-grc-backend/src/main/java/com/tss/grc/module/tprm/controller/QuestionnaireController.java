@@ -1,5 +1,6 @@
 package com.tss.grc.module.tprm.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.tprm.entity.QuestionnaireQuestion;
 import com.tss.grc.module.tprm.entity.QuestionnaireResponse;
 import com.tss.grc.module.tprm.entity.QuestionnaireTemplate;
@@ -32,6 +33,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/tprm")
 @RequiredArgsConstructor
+@RequireModule("TPRM")
 @Tag(name = "TPRM — Questionnaire engine")
 public class QuestionnaireController {
 

@@ -4,6 +4,7 @@ import com.tss.grc.module.ethics.entity.CaseAction;
 import com.tss.grc.module.ethics.entity.CaseLink;
 import com.tss.grc.module.ethics.entity.EthicsCase;
 import com.tss.grc.module.ethics.service.EthicsCaseService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +30,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/ethics/cases")
 @RequiredArgsConstructor
+@RequireModule("ETHICS")
 @Tag(name = "Ethics & Compliance — Cases (Hotline + Investigations)")
 @SecurityRequirement(name = "bearerAuth")
 public class EthicsCaseController {

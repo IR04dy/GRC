@@ -4,6 +4,7 @@ import com.tss.grc.module.ndi.reports.entity.NdiReportDefinition;
 import com.tss.grc.module.ndi.reports.service.NdiReportExporter;
 import com.tss.grc.module.ndi.reports.service.NdiReportService;
 import com.tss.grc.module.ndi.reports.service.NdiReportService.ReportResult;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -18,6 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/ndi/reports")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "NDI — Reports")
 public class NdiReportController {
 

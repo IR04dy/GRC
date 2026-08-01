@@ -2,6 +2,7 @@ package com.tss.grc.module.admin.committee.controller;
 
 import com.tss.grc.module.admin.committee.entity.CommitteeActionItem;
 import com.tss.grc.module.admin.committee.service.CommitteeActionItemService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -14,6 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/committees/action-items")
 @RequiredArgsConstructor
+@RequireModule("BOARD")
 public class CommitteeActionItemController {
 
     private final CommitteeActionItemService service;

@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.finance.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.finance.entity.CbamLine;
 import com.tss.grc.module.sust.finance.entity.EnvPermit;
 import com.tss.grc.module.sust.finance.entity.EsgTarget;
@@ -44,6 +45,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/sustainability/horizon")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — Regulatory horizon (targets / IFRS / NCEC / CBAM)")
 public class EsgHorizonController {
 

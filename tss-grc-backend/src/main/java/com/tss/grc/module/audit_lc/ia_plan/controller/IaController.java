@@ -21,6 +21,7 @@ import com.tss.grc.module.audit_lc.ia_plan.dto.IaDtos.UniverseUpdateRequest;
 import com.tss.grc.module.audit_lc.ia_plan.service.IaAnnualPlanService;
 import com.tss.grc.module.audit_lc.ia_plan.service.IaAuditUniverseService;
 import com.tss.grc.module.audit_lc.ia_plan.service.IaEngagementService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -106,6 +107,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/ia")
 @RequiredArgsConstructor
+@RequireModule("AUDIT_LC")
 @Tag(name = "Internal Audit — Annual Plan + Engagements (Sprint 13)")
 @SecurityRequirement(name = "bearerAuth")
 public class IaController {

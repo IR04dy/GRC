@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.vendor.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.evidence.service.SustEvidenceLinkService;
 import com.tss.grc.module.sust.vendor.dto.VendorEsgResponseRequest;
 import com.tss.grc.module.sust.vendor.dto.VendorEsgSurveyCreateRequest;
@@ -44,6 +45,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sustainability/vendor-surveys")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — Vendor ESG Surveillance")
 public class VendorEsgSurveyController {
 

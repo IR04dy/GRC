@@ -10,6 +10,7 @@ import com.tss.grc.module.fraud.dto.FraudDtos.OutcomeRequest;
 import com.tss.grc.module.fraud.dto.FraudDtos.TriageRequest;
 import com.tss.grc.module.fraud.dto.FraudDtos.TypologyResponse;
 import com.tss.grc.module.fraud.service.FraudService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -73,6 +74,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/fraud")
 @RequiredArgsConstructor
+@RequireModule("ETHICS")
 @Tag(name = "Fraud Risk Management (Sprint 14)")
 @SecurityRequirement(name = "bearerAuth")
 public class FraudController {

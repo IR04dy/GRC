@@ -4,6 +4,7 @@ import com.tss.grc.module.bcm.cycle.entity.BcmRisk;
 import com.tss.grc.module.bcm.cycle.entity.ContinuityStrategy;
 import com.tss.grc.module.bcm.cycle.service.BcmRiskService;
 import com.tss.grc.module.bcm.cycle.service.ContinuityStrategyService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +35,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Risks + Strategies (BCM-1)")
 public class BcmRiskController {
 

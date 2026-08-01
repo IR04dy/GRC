@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.entity.ConsentRecord;
 import com.tss.grc.module.privacy.service.ConsentRecordService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,6 +17,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/privacy/consents")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "Consent Records (PDPL)")
 public class ConsentRecordController {
 

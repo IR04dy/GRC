@@ -2,6 +2,7 @@ package com.tss.grc.module.nca_ecc.controller;
 
 import com.tss.grc.module.nca_ecc.dto.NcaEccFilingDto;
 import com.tss.grc.module.nca_ecc.service.NcaEccFilingService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/nca-ecc/filings")
 @RequiredArgsConstructor
+@RequireModule("COMPLIANCE")
 public class NcaEccFilingController {
 
     private final NcaEccFilingService service;

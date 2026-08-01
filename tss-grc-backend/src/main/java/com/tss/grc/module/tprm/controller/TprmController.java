@@ -1,5 +1,6 @@
 package com.tss.grc.module.tprm.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.tprm.entity.Vendor;
 import com.tss.grc.module.tprm.entity.VendorAssessment;
 import com.tss.grc.module.tprm.service.TprmService;
@@ -19,6 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/tprm")
 @RequiredArgsConstructor
+@RequireModule("TPRM")
 @Tag(name = "TPRM")
 @SecurityRequirement(name = "bearerAuth")
 public class TprmController {

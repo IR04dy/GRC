@@ -2,6 +2,7 @@ package com.tss.grc.module.ndi.settings.controller;
 
 import com.tss.grc.module.ndi.settings.entity.NdiSetting;
 import com.tss.grc.module.ndi.settings.service.NdiSettingService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ndi/settings")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "NDI — Settings")
 public class NdiSettingController {
 

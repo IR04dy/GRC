@@ -4,6 +4,7 @@ import com.tss.grc.module.bcm.cycle.service.BcmReadinessScoreService;
 import com.tss.grc.module.bcm.cycle.service.BcmReadinessScoreService.CycleScore;
 import com.tss.grc.module.bcm.cycle.service.BcmReadinessScoreService.ScoreBreakdown;
 import com.tss.grc.module.bcm.cycle.service.BcmReadinessScoreService.TenantScore;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,6 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm/readiness-score")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM Readiness Score")
 public class BcmReadinessScoreController {
 

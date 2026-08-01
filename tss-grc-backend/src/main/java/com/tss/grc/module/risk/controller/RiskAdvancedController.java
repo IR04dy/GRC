@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.dto.RiskAssessmentRequest;
 import com.tss.grc.module.risk.dto.RiskTreatmentRequest;
 import com.tss.grc.module.risk.dto.RiskTreatmentUpdateRequest;
@@ -37,6 +38,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/risk")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "Risk-Advanced — assessments & treatments")
 public class RiskAdvancedController {
 

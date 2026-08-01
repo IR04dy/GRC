@@ -4,6 +4,7 @@ import com.tss.grc.module.compliance.entity.AuditEngagement;
 import com.tss.grc.module.compliance.entity.AuditFinding;
 import com.tss.grc.module.compliance.service.AuditEngagementService;
 import com.tss.grc.module.compliance.service.CapaWorkflowService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,6 +27,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/compliance")
 @RequiredArgsConstructor
+@RequireModule("COMPLIANCE")
 @Tag(name = "Compliance — Audit Engagements & CAPA Workflow")
 @SecurityRequirement(name = "bearerAuth")
 public class AuditEngagementController {

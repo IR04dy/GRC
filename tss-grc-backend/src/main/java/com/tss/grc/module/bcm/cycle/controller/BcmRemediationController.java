@@ -4,6 +4,7 @@ import com.tss.grc.module.bcm.cycle.entity.BcmCorrectiveAction;
 import com.tss.grc.module.bcm.cycle.entity.BcmGap;
 import com.tss.grc.module.bcm.cycle.entity.BcmLessonLearned;
 import com.tss.grc.module.bcm.cycle.service.BcmRemediationService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +40,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/bcm")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Lessons / Gaps / CAPA (BCM-3)")
 public class BcmRemediationController {
 

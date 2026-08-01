@@ -2,6 +2,7 @@ package com.tss.grc.module.admin.committee.controller;
 
 import com.tss.grc.module.admin.committee.dto.CommitteeDtos.*;
 import com.tss.grc.module.admin.committee.service.CommitteeService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -20,6 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/committees")
 @RequiredArgsConstructor
+@RequireModule("BOARD")
 @Tag(name = "Committee Workflows")
 @SecurityRequirement(name = "bearerAuth")
 public class CommitteeController {

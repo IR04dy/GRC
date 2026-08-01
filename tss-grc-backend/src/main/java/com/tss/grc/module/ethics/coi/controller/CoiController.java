@@ -9,6 +9,7 @@ import com.tss.grc.module.ethics.coi.dto.CoiDtos.RecusalEventResponse;
 import com.tss.grc.module.ethics.coi.dto.CoiDtos.ReviewDeclarationRequest;
 import com.tss.grc.module.ethics.coi.dto.CoiDtos.SubmitDeclarationRequest;
 import com.tss.grc.module.ethics.coi.service.CoiService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -47,6 +48,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/coi")
 @RequiredArgsConstructor
+@RequireModule("ETHICS")
 @Tag(name = "Ethics — Conflict of Interest (Sprint 13)")
 @SecurityRequirement(name = "bearerAuth")
 public class CoiController {

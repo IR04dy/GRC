@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.dto.MethodologyDtos.ConfigDto;
 import com.tss.grc.module.risk.dto.MethodologyDtos.ConfigUpdateDto;
 import com.tss.grc.module.risk.dto.MethodologyDtos.ImpactRatingsResponse;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/risk")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "Risk methodology & multi-dimensional impact (E-F)")
 public class RiskMethodologyController {
 

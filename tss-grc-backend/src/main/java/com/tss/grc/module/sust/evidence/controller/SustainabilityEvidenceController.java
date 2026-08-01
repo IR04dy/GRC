@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.evidence.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.evidence.entity.SustainabilityEvidence;
 import com.tss.grc.module.sust.evidence.service.SustainabilityEvidenceService;
 import com.tss.grc.security.GrcUserDetails;
@@ -22,6 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sustainability/evidence")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — Evidence Repository")
 public class SustainabilityEvidenceController {
 

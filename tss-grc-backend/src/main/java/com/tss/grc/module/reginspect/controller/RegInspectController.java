@@ -1,5 +1,6 @@
 package com.tss.grc.module.reginspect.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.reginspect.dto.RegInspectDtos.CreateDocumentRequestRequest;
 import com.tss.grc.module.reginspect.dto.RegInspectDtos.CreateInspectionRequest;
 import com.tss.grc.module.reginspect.dto.RegInspectDtos.DashboardResponse;
@@ -37,6 +38,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/reginspect")
 @RequiredArgsConstructor
+@RequireModule("COMPLIANCE")
 @Tag(name = "Regulatory Inspection Workspace (Sprint 15)")
 @SecurityRequirement(name = "bearerAuth")
 public class RegInspectController {

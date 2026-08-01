@@ -5,6 +5,7 @@ import com.tss.grc.module.bcm.entity.CriticalProcess;
 import com.tss.grc.module.bcm.entity.ProcessDependency;
 import com.tss.grc.module.bcm.repository.CriticalProcessRepository;
 import com.tss.grc.module.bcm.repository.ProcessDependencyRepository;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +25,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/v1/bcm")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — BIA Dependency Graph")
 @SecurityRequirement(name = "bearerAuth")
 public class DependencyGraphController {

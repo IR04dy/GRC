@@ -1,5 +1,6 @@
 package com.tss.grc.module.cyber.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.service.PolicyManagementService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -46,6 +47,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/v1/cyber/policies")
 @RequiredArgsConstructor
+@RequireModule("CYBER")
 @Tag(name = "Cyber Security — Policies")
 @SecurityRequirement(name = "bearerAuth")
 public class CyberPolicyController {

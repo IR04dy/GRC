@@ -2,6 +2,7 @@ package com.tss.grc.module.compliance.controller;
 
 import com.tss.grc.module.compliance.service.RegulatoryHorizonService;
 import com.tss.grc.module.compliance.service.RegulatoryHorizonService.Horizon;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/compliance/regulatory-horizon")
 @RequiredArgsConstructor
+@RequireModule("COMPLIANCE")
 @Tag(name = "Compliance — Regulatory Horizon")
 public class RegulatoryHorizonController {
 

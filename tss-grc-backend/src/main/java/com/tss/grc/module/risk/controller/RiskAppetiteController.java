@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.dto.RiskAppetiteRequest;
 import com.tss.grc.module.risk.entity.AppetiteBreachEvent;
 import com.tss.grc.module.risk.entity.RiskAppetiteStatement;
@@ -33,6 +34,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/risk")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "ERM — Risk appetite")
 @SecurityRequirement(name = "bearerAuth")
 public class RiskAppetiteController {

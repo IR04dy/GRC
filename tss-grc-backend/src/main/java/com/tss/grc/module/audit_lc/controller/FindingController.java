@@ -2,6 +2,7 @@ package com.tss.grc.module.audit_lc.controller;
 
 import com.tss.grc.module.audit_lc.dto.FindingDto;
 import com.tss.grc.module.audit_lc.service.FindingService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/audit-lc/findings")
 @RequiredArgsConstructor
+@RequireModule("AUDIT_LC")
 public class FindingController {
 
     private final FindingService service;

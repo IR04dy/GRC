@@ -2,6 +2,7 @@ package com.tss.grc.module.audit_eng.controller;
 
 import com.tss.grc.module.audit_eng.dto.AuditEngagementDto;
 import com.tss.grc.module.audit_eng.service.AuditEngagementService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import java.util.List;
 @RestController("auditEngAuditEngagementController")
 @RequestMapping("/api/audit-eng/engagements")
 @RequiredArgsConstructor
+@RequireModule("AUDIT_LC")
 public class AuditEngagementController {
 
     private final AuditEngagementService service;

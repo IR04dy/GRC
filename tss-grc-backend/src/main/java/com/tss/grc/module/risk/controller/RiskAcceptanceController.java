@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.dto.RiskAcceptanceDtos.ApproveDto;
 import com.tss.grc.module.risk.dto.RiskAcceptanceDtos.CreateDto;
 import com.tss.grc.module.risk.dto.RiskAcceptanceDtos.Response;
@@ -34,6 +35,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/risk")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "Risk Management — Acceptance")
 @SecurityRequirement(name = "bearerAuth")
 public class RiskAcceptanceController {

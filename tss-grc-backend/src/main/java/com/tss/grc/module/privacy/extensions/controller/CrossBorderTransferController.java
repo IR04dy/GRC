@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.extensions.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.AssessRequest;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.CrossBorderCreate;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.CrossBorderResponse;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/privacy/cross-border-transfers")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "PDPL — Cross-border transfer")
 @SecurityRequirement(name = "bearerAuth")
 public class CrossBorderTransferController {

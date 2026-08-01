@@ -3,6 +3,7 @@ package com.tss.grc.module.bcm.cycle.controller;
 import com.tss.grc.module.bcm.cycle.entity.CrisisAar;
 import com.tss.grc.module.bcm.cycle.service.CrisisAarService;
 import com.tss.grc.module.bcm.cycle.service.CrisisAarService.UpdateBody;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,6 +28,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/bcm/aars")
+@RequireModule("BCM")
 @Tag(name = "NCEMA After-Action Reports")
 public class CrisisAarController {
 

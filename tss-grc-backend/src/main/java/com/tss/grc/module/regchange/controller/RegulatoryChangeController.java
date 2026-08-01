@@ -1,5 +1,6 @@
 package com.tss.grc.module.regchange.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.regchange.dto.RegulatoryChangeDto;
 import com.tss.grc.module.regchange.service.RegulatoryChangeService;
 import jakarta.validation.Valid;
@@ -12,6 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/regchange/changes")
 @RequiredArgsConstructor
+@RequireModule("COMPLIANCE")
 public class RegulatoryChangeController {
 
     private final RegulatoryChangeService service;

@@ -15,6 +15,7 @@ import com.tss.grc.module.cyber.service.CyberIncidentService;
 import com.tss.grc.module.cyber.service.CyberSubControlService;
 import com.tss.grc.module.cyber.service.CyberVulnExceptionService;
 import com.tss.grc.module.cyber.service.CyberVulnerabilityService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +42,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/cyber")
 @RequiredArgsConstructor
+@RequireModule("CYBER")
 @Tag(name = "Cyber Security")
 @SecurityRequirement(name = "bearerAuth")
 public class CyberController {

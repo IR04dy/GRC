@@ -2,6 +2,7 @@ package com.tss.grc.module.incident.controller;
 
 import com.tss.grc.module.incident.dto.*;
 import com.tss.grc.module.incident.service.IncidentService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,6 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/incidents")
 @RequiredArgsConstructor
+@RequireModule("SOCOPS")
 @Tag(name = "Incident Management")
 @SecurityRequirement(name = "bearerAuth")
 public class IncidentController {

@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.kri.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.kri.dto.KriDtos.KriBreachResponse;
 import com.tss.grc.module.risk.kri.dto.KriDtos.KriDashboardSnapshot;
 import com.tss.grc.module.risk.kri.dto.KriDtos.KriDefinitionRequest;
@@ -41,6 +42,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/risk/kri")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "KRI — Key Risk Indicators")
 @SecurityRequirement(name = "bearerAuth")
 public class KriController {

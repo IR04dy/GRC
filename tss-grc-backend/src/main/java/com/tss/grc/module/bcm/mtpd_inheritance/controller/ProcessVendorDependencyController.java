@@ -4,6 +4,7 @@ import com.tss.grc.module.bcm.mtpd_inheritance.dto.MtpdInheritanceDtos.Dependenc
 import com.tss.grc.module.bcm.mtpd_inheritance.dto.MtpdInheritanceDtos.DependencyResponse;
 import com.tss.grc.module.bcm.mtpd_inheritance.dto.MtpdInheritanceDtos.DependencyUpdateRequest;
 import com.tss.grc.module.bcm.mtpd_inheritance.service.MtpdInheritanceService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -32,6 +33,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm/process-vendor-dependencies")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Process ↔ Vendor Dependencies (Slice 10-E)")
 @SecurityRequirement(name = "bearerAuth")
 public class ProcessVendorDependencyController {

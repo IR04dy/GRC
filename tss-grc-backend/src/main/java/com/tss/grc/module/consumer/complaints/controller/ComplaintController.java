@@ -12,6 +12,7 @@ import com.tss.grc.module.consumer.complaints.dto.ComplaintDtos.SubmitComplaintR
 import com.tss.grc.module.consumer.complaints.dto.ComplaintDtos.SubmitComplaintResponse;
 import com.tss.grc.module.consumer.complaints.dto.ComplaintDtos.TransitionRequest;
 import com.tss.grc.module.consumer.complaints.service.ComplaintService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -44,6 +45,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/complaints")
 @RequiredArgsConstructor
+@RequireModule("ETHICS")
 @Tag(name = "Customer Complaints",
      description = "SAMA Banking Consumer Protection — complaint intake, lifecycle, SAMA escalation")
 public class ComplaintController {

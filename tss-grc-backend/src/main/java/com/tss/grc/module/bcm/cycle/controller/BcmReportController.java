@@ -2,6 +2,7 @@ package com.tss.grc.module.bcm.cycle.controller;
 
 import com.tss.grc.module.bcm.cycle.service.BcmReportService;
 import com.tss.grc.module.bcm.cycle.service.BcmReportService.ReportDef;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,6 +21,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/bcm/reports")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM Reports")
 public class BcmReportController {
 

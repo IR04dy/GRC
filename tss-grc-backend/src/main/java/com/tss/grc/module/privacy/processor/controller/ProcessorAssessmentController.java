@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.processor.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.processor.entity.ProcessorAssessment;
 import com.tss.grc.module.privacy.processor.service.ProcessorAssessmentService;
 import com.tss.grc.security.GrcUserDetails;
@@ -18,6 +19,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/privacy/processor-assessments")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "Processor due diligence (PDPL Art. 28)")
 public class ProcessorAssessmentController {
 

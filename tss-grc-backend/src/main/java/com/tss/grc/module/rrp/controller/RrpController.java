@@ -1,5 +1,6 @@
 package com.tss.grc.module.rrp.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.rrp.dto.RrpDtos.CreateCriticalFunctionRequest;
 import com.tss.grc.module.rrp.dto.RrpDtos.CreateCycleRequest;
 import com.tss.grc.module.rrp.dto.RrpDtos.CreateIndicatorRequest;
@@ -43,6 +44,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/rrp")
 @RequiredArgsConstructor
+@RequireModule("SAUDI_FS")
 @Tag(name = "Recovery & Resolution Plan (Sprint 17)")
 @SecurityRequirement(name = "bearerAuth")
 public class RrpController {

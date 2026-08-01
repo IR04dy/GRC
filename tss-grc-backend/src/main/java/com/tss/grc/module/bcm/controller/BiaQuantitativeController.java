@@ -5,6 +5,7 @@ import com.tss.grc.module.bcm.dto.BiaQuantitativeDtos.BiaQuantitativeResponse;
 import com.tss.grc.module.bcm.dto.BiaQuantitativeDtos.BoardApprovalRequest;
 import com.tss.grc.module.bcm.dto.BiaQuantitativeDtos.CfoApprovalRequest;
 import com.tss.grc.module.bcm.service.QuantitativeBiaService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -42,6 +43,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/bcm/bia/quantitative")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Quantitative BIA (Slice 9-C)")
 @SecurityRequirement(name = "bearerAuth")
 // Class-level grant is the READ floor — every endpoint requires at least one of

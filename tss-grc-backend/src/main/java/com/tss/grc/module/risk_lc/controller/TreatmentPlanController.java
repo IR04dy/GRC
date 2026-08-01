@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk_lc.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk_lc.dto.TreatmentPlanDto;
 import com.tss.grc.module.risk_lc.service.TreatmentPlanService;
 import jakarta.validation.Valid;
@@ -25,6 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/risk-lc/treatment-plans")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 public class TreatmentPlanController {
 
     private final TreatmentPlanService service;

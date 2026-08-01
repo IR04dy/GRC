@@ -2,6 +2,7 @@ package com.tss.grc.module.cyber.controller;
 
 import com.tss.grc.module.cyber.entity.CloudService;
 import com.tss.grc.module.cyber.service.CloudServiceService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/cyber/cloud-services")
 @RequiredArgsConstructor
+@RequireModule("CYBER")
 @Tag(name = "Cloud Services (NCA CSCC)")
 public class CloudServiceController {
 

@@ -1,6 +1,7 @@
 package com.tss.grc.module.compliance.controller;
 
 import com.tss.grc.module.compliance.entity.Framework;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.policy.entity.PolicyDocumentFrameworkMapping;
 import com.tss.grc.module.compliance.service.FrameworkAnchorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +32,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/v1/compliance")
 @RequiredArgsConstructor
+@RequireModule("COMPLIANCE")
 @Tag(name = "Compliance — Framework anchor (Policies)")
 @SecurityRequirement(name = "bearerAuth")
 public class FrameworkAnchorController {

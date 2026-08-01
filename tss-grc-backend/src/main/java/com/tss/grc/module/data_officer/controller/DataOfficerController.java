@@ -5,6 +5,7 @@ import com.tss.grc.module.data_officer.service.DataGovernanceService;
 import com.tss.grc.module.data_officer.service.DataOfficerQueryService;
 import com.tss.grc.module.data_officer.service.DataSubjectRightsService;
 import com.tss.grc.module.data_officer.service.PrivacyAssuranceService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/data-officer")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "Data Officer Toolkit", description = "DSR · Consent · DPIA · Breach · Notice · Retention · NDR · Catalog · Quality · Ethics")
 public class DataOfficerController {
 

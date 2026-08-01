@@ -7,6 +7,7 @@ import com.tss.grc.module.compliance.entity.RegulatoryChange;
 import com.tss.grc.module.compliance.repository.AuditFindingRepository;
 import com.tss.grc.module.compliance.service.PolicyService;
 import com.tss.grc.module.compliance.service.RegulatoryChangeService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,6 +38,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/compliance")
 @RequiredArgsConstructor
+@RequireModule("COMPLIANCE")
 @Tag(name = "Compliance — Regulatory Change & Policy")
 @SecurityRequirement(name = "bearerAuth")
 public class RegChangePolicyController {

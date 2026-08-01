@@ -1,6 +1,7 @@
 package com.tss.grc.module.bcm.cycle.controller;
 
 import com.tss.grc.module.bcm.cycle.service.CrisisEventService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm/crisis")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Mobile Crisis Room (Slice 9-F)")
 @SecurityRequirement(name = "bearerAuth")
 public class MobileCrisisController {

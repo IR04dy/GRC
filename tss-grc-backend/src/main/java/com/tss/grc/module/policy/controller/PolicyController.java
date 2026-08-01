@@ -1,5 +1,6 @@
 package com.tss.grc.module.policy.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.policy.entity.PolicyAttestation;
 import com.tss.grc.module.policy.entity.PolicyDocument;
 import com.tss.grc.module.policy.entity.PolicyException;
@@ -37,6 +38,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/policy")
 @RequiredArgsConstructor
+@RequireModule("COMPLIANCE")
 @Tag(name = "Policy Management")
 public class PolicyController {
 

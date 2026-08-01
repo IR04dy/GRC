@@ -4,6 +4,7 @@ import com.tss.grc.module.bcm.cycle.entity.BcmBiaAssessment;
 import com.tss.grc.module.bcm.cycle.service.BcmBiaAssessmentService;
 import com.tss.grc.module.bcm.entity.BcmPlan;
 import com.tss.grc.module.bcm.service.BcmService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/bcm/bia-assessments")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM BIA Assessments")
 public class BcmBiaAssessmentController {
 

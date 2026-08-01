@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.tcfd.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.tcfd.dto.TcfdItemCreateRequest;
 import com.tss.grc.module.sust.tcfd.entity.TcfdItem;
 import com.tss.grc.module.sust.tcfd.service.TcfdItemService;
@@ -23,6 +24,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sustainability/tcfd")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — TCFD Alignment")
 public class TcfdItemController {
 

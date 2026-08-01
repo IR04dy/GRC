@@ -1,5 +1,6 @@
 package com.tss.grc.module.sharia.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sharia.dto.ShariaDtos.AuditFindingResponse;
 import com.tss.grc.module.sharia.dto.ShariaDtos.CreateResolutionRequest;
 import com.tss.grc.module.sharia.dto.ShariaDtos.CreateScholarRequest;
@@ -46,6 +47,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/sharia")
 @RequiredArgsConstructor
+@RequireModule("SAUDI_FS")
 @Tag(name = "Sharia Governance & Audit (Sprint 20)")
 @SecurityRequirement(name = "bearerAuth")
 public class ShariaController {

@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.climate.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.climate.dto.ClimateRiskCreateRequest;
 import com.tss.grc.module.sust.climate.entity.ClimateRiskOpportunity;
 import com.tss.grc.module.sust.climate.service.ClimateRiskOpportunityService;
@@ -26,6 +27,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sustainability/climate-risks")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — Climate Risks & Opportunities")
 public class ClimateRiskOpportunityController {
 

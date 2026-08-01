@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy_lc.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy_lc.dto.DsrCaseDto;
 import com.tss.grc.module.privacy_lc.service.DsrCaseService;
 import jakarta.validation.Valid;
@@ -12,6 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/privacy-lc/dsr-cases")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 public class DsrCaseController {
 
     private final DsrCaseService service;

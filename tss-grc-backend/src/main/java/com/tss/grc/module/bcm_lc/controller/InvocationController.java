@@ -2,6 +2,7 @@ package com.tss.grc.module.bcm_lc.controller;
 
 import com.tss.grc.module.bcm_lc.dto.InvocationDto;
 import com.tss.grc.module.bcm_lc.service.InvocationService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/bcm-lc/invocations")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 public class InvocationController {
 
     private final InvocationService service;

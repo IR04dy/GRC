@@ -2,6 +2,7 @@ package com.tss.grc.module.bcm.drp.controller;
 
 import com.tss.grc.module.bcm.drp.dto.DrPlanDtos.*;
 import com.tss.grc.module.bcm.drp.service.DrPlanService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/bcm/dr-plans")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "DR Plans")
 @SecurityRequirement(name = "bearerAuth")
 public class DrPlanController {

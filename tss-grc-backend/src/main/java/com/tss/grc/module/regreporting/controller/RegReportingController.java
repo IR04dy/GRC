@@ -1,5 +1,6 @@
 package com.tss.grc.module.regreporting.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.regreporting.dto.RegReportingDtos.CalendarResponse;
 import com.tss.grc.module.regreporting.dto.RegReportingDtos.CreateObligationRequest;
 import com.tss.grc.module.regreporting.dto.RegReportingDtos.DashboardResponse;
@@ -43,6 +44,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/regreporting")
 @RequiredArgsConstructor
+@RequireModule("COMPLIANCE")
 @Tag(name = "Mandatory Regulatory Reporting (Sprint 16)")
 @SecurityRequirement(name = "bearerAuth")
 public class RegReportingController {

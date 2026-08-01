@@ -5,6 +5,7 @@ import com.tss.grc.module.ccm.dto.CcmDtos.TestDefinitionRequest;
 import com.tss.grc.module.ccm.dto.CcmDtos.TestDefinitionResponse;
 import com.tss.grc.module.ccm.dto.CcmDtos.TestRunResponse;
 import com.tss.grc.module.ccm.service.CcmService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +30,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/ccm")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "CCM — Continuous Control Monitoring")
 @SecurityRequirement(name = "bearerAuth")
 public class CcmController {

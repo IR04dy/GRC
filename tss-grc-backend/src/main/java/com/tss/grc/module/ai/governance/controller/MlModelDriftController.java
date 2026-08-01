@@ -3,6 +3,7 @@ package com.tss.grc.module.ai.governance.controller;
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.DriftObservationRequest;
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.DriftObservationResponse;
 import com.tss.grc.module.ai.governance.service.MlModelDriftService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -30,6 +31,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/ai/models/{externalId}/drift-observations")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "AI/ML Model Drift Observations")
 @SecurityRequirement(name = "bearerAuth")
 public class MlModelDriftController {

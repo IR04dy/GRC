@@ -10,6 +10,7 @@ import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos.RunTimeline;
 import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos.StartRunRequest;
 import com.tss.grc.module.bcm.cycle.runtime.dto.ExerciseRuntimeDtos.TransitionRequest;
 import com.tss.grc.module.bcm.cycle.runtime.service.ExerciseRuntimeService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -60,6 +61,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm/exercise-runs")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Exercise Runtime (Slice 10-B)")
 @SecurityRequirement(name = "bearerAuth")
 public class ExerciseRuntimeController {

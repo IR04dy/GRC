@@ -1,5 +1,6 @@
 package com.tss.grc.module.tprm.bcp_attestation.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.tprm.bcp_attestation.dto.VendorBcpAttestationDtos.AttestationResponse;
 import com.tss.grc.module.tprm.bcp_attestation.dto.VendorBcpAttestationDtos.AttestationReviewRequest;
 import com.tss.grc.module.tprm.bcp_attestation.dto.VendorBcpAttestationDtos.AttestationSubmitRequest;
@@ -37,6 +38,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/tprm/bcp-attestations")
 @RequiredArgsConstructor
+@RequireModule("TPRM")
 @Tag(name = "TPRM — Vendor BCP Attestation Rows (Slice 10-D)")
 @SecurityRequirement(name = "bearerAuth")
 public class VendorBcpAttestationController {

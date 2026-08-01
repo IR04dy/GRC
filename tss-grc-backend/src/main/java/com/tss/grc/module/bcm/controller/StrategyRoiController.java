@@ -5,6 +5,7 @@ import com.tss.grc.module.bcm.dto.StrategyRoiDtos.StrategyRoiComparison;
 import com.tss.grc.module.bcm.dto.StrategyRoiDtos.StrategyRoiRequest;
 import com.tss.grc.module.bcm.dto.StrategyRoiDtos.StrategyRoiResponse;
 import com.tss.grc.module.bcm.service.StrategyRoiService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -44,6 +45,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/bcm/roi/analyses")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Continuity Strategy ROI (Slice 9-D)")
 @SecurityRequirement(name = "bearerAuth")
 public class StrategyRoiController {

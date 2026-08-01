@@ -5,6 +5,7 @@ import com.tss.grc.module.bcm.cycle.dto.ScenarioLibraryDtos.InstantiatedExercise
 import com.tss.grc.module.bcm.cycle.dto.ScenarioLibraryDtos.ScenarioDetail;
 import com.tss.grc.module.bcm.cycle.dto.ScenarioLibraryDtos.ScenarioSummary;
 import com.tss.grc.module.bcm.cycle.service.ExerciseScenarioLibraryService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -51,6 +52,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm/scenario-library")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Exercise Scenario Library (Slice 10-A)")
 @SecurityRequirement(name = "bearerAuth")
 public class ExerciseScenarioLibraryController {

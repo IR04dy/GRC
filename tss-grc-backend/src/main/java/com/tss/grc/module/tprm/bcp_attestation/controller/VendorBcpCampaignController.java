@@ -1,5 +1,6 @@
 package com.tss.grc.module.tprm.bcp_attestation.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.tprm.bcp_attestation.dto.VendorBcpAttestationDtos.CampaignCloseRequest;
 import com.tss.grc.module.tprm.bcp_attestation.dto.VendorBcpAttestationDtos.CampaignCreateRequest;
 import com.tss.grc.module.tprm.bcp_attestation.dto.VendorBcpAttestationDtos.CampaignResponse;
@@ -40,6 +41,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/tprm/bcp-campaigns")
 @RequiredArgsConstructor
+@RequireModule("TPRM")
 @Tag(name = "TPRM — Vendor BCP Attestation Campaigns (Slice 10-D)")
 @SecurityRequirement(name = "bearerAuth")
 public class VendorBcpCampaignController {

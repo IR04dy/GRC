@@ -1,6 +1,7 @@
 package com.tss.grc.module.privacy.extensions.controller;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.CrossBorderResponse;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.DisposalResponse;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.NoticeResponse;
@@ -31,6 +32,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/privacy/ropa-workflows")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "PDPL — ROPA workflows")
 @SecurityRequirement(name = "bearerAuth")
 public class RopaWorkflowsController {

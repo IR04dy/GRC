@@ -7,6 +7,7 @@ import com.tss.grc.module.opres.dto.OpResDtos.CreateAssessmentRequest;
 import com.tss.grc.module.opres.dto.OpResDtos.PillarResponse;
 import com.tss.grc.module.opres.dto.OpResDtos.UpdateAssessmentRequest;
 import com.tss.grc.module.opres.service.OpResService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,6 +36,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/opres")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "Operational Resilience Self-Assessment (Sprint 14)")
 @SecurityRequirement(name = "bearerAuth")
 public class OpResController {

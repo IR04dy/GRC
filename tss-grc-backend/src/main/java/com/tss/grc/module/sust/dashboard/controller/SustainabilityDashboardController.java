@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.dashboard.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.dashboard.service.SustainabilityDashboardService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sustainability/dashboard")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — Executive Dashboard")
 public class SustainabilityDashboardController {
 

@@ -1,5 +1,6 @@
 package com.tss.grc.module.scm.fourthparty.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.CreateRequest;
 import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.Response;
 import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.UpdateRequest;
@@ -26,6 +27,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/scm/fourth-party")
 @RequiredArgsConstructor
+@RequireModule("TPRM")
 @Tag(name = "Fourth-party exposure")
 @SecurityRequirement(name = "bearerAuth")
 public class FourthPartyExposureController {

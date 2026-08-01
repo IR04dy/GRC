@@ -3,6 +3,7 @@ package com.tss.grc.module.bcm.cycle.controller;
 import com.tss.grc.module.bcm.cycle.service.RegulatorCountdownService;
 import com.tss.grc.module.bcm.cycle.service.RegulatorCountdownService.CountdownRow;
 import com.tss.grc.module.bcm.cycle.service.RegulatorCountdownService.CountdownSummary;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,6 +30,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm/regulator-countdowns")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM Regulator Countdowns")
 public class RegulatorCountdownController {
 

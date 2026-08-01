@@ -16,6 +16,7 @@ import com.tss.grc.module.openbanking.dto.ObDtos.TransitionIncidentRequest;
 import com.tss.grc.module.openbanking.dto.ObDtos.TransitionTppRequest;
 import com.tss.grc.module.openbanking.dto.ObDtos.UpdateTppRequest;
 import com.tss.grc.module.openbanking.service.ObService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +44,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/openbanking")
 @RequiredArgsConstructor
+@RequireModule("SAUDI_FS")
 @Tag(name = "Open Banking Compliance (Sprint 19)")
 @SecurityRequirement(name = "bearerAuth")
 public class ObController {

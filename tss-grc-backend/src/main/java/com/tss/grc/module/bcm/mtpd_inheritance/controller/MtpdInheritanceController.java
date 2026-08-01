@@ -8,6 +8,7 @@ import com.tss.grc.module.bcm.mtpd_inheritance.dto.MtpdInheritanceDtos.ComputeRe
 import com.tss.grc.module.bcm.mtpd_inheritance.dto.MtpdInheritanceDtos.FindingResponse;
 import com.tss.grc.module.bcm.mtpd_inheritance.dto.MtpdInheritanceDtos.PublishRequest;
 import com.tss.grc.module.bcm.mtpd_inheritance.service.MtpdInheritanceService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -32,6 +33,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm/mtpd-inheritance")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Vendor MTPD Inheritance (Slice 10-E)")
 @SecurityRequirement(name = "bearerAuth")
 public class MtpdInheritanceController {

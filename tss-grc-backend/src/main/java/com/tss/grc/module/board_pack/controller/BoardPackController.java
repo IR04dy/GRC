@@ -2,6 +2,7 @@ package com.tss.grc.module.board_pack.controller;
 
 import com.tss.grc.module.board_pack.dto.BoardPackDto;
 import com.tss.grc.module.board_pack.service.BoardPackService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import java.util.List;
 @RestController("boardPackBoardPackController")
 @RequestMapping("/api/board-pack/packs")
 @RequiredArgsConstructor
+@RequireModule("BOARD")
 public class BoardPackController {
 
     private final BoardPackService service;

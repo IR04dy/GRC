@@ -2,6 +2,7 @@ package com.tss.grc.module.ndi.framework.controller;
 
 import com.tss.grc.module.ndi.framework.entity.NdiFrameworkItem;
 import com.tss.grc.module.ndi.framework.service.NdiFrameworkItemService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -32,6 +33,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ndi/framework")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "NDI — Framework Library")
 public class NdiFrameworkItemController {
 

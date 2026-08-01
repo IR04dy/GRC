@@ -10,6 +10,7 @@ import com.tss.grc.module.compliance.obligation.service.ObligationService;
 import com.tss.grc.module.compliance.obligation.service.ObligationAttestationService;
 import com.tss.grc.module.attachment.dto.AttachmentResponse;
 import com.tss.grc.module.attachment.service.AttachmentService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -44,6 +45,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/compliance/obligations")
 @RequiredArgsConstructor
+@RequireModule("COMPLIANCE")
 @Tag(name = "Compliance — Obligation Register (Sprint 11)")
 @SecurityRequirement(name = "bearerAuth")
 public class ObligationController {

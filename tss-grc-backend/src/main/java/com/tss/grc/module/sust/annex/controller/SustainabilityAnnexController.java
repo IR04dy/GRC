@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.annex.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.annex.dto.ReportingYearCreateRequest;
 import com.tss.grc.module.sust.annex.entity.ReportingYear;
 import com.tss.grc.module.sust.annex.entity.SustainabilityReport;
@@ -34,6 +35,7 @@ import java.util.List;
  */
 @RestController
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — Annex & Reports")
 public class SustainabilityAnnexController {
 

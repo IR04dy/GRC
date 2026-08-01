@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.bridge.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.bridge.dto.CyberBreachBridgeLogDtos.*;
 import com.tss.grc.module.privacy.bridge.service.CyberPdplBridgeService;
 import com.tss.grc.security.GrcUserDetails;
@@ -19,6 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/privacy/cyber-bridge")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "Cyber → PDPL Bridge")
 @SecurityRequirement(name = "bearerAuth")
 public class CyberPdplBridgeController {

@@ -6,6 +6,7 @@ import com.tss.grc.module.bcm.cycle.entity.SiemInboundEvent;
 import com.tss.grc.module.bcm.cycle.service.BcmAuditCompletionService;
 import com.tss.grc.module.bcm.cycle.service.BcmAuditCompletionService.OpresSummary;
 import com.tss.grc.module.bcm.cycle.service.BcmAuditCompletionService.SiemInboundPayload;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -40,6 +41,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM Audit Completion (Tier-3 #18 #21 · Tier-4 #24 #29)")
 public class BcmAuditCompletionController {
 

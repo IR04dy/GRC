@@ -6,6 +6,7 @@ import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.MlModelRequest;
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.MlModelResponse;
 import com.tss.grc.module.ai.governance.service.AiRegistryExportService;
 import com.tss.grc.module.ai.governance.service.MlModelService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,6 +37,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/ai/models")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "AI/ML Model Registry")
 @SecurityRequirement(name = "bearerAuth")
 public class MlModelController {

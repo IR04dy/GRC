@@ -1,5 +1,6 @@
 package com.tss.grc.module.scm.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.scm.dto.*;
 import com.tss.grc.module.scm.service.ScmService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,6 +21,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/scm")
 @RequiredArgsConstructor
+@RequireModule("TPRM")
 @Tag(name = "Supply Chain Management")
 @SecurityRequirement(name = "bearerAuth")
 public class ScmController {

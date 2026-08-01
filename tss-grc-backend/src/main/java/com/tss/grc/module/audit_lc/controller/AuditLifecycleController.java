@@ -4,6 +4,7 @@ import com.tss.grc.module.audit_lc.entity.AnnualPlan;
 import com.tss.grc.module.audit_lc.entity.CapaTask;
 import com.tss.grc.module.audit_lc.entity.WorkingPaper;
 import com.tss.grc.module.audit_lc.service.AuditLifecycleService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +33,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/audit-lc")
 @RequiredArgsConstructor
+@RequireModule("AUDIT_LC")
 @Tag(name = "Audit lifecycle — plans, working papers, CAPA")
 public class AuditLifecycleController {
 

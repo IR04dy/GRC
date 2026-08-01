@@ -2,6 +2,7 @@ package com.tss.grc.module.ndi.compliance.controller;
 
 import com.tss.grc.module.ndi.compliance.entity.NdiComplianceAssessment;
 import com.tss.grc.module.ndi.compliance.service.NdiComplianceAssessmentService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -35,6 +36,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ndi/compliance")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "NDI — Compliance Assessment")
 public class NdiComplianceAssessmentController {
 

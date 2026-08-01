@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.entity.DataBreach;
 import com.tss.grc.module.privacy.entity.DataSubjectRequest;
 import com.tss.grc.module.privacy.entity.ProcessingActivity;
@@ -19,6 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/privacy")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "Privacy")
 @SecurityRequirement(name = "bearerAuth")
 public class PrivacyController {

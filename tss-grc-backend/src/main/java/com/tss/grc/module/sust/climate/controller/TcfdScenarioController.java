@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.climate.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.ProbabilityWeightedExpectedLoss;
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.TcfdLifecycleTransitionRequest;
 import com.tss.grc.module.sust.climate.dto.ClimateDtos.TcfdScenarioRequest;
@@ -37,6 +38,7 @@ import java.util.UUID;
 // /api/v1/climate/* path is retained as an alias so existing clients keep working.
 @RequestMapping({"/api/v1/sustainability/scenarios", "/api/v1/climate/scenarios"})
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "TCFD Climate Scenarios")
 @SecurityRequirement(name = "bearerAuth")
 public class TcfdScenarioController {

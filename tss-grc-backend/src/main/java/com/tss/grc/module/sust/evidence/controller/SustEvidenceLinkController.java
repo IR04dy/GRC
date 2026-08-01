@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.evidence.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.evidence.dto.SustEvidenceLinkRequest;
 import com.tss.grc.module.sust.evidence.service.SustEvidenceLinkService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,6 +28,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/sustainability/evidence-links")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — Evidence Links (module/evidence bridge)")
 public class SustEvidenceLinkController {
 

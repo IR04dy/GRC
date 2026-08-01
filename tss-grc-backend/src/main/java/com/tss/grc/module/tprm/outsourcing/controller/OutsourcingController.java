@@ -1,5 +1,6 @@
 package com.tss.grc.module.tprm.outsourcing.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.tprm.outsourcing.dto.OutsourcingDtos.ArrangementCreateRequest;
 import com.tss.grc.module.tprm.outsourcing.dto.OutsourcingDtos.ArrangementResponse;
 import com.tss.grc.module.tprm.outsourcing.dto.OutsourcingDtos.ArrangementTransitionRequest;
@@ -78,6 +79,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/tprm/outsourcing")
 @RequiredArgsConstructor
+@RequireModule("TPRM")
 @Tag(name = "TPRM — Outsourcing Arrangement Register (Sprint 13)")
 @SecurityRequirement(name = "bearerAuth")
 public class OutsourcingController {

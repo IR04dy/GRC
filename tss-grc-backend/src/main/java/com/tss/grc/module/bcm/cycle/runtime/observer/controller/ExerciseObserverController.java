@@ -9,6 +9,7 @@ import com.tss.grc.module.bcm.cycle.runtime.observer.dto.ObserverDtos.Observatio
 import com.tss.grc.module.bcm.cycle.runtime.observer.dto.ObserverDtos.ObserverDashboard;
 import com.tss.grc.module.bcm.cycle.runtime.observer.service.ExerciseObserverService;
 import com.tss.grc.module.bcm.cycle.entity.BcmGap;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -63,6 +64,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm/exercise-runs")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Exercise Observer Dashboard (Slice 10-C)")
 @SecurityRequirement(name = "bearerAuth")
 public class ExerciseObserverController {

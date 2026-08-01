@@ -1,5 +1,6 @@
 package com.tss.grc.module.scm.resilience.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.scm.resilience.dto.SupplierResilienceDtos.*;
 import com.tss.grc.module.scm.resilience.service.AlternateSupplierService;
 import com.tss.grc.module.scm.resilience.service.ExitPlanService;
@@ -30,6 +31,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/scm/resilience")
 @RequiredArgsConstructor
+@RequireModule("TPRM")
 @Tag(name = "Supplier Resilience")
 @SecurityRequirement(name = "bearerAuth")
 public class SupplierResilienceController {

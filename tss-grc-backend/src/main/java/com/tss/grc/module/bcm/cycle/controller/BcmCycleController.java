@@ -3,6 +3,7 @@ package com.tss.grc.module.bcm.cycle.controller;
 import com.tss.grc.module.bcm.cycle.entity.BcmAssessmentCycle;
 import com.tss.grc.module.bcm.cycle.entity.BcmGovernanceRecord;
 import com.tss.grc.module.bcm.cycle.service.BcmCycleService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +34,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Cycles + Governance (BCM-1)")
 public class BcmCycleController {
 

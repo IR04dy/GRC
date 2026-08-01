@@ -4,6 +4,7 @@ import com.tss.grc.module.ndi.gap.entity.NdiCorrectiveAction;
 import com.tss.grc.module.ndi.gap.entity.NdiGap;
 import com.tss.grc.module.ndi.gap.service.NdiGapService;
 import com.tss.grc.module.ndi.gap.service.NdiGapService.GapAggregate;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -36,6 +37,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ndi/gaps")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "NDI — Gaps + Corrective Actions")
 public class NdiGapController {
 

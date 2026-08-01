@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.ghg.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.ghg.entity.EmissionFactor;
 import com.tss.grc.module.sust.ghg.service.EmissionFactorService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/sustainability/ghg/factors")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — GHG Emission-Factor Library")
 public class EmissionFactorController {
 

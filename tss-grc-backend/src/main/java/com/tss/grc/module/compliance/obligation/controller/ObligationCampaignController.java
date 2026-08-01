@@ -5,6 +5,7 @@ import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.CampaignCreat
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.CampaignResponse;
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.CampaignStatsResponse;
 import com.tss.grc.module.compliance.obligation.service.ObligationCampaignService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -34,6 +35,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/compliance/obligation-campaigns")
 @RequiredArgsConstructor
+@RequireModule("COMPLIANCE")
 @Tag(name = "Compliance — Obligation Attestation Campaigns (Sprint 11)")
 @SecurityRequirement(name = "bearerAuth")
 public class ObligationCampaignController {

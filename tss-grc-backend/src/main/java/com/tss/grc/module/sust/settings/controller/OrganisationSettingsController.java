@@ -1,5 +1,6 @@
 package com.tss.grc.module.sust.settings.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.sust.settings.entity.OrganisationSettings;
 import com.tss.grc.module.sust.settings.service.OrganisationSettingsService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/sustainability/settings")
 @RequiredArgsConstructor
+@RequireModule("ESG")
 @Tag(name = "Sustainability — Settings")
 public class OrganisationSettingsController {
 

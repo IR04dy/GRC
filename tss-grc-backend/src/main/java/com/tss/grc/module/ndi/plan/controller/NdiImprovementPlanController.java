@@ -5,6 +5,7 @@ import com.tss.grc.module.ndi.plan.entity.NdiImprovementPlanItem;
 import com.tss.grc.module.ndi.plan.service.NdiImprovementPlanService;
 import com.tss.grc.module.ndi.plan.service.NdiImprovementPlanService.EnrichedPlanItem;
 import com.tss.grc.module.ndi.plan.service.NdiImprovementPlanService.PlanRollup;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ndi/plans")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "NDI — Improvement Plans")
 public class NdiImprovementPlanController {
 

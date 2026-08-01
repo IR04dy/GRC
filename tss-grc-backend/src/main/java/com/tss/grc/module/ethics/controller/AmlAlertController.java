@@ -2,6 +2,7 @@ package com.tss.grc.module.ethics.controller;
 
 import com.tss.grc.module.ethics.entity.AmlAlert;
 import com.tss.grc.module.ethics.service.AmlAlertService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/ethics/aml-alerts")
 @RequiredArgsConstructor
+@RequireModule("ETHICS")
 @Tag(name = "Ethics & Compliance — AML Transaction Alerts")
 @SecurityRequirement(name = "bearerAuth")
 public class AmlAlertController {

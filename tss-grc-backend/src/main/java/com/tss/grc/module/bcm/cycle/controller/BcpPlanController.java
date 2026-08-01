@@ -7,6 +7,7 @@ import com.tss.grc.module.bcm.cycle.service.BcpPlanPdfExporter;
 import com.tss.grc.module.bcm.cycle.service.BcpPlanService;
 import com.tss.grc.module.bcm.cycle.service.BcpPlanService.SectionDef;
 import com.tss.grc.module.bcm.cycle.service.BcpPlanService.VersionDiff;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/bcm/plans")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM BCP/DRP Plan Builder")
 public class BcpPlanController {
 

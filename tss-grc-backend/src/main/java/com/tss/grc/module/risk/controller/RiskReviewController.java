@@ -1,5 +1,6 @@
 package com.tss.grc.module.risk.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.dto.RiskReviewDtos.OverdueRow;
 import com.tss.grc.module.risk.dto.RiskReviewDtos.ReassessDto;
 import com.tss.grc.module.risk.dto.RiskReviewDtos.ReviewResponse;
@@ -30,6 +31,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/risk")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "Risk Management — Review & Reassessment")
 @SecurityRequirement(name = "bearerAuth")
 public class RiskReviewController {

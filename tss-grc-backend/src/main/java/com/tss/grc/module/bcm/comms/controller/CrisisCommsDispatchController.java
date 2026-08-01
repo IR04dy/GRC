@@ -4,6 +4,7 @@ import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.CascadeResponse;
 import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.DispatchRequest;
 import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.DispatchResult;
 import com.tss.grc.module.bcm.comms.service.CrisisCommsDispatchService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -31,6 +32,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/bcm/comms/v2")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — Crisis Communications Dispatch (Slice 9-E)")
 @SecurityRequirement(name = "bearerAuth")
 public class CrisisCommsDispatchController {

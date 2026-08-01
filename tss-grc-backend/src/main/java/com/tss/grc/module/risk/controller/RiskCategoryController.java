@@ -1,6 +1,7 @@
 package com.tss.grc.module.risk.controller;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.risk.entity.RiskCategory;
 import com.tss.grc.module.risk.repository.RiskCategoryRepository;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -14,6 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/risk/categories")
 @RequiredArgsConstructor
+@RequireModule("RISK")
 @Tag(name = "Risk Categories")
 @SecurityRequirement(name = "bearerAuth")
 public class RiskCategoryController {

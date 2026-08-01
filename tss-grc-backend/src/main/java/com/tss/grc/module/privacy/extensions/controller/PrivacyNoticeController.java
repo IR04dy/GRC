@@ -1,5 +1,6 @@
 package com.tss.grc.module.privacy.extensions.controller;
 
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.NoticeArchiveRequest;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.NoticeCreate;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.NoticeResponse;
@@ -22,6 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/privacy/notices")
 @RequiredArgsConstructor
+@RequireModule("PDPL")
 @Tag(name = "PDPL — Privacy notices")
 @SecurityRequirement(name = "bearerAuth")
 public class PrivacyNoticeController {

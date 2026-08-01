@@ -3,6 +3,7 @@ package com.tss.grc.module.bcm.binder.controller;
 import com.tss.grc.module.bcm.binder.dto.BcpBinderDtos.BinderResponse;
 import com.tss.grc.module.bcm.binder.service.BcpBinderService;
 import com.tss.grc.module.bcm.binder.service.BcpBinderService.DownloadResult;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/bcm")
 @RequiredArgsConstructor
+@RequireModule("BCM")
 @Tag(name = "BCM — BCP/DRP Binder Export (Slice 10-F)")
 @SecurityRequirement(name = "bearerAuth")
 public class BcpBinderController {

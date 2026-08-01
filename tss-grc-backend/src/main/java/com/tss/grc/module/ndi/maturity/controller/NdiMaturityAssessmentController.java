@@ -2,6 +2,7 @@ package com.tss.grc.module.ndi.maturity.controller;
 
 import com.tss.grc.module.ndi.maturity.entity.NdiMaturityAssessment;
 import com.tss.grc.module.ndi.maturity.service.NdiMaturityAssessmentService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,6 +34,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ndi/maturity")
 @RequiredArgsConstructor
+@RequireModule("DATA_AI_GOV")
 @Tag(name = "NDI — Maturity Assessment")
 public class NdiMaturityAssessmentController {
 

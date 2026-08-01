@@ -2,6 +2,7 @@ package com.tss.grc.module.admin.committee.controller;
 
 import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
 import com.tss.grc.module.admin.committee.service.CommitteeCalendarService;
+import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +24,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/committees/calendar")
 @RequiredArgsConstructor
+@RequireModule("BOARD")
 public class CommitteeCalendarController {
 
     private final CommitteeCalendarService service;
