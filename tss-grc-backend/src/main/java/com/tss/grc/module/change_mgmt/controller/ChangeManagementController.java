@@ -251,9 +251,15 @@ public class ChangeManagementController {
 
     /**
      * S4/W1-4 (finding F-4): is this tenant's committee routing actually configured?
-     * The authorisation matrix can demand CAB/ECAB while no committee is mapped, in
-     * which case referrals fail and changes fall back to the legacy tally — an absent
-     * configuration row, not an error, so it needs to be asked about explicitly.
+     * The authorisation matrix can demand CAB/ECAB while no committee is mapped — an
+     * absent configuration row, not an error, so it needs to be asked about explicitly.
+     *
+     * <p><b>ADR-017 D-2 corrected the second half of this sentence.</b> It used to end
+     * "…referrals fail and changes fall back to the legacy tally", which was true and was
+     * the defect: a gate the tenant could not fill was answered by approving anyway.
+     * Those approvals are now refused (409 {@code change-authority-not-configured}), so
+     * this endpoint reports a condition that blocks work rather than one that silently
+     * downgrades it — and {@code configured} here is the same predicate the refusal uses.
      */
     @GetMapping("/governance-health")
     @PreAuthorize("hasPermission('CHANGE','READ')")

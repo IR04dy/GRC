@@ -15,6 +15,7 @@ import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { MeetingPapersPanel } from '../../components/committees/MeetingPapersPanel';
+import { ChangeAuthorityPanel } from '../../components/committees/ChangeAuthorityPanel';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
@@ -604,6 +605,11 @@ export function CommitteesPage() {
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
+
+      {/* ADR-017 D-2 — the screen the change-authority refusal names. Self-hiding for
+          personas without ADMIN:READ, and above the register because an unconfigured
+          gate blocks approvals platform-wide, not just on this page. */}
+      {tab === 'committees' && <ChangeAuthorityPanel />}
 
       {tab === 'committees' && (
         <Card title={t('comTabCommittees')} Icon={Landmark}

@@ -72,6 +72,50 @@ export function dissolveCommittee(id: number, reason: string): Promise<Committee
   return api.post(`${BASE}/${id}/dissolve`, { reason });
 }
 
+// ── ADR-017 D-2: per-tenant change authority (CAB / ECAB) ──────────────────────
+//
+// The screen the 409 `change-authority-not-configured` refusal names. Before this
+// existed, the only way a tenant could name its own change authority was a DBA
+// INSERT into admin.committee_gate_map — so the refusal had no remedy inside the
+// product, which is the dead end D-2's own conditions rule out.
+
+export type AuthorityGate = 'CAB' | 'ECAB';
+
+export interface GateAuthority {
+  gate: AuthorityGate;
+  committeeId?: number | null;
+  committeeNameEn?: string;
+  committeeNameAr?: string;
+  committeeType?: string;
+  committeeStatus?: CommitteeStatus;
+  /** The server's verdict — NOT "a row exists". A row pointing at a dissolved
+   *  committee comes back configured=false with fault=COMMITTEE_UNAVAILABLE. */
+  configured: boolean;
+  fault?: 'NOT_MAPPED' | 'COMMITTEE_UNAVAILABLE' | null;
+}
+
+export interface EligibleCommittee {
+  id: number; nameEn: string; nameAr?: string;
+  committeeType: string; status: CommitteeStatus;
+}
+
+export function listGateAuthority(): Promise<GateAuthority[]> {
+  return api.get('/api/v1/changes/authority');
+}
+
+export function listEligibleAuthorities(): Promise<EligibleCommittee[]> {
+  return api.get('/api/v1/changes/authority/eligible');
+}
+
+export function setGateAuthority(gate: AuthorityGate, committeeId: number):
+    Promise<{ gate: string; committeeId: number; configured: boolean }> {
+  return api.put(`/api/v1/changes/authority/${gate}`, { committeeId });
+}
+
+export function clearGateAuthority(gate: AuthorityGate): Promise<void> {
+  return api.delete(`/api/v1/changes/authority/${gate}`);
+}
+
 export function listMeetings(status?: MeetingStatus, page = 0, size = 200):
     Promise<{ content: CommitteeMeeting[]; totalElements: number }> {
   const qs = status ? `&status=${status}` : '';

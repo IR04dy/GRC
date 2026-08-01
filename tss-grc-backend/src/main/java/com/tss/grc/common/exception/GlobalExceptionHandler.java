@@ -279,6 +279,40 @@ public class GlobalExceptionHandler {
         return pd;
     }
 
+    /**
+     * ADR-017 <b>D-2</b> — a CAB-dependent approval refused because the tenant has not named the
+     * committee its own authorisation matrix demands. <b>409, not 500 and not a silent pass.</b>
+     *
+     * <p>409 rather than 422 for consistency: every other lifecycle refusal in this platform is a
+     * 409 ({@link IllegalTransitionException}, the SoD gates, the quorum gates) and the frontend's
+     * {@code problemMessage()} already renders one. The distinguishing signal for a client that
+     * wants to <em>act</em> is the {@code type} URI plus the properties, not the status code.
+     *
+     * <p>Every property here exists because D-2 requires the refusal to be actionable — it must name
+     * the missing configuration and the screen that sets it. {@code reason} separates the two
+     * different fixes (nothing mapped vs mapped-at-a-dissolved-committee); {@code remedyScreen} is
+     * what the frontend routes to; {@code remedyApi} is for headless onboarding. Echoing
+     * {@code organisationId} tells the caller nothing they did not send — it is their own, from
+     * their JWT — the same argument as {@link #handleModuleDisabled}.
+     */
+    @ExceptionHandler(ChangeAuthorityNotConfiguredException.class)
+    public ProblemDetail handleChangeAuthorityNotConfigured(ChangeAuthorityNotConfiguredException ex) {
+        log.warn("[change-governance] org={} gate={} target={} refused — {}",
+            ex.getOrganisationId(), ex.getGate(), ex.getTarget(), ex.getReason());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Change Authority Not Configured");
+        pd.setType(URI.create("https://grc.tss.com/errors/change-authority-not-configured"));
+        pd.setProperty("gate", ex.getGate());
+        pd.setProperty("reason", ex.getReason());
+        pd.setProperty("target", ex.getTarget());
+        pd.setProperty("organisationId", ex.getOrganisationId());
+        pd.setProperty("configuration", ChangeAuthorityNotConfiguredException.CONFIGURATION);
+        pd.setProperty("remedyScreen", ChangeAuthorityNotConfiguredException.REMEDY_SCREEN);
+        pd.setProperty("remedyApi", ChangeAuthorityNotConfiguredException.REMEDY_API);
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
     /** Catch-all for IllegalStateException not caught by a more specific handler. */
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException ex) {

@@ -137,6 +137,58 @@ absence is now visible instead of latent.
 > from the commercial seat: the failure must be a **guided onboarding moment that names the screen**, not a
 > dead-end error mid-demo; and the SKU-activation gate must mean no tenant ever meets it in normal operation.
 
+> ### ✅ Closed 2026-08-01 — **A17-D2: the config surface already existed, and the missing half was the rule**
+>
+> **The amendment above got its own blocker wrong, and it is worth being precise about how.** It said "there
+> is no per-tenant platform configuration table", sized D-2 at **M→L**, and put it last as *"spine work, not a
+> decision-implementation"*. Measured before starting: **`admin.committee_gate_map` has been exactly that
+> table since V310 (2026-07-23)** — `(organisation_id, gate, committee_id)`, unique on the pair, seeded by
+> V314, and already read by `CommitteeReferralService.refer`. It shipped **seven days before** the amendment
+> declared it absent. The generic-config argument still holds for tenant regulator identity and
+> data-residency flags; it never applied to D-2's own clause. *Re-measure the prerequisite before inheriting
+> the estimate.*
+>
+> **What was genuinely unbuilt was the decision's second clause** — the rule for the fact's absence — and it
+> was unbuilt in the worst direction. Measured live: all three tenants' matrices demand CAB (5 cells) and
+> ECAB (6); only org 1 had a gate-map row; and orgs 2 and 3 **approved CAB-routed changes anyway**, because
+> the committee gate engaged only when a referral already existed and no referral can be created for an
+> unmapped gate. `EMERGENCY_APPROVED` was weaker still — no committee, no vote, 200 straight from `DRAFT`.
+> That is the silent pass this decision forbids, filed as **F2-87**.
+>
+> **What shipped, and the three judgements inside it:**
+> 1. **Only the permissive transitions fail closed** — `CAB_APPROVED` and `EMERGENCY_APPROVED`, not
+>    `CAB_REJECTED`. Refusing a *rejection* for want of a committee keeps alive a change somebody tried to
+>    kill. Fail-closed has a direction; a classification ratchet now forces every future decision target to
+>    declare which side it is on.
+> 2. **The refusal and the health report share one SQL predicate**, textually, asserted by a test. They had
+>    already drifted: a row pointing at a **DISSOLVED** committee made the report call the gate healthy while
+>    `refer()` rejected it — the F2-62 shape, caught here before it was reported by anyone else.
+> 3. **A silent matrix is not a demand.** No cell for a change's (type, risk) ⇒ no committee required. The
+>    matrix *is* the tenant's documented authority; failing closed on its silence would refuse approvals in
+>    tenants that never asked for a CAB.
+>
+> **Both commercial conditions were met and one was only met by building the screen.** `admin.committee_gate_map`
+> had an entity, a two-method read repository and **no writer of any kind** — no service, no endpoint, no UI —
+> so the only way a tenant could name its own change authority was a DBA `INSERT`, and "an error that names
+> the screen" would have been a lie. `GET/PUT/DELETE /api/v1/changes/authority` plus a Change-authority panel
+> on `/committees` now exist, and the round trip is verified live: create committee → name the gate → the same
+> refused transition returns **200** → clear the gate → **409** again.
+>
+> ⚠ **One SKU coupling is recorded rather than solved, because no annotation can solve it.** Naming the
+> authority is change governance (`CHANGE`), but **constituting** a committee is licensed as `BOARD`. A tenant
+> that buys change governance without the board pack can reach the screen and have nothing to select. All
+> three dev tenants hold both, so it is latent — but it belongs in the **D-4 shelf decision**: either the
+> Change Governance SKU includes the committee subsystem, or its onboarding gate must say it depends on it.
+> (The first draft tried to dodge this by putting the endpoint in the committee package under a `CHANGE`
+> guard; `EntitlementCoverageRatchetTest` refused it, correctly — package↔SKU is the source of truth, so the
+> controller moved to `change_mgmt` instead.)
+>
+> **The SKU-activation clause is NOT discharged.** D-2 also says setting the gate is a required onboarding
+> step blocking change-governance activation. Nothing creates an organisation yet (**F2-81**), so there is no
+> onboarding sequence to insert it into; the clause is carried there rather than quietly dropped. Until then
+> the boot WARN and the panel's amber banner are the only prompts — which is exactly the posture F2-87 says is
+> insufficient on its own, and is why the gate now refuses instead of warning.
+
 ---
 
 ## D-3 — ECAB retrospective ratification SLA: **5 business days**, per-tenant overridable (closes D-2 / O-5)

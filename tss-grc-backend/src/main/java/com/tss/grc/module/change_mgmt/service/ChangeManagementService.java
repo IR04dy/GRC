@@ -1,5 +1,6 @@
 package com.tss.grc.module.change_mgmt.service;
 
+import com.tss.grc.common.exception.ChangeAuthorityNotConfiguredException;
 import com.tss.grc.common.tenant.TenantContext;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -155,6 +156,16 @@ public class ChangeManagementService {
     @Autowired(required = false)
     private CommitteeReferralService referralService;
 
+    /** ADR-017 D-2: owns the "is this tenant's CAB/ECAB gate configured?" predicate,
+     *  shared with the startup health report so the two cannot drift. Optional
+     *  (field-injected) so directly-constructed unit tests need not supply it — but note
+     *  that when it IS null the fail-closed check no-ops, so a mocked test that forgets to
+     *  set it passes vacuously. {@code ChangeAuthorityFailClosedTest} sets it with
+     *  {@code ReflectionTestUtils} for exactly that reason; three of its assertions were
+     *  green-because-absent on the first run. */
+    @Autowired(required = false)
+    private ChangeGovernanceHealthService governanceHealth;
+
     /** CM-C2: minimum recorded APPROVE votes required before a change may move to
      *  CAB_APPROVED. Configurable per deployment; defaults to 1 (four-eyes). */
     @Value("${grc.change.cab-min-approvals:1}")
@@ -279,10 +290,12 @@ public class ChangeManagementService {
             case "EMERGENCY_APPROVED" -> {
                 if (!"EMERGENCY".equals(c.getChangeType()))
                     throw new IllegalArgumentException("Emergency-approval path is only valid for EMERGENCY changes");
+                requireConfiguredChangeAuthority(c, target);
                 c.setCabDecisionAt(LocalDateTime.now());
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
             }
             case "CAB_APPROVED" -> {
+                requireConfiguredChangeAuthority(c, target);
                 // Track D: a change referred to a committee is decided THERE — the
                 // committee's carried resolution is the CAB decision (system-of-
                 // record), asserted on quorate (MINUTES_APPROVED) minutes. A
@@ -736,6 +749,69 @@ public class ChangeManagementService {
     }
 
     // ── CH-17: classification-driven authorisation matrix ────────────────────
+
+    /**
+     * <b>ADR-017 D-2 — fail closed when the tenant has not named the authority its own matrix
+     * demands.</b> Called from the two <em>permissive</em> CAB-dependent transitions.
+     *
+     * <p><b>The state this closes, measured 2026-08-01.</b> All three tenants' authorisation
+     * matrices demanded a committee — CAB on 5 cells, ECAB on 6 — while only org 1 had a
+     * {@code admin.committee_gate_map} row. In orgs 2 and 3 the demand therefore could not be
+     * met by anything: {@code CommitteeReferralService.refer} throws for an unmapped gate, so
+     * no change was ever referred, so the {@code CAB_APPROVED} branch below took its
+     * {@code else} — the legacy recorded-vote tally — and the change reached
+     * {@code CAB_APPROVED} <b>with no committee involved at all</b>. {@code EMERGENCY_APPROVED}
+     * was weaker still: it consulted neither a committee nor a vote, only F2-29's
+     * {@code CHANGE:APPROVE} + not-the-raiser check. That is the "silent pass" D-2 forbids, and
+     * {@code ChangeGovernanceHealthService} had been WARNing about it at every boot for a week —
+     * <b>which is the lesson: F-4 was closed by making the gap loud, and a WARN is not a
+     * control.</b>
+     *
+     * <p><b>Why only the permissive transitions.</b> D-2 says "the CAB-dependent transitions
+     * fail closed", and {@code CAB_REJECTED} is nominally one of them — but refusing a
+     * <em>rejection</em> because no committee is configured keeps alive a change somebody tried
+     * to kill, which fails closed in the direction that adds risk. Fail-closed means refuse the
+     * transition that grants authority, not every transition that mentions the CAB. Rejection
+     * stays available and remains reworkable via {@code CAB_REJECTED → DRAFT}.
+     *
+     * <p><b>Why an existing referral is a pass.</b> If this change has been referred, its
+     * deciding committee is identified for this change specifically — a stronger fact than the
+     * tenant default D-2 is about — so the "unset" condition does not hold. Note what this
+     * deliberately does <em>not</em> do: {@code EMERGENCY_APPROVED} still does not <em>require</em>
+     * the ECAB's recorded decision. Requiring retrospective ratification is ADR-017 D-3 / S7,
+     * which needs ratification columns that do not exist yet; widening it here would ship half
+     * of D-3 under D-2's name.
+     *
+     * <p><b>Why a silent matrix is a pass.</b> {@code resolveMatrix} returns null when the
+     * tenant has no cell for this (type, risk). The matrix <em>is</em> the tenant's documented
+     * change authority, and the absence of a cell is not a demand for a committee — failing
+     * closed there would refuse approvals in tenants that never asked for a CAB. The residual
+     * is recorded rather than hidden: a tenant that deletes its own matrix rows escapes this
+     * gate, which is why matrix writes are themselves {@code ADMIN}-guarded and audited.
+     */
+    private void requireConfiguredChangeAuthority(ChangeRequest c, String target) {
+        if (governanceHealth == null) return;   // directly-constructed unit tests
+        ChangeAuthorisationMatrix m = resolveMatrix(c);
+        if (m == null || m.getGate() == null) return;
+        String gate = m.getGate().trim().toUpperCase();
+        if (!"CAB".equals(gate) && !"ECAB".equals(gate)) return;   // AUTO — no committee demanded
+        if (referralService != null && referralService.activeReferral("CHANGE", c.getId()).isPresent())
+            return;
+        String fault = governanceHealth.gateConfigurationFault(c.getOrganisationId(), gate);
+        if (fault == null) return;
+        String why = ChangeAuthorityNotConfiguredException.COMMITTEE_UNAVAILABLE.equals(fault)
+            ? "the committee mapped to the " + gate + " gate is dissolved or no longer exists"
+            : "no committee is mapped to the " + gate + " gate for this organisation";
+        throw new ChangeAuthorityNotConfiguredException(
+            "Change authority is not configured: this change's authorisation matrix ("
+                + nullSafeStr(c.getChangeType()) + " / " + nullSafeStr(c.getRiskLevel())
+                + ") requires " + gate + " authorisation, but " + why
+                + ". Constitute an ACTIVE committee and map it to the gate on the Committees "
+                + "screen (" + ChangeAuthorityNotConfiguredException.REMEDY_SCREEN
+                + " → Change authority), then retry. The approval was refused rather than "
+                + "recorded without the authority the matrix names.",
+            gate, c.getOrganisationId(), fault, target);
+    }
 
     /** Look up the (type x risk) authorisation row for a change; null if the
      *  matrix is not wired or no cell matches. */
