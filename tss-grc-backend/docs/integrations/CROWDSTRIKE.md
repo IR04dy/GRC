@@ -175,18 +175,36 @@ on poll. Tracked as a separate sprint — out of scope for slice 3.
 
 ## REST endpoints
 
-| Method | Path                                                | Roles                                                     |
+| Method | Path                                                | Authorised by                                             |
 |--------|-----------------------------------------------------|-----------------------------------------------------------|
-| GET    | `/api/v1/integrations/crowdstrike/status`           | PLATFORM_ADMIN, CISO, SOC_ANALYST, SOC_TIER_2, SOC_AUTOMATION, INCIDENT_COMMANDER |
-| GET    | `/api/v1/integrations/crowdstrike/config`           | PLATFORM_ADMIN, CISO                                      |
+| GET    | `/api/v1/integrations/crowdstrike/status`           | **`INTEGRATIONS:READ`** *(was PLATFORM_ADMIN, CISO, SOC_ANALYST, SOC_TIER_2, SOC_AUTOMATION, INCIDENT_COMMANDER — four of those six do not exist in `iam.roles`, so it admitted two; ADR-017 D-8 / V343)* |
+| GET    | `/api/v1/integrations/crowdstrike/config`           | **`INTEGRATIONS:READ`** *(was PLATFORM_ADMIN, CISO)*      |
 | POST   | `/api/v1/integrations/crowdstrike/poll`             | **`CYBER:WRITE`** *(was PLATFORM_ADMIN, SOC_AUTOMATION — SOC_AUTOMATION does not exist, so this was admin-only; F2-05)* |
-| POST   | `/api/v1/integrations/crowdstrike/contain/{hostId}` | SOC_TIER_2, INCIDENT_COMMANDER, CISO, PLATFORM_ADMIN      |
-| POST   | `/api/v1/integrations/crowdstrike/lift/{hostId}`    | CISO, PLATFORM_ADMIN                                      |
-| GET    | `/api/v1/integrations/crowdstrike/stub/recorded-calls` | PLATFORM_ADMIN, CISO                                    |
+| POST   | `/api/v1/integrations/crowdstrike/contain/{hostId}` | `CISO`, `PLATFORM_ADMIN` — a **role list on purpose**; see below |
+| POST   | `/api/v1/integrations/crowdstrike/lift/{hostId}`    | `CISO`, `PLATFORM_ADMIN`                                  |
+| GET    | `/api/v1/integrations/crowdstrike/stub/recorded-calls` | **`INTEGRATIONS:WRITE`** — it returns frozen request payloads, so it is the administer tier, not the observe tier |
 
-The `lift` endpoint is intentionally narrower than `contain`: the
-restore-from-isolation decision sits with security leadership, not Tier
-2 analysts.
+`INTEGRATIONS:READ` is granted to `ORG_ADMIN`, `GRC_ADMINISTRATOR`, `CISO` and
+`CYBER_MANAGER`; `INTEGRATIONS:WRITE` to `ORG_ADMIN` and `CISO`. Both are
+issued as rows in `iam.role_permissions`, so a customer can re-grant them
+from the role editor without a jar — which is the whole point of the change.
+
+**`contain` and `lift` deliberately stay role guards, and they name the same
+two roles.** Containment is a security-operations decision that merely travels
+over an integration: `INTEGRATIONS:WRITE` would hand host quarantine to
+`ORG_ADMIN`, a tenant administrator with no SOC claim, and `CYBER:WRITE` is
+worse — it is held by the eight `*_INGEST` machine accounts, and a SIEM feed
+must not be able to isolate a production host. `lift` matches `contain`
+exactly rather than being narrower: whoever may isolate a host must be able to
+restore it, or an outage outlives the responder's shift.
+
+> ⚠ **Corrected 2026-08-01.** This table used to list `SOC_ANALYST`,
+> `SOC_TIER_2`, `SOC_AUTOMATION` and `INCIDENT_COMMANDER`, and the paragraph
+> under it said `lift` was "narrower than `contain` … not Tier 2 analysts".
+> **None of those four roles exists in `iam.roles`,** so `contain` and `lift`
+> had the identical population all along and the documented distinction was
+> describing a control that was not there. If you built an access matrix or an
+> ECC-2 evidence pack from the old table, it overstates who could act.
 
 ## Smoke-test curls
 

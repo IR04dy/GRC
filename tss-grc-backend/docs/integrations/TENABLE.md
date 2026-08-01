@@ -218,21 +218,45 @@ right default.
 
 ## REST endpoints
 
-| Method | Path                                                | Roles                                                                  |
+| Method | Path                                                | Authorised by                                                          |
 |--------|-----------------------------------------------------|------------------------------------------------------------------------|
-| GET    | `/api/v1/integrations/tenable/status`               | PLATFORM_ADMIN, CISO, RISK_MANAGER, SOC_ANALYST, SOC_TIER_2, SOC_AUTOMATION, INCIDENT_COMMANDER, BOARD_MEMBER |
-| GET    | `/api/v1/integrations/tenable/config`               | PLATFORM_ADMIN, CISO                                                   |
+| GET    | `/api/v1/integrations/tenable/status`               | **`INTEGRATIONS:READ`** *(was an eight-name list of which five do not exist in `iam.roles`; ADR-017 D-8 / V343)* |
+| GET    | `/api/v1/integrations/tenable/config`               | **`INTEGRATIONS:READ`** *(was PLATFORM_ADMIN, CISO)*                   |
 | POST   | `/api/v1/integrations/tenable/poll`                 | **`CYBER:WRITE`** *(was PLATFORM_ADMIN, SOC_AUTOMATION — SOC_AUTOMATION does not exist, so this was admin-only; F2-05)* |
-| POST   | `/api/v1/integrations/tenable/recast/{pluginId}`    | CISO, RISK_MANAGER, PLATFORM_ADMIN                                     |
-| POST   | `/api/v1/integrations/tenable/accept-risk/{pluginId}`| CISO, RISK_MANAGER, PLATFORM_ADMIN, BOARD_MEMBER                       |
-| POST   | `/api/v1/integrations/tenable/remove-recast/{pluginId}` | CISO, PLATFORM_ADMIN                                                |
-| GET    | `/api/v1/integrations/tenable/stub/recorded-calls`  | PLATFORM_ADMIN, CISO                                                   |
+| POST   | `/api/v1/integrations/tenable/recast/{pluginId}`    | `CISO`, `RISK_MANAGER`, `PLATFORM_ADMIN` — a **role list on purpose**   |
+| POST   | `/api/v1/integrations/tenable/accept-risk/{pluginId}`| `CISO`, `RISK_MANAGER`, `PLATFORM_ADMIN`                               |
+| POST   | `/api/v1/integrations/tenable/remove-recast/{pluginId}` | `CISO`, `PLATFORM_ADMIN`                                            |
+| GET    | `/api/v1/integrations/tenable/stub/recorded-calls`  | **`INTEGRATIONS:WRITE`** — it returns frozen request payloads          |
 
-The `accept-risk` endpoint includes `BOARD_MEMBER` because under SAMA
-CSF residual-risk decisions sit with the board (or its delegated
-committee). The `remove-recast` endpoint is narrower (CISO /
-PLATFORM_ADMIN only) — the "revert to Tenable default severity"
-decision should not be undone by anyone outside security leadership.
+`INTEGRATIONS:READ` is granted to `ORG_ADMIN`, `GRC_ADMINISTRATOR`, `CISO` and
+`CYBER_MANAGER`; `INTEGRATIONS:WRITE` to `ORG_ADMIN` and `CISO`. Both are rows
+in `iam.role_permissions`, re-grantable from the role editor.
+
+**`recast`, `accept-risk` and `remove-recast` deliberately stay role guards.**
+Severity override and vulnerability risk-acceptance are a *two-population*
+decision — cyber **and** risk — and no catalogued permission expresses that.
+Converting them to `INTEGRATIONS:WRITE` (`ORG_ADMIN`, `CISO`) would **revoke
+them from `RISK_MANAGER`**, the one role whose function this is; converting
+them to `CYBER:WRITE` would extend them to eight machine accounts.
+`remove-recast` stays narrower than `recast` on purpose: reverting another
+analyst's severity decision is a narrower act than making one.
+
+> ⚠ **Two corrections, 2026-08-01 (ADR-017 D-8).**
+>
+> 1. **`BOARD_MEMBER` is removed from `accept-risk`.** The SAMA CSF argument
+>    for it — residual-risk decisions sit with the board or its delegated
+>    committee — is sound, and the implementation never worked: **`BOARD_MEMBER`
+>    does not exist in `iam.roles`** on either the dev or the production
+>    database, so no board member ever reached this endpoint and the guard
+>    admitted `CISO`, `RISK_MANAGER` and `PLATFORM_ADMIN`. A board acceptance
+>    path is a real requirement that needs a real role, not a name in an
+>    annotation. Until one exists, do not present this endpoint as evidence of
+>    board-level risk acceptance.
+> 2. **`RISK_MANAGER` no longer reads `/status`.** It was named there and does
+>    not hold `INTEGRATIONS:READ`. It keeps all three action endpoints and every
+>    `RISK:*` permission; what it loses is the adapter's polling timestamp. This
+>    is the only access loss in the change, and it is live-verified in both
+>    directions (200 before, 403 after).
 
 ## Smoke-test curls
 

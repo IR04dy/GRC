@@ -133,6 +133,29 @@ class RoleGuardConversionRatchetTest {
      * VIEWER/REGULATOR_VIEWER via {@code CYBER:READ} or drop CISO via {@code PLATFORM:WRITE}. Naming
      * the owner of integration administration is a product decision, not a conversion.
      *
+     * <p><b>537</b> after {@code integrations} came back: <b>15 of those 20 moved</b> once the product
+     * decision was taken (ADR-017 D-8, V343 catalogues {@code INTEGRATIONS:READ}/{@code WRITE}). The
+     * paragraph above was right that no <em>existing</em> permission fit and wrong to leave it there —
+     * <b>"no catalogued permission matches this population" is an argument for cataloguing one, and
+     * the module sat administrator-only for as long as that sentence stood.</b> The measured effect is
+     * not a narrowing: the 20 guards recited nine role names of which <b>six do not exist</b>, so 15
+     * endpoints were reachable by {@code PLATFORM_ADMIN} and {@code CISO} alone — <em>by attrition,
+     * not by design</em> — and {@code splunk/test-push} by PLATFORM_ADMIN alone. This is therefore a
+     * <b>re-grant</b>, probed per endpoint as one, with a single access loss recorded in the guard that
+     * takes it ({@code TenableController#status} loses {@code RISK_MANAGER}).
+     *
+     * <p>The 5 sites deliberately left as role guards are the module's <em>outbound action</em>
+     * endpoints — {@code contain}, {@code lift}, {@code recast}, {@code acceptRisk},
+     * {@code removeRecast} — and they had their <b>ghost legs stripped without being converted</b>,
+     * which is provably access-preserving because a name absent from {@code iam.roles} can never
+     * satisfy {@code hasAnyRole}. Converting them was measured and rejected in both directions:
+     * {@code INTEGRATIONS:WRITE} is {@code {ORG_ADMIN, CISO\}} and would <em>revoke</em> severity
+     * recast and vulnerability risk-acceptance from {@code RISK_MANAGER}, the role whose function that
+     * is, while {@code CYBER:WRITE} includes eight machine feeds. <b>A ratchet that only ever counts
+     * down invites conversion for its own sake; five sites here are the honest floor, and each says so
+     * in its own javadoc</b> — {@link com.tss.grc.security.IntegrationsAuthorizationTest} pins them,
+     * along with the invariant that the only role names this package may recite are three that exist.
+     *
      * <p><b>564</b> after the fifth: {@code board_pack}'s 4 read/write sites moved to
      * {@code ADMIN:READ}/{@code ADMIN:WRITE} — already granted, so <b>no migration</b>. This one
      * inverts the pattern. Five of the read guard's six role names were ghosts (CRO, BOARD_MEMBER,
@@ -178,7 +201,7 @@ class RoleGuardConversionRatchetTest {
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 552;
+    private static final int BASELINE_PURE_ROLE_SITES = 537;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"

@@ -167,8 +167,14 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   query filters `organisation_id`** (developer responsibility); prod adds a
   tenant write-guard interceptor. Schedulers/async must be org-explicit.
 - **Authorization** — `@PreAuthorize("hasPermission('MODULE','ACTION')")` via
-  `ModulePermissionEvaluator`; 94-permission catalogue (24 modules ×
-  READ/WRITE/APPROVE/DELETE/TRIAGE/EXPORT); PLATFORM_ADMIN bypasses in code.
+  `ModulePermissionEvaluator`; **114-permission catalogue across 31 modules**
+  (READ/WRITE/APPROVE/DELETE/TRIAGE/EXPORT), measured 2026-08-01 in both dev and
+  prod — this line said "94 / 24" for months; **PLATFORM_ADMIN bypasses in code**,
+  so `admin` proves nothing about authorization: probe with a real persona.
+  ⚠ **`hasAnyRole(...)` is a second, independent gate that gets NO admin bypass**
+  and validates nothing — **537 endpoints still authorise by role name, reciting
+  role names with a ~50% miss rate against `iam.roles`** (F2-05/F2-52). Before
+  trusting or writing one, check the names exist.
 - **Soft deletes** — `is_deleted` + `@Where`; native SQL must filter it.
   Exception: `iam.user_roles` rows are hard-deleted.
 - **Four-eyes/SoD gates are server-enforced 409s** (allocation approve, tag decide,

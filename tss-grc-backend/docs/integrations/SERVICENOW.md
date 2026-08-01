@@ -43,12 +43,23 @@ chosen at startup by `grc.integrations.servicenow.mode`:
            type: OAUTH2_CLIENT_CREDENTIALS   # or BASIC
    ```
 
-3. Hit the smoke endpoints (admin / CISO only):
+3. Hit the smoke endpoints. Both require **`INTEGRATIONS:READ`**, granted to
+   `ORG_ADMIN`, `GRC_ADMINISTRATOR`, `CISO` and `CYBER_MANAGER` (ADR-017 D-8,
+   V343). `POST /test-push` and `GET /stub/recorded-calls` require the narrower
+   **`INTEGRATIONS:WRITE`** (`ORG_ADMIN`, `CISO`), because one transmits to your
+   ServiceNow instance and the other returns the frozen request payloads.
 
    ```bash
    curl -H "Authorization: Bearer $JWT" http://localhost:8084/api/v1/integrations/servicenow/health
    curl -H "Authorization: Bearer $JWT" http://localhost:8084/api/v1/integrations/servicenow/config
    ```
+
+   > ⚠ **Corrected 2026-08-01.** This step used to say "admin / CISO only",
+   > which was accurate and was the defect: integration administration was
+   > reachable by exactly two personas, one of which bypasses authorisation in
+   > code, because four of the guards' role names did not exist. These are
+   > permissions now, so you can grant them from the role editor rather than
+   > handing someone a platform-administrator account to check a health page.
 
 ## Field mapping (GRC → ServiceNow)
 

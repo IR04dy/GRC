@@ -57,20 +57,27 @@ import static org.assertj.core.api.Assertions.assertThat;
  * PLATFORM_ADMIN — and <b>no</b> VIEWER, REGULATOR_VIEWER, EXTERNAL_AUDITOR or SUPPLIER_USER. The
  * grant is already correct, so unlike V326/V327/V328 this slice needs no migration at all.
  *
- * <h3>⚠ Why only four of this package's twenty-four role guards moved</h3>
- * <p>The other twenty are <b>not defective</b>: they name {@code PLATFORM_ADMIN}, {@code CISO} and
- * {@code RISK_MANAGER}, which all exist, and there is <b>no catalogued permission whose population
- * matches {@code {PLATFORM_ADMIN, CISO\}}</b>. {@code CYBER:READ} would widen integration
- * configuration and recorded API-call logs to 19 roles including VIEWER, REGULATOR_VIEWER and
- * EXTERNAL_AUDITOR; {@code PLATFORM:WRITE} is held by ORG_ADMIN alone and would <em>drop CISO</em>,
- * locking out the persona that runs the integrations. Host containment
- * ({@code CrowdStrikeController#contain}) and vulnerability risk acceptance
- * ({@code TenableController#acceptRisk}) need a tier <em>narrower</em> than {@code CYBER:WRITE},
- * because that includes eight machine accounts and a SIEM feed must not be able to quarantine a host.
- * Converting them uniformly would loosen guards while closing one — the F2-51 lesson. Naming the
- * owner of integration administration is a product decision, recorded in the plan, not guessed here.
+ * <h3>⚠ Why only four of this package's twenty-four role guards moved — SUPERSEDED 2026-08-01</h3>
+ * <p>This section used to end "naming the owner of integration administration is a product decision,
+ * recorded in the plan, not guessed here", and it was right about the four but wrong to stop. That
+ * decision was taken as <b>ADR-017 D-8</b>, {@code INTEGRATIONS:READ}/{@code WRITE} were catalogued by
+ * <b>V343</b>, and <b>15 of the remaining 20 sites</b> moved onto them. The claim it rested on —
+ * "the other twenty are <em>not defective</em>: they name PLATFORM_ADMIN, CISO and RISK_MANAGER, which
+ * all exist" — <b>was itself the F2-27 shape</b>: those three do exist, and <em>six other names in the
+ * same twenty guards do not</em> ({@code SOC_ANALYST}, {@code SOC_TIER_2}, {@code SOC_AUTOMATION},
+ * {@code INTEGRATION_SERVICE}, {@code INCIDENT_COMMANDER}, {@code BOARD_MEMBER}), which is precisely
+ * why the effective population had collapsed to two personas. Checking the names a guard needs is not
+ * the same as checking the names a guard has.
+ *
+ * <p>What survives from the original reasoning, and is now pinned rather than argued: the five
+ * <em>outbound action</em> endpoints stay role-guarded, because {@code CYBER:WRITE} includes eight
+ * machine feeds and {@code INTEGRATIONS:WRITE} ({@code ORG_ADMIN}, {@code CISO}) would revoke
+ * severity recast and risk acceptance from {@code RISK_MANAGER}, whose function that is. Their ghost
+ * legs were stripped without converting them — provably access-preserving, since a name absent from
+ * {@code iam.roles} can never satisfy {@code hasAnyRole}.
  *
  * @see com.tss.grc.security.RoleGuardConversionRatchetTest the census and the platform-wide ratchet
+ * @see com.tss.grc.security.IntegrationsAuthorizationTest the A17-D8 partition and the ghost ratchet
  */
 class IntegrationsIngestGuardTest {
 

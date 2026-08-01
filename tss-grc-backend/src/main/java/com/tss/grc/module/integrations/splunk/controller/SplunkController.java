@@ -29,16 +29,22 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Admin and SOC REST endpoints for the Splunk SIEM bridge. Endpoints split
- * by role:
+ * Admin and SOC REST endpoints for the Splunk SIEM bridge. Endpoints split by
+ * permission — {@code INTEGRATIONS:READ} to observe, {@code INTEGRATIONS:WRITE}
+ * to transmit (ADR-017 D-8, V343):
  *
  * <ul>
- *   <li>{@code GET  /status} — kill-switch, mode, last-successful-push timestamp.</li>
- *   <li>{@code POST /test-push} — PLATFORM_ADMIN only — smoke-test an arbitrary event.</li>
- *   <li>{@code POST /security-event/{id}} — SOC_ANALYST / SOC_AUTOMATION — push a known event.</li>
- *   <li>{@code GET  /config} — PLATFORM_ADMIN / CISO — bound configuration (HEC token masked).</li>
- *   <li>{@code GET  /stub/recorded-calls} — PLATFORM_ADMIN / CISO — STUB-only call log.</li>
+ *   <li>{@code GET  /status} — {@code INTEGRATIONS:READ} — kill-switch, mode, last-push timestamp.</li>
+ *   <li>{@code GET  /config} — {@code INTEGRATIONS:READ} — bound configuration (HEC token masked).</li>
+ *   <li>{@code POST /test-push} — {@code INTEGRATIONS:WRITE} — smoke-test an arbitrary event.</li>
+ *   <li>{@code POST /security-event/{id}} — {@code INTEGRATIONS:WRITE} — push a known event.</li>
+ *   <li>{@code GET  /stub/recorded-calls} — {@code INTEGRATIONS:WRITE} — STUB-only call log; it
+ *       returns frozen request payloads, which is why it sits at the WRITE tier and not READ.</li>
  * </ul>
+ *
+ * <p>This list previously read "PLATFORM_ADMIN only" and "SOC_ANALYST / SOC_AUTOMATION". Two of those
+ * names do not exist in {@code iam.roles}, so the documentation described a population that could
+ * never be assembled — the route table was as wrong as the guard it described.
  */
 @RestController
 @RequestMapping("/api/v1/integrations/splunk")
@@ -68,7 +74,11 @@ public class SplunkController {
     }
 
     @GetMapping("/status")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CISO','SOC_ANALYST','SOC_AUTOMATION')")
+    // A17-D8: was hasAnyRole('PLATFORM_ADMIN','CISO','SOC_ANALYST','SOC_AUTOMATION'). Two of those
+    // four names do not exist in iam.roles, and hasAnyRole gets no PLATFORM_ADMIN bypass, so this was
+    // reachable by exactly PLATFORM_ADMIN and CISO. INTEGRATIONS:READ = ORG_ADMIN, GRC_ADMINISTRATOR,
+    // CISO, CYBER_MANAGER — see V343 for the per-grantee need-to-know. ADR-017 D-8.
+    @PreAuthorize("hasPermission('INTEGRATIONS','READ')")
     @Operation(summary = "Splunk integration health + last-successful-push timestamp")
     public Map<String, Object> status() {
         boolean healthy = client.isHealthy();
@@ -88,7 +98,7 @@ public class SplunkController {
     }
 
     @GetMapping("/config")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CISO')")
+    @PreAuthorize("hasPermission('INTEGRATIONS','READ')")   // A17-D8 — was hasAnyRole('PLATFORM_ADMIN','CISO')
     @Operation(summary = "Bound Splunk integration configuration — HEC token masked")
     public Map<String, Object> config() {
         Map<String, Object> body = new LinkedHashMap<>();
@@ -112,21 +122,31 @@ public class SplunkController {
     }
 
     @PostMapping("/test-push")
-    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    // A17-D8: was hasRole('PLATFORM_ADMIN') — administrator-only, so the integration smoke test could
+    // not be run by the persona that owns the integration. INTEGRATIONS:WRITE = ORG_ADMIN, CISO. This
+    // transmits an arbitrary event to a third party, which is why it is the WRITE tier and not READ.
+    @PreAuthorize("hasPermission('INTEGRATIONS','WRITE')")
     @Operation(summary = "Manual smoke-test: push an arbitrary event through the outbound pipeline")
     public SplunkHecEventResponse testPush(@Valid @RequestBody SplunkHecEventRequest req) {
         return outbound.push(req);
     }
 
     @PostMapping("/security-event/{id}")
-    @PreAuthorize("hasAnyRole('SOC_ANALYST','SOC_AUTOMATION','PLATFORM_ADMIN','CISO')")
+    // A17-D8: egress, not ingest. The four INGEST endpoints stay on CYBER:WRITE (F2-05 slice 4) because
+    // the *_INGEST machine roles hold it; this one sends platform data OUT to a third party, which is the
+    // data-transfer surface PDPL art. 29 / NCA ECC-2 name. Was two ghosts + PLATFORM_ADMIN + CISO.
+    @PreAuthorize("hasPermission('INTEGRATIONS','WRITE')")
     @Operation(summary = "Manually push a known SOC security event into Splunk")
     public SplunkHecEventResponse pushSecurityEvent(@PathVariable Long id) {
         return outbound.pushSecurityEvent(id);
     }
 
     @GetMapping("/stub/recorded-calls")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CISO')")
+    // A17-D8 — WRITE tier on a GET, deliberately. StubInvocation carries the frozen inbound PAYLOAD, so
+    // this is the only READ-shaped endpoint in the module that can return what was actually transmitted.
+    // It must not widen to the two assurance personas INTEGRATIONS:READ adds. Returns [] outside STUB
+    // mode (the bean is absent), so the exposure is dev/pilot-only — but a guard is not a mode.
+    @PreAuthorize("hasPermission('INTEGRATIONS','WRITE')")
     @Operation(summary = "STUB mode only — list calls the stub client has seen")
     public ResponseEntity<List<StubInvocation>> recordedCalls() {
         StubSplunkClient stub = stubProvider.getIfAvailable();

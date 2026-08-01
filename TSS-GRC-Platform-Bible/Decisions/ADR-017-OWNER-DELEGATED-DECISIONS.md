@@ -321,7 +321,7 @@ to the *tenant* administrator, and neither is the author of PDPL/ECC/NDMO/Nazaha
 
 ---
 
-## D-8 — Integration administration: catalogue an **`INTEGRATIONS`** module (closes the slice-4 open call)
+## D-8 — Integration administration: catalogue an **`INTEGRATIONS`** module (closes the slice-4 open call) — ✅ **SHIPPED V343**
 
 F2-05 slice 4 converted the four *ingest* endpoints to `CYBER:WRITE` (correct — the eight seeded `*_INGEST`
 machine roles already hold it) and deliberately left the other 20 guards alone, because **no catalogued
@@ -369,6 +369,75 @@ and its population question is different; it gets its own ADR when its slice is 
 >   before/after population per endpoint rather than in aggregate.
 > - The ghost names must be **deleted, not seeded**. Seeding `SOC_ANALYST` to make an old guard work would
 >   make an absent control look present — §7's standing exclusion.
+
+> ### ✅ Shipped as V343, 2026-08-01 — and the decision changed shape in two places once it was measured
+>
+> **15 of the 20 guards moved**, not 20. Suite **2752/0/0**; live **154 checks across 7 personas**, with a
+> before/after diff over 132 cells: **114 unchanged, 17 gains, 1 loss, 0 unexpected**. Role-guard ratchet
+> **552 → 537**. Grants: `INTEGRATIONS:READ` → `ORG_ADMIN`, `GRC_ADMINISTRATOR`, `CISO`, `CYBER_MANAGER`;
+> `INTEGRATIONS:WRITE` → `ORG_ADMIN`, `CISO`. All six ghost names are gone from the package, and
+> `SOC_ANALYST`, `SOC_TIER_2`, `SOC_AUTOMATION` and `INTEGRATION_SERVICE` are now absent from **every**
+> `@PreAuthorize` on the platform — this package was their last user (the distinct-role-name census fell
+> 74 → 62 over F2-05, and these four came out here).
+>
+> **1. The READ/WRITE line is not where this decision drew it.** D-8 put "logs of what left the platform"
+> under `INTEGRATIONS:READ`. Measured against the code, the only endpoints that return anything resembling
+> a payload are the four `/stub/recorded-calls` diagnostics, and `StubInvocation` carries the **frozen
+> inbound payload verbatim**. They are therefore on `INTEGRATIONS:WRITE` — a GET on the write tier, which
+> looks wrong and is right: the tier is *integration administrator*, and widening a payload dump to the two
+> assurance personas READ adds would have been the opposite of this decision's purpose. Conversely the PDPL
+> framing in the amendment is **narrower than it claimed**: those four endpoints resolve the stub bean via
+> `ObjectProvider#getIfAvailable` and return `[]` when it is absent, which it is unless `mode=STUB`. So the
+> personal-data exposure is real in dev and in any customer pilot left in STUB, and nil in LIVE. *A mode is
+> not a guard, so the guard still had to be right — but the risk register entry should say "pilot", not
+> "production".*
+>
+> **2. The five outbound-action endpoints were NOT converted, and the reason is a revocation this decision
+> did not foresee.** D-8 listed host containment and vulnerability risk-acceptance under "Unchanged" and
+> said only that they must stay narrower than the ingest tier. Measured: `INTEGRATIONS:WRITE` is
+> `{ORG_ADMIN, CISO}`, and `RISK_MANAGER` holds neither — so converting `recast` / `accept-risk` /
+> `remove-recast` onto it would have **taken severity override and vulnerability risk-acceptance away from
+> the one role whose function that is**, while handing host quarantine to a tenant administrator with no
+> security-operations claim. Live-proven after the change: the throwaway `ORG_ADMIN` probe user gets 200 on
+> all 15 converted endpoints and **403 on all five actions**, which is the design, not a gap. Their ghost
+> legs were stripped without converting them — provably access-preserving, since a name absent from
+> `iam.roles` can never satisfy `hasAnyRole`. *Vulnerability risk-acceptance is a two-population decision —
+> cyber **and** risk — that no catalogued permission expresses. Naming one is a real open question and it is
+> better left named than answered by whichever permission happened to be nearest.*
+>
+> **The `CYBER_MANAGER` rationale this amendment demanded, and it came out stronger than expected.**
+> `CYBER_MANAGER` already holds `CYBER:READ` + `WRITE` + `DELETE` + `EXPORT`, so every detection and
+> vulnerability finding these four adapters ingest is already readable *and exportable* by that role.
+> `INTEGRATIONS:READ` adds only the record of the **transport** — adapter health, masked configuration,
+> last-poll/last-push timestamps — for payloads the role may already read in full. Under PDPL that is the
+> weaker access, not the stronger one. Refusing it would produce a cyber manager who can export a
+> vulnerability register but cannot tell whether the scanner feeding it stopped four weeks ago.
+>
+> **One access loss, recorded in the guard that takes it.** `RISK_MANAGER` loses
+> `GET /api/v1/integrations/tenable/status`, where it was named alongside PLATFORM_ADMIN, CISO and **five**
+> ghosts — `BOARD_MEMBER` on an adapter kill-switch endpoint being the tell that the list was written by
+> enumeration. It keeps all three Tenable actions and every `RISK:*` permission, and it holds no `CYBER`
+> permission on either database, so it never had a route to the findings themselves.
+>
+> **`BOARD_MEMBER` came off `accept-risk`, and `docs/integrations/TENABLE.md` had to be corrected rather
+> than edited.** That page justified the name on SAMA CSF grounds — residual-risk decisions sit with the
+> board or its delegated committee — which is a sound requirement whose implementation never existed: the
+> role is absent from both databases, so no board member ever reached the endpoint. The page now says so,
+> because a customer building an access matrix from the old table would have documented a board-level
+> control the platform does not have. **The same correction was owed on CROWDSTRIKE.md, which described
+> `lift` as "narrower than `contain` … not Tier 2 analysts" when four ghost names had made the two
+> identical all along.** *F2-05 slice 4's keeper was "when a ghost role appears in a guard, grep the docs
+> for it". This slice adds the sharper version: the docs did not merely repeat the ghost, they described a
+> **distinction between two controls that did not differ** — a runbook can assert a control the code never
+> had, and an ECC-2 evidence pack built from it inherits the claim.*
+>
+> **What the F2-05 slice-4 note got wrong, which is worth stating plainly because it held for three days.**
+> It recorded that the remaining 20 guards were "not defective: they name PLATFORM_ADMIN, CISO and
+> RISK_MANAGER, which all exist". Those three do exist — and six *other* names in the same twenty guards do
+> not. **Checking the names a guard needs is not the same as checking the names a guard has.** That
+> sentence, plus "no catalogued permission matches this population", is what kept the module
+> administrator-only: *"no permission fits" is an argument for cataloguing one, not for leaving the guard
+> alone.*
 
 ---
 
@@ -663,9 +732,11 @@ F2-53, and the fraud/integration/export tails.
 done by this document: the module-registry SKU reconciliation (D-1); per-tenant CAB configuration with
 fail-closed transitions (D-2); the ECAB SLA clock and escalation (D-3); the board-pack JSON aggregate
 (D-5); the migration-naming test plus renumber-or-delete (D-6); `KB` catalogue + grants (D-7);
-`INTEGRATIONS` catalogue + grants and the remaining 20 guard conversions (D-8); `FRAUD_INVESTIGATOR` +
-grant (D-9); the EXPORT grant sweep under the new rule (D-10); audience-scoped board-pack reads (D-11);
-`nca_ecc` `submittedBy` (D-12). Migrations will be needed for D-7, D-8, D-9 and probably D-10.
+~~`INTEGRATIONS` catalogue + grants and the remaining 20 guard conversions (D-8)~~ ✅ **V343, 15 of the 20 —
+the other 5 are outbound actions deliberately left as role guards, see D-8's shipped block**;
+`FRAUD_INVESTIGATOR` + grant (D-9); the EXPORT grant sweep under the new rule (D-10); audience-scoped
+board-pack reads (D-11); `nca_ecc` `submittedBy` (D-12). Migrations will be needed for D-7, D-8, D-9 and
+probably D-10.
 
 **Still genuinely owner-only, and deliberately left so:**
 

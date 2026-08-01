@@ -101,6 +101,27 @@ the SOC analyst sees the row in the active queue and re-ranks during
 triage — preferable to a silent 72h SLA on something that may actually
 be urgent.
 
+## Who may call which endpoint
+
+ADR-017 D-8 / **V343**: the admin surface authorises on the `INTEGRATIONS`
+module, not on role names.
+
+| Method | Path                    | Authorised by                                                      |
+|--------|-------------------------|--------------------------------------------------------------------|
+| GET    | `/splunk/status`        | **`INTEGRATIONS:READ`** *(was PLATFORM_ADMIN, CISO, SOC_ANALYST, SOC_AUTOMATION — the last two do not exist in `iam.roles`)* |
+| GET    | `/splunk/config`        | **`INTEGRATIONS:READ`** — HEC token is masked                       |
+| POST   | `/splunk/test-push`     | **`INTEGRATIONS:WRITE`** *(was `hasRole('PLATFORM_ADMIN')` — the persona that owns the integration could not smoke-test it)* |
+| POST   | `/splunk/security-event/{id}` | **`INTEGRATIONS:WRITE`** — egress of platform data to a third party |
+| GET    | `/splunk/stub/recorded-calls` | **`INTEGRATIONS:WRITE`** — returns frozen request payloads     |
+| POST   | `/splunk/webhook`       | **`CYBER:WRITE`** — ingest; `SIEM_INGEST` holds it (F2-05, see below) |
+
+`INTEGRATIONS:READ` → `ORG_ADMIN`, `GRC_ADMINISTRATOR`, `CISO`, `CYBER_MANAGER`.
+`INTEGRATIONS:WRITE` → `ORG_ADMIN`, `CISO`. Both are rows in
+`iam.role_permissions`, so re-granting them is a role-editor change rather than
+a release. Note that `security-event/{id}` is **egress** and therefore sits on
+`INTEGRATIONS:WRITE` while `/webhook` is **ingest** and stays on `CYBER:WRITE` —
+the direction of travel, not the transport, decides the tier.
+
 ## Outbound — sample curl
 
 The `test-push` endpoint exercises the full outbound pipeline. In STUB
