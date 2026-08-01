@@ -43,8 +43,14 @@ class DeploymentInfoContributorTest {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> migrationsFrom(JdbcTemplate jdbc, boolean flywayEnabled) {
+        return migrationsFrom(jdbc, flywayEnabled, "");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> migrationsFrom(JdbcTemplate jdbc, boolean flywayEnabled,
+                                               String flywaySchema) {
         Info.Builder builder = new Info.Builder();
-        new DeploymentInfoContributor(jdbc, "flyway_schema_history", flywayEnabled)
+        new DeploymentInfoContributor(jdbc, "flyway_schema_history", flywaySchema, flywayEnabled)
             .contribute(builder);
         return (Map<String, Object>) builder.build().getDetails().get("migrations");
     }
@@ -148,6 +154,74 @@ class DeploymentInfoContributorTest {
         // Dotted versions are legal Flyway and sort part-wise, not lexically.
         assertThat(DeploymentInfoContributor.compareVersions("1.2", "1.10")).isNegative();
         assertThat(DeploymentInfoContributor.compareVersions("2", "1.9")).isPositive();
+    }
+
+    // ── F2-73 ────────────────────────────────────────────────────────────────────────────────
+    // Production reported `historyAvailable: false` with the note "nothing has been applied through
+    // Flyway" while platform.flyway_schema_history held 45 rows through V336. Two defects in one
+    // sentence: the table name was unqualified, and a read failure was rendered as a fact about the
+    // world. Both are pinned below, because `pending` — and therefore deployment_identity.py's
+    // "packaged but NOT applied" check — is computed only when the history reads successfully.
+
+    @Test
+    void theHistoryTableIsQualifiedWithFlywaysOwnDefaultSchema() {
+        JdbcTemplate jdbc = historyReturning("300");
+        migrationsFrom(jdbc, true, "platform");
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(jdbc).queryForList(sql.capture(), eq(String.class));
+
+        // Flyway creates its history table INSIDE spring.flyway.default-schema. Query it unqualified
+        // and SQL Server resolves against the login's default schema — dbo in production, which is
+        // empty — so the read raises `Invalid object name` and this class reported "nothing applied".
+        assertThat(sql.getValue())
+            .as("the query must name the schema Flyway actually puts the table in")
+            .contains("platform.flyway_schema_history");
+    }
+
+    @Test
+    void withNoConfiguredSchemaTheTableStaysUnqualified() {
+        // Dev sets no default-schema, and adding a bogus prefix there would break the one
+        // environment that was working. The fix must be inert when the property is absent.
+        JdbcTemplate jdbc = historyReturning("300");
+        migrationsFrom(jdbc, true, "   ");
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(jdbc).queryForList(sql.capture(), eq(String.class));
+        assertThat(sql.getValue()).contains("FROM flyway_schema_history");
+        assertThat(sql.getValue()).doesNotContain(".flyway_schema_history");
+    }
+
+    @Test
+    void anUnreadableHistoryIsReportedAsBlindness_notAsAnEmptyHistory() {
+        // The table EXISTS (OBJECT_ID answers) but cannot be read. That is the production case, and
+        // it is the opposite of "nothing has been applied".
+        JdbcTemplate jdbc = historyMissing();
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), anyString())).thenReturn(1234);
+
+        Map<String, Object> m = migrationsFrom(jdbc, true, "platform");
+
+        assertThat(m.get("historyAvailable")).isEqualTo(false);
+        assertThat(m.get("historyReadable")).as("the field that distinguishes the two").isEqualTo(false);
+        assertThat((String) m.get("note"))
+            .as("an operator must not read a failed query as a clean database")
+            .contains("EXISTS but could not be read")
+            .contains("Invalid object name")
+            .doesNotContain("nothing has been applied");
+    }
+
+    @Test
+    void anAbsentHistoryStillReadsAsAbsent_soDevIsUnchanged() {
+        // OBJECT_ID answers null: the table really is not there. This is the dev truth and it must
+        // survive the fix — otherwise every dev box would start claiming its instrument is blind.
+        JdbcTemplate jdbc = historyMissing();
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), anyString())).thenReturn(null);
+
+        Map<String, Object> m = migrationsFrom(jdbc, true, "platform");
+
+        assertThat(m.get("historyAvailable")).isEqualTo(false);
+        assertThat(m).doesNotContainKey("historyReadable");
+        assertThat((String) m.get("note")).contains("nothing has been applied through Flyway");
     }
 
     @Test

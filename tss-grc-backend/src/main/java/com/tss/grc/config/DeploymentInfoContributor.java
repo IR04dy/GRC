@@ -46,6 +46,37 @@ import java.util.regex.Pattern;
  *       is non-empty, "it will apply on the next restart" is a claim with evidence behind it.</li>
  * </ul>
  *
+ * <h3>⚠ F2-73 — this class was blind in production, and reported its blindness as good news</h3>
+ *
+ * <p>Found running W0-3's post-deploy verification on 2026-08-01. Production's
+ * {@code /actuator/info} answered:
+ *
+ * <pre>{@code "historyAvailable": false,
+ * "note": "no flyway_schema_history table yet — nothing has been applied through Flyway"}</pre>
+ *
+ * <p>while {@code platform.flyway_schema_history} held <b>45 successful rows through V336</b>, applied
+ * at 16:47:23 the previous evening. The cause: {@code application-prod.yml} sets
+ * {@code spring.flyway.default-schema: platform} — and its own comment says <em>"History table becomes
+ * platform.flyway_schema_history"</em> — but {@link #appliedHead()} interpolated only
+ * {@code spring.flyway.table}, <b>unqualified</b>. The connection's default schema for the app login is
+ * {@code dbo}, which is empty, so the query raised {@code Invalid object name
+ * 'flyway_schema_history'}, the {@code catch} logged it at {@code DEBUG} and returned {@code null}.
+ *
+ * <p><b>Why that is not cosmetic.</b> {@code pending} is computed only in the branch where
+ * {@code appliedHead != null}. So in production {@code pending} was <em>always empty</em> — and
+ * {@code Appendix/scripts/deployment_identity.py} raises its "packaged but NOT applied" problem from
+ * exactly that field. The detector the plan calls RC-B's instrument could not fire in the only
+ * environment RC-B is about. On the morning this was found, V337 and V338 were packaged-and-unapplied
+ * and the probe reported no problem.
+ *
+ * <p><b>The shape of the bug is worth more than the bug.</b> The {@code null} branch was written for
+ * development, where Flyway is off and the table genuinely does not exist, and its message is correct
+ * there. In production the same {@code null} meant "I could not read it" and the message asserted
+ * "nothing has been applied" — <b>a read failure rendered as a statement about the world.</b> So the
+ * fix is two things, not one: qualify the table, and never again let unreadable be reported as empty.
+ * {@code tableExists()} separates them, an unreadable history logs at {@code WARN} when Flyway is
+ * enabled, and the payload carries the driver's own error instead of a reassuring sentence.
+ *
  * <h3>Exposure</h3>
  * <p>Measured before publishing any of it: production runs the app on {@code SERVER_PORT=8090} and
  * actuator on {@code MANAGEMENT_SERVER_PORT=8091}, a separate port that nginx does not proxy (it
@@ -70,10 +101,17 @@ public class DeploymentInfoContributor implements InfoContributor {
             JdbcTemplate jdbc,
             @org.springframework.beans.factory.annotation.Value("${spring.flyway.table:flyway_schema_history}")
             String historyTable,
+            // F2-73: without this, the table name below is unqualified and resolves to the
+            // connection's default schema (dbo), where the history table has never lived in
+            // production. Flyway itself creates the table inside `default-schema`.
+            @org.springframework.beans.factory.annotation.Value("${spring.flyway.default-schema:}")
+            String flywaySchema,
             @org.springframework.beans.factory.annotation.Value("${spring.flyway.enabled:true}")
             boolean flywayEnabled) {
         this.jdbc = jdbc;
-        this.historyTable = historyTable;
+        this.historyTable = (flywaySchema == null || flywaySchema.isBlank())
+            ? historyTable
+            : flywaySchema.trim() + "." + historyTable;
         this.flywayEnabled = flywayEnabled;
     }
 
@@ -102,15 +140,31 @@ public class DeploymentInfoContributor implements InfoContributor {
 
         String applied = appliedHead();
         if (applied == null) {
-            // Dev bootstraps its schema with Python scripts and runs with Flyway off, so the history
-            // table genuinely does not exist. Say that, rather than reporting every packaged
-            // migration as "pending" — which would be true of a fresh database and false here, and
-            // an operator reading it on the wrong box would draw exactly the wrong conclusion.
+            // ⚠ F2-73: this used to state "nothing has been applied" for BOTH cases — a table that
+            // is genuinely absent (dev, Flyway off, Python-bootstrapped) and a table this class
+            // simply could not read (prod, where the name was unqualified and resolved to an empty
+            // dbo). The two are opposite facts and only one of them is good news. Separate them,
+            // and when Flyway is enabled and the history is unreadable, say so loudly: a blind
+            // instrument must announce its blindness, because every consumer downstream —
+            // deployment_identity.py's "packaged but NOT applied" check above all — reads absence
+            // as "there is nothing to report".
             migrations.put("appliedHead", null);
             migrations.put("historyAvailable", false);
-            migrations.put("note", flywayEnabled
-                ? "no " + historyTable + " table yet — nothing has been applied through Flyway"
-                : "Flyway is disabled in this profile; schema is managed outside it");
+            String readError = historyReadError;
+            if (readError != null && tableExists()) {
+                migrations.put("historyReadable", false);
+                migrations.put("note", "the " + historyTable + " table EXISTS but could not be read, "
+                    + "so `pending` below is unknown rather than empty — this instrument is blind: "
+                    + readError);
+                if (flywayEnabled) {
+                    log.warn("[W0-7] {} exists but is unreadable — /actuator/info cannot report the "
+                        + "applied head or the pending set: {}", historyTable, readError);
+                }
+            } else {
+                migrations.put("note", flywayEnabled
+                    ? "no " + historyTable + " table yet — nothing has been applied through Flyway"
+                    : "Flyway is disabled in this profile; schema is managed outside it");
+            }
         } else {
             migrations.put("appliedHead", applied);
             migrations.put("historyAvailable", true);
@@ -178,15 +232,61 @@ public class DeploymentInfoContributor implements InfoContributor {
      * is absent. Read with SQL rather than through the {@code Flyway} bean on purpose: with
      * {@code spring.flyway.enabled=false} there is no such bean, and the dev profile runs that way.
      */
+    /**
+     * Set when {@link #appliedHead()} could not read the history table. Distinguishes "there is no
+     * history" from "I cannot see the history", which F2-73 conflated into one reassuring sentence.
+     */
+    private volatile String historyReadError;
+
     private String appliedHead() {
+        historyReadError = null;
         try {
             List<String> rows = jdbc.queryForList(
                 "SELECT version FROM " + historyTable + " WHERE success = 1 AND version IS NOT NULL",
                 String.class);
             return rows.stream().max(DeploymentInfoContributor::compareVersions).orElse(null);
         } catch (Exception e) {
-            log.debug("Flyway history table '{}' not readable: {}", historyTable, e.getMessage());
+            // DEBUG was how this hid for nine days. The caller decides the severity, because only
+            // it knows whether the table exists — see the F2-73 note in the class Javadoc.
+            historyReadError = describe(e);
+            log.debug("Flyway history table '{}' not readable: {}", historyTable, historyReadError);
             return null;
+        }
+    }
+
+    /**
+     * The failure, described the way an operator can act on.
+     *
+     * <p>Spring wraps a driver error, and its own {@code getMessage()} is the useless half:
+     * {@code "select; bad SQL grammar [SELECT version FROM flyway_schema_history]"}. The actionable
+     * sentence — {@code "Invalid object name 'flyway_schema_history'"} — is down in the cause. So walk
+     * to the root and carry both, because "bad SQL grammar" would have told nobody that the answer was
+     * a missing schema qualifier.
+     */
+    private static String describe(Throwable e) {
+        Throwable root = e;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String outer = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+        String inner = root.getMessage();
+        String combined = (inner == null || inner.equals(outer) || outer.contains(inner))
+            ? outer
+            : inner + " (" + outer + ")";
+        return combined.replaceAll("\\s+", " ").trim();
+    }
+
+    /**
+     * Does the history table exist at all? Asked only when the read failed, and asked through
+     * {@code OBJECT_ID} so a permission error on the table itself still answers.
+     */
+    private boolean tableExists() {
+        try {
+            Integer id = jdbc.queryForObject("SELECT OBJECT_ID(?)", Integer.class, historyTable);
+            return id != null;
+        } catch (Exception e) {
+            log.debug("could not test existence of '{}': {}", historyTable, e.getMessage());
+            return false;
         }
     }
 
