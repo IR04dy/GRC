@@ -11,9 +11,10 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
-  listCatalog, listLicenses, upsertLicense, disableLicense,
+  listCatalog, listSellableCatalog, listLicenses, upsertLicense, disableLicense,
   type OrganisationLicense, type LicenseTier,
 } from '../../lib/licensing';
+import { useEntitlement } from '../../lib/entitlement';
 
 /**
  * Module Licensing admin page — F9 follow-up.
@@ -23,11 +24,17 @@ import {
  * licence rows (from {@code /licensing/modules}), then enable, disable
  * or change the tier of any row.
  *
- * <p>The page is intentionally tenant-scoped — never cross-tenant —
- * because the backend enforces `organisationId` from the JWT and
- * ignores any value sent from the client. This avoids the historical
- * footgun where a multi-tenant admin UI accidentally writes a row to
- * the wrong tenant.
+ * <p>The page is tenant-scoped: it sends no {@code organisationId}, so every
+ * write lands on the organisation the admin is currently switched into.
+ *
+ * <p>⚠ This paragraph used to say the page was safe "because the backend
+ * enforces {@code organisationId} from the JWT and ignores any value sent from
+ * the client". It did do that, and that was <b>F2-45</b>: a body naming
+ * organisation 2 produced a row for organisation 1 and answered 200, so the
+ * behaviour the comment presented as a safety property was in fact a silent
+ * cross-tenant write. Since 2026-08-01 the body is honoured and the target
+ * organisation must exist. This page stays tenant-scoped by <i>omitting</i> the
+ * field, which is now a choice rather than something the server imposes.
  */
 const TIERS: { value: LicenseTier; label: string }[] = [
   { value: 'FREE',       label: 'FREE' },
@@ -41,22 +48,30 @@ export function LicensingPage() {
   const toast = useToast();
 
   const [catalog, setCatalog] = useState<string[]>([]);
+  const [sellable, setSellable] = useState<Set<string>>(new Set());
   const [licenses, setLicenses] = useState<OrganisationLicense[]>([]);
   const [loading, setLoading] = useState(false);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
+
+  // F2-04b — granting a SKU to your OWN tenant must move the sidebar, or the
+  // admin enables ESG, sees nothing appear, and reloads to check.
+  const { refresh: refreshEntitlement } = useEntitlement();
 
   async function reload() {
     setLoading(true);
     // Per-call .catch() so one failing endpoint does not blank the whole page.
     // Real dev DBs are often missing one or the other (catalog seed lag, no
     // licence rows yet) — we still want the other table to render.
-    const [cat, lic] = await Promise.all([
+    const [cat, sell, lic] = await Promise.all([
       listCatalog().catch(() => [] as string[]),
+      listSellableCatalog().catch(() => [] as string[]),
       listLicenses().catch(() => [] as OrganisationLicense[]),
     ]);
     setCatalog(cat.slice().sort());
+    setSellable(new Set(sell));
     setLicenses(lic);
     setLoading(false);
+    refreshEntitlement();
   }
   useEffect(() => { void reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -174,13 +189,21 @@ export function LicensingPage() {
                     </td>
                     <td className="mono">{license?.validTo ?? <span className="text-muted">—</span>}</td>
                     <td style={{ textAlign: 'end' }}>
+                      {/* A retired code with no existing row cannot be created:
+                          `upsert` refuses it (ADR-018 §5 retires 12 of the 27
+                          codes in /catalog into other SKUs or Base). Offering
+                          Enable here was a button whose only possible outcome
+                          was an error toast — 12 of 27 rows. An existing row
+                          keeps its Disable action so it can still be wound down. */}
                       {license?.enabled
                         ? <Button variant="ghost" disabled={pendingCode === code} onClick={() => void disable(code)}>
                             {isAr ? 'تعطيل' : 'Disable'}
                           </Button>
-                        : <Button variant="primary" disabled={pendingCode === code} onClick={() => void enable(code)}>
-                            {isAr ? 'تفعيل' : 'Enable'}
-                          </Button>}
+                        : (license == null && sellable.size > 0 && !sellable.has(code))
+                          ? <Badge tone="neutral">{isAr ? 'مُتقاعدة' : 'Retired'}</Badge>
+                          : <Button variant="primary" disabled={pendingCode === code} onClick={() => void enable(code)}>
+                              {isAr ? 'تفعيل' : 'Enable'}
+                            </Button>}
                     </td>
                   </tr>
                 ))}

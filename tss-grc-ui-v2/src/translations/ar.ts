@@ -6193,4 +6193,11 @@ export const ar = {
   'expert.collect.titleLabel':   'عنوان الطلب *',
   'expert.collect.descLabel':    'الوصف / الدليل الموصى به',
   'expert.collect.priority':     'الأولوية',
+
+  // بوابة الترخيص (F2-04b) — تظهر عندما ينتمي المسار إلى وحدة لم ترخّصها المؤسسة.
+  licGateTitle:  'الوحدة غير مُرخّصة',
+  licGateBody:   'لا تشمل رخصة مؤسستك هذه الوحدة، لذلك لا تتوفر شاشاتها.',
+  licGateHint:   'تواصل مع مسؤول المنصة لتمكين هذه الوحدة.',
+  licGateBack:   'العودة إلى لوحة المعلومات',
+  licGateSku:    'الوحدة المطلوبة',
 } as const;

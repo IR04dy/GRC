@@ -1,9 +1,16 @@
-import { Suspense, createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { Suspense, createContext, lazy, useContext, useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { CommandPalette } from '../search/CommandPalette';
 import { HelpButton } from '../HelpButton';
 import { useI18n } from '../../lib/i18n';
+import { EntitlementProvider, useEntitlement } from '../../lib/entitlement';
+import { isBarePath } from '../../lib/publicPaths';
+
+// F2-04b. Lazy so the gate screen costs nothing on the happy path — a licensed
+// tenant never fetches this chunk.
+const ModuleNotLicensedPage = lazy(() =>
+  import('../../pages/ModuleNotLicensedPage').then(m => ({ default: m.ModuleNotLicensedPage })));
 
 /**
  * AppLayout — the single persistent application shell.
@@ -32,29 +39,31 @@ export const useSidebarDrawer = () => useContext(SidebarDrawerContext);
 
 // ── Bare (no-chrome) routes ───────────────────────────────────────────
 // Public portals (PublicShell) + the login + token/full-screen surfaces bring
-// their own layout and must NOT get the authenticated sidebar/topbar. Derived
-// from the actual page set: the 9 PublicShell pages + LoginPage,
-// MobileCrisisRoomPage, PublicSubprocessorListPage, VendorAttestationSubmitPage
-// (which render neither Shell nor PublicShell). Everything else renders <Shell>
-// and therefore gets the persistent chrome.
-const BARE_PREFIXES = [
-  '/login',
-  '/public/',
-  '/portal/',
-  '/privacy/public/',
-  '/ethics/whistleblower/submit',
-  '/ethics/whistleblower/status',
-  '/tprm/attestations/',
-  '/crisis/mobile',
-  '/bcm/crisis/mobile',
-];
-function isBarePath(pathname: string): boolean {
-  if (pathname === '/') return true; // redirects to /login
-  return BARE_PREFIXES.some(pre => pathname === pre || pathname.startsWith(pre));
-}
-
+// their own layout and must NOT get the authenticated sidebar/topbar.
+//
+// The list itself moved to lib/publicPaths.ts with F2-04b, because the licence
+// gate needs the same set — a path with no session has no tenant to entitle —
+// and two copies of "which routes are public" would eventually disagree. See
+// that file for why one list answers both questions.
 function PageFallback() {
   return <div className="page" aria-busy="true" />;
+}
+
+/**
+ * F2-04b — refuses the current route when its module is not licensed.
+ *
+ * <p>One gate over a path→SKU prefix map, rather than a wrapper on each of the
+ * 328 {@code <Route>}s: same grain the server uses (package → SKU, not endpoint
+ * → SKU), and it cannot be forgotten on a newly added route.
+ *
+ * <p>Fails open in every uncertain case — see lib/entitlement.tsx. This is UX,
+ * not enforcement; {@code LicenseGuardAspect} is the boundary.
+ */
+function ModuleGate({ children }: { children: React.ReactNode }) {
+  const { pathname } = useLocation();
+  const { isPathEnabled } = useEntitlement();
+  if (isPathEnabled(pathname)) return <>{children}</>;
+  return <ModuleNotLicensedPage />;
 }
 
 export function AppLayout() {
@@ -99,6 +108,12 @@ export function AppLayout() {
 
   // Public / full-screen routes: no persistent chrome — the page supplies its
   // own layout. Still wrapped in Suspense for lazy chunks.
+  //
+  // Deliberately OUTSIDE EntitlementProvider and ModuleGate: these routes have
+  // no session, so there is nothing to entitle. `skuForPath` returns null for
+  // them anyway (belt and braces), but keeping the provider off this branch also
+  // keeps an anonymous whistleblower from issuing an `isAuthenticated()` request
+  // that can only 401.
   if (isBarePath(pathname)) {
     return (
       <SidebarDrawerContext.Provider value={drawer}>
@@ -109,22 +124,26 @@ export function AppLayout() {
 
   return (
     <SidebarDrawerContext.Provider value={drawer}>
-      <div className="grc-shell">
-        {/* A11y — jump past the persistent chrome straight to page content. */}
-        <a href="#main-content" className="skip-link">
-          {lang === 'ar' ? 'تخطَّ إلى المحتوى الرئيسي' : 'Skip to main content'}
-        </a>
-        <Sidebar open={drawerOpen} />
-        {drawerOpen && <div className="sb-backdrop" onClick={() => setDrawerOpen(false)} />}
-        {/* Inner Suspense: only the main column shows the fallback while a page
-            chunk loads — the Sidebar above stays mounted. */}
-        <Suspense fallback={<PageFallback />}>
-          <Outlet />
-        </Suspense>
-        {/* Mounted once at shell level — persists across navigation. */}
-        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
-        <HelpButton />
-      </div>
+      {/* F2-04b — one fetch of the tenant's enabled SKUs per login: AppLayout is
+          the single persistent shell, so this does not refetch on navigation. */}
+      <EntitlementProvider>
+        <div className="grc-shell">
+          {/* A11y — jump past the persistent chrome straight to page content. */}
+          <a href="#main-content" className="skip-link">
+            {lang === 'ar' ? 'تخطَّ إلى المحتوى الرئيسي' : 'Skip to main content'}
+          </a>
+          <Sidebar open={drawerOpen} />
+          {drawerOpen && <div className="sb-backdrop" onClick={() => setDrawerOpen(false)} />}
+          {/* Inner Suspense: only the main column shows the fallback while a page
+              chunk loads — the Sidebar above stays mounted. */}
+          <Suspense fallback={<PageFallback />}>
+            <ModuleGate><Outlet /></ModuleGate>
+          </Suspense>
+          {/* Mounted once at shell level — persists across navigation. */}
+          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+          <HelpButton />
+        </div>
+      </EntitlementProvider>
     </SidebarDrawerContext.Provider>
   );
 }

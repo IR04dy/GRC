@@ -19,6 +19,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
 import { cn } from '../../lib/cn';
 import { capaTaskApi, notificationApi, workflowSubmissionApi } from '../../lib/api';
+import { filterNavByEntitlement, useEntitlement } from '../../lib/entitlement';
 
 interface NavItem {
   id: string;
@@ -654,22 +655,41 @@ export function Sidebar({ open = false }: { open?: boolean }) {
     return null;
   }
 
+  // ── F2-04b: hide what the tenant has not licensed ────────────────────
+  // The SKU comes from the destination path (lib/entitlement.tsx), not from the
+  // nav group: pillars are a UX grouping and several mix SKUs on purpose — the
+  // Risk pillar lists SOCOPS incidents and RCA, the Privacy pillar lists
+  // DATA_AI_GOV's NDI. Grouping by pillar would hide the wrong things.
+  //
+  // An emptied group is dropped along with its header. Leaving "ESG & Climate"
+  // in place with nothing under it advertises precisely the module we are
+  // hiding, and reads as a bug rather than a licence boundary.
+  //
+  // Fails open: `isEnabled(null)` is true, and so is every SKU while the
+  // enabled-modules list is still loading — so the nav never flickers down to a
+  // stub on a slow network, and a licensing outage cannot hide the product.
+  const { isEnabled } = useEntitlement();
+  const visibleGroups = useMemo(
+    () => filterNavByEntitlement<NavItem, NavGroup>(NAV_GROUPS, isEnabled),
+    [isEnabled],
+  );
+
   // Auto-expand sets — derived, not stored. Computed every render
   // from the active route, then OR'd with the user's manual sets.
   const autoExpandGroups = useMemo(() => {
     const s = new Set<string>();
-    for (const g of NAV_GROUPS) if (groupContainsActive(g, pathname)) s.add(g.id);
+    for (const g of visibleGroups) if (groupContainsActive(g, pathname)) s.add(g.id);
     return s;
-  }, [pathname]);
+  }, [pathname, visibleGroups]);
   const autoExpandItems = useMemo(() => {
     const s = new Set<string>();
-    for (const g of NAV_GROUPS) {
+    for (const g of visibleGroups) {
       for (const it of g.items) {
         if (it.children && it.children.some(c => pathMatches(pathname, c.to))) s.add(it.id);
       }
     }
     return s;
-  }, [pathname]);
+  }, [pathname, visibleGroups]);
 
   return (
     <aside ref={asideRef} className={open ? 'sb sb-open' : 'sb'}>
@@ -681,7 +701,7 @@ export function Sidebar({ open = false }: { open?: boolean }) {
         </div>
       </div>
 
-      {NAV_GROUPS.map(group => {
+      {visibleGroups.map(group => {
         const isPinned = !!group.pinned;
         // Group is "shown" if: pinned, OR contains active route, OR user
         // hasn't collapsed it. Active route always wins so the user

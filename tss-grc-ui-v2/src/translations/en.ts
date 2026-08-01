@@ -6213,4 +6213,12 @@ export const en = {
   'expert.collect.titleLabel':   'Request title *',
   'expert.collect.descLabel':    'Description / recommended evidence',
   'expert.collect.priority':     'Priority',
+
+  // Licensing gate (F2-04b) — shown when a route belongs to a SKU the tenant
+  // has not licensed. The server refuses these routes' APIs regardless.
+  licGateTitle:  'Module not licensed',
+  licGateBody:   "Your organisation's licence does not include this module, so its screens are unavailable.",
+  licGateHint:   'Contact your platform administrator to enable it.',
+  licGateBack:   'Back to dashboard',
+  licGateSku:    'Required module',
 } as const;
