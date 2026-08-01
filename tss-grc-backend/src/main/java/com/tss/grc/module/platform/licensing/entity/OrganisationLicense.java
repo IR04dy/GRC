@@ -29,21 +29,42 @@ public class OrganisationLicense {
     @Column(name = "module_code", nullable = false, length = 40)
     private String moduleCode;
 
-    /** FREE | PRO | ENTERPRISE */
+    /**
+     * FREE | PRO | ENTERPRISE.
+     *
+     * <p>⚠ <b>No field initialiser, deliberately — and this class is also the request body.</b>
+     * {@code tier}, {@code validFrom} and {@code enabled} used to be initialised here to
+     * {@code "PRO"}, {@code LocalDate.now()} and {@code true}. {@code LicensingService.upsert}
+     * applies a partial update with {@code if (body.getX() != null) existing.setX(...)}, so a
+     * defaulted field is <em>never</em> null and every partial update silently overwrote all three.
+     * Live-verified 2026-08-01: re-enabling one tenant's ESG licence with
+     * {@code {"enabled": true\}} rewrote its tier from ENTERPRISE to PRO. The other two are worse —
+     * a patch to {@code notes} reset the licence start date to today and <b>silently re-enabled a
+     * module the business had deliberately disabled</b>, undoing the one commercial control this
+     * table exists to carry.
+     *
+     * <p>The defaults live in {@code upsertInternal}'s create branch, which already applied them
+     * behind three {@code == null} checks that could never fire — dead code that proved the author
+     * expected these fields to arrive null. Removing the initialisers makes that code live and the
+     * update branch honest. <b>Do not reintroduce them:</b> for an entity that doubles as a partial
+     * request body, a field default is indistinguishable from a value the caller sent.
+     */
     @Column(nullable = false, length = 20)
-    private String tier = "PRO";
+    private String tier;
 
     @Column(name = "seat_count")
     private Integer seatCount;
 
+    /** No initialiser — see {@link #tier}. Defaulted on create by {@code LicensingService}. */
     @Column(name = "valid_from", nullable = false)
-    private LocalDate validFrom = LocalDate.now();
+    private LocalDate validFrom;
 
     @Column(name = "valid_to")
     private LocalDate validTo;
 
+    /** No initialiser — see {@link #tier}. A default here re-enables what {@code disable} turned off. */
     @Column(nullable = false)
-    private Boolean enabled = true;
+    private Boolean enabled;
 
     @Column(columnDefinition = "NVARCHAR(MAX)")
     private String notes;

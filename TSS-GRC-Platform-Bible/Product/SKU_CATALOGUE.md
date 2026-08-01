@@ -105,8 +105,21 @@ because "quietly filed" is how the other seven went missing.
 
 ## 5. Legacy code → ratified destination (all 20 accounted for)
 
-`LicensingService.KNOWN_MODULES` and the live `platform.organisation_licenses` rows agree on the
-same 20 codes. Measured 2026-07-30: **org 1 holds all 20; orgs 2 and 3 hold `SOCOPS` only.**
+~~`LicensingService.KNOWN_MODULES` and the live `platform.organisation_licenses` rows agree on the
+same 20 codes. Measured 2026-07-30: **org 1 holds all 20; orgs 2 and 3 hold `SOCOPS` only.**~~
+
+✅ **Superseded 2026-08-01 by W2-0 / V344.** Every organisation now holds **all 15 ratified SKUs**
+(22 → 57 rows; org 1 needed 7, orgs 2 and 3 needed 14 each), and `LicensingService` no longer
+carries one flat set: **`SELLABLE_MODULES`** is the 15 below, **`RETIRED_DESTINATION`** is the 12
+codes rows still name, and `KNOWN_MODULES` is their union — a *validation* set, not a catalogue.
+`upsert` refuses to create a **new** row for a retired code and still allows an existing one to be
+wound down, which is the asymmetry an orderly retirement needs. Standing check:
+`Appendix/scripts/licence_coverage.py` (exits non-zero on any tenant missing any ratified SKU).
+
+⚠ Org 1's seven Base-retired rows (`EVIDENCE`, `REPORTING`, `AUDIT_LOG`, `PLATFORM_ADMIN`,
+`CONTROL_LIB`, `POSTURE`, `AUTOMATION`) were deliberately **left in place**: R4 makes them
+non-entitlements rather than over-entitlements, and deleting rows a tenant holds is a separate
+decision with its own semantics. V344 FAILS if their population ever changes.
 
 | Legacy code | Destination | Class | Retirement safety (measured) |
 |---|---|---|---|

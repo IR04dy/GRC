@@ -1648,6 +1648,80 @@ Start-Service TssGrcBackend
 | **Lesson** | **A message that is written but not delivered is worse than no message, because the code reads as if the user was told.** Three reviewers looked at `PolicyManagementService:413` during the Change+Policy remediation and read a well-worded SoD refusal; none checked which handler would render it. The general form: **an error contract is a property of the handler, not of the throw site**, and every throw site in this codebase was written as though it were the other way round |
 
 
+## F2-45 · The licence endpoint answered 200 for the wrong organisation
+
+| Field | Content |
+|---|---|
+| **ID** | F2-45 *(found by F2-22b(i), 2026-07-26; spec written 2026-08-01, the day it was worked — it had lived only inside W2-0's plan row)* |
+| **Category** | Authorisation / API contract — a tenant-stamping guard applied to the one endpoint whose tenant is legitimately caller-supplied |
+| **Severity** | **P3 Medium.** No unauthorised access: the only caller is `PLATFORM_ADMIN` and the write stayed inside their own tenant. The harm is a false belief about a commercial fact |
+| **Provenance** | Not sought. F2-22b measured body-supplied `organisationId` across all **214** entity-bound writes to find mass-assignment sites; licensing came back as the single legitimate one, and the measurement then showed the controller discarding it |
+| **Current State** | `LicensingController.upsert` opened with `body.setOrganisationId(TenantContext.getCurrentTenant())`, commented *"keeps cross-tenant writes from sneaking through"*. `disable` used `TenantContext` only and took no organisation at all |
+| **Problem** | The overwrite kept nothing out — `PLATFORM_ADMIN` switches tenants at will, and `LicensingService.upsert` already declares `TenantContext.allowCrossTenantWrite()`. What it did was **silently retarget the write**: a body naming organisation 2 returned **200 OK with a row for organisation 1**. The operator's belief that tenant 2 was licensed was wrong and nothing in the response said so. *A 403 would have been safe; succeeding against the wrong tenant is the failure mode a customer discovers* |
+| **Root Cause** | A platform-wide rule — *stamp the tenant from `TenantContext`, never trust the body* — applied to the **one** endpoint it does not fit. Licensing is inherently cross-tenant: a host operator names the organisation being licensed. The rule is right 213 times out of 214, and the exception was never written down, so a later reader hardened the exception |
+| **Business Impact** | It is the mechanism W2-0's grandfather backfill would have used, and the reason the backfill had to be driven from a migration instead. Operationally: a tenant believed to be licensed is not, and the first symptom is a 403 on a module the customer has paid for — after F2-04 annotates ~2,138 endpoints, on any module |
+| **Technical Impact** | Two endpoints. `upsert` retargeted silently; `disable` could not name another organisation at all, so grant and revoke had different reach — an operator could create a cross-tenant row (via the service) and not remove it |
+| **UX Impact** | The worst kind: none. 200 OK, a well-formed body, and the `organisationId` in the response echoing the value the server substituted rather than the one sent |
+| **Recommendation** | Honour `body.organisationId` when supplied, default to the caller's tenant when not, and **verify the organisation exists** — `organisation_licenses` has no foreign key to `platform.organisations`, so an unchecked id writes rows nothing will ever read. Give `disable` the same optional parameter |
+| **Alternatives** | (a) **Refuse a body naming another organisation (400).** Honest, and leaves the backfill without an API. (b) **Add a separate `/organisations/{id}/licences` sub-resource.** Cleaner REST, and a second role-guarded endpoint the F2-05 ratchet would count. (c) **Leave it and document it.** Rejected: the defect is a silent wrong answer, and documenting a silent wrong answer does not make it loud |
+| **Trade-offs** | The endpoint is now genuinely cross-tenant, so its correctness rests on `hasRole('PLATFORM_ADMIN')` and on `allowCrossTenantWrite()` being scoped to this one service method. Both were already true; this change makes them load-bearing. A cross-tenant licence **read** was deliberately not added — a `PLATFORM_ADMIN` reads any tenant's licences by switching into it, so a new endpoint would raise the role-guard count to save a round trip |
+| **Effort** | **S** — two controller methods, one service method, 2 unit tests, live probe |
+| **Verification** | Suite **2760/0/0**. Live **28/28** on `:8084`: a body naming org 2 returns 200 with `organisationId: 2`, **org 2's row changes and org 1's does not**; org 999 is refused **404** and writes nothing; omitting `organisationId` still targets the caller's tenant; `disable?organisationId=2` disables org 2 and leaves org 1 enabled; `viewer` is **403** on both writes and still reads its own tenant's licences |
+| **Status** | ✅ **CLOSED 2026-08-01** with W2-0 (branch `feat/w2-0-licence-backfill`). Code-only — prod gets it on the next jar |
+| **References** | `LicensingController#upsert`, `#disable` · `LicensingService#resolveLicensingTarget` · `LicensingServiceTest#resolveLicensingTarget_*` · [[F2-22b]] (the 214-write measurement) · W2-0 in `UNIFIED_IMPLEMENTATION_PLAN.md` §3 |
+| **Lesson** | **A platform-wide invariant needs its exceptions written down, or the next reader will harden the exception.** *"Never trust the body's tenant"* is correct on 213 of 214 writes, and applying it to the 214th produced a wrong answer rather than a refusal — which is strictly worse, because a refusal is visible |
+
+---
+
+## F2-81 · The platform cannot onboard a tenant — nothing creates an organisation
+
+| Field | Content |
+|---|---|
+| **ID** | F2-81 *(measured while building W2-0, 2026-08-01)* |
+| **Category** | Product completeness / multi-tenancy — the commercial kind, not the isolation kind |
+| **Severity** | **P2 High** commercially, **P4** technically. Nothing is broken; something is absent, and it is the thing a SaaS contract assumes |
+| **Provenance** | Not sought. W2-0's plan row said *"nothing creates licence rows on organisation creation"*, so the fix looked like a provisioning hook. Looking for the creation to hook into is what found there is none |
+| **Current State** | `OrganisationController` exposes `GET /accessible` and `POST /switch/{id}` — **no POST to create.** `OrganisationRepository` is a bare `JpaRepository<Organisation, Long>` with one finder, and **no code anywhere calls `save` on it**: all eight consumers read a name for an export header. Organisations 1–3 exist because the Python bootstrap inserted them |
+| **Problem** | F2-32's closing sentence presumes a creation path to fix. There is none — so there is nothing to provision licence rows, roles, a first administrator, branding, or an audit record of who onboarded whom. **A platform whose tenant count can only be changed by a DBA is not multi-tenant in the commercial sense**, whatever the code does with `organisation_id` |
+| **Root Cause** | The tenant model was built from the inside out: `TenantContext`, per-query filtering, a switcher and a write-guard interceptor all exist and work. The *entry* was never built, because dev never needed one — the bootstrap script created the tenants the demo required, and each new tenant's licence row was hand-written into whichever migration was open at the time (`SOCOPS` for orgs 2 and 3, in V150 and later). **The workaround is what kept the gap invisible** |
+| **Business Impact** | Onboarding a customer requires a DBA with `sa` on the production database, and the steps are not written down in one place. Under SAMA outsourcing and NCA ECC change-control expectations, provisioning a tenant by ad-hoc SQL is not an auditable process; and a self-service trial, a reseller, or any multi-tenant sales motion is impossible today |
+| **Technical Impact** | Every downstream default is unowned. After F2-04 annotates ~2,138 endpoints against licence rows, a hand-inserted organisation is **fail-closed on everything**, which is a support incident that looks like a platform outage |
+| **UX Impact** | There is no screen. A platform administrator can switch between organisations and cannot create one |
+| **Recommendation** | One transactional onboarding operation — organisation → first administrator → role grants → branding defaults → the 15 licence rows → an audit event — with a rollback if any step fails, because a half-provisioned tenant is worse than none. Belongs with F2-04 or immediately after it, since F2-04 is what makes the licence half load-bearing |
+| **Alternatives** | (a) **A documented runbook + SQL script.** Cheapest, auditable if the script is versioned, and still needs `sa`. (b) **A provisioning hook on `OrganisationRepository.save`.** Rejected — a hook on a method nobody calls is speculative code that will be wrong by the time it has a caller. (c) **What this slice did:** grandfather the tenants that exist (V344) and make the fourth one's absence **loud** — `licence_coverage.py` exits non-zero on any tenant missing any ratified SKU |
+| **Trade-offs** | Detection instead of prevention. The next organisation will still be born blacked out; the difference is that a script now says so in one line instead of a customer saying so in a ticket |
+| **Effort** | **M** — a feature, not a fix: endpoint, service, transaction boundary, tests, and a decision about who may create a tenant |
+| **Verification** | The absence is verifiable: `grep -rn "OrganisationRepository" --include=*.java` returns 8 consumers and **0** `save` calls; `OrganisationController` has no `@PostMapping` other than `switch/{id}`. Coverage of the tenants that do exist: `py Appendix/scripts/licence_coverage.py --db TSS_GRC` exits **0**; the same against prod exits **1** until V344 runs there |
+| **Status** | ⬜ **OPEN.** V344 + `licence_coverage.py` shipped 2026-08-01 as the interim; the onboarding path is unscheduled |
+| **References** | `module/platform/controller/OrganisationController.java` · `module/platform/repository/OrganisationRepository.java` · `V97__module_licensing.sql` (the `organisation_id = 1` literal) · `Appendix/scripts/licence_coverage.py` · [[F2-32]] · W2-0, [[F2-04]] |
+| **Lesson** | **A seed written for one tenant is a provisioning bug that only surfaces when there is a second tenant** — and it will surface as an entitlement failure, not as a missing feature, because the missing feature has no error message. Also: *the plan's description of a defect is a hypothesis about its cause.* This row exists because the stated cause ("no licence rows on creation") was checked instead of assumed |
+
+---
+
+## F2-82 · Three entity field defaults silently overwrote every partial licence update
+
+| Field | Content |
+|---|---|
+| **ID** | F2-82 *(found probing W2-0's own fix, 2026-08-01)* |
+| **Category** | Entity-as-DTO / partial-update semantics. **Not** the mass-assignment shape F2-30 ratchets — no attacker sets a field they should not; a *default* overwrites a value nobody sent |
+| **Severity** | **P3 Medium**, with a commercial edge: the overwritten values are contract terms, and one of them is an enforcement flag |
+| **Provenance** | Not sought, and found only because the live probe printed the whole row rather than the field under test. The F2-45 probe re-enabled a licence and the assertion passed; the printed row showed `tier` had changed from `ENTERPRISE` to `PRO` |
+| **Current State** | `OrganisationLicense` doubles as the `@RequestBody` and initialised `tier = "PRO"`, `validFrom = LocalDate.now()`, `enabled = true`. `LicensingService.upsert`'s update branch is `if (body.getX() != null) existing.setX(body.getX())` |
+| **Problem** | A defaulted field is **never null**, so all three fired on every partial update. Measured live: `{"enabled": true}` on one tenant's `ESG` row rewrote **ENTERPRISE → PRO**. A patch to `notes` resets `validFrom` — the licence start date — to today. And **any unrelated edit re-enables a module the business deliberately disabled**, which undoes the only commercial control `organisation_licenses` carries |
+| **Root Cause** | Two correct-looking idioms that are incompatible: a JPA entity with sensible field defaults, and a partial update that treats `null` as *not supplied*. Together, *not supplied* and *supplied as the default* become the same value, and the second wins. **The create branch already defaulted all three behind `== null` checks that could never fire** — dead code that proves its author expected nulls, and that nobody reconciled with the initialisers |
+| **Business Impact** | De-licensing is how the platform stops serving an unpaid module. If any subsequent edit re-enables it, the control is advisory. Tier downgrades and reset start dates are silent losses of contract terms in the table an invoice would be reconciled against |
+| **Technical Impact** | Every write through `POST /api/v1/licensing/modules` after a `disable` re-opens the module for the tenant, cache eviction and all — the JWT claim picks it up on the tenant's next login, so the change propagates without anyone acting |
+| **UX Impact** | Silent. 200 OK, and the response body shows the overwritten values, so a UI reading the response renders the wrong state as if it were the state the operator asked for |
+| **Recommendation** | Remove the initialisers; keep the defaults in the create branch, where they already were. Assert the preservation against values a default would **change** |
+| **Alternatives** | (a) **A separate patch DTO with `Optional<T>` fields.** Correct and larger; F2-22b records this endpoint's entity-as-body as deliberate, so it would be a wider change than the defect. (b) **`@DynamicUpdate` / JSON-merge-patch.** Same conclusion. (c) **Keep the initialisers, compare against them.** Rejected — "if the value equals the default, assume it was not sent" makes it impossible to *set* a licence to PRO |
+| **Trade-offs** | `tier`, `validFrom` and `enabled` are `nullable = false` in the schema, so a create path that forgets to default them now fails at the database rather than silently inserting `PRO`/today/`true`. That is the correct direction, and the create branch already covers all three |
+| **Effort** | **S** — three field initialisers, 5 unit tests |
+| **Verification** | Suite **2760/0/0** (+5 in `LicensingServiceTest`, 7 → 12). **Mutation-proven**: reinstating `enabled = true` fails `upsert_partialUpdateDoesNotResurrectDefaults` by name with the de-licensing message. Live before/after: the same re-enable request left `tier` at `ENTERPRISE` after the fix, where it had produced `PRO` before |
+| **Status** | ✅ **FIXED 2026-08-01** with W2-0. Code-only |
+| **References** | `OrganisationLicense` (`tier`, `validFrom`, `enabled`) · `LicensingService#upsertInternal` · `LicensingServiceTest#upsert_partialUpdateDoesNotResurrectDefaults` · [[F2-30]] (the mass-assignment ratchet this is adjacent to and not an instance of) · [[F2-45]] |
+| **Lesson** | Two. **(a) A test that asserts a field still equals the value the bug would also produce is not testing anything.** `upsert_existingRowUpdatesFields` claimed *"existing fields preserved"* and passed for years: it patched a row whose `enabled` was already `true`, so preservation and overwriting were indistinguishable. The replacement starts the row DISABLED, on FREE, dated last year — three values no default produces. **(b) Print the whole row, not the field under test.** This was found because a passing assertion sat next to a printed row that had quietly changed in a column nobody was asserting |
+
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

@@ -3,6 +3,7 @@ package com.tss.grc.module.platform.licensing.service;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.licensing.entity.OrganisationLicense;
 import com.tss.grc.module.platform.licensing.repository.OrganisationLicenseRepository;
+import com.tss.grc.module.platform.repository.OrganisationRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,6 +37,7 @@ class LicensingServiceTest {
     private static final Long ORG_ID = 7L;
 
     @Mock private OrganisationLicenseRepository repo;
+    @Mock private OrganisationRepository organisations;
     @Mock private AuditLogService audit;
     @InjectMocks private LicensingService service;
 
@@ -118,5 +120,101 @@ class LicensingServiceTest {
         assertThat(saved.getTier()).isEqualTo("ENTERPRISE");
         // existing fields preserved
         assertThat(saved.getEnabled()).isTrue();
+    }
+
+    /**
+     * The partial update must leave out what the caller left out — asserted against values the
+     * default would have <em>changed</em>, which is the whole point.
+     *
+     * <p>⚠ {@link #upsert_existingRowUpdatesFields()} above already claimed "existing fields
+     * preserved" and passed while the opposite was true: the entity initialised
+     * {@code enabled = true}, so the patch overwrote a {@code true} with a {@code true} and the
+     * assertion could not tell preservation from overwriting. <b>A test that asserts a field still
+     * equals the value the bug would also produce is not testing anything.</b> Here the row starts
+     * DISABLED, on FREE, dated last year — three values no default would produce.
+     */
+    @Test void upsert_partialUpdateDoesNotResurrectDefaults() {
+        LocalDate lastYear = LocalDate.now().minusYears(1);
+        OrganisationLicense existing = lic("RISK", false, lastYear, null);
+        existing.setTier("FREE");
+        when(repo.findByOrganisationIdAndModuleCode(ORG_ID, "RISK")).thenReturn(Optional.of(existing));
+        when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // The operator is only annotating the row. Nothing about tier, dates, or enablement.
+        OrganisationLicense patch = new OrganisationLicense();
+        patch.setOrganisationId(ORG_ID);
+        patch.setModuleCode("RISK");
+        patch.setNotes("Contract renewal pending — do not re-enable");
+
+        OrganisationLicense saved = service.upsert(patch);
+
+        assertThat(saved.getEnabled())
+            .as("a patch that says nothing about enablement must NOT re-enable a disabled licence — "
+                + "de-licensing is the one commercial control this table carries, and an entity "
+                + "field default silently undid it on any unrelated edit")
+            .isFalse();
+        assertThat(saved.getTier())
+            .as("a patch that says nothing about tier must not downgrade ENTERPRISE/FREE to PRO")
+            .isEqualTo("FREE");
+        assertThat(saved.getValidFrom())
+            .as("a patch that says nothing about dates must not reset the licence start to today, "
+                + "which is the contract start date")
+            .isEqualTo(lastYear);
+        assertThat(saved.getNotes()).isEqualTo("Contract renewal pending — do not re-enable");
+    }
+
+    /** A retired code may be wound down on an existing row and never newly created (ADR-018 §5). */
+    @Test void upsert_refusesToNewlyLicenseARetiredCode() {
+        when(repo.findByOrganisationIdAndModuleCode(ORG_ID, "POLICY")).thenReturn(Optional.empty());
+        OrganisationLicense body = new OrganisationLicense();
+        body.setOrganisationId(ORG_ID); body.setModuleCode("POLICY");
+
+        assertThatThrownBy(() -> service.upsert(body))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("retired")
+            .as("the refusal must name the SKU to buy instead, or the operator has to read an ADR")
+            .hasMessageContaining("COMPLIANCE");
+    }
+
+    @Test void upsert_stillAllowsWindingDownAnExistingRetiredRow() {
+        OrganisationLicense existing = lic("POLICY", true, LocalDate.now().minusYears(1), null);
+        when(repo.findByOrganisationIdAndModuleCode(ORG_ID, "POLICY")).thenReturn(Optional.of(existing));
+        when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        OrganisationLicense patch = new OrganisationLicense();
+        patch.setOrganisationId(ORG_ID); patch.setModuleCode("POLICY");
+        patch.setValidTo(LocalDate.now().plusMonths(3));
+
+        assertThat(service.upsert(patch).getValidTo()).isEqualTo(LocalDate.now().plusMonths(3));
+    }
+
+    /** A Base-retired code has no successor to recommend, so the message must say so instead. */
+    @Test void upsert_refusalForABaseCodeSaysThereIsNothingToGrant() {
+        when(repo.findByOrganisationIdAndModuleCode(ORG_ID, "EVIDENCE")).thenReturn(Optional.empty());
+        OrganisationLicense body = new OrganisationLicense();
+        body.setOrganisationId(ORG_ID); body.setModuleCode("EVIDENCE");
+
+        assertThatThrownBy(() -> service.upsert(body))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Base Platform")
+            .hasMessageContaining("nothing to grant");
+    }
+
+    @Test void resolveLicensingTarget_refusesAnOrganisationThatDoesNotExist() {
+        when(organisations.existsById(999L)).thenReturn(false);
+        assertThatThrownBy(() -> service.resolveLicensingTarget(999L))
+            .isInstanceOf(jakarta.persistence.EntityNotFoundException.class)
+            .as("organisation_licenses carries no FK to platform.organisations, so an unchecked id "
+                + "writes rows nothing will ever read")
+            .hasMessageContaining("999");
+    }
+
+    @Test void resolveLicensingTarget_honoursAnOrganisationThatDoesExist() {
+        when(organisations.existsById(2L)).thenReturn(true);
+        assertThat(service.resolveLicensingTarget(2L))
+            .as("F2-45: the body's organisationId must reach the row. Overwriting it with the "
+                + "caller's tenant did not refuse the cross-tenant grant, it answered 200 for the "
+                + "wrong organisation")
+            .isEqualTo(2L);
     }
 }

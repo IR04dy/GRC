@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -152,19 +153,87 @@ class SkuCatalogueRatchetTest {
             .isEmpty();
     }
 
+    /**
+     * Every assignable code is accounted for in the catalogue — either as one of the 15 ratified
+     * SKUs, or as a legacy code with a §5 destination.
+     *
+     * <p>⚠ This assertion used to be {@code KNOWN_MODULES ⊆ LEGACY_DESTINATION.keySet()}, which was
+     * right while every assignable code was a legacy one and <b>wrong the moment W2-0 added the
+     * seven ratified codes no tenant had yet</b> (ESG, ETHICS, SAUDI_FS, DATA_AI_GOV, BOARD,
+     * ACCESS_GOV, CHANGE). It failed on them, correctly by its own wording and incorrectly by its
+     * purpose: they are not legacy, they are the catalogue. Widened to the union, which keeps the
+     * drift it exists to catch — a code appearing in neither set is still a code the catalogue has
+     * never heard of.
+     */
     @Test
-    void everyKnownModuleCodeHasARatifiedDestination() {
-        Set<String> unmapped = new TreeSet<>(LicensingService.KNOWN_MODULES);
-        unmapped.removeAll(LEGACY_DESTINATION.keySet());
+    void everyKnownModuleCodeIsAccountedForInTheCatalogue() {
+        Set<String> accounted = new TreeSet<>(RATIFIED);
+        accounted.addAll(LEGACY_DESTINATION.keySet());
 
-        assertThat(unmapped)
-            .as("A code exists in LicensingService.KNOWN_MODULES with no destination in the "
-                + "ratified catalogue's §5 mapping. This is the direction that drifts: a "
+        Set<String> unaccounted = new TreeSet<>(LicensingService.KNOWN_MODULES);
+        unaccounted.removeAll(accounted);
+
+        assertThat(unaccounted)
+            .as("A code exists in LicensingService.KNOWN_MODULES that is neither a ratified SKU nor "
+                + "a legacy code with a §5 destination. This is the direction that drifts: a "
                 + "migration introduces a code, the Set.of grows to make validation pass, and "
                 + "the catalogue never hears about it — which is how SOCOPS came to be enforced "
                 + "in 22 places while the annotation's own Javadoc listed 19 codes without it. "
-                + "Add the code to SKU_CATALOGUE.md §5 and to LEGACY_DESTINATION.")
+                + "Add the code to SKU_CATALOGUE.md — §3 if it is sellable, §5 if it is retiring.")
             .isEmpty();
+    }
+
+    /**
+     * The service's retirement map and the catalogue's §5 must agree. Two independent
+     * transcriptions of the same table, asserted equal — which is the only way a transcription
+     * catches drift. {@link LicensingService#RETIRED_DESTINATION} exists because the service quotes
+     * the destination in its refusal message ("grant COMPLIANCE instead"), and a wrong destination
+     * in that message sends an operator to license the wrong SKU.
+     *
+     * <p>The two sets are deliberately not derived from each other: {@link #LEGACY_DESTINATION} is
+     * this test's transcription of the markdown, and the map in the service is the code's. If one
+     * ever imported the other, this assertion would compare a value with itself.
+     */
+    @Test
+    void theServicesRetirementMapMatchesTheCatalogue() {
+        Map<String, String> fromCatalogue = new TreeMap<>();
+        LEGACY_DESTINATION.forEach((code, dest) -> {
+            // A code whose destination is itself is carried forward, not retired.
+            if (!code.equals(dest)) fromCatalogue.put(code, dest);
+        });
+
+        assertThat(new TreeMap<>(LicensingService.RETIRED_DESTINATION))
+            .as("LicensingService.RETIRED_DESTINATION disagrees with SKU_CATALOGUE.md §5. The "
+                + "service quotes these destinations back to an operator who tried to license a "
+                + "retired code, so a wrong entry tells them to buy the wrong SKU. Amend the "
+                + "catalogue, ADR-018 and both maps together.")
+            .isEqualTo(fromCatalogue);
+    }
+
+    /**
+     * The sellable set and the retired set must not overlap, and together they must be exactly the
+     * validation set. A code in both would be simultaneously offerable and refused — and the
+     * refusal wins, so the platform would silently stop selling a ratified SKU.
+     */
+    @Test
+    void sellableAndRetiredPartitionTheAssignableCodes() {
+        Set<String> overlap = new TreeSet<>(LicensingService.SELLABLE_MODULES);
+        overlap.retainAll(LicensingService.RETIRED_DESTINATION.keySet());
+        assertThat(overlap)
+            .as("A code is both sellable and retired. upsert() refuses new rows for retired codes, "
+                + "so the refusal wins and a ratified SKU becomes unsellable with no error anywhere "
+                + "except the operator's screen.")
+            .isEmpty();
+
+        Set<String> union = new TreeSet<>(LicensingService.SELLABLE_MODULES);
+        union.addAll(LicensingService.RETIRED_DESTINATION.keySet());
+        assertThat(new TreeSet<>(LicensingService.KNOWN_MODULES))
+            .as("KNOWN_MODULES is meant to be exactly SELLABLE_MODULES ∪ RETIRED_DESTINATION's keys")
+            .isEqualTo(union);
+
+        assertThat(LicensingService.SELLABLE_MODULES)
+            .as("the sellable set must be the 15 ratified SKUs — no more, no fewer")
+            .containsExactlyInAnyOrderElementsOf(RATIFIED);
     }
 
     /**
