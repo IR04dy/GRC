@@ -10,6 +10,7 @@ import { Badge } from '../ui/Badge';
 import { Select } from '../ui/Select';
 import { Input } from '../ui/Input';
 import { useI18n } from '../../lib/i18n';
+import { getUser } from '../../lib/auth';
 import { adminApi, departmentsApi, type AdminUserDto, type DepartmentDto, type AdminRoleDto } from '../../lib/api';
 import {
   recipientListsApi, workflowRequestsApi,
@@ -34,6 +35,13 @@ export function validateRecipients(recipients: WorkflowRecipientInput[], routing
       return ar ? 'حدد اسم الدور' : 'Select a role name for the ROLE recipient';
     if (r.recipientType === 'EXTERNAL' && !(r.recipientKey ?? '').includes('@'))
       return ar ? 'المستلم الخارجي يتطلب بريداً صالحاً' : 'EXTERNAL recipient requires a valid contact email';
+    // F2-86 — the server refuses a request whose approval gate is the person raising it (400,
+    // four-eyes). Said here too, because every other server rule in this form is pre-empted here
+    // and a raise that only fails on submit reads as a broken button rather than a control.
+    if (r.recipientType === 'USER' && r.recipientId === getUser()?.userId
+        && (r.actorRole === 'APPROVER' || r.actorRole === 'REVIEWER'))
+      return ar ? 'لا يمكنك أن تكون المعتمد أو المراجع لطلبك (مبدأ الرقابة المزدوجة)'
+                : 'You cannot be the approver or reviewer of your own request (four-eyes)';
   }
   if (routingMode === 'SEQUENTIAL') {
     const steps = [...new Set(recipients.map(r => r.stepNo ?? 1))].sort((a, b) => a - b);

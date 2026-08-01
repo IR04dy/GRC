@@ -860,4 +860,132 @@ class WorkflowRequestServiceTest {
             ORG, "SecurityEvent", 4321L, pageable);
         verify(requestRepo, never()).findByOrganisationIdAndSourceModuleOrderByCreatedAtDesc(any(), any(), any());
     }
+
+    // ── F2-86 — four eyes on the engine 26 module screens raise requests through ─────────────
+    //
+    // Both halves were found by the clean-tenant probe (Appendix/scripts/clean_tenant_probe.py),
+    // not by reading the code: on a tenant with no history, an initiator named itself approver,
+    // submitted, approved — 200 APPROVED — and on the recipient-gated shape the rule ran backwards,
+    // refusing the designated approver (400) and admitting the raiser (200).
+
+    private CreateRequest approvalWith(Long approverId, Long reviewerId, List<RecipientDto> recipients) {
+        return new CreateRequest("RISK", "Risk", 5L, "APPROVAL",
+            "Approve me", null, null, "PARALLEL", "ALL", "REVIEW",
+            LocalDate.now().plusDays(7), 48, "MEDIUM", null,
+            3, null, null, true, false, null, reviewerId, approverId, recipients, null, null, null, null, null);
+    }
+
+    private static RecipientDto approver(Long id) {
+        return new RecipientDto("USER", id, null, null, "APPROVER", 1);
+    }
+
+    /** A request already at the approval step, gated only by an APPROVER recipient row. */
+    private WorkflowRequest submittedWithApproverRecipient(Long id, Long initiator, Long approverUser) {
+        WorkflowRequest r = sentRequest(id, "PARALLEL", "ALL", null);
+        r.setRequestType("APPROVAL");
+        r.setStatus("SUBMITTED");
+        r.setInitiatedBy(initiator);
+        WorkflowRequestRecipient x = rec(id, approverUser, 1, "PENDING");
+        x.setActorRole("APPROVER");
+        when(requestRepo.findByIdAndOrganisationId(id, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, id))
+            .thenReturn(List.of(x));
+        return r;
+    }
+
+    @Test
+    void create_initiatorAsNamedApprover_rejected() {
+        authAs(1L, "raiser", "PLATFORM_ADMIN");     // admin bypasses ACTOR gates, not validation
+        when(userRepo.findById(anyLong())).thenAnswer(inv -> Optional.of(orgUser(inv.getArgument(0))));
+        assertThatThrownBy(() -> svc.create(approvalWith(1L, null, List.of(user(2L, 1)))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("four-eyes");
+        verify(requestRepo, never()).save(any());
+    }
+
+    @Test
+    void create_initiatorAsNamedReviewer_rejected() {
+        authAs(1L, "raiser", "PLATFORM_ADMIN");
+        when(userRepo.findById(anyLong())).thenAnswer(inv -> Optional.of(orgUser(inv.getArgument(0))));
+        assertThatThrownBy(() -> svc.create(approvalWith(2L, 1L, List.of(user(3L, 1)))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("reviewer of their own request");
+    }
+
+    @Test
+    void create_initiatorAsApproverRecipient_rejected() {
+        // The recipient gate is exactly as load-bearing as the named column — create() accepts it
+        // as *the* approval gate — so it has to carry the same rule.
+        authAs(1L, "raiser", "PLATFORM_ADMIN");
+        when(userRepo.findById(anyLong())).thenAnswer(inv -> Optional.of(orgUser(inv.getArgument(0))));
+        assertThatThrownBy(() -> svc.create(approvalWith(null, null, List.of(approver(1L)))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("APPROVER or REVIEWER recipient");
+    }
+
+    @Test
+    void create_someoneElseAsApprover_stillAllowed() {
+        // The anti-vacuity half: the rule must refuse self-gating without refusing four eyes.
+        authAs(1L, "raiser", "PLATFORM_ADMIN");
+        when(userRepo.findById(anyLong())).thenAnswer(inv -> Optional.of(orgUser(inv.getArgument(0))));
+        assertThat(svc.create(approvalWith(2L, null, List.of(user(3L, 1)))).status()).isEqualTo("DRAFT");
+        assertThat(svc.create(approvalWith(null, null, List.of(approver(2L)))).status()).isEqualTo("DRAFT");
+    }
+
+    @Test
+    void approve_designatedApproverRecipient_isHonoured() {
+        // Before F2-86 this was the 400: approve() resolved only approverId, so the person the
+        // request designates as its approver could not approve it.
+        submittedWithApproverRecipient(20L, 1L, 2L);
+        authAs(2L, "approver");                       // NOT admin — the gate must admit them on merit
+        assertThat(svc.approve(20L, "ok").status()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void approve_initiatorRefused_whenAnApproverRecipientIsDesignated() {
+        // ...and this was the 200: the fallback handed the gate to the initiator.
+        submittedWithApproverRecipient(21L, 1L, 2L);
+        authAs(1L, "raiser");
+        assertThatThrownBy(() -> svc.approve(21L, "self"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("designated actor");
+    }
+
+    @Test
+    void approve_initiatorWhoIsAlsoTheNamedApprover_is409() {
+        // The backstop for rows written before the create-time rule: a 409, because an SoD refusal
+        // is a conflict with the request's own history rather than a malformed call.
+        WorkflowRequest r = sentRequest(22L, "PARALLEL", "ALL", null);
+        r.setStatus("SUBMITTED");
+        r.setInitiatedBy(1L);
+        r.setApproverId(1L);
+        when(requestRepo.findByIdAndOrganisationId(22L, ORG)).thenReturn(Optional.of(r));
+        authAs(1L, "raiser");
+        assertThatThrownBy(() -> svc.approve(22L, "self"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Four-eyes");
+    }
+
+    @Test
+    void reject_usesTheSameResolvedGate() {
+        // approve() and reject() are the same authority; a fix applied to one only would leave the
+        // other as the way round it.
+        submittedWithApproverRecipient(23L, 1L, 2L);
+        authAs(2L, "approver");
+        assertThat(svc.reject(23L, "no").status()).isEqualTo("REJECTED");
+    }
+
+    @Test
+    void approve_withNoGateAtAll_stillFallsBackToTheInitiator() {
+        // Unchanged behaviour, asserted so the fix cannot quietly break requests that designate
+        // nobody (an ACK or NOTIFICATION the initiator closes out themselves).
+        WorkflowRequest r = sentRequest(24L, "PARALLEL", "ALL", null);
+        r.setStatus("SUBMITTED");
+        r.setInitiatedBy(7L);
+        when(requestRepo.findByIdAndOrganisationId(24L, ORG)).thenReturn(Optional.of(r));
+        when(recipientRepo.findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(ORG, 24L))
+            .thenReturn(List.of(rec(24L, 8L, 1, "PENDING")));   // ASSIGNEE only — not a gate
+        authAs(7L, "initiator");
+        assertThat(svc.approve(24L, "ack").status()).isEqualTo("APPROVED");
+    }
 }

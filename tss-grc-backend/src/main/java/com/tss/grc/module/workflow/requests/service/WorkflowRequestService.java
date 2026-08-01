@@ -345,6 +345,35 @@ public class WorkflowRequestService {
             throw new IllegalArgumentException(
                 "APPROVAL requests require an approver (approverId or a recipient with the APPROVER actor role)");
 
+        /*
+         * F2-86 — four eyes has to be structural, not conventional. The rule above requires *an*
+         * approver and never asked who: measured on a clean tenant, a request naming its own
+         * initiator as approverId was accepted, and that initiator then submitted and approved it —
+         * 200 APPROVED, no second pair of eyes anywhere in the trail. The workflow engine is the
+         * approval path 26 module screens raise requests through, so this was the generic version
+         * of F2-29 (a raiser approving their own emergency change).
+         *
+         * Refused at the door rather than only at approve() time, because refusing there would
+         * leave a request whose only designated approver is barred from approving it — a dead end a
+         * user could create and not escape. Covers the recipient gate too: a USER recipient carrying
+         * APPROVER or REVIEWER is exactly as load-bearing as the named column.
+         */
+        Long initiator = r.getInitiatedBy();
+        if (initiator != null) {
+            if (initiator.equals(r.getApproverId()))
+                throw new IllegalArgumentException(
+                    "The initiator cannot be the approver of their own request (four-eyes)");
+            if (initiator.equals(r.getReviewerId()))
+                throw new IllegalArgumentException(
+                    "The initiator cannot be the reviewer of their own request (four-eyes)");
+            if (recipients.stream().anyMatch(x ->
+                    "USER".equals(upperOr(x.recipientType(), ""))
+                        && initiator.equals(x.recipientId())
+                        && Set.of("APPROVER", "REVIEWER").contains(upperOr(x.actorRole(), "ASSIGNEE"))))
+                throw new IllegalArgumentException(
+                    "The initiator cannot be their own APPROVER or REVIEWER recipient (four-eyes)");
+        }
+
         // WF-9 — QUORUM/MAJORITY completion applies to PARALLEL routing; QUORUM needs a valid threshold.
         if (Set.of("QUORUM", "MAJORITY").contains(r.getCompletionRule())) {
             if (!"PARALLEL".equals(r.getRoutingMode()))
@@ -505,7 +534,7 @@ public class WorkflowRequestService {
     @Transactional
     public RequestResponse review(Long id, String outcome, String note) {
         WorkflowRequest r = get(id);
-        requireActor(r.getReviewerId(), r, "review");
+        requireActor(reviewGate(r), r, "review");
         String from = r.getStatus();
         String verdict = upperOr(outcome, "");
         switch (verdict) {
@@ -542,7 +571,7 @@ public class WorkflowRequestService {
     @Transactional
     public RequestResponse approve(Long id, String note) {
         WorkflowRequest r = get(id);
-        requireActor(r.getApproverId() != null ? r.getApproverId() : r.getReviewerId(), r, "approve");
+        requireActor(approvalGate(r), r, "approve");
         String from = r.getStatus();
         if ("SUBMITTED".equals(r.getStatus())) transition(r, "UNDER_REVIEW");
         transition(r, "APPROVED");
@@ -556,7 +585,7 @@ public class WorkflowRequestService {
     @Transactional
     public RequestResponse reject(Long id, String note) {
         WorkflowRequest r = get(id);
-        requireActor(r.getApproverId() != null ? r.getApproverId() : r.getReviewerId(), r, "reject");
+        requireActor(approvalGate(r), r, "reject");
         String from = r.getStatus();
         if ("SUBMITTED".equals(r.getStatus())) transition(r, "UNDER_REVIEW");
         transition(r, "REJECTED");
@@ -1205,11 +1234,67 @@ public class WorkflowRequestService {
 
     /** Actor gate for review/approve: named actor, or the initiator when no actor named, or admin. */
     private void requireActor(Long namedActor, WorkflowRequest r, String action) {
+        requireActor(namedActor != null ? Set.of(namedActor) : Set.of(), r, action);
+    }
+
+    /**
+     * Actor gate over a <b>set</b> of designated actors.
+     *
+     * <p>F2-86, second half. {@code approve()} resolved its gate as {@code approverId} only, while
+     * {@code create()} accepts an APPROVAL request gated on an {@code actorRole=APPROVER} recipient
+     * instead. On that shape the fallback below handed the gate to the <em>initiator</em>, so the
+     * clean-tenant probe measured the four-eyes rule running backwards: the designated approver got
+     * <b>400 "Only the designated actor may approve"</b> and the person who raised the request got
+     * <b>200 APPROVED</b>. A validation rule that blesses two gates and an enforcement point that
+     * honours one is worse than having only one gate — the request looks controlled and is not.
+     *
+     * <p>An empty gate keeps the original meaning: nobody was designated, so the initiator drives
+     * their own request (a NOTIFICATION or ACK closing out). {@code create()} forbids that shape for
+     * APPROVAL requests.
+     */
+    private void requireActor(Set<Long> gate, WorkflowRequest r, String action) {
         Long userId = CurrentActor.userId();
         if (isPlatformAdmin()) return;
-        Long gate = namedActor != null ? namedActor : r.getInitiatedBy();
-        if (gate == null || !gate.equals(userId))
+        if (gate.isEmpty()) {
+            Long fallback = r.getInitiatedBy();
+            if (fallback == null || !fallback.equals(userId))
+                throw new IllegalArgumentException("Only the designated actor may " + action + " this request");
+            return;
+        }
+        if (userId == null || !gate.contains(userId))
             throw new IllegalArgumentException("Only the designated actor may " + action + " this request");
+        // Four-eyes backstop for rows that predate the create-time rule above. A 409, because an SoD
+        // refusal is a conflict with the request's own history, not a malformed call.
+        if (userId.equals(r.getInitiatedBy()))
+            throw new IllegalStateException(
+                "Four-eyes: the initiator of this request may not " + action + " it");
+    }
+
+    /**
+     * Everyone entitled to act on the approval gate: the named approver, else the named reviewer,
+     * else the users carried by {@code APPROVER} recipient rows (F2-86).
+     */
+    private Set<Long> approvalGate(WorkflowRequest r) {
+        if (r.getApproverId() != null) return Set.of(r.getApproverId());
+        if (r.getReviewerId() != null) return Set.of(r.getReviewerId());
+        return gateFromRecipients(r, "APPROVER");
+    }
+
+    /** The review gate: the named reviewer, else {@code REVIEWER} recipient rows. */
+    private Set<Long> reviewGate(WorkflowRequest r) {
+        if (r.getReviewerId() != null) return Set.of(r.getReviewerId());
+        return gateFromRecipients(r, "REVIEWER");
+    }
+
+    private Set<Long> gateFromRecipients(WorkflowRequest r, String actorRole) {
+        Set<Long> out = new LinkedHashSet<>();
+        for (WorkflowRequestRecipient x : recipientRepo
+                .findByOrganisationIdAndRequestIdOrderByStepNoAscIdAsc(r.getOrganisationId(), r.getId())) {
+            if ("USER".equals(x.getRecipientType()) && actorRole.equals(x.getActorRole())
+                    && x.getRecipientId() != null)
+                out.add(x.getRecipientId());
+        }
+        return out;
     }
 
     private void requireInitiatorOrAdmin(WorkflowRequest r, String action) {
