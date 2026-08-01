@@ -1,6 +1,8 @@
 package com.tss.grc.module.platform.auditlog.controller;
 
+import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.entity.AuditLogEntry;
+import com.tss.grc.module.platform.auditlog.service.AuditChainService;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ import java.util.Map;
 public class AuditLogController {
 
     private final AuditLogService service;
+    private final AuditChainService chain;
 
     @GetMapping
     @PreAuthorize("hasPermission('AUDIT_LOG','READ')")
@@ -55,5 +58,38 @@ public class AuditLogController {
     @PreAuthorize("hasPermission('AUDIT_LOG','READ')")
     public List<AuditLogEntry> trace(@PathVariable String correlationId) {
         return service.trace(correlationId);
+    }
+
+    // ─── F2-31: tamper-evidence ───────────────────────────────────────
+
+    /**
+     * Verifies this tenant's audit-ledger hash chain and reports the first break, if any.
+     *
+     * <p>The response deliberately carries a {@code limitation} string. This control detects
+     * modification, mid-chain deletion and insertion; it does NOT detect truncation of the newest
+     * rows, and unkeyed it does not resist an actor with database write access. An integrity report
+     * that answers "VERIFIED" without saying what was not checked is the kind of evidence that
+     * misleads an examiner, so the boundary travels with the verdict.
+     */
+    @GetMapping("/integrity")
+    @PreAuthorize("hasPermission('AUDIT_LOG','READ')")
+    public Map<String, Object> integrity() {
+        return chain.verifyTenant(TenantContext.getCurrentTenant());
+    }
+
+    /**
+     * Seals this tenant's unsealed rows now, instead of waiting for the periodic pass.
+     *
+     * <p>Guarded on {@code AUDIT_LOG:WRITE} — it mutates the three integrity columns. It exists so
+     * the control can be EXERCISED rather than only observed: a sealing pass whose only trigger is a
+     * timer is a control nobody can demonstrate on request, and DF-1 showed what an unobserved
+     * scheduled sweep costs (48 silent failures a day for eight days).
+     */
+    @PostMapping("/integrity/seal")
+    @PreAuthorize("hasPermission('AUDIT_LOG','WRITE')")
+    public Map<String, Object> seal() {
+        Long org = TenantContext.getCurrentTenant();
+        int sealed = chain.sealTenant(org);
+        return Map.of("organisationId", org, "sealed", sealed);
     }
 }

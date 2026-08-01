@@ -181,6 +181,18 @@ grc:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
+  # Audit-ledger tamper-evidence — F2-31. See AuditChainHasher for the threat boundary.
+  audit:
+    # HMAC key for the audit hash chain. It lives HERE (external.properties beside the jar), never
+    # in the database — that separation is the whole control: a database-only compromise (SQL
+    # injection, a stolen `sa` password, a DBA without filesystem access) cannot forge a valid
+    # chain. Unset, the chain falls back to plain SHA-256 and every verification response says so.
+    # >=32 chars, no placeholder text, or it is refused and treated as unset.
+    integrity-key: ${AUDIT_INTEGRITY_KEY:}
+    sealing-enabled: ${AUDIT_SEALING_ENABLED:true}
+    seal-interval-ms: ${AUDIT_SEAL_INTERVAL_MS:300000}        # 5 minutes
+    seal-initial-delay-ms: ${AUDIT_SEAL_INITIAL_DELAY_MS:60000}
+
   # Security policies
   security:
     max-failed-login-attempts: 5

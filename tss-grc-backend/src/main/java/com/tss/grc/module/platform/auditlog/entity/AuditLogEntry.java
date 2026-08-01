@@ -114,4 +114,29 @@ public class AuditLogEntry {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    // ─── F2-31: tamper-evidence ───────────────────────────────────────
+    // These four columns are the ONLY mutable ones after insert, and they are excluded from the
+    // hashed content — see AuditChainHasher. Everything else is write-once in practice.
+
+    /** MAC over this row's content chained to {@link #prevHash}. Null until the row is sealed. */
+    @Column(name = "row_hash", length = 64)
+    private String rowHash;
+
+    /** The {@link #rowHash} of the previous sealed row in this tenant's chain; GENESIS for the first. */
+    @Column(name = "prev_hash", length = 64)
+    private String prevHash;
+
+    /**
+     * {@code HMAC-SHA256} or {@code SHA-256} — recorded per row so a key rotation reads as a key
+     * rotation. Without it, rotating the integrity key would make every historical row fail
+     * verification, and an integrity alarm that fires on a routine operation is an alarm operators
+     * learn to ignore.
+     */
+    @Column(name = "hash_alg", length = 20)
+    private String hashAlg;
+
+    /** When this row was sealed. Rows newer than the last seal are UNSEALED, not broken. */
+    @Column(name = "sealed_at")
+    private LocalDateTime sealedAt;
 }

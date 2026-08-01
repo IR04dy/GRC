@@ -79,3 +79,31 @@ NOTIFY_FROM_EMAIL=noreply@tss-grc.com
 #CROWDSTRIKE_CLIENT_SECRET=
 #TENABLE_ACCESS_KEY=
 #TENABLE_SECRET_KEY=
+
+# ── Audit-ledger tamper-evidence (F2-31) ────────────────────────────────────
+# HMAC key for platform.audit_log's hash chain. It belongs HERE and NOT in the
+# database: that separation IS the control — a database-only compromise (SQL
+# injection, a stolen `sa` password, a DBA without filesystem access) cannot
+# forge a valid chain. Leave it unset and the chain falls back to plain SHA-256,
+# which still detects modification and mid-chain deletion but can be recomputed
+# by anyone with database write access; every /api/v1/audit-log/integrity
+# response reports which mode is in force.
+#
+# >=32 chars, no "change-this"/"placeholder" text, or it is refused and logged.
+# ⚠ Rotating it does not raise a false tamper alarm — each row records the
+# algorithm it was sealed under — but be precise about what rotation costs:
+# rows sealed under the OLD key become UNVERIFIABLE, not verified. The endpoint
+# then answers PARTIALLY_VERIFIED with verified=false, tamperDetected=false and
+# an exact count, because claiming verified=true over rows it could not check is
+# how an integrity report comes to mislead an examiner. Re-sealing them under
+# the new key is deliberately NOT offered: it would overwrite the only evidence
+# those rows have. Rotate only with a reason, and keep the old key archived.
+#
+# ⚠ What this does not cover, stated plainly: truncation of the newest rows is
+# undetectable from inside the same database, and an actor holding BOTH this
+# file and the database can recompute the chain. On a deployment where the DBA,
+# platform admin and deployment operator are one person, this is deterrence and
+# evidence-of-effort. Separate key custody is what makes it prevention.
+#AUDIT_INTEGRITY_KEY=
+#AUDIT_SEALING_ENABLED=true
+#AUDIT_SEAL_INTERVAL_MS=300000
