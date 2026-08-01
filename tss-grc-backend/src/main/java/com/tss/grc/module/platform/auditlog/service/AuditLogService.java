@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Platform audit-log service — Framework Intersection F7.
@@ -38,6 +40,51 @@ import java.util.UUID;
  * <p>HTTP context (ip/user_agent/endpoint) and Spring Security user
  * info are pulled automatically. TenantContext gives the
  * organisation_id. Callers never have to remember those fields.
+ *
+ * <h3>F2-54 — {@code user_role} records a role, and says how it knows</h3>
+ *
+ * <p>Until 2026-07-31 this class filled the column with
+ * {@code auth.getAuthorities().iterator().next().getAuthority()}. The authority
+ * collection is a {@link java.util.HashSet} holding <em>both</em> {@code ROLE_*} role
+ * authorities and bare {@code MODULE_ACTION} permission authorities, so
+ * {@code iterator().next()} took an arbitrary element of a hash set. Measured across
+ * both databases: <b>16 distinct values, of which ZERO were role names</b> — 13 were
+ * permissions ({@code BCM_APPROVE} alone on 1,665 rows) and 3 were {@code ROLE_}-prefixed.
+ * It was also non-deterministic: {@code admin} appeared under <b>six</b> different
+ * values, {@code so_officer} under four.
+ *
+ * <p>That matters more than a mislabelled column. This platform sells a
+ * SAMA/NCA/CMA-grade audit trail, and an examiner reconciling "who did this" against
+ * the role matrix got an answer that was not merely wrong but <em>differently wrong
+ * each time</em>.
+ *
+ * <p>Now: {@link #resolveRoles} keeps only {@code ROLE_}-prefixed authorities, strips the
+ * prefix, de-duplicates and <b>sorts</b> them — so a multi-role principal records its whole
+ * set, deterministically, and a permission can never appear. Every row also carries
+ * {@code user_role_source} saying how the value was obtained, because "no role recorded" and
+ * "role deliberately not recorded" are different facts an auditor must be able to tell apart:
+ *
+ * <ul>
+ *   <li>{@link #SRC_RESOLVED} — the actor's role set as at the action.</li>
+ *   <li>{@link #SRC_RESOLVED_TRUNCATED} — as above but longer than the column; truncation is
+ *       labelled rather than silent, which is the whole point of the finding.</li>
+ *   <li>{@link #SRC_NO_ROLE_AUTHORITY} — authenticated, but the principal holds no
+ *       {@code ROLE_*} authority at all (a machine/token identity carrying only permissions).</li>
+ *   <li>{@link #SRC_NO_PRINCIPAL} — no authenticated principal: schedulers and off-request work.</li>
+ *   <li>{@link #SRC_SUPPRESSED} — deliberately not recorded. Whistleblower reporting suppresses
+ *       actor identity by design, and this label distinguishes that from a gap.</li>
+ *   <li>{@link #SRC_LEGACY_AUTHORITY_SAMPLE} — set only by V339, on pre-fix rows that carry a
+ *       value. <b>That value is an arbitrary authority, usually a permission; do not reconcile
+ *       it against the role matrix.</b></li>
+ *   <li>{@link #SRC_LEGACY_UNRECORDED} — set only by V339, on pre-fix rows with no value at all.
+ *       The old code could not distinguish "no principal" from "principal with no authorities",
+ *       so neither can this label, and it says so rather than guessing one.</li>
+ * </ul>
+ *
+ * <p><b>History is labelled, never rewritten.</b> A permission does not determine which role
+ * the actor held, so back-filling real roles would be fabrication — and an audit ledger that
+ * edits its own past to look clean is worth less than one that admits a gap. This follows the
+ * V322 precedent ({@code tally_source}: label every row, flip none).
  */
 @Service
 @RequiredArgsConstructor
@@ -46,6 +93,37 @@ public class AuditLogService {
     private static final Logger log = LoggerFactory.getLogger(AuditLogService.class);
 
     private static final Set<String> SEVERITIES = Set.of("INFO", "WARN", "ERROR");
+
+    // ─── F2-54: user_role provenance ──────────────────────────────
+    /** {@code platform.audit_log.user_role} is NVARCHAR(60) — see V95. */
+    static final int USER_ROLE_MAX = 60;
+
+    /** Spring Security's role-authority prefix. Anything without it is a permission, not a role. */
+    private static final String ROLE_PREFIX = "ROLE_";
+
+    /** The actor's role set as at the action. */
+    public static final String SRC_RESOLVED             = "RESOLVED";
+    /** As {@link #SRC_RESOLVED}, but the set did not fit the column — truncation is labelled. */
+    public static final String SRC_RESOLVED_TRUNCATED   = "RESOLVED_TRUNCATED";
+    /** Authenticated, but the principal holds no {@code ROLE_*} authority (permissions only). */
+    public static final String SRC_NO_ROLE_AUTHORITY    = "NO_ROLE_AUTHORITY";
+    /** No authenticated principal: schedulers, async listeners, off-request work. */
+    public static final String SRC_NO_PRINCIPAL         = "NO_PRINCIPAL";
+    /** Deliberately not recorded — whistleblower reporting suppresses actor identity by design. */
+    public static final String SRC_SUPPRESSED           = "SUPPRESSED_BY_DESIGN";
+    /** V339 only: a pre-fix row whose value is an arbitrary authority (usually a permission). */
+    public static final String SRC_LEGACY_AUTHORITY_SAMPLE = "LEGACY_AUTHORITY_SAMPLE";
+    /** V339 only: a pre-fix row with no value, cause unrecoverable. */
+    public static final String SRC_LEGACY_UNRECORDED    = "LEGACY_UNRECORDED";
+
+    /**
+     * Every label this column may hold. Pinned by test rather than by a DB CHECK — a CHECK on a
+     * value-set the code keeps extending is the {@code ck_ca_source} landmine, and here a
+     * rejected INSERT loses an audit row.
+     */
+    public static final Set<String> USER_ROLE_SOURCES = Set.of(
+        SRC_RESOLVED, SRC_RESOLVED_TRUNCATED, SRC_NO_ROLE_AUTHORITY, SRC_NO_PRINCIPAL,
+        SRC_SUPPRESSED, SRC_LEGACY_AUTHORITY_SAMPLE, SRC_LEGACY_UNRECORDED);
 
     private final AuditLogRepository repo;
     /** Optional: HttpServletRequest is only present inside an HTTP call. */
@@ -85,6 +163,12 @@ public class AuditLogService {
         e.setParentAuditId(b.parentAuditId);
         e.setDigitalSignatureRef(b.digitalSignatureRef);
         e.setMessage(b.message);
+        // Usually null; a caller may declare provenance (see SRC_SUPPRESSED). Validated, because a
+        // free-text provenance column is a column that tells the reader nothing.
+        if (b.userRoleSource != null && !USER_ROLE_SOURCES.contains(b.userRoleSource))
+            throw new IllegalArgumentException(
+                "user_role_source must be one of " + USER_ROLE_SOURCES + ", got: " + b.userRoleSource);
+        e.setUserRoleSource(b.userRoleSource);
 
         if (b.severity != null) {
             if (!SEVERITIES.contains(b.severity))
@@ -94,10 +178,22 @@ public class AuditLogService {
 
         // Auto-fill from HTTP + security if available
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
-            e.setUserUsername(auth.getName());
-            if (!auth.getAuthorities().isEmpty())
-                e.setUserRole(auth.getAuthorities().iterator().next().getAuthority());
+        if (e.getUserRoleSource() == null) {   // a caller may have declared it (see SRC_SUPPRESSED)
+            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                e.setUserUsername(auth.getName());
+                String roles = resolveRoles(auth);
+                if (roles.isEmpty()) {
+                    e.setUserRoleSource(SRC_NO_ROLE_AUTHORITY);
+                } else if (roles.length() > USER_ROLE_MAX) {
+                    e.setUserRole(roles.substring(0, USER_ROLE_MAX - 1) + "…");
+                    e.setUserRoleSource(SRC_RESOLVED_TRUNCATED);
+                } else {
+                    e.setUserRole(roles);
+                    e.setUserRoleSource(SRC_RESOLVED);
+                }
+            } else {
+                e.setUserRoleSource(SRC_NO_PRINCIPAL);
+            }
         }
         HttpServletRequest req = currentRequestOrNull();
         if (req != null) {
@@ -111,6 +207,37 @@ public class AuditLogService {
             saved.getOrganisationId(), saved.getActionType(),
             saved.getEntityType(), saved.getEntityId(), saved.getSeverity());
         return saved;
+    }
+
+    /**
+     * The actor's ROLES, comma-separated, {@code ROLE_} stripped, de-duplicated and
+     * <b>sorted</b> — or {@code ""} when the principal holds no role authority.
+     *
+     * <p>Three properties, each of which was a defect before F2-54:
+     * <ol>
+     *   <li><b>Roles only.</b> The authority collection mixes {@code ROLE_*} roles with bare
+     *       {@code MODULE_ACTION} permissions; the old code took {@code iterator().next()} of it.
+     *       Measured on both databases, that produced <b>16 distinct values and not one role
+     *       name</b> — {@code BCM_APPROVE} alone on 1,665 dev rows.</li>
+     *   <li><b>The whole set, not a sample.</b> {@code so_officer} really does hold two roles
+     *       (CISO + SUSTAINABILITY_OFFICER) and the four-eyes flows depend on which one acted, so
+     *       recording one of them is a lossy answer to the only question an examiner asks.</li>
+     *   <li><b>Sorted, therefore deterministic.</b> The source is a {@link java.util.HashSet}, so
+     *       without an ordering the same principal records a different string run to run —
+     *       {@code admin} appeared under six values. That is worse than being wrong once: it
+     *       defeats reconciliation, because two rows that disagree are indistinguishable from a
+     *       role change between them.</li>
+     * </ol>
+     */
+    static String resolveRoles(Authentication auth) {
+        return auth.getAuthorities().stream()
+            .map(GrantedAuthority::getAuthority)
+            .filter(a -> a != null && a.startsWith(ROLE_PREFIX))
+            .map(a -> a.substring(ROLE_PREFIX.length()))
+            .filter(a -> !a.isBlank())
+            .distinct()
+            .sorted()
+            .collect(Collectors.joining(","));
     }
 
     /**
@@ -204,7 +331,7 @@ public class AuditLogService {
         String oldValueJson, newValueJson;
         String workflowStatusBefore, workflowStatusAfter;
         String sourceModule, correlationId, digitalSignatureRef;
-        String severity, message;
+        String severity, message, userRoleSource;
 
         public AuditEventBuilder actionType(String v) { this.actionType = v; return this; }
         public AuditEventBuilder entityType(String v) { this.entityType = v; return this; }
@@ -221,5 +348,14 @@ public class AuditLogService {
         public AuditEventBuilder digitalSignatureRef(String v) { this.digitalSignatureRef = v; return this; }
         public AuditEventBuilder severity(String v) { this.severity = v; return this; }
         public AuditEventBuilder message(String v) { this.message = v; return this; }
+
+        /**
+         * Declare how {@code user_role} was obtained, suppressing the automatic resolution.
+         * The only current use is {@link AuditLogService#SRC_SUPPRESSED} — a caller asserting
+         * that actor identity is withheld <em>by design</em>, which an auditor must be able to
+         * tell apart from a gap. Anything not in {@link AuditLogService#USER_ROLE_SOURCES} is
+         * rejected, so this cannot become a free-text field.
+         */
+        public AuditEventBuilder userRoleSource(String v) { this.userRoleSource = v; return this; }
     }
 }

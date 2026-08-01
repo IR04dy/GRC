@@ -508,6 +508,12 @@ public class WhistleblowerCaseService {
      * this is the only audit path used for public-portal whistleblower
      * submissions to preserve reporter anonymity. The user fields are
      * also cleared because the caller is unauthenticated.
+     *
+     * <p>F2-54: it also stamps {@code user_role_source = SUPPRESSED_BY_DESIGN}. The NULLs above
+     * are a deliberate protection, and until now they were indistinguishable in the ledger from
+     * the platform simply failing to record an actor — so the one place that withholds identity
+     * on purpose looked exactly like a gap. This is the second of the two writers of
+     * {@code platform.audit_log}; the other is {@code AuditLogService.recordEvent}.
      */
     void anonymousAudit(Long orgId, String actionType, Long entityId, String message) {
         AuditLogEntry e = new AuditLogEntry();
@@ -519,7 +525,8 @@ public class WhistleblowerCaseService {
         e.setMessage(message);
         e.setSeverity("INFO");
         // Explicitly leave ip_address / user_agent / source_endpoint /
-        // user_username / user_role NULL — see service Javadoc.
+        // user_username / user_role NULL — see service Javadoc — and SAY SO in the row.
+        e.setUserRoleSource(AuditLogService.SRC_SUPPRESSED);
         auditRepo.save(e);
         log.debug("[audit-anon] org={} {} WhistleblowerCase#{} (ip-suppressed)",
                 orgId, actionType, entityId);

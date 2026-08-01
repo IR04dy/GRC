@@ -36,8 +36,26 @@ public class AuditLogEntry {
     @Column(name = "user_username", length = 120)
     private String userUsername;
 
+    /**
+     * The actor's ROLE set at the moment of the action — comma-separated, sorted, {@code ROLE_}
+     * prefix stripped. Never a permission: see {@link #userRoleSource} and F2-54.
+     */
     @Column(name = "user_role", length = 60)
     private String userRole;
+
+    /**
+     * How {@link #userRole} was obtained — so a reader can tell "no role recorded" from "role
+     * deliberately not recorded" from "recorded by code that got it wrong". Values are the
+     * {@code SRC_*} constants on {@code AuditLogService} plus the two {@code LEGACY_*} labels
+     * V339 stamps on pre-fix rows.
+     *
+     * <p>⚠ Deliberately NOT a DB CHECK constraint. The {@code ck_ca_source} landmine is that a
+     * CHECK on a value-set the code keeps extending turns every new label into a 500 — and here
+     * a rejected INSERT is a <em>lost audit row</em>, which is worse than an unrecognised label.
+     * The label set is pinned by test instead.
+     */
+    @Column(name = "user_role_source", length = 40)
+    private String userRoleSource;
 
     @Column(name = "action_type", nullable = false, length = 40)
     private String actionType;
