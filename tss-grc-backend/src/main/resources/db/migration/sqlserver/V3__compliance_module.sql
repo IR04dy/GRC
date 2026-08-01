@@ -4,7 +4,33 @@
 -- Run via Flyway (disabled in dev — run manually with sqlcmd)
 -- ============================================================================
 
-USE TSS_GRC;
+-- ⚠ `USE TSS_GRC;` removed 2026-08-01 (F2-76). Flyway is already connected to the target
+-- database, so the statement was redundant here and actively wrong anywhere else: on a customer
+-- database with any other name it either fails outright, or — worse — SUCCEEDS by switching to some
+-- unrelated database that happens to be called TSS_GRC on the same instance, writing this file's
+-- DDL there while Flyway records the migration as applied. Five files carried it (V3, V4, V5, V7,
+-- V10), all below the V292 baseline, which is why neither environment ever executed them.
+
+-- ── The schema this file's tables live in (F2-75, added 2026-08-01) ───────────
+--
+-- ⚠ This was missing for the entire life of the file, and it is the earliest reason
+-- `flyway:migrate` cannot build this platform from empty. V1 declares thirteen schemas and
+-- `compliance` is NOT one of them; the first CREATE SCHEMA compliance in the whole migration set
+-- sits at V184 — 181 files AFTER the three tables below. So a genuinely new customer database dies
+-- on the THIRD migration, with "The specified schema name 'compliance' either does not exist".
+-- The plan's estimate was that an empty-database run "aborts no later than V47". It aborts at V3.
+--
+-- Why nobody hit it: dev runs with Flyway OFF and the Python bootstrap made the schema, while
+-- production is baselined at V292 so V1-V291 are recorded as applied and never execute. Two schema
+-- authorities, and neither of them runs this file. RC-A exactly.
+--
+-- Editing a shipped migration is normally forbidden — it breaks flyway:validate wherever the file
+-- already ran. Verified safe here rather than assumed: prod's platform.flyway_schema_history holds
+-- 45 rows of which exactly ONE is at or below the baseline (the '<< Flyway Baseline >>' marker at
+-- V292), so no checksum for V1-V291 exists anywhere, and dev never ran Flyway at all.
+--
+-- Guarded and idempotent, in the same form V184 uses.
+IF SCHEMA_ID('compliance') IS NULL EXEC('CREATE SCHEMA compliance');
 GO
 
 -- ── Controls ─────────────────────────────────────────────────────────────────

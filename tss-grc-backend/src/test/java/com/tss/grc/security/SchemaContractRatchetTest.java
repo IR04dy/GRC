@@ -122,8 +122,26 @@ class SchemaContractRatchetTest {
      * a red build nobody can fix gets disabled. Lower it as bootstrap DDL becomes migrations;
      * <b>never raise it to make a new entity pass</b> — a new table with no migration is a table
      * that will not exist for the next customer.
+     *
+     * <h4>✅ 0 as of 2026-08-01 — this is now a hard gate, not a ratchet</h4>
+     *
+     * All 67 landed in one slice, generated from {@code sys.schemas}/{@code sys.columns}/
+     * {@code sys.indexes} by {@code Appendix/scripts/schema_from_catalog.py} rather than
+     * hand-copied. The reason for generating is V338: it re-issued V12–V14 verbatim and Hibernate
+     * rejected the result (<em>Invalid column name 'deleted_by'</em>) because those files were three
+     * months stale — <b>re-issuing a stale migration reproduces a stale schema</b>, and doing it 67
+     * times by hand is 67 chances to ship that. A catalog read cannot be stale.
+     *
+     * <p>Proven, not asserted: V341+V342 were applied to a genuinely empty scratch database and the
+     * result compared column-for-column with dev — 67/67 tables, 112/112 indexes, 86/86 PK+UNIQUE
+     * constraints, <b>1,666/1,666 columns, zero drift</b>, and idempotent on a second pass. The same
+     * comparator run against production reports zero drift too.
+     *
+     * <p><b>The prize, and the reason the ceiling is now 0:</b> a new entity whose table has no
+     * runnable DDL fails this build immediately, instead of shipping a platform the next customer
+     * cannot be given.
      */
-    private static final int BASELINE_MAPPED_WITHOUT_MIGRATION = 67;
+    private static final int BASELINE_MAPPED_WITHOUT_MIGRATION = 0;
 
     /**
      * <b>11, measured 2026-07-31, and it must only ever decrease.</b>
@@ -138,8 +156,23 @@ class SchemaContractRatchetTest {
      * {@code CREATE TABLE sharia.…}, because the schema it belongs to would not exist. The table
      * ratchet would read 0 and the claim "the migrations can build the platform" would still be
      * false. A gate that can reach green while the property it stands for is broken is not a gate.
+     *
+     * <h4>✅ 0 as of 2026-08-01, and the review that demanded this ratchet was vindicated twice</h4>
+     *
+     * Once by prediction — the table ratchet did reach 0 in a single slice, exactly as warned. And
+     * once by demonstration: the spine generator's <em>first</em> emission declared only these 11,
+     * and the empty-database proof failed on its very first {@code CREATE TABLE} with
+     * <em>"The specified schema name 'ai_governance' either does not exist"</em>. {@code ai_governance},
+     * {@code compliance} and {@code evidence} are among the 40 schemas that <b>do</b> have a
+     * {@code CREATE SCHEMA} — in three <em>earlier</em> migrations — so the new file was silently
+     * depending on them. Correct in a full chain, broken out of it. The generator now declares all
+     * <b>14</b> schemas its own tables live in, guarded by {@code IF NOT EXISTS}.
+     *
+     * <p>🔑 A migration that creates a table should declare the schema it needs. Relying on an
+     * earlier file is the same ordering fragility that makes V47's column-existence guard pass on an
+     * empty database and then fail its {@code ALTER}.
      */
-    private static final int BASELINE_MAPPED_SCHEMAS_WITHOUT_MIGRATION = 11;
+    private static final int BASELINE_MAPPED_SCHEMAS_WITHOUT_MIGRATION = 0;
 
     /**
      * Mapped tables deliberately not created by any migration in this repo, with the reason.
@@ -362,6 +395,120 @@ class SchemaContractRatchetTest {
                 uncreated.size(), BASELINE_MAPPED_SCHEMAS_WITHOUT_MIGRATION,
                 String.join(", ", uncreated)))
             .isLessThanOrEqualTo(BASELINE_MAPPED_SCHEMAS_WITHOUT_MIGRATION);
+    }
+
+    /**
+     * Every migration that creates a table must declare the schemas <em>it</em> needs, or be
+     * preceded by a file that does — checked in file order, which is the order Flyway runs them.
+     *
+     * <p>⚠ This test exists because the empty-database proof caught what no other gate could. The
+     * spine generator's first emission declared only the 11 schemas no migration covered, leaving
+     * {@code ai_governance}, {@code compliance} and {@code evidence} to three earlier files. Both
+     * ratchets above read 0 — correctly — while {@code CREATE TABLE} failed on line one of a real
+     * build. <b>A table-level gate cannot see a schema-level dependency.</b>
+     *
+     * <p>Ordering matters here in a way it does not elsewhere in this class, so the check walks the
+     * folder numerically and accumulates: a schema is available at file N if any file ≤ N declares
+     * it. That reproduces what Flyway does, rather than treating the folder as a set.
+     */
+    @Test
+    void noMigrationCreatesATableInASchemaNoEarlierMigrationHasDeclared() throws IOException {
+        List<Path> files;
+        try (Stream<Path> s = Files.list(migrationDir())) {
+            files = s.filter(p -> MIGRATION_NAME.matcher(p.getFileName().toString()).matches())
+                .sorted((a, b) -> Integer.compare(version(a), version(b)))
+                .toList();
+        }
+        assertThat(files).as("no migration files parsed — this check would be vacuous")
+            .hasSizeGreaterThanOrEqualTo(MIN_MIGRATIONS);
+
+        Set<String> available = new LinkedHashSet<>();
+        available.add(DEFAULT_SCHEMA);                 // platform is created by V1's core schemas
+        List<String> violations = new ArrayList<>();
+        for (Path p : files) {
+            String body = Files.readString(p);
+            Matcher cs = CREATE_SCHEMA.matcher(body);
+            while (cs.find()) {
+                available.add(cs.group(1).toLowerCase(Locale.ROOT));
+            }
+            Matcher ct = CREATE_TABLE.matcher(body);
+            while (ct.find()) {
+                String schema = ct.group(1).toLowerCase(Locale.ROOT);
+                if (!available.contains(schema)) {
+                    violations.add("%s creates %s.%s but no migration up to here declares schema [%s]"
+                        .formatted(p.getFileName(), schema, ct.group(2).toLowerCase(Locale.ROOT),
+                                   schema));
+                }
+            }
+        }
+
+        assertThat(violations).as("""
+            A migration creates a table in a schema that nothing before it declares. On an existing \
+            database this passes because the schema is already there; on the empty database a new \
+            customer gets, it fails on the CREATE TABLE. Add the CREATE SCHEMA (IF NOT EXISTS) to \
+            the same file — do not rely on an earlier one.
+
+            %s""".formatted(String.join("\n            ", violations)))
+            .isEmpty();
+    }
+
+    /**
+     * No migration may hard-code the database it runs against — F2-76.
+     *
+     * <p>Five files carried {@code USE TSS_GRC;} (V3, V4, V5, V7, V10). Flyway is already connected
+     * to the target database, so it was redundant here and wrong anywhere else. The benign failure
+     * mode is an error on a customer database with another name. <b>The dangerous one is success:</b>
+     * if some unrelated {@code TSS_GRC} exists on the same instance, the statement switches to it,
+     * that file's DDL lands in the wrong database, and Flyway records the migration as applied.
+     *
+     * <p>All five sat below the V292 baseline, so neither environment ever executed them — the same
+     * reason F2-75 hid in V3 for the file's whole life. A hard zero, because there is no legitimate
+     * use for it.
+     *
+     * <p>⚠ The first version of this check matched any line <em>starting with</em> {@code "USE "}
+     * and reported {@code V191__contextual_help.sql} — whose seeded help text contains the English
+     * sentence <em>"Use the Bow-tie view…"</em> inside an INSERT. This repository's standing lesson
+     * is that a regex matching too little invents defects; that was the mirror image, and a gate
+     * with a false positive gets suppressed just as fast as one that is always red. The pattern now
+     * anchors the <b>whole line</b>: {@code USE}, one identifier, optional semicolon, end.
+     */
+    private static final Pattern USE_STATEMENT = Pattern.compile(
+        "^\\s*USE\\s+\\[?\\w+]?\\s*;?\\s*$", Pattern.CASE_INSENSITIVE);
+
+    @Test
+    void noMigrationHardCodesItsDatabaseName() throws IOException {
+        List<String> offenders = new ArrayList<>();
+        try (Stream<Path> files = Files.list(migrationDir())) {
+            for (Path p : files.filter(f -> f.getFileName().toString().endsWith(".sql")).toList()) {
+                for (String line : Files.readAllLines(p)) {
+                    if (USE_STATEMENT.matcher(line).matches()) {
+                        offenders.add(p.getFileName() + ": " + line.strip());
+                    }
+                }
+            }
+        }
+
+        // Anti-vacuity: the pattern must still match the thing it was written for. A pattern
+        // tightened until it matches nothing is the other way this gate could go quietly green.
+        assertThat(USE_STATEMENT.matcher("USE TSS_GRC;").matches())
+            .as("the pattern must still recognise the statement this test exists to ban").isTrue();
+        assertThat(USE_STATEMENT.matcher("  use [Other_Db]").matches()).isTrue();
+        assertThat(USE_STATEMENT.matcher(
+            "  'Use the **Bow-tie** view (`/risk/bowtie`) for top-tier risks.',").matches())
+            .as("and must not fire on English prose inside seeded help text").isFalse();
+        assertThat(offenders).as("""
+            A migration hard-codes its database with USE. Flyway already connects to the target, so \
+            remove the line. On a customer database with a different name this either fails, or \
+            silently applies the file's DDL to whatever other database bears the hard-coded name \
+            while Flyway records success.
+
+            %s""".formatted(String.join("\n            ", offenders)))
+            .isEmpty();
+    }
+
+    private static int version(Path p) {
+        Matcher m = MIGRATION_NAME.matcher(p.getFileName().toString());
+        return m.matches() ? Integer.parseInt(m.group(1)) : Integer.MAX_VALUE;
     }
 
     @Test

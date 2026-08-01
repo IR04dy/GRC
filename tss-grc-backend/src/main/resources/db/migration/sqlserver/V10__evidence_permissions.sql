@@ -4,8 +4,12 @@
 -- and assigns them to PLATFORM_ADMIN and ORG_ADMIN roles.
 -- ============================================================
 
-USE TSS_GRC;
-GO
+-- ⚠ `USE TSS_GRC;` removed 2026-08-01 (F2-76). Flyway is already connected to the target
+-- database, so the statement was redundant here and actively wrong anywhere else: on a customer
+-- database with any other name it either fails outright, or — worse — SUCCEEDS by switching to some
+-- unrelated database that happens to be called TSS_GRC on the same instance, writing this file's
+-- DDL there while Flyway records the migration as applied. Five files carried it (V3, V4, V5, V7,
+-- V10), all below the V292 baseline, which is why neither environment ever executed them.
 
 SET NOCOUNT ON;
 
