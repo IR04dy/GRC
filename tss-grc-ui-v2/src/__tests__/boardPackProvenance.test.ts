@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { filterNavByEntitlement, type GatedNavItem } from '../lib/entitlement';
+import { stripComments } from './support/sourceScan';
 
 /**
  * F2-42 / ADR-017 D-5 — the board pack has one source, and it is the server.
@@ -42,10 +43,18 @@ const sidebar = readFileSync(join(SRC, 'components', 'layout', 'Sidebar.tsx'), '
  * containing `@RestController`, a `package-info.java` describing its own layout,
  * and `RequireModule.java`'s own usage example). Keeping the prose and stripping it
  * here is better than deleting the explanation to satisfy a regex.
+ *
+ * ⚠ **Corrected by F2-68(c):** the stripper this file originally shipped — strip block
+ * comments, then strip line comments — is unsound. A `//` line containing a block-OPEN
+ * marker opens a phantom block comment that runs to the next block-CLOSE marker
+ * anywhere later in the file, and it mangled 23 files here. **It did not change any
+ * conclusion here** — both files below come out byte-identical under either version,
+ * re-measured — but over-stripping makes *absence* assertions pass for the wrong
+ * reason, so relying on that would have been luck. It now uses the shared sound
+ * scanner, whose own soundness is pinned in `apiClientReachability.test.ts`.
  */
-const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-const pageCode = code(page);
-const clientCode = code(client);
+const pageCode = stripComments(page);
+const clientCode = stripComments(client);
 
 describe('the fabricated board pack is gone', () => {
   it('lib/boardPack.ts no longer exists', () => {

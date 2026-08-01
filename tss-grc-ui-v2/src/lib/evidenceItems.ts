@@ -8,9 +8,14 @@
 //                          │  └─reject──▶ REJECTED ─┐
 //                          └─────────── resubmit ◀──┘  (REJECTED/EXPIRED/NEEDS_REVISION → PENDING_REVIEW)
 //
-// The old `/api/sustainability/evidence` silo (sustainabilityEvidence.ts) is
-// superseded by this; the ESG evidence tab now speaks to this engine and links
-// items back to ESG entities via the S-C bridge (see sustEvidenceLinks.ts).
+// The old `/api/sustainability/evidence` silo is superseded by this; the ESG
+// evidence tab now speaks to this engine and links items back to ESG entities
+// via the S-C bridge (see sustEvidenceLinks.ts).
+//
+// F2-68(c): its client (lib/sustainabilityEvidence.ts) was deleted — ten API
+// functions no file imported, found by the unused-API-client scan. The BACKEND
+// silo is still mapped and still holds 21 rows in sust.evidence, now with no
+// client at all; retiring that endpoint is a product call, filed as F2-85.
 
 import { api, uploadFile, type PageResponse } from './api';
 
