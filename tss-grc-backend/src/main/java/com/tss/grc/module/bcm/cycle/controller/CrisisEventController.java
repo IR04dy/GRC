@@ -89,8 +89,11 @@ public class CrisisEventController {
      * Tier-2 #12 — PDF export of the crisis event as an after-action report.
      * Includes the SitReps timeline, decisions log, and regulator notifications.
      */
+    // F2-61: EXPORT is composed with READ (ADR-017 D-10c). The after-action report carries the
+    // SitRep timeline, the decisions log and the regulator notifications for a live crisis — the
+    // narrowest reading of "may not view a crisis record" cannot admit taking all three as a file.
     @GetMapping("/{id}/export.pdf")
-    @PreAuthorize("hasPermission('BCM', 'EXPORT')")
+    @PreAuthorize("hasPermission('BCM','EXPORT') and hasPermission('BCM','READ')")
     public ResponseEntity<byte[]> exportPdf(@PathVariable Long id,
                                             @RequestParam(defaultValue = "en") String lang) {
         CrisisEvent e = service.get(id);

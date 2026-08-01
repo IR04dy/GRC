@@ -79,8 +79,12 @@ public class BcpPlanController {
      * bytes as a download with a filename matching the plan code so the
      * browser saves "BCP-2026-000001.pdf" rather than "export".
      */
+    // F2-61: EXPORT is composed with READ — see BcmEvidencePackageController for the measurement
+    // and ADR-017 D-10c for the rule. Before this, so_officer (CISO, holds BCM:EXPORT via V320
+    // Part 3 and no BCM:READ) was refused GET /api/v1/bcm/plans with 403 and served this same
+    // plan as 38,043 bytes of PDF with 200.
     @GetMapping("/{id}/export.pdf")
-    @PreAuthorize("hasPermission('BCM', 'EXPORT')")
+    @PreAuthorize("hasPermission('BCM','EXPORT') and hasPermission('BCM','READ')")
     public ResponseEntity<byte[]> exportPdf(@PathVariable Long id,
                                             @RequestParam(defaultValue = "en") String lang) {
         BcpPlan p = service.get(id);

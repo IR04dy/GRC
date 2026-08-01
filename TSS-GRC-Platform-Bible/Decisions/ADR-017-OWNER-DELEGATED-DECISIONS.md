@@ -490,6 +490,81 @@ teeth must re-review its grants in the same commit.
 > probing. **The same query has not been run on prod**, where the answer is unknown. Running it also found
 > **F2-54** — `platform.audit_log.user_role` records a *permission*, not a role, on all 5,801 rows.
 
+> ### ⚠ Amended 2026-08-01 — **D-10c: the rule was one-directional, and read as a floor it undoes its own fixes**
+>
+> This amendment discharges **F2-61(a)**. It is an engineer-drafted amendment to a rule already ratified under
+> this ADR's standing delegation, not a fresh owner call. Drafted from a measurement, not from the sentence.
+>
+> **The problem with "EXPORT follows READ" is that it is a comparison without a direction.** Read as a
+> **ceiling** it says *EXPORT must not exceed READ* — narrowing. Read as a **floor** it says *wherever READ is
+> held, EXPORT should be too* — widening. Both readings are faithful to the words, and they disagree about
+> real grants. F2-61's own proposed shape ("default deny for generic personas") assumed the ceiling; the
+> sentence as written also licenses the floor. Measured consequences of the floor reading
+> (`Appendix/scripts/export_grant_policy.py`, dev and prod, 2026-08-01): it would add **2** grants —
+> `CHANGE:EXPORT` and `REGULATORY:EXPORT` to `VIEWER`. **`REGULATORY:EXPORT` is precisely the grant V333 and
+> V335 revoked from `VIEWER` three days earlier, under this very rule.** A rule that re-grants what it was
+> used to revoke is not a rule yet.
+>
+> **Decision — the rule is a CEILING, and it is stated as a containment:**
+>
+> > **For every module, the set of roles holding `MODULE:EXPORT` must be a subset of those holding
+> > `MODULE:READ`. A file is a superset of a screen: there is no coherent authorisation state in which a
+> > principal may extract the whole register and be refused one record of it. `EXPORT` never implies a grant
+> > — holding `READ` creates no entitlement to `EXPORT`, which remains a separate decision per module.**
+>
+> That is strictly narrower than the original sentence and contradicts nothing already shipped: D-10a's
+> revocations, F2-59's and F2-60's narrowings all move in the ceiling direction.
+>
+> **Enforced in the guard, not in the grant table.** The containment is a property of every export handler:
+> `hasPermission('M','EXPORT') and hasPermission('M','READ')`. Maintaining it by hand in `iam.role_permissions`
+> is what failed — V320 granted one permission to satisfy one endpoint's AND-composition and inverted three
+> other guards it never mentioned, because **a permission is module-wide and a guard is not.** A grant edit
+> can be undone by the next grant edit; a composed guard cannot drift.
+>
+> **The three documented exceptions, enumerated rather than described:**
+>
+> **(i) A module with no same-module `READ`.** `BOARD:READ` is deliberately not catalogued (D-11(a) put board
+> reads on `ADMIN:READ`), while `BOARD:EXPORT` is held by 8 roles. For such a module the containment is
+> **unsatisfiable, not unsatisfied**, and the guard composes with the module's *actual* read authority. The
+> original rule silently assumed every `MODULE:EXPORT` has a `MODULE:READ` to follow; one of 26 does not.
+>
+> **(ii) A guard already narrowed on an independent axis.** `MlModelController`'s AI export ANDs
+> `hasAnyRole('RISK_MANAGER','CISO','DPO','AUDITOR','PLATFORM_ADMIN')`, so `AI:EXPORT` alone is insufficient
+> and `AUDITOR` holding it without `AI:READ` cannot widen anything. V320 granted that deliberately and
+> recorded why. A role list is a second gate, and two gates satisfy the intent of one containment.
+>
+> **(iii) A grant that exists only to satisfy an exception of type (ii).** `CISO` and `CFO` hold `BCM:EXPORT`
+> without `BCM:READ` for exactly that reason. Rather than revoke (which breaks the binder endpoint's recorded
+> intent) or grant `BCM:READ` (which widens two executive roles across all of BCM to fix an over-grant — the
+> wrong direction under NCA ECC 2-2 least privilege), the **guards** were composed. The grant survives in the
+> table and is now unreachable in code.
+>
+> **What that decided, on the platform, in this slice.** Three BCM export handlers authorised on `BCM:EXPORT`
+> alone: the BCP plan PDF, the crisis after-action report, and the cycle evidence ZIP whose own source calls
+> it *"the most sensitive export on the platform"*. Live before: `so_officer` (CISO) → **403** on
+> `GET /api/v1/bcm/plans`, **200 + 38,043 bytes** of that plan as PDF, **200 + 55,107 bytes** of evidence ZIP.
+> **The file was the only way that user could see any of it** — F2-27's ratified premise running backwards.
+> Live after: **403 on all three**, with `auditor`, `compliance`, `rmanager` and `viewer` — every persona
+> holding both — still served real bytes on the screen *and* the file.
+>
+> **What is deferred to F2-61(c), and it is a real remainder, not a formality.** **32 of the 40** file-returning
+> handlers still authorise on `EXPORT` alone. None is currently exploitable, because after this slice every
+> module's grants satisfy the containment — but each is one grant edit away from the BCM defect, which is
+> exactly how BCM got there. Composing them is module-sized with a before/after probe each, because a module
+> whose `EXPORT` is legitimately wider would lose live access on the day the AND lands. Ceiling pinned at 32 in
+> `ExportAuthorizationRatchetTest`: it may fall and must never rise.
+>
+> ➕ **A measurement worth keeping even though it changed nothing here.** The tier rule's *breadth* problem is
+> six modules, not twenty-four: `WORKFLOW` 54, `CHANGE` 45, `AI` 42, `SUST` 31, `NDI` 31, `COMPLIANCE` 31 of 58
+> roles, while 14 of the 26 sit at 14 roles or fewer. Any future narrowing should start there, and the
+> `VIEWER`-holds-16 figure is now **identical in dev and prod** — the dev-16/prod-17 divergence F2-61 recorded
+> closed when V335 reached production.
+>
+> ⚠ **And the endpoint this whole exception chain protects returns 500 for every caller** — `admin`,
+> `auditor` and `so_officer` all get `PDF export failed` from `/api/v1/bcm/binders/1/download` on three real
+> `BILINGUAL` rows. V320 granted two roles a module-wide permission to preserve access to something that
+> works for nobody. Filed as **F2-78**; not fixed here.
+
 ---
 
 ## D-11 — The two `board_pack` residuals from F2-05 slice 5

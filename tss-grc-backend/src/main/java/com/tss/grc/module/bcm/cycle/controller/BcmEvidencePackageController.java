@@ -47,7 +47,21 @@ public class BcmEvidencePackageController {
     // it the most sensitive export on the platform, and still reached for READ, because at
     // the time EXPORT enforced nothing anywhere in the codebase and so did not read as a real
     // option. Access-preserving: all 17 roles holding BCM:READ also hold BCM:EXPORT.
-    @PreAuthorize("hasPermission('BCM','EXPORT')")
+    //
+    // ⚠ F2-61, 2026-08-01: that last sentence was checked in ONE direction, and the migration
+    // that made the claim broke the other one in the same file. V320 Part 3 granted BCM:EXPORT
+    // to CISO and CFO — neither of which holds BCM:READ — to keep an AND-composed role list on
+    // BcpBinderController#download working. The grant is module-wide, so it silently widened the
+    // three BCM export guards nobody was reasoning about, this one included. Live-proven before
+    // the fix: so_officer (CISO) got 403 on GET /api/v1/bcm/plans and 200 + 55,107 bytes of real
+    // ZIP here. The file was the only way that user could see any of it.
+    //
+    // So EXPORT is composed with READ. A file is a superset of a screen; there is no coherent
+    // authorisation state in which a principal may take the whole cycle as a ZIP and be refused
+    // one record of it. ADR-017 D-10c. AND narrows and never widens: the only roles that lose
+    // anything are exactly the two whose EXPORT was granted for a different endpoint's guard,
+    // and that endpoint keeps its own role list and still admits them.
+    @PreAuthorize("hasPermission('BCM','EXPORT') and hasPermission('BCM','READ')")
     public ResponseEntity<ByteArrayResource> download(@PathVariable Long cycleId) {
         EvidencePackage pkg = service.generate(cycleId, currentPrincipalName());
         ByteArrayResource body = new ByteArrayResource(pkg.bytes());
