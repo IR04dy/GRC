@@ -1,11 +1,13 @@
 package com.tss.grc.module.admin.committee.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.tss.grc.common.model.CommitteeTypes;
 import com.tss.grc.module.admin.committee.entity.Committee;
 import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
@@ -23,7 +25,20 @@ public final class CommitteeDtos {
             // long-standing MethodArgumentNotValidException handler.
             @NotBlank @Size(max = 255) String nameAr,
             String descriptionEn, String descriptionAr,
-            @NotBlank @Size(max = 30) String committeeType,
+            // W1-5 — found by the golden-path integration test on its very first call.
+            // `@Size(max = 30)` was the whole contract, so `CK_com_type` was the only enforcement
+            // of the vocabulary and an off-vocabulary value arrived as a ConstraintViolation:
+            // 500 "An unexpected database error occurred." on a committee-creation request that
+            // was otherwise well formed. Same shape as F2-25 (the two mandatory dates on the
+            // sibling appoint endpoint) and F2-88 (a duplicate code) — an entity-backed write
+            // whose only statement of what is legal lives in the database.
+            //
+            // ⚠ `CAB` is deliberately NOT in this vocabulary. ADR-017 D-2: the CAB is a *role* a
+            // tenant assigns to one of its committees through `admin.committee_gate_map`, not a
+            // committee type. Do not "fix" a rejected `committeeType: "CAB"` by widening this.
+            @NotBlank @Size(max = 30)
+            @Pattern(regexp = CommitteeTypes.REGEX, message = CommitteeTypes.MESSAGE)
+            String committeeType,
             String chairpersonName, String chairpersonRole,
             String secretaryName,
             String membersJson, String charterEn, String charterAr,

@@ -56,7 +56,16 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all tests (~2,700 tests; ~1 min hot, 3–5 min cold)
+mvn -o clean package        # full build + all UNIT tests (2,818; ~1 min hot, 3–5 min cold)
+                            # hermetic: needs no database and no secrets — keep it that way
+
+# Integration tests (*IT.java) — real HTTP + the real dev SQL Server. W1-5/F2-18.
+JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn -o verify -Pit
+# ⚠ NOT -DskipTests: failsafe honours it too, so the build goes green having run NEITHER
+#   suite. Missing env is a hard failure with instructions, never a skip.
+# ⚠ The `it` profile is why `mvn -o clean package` stays database-free. Do not promote
+#   failsafe out of it — but do not let the ITs rot either: CommitteeGoldenPathContractTest
+#   runs in the normal suite and fails if the wiring or any declared step disappears.
 mvn test -Dtest=ClassName#method
 java -jar target/tss-grc-platform-0.1.0-SNAPSHOT.jar --spring.profiles.active=dev
 ```

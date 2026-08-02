@@ -1809,6 +1809,60 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **Open.** Out of A17-D2's scope; filed with a reproduction rather than fixed opportunistically |
 | **References** | `CommitteeController#createCommittee` · `CommitteeRepository#findByOrganisationIdAndCode` (the check that exists and is not called) · `GlobalExceptionHandler` · [[F2-84]] · [[F2-87]] |
 | **Lesson** | **A probe that is idempotent enough to re-run will find the defects that only a second run reaches.** This was invisible on the first pass and mistaken for a regression on the second — the tell was that the 500 came from an endpoint the slice never touched |
+| **➕ Reproduced again 2026-08-02** | W1-5's golden path hit this on its **second consecutive run**, on a code the first run had created. Not an edge case — it is what the second run of anything looks like, which raises the practical severity even though the technical one is unchanged. The IT works around it by purging its own prior artefacts before the class, so this remains open and undisguised |
+
+
+## F2-89 · A committee motion cannot be raised undecided
+
+| Field | Content |
+|---|---|
+| **ID** | F2-89 *(found by W1-5's golden-path integration test, 2026-08-02)* |
+| **Category** | Data model — a governance state that does not exist |
+| **Severity** | **P2 High** for S7, **P3** today, because the only mode anyone has used is "record a decision already taken" |
+| **Current State** | `admin.committee_resolutions.outcome` is **`NOT NULL` with no default**, and `CK_resolution_outcome` permits exactly `APPROVED \| REJECTED \| DEFERRED \| WITHDRAWN` — four **decided** states and nothing for *raised, awaiting the vote*. Omitting the field is `500 "An unexpected database error occurred."` Measured: **all 20 pre-existing resolutions are `APPROVED`**, tallies seeded as scalars |
+| **Problem** | To decide a motion by in-platform voting you must first record a decision for it, then hold the vote that determines that decision. The contradiction is explicit in the codebase: F2-40's guard tells the caller *"to decide a motion by in-platform voting, create the resolution with no tally"* — possible for the tally, **impossible for the outcome**. `DEFERRED` is the least-wrong placeholder and still wrong: a committee actively deferring is a real governance act, and this borrows its label for "not yet asked" |
+| **➕ The sharper half** | `CommitteeResolutionService.create` publishes an F8 domain event named **`COMMITTEE_RESOLUTION_` + outcome** at creation. So raising a motion for a vote broadcasts `COMMITTEE_RESOLUTION_DEFERRED` to downstream automation before anyone has voted — and a secretary who picked `APPROVED` as the placeholder would broadcast `COMMITTEE_RESOLUTION_APPROVED`, which that method's own comment says drives "regulator notification, board notification, risk-register update for accepted risks, policy publication for approved policies". A decision event fired by the act of *asking* the question |
+| **Root Cause** | The resolution table was designed as a **minute-book record** — a row describing a decision that has already happened — and `CH-14`/Track C later added per-member voting on top without giving the record a pre-decision state. The same "designed for one mode, extended into a second" shape as F2-26's votes ([[F2-26]]) and F2-40's tallies ([[F2-40]]) |
+| **Business Impact** | The agenda → motion → vote → decision cycle **S7** must build has no state for a live motion, so a CAB queue cannot show what is currently before the committee without misrepresenting it as decided |
+| **Recommendation** | Add a pre-decision state (`PROPOSED`/`OPEN`) to `CK_resolution_outcome` **and** make the creation event carry it, so no downstream rule fires on a placeholder. Do it inside S7, whose row already requires the platform to *"state which decision mode is authoritative"* — a question that cannot be answered while only one of the two modes has a representable starting state |
+| **Effort** | **S** (migration + vocabulary + the F8 event name), but it is a **decision** first |
+| **Status** | ⬜ **Open — carried to S7 deliberately.** W1-5 passes `DEFERRED` and documents why at the call site rather than fixing a data model whose correct shape is S7's to decide |
+| **References** | `CommitteeResolutionService#create` (the F8 publish) · `CK_resolution_outcome` · `CommitteeGoldenPathIT#raiseMotion` · [[F2-40]] · [[F2-18]] |
+| **Lesson** | **A record with no undecided state can only ever describe the past.** The voting engine, the recusal rules and the quorum arithmetic were all built correctly on top of a table that has nowhere to put the question being asked |
+
+
+## F2-90 · Approving committee minutes wrote nothing to the audit ledger
+
+| Field | Content |
+|---|---|
+| **ID** | F2-90 *(found by W1-5's golden-path integration test on its final step, 2026-08-02)* |
+| **Category** | Assurance / audit ledger completeness |
+| **Severity** | **P2 High.** No authorisation impact — every gate held — but the platform's tamper-evident record omitted the act it is most needed for |
+| **Current State** | Measured across the whole of `platform.audit_log`: **`MEETING_ATTENDANCE` was the only meeting action ever written**, and `audit.log` appeared exactly **once** in the whole of `CommitteeService`. Starting a meeting, completing it (which records the minutes text), **approving the minutes**, and cancelling it all wrote nothing |
+| **Problem** | Minutes approval is the act that makes a committee decision binding. Four gates guard it — `COMPLETED`, quorate, quorum `COMPUTED` not asserted, and F2-39's separation from whoever recorded the attendance — and Track D asserts `CAB_APPROVED` on the result. An auditor reading the hash-chained ledger ([[F2-31]]) could see the **attendance sheet being replaced** and not the approval resting on it |
+| **Why the e-signature is not a substitute** | It is a different subsystem behind a different permission (`SIGNATURE:READ` vs `AUDIT_LOG:READ`), it records a *signature* rather than an *event*, and it carries no actor role, correlation id or before/after status. "Signed" and "recorded in the ledger" are two claims, and the platform was making one while the SAMA/NCA evidence story rests on both |
+| **Root Cause** | `recordAttendance` was written during F2-28 with an audit line because *that slice was about attendance provenance*. The surrounding lifecycle predates it and was never revisited. **No unit test could catch it:** 32 tests in `CommitteeQuorumMinutesTest` mock `AuditLogService` and none asserts a call on the approval path — the [[F2-18]] blind spot exactly, and it was found on the golden path's last step |
+| **Business Impact** | A committee decision pack assembled from the audit ledger would show attendance edits and no approvals |
+| **Status** | ✅ **DONE 2026-08-02** (no migration). `MEETING_START`, `MEETING_COMPLETE`, `MINUTES_APPROVE` and `MEETING_CANCEL` now written; `MINUTES_APPROVE` carries the approver, the persisted quorum (`present/denominator`, `required`, `quorumSource`) and the minutes SHA-256, so the ledger row states the preconditions rather than only the outcome. **Mutation-proven:** disabling the `MINUTES_APPROVE` line fails `CommitteeGoldenPathIT` with the expected/actual action-list diff |
+| **References** | `CommitteeService#approveMinutes` · `CommitteeGoldenPathIT` step 14 · [[F2-31]] · [[F2-39]] · [[F2-18]] |
+| **Lesson** | **The golden-path assertion was almost written as "the ledger is not empty", and that would have passed.** The meeting *did* have audit rows — for the sheet, not the sign-off. Asserting the named actions is what turned a green tick into a finding |
+
+
+## F2-91 · The committee-type vocabulary was stated three times and wrong twice
+
+| Field | Content |
+|---|---|
+| **ID** | F2-91 *(found by W1-5's golden-path integration test on its FIRST call, 2026-08-02)* |
+| **Category** | Boundary validation / vocabulary drift |
+| **Severity** | **P2 High** — one half is a 500 on a well-formed request, the other silently refuses legal values |
+| **Current State** | Three definitions: `CK_com_type` **22** values (`V40`, extended by `V154`); `BoardPackDto.audience`'s `@Pattern` **17**; `CommitteeCreateRequest.committeeType` **none** — only `@NotBlank @Size(max = 30)` |
+| **Problem (a)** | The database CHECK was the *only* enforcement on committee creation, so an off-vocabulary type arrived as a `ConstraintViolationException` and surfaced as **500 "An unexpected database error occurred."** The field that **sets** the vocabulary was unvalidated while the field that merely **references** it was validated and ratcheted |
+| **Problem (b)** | The board-pack pattern was missing `OTHER`, `ARCH_REVIEW`, `INVESTMENT`, `ALCO`, `AML`. **All five have been in `CK_com_type` since `V154` — 177 migrations before `V331` widened that pattern "to the real vocabulary"**, so the widening was five short on the day it shipped. A tenant with an ALCO or an Investment committee could not scope a pack to it, and the refusal said the value *"must be an `admin.committees.committee_type` value"* while being exactly that |
+| **Root Cause** | ADR-017 D-11 recorded that this drift *"cannot recur unnoticed"* because `V331` throws when a **stored** audience fails to resolve. That guard is real and **points the wrong way**: it checks rows against the vocabulary, never the vocabulary's several definitions against each other. The direction that had actually drifted was the one nothing watched |
+| **Status** | ✅ **DONE 2026-08-02** (no migration — the database was already right; the Java copies were wrong). `common.model.CommitteeTypes` is now the single statement; both DTOs validate against it and yield a 400 naming the field. **Two ratchets, deliberately split:** `CommitteeTypeVocabularyTest` ties every Java copy together in the ordinary suite, and `CommitteeGoldenPathIT` ties Java to `CK_com_type` **against a real database** — with a failure message naming which side is missing what and which failure it will cause. No unit test can make the second assertion, which is the clearest argument for W1-5 existing at all. **Mutation-proven in both directions** |
+| **⚠ Not a defect, and worth stating** | The vocabulary has **no `CAB` or `ECAB`**, and that is ADR-017 D-2: *"the CAB is a role, not necessarily a standing committee."* The golden path's first draft tried to constitute a committee of type `CAB`; widening the vocabulary would have made the test pass **by reversing the decision that unblocked the whole change-governance epic**. `CommitteeTypeVocabularyTest#cabIsARoleNotACommitteeType` now pins the absence with the citation |
+| **References** | `common.model.CommitteeTypes` · `CommitteeDtos.CommitteeCreateRequest` · `BoardPackDto#audience` · `V154` · `V331` · ADR-017 D-2, D-11 |
+| **Lesson** | **A guard that checks data against a vocabulary is not a guard on the vocabulary.** D-11's claim was true and answered a different question — and the reflex fix for the 500 (add `CAB`) would have quietly overturned an owner-ratified decision, so *the first thing to check when a test fails on a vocabulary is whether the vocabulary is right* |
 
 
 ## Sequencing — what to do, in what order

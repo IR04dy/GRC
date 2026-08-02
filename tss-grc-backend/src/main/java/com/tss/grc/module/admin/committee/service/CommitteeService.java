@@ -243,6 +243,8 @@ public class CommitteeService {
         }
         m.setStatus("IN_PROGRESS");
         m.setStartedAt(LocalDateTime.now());
+        audit.log("MEETING_START", "CommitteeMeeting", m.getId(),
+            "Meeting " + label(m) + " opened");
         return m;
     }
 
@@ -279,6 +281,10 @@ public class CommitteeService {
         // No quorum recomputation here. Quorum has exactly one origin — recordAttendance —
         // because the old early-return-when-no-rows behaviour on this path is what let an
         // asserted flag become a governance fact.
+        audit.log("MEETING_COMPLETE", "CommitteeMeeting", m.getId(),
+            "Meeting " + label(m) + " closed and minutes recorded ("
+                + (m.getMinutesEn() == null ? 0 : m.getMinutesEn().length()) + " chars EN, "
+                + (m.getMinutesAr() == null ? 0 : m.getMinutesAr().length()) + " chars AR)");
         return m;
     }
 
@@ -331,7 +337,35 @@ public class CommitteeService {
                 + " — minutes sha256=" + minutesDigest(m);
             signatureService.sign("committee_meeting", m.getId(), "APPROVE", statement, approverId);
         }
+        // W1-5 / F2-90 — this line did not exist, and it is the one that matters most.
+        //
+        // Approving the minutes is the act that makes a committee decision binding: four gates
+        // guard it (COMPLETED, quorate, quorum COMPUTED not asserted, and F2-39's separation from
+        // whoever recorded attendance), it stamps the approver, and Track D asserts CAB_APPROVED on
+        // the result. None of it reached the audit ledger. Measured across the whole of
+        // platform.audit_log: MEETING_ATTENDANCE was the ONLY meeting action ever written, so an
+        // auditor reading the tamper-evident chain (F2-31) could see the attendance sheet being
+        // replaced and not the approval resting on it.
+        //
+        // The e-signature is not a substitute. It is a different subsystem behind a different
+        // permission (SIGNATURE:READ vs AUDIT_LOG:READ), it records a signature rather than an
+        // event, and it carries no actor role, correlation id or before/after status. "Signed" and
+        // "recorded in the ledger" are two claims and the platform was only making one.
+        //
+        // No unit test caught it: 32 tests in CommitteeQuorumMinutesTest mock AuditLogService and
+        // none asserts a call here — the F2-18 blind spot, found on the golden path's last step.
+        audit.log("MINUTES_APPROVE", "CommitteeMeeting", m.getId(),
+            "Minutes of " + label(m) + " approved by "
+                + (approverName == null ? "user#" + approverId : approverName)
+                + " · quorum " + m.getQuorumPresent() + "/" + m.getQuorumDenominator()
+                + " required " + m.getQuorumRequired()
+                + " (" + m.getQuorumSource() + ") · minutes sha256=" + minutesDigest(m));
         return m;
+    }
+
+    /** Human-readable meeting label for ledger messages: code when it has one, id otherwise. */
+    private static String label(CommitteeMeeting m) {
+        return m.getMeetingCode() != null ? m.getMeetingCode() : ("#" + m.getId());
     }
 
     /** SHA-256 of the meeting's minutes content, binding the sign-off to what was
@@ -358,6 +392,10 @@ public class CommitteeService {
         }
         m.setStatus("CANCELLED");
         m.setCancelReason(req.reason());
+        // Cancelling a CAB meeting is as governance-material as holding one: it is how a change
+        // waiting on a decision stops getting one. Same F2-90 gap.
+        audit.log("MEETING_CANCEL", "CommitteeMeeting", m.getId(),
+            "Meeting " + label(m) + " cancelled · reason: " + req.reason());
         return m;
     }
 

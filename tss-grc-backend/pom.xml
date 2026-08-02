@@ -347,6 +347,51 @@
     </build>
 
     <profiles>
+        <!--
+          W1-5 / F2-18 — integration tests (`*IT.java`), run with:
+
+              mvn -o verify -Pit -DskipITs=false
+
+          Deliberately behind a profile, and the reason is a build contract rather than
+          taste. Surefire's default includes are `*Test`/`Test*`/`*Tests`/`*TestCase`, so
+          `*IT.java` never runs in `mvn test` — but `mvn verify`/`mvn install` DO reach the
+          `integration-test` phase, and these tests need a reachable SQL Server plus
+          JWT_SECRET and DB_PASSWORD. Wiring failsafe unconditionally would therefore turn
+          `mvn install` from "compiles and passes 2,807 unit tests" into "needs a database",
+          on a repo whose documented full build is `mvn -o clean package`.
+
+          The profile is NOT a licence to let these rot. `CommitteeGoldenPathContractTest`
+          runs in the ordinary suite and asserts this wiring still exists and still covers
+          every declared golden-path step — because an integration test nobody can run is
+          the same defect as a warning nobody consumes (A17-D2 / F2-87).
+        -->
+        <profile>
+            <id>it</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <configuration>
+                            <includes>
+                                <include>**/*IT.java</include>
+                            </includes>
+                            <!-- One Spring context, reused across ITs; 417 entities boot slowly. -->
+                            <forkCount>1</forkCount>
+                            <reuseForks>true</reuseForks>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>dev</id>
             <properties>

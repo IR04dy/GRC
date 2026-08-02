@@ -1,6 +1,7 @@
 package com.tss.grc.module.board_pack.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.tss.grc.common.model.CommitteeTypes;
 import com.tss.grc.module.board_pack.entity.BoardPack;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -24,17 +25,27 @@ public class BoardPackDto {
      * slice that also lands ADR-017 D-11's read filter.
      *
      * <p>What it replaced was worse than stale: {@code BOARD|AUDIT_COMMITTEE|RISK_COMMITTEE|EXEC},
-     * a four-value set against five stored values and seventeen real committee types. One pack held
-     * {@code CYBER_COMMITTEE}, <b>which this API could not recreate</b>, and neither
-     * {@code CYBER_COMMITTEE} nor {@code EXEC} matched any {@code committee_type} — so joining
-     * audience to committee resolved 3 of 5 and silently mis-scoped the rest. V331 re-points those two
-     * onto the real vocabulary and throws if any stored audience fails to resolve.
+     * a four-value set against five stored values. One pack held {@code CYBER_COMMITTEE},
+     * <b>which this API could not recreate</b>, and neither {@code CYBER_COMMITTEE} nor {@code EXEC}
+     * matched any {@code committee_type} — so joining audience to committee resolved 3 of 5 and
+     * silently mis-scoped the rest. V331 re-points those two onto the real vocabulary and throws if
+     * any stored audience fails to resolve.
+     *
+     * <p>⚠ <b>W1-5 correction.</b> V331 widened this to "the real vocabulary" and landed
+     * <b>17 of 22</b>: {@code OTHER}, {@code ARCH_REVIEW}, {@code INVESTMENT}, {@code ALCO} and
+     * {@code AML} were missing, and all five have been in {@code CK_com_type} since {@code V154} —
+     * 177 migrations earlier. So a tenant with an ALCO or an Investment committee could not scope a
+     * pack to it, and the refusal said the value "must be an {@code admin.committees.committee_type}
+     * value" while being exactly that. The guard D-11 relied on — {@code V331} throwing when a
+     * <em>stored</em> audience fails to resolve — points the other way and could never see this.
+     * The vocabulary now lives in {@link CommitteeTypes}, with a ratchet tying every Java copy
+     * together and an integration-test assertion tying it to {@code CK_com_type} itself. Sharing the
+     * constant is not the cross-module read ADR-012 governs; {@code common.model} is kernel, and a
+     * live per-tenant committee lookup is still the follow-up slice.
      */
-    @NotBlank @Pattern(regexp = "BOARD|AUDIT_COMMITTEE|RISK_COMMITTEE|EXEC_COMMITTEE|CYBER_SECURITY"
-        + "|COMPLIANCE_COMMITTEE|BCM_COMMITTEE|CRISIS_MANAGEMENT|DATA_GOVERNANCE|PRIVACY_DPO"
-        + "|ESG_SUSTAINABILITY|INTERNAL_CONTROL|IT_STEERING|NOMINATION_REMUNERATION|AI_ETHICS"
-        + "|ANTI_FRAUD|TECH_COMMITTEE",
-        message = "audience must be an admin.committees.committee_type value")
+    @NotBlank
+    @Pattern(regexp = CommitteeTypes.REGEX,
+        message = "audience " + CommitteeTypes.MESSAGE)
     private String audience;
     private String riskSummaryJson;
     private String appetiteBreachesJson;
