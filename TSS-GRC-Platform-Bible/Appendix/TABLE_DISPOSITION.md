@@ -5,32 +5,23 @@ input is `table_disposition_exceptions.csv`, validated in both directions.
 
 | | count |
 |---|---|
-| tables in dev / prod | 464 / 464 |
-| rows in the register | 468 |
+| tables in dev / prod | 465 / 465 |
+| rows in the register | 466 |
 | classified from the exceptions file | 9 |
 
 | code | count | meaning |
 |---|---|---|
-| `OPERATING` | 395 | mapped and carrying data |
-| `WIRED_UNPROVEN` | 28 | mapped, 0 rows in both — shipped, never exercised |
+| `OPERATING` | 399 | mapped and carrying data |
+| `WIRED_UNPROVEN` | 25 | mapped, 0 rows in both — shipped, never exercised |
 | `SEED_ONLY` | 16 | **the only writer is a seed script** — ballast, shipped to prod by the restore |
 | `LEGACY` | 10 | no mapping, no Java reference, no seed insert, yet holds rows |
 | `ORPHAN_CONFIRMED` | 10 | no mapping, no reference, no rows |
 | `DORMANT` | 5 | empty by design (rare-event or awaiting connector config) |
-| `PROD_ONLY_LEFTOVER` | 3 | in prod only; no migration will remove it |
 | `INTENTIONAL_TECHNICAL` | 1 | infrastructure by design |
 
 Codes deliberately **not** assigned here, because a data-plane scan cannot justify
 them: `DARK_UI`, `DARK_API`, `BROKEN_CHAIN`. The route plane is owned by
 `routeReachability.test.ts` (F2-07b).
-
-## PROD_ONLY_LEFTOVER (3)
-
-| table | dev | prod | jpa | code refs | reason |
-|---|---|---|---|---|---|
-| `risk.kri_breach_events` | ABSENT | 0 | 0 | 0 | absent from dev, 0 row(s) in prod; dropped by V337__drop_legacy_kri_tables_reissue.sql, above the V292 baseline, so it applies on the next Flyway run (V247__drop_legacy_kri_tables.sql also drops it but is at or below the baseline and can never run) |
-| `risk.kri_definitions` | ABSENT | 0 | 0 | 0 | absent from dev, 0 row(s) in prod; dropped by V337__drop_legacy_kri_tables_reissue.sql, above the V292 baseline, so it applies on the next Flyway run (V247__drop_legacy_kri_tables.sql also drops it but is at or below the baseline and can never run) |
-| `risk.kri_readings` | ABSENT | 0 | 0 | 0 | absent from dev, 0 row(s) in prod; dropped by V337__drop_legacy_kri_tables_reissue.sql, above the V292 baseline, so it applies on the next Flyway run (V247__drop_legacy_kri_tables.sql also drops it but is at or below the baseline and can never run) |
 
 ## ORPHAN_CONFIRMED (10)
 
@@ -83,24 +74,21 @@ them: `DARK_UI`, `DARK_API`, `BROKEN_CHAIN`. The route plane is owned by
 | `privacy.privacy_assessments` | 6 | 6 | 0 | 0 | no JPA mapping, no Java reference and no seed insert, yet 12 row(s) — rows arrived from a migration or by hand |
 | `risk.risk_indicators` | 8 | 8 | 0 | 0 | no JPA mapping, no Java reference and no seed insert, yet 16 row(s) — rows arrived from a migration or by hand |
 
-## WIRED_UNPROVEN (28)
+## WIRED_UNPROVEN (25)
 
 | table | dev | prod | jpa | code refs | reason |
 |---|---|---|---|---|---|
-| `admin.committee_meeting_attendee` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
-| `admin.committee_referral` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
-| `admin.committee_resolution_vote` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `audit_committee.dashboard_attestation` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `audit_committee.dashboard_snapshot` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `bcm.crisis_comms_cascade` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `dataclass.dataclass_event` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `intake.intake_events` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `intake.intake_records` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
-| `platform.file_metadata` | 0 | ABSENT | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
-| `platform.nafath_transaction` | 0 | ABSENT | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
-| `platform.persistence_row` | 0 | ABSENT | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
+| `platform.file_metadata` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
+| `platform.nafath_transaction` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
+| `platform.persistence_row` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `platform.saved_views` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
-| `platform.sso_provider_config` | 0 | ABSENT | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
+| `platform.sso_provider_config` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `platform.web_push_subscription` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `socops.detection_rule` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `socops.forensics_custody_event` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |

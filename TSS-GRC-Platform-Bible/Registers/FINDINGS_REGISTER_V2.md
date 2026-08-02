@@ -1886,6 +1886,39 @@ Start-Service TssGrcBackend
 | **Lesson** | **A control that is off in dev and on in prod is not tested — it is deployed and hoped for.** This is the same shape as F2-62's dead flag and A17-D2's fail-open WARN, with the polarity reversed: instead of a control that did nothing, a control that did far too much. Both were invisible for the same reason — *the only environment that runs it is the one nobody probes.* Its javadoc named the gap ("never this bean") and its config named the missing precondition ("only after the documented staging soak"); **two accurate warnings, written by us, consumed by nobody** |
 
 
+## F2-93 · The change record says when the CAB decided and never who
+
+|  |  |
+|---|---|
+| **ID** | F2-93 *(found while building A17-D3, because the control D-3 specifies could not be enforced without it)* |
+| **Module** | `change_mgmt` |
+| **Severity** | **P2** on its own; **blocking** for A17-D3 |
+| **Current State** | `change_mgmt.change_requests` carried `cab_decision_at` and `cab_decision_notes` and **no column naming the decider**. The author of a CAB approval, a CAB rejection or an emergency ECAB approval existed only in `platform.audit_log` |
+| **Problem** | Two consequences, one obvious and one not. Obvious: an examiner asking *"who authorised this emergency change?"* is answered from a log rather than from the record — and the log is a different retention class from the register. Not obvious: **ADR-017 D-3's segregation-of-duties test had nothing to compare against.** Retrospective ratification exists to supply the independent scrutiny the emergency path skipped; if the emergency approver may also ratify, the control certifies its own author's decision *and* the evidence pack asserts that a second party reviewed it. That is [[F2-29]] one lifecycle step later |
+| **Root Cause** | The decision fields were added as *timestamp + free text*. Provenance was treated as an audit concern, and the audit trail genuinely does hold it — which is exactly why nobody noticed the register did not |
+| **Fix** | **V345** adds `cab_decision_by_id` / `cab_decision_by_name`, stamped from the authenticated principal on all three CAB-decision transitions — never from a request body (the [[F2-24]] rule). **Not back-filled from the audit ledger**: the ledger holds usernames, not the identity the SoD test compares, and inferring one from the other manufactures provenance for a decision nobody can now attest to. Legacy rows keep NULL, and `GRANDFATHERED` is what stops that NULL being read as "no conflict" |
+| **Status** | ✅ **Fixed** — V345, `ChangeManagementService#stampDecisionAuthor`, live-probed (`cabDecisionByName=compliance`, `cabDecisionById=3`) |
+| **Lesson** | **A control cannot be enforced against a fact the record does not hold.** The SoD rule was decided in ADR-017 nine days before anyone checked whether the comparison it requires was possible. Measuring the *inputs* a decision needs is part of measuring whether the decision is buildable — the amendment pass checked for ratification columns and missed that the approver was equally absent |
+
+
+## F2-94 · 126 of 164 automation rules notify nobody — the engine reads `to_role`, the rules all write `roles`
+
+|  |  |
+|---|---|
+| **ID** | F2-94 *(found by A17-D3's live probe: the escalation fired, was audited, and reached no one)* |
+| **Module** | `platform/automation` (F8 engine) — affects `change_mgmt`, `policy`, `bcm`, `privacy`, `risk`, `sust`, `socops` and every other module that seeded a rule |
+| **Severity** | **P1.** The platform's entire notification/escalation fan-out is inert for 77% of its rules |
+| **Current State** | `AutomationActionExecutor.handleNotify` resolves the recipient from `action_json.to_role` (ESCALATE) or `action_json.role` (NOTIFY) — **singular string keys**. Every seeded rule from V96 onward writes `"roles": ["CISO","CTO",…]` — **a plural array the executor never reads**. Measured 2026-08-02 in both databases: **dev 126 of 164 NOTIFY/ESCALATE rule codes (153 rows across 3 tenants); prod 125 of 161 (150 rows)**. Only **12** rules — `AR-06/09/10/12/13` and the seven `BCM-T*` — actually deliver |
+| **Problem** | The rule fires, the engine records `RULE_FIRED`, `automation_rule_runs` gets a row, `fire_count` increments — and `handleNotify` returns `ESCALATE (no role configured — audit-only)` having sent nothing. Every downstream signal says the automation worked. Among the dead rules: `AR-97` HIGH-risk **emergency change approved → escalate CTO + CISO**, `AR-72` **expired policy → escalate owner**, `AR-73` HIGH-risk policy exception → CRO + General Counsel, `AR-75` attestation declined → manager + DPO, `CHG-TASK-OVERDUE`, `POL-REVIEW-DUE` |
+| **How long it was live, and why nobody knew** | Since the seeds were written. **`platform.audit_log` already holds 278 rows in dev and 164 in prod whose message is `has no role configured`** — the engine has been reporting its own inertness continuously and the WARN was never read. Third instance of that exact shape in this programme after [[F2-87]]'s boot WARN and [[F2-92]]'s javadoc |
+| **Root Cause** | A comment asserting an agreement nobody measured. The executor's own javadoc says the singular naming *"match[es] the conventional naming in the seed rules"*; measured, it matches **12 of 164** of them. The two halves were authored independently and the prose bridged them |
+| **Fix** | **A17-D3 fixed only its own rule** (`CHG-RATIFY-BREACH` → `"to_role":"CISO"`, live-verified as `ESCALATE → CISO (1 delivered)` landing in `so_officer`'s inbox), plus a V345 self-check that THROWs if the key drifts back. The other 125 need their own slice. **The better fix is almost certainly in the executor** — accept `roles[]` as well as `role`/`to_role`: one code change instead of 150 data rows in two databases, it matches what the seed rules plainly intend (multi-role fan-out, which a singular key cannot express), and it stops the next rule authored from the V305 pattern breaking the same way. ⚠ **But switching it on begins delivering ~150 rules' worth of notifications that have never been sent**, to real inboxes, for events already in the backlog. That is an operational decision, not a refactor |
+| **Effort** | **S** for the executor change; **S–M** for the notification-volume assessment that must precede it |
+| **Status** | ⬜ **Open — P1.** `CHG-RATIFY-BREACH` fixed and delivering; 125 rule codes still inert |
+| **References** | `AutomationActionExecutor#handleNotify` (the `to_role`/`role` reads) · `V96__automation_rules.sql` · `V305__change_policy_automation_seed.sql` · `V345__change_ratification_sla.sql` (the corrected shape + the self-check) · [[F2-52]] · [[F2-62]] |
+| **Lesson** | **A fired rule is not a delivered notification, and every metric the engine keeps conflates them.** `fire_count`, `last_fired_at`, `automation_rule_runs` and the `RULE_FIRED` audit row all increment identically whether one person or nobody was notified — so the observable surface is indistinguishable in the two cases. This is [[F2-62]]'s dead control with better telemetry: the numbers went up. **When a subsystem's success metric is "we tried", the only proof of the control is the recipient.** A17-D3 only found it because its live probe asked *who received this*, not *did it fire* |
+
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

@@ -63,6 +63,71 @@ public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, Lo
         @Param("from") java.time.LocalDateTime from,
         @Param("to") java.time.LocalDateTime to);
 
+    /**
+     * A17-D3: emergency changes whose ratification clock has expired.
+     *
+     * <p>The predicate is total by construction — {@code PENDING} implies a
+     * non-null {@code ratificationDueAt} ({@code ck_change_ratification_clock},
+     * V345), so no row can slip through on SQL's UNKNOWN. That is not a
+     * theoretical worry: the one pre-existing EMERGENCY row has a null
+     * implementation timestamp, and against a null due date this comparison
+     * would have filtered it out and reported it compliant forever.
+     *
+     * <p>{@code ratificationEscalatedAt IS NULL} is a cheap first-pass filter, not
+     * the dedup: the audit-ledger marker is (mirroring {@code ChangeTaskSlaScheduler}),
+     * because the marker survives a manual clearing of the column.
+     */
+    @Query("""
+        SELECT c FROM ChangeRequest c
+        WHERE c.organisationId = :orgId
+          AND c.ratificationState = 'PENDING'
+          AND c.ratificationDueAt < :now
+        ORDER BY c.ratificationDueAt ASC
+        """)
+    java.util.List<ChangeRequest> findRatificationBreaches(
+        @Param("orgId") Long orgId,
+        @Param("now") java.time.LocalDateTime now);
+
+    /** A17-D3: the interim unauthorised-change register — every emergency change
+     *  that is not in a settled ratification state. CE-11 will widen this. */
+    @Query("""
+        SELECT c FROM ChangeRequest c
+        WHERE c.organisationId = :orgId
+          AND c.ratificationState <> 'NOT_REQUIRED'
+        ORDER BY CASE c.ratificationState
+                     WHEN 'PENDING' THEN 0
+                     WHEN 'AWAITING_IMPLEMENTATION' THEN 1
+                     WHEN 'REJECTED' THEN 2
+                     ELSE 3 END,
+                 c.ratificationDueAt ASC, c.id ASC
+        """)
+    java.util.List<ChangeRequest> findRatificationRegister(@Param("orgId") Long orgId);
+
+    /** A17-D3 KPI counts: [ratificationState, count] for a tenant. */
+    @Query("""
+        SELECT c.ratificationState, COUNT(c) FROM ChangeRequest c
+        WHERE c.organisationId = :orgId
+        GROUP BY c.ratificationState
+        """)
+    java.util.List<Object[]> countByRatificationStateGrouped(@Param("orgId") Long orgId);
+
+    /**
+     * A17-D3: stamp the escalation timestamp without loading or saving the entity.
+     *
+     * <p>Native single-statement UPDATE on purpose. The sweep runs off-request and
+     * the ROWVERSION landmine (never save an entity twice around a native
+     * {@code @Modifying} on the same table) is easiest to avoid by never loading
+     * the entity for writing at all. {@code ChangeTaskSlaScheduler} sidestepped this
+     * by writing nothing; D-3 has to record the escalation, so it writes once.
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query(value = """
+        UPDATE change_mgmt.change_requests
+           SET ratification_escalated_at = :now
+         WHERE id = :id AND ratification_escalated_at IS NULL
+        """, nativeQuery = true)
+    int stampRatificationEscalation(@Param("id") Long id, @Param("now") java.time.LocalDateTime now);
+
     /** CH-17: other live (non-terminal) changes whose scheduled window overlaps
      *  the given interval — conflict-detection candidates. */
     @Query("""

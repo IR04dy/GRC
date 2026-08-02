@@ -8,6 +8,7 @@ import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
+import com.tss.grc.module.change_mgmt.dto.RatificationDtos;
 
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService;
@@ -277,6 +278,59 @@ public class ChangeManagementController {
     @PreAuthorize("hasPermission('CHANGE','READ')")
     @Operation(summary = "Resolve the authorisation required for a specific change and whether it is satisfied.")
     public Map<String, Object> authorisation(@PathVariable Long id) { return service.resolveAuthorisation(id); }
+
+    // ── A17-D3: emergency-change retrospective ratification ───────────────────
+
+    /**
+     * Record the CAB's retrospective decision on an emergency change.
+     *
+     * <p>Guard is {@code CHANGE:APPROVE}, matching the CAB-vote endpoint: ratification
+     * IS a CAB decision, taken after the fact. {@code CHANGE:WRITE} authorises raising
+     * and editing a change, not authorising one.
+     *
+     * <p>Returns 409 when the caller emergency-approved, raised or owns the change — the
+     * segregation-of-duties gate is the whole point of retrospective ratification, and a
+     * 409 with an SoD message is the feature working.
+     */
+    @PostMapping("/{id}/ratify")
+    @PreAuthorize("hasPermission('CHANGE','APPROVE')")
+    @Operation(summary = "Retrospectively ratify (or refuse to ratify) an implemented emergency change — ADR-017 D-3.")
+    public ChangeRequest ratify(@PathVariable Long id,
+                               @Valid @RequestBody RatificationDtos.RatifyRequest body,
+                               Authentication auth) {
+        return service.ratify(id, body.decision(), body.notes(), userIdOf(auth), usernameOf(auth));
+    }
+
+    /**
+     * The interim unauthorised-change register: emergency changes carrying a
+     * ratification duty, overdue first. CE-11 will widen this surface, not replace it.
+     */
+    @GetMapping("/ratification-register")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Emergency changes awaiting or past their CAB ratification deadline.")
+    public Map<String, Object> ratificationRegister() { return service.ratificationRegister(); }
+
+    @GetMapping("/ratification-policy")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "This tenant's emergency-ratification SLA (business days) and escalation role.")
+    public ChangeRatificationPolicy ratificationPolicy() { return service.ratificationPolicy(); }
+
+    /**
+     * Change the tenant's ratification SLA, within the ADR-017 D-3 amendment-2 ceiling.
+     *
+     * <p>{@code CHANGE:APPROVE} rather than {@code CHANGE:WRITE}: this field decides how
+     * long an unauthorised production change may stand before the CISO is told, so it is
+     * a governance setting, not change authorship. Editing it must not be inside the
+     * privilege of the people whose changes it measures.
+     */
+    @PutMapping("/ratification-policy")
+    @PreAuthorize("hasPermission('CHANGE','APPROVE')")
+    @Operation(summary = "Set the emergency-ratification SLA (1..10 business days) and escalation role.")
+    public ChangeRatificationPolicy updateRatificationPolicy(
+            @Valid @RequestBody RatificationDtos.RatificationPolicyRequest body,
+            Authentication auth) {
+        return service.updateRatificationPolicy(body.slaBusinessDays(), body.escalationRole(), userIdOf(auth));
+    }
 
     // ── CH-17: freeze windows + change calendar + conflicts ───────────────────
 

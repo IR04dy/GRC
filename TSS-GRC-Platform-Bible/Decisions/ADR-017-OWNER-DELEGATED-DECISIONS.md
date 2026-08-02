@@ -228,6 +228,75 @@ documented approval of changes. For a weekly CAB cadence — the market norm —
 > and its register both have somewhere to live. It stays last in the ADR-017 queue and is not a standalone
 > slice.
 
+> ### ✅ Implemented 2026-08-02 — `V345`, and re-measurement changed the design twice
+>
+> Built as `feat/a17-d3-ecab-ratification-sla`. Unit suite **2,855/0/0**, IT **4/4**, **48/48** live probes
+> against the running stack with four real personas. Three of the amendment's premises held in **both**
+> databases. Two things it did not know changed the design:
+>
+> **1. The clock has a column but no value.** The one EMERGENCY row's `implementation_started` *and*
+> `implementation_ended` are both **NULL** — those columns are only ever written by the IMPLEMENTING /
+> IMPLEMENTED transitions and the row was seeded straight into IMPLEMENTED. So this decision's
+> *"the clock **does** have a legitimate start — that half survives contact with the schema"* is true of the
+> schema and **false of the data**. It matters because `WHERE ratification_due_at < now` against NULL is
+> UNKNOWN, which filters the row **out** — reporting it compliant forever rather than exempt. That is F2-62's
+> dead-control shape, and it turned amendment 3 from a courtesy into a structural requirement. The design
+> answer is `ck_change_ratification_clock`: **PENDING cannot exist without a due date**, so the breach
+> predicate is total by constraint rather than by hope. Proven live — the database refuses the update.
+>
+> **2. Ratification is orthogonal to `status`, so D-3 never needed X-2.** An emergency change awaiting
+> ratification is genuinely `IMPLEMENTED` *and* genuinely awaiting ratification. A single `status` column has
+> to discard one of those facts, and the one it would discard — *this is live in production* — is what the
+> FSC, the change calendar and the KPI pack all read. `ck_change_status` is untouched and a test pins that.
+> Six states, not five: **`AWAITING_IMPLEMENTATION`** exists because this decision starts the clock at
+> implementation, so between ECAB approval and go-live the change is neither compliant nor breached, and
+> collapsing that window into either answer is a lie in one direction or the other. Breach is **derived**
+> (`PENDING` + past due), not a seventh state, so a late ratification cannot overwrite the fact that it
+> breached — `ratification_escalated_at` survives it.
+>
+> **Detail decided under standing delegation:** the clock anchors on **`implementation_started`**, not
+> `implementation_ended`. It is the earliest defensible anchor, so it cannot be gamed by dragging out the
+> implementation window — the same gaming the *"not at raise"* clause exists to prevent — and it is the first
+> moment the change is actually live, which is when an unratified emergency change becomes an unauthorised
+> production change in the register's sense. Stated explicitly because leaving it ambiguous would recreate
+> F-014's two-answers defect.
+>
+> **Amendment 2 is enforced twice.** `sla_business_days` is bounded **1..10** by `ck_ratification_sla_bounds`
+> in the database *and* by `@Min`/`@Max` on the DTO *and* re-checked in the service. Ten is two weekly CAB
+> cycles. Three layers is not redundancy: the DTO produces the 400 that explains the rule, the CHECK makes it
+> true for a direct UPDATE or a support script, and the service covers server-side callers that never see a
+> DTO. A ratchet asserts all three agree, and a stored out-of-bound value falls back to the ADR default
+> rather than being honoured. Live: 365 → 400, 0 → 400, 3 → 200, and **an existing deadline does not move**
+> when the SLA changes (due dates are stamped once, at implementation).
+>
+> **Two findings the build could not avoid.** **F2-93** — the change record named *when* the CAB decided and
+> never *who*, so the SoD test this decision requires had nothing to compare against; fixed in the same
+> migration, not back-filled from the audit ledger (that would manufacture provenance). **F2-94 (P1)** — the
+> escalation fired, was audited, incremented `fire_count`, and **reached nobody**: the F8 executor reads
+> `to_role`, and every rule seeded since V96 writes `roles`. **126 of 164 rule codes platform-wide** are in
+> that state, including `AR-97` HIGH-risk-emergency-change → CTO + CISO. D-3's own rule is fixed and
+> live-verified as `ESCALATE → CISO (1 delivered)` landing in a real inbox; the other 125 need their own
+> slice.
+>
+> **What the interim escalation actually is, now that it runs:** a daily sweep (cron configurable — a
+> hard-coded daily job means the consequence half can only ever be exercised by unit tests) that publishes
+> `CHANGE_RATIFICATION_BREACHED`, stamps `ratification_escalated_at`, and writes a ledger line naming the
+> consequence: *"Until ratified it stands as an unauthorised production change."* When CE-11 lands, the
+> register becomes an **additional** sink. `GET /api/v1/changes/ratification-register` says so in its own
+> payload (`registerScope: EMERGENCY_RATIFICATION_ONLY`) so no consumer mistakes it for the full article.
+>
+> ⚠ **The sweep's first cut was itself a dead control, and six green unit tests could not see it.**
+> `@Transactional` on a method called from `tick()` in the same class is self-invocation — the proxy is
+> bypassed, so the native escalation stamp threw *"Executing an update/delete query"* on **every** run while
+> `tick()` logged one WARN and continued. Mocked repositories need no transaction, so the tests were green
+> against a control that had never once fired. Only the live fire against a real database found it. Fixed
+> with a per-change `REQUIRES_NEW` `TransactionTemplate`; the WARN is now an ERROR that says out loud that no
+> escalation was recorded; and a test asserts the propagation, because that was the one property whose
+> absence every other test was blind to.
+>
+> **No frontend.** The register and policy endpoints exist for S7/CE-13 to consume. Adding a screen now would
+> be nav-to-nowhere — the F2-02 defect CE-0 deliberately avoided.
+
 ---
 
 ## D-4 — SKU shelf name: **"Change Governance & CAB"** (closes D-9 / O-6)

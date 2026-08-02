@@ -113,8 +113,54 @@ public class ChangeRequest {
     @Column(name = "cab_decision_notes", columnDefinition = "NVARCHAR(MAX)")
     private String cabDecisionNotes;
 
+    // F2-93 / A17-D3 (V345) — WHO decided. The record carried cabDecisionAt and
+    // cabDecisionNotes and named nobody; the decision's author existed only in the
+    // audit ledger. That is a governance gap on its own (an examiner asking "who
+    // authorised this emergency change?" should not be routed to a log), and it is
+    // also what made D-3's segregation-of-duties test impossible: the ratifier must
+    // not be the person who emergency-approved, and there was nothing to compare
+    // against. Stamped from the authenticated principal on the three CAB-decision
+    // transitions — never from a request body.
+    @Column(name = "cab_decision_by_id")
+    private Long cabDecisionById;
+
+    @Column(name = "cab_decision_by_name", length = 255)
+    private String cabDecisionByName;
+
     @Column(name = "outcome", length = 30)
     private String outcome;
+
+    // ── A17-D3: retrospective ratification of emergency changes (V345) ────────
+    // Orthogonal to `status` on purpose: an emergency change awaiting ratification
+    // is genuinely IMPLEMENTED *and* genuinely awaiting ratification, and folding
+    // both into one column would discard the half the FSC/calendar/KPI pack read.
+    // Vocabulary + rationale: RatificationStates.
+    @Column(name = "ratification_state", nullable = false, length = 24)
+    private String ratificationState = "NOT_REQUIRED";
+
+    /** Never null while state is PENDING — enforced by ck_change_ratification_clock. */
+    @Column(name = "ratification_due_at")
+    private LocalDateTime ratificationDueAt;
+
+    @Column(name = "ratified_at")
+    private LocalDateTime ratifiedAt;
+
+    @Column(name = "ratified_by_id")
+    private Long ratifiedById;
+
+    @Column(name = "ratified_by_name", length = 255)
+    private String ratifiedByName;
+
+    @Column(name = "ratification_notes", columnDefinition = "NVARCHAR(MAX)")
+    private String ratificationNotes;
+
+    /**
+     * Set once when the breach sweep escalates. Deliberately NOT cleared by a
+     * later ratification: "ratified late" and "never breached" are different
+     * governance facts and must not collapse into the same record.
+     */
+    @Column(name = "ratification_escalated_at")
+    private LocalDateTime ratificationEscalatedAt;
 
     // CH-11: structured post-implementation review (PIR). post_review_date above
     // records WHEN the review window opened; these record its CONTENT + sign-off.

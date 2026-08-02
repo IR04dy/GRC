@@ -2,6 +2,9 @@ package com.tss.grc.module.change_mgmt.service;
 
 import com.tss.grc.common.exception.ChangeAuthorityNotConfiguredException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.util.SaudiWorkdayUtil;
+import com.tss.grc.module.change_mgmt.model.RatificationStates;
+import com.tss.grc.module.platform.calendar.service.SaudiWorkdayCalendar;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -166,6 +169,24 @@ public class ChangeManagementService {
     @Autowired(required = false)
     private ChangeGovernanceHealthService governanceHealth;
 
+    /** A17-D3: per-tenant emergency-ratification SLA (V345). Optional — but note the
+     *  polarity, which is the opposite of every other optional field above: when this
+     *  is absent the arming does NOT no-op, it falls back to
+     *  {@link RatificationStates#DEFAULT_SLA_BUSINESS_DAYS}. A missing config row must
+     *  never mean "no ratification clock" — that is how a control becomes dead
+     *  (F2-62), and it is why the V345 self-check THROWs if any live tenant lacks a
+     *  policy row rather than letting the default silently cover for it. */
+    @Autowired(required = false)
+    private ChangeRatificationPolicyRepository ratificationPolicyRepo;
+
+    /** A17-D3: Saudi business-day arithmetic — the working week is Sunday–Thursday and
+     *  the tenant's public holidays must not consume the ratification window. Optional;
+     *  when absent the clock falls back to plain Fri/Sat-skipping arithmetic
+     *  ({@code SaudiWorkdayUtil}) rather than to calendar days, so a directly-
+     *  constructed unit test still gets a business-day answer. */
+    @Autowired(required = false)
+    private SaudiWorkdayCalendar workdayCalendar;
+
     /** CM-C2: minimum recorded APPROVE votes required before a change may move to
      *  CAB_APPROVED. Configurable per deployment; defaults to 1 (four-eyes). */
     @Value("${grc.change.cab-min-approvals:1}")
@@ -293,6 +314,11 @@ public class ChangeManagementService {
                 requireConfiguredChangeAuthority(c, target);
                 c.setCabDecisionAt(LocalDateTime.now());
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
+                stampDecisionAuthor(c);
+                // A17-D3: the change is authorised but the clock has not started —
+                // by decision it starts at implementation, not here.
+                if (RatificationStates.NOT_REQUIRED.equals(c.getRatificationState()))
+                    c.setRatificationState(RatificationStates.AWAITING_IMPLEMENTATION);
             }
             case "CAB_APPROVED" -> {
                 requireConfiguredChangeAuthority(c, target);
@@ -327,6 +353,7 @@ public class ChangeManagementService {
             case "CAB_REJECTED" -> {
                 c.setCabDecisionAt(LocalDateTime.now());
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
+                stampDecisionAuthor(c);
             }
             case "SCHEDULED" ->
                 // CH-17: block scheduling into an active freeze/blackout window
@@ -334,9 +361,16 @@ public class ChangeManagementService {
                 enforceFreeze(c);
             case "IMPLEMENTING" -> {
                 if (c.getImplementationStarted() == null) c.setImplementationStarted(LocalDateTime.now());
+                // A17-D3: the clock starts HERE — first moment the change is live.
+                startRatificationClock(c);
             }
             case "IMPLEMENTED" -> {
                 if (c.getImplementationEnded() == null) c.setImplementationEnded(LocalDateTime.now());
+                // A17-D3 belt-and-braces: EMERGENCY_APPROVED -> IMPLEMENTING is the only
+                // legal route to IMPLEMENTED for an emergency change, so the clock is
+                // normally already running. Arm here too, because a future transition-map
+                // edit that adds a shortcut must not silently drop the ratification duty.
+                startRatificationClock(c);
                 if (body.get("outcome") != null) {
                     String oc = body.get("outcome").toString();
                     if (!OUTCOMES.contains(oc))
@@ -637,7 +671,305 @@ public class ChangeManagementService {
 
         // CH-5: overdue open tasks (dueAt passed, not DONE/SKIPPED) — the SLA KPI.
         out.put("overdueTasks", taskRepo.countOverdueOpen(org, java.time.LocalDateTime.now()));
+
+        // A17-D3: emergency-ratification standing. `ratificationBreaches` is the number
+        // that belongs on a CISO dashboard — emergency changes live in production that
+        // the CAB never retrospectively authorised, past the tenant's SLA. Reported
+        // separately from `ratificationPending` because "owed" and "overdue" are
+        // different governance facts, and reporting only the total would let a breach
+        // hide inside a healthy-looking backlog.
+        Map<String, Long> byRatification = new HashMap<>();
+        for (String s : RatificationStates.VALUES) byRatification.put(s, 0L);
+        for (Object[] row : changeRepo.countByRatificationStateGrouped(org))
+            byRatification.put(String.valueOf(row[0]), ((Number) row[1]).longValue());
+        out.put("byRatificationState", byRatification);
+        out.put("ratificationPending",
+            byRatification.getOrDefault(RatificationStates.PENDING, 0L)
+          + byRatification.getOrDefault(RatificationStates.AWAITING_IMPLEMENTATION, 0L));
+        out.put("ratificationBreaches",
+            (long) changeRepo.findRatificationBreaches(org, java.time.LocalDateTime.now()).size());
+        out.put("ratificationSlaBusinessDays", slaBusinessDays(org));
         return out;
+    }
+
+    // ── A17-D3: emergency-change retrospective ratification ─────────────────────
+    //
+    // ADR-017 D-3. An emergency change is implemented on ECAB authority and then
+    // retrospectively ratified by the CAB within the tenant's SLA (default 5 Saudi
+    // business days from implementation start). Breach escalates to the CISO and is
+    // recorded — "an SLA with no consequence is a report, not a control".
+    //
+    // Three things here are amendments to the decision as first written, each because
+    // the decision could not be built as specified:
+    //   1. The escalation destination is the F8 engine + the audit ledger, because
+    //      CE-11's unauthorised-change register does not exist as a table yet.
+    //   2. The per-tenant override is bounded (1..10) in the DTO *and* the database.
+    //   3. Pre-existing emergency rows are GRANDFATHERED by V345, not retro-clocked.
+
+    /**
+     * Resolve the tenant's ratification SLA in business days.
+     *
+     * <p>Falls back to the ADR default rather than to "no clock". A missing policy row
+     * must not mean a missing control — see the field comment on
+     * {@code ratificationPolicyRepo}.
+     */
+    int slaBusinessDays(Long org) {
+        if (ratificationPolicyRepo == null || org == null) return RatificationStates.DEFAULT_SLA_BUSINESS_DAYS;
+        return ratificationPolicyRepo.findByOrganisationId(org)
+            .map(ChangeRatificationPolicy::getSlaBusinessDays)
+            .filter(d -> d != null && d >= RatificationStates.MIN_SLA_BUSINESS_DAYS
+                                   && d <= RatificationStates.MAX_SLA_BUSINESS_DAYS)
+            .orElse(RatificationStates.DEFAULT_SLA_BUSINESS_DAYS);
+    }
+
+    /**
+     * Move an ECAB-approved emergency change from AWAITING_IMPLEMENTATION to PENDING,
+     * computing the due date from the implementation start.
+     *
+     * <p>No-ops for anything that is not awaiting implementation, so re-entry is safe
+     * and a NORMAL change is never dragged into the ratification register.
+     *
+     * <p>The due date is computed <b>once</b> and stored. Recomputing it on read would
+     * mean a later edit to the tenant's SLA silently moved historical deadlines, which
+     * is precisely the property an examiner tests for.
+     */
+    private void startRatificationClock(ChangeRequest c) {
+        if (!RatificationStates.AWAITING_IMPLEMENTATION.equals(c.getRatificationState())) return;
+        LocalDateTime from = c.getImplementationStarted() != null
+            ? c.getImplementationStarted() : LocalDateTime.now();
+        int days = slaBusinessDays(c.getOrganisationId());
+        c.setRatificationDueAt(addBusinessDays(c.getOrganisationId(), from, days));
+        c.setRatificationState(RatificationStates.PENDING);
+        audit.log("RATIFICATION_ARMED", "ChangeRequest", c.getId(),
+            "Emergency change " + nullSafeMsg(c.getChangeCode()) + " requires CAB ratification by "
+                + c.getRatificationDueAt() + " (" + days + " business days from implementation start)");
+    }
+
+    /**
+     * Saudi business-day arithmetic, holiday-aware when the calendar bean is present.
+     *
+     * <p>The tenant calendar is preferred because a Saudi tenant's Eid holidays must not
+     * consume the ratification window; the static fallback still skips Friday and
+     * Saturday, so a directly-constructed unit test gets a business-day answer rather
+     * than a calendar-day one. Both agree the working week is Sunday–Thursday.
+     */
+    private LocalDateTime addBusinessDays(Long org, LocalDateTime from, int days) {
+        if (workdayCalendar != null && org != null)
+            return workdayCalendar.addBusinessDays(org, from.toLocalDate(), days).atTime(from.toLocalTime());
+        return SaudiWorkdayUtil.addBusinessDays(from, days);
+    }
+
+    /**
+     * Record the CAB's retrospective decision on an emergency change.
+     *
+     * <p><b>The SoD gate is the point of the feature.</b> D-3 exists because an
+     * emergency change goes live without CAB scrutiny; ratification supplies that
+     * scrutiny afterwards. If the person who emergency-approved it could also ratify
+     * it, the control would certify its own author's decision and the platform would
+     * hold evidence saying a second party had reviewed it. That is F2-29 one step
+     * later in the lifecycle, so the same three exclusions apply — approver, raiser,
+     * owner — evaluated on the <b>resolved user id</b>, never on a name from the body.
+     *
+     * <p>Late ratification is permitted and is recorded as late:
+     * {@code ratificationEscalatedAt} is deliberately not cleared.
+     */
+    @Transactional
+    public ChangeRequest ratify(Long id, String decision, String notes,
+                               Long actorUserId, String actorName) {
+        ChangeRequest c = require(id);
+
+        if (decision == null || decision.isBlank())
+            throw new IllegalArgumentException(
+                "decision is required — one of " + RatificationStates.DECISIONS);
+        String d = decision.trim().toUpperCase();
+        if (!RatificationStates.DECISIONS.contains(d))
+            throw new IllegalArgumentException(
+                "Invalid ratification decision '" + decision + "' — allowed: " + RatificationStates.DECISIONS);
+
+        String state = c.getRatificationState();
+        if (RatificationStates.NOT_REQUIRED.equals(state))
+            throw new IllegalStateException(
+                "Change " + nullSafeMsg(c.getChangeCode()) + " does not require retrospective ratification. "
+              + "Only EMERGENCY changes approved through the ECAB path do — a change approved by the CAB "
+              + "in the first place has already had its scrutiny.");
+        if (RatificationStates.GRANDFATHERED.equals(state))
+            throw new IllegalStateException(
+                "Change " + nullSafeMsg(c.getChangeCode()) + " pre-dates the ratification clock (V345) and "
+              + "carries no SLA. Reopen it deliberately by re-arming the clock if the governance record "
+              + "must be closed — it is not ratified silently, because no clock ever ran for it.");
+        if (RatificationStates.RATIFIED.equals(state) || RatificationStates.REJECTED.equals(state))
+            throw new IllegalStateException(
+                "Change " + nullSafeMsg(c.getChangeCode()) + " was already " + state.toLowerCase()
+              + " on " + c.getRatifiedAt() + " by " + nullSafeStr(c.getRatifiedByName())
+              + ". A ratification decision is recorded once.");
+        if (RatificationStates.AWAITING_IMPLEMENTATION.equals(state))
+            throw new IllegalStateException(
+                "Change " + nullSafeMsg(c.getChangeCode()) + " has not been implemented yet, so there is "
+              + "nothing to ratify retrospectively. The ratification clock starts at implementation "
+              + "(ADR-017 D-3); approve or reject it through the normal CAB path instead.");
+
+        if (actorUserId == null && nullSafeStr(actorName).isBlank())
+            throw new AccessDeniedException("A ratification decision must be recorded by an identified user.");
+        String ratifier = nullSafeStr(actorName).isBlank() ? ("user#" + actorUserId) : actorName.trim();
+
+        requireRatificationSeparation(c, actorUserId, ratifier);
+
+        boolean late = c.getRatificationDueAt() != null
+            && LocalDateTime.now().isAfter(c.getRatificationDueAt());
+
+        c.setRatificationState(RatificationStates.DECISION_RATIFY.equals(d)
+            ? RatificationStates.RATIFIED : RatificationStates.REJECTED);
+        c.setRatifiedAt(LocalDateTime.now());
+        c.setRatifiedById(actorUserId);
+        c.setRatifiedByName(ratifier);
+        c.setRatificationNotes(blank(notes));
+        ChangeRequest saved = changeRepo.save(c);
+
+        audit.log("RATIFICATION_" + d, "ChangeRequest", saved.getId(),
+            "Emergency change " + nullSafeMsg(saved.getChangeCode()) + " " + saved.getRatificationState().toLowerCase()
+                + " by " + ratifier + (late ? " — AFTER the SLA deadline of " + c.getRatificationDueAt() : "")
+                + (saved.getRatificationEscalatedAt() != null
+                    ? " (breach was escalated on " + saved.getRatificationEscalatedAt() + ")" : ""));
+        emitChange(saved);
+        return saved;
+    }
+
+    /**
+     * The ratifier may not be the emergency approver, the raiser or the change owner.
+     *
+     * <p>Evaluated on user ids. The name fallback is for legacy rows whose ids were never
+     * captured — a fallback, never the primary test, exactly as in {@code recordApproval}.
+     * A row with a null {@code cabDecisionById} (everything approved before V345) cannot
+     * be tested on the approver at all; that is stated in the message rather than passed
+     * over, because an SoD gate that silently cannot evaluate is worse than one that says so.
+     */
+    private void requireRatificationSeparation(ChangeRequest c, Long actorUserId, String ratifier) {
+        boolean selfApprover = actorUserId != null && actorUserId.equals(c.getCabDecisionById());
+        boolean selfRaiser   = actorUserId != null
+            && (actorUserId.equals(c.getRequestedById()) || actorUserId.equals(c.getChangeOwnerId()));
+        boolean nameFallback = actorUserId == null && ratifier != null
+            && (ratifier.equalsIgnoreCase(nullSafeStr(c.getCabDecisionByName()))
+             || ratifier.equalsIgnoreCase(nullSafeStr(c.getRequestedByName()))
+             || ratifier.equalsIgnoreCase(nullSafeStr(c.getChangeOwnerName())));
+
+        if (selfApprover)
+            throw new IllegalStateException(
+                "Segregation of duties: " + ratifier + " emergency-approved change "
+              + nullSafeMsg(c.getChangeCode()) + ", so they cannot also ratify it. Retrospective "
+              + "ratification exists to supply the independent scrutiny the emergency path skipped — "
+              + "self-ratification would certify the approver's own decision and the evidence pack "
+              + "would claim a second party had reviewed it.");
+        if (selfRaiser || nameFallback)
+            throw new IllegalStateException(
+                "Segregation of duties: " + ratifier + " raised or owns change "
+              + nullSafeMsg(c.getChangeCode()) + ", so they cannot ratify it. Another CHANGE:APPROVE "
+              + "holder must record the CAB's retrospective decision.");
+    }
+
+    /**
+     * A17-D3 interim register: every change carrying a ratification duty, PENDING and
+     * overdue first. This is the surface CE-11's unauthorised-change register will
+     * widen — not replace, and not duplicate.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> ratificationRegister() {
+        Long org = TenantContext.getCurrentTenant();
+        LocalDateTime now = LocalDateTime.now();
+        List<Map<String, Object>> rows = new java.util.ArrayList<>();
+        for (ChangeRequest c : changeRepo.findRatificationRegister(org)) {
+            boolean breached = RatificationStates.PENDING.equals(c.getRatificationState())
+                && c.getRatificationDueAt() != null && now.isAfter(c.getRatificationDueAt());
+            Map<String, Object> row = new HashMap<>();
+            row.put("id", c.getId());
+            row.put("changeCode", c.getChangeCode());
+            row.put("titleEn", c.getTitleEn());
+            row.put("titleAr", c.getTitleAr());
+            row.put("status", c.getStatus());
+            row.put("riskLevel", c.getRiskLevel());
+            row.put("ratificationState", c.getRatificationState());
+            row.put("implementationStarted", c.getImplementationStarted());
+            row.put("ratificationDueAt", c.getRatificationDueAt());
+            row.put("ratifiedAt", c.getRatifiedAt());
+            row.put("ratifiedByName", c.getRatifiedByName());
+            row.put("escalatedAt", c.getRatificationEscalatedAt());
+            row.put("approvedByName", c.getCabDecisionByName());
+            row.put("breached", breached);
+            row.put("businessDaysOverdue", breached
+                ? SaudiWorkdayUtil.businessDaysBetween(c.getRatificationDueAt(), now) : 0L);
+            rows.add(row);
+        }
+        Map<String, Object> out = new HashMap<>();
+        out.put("slaBusinessDays", slaBusinessDays(org));
+        out.put("slaCeilingBusinessDays", RatificationStates.MAX_SLA_BUSINESS_DAYS);
+        out.put("rows", rows);
+        out.put("breaches", rows.stream().filter(r -> Boolean.TRUE.equals(r.get("breached"))).count());
+        // Stated rather than implied: this register is the interim destination while
+        // CE-11 does not exist. A consumer must be able to tell an interim sink from
+        // the final one without reading the plan.
+        out.put("registerScope", "EMERGENCY_RATIFICATION_ONLY");
+        out.put("note", "Interim A17-D3 register. CE-11's full unauthorised-change register "
+                      + "(unapproved production changes detected from configuration drift) is not built yet.");
+        return out;
+    }
+
+    @Transactional(readOnly = true)
+    public ChangeRatificationPolicy ratificationPolicy() {
+        Long org = TenantContext.getCurrentTenant();
+        if (ratificationPolicyRepo == null)
+            throw new IllegalStateException("Ratification policy storage is not available");
+        return ratificationPolicyRepo.findByOrganisationId(org)
+            .orElseThrow(() -> new EntityNotFoundException(
+                "No ratification policy row for organisation " + org + ". V345 seeds one per tenant and "
+              + "THROWs if any live tenant lacks one, so this means the row was deleted after migration."));
+    }
+
+    /**
+     * Update the tenant's ratification SLA.
+     *
+     * <p>The bound is re-checked here even though {@code @Max} on the DTO and
+     * {@code ck_ratification_sla_bounds} in the database both enforce it, because this
+     * method is also reachable from server-side callers that never see a DTO. Three
+     * checks for one rule is not redundancy — it is the rule being true at every layer
+     * that can write it.
+     */
+    @Transactional
+    public ChangeRatificationPolicy updateRatificationPolicy(Integer slaBusinessDays, String escalationRole,
+                                                            Long actorUserId) {
+        ChangeRatificationPolicy p = ratificationPolicy();
+        int previous = p.getSlaBusinessDays() == null
+            ? RatificationStates.DEFAULT_SLA_BUSINESS_DAYS : p.getSlaBusinessDays();
+        if (slaBusinessDays != null) {
+            if (slaBusinessDays < RatificationStates.MIN_SLA_BUSINESS_DAYS
+             || slaBusinessDays > RatificationStates.MAX_SLA_BUSINESS_DAYS)
+                throw new IllegalArgumentException(
+                    "slaBusinessDays must be between " + RatificationStates.MIN_SLA_BUSINESS_DAYS + " and "
+                  + RatificationStates.MAX_SLA_BUSINESS_DAYS + " business days (ADR-017 D-3 amendment 2). "
+                  + RatificationStates.MAX_SLA_BUSINESS_DAYS + " business days is two weekly CAB cycles; an "
+                  + "emergency change unratified after two consecutive CABs is an unauthorised change, not a "
+                  + "slow one. A longer window is a documented, approved deviation — not a settings field.");
+            p.setSlaBusinessDays(slaBusinessDays);
+        }
+        if (escalationRole != null && !escalationRole.isBlank()) p.setEscalationRole(escalationRole.trim());
+        p.setUpdatedAt(LocalDateTime.now());
+        p.setUpdatedBy(actorUserId);
+        ChangeRatificationPolicy saved = ratificationPolicyRepo.save(p);
+        audit.log("RATIFICATION_POLICY_UPDATE", "ChangeRatificationPolicy", saved.getId(),
+            "Emergency-ratification SLA set to " + saved.getSlaBusinessDays() + " business days (was "
+                + previous + "), escalating to " + saved.getEscalationRole()
+                + ". Existing deadlines are unchanged — due dates are stamped once, at implementation.");
+        return saved;
+    }
+
+    /** Stamp the authenticated principal as the author of a CAB decision (F2-93). */
+    private void stampDecisionAuthor(ChangeRequest c) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return;
+        if (auth.getPrincipal() instanceof com.tss.grc.security.GrcUserDetails u) {
+            c.setCabDecisionById(u.getUserId());
+            c.setCabDecisionByName(u.getUsername());
+        } else if (auth.getName() != null) {
+            c.setCabDecisionByName(auth.getName());
+        }
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
