@@ -77,7 +77,13 @@ public final class SkuRegistry {
         Map.entry("ndi", "DATA_AI_GOV"),
         Map.entry("ai", "DATA_AI_GOV"),
         Map.entry("board_pack", "BOARD"),
-        Map.entry("change_mgmt", "CHANGE"));
+        Map.entry("change_mgmt", "CHANGE"),
+        // S5/CE-1 — the adapters that bridge Change Enablement to admin.committee and
+        // incident. Homed to CHANGE, not Base: they exist only to serve this SKU, they ship
+        // and are licensed with it, and Base must not carry change-specific glue. Creating a
+        // module package IS an entitlement decision here, because requiredSkuForPackage
+        // THROWS for an unhomed one (ADR-018 R1 — the homing is total and disjoint).
+        Map.entry("change_adapters", "CHANGE"));
 
     /**
      * ADR-018 R6 — {@code "<top>.<sub>"} → SKU, consulted before {@link #PACKAGE_TO_SKU} because

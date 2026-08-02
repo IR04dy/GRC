@@ -2,8 +2,7 @@ package com.tss.grc.module.change_mgmt.service;
 
 import com.tss.grc.common.exception.ChangeAuthorityNotConfiguredException;
 import com.tss.grc.common.tenant.TenantContext;
-import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
-import com.tss.grc.module.admin.committee.service.CommitteeReferralService;
+import com.tss.grc.module.change_mgmt.spi.CommitteePort;
 import com.tss.grc.module.change_mgmt.entity.ChangeApproval;
 import com.tss.grc.module.change_mgmt.entity.ChangeAuthorisationMatrix;
 import com.tss.grc.module.change_mgmt.entity.ChangeRequest;
@@ -42,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -83,7 +83,7 @@ class ChangeAuthorityFailClosedTest {
     @Mock private ApplicationEventPublisher publisher;
     @Mock private ChangeAuthorisationMatrixRepository authMatrixRepo;
     @Mock private ChangeGovernanceHealthService governanceHealth;
-    @Mock private CommitteeReferralService referralService;
+    @Mock private CommitteePort committeePort;
     @InjectMocks private ChangeManagementService service;
 
     @BeforeEach
@@ -94,7 +94,10 @@ class ChangeAuthorityFailClosedTest {
         // returns early on a null governanceHealth and nothing throws. Wire them by hand.
         ReflectionTestUtils.setField(service, "governanceHealth", governanceHealth);
         ReflectionTestUtils.setField(service, "authMatrixRepo", authMatrixRepo);
-        ReflectionTestUtils.setField(service, "referralService", referralService);
+        // S5/CE-1: the field is now the port, not the peer service. Renaming a
+        // reflection-injected field silently re-vacuums exactly the assertions this
+        // comment warns about, so the rename must move with it.
+        ReflectionTestUtils.setField(service, "committeePort", committeePort);
         TenantContext.setCurrentTenant(ORG_ID);
         // CHANGE_APPROVE so F2-29's authority check passes and this test measures only D-2's gate.
         SecurityContextHolder.getContext().setAuthentication(
@@ -102,7 +105,7 @@ class ChangeAuthorityFailClosedTest {
                 List.of(new SimpleGrantedAuthority("CHANGE_READ"),
                         new SimpleGrantedAuthority("CHANGE_WRITE"),
                         new SimpleGrantedAuthority("CHANGE_APPROVE"))));
-        when(referralService.activeReferral(anyString(), anyLong())).thenReturn(Optional.empty());
+        when(committeePort.activeReferral(anyString(), anyLong())).thenReturn(Optional.empty());
     }
 
     @AfterEach
@@ -250,14 +253,18 @@ class ChangeAuthorityFailClosedTest {
         change("CAB_PENDING", "NORMAL", "LOW");
         matrixDemands("CAB", "NORMAL", "LOW");
         gateFault("CAB", ChangeAuthorityNotConfiguredException.NOT_MAPPED);
-        CommitteeReferral ref = new CommitteeReferral();
-        ref.setCommitteeId(77L);
-        when(referralService.activeReferral("CHANGE", CHANGE_ID)).thenReturn(Optional.of(ref));
+        CommitteePort.ReferralView ref = new CommitteePort.ReferralView(
+            5L, ORG_ID, "CHANGE", CHANGE_ID, 77L, null, null, "CAB", "APPROVAL",
+            "PENDING", "secretary", null, null);
+        when(committeePort.activeReferral("CHANGE", CHANGE_ID)).thenReturn(Optional.of(ref));
 
         service.transition(CHANGE_ID, "CAB_APPROVED", new HashMap<>());
         // The referral path asserts the committee's own decision instead; D-2's "unset" condition
         // does not hold for a change whose deciding committee is named explicitly.
-        assertThat(ref.getCommitteeId()).isEqualTo(77L);
+        assertThat(ref.committeeId()).isEqualTo(77L);
+        // And it must be the PORT that was asked — a green assertion on a local record would
+        // hold even if the referral branch were never taken.
+        verify(committeePort).assertDecisionApproves("CHANGE", CHANGE_ID, 1);
     }
 
     // ─── anti-drift ──────────────────────────────────────────────────────────────

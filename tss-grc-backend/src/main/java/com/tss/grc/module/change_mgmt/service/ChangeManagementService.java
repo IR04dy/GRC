@@ -12,11 +12,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.repository.*;
-import com.tss.grc.module.incident.dto.IncidentRequest;
-import com.tss.grc.module.incident.dto.IncidentResponse;
-import com.tss.grc.module.incident.service.IncidentService;
-import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
-import com.tss.grc.module.admin.committee.service.CommitteeReferralService;
+import com.tss.grc.module.change_mgmt.spi.CommitteePort;
+import com.tss.grc.module.change_mgmt.spi.IncidentPort;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.platform.realtime.BroadcastHelper;
@@ -138,10 +135,11 @@ public class ChangeManagementService {
     private BroadcastHelper bcast;
 
     /** CH-13: auto-open a downstream incident when a change is rolled back.
-     *  Optional (field-injected) so unit tests that construct the service
+     *  S5/CE-1: reached through {@link IncidentPort}, so this module no longer imports
+     *  `module.incident`. Optional (field-injected) so unit tests that construct the service
      *  directly need not supply it — the rollback hook then no-ops. */
     @Autowired(required = false)
-    private IncidentService incidentService;
+    private IncidentPort incidentPort;
 
     /** CH-17: per-tenant (type x risk) authorisation matrix driving the CAB
      *  quorum. Optional — when absent the flat cab-min-approvals default applies
@@ -154,10 +152,12 @@ public class ChangeManagementService {
     @Autowired(required = false)
     private ChangeFreezeWindowRepository freezeRepo;
 
-    /** Track D: committee re-route. Optional (field-injected) so directly-
-     *  constructed unit tests need not supply it — referral endpoints then no-op. */
+    /** Track D: committee re-route, S5/CE-1: through {@link CommitteePort} rather than the
+     *  peer service, so `module.admin.committee` is no longer on this module's import list.
+     *  Optional (field-injected) so directly-constructed unit tests need not supply it —
+     *  referral endpoints then no-op. */
     @Autowired(required = false)
-    private CommitteeReferralService referralService;
+    private CommitteePort committeePort;
 
     /** ADR-017 D-2: owns the "is this tenant's CAB/ECAB gate configured?" predicate,
      *  shared with the startup health report so the two cannot drift. Optional
@@ -327,8 +327,8 @@ public class ChangeManagementService {
                 // record), asserted on quorate (MINUTES_APPROVED) minutes. A
                 // non-referred change takes the legacy recorded-votes gate below,
                 // byte-for-byte, so nothing changes for the existing flow.
-                if (referralService != null && referralService.activeReferral("CHANGE", id).isPresent()) {
-                    referralService.assertDecisionApproves("CHANGE", id, requiredApprovals(c));
+                if (committeePort != null && committeePort.activeReferral("CHANGE", id).isPresent()) {
+                    committeePort.assertDecisionApproves("CHANGE", id, requiredApprovals(c));
                 } else {
                     // CM-C2 (CAB quorum): approval must be backed by recorded votes —
                     // at least `cabMinApprovals` APPROVE and zero REJECT. Closes the
@@ -451,7 +451,7 @@ public class ChangeManagementService {
         ChangeRequest c = require(changeId);
         // Track D: a referred change is decided in committee — block the direct
         // CAB vote path so the two can't both satisfy CAB_APPROVED (no dual-count).
-        if (referralService != null && referralService.activeReferral("CHANGE", changeId).isPresent())
+        if (committeePort != null && committeePort.activeReferral("CHANGE", changeId).isPresent())
             throw new IllegalStateException(
                 "This change is routed through a committee — record the decision as a committee vote, not a direct CAB vote");
         if (!"CAB_PENDING".equals(c.getStatus()) && !"IMPACT_ASSESSED".equals(c.getStatus()))
@@ -1127,7 +1127,7 @@ public class ChangeManagementService {
         if (m == null || m.getGate() == null) return;
         String gate = m.getGate().trim().toUpperCase();
         if (!"CAB".equals(gate) && !"ECAB".equals(gate)) return;   // AUTO — no committee demanded
-        if (referralService != null && referralService.activeReferral("CHANGE", c.getId()).isPresent())
+        if (committeePort != null && committeePort.activeReferral("CHANGE", c.getId()).isPresent())
             return;
         String fault = governanceHealth.gateConfigurationFault(c.getOrganisationId(), gate);
         if (fault == null) return;
@@ -1195,8 +1195,8 @@ public class ChangeManagementService {
      *  be passed explicitly or is resolved from the per-tenant gate map. S1: link
      *  only — this does NOT yet gate the CAB_APPROVED transition. */
     @Transactional
-    public CommitteeReferral referToCommittee(Long id, Long committeeId, String referredBy) {
-        if (referralService == null)
+    public CommitteePort.ReferralView referToCommittee(Long id, Long committeeId, String referredBy) {
+        if (committeePort == null)
             throw new IllegalStateException("Committee referral is not available");
         ChangeRequest c = require(id);
         ChangeAuthorisationMatrix m = resolveMatrix(c);
@@ -1208,20 +1208,20 @@ public class ChangeManagementService {
         String recusal = java.util.stream.Stream.of(c.getRequestedByName(), c.getChangeOwnerName())
             .filter(x -> x != null && !x.isBlank()).map(String::trim).distinct()
             .collect(java.util.stream.Collectors.joining(","));
-        CommitteeReferral r = referralService.refer("CHANGE", id, gate, mode, committeeId, referredBy,
+        CommitteePort.ReferralView r = committeePort.refer("CHANGE", id, gate, mode, committeeId, referredBy,
             recusal.isBlank() ? null : recusal);
         audit.log("REFER_TO_COMMITTEE", "ChangeRequest", id,
-            "Referred to committee " + r.getCommitteeId() + " (gate " + gate + ", mode " + mode + ")");
+            "Referred to committee " + r.committeeId() + " (gate " + gate + ", mode " + mode + ")");
         return r;
     }
 
     /** Bind the committee resolution deciding this change (secretary links the
      *  motion after raising it in the meeting). */
     @Transactional
-    public CommitteeReferral linkChangeResolution(Long id, Long resolutionId) {
-        if (referralService == null) throw new IllegalStateException("Committee referral is not available");
+    public CommitteePort.ReferralView linkChangeResolution(Long id, Long resolutionId) {
+        if (committeePort == null) throw new IllegalStateException("Committee referral is not available");
         require(id);
-        CommitteeReferral r = referralService.linkResolution("CHANGE", id, resolutionId);
+        CommitteePort.ReferralView r = committeePort.linkResolution("CHANGE", id, resolutionId);
         audit.log("REFER_LINK_RESOLUTION", "ChangeRequest", id, "Linked committee resolution " + resolutionId);
         return r;
     }
@@ -1231,17 +1231,17 @@ public class ChangeManagementService {
     public Map<String, Object> committeeReferral(Long id) {
         require(id);
         Map<String, Object> out = new HashMap<>();
-        if (referralService == null) return out;
-        referralService.activeReferral("CHANGE", id).ifPresent(r -> {
-            out.put("referralId",   r.getId());
-            out.put("committeeId",  r.getCommitteeId());
-            out.put("gate",         r.getGate());
-            out.put("mode",         r.getMode());
-            out.put("status",       r.getStatus());
-            out.put("meetingId",    r.getMeetingId());
-            out.put("resolutionId", r.getResolutionId());
-            out.put("referredBy",   r.getReferredBy());
-            referralService.enrich(r, out);   // resolution outcome/tally + meeting status/quorum
+        if (committeePort == null) return out;
+        committeePort.activeReferral("CHANGE", id).ifPresent(r -> {
+            out.put("referralId",   r.id());
+            out.put("committeeId",  r.committeeId());
+            out.put("gate",         r.gate());
+            out.put("mode",         r.mode());
+            out.put("status",       r.status());
+            out.put("meetingId",    r.meetingId());
+            out.put("resolutionId", r.resolutionId());
+            out.put("referredBy",   r.referredBy());
+            committeePort.describe(r, out);   // resolution outcome/tally + meeting status/quorum
         });
         return out;
     }
@@ -1371,37 +1371,41 @@ public class ChangeManagementService {
      * back to the change ({@code INCIDENT} / {@code TRIGGERED_BY}) so the failure
      * enters the NIST 800-61r2 incident lifecycle instead of only emitting a
      * CHANGE_FAILED event. Idempotent — skips if the change already carries an
-     * INCIDENT TRIGGERED_BY link. No-op when the incident module is not wired
-     * (unit tests that construct the service directly leave incidentService null).
+     * INCIDENT TRIGGERED_BY link. No-op when the incident port is not wired
+     * (unit tests that construct the service directly leave incidentPort null).
+     *
+     * <p>S5/CE-1: the eight nulls and the {@code "OPEN"} literal that used to be built here now
+     * live in {@code IncidentAdapter}. This method states what it wants; the adapter knows how the
+     * incident module wants to be asked. The risk→severity mapping stays here, because that is a
+     * statement about change risk and not about incidents.
      */
     private void autoRaiseRollbackIncident(ChangeRequest c) {
-        if (incidentService == null) return;
+        if (incidentPort == null) return;
         boolean already = linkRepo.findByChangeRequestId(c.getId()).stream()
             .anyMatch(l -> "INCIDENT".equals(l.getEntityType()) && "TRIGGERED_BY".equals(l.getLinkType()));
         if (already) return;
 
         String code = nullSafeStr(c.getChangeCode());
-        IncidentResponse inc = incidentService.create(new IncidentRequest(
+        var raised = incidentPort.raiseFromChange(
             "Failed change " + code + " — rolled back",
             "تغيير فاشل " + code + " — تم التراجع",
-            mapRiskToSeverity(c.getRiskLevel()), "INFRASTRUCTURE", "OPEN",
-            blank(c.getChangeOwnerName()),
-            LocalDate.now(), null,
+            mapRiskToSeverity(c.getRiskLevel()), "INFRASTRUCTURE",
+            c.getChangeOwnerName(),
             "Auto-raised from rolled-back change " + code
                 + " (" + nullSafeStr(c.getTitleEn()) + "). Investigate root cause "
-                + "(test-plan gap, missing rollback step) and confirm service restoration.",
-            null, null, null));
+                + "(test-plan gap, missing rollback step) and confirm service restoration.");
+        if (raised.isEmpty()) return;
 
         ChangeLink link = new ChangeLink();
         link.setChangeRequestId(c.getId());
         link.setEntityType("INCIDENT");
-        link.setEntityId(inc.id());
+        link.setEntityId(raised.get().id());
         link.setLinkType("TRIGGERED_BY");
         link.setNotes("Auto-linked: incident raised on rollback of " + code);
         linkRepo.save(link);
 
         audit.log("ROLLBACK_INCIDENT", "ChangeRequest", c.getId(),
-            "Rolled-back change " + nullSafeMsg(code) + " auto-raised incident #" + inc.id()
+            "Rolled-back change " + nullSafeMsg(code) + " auto-raised incident #" + raised.get().id()
                 + " and linked it (INCIDENT / TRIGGERED_BY)");
     }
 }

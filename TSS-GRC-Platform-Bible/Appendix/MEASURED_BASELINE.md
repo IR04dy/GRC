@@ -32,7 +32,7 @@ that will be read as current forever.
 
 | Metric | Measured (08-01) | 07-25 | Where the platform's own docs say otherwise |
 |---|---:|---:|---|
-| Backend module packages | **58** (57 with code + 1 empty) | 58 | `CLAUDE.md` now lists all 58 ✅ (it said **24** until F2-19) |
+| Backend module packages | **59** (57 with code + 1 empty + `change_adapters`, added by S5/CE-1) | 58 | `CLAUDE.md` now lists all 58 ✅ (it said **24** until F2-19). ⚠ The 59th is deliberate and needed an ADR-018 homing decision, not just a directory — `SkuRegistry.requiredSkuForPackage` THROWS for an unhomed `module.*` package |
 | Module Java LoC | **192,113** | 186,285 | — |
 | Files declaring a JPA entity | **414** | *pub. 417* | ⚠ see §0.1 — 417 was a substring count |
 | JPA entity **classes** declared | **427** | — | 13 of them live in one file (`data_officer`) |
@@ -40,7 +40,7 @@ that will be read as current forever.
 | Write endpoints (`POST/PUT/PATCH/DELETE`) | **1,219** | *pub. 1,151* | ⚠ see §0.1 — 1,151 reproduces under no rule |
 | `@PreAuthorize` annotations (comment-stripped) | **2,156** | *pub. 2,268* | ⚠ see §0.1 — never reproducible |
 | Distinct permission modules used by guards | **31** | 27 | matches `CLAUDE.md` "31 modules / 114 permissions" ✅ |
-| Module packages with **zero** `hasPermission` usage | **16 of 58** | 21 | F2-05 converted 5 (`fraud`, `integrations`, `knowledge`, `board_pack`, `socops`) |
+| Module packages with **zero** `hasPermission` usage | **17 of 59** | 21 | F2-05 converted 5 (`fraud`, `integrations`, `knowledge`, `board_pack`, `socops`); the 17th is `change_adapters`, which is **correct** — adapters carry no endpoint, so a guard there would be a second unguarded door (`ChangeModuleBoundaryTest` asserts they hold no `@RestController`) |
 | Tests attributed to modules | **2,669** (suite total **2,797**) | 2,339 / 2,415 | `CLAUDE.md` says "~2,700 tests" ✅ |
 | Module packages with **zero tests** | **15**, totalling **18,011 LoC (9.4%)** | 19 / 20,503 / 11.0% | — |
 | Distinct **JPA** schemas | **50** | 50 | matches `CLAUDE.md` "50+" ✅ |
@@ -245,7 +245,7 @@ exported, or air-gapped independently. This is the hard floor under every per-mo
 
 - **31** distinct permission modules are referenced by `hasPermission(MODULE, ACTION)` guards
   (was 27 — F2-05 added `FRAUD`, `INTEGRATIONS`, `KB`, and `socops` moved onto `CYBER`).
-- **16 of 58** module packages contain **no `hasPermission` call at all** (was 21). They are *not*
+- **17 of 59** module packages contain **no `hasPermission` call at all** (was 21). They are *not*
   unguarded — they use hard-coded `hasAnyRole('ROLE_A','ROLE_B',…)` lists:
 
   `sharia` · `aml` · `ccm` · `openbanking` · `rrp` · `governance` · `cpty` · `outsourcing` ·

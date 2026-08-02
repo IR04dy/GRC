@@ -71,7 +71,7 @@ PROD_DB = "TSS_GRC_Deployment"
 # in the same commit; that pairing is the whole point — a number with no checker goes stale silently.
 PUBLISHED_AS_OF = "2026-08-02"          # ← bump ONLY when the doc is regenerated
 PUBLISHED = {
-    "module_packages": 58,
+    "module_packages": 59,
     "module_loc": 192_113,
     "entities_strict": 414,             # FILES declaring an entity (the doc published 417: a substring
     "entity_decls": 427,                # count). Entity CLASSES — 13 more, all in data_officer.
@@ -79,7 +79,7 @@ PUBLISHED = {
     "writes": 1_219,
     "main_preauthorize": 2_156,
     "perm_modules": 31,
-    "packages_no_haspermission": 16,
+    "packages_no_haspermission": 17,
     "module_tests": 2_669,
     "suite_tests": 2_797,
     "zero_test_packages": 15,

@@ -1,6 +1,6 @@
 package com.tss.grc.module.change_mgmt.controller;
 
-import com.tss.grc.module.admin.committee.service.CommitteeGateMapService;
+import com.tss.grc.module.change_mgmt.spi.CommitteePort;
 import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -52,13 +52,13 @@ import java.util.Map;
 @SecurityRequirement(name = "bearerAuth")
 public class ChangeAuthorityController {
 
-    private final CommitteeGateMapService service;
+    private final CommitteePort service;
 
     @GetMapping
     @Operation(summary = "This tenant's CAB/ECAB authority, with the configured verdict per gate")
     @PreAuthorize("hasPermission('ADMIN','READ')")
     public List<Map<String, Object>> current() {
-        return service.current();
+        return service.gateMap();
     }
 
     @GetMapping("/eligible")
@@ -75,14 +75,14 @@ public class ChangeAuthorityController {
         Object raw = body == null ? null : body.get("committeeId");
         Long committeeId = raw instanceof Number n ? n.longValue()
             : raw == null ? null : Long.valueOf(raw.toString().trim());
-        return service.upsert(gate, committeeId);
+        return service.mapGate(gate, committeeId);
     }
 
     @DeleteMapping("/{gate}")
     @Operation(summary = "Clear this gate — changes routed to it can no longer be approved")
     @PreAuthorize("hasPermission('ADMIN','WRITE')")
     public ResponseEntity<Void> clear(@PathVariable String gate) {
-        service.clear(gate);
+        service.unmapGate(gate);
         return ResponseEntity.noContent().build();
     }
 }

@@ -13,7 +13,7 @@ import com.tss.grc.module.change_mgmt.dto.RatificationDtos;
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService;
 import com.tss.grc.module.change_mgmt.service.ChangeManagementService;
-import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
+import com.tss.grc.module.change_mgmt.spi.CommitteePort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -211,7 +211,7 @@ public class ChangeManagementController {
     @PostMapping("/{id}/refer-to-committee")
     @PreAuthorize("hasPermission('CHANGE','WRITE')")
     @ResponseStatus(HttpStatus.CREATED)
-    public CommitteeReferral referToCommittee(@PathVariable Long id,
+    public CommitteePort.ReferralView referToCommittee(@PathVariable Long id,
             @RequestBody(required = false) Map<String, Object> body, Principal principal) {
         Long committeeId = (body != null && body.get("committeeId") != null)
             ? Long.valueOf(body.get("committeeId").toString()) : null;
@@ -226,7 +226,7 @@ public class ChangeManagementController {
 
     @PostMapping("/{id}/committee/resolution")
     @PreAuthorize("hasPermission('CHANGE','WRITE')")
-    public CommitteeReferral linkChangeResolution(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+    public CommitteePort.ReferralView linkChangeResolution(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         Long resolutionId = Long.valueOf(body.get("resolutionId").toString());
         return service.linkChangeResolution(id, resolutionId);
     }
