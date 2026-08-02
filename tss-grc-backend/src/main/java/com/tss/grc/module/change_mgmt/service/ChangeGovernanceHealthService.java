@@ -62,8 +62,32 @@ public class ChangeGovernanceHealthService {
      * <b>The single definition of "this tenant's gate is configured".</b> Correlated on
      * {@code :orgCol} / {@code :gateCol} so both the aggregate report and the single-gate
      * lookup below use the same text. A gate is configured when a live gate-map row points
-     * at a committee that exists, is not soft-deleted, and is not {@code DISSOLVED} — the
-     * last clause matching what {@code CommitteeReferralService.refer} actually enforces.
+     * at a committee that exists, is not soft-deleted, is not {@code DISSOLVED} — the third
+     * clause matching what {@code CommitteeReferralService.refer} actually enforces — and
+     * <b>has at least one ACTIVE voting seat</b>.
+     *
+     * <p><b>F2-96 — why the last clause was added, and why it belongs HERE.</b> Measured
+     * 2026-08-02 in dev and production alike: committee 13, the committee org 1's CAB gate
+     * points at, had <b>zero ACTIVE voting seats</b> in both databases, and this method
+     * reported {@code healthy: true}. The predicate answered "is a committee mapped?" while
+     * the screen it feeds claims "changes routed to this authority can be authorised". A
+     * committee with no voting seat can never be quorate — {@code computeQuorum} sets
+     * {@code quorumMet = 0} whenever {@code totalVoting == 0} — so a referred change routed
+     * there is undecidable, and a non-referred one was being recorded as <em>CAB approved</em>
+     * in the name of a body with no members.
+     *
+     * <p>It belongs in this constant rather than in a second check because F2-62's lesson is
+     * that <b>a report describing access must share its predicate with the enforcement
+     * point</b>. {@link #gateConfigurationFault} feeds
+     * {@code ChangeManagementService.requireConfiguredChangeAuthority}, so widening the
+     * definition here makes the report honest <em>and</em> the gate fail closed in the same
+     * edit. Two predicates would have let them drift again, which is the defect this fixes.
+     *
+     * <p>⚠ The consequence is deliberate and it is not cosmetic: a tenant whose mapped
+     * committee has an empty roster now has its CAB/ECAB approvals <b>refused</b> until
+     * members are appointed. ADR-017 D-2 accepted exactly this trade — fail closed, with a
+     * guided onboarding moment naming the screen — and {@link #ROSTER_EMPTY_REMEDY} names
+     * appointing members rather than re-mapping the gate, because the mapping is correct.
      */
     private static final String CONFIGURED_PREDICATE = """
         EXISTS (SELECT 1
@@ -75,8 +99,35 @@ public class ChangeGovernanceHealthService {
                    AND g.gate = %s
                    AND g.is_deleted = 0
                    AND c.is_deleted = 0
-                   AND c.status <> 'DISSOLVED')
+                   AND c.status <> 'DISSOLVED'
+                   AND EXISTS (SELECT 1
+                                 FROM admin.committee_member_terms t
+                                WHERE t.committee_id = c.id
+                                  AND t.organisation_id = c.organisation_id
+                                  AND t.renewal_status = 'ACTIVE'
+                                  AND t.is_voting_member = 1))
         """;
+
+    /**
+     * Does a live gate-map row point at a live committee, ignoring whether it can be quorate?
+     * Used only to tell {@link #ROSTER_EMPTY} apart from {@link #COMMITTEE_UNAVAILABLE}, so
+     * the remedy can name the right screen.
+     */
+    private static final String COMMITTEE_LIVE_SQL = """
+        SELECT COUNT(*)
+          FROM admin.committee_gate_map g
+          JOIN admin.committees c
+            ON c.id = g.committee_id AND c.organisation_id = g.organisation_id
+         WHERE g.organisation_id = ?1 AND g.gate = ?2
+           AND g.is_deleted = 0 AND c.is_deleted = 0 AND c.status <> 'DISSOLVED'
+        """;
+
+    static final String ROSTER_EMPTY_REMEDY =
+        "The gate is mapped to a live committee, but that committee has no ACTIVE voting member, "
+      + "so it can never be quorate and no decision it records would be valid. Appoint voting "
+      + "members to it on the Committees screen (" + ChangeAuthorityNotConfiguredException.REMEDY_SCREEN
+      + " -> the committee -> Members), then retry. Re-mapping the gate is NOT the fix here: the "
+      + "mapping is correct and the body is empty.";
 
     private static final String GAP_SQL = """
         SELECT m.organisation_id, m.gate, COUNT(*) AS matrix_rows
@@ -128,6 +179,15 @@ public class ChangeGovernanceHealthService {
         Number ok = (Number) em.createNativeQuery(CONFIGURED_ONE_SQL)
             .setParameter(1, organisationId).setParameter(2, gate).getSingleResult();
         if (ok != null && ok.intValue() == 1) return null;
+
+        // Three faults, not two — the remedy differs (F2-96). Narrowest first: a live committee
+        // that simply has nobody on it is a different administrative action from a missing or
+        // dissolved one, and collapsing them would send the operator to re-map a correct mapping.
+        Number live = (Number) em.createNativeQuery(COMMITTEE_LIVE_SQL)
+            .setParameter(1, organisationId).setParameter(2, gate).getSingleResult();
+        if (live != null && live.longValue() > 0)
+            return ChangeAuthorityNotConfiguredException.ROSTER_EMPTY;
+
         Number rows = (Number) em.createNativeQuery(ROW_EXISTS_SQL)
             .setParameter(1, organisationId).setParameter(2, gate).getSingleResult();
         return (rows != null && rows.longValue() > 0)
@@ -168,6 +228,7 @@ public class ChangeGovernanceHealthService {
             // remedy names the screen that fixes it, because a refusal an administrator
             // cannot act on is the dead-end error D-2 explicitly rules out.
             "remedy", gaps.isEmpty() ? ""
+                : rosterOnly(gaps) ? ROSTER_EMPTY_REMEDY
                 : "Constitute an ACTIVE committee for this organisation and map it to the gate "
                   + "on the Committees screen (" + ChangeAuthorityNotConfiguredException.REMEDY_SCREEN
                   + " → Change authority), or call "
@@ -175,6 +236,18 @@ public class ChangeGovernanceHealthService {
                   + "authorisation matrix demands this gate CANNOT be approved — the approval is "
                   + "refused rather than falling back to the legacy approval tally."
         );
+    }
+
+    /**
+     * True when every gap is a mapped-but-empty committee, so the remedy is "appoint members"
+     * rather than "map a committee". Checked per gap because a tenant can have one of each, and
+     * a remedy that names the wrong screen is the dead-end error ADR-017 D-2 rules out.
+     */
+    private boolean rosterOnly(List<GateGap> gaps) {
+        Long org = TenantContext.getCurrentTenant();
+        return !gaps.isEmpty() && gaps.stream().allMatch(g ->
+            ChangeAuthorityNotConfiguredException.ROSTER_EMPTY.equals(
+                gateConfigurationFault(org, g.gate())));
     }
 
     /**

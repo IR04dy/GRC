@@ -1131,9 +1131,17 @@ public class ChangeManagementService {
             return;
         String fault = governanceHealth.gateConfigurationFault(c.getOrganisationId(), gate);
         if (fault == null) return;
-        String why = ChangeAuthorityNotConfiguredException.COMMITTEE_UNAVAILABLE.equals(fault)
-            ? "the committee mapped to the " + gate + " gate is dissolved or no longer exists"
-            : "no committee is mapped to the " + gate + " gate for this organisation";
+        String why = switch (fault) {
+            case ChangeAuthorityNotConfiguredException.COMMITTEE_UNAVAILABLE ->
+                "the committee mapped to the " + gate + " gate is dissolved or no longer exists";
+            // F2-96: the mapping is correct and the body is empty. Saying "no committee is mapped"
+            // here would send the administrator to re-map a gate that is already right.
+            case ChangeAuthorityNotConfiguredException.ROSTER_EMPTY ->
+                "the committee mapped to the " + gate + " gate has no ACTIVE voting member, so it "
+                + "can never be quorate and any decision recorded in its name would be invalid";
+            default ->
+                "no committee is mapped to the " + gate + " gate for this organisation";
+        };
         throw new ChangeAuthorityNotConfiguredException(
             "Change authority is not configured: this change's authorisation matrix ("
                 + nullSafeStr(c.getChangeType()) + " / " + nullSafeStr(c.getRiskLevel())

@@ -34,6 +34,16 @@ public class ChangeAuthorityNotConfiguredException extends RuntimeException {
     /** A row exists but its committee is absent, soft-deleted or DISSOLVED. */
     public static final String COMMITTEE_UNAVAILABLE = "COMMITTEE_UNAVAILABLE";
 
+    /**
+     * F2-96 — a live row points at a live committee that <b>cannot ever be quorate</b>, because it
+     * has no ACTIVE voting seat. Distinguished from {@link #COMMITTEE_UNAVAILABLE} because the
+     * remedy is different: the committee exists and is correctly mapped, so the administrator must
+     * appoint members rather than re-map a gate. Measured 2026-08-02 in dev AND prod — committee 13,
+     * the CAB gate's own target, had zero active voting seats in both while
+     * {@code governance-health} reported {@code healthy: true}.
+     */
+    public static final String ROSTER_EMPTY = "ROSTER_EMPTY";
+
     /** The screen that sets the configuration. Named in the refusal, per D-2. */
     public static final String REMEDY_SCREEN = "/committees";
     /** The API the screen calls, for integrators driving onboarding headlessly. */
@@ -60,7 +70,7 @@ public class ChangeAuthorityNotConfiguredException extends RuntimeException {
 
     public Long getOrganisationId() { return organisationId; }
 
-    /** {@link #NOT_MAPPED} or {@link #COMMITTEE_UNAVAILABLE}. */
+    /** {@link #NOT_MAPPED}, {@link #COMMITTEE_UNAVAILABLE} or {@link #ROSTER_EMPTY}. */
     public String getReason() { return reason; }
 
     /** The transition that was refused (e.g. {@code CAB_APPROVED}). */
