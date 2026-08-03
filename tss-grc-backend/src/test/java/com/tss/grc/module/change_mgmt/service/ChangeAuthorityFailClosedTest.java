@@ -283,7 +283,16 @@ class ChangeAuthorityFailClosedTest {
         Set<String> targets = (Set<String>) f.get(null);
 
         Set<String> failClosed = Set.of("CAB_APPROVED", "EMERGENCY_APPROVED");
-        Set<String> deliberatelyOpen = Set.of("CAB_REJECTED");
+        // S7c / X-2 — CAB_DEFERRED and MORE_INFO_REQUIRED join CAB_REJECTED as DELIBERATELY OPEN.
+        // The A17-D2 question is "must an unconfigured change authority refuse this transition?",
+        // and the answer turns on whether the transition AUTHORISES anything. These two do the
+        // opposite: they record that the committee did not authorise the change. Refusing to record
+        // a deferral because the tenant's gate map is broken would trap the change at CAB_PENDING —
+        // the exact limbo S7c exists to end, and F2-96's shape (a control whose first act refuses
+        // the only remedy available). They still require CHANGE:APPROVE, because asserting what a
+        // governance body concluded is a decision; that is a different question and it is answered
+        // in DECISION_TARGETS.
+        Set<String> deliberatelyOpen = Set.of("CAB_REJECTED", "CAB_DEFERRED", "MORE_INFO_REQUIRED");
 
         assertThat(targets)
             .as("D-2 classification must cover every CAB decision target")

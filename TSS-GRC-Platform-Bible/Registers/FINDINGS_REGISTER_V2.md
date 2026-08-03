@@ -2057,6 +2057,39 @@ Start-Service TssGrcBackend
 | **References** | `CommitteeReferralService#awaitingDecision` · `V350` · [[F2-96]] · [[F2-101]] |
 | **Lesson** | **A queue is only as trustworthy as what removes things from it.** Every control in this module reads the referral row — the gate, the recusal list, the decision write-back — and none of them asks whether the thing referred still exists. ⚠ And a practical one: **the orphans are almost certainly my own probe debris from an earlier slice**, which is the argument for cleanup on the referring side rather than a manual delete: a probe that leaves routing rows behind will do it again.
 
+
+## F2-103 · The CAB approval recorded when it was decided and never who
+
+|  |  |
+|---|---|
+| **ID** | F2-103 *(found by S7c while adding two decision branches next to the existing ones)* |
+| **Module** | `change_mgmt` — `ChangeManagementService`, the `CAB_APPROVED` transition |
+| **Severity** | **P2** — the platform's central authorisation act had a timestamp and an anonymous approver |
+| **Current State** | `stampDecisionAuthor` had exactly **two** call sites: `EMERGENCY_APPROVED` and `CAB_REJECTED`. **Not** `CAB_APPROVED`. So the ordinary CAB approval set `cab_decision_at` and `cab_decision_notes` and left `cab_decision_by_id` / `cab_decision_by_name` NULL |
+| **Measured** | **Zero** rows in dev carry `cab_decision_by_id`, and **2** carry `cab_decision_at` without it. The only test asserting the column lives in `EmergencyRatificationTest`. (In prod the columns do not exist yet — V345 is among the pending set) |
+| **Problem** | This is [[F2-93]]'s own finding, unfixed on the branch that matters most. F2-93 was raised because "the record says when the CAB decided and never who" and was fixed **while A17-D3 was in flight**, so the author landed on the two paths that slice touched. The SoD check F2-93 existed to enable — comparing the approver against the requester/owner — had nothing to compare against for an approval, which is the only decision where that comparison matters |
+| **What it is NOT** | Not a missing column (V345 added both) and not a missing audit trail: the ledger's `TRANSITION` row names the actor. But an audit row and the record are two different reads, and every report, export and board pack reads the record |
+| **Fix** | One line — `stampDecisionAuthor(c)` in the `CAB_APPROVED` branch — plus `CabDecisionOutcomesTest.everyDecisionBranchStampsItsAuthor`, which parses the real switch and fails if **any** `DECISION_TARGETS` branch records a decision without its author or without `cab_decision_at`. Mutation-proven: restoring the omission fails that test |
+| **Status** | ✅ **Fixed 2026-08-03** (no migration — the columns already existed). Live: an ordinary approval now stamps `cab_decision_by_id=3` / `cab_decision_by_name=compliance` where every previous row had NULL |
+| **References** | `ChangeManagementService` `CAB_APPROVED` branch · `#stampDecisionAuthor` · `CabDecisionOutcomesTest` · [[F2-93]] · [[F2-90]] |
+| **Lesson** | **A fix applied while working on one path stops at the edge of that path.** F2-93 was correct, tested and incomplete, and the incompleteness was invisible because its test lived in the slice that found it. When a fix adds a field that several branches should set, the guard has to be *"every branch of this kind sets it"* — a per-branch assertion cannot fail for the branch nobody wrote it for. Same shape as [[F2-100]], where one publish site was mistaken for the only one needed |
+
+
+## F2-104 · The audit ledger's structured status columns are used by 4 of 32 transition types
+
+|  |  |
+|---|---|
+| **ID** | F2-104 *(found by S7c's live probe asserting the wrong column, which is how the gap surfaced)* |
+| **Module** | `platform/auditlog` — `platform.audit_log.workflow_status_before` / `_after` |
+| **Severity** | **P3** — the history is recorded and readable, but only queryable by `LIKE` over prose |
+| **Current State** | Measured 2026-08-03 in dev: **18 of 7,701** audit rows populate `workflow_status_after`, and they come from **4 of the 32** entity types that record a `TRANSITION` action (all four are `Bcm*`). Every other transition — including every `ChangeRequest` one — puts the statuses in the free-text `message`: *"Change CHG-2025-0014 status CAB_PENDING → CAB_APPROVED"* |
+| **Problem** | The columns exist to make lifecycle history *queryable*. "Show me every change that reached `CAB_APPROVED` last quarter, and who moved it" is a one-line query against the structured columns and a `LIKE '%status%→ CAB_APPROVED%'` against prose — which breaks the moment a message is reworded, and cannot be indexed. The tamper-evident chain (F2-31) hashes the row either way, so nothing is *lost*; it is a findability defect, not an integrity one |
+| **What it is NOT** | Not a change-module defect and not caused by S7c: it is platform-wide and pre-dates every slice in this programme. And not a silent one — the information is in the message, so an auditor reading the ledger sees the transition |
+| **Recommendation** | Populate the two columns from the transition call sites. Cheap per site, but there are **28 entity types** to touch, so it is a sweep with a ratchet (the `AuditLogService` overload that takes before/after already exists — the four `Bcm*` types use it), not a one-line fix. Sequence it after S7/S8 rather than inside a slice about CAB outcomes |
+| **Status** | ⬜ **Open — filed, not fixed.** S7c's probe was repointed to read the message, with a comment saying why, rather than quietly asserting a weaker thing |
+| **References** | `platform.audit_log` · `AuditLogService` · [[F2-31]] (the hash chain, which is unaffected) · [[F2-90]] |
+| **Lesson** | **A probe that asserts the wrong column finds a real gap.** My assertion read `workflow_status_after`, failed, and the honest answer was neither "my probe is wrong" nor "the code is broken" but "these columns are populated by 4 of 32 producers". ⚠ Also worth noting the shape: a nullable column that *one* module fills in looks like a feature and behaves like a convention
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

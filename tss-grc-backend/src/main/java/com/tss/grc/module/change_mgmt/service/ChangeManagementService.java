@@ -54,7 +54,18 @@ public class ChangeManagementService {
         Map.entry("DRAFT",              Set.of("SUBMITTED", "EMERGENCY_APPROVED", "CANCELLED")),
         Map.entry("SUBMITTED",          Set.of("IMPACT_ASSESSED", "CANCELLED")),
         Map.entry("IMPACT_ASSESSED",    Set.of("CAB_PENDING", "CANCELLED")),
-        Map.entry("CAB_PENDING",        Set.of("CAB_APPROVED", "CAB_REJECTED")),
+        // S7c / X-2 — a CAB may also DEFER or ask for MORE INFORMATION. Both are decisions the
+        // committee can already reach (CommitteeResolution.outcome has permitted DEFERRED since
+        // V154) and the change previously could not represent: it stayed at CAB_PENDING, with no
+        // cab_decision_at, byte-identical to a change nobody had looked at.
+        Map.entry("CAB_PENDING",        Set.of("CAB_APPROVED", "CAB_REJECTED",
+                                               "CAB_DEFERRED", "MORE_INFO_REQUIRED")),
+        // Both route back into the queue rather than forward: a deferred motion is re-tabled
+        // (AR-152 already tells the secretary to), and a change whose questions have been answered
+        // goes back before the same CAB. Neither is terminal, and neither may jump the gate — the
+        // only way on from here is through CAB_PENDING again.
+        Map.entry("CAB_DEFERRED",       Set.of("CAB_PENDING", "CANCELLED")),
+        Map.entry("MORE_INFO_REQUIRED", Set.of("CAB_PENDING", "CANCELLED")),
         Map.entry("CAB_APPROVED",       Set.of("SCHEDULED", "CANCELLED")),
         Map.entry("SCHEDULED",          Set.of("IMPLEMENTING", "CANCELLED")),
         Map.entry("EMERGENCY_APPROVED", Set.of("IMPLEMENTING", "CANCELLED")),
@@ -126,7 +137,15 @@ public class ChangeManagementService {
      * on {@code WRITE}: over-tightening 403s people on their own screens.
      */
     private static final Set<String> DECISION_TARGETS =
-        Set.of("CAB_APPROVED", "CAB_REJECTED", "EMERGENCY_APPROVED");
+        Set.of("CAB_APPROVED", "CAB_REJECTED", "EMERGENCY_APPROVED",
+               // S7c / X-2 — these are CAB DECISIONS, not edits. Recording "the committee deferred
+               // this" or "the committee wants more information" is an assertion about what a
+               // governance body concluded, so it needs CHANGE:APPROVE like every other decision.
+               // Leaving them on the silent CHANGE:WRITE default would let anyone who can edit a
+               // change record a committee conclusion — the F2-29 defect, reintroduced.
+               // `ChangeDecisionAuthorityTest` predicted this exact question and is what forced it
+               // to be answered here rather than defaulted.
+               "CAB_DEFERRED", "MORE_INFO_REQUIRED");
 
     private final ChangeRequestRepository changeRepo;
     private final ChangeApprovalRepository approvalRepo;
@@ -363,8 +382,33 @@ public class ChangeManagementService {
                 requireRequiredRolesPresent(id);
                 c.setCabDecisionAt(LocalDateTime.now());
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
+                // ⚠ F2-103 — THIS LINE WAS MISSING, on the one decision that matters most.
+                // F2-93 added cab_decision_by_id/_name because "the record says when the CAB
+                // decided and never who", and it was found and fixed while A17-D3 was in flight —
+                // so the author got stamped on the two paths that slice touched (EMERGENCY_APPROVED
+                // and CAB_REJECTED) and not on ordinary CAB approval. Measured 2026-08-03:
+                // **zero** rows in dev have cab_decision_by_id set, and 2 have cab_decision_at
+                // without it. The only test asserting the column lives in EmergencyRatificationTest.
+                // So the platform's central authorisation act recorded a timestamp and an
+                // anonymous approver, which is precisely the gap F2-93 was raised to close.
+                stampDecisionAuthor(c);
             }
             case "CAB_REJECTED" -> {
+                c.setCabDecisionAt(LocalDateTime.now());
+                c.setCabDecisionNotes(strFromBody(body, "notes"));
+                stampDecisionAuthor(c);
+            }
+            // ── S7c / X-2 — the committee considered it and did not authorise it ──────────────
+            // The whole point of these two states is the stamp: a change that carries
+            // cab_decision_at + the author is one a named person recorded a committee conclusion
+            // about, and that is what distinguishes it from CAB_PENDING-since-forever.
+            //
+            // Deliberately NOT calling requireConfiguredChangeAuthority: neither state authorises
+            // anything, so refusing to record a deferral because the tenant's gate map is broken
+            // would trap the change in exactly the limbo this slice exists to end. Same reasoning
+            // that made CAB_REJECTED "deliberately open" under A17-D2, and
+            // ChangeAuthorityFailClosedTest forces the classification to be stated.
+            case "CAB_DEFERRED", "MORE_INFO_REQUIRED" -> {
                 c.setCabDecisionAt(LocalDateTime.now());
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
                 stampDecisionAuthor(c);

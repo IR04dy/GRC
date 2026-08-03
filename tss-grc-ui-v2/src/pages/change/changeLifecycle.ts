@@ -21,7 +21,18 @@ import type { ChangeRequestDto } from '../../lib/api';
  * UI has no reject control at all today, only a `CAB_REJECTED` status label and column. The
  * API accepts it, so a future reject button inherits the gate rather than rediscovering it.
  */
-export const DECISION_TARGETS = new Set(['CAB_APPROVED', 'CAB_REJECTED', 'EMERGENCY_APPROVED']);
+export const DECISION_TARGETS = new Set([
+  'CAB_APPROVED', 'CAB_REJECTED', 'EMERGENCY_APPROVED',
+  // S7c / X-2 — CAB_DEFERRED and MORE_INFO_REQUIRED are CAB decisions too: recording what a
+  // governance body concluded needs CHANGE:APPROVE, not merely CHANGE:WRITE. Mirrored from the
+  // backend set, where `ChangeDecisionAuthorityTest` forced the classification to be stated and
+  // `ChangeAuthorityFailClosedTest` recorded them as *deliberately open* under A17-D2 — neither
+  // authorises anything, so an unconfigured gate must not refuse to record them.
+  //
+  // Like CAB_REJECTED, this page offers no control for either yet; the decision panel is CE-13.
+  // They are in the set so that panel inherits the gate instead of rediscovering it.
+  'CAB_DEFERRED', 'MORE_INFO_REQUIRED',
+]);
 
 /**
  * Can the signed-in user actually perform this transition? Used to *disable* rather than

@@ -84,6 +84,21 @@ const NOT_OFFERED_BY_DESIGN: Record<string, string> = {
   'CAB_PENDING → CAB_REJECTED': 'no reject control exists yet — CE-13 decision panel',
   'CAB_REJECTED → DRAFT': 'rework after rejection; unreachable while nothing can reject (CE-13)',
 
+  // ⚠ S7c / X-2 — the same gap, widened deliberately. V351 gave a CAB somewhere to put a
+  // non-approval: before it, a committee that DEFERRED (an outcome CommitteeResolution has
+  // permitted since V154) left the change at CAB_PENDING with no cab_decision_at — indistinguishable
+  // from a change nobody had looked at. The server states and their authority classification ship
+  // now because they are what makes the RECORD correct; the controls belong to CE-13's decision
+  // panel, alongside the reject button above. All four are reachable over the API today, which is
+  // what distinguishes them from X-2's PENDING_RATIFICATION — dropped precisely because nothing
+  // could ever produce it.
+  'CAB_PENDING → CAB_DEFERRED': 'no defer control yet — CE-13 decision panel (API-reachable)',
+  'CAB_PENDING → MORE_INFO_REQUIRED': 'no more-info control yet — CE-13 decision panel (API-reachable)',
+  'CAB_DEFERRED → CAB_PENDING': 're-table after deferral; needs the defer control first (CE-13)',
+  'MORE_INFO_REQUIRED → CAB_PENDING': 'return to the CAB once answered; needs the control first (CE-13)',
+  'CAB_DEFERRED → CANCELLED': 'as DRAFT → CANCELLED',
+  'MORE_INFO_REQUIRED → CANCELLED': 'as DRAFT → CANCELLED',
+
   // ROLLED_BACK is recorded as an *outcome* on the IMPLEMENTING transition, not reached by
   // advancing status, so the move exists without being a forward step.
   'IMPLEMENTING → ROLLED_BACK': 'chosen as an outcome on IMPLEMENTING, not by advancing',
@@ -98,8 +113,12 @@ describe('S5c — the frontend lifecycle agrees with the backend state machine',
     // Anti-vacuity. A regex that matches nothing would make every assertion below pass, which is
     // exactly how four backend scans under-counted this month.
     expect(backend.size, 'no Map.entry(...) transitions parsed from ChangeManagementService')
-      .toBeGreaterThanOrEqual(14);
-    expect(backend.get('CAB_PENDING')).toEqual(new Set(['CAB_APPROVED', 'CAB_REJECTED']));
+      .toBeGreaterThanOrEqual(16);   // S7c: +CAB_DEFERRED +MORE_INFO_REQUIRED as source states
+    // S7c / X-2 — a CAB may now defer or ask for more information. Before V351 a committee that
+    // deferred left the change at CAB_PENDING with no decision stamp, byte-identical to one nobody
+    // had looked at.
+    expect(backend.get('CAB_PENDING')).toEqual(
+      new Set(['CAB_APPROVED', 'CAB_REJECTED', 'CAB_DEFERRED', 'MORE_INFO_REQUIRED']));
   });
 
   it('never offers a forward move the server would refuse', () => {

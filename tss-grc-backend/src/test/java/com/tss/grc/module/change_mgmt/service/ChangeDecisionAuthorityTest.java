@@ -250,8 +250,13 @@ class ChangeDecisionAuthorityTest {
 
         // Anti-vacuity: if the reflection ever stops resolving the real fields, the assertion above
         // passes trivially over an empty set. Pin the measured sizes so it cannot go green empty.
-        assertThat(reachable).hasSizeGreaterThanOrEqualTo(13);
+        assertThat(reachable).hasSizeGreaterThanOrEqualTo(15);   // S7c: +CAB_DEFERRED +MORE_INFO_REQUIRED
         assertThat(decisions).containsExactlyInAnyOrder(
-            "CAB_APPROVED", "CAB_REJECTED", "EMERGENCY_APPROVED");
+            "CAB_APPROVED", "CAB_REJECTED", "EMERGENCY_APPROVED",
+            // S7c / X-2 — landed, and this test is what made it be said out loud. The javadoc
+            // above predicted "at least two of those three are plainly CAB decisions"; both are,
+            // and PENDING_RATIFICATION was dropped rather than added because A17-D3 left it with
+            // no producer (V351's own self-check refuses it).
+            "CAB_DEFERRED", "MORE_INFO_REQUIRED");
     }
 }
