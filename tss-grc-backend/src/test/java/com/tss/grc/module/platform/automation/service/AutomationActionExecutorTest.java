@@ -83,29 +83,94 @@ class AutomationActionExecutorTest {
 
     // ─── NOTIFY ────────────────────────────────────────────────────
 
+    /** Convenience: a fan-out that delivered to every role it was given. */
+    private static NotificationService.RoleFanout delivered(int n, String... roles) {
+        return new NotificationService.RoleFanout(n, List.of(roles), List.of(), List.of());
+    }
+
+    private void whenFanout(NotificationService.RoleFanout result, String... expectedRoles) {
+        when(notify.broadcastToRoles(eq(ORG_ID), eq(List.of(expectedRoles)), anyString(),
+            anyString(), anyString(), anyString(), any(), anyLong())).thenReturn(result);
+    }
+
     @Test void notify_broadcastsAndAuditsRoleAndCount() throws Exception {
         AutomationRule r = rule("AR-Y",
             "{\"type\":\"NOTIFY\",\"role\":\"BCM_MANAGER\",\"message\":\"call tree failed\"}");
-        when(notify.broadcastToRole(eq(ORG_ID), eq("BCM_MANAGER"), anyString(), anyString(),
-            anyString(), anyString(), anyString(), anyLong())).thenReturn(3);
+        whenFanout(delivered(3, "BCM_MANAGER"), "BCM_MANAGER");
 
         String summary = executor.execute(r, ev("BCM_CALL_TREE_FAILED"));
 
-        assertThat(summary).isEqualTo("NOTIFY → BCM_MANAGER (3 delivered)");
-        verify(notify).broadcastToRole(eq(ORG_ID), eq("BCM_MANAGER"),
+        assertThat(summary).isEqualTo("NOTIFY → BCM_MANAGER (3 recipients)");
+        verify(notify).broadcastToRoles(eq(ORG_ID), eq(List.of("BCM_MANAGER")),
             anyString(), anyString(), anyString(), eq("NOTIFICATION"), any(), anyLong());
         verify(audit).recordEvent(any());   // single audit row for the rule fire
     }
 
-    @Test void notify_blankRoleFallsBackToAuditOnly() throws Exception {
-        AutomationRule r = rule("AR-Z", "{\"type\":\"NOTIFY\"}");
+    /**
+     * F2-94's defect, pinned: the plural key that 147 of 164 seeded rows use. Before the fix
+     * this fell into the "no role configured" branch and the rule reached nobody while every
+     * engine metric recorded a successful fire.
+     */
+    @Test void notify_resolvesThePluralRolesKeyEverySeedActuallyUses() throws Exception {
+        AutomationRule r = rule("AR-146",
+            "{\"type\":\"NOTIFY\",\"roles\":[\"CISO\",\"DPO\"],\"template\":\"X\"}");
+        whenFanout(delivered(2, "CISO", "DPO"), "CISO", "DPO");
 
-        String summary = executor.execute(r, ev("X"));
+        String summary = executor.execute(r, ev("COMMITTEE_RESOLUTION_APPROVED"));
 
-        assertThat(summary).contains("no role configured");
-        verify(notify, never()).broadcastToRole(anyLong(), anyString(),
+        assertThat(summary).isEqualTo("NOTIFY → CISO,DPO (2 recipients)");
+        verify(notify).broadcastToRoles(eq(ORG_ID), eq(List.of("CISO", "DPO")),
+            anyString(), anyString(), anyString(), eq("NOTIFICATION"), any(), anyLong());
+    }
+
+    /**
+     * The two failures must be distinguishable in the audit row, because only one of them is
+     * a grant. A single "(0 recipients)" is what made the whole fan-out look healthy.
+     */
+    @Test void notify_separatesUnheldRolesFromNamesThatAreNotRolesAtAll() throws Exception {
+        AutomationRule r = rule("AR-97",
+            "{\"type\":\"ESCALATE\",\"roles\":[\"CTO\",\"CISO\",\"CHANGE_MANAGER\"]}");
+        when(notify.broadcastToRoles(eq(ORG_ID), eq(List.of("CTO", "CISO", "CHANGE_MANAGER")),
+            anyString(), anyString(), anyString(), anyString(), any(), anyLong()))
+            .thenReturn(new NotificationService.RoleFanout(
+                1, List.of("CISO"), List.of("CHANGE_MANAGER"), List.of("CTO")));
+
+        String summary = executor.execute(r, ev("CHANGE_EMERGENCY_APPROVED"));
+
+        assertThat(summary)
+            .isEqualTo("ESCALATE → CISO (1 recipient); no active holder of CHANGE_MANAGER; "
+                     + "NOT A ROLE: CTO");
+        ArgumentCaptor<AuditLogService.AuditEventBuilder> cap =
+            ArgumentCaptor.forClass(AuditLogService.AuditEventBuilder.class);
+        verify(audit).recordEvent(cap.capture());
+    }
+
+    @Test void notify_noAudienceAddressedFallsBackToAuditOnly() throws Exception {
+        AutomationRule r = rule("AR-149", "{\"type\":\"NOTIFY\",\"template\":\"X\"}");
+
+        String summary = executor.execute(r, ev("COMMITTEE_ACTION_CREATED"));
+
+        assertThat(summary).contains("no audience addressed");
+        verify(notify, never()).broadcastToRoles(anyLong(), any(),
             anyString(), anyString(), anyString(), anyString(), anyString(), anyLong());
         verify(audit).recordEvent(any());
+    }
+
+    /**
+     * A key the executor does not read is not an audience. AR-148 named its recipients under
+     * {@code escalateTo}/{@code cc}; normalising the data (V346) is the fix, not widening the
+     * vocabulary — {@code also} carries entity type names on three other rules.
+     */
+    @Test void notify_ignoresRecipientKeysOutsideTheClosedVocabulary() throws Exception {
+        AutomationRule r = rule("AR-148",
+            "{\"type\":\"ESCALATE\",\"escalateTo\":\"LINE_MANAGER\","
+          + "\"cc\":[\"COMMITTEE_CHAIR\"],\"also\":[\"NcaCriticalAssessment\"]}");
+
+        String summary = executor.execute(r, ev("COMMITTEE_ACTION_OVERDUE"));
+
+        assertThat(summary).contains("no audience addressed");
+        verify(notify, never()).broadcastToRoles(anyLong(), any(),
+            anyString(), anyString(), anyString(), anyString(), anyString(), anyLong());
     }
 
     // ─── ESCALATE ──────────────────────────────────────────────────
@@ -113,13 +178,12 @@ class AutomationActionExecutorTest {
     @Test void escalate_usesToRoleAndWarnSeverity() throws Exception {
         AutomationRule r = rule("AR-ESC",
             "{\"type\":\"ESCALATE\",\"to_role\":\"CISO\",\"message\":\"sev1\"}");
-        when(notify.broadcastToRole(eq(ORG_ID), eq("CISO"), anyString(), anyString(),
-            anyString(), eq("ESCALATION"), any(), anyLong())).thenReturn(1);
+        whenFanout(delivered(1, "CISO"), "CISO");
 
         String summary = executor.execute(r, ev("RISK_APPETITE_BREACHED"));
 
-        assertThat(summary).isEqualTo("ESCALATE → CISO (1 delivered)");
-        verify(notify).broadcastToRole(eq(ORG_ID), eq("CISO"),
+        assertThat(summary).isEqualTo("ESCALATE → CISO (1 recipient)");
+        verify(notify).broadcastToRoles(eq(ORG_ID), eq(List.of("CISO")),
             anyString(), anyString(), anyString(), eq("ESCALATION"), any(), anyLong());
     }
 

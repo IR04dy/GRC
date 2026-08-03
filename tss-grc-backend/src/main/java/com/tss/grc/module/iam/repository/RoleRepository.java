@@ -32,4 +32,33 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
     @Modifying
     @Query(value = "DELETE FROM iam.role_permissions WHERE role_id = :id", nativeQuery = true)
     void clearRolePermissions(@Param("id") Long id);
+
+    /**
+     * F2-94 — every role name visible to the tenant (its own plus the global ones) paired
+     * with the number of users who would actually receive a broadcast addressed to it.
+     * One query, so a report over ~84 addressed role names does not become ~84 round trips.
+     *
+     * <p><b>The holder predicate is deliberately identical to
+     * {@code UserRepository#findActiveByOrganisationIdAndRoleName}</b> — active, not locked,
+     * not soft-deleted, same tenant. F2-62's defect was a report and an enforcement point
+     * computing access separately and drifting apart, each half defensible alone. A role
+     * absent from this result is not a role at all, which is a different fault from a role
+     * present with zero holders, and the two have different remedies.
+     *
+     * @return rows of {@code [role_name (String), active_holders (Number)]}
+     */
+    @Query(value = """
+        SELECT ro.role_name AS role_name, COUNT(DISTINCT u.id) AS active_holders
+          FROM iam.roles ro
+          LEFT JOIN iam.user_roles ur ON ur.role_id = ro.id
+          LEFT JOIN iam.users u ON u.id = ur.user_id
+               AND u.organisation_id = :org
+               AND u.is_active = 1
+               AND ISNULL(u.is_deleted, 0) = 0
+               AND (u.is_locked IS NULL OR u.is_locked = 0)
+         WHERE ro.is_deleted = 0
+           AND (ro.organisation_id = :org OR ro.organisation_id IS NULL)
+         GROUP BY ro.role_name
+        """, nativeQuery = true)
+    List<Object[]> countActiveHoldersByRole(@Param("org") Long org);
 }

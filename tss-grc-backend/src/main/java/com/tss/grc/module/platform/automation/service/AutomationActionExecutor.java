@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -22,12 +23,13 @@ import java.util.stream.Collectors;
  * <h3>Action types</h3>
  * <ul>
  *   <li><b>AUDIT</b> — writes an audit-log row with the configured severity + message.</li>
- *   <li><b>NOTIFY</b> — fans a notification out to every active user holding the role
- *       named in {@code action.role}. Writes one audit row for the rule fire and one
- *       notification per recipient (capped at 50). Falls back to an audit-only entry
- *       if no users hold the role — the rule fire is still inspectable.</li>
+ *   <li><b>NOTIFY</b> — fans a notification out to every active user holding <em>any</em>
+ *       role named under {@link #RECIPIENT_KEYS}, recipients de-duplicated. Writes one
+ *       audit row for the rule fire and one notification per recipient (capped at 50).
+ *       The audit row distinguishes delivered / unheld / not-a-role, because those have
+ *       different remedies (F2-94).</li>
  *   <li><b>ESCALATE</b> — same fan-out as NOTIFY but with severity HIGH on the
- *       notification and severity WARN on the audit row. Uses {@code action.to_role}.</li>
+ *       notification and WARN on the audit row (ERROR if a name is not a role).</li>
  *   <li><b>FLAG</b> — writes an audit row with action type {@code FLAG} that names
  *       {@code action.entity_field} so a follow-up scheduled job (per consuming
  *       module) can flip the field. Audit-only by design — flipping a column on an
@@ -50,6 +52,29 @@ public class AutomationActionExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(AutomationActionExecutor.class);
     private static final ObjectMapper M = new ObjectMapper();
+
+    /**
+     * The <b>closed</b> set of {@code action_json} keys that may name a NOTIFY/ESCALATE
+     * audience, in resolution order. This is the single definition — the executor reads
+     * it and {@code AutomationRecipientKeyRatchetTest} scans every migration against it,
+     * so a rule written with an eighth key fails the build instead of silently notifying
+     * nobody.
+     *
+     * <p><b>F2-94.</b> The executor used to read only {@code role} and {@code to_role},
+     * asserting in its own javadoc that this matched "the conventional naming in the seed
+     * rules". Measured 2026-08-03: {@code roles} carried 147 of the 164 NOTIFY/ESCALATE
+     * rows and was never read, so 127 of 140 rule codes — among them HIGH-risk emergency
+     * change approval, expired policy, and declined attestation — fired, audited,
+     * incremented {@code fire_count} and reached no one.
+     *
+     * <p><b>Why closed rather than generous.</b> The seeds had invented seven recipient-ish
+     * keys. Reading all of them looks safer and is not: {@code also} carries role names on
+     * two rules ({@code CONTROL_OWNER}) and <em>entity type</em> names on three
+     * ({@code DRP}, {@code NcaCriticalAssessment}), so a generous union would broadcast to
+     * a "role" named after an assessment. An unbounded vocabulary is the defect; reading
+     * more of it is not the fix.
+     */
+    static final List<String> RECIPIENT_KEYS = List.of("roles", "role", "to_role");
 
     private final AuditLogService audit;
     private final NotificationService notify;
@@ -110,26 +135,64 @@ public class AutomationActionExecutor {
     // ─── NOTIFY / ESCALATE ────────────────────────────────────────────
 
     /**
-     * NOTIFY and ESCALATE share the same fan-out logic. ESCALATE bumps severity
-     * (so the recipient inbox sorts it higher) and uses the {@code to_role} field
-     * instead of {@code role}, matching the conventional naming in the seed rules.
+     * Every {@code action_json} key in {@link #RECIPIENT_KEYS} that carries a value, in
+     * order, flattened and de-duplicated. Each key may hold a scalar or an array — the
+     * seeds do both — so both are accepted rather than making the shape a second way to
+     * silently address nobody.
+     *
+     * <p>Package-private so the ratchet can assert that what the executor reads is exactly
+     * what the migrations are checked against.
+     */
+    static List<String> recipientRoles(JsonNode action) {
+        List<String> out = new ArrayList<>();
+        for (String key : RECIPIENT_KEYS) {
+            JsonNode node = action.path(key);
+            if (node.isMissingNode() || node.isNull()) continue;
+            if (node.isArray()) {
+                for (JsonNode el : node) addRole(out, el.asText(""));
+            } else {
+                addRole(out, node.asText(""));
+            }
+        }
+        return out;
+    }
+
+    private static void addRole(List<String> out, String raw) {
+        if (raw == null) return;
+        String role = raw.trim();
+        if (role.isEmpty()) return;
+        if (out.stream().noneMatch(r -> r.equalsIgnoreCase(role))) out.add(role);
+    }
+
+    /**
+     * NOTIFY and ESCALATE share the same fan-out logic. ESCALATE bumps severity so the
+     * recipient inbox sorts it higher; both resolve their audience through
+     * {@link #RECIPIENT_KEYS}.
+     *
+     * <p><b>F2-94 — what changed and why the audit row now says more.</b> The old row read
+     * {@code "ESCALATE → CISO (0 recipients)"} whether the role was unheld, misspelt, or
+     * nonexistent, and {@code "has no role configured"} whenever the rule used the plural
+     * key. Both are now separated, because the remedies are different and only one of them
+     * is the operator's to apply: an <b>unheld</b> role needs a grant, an <b>unknown</b>
+     * role needs the rule or the role catalogue fixed. Severity rises to ERROR for an
+     * unknown role — it cannot come right on its own.
      */
     private String handleNotify(AutomationRule rule, DomainEvent event, JsonNode action,
                                 boolean escalate) {
-        String role = escalate
-            ? action.path("to_role").asText(action.path("role").asText(""))
-            : action.path("role").asText("");
+        String verb = escalate ? "ESCALATE" : "NOTIFY";
+        List<String> roles = recipientRoles(action);
 
-        if (role.isBlank()) {
+        if (roles.isEmpty()) {
             audit.recordEvent(new AuditLogService.AuditEventBuilder()
                 .actionType("RULE_FIRED")
                 .severity("WARN")
                 .entityCode(rule.getRuleCode())
                 .sourceModule("automation")
                 .correlationId(event.correlationId())
-                .message((escalate ? "ESCALATE" : "NOTIFY") + " rule " + rule.getRuleCode()
-                    + " has no role configured"));
-            return (escalate ? "ESCALATE" : "NOTIFY") + " (no role configured — audit-only)";
+                .message(verb + " rule " + rule.getRuleCode()
+                    + " addresses no audience — expected one of " + RECIPIENT_KEYS
+                    + " in action_json"));
+            return verb + " (no audience addressed — audit-only)";
         }
 
         String titleEn = action.path("title").asText(
@@ -139,27 +202,45 @@ public class AutomationActionExecutor {
         String messageEn = buildMessage(rule, event, action);
         String notificationType = escalate ? "ESCALATION" : "NOTIFICATION";
 
-        int delivered = notify.broadcastToRole(
-            event.organisationId(), role,
+        NotificationService.RoleFanout fanout = notify.broadcastToRoles(
+            event.organisationId(), roles,
             titleEn, titleAr, messageEn,
             notificationType,
             event.entityType(), event.entityId());
 
-        // One audit row for the rule fire — keeps the engine's audit trail consistent
-        // whether or not anyone held the role.
+        String outcome = describe(fanout);
+        // One audit row for the rule fire — the engine's trail stays consistent whether or
+        // not anyone was reached, but it no longer *reads* the same in both cases.
         audit.recordEvent(new AuditLogService.AuditEventBuilder()
             .actionType("RULE_FIRED")
-            .severity(escalate ? "WARN" : "INFO")
+            .severity(fanout.hasConfigurationDefect() ? "ERROR" : escalate ? "WARN" : "INFO")
             .entityType(event.entityType())
             .entityId(event.entityId())
             .entityCode(rule.getRuleCode())
             .sourceModule("automation")
             .correlationId(event.correlationId())
-            .message((escalate ? "ESCALATE → " : "NOTIFY → ") + role
-                + " (" + delivered + " recipient" + (delivered == 1 ? "" : "s") + ")"));
+            .message(verb + " → " + outcome));
 
-        return (escalate ? "ESCALATE" : "NOTIFY") + " → " + role
-            + " (" + delivered + " delivered)";
+        if (fanout.reachedNobody()) {
+            log.warn("[automation] rule {} fired and reached nobody: {}",
+                rule.getRuleCode(), outcome);
+        }
+        return verb + " → " + outcome;
+    }
+
+    /** Render a fan-out so the three outcomes are distinguishable in one line of audit. */
+    private static String describe(NotificationService.RoleFanout f) {
+        StringBuilder b = new StringBuilder();
+        b.append(f.deliveredRoles().isEmpty() ? "nobody" : String.join(",", f.deliveredRoles()));
+        b.append(" (").append(f.delivered())
+         .append(" recipient").append(f.delivered() == 1 ? "" : "s").append(")");
+        if (!f.unheldRoles().isEmpty()) {
+            b.append("; no active holder of ").append(String.join(",", f.unheldRoles()));
+        }
+        if (!f.unknownRoles().isEmpty()) {
+            b.append("; NOT A ROLE: ").append(String.join(",", f.unknownRoles()));
+        }
+        return b.toString();
     }
 
     // ─── FLAG ────────────────────────────────────────────────────────

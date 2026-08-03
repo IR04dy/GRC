@@ -5,6 +5,7 @@ import com.tss.grc.module.platform.automation.entity.AutomationRule;
 import com.tss.grc.module.platform.automation.entity.AutomationRuleRun;
 import com.tss.grc.module.platform.automation.repository.AutomationRuleRepository;
 import com.tss.grc.module.platform.automation.repository.AutomationRuleRunRepository;
+import com.tss.grc.module.platform.automation.service.NotificationReachabilityService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class AutomationRuleController {
 
     private final AutomationRuleRepository rules;
     private final AutomationRuleRunRepository runs;
+    private final NotificationReachabilityService reachability;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -108,6 +110,20 @@ public class AutomationRuleController {
             "skipped",  runs.countByOrganisationIdAndOutcome(o, "SKIPPED"),
             "failed",   runs.countByOrganisationIdAndOutcome(o, "FAILED")
         );
+    }
+
+    /**
+     * F2-94 — who a NOTIFY/ESCALATE rule would actually reach, per rule and per addressed
+     * role, splitting "nobody holds this role" from "this is not a role". Read-only.
+     *
+     * <p>Guarded on AUTOMATION:READ rather than {@code isAuthenticated()} like its
+     * neighbours: this enumerates the tenant's role names and how many active users hold
+     * each, which is access-model shape, not rule configuration.
+     */
+    @GetMapping("/notification-reachability")
+    @PreAuthorize("hasPermission('AUTOMATION','READ')")
+    public NotificationReachabilityService.ReachabilityReport notificationReachability() {
+        return reachability.report(org());
     }
 
     @SuppressWarnings("unused")

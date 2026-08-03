@@ -45,7 +45,7 @@ that will be read as current forever.
 | Module packages with **zero tests** | **15**, totalling **18,011 LoC (9.4%)** | 19 / 20,503 / 11.0% | — |
 | Distinct **JPA** schemas | **50** | 50 | matches `CLAUDE.md` "50+" ✅ |
 | **Database** schemas holding tables (dev & prod) | **51** | *not measured* | the 51st is `audit`, which JPA does not know — §7 |
-| Flyway migrations on disk | **333** files, `V1`–`V345`, 4.31 MB | 304 / `V1`–`V314` | next free **V346** |
+| Flyway migrations on disk | **334** files, `V1`–`V346`, 4.32 MB | 304 / `V1`–`V314` | next free **V347** |
 | **Deployed** Flyway baseline / head | **baseline `V292`**, head **`V336`**, **8 pending** | *pub. "baseline V312"* | ⚠ see §0.1 — load-bearing and wrong |
 | Frontend pages (`.tsx` under `pages/`) | **330** in **114** folders | 329 / 114 | — |
 | Routes registered in `App.tsx` | **328** | 328 | — |
@@ -469,13 +469,13 @@ Measured from `platform.flyway_schema_history` in `TSS_GRC_Deployment`, not from
 |---|---|
 | Baseline | **`V292`** — *not* `V312`, which this page asserted for six days |
 | Applied head | **`V344`** (53 history rows: the baseline + `V293`…`V344`, **0 failed**) — re-measured 2026-08-02 after the deploy that applied `V337`…`V344` in 0.725 s |
-| Files at or below the baseline | **280 of 333** — recorded as applied, **never executed here** |
+| Files at or below the baseline | **280 of 334** — recorded as applied, **never executed here** |
 | Files executed by Flyway in prod | **52** |
-| **Pending the next jar** | **1** — `V345` (A17-D3, the ratification SLA) |
+| **Pending the next jar** | **2** — `V345` (A17-D3, the ratification SLA) and `V346` (F2-94, the automation recipient-key normalisation + `AUTOMATION:READ`) |
 | Dev | Flyway **OFF**; no `flyway_schema_history` table at all. Migrations applied by hand via pyodbc |
 
 **Why the baseline number is load-bearing and not trivia.** The baseline is the line below which Flyway
-marks everything applied without running it. At `V292`, **280 of the 333 migration files have never
+marks everything applied without running it. At `V292`, **280 of the 334 migration files have never
 executed against production** — prod's schema for all of them came from the restored dump (§7.3), not
 from the DDL in this repository. Believing the baseline was `V312` hides twenty versions' worth of that,
 and it is the whole of RC-A: *which migrations can never run?* A migration numbered at or below the
