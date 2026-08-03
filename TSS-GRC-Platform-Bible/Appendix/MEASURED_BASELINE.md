@@ -45,7 +45,7 @@ that will be read as current forever.
 | Module packages with **zero tests** | **15**, totalling **18,011 LoC (9.4%)** | 19 / 20,503 / 11.0% | — |
 | Distinct **JPA** schemas | **50** | 50 | matches `CLAUDE.md` "50+" ✅ |
 | **Database** schemas holding tables (dev & prod) | **51** | *not measured* | the 51st is `audit`, which JPA does not know — §7 |
-| Flyway migrations on disk | **336** files, `V1`–`V348`, 4.34 MB | 304 / `V1`–`V314` | next free **V349** |
+| Flyway migrations on disk | **337** files, `V1`–`V349`, 4.34 MB | 304 / `V1`–`V314` | next free **V350** |
 | **Deployed** Flyway baseline / head | **baseline `V292`**, head **`V336`**, **8 pending** | *pub. "baseline V312"* | ⚠ see §0.1 — load-bearing and wrong |
 | Frontend pages (`.tsx` under `pages/`) | **336** in **114** folders | 329 / 114 | S5c split the 1,036-line `ChangesPage` into `pages/change/` — +7 files, same folder count |
 | Routes registered in `App.tsx` | **328** | 328 | — |
@@ -469,9 +469,9 @@ Measured from `platform.flyway_schema_history` in `TSS_GRC_Deployment`, not from
 |---|---|
 | Baseline | **`V292`** — *not* `V312`, which this page asserted for six days |
 | Applied head | **`V344`** (53 history rows: the baseline + `V293`…`V344`, **0 failed**) — re-measured 2026-08-02 after the deploy that applied `V337`…`V344` in 0.725 s |
-| Files at or below the baseline | **280 of 336** — recorded as applied, **never executed here** |
+| Files at or below the baseline | **280 of 337** — recorded as applied, **never executed here** |
 | Files executed by Flyway in prod | **52** |
-| **Pending the next jar** | **4** — `V345` (A17-D3, the ratification SLA), `V346` (F2-94, the automation recipient-key normalisation + `AUTOMATION:READ`), `V347` (F2-95/S6b-ii, dropping the ghost role `CTO` from the change authorisation matrix) and `V348` (S6c, the per-committee `quorum_requires_chair` clause — lands **inert**, default 0, and its own self-check refuses to apply if anything is already opted in) |
+| **Pending the next jar** | **5** — `V345` (A17-D3, the ratification SLA), `V346` (F2-94, the automation recipient-key normalisation + `AUTOMATION:READ`), `V347` (F2-95/S6b-ii, dropping the ghost role `CTO` from the change authorisation matrix), `V348` (S6c, the per-committee `quorum_requires_chair` clause — lands **inert**, default 0, and its own self-check refuses to apply if anything is already opted in) and `V349` (S7a/F2-89+F2-100, `PROPOSED` joins `CK_resolution_outcome` and `decision_published_at` is added — also lands inert: it backfills a suppression stamp onto every existing decided resolution precisely so the fix's first act is *not* to announce 22 historical board decisions as new) |
 | Dev | Flyway **OFF**; no `flyway_schema_history` table at all. Migrations applied by hand via pyodbc |
 
 **Why the baseline number is load-bearing and not trivia.** The baseline is the line below which Flyway

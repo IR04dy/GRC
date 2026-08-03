@@ -117,16 +117,34 @@ public class CommitteeReferralService {
             throw new IllegalStateException("The committee motion has not been raised and linked yet");
         CommitteeResolution res = resolutionRepo.findByIdAndOrganisationId(ref.getResolutionId(), org)
             .orElseThrow(() -> new IllegalStateException("The linked committee resolution is missing"));
+        // S7a — the decision mode this gate enforces is stated in CommitteeDecisionAuthority:
+        // meeting-bound minutes, and it is the ONLY representable mode because meeting_id is
+        // NOT NULL. ⚠ The `!= null` below therefore cannot be false. It is kept because a
+        // missing meeting must fail closed rather than skip the gate — but read quickly it
+        // looks like a documented exemption for asynchronous voting, and it is not one. If
+        // asynchronous voting is ever built, the exemption has to be argued and gated, not
+        // inherited from this null check.
         if (res.getMeetingId() != null) {
             CommitteeMeeting mtg = meetingRepo.findByIdAndOrganisationId(res.getMeetingId(), org)
                 .orElseThrow(() -> new IllegalStateException("The linked committee meeting is missing"));
-            if (!"MINUTES_APPROVED".equals(mtg.getStatus()))
+            if (!CommitteeDecisionAuthority.MINUTES_APPROVED.equals(mtg.getStatus()))
                 throw new IllegalStateException(
                     "Committee minutes are not approved yet (meeting is " + mtg.getStatus() + ")");
         }
+        // F2-89 — "not decided yet" and "decided against" are different answers and the refusal
+        // must not conflate them. Before V349 the vocabulary had no undecided value, so a motion
+        // awaiting a vote had to carry some verdict and this message reported it as one: a
+        // raised motion read as "the committee did not approve this item", sending the requester
+        // to argue their case when what was needed was for the committee to vote. Same rule as
+        // S6c's quorum refusal — a message naming the wrong remedy costs someone a day.
         if (!"APPROVED".equals(res.getOutcome()))
             throw new IllegalStateException(
-                "The committee did not approve this item (resolution outcome is " + res.getOutcome() + ")");
+                CommitteeDecisionAuthority.isDecided(res)
+                    ? "The committee did not approve this item (resolution outcome is "
+                      + res.getOutcome() + ")"
+                    : "The committee has not decided this motion yet — it is still "
+                      + res.getOutcome() + " and no vote has been counted. It needs to be put to "
+                      + "the committee and the minutes approved before this can advance.");
         int forVotes = res.getVoteFor() == null ? 0 : res.getVoteFor();
         if (forVotes < minApprovals)
             throw new IllegalStateException("Committee approval is short of the required "

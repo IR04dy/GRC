@@ -5,6 +5,7 @@ import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolutionVote;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingAttendeeRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeReferralRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeResolutionRepository;
@@ -72,6 +73,11 @@ class ResolutionTallyProvenanceTest {
     @Mock CommitteeMeetingAttendeeRepository  attendeeRepo;
     @Mock CommitteeReferralRepository         referralRepo;
     @Mock CommitteeMemberTermRepository       memberTermRepo;
+    /** F2-100 — a decision is binding on APPROVED minutes, so publishing needs the meeting.
+     *  A real mock rather than a null: publishIfBinding() catches RuntimeException so a
+     *  recorded vote is never rolled back by a failed announcement, which means a null
+     *  dependency here would be swallowed instead of failing. */
+    @Mock CommitteeMeetingRepository          meetingRepo;
 
     @InjectMocks CommitteeResolutionService service;
 

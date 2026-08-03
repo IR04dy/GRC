@@ -88,7 +88,17 @@ public class CommitteeResolution {
     @Column(name = "vote_abstain", nullable = false)
     private Integer voteAbstain = 0;
 
-    /** APPROVED | REJECTED | DEFERRED | WITHDRAWN */
+    /**
+     * PROPOSED | APPROVED | REJECTED | DEFERRED | WITHDRAWN — see
+     * {@link com.tss.grc.module.admin.committee.service.CommitteeDecisionAuthority}, which owns
+     * the vocabulary and the {@code isDecided} split.
+     *
+     * <p>S7a / V349 added {@code PROPOSED}. Before it, all four permitted values were
+     * <em>decisions</em>, so a motion could not be raised without recording a verdict for it
+     * (F2-89) — and since {@code create()} published {@code COMMITTEE_RESOLUTION_<outcome>}, every
+     * placeholder a caller could pick fired an enabled rule: APPROVED started a regulator
+     * disclosure clock, DEFERRED asked the secretary to re-table a motion never tabled.
+     */
     @Column(nullable = false, length = 20)
     private String outcome;
 
@@ -153,4 +163,31 @@ public class CommitteeResolution {
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "tally_stamped_at")
     private LocalDateTime tallyStampedAt;
+
+    // ── F2-100 / V349 — when the binding decision was announced ───────────────
+
+    /**
+     * When {@code COMMITTEE_RESOLUTION_<outcome>} was published for this motion, or {@code NULL}
+     * if the decision has not become binding yet.
+     *
+     * <p><b>This is the idempotency fact</b> for the three sites that can make a decision binding
+     * — creating a resolution on already-approved minutes, casting the vote that decides it, and
+     * approving the minutes it sits in. Whichever happens last publishes; the other two find this
+     * stamped and do nothing. A column rather than the audit-marker scan
+     * {@code CommitteeScheduledSweep} uses, because F2-90 had just established that the ledger was
+     * not being written for meeting actions at all — an idempotency check that reads a log which
+     * may never have been written will re-announce.
+     *
+     * <p>{@code READ_ONLY}: a caller who could set this could suppress the announcement of their
+     * own committee's decision, which is the DF-3 rule (a provenance field a caller can set
+     * records nothing).
+     *
+     * <p>⚠ Rows that pre-date V349 are stamped with their {@code created_at} as a
+     * <b>suppression</b> — the platform will not announce a historical board decision as new. For
+     * the four rows AR-147 had already fired on that is literally true; for the rest it is a
+     * suppression and the migration says so rather than implying a history it does not have.
+     */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @Column(name = "decision_published_at")
+    private LocalDateTime decisionPublishedAt;
 }

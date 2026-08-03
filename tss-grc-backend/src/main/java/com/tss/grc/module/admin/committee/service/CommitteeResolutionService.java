@@ -1,10 +1,12 @@
 package com.tss.grc.module.admin.committee.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolutionVote;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingAttendeeRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeResolutionRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeResolutionVoteRepository;
@@ -44,6 +46,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CommitteeResolutionService {
 
+    private static final org.slf4j.Logger log =
+        org.slf4j.LoggerFactory.getLogger(CommitteeResolutionService.class);
+
     private final CommitteeResolutionRepository repo;
     private final AuditLogService               audit;
     private final ApplicationEventPublisher     publisher;
@@ -58,6 +63,13 @@ public class CommitteeResolutionService {
      *  the branch that uses it silently no-ops. That is exactly how the Track-D recusal
      *  path went untested. A security control must not be able to disappear that way. */
     private final CommitteeMemberTermRepository      memberTermRepo;
+
+    /** F2-100: a decision is binding on approved minutes, so publishing needs the meeting.
+     *  A <b>constructor</b> dependency for the reason spelled out on {@code memberTermRepo}
+     *  above — a field-injected collaborator stays null under {@code @InjectMocks} and the
+     *  branch that uses it silently no-ops, which is precisely how the missing publish went
+     *  unnoticed for as long as it did. */
+    private final CommitteeMeetingRepository         meetingRepo;
 
     /** Track D (S2): optional — force-RECUSE a referred item's requester/author
      *  from the deciding vote. Field-injected so directly-constructed unit tests
@@ -301,23 +313,48 @@ public class CommitteeResolutionService {
         r.setVoteFor(forC);
         r.setVoteAgainst(agC);
         r.setVoteAbstain(abC);
-        // Map the tally onto the resolution's permitted outcome vocabulary
-        // (CK_resolution_outcome: APPROVED | REJECTED | DEFERRED | WITHDRAWN).
-        // A tie among cast FOR/AGAINST votes fails the motion (REJECTED); only
-        // abstentions/recusals leave it undecided (DEFERRED).
-        String outcome;
-        if (forC > agC)               outcome = "APPROVED";
-        else if (forC > 0 || agC > 0) outcome = "REJECTED";
-        else                          outcome = "DEFERRED";
-        r.setOutcome(outcome);
+        r.setOutcome(outcomeFor(vs.size(), forC, agC));
         r.setTallySource("COMPUTED");
         r.setTallyRecordedByUserId(null);   // the vote rows carry their own attribution
         r.setTallyRecordedByName(null);
         r.setTallyStampedAt(LocalDateTime.now());
         repo.save(r);
+        // F2-100 — the vote that decides a motion is one of the three moments a decision can
+        // become binding. Before this line, deciding a motion by counted votes published
+        // nothing at all.
+        publishIfBinding(r);
     }
 
     private static int zero(Integer i) { return i == null ? 0 : i; }
+
+    /**
+     * Map a counted tally onto the outcome vocabulary
+     * ({@code CK_resolution_outcome}: PROPOSED | APPROVED | REJECTED | DEFERRED | WITHDRAWN).
+     *
+     * <p>A tie among cast FOR/AGAINST votes fails the motion (REJECTED); only abstentions and
+     * recusals leave it undecided-by-the-meeting (DEFERRED).
+     *
+     * <p><b>F2-89 — "nobody has voted" and "the committee could not decide" are different facts.</b>
+     * Before V349 this returned DEFERRED for both, because DEFERRED was the closest thing to
+     * undecided the vocabulary had. They have different consequences: AR-152 re-tables a DEFERRED
+     * motion at the next meeting, which is the right response to a committee that considered a
+     * motion and did not carry it, and the wrong response to one that has not been put to a vote.
+     *
+     * <p>⚠ <b>{@code voteRows == 0} cannot happen from the one caller</b> —
+     * {@link #recomputeTally} runs after {@code voteRepo.save}, and no path in the module deletes a
+     * resolution vote (checked: the repository has no delete, and the controller exposes none). It
+     * is a <b>pure static function</b> rather than a branch inside {@code recomputeTally} precisely
+     * so that case is stated and tested instead of being an unreachable line that reads like a
+     * fix. If a withdraw-vote path is ever added, this already answers correctly rather than
+     * silently deferring a motion nobody voted on — and the test says so, so the decision is
+     * inherited deliberately and not by accident.
+     */
+    static String outcomeFor(int voteRows, int forCount, int againstCount) {
+        if (voteRows <= 0)                          return CommitteeDecisionAuthority.PROPOSED;
+        if (forCount > againstCount)                return "APPROVED";
+        if (forCount > 0 || againstCount > 0)       return "REJECTED";
+        return "DEFERRED";
+    }
 
     @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
     public List<CommitteeResolution> listByMeeting(Long meetingId) {
@@ -360,6 +397,26 @@ public class CommitteeResolutionService {
         Long org = TenantContext.getCurrentTenant();
         in.setOrganisationId(org);
         in.setCreatedAt(LocalDateTime.now());
+        // F2-100: server-assigned, never accepted from the body — a caller who could stamp this
+        // would suppress the announcement of their own committee's decision.
+        in.setDecisionPublishedAt(null);
+
+        // ── F2-89: a motion may now be RAISED ────────────────────────────────────────────
+        // Absent or blank outcome means "raised, not yet decided" instead of a 500 on a NOT NULL
+        // column. Before V349 there was no such value, so every caller had to name a verdict:
+        // the golden-path IT picked DEFERRED (and tripped AR-152's re-table rule 38 times), and
+        // the only UI that creates a resolution defaulted the field to APPROVED.
+        if (norm(in.getOutcome()).isEmpty()) {
+            in.setOutcome(CommitteeDecisionAuthority.PROPOSED);
+        } else {
+            String want = norm(in.getOutcome()).toUpperCase(java.util.Locale.ROOT);
+            if (!CommitteeDecisionAuthority.ALL.contains(want))
+                throw new IllegalArgumentException(
+                    "outcome must be one of " + CommitteeDecisionAuthority.ALL + " — got \""
+                  + in.getOutcome() + "\". Use " + CommitteeDecisionAuthority.PROPOSED
+                  + " to raise a motion that has not been decided yet.");
+            in.setOutcome(want);
+        }
 
         int assertedVotes = zero(in.getVoteFor()) + zero(in.getVoteAgainst()) + zero(in.getVoteAbstain());
         in.setTallyRecordedByUserId(null);
@@ -387,21 +444,101 @@ public class CommitteeResolutionService {
                         ? "user#" + saved.getTallyRecordedByUserId() : saved.getTallyRecordedByName())
                     : ""));
 
-        // F8 — broadcast resolution outcomes so downstream automation can
-        // act (regulator notification, board notification, risk-register
-        // update for accepted risks, policy publication for approved
-        // policies, etc.). The trigger event encodes the outcome so rule
-        // conditions can dispatch.
-        publisher.publishEvent(DomainEvent.of(
-            org, "COMMITTEE_RESOLUTION_" + saved.getOutcome(),
-            "CommitteeResolution", saved.getId(),
-            Map.of("resolutionCode",  saved.getResolutionCode(),
-                   "committeeId",     saved.getCommitteeId(),
-                   "meetingId",       saved.getMeetingId(),
-                   "outcome",         saved.getOutcome(),
-                   "regulatorNotify", Boolean.valueOf(saved.getRegulatorNotify() != null && saved.getRegulatorNotify() == 1),
-                   "confidentiality", saved.getConfidentiality() == null ? "" : saved.getConfidentiality())));
+        // ── F2-89/F2-100: raising a motion is not deciding it ────────────────────────────
+        // This publish used to be unconditional, so creating a resolution announced its
+        // "decision" whether or not one had been taken. A raised motion now gets an event that
+        // says so, and the decision event is published when the decision becomes BINDING —
+        // which for a resolution created on already-approved minutes is right here, and
+        // otherwise is at the deciding vote or at minutes approval.
+        if (!CommitteeDecisionAuthority.isDecided(saved)) {
+            // No seeded rule listens to this: nothing has been decided, so nobody should be
+            // paged. It exists so tenants have a correct hook for "a motion was tabled" instead
+            // of reaching for a decision event, and so the audit story is not create-only.
+            publisher.publishEvent(DomainEvent.of(
+                org, "COMMITTEE_MOTION_RAISED", "CommitteeResolution", saved.getId(),
+                Map.of("resolutionCode", saved.getResolutionCode(),
+                       "committeeId",    saved.getCommitteeId(),
+                       "meetingId",      saved.getMeetingId(),
+                       "titleEn",        saved.getTitleEn() == null ? "" : saved.getTitleEn(),
+                       "confidentiality", saved.getConfidentiality() == null ? "" : saved.getConfidentiality())));
+        } else {
+            publishIfBinding(saved);
+        }
 
         return saved;
+    }
+
+    // ── F2-100: the single site that announces a committee decision ──────────────────────
+
+    /**
+     * Publish {@code COMMITTEE_RESOLUTION_<outcome>} if — and only once — this decision has
+     * become binding.
+     *
+     * <p><b>Why this is not simply "publish on the deciding vote".</b> A decision is binding on
+     * approved minutes, not on a tally (see {@link CommitteeDecisionAuthority}), and the two
+     * orders both happen in real data: measured 2026-08-03, <b>19 of 22</b> resolutions in dev
+     * belong to meetings that were already {@code MINUTES_APPROVED} when the resolution was
+     * recorded — the secretariat approves the minutes, then types up what was resolved. Publishing
+     * only at minutes approval would therefore have announced nothing for the dominant real-world
+     * pattern, which is the mirror image of the bug being fixed. So all three moments try, and
+     * {@code decision_published_at} makes exactly one of them win.
+     *
+     * <p>Never throws. An announcement failure must not roll back a recorded vote or a recorded
+     * resolution — the decision is the fact, the notification is a consequence of it. This is the
+     * F2-90 lesson inverted: the ledger entry and the row are what an auditor reads, and neither
+     * should be lost because an event listener was unhappy.
+     */
+    void publishIfBinding(CommitteeResolution r) {
+        try {
+            if (r == null || r.getId() == null) return;
+            if (r.getDecisionPublishedAt() != null) return;          // already announced
+            if (!CommitteeDecisionAuthority.isDecided(r)) return;    // nothing decided yet
+            Long org = r.getOrganisationId() != null ? r.getOrganisationId() : TenantContext.getCurrentTenant();
+            CommitteeMeeting meeting = r.getMeetingId() == null ? null
+                : meetingRepo.findByIdAndOrganisationId(r.getMeetingId(), org).orElse(null);
+            if (!CommitteeDecisionAuthority.isBinding(r, meeting)) return;
+
+            r.setDecisionPublishedAt(LocalDateTime.now());
+            repo.save(r);
+
+            // F8 — broadcast resolution outcomes so downstream automation can act (regulator
+            // notification, board-register filing, risk-register update for accepted risks,
+            // policy publication for approved policies, …). The trigger event encodes the
+            // outcome so rule conditions can dispatch.
+            publisher.publishEvent(DomainEvent.of(
+                org, "COMMITTEE_RESOLUTION_" + r.getOutcome(),
+                "CommitteeResolution", r.getId(),
+                Map.of("resolutionCode",  r.getResolutionCode(),
+                       "committeeId",     r.getCommitteeId(),
+                       "meetingId",       r.getMeetingId(),
+                       "outcome",         r.getOutcome(),
+                       "regulatorNotify", Boolean.valueOf(r.getRegulatorNotify() != null && r.getRegulatorNotify() == 1),
+                       "confidentiality", r.getConfidentiality() == null ? "" : r.getConfidentiality())));
+        } catch (RuntimeException ex) {
+            log.warn("[committee] could not announce the decision on resolution {}: {}",
+                r == null ? null : r.getId(), ex.getMessage());
+        }
+    }
+
+    /**
+     * Approving the minutes is the act that makes every decision in them binding — so it is the
+     * third publish moment. Called by {@code CommitteeService.approveMinutes} after the status
+     * flip; each resolution is {@code decision_published_at}-guarded, and a motion still
+     * {@code PROPOSED} when the minutes are approved is simply not announced (the committee
+     * recorded no verdict for it).
+     *
+     * @return how many decisions were announced — logged by the caller, and asserted by the
+     *         golden-path IT so a silent zero cannot pass for success.
+     */
+    @Transactional
+    public int publishBindingDecisionsForMeeting(Long meetingId) {
+        if (meetingId == null) return 0;
+        int published = 0;
+        for (CommitteeResolution r : listByMeeting(meetingId)) {
+            if (r.getDecisionPublishedAt() != null) continue;
+            publishIfBinding(r);
+            if (r.getDecisionPublishedAt() != null) published++;
+        }
+        return published;
     }
 }

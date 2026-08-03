@@ -322,6 +322,25 @@ class CommitteeGoldenPathIT {
         assertThat(approved.path("status").asText()).isEqualTo("MINUTES_APPROVED");
         step("approveMinutesAsASecondPrincipal");
 
+        // 11b ── F2-100: approving the minutes is what announces the decision -------------
+        // Measured before the fix: resolutions 69 and 70 reached APPROVED through counted votes on
+        // 2026-08-03, and AR-147 (COMMITTEE_RESOLUTION_APPROVED) last fired 2026-07-26 — so the
+        // module's one publishEvent, in create(), never fired for either. Announcement is asserted
+        // through the real HTTP stack here because no unit test can see the ordering: the vote
+        // happened while the meeting was IN_PROGRESS, so the decision could only become binding
+        // at this step.
+        JsonNode decided = get(approverToken,
+            "/api/v1/committees/resolutions/" + resolutionId, HttpStatus.OK);
+        assertThat(decided.path("outcome").asText())
+            .as("the counted votes decided the motion")
+            .isEqualTo("APPROVED");
+        assertThat(decided.path("decisionPublishedAt").isNull()
+                || decided.path("decisionPublishedAt").asText().isEmpty())
+            .as("F2-100 — approving the minutes must stamp the decision as announced; a null here "
+                + "means the outcome event still reaches no automation")
+            .isFalse();
+        step("assertTheDecisionWasAnnouncedOnApprovedMinutes");
+
         // 12 ── the e-signature over the minutes -----------------------------------------
         JsonNode signatures = get(approverToken,
             "/api/v1/signatures/committee_meeting/" + meetingId, HttpStatus.OK);
@@ -634,26 +653,21 @@ class CommitteeGoldenPathIT {
     }
 
     /**
-     * ⚠ <b>A motion cannot be raised undecided, and that is a finding rather than a quirk of this
-     * test.</b>
+     * Raise the motion — <b>undecided</b>, which S7a/V349 made possible.
      *
-     * <p>{@code admin.committee_resolutions.outcome} is {@code NOT NULL} with no default, and
-     * {@code CK_resolution_outcome} permits only {@code APPROVED | REJECTED | DEFERRED | WITHDRAWN} —
-     * four <em>decided</em> states and no "raised, awaiting the vote". So to vote on a motion
-     * in-platform you must first record a decision for it, then hold the vote that determines that
-     * decision. Omitting the field is {@code 500 "An unexpected database error occurred."}
+     * <p>⚠ <b>This method used to carry F2-89 as a comment and a workaround.</b>
+     * {@code CK_resolution_outcome} permitted only four <em>decided</em> values, so to vote on a
+     * motion in-platform you first had to record a decision for it and then hold the vote that
+     * determined that decision; omitting the field was a 500. This test posted
+     * {@code outcome: "DEFERRED"} as "the least-wrong placeholder" — and it was worse than
+     * least-wrong, because {@code AR-152 (COMMITTEE_RESOLUTION_DEFERRED → re-table at the next
+     * meeting)} is <b>enabled</b>, so the platform's own reference walkthrough for correct
+     * committee governance emitted a false deferral on every run. Measured before the fix:
+     * AR-152 {@code fire_count = 38} with <b>zero</b> deferred resolutions in the database.
      *
-     * <p>The contradiction is explicit in the codebase: F2-40's guard tells the caller <i>"to decide a
-     * motion by in-platform voting, create the resolution with no tally"</i> — possible for the tally,
-     * impossible for the outcome. And the data agrees that nobody has ever tried: all 20 pre-existing
-     * resolutions are {@code APPROVED}, tallies seeded as scalars, which is the same "the mechanism
-     * was right and its data never existed" shape as F2-28's zero attendance rows.
-     *
-     * <p>{@code DEFERRED} is the least-wrong placeholder and it is still wrong: a committee actively
-     * deferring a decision is a real governance act, and this borrows its label for "not yet asked".
-     * Filed as <b>F2-89</b> and left for S7, whose own row requires the platform to <i>state which
-     * decision mode is authoritative</i> — a question that cannot be answered while only one of the
-     * two modes has a representable starting state.
+     * <p>The field is now omitted entirely and the motion is {@code PROPOSED}. The two assertions
+     * below are what the workaround made unassertable: that a raised motion is not decided, and
+     * that raising it announces nothing.
      */
     private long raiseMotion(long committeeId, long meetingId) {
         Map<String, Object> body = new LinkedHashMap<>();
@@ -666,8 +680,15 @@ class CommitteeGoldenPathIT {
         body.put("bodyEn", "That the change be approved subject to the recorded conditions.");
         body.put("bodyAr", "الموافقة على التغيير وفق الشروط المسجلة.");
         body.put("confidentiality", "INTERNAL");
-        body.put("outcome", "DEFERRED");   // F2-89 — see above; there is no undecided state
+        // no `outcome` — F2-89/V349: a motion may be raised without a verdict
         JsonNode r = post(secretariatToken, "/api/v1/committees/resolutions", body, HttpStatus.OK);
+        assertThat(r.path("outcome").asText())
+            .as("F2-89 — a motion raised through the real HTTP stack must come back PROPOSED, not "
+                + "carrying a verdict nobody voted on")
+            .isEqualTo("PROPOSED");
+        assertThat(r.path("decisionPublishedAt").isNull() || r.path("decisionPublishedAt").asText().isEmpty())
+            .as("F2-100 — raising a motion must not announce a decision")
+            .isTrue();
         assertThat(r.path("tallySource").asText())
             .as("F2-40 — a motion raised with no asserted numbers is COMPUTED, and only a COMPUTED "
                 + "or unlabelled-and-empty tally may be voted on; ASSERTED would 409 on the first vote")

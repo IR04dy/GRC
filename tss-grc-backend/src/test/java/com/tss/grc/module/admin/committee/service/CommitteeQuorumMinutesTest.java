@@ -18,6 +18,7 @@ import com.tss.grc.module.signature.service.SignatureService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -82,6 +83,8 @@ class CommitteeQuorumMinutesTest {
     @Mock CommitteeMemberTermRepository       memberTermRepo;
     @Mock AuditLogService                     audit;
     @Mock SignatureService                    signatureService;
+    /** F2-100 — approveMinutes now announces the binding decisions in the minutes it approves. */
+    @Mock CommitteeResolutionService          resolutions;
 
     @InjectMocks CommitteeService service;
 
@@ -521,6 +524,37 @@ class CommitteeQuorumMinutesTest {
             .contains("MTG-2026-CAB-A1B2")
             .contains("minutes sha256=")
             .matches(".*sha256=[0-9a-f]{64}.*");
+    }
+
+    @Test
+    @DisplayName("F2-100 — approving the minutes announces the binding decisions inside them")
+    void approving_minutes_announces_the_binding_decisions_in_them() {
+        // The wiring, not the publishing: CommitteeMotionLifecycleTest proves what
+        // publishBindingDecisionsForMeeting does, and this proves approveMinutes actually calls
+        // it. Without this, deleting the call would break no test — the two halves have to be
+        // pinned separately or the delegation is the untested part.
+        rosterOf(4, 0);
+        record(4);
+        meeting.setStatus("COMPLETED");
+        meeting.setMinutesEn("Resolved: approve change CHG-42.");
+
+        service.approveMinutes(MEETING_ID, "Chair", CHAIR);
+
+        verify(resolutions).publishBindingDecisionsForMeeting(MEETING_ID);
+    }
+
+    @Test
+    @DisplayName("a refused minutes approval announces nothing")
+    void a_refused_approval_announces_nothing() {
+        // Order matters as much as the call: quorum is checked before the flip, so a meeting that
+        // cannot be approved must not announce the decisions it holds.
+        rosterOf(4, 0);
+        record(1);                       // 1 of 4 present — not quorate
+        meeting.setStatus("COMPLETED");
+
+        assertThatThrownBy(() -> service.approveMinutes(MEETING_ID, "Chair", CHAIR))
+            .isInstanceOf(IllegalStateException.class);
+        verify(resolutions, never()).publishBindingDecisionsForMeeting(any());
     }
 
     @Test

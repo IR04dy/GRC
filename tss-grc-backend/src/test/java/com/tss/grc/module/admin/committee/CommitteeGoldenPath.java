@@ -44,6 +44,10 @@ public final class CommitteeGoldenPath {
         "castOwnVoteThenRecordTwoOnBehalfIncludingARecusal",
         "completeMeeting",
         "approveMinutesAsASecondPrincipal",
+        // S7a / F2-100 — the decision is announced when the minutes make it binding, not at
+        // create. Only an end-to-end walk can assert the ordering: the votes were cast while the
+        // meeting was IN_PROGRESS, so this is the step at which the outcome event can fire.
+        "assertTheDecisionWasAnnouncedOnApprovedMinutes",
         "verifyTheESignatureOverTheMinutes",
         "advanceTheChangeOnTheCommitteeDecision",
         "assertTheAuditLedgerRecordedTheDecision"

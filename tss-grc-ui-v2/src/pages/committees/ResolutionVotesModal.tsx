@@ -6,7 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
-  recordResolutionVote, listResolutionVotes,
+  recordResolutionVote, listResolutionVotes, OUTCOME_TONE,
   type Resolution, type ResolutionVote,
 } from '../../lib/committees';
 
@@ -63,7 +63,10 @@ export function ResolutionVotesModal({ resolution, onClose, onSaved }: {
   }
 
   const total = res.voteFor + res.voteAgainst + res.voteAbstain;
-  const outcomeTone = res.outcome === 'APPROVED' ? 'success' : res.outcome === 'REJECTED' ? 'danger' : 'warning';
+  // S7a — the shared map, not a third ternary. The inline one this replaces fell through to
+  // `warning` for anything that was not APPROVED or REJECTED, so a motion that has merely been
+  // PROPOSED would have rendered amber, as though something were wrong with it.
+  const outcomeTone = OUTCOME_TONE[res.outcome] ?? 'neutral';
 
   return (
     <Modal

@@ -582,7 +582,23 @@ export const TYPE_LABEL_EN: Record<ExtendedCommitteeType, string> = {
 // First-class records replacing the V40 decisions_json + action_items_json
 // blobs. Resolutions are immutable; actions have a full lifecycle.
 
-export type ResolutionOutcome = 'APPROVED' | 'REJECTED' | 'DEFERRED' | 'WITHDRAWN';
+/**
+ * S7a / V349 — `PROPOSED` is a motion **raised and not yet decided**, and the other four are
+ * decisions. Keep this in step with `CommitteeDecisionAuthority.ALL` on the server, which is
+ * itself ratcheted against `CK_resolution_outcome`.
+ *
+ * ⚠ Before V349 all four permitted values were verdicts, so a motion could not be raised without
+ * recording one — and the form below defaulted the field to `APPROVED`, which is wired to a
+ * regulator disclosure clock (AR-146) and a board-register filing instruction (AR-147).
+ */
+export type ResolutionOutcome = 'PROPOSED' | 'APPROVED' | 'REJECTED' | 'DEFERRED' | 'WITHDRAWN';
+
+/** The outcomes that mean the committee has decided — mirrors `CommitteeDecisionAuthority.DECIDED`. */
+export const DECIDED_OUTCOMES: readonly ResolutionOutcome[] =
+  ['APPROVED', 'REJECTED', 'DEFERRED', 'WITHDRAWN'] as const;
+
+export const isDecidedOutcome = (o: string | null | undefined): boolean =>
+  !!o && (DECIDED_OUTCOMES as readonly string[]).includes(o);
 export type ConfidentialityLevel = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED';
 export type ActionStatus = 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE' | 'CANCELLED' | 'DEFERRED';
 export type ActionPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
@@ -731,7 +747,9 @@ export function populateAgenda(meetingId: number): Promise<CommitteeMeeting> {
   return api.post(`${CAL_BASE}/populate-agenda/${meetingId}`);
 }
 
-export const OUTCOME_TONE: Record<ResolutionOutcome, 'success' | 'danger' | 'warning' | 'neutral'> = {
+export const OUTCOME_TONE: Record<ResolutionOutcome, 'success' | 'danger' | 'warning' | 'neutral' | 'info'> = {
+  // `info` rather than a warning tone: a raised motion is a normal state, not a problem.
+  PROPOSED: 'info',
   APPROVED: 'success', REJECTED: 'danger', DEFERRED: 'warning', WITHDRAWN: 'neutral',
 };
 

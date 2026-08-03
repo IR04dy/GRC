@@ -63,6 +63,8 @@ class CommitteeQuorumChairClauseTest {
     @Mock CommitteeMeetingAttendeeRepository attendeeRepo;
     @Mock CommitteeMemberTermRepository      memberTermRepo;
     @Mock AuditLogService                    audit;
+    /** F2-100 — approveMinutes now announces the binding decisions in the minutes it approves. */
+    @Mock CommitteeResolutionService         resolutions;
 
     @InjectMocks CommitteeService service;
 

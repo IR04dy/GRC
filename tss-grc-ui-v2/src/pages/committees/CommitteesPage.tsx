@@ -186,10 +186,15 @@ export function CommitteesPage() {
 
   // ─── Record a resolution against a meeting ───────────────────────
   const isAr = lang === 'ar';
-  const OUTCOMES: ResolutionOutcome[] = ['APPROVED', 'REJECTED', 'DEFERRED', 'WITHDRAWN'];
+  // S7a / F2-89 — PROPOSED first, and it is the DEFAULT. This list used to start at APPROVED and
+  // `resolutionInitial` defaulted the field to it, so the only screen that creates a resolution
+  // pre-filled a verdict nobody had voted on — and creating it published
+  // COMMITTEE_RESOLUTION_APPROVED, which AR-146 turns into a 24 h regulator disclosure clock and
+  // AR-147 into "file this in the board-resolutions register within 48 h".
+  const OUTCOMES: ResolutionOutcome[] = ['PROPOSED', 'APPROVED', 'REJECTED', 'DEFERRED', 'WITHDRAWN'];
   const CONFIDENTIALITIES: ConfidentialityLevel[] = ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'];
   const OUTCOME_AR: Record<ResolutionOutcome, string> = {
-    APPROVED: 'معتمَد', REJECTED: 'مرفوض', DEFERRED: 'مؤجَّل', WITHDRAWN: 'مسحوب',
+    PROPOSED: 'مطروح', APPROVED: 'معتمَد', REJECTED: 'مرفوض', DEFERRED: 'مؤجَّل', WITHDRAWN: 'مسحوب',
   };
   const CONF_AR: Record<ConfidentialityLevel, string> = {
     PUBLIC: 'عام', INTERNAL: 'داخلي', CONFIDENTIAL: 'سرّي', RESTRICTED: 'مقيَّد',
@@ -227,7 +232,8 @@ export function CommitteesPage() {
   ];
   const resolutionInitial = {
     meetingId: '', titleEn: '', titleAr: '', bodyEn: '', bodyAr: '',
-    outcome: 'APPROVED', confidentiality: 'INTERNAL', regulatorNotify: 'false',
+    // F2-89 — raise the motion, do not pre-decide it. See OUTCOMES above.
+    outcome: 'PROPOSED', confidentiality: 'INTERNAL', regulatorNotify: 'false',
     voteFor: '0', voteAgainst: '0', voteAbstain: '0',
     proposedBy: '', secondedBy: '', effectiveFrom: '', reviewRequiredBy: '',
     dissentNotesEn: '', dissentNotesAr: '',

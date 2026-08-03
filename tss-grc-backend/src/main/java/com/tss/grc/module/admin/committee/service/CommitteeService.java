@@ -54,6 +54,13 @@ public class CommitteeService {
     private final CommitteeMemberTermRepository memberTermRepo;
     private final AuditLogService audit;
 
+    /** F2-100: approving the minutes is what makes the decisions in them binding, so this is
+     *  where the outcome events are announced. A <b>constructor</b> dependency deliberately —
+     *  the DF-3 rule recorded on {@code CommitteeResolutionService#memberTermRepo}: a
+     *  field-injected collaborator is null under {@code @InjectMocks} and the announcement
+     *  would silently vanish, which is the exact failure mode being fixed. */
+    private final CommitteeResolutionService resolutions;
+
     /** Track D (S4): reuse the platform e-signature subsystem to record a
      *  non-repudiable sign-off when committee minutes are approved. Optional so
      *  directly-constructed unit tests are unaffected (sign-off then no-ops). */
@@ -391,6 +398,20 @@ public class CommitteeService {
                 + " · quorum " + m.getQuorumPresent() + "/" + m.getQuorumDenominator()
                 + " required " + m.getQuorumRequired()
                 + " (" + m.getQuorumSource() + ") · minutes sha256=" + minutesDigest(m));
+
+        // ── F2-100 — approving the minutes is what makes the decisions in them binding ─────
+        // Until S7a this method published nothing, and neither did the vote that decided a
+        // motion; the ONLY outcome event in the module fired at resolution *create*. So a
+        // committee decision taken through counted in-platform votes reached no automation at
+        // all, while raising the motion tripped AR-152's "re-table at the next meeting".
+        // Delegated rather than inlined so there is one publish site
+        // (CommitteeResolutionService#publishIfBinding), the F2-62 rule: one predicate, every
+        // consumer. Each resolution is decision_published_at-guarded, so the create/vote/approve
+        // orders cannot double-announce.
+        int announced = resolutions.publishBindingDecisionsForMeeting(m.getId());
+        if (announced > 0)
+            log.info("[committee] minutes of {} approved — announced {} binding decision(s)",
+                label(m), announced);
         return m;
     }
 
