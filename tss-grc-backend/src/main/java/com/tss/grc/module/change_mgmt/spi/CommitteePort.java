@@ -56,8 +56,27 @@ public interface CommitteePort {
         String status,
         String referredBy,
         String recusalNames,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        // S7b / V350 — appended, not interleaved: the existing keys keep their positions so the
+        // payload the frontend already reads is unchanged, and these are additive.
+        String sourceCode,
+        String subjectEn,
+        String subjectAr
     ) { }
+
+    /**
+     * S7b / CE-4 — what the committee is being asked to decide, as this module states it.
+     *
+     * <p>A change-owned record mirroring {@code CommitteeReferralService.SubjectRef}, for the same
+     * reason {@link ReferralView} mirrors the entity: a port that took the peer's type would move
+     * the import one file sideways and leave this module compiled against {@code admin}.
+     *
+     * <p>It exists because the agenda is built in the committee module and cannot read
+     * {@code change_requests} to find out what it is deciding — S5a took those imports to zero and
+     * {@code ChangeModuleBoundaryTest} keeps them there. So the referring module states the label
+     * once, at referral time, and the referral keeps it (V350).
+     */
+    record SubjectRef(String code, String titleEn, String titleAr) { }
 
     /** One row of the tenant's gate → committee map (A17-D2's config surface). */
     record GateMapping(
@@ -77,7 +96,8 @@ public interface CommitteePort {
 
     /** Refer a record to a committee under a gate. Idempotent on (tenant, module, record). */
     ReferralView refer(String sourceModule, Long sourceEntityId, String gate, String mode,
-                       Long committeeId, String referredBy, String recusalNames);
+                       Long committeeId, String referredBy, String recusalNames,
+                       SubjectRef subject);
 
     /** Bind a carried committee resolution to the referral — the decision write-back. */
     ReferralView linkResolution(String sourceModule, Long sourceEntityId, Long resolutionId);

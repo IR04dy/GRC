@@ -48,10 +48,18 @@ public class CommitteeAdapter implements CommitteePort {
 
     @Override
     public ReferralView refer(String sourceModule, Long sourceEntityId, String gate, String mode,
-                              Long committeeId, String referredBy, String recusalNames) {
+                              Long committeeId, String referredBy, String recusalNames,
+                              SubjectRef subject) {
         requireEngine();
+        // S7b — translate the change-owned SubjectRef into the committee-owned one. The two are
+        // field-for-field on purpose and this line is the only place they meet, which is the whole
+        // point of the adapter living outside both modules.
+        var engineSubject = subject == null
+            ? CommitteeReferralService.SubjectRef.NONE
+            : new CommitteeReferralService.SubjectRef(
+                subject.code(), subject.titleEn(), subject.titleAr());
         return view(referrals.refer(sourceModule, sourceEntityId, gate, mode,
-                                    committeeId, referredBy, recusalNames));
+                                    committeeId, referredBy, recusalNames, engineSubject));
     }
 
     @Override
@@ -110,7 +118,8 @@ public class CommitteeAdapter implements CommitteePort {
         return new ReferralView(
             r.getId(), r.getOrganisationId(), r.getSourceModule(), r.getSourceEntityId(),
             r.getCommitteeId(), r.getMeetingId(), r.getResolutionId(), r.getGate(),
-            r.getMode(), r.getStatus(), r.getReferredBy(), r.getRecusalNames(), r.getCreatedAt());
+            r.getMode(), r.getStatus(), r.getReferredBy(), r.getRecusalNames(), r.getCreatedAt(),
+            r.getSourceCode(), r.getSubjectEn(), r.getSubjectAr());
     }
 
     /** A write that needs the engine fails loudly rather than pretending to succeed. */

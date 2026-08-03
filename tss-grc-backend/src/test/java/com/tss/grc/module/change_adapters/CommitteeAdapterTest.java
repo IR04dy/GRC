@@ -133,7 +133,8 @@ class CommitteeAdapterTest {
     void aWriteWithNoCommitteeEngineFailsLoudlyRatherThanPretending() {
         CommitteeAdapter noEngine = new CommitteeAdapter(null, null);
 
-        assertThatThrownBy(() -> noEngine.refer("CHANGE", 1L, "CAB", "APPROVAL", 13L, "x", null))
+        assertThatThrownBy(() -> noEngine.refer("CHANGE", 1L, "CAB", "APPROVAL", 13L, "x", null,
+            new CommitteePort.SubjectRef("CHG-1", "t", null)))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("committee engine is not available")
             .as("recording a change as committee-decided without the engine would assert an "
@@ -170,7 +171,7 @@ class CommitteeAdapterTest {
 
         adapter().describe(new CommitteePort.ReferralView(
             41L, 1L, "CHANGE", 500L, 13L, null, null, "CAB", "APPROVAL", "PENDING", "x", null,
-            LocalDateTime.now()), out);
+            LocalDateTime.now(), "CHG-1", "Subject", null), out);
 
         assertThat(out).as("a referral the engine no longer has must enrich nothing").isEmpty();
         verify(referrals, never()).enrich(org.mockito.ArgumentMatchers.any(),

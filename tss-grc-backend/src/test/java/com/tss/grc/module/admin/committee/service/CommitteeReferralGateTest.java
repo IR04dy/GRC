@@ -14,6 +14,7 @@ import com.tss.grc.module.admin.committee.repository.CommitteeResolutionReposito
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,12 +23,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,6 +58,9 @@ class CommitteeReferralGateTest {
     private static final Long ORG      = 1L;
     private static final String MODULE = "CHANGE";
     private static final Long ENTITY   = 500L;
+    /** S7b — a referral states what the committee is being asked to decide (V350). */
+    private static final CommitteeReferralService.SubjectRef SUBJECT =
+        new CommitteeReferralService.SubjectRef("CHG-2026-0042", "Upgrade the gateway", "ترقية البوابة");
 
     @Mock CommitteeReferralRepository   referralRepo;
     @Mock CommitteeGateMapRepository    gateMapRepo;
@@ -266,7 +272,7 @@ class CommitteeReferralGateTest {
                 .thenReturn(Optional.empty());
         when(gateMapRepo.findByOrganisationIdAndGate(ORG, "CAB")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.refer(MODULE, ENTITY, "CAB", "APPROVAL", null, "admin", null))
+        assertThatThrownBy(() -> service.refer(MODULE, ENTITY, "CAB", "APPROVAL", null, "admin", null, SUBJECT))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No committee is configured for gate CAB");
     }
@@ -287,7 +293,7 @@ class CommitteeReferralGateTest {
         when(committeeRepo.findByIdAndOrganisationId(7L, ORG)).thenReturn(Optional.of(c));
         when(referralRepo.save(any(CommitteeReferral.class))).thenAnswer(i -> i.getArgument(0));
 
-        CommitteeReferral saved = service.refer(MODULE, ENTITY, "CAB", null, null, "admin", "Requester Name");
+        CommitteeReferral saved = service.refer(MODULE, ENTITY, "CAB", null, null, "admin", "Requester Name", SUBJECT);
 
         assertThat(saved.getCommitteeId()).isEqualTo(7L);
         assertThat(saved.getMode()).isEqualTo("APPROVAL");          // defaulted from null
@@ -301,7 +307,7 @@ class CommitteeReferralGateTest {
         CommitteeReferral existing = referral(null);
         givenReferral(existing);
 
-        CommitteeReferral result = service.refer(MODULE, ENTITY, "CAB", "APPROVAL", 7L, "admin", null);
+        CommitteeReferral result = service.refer(MODULE, ENTITY, "CAB", "APPROVAL", 7L, "admin", null, SUBJECT);
 
         assertThat(result).isSameAs(existing);
         verify(referralRepo, never()).save(any());
@@ -317,7 +323,7 @@ class CommitteeReferralGateTest {
         c.setStatus("DISSOLVED");
         when(committeeRepo.findByIdAndOrganisationId(7L, ORG)).thenReturn(Optional.of(c));
 
-        assertThatThrownBy(() -> service.refer(MODULE, ENTITY, "CAB", "APPROVAL", 7L, "admin", null))
+        assertThatThrownBy(() -> service.refer(MODULE, ENTITY, "CAB", "APPROVAL", 7L, "admin", null, SUBJECT))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("is dissolved");
     }
@@ -328,7 +334,7 @@ class CommitteeReferralGateTest {
                 .thenReturn(Optional.empty());
         when(committeeRepo.findByIdAndOrganisationId(7L, ORG)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.refer(MODULE, ENTITY, "CAB", "APPROVAL", 7L, "admin", null))
+        assertThatThrownBy(() -> service.refer(MODULE, ENTITY, "CAB", "APPROVAL", 7L, "admin", null, SUBJECT))
                 .isInstanceOf(EntityNotFoundException.class)
                 .hasMessageContaining("not found in this org");
     }
@@ -367,5 +373,121 @@ class CommitteeReferralGateTest {
         assertThatThrownBy(() -> service.linkResolution(MODULE, ENTITY, 99L))
                 .isInstanceOf(EntityNotFoundException.class)
                 .hasMessageContaining("No committee referral");
+    }
+
+    // ══════════════════ S7b / CE-4 — the CAB queue, and the orphan guard ══════════════════
+
+    private void givenActiveCommittee(Long id) {
+        Committee c = new Committee();
+        c.setId(id);
+        c.setOrganisationId(ORG);
+        c.setStatus("ACTIVE");
+        when(committeeRepo.findByIdAndOrganisationId(id, ORG)).thenReturn(Optional.of(c));
+    }
+
+    private CommitteeReferral queued(Long id, String code, String status) {
+        CommitteeReferral r = new CommitteeReferral();
+        r.setId(id);
+        r.setOrganisationId(ORG);
+        r.setCommitteeId(74L);
+        r.setSourceModule(MODULE);
+        r.setSourceEntityId(id);
+        r.setGate("CAB");
+        r.setStatus(status);
+        r.setSourceCode(code);
+        r.setSubjectEn(code == null ? null : ("Subject for " + code));
+        return r;
+    }
+
+    @Test
+    @DisplayName("S7b — refer() records the subject the agenda needs")
+    void referRecordsTheAgendaSubject() {
+        givenActiveCommittee(7L);
+        when(referralRepo.findByOrganisationIdAndSourceModuleAndSourceEntityId(ORG, MODULE, ENTITY))
+            .thenReturn(Optional.empty());
+        when(referralRepo.save(any(CommitteeReferral.class))).thenAnswer(i -> i.getArgument(0));
+
+        CommitteeReferral saved = service.refer(MODULE, ENTITY, "CAB", "APPROVAL", 7L, "admin", null, SUBJECT);
+
+        assertThat(saved.getSourceCode()).isEqualTo("CHG-2026-0042");
+        assertThat(saved.getSubjectEn()).isEqualTo("Upgrade the gateway");
+        assertThat(saved.getSubjectAr()).isEqualTo("ترقية البوابة");
+    }
+
+    @Test
+    @DisplayName("S7b — SubjectRef.NONE records nothing, and the item stays off the agenda")
+    void referWithNoSubjectRecordsNothing() {
+        // The omission has to be possible — a caller may genuinely hold no reference — but it is
+        // explicit at the call site rather than an overload, so it is a decision on the record.
+        givenActiveCommittee(7L);
+        when(referralRepo.findByOrganisationIdAndSourceModuleAndSourceEntityId(ORG, MODULE, ENTITY))
+            .thenReturn(Optional.empty());
+        when(referralRepo.save(any(CommitteeReferral.class))).thenAnswer(i -> i.getArgument(0));
+
+        CommitteeReferral saved = service.refer(MODULE, ENTITY, "CAB", "APPROVAL", 7L, "admin", null,
+            CommitteeReferralService.SubjectRef.NONE);
+
+        assertThat(saved.getSourceCode()).isNull();
+        assertThat(CommitteeReferralService.SubjectRef.NONE.isPresent()).isFalse();
+        assertThat(SUBJECT.isPresent()).isTrue();
+    }
+
+    @Test
+    @DisplayName("⚠ S7b — a referral with no recorded subject is NOT in the CAB queue")
+    void theQueueExcludesSubjectlessReferrals() {
+        // THE measurement this guard exists for: dev's only two PENDING referrals (#7 and #8,
+        // created by `compliance`) point at change ids 101 and 102, and no change request with
+        // either id exists in ANY organisation — orphans left when their changes were deleted, and
+        // nothing detects or clears them. A queue keyed on status alone would have put two
+        // non-existent items on an agenda while omitting all three real ones. Requiring V350's
+        // snapshot excludes them for a stated reason rather than by luck.
+        when(referralRepo.findByOrganisationIdAndCommitteeIdAndStatusInOrderByIdAsc(
+                eq(ORG), eq(74L), any()))
+            .thenReturn(List.of(
+                queued(7L,   null,            "PENDING"),      // orphan → change 101
+                queued(8L,   null,            "PENDING"),      // orphan → change 102
+                queued(161L, "CHG-2025-0014", "PENDING"),      // real
+                queued(162L, "CHG-2025-0020", "SCHEDULED")));  // real, already on a meeting
+
+        List<CommitteeReferral> queue = service.awaitingDecision(74L);
+
+        assertThat(queue).extracting(CommitteeReferral::getSourceCode)
+            .containsExactly("CHG-2025-0014", "CHG-2025-0020");
+        assertThat(queue).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("S7b — a blank source code counts as absent, not as a code")
+    void aBlankCodeIsNotACode() {
+        when(referralRepo.findByOrganisationIdAndCommitteeIdAndStatusInOrderByIdAsc(
+                eq(ORG), eq(74L), any()))
+            .thenReturn(List.of(queued(9L, "   ", "PENDING")));
+
+        assertThat(service.awaitingDecision(74L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("S7b — the queue asks only for PENDING and SCHEDULED, never a decided referral")
+    void theQueueAsksOnlyForUndecidedStatuses() {
+        // DECIDED / WITHDRAWN items are finished with; re-tabling them would be the agenda
+        // repeating a decision the committee has already taken.
+        when(referralRepo.findByOrganisationIdAndCommitteeIdAndStatusInOrderByIdAsc(
+                eq(ORG), eq(74L), any())).thenReturn(List.of());
+
+        service.awaitingDecision(74L);
+
+        org.mockito.ArgumentCaptor<java.util.Collection<String>> statuses =
+            org.mockito.ArgumentCaptor.forClass(java.util.Collection.class);
+        verify(referralRepo).findByOrganisationIdAndCommitteeIdAndStatusInOrderByIdAsc(
+            eq(ORG), eq(74L), statuses.capture());
+        assertThat(statuses.getValue()).containsExactlyInAnyOrder("PENDING", "SCHEDULED");
+    }
+
+    @Test
+    @DisplayName("S7b — a null committee id yields an empty queue rather than an unscoped read")
+    void aNullCommitteeIsNotAWildcard() {
+        assertThat(service.awaitingDecision(null)).isEmpty();
+        verify(referralRepo, never()).findByOrganisationIdAndCommitteeIdAndStatusInOrderByIdAsc(
+            any(), any(), any());
     }
 }

@@ -1409,8 +1409,13 @@ public class ChangeManagementService {
         String recusal = java.util.stream.Stream.of(c.getRequestedByName(), c.getChangeOwnerName())
             .filter(x -> x != null && !x.isBlank()).map(String::trim).distinct()
             .collect(java.util.stream.Collectors.joining(","));
+        // S7b / CE-4 — state what the committee is being asked to decide. Without this the
+        // referral routes correctly and never appears on the committee's agenda, which is how a
+        // change could be "before the CAB" and invisible to it.
+        CommitteePort.SubjectRef subject = new CommitteePort.SubjectRef(
+            c.getChangeCode(), c.getTitleEn(), c.getTitleAr());
         CommitteePort.ReferralView r = committeePort.refer("CHANGE", id, gate, mode, committeeId, referredBy,
-            recusal.isBlank() ? null : recusal);
+            recusal.isBlank() ? null : recusal, subject);
         audit.log("REFER_TO_COMMITTEE", "ChangeRequest", id,
             "Referred to committee " + r.committeeId() + " (gate " + gate + ", mode " + mode + ")");
         return r;

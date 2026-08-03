@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -39,15 +40,35 @@ public class CommitteeReferralService {
     private final CommitteeMeetingRepository    meetingRepo;
 
     /**
+     * S7b / V350 — what the committee is being asked to decide, as the referring module states it.
+     *
+     * <p>Carried on the referral rather than joined at agenda-build time: the agenda is built in
+     * this module and the item belongs to a peer, so a join would be a reverse dependency ADR-012
+     * has no port for. See {@link CommitteeReferral#getSourceCode()}.
+     */
+    public record SubjectRef(String code, String titleEn, String titleAr) {
+        /** For callers that genuinely have nothing to state — the item stays off the agenda. */
+        public static final SubjectRef NONE = new SubjectRef(null, null, null);
+        public boolean isPresent() { return code != null && !code.isBlank(); }
+    }
+
+    /**
      * Create (or reuse) the active referral of a source item to its CAB/ECAB
      * committee. {@code committeeId} is optional — when null the per-tenant gate
      * map resolves it (user decision #1). {@code recusalNames} is a CSV of the
      * requester/author names to force-RECUSE from the vote. Idempotent: one
      * active referral per item.
+     *
+     * <p><b>{@code subject} is a required parameter, not an overload.</b> A referral with no
+     * subject never reaches an agenda (see {@link CommitteeReferral#getSourceCode()}), so an
+     * optional variant would let a caller silently produce an invisible item — which is the
+     * defect S7b exists to close. Callers with nothing to state pass {@link SubjectRef#NONE}
+     * explicitly and the omission is then a decision on the record.
      */
     @Transactional
     public CommitteeReferral refer(String sourceModule, Long sourceEntityId, String gate,
-                                   String mode, Long committeeId, String referredBy, String recusalNames) {
+                                   String mode, Long committeeId, String referredBy, String recusalNames,
+                                   SubjectRef subject) {
         Long org = TenantContext.getCurrentTenant();
 
         Optional<CommitteeReferral> existing = referralRepo
@@ -76,7 +97,41 @@ public class CommitteeReferralService {
         r.setStatus("PENDING");
         r.setReferredBy(referredBy);
         r.setRecusalNames(recusalNames);
+        if (subject != null) {
+            r.setSourceCode(blankToNull(subject.code()));
+            r.setSubjectEn(blankToNull(subject.titleEn()));
+            r.setSubjectAr(blankToNull(subject.titleAr()));
+        }
         return referralRepo.save(r);
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    /**
+     * S7b / CE-4 — the items this committee has been asked to decide and has not decided yet.
+     * This is the CAB queue, as the agenda builder needs it.
+     *
+     * <p><b>Only referrals carrying a {@code sourceCode} are returned, and that is the control.</b>
+     * Measured 2026-08-03: dev's only two {@code PENDING} referrals point at change ids 101 and 102,
+     * and no change request with either id exists in <em>any</em> organisation — orphans left when
+     * their changes were deleted, and nothing detects or clears them. A queue keyed on
+     * {@code status = 'PENDING'} alone would have put two non-existent items on an agenda while
+     * omitting all three real ones: wrong in both directions, F2-96's shape. Requiring the snapshot
+     * excludes them for a stated reason instead of by luck.
+     *
+     * <p>{@code DECIDED} and {@code WITHDRAWN} are excluded — the committee has finished with them.
+     */
+    @Transactional(readOnly = true)
+    public List<CommitteeReferral> awaitingDecision(Long committeeId) {
+        if (committeeId == null) return List.of();
+        return referralRepo
+            .findByOrganisationIdAndCommitteeIdAndStatusInOrderByIdAsc(
+                TenantContext.getCurrentTenant(), committeeId, List.of("PENDING", "SCHEDULED"))
+            .stream()
+            .filter(r -> r.getSourceCode() != null && !r.getSourceCode().isBlank())
+            .toList();
     }
 
     /**

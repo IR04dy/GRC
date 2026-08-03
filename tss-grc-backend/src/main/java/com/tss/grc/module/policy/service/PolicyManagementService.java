@@ -467,8 +467,13 @@ public class PolicyManagementService {
         String recusal = java.util.stream.Stream.of(p.getCreatedBy(), p.getOwnerName(), p.getOwnerEmail())
             .filter(x -> x != null && !x.isBlank()).map(String::trim).distinct()
             .collect(java.util.stream.Collectors.joining(","));
+        // S7b / CE-4 — a referred policy belongs on the committee's agenda for the same reason a
+        // referred change does. Policy has no separate code column, so the document reference is
+        // its own code.
+        CommitteeReferralService.SubjectRef subject = new CommitteeReferralService.SubjectRef(
+            p.getPolicyCode(), p.getTitleEn(), p.getTitleAr());
         CommitteeReferral r = referralService.refer("POLICY", id, "CAB", "APPROVAL", committeeId, referredBy,
-            recusal.isBlank() ? null : recusal);
+            recusal.isBlank() ? null : recusal, subject);
         audit.log("REFER_TO_COMMITTEE", "PolicyDocument", id, "Referred to committee " + r.getCommitteeId());
         return r;
     }

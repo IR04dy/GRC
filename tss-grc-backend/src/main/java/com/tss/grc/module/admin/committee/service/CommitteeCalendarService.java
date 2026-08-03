@@ -6,6 +6,7 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.admin.committee.entity.Committee;
 import com.tss.grc.module.admin.committee.entity.CommitteeActionItem;
 import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
+import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
 import com.tss.grc.module.admin.committee.entity.CommitteeStandingItem;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
@@ -58,6 +59,16 @@ public class CommitteeCalendarService {
     private final CommitteeStandingItemRepository    standingItems;
     private final CommitteeActionItemService         actionItems;
     private final AuditLogService                    audit;
+
+    /** S7b / CE-4 — the CAB queue this committee has been asked to decide.
+     *  {@code @Autowired(required = false)} deliberately: 30+ existing calendar tests construct
+     *  this service through {@code @InjectMocks} without it, and an agenda missing its
+     *  items-for-decision block is a degraded agenda, not a broken control — unlike F2-100's
+     *  announcement, which had to fail loudly. `populateAgenda` null-guards it, and
+     *  {@code CabQueueAgendaTest} asserts the block IS built when the collaborator is present, so
+     *  the wiring cannot quietly disappear. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private CommitteeReferralService                 referrals;
     private final ObjectMapper                       json = new ObjectMapper();
 
     /**
@@ -146,12 +157,23 @@ public class CommitteeCalendarService {
         // the platform rolls forward every still-open action.
         List<CommitteeActionItem> openActions = actionItems.openActionsForCommittee(m.getCommitteeId());
 
-        m.setAgendaJson(buildAgendaJsonWithMattersArising(items, openActions));
+        // S7b / CE-4 — the items this committee has actually been asked to decide. Until now the
+        // agenda was built from the charter template's standing items plus open actions rolled
+        // forward, so a change referred to the CAB never appeared on that CAB's agenda: measured
+        // 2026-08-03, dev committee 74 had a referral awaiting decision and its meeting's agenda
+        // had no line for it. `awaitingDecision` returns only referrals carrying a V350 subject
+        // snapshot — see its javadoc for why that is a control and not a convenience.
+        List<CommitteeReferral> forDecision = referrals == null
+            ? List.of()
+            : referrals.awaitingDecision(m.getCommitteeId());
+
+        m.setAgendaJson(buildAgendaJsonWithMattersArising(items, openActions, forDecision));
         CommitteeMeeting saved = meetings.save(m);
 
         audit.log("CAL_POPULATE_AGENDA", "CommitteeMeeting", meetingId,
             "Repopulated agenda · standing=" + items.size()
-                + " · open-actions=" + openActions.size());
+                + " · open-actions=" + openActions.size()
+                + " · items-for-decision=" + forDecision.size());
         return saved;
     }
 
@@ -216,12 +238,15 @@ public class CommitteeCalendarService {
     // ── Agenda JSON builders ──────────────────────────────────────────
 
     private String buildAgendaJson(List<CommitteeStandingItem> items) {
-        return buildAgendaJsonWithMattersArising(items, List.of());
+        // A meeting being created for a future year has no referrals yet — the queue is populated
+        // by referToCommittee between now and then, and `populateAgenda` re-runs to pick them up.
+        return buildAgendaJsonWithMattersArising(items, List.of(), List.of());
     }
 
     private String buildAgendaJsonWithMattersArising(
             List<CommitteeStandingItem> standing,
-            List<CommitteeActionItem> openActions) {
+            List<CommitteeActionItem> openActions,
+            List<CommitteeReferral> forDecision) {
         List<Map<String, Object>> out = new ArrayList<>();
         int seq = 1;
 
@@ -241,6 +266,27 @@ public class CommitteeCalendarService {
             "Matters arising — " + openActions.size() + " open actions",
             "الأمور المنبثقة — " + openActions.size() + " إجراءات مفتوحة",
             "Secretary", 10, true, "ACTIONS"));
+
+        // ── S7b / CE-4 — Items for decision, BEFORE the standing items ──────────────────
+        // Ordered ahead of the template's standing items on purpose: these are the reason the
+        // committee is sitting, and a charter template listing eight standing reports would
+        // otherwise push the change awaiting authorisation past the point where the meeting runs
+        // out of time. Each line names the item by the reference it was tabled under (V350's
+        // snapshot) so the agenda is readable without a cross-module read.
+        for (CommitteeReferral ref : forDecision) {
+            String code = ref.getSourceCode();
+            String en = ref.getSubjectEn() == null || ref.getSubjectEn().isBlank()
+                ? code : (code + " — " + ref.getSubjectEn());
+            // Fall back to the English subject rather than to the bare code: an Arabic reader is
+            // better served by a title they can read in the other language than by an id alone.
+            String arSubject = ref.getSubjectAr() == null || ref.getSubjectAr().isBlank()
+                ? ref.getSubjectEn() : ref.getSubjectAr();
+            String ar = arSubject == null || arSubject.isBlank() ? code : (code + " — " + arSubject);
+            out.add(rowOf(seq++,
+                "For decision: " + en,
+                "للقرار: " + ar,
+                "Secretary", 15, true, ref.getSourceModule()));
+        }
 
         // Items 4+ — standing items in defined sequence.
         for (CommitteeStandingItem it : standing) {

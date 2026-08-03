@@ -2024,6 +2024,39 @@ Start-Service TssGrcBackend
 | **Lesson** | **An event published at creation attests to nothing that has happened yet.** The defect and its inverse were one line apart, and the measurement that separated them was a timestamp comparison: `last_fired_at` earlier than the row it should have fired for. ⚠ And a live probe of an async engine has to *wait*: the F8 executor publishes `afterCommit` in a `REQUIRES_NEW` transaction, so reading `fire_count` once right after the HTTP response reports a rule that did fire as not-fired. My first probe run "failed" on exactly that and I nearly recorded a working control as broken |
 
 
+
+## F2-101 · The authorisation matrix demands a CAB and the code lets direct votes stand in
+
+|  |  |
+|---|---|
+| **ID** | F2-101 *(found by S7b, measuring what "the CAB queue" actually means before building an agenda over it)* |
+| **Module** | `change_mgmt` — `ChangeManagementService#requireConfiguredChangeAuthority` + the `CAB_APPROVED` transition |
+| **Severity** | **P2** — the column that records which body may authorise a change does not decide which body does |
+| **Current State** | `change_authorisation_matrix.gate` names the authorising body per (change type × risk): measured **15 CAB + 18 ECAB + 3 AUTO of 36 rows**, identical in dev and prod. The `CAB_APPROVED` transition reads it, and if the gate is CAB/ECAB it checks only that the gate is *configurable* — `gateConfigurationFault` — then, absent a referral, falls through to the **legacy recorded-votes path** (`change_approvals`: ≥ `cabMinApprovals` APPROVE, zero REJECT). Referral is a separate explicit call (`POST /{id}/refer-to-committee`), never a consequence of the transition |
+| **Measured** | **8 changes in dev and 8 in prod** are `CAB_APPROVED` or beyond, their matrix row demands **CAB or ECAB**, and they have **no committee referral at all**. And of the changes awaiting a decision right now, **3 of 4 in dev and 3 of 3 in prod** have no referral either |
+| **Problem** | "Approved by a quorate committee" and "approved by some people who voted" are not the same governance fact, and the difference is exactly what a SAMA or NCA examiner asks about. The committee path carries an active-roster denominator, COI and SoD recusal, a chair clause, e-signed minutes over a content hash and — since F2-90 — a ledger entry. The direct path carries named approval rows. The matrix column that is supposed to say which one is required is **advisory**, which is the same defect [[F2-95]] found one column to the left in the same table, one slice earlier |
+| **What it is NOT** | Not an ungated bypass. The direct path has its own gate (CM-C2: a REJECT on record blocks approval, and `cabMinApprovals` APPROVEs are required), and `requireConfiguredChangeAuthority` still fails closed when the tenant's gate map is broken (A17-D2/F2-96). The `AUTO` rows demand nothing **by design** and are correct. So this is a wrong-authority finding, not a no-authority one |
+| **Recommendation — and it is an OWNER decision** | Making `gate=CAB` require a referral is a one-line change and it would **refuse the path by which 8 changes in each database were authorised**, plus every future change in a tenant that does not use committees. That is S6b-ii's shape exactly, and the same three options apply: (a) hard gate; (b) report the divergence and leave the path open; (c) per-tenant opt-in, default off — the V348 pattern. The measurement is what the decision needs and it is now on the record; picking (a) without it would have been the control-refuses-everything mistake for the third time |
+| **Status** | ⬜ **Open — measured, filed, and deliberately not enforced in S7b.** S7b's own scope was the agenda; enforcing the gate changes who may authorise a change, which is not a decision to take inside a slice about agenda lines |
+| **References** | `ChangeManagementService#requireConfiguredChangeAuthority` · the `CAB_APPROVED` case · `ChangeAuthorisationMatrix#gate` · [[F2-95]] · [[F2-96]] · [[F2-102]] |
+| **Lesson** | **A column that names an authority is not an authority.** Two slices running, the same table has produced the same defect: `required_roles` was advisory (F2-95) and `gate` is advisory (F2-101). Worth checking every remaining column of `change_authorisation_matrix` against its enforcement rather than waiting for the third one to surface |
+
+
+## F2-102 · A committee referral outlives the record it refers to, and nothing notices
+
+|  |  |
+|---|---|
+| **ID** | F2-102 *(found by S7b while defining the CAB queue — it is why the queue has a presence test)* |
+| **Module** | `admin/committee` — `committee_referral` |
+| **Severity** | **P3** — dev-only debris today, but it is the input an agenda builder trusts |
+| **Current State** | Measured 2026-08-03 in dev: the only two `PENDING` referrals, **#7 and #8**, both created by `compliance`, point at `source_entity_id` **101** and **102** — and **no `change_requests` row with either id exists in any organisation**. Deleting a change does not withdraw, delete or flag its referral, and no sweep or report detects the dangling pair. Prod holds zero referrals, so this is dev debris rather than a production data problem |
+| **Problem** | The referral table is what the CAB queue is read from. A naive agenda keyed on `status = 'PENDING'` would have listed **two items that do not exist while omitting all three real ones** — wrong in both directions, which is [[F2-96]]'s shape: a confident report that is wrong twice over. Governance artefacts that name non-existent items are worse than an empty agenda, because an empty agenda is visibly empty |
+| **Fix (partial, in S7b)** | The queue read requires V350's subject snapshot (`source_code`), so pre-V350 rows — including both orphans — are excluded **for a stated reason rather than by luck**, and `CommitteeReferralGateTest.theQueueExcludesSubjectlessReferrals` pins it with the measurement in the test body. That makes the agenda correct; it does **not** clean up or detect the orphans |
+| **Still open** | Nothing withdraws a referral when its source record is deleted, and nothing reports a dangling one. The clean fix needs a direction the boundary has no port for (the committee module cannot ask whether a `change_requests` row exists — ADR-012, and S5a took those imports to zero), so it belongs on the **referring** side: the change module's delete path should withdraw the referral, and a health check should count danglers |
+| **Status** | ⬜ **Open** — the agenda is protected; the orphans are not cleaned. Filed rather than swept, because a `DELETE` against governance-routing rows needs the owner's explicit OK (house rule 6) |
+| **References** | `CommitteeReferralService#awaitingDecision` · `V350` · [[F2-96]] · [[F2-101]] |
+| **Lesson** | **A queue is only as trustworthy as what removes things from it.** Every control in this module reads the referral row — the gate, the recusal list, the decision write-back — and none of them asks whether the thing referred still exists. ⚠ And a practical one: **the orphans are almost certainly my own probe debris from an earlier slice**, which is the argument for cleanup on the referring side rather than a manual delete: a probe that leaves routing rows behind will do it again.
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

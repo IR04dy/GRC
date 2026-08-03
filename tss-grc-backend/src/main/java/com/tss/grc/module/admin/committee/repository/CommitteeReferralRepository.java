@@ -12,4 +12,8 @@ public interface CommitteeReferralRepository extends JpaRepository<CommitteeRefe
         Long organisationId, String sourceModule, Long sourceEntityId);
 
     Optional<CommitteeReferral> findByResolutionId(Long resolutionId);
+
+    /** S7b / CE-4 — the CAB queue for one committee. Org-scoped, like every query here. */
+    java.util.List<CommitteeReferral> findByOrganisationIdAndCommitteeIdAndStatusInOrderByIdAsc(
+        Long organisationId, Long committeeId, java.util.Collection<String> statuses);
 }

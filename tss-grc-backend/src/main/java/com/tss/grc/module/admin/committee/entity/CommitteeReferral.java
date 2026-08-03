@@ -56,6 +56,41 @@ public class CommitteeReferral {
     @Column(name = "recusal_names", length = 500)
     private String recusalNames;
 
+    // ── S7b / V350 — the agenda line's label, snapshotted at referral time ───────────
+
+    /**
+     * The referring module's own reference for the item (e.g. {@code CHG-2025-0014}).
+     *
+     * <p><b>Why the referral carries this instead of the agenda builder joining.</b> The agenda is
+     * built in {@code admin/committee} and the item is a {@code change_mgmt} record; S5a took that
+     * module's peer imports to zero behind {@code CommitteePort} and {@code ChangeModuleBoundaryTest}
+     * fails if they return. Reading {@code change_requests} to render an agenda line would be a new
+     * reverse dependency in the direction there is no port for. The referring module supplies the
+     * label at referral time — the same direction the port already runs.
+     *
+     * <p>A snapshot is also the right semantics: an agenda records what was put before the
+     * committee <em>under the title it was tabled under</em>, not whatever the record was renamed
+     * to afterwards.
+     *
+     * <p>⚠ <b>It is also the agenda builder's presence flag.</b> Only referrals carrying a
+     * {@code sourceCode} are put on an agenda. Pre-V350 rows have none — and that is what keeps
+     * dev's two orphaned referrals (#7 and #8 point at change ids 101 and 102, which exist in no
+     * organisation) off it. A builder keyed on {@code status = 'PENDING'} alone would have listed
+     * two items that do not exist while omitting all three real ones.
+     */
+    @Column(name = "source_code", length = 80)
+    private String sourceCode;
+
+    /** What the committee is being asked to decide, in English. */
+    @Column(name = "subject_en", length = 500)
+    private String subjectEn;
+
+    /** …and in Arabic (house rule 7). Nullable: the referring module may genuinely hold no Arabic
+     *  title, and refusing the referral over a label would block the governance path to protect
+     *  the label — S6b-ii's lesson. */
+    @Column(name = "subject_ar", length = 500)
+    private String subjectAr;
+
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
 

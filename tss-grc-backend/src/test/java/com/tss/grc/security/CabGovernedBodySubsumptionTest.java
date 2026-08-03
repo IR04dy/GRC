@@ -1,6 +1,7 @@
 package com.tss.grc.security;
 
 import com.tss.grc.module.admin.committee.entity.Committee;
+import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
 import com.tss.grc.module.change_mgmt.entity.ChangeAuthorisationMatrix;
 import org.junit.jupiter.api.DisplayName;
@@ -159,6 +160,51 @@ class CabGovernedBodySubsumptionTest {
             "isVotingMember",    // voting
             "termStartsAt",      // from_date
             "termEndsAt");       // to_date
+    }
+
+    @Test
+    @DisplayName("S7b — scope_json and notice_period_hours are refuted too, not merely deferred")
+    void theTwoColumnsDeferredToS7HaveNoConsumerThere() {
+        // S6 moved these to S7 on the stated grounds that "S7's agenda build is their only
+        // consumer". S7b built that agenda, and measured against the code both premises are false:
+        //
+        //   scope_json           CommitteeReferral.committee_id is NOT NULL, so the referral IS the
+        //                        assignment and the gate map decides it. There is no
+        //                        candidate-discovery step for a scope filter to narrow — every item
+        //                        on a committee's agenda got there by an explicit referral to that
+        //                        committee. A scope column would be a SECOND, competing way to
+        //                        decide which committee sees an item.
+        //
+        //   notice_period_hours  CommitteeMeeting has agenda_json and no publication act at all —
+        //                        no published_at, no circulated_at, no notice flag. populateAgenda
+        //                        idempotently rewrites the JSON. There is no moment at which an
+        //                        agenda becomes "published", so there is nothing for a notice period
+        //                        to be measured against. The column would be a policy with no event
+        //                        to enforce it at, which is F2-95's "advisory" shape.
+        //
+        // To build either for real: add the consumer FIRST (a candidate-discovery step, or an
+        // agenda-publication lifecycle), then the column, then delete this test in the same commit.
+        assertThat(Arrays.stream(Committee.class.getDeclaredFields()).map(java.lang.reflect.Field::getName))
+            .as("scope_json has no consumer — the referral's committee_id already assigns the item")
+            .doesNotContain("scopeJson");
+        assertThat(Arrays.stream(Committee.class.getDeclaredFields()).map(java.lang.reflect.Field::getName))
+            .as("notice_period_hours has nothing to measure from — there is no agenda publication act")
+            .doesNotContain("noticePeriodHours");
+
+        // The second half of the premise, asserted so it cannot silently change under the comment:
+        // if a publication field ever appears on the meeting, the notice period becomes buildable
+        // and this test should be revisited rather than trusted.
+        List<String> publicationish = Arrays.stream(CommitteeMeeting.class.getDeclaredFields())
+            .map(java.lang.reflect.Field::getName)
+            .filter(n -> n.toLowerCase().contains("publish") || n.toLowerCase().contains("circulat")
+                      || n.toLowerCase().contains("notice"))
+            .toList();
+        assertThat(publicationish)
+            .as("""
+                CommitteeMeeting has gained a publication/notice field, so notice_period_hours now \
+                HAS something to measure from. Re-open the S7 row rather than leaving this test \
+                asserting a premise that has moved: %s""", publicationish)
+            .isEmpty();
     }
 
     @Test
