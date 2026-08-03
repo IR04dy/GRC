@@ -24,6 +24,8 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -210,6 +212,59 @@ class RequiredRoleResolutionTest {
             .as("no configured requirement means the vote count is the whole answer, as before")
             .isEqualTo(true);
         assertThat(out.get("roleRemedy")).isNull();
+    }
+
+    // ── S6b-ii: the gate. Only MISSING blocks, and that is the decision. ──────────────
+
+    @Test
+    void theGateRefusesWhenAnEnforceableRoleWasNotHeldByAnyApprover() {
+        matrixRequires("CISO");
+        approvedBy(9L, "Chief Information Security Officer", "RISK_MANAGER");
+
+        assertThatThrownBy(() -> service.requireRequiredRolesPresent(CHANGE_ID))
+            .isInstanceOf(IllegalStateException.class)
+            .as("409, same shape as the vote-count and REJECT-on-record gates beside it")
+            .hasMessageContaining("requires an APPROVE from a holder of CISO")
+            .hasMessageContaining("amend the authorisation matrix");
+    }
+
+    /**
+     * The measurement that shaped the whole design. A literal gate — one refusing whenever any
+     * required role was unsatisfied — would have refused <b>9 of 11</b> already-decided changes in
+     * dev and <b>8 of 10</b> in production, because {@code CHANGE_MANAGER} is required on all 33
+     * configured rows and no active user in either database holds it. Refusing on that leaves the
+     * approver no action that could ever succeed, which is F2-92's shape.
+     */
+    @Test
+    void theGateDoesNotRefuseForARoleNobodyCouldEverSatisfy() {
+        matrixRequires("CHANGE_MANAGER");        // real role, zero active holders
+        approvedBy(9L, "someone", "RISK_MANAGER");
+
+        assertThatCode(() -> service.requireRequiredRolesPresent(CHANGE_ID))
+            .as("a control whose first act refuses every approval, with no action available to the "
+              + "approver, is the defect and not the feature")
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void theGateDoesNotRefuseForANameThatIsNotARoleAtAll() {
+        // V347 removed the only seeded NOT_A_ROLE (`CTO`), but a tenant could still configure one,
+        // and the gate must report rather than block — granting is impossible either way.
+        matrixRequires("CTO");
+        approvedBy(9L, "someone", "RISK_MANAGER");
+
+        assertThatCode(() -> service.requireRequiredRolesPresent(CHANGE_ID))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void theGatePassesOnceAHolderHasApproved() {
+        matrixRequires("CHANGE_MANAGER,CISO");   // one unenforceable, one enforceable and satisfied
+        approvedBy(7L, "so_officer", "CISO");
+
+        assertThatCode(() -> service.requireRequiredRolesPresent(CHANGE_ID))
+            .as("the enforceable half is met; the unenforceable half must not hold the decision up")
+            .doesNotThrowAnyException();
     }
 
     /**

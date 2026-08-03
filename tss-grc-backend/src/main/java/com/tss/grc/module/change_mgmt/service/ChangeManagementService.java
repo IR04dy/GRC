@@ -360,6 +360,7 @@ public class ChangeManagementService {
                             "Cannot CAB-approve: requires at least " + required
                                 + " recorded APPROVE vote(s) (have " + approves + ")");
                 }
+                requireRequiredRolesPresent(id);
                 c.setCabDecisionAt(LocalDateTime.now());
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
             }
@@ -1278,6 +1279,47 @@ public class ChangeManagementService {
                 null));
         }
         return out;
+    }
+
+    /**
+     * S6b-ii — refuse a CAB approval when a role the matrix requires is <b>checkable here and was
+     * not held by any approver</b>. The other half of F2-95: S6b-i made the payload honest, this
+     * makes the requirement bite.
+     *
+     * <p><b>Only {@link #ROLE_MISSING} blocks, and that is the whole design.</b> Measured 2026-08-03
+     * before deciding: a <em>literal</em> gate — one that refused whenever any required role was
+     * unsatisfied — would have refused <b>9 of 11</b> already-decided changes in dev and <b>8 of
+     * 10</b> in production. The reason is not the vocabulary mismatch the finding first blamed:
+     * {@code CHANGE_MANAGER} is required on all 33 configured rows and <b>no active user in either
+     * database holds it</b>. Refusing on that leaves the approver no action that could ever succeed
+     * — F2-92's shape, a control whose first act is to refuse everything — so
+     * {@code NO_ACTIVE_HOLDER} and {@code NOT_A_ROLE} are reported as configuration faults and
+     * never block. V347 removed the one {@code NOT_A_ROLE} in seeded config ({@code CTO}, a ghost),
+     * so the two halves no longer overlap.
+     *
+     * <p><b>Not enforced at {@code EMERGENCY_APPROVED}, deliberately.</b> An emergency change is
+     * authorised fast and <em>ratified</em> afterwards — that is what A17-D3's ratification SLA
+     * exists for. Putting a role gate in front of emergency authorisation would add friction at the
+     * exact moment the platform is meant to get out of the way, and the control is not lost: the
+     * ratification path is where the after-the-fact check belongs. Filed as the follow-up rather
+     * than smuggled in here.
+     *
+     * <p>Throws {@link IllegalStateException}, which maps to <b>409</b> — the same status and shape
+     * as the vote-count and REJECT-on-record gates immediately above it, so the caller sees one
+     * consistent "this decision cannot be recorded yet" contract.
+     */
+    void requireRequiredRolesPresent(Long id) {   // package-private: asserted directly, as
+                                                  // TenantWriteGuardInterceptor.decide is
+        List<String> gaps = requiredRoleStates(id).stream()
+            .filter(r -> ROLE_MISSING.equals(r.status()))
+            .map(RequiredRoleState::role)
+            .toList();
+        if (gaps.isEmpty()) return;
+        throw new IllegalStateException(
+            "Cannot CAB-approve: this change's authorisation matrix requires an APPROVE from a "
+          + "holder of " + String.join(", ", gaps) + ", and none of the recorded approvers holds "
+          + "that role. Either have a holder approve, or amend the authorisation matrix for this "
+          + "change type and risk level.");
     }
 
     public Map<String, Object> resolveAuthorisation(Long id) {
