@@ -2328,3 +2328,21 @@ tr:hover .row-actions { opacity: 1; }
 .datatable-pager__btn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--primary-200); color: var(--primary-700); }
 .datatable-pager__btn:disabled { opacity: .45; cursor: not-allowed; }
 .datatable-pager__btn:focus-visible { box-shadow: var(--focus-ring); outline: none; }
+
+/* ── F2-98: DemoDataNotice ───────────────────────────────────────────────────
+   One disclosure for demo substitution. Logical properties throughout so it
+   mirrors correctly in the Arabic-primary RTL direction without a second rule. */
+.demo-data-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-block-end: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--r-md);
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.demo-data-notice svg { flex: 0 0 auto; opacity: .8; }

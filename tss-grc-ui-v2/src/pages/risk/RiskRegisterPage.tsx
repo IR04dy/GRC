@@ -28,6 +28,7 @@ import { toRiskResponse, usePromotedProvenance } from '../../lib/promotedAdapter
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { isAuthenticated } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n';
+import { DemoDataNotice } from '../../components/ui/DemoDataNotice';
 import { statusLabel as i18nStatusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { useLiveRefresh } from '../../lib/useLiveRefresh';
@@ -192,7 +193,11 @@ export function RiskRegisterPage() {
   const [editingRisk, setEditingRisk] = useState<RiskResponse | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<RiskResponse | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const demoMode = !isAuthenticated();
+  // F2-98: reactive. The failure branch below already surfaces `riskLoadError` — but an error
+  // toast says the *load* failed, not that the rows still on screen are invented. Both facts
+  // are true and the user needs the second one; the hook's own convention (`enabled: !isDemo`)
+  // then also stops live refresh from ticking over fabricated rows.
+  const [demoMode, setDemoMode] = useState(!isAuthenticated());
 
   // ── DD-48: filter modal — drives the existing RiskFilters via URL ─────
   const [filterOpen, setFilterOpen] = useState(false);
@@ -210,14 +215,16 @@ export function RiskRegisterPage() {
   };
 
   async function load() {
-    if (demoMode) { setRisks(MOCK_RISKS); return; }
+    if (!isAuthenticated()) { setRisks(MOCK_RISKS); setDemoMode(true); return; }
     setLoading(true); setError(null);
     try {
       const page = await riskApi.list(undefined, 0, 100);
       setRisks(page.content ?? []);
+      setDemoMode(false);
     } catch {
       setError(t('riskLoadError'));
       setRisks(MOCK_RISKS);
+      setDemoMode(true);
     } finally {
       setLoading(false);
     }
@@ -561,7 +568,11 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
   const [stats, setStats] = useState<{ totalKris: number; green: number; amber: number; red: number; noData: number; openBreaches: number } | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // F2-98: reactive — `applyMock()` also runs when a tenant simply has no KRIs defined yet
+  // (the comment below says so out loud) and when the engine call fails.
+  const [showingDemo, setShowingDemo] = useState(demoMode);
   function applyMock() {
+    setShowingDemo(true);
     setKris(KRIS); setStats(KRI_DASHBOARD_STATS);
     setLatest(KRI_LATEST_BANDS);
     setBreaches(Object.fromEntries(Object.entries(KRI_BREACHES)
@@ -569,7 +580,7 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
   }
 
   async function loadAll() {
-    if (demoMode) { applyMock(); return; }
+    if (!isAuthenticated()) { applyMock(); return; }
     setLoading(true);
     try {
       // E-E: read the canonical KRI engine (/api/v1/risk/kri/*). The definition
@@ -596,6 +607,7 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
       const bc: Record<number, number> = {};
       dash.openBreaches.forEach(b => { bc[b.kriId] = (bc[b.kriId] ?? 0) + 1; });
       setBreaches(bc);
+      setShowingDemo(false);
     } catch { applyMock(); }
     finally { setLoading(false); }
   }
@@ -620,11 +632,10 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
 
   return (
     <>
-      {demoMode && (
-        <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--ink-3)' }}>
-          Demo mode · sample KRIs shown. Sign in for live thresholds and readings.
-        </div>
-      )}
+      {/* F2-98: was a hard-coded English sentence ending "Sign in for live thresholds" —
+          wrong language for an Arabic-primary product, and wrong advice for the signed-in
+          user who is the one actually being shown sample KRIs. */}
+      {showingDemo && <DemoDataNotice signedIn={isAuthenticated()} detailKey="demoNoticeKris" />}
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(140px, 1fr))', marginBottom: 12 }}>
         <Kpi Icon={Activity}      label={t('kriKpiTotal')}        value={stats?.totalKris ?? 0}    tone="primary" to="/risk/kri/dashboard" />
         <Kpi Icon={ShieldCheck}   label={t('kriKpiGreen')}        value={stats?.green ?? 0}        tone="success" to="/risk/kri/dashboard" />
@@ -693,7 +704,10 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
+  // F2-98: reactive, as KriDashboard.
+  const [showingDemo, setShowingDemo] = useState(demoMode);
   function applyMock() {
+    setShowingDemo(true);
     // Sprint 4: extend demo with Saudi-aligned appetite library so the
     // Appetite tab reflects the regulator-cited statements that listed/
     // SAMA-supervised entities are expected to carry at board level.
@@ -714,7 +728,7 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
   }
 
   async function loadAll() {
-    if (demoMode) { applyMock(); return; }
+    if (!isAuthenticated()) { applyMock(); return; }
     setLoading(true);
     try {
       const [page, dash] = await Promise.all([
@@ -733,6 +747,7 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
         } catch { /* ignore */ }
       }));
       setBreaches(bm);
+      setShowingDemo(false);
     } catch { applyMock(); }
     finally { setLoading(false); }
   }
@@ -770,11 +785,7 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
 
   return (
     <>
-      {demoMode && (
-        <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--ink-3)' }}>
-          Demo mode · sample appetite statements shown. Sign in for live exposure tracking.
-        </div>
-      )}
+      {showingDemo && <DemoDataNotice signedIn={isAuthenticated()} detailKey="demoNoticeAppetite" />}
       {/* Sprint 4 — Saudi-aligned breach feed driven by the SLA engine.
           Surfaces every appetite statement currently outside its tolerance
           band with regulator citation and a live SLA countdown. */}

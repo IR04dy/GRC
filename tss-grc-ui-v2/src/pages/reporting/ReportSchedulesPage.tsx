@@ -59,7 +59,9 @@ const EMPTY: Partial<ReportScheduleDto> = {
 export function ReportSchedulesPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const demoMode = !isAuthenticated();
+  // F2-98: state the substitution sets, not a const derived from the session — `applyDemo()`
+  // also runs for a signed-in user whose schedule list comes back empty.
+  const [demoMode, setDemoMode] = useState(!isAuthenticated());
   const [items, setItems] = useState<ReportScheduleDto[]>([]);
   const [recent, setRecent] = useState<ReportRunDto[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,10 +70,10 @@ export function ReportSchedulesPage() {
   const [confirmDel, setConfirmDel] = useState<ReportScheduleDto | null>(null);
   const [busy, setBusy] = useState(false);
 
-  function applyDemo() { setItems(REPORT_SCHEDULES); setRecent(REPORT_RUNS); }
+  function applyDemo() { setItems(REPORT_SCHEDULES); setRecent(REPORT_RUNS); setDemoMode(true); }
 
   async function load() {
-    if (demoMode) { applyDemo(); return; }
+    if (!isAuthenticated()) { applyDemo(); return; }
     setLoading(true);
     // Per-call .catch() — if `list` fails fall back to demo, but don't let
     // a transient `recent` failure also wipe out the (potentially good) list.
@@ -83,6 +85,7 @@ export function ReportSchedulesPage() {
     if (list.length === 0) { applyDemo(); setLoading(false); return; }
     setItems(list);
     setRecent(runs);
+    setDemoMode(false);
     setLoading(false);
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);

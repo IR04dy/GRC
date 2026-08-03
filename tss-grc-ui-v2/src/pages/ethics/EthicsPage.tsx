@@ -25,6 +25,7 @@ import {
   type AmlAlertDto, type AmlAnalyticsDto, type FrameworkDto,
 } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { DemoDataNotice } from '../../components/ui/DemoDataNotice';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import { isAuthenticated } from '../../lib/auth';
@@ -112,7 +113,8 @@ export function EthicsPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
-  const demoMode = !isAuthenticated();
+  // F2-98: reactive, because `applyDemoCases()` also fires on an empty list and on failure.
+  const [demoMode, setDemoMode] = useState(!isAuthenticated());
 
   const [tab, setTab] = useState<TabId>('register');
   const [apiItems, setItems] = useState<EthicsCaseDto[]>([]);
@@ -130,10 +132,12 @@ export function EthicsPage() {
   const [busy, setBusy] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
 
-  function applyDemoCases() { setItems(ETHICS_CASES); setAnalytics(ETHICS_ANALYTICS); }
+  function applyDemoCases() {
+    setItems(ETHICS_CASES); setAnalytics(ETHICS_ANALYTICS); setDemoMode(true);
+  }
 
   async function load() {
-    if (demoMode) { applyDemoCases(); return; }
+    if (!isAuthenticated()) { applyDemoCases(); return; }
     setLoading(true);
     try {
       const [page, an, fws] = await Promise.all([
@@ -146,6 +150,7 @@ export function EthicsPage() {
       setItems(list);
       setAnalytics(an);
       setFrameworks(fws);
+      setDemoMode(false);
     } catch { applyDemoCases(); }
     finally { setLoading(false); }
   }
@@ -651,10 +656,16 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   const [confirmDel, setConfirmDel] = useState<AmlAlertDto | null>(null);
   const [busy, setBusy] = useState(false);
 
-  function applyDemoAml() { setItems(AML_ALERTS); setAnalytics(AML_ANALYTICS); }
+  // F2-98: this tab substitutes independently of the parent, so it discloses independently —
+  // the cases list can be the tenant's own while these alerts are invented, and the parent's
+  // single header badge cannot represent both.
+  const [showingDemo, setShowingDemo] = useState(demoMode);
+  function applyDemoAml() {
+    setItems(AML_ALERTS); setAnalytics(AML_ANALYTICS); setShowingDemo(true);
+  }
 
   async function load() {
-    if (demoMode) { applyDemoAml(); return; }
+    if (!isAuthenticated()) { applyDemoAml(); return; }
     setLoading(true);
     try {
       const [page, an] = await Promise.all([
@@ -665,6 +676,7 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
       if (list.length === 0) { applyDemoAml(); return; }
       setItems(list);
       setAnalytics(an);
+      setShowingDemo(false);
     } catch { applyDemoAml(); }
     finally { setLoading(false); }
   }
@@ -776,6 +788,7 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
 
   return (
     <>
+      {showingDemo && <DemoDataNotice signedIn={isAuthenticated()} detailKey="demoNoticeAml" />}
       {analytics && (
         <div className="ethics-kpi-5">
           <Kpi Icon={Activity}    label={t('amlKpiTotal')}     value={analytics.total}      tone="primary" to="/aml/sanctions/dashboard" />
@@ -881,7 +894,10 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   const [busy, setBusy] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
+  // F2-98: as AmlAlertsTab — substitutes on its own, so it discloses on its own.
+  const [showingDemo, setShowingDemo] = useState(demoMode);
   function applyDemoKyc() {
+    setShowingDemo(true);
     setItems(KYC_SUBJECTS);
     setAnalytics({
       total: KYC_SUBJECTS.length,
@@ -898,7 +914,7 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   }
 
   async function load() {
-    if (demoMode) { applyDemoKyc(); return; }
+    if (!isAuthenticated()) { applyDemoKyc(); return; }
     setLoading(true);
     try {
       const [page, an] = await Promise.all([
@@ -909,6 +925,7 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
       if (list.length === 0) { applyDemoKyc(); return; }
       setItems(list);
       setAnalytics(an);
+      setShowingDemo(false);
     } catch { applyDemoKyc(); }
     finally { setLoading(false); }
   }
@@ -1043,6 +1060,7 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
 
   return (
     <>
+      {showingDemo && <DemoDataNotice signedIn={isAuthenticated()} detailKey="demoNoticeKyc" />}
       {analytics && (
         <div className="ethics-kpi-5">
           <Kpi Icon={Activity}    label={t('kycKpiTotal')}      value={analytics.total}      tone="primary" to="/aml/sanctions/dashboard" />

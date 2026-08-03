@@ -125,48 +125,85 @@ describe('W2-1b — a demo substitution is never silent', () => {
    * <p>The lesson is the one the export ceiling taught: a guard scoped to a *mechanism* tolerates
    * every reimplementation of the behaviour. This is scoped to the behaviour.
    */
-  const STATIC_DISCLOSURE_ALLOWED: Record<string, string> = {
-    // Each substitutes mock rows for a signed-in user without raising the badge. Fixing them is
-    // three lines apiece (useState + set it where the mock is applied) — tracked as F2-98.
-    'pages/ethics/EthicsPage.tsx': 'F2-98 — cases, AML alerts and KYC all substitute silently',
-    'pages/risk/RiskRegisterPage.tsx': 'F2-98 — the KRI and appetite dashboards substitute silently',
-    'pages/reporting/ReportSchedulesPage.tsx': 'F2-98 — empty schedule list substitutes silently',
-  };
+  /** Strip comments — a javadoc describing the old shape is documentation, not code. */
+  function code(body: string): string {
+    return body.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+  }
 
-  it('a page that hand-rolls the substitution still discloses it reactively', () => {
+  /**
+   * Every `applyDemo…()` / `applyMock()` body in a file, by brace matching.
+   *
+   * ⚠ The detector is deliberately **behavioural, not name-based**. Its first draft looked for
+   * `set(Demo|IsDemo)…(true)` anywhere in the file, and that was wrong twice over: it reported the
+   * correctly-fixed `RiskRegisterPage` as broken (its state is called `showingDemo`), and it passed
+   * `EthicsPage` on the strength of its *parent's* `setDemoMode(true)` while both child tabs were
+   * still silent. Naming is not the contract; setting the flag where the mock is applied is.
+   */
+  function applierBodies(src: string): { name: string; body: string }[] {
+    const out: { name: string; body: string }[] = [];
+    const re = /function\s+(apply[A-Za-z0-9_]*)\s*\([^)]*\)\s*\{/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src)) !== null) {
+      let depth = 1, i = re.lastIndex;
+      while (i < src.length && depth > 0) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}') depth--;
+        i++;
+      }
+      out.push({ name: m[1], body: src.slice(re.lastIndex, i) });
+    }
+    return out;
+  }
+
+  it('a page that hand-rolls the substitution raises the flag where it applies the mock', () => {
     const offenders: string[] = [];
+    let scanned = 0;
     for (const { path, body } of ALL) {
       if (IS_TEST(path)) continue;
-      const codeOnly = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-      // Does this file apply a mock dataset from a catch, or from an empty-result branch?
-      const substitutes =
-        /catch\s*(\([^)]*\))?\s*\{\s*(apply|set)[A-Za-z]*\(/.test(codeOnly)
-        || /\.length === 0\)\s*\{?\s*(apply|set)[A-Za-z]*\(/.test(codeOnly);
-      if (!substitutes) continue;
       if (!/import[\s\S]{0,400}?from\s+['"][^'"]*mock[^'"]*['"]/i.test(body)) continue;
-      // Reactive disclosure = the demo flag is STATE that the substitution sets, not a const
-      // derived from the session. `const demoMode = !isAuthenticated()` is the failing shape.
-      const reactive = /set(Demo|IsDemo)[A-Za-z]*\(\s*true\s*\)/.test(codeOnly);
-      if (!reactive && !(path in STATIC_DISCLOSURE_ALLOWED)) offenders.push(path);
+      const src = code(body);
+      // Only files that substitute from a catch or an empty-result branch are in scope: applying a
+      // mock in an explicit "load demo" button is not an undisclosed substitution.
+      const substitutes =
+        /catch\s*(\([^)]*\))?\s*\{\s*(apply|set)[A-Za-z]*\(/.test(src)
+        || /\.length === 0\)\s*\{?\s*(apply|set)[A-Za-z]*\(/.test(src);
+      if (!substitutes) continue;
+      for (const { name, fnBody } of applierBodies(src).map(a => ({ name: a.name, fnBody: a.body }))) {
+        // Is this applier actually one of the substitution paths, or an unrelated apply*?
+        const isSubstitutionPath = new RegExp(
+          `(catch\\s*(\\([^)]*\\))?\\s*\\{\\s*${name}\\(|\\.length === 0\\)\\s*\\{?\\s*${name}\\()`)
+          .test(src);
+        if (!isSubstitutionPath) continue;
+        scanned++;
+        if (!/\bset[A-Za-z0-9_]*\(\s*true\s*\)/.test(fnBody)) offenders.push(`${path} → ${name}()`);
+      }
     }
+    // Anti-vacuity: a brace-matcher that found nothing would make this green for the wrong reason.
+    expect(scanned, 'the applier scan found no substitution paths at all — it has stopped working')
+      .toBeGreaterThanOrEqual(6);
     expect(offenders,
-      'These pages substitute mock rows for a signed-in user and disclose it with a flag that only '
-      + 'tracks authentication, so the badge never appears in the case that matters. Make the demo '
-      + 'flag state and set it where the mock is applied:\n  ' + offenders.join('\n  '))
+      'These functions put fabricated rows on screen without raising the demo flag, so a signed-in '
+      + 'user cannot tell them from their own records (F2-98). Set the flag inside the applier:\n  '
+      + offenders.join('\n  '))
       .toEqual([]);
   });
 
-  it('keeps the F2-98 allow-list honest — a fixed page must be removed from it', () => {
-    const stale: string[] = [];
-    for (const path of Object.keys(STATIC_DISCLOSURE_ALLOWED)) {
-      const f = ALL.find(x => x.path === path);
-      if (!f) { stale.push(`${path} — file moved or deleted`); continue; }
-      const codeOnly = f.body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-      if (/set(Demo|IsDemo)[A-Za-z]*\(\s*true\s*\)/.test(codeOnly))
-        stale.push(`${path} — now discloses reactively; delete this entry`);
+  it('no page still derives its demo disclosure from the session alone', () => {
+    // `const demoMode = !isAuthenticated()` is the exact failing shape: evaluated once, false for
+    // every signed-in user, and therefore silent on both substitution paths.
+    const offenders: string[] = [];
+    for (const { path, body } of ALL) {
+      if (IS_TEST(path)) continue;
+      if (!/import[\s\S]{0,400}?from\s+['"][^'"]*mock[^'"]*['"]/i.test(body)) continue;
+      const src = code(body);
+      if (!/catch\s*(\([^)]*\))?\s*\{\s*apply[A-Za-z]*\(|\.length === 0\)\s*\{?\s*apply[A-Za-z]*\(/.test(src))
+        continue;
+      if (/const\s+\w*[Dd]emo\w*\s*=\s*!isAuthenticated\(\)/.test(src)) offenders.push(path);
     }
-    expect(stale, 'STATIC_DISCLOSURE_ALLOWED entries that no longer describe a gap:\n  '
-      + stale.join('\n  ')).toEqual([]);
+    expect(offenders,
+      'A demo flag declared `const … = !isAuthenticated()` cannot describe a substitution that '
+      + 'happens to a signed-in user. Make it state (F2-98):\n  ' + offenders.join('\n  '))
+      .toEqual([]);
   });
 
   it('the hook still documents both substitution paths', () => {

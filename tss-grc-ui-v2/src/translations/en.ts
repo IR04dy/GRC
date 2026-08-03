@@ -568,6 +568,13 @@ export const en = {
   comingSoon: 'Coming next',
   comingSoonSub: 'This view will follow once we agree on the design language.',
   demoMode: 'Demo mode · using sample data',
+  // F2-98: the substitution a SIGNED-IN user can hit — an empty register, or the API failing.
+  // Deliberately does not say "sign in": the reader already has a session.
+  demoDataSubstituted:'Sample data — your own records could not be loaded',
+  demoNoticeKris:      'sample KRIs; live thresholds and readings are unavailable',
+  demoNoticeAppetite:  'sample appetite statements; live exposure tracking is unavailable',
+  demoNoticeAml:       'sample AML alerts',
+  demoNoticeKyc:       'sample KYC subjects',
 
   // Settings page
   settingsEyebrow: 'Workspace',
