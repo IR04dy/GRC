@@ -1988,6 +1988,22 @@ Start-Service TssGrcBackend
 | **Lesson** | **A disclosure bound to the wrong condition is worse than none — it reads as a considered decision.** W2-1b was right that demo substitution is designed, not a defect, and right to pin it rather than delete it; what it could not see is that the flag it pinned was `isDemo` on the hook, while four pages carried a same-named `demoMode` meaning something else. My own first scan called `ChangesPage` *disclosed* because the file **contains** `demoMode` — the presence of a disclosure token is not disclosure of the right event |
 
 
+## F2-99 · A misspelt JSON key erased a committee's attendance sheet, and answered 200
+
+|  |  |
+|---|---|
+| **ID** | F2-99 *(found by S6c's own live probe — the probe had the bug, and the platform's response to it was the finding)* |
+| **Module** | `admin/committee` — `POST /api/admin/committees/meetings/{id}/attendance` |
+| **Severity** | **P3** — fails closed and is fully audited, but destroys governance evidence on a typo |
+| **Current State** | The endpoint **replaces the whole sheet**: it deletes every attendance row and rebuilds from `req.marks()`. The platform sets `spring.jackson.deserialization.fail-on-unknown-properties: false` — a deliberate forward-compatibility choice — so my probe's `{"attendees": [...]}` deserialised to `marks == null`, the service's `req.marks() == null ? List.of() : …` read that as "nobody attended", and the call answered **200** having deleted a 4-row sheet and recomputed quorum to not-met |
+| **Problem** | Attendance is the *only* origin of quorum since F2-28/V319, and quorum is the precondition for approving minutes, which is the precondition for authorising a change or publishing a policy. So a single mistyped key at the top of that chain silently discards the record the whole chain rests on. It took three probe runs to notice, and only because every downstream assertion read `present=0/2` |
+| **What it is NOT** | Not a security hole and not silent in the ledger: quorum goes to **not met**, so it fails closed, and `MEETING_ATTENDANCE` records *"Attendance sheet replaced · 4 row(s) → 0"* exactly as F2-28's register item 6 requires. The audit trail was right; the API was too forgiving |
+| **Fix** | `@NotNull` on `AttendanceRequest.marks` — **deliberately not `@NotEmpty`**. An empty list is a legitimate assertion ("nobody attended"); per `AttendanceMark`'s own javadoc an unmarked voting seat is *absent* and still counts in the denominator. The distinction that matters is **absent field** (a mistake — now a 400 naming `marks`) versus **empty list** (something the caller meant). The global Jackson setting is left alone: flipping `fail-on-unknown-properties` platform-wide would change every endpoint's contract to fix one of them |
+| **Status** | ✅ **Fixed 2026-08-03** (no migration). Live 5/5: a good sheet records 4 present · the misspelt key answers **400** with `{"marks": "Field is required"}` · **the existing sheet survives the rejected request** · `[]` still returns 200 with 0 present |
+| **References** | `CommitteeDtos.AttendanceRequest` · `CommitteeService#recordAttendance` · `application.yml:108` · [[F2-28]] (which made attendance the sole origin of quorum, and therefore made this matter) |
+| **Lesson** | **A replace-the-collection endpoint has to distinguish "you sent nothing" from "you sent an empty set".** With unknown properties ignored — a reasonable platform-wide choice — every such endpoint reads a typo as a deliberate wipe. Worth sweeping the other `List<…>`-replacing request bodies for the same shape; that is a separate slice, and it is filed rather than claimed. ⚠ And the meta-lesson: **my probe was wrong three times before I read the endpoint's own DTO.** `present=0/2` was the platform reporting the truth about a request I had malformed, and I spent two edits looking for the defect in my new code |
+
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

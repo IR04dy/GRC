@@ -42,7 +42,14 @@ public final class CommitteeDtos {
             String chairpersonName, String chairpersonRole,
             String secretaryName,
             String membersJson, String charterEn, String charterAr,
-            String meetingCadence, Integer quorumPct
+            String meetingCadence, Integer quorumPct,
+            /**
+             * S6c — the charter requires someone presiding for the meeting to be quorate.
+             * Nullable: absent means "not stated", which the service reads as false. A flag with
+             * no way to set it through the API is a dead control (A17-D2's whole subject), so it
+             * is on create AND update, and echoed on the response.
+             */
+            Boolean quorumRequiresChair
     ) {}
 
     public record CommitteeUpdateRequest(
@@ -50,7 +57,9 @@ public final class CommitteeDtos {
             String descriptionEn, String descriptionAr,
             String chairpersonName, String chairpersonRole, String secretaryName,
             String membersJson, String charterEn, String charterAr,
-            String meetingCadence, Integer quorumPct
+            String meetingCadence, Integer quorumPct,
+            /** S6c — null leaves the existing setting alone; the update is a partial patch. */
+            Boolean quorumRequiresChair
     ) {}
 
     public record CommitteeDissolveRequest(@NotBlank @Size(max = 500) String reason) {}
@@ -64,6 +73,8 @@ public final class CommitteeDtos {
             String chairpersonName, String chairpersonRole, String secretaryName,
             String membersJson, String charterEn, String charterAr,
             String meetingCadence, Integer quorumPct,
+            /** S6c — always present, so a caller can see the clause is OFF rather than absent. */
+            Boolean quorumRequiresChair,
             String status,
             LocalDateTime dissolvedAt, String dissolvedReason,
             LocalDateTime createdAt, LocalDateTime updatedAt
@@ -77,6 +88,11 @@ public final class CommitteeDtos {
                     c.getChairpersonName(), c.getChairpersonRole(), c.getSecretaryName(),
                     c.getMembersJson(), c.getCharterEn(), c.getCharterAr(),
                     c.getMeetingCadence(), c.getQuorumPct(),
+                    // S6c: never null on the wire. The entity defaults FALSE and V348 makes the
+                    // column NOT NULL, but a legacy row read before the migration would be null,
+                    // and `@JsonInclude(NON_NULL)` would then drop the field entirely — a caller
+                    // could not tell "clause off" from "field does not exist".
+                    Boolean.TRUE.equals(c.getQuorumRequiresChair()),
                     c.getStatus(),
                     c.getDissolvedAt(), c.getDissolvedReason(),
                     c.getCreatedAt(), c.getUpdatedAt());
@@ -139,7 +155,24 @@ public final class CommitteeDtos {
             @Size(max = 1000) String coiNote
     ) {}
 
-    public record AttendanceRequest(java.util.List<AttendanceMark> marks) {}
+    /**
+     * <b>Replaces the whole sheet</b>, so the collection must be <em>present</em> — {@code @NotNull},
+     * deliberately not {@code @NotEmpty}.
+     *
+     * <p><b>Found by S6c's own live probe, which posted the wrong key.</b> The platform sets
+     * {@code spring.jackson.deserialization.fail-on-unknown-properties: false} (a deliberate
+     * forward-compatibility choice), so {@code {"attendees": [...]}} deserialised to
+     * {@code marks == null}, the service read that as {@code List.of()}, and the endpoint answered
+     * <b>200</b> having <em>deleted the attendance sheet</em> and recomputed quorum to not-met. It
+     * fails closed and the ledger records "4 row(s) → 0", so nothing was hidden — but a typo in a
+     * key name should not be able to erase governance evidence.
+     *
+     * <p>{@code []} stays legal and means "nobody attended", which is a real thing to record: per
+     * {@link AttendanceMark}, an unmarked voting seat is <em>absent</em> and still counts in the
+     * denominator. So the distinction that matters is <b>absent field</b> (probably a mistake, now a
+     * 400 naming {@code marks}) versus <b>empty list</b> (an assertion the caller meant to make).
+     */
+    public record AttendanceRequest(@NotNull java.util.List<AttendanceMark> marks) {}
 
     /** <b>Output only.</b> {@code votingMember} is resolved from the seat, never echoed from a
      *  request — the field's presence here is what made the old shape ambiguous. */
@@ -180,6 +213,15 @@ public final class CommitteeDtos {
             java.time.LocalDateTime computedAt,
             int unrecordedVoting,
             int rosterUnlinked,
+            /**
+             * S6c — the committee's charter requires someone presiding for the meeting to be
+             * quorate. Reported even when false, so a caller can tell "the clause does not apply"
+             * from "the clause applies and is satisfied": a report that only mentions a rule when it
+             * bites cannot be used to check the rule is configured.
+             */
+            boolean chairRequired,
+            /** S6c — a present, non-guest attendee whose seat presides (chair or deputy). */
+            boolean chairPresent,
             java.util.List<AttendeeRow> attendees
     ) {}
 

@@ -144,6 +144,9 @@ public class CommitteeService {
         c.setCharterAr(req.charterAr());
         if (req.meetingCadence() != null) c.setMeetingCadence(req.meetingCadence());
         c.setQuorumPct(req.quorumPct());
+        // S6c: absent means "the charter did not say", which is FALSE — never null, because the
+        // column is NOT NULL and a null here would fail the insert rather than default politely.
+        c.setQuorumRequiresChair(Boolean.TRUE.equals(req.quorumRequiresChair()));
         c.setStatus("ACTIVE");
         return repo.save(c);
     }
@@ -166,6 +169,10 @@ public class CommitteeService {
         if (req.charterAr() != null) c.setCharterAr(req.charterAr());
         if (req.meetingCadence() != null) c.setMeetingCadence(req.meetingCadence());
         if (req.quorumPct() != null) c.setQuorumPct(req.quorumPct());
+        // S6c: a partial patch, so null leaves the clause as it was. Turning it OFF is an
+        // explicit `false`, which is the point — a governance clause should not be droppable by
+        // omitting a field from a form that happens not to render it.
+        if (req.quorumRequiresChair() != null) c.setQuorumRequiresChair(req.quorumRequiresChair());
         return c;
     }
 
@@ -312,8 +319,18 @@ public class CommitteeService {
         // not reach quorum — a quorate meeting is a precondition for binding decisions.
         if (m.getQuorumMet() == null || m.getQuorumMet() != 1)
             throw new IllegalStateException(
-                "Cannot approve minutes: the meeting did not reach quorum. Record attendance "
-                    + "and ensure enough voting members were present.");
+                "Cannot approve minutes: the meeting did not reach quorum. "
+                    // S6c: headcount is no longer the only way to fail, so the message must not
+                    // imply it is. A17-D2 and F2-96 both turned on this: a refusal that names the
+                    // wrong remedy sends the operator to fix something that was never broken.
+                    + (quorumFailedOnChairClause(m)
+                        ? "Enough voting members were present (" + m.getQuorumPresent() + "/"
+                          + m.getQuorumRequired() + "), but this committee's charter requires the "
+                          + "chair — or a deputy standing in for them — to be present, and the "
+                          + "attendance sheet marks nobody presiding. Record the presiding member "
+                          + "as present, or clear `quorumRequiresChair` on the committee if the "
+                          + "charter does not in fact require it."
+                        : "Record attendance and ensure enough voting members were present."));
 
         // F2-28 / DF-5: the flag must have been DERIVED, not asserted. Pre-V319 meetings carry
         // ASSERTED_LEGACY and are deliberately left as they are — 15 are already approved and
@@ -564,7 +581,10 @@ public class CommitteeService {
 
         return new QuorumView(meetingId, pct, totalVoting, presentVoting, required,
             m.getQuorumMet() != null && m.getQuorumMet() == 1,
-            m.getQuorumSource(), m.getQuorumComputedAt(), unrecorded, unlinked, view);
+            m.getQuorumSource(), m.getQuorumComputedAt(), unrecorded, unlinked,
+            // S6c: both facts, always — see the record's javadoc for why `chairRequired` is
+            // reported even when the clause does not apply.
+            chairRequiredFor(m), chairClauseSatisfiedFromRows(rows), view);
     }
 
     /**
@@ -591,7 +611,61 @@ public class CommitteeService {
         m.setQuorumSource("COMPUTED");
         // A committee with no active voting seats cannot be quorate. Previously this read as
         // "no rows → keep the flag", which let an empty roster inherit an asserted 1.
-        m.setQuorumMet((short) (totalVoting > 0 && presentVoting >= required ? 1 : 0));
+        // S6c: and when the committee's charter requires someone presiding, headcount alone is not
+        // quorum. The clause is per-committee and off by default (V348), so this changes nothing for
+        // a committee that has not opted in.
+        boolean numeric = totalVoting > 0 && presentVoting >= required;
+        m.setQuorumMet((short) (numeric && chairClauseSatisfied(m, rows) ? 1 : 0));
+    }
+
+    /**
+     * S6c — is the committee's "someone must preside" clause satisfied by this attendance sheet?
+     *
+     * <p>Vacuously true when the committee has not opted in, which is every committee until a tenant
+     * says otherwise. When it has, the sheet must mark a <b>present</b> attendee whose seat title
+     * classifies as presiding — chair, or a deputy standing in (the decision lives in
+     * {@link CommitteeSeatOffice#presides()}, once, rather than in a substring here).
+     *
+     * <p>Guests are excluded on purpose: {@code recordAttendance} sets {@code isGuest} for anyone not
+     * on the roster and forces {@code isVotingMember = false}, and a visitor introduced as "Chair" of
+     * something else must not confer quorum on this committee.
+     */
+    private boolean chairClauseSatisfied(CommitteeMeeting m, List<CommitteeMeetingAttendee> rows) {
+        return !chairRequiredFor(m) || chairClauseSatisfiedFromRows(rows);
+    }
+
+    /**
+     * The sheet-only half: is anyone presiding present? Separated from the clause test so the report
+     * can state "a chair IS present" for a committee that does not require one — one predicate, two
+     * consumers, which is the rule F2-62 turned into a habit and F2-96 proved by breaking.
+     */
+    private boolean chairClauseSatisfiedFromRows(List<CommitteeMeetingAttendee> rows) {
+        return rows.stream()
+            .filter(a -> Boolean.TRUE.equals(a.getPresent()))
+            .filter(a -> !Boolean.TRUE.equals(a.getIsGuest()))
+            .anyMatch(a -> CommitteeSeatOffice.classify(a.getMemberRole()).presides());
+    }
+
+    /**
+     * S6c — did this meeting fail quorum <em>only</em> because nobody was presiding?
+     *
+     * <p>Used to choose the refusal message, so the operator is told which of two different things to
+     * fix. Reads the persisted numbers rather than recounting: they were computed from the sheet that
+     * is on file, and recounting here could disagree with what the record says.
+     */
+    private boolean quorumFailedOnChairClause(CommitteeMeeting m) {
+        if (!chairRequiredFor(m)) return false;
+        Integer present = m.getQuorumPresent(), required = m.getQuorumRequired();
+        if (present == null || required == null || present < required) return false;
+        return !chairClauseSatisfiedFromRows(attendeeRepo.findByCommitteeMeetingId(m.getId()));
+    }
+
+    private boolean chairRequiredFor(CommitteeMeeting m) {
+        return m.getCommitteeId() != null
+            && repo.findById(m.getCommitteeId())
+                   .map(Committee::getQuorumRequiresChair)
+                   .filter(Boolean.TRUE::equals)
+                   .isPresent();
     }
 
     private List<CommitteeMemberTerm> rosterOf(CommitteeMeeting m) {

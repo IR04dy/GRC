@@ -85,8 +85,8 @@ PUBLISHED = {
     "zero_test_packages": 15,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 335,
-    "migration_head": 347,
+    "migration_files": 336,
+    "migration_head": 348,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
     "fe_pages": 336,
     "fe_page_folders": 114,

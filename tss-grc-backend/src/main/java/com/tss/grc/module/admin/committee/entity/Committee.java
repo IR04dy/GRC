@@ -65,6 +65,21 @@ public class Committee {
     @Column(name = "quorum_pct")
     private Integer quorumPct;
 
+    /**
+     * S6c / V348 — when set, this committee is quorate only if someone <b>presiding</b> is present
+     * (the chair, or a deputy standing in for them — see {@link
+     * com.tss.grc.module.admin.committee.service.CommitteeSeatOffice#presides()}).
+     *
+     * <p><b>Opt-in, default 0, and deliberately so.</b> Measured before shipping: only 7 of 19
+     * committees in dev and 5 of 17 in production have an active chair seat at all, and the chair was
+     * present at 1 of 18 / 0 of 17 meetings recorded quorate. A default-on requirement would refuse
+     * essentially every meeting either database has ever held, which is the shape S6b-ii established
+     * is not acceptable — a control whose first act refuses everything leaves the user no action that
+     * could succeed. A tenant turns it on for a committee whose charter says so.
+     */
+    @Column(name = "quorum_requires_chair", nullable = false)
+    private Boolean quorumRequiresChair = Boolean.FALSE;
+
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
 
