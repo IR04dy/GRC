@@ -113,8 +113,22 @@ public class CommitteeService {
 
     @Transactional
     public Committee createCommittee(CommitteeCreateRequest req) {
+        Long org = TenantContext.getCurrentTenant();
+        // F2-88 — pre-flight the unique code so the caller is told WHICH FIELD clashed. The unique
+        // index UQ_com_code(organisation_id, code) is enforced at flush, so without this the
+        // failure arrived as a DataIntegrityViolationException and answered 500 "An unexpected
+        // database error occurred." on the first step of tenant onboarding. GlobalExceptionHandler
+        // now maps that class to a 409 as a backstop, but a backstop cannot name `code` — only the
+        // service knows the domain field behind the constraint, which is why both halves exist.
+        // The repository method this needs already existed and was never called.
+        if (req.code() != null && !req.code().isBlank()
+                && repo.findByOrganisationIdAndCode(org, req.code().trim()).isPresent()) {
+            throw new com.tss.grc.common.exception.DuplicateResourceException("code",
+                "A committee with code '" + req.code().trim() + "' already exists in this "
+                + "organisation. Committee codes must be unique per tenant — choose another.");
+        }
         Committee c = new Committee();
-        c.setOrganisationId(TenantContext.getCurrentTenant());
+        c.setOrganisationId(org);
         c.setCode(req.code());
         c.setExternalId("COM_" + UUID.randomUUID().toString().substring(0, 12));
         c.setNameEn(req.nameEn());

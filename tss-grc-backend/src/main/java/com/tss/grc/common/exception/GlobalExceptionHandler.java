@@ -213,6 +213,27 @@ public class GlobalExceptionHandler {
         return pd;
     }
 
+    /**
+     * F2-88 — the pre-flighted half: a uniqueness clash the service detected before the flush, so
+     * it can name the field. Shares {@code conflictKind=UNIQUE} with
+     * {@link #handleDataIntegrityViolation} so a client need not care which half caught it, and adds
+     * {@code errors} in the same shape bean validation uses — the FE's {@code problemMessage()}
+     * already folds that map into a toast that names the field.
+     */
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ProblemDetail handleDuplicateResource(DuplicateResourceException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Conflict");
+        pd.setType(URI.create("https://grc.tss.com/errors/data-integrity"));
+        pd.setProperty("conflictKind", "UNIQUE");
+        if (ex.getField() != null && !ex.getField().isBlank()) {
+            pd.setProperty("field", ex.getField());
+            pd.setProperty("errors", Map.of(ex.getField(), ex.getMessage()));
+        }
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ProblemDetail handleBadCredentials(BadCredentialsException ex) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Invalid username or password.");
@@ -423,6 +444,120 @@ public class GlobalExceptionHandler {
         pd.setType(URI.create("https://grc.tss.com/errors/unexpected-rollback"));
         pd.setProperty("timestamp", Instant.now());
         return pd;
+    }
+
+    /**
+     * F2-88 — a constraint the database enforces and the code did not check must not surface as a
+     * 500.
+     *
+     * <p><b>The defect.</b> {@code POST /api/admin/committees} with a {@code code} the tenant
+     * already holds answered <b>500 "An unexpected database error occurred."</b> — reproduced
+     * deliberately: the same payload twice, 201 then 500. The unique index is enforced at flush, so
+     * the failure arrives as a {@link DataIntegrityViolationException}, which
+     * {@link #handleMissingDbObject}'s else-branch swept into the generic 500. It is on the first
+     * step of tenant onboarding for change governance — the step F2-87's refusal routes an
+     * administrator to — so "constitute a committee" answered 500 and turned a guided onboarding
+     * moment into a support ticket. W1-5's golden path then hit it on its second consecutive run:
+     * not an edge case, but what the second run of anything looks like.
+     *
+     * <p><b>Why a generic backstop and not only the pre-flight.</b> The specific fix is a
+     * pre-flight in the service, which can name the field ({@code code}). But measured on this
+     * database there are <b>264 unique non-PK indexes, 124 UNIQUE constraints and 181 foreign
+     * keys</b> — every one of them a future 500 of exactly this shape. A pre-flight fixes one; this
+     * maps the whole class onto the right status so the next unique index cannot repeat it.
+     *
+     * <p><b>What it deliberately does not say.</b> The driver's message carries the schema and the
+     * <em>duplicate values</em> — {@code "The duplicate key value is (1, CMT-…)"} — which is tenant
+     * data, and prod hardening (SEC-CFG-001) strips root messages for exactly that reason. So the
+     * response names the <em>kind</em> of conflict and the constraint identifier, never the raw
+     * message and never the values. The field name comes from the service pre-flight, which knows
+     * the domain; the backstop's job is the status code and a truthful category.
+     */
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrityViolation(
+            org.springframework.dao.DataIntegrityViolationException ex) {
+        int sqlError = sqlErrorCode(ex);
+        String constraint = constraintName(ex);
+
+        // SQL Server error numbers. Grouped by what the caller can do about it, which is the only
+        // distinction that belongs in a status code.
+        String kind;
+        HttpStatus status;
+        String detail;
+        switch (sqlError) {
+            case 2627, 2601 -> {                     // UNIQUE KEY / unique index violation
+                kind = "UNIQUE";
+                status = HttpStatus.CONFLICT;
+                detail = "A record with these values already exists. One of the fields you supplied "
+                       + "must be unique within your organisation — change it and try again.";
+            }
+            case 547 -> {                            // FOREIGN KEY / CHECK constraint
+                kind = "REFERENCE";
+                status = HttpStatus.CONFLICT;
+                detail = "This operation conflicts with a related record: either something it "
+                       + "refers to does not exist, or the record is still referenced elsewhere "
+                       + "and cannot be removed.";
+            }
+            case 515 -> {                            // cannot insert NULL
+                kind = "REQUIRED_FIELD";
+                status = HttpStatus.BAD_REQUEST;
+                detail = "A required field was not supplied. Check the request body against the "
+                       + "endpoint's schema.";
+            }
+            default -> {
+                kind = "INTEGRITY";
+                status = HttpStatus.CONFLICT;
+                detail = "The database rejected this change because it would break a data "
+                       + "integrity rule.";
+            }
+        }
+
+        // Full detail server-side only — this is where the schema and the duplicate values belong.
+        log.warn("[integrity] sqlError={} constraint={} kind={} — {}",
+            sqlError, constraint, kind, rootMessage(ex));
+
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, detail);
+        pd.setTitle(status == HttpStatus.CONFLICT ? "Conflict" : "Validation Failed");
+        pd.setType(URI.create("https://grc.tss.com/errors/data-integrity"));
+        pd.setProperty("conflictKind", kind);
+        if (constraint != null && !constraint.isBlank()) {
+            // The constraint identifier, not the message: stable, actionable for support, and it
+            // carries no row values.
+            pd.setProperty("constraint", constraint);
+        }
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
+    /** Vendor error number from anywhere in the cause chain, or 0 when there is no SQLException. */
+    private static int sqlErrorCode(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (t instanceof java.sql.SQLException sqlEx) return sqlEx.getErrorCode();
+            if (t.getCause() == t) break;
+        }
+        return 0;
+    }
+
+    /**
+     * The violated constraint's name. Hibernate's own
+     * {@code ConstraintViolationException#getConstraintName} is the reliable source; Spring's
+     * translated message appends {@code constraint [NAME]} as a fallback for drivers Hibernate
+     * cannot parse.
+     */
+    private static String constraintName(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (t instanceof org.hibernate.exception.ConstraintViolationException hce
+                    && hce.getConstraintName() != null) {
+                return hce.getConstraintName();
+            }
+            if (t.getCause() == t) break;
+        }
+        String msg = ex.getMessage();
+        if (msg == null) return null;
+        int at = msg.lastIndexOf("constraint [");
+        if (at < 0) return null;
+        int close = msg.indexOf(']', at);
+        return close < 0 ? null : msg.substring(at + "constraint [".length(), close);
     }
 
     @ExceptionHandler(DataAccessException.class)
