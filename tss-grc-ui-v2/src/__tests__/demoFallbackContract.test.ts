@@ -114,6 +114,61 @@ describe('W2-1b — a demo substitution is never silent', () => {
       .toEqual([]);
   });
 
+  /**
+   * F2-98 — the guard above triggers on a call to the hook. Four pages **hand-roll** the same
+   * substitution (`catch { applyDemo() }` / `if (list.length === 0) applyDemo()`) and so were
+   * outside it entirely. All four disclosed with `{demoMode && <Badge>}` where
+   * `const demoMode = !isAuthenticated()` — a value computed once, which is false for exactly the
+   * users who can hit the empty-register and API-failure paths. So the badge announced the case
+   * that was already obvious (you are not signed in) and stayed silent on the two that are not.
+   *
+   * <p>The lesson is the one the export ceiling taught: a guard scoped to a *mechanism* tolerates
+   * every reimplementation of the behaviour. This is scoped to the behaviour.
+   */
+  const STATIC_DISCLOSURE_ALLOWED: Record<string, string> = {
+    // Each substitutes mock rows for a signed-in user without raising the badge. Fixing them is
+    // three lines apiece (useState + set it where the mock is applied) — tracked as F2-98.
+    'pages/ethics/EthicsPage.tsx': 'F2-98 — cases, AML alerts and KYC all substitute silently',
+    'pages/risk/RiskRegisterPage.tsx': 'F2-98 — the KRI and appetite dashboards substitute silently',
+    'pages/reporting/ReportSchedulesPage.tsx': 'F2-98 — empty schedule list substitutes silently',
+  };
+
+  it('a page that hand-rolls the substitution still discloses it reactively', () => {
+    const offenders: string[] = [];
+    for (const { path, body } of ALL) {
+      if (IS_TEST(path)) continue;
+      const codeOnly = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+      // Does this file apply a mock dataset from a catch, or from an empty-result branch?
+      const substitutes =
+        /catch\s*(\([^)]*\))?\s*\{\s*(apply|set)[A-Za-z]*\(/.test(codeOnly)
+        || /\.length === 0\)\s*\{?\s*(apply|set)[A-Za-z]*\(/.test(codeOnly);
+      if (!substitutes) continue;
+      if (!/import[\s\S]{0,400}?from\s+['"][^'"]*mock[^'"]*['"]/i.test(body)) continue;
+      // Reactive disclosure = the demo flag is STATE that the substitution sets, not a const
+      // derived from the session. `const demoMode = !isAuthenticated()` is the failing shape.
+      const reactive = /set(Demo|IsDemo)[A-Za-z]*\(\s*true\s*\)/.test(codeOnly);
+      if (!reactive && !(path in STATIC_DISCLOSURE_ALLOWED)) offenders.push(path);
+    }
+    expect(offenders,
+      'These pages substitute mock rows for a signed-in user and disclose it with a flag that only '
+      + 'tracks authentication, so the badge never appears in the case that matters. Make the demo '
+      + 'flag state and set it where the mock is applied:\n  ' + offenders.join('\n  '))
+      .toEqual([]);
+  });
+
+  it('keeps the F2-98 allow-list honest — a fixed page must be removed from it', () => {
+    const stale: string[] = [];
+    for (const path of Object.keys(STATIC_DISCLOSURE_ALLOWED)) {
+      const f = ALL.find(x => x.path === path);
+      if (!f) { stale.push(`${path} — file moved or deleted`); continue; }
+      const codeOnly = f.body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+      if (/set(Demo|IsDemo)[A-Za-z]*\(\s*true\s*\)/.test(codeOnly))
+        stale.push(`${path} — now discloses reactively; delete this entry`);
+    }
+    expect(stale, 'STATIC_DISCLOSURE_ALLOWED entries that no longer describe a gap:\n  '
+      + stale.join('\n  ')).toEqual([]);
+  });
+
   it('the hook still documents both substitution paths', () => {
     const hook = ALL.find(f => f.path === 'lib/useApiResource.ts');
     expect(hook, 'useApiResource.ts moved — this contract test needs repointing').toBeDefined();

@@ -209,6 +209,8 @@ export const en = {
   exportStarted:       'Export started — your download should begin shortly',
   exportFailed:        'We couldn’t export the file. Try again.',
   exportSignInRequired:'Sign in to export',
+  // F2-98: shown when the rows on screen are sample data even though the user IS signed in.
+  exportDemoDataBlocked:'Export is unavailable while sample data is on screen — it would not match this export',
 
   // ── Change Management module ───────────────────────────
   modChanges:                'Change Management',

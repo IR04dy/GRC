@@ -178,7 +178,7 @@ import { ScmPage } from './pages/scm/ScmPage';
 const AdminPage              = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
 const LicensingPage          = lazy(() => import('./pages/admin/LicensingPage').then(m => ({ default: m.LicensingPage })));
 const HelpTopicsAdminPage    = lazy(() => import('./pages/admin/HelpTopicsAdminPage').then(m => ({ default: m.HelpTopicsAdminPage })));
-const ChangesPage            = lazy(() => import('./pages/changes/ChangesPage').then(m => ({ default: m.ChangesPage })));
+const ChangesPage            = lazy(() => import('./pages/change/ChangesPage').then(m => ({ default: m.ChangesPage })));
 const EthicsPage             = lazy(() => import('./pages/ethics/EthicsPage').then(m => ({ default: m.EthicsPage })));
 // Sprint 13 — Whistleblower / Ethics Hotline.
 const WhistleblowerSubmitPublicPage = lazy(() => import('./pages/ethics/WhistleblowerSubmitPublicPage').then(m => ({ default: m.WhistleblowerSubmitPublicPage })));

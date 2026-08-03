@@ -1971,6 +1971,23 @@ Start-Service TssGrcBackend
 | **Lesson** | **An allowlist entry is a filed defect or it is a silencer.** The ratchet needed one exception; making the entry carry a finding id, and testing that the excused rule is still broken, is what keeps the difference visible. The alternative — inventing a role so the count reached zero — would have made the report green by making the platform wrong |
 
 
+## F2-98 · The "Demo mode" badge tracks the session, not the substitution
+
+|  |  |
+|---|---|
+| **ID** | F2-98 *(found by S5c while splitting `ChangesPage`; the file being restructured was one of the four)* |
+| **Module** | frontend — `pages/change`, `pages/ethics`, `pages/risk`, `pages/reporting` |
+| **Severity** | **P2** — a signed-in user cannot distinguish fabricated records from their own |
+| **Current State** | Four pages hand-roll the demo-data fallback instead of using `useApiResource`. All four call their `applyDemo*()` from **three** places — not signed in, the register came back **empty**, and the API **threw** — and all four disclose it with `{demoMode && <Badge>Demo mode</Badge>}` where `const demoMode = !isAuthenticated()`, a value computed once at render |
+| **Problem** | `!isAuthenticated()` is **false** for exactly the two cases a real tenant can hit. A fresh tenant with no changes yet, or any user while the backend is down, is shown a full register of invented records **with no badge**. So the disclosure fires for the case that was already obvious (you are not logged in) and stays silent for the two that are not. Measured live: an empty `200` and a network failure both put **10 fabricated change requests** on screen; the export menu stayed enabled and, when disabled, said *"Sign in to export"* to a user who was signed in — and the file it would have produced is the real, empty register, so screen and export disagree |
+| **Why the existing guard missed it** | `demoFallbackContract.test.ts` already asserts *"every page consuming `useApiList`/`useApiResource` surfaces `isDemo`"* — 10 of 10 hook consumers pass. Its trigger is the **hook**. These four pages reimplement the behaviour, so they were never in scope. A guard scoped to a mechanism tolerates every reimplementation of it; the same distinction `BARE_EXPORT_CEILING` → `everyExportHandlerAlsoDemandsARead` turned on |
+| **Fix** | Make the flag **state the substitution sets**, exactly as the hook does (`isDemo` starts at `!isAuthenticated()` and is then set by each substitution path). Three lines per page. `pages/change` is done — badge appears on both silent paths, clears again when the tenant's own rows arrive, and the export tooltip now names the real reason (new key `exportDemoDataBlocked`, EN + AR) |
+| **Effort** | **S** — the remaining three pages are the same three lines each |
+| **Status** | 🟡 **Partly fixed.** `pages/change/ChangesPage.tsx` fixed and live-verified 3/3 (empty `200`, network failure, real rows) in both languages. `ethics`, `risk` and `reporting` are named in `demoFallbackContract.STATIC_DISCLOSURE_ALLOWED` with this finding id, and a companion test fails if an entry stops describing a real gap — so the allow-list cannot outlive what it excuses |
+| **References** | `demoFallbackContract.test.ts` (widened guard + allow-list) · `lib/useApiResource.ts` (the correct model) · `ExportMenu.disabledReason` · [[F2-42]] (the same "fabricated where the server has an answer" shape) · W2-1b (which pinned the *disclosed* contract deliberately) |
+| **Lesson** | **A disclosure bound to the wrong condition is worse than none — it reads as a considered decision.** W2-1b was right that demo substitution is designed, not a defect, and right to pin it rather than delete it; what it could not see is that the flag it pinned was `isDemo` on the hook, while four pages carried a same-named `demoMode` meaning something else. My own first scan called `ChangesPage` *disclosed* because the file **contains** `demoMode` — the presence of a disclosure token is not disclosure of the right event |
+
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

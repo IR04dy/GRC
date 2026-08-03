@@ -15,9 +15,14 @@ interface Toast {
  * Props:
  *   onPdf / onXlsx / onDocx — async callbacks that perform the download
  *   demoMode — when true, the menu is disabled and shows a tooltip
+ *   disabledReason — F2-98: the i18n key explaining *why* it is disabled. Defaults to
+ *     `exportSignInRequired`, which was the only cause when this component was written.
+ *     It is no longer: a signed-in user whose register came back empty is shown demo rows,
+ *     and exporting then produces the real (empty) file while the screen shows invented
+ *     ones. Blocking is right; "Sign in to export" is the wrong sentence to block with.
  */
 export function ExportMenu({
-  demoMode, t, toast, onPdf, onXlsx, onDocx,
+  demoMode, t, toast, onPdf, onXlsx, onDocx, disabledReason = 'exportSignInRequired',
 }: {
   demoMode: boolean;
   t: (k: string) => string;
@@ -25,6 +30,7 @@ export function ExportMenu({
   onPdf?: () => Promise<void>;
   onXlsx?: () => Promise<void>;
   onDocx?: () => Promise<void>;
+  disabledReason?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<'pdf' | 'xlsx' | 'docx' | null>(null);
@@ -54,7 +60,7 @@ export function ExportMenu({
         Icon={Download}
         disabled={demoMode || busy != null}
         onClick={() => setOpen(o => !o)}
-        title={demoMode ? t('exportSignInRequired') : t('riskExport')}
+        title={demoMode ? t(disabledReason) : t('riskExport')}
       >
         {t('riskExport')}
         <ChevronDown size={12} style={{ marginInlineStart: 4, opacity: 0.7 }} />
