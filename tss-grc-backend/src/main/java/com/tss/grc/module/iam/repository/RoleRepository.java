@@ -47,6 +47,20 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
      *
      * @return rows of {@code [role_name (String), active_holders (Number)]}
      */
+    /**
+     * The platform role names held by one user. F2-95 — the only vocabulary in which
+     * "did a CISO approve this change?" can be asked without inventing a fourth one:
+     * `change_approvals.approver_role` is free text (7 distinct values in both databases,
+     * <b>none</b> of them a platform role name), and committee seat titles are a third set.
+     */
+    @Query(value = """
+        SELECT r.role_name
+          FROM iam.user_roles ur
+          JOIN iam.roles r ON r.id = ur.role_id
+         WHERE ur.user_id = :userId AND r.is_deleted = 0
+        """, nativeQuery = true)
+    List<String> findRoleNamesByUserId(@Param("userId") Long userId);
+
     @Query(value = """
         SELECT ro.role_name AS role_name, COUNT(DISTINCT u.id) AS active_holders
           FROM iam.roles ro

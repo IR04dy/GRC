@@ -5,6 +5,7 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.common.util.SaudiWorkdayUtil;
 import com.tss.grc.module.change_mgmt.model.RatificationStates;
 import com.tss.grc.module.platform.calendar.service.SaudiWorkdayCalendar;
+import com.tss.grc.module.platform.service.RoleDirectoryService;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -29,8 +30,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -146,6 +151,14 @@ public class ChangeManagementService {
      *  (keeps unit tests that construct the service directly working). */
     @Autowired(required = false)
     private ChangeAuthorisationMatrixRepository authMatrixRepo;
+
+    /** F2-95: resolves the matrix's {@code required_roles} against the platform's own role
+     *  vocabulary. A {@code platform} service rather than an `iam` import, because ADR-012
+     *  forbids this module a peer — see {@link RoleDirectoryService}. Optional, so a required
+     *  role reads as unverifiable rather than satisfied when the directory is absent: the
+     *  fail-safe direction, since claiming satisfied is the defect being fixed. */
+    @Autowired(required = false)
+    private RoleDirectoryService roleDirectory;
 
     /** CH-17: freeze/blackout windows. Optional — when absent, no freeze gate
      *  is enforced (keeps directly-constructed unit tests working). */
@@ -1179,12 +1192,111 @@ public class ChangeManagementService {
     /** CH-17: the authorisation required for a specific change (gate / min
      *  approvals / advisory roles) alongside how many APPROVE votes it has. */
     @Transactional(readOnly = true)
+    /**
+     * One required role from the matrix, and whether the recorded approvals meet it.
+     *
+     * @param role       the name as configured on the matrix row
+     * @param status     {@link #ROLE_SATISFIED} · {@link #ROLE_MISSING} ·
+     *                   {@link RoleDirectoryService#NO_ACTIVE_HOLDER} ·
+     *                   {@link RoleDirectoryService#NOT_A_ROLE}
+     * @param satisfiedBy the approver who supplied it, when satisfied
+     */
+    public record RequiredRoleState(String role, String status, String satisfiedBy) {}
+
+    /** A required role that some approver holds. */
+    public static final String ROLE_SATISFIED = "SATISFIED";
+    /** Checkable here — somebody holds it — and no approver did. A real authorisation gap. */
+    public static final String ROLE_MISSING = "MISSING";
+
+    /**
+     * F2-95 — resolve {@code required_roles} against the approvals actually recorded.
+     *
+     * <p><b>The defect.</b> `required_roles` is configured on <b>33 of 36 matrix rows in dev and
+     * production alike</b> ({@code CHANGE_MANAGER}, {@code CISO}, {@code CTO}) and was read in
+     * exactly one place: to echo the CSV back beside a {@code satisfied} flag computed purely
+     * from vote <em>counts</em>. So the API asserted "a CRITICAL change requires the CISO" and
+     * reported it satisfied with no CISO anywhere near it — worse than not having the field,
+     * because a reviewer reads the two together.
+     *
+     * <p><b>Why through {@code approver_id}.</b> Three vocabularies name roles on this one
+     * decision path: the matrix uses <em>platform role names</em>; committee rosters use
+     * governance <em>seat titles</em> ({@code Chair}, {@code Member}); and
+     * {@code change_approvals.approver_role} is <em>free text the voter types</em> — measured,
+     * 7 distinct values in both databases and <b>not one</b> of them a platform role name. So
+     * the requirement is resolved through {@code approver_id → iam.user_roles}, the platform's
+     * own authorisation vocabulary, and no fourth vocabulary is invented.
+     *
+     * <p><b>Why unmet is not one status but three.</b> Measured 2026-08-03, identically in dev
+     * and prod: {@code CISO} has one active holder and is checkable; {@code CHANGE_MANAGER} — on
+     * all 33 rows — is a real role <b>nobody holds</b>; {@code CTO} is not a role at all
+     * ([[F2-52]]'s ghost shape). Collapsing those into "unsatisfied" would tell an administrator
+     * to go and find a CHANGE_MANAGER who cannot exist, and the same collapse is what made a
+     * literal enforcement gate refuse <b>9 of 11</b> already-decided changes in dev and 8 of 10
+     * in prod. Only {@link #ROLE_MISSING} is an authorisation gap; the other two are
+     * configuration faults, and the remedies are different.
+     */
+    @Transactional(readOnly = true)
+    public List<RequiredRoleState> requiredRoleStates(Long id) {
+        ChangeRequest c = require(id);
+        ChangeAuthorisationMatrix m = resolveMatrix(c);
+        String csv = m != null ? m.getRequiredRoles() : null;
+        if (csv == null || csv.isBlank()) return List.of();
+
+        Map<String, String> enforceability = roleDirectory == null
+            ? Map.of()
+            : roleDirectory.enforceabilityByRole(c.getOrganisationId());
+
+        // Who approved, and what platform roles do they actually hold. Resolved once per
+        // approver, not once per (approver x required role).
+        Map<Long, String> approverNames = new LinkedHashMap<>();
+        Set<String> rolesHeldByApprovers = new LinkedHashSet<>();
+        Map<String, String> firstHolderOfRole = new LinkedHashMap<>();
+        for (ChangeApproval v : approvalRepo.findByChangeRequestIdOrderByDecidedAtAsc(id)) {
+            if (!"APPROVE".equalsIgnoreCase(v.getDecision()) || v.getApproverId() == null) continue;
+            approverNames.putIfAbsent(v.getApproverId(), v.getApproverName());
+            if (roleDirectory == null) continue;
+            for (String held : roleDirectory.rolesOf(v.getApproverId())) {
+                rolesHeldByApprovers.add(held);
+                firstHolderOfRole.putIfAbsent(held, v.getApproverName());
+            }
+        }
+
+        List<RequiredRoleState> out = new ArrayList<>();
+        for (String raw : csv.split(",")) {
+            String role = raw.trim();
+            if (role.isEmpty()) continue;
+            String key = role.toUpperCase(Locale.ROOT);
+            if (rolesHeldByApprovers.contains(key)) {
+                out.add(new RequiredRoleState(role, ROLE_SATISFIED, firstHolderOfRole.get(key)));
+                continue;
+            }
+            String checkable = roleDirectory == null
+                ? RoleDirectoryService.NOT_A_ROLE
+                : roleDirectory.enforceability(enforceability, role);
+            out.add(new RequiredRoleState(role,
+                RoleDirectoryService.ENFORCEABLE.equals(checkable) ? ROLE_MISSING : checkable,
+                null));
+        }
+        return out;
+    }
+
     public Map<String, Object> resolveAuthorisation(Long id) {
         ChangeRequest c = require(id);
         ChangeAuthorisationMatrix m = resolveMatrix(c);
         long approves = approvalRepo.findByChangeRequestIdOrderByDecidedAtAsc(id).stream()
             .filter(v -> "APPROVE".equalsIgnoreCase(v.getDecision())).count();
         int required = requiredApprovals(c);
+        List<RequiredRoleState> roleStates = requiredRoleStates(id);
+
+        boolean approvalsSatisfied = approves >= required;
+        List<String> roleGaps = roleStates.stream()
+            .filter(r -> ROLE_MISSING.equals(r.status())).map(RequiredRoleState::role).toList();
+        List<String> unverifiableRoles = roleStates.stream()
+            .filter(r -> RoleDirectoryService.NOT_A_ROLE.equals(r.status())
+                      || RoleDirectoryService.NO_ACTIVE_HOLDER.equals(r.status()))
+            .map(RequiredRoleState::role).toList();
+        boolean rolesSatisfied = roleGaps.isEmpty() && unverifiableRoles.isEmpty();
+
         Map<String, Object> out = new HashMap<>();
         out.put("changeType",      c.getChangeType());
         out.put("riskLevel",       c.getRiskLevel());
@@ -1192,8 +1304,47 @@ public class ChangeManagementService {
         out.put("minApprovals",    required);
         out.put("requiredRoles",   m != null ? m.getRequiredRoles() : null);
         out.put("approvesRecorded", approves);
-        out.put("satisfied",       approves >= required);
+        // Split, because one flag could not carry both facts and was silently carrying only
+        // the cheaper one. `satisfied` keeps its key for existing callers but is now the
+        // conjunction — it must never read true while a configured role requirement is
+        // unmet or unverifiable, which was the whole of F2-95.
+        out.put("approvalsSatisfied", approvalsSatisfied);
+        out.put("rolesSatisfied",     rolesSatisfied);
+        out.put("requiredRoleStates", roleStates);
+        out.put("roleGaps",           roleGaps);
+        out.put("unverifiableRoles",  unverifiableRoles);
+        out.put("satisfied",          approvalsSatisfied && rolesSatisfied);
+        out.put("roleRemedy",         roleRemedy(roleGaps, roleStates));
         return out;
+    }
+
+    /**
+     * Name the action, and name which action is <em>not</em> it — F2-96's rule. Telling an
+     * administrator to "assign the CHANGE_MANAGER role" is useless when the role has no holder
+     * anywhere in the tenant, and actively wrong for {@code CTO}, which is not a role.
+     */
+    private static String roleRemedy(List<String> gaps, List<RequiredRoleState> states) {
+        if (states.isEmpty()) return null;
+        List<String> unheld = states.stream()
+            .filter(r -> RoleDirectoryService.NO_ACTIVE_HOLDER.equals(r.status()))
+            .map(RequiredRoleState::role).toList();
+        List<String> ghosts = states.stream()
+            .filter(r -> RoleDirectoryService.NOT_A_ROLE.equals(r.status()))
+            .map(RequiredRoleState::role).toList();
+        if (gaps.isEmpty() && unheld.isEmpty() && ghosts.isEmpty())
+            return "Every role this change's authorisation matrix requires was held by an approver.";
+        StringBuilder b = new StringBuilder();
+        if (!gaps.isEmpty())
+            b.append("Needs an APPROVE from a holder of ").append(String.join(", ", gaps))
+             .append(". ");
+        if (!unheld.isEmpty())
+            b.append(String.join(", ", unheld)).append(" is required but no active user in this "
+              + "tenant holds it, so no approval can satisfy it — grant the role, or amend the "
+              + "authorisation matrix. ");
+        if (!ghosts.isEmpty())
+            b.append(String.join(", ", ghosts)).append(" is not a role in this tenant at all; "
+              + "granting is impossible — create the role or remove it from the matrix row. ");
+        return b.toString().trim();
     }
 
     // ── Track D: refer a change to its CAB/ECAB committee ─────────────────────

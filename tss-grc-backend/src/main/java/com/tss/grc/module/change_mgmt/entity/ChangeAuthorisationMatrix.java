@@ -40,7 +40,24 @@ public class ChangeAuthorisationMatrix {
     @Column(name = "min_approvals", nullable = false)
     private Integer minApprovals = 1;
 
-    /** CSV of roles that should cover the approval (advisory, e.g. "CHANGE_MANAGER,CISO"). */
+    /**
+     * CSV of <b>platform role names</b> that must cover the approval, e.g.
+     * {@code "CHANGE_MANAGER,CISO"}.
+     *
+     * <p>⚠ This javadoc said <b>"advisory"</b> for as long as the column existed, and that word
+     * was the finding (F2-95): the field was configured on 33 of 36 rows and applied nowhere,
+     * while the API echoed it back beside a {@code satisfied} flag computed from vote counts
+     * alone. "Advisory" is what gets written when a check turns out to be impossible mid
+     * implementation — here because three vocabularies name roles on this path (these platform
+     * roles, governance seat titles on committee rosters, and the free text a voter types into
+     * {@code change_approvals.approver_role}).
+     *
+     * <p>Now resolved through {@code approver_id → iam.user_roles} by
+     * {@code ChangeManagementService#requiredRoleStates}, which reports each role as SATISFIED,
+     * MISSING, NO_ACTIVE_HOLDER or NOT_A_ROLE. It is <b>reported, not yet gated</b> — see that
+     * method for the measurement showing a literal gate would refuse 9 of 11 already-decided
+     * changes.
+     */
     @Column(name = "required_roles", length = 400)
     private String requiredRoles;
 

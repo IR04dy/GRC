@@ -611,10 +611,34 @@ export interface ChangeAuthMatrixCell {
   gate: string; minApprovals: number; requiredRoles?: string | null;
   notesEn?: string; notesAr?: string;
 }
+/** One required role from the matrix and whether the recorded approvals met it (F2-95). */
+export interface RequiredRoleState {
+  role: string;
+  /** SATISFIED | MISSING | NO_ACTIVE_HOLDER | NOT_A_ROLE */
+  status: 'SATISFIED' | 'MISSING' | 'NO_ACTIVE_HOLDER' | 'NOT_A_ROLE';
+  satisfiedBy?: string | null;
+}
 export interface ChangeAuthorisationView {
   changeType: string; riskLevel: string; gate: string;
   minApprovals: number; requiredRoles?: string | null;
-  approvesRecorded: number; satisfied: boolean;
+  approvesRecorded: number;
+  /** The vote count alone — what `satisfied` used to mean on its own. */
+  approvalsSatisfied: boolean;
+  /** Every configured role requirement met. False when any is unmet OR unverifiable. */
+  rolesSatisfied: boolean;
+  requiredRoleStates: RequiredRoleState[];
+  /** Roles that are checkable here and were not held by any approver — the actionable ask. */
+  roleGaps: string[];
+  /** Roles no approval could ever satisfy: nobody holds them, or they are not roles. */
+  unverifiableRoles: string[];
+  /**
+   * ⚠ F2-95 changed this field's meaning: it is now `approvalsSatisfied && rolesSatisfied`.
+   * It previously counted votes only, so it read `true` beside `requiredRoles: "…,CISO"` when
+   * no CISO had approved. Nothing renders this payload yet — the pair was served to API
+   * consumers and awaits CE-13's CAB workspace — so widening it breaks no screen.
+   */
+  satisfied: boolean;
+  roleRemedy?: string | null;
 }
 export interface ChangeFreezeWindowDto {
   id?: number; organisationId?: number;
