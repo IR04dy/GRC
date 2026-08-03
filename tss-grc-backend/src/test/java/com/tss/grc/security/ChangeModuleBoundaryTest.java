@@ -205,4 +205,49 @@ class ChangeModuleBoundaryTest {
               + "to one commercial module (ADR-018 R4)")
             .doesNotContain("change_adapters");
     }
+
+    /**
+     * ⚠ The package is called {@code change_mgmt} <b>by decision</b>, not by inertia — do not
+     * "tidy" it to {@code change}.
+     *
+     * <p>{@code UNIFIED_IMPLEMENTATION_PLAN} §6c proposed the tree as {@code module/change/**} on
+     * <b>2026-07-25</b> (`ff087c7c`), and <b>S5b</b> is written as "the package move
+     * {@code module/change_mgmt} → {@code module/change}". Five days later
+     * <b>ADR-017 D-4</b> (`921f8a11`, 2026-07-30) settled the naming question in the opposite
+     * direction:
+     *
+     * <blockquote>{@code Change Governance & CAB} is the shelf/SKU name; <b>{@code change_mgmt}
+     * remains the package name</b> and "Change Enablement" the internal practice name, because ITIL
+     * alignment is an asset in engineering documentation and a liability on a price list.
+     * </blockquote>
+     *
+     * <p>So the rename would reverse a ratified decision taken <em>after</em> the plan proposed it,
+     * and it is not a cosmetic 55-file sweep but a reversal. The same trap W1-5 hit from the other
+     * side: its first draft constituted a committee of type {@code "CAB"}, and the obvious fix —
+     * widening the vocabulary — would have reversed ADR-017 D-2. A decision that lives only in a
+     * document gets undone by the next person doing an obvious tidy-up, so it is pinned here.
+     *
+     * <p>To genuinely rename the package, amend ADR-017 D-4 first and delete this test in the same
+     * commit — that is the intended way through, and it forces the decision to be re-taken rather
+     * than drifted past.
+     */
+    @Test
+    void thePackageNameIsChangeMgmtByRatifiedDecisionAndNotByAccident() {
+        assertThat(Files.isDirectory(MODULE))
+            .as("ADR-017 D-4: `change_mgmt` remains the package name. If this fails because the "
+              + "package was renamed, the rename reversed a ratified decision — amend the ADR or "
+              + "revert the move")
+            .isTrue();
+        assertThat(MODULE.toString().replace('\\', '/'))
+            .as("the module must still live at module/change_mgmt (ADR-017 D-4)")
+            .endsWith("module/change_mgmt");
+        assertThat(SkuRegistry.PACKAGE_TO_SKU)
+            .as("the entitlement homing keys on the package NAME, so a rename silently unhomes the "
+              + "module and requiredSkuForPackage throws for everything inside it (ADR-018 R1)")
+            .containsKey("change_mgmt");
+        assertThat(ALLOWED)
+            .as("the boundary's own allow-list names the package; a rename that missed this would "
+              + "make every one of the module's self-imports look like a peer violation")
+            .contains("change_mgmt");
+    }
 }
