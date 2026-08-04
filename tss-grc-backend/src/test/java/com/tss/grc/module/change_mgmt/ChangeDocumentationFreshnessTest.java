@@ -242,6 +242,48 @@ class ChangeDocumentationFreshnessTest {
     }
 
     @Test
+    @DisplayName("every CHANGE export the platform serves is documented")
+    void everyChangeExportIsDocumented() {
+        // The inverse of everyCitedPathExists, added by S8d: that test catches a document naming an
+        // endpoint that is gone; this one catches an endpoint no document names. An export nobody
+        // knows about is not a deliverable, and G-14 is a list of three artefacts precisely because
+        // the first two existed and were invisible.
+        String src = read(CONTROLLERS.stream()
+            .filter(p -> p.getFileName().toString().equals("ExportController.java"))
+            .findFirst().orElseThrow(() -> new AssertionError(
+                "ExportController is not in the scanned list — this test cannot check what it "
+                + "cannot read")));
+        Set<String> guarded = new TreeSet<>();
+        Matcher m = Pattern.compile(
+            "@GetMapping\\(\"([^\"]+)\"\\)\\s*\\n\\s*@PreAuthorize\\(CHANGE_EXPORT\\)").matcher(src);
+        while (m.find()) guarded.add(m.group(1));
+
+        assertThat(guarded)
+            .as("anti-vacuity: the CHANGE_EXPORT scan must find the handlers it is about to check")
+            .hasSizeGreaterThanOrEqualTo(4);
+
+        String docs = chronicleSection() + "\n" + read(RUNBOOK);
+        List<String> undocumented = guarded.stream()
+            .filter(p -> !mentionsPath(docs, p))
+            .toList();
+        assertThat(undocumented)
+            .as("These CHANGE:EXPORT endpoints exist and neither §3.10 nor the runbook mentions them. "
+                + "Document them — an auditor artefact nobody can find is not an artefact.")
+            .isEmpty();
+    }
+
+    /**
+     * True when the documents name this handler path, allowing for brace-list shorthand
+     * ({@code change-register.{pdf,xlsx,docx}}) and for the {@code {id}} placeholder being spelled
+     * with a different variable name.
+     */
+    private boolean mentionsPath(String docs, String handlerPath) {
+        Set<String> cited = citedPaths(docs);
+        String full = "/api/v1/reporting" + handlerPath;
+        return cited.stream().anyMatch(c -> shapeMatches(full, c));
+    }
+
+    @Test
     @DisplayName("every API path the documents cite still exists")
     void everyCitedPathExists() {
         Set<String> mapped = mappedPaths();

@@ -101,6 +101,7 @@ public class ExportService {
     private final PolicyDocumentRepository policyDocRepo;      // CH-10: controlled policy PDF
     private final CommitteeMeetingRepository meetingRepo;      // S7f/CE-14a: agenda + minutes
     private final CommitteeResolutionRepository resolutionRepo; // S7f/CE-14a: minutes
+    private final ChangeDecisionRegisterService decisionRegisterService; // S8d/CE-14b: decision register
 
     /** S7f: the meetings' `*_json` snapshot columns. One mapper, not one per call. */
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -421,6 +422,176 @@ public class ExportService {
                 }
             },
             false); // portrait
+    }
+
+    // ── S8d / CE-14b: the CAB decision register ─────────────────────────────────────────────────
+    //
+    // The third and last artefact G-14 names. Rows come from ChangeDecisionRegisterService, whose
+    // javadoc records why they carry two axes: eleven changes in dev have passed a decision point and
+    // only ONE names its author, so a register can neither print one row nor print eleven attributed
+    // ones. Both renderers below print "not recorded" where nothing was recorded — never a blank cell,
+    // because in a decision register a blank reads as "no objection".
+
+    /** Localised label for a basis/evidence code. Kept here so both renderers agree. */
+    private static String decisionAxisLabel(String code, boolean ar) {
+        return switch (code == null ? "" : code) {
+            case ChangeDecisionRegisterService.BASIS_RECORDED   -> ar ? "مُسجَّل" : "Recorded";
+            case ChangeDecisionRegisterService.BASIS_INFERRED   -> ar ? "مُستنتج من الحالة" : "Inferred from state";
+            case ChangeDecisionRegisterService.EVIDENCE_RESOLUTION -> ar ? "قرار لجنة" : "Committee resolution";
+            case ChangeDecisionRegisterService.EVIDENCE_VOTES   -> ar ? "أصوات مُسجَّلة" : "Recorded votes";
+            case ChangeDecisionRegisterService.EVIDENCE_NONE    -> ar ? "لا يوجد" : "None";
+            default -> code == null ? "" : code;
+        };
+    }
+
+    private static final String NOT_RECORDED_EN = "not recorded";
+    private static final String NOT_RECORDED_AR = "غير مُسجَّل";
+
+    @Transactional(readOnly = true)
+    public byte[] changeDecisionRegisterPdf(String lang) {
+        Long org = TenantContext.getCurrentTenant();
+        Organisation o = orgRepo.findById(org).orElse(null);
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        String none = ar ? NOT_RECORDED_AR : NOT_RECORDED_EN;
+
+        ChangeDecisionRegisterService.Register reg = decisionRegisterService.build();
+        ExportAuditContext.record(reg.rows().size(), 1, "ExportService.changeDecisionRegister");
+
+        long attributed = reg.attributed();
+        long resolutionBacked = reg.byEvidence()
+            .getOrDefault(ChangeDecisionRegisterService.EVIDENCE_RESOLUTION, 0L);
+        long unevidenced = reg.byEvidence()
+            .getOrDefault(ChangeDecisionRegisterService.EVIDENCE_NONE, 0L);
+
+        return buildReportPdf(o, ar,
+            "Change Management", "إدارة التغيير",
+            "CAB Decision Register", "سجل قرارات لجنة استشارات التغيير",
+            List.of(
+                new PdfTheme.Kpi(ar ? "القرارات" : "Decisions", String.valueOf(reg.total()),
+                    ar ? "تجاوزت نقطة قرار" : "Past a decision point"),
+                // ⚠ This KPI is the whole point of the document. "12 decisions" alone would let a
+                // reader assume twelve recorded acts; eleven of them name nobody.
+                new PdfTheme.Kpi(ar ? "منسوبة" : "Attributed", attributed + " / " + reg.total(),
+                    ar ? "تحمل وقتاً أو صاحب قرار" : "Carry a time or an author"),
+                new PdfTheme.Kpi(ar ? "بقرار لجنة" : "By resolution", String.valueOf(resolutionBacked),
+                    ar ? "سجل النظام" : "System of record"),
+                new PdfTheme.Kpi(ar ? "بلا إثبات" : "Unevidenced", String.valueOf(unevidenced),
+                    ar ? "لا قرار ولا أصوات" : "No resolution, no votes")
+            ),
+            new ReportMetadata("Change", ar ? "سجل قرارات CAB" : "CAB Decision Register",
+                (ar ? "حتى " : "As of ") + DATE_FMT.format(java.time.LocalDate.now()),
+                ar ? "كل تغيير تجاوز نقطة قرار" : "Every change past a decision point",
+                lang, "Internal", reg.rows().size()),
+            (doc) -> {
+                float[] widths = new float[]{ 1.3f, 3.2f, 1.3f, 1.5f, 1.5f, 1.6f, 1.5f, 1.3f };
+                PdfPTable t = new PdfPTable(widths);
+                t.setWidthPercentage(100);
+                t.setRunDirection(PdfTheme.runDir(ar));
+                String[] hdr = ar
+                    ? new String[]{ "الرمز", "التغيير", "القرار", "التاريخ", "صاحب القرار",
+                                    "الأساس", "الإثبات", "الشروط" }
+                    : new String[]{ "Code", "Change", "Decision", "Decided", "By",
+                                    "Basis", "Evidence", "Conditions" };
+                for (String h : hdr) headerCell(t, h);
+                for (ChangeDecisionRegisterService.DecisionRow r : reg.rows()) {
+                    String name = ar && r.titleAr() != null ? r.titleAr() : r.titleEn();
+                    cell(t, safe(r.reference()));
+                    cell(t, safe(name));
+                    cell(t, safe(r.decision()));
+                    cell(t, r.decidedAt() != null ? DATE_FMT.format(r.decidedAt().toLocalDate()) : none);
+                    cell(t, r.decidedBy() != null && !r.decidedBy().isBlank() ? r.decidedBy() : none);
+                    cell(t, decisionAxisLabel(r.basis(), ar));
+                    // The resolution code earns its place beside the evidence label: it is what an
+                    // auditor asks for next.
+                    cell(t, decisionAxisLabel(r.evidence(), ar)
+                        + (r.resolutionCode() != null ? " · " + r.resolutionCode() : "")
+                        + (r.voteSummary() != null && !r.voteSummary().isEmpty() && r.resolutionCode() == null
+                            ? " · " + r.voteSummary() : ""));
+                    cell(t, r.conditionsTotal() == 0 ? "—"
+                        : r.conditionsOpen() + " / " + r.conditionsTotal());
+                }
+                doc.add(t);
+
+                // Recusals are a governance fact, not a footnote — but only a handful of rows have
+                // them, so they go under the table rather than into a column that is empty for all
+                // but one row.
+                List<ChangeDecisionRegisterService.DecisionRow> withRecusals = reg.rows().stream()
+                    .filter(r -> r.recusals() != null && !r.recusals().isEmpty()).toList();
+                if (!withRecusals.isEmpty()) {
+                    cabSection(doc, ar, "Recusals", "التنحّي عن التصويت");
+                    for (ChangeDecisionRegisterService.DecisionRow r : withRecusals) {
+                        Paragraph p = new Paragraph(safe(r.reference()) + " — "
+                            + String.join(", ", r.recusals()), PdfFonts.body(9));
+                        if (ar) p.setAlignment(Element.ALIGN_RIGHT);
+                        doc.add(p);
+                    }
+                }
+            });
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] changeDecisionRegisterXlsx(String lang) {
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        String none = ar ? NOT_RECORDED_AR : NOT_RECORDED_EN;
+        ChangeDecisionRegisterService.Register reg = decisionRegisterService.build();
+        ExportAuditContext.record(reg.rows().size(), 1, "ExportService.changeDecisionRegister");
+
+        try (Workbook wb = new XSSFWorkbook()) {
+            Sheet sheet = wb.createSheet("CAB Decisions");
+            CellStyle hdrStyle = headerStyle(wb);
+            CellStyle wrapStyle = wrapStyle(wb);
+
+            String[] headers = { "Code", "Title (EN)", "Title (AR)", "Type", "Risk", "Status",
+                "Decision", "Decided At", "Decided By", "Basis", "Evidence", "Resolution",
+                "Resolution Outcome", "Tally Source", "For", "Against", "Abstain", "Recused",
+                "Recorded Votes", "Conditions Open", "Conditions Total", "Decision Notes" };
+            Row hdr = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) {
+                Cell c = hdr.createCell(i);
+                c.setCellValue(headers[i]);
+                c.setCellStyle(hdrStyle);
+            }
+
+            int rowIdx = 1;
+            for (ChangeDecisionRegisterService.DecisionRow r : reg.rows()) {
+                Row row = sheet.createRow(rowIdx++);
+                int i = 0;
+                row.createCell(i++).setCellValue(safe(r.reference()));
+                Cell t1 = row.createCell(i++); t1.setCellValue(safe(r.titleEn())); t1.setCellStyle(wrapStyle);
+                Cell t2 = row.createCell(i++); t2.setCellValue(safe(r.titleAr())); t2.setCellStyle(wrapStyle);
+                row.createCell(i++).setCellValue(safe(r.changeType()));
+                row.createCell(i++).setCellValue(safe(r.riskLevel()));
+                row.createCell(i++).setCellValue(safe(r.status()));
+                row.createCell(i++).setCellValue(safe(r.decision()));
+                row.createCell(i++).setCellValue(r.decidedAt() != null ? r.decidedAt().toString() : none);
+                row.createCell(i++).setCellValue(
+                    r.decidedBy() != null && !r.decidedBy().isBlank() ? r.decidedBy() : none);
+                row.createCell(i++).setCellValue(safe(r.basis()));
+                row.createCell(i++).setCellValue(safe(r.evidence()));
+                row.createCell(i++).setCellValue(safe(r.resolutionCode()));
+                row.createCell(i++).setCellValue(safe(r.resolutionOutcome()));
+                // S7f's lesson: a tally with no stated source is a figure somebody typed.
+                row.createCell(i++).setCellValue(safe(r.tallySource()));
+                row.createCell(i++).setCellValue(r.voteFor() == null ? "" : String.valueOf(r.voteFor()));
+                row.createCell(i++).setCellValue(r.voteAgainst() == null ? "" : String.valueOf(r.voteAgainst()));
+                row.createCell(i++).setCellValue(r.voteAbstain() == null ? "" : String.valueOf(r.voteAbstain()));
+                row.createCell(i++).setCellValue(
+                    r.recusals() == null || r.recusals().isEmpty() ? "" : String.join(", ", r.recusals()));
+                row.createCell(i++).setCellValue(safe(r.voteSummary()));
+                row.createCell(i++).setCellValue(String.valueOf(r.conditionsOpen()));
+                row.createCell(i++).setCellValue(String.valueOf(r.conditionsTotal()));
+                Cell nc = row.createCell(i); nc.setCellValue(safe(r.decisionNotes())); nc.setCellStyle(wrapStyle);
+            }
+
+            XlsxStyler.freezeAndFilter(sheet, headers.length, rowIdx - 1);
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+                if (XlsxStyler.isStatusHeader(headers[i])) XlsxStyler.statusColors(sheet, i, 1, rowIdx - 1);
+            }
+            return writeWorkbook(wb);
+        } catch (java.io.IOException e) {
+            throw new ExportException("Excel", "Excel generation failed", e);
+        }
     }
 
     // ── S7f / CE-14a: the committee meeting's agenda pack and its minutes ───────────────────────

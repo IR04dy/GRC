@@ -298,9 +298,23 @@ only through ports in `spi/` (`CommitteePort`, `EvidencePort`, `CapaPort`,
 
 **Records for an auditor:** change register (`/api/v1/reporting/change-register.{pdf,xlsx,docx}`,
 `CHANGE:EXPORT` **and** `CHANGE:READ`), per-change CAB pack
-(`/api/v1/reporting/change/{id}/cab-pack.pdf`), and the committee's own agenda pack and
-minutes (`/api/v1/reporting/committee/meeting/{id}/{agenda,minutes}.pdf`, guarded `ADMIN`
-because the engine is generic). All bilingual with real Arabic RTL shaping (`?lang=ar`).
+(`/api/v1/reporting/change/{id}/cab-pack.pdf`), the **CAB decision register**
+(`/api/v1/reporting/change-decision-register.{pdf,xlsx}` — every change past a decision
+point, and see below), and the committee's own agenda pack and minutes
+(`/api/v1/reporting/committee/meeting/{id}/{agenda,minutes}.pdf`, guarded `ADMIN` because
+the engine is generic). All bilingual with real Arabic RTL shaping (`?lang=ar`), and every
+export is written to the audit ledger.
+
+**The decision register states what it does not know.** Each row carries two independent
+axes: whether the decision itself is `RECORDED` (the change carries a decision timestamp
+or author) or `INFERRED_FROM_STATE` (a change in `IMPLEMENTING` must have been approved —
+the state proves an act happened without saying when or by whom), and what evidences it —
+a carried committee `RESOLUTION`, legacy `RECORDED_VOTES` with named approvers, or `NONE`
+(correct for an `AUTO`-gated change: no committee was ever asked). The header publishes how
+many rows are attributed, because *"12 decisions"* on its own invites the reader to assume
+twelve recorded acts. Measured 2026-08-04: **11 changes past a decision point, 1 naming its
+author** — so a register printing only stamped decisions would hide ten real governance
+events, and one attributing all eleven would invent ten authors.
 
 **Analytics** — `GET /api/v1/changes/analytics` carries `kpis`: 19 ITIL/ISO metrics, each
 with its numerator, denominator, population, **basis** (how much of the population is

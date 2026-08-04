@@ -223,6 +223,7 @@ A *published* forward schedule of change (FSC) and a declared service outage (PS
 |---|---|---|
 | Change register | `/api/v1/reporting/change-register.{pdf,xlsx,docx}` | `CHANGE:EXPORT` **and** `CHANGE:READ` |
 | CAB pack for one change | `/api/v1/reporting/change/{id}/cab-pack.pdf` | `CHANGE:EXPORT` **and** `CHANGE:READ` |
+| **CAB decision register** | `/api/v1/reporting/change-decision-register.{pdf,xlsx}` | `CHANGE:EXPORT` **and** `CHANGE:READ` |
 | Meeting agenda pack | `/api/v1/reporting/committee/meeting/{id}/agenda.pdf` | `ADMIN:EXPORT` **and** `ADMIN:READ` |
 | Meeting minutes | `/api/v1/reporting/committee/meeting/{id}/minutes.pdf` | `ADMIN:EXPORT` **and** `ADMIN:READ` |
 
@@ -231,6 +232,31 @@ exports are guarded `ADMIN` because the engine is generic: minutes for the audit
 a change-management artefact.
 
 Every export is written to the audit ledger.
+
+### §8.1 Reading the decision register
+
+One row per change **past a decision point** — which includes deferrals and requests for more
+information, because those are decisions the committee took. Each row answers two separate
+questions, and you need both:
+
+| Column | Values | What it means |
+|---|---|---|
+| **Basis** | `RECORDED` | The change carries a decision timestamp or author — somebody recorded the act |
+| | `INFERRED_FROM_STATE` | The state proves an approval happened (a change cannot reach `IMPLEMENTING` otherwise) but **nothing recorded when or by whom** |
+| **Evidence** | `RESOLUTION` | A carried committee resolution — the system of record. The register prints its code, outcome, tally **and the tally's source** |
+| | `RECORDED_VOTES` | A legacy per-change tally with named approvers |
+| | `NONE` | Nothing backs it — **correct** for an `AUTO`-gated change, since no committee was asked |
+
+⚠ **`INFERRED_FROM_STATE` is not an error to fix in the register.** It is the historical record
+being honest: those changes were approved before the platform stamped the author (F2-93/F2-103).
+Decisions taken from now on are `RECORDED`. Where the register says *"not recorded"* it means
+exactly that — never treat a blank or a dash as "no objection".
+
+The header states how many rows are attributed. A register that said *"12 decisions"* without it
+would invite you to read twelve recorded acts; measured 2026-08-04, one of eleven named its author.
+
+Recusals from the committee vote are listed under the table in the PDF and in their own column in
+the XLSX — a member who stood aside is a governance fact an auditor asks about by name.
 
 ---
 

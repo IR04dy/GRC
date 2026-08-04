@@ -2138,6 +2138,21 @@ Start-Service TssGrcBackend
 | **References** | `ChangeManagementService.analytics()` · `ChangeKpiService` · `ChangeKpi` · [[F2-42]] (fabricated aggregate) · S7f (the export-provenance precedent) |
 | **Lesson** | **A percentage without its denominator is not a measurement, it is a mood.** The fix that matters is structural: the KPI type now makes it impossible to emit a rate without saying what it was computed over, and impossible to emit `0%` where the truthful answer is "nothing has happened yet". ⚠ And my own first drafts of two new metrics made the same mistake in the same hour — "0 conditions overdue" over 0 conditions, "0 terms expiring" over 0 terms — both caught by the live probe, not by review |
 
+## F2-109 · Nothing generates `change_code`, so every change a user creates is unciteable
+
+|  |  |
+|---|---|
+| **ID** | F2-109 *(found by S8d while building the decision register over real rows)* |
+| **Module** | `change_mgmt` — `ChangeManagementService.create`; consequences in `module/reporting` (change register, CAB pack, decision register) |
+| **Severity** | **P3** — no data loss and no wrong answer, but a governance record nobody can cite by reference. ISO 20000 documented information is expected to carry an identifier |
+| **Current State** | ⬜ **OPEN.** S8d ships a mitigation, not a fix: `DecisionRow.reference()` falls back to `#<id>`, the platform's real identifier, so the decision register can always cite a row. The other change exports still print the blank |
+| **Problem** | `change_code` is the human identifier every change artefact is keyed on — `CHG-2025-0001` in the register, the CAB pack title, the minutes. **No code path assigns it.** The only `setChangeCode` call in all of `module/` is a merge of a client-supplied value inside the update path, so a change created through `POST /api/v1/changes` — including from the UI's own intake flow — carries `NULL` for its whole life, and every export prints an empty Code cell for it |
+| **How it was found** | The CE-14b probe created a `[REVIEW-TEST]` change through the API and then looked for it in the served register by its code. `change_code` came back `None`. The first reaction was that the probe had read the wrong column; grepping the module showed there is no writer |
+| **Why both databases look clean** | Dev shows **1 of 18** live changes without a code and prod **0 of 15** — but that one was the probe's own row. Every other row was written by `seed_real_data.py` or by the W1-5 integration test, both of which set the code explicitly. **The gap is invisible in the data because the create path has never been exercised in either database.** Same shape as F2-105, where "nothing consumed `pir_follow_up`" turned out to be the shallower half of "nothing could write it either" |
+| **What it is NOT** | Not a uniqueness or collision bug — there is no generator to collide. Not a display bug: the column is genuinely empty. And not fixed by the S8d fallback, which only rescues one of the four artefacts |
+| **Fix shape** | A per-tenant sequence (`CHG-<year>-<nnnn>`, scoped by `organisation_id`) assigned on create, with a unique index, plus a decision about the rows already holding NULL: backfill, or leave and let `#<id>` stand. Both need the owner's call, and a backfill is a data change, so it is not a slice to take unilaterally |
+| **Evidence** | `grep -rn "setChangeCode" module/` → exactly one hit, `ChangeManagementService:1482`, inside the field-merge helper · probe leg `F2-109` in `ce14b_probe.py` asserts the created row has **no** code, so the finding cannot quietly close itself · `DecisionRow.reference()` javadoc records it at the point of use |
+
 ## F2-108 · The module boundary ratchet inspects imports, so native SQL crosses it unseen
 
 |  |  |

@@ -216,6 +216,32 @@ public class ExportController {
         return pdf(exportService.cabPackPdf(id, lang), ExportNaming.build("Change", "CABPack-" + id, lang, "pdf"));
     }
 
+    // ── S8d / CE-14b: the CAB decision register ─────────────────────────────
+    //
+    // Guarded CHANGE, unlike the meeting records below: this document is one row per CHANGE, sourced
+    // from the change register, and it is the change manager's artefact rather than the committee
+    // secretary's. Two formats and no DOCX — a register is a table, and the XLSX is the one an auditor
+    // filters. ⚠ Both are documented in PROJECT_CHRONICLE §3.10 and the CAB runbook §8 because
+    // ChangeDocumentationFreshnessTest now fails on a CHANGE export that no document mentions.
+
+    @GetMapping("/change-decision-register.pdf")
+    @PreAuthorize(CHANGE_EXPORT)
+    @Operation(summary = "CE-14b: CAB decision register — every change past a decision point, with "
+        + "whether the decision is recorded or inferred and what evidences it. ?lang=ar for Arabic RTL.")
+    public ResponseEntity<byte[]> changeDecisionRegisterPdf(@RequestParam(defaultValue = "en") String lang) {
+        return pdf(exportService.changeDecisionRegisterPdf(lang),
+                   ExportNaming.build("Change", "CABDecisionRegister", lang, "pdf"));
+    }
+
+    @GetMapping("/change-decision-register.xlsx")
+    @PreAuthorize(CHANGE_EXPORT)
+    @Operation(summary = "CE-14b: CAB decision register XLSX — 22 columns including the resolution "
+        + "code, the tally and its source, recusals, and the conditions attached to each decision.")
+    public ResponseEntity<byte[]> changeDecisionRegisterXlsx(@RequestParam(defaultValue = "en") String lang) {
+        return xlsx(exportService.changeDecisionRegisterXlsx(lang),
+                    ExportNaming.build("Change", "CABDecisionRegister", lang, "xlsx"));
+    }
+
     // ── S7f / CE-14a: the committee meeting's own records ───────────────────
     //
     // Distinct from the CAB pack above, which is a pack for ONE CHANGE. These are the artifacts a

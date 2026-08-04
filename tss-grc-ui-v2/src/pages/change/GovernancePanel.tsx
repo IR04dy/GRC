@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ShieldCheck, Snowflake, CalendarDays, Plus, Trash2 } from 'lucide-react';
+import { ShieldCheck, Snowflake, CalendarDays, Plus, Trash2, Gavel, FileText, Sheet } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
@@ -9,9 +9,10 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useDialog } from '../../lib/dialog';
 import {
-  changeApi, ApiError,
+  changeApi, reportingApi, ApiError,
   type ChangeAuthMatrixCell, type ChangeFreezeWindowDto, type ChangeCalendarView,
 } from '../../lib/api';
+import { canExport } from '../../lib/auth';
 
 const GATE_TONE: Record<string, BadgeTone> = { AUTO: 'success', CAB: 'info', ECAB: 'warning' };
 const RISK_TONE: Record<string, BadgeTone> = { LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger' };
@@ -30,6 +31,7 @@ export function GovernancePanel({ toast }: { toast: ReturnType<typeof useToast> 
   const [freezes, setFreezes] = useState<ChangeFreezeWindowDto[]>([]);
   const [calendar, setCalendar] = useState<ChangeCalendarView | null>(null);
   const [freezeOpen, setFreezeOpen] = useState(false);
+  const [decisionsBusy, setDecisionsBusy] = useState<'pdf' | 'xlsx' | null>(null);
 
   async function load() {
     try {
@@ -75,8 +77,44 @@ export function GovernancePanel({ toast }: { toast: ReturnType<typeof useToast> 
 
   const d = (s?: string) => (s ? new Date(s).toLocaleDateString() : '—');
 
+  /* S8d/CE-14b — the decision register download. Hidden rather than disabled for a principal
+     without CHANGE:EXPORT, matching the register menu on ChangesPage (F2-27): CHANGE:EXPORT is
+     withheld from VIEWER where CHANGE:READ is not, so an always-visible button is a 403 waiting
+     to be clicked. */
+  async function downloadDecisions(fmt: 'pdf' | 'xlsx') {
+    setDecisionsBusy(fmt);
+    try {
+      if (fmt === 'pdf') await reportingApi.changeDecisionRegisterPdf(lang);
+      else await reportingApi.changeDecisionRegisterXlsx(lang);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : t('govDecisionRegisterFailed'));
+    } finally {
+      setDecisionsBusy(null);
+    }
+  }
+
   return (
     <div className="changes-gov-stack">
+      {/* S8d/CE-14b — the decision register. First card in the governance tab because it is the
+          document an auditor asks for, and because its two-axis honesty needs stating on screen
+          rather than only inside the file. */}
+      {canExport('CHANGE') && (
+        <Card title={t('govDecisionRegisterTitle')} Icon={Gavel}>
+          <p className="changes-gov-sub">{t('govDecisionRegisterSub')}</p>
+          <p className="changes-kpi-hint">{t('govDecisionRegisterBasis')}</p>
+          <div className="changes-gov-actions">
+            <Button variant="secondary" Icon={FileText} disabled={decisionsBusy !== null}
+                    onClick={() => downloadDecisions('pdf')}>
+              {decisionsBusy === 'pdf' ? t('exporting') : t('govDecisionRegisterPdf')}
+            </Button>
+            <Button variant="secondary" Icon={Sheet} disabled={decisionsBusy !== null}
+                    onClick={() => downloadDecisions('xlsx')}>
+              {decisionsBusy === 'xlsx' ? t('exporting') : t('govDecisionRegisterXlsx')}
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* Authorisation matrix */}
       <Card title={t('govAuthMatrixTitle')} Icon={ShieldCheck}>
         <p className="changes-gov-sub">{t('govAuthMatrixSub')}</p>

@@ -243,6 +243,15 @@ export const en = {
   govColChange:              'Change',
   govColWindow:              'Scheduled window',
   govColStatus:              'Status',
+  // S8d/CE-14b — the CAB decision register. The `Basis` line is on screen and not only inside the
+  // file: a reader who downloads it without knowing the two axes will read every row as attributed.
+  govDecisionRegisterTitle:  'CAB Decision Register',
+  govDecisionRegisterSub:    'Every change that has passed a decision point — approvals, rejections, deferrals and requests for more information — with the committee resolution or recorded votes behind each one.',
+  govDecisionRegisterBasis:  'Each row states whether the decision itself was recorded, or inferred from the change’s state because nothing recorded when or by whom. Where it says “not recorded”, nothing was.',
+  govDecisionRegisterPdf:    'Decision register (PDF)',
+  govDecisionRegisterXlsx:   'Decision register (Excel)',
+  govDecisionRegisterFailed: 'The decision register could not be generated.',
+  exporting:                 'Exporting…',
   govFreezeTitle:            'Freeze / Blackout Windows',
   govFreezeSub:              'During an active window, only emergency changes may be scheduled.',
   govFreezeNew:              'New freeze window',

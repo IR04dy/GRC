@@ -888,6 +888,11 @@ export const reportingApi = {
   changeRegisterXlsx: () => downloadFile('/api/v1/reporting/change-register.xlsx', 'change-register.xlsx'),
   changeRegisterDocx: (lang: string) => downloadFile(`/api/v1/reporting/change-register.docx?lang=${encodeURIComponent(lang)}`, 'change-register.docx'),
   cabPackPdf:         (id: number, lang: string) => downloadFile(`/api/v1/reporting/change/${id}/cab-pack.pdf?lang=${encodeURIComponent(lang)}`, `cab-pack-${id}.pdf`),
+  // S8d/CE-14b — the CAB decision register: one row per change past a decision point, each stating
+  // whether the decision is recorded or inferred and what evidences it. Guarded CHANGE:EXPORT +
+  // CHANGE:READ, so the caller must be behind `canExport('CHANGE')` like the register above.
+  changeDecisionRegisterPdf:  (lang: string) => downloadFile(`/api/v1/reporting/change-decision-register.pdf?lang=${encodeURIComponent(lang)}`, 'cab-decision-register.pdf'),
+  changeDecisionRegisterXlsx: (lang: string) => downloadFile(`/api/v1/reporting/change-decision-register.xlsx?lang=${encodeURIComponent(lang)}`, 'cab-decision-register.xlsx'),
   policyDocumentPdf:  (id: number, lang: string) => downloadFile(`/api/v1/reporting/policy/${id}/document.pdf?lang=${encodeURIComponent(lang)}`, `policy-${id}.pdf`),
   // S7f/CE-14a — the MEETING's records, distinct from cabPackPdf above (which packs one change).
   // Guarded ADMIN:EXPORT + ADMIN:READ server-side: the committee engine is generic, not change-only.
