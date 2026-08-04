@@ -344,6 +344,9 @@
 /* S8d/CE-14b — the decision-register download pair. Wraps rather than overflowing: the Arabic
    labels are longer than the English ones and RTL inherits direction from the page. */
 .changes-gov-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-3); }
+/* S8e/CE-2 — the model catalogue: coverage chips above the table, row actions inline. */
+.changes-gov-model-kpis { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.changes-gov-model-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: flex-end; }
 .changes-gov-table-wrap { overflow-x: auto; }
 .changes-gov-table {
   width: 100%;

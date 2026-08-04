@@ -2,20 +2,20 @@ schema,table,code,source,rows_dev,rows_prod,jpa_files,code_refs,test_refs,migrat
 admin,committee_action_items,OPERATING,generated,33,33,1,0,1,3,2,1,1,mapped and carrying data
 admin,committee_form_templates,OPERATING,generated,10,10,1,1,0,2,1,2,0,mapped and carrying data
 admin,committee_gate_map,OPERATING,generated,2,2,1,2,0,2,1,0,0,mapped and carrying data
-admin,committee_meeting_attendee,OPERATING,generated,4,0,1,0,1,2,0,0,0,mapped and carrying data
+admin,committee_meeting_attendee,OPERATING,generated,4,0,1,1,1,2,0,0,0,mapped and carrying data
 admin,committee_meeting_papers,OPERATING,generated,21,21,1,0,1,1,0,1,1,mapped and carrying data
-admin,committee_meetings,OPERATING,generated,34,32,1,1,1,6,2,3,2,mapped and carrying data
+admin,committee_meetings,OPERATING,generated,34,32,1,2,1,6,2,3,2,mapped and carrying data
 admin,committee_member_skills,OPERATING,generated,31,31,1,0,0,1,0,1,1,mapped and carrying data
 admin,committee_member_terms,OPERATING,generated,37,31,1,1,2,3,0,3,2,mapped and carrying data
-admin,committee_referral,OPERATING,generated,4,0,1,0,1,3,0,0,0,mapped and carrying data
+admin,committee_referral,OPERATING,generated,4,0,1,1,1,3,0,0,0,mapped and carrying data
 admin,committee_resolution_vote,OPERATING,generated,4,0,1,0,1,3,0,1,0,mapped and carrying data
-admin,committee_resolutions,OPERATING,generated,22,20,1,0,1,5,2,2,2,mapped and carrying data
+admin,committee_resolutions,OPERATING,generated,22,20,1,1,1,5,2,2,2,mapped and carrying data
 admin,committee_standing_items,OPERATING,generated,148,148,1,0,0,2,1,1,0,mapped and carrying data
-admin,committee_templates,OPERATING,generated,19,19,1,1,1,1,1,1,0,mapped and carrying data
+admin,committee_templates,OPERATING,generated,19,19,1,1,1,2,1,1,0,mapped and carrying data
 admin,committees,OPERATING,generated,19,17,1,3,4,7,2,9,1,mapped and carrying data
 ai,ai_suggestions,OPERATING,generated,43,32,1,0,0,2,1,1,1,mapped and carrying data
 ai_governance,ai_lifecycle_event,OPERATING,generated,13,13,1,0,0,1,0,2,1,mapped and carrying data
-ai_governance,ml_model,OPERATING,generated,25,25,1,0,0,2,1,2,2,mapped and carrying data
+ai_governance,ml_model,OPERATING,generated,25,25,1,0,0,3,1,2,2,mapped and carrying data
 ai_governance,ml_model_audit,OPERATING,generated,24,24,1,0,0,2,1,1,1,mapped and carrying data
 ai_governance,ml_model_drift_observation,OPERATING,generated,26,26,1,0,0,2,1,1,1,mapped and carrying data
 ai_governance,model_validation,OPERATING,generated,16,16,1,0,0,1,0,3,2,mapped and carrying data
@@ -84,7 +84,7 @@ bcm,mtpd_inheritance_finding,OPERATING,generated,8,8,1,0,0,2,0,1,0,mapped and ca
 bcm,peak_seasons,OPERATING,generated,6,6,1,0,0,1,1,0,0,mapped and carrying data
 bcm,plan_acknowledgements,OPERATING,generated,8,8,1,0,0,1,1,0,0,mapped and carrying data
 bcm,plan_review_attestations,OPERATING,generated,5,5,1,0,0,1,1,0,0,mapped and carrying data
-bcm,plan_templates,OPERATING,generated,8,8,1,0,0,1,1,0,0,mapped and carrying data
+bcm,plan_templates,OPERATING,generated,8,8,1,0,0,2,1,0,0,mapped and carrying data
 bcm,process_dependencies,OPERATING,generated,9,9,1,0,0,2,0,1,1,mapped and carrying data
 bcm,process_vendor_dependency,OPERATING,generated,12,12,1,0,0,1,1,1,1,mapped and carrying data
 bcm,recovery_operations,SEED_ONLY,generated,11,11,0,0,0,2,0,2,2,"no JPA mapping and no Java reference; the only writer is a seed script (seed_real_data.py, setup_bcm_db.py) — 22 row(s) of ballast, present in prod because it was restored from a dev dump"
@@ -96,17 +96,19 @@ bcm_lc,drills,LEGACY,generated,5,5,0,0,0,2,1,2,0,"no JPA mapping, no Java refere
 bcm_lc,invocations,OPERATING,generated,3,3,1,0,0,1,0,3,1,mapped and carrying data
 bcm_lc,recovery_strategies,LEGACY,generated,8,8,0,0,0,2,1,2,0,"no JPA mapping, no Java reference and no seed insert, yet 16 row(s) — rows arrived from a migration or by hand"
 board_pack,packs,OPERATING,generated,16,16,1,0,1,4,2,2,2,mapped and carrying data
-capa,tasks,OPERATING,generated,14,15,1,0,1,1,0,1,1,mapped and carrying data
+capa,tasks,OPERATING,generated,14,15,1,0,1,2,0,1,1,mapped and carrying data
 ccm,control_test_definition,OPERATING,generated,10,10,1,0,0,1,1,0,0,mapped and carrying data
 ccm,control_test_run,OPERATING,generated,3,3,1,0,0,2,0,0,0,mapped and carrying data
 change_mgmt,change_approvals,OPERATING,generated,31,31,1,0,0,2,0,1,1,mapped and carrying data
-change_mgmt,change_authorisation_matrix,OPERATING,generated,36,36,1,1,0,3,1,0,0,mapped and carrying data
+change_mgmt,change_authorisation_matrix,OPERATING,generated,36,36,1,1,0,4,1,0,0,mapped and carrying data
 change_mgmt,change_comments,OPERATING,generated,45,46,1,0,0,1,0,0,0,mapped and carrying data
 change_mgmt,change_condition,WIRED_UNPROVEN,generated,0,ABSENT,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 change_mgmt,change_freeze_window,OPERATING,generated,3,3,1,0,0,1,1,0,0,mapped and carrying data
-change_mgmt,change_links,OPERATING,generated,46,45,1,0,0,1,0,0,0,mapped and carrying data
+change_mgmt,change_links,OPERATING,generated,46,45,1,0,0,2,0,0,0,mapped and carrying data
+change_mgmt,change_model,WIRED_UNPROVEN,generated,0,ABSENT,1,0,0,1,1,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
+change_mgmt,change_model_usage,WIRED_UNPROVEN,generated,0,ABSENT,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 change_mgmt,change_ratification_policy,OPERATING,generated,3,ABSENT,1,0,0,1,1,0,0,mapped and carrying data
-change_mgmt,change_requests,OPERATING,generated,17,15,1,1,2,7,0,1,0,mapped and carrying data
+change_mgmt,change_requests,OPERATING,generated,17,15,1,2,2,8,0,1,0,mapped and carrying data
 change_mgmt,change_tasks,OPERATING,generated,41,41,1,0,0,1,0,1,1,mapped and carrying data
 compliance,assessments,OPERATING,generated,4,4,1,0,0,3,1,1,0,mapped and carrying data
 compliance,audit_engagements,OPERATING,generated,12,12,1,0,0,1,0,1,1,mapped and carrying data
@@ -188,12 +190,12 @@ evidence,connector_definitions,OPERATING,generated,4,4,1,0,0,1,0,0,0,mapped and 
 evidence,control_links,OPERATING,generated,1147,1147,1,0,0,2,0,1,0,mapped and carrying data
 evidence,controls,OPERATING,generated,174,174,1,0,0,2,1,12,10,mapped and carrying data
 evidence,evidence_connectors,OPERATING,generated,11,11,1,0,0,1,1,0,0,mapped and carrying data
-evidence,evidence_items,OPERATING,generated,104,104,1,1,0,12,0,4,0,mapped and carrying data
-evidence,evidence_links,OPERATING,generated,21,21,1,0,0,3,0,1,1,mapped and carrying data
+evidence,evidence_items,OPERATING,generated,103,104,1,1,0,13,0,4,0,mapped and carrying data
+evidence,evidence_links,OPERATING,generated,21,21,1,0,0,4,0,1,1,mapped and carrying data
 evidence,evidence_request_comments,OPERATING,generated,7,7,1,0,0,1,0,0,0,mapped and carrying data
 evidence,evidence_requests,OPERATING,generated,44,44,1,0,0,7,0,2,0,mapped and carrying data
-evidence,evidence_reviews,OPERATING,generated,19,19,1,0,0,3,0,0,0,mapped and carrying data
-evidence,evidence_versions,OPERATING,generated,60,60,1,1,0,3,0,1,0,mapped and carrying data
+evidence,evidence_reviews,OPERATING,generated,19,19,1,0,0,4,0,0,0,mapped and carrying data
+evidence,evidence_versions,OPERATING,generated,60,60,1,1,0,4,0,1,0,mapped and carrying data
 evidence,frameworks,OPERATING,generated,16,16,1,0,0,2,1,11,10,mapped and carrying data
 evidence,sub_controls,OPERATING,generated,654,654,1,0,0,2,1,12,10,mapped and carrying data
 fraud,fraud_case,OPERATING,generated,22,22,1,0,0,3,0,3,2,mapped and carrying data
@@ -244,10 +246,10 @@ outsourcing,ongoing_review,OPERATING,generated,7,7,1,0,0,1,0,3,2,mapped and carr
 outsourcing,outsourcing_arrangement,OPERATING,generated,20,20,1,0,0,1,0,3,2,mapped and carrying data
 outsourcing,outsourcing_event,OPERATING,generated,10,10,1,0,0,1,0,2,1,mapped and carrying data
 platform,attachments,OPERATING,generated,20,18,1,0,0,5,0,1,0,mapped and carrying data
-platform,audit_log,OPERATING,generated,7970,4096,1,1,2,11,1,2,0,mapped and carrying data
+platform,audit_log,OPERATING,generated,8427,4096,1,1,2,11,1,2,0,mapped and carrying data
 platform,authority_document_citations,OPERATING,generated,214,214,1,0,0,6,4,0,0,mapped and carrying data
 platform,authority_documents,OPERATING,generated,19,19,1,0,0,7,1,0,0,mapped and carrying data
-platform,automation_rule_runs,OPERATING,generated,355,175,1,0,0,1,0,0,0,mapped and carrying data
+platform,automation_rule_runs,OPERATING,generated,394,175,1,0,0,1,0,0,0,mapped and carrying data
 platform,automation_rules,OPERATING,generated,214,211,1,0,0,43,42,11,0,mapped and carrying data
 platform,brand_theme,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
 platform,business_units,LEGACY,generated,10,10,0,0,0,3,0,0,0,"no JPA mapping, no Java reference and no seed insert, yet 20 row(s) — rows arrived from a migration or by hand"
@@ -271,7 +273,7 @@ platform,notifications,OPERATING,generated,409,380,1,0,0,2,0,1,0,mapped and carr
 platform,organisation_licenses,OPERATING,generated,57,57,1,0,0,3,3,3,3,mapped and carrying data
 platform,organisations,OPERATING,generated,3,3,1,1,1,9,1,3,1,mapped and carrying data
 platform,persistence_row,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
-platform,refresh_token,OPERATING,generated,2174,1060,1,0,1,1,0,1,0,mapped and carrying data
+platform,refresh_token,OPERATING,generated,2278,1060,1,0,1,1,0,1,0,mapped and carrying data
 platform,risk_control_links,OPERATING,generated,24,24,1,0,0,3,1,0,0,mapped and carrying data
 platform,saved_views,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 platform,signatures,OPERATING,generated,4,1,1,0,1,1,0,0,0,mapped and carrying data
@@ -442,7 +444,7 @@ tprm,outsourcing_exit_plan,OPERATING,generated,9,9,1,0,0,2,1,1,1,mapped and carr
 tprm,outsourcing_monitoring_event,OPERATING,generated,11,11,1,0,0,2,1,1,1,mapped and carrying data
 tprm,questionnaire_questions,OPERATING,generated,23,23,1,0,0,2,1,1,1,mapped and carrying data
 tprm,questionnaire_responses,OPERATING,generated,22,22,1,0,0,2,0,1,1,mapped and carrying data
-tprm,questionnaire_templates,OPERATING,generated,3,3,1,0,0,1,1,1,1,mapped and carrying data
+tprm,questionnaire_templates,OPERATING,generated,3,3,1,0,0,2,1,1,1,mapped and carrying data
 tprm,third_party_cyber_assessments,OPERATING,generated,16,16,1,0,0,1,1,1,1,mapped and carrying data
 tprm,vendor_assessments,OPERATING,generated,19,19,1,0,0,4,0,1,1,mapped and carrying data
 tprm,vendor_bcp_attestation,OPERATING,generated,12,12,1,0,0,2,0,2,2,mapped and carrying data

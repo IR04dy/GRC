@@ -235,6 +235,21 @@ public class ChangeManagementService {
     @Autowired(required = false)
     private ChangeFreezeWindowRepository freezeRepo;
 
+    /**
+     * S8e / CE-2: the change model catalogue. Optional — directly-constructed unit tests need not
+     * supply it.
+     *
+     * <p>⚠ <b>The polarity is deliberate and it is the opposite of S8a's evidence gate.</b> When
+     * this is null the model requirement cannot be evaluated, and the transition is ALLOWED. That is
+     * fail-open, which S8a refused for verified evidence — the difference is what the two guards
+     * protect. The evidence gate stands between a CAB obligation and its discharge, so a guard that
+     * cannot see the evidence must refuse. This one enforces an <b>opt-in tenant preference</b> whose
+     * flag defaults to off; refusing every AUTO-gated change in a deployment that has no catalogue
+     * wired would break work in a configuration nobody asked to be strict.
+     */
+    @Autowired(required = false)
+    private ChangeModelService modelService;
+
     /** Track D: committee re-route, S5/CE-1: through {@link CommitteePort} rather than the
      *  peer service, so `module.admin.committee` is no longer on this module's import list.
      *  Optional (field-injected) so directly-constructed unit tests need not supply it —
@@ -437,6 +452,9 @@ public class ChangeManagementService {
                                 + " recorded APPROVE vote(s) (have " + approves + ")");
                 }
                 requireRequiredRolesPresent(id);
+                // S8e/CE-2: when the tenant has switched this cell to "pre-approved procedure
+                // required", the change must cite a LIVE model — APPROVED, unexpired, not deviated.
+                requireModelIfCellDemandsIt(c);
                 c.setCabDecisionAt(LocalDateTime.now());
                 c.setCabDecisionNotes(strFromBody(body, "notes"));
                 // ⚠ F2-103 — THIS LINE WAS MISSING, on the one decision that matters most.
@@ -1806,6 +1824,33 @@ public class ChangeManagementService {
           + "change type and risk level.");
     }
 
+    /**
+     * S8e / CE-2 — refuse {@code → CAB_APPROVED} when this cell requires a pre-approved model and
+     * the change does not have a live one.
+     *
+     * <p>Measured safe on arrival: V354 asserts {@code requires_model = 0} on all 36 matrix rows in
+     * each database, so this refuses nothing until a tenant switches a cell on — deliberately,
+     * because 5 STANDARD changes exist and 3 are in flight.
+     *
+     * <p>The message names the reason from {@code backingFor}, not a bare "no model": an
+     * administrator told only that something is missing cannot tell an expired pre-approval from an
+     * absent one, and those have different remedies.
+     */
+    private void requireModelIfCellDemandsIt(ChangeRequest c) {
+        if (modelService == null) return;                 // see the field javadoc on polarity
+        ChangeAuthorisationMatrix cell = resolveMatrix(c);
+        if (cell == null || !Boolean.TRUE.equals(cell.getRequiresModel())) return;
+        if (modelService.liveModelFor(c.getId()).isPresent()) return;
+
+        Object reason = modelService.backingFor(c.getId()).get("reason");
+        throw new IllegalStateException(
+            "Cannot CAB-approve: this tenant requires a pre-approved change model for "
+            + nullSafeStr(c.getChangeType()) + " / " + nullSafeStr(c.getRiskLevel())
+            + " changes, and this one has no live pre-approval (" + reason + "). Apply an APPROVED, "
+            + "unexpired model whose procedure the change actually followed, or amend the "
+            + "authorisation matrix cell to route this change to the CAB instead.");
+    }
+
     public Map<String, Object> resolveAuthorisation(Long id) {
         ChangeRequest c = require(id);
         ChangeAuthorisationMatrix m = resolveMatrix(c);
@@ -1829,6 +1874,11 @@ public class ChangeManagementService {
         out.put("gate",            m != null ? m.getGate() : "CAB");
         out.put("minApprovals",    required);
         out.put("requiredRoles",   m != null ? m.getRequiredRoles() : null);
+        // S8e/CE-2 — what backs the pre-approval, and when it is not backed, why not. Reported
+        // whether or not the cell demands it, because "this AUTO-gated change rests on nothing" is
+        // the fact G-2 is about and it is true regardless of the flag.
+        out.put("requiresModel",   m != null && Boolean.TRUE.equals(m.getRequiresModel()));
+        if (modelService != null) out.put("modelBacking", modelService.backingFor(id));
         out.put("approvesRecorded", approves);
         // Split, because one flag could not carry both facts and was silently carrying only
         // the cheaper one. `satisfied` keeps its key for existing callers but is now the

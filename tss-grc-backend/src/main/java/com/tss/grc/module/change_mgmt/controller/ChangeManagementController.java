@@ -9,11 +9,13 @@ import com.tss.grc.security.GrcUserDetails;
 
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
 import com.tss.grc.module.change_mgmt.dto.ChangeConditionRequest;
+import com.tss.grc.module.change_mgmt.dto.ChangeModelRequest;
 import com.tss.grc.module.change_mgmt.dto.RatificationDtos;
 
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService;
 import com.tss.grc.module.change_mgmt.service.ChangeManagementService;
+import com.tss.grc.module.change_mgmt.service.ChangeModelService;
 import com.tss.grc.module.change_mgmt.spi.CommitteePort;
 import com.tss.grc.module.change_mgmt.spi.EvidencePort;
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,6 +51,15 @@ public class ChangeManagementController {
 
     private final ChangeManagementService service;
     private final ChangeGovernanceHealthService governanceHealth;
+    private final ChangeModelService modelService;   // S8e/CE-2
+
+    /** Read a string out of a raw body. These endpoints take Maps, not DTOs, because {@code @Valid}
+     *  fires BEFORE {@code @PreAuthorize} and a bean-validated body answers 400 to a caller who
+     *  should be getting 403. */
+    private static String strFromBody(Map<String, Object> body, String key) {
+        Object v = body == null ? null : body.get(key);
+        return v == null ? null : String.valueOf(v);
+    }
 
     // ── Listing + CRUD ──────────────────────────────────────────────────────
 
@@ -368,6 +379,90 @@ public class ChangeManagementController {
     @PreAuthorize("hasPermission('CHANGE','READ')")
     @Operation(summary = "Resolve the authorisation required for a specific change and whether it is satisfied.")
     public Map<String, Object> authorisation(@PathVariable Long id) { return service.resolveAuthorisation(id); }
+
+    // ── S8e / CE-2: the change model catalogue ────────────────────────────────
+    //
+    // G-2: "STANDARD is an unbacked string, so 'pre-approved' is a claim with no record." A model IS
+    // the record — a named procedure with an authority and an expiry date.
+    //
+    // ⚠ The authorisation split is the design, not decoration. Authoring a model is CHANGE:WRITE
+    // (writing down a procedure is clerical); GRANTING the pre-approval is CHANGE:APPROVE and may not
+    // come from the author (a pre-approval somebody issued to their own procedure authorises their own
+    // future changes with nobody else in the chain); applying one is CHANGE:WRITE again. F2-29's
+    // classification, applied to a new surface rather than discovered on it later.
+
+    @GetMapping("/models")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "CE-2: the tenant's change model catalogue — pre-approved procedures with "
+        + "their authority and expiry.")
+    public List<ChangeModel> models() { return modelService.models(); }
+
+    @PostMapping("/models")
+    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    @Operation(summary = "CE-2: author a change model. Always created DRAFT — the pre-approval is a "
+        + "separate act by a different person.")
+    public ChangeModel createModel(@Valid @RequestBody ChangeModelRequest body) {
+        return modelService.create(body);
+    }
+
+    @PutMapping("/models/{id}")
+    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    @Operation(summary = "CE-2: edit a DRAFT or suspended model. An APPROVED model is refused — "
+        + "editing a live authority changes what was authorised without re-authorisation.")
+    public ChangeModel updateModel(@PathVariable Long id, @Valid @RequestBody ChangeModelRequest body) {
+        return modelService.update(id, body);
+    }
+
+    /**
+     * Grant the pre-approval. {@code validForDays} is required and bounded (30–730): "what stops a
+     * tenant choosing 3,650 days?" is the first question an examiner asks about a self-set validity
+     * period, and ADR-017 D-3 asked it of the ratification SLA for the same reason.
+     *
+     * <p>Body is a {@code Map} rather than a DTO on purpose: {@code @Valid} fires <b>before</b>
+     * {@code @PreAuthorize}, so a bean-validated body would answer 400 to a caller who should be
+     * getting 403, and this endpoint's whole point is that only a {@code CHANGE:APPROVE} holder
+     * reaches it. The bounds are enforced in the service, which is also where the four-eyes rule is.
+     */
+    @PostMapping("/models/{id}/approve")
+    @PreAuthorize("hasPermission('CHANGE','APPROVE')")
+    @Operation(summary = "CE-2: grant a model's pre-approval — stamps the authority and the expiry. "
+        + "Refused for the model's own author (SoD).")
+    public ChangeModel approveModel(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Object days = body.get("validForDays");
+        Integer validForDays = days instanceof Number n ? n.intValue()
+            : days instanceof String s && !s.isBlank() ? Integer.valueOf(s.trim()) : null;
+        return modelService.approve(id, validForDays, strFromBody(body, "note"));
+    }
+
+    @PostMapping("/models/{id}/status")
+    @PreAuthorize("hasPermission('CHANGE','APPROVE')")
+    @Operation(summary = "CE-2: suspend or retire a model. Withdrawing an authority is an approval "
+        + "act; APPROVED is refused here because granting one has to record its expiry.")
+    public ChangeModel setModelStatus(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        return modelService.setStatus(id, strFromBody(body, "status"));
+    }
+
+    @GetMapping("/{id}/model")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "CE-2: the model backing this change, and — when it is not backed — why not.")
+    public Map<String, Object> changeModelBacking(@PathVariable Long id) {
+        return modelService.backingFor(id);
+    }
+
+    @PostMapping("/{id}/model")
+    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    @Operation(summary = "CE-2: apply a model to this change. Refused for a model that is not "
+        + "APPROVED or whose pre-approval has expired.")
+    public Map<String, Object> applyModel(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Object mid = body.get("modelId");
+        Long modelId = mid instanceof Number n ? n.longValue()
+            : mid instanceof String s && !s.isBlank() ? Long.valueOf(s.trim()) : null;
+        if (modelId == null) {
+            throw new IllegalStateException("modelId is required to apply a change model.");
+        }
+        modelService.applyToChange(id, modelId, strFromBody(body, "deviationNotes"));
+        return modelService.backingFor(id);
+    }
 
     // ── A17-D3: emergency-change retrospective ratification ───────────────────
 

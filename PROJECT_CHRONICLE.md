@@ -285,6 +285,16 @@ only through ports in `spi/` (`CommitteePort`, `EvidencePort`, `CapaPort`,
   (`ck_change_ratification_clock` makes a pending state without a due date
   unrepresentable), swept daily at 01:55, escalating to the CISO with an audit-ledger
   event on breach.
+- **Pre-approval is a record, not a label.** A `STANDARD` change is "pre-approved" only if it
+  cites a **change model** — a named procedure in `change_mgmt.change_model` with an authorising
+  person, a moment and an **expiry date** (`ck_cmodel_preapproval` makes any other combination
+  unrepresentable). Authoring a model is `CHANGE:WRITE` and produces a `DRAFT`; granting the
+  pre-approval is `CHANGE:APPROVE` and **may not come from the author**; an `APPROVED` model cannot
+  be edited in place. An **expired** pre-approval authorises nothing, and a change that cites a
+  model then deviates from it is not backed by it. Whether a cell *requires* a model is opt-in per
+  tenant and per cell (`change_authorisation_matrix.requires_model`, default off — 5 STANDARD
+  changes exist in each database and 3 are in flight, so a default-on flag would refuse work
+  already under way).
 - **Closure needs a retrospective.** A `NORMAL`/`EMERGENCY` change cannot reach `CLOSED`
   without a recorded PIR summary (`STANDARD` is exempt — it is pre-approved, low-risk
   work). And a PIR that records objectives *not* met cannot close without a follow-up
@@ -331,12 +341,11 @@ must constitute its CAB and map the gates before any `CAB`/`ECAB` change can be 
 configuration. Step-by-step: **`docs/change-manager/CAB_OPERATING_RUNBOOK.md`**.
 
 **Not built yet** (tracked as CE-2, CE-8, CE-10, CE-11, CE-13 in
-`CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md`): a change-model catalogue,
-so `STANDARD` is still an unbacked string rather than a recorded pre-approval; a
-*published* forward schedule of change and declared service outage (the calendar, freeze
-windows and conflict detection exist, the publication act does not); workflow-engine
-adoption as the 15th module; the unauthorised-change register (emergency ratification is
-its interim sink); and the CAB workspace as its own frontend surface.
+`CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md`): a *published* forward
+schedule of change and declared service outage (the calendar, freeze windows and conflict
+detection exist, the publication act does not); workflow-engine adoption as the 15th
+module; the unauthorised-change register (emergency ratification is its interim sink);
+and the CAB workspace as its own frontend surface.
 
 ---
 

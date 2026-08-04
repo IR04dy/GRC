@@ -108,6 +108,34 @@ required approvals, and whether the authority behind it is configured.
 > statements, and `/{id}/authorisation` is how you tell which applies to the change in front of you.
 > This is the distinction the CE-16 probe itself got wrong first time.
 
+### §3.1 Change models — what makes a STANDARD change pre-approved
+
+A gate of `AUTO` says *no committee sitting is needed*. The question an auditor asks next is **on
+whose authority**, and the answer is a **change model**: a named procedure with an approver and an
+expiry date.
+
+| Act | Endpoint | Permission | Rule |
+|---|---|---|---|
+| List the catalogue | `GET /api/v1/changes/models` | `CHANGE:READ` | |
+| Author a model | `POST /api/v1/changes/models` | `CHANGE:WRITE` | Always created `DRAFT` — saving does not grant an authority |
+| **Grant the pre-approval** | `POST /api/v1/changes/models/{id}/approve` | `CHANGE:APPROVE` | **Not the author** (SoD). `validForDays` is required, 30–730 |
+| Suspend / retire | `POST /api/v1/changes/models/{id}/status` | `CHANGE:APPROVE` | Withdraws the authority; the history stays readable |
+| Apply to a change | `POST /api/v1/changes/{id}/model` | `CHANGE:WRITE` | Refused for a model that is not `APPROVED`, is expired, or is for another change type |
+| Read the backing | `GET /api/v1/changes/{id}/model` | `CHANGE:READ` | Always states a reason, never a bare false |
+
+**A pre-approval expires on purpose.** One that never comes due is not a control, which is why
+`validForDays` is mandatory and bounded. An `APPROVED` model whose date has passed shows as
+*Pre-approval expired* and authorises nothing until it is re-approved.
+
+**Deviation breaks the backing.** If the change departed from the procedure, record it in
+`deviationNotes` — the change then reads as *not* model-backed, because citing a procedure and then
+not following it is not doing the pre-approved thing.
+
+**Turning the requirement on.** `change_authorisation_matrix.requires_model` is off everywhere by
+default. Switch it on for a cell and `→ CAB_APPROVED` is refused for any change in that cell without
+a live model. Do it **after** the catalogue has models: 5 STANDARD changes exist in each database and
+3 are in flight, so switching it on first refuses work already under way.
+
 > ⚠ The matrix's own `gate` column is **advisory** on the change record until a gate map exists:
 > 8 changes in each database were authorised carrying a `CAB`/`ECAB` gate with no committee behind
 > it (F2-101). Reading a gate value is not proof a committee saw the change.

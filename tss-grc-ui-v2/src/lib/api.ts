@@ -693,8 +693,38 @@ export interface ChangeAuthMatrixCell {
   id: number; organisationId?: number;
   changeType: string; riskLevel: string;
   gate: string; minApprovals: number; requiredRoles?: string | null;
+  /** S8e/CE-2 — opt-in per cell: this gate authorises only on a live pre-approved model. */
+  requiresModel?: boolean;
   notesEn?: string; notesAr?: string;
 }
+// ─── S8e/CE-2: the change model catalogue ───────────────────────────────────
+/**
+ * A pre-approved procedure. `preApproved` alone means nothing — a model confers pre-approval only
+ * while it is APPROVED and `authorisedUntil` is in the future, which is why the server never sends
+ * a bare boolean and the UI never computes one.
+ */
+export interface ChangeModelDto {
+  id: number; organisationId?: number;
+  code: string; nameEn: string; nameAr: string;
+  descriptionEn?: string | null; descriptionAr?: string | null;
+  changeType: string; riskDefault?: string | null; gateOverride?: string | null;
+  preApproved: boolean;
+  authorisedByName?: string | null; authorisedAt?: string | null; authorisedUntil?: string | null;
+  standardSteps?: string | null; rollbackTemplate?: string | null; testTemplate?: string | null;
+  maxLeadTimeHours?: number | null; reviewCadence?: string | null;
+  status: 'DRAFT' | 'APPROVED' | 'SUSPENDED' | 'RETIRED';
+  createdBy?: string | null; createdAt?: string | null;
+}
+/** Why a change is or is not backed by a live pre-approval. `reason` is always present. */
+export interface ChangeModelBacking {
+  modelBacked: boolean;
+  reason: 'LIVE_PRE_APPROVAL' | 'NO_MODEL_CITED' | 'DEVIATED_FROM_MODEL' | 'MODEL_NOT_FOUND'
+        | 'PRE_APPROVAL_EXPIRED' | 'MODEL_NOT_APPROVED' | 'NOT_PRE_APPROVED';
+  modelCode?: string | null; modelNameEn?: string | null; modelNameAr?: string | null;
+  modelStatus?: string | null; authorisedByName?: string | null; authorisedUntil?: string | null;
+  deviation?: boolean; deviationNotes?: string | null;
+}
+
 /** One required role from the matrix and whether the recorded approvals met it (F2-95). */
 export interface RequiredRoleState {
   role: string;
@@ -820,6 +850,19 @@ export const changeApi = {
   // CH-17: classification-driven authorisation + freeze/calendar/conflicts
   authorisationMatrix: () => api.get<ChangeAuthMatrixCell[]>('/api/v1/changes/authorisation-matrix'),
   authorisation: (id: number) => api.get<ChangeAuthorisationView>(`/api/v1/changes/${id}/authorisation`),
+  // S8e/CE-2 — the model catalogue. Authoring is WRITE; granting the pre-approval is APPROVE and
+  // is refused for the model's own author, so the UI must not offer "create and approve" as one act.
+  models:        () => api.get<ChangeModelDto[]>('/api/v1/changes/models'),
+  createModel:   (body: Record<string, unknown>) => api.post<ChangeModelDto>('/api/v1/changes/models', body),
+  updateModel:   (id: number, body: Record<string, unknown>) => api.put<ChangeModelDto>(`/api/v1/changes/models/${id}`, body),
+  approveModel:  (id: number, validForDays: number, note?: string) =>
+    api.post<ChangeModelDto>(`/api/v1/changes/models/${id}/approve`, { validForDays, note }),
+  setModelStatus:(id: number, status: string) =>
+    api.post<ChangeModelDto>(`/api/v1/changes/models/${id}/status`, { status }),
+  changeModel:   (id: number) => api.get<ChangeModelBacking>(`/api/v1/changes/${id}/model`),
+  applyModel:    (id: number, modelId: number, deviationNotes?: string) =>
+    api.post<ChangeModelBacking>(`/api/v1/changes/${id}/model`, { modelId, deviationNotes }),
+
   freezeWindows: () => api.get<ChangeFreezeWindowDto[]>('/api/v1/changes/freeze-windows'),
   createFreeze:  (body: Partial<ChangeFreezeWindowDto>) => api.post<ChangeFreezeWindowDto>('/api/v1/changes/freeze-windows', body),
   deleteFreeze:  (id: number) => api.delete<void>(`/api/v1/changes/freeze-windows/${id}`),

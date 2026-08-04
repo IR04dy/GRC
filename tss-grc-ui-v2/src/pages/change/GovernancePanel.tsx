@@ -13,6 +13,7 @@ import {
   type ChangeAuthMatrixCell, type ChangeFreezeWindowDto, type ChangeCalendarView,
 } from '../../lib/api';
 import { canExport } from '../../lib/auth';
+import { ChangeModelCatalogue } from './ChangeModelCatalogue';
 
 const GATE_TONE: Record<string, BadgeTone> = { AUTO: 'success', CAB: 'info', ECAB: 'warning' };
 const RISK_TONE: Record<string, BadgeTone> = { LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger' };
@@ -114,6 +115,11 @@ export function GovernancePanel({ toast }: { toast: ReturnType<typeof useToast> 
           </div>
         </Card>
       )}
+
+      {/* S8e/CE-2 — the model catalogue sits directly above the authorisation matrix, because the
+          matrix's AUTO cell is exactly what a model backs. Reading them in the other order tells you
+          that STANDARD/LOW needs no committee without telling you what stands in for one. */}
+      <ChangeModelCatalogue toast={toast} />
 
       {/* Authorisation matrix */}
       <Card title={t('govAuthMatrixTitle')} Icon={ShieldCheck}>

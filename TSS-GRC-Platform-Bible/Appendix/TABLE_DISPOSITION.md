@@ -5,17 +5,17 @@ input is `table_disposition_exceptions.csv`, validated in both directions.
 
 | | count |
 |---|---|
-| tables in dev / prod | 466 / 465 |
-| rows in the register | 467 |
+| tables in dev / prod | 468 / 465 |
+| rows in the register | 469 |
 | classified from the exceptions file | 9 |
 
 | code | count | meaning |
 |---|---|---|
 | `OPERATING` | 399 | mapped and carrying data |
-| `WIRED_UNPROVEN` | 26 | mapped, 0 rows in both — shipped, never exercised |
+| `WIRED_UNPROVEN` | 28 | mapped, 0 rows in both — shipped, never exercised |
 | `SEED_ONLY` | 16 | **the only writer is a seed script** — ballast, shipped to prod by the restore |
-| `LEGACY` | 10 | no mapping, no Java reference, no seed insert, yet holds rows |
 | `ORPHAN_CONFIRMED` | 10 | no mapping, no reference, no rows |
+| `LEGACY` | 10 | no mapping, no Java reference, no seed insert, yet holds rows |
 | `DORMANT` | 5 | empty by design (rare-event or awaiting connector config) |
 | `INTENTIONAL_TECHNICAL` | 1 | infrastructure by design |
 
@@ -74,7 +74,7 @@ them: `DARK_UI`, `DARK_API`, `BROKEN_CHAIN`. The route plane is owned by
 | `privacy.privacy_assessments` | 6 | 6 | 0 | 0 | no JPA mapping, no Java reference and no seed insert, yet 12 row(s) — rows arrived from a migration or by hand |
 | `risk.risk_indicators` | 8 | 8 | 0 | 0 | no JPA mapping, no Java reference and no seed insert, yet 16 row(s) — rows arrived from a migration or by hand |
 
-## WIRED_UNPROVEN (26)
+## WIRED_UNPROVEN (28)
 
 | table | dev | prod | jpa | code refs | reason |
 |---|---|---|---|---|---|
@@ -82,6 +82,8 @@ them: `DARK_UI`, `DARK_API`, `BROKEN_CHAIN`. The route plane is owned by
 | `audit_committee.dashboard_snapshot` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `bcm.crisis_comms_cascade` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `change_mgmt.change_condition` | 0 | ABSENT | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
+| `change_mgmt.change_model` | 0 | ABSENT | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
+| `change_mgmt.change_model_usage` | 0 | ABSENT | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `dataclass.dataclass_event` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `intake.intake_events` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |
 | `intake.intake_records` | 0 | 0 | 1 | 0 | mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two) |

@@ -61,6 +61,25 @@ public class ChangeAuthorisationMatrix {
     @Column(name = "required_roles", length = 400)
     private String requiredRoles;
 
+    /**
+     * S8e / CE-2 — when true, this cell authorises a change <b>only</b> on the strength of a live
+     * pre-approved change model. Per tenant AND per cell, because "STANDARD/LOW needs no committee
+     * provided it follows a pre-approved procedure" is a statement about the cell.
+     *
+     * <p><b>Defaults to false, and V354 asserts it is false on every existing row.</b> 5 STANDARD
+     * changes exist in each database and 3 are in flight, so a default-on flag would refuse work
+     * already under way — the mistake S6c avoided for {@code quorum_requires_chair}, where
+     * default-on would have refused 17 of 18 quorate meetings. Enabling it is a tenant decision
+     * taken after the catalogue has models in it.
+     *
+     * <p>⚠ Unlike {@link #requiredRoles}, this is <b>gated, not reported</b>: when it is on,
+     * {@code ChangeManagementService} refuses {@code → CAB_APPROVED} with a 409 naming the missing
+     * model. A second column that describes a control without applying it is F2-95's shape, and one
+     * of those on this table is already one too many.
+     */
+    @Column(name = "requires_model", nullable = false)
+    private Boolean requiresModel = false;
+
     @Column(name = "notes_en", columnDefinition = "NVARCHAR(MAX)")
     private String notesEn;
 
