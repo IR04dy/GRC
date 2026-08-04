@@ -480,3 +480,43 @@
   font-size: var(--text-xs);
   color: var(--ink-3);
 }
+
+/* ─── S8a / CE-9: evidence on a change and on its conditions ─────────────── */
+
+/* The condition row's right-hand column: its evidence above its actions, because the actions
+   depend on the evidence — Satisfy is disabled until something there is verified. */
+.changes-cond-side {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: var(--sp-2); flex-shrink: 0; max-width: 42%;
+}
+.changes-cond-side .changes-cond-hint { margin: 0; text-align: end; }
+
+.changes-ev { display: flex; flex-direction: column; gap: var(--sp-3); align-items: flex-start; }
+.changes-ev--compact { align-items: flex-end; gap: var(--sp-2); }
+.changes-ev-sub {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--text-xs); color: var(--ink-3); line-height: 1.6;
+}
+.changes-ev-none { font-size: var(--text-2xs); color: var(--ink-3); }
+.changes-ev-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); width: 100%; }
+.changes-ev-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-2); border-radius: var(--r-sm);
+  font-size: var(--text-xs); color: var(--ink-2);
+  /* Verified vs merely attached is the distinction the whole slice turns on, so it is visible
+     without reading the badge text. */
+  border-inline-start: 3px solid var(--border);
+}
+.changes-ev-row[data-verified="1"] { border-inline-start-color: var(--success); }
+.changes-ev-row svg { flex-shrink: 0; color: var(--ink-3); }
+.changes-ev-row[data-verified="1"] svg { color: var(--success); }
+.changes-ev-title { font-weight: 500; color: var(--ink-1); }
+.changes-ev-file { font-size: var(--text-2xs); color: var(--ink-3); }
+.changes-ev-hash {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-2xs); color: var(--ink-3);
+  /* The hash is the artefact's identity — always LTR, even in an Arabic page. */
+  direction: ltr; unicode-bidi: isolate;
+}
+.changes-ev-hint { margin: 0; font-size: var(--text-2xs); color: var(--ink-3); }

@@ -15,6 +15,7 @@ import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService;
 import com.tss.grc.module.change_mgmt.service.ChangeManagementService;
 import com.tss.grc.module.change_mgmt.spi.CommitteePort;
+import com.tss.grc.module.change_mgmt.spi.EvidencePort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -160,6 +161,46 @@ public class ChangeManagementController {
     private static String usernameOf(Authentication auth) {
         if (auth != null && auth.getPrincipal() instanceof GrcUserDetails u) return u.getUsername();
         return auth != null ? auth.getName() : null;
+    }
+
+    // ── Evidence (S8a / CE-9) ───────────────────────────────────────────────
+    //
+    // Attaches, never uploads: the item is created, hashed, versioned and four-eyes reviewed inside
+    // the evidence subsystem. Guarded CHANGE — the subject is a change record, and the evidence
+    // module guards its own store — and WRITE rather than APPROVE, because attaching an artefact is
+    // clerical work; what makes it count is the evidence subsystem's own review.
+
+    @GetMapping("/{id}/evidence")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    public List<EvidencePort.EvidenceRef> evidence(@PathVariable Long id) {
+        return service.evidenceForChange(id);
+    }
+
+    @PostMapping("/{id}/evidence")
+    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public EvidencePort.EvidenceRef attachEvidence(@PathVariable Long id,
+                                                  @RequestBody Map<String, Object> body) {
+        Object ev = body == null ? null : body.get("evidenceId");
+        if (ev == null) throw new IllegalArgumentException("evidenceId is required");
+        return service.attachEvidenceToChange(id, Long.valueOf(ev.toString()), strFrom(body, "notes"));
+    }
+
+    @GetMapping("/conditions/{conditionId}/evidence")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    public List<EvidencePort.EvidenceRef> conditionEvidence(@PathVariable Long conditionId) {
+        return service.evidenceForCondition(conditionId);
+    }
+
+    @PostMapping("/conditions/{conditionId}/evidence")
+    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public EvidencePort.EvidenceRef attachConditionEvidence(@PathVariable Long conditionId,
+                                                           @RequestBody Map<String, Object> body) {
+        Object ev = body == null ? null : body.get("evidenceId");
+        if (ev == null) throw new IllegalArgumentException("evidenceId is required");
+        return service.attachEvidenceToCondition(conditionId, Long.valueOf(ev.toString()),
+                                                 strFrom(body, "notes"));
     }
 
     // ── Conditions register (S7e / CE-5) ────────────────────────────────────

@@ -6,6 +6,7 @@ import com.tss.grc.module.change_mgmt.entity.ChangeCondition;
 import com.tss.grc.module.change_mgmt.entity.ChangeRequest;
 import com.tss.grc.module.change_mgmt.repository.ChangeConditionRepository;
 import com.tss.grc.module.change_mgmt.repository.ChangeRequestRepository;
+import com.tss.grc.module.change_mgmt.spi.EvidencePort;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.security.GrcUserDetails;
 import org.junit.jupiter.api.AfterEach;
@@ -55,6 +56,7 @@ class ChangeConditionLifecycleTest {
     @Mock private ChangeConditionRepository   conditionRepo;
     @Mock private AuditLogService             audit;
     @Mock private ApplicationEventPublisher   publisher;
+    @Mock private EvidencePort                evidencePort;
 
     private ChangeManagementService service;
 
@@ -63,6 +65,12 @@ class ChangeConditionLifecycleTest {
         TenantContext.setCurrentTenant(ORG);
         service = new ChangeManagementService(changeRepo, null, null, null, null, audit, publisher);
         ReflectionTestUtils.setField(service, "conditionRepo", conditionRepo);
+        ReflectionTestUtils.setField(service, "evidencePort", evidencePort);
+        // S8a/CE-9: satisfying a condition now requires APPROVED evidence. The default here is "one
+        // approved artefact is attached", so the tests written before that gate keep testing what
+        // they were written to test; the gate itself is exercised by ChangeConditionEvidenceTest.
+        when(evidencePort.attached(EvidencePort.Subject.CONDITION, 501L))
+            .thenReturn(List.of(approvedEvidence()));
         when(changeRepo.save(any(ChangeRequest.class))).thenAnswer(i -> i.getArgument(0));
         when(conditionRepo.save(any(ChangeCondition.class))).thenAnswer(i -> {
             ChangeCondition c = i.getArgument(0);
@@ -102,6 +110,11 @@ class ChangeConditionLifecycleTest {
         c.setChangeOwnerName("owner");
         c.setChangeOwnerId(12L);
         return c;
+    }
+
+    private static EvidencePort.EvidenceRef approvedEvidence() {
+        return new EvidencePort.EvidenceRef(9001L, "ev-9001", "DR rehearsal report", "تقرير التمرين",
+                                           "REPORT", "APPROVED", true, "dr.pdf", "abc123");
     }
 
     private static ChangeCondition open(long id) {

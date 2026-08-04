@@ -583,6 +583,27 @@ export interface ChangeConditionDto {
   closureNotes?: string | null;
 }
 
+/**
+ * S8a/CE-9 — an evidence item as the change module sees it (the `EvidencePort.EvidenceRef` record).
+ *
+ * Deliberately a projection, not `EvidenceItemDto`: the change module has no business knowing the
+ * subsystem's 30-odd columns, and the four fields that matter here are the ones prose could never
+ * carry — `sha256`, `fileName`, the review `status`, and `verified`.
+ */
+export interface ChangeEvidenceRef {
+  id: number;
+  externalId?: string | null;
+  titleEn?: string | null;
+  titleAr?: string | null;
+  evidenceType?: string | null;
+  /** The subsystem's review state: DRAFT / PENDING_REVIEW / APPROVED / EXPIRED / … */
+  status?: string | null;
+  /** True only for APPROVED. A condition may be recorded satisfied only when something here is true. */
+  verified: boolean;
+  fileName?: string | null;
+  sha256?: string | null;
+}
+
 /** What a caller may set. Mirrors the backend record — no status, no ids, no closing fields. */
 export interface ChangeConditionRequest {
   textEn: string;
@@ -745,6 +766,18 @@ export const changeApi = {
                      api.post<ChangeConditionDto>(`/api/v1/changes/conditions/${conditionId}/satisfy`, { notes }),
   waiveCondition:  (conditionId: number, reason: string) =>
                      api.post<ChangeConditionDto>(`/api/v1/changes/conditions/${conditionId}/waive`, { reason }),
+
+  // S8a/CE-9: evidence on a change and on its conditions — the platform evidence subsystem, not
+  // change_links. Attaches an EXISTING item: hashing, versioning and the four-eyes review belong to
+  // the evidence workspace, and a second upload door here would have none of them.
+  evidence:            (id: number) => api.get<ChangeEvidenceRef[]>(`/api/v1/changes/${id}/evidence`),
+  attachEvidence:      (id: number, evidenceId: number, notes?: string) =>
+                         api.post<ChangeEvidenceRef>(`/api/v1/changes/${id}/evidence`, { evidenceId, notes }),
+  conditionEvidence:   (conditionId: number) =>
+                         api.get<ChangeEvidenceRef[]>(`/api/v1/changes/conditions/${conditionId}/evidence`),
+  attachConditionEvidence: (conditionId: number, evidenceId: number, notes?: string) =>
+                         api.post<ChangeEvidenceRef>(`/api/v1/changes/conditions/${conditionId}/evidence`,
+                                                     { evidenceId, notes }),
 
   comments:    (id: number) => api.get<ChangeCommentDto[]>(`/api/v1/changes/${id}/comments`),
   comment:     (id: number, body: Partial<ChangeCommentDto>) => api.post<ChangeCommentDto>(`/api/v1/changes/${id}/comments`, body),

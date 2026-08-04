@@ -18,6 +18,7 @@ import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal } from '../../components/ui/FormModal';
 import { changeApi, ApiError, type ChangeConditionDto, type ChangeRequestDto } from '../../lib/api';
+import { EvidenceAttachments, useAttachedEvidence } from './ChangeEvidence';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 
@@ -125,16 +126,8 @@ export function ConditionsCard({ change, onChanged, toast }: {
                   </div>
                   {c.closureNotes && <div className="changes-cond-notes">{c.closureNotes}</div>}
                 </div>
-                {c.status === 'OPEN' && (
-                  <div className="changes-cond-actions">
-                    <Button variant="ghost" Icon={Check} onClick={() => void satisfy(c)} disabled={busy}>
-                      {t('changeCondSatisfy')}
-                    </Button>
-                    <Button variant="ghost" Icon={Ban} onClick={() => setWaiving(c)} disabled={busy}>
-                      {t('changeCondWaive')}
-                    </Button>
-                  </div>
-                )}
+                <ConditionRowActions condition={c} busy={busy} onSatisfy={satisfy}
+                                     onWaive={setWaiving} toast={toast} />
               </div>
             ))}
           </div>}
@@ -170,5 +163,50 @@ export function ConditionsCard({ change, onChanged, toast }: {
         onClose={() => setWaiving(null)}
       />
     </Card>
+  );
+}
+
+/**
+ * S8a/CE-9 — the evidence half of a condition row, split out because it needs its own hook.
+ *
+ * ⚠ **Satisfy is disabled until verified evidence is attached, and says why.** The server refuses
+ * either way (`requireVerifiedEvidence`), but a disabled button with a sentence beside it is the
+ * difference between a rule and a mystery — and the sentence has to name the two ways forward,
+ * because "get it reviewed" and "waive it" are both legitimate and only an approver can do the second.
+ *
+ * The evidence list shows on closed conditions too: the artefact that discharged an obligation is
+ * exactly what an auditor comes back for, and hiding it once the row goes green would put it out of
+ * reach at the one moment it matters.
+ */
+function ConditionRowActions({ condition, busy, onSatisfy, onWaive, toast }: {
+  condition: ChangeConditionDto;
+  busy: boolean;
+  onSatisfy: (c: ChangeConditionDto) => void | Promise<void>;
+  onWaive: (c: ChangeConditionDto) => void;
+  toast: ReturnType<typeof useToast>;
+}) {
+  const { t } = useI18n();
+  const { items, reload, verified } = useAttachedEvidence('condition', condition.id);
+  const isOpen = condition.status === 'OPEN';
+
+  return (
+    <div className="changes-cond-side">
+      <EvidenceAttachments subject="condition" subjectId={condition.id} items={items}
+                           onChanged={reload} toast={toast} compact />
+      {isOpen && (
+        <div className="changes-cond-actions">
+          <Button variant="ghost" Icon={Check} onClick={() => void onSatisfy(condition)}
+                  disabled={busy || !verified}>
+            {t('changeCondSatisfy')}
+          </Button>
+          <Button variant="ghost" Icon={Ban} onClick={() => onWaive(condition)} disabled={busy}>
+            {t('changeCondWaive')}
+          </Button>
+        </div>
+      )}
+      {isOpen && !verified && (
+        <p className="changes-cond-hint">{t('changeCondNeedsEvidence')}</p>
+      )}
+    </div>
   );
 }

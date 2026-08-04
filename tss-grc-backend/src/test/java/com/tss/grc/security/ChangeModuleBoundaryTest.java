@@ -172,11 +172,11 @@ class ChangeModuleBoundaryTest {
         assertThat(peersReached)
             .as("""
                 the adapters exist to reach exactly the peers the change module gave up: \
-                admin (the committee engine), capa (S7d/CE-7's PIR follow-up tracker) and \
-                incident (CH-13's rollback hook). Reaching a fourth means a new dependency \
+                admin (the committee engine), capa (S7d/CE-7's PIR follow-up tracker), evidence \
+                (S8a/CE-9's change evidence) and incident (CH-13's rollback hook). Reaching a fifth \
                 arrived without a port decision — widen this list only together with a new \
                 port and the reason it exists, never to make a red build green.""")
-            .containsExactly("admin", "capa", "incident");
+            .containsExactly("admin", "capa", "evidence", "incident");
     }
 
     @Test

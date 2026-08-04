@@ -45,9 +45,9 @@ that will be read as current forever.
 | Module packages with **zero tests** | **15**, totalling **18,011 LoC (9.4%)** | 19 / 20,503 / 11.0% | — |
 | Distinct **JPA** schemas | **50** | 50 | matches `CLAUDE.md` "50+" ✅ |
 | **Database** schemas holding tables (dev & prod) | **51** | *not measured* | the 51st is `audit`, which JPA does not know — §7 |
-| Flyway migrations on disk | **340** files, `V1`–`V352`, 4.37 MB | 304 / `V1`–`V314` | next free **V353** |
+| Flyway migrations on disk | **341** files, `V1`–`V353`, 4.37 MB | 304 / `V1`–`V314` | next free **V354** |
 | **Deployed** Flyway baseline / head | **baseline `V292`**, head **`V336`**, **8 pending** | *pub. "baseline V312"* | ⚠ see §0.1 — load-bearing and wrong |
-| Frontend pages (`.tsx` under `pages/`) | **337** in **114** folders | 329 / 114 | S5c split the 1,036-line `ChangesPage` into `pages/change/` — +7 files, same folder count; S7e added `ChangeConditionsCard` |
+| Frontend pages (`.tsx` under `pages/`) | **338** in **114** folders | 329 / 114 | S5c split the 1,036-line `ChangesPage` into `pages/change/` — +7 files, same folder count; S7e added `ChangeConditionsCard`, S8a `ChangeEvidence` |
 | Routes registered in `App.tsx` | **328** | 328 | — |
 | Sidebar navigation entries | **193** | 184 | — |
 | Mock-data import statements | **30** in **26** files | 44 / 29 | W2-1 removed 14 |
@@ -318,7 +318,7 @@ is unadopted", and now to "adopted in code, not yet in the deployed data".)
 
 | Metric | Measured (08-01) | Reading |
 |---|---:|---|
-| Pages | **337** in **114** folders | More screens than ServiceNow GRC exposes in its entire IRM suite |
+| Pages | **338** in **114** folders | More screens than ServiceNow GRC exposes in its entire IRM suite |
 | Routes in `App.tsx` | **328** | One flat route table |
 | Sidebar entries | **193** (was 184) | **~135 routed pages are not in the navigation** — reachable only by URL |
 | Largest page folders | `bcm` 30, `socops` 25, `detail` 10, `workflow` 10, `cyber` 9, `risk` 9 | `bcm` alone has more screens than most competitors' whole BCM product |
@@ -446,7 +446,7 @@ also has. The platform is best-assured exactly where it is least differentiated.
 - **332** migration files, `V1`…`V344`, **4.30 MB** of DDL. Next free version: **V345**.
 - Sequence gaps at `V82–V90`, `V168`, `V169`, `V174` — expected (withdrawn during development),
   harmless to Flyway, but they mean "highest number" ≠ "count".
-- **50 distinct JPA schemas. 51 database schemas hold tables**, in *both* dev and prod (464 tables each).
+- **50 distinct JPA schemas. 51 database schemas hold tables**, in *both* dev and prod (466 / 465 tables — dev leads by the two tables the pending migrations create; see §7-C).
 
 ### 7-A. The schema JPA does not know
 
@@ -469,9 +469,9 @@ Measured from `platform.flyway_schema_history` in `TSS_GRC_Deployment`, not from
 |---|---|
 | Baseline | **`V292`** — *not* `V312`, which this page asserted for six days |
 | Applied head | **`V344`** (53 history rows: the baseline + `V293`…`V344`, **0 failed**) — re-measured 2026-08-02 after the deploy that applied `V337`…`V344` in 0.725 s |
-| Files at or below the baseline | **280 of 340** — recorded as applied, **never executed here** |
+| Files at or below the baseline | **280 of 341** — recorded as applied, **never executed here** |
 | Files executed by Flyway in prod | **52** |
-| **Pending the next jar** | **8** — `V345` (A17-D3 ratification SLA), `V346` (F2-94 recipient keys + `AUTOMATION:READ`), `V347` (F2-95/S6b-ii, the ghost role `CTO` dropped), `V348` (S6c `quorum_requires_chair`, inert), `V349` (S7a/F2-89+F2-100, `PROPOSED` + `decision_published_at`, inert), `V350` (S7b/CE-4, the referral's agenda subject — three nullable columns, no backfill by design) and `V351` (S7c/X-2, `ck_change_status` **14 → 16**: `CAB_DEFERRED` + `MORE_INFO_REQUIRED`, a CHECK widening that cannot move a row. ⚠ `PENDING_RATIFICATION` is deliberately **not** added — A17-D3 models ratification orthogonally to `status`, so it has no producer, and V351's own self-check refuses it) and `V352` (S7e/CE-5, the conditions register — a new, **empty** `change_mgmt.change_condition`; the guard it enables can refuse no existing change because zero conditions exist, and the migration's own self-check refuses to let the table ship seeded) |
+| **Pending the next jar** | **9** — `V345` (A17-D3 ratification SLA), `V346` (F2-94 recipient keys + `AUTOMATION:READ`), `V347` (F2-95/S6b-ii, the ghost role `CTO` dropped), `V348` (S6c `quorum_requires_chair`, inert), `V349` (S7a/F2-89+F2-100, `PROPOSED` + `decision_published_at`, inert), `V350` (S7b/CE-4, the referral's agenda subject — three nullable columns, no backfill by design), `V351` (S7c/X-2, `ck_change_status` **14 → 16**: `CAB_DEFERRED` + `MORE_INFO_REQUIRED`, a CHECK widening that cannot move a row. ⚠ `PENDING_RATIFICATION` is deliberately **not** added — A17-D3 models ratification orthogonally to `status`, so it has no producer, and V351's own self-check refuses it), `V352` (S7e/CE-5, the conditions register — a new, **empty** `change_mgmt.change_condition`; the guard it enables can refuse no existing change because zero conditions exist, and the migration's own self-check refuses to let the table ship seeded) and `V353` (S8a/CE-9, `CK_ev_links_module` **9 → 10**: `+CHANGE`, so a change may carry evidence from the platform subsystem. Another CHECK widening that cannot move a row — measured **0** `linked_module='CHANGE'` rows in either database, because the value was impossible until now — and the recreate lists all nine prior values with a self-check proving none was lost) |
 | Dev | Flyway **OFF**; no `flyway_schema_history` table at all. Migrations applied by hand via pyodbc |
 
 **Why the baseline number is load-bearing and not trivia.** The baseline is the line below which Flyway
@@ -493,22 +493,27 @@ disabled or failed would black out two tenants on everything except security ope
 
 | Measure | Value |
 |---|---|
-| Tables in dev / prod | **464 / 464**, **460 shared** |
+| Tables in dev / prod | **466 / 465**, **464 shared** — re-measured 2026-08-04 |
 | Shared tables with **identical row counts** | **429 (93%)** |
-| Prod-only tables | **4** — `platform.flyway_schema_history` + `risk.kri_definitions`, `risk.kri_readings`, `risk.kri_breach_events` (F2-65's leftovers) |
-| Dev-only tables | **4** — `platform.file_metadata`, `platform.nafath_transaction`, `platform.persistence_row`, `platform.sso_provider_config` |
+| Prod-only tables | **1** — `platform.flyway_schema_history`. ⚠ This line said **4** until 2026-08-04: F2-65's three `risk.kri_definitions`/`kri_readings`/`kri_breach_events` leftovers are **gone from prod**, so the legacy-table drop reached it. Measured, not inferred |
+| Dev-only tables | **2** — `change_mgmt.change_ratification_policy` (V345) and `change_mgmt.change_condition` (V352). ⚠ Also said **4** until 2026-08-04, naming `file_metadata`, `nafath_transaction`, `persistence_row` and `sso_provider_config` — the 2026-08-02 deploy of `V337`–`V344` created all four in prod, which is the whole point of the row below: **the dev-only set shrinks as the pending set is applied**, so a figure recorded before a deploy describes a database that no longer exists |
 
 Production is a **2026-07-11 restore of a dev dump**. The consequence is methodological and it
 invalidates a whole class of argument: **classifying a production row by its provenance proves nothing**,
 because the row was seeded in dev and copied. Only a *clean tenant*, created through the API and torn
 down, is trustworthy provenance evidence — which is why F2-68(d) built one.
 
-⚠ **And the divergence is not noise: the 4 dev-only tables are exactly the tables the 8 pending
-migrations create.** `persistence_row` (F2-71), `file_metadata`, `nafath_transaction`,
-`sso_provider_config` exist in dev because dev applied `V337`–`V344` by hand. So "dev and prod differ by
-4 tables" and "prod is 8 migrations behind" are the *same fact* measured two ways — and when this page
-last recorded the clone, it said **zero** dev-only tables, which was true then and stopped being true
-the moment the next migration was hand-applied.
+⚠ **And the divergence is not noise: every dev-only table is a table one of the pending migrations
+creates.** `change_ratification_policy` (V345) and `change_condition` (V352) exist in dev because dev
+applied them by hand. So "dev and prod differ by 2 tables" and "prod is 9 migrations behind" are the
+*same fact* measured two ways.
+
+**⚠ The corollary, which this page learned the hard way twice:** the dev-only set is *not* a stable
+property of the two databases — it shrinks the moment a deploy runs and grows the moment a migration
+is hand-applied. This page has now recorded it as **zero** (true before the first hand-application),
+as **four** (true between then and the 2026-08-02 deploy, which created all four in prod), and as
+**two**. Each figure was correct when measured and wrong within days. Only the *invariant* — dev-only
+⊆ tables created by pending migrations — survives, and that is the claim worth citing.
 
 **Risk this creates:** dev and prod schemas are produced by *two different mechanisms*. Nothing in CI
 proves they converge — `SchemaContractRatchetTest` and `Appendix/scripts/schema_drift.py` narrow it, but

@@ -16,6 +16,7 @@ import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.repository.*;
 import com.tss.grc.module.change_mgmt.spi.CapaPort;
 import com.tss.grc.module.change_mgmt.spi.CommitteePort;
+import com.tss.grc.module.change_mgmt.spi.EvidencePort;
 import com.tss.grc.module.change_mgmt.spi.IncidentPort;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -182,6 +183,21 @@ public class ChangeManagementService {
      */
     @Autowired(required = false)
     private ChangeConditionRepository conditionRepo;
+
+    /**
+     * S8a/CE-9: a change and its conditions carry real evidence — hashed, versioned and
+     * four-eyes reviewed — instead of prose in {@code test_plan} / {@code rollback_plan}.
+     *
+     * <p>⚠ <b>The absent-port polarity is SPLIT here, and the split is the control.</b> Reads and
+     * attaches no-op when the adapter is missing (a directly-constructed unit test must still work).
+     * But {@link #requireVerifiedEvidence} treats a null port as <em>cannot verify</em> and
+     * REFUSES — because a satisfaction gate that passes when it cannot see the evidence is the
+     * fail-open direction, which is F2-95's defect exactly ("satisfied" reading true over an
+     * unverifiable requirement). Same reasoning as A17-D3's ratification policy field, whose javadoc
+     * flags the same inversion.
+     */
+    @Autowired(required = false)
+    private EvidencePort evidencePort;
 
     /** S7d/CE-7: a PIR follow-up becomes a tracked CAPA in the Base universal tracker.
      *  S5/CE-1: reached through {@link CapaPort} — {@code module.capa} is a peer, so the same
@@ -743,6 +759,11 @@ public class ChangeManagementService {
         ChangeRequest c = require(cond.getChangeRequestId());
 
         if (ChangeConditionStatus.WAIVED.equals(target)) assertNotSelfWaiver(c);
+        // S8a/CE-9 — the `ConditionsSatisfiedGuard` half S7e deferred to S8: SATISFIED now means
+        // "verified evidence says so", not "somebody typed a note". Waiving is untouched, because a
+        // waiver is an authority act with a reason and an independent approver — so the path is
+        // strengthened, never trapped.
+        if (ChangeConditionStatus.SATISFIED.equals(target)) requireVerifiedEvidence(conditionId);
 
         cond.setStatus(target);
         cond.setClosedAt(LocalDateTime.now());
@@ -807,6 +828,110 @@ public class ChangeManagementService {
         return ChangeConditionStatus.isConditional(
             conditionRepo.countByOrganisationIdAndChangeRequestId(
                 TenantContext.getCurrentTenant(), changeId));
+    }
+
+    // ── S8a / CE-9: evidence on a change and on its conditions ──────────────────────────────────
+
+    /** Everything attached to this change. Empty when the evidence subsystem is unavailable. */
+    @Transactional(readOnly = true)
+    public List<EvidencePort.EvidenceRef> evidenceForChange(Long changeId) {
+        require(changeId);
+        return evidencePort == null ? List.of()
+            : evidencePort.attached(EvidencePort.Subject.CHANGE, changeId);
+    }
+
+    /** Everything attached to this condition — the artefacts that discharge the obligation. */
+    @Transactional(readOnly = true)
+    public List<EvidencePort.EvidenceRef> evidenceForCondition(Long conditionId) {
+        requireCondition(conditionId);
+        return evidencePort == null ? List.of()
+            : evidencePort.attached(EvidencePort.Subject.CONDITION, conditionId);
+    }
+
+    /**
+     * Attach an existing evidence item to a change.
+     *
+     * <p>Attaches, never uploads: the item is created, hashed, versioned and reviewed inside the
+     * evidence subsystem. A change-module upload path would be a second door into the same store with
+     * none of that — the deficiency G-9 describes rather than its remedy.
+     */
+    @Transactional
+    public EvidencePort.EvidenceRef attachEvidenceToChange(Long changeId, Long evidenceId, String notes) {
+        ChangeRequest c = require(changeId);
+        EvidencePort.EvidenceRef ref = attachOrThrow(EvidencePort.Subject.CHANGE, changeId, evidenceId, notes);
+        audit.log("EVIDENCE_ATTACHED", "ChangeRequest", changeId,
+            "Evidence #" + evidenceId + " (" + nullSafeStr(ref.titleEn()) + ", " + nullSafeStr(ref.status())
+                + ") attached to change " + nullSafeMsg(c.getChangeCode()));
+        return ref;
+    }
+
+    /** Attach an existing evidence item to one condition on an approval. */
+    @Transactional
+    public EvidencePort.EvidenceRef attachEvidenceToCondition(Long conditionId, Long evidenceId, String notes) {
+        ChangeCondition cond = requireCondition(conditionId);
+        EvidencePort.EvidenceRef ref =
+            attachOrThrow(EvidencePort.Subject.CONDITION, conditionId, evidenceId, notes);
+        audit.log("EVIDENCE_ATTACHED", "ChangeRequest", cond.getChangeRequestId(),
+            "Evidence #" + evidenceId + " (" + nullSafeStr(ref.titleEn()) + ", " + nullSafeStr(ref.status())
+                + ") attached to condition #" + conditionId);
+        return ref;
+    }
+
+    private EvidencePort.EvidenceRef attachOrThrow(EvidencePort.Subject subject, Long subjectId,
+                                                   Long evidenceId, String notes) {
+        if (evidencePort == null)
+            throw new IllegalStateException(
+                "The evidence subsystem is not available, so evidence cannot be attached");
+        return evidencePort.attach(subject, subjectId, evidenceId, notes)
+            // The adapter returns empty for an id that does not resolve inside the tenant. A 404 is
+            // the honest answer: silently succeeding would leave a change claiming evidence it has
+            // not got, which is worse than the free text this slice replaces.
+            .orElseThrow(() -> new EntityNotFoundException(
+                "Evidence item " + evidenceId + " was not found in this organisation, so it was not "
+                    + "attached. Create and review the evidence in the evidence workspace first."));
+    }
+
+    private ChangeCondition requireCondition(Long conditionId) {
+        Long org = TenantContext.getCurrentTenant();
+        ChangeCondition cond = conditionRepo == null ? null
+            : conditionRepo.findByIdAndOrganisationId(conditionId, org).orElse(null);
+        if (cond == null) throw new EntityNotFoundException("Condition not found: " + conditionId);
+        require(cond.getChangeRequestId());   // tenant + existence of the parent change
+        return cond;
+    }
+
+    /**
+     * S8a — a condition may only be recorded SATISFIED when <b>verified</b> evidence says so.
+     *
+     * <p>This is the "verified" half of {@code ConditionsSatisfiedGuard} that S7e shipped the gate
+     * without and explicitly left to S8. Verified means the subsystem's {@code APPROVED} state and
+     * nothing else: measured across both databases, 34 of 104 items are APPROVED while 29 are
+     * PENDING_REVIEW and 29 are EXPIRED, so accepting anything else would let evidence somebody
+     * merely uploaded — or evidence that has aged out — discharge an obligation the CAB imposed.
+     *
+     * <p>⚠ <b>Fails closed when the port is absent</b>, unlike every read above. A gate that passes
+     * because it cannot see the evidence is F2-95's defect verbatim ("satisfied" reading true over an
+     * unverifiable requirement), and the escape hatch already exists and is auditable: an independent
+     * {@code CHANGE:APPROVE} holder may <em>waive</em> the condition with a stated reason.
+     *
+     * <p>Measured safe to introduce: zero conditions exist in either database, so no recorded
+     * satisfaction is invalidated and no change is stranded.
+     */
+    private void requireVerifiedEvidence(Long conditionId) {
+        List<EvidencePort.EvidenceRef> attached = evidencePort == null ? List.of()
+            : evidencePort.attached(EvidencePort.Subject.CONDITION, conditionId);
+        if (attached.stream().anyMatch(EvidencePort.EvidenceRef::verified)) return;
+
+        String seen = attached.isEmpty() ? "none attached"
+            : attached.stream()
+                .map(e -> "#" + e.id() + " " + nullSafeStr(e.titleEn()) + " [" + nullSafeStr(e.status()) + "]")
+                .collect(java.util.stream.Collectors.joining("; "));
+        throw new IllegalStateException(
+            "Cannot record condition #" + conditionId + " as satisfied: it carries no APPROVED "
+                + "evidence. Attach the artefact that discharges it and have it reviewed in the "
+                + "evidence workspace — uploaded-but-unreviewed evidence does not count. Currently: "
+                + seen + ". If the obligation no longer applies, an approver other than the "
+                + "requester may waive it with a reason.");
     }
 
     private void stampImposer(ChangeCondition cond) {

@@ -28,6 +28,7 @@ import { STATUS_TONE, TYPE_TONE, RISK_TONE } from './changeVocabulary';
 import { mayTransitionTo, nextStatus } from './changeLifecycle';
 import { Field, Block } from './ChangeFields';
 import { ConditionsCard } from './ChangeConditionsCard';
+import { ChangeEvidenceCard } from './ChangeEvidence';
 import { PirCard } from './ChangePirCard';
 
 // ─── Workflow detail panel ─────────────────────────────────────────────────
@@ -204,6 +205,11 @@ export function WorkflowPanel({ items, detailId, setDetailId, onTransition, onCh
             )}
           </div>
         </Card>
+
+        {/* S8a/CE-9 — the change's own evidence: test results, back-out proof, implementation logs.
+            Above the conditions register because a condition's artefact is usually one of these, and
+            because G-9's complaint was about this change-level set. */}
+        <ChangeEvidenceCard change={change} toast={toast} />
 
         {/* S7e/CE-5 — above the PIR, because a condition blocks implementation and the PIR
             comes after it. Reading order follows the lifecycle. */}
