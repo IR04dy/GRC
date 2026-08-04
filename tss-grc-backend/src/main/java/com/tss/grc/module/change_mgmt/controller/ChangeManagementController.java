@@ -8,6 +8,7 @@ import com.tss.grc.module.platform.licensing.guard.RequireModule;
 import com.tss.grc.security.GrcUserDetails;
 
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
+import com.tss.grc.module.change_mgmt.dto.ChangeConditionRequest;
 import com.tss.grc.module.change_mgmt.dto.RatificationDtos;
 
 import com.tss.grc.module.change_mgmt.entity.*;
@@ -159,6 +160,54 @@ public class ChangeManagementController {
     private static String usernameOf(Authentication auth) {
         if (auth != null && auth.getPrincipal() instanceof GrcUserDetails u) return u.getUsername();
         return auth != null ? auth.getName() : null;
+    }
+
+    // ── Conditions register (S7e / CE-5) ────────────────────────────────────
+    //
+    // ⚠ Note the guard split, which is the whole authorisation statement of this feature.
+    // Imposing a condition and waiving one are APPROVAL acts — one adds an obligation as the price
+    // of approval, the other forgives it — so both demand CHANGE:APPROVE (9 roles). Recording that
+    // an obligation was met is operational work, so it needs only CHANGE:WRITE (42 roles). F2-29's
+    // classification, applied to a new surface rather than discovered on it later.
+
+    @GetMapping("/{id}/conditions")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    public List<ChangeCondition> conditions(@PathVariable Long id) { return service.conditions(id); }
+
+    /** The tenant-wide blocker list: every open obligation, soonest due first, undated last. */
+    @GetMapping("/conditions/open")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    public List<ChangeCondition> openConditions() { return service.openConditions(); }
+
+    @PostMapping("/{id}/conditions")
+    @PreAuthorize("hasPermission('CHANGE','APPROVE')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ChangeCondition addCondition(@PathVariable Long id,
+                                        @Valid @RequestBody ChangeConditionRequest body) {
+        return service.addCondition(id, body);
+    }
+
+    @PostMapping("/conditions/{conditionId}/satisfy")
+    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    public ChangeCondition satisfyCondition(@PathVariable Long conditionId,
+                                            @RequestBody(required = false) Map<String, Object> body) {
+        return service.satisfyCondition(conditionId, strFrom(body, "notes"));
+    }
+
+    @PostMapping("/conditions/{conditionId}/waive")
+    @PreAuthorize("hasPermission('CHANGE','APPROVE')")
+    public ChangeCondition waiveCondition(@PathVariable Long conditionId,
+                                          @RequestBody(required = false) Map<String, Object> body) {
+        // The reason is validated in the service (and by ck_cc_waiver_reason), not with @NotBlank on
+        // a wrapper DTO: @Valid fires BEFORE @PreAuthorize, so a bean-validated body would answer 400
+        // to a caller who should have been told 403 — the landmine CLAUDE.md records.
+        return service.waiveCondition(conditionId, strFrom(body, "reason"));
+    }
+
+    private static String strFrom(Map<String, Object> body, String key) {
+        if (body == null) return null;
+        Object v = body.get(key);
+        return v == null ? null : v.toString();
     }
 
     // ── Tasks ───────────────────────────────────────────────────────────────

@@ -562,6 +562,36 @@ export interface ChangeApprovalDto {
   comments?: string;
   decidedAt?: string;
 }
+/** S7e/CE-5 — a condition the approving authority attached to a change (V352). */
+export interface ChangeConditionDto {
+  id: number;
+  changeRequestId: number;
+  sortOrder?: number;
+  textEn: string;
+  textAr: string;
+  imposedById?: number | null;
+  imposedByName?: string | null;
+  imposedAt?: string | null;
+  ownerName?: string | null;
+  dueAt?: string | null;
+  /** OPEN blocks implementation. SATISFIED and WAIVED are deliberately distinct: collapsing them
+   *  would make a governance breach indistinguishable from compliance in every report. */
+  status: 'OPEN' | 'SATISFIED' | 'WAIVED';
+  closedById?: number | null;
+  closedByName?: string | null;
+  closedAt?: string | null;
+  closureNotes?: string | null;
+}
+
+/** What a caller may set. Mirrors the backend record — no status, no ids, no closing fields. */
+export interface ChangeConditionRequest {
+  textEn: string;
+  textAr: string;
+  ownerName?: string;
+  dueAt?: string;
+  sortOrder?: number;
+}
+
 export interface ChangeTaskDto {
   id?: number; changeRequestId?: number;
   sortOrder?: number;
@@ -704,6 +734,17 @@ export const changeApi = {
   deleteLink:  (linkId: number) => api.delete<void>(`/api/v1/changes/links/${linkId}`),
   linksForEntity: (entityType: string, entityId: number) =>
                   api.get<LinkedChangeView[]>(`/api/v1/changes/links/by-entity?entityType=${encodeURIComponent(entityType)}&entityId=${entityId}`),
+
+  // S7e/CE-5: the conditions register. Note the guard split the endpoints encode — imposing and
+  // waiving are CHANGE:APPROVE acts, satisfying is CHANGE:WRITE.
+  conditions:      (id: number) => api.get<ChangeConditionDto[]>(`/api/v1/changes/${id}/conditions`),
+  openConditions:  () => api.get<ChangeConditionDto[]>('/api/v1/changes/conditions/open'),
+  addCondition:    (id: number, body: ChangeConditionRequest) =>
+                     api.post<ChangeConditionDto>(`/api/v1/changes/${id}/conditions`, body),
+  satisfyCondition: (conditionId: number, notes?: string) =>
+                     api.post<ChangeConditionDto>(`/api/v1/changes/conditions/${conditionId}/satisfy`, { notes }),
+  waiveCondition:  (conditionId: number, reason: string) =>
+                     api.post<ChangeConditionDto>(`/api/v1/changes/conditions/${conditionId}/waive`, { reason }),
 
   comments:    (id: number) => api.get<ChangeCommentDto[]>(`/api/v1/changes/${id}/comments`),
   comment:     (id: number, body: Partial<ChangeCommentDto>) => api.post<ChangeCommentDto>(`/api/v1/changes/${id}/comments`, body),

@@ -4,15 +4,15 @@ admin,committee_form_templates,OPERATING,generated,10,10,1,1,0,2,1,2,0,mapped an
 admin,committee_gate_map,OPERATING,generated,2,2,1,2,0,2,1,0,0,mapped and carrying data
 admin,committee_meeting_attendee,OPERATING,generated,4,0,1,0,1,2,0,0,0,mapped and carrying data
 admin,committee_meeting_papers,OPERATING,generated,21,21,1,0,1,1,0,1,1,mapped and carrying data
-admin,committee_meetings,OPERATING,generated,34,32,1,1,1,4,2,3,2,mapped and carrying data
+admin,committee_meetings,OPERATING,generated,34,32,1,1,1,6,2,3,2,mapped and carrying data
 admin,committee_member_skills,OPERATING,generated,31,31,1,0,0,1,0,1,1,mapped and carrying data
-admin,committee_member_terms,OPERATING,generated,37,31,1,0,1,3,0,3,2,mapped and carrying data
-admin,committee_referral,OPERATING,generated,4,0,1,0,1,2,0,0,0,mapped and carrying data
+admin,committee_member_terms,OPERATING,generated,37,31,1,1,2,3,0,3,2,mapped and carrying data
+admin,committee_referral,OPERATING,generated,4,0,1,0,1,3,0,0,0,mapped and carrying data
 admin,committee_resolution_vote,OPERATING,generated,4,0,1,0,1,3,0,1,0,mapped and carrying data
-admin,committee_resolutions,OPERATING,generated,22,20,1,0,1,4,2,2,2,mapped and carrying data
+admin,committee_resolutions,OPERATING,generated,22,20,1,0,1,5,2,2,2,mapped and carrying data
 admin,committee_standing_items,OPERATING,generated,148,148,1,0,0,2,1,1,0,mapped and carrying data
 admin,committee_templates,OPERATING,generated,19,19,1,1,1,1,1,1,0,mapped and carrying data
-admin,committees,OPERATING,generated,19,17,1,3,3,6,2,9,1,mapped and carrying data
+admin,committees,OPERATING,generated,19,17,1,3,4,7,2,9,1,mapped and carrying data
 ai,ai_suggestions,OPERATING,generated,43,32,1,0,0,2,1,1,1,mapped and carrying data
 ai_governance,ai_lifecycle_event,OPERATING,generated,13,13,1,0,0,1,0,2,1,mapped and carrying data
 ai_governance,ml_model,OPERATING,generated,25,25,1,0,0,2,1,2,2,mapped and carrying data
@@ -96,16 +96,17 @@ bcm_lc,drills,LEGACY,generated,5,5,0,0,0,2,1,2,0,"no JPA mapping, no Java refere
 bcm_lc,invocations,OPERATING,generated,3,3,1,0,0,1,0,3,1,mapped and carrying data
 bcm_lc,recovery_strategies,LEGACY,generated,8,8,0,0,0,2,1,2,0,"no JPA mapping, no Java reference and no seed insert, yet 16 row(s) — rows arrived from a migration or by hand"
 board_pack,packs,OPERATING,generated,16,16,1,0,1,4,2,2,2,mapped and carrying data
-capa,tasks,OPERATING,generated,14,15,1,0,0,1,0,1,1,mapped and carrying data
+capa,tasks,OPERATING,generated,14,15,1,0,1,1,0,1,1,mapped and carrying data
 ccm,control_test_definition,OPERATING,generated,10,10,1,0,0,1,1,0,0,mapped and carrying data
 ccm,control_test_run,OPERATING,generated,3,3,1,0,0,2,0,0,0,mapped and carrying data
 change_mgmt,change_approvals,OPERATING,generated,31,31,1,0,0,2,0,1,1,mapped and carrying data
-change_mgmt,change_authorisation_matrix,OPERATING,generated,36,36,1,1,0,2,1,0,0,mapped and carrying data
+change_mgmt,change_authorisation_matrix,OPERATING,generated,36,36,1,1,0,3,1,0,0,mapped and carrying data
 change_mgmt,change_comments,OPERATING,generated,45,46,1,0,0,1,0,0,0,mapped and carrying data
+change_mgmt,change_condition,WIRED_UNPROVEN,generated,0,ABSENT,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 change_mgmt,change_freeze_window,OPERATING,generated,3,3,1,0,0,1,1,0,0,mapped and carrying data
 change_mgmt,change_links,OPERATING,generated,46,45,1,0,0,1,0,0,0,mapped and carrying data
 change_mgmt,change_ratification_policy,OPERATING,generated,3,ABSENT,1,0,0,1,1,0,0,mapped and carrying data
-change_mgmt,change_requests,OPERATING,generated,17,15,1,1,1,4,0,1,0,mapped and carrying data
+change_mgmt,change_requests,OPERATING,generated,17,15,1,1,2,7,0,1,0,mapped and carrying data
 change_mgmt,change_tasks,OPERATING,generated,41,41,1,0,0,1,0,1,1,mapped and carrying data
 compliance,assessments,OPERATING,generated,4,4,1,0,0,3,1,1,0,mapped and carrying data
 compliance,audit_engagements,OPERATING,generated,12,12,1,0,0,1,0,1,1,mapped and carrying data
@@ -202,13 +203,13 @@ iam,access_requests,OPERATING,generated,6,6,1,1,0,2,0,0,0,mapped and carrying da
 iam,access_review_campaigns,OPERATING,generated,2,2,1,0,0,2,0,0,0,mapped and carrying data
 iam,access_review_items,DORMANT,exceptions-file,0,0,1,1,0,1,0,0,0,"Snapshotted from iam.user_roles when a recertification campaign is created. 0 rows means no campaign has been run in either database, which is a usage fact rather than a wiring fact — AccessReviewItemRepository is live and its closure gate is tested."
 iam,break_glass_events,DORMANT,exceptions-file,0,0,1,1,0,1,0,0,0,"Emergency access is a rare event by design. 0 rows means it has never been needed, not that it is unwired — BreakGlassService is live and its self-review 409 is tested. ADR-017 D-10b notes the deeper point: this door stays unused because the roles that would need it hold everything permanently."
-iam,permissions,OPERATING,generated,114,114,1,2,0,29,20,3,0,mapped and carrying data
-iam,role_permissions,OPERATING,generated,1492,1492,1,4,0,31,26,4,0,mapped and carrying data
-iam,roles,OPERATING,generated,59,59,1,5,9,36,7,5,0,mapped and carrying data
+iam,permissions,OPERATING,generated,115,114,1,2,0,30,21,3,0,mapped and carrying data
+iam,role_permissions,OPERATING,generated,1494,1492,1,4,0,32,27,4,0,mapped and carrying data
+iam,roles,OPERATING,generated,59,59,1,5,9,38,7,5,0,mapped and carrying data
 iam,sod_rules,OPERATING,generated,8,8,1,0,0,1,1,0,0,mapped and carrying data
 iam,sod_violations,OPERATING,generated,9,9,1,0,0,1,0,0,0,mapped and carrying data
-iam,user_roles,OPERATING,generated,11,11,1,4,0,8,2,2,1,mapped and carrying data
-iam,users,OPERATING,generated,7,7,1,4,2,10,1,16,1,mapped and carrying data
+iam,user_roles,OPERATING,generated,11,11,1,5,0,8,2,2,1,mapped and carrying data
+iam,users,OPERATING,generated,7,7,1,5,2,10,1,16,1,mapped and carrying data
 intake,intake_events,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 intake,intake_records,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 kb,articles,OPERATING,generated,22,22,1,0,0,3,1,1,1,mapped and carrying data
@@ -243,11 +244,11 @@ outsourcing,ongoing_review,OPERATING,generated,7,7,1,0,0,1,0,3,2,mapped and carr
 outsourcing,outsourcing_arrangement,OPERATING,generated,20,20,1,0,0,1,0,3,2,mapped and carrying data
 outsourcing,outsourcing_event,OPERATING,generated,10,10,1,0,0,1,0,2,1,mapped and carrying data
 platform,attachments,OPERATING,generated,20,18,1,0,0,5,0,1,0,mapped and carrying data
-platform,audit_log,OPERATING,generated,7232,4027,1,1,1,10,1,2,0,mapped and carrying data
+platform,audit_log,OPERATING,generated,7970,4096,1,1,2,11,1,2,0,mapped and carrying data
 platform,authority_document_citations,OPERATING,generated,214,214,1,0,0,6,4,0,0,mapped and carrying data
 platform,authority_documents,OPERATING,generated,19,19,1,0,0,7,1,0,0,mapped and carrying data
-platform,automation_rule_runs,OPERATING,generated,311,171,1,0,0,1,0,0,0,mapped and carrying data
-platform,automation_rules,OPERATING,generated,214,211,1,0,0,42,42,11,0,mapped and carrying data
+platform,automation_rule_runs,OPERATING,generated,355,175,1,0,0,1,0,0,0,mapped and carrying data
+platform,automation_rules,OPERATING,generated,214,211,1,0,0,43,42,11,0,mapped and carrying data
 platform,brand_theme,OPERATING,generated,1,1,1,0,0,1,0,0,0,mapped and carrying data
 platform,business_units,LEGACY,generated,10,10,0,0,0,3,0,0,0,"no JPA mapping, no Java reference and no seed insert, yet 20 row(s) — rows arrived from a migration or by hand"
 platform,calendar_events,OPERATING,generated,10,10,1,0,0,2,1,0,0,mapped and carrying data
@@ -270,10 +271,10 @@ platform,notifications,OPERATING,generated,409,380,1,0,0,2,0,1,0,mapped and carr
 platform,organisation_licenses,OPERATING,generated,57,57,1,0,0,3,3,3,3,mapped and carrying data
 platform,organisations,OPERATING,generated,3,3,1,1,1,9,1,3,1,mapped and carrying data
 platform,persistence_row,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
-platform,refresh_token,OPERATING,generated,2017,1060,1,0,0,1,0,1,0,mapped and carrying data
+platform,refresh_token,OPERATING,generated,2174,1060,1,0,1,1,0,1,0,mapped and carrying data
 platform,risk_control_links,OPERATING,generated,24,24,1,0,0,3,1,0,0,mapped and carrying data
 platform,saved_views,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
-platform,signatures,OPERATING,generated,2,1,1,0,1,1,0,0,0,mapped and carrying data
+platform,signatures,OPERATING,generated,4,1,1,0,1,1,0,0,0,mapped and carrying data
 platform,splunk_hec_outbound_log,OPERATING,generated,12,1,1,0,0,1,0,0,0,mapped and carrying data
 platform,sso_provider_config,WIRED_UNPROVEN,generated,0,0,1,0,0,1,0,0,0,"mapped; no rows in either database today (probes clean up after themselves and prod is a restore of dev, so this is one observation, not two)"
 platform,tenable_finding_log,OPERATING,generated,5,5,1,0,0,1,0,0,0,mapped and carrying data
@@ -319,7 +320,7 @@ regreporting,regreport_filing,OPERATING,generated,38,38,1,0,0,1,0,3,2,mapped and
 regreporting,regreport_obligation,OPERATING,generated,19,19,1,0,0,1,0,3,2,mapped and carrying data
 reporting,report_definitions,SEED_ONLY,generated,20,20,0,0,0,3,0,2,1,"no JPA mapping and no Java reference; the only writer is a seed script (seed_real_data.py) — 40 row(s) of ballast, present in prod because it was restored from a dev dump"
 reporting,report_executions,ORPHAN_CONFIRMED,generated,0,0,0,0,0,2,0,1,0,"no JPA mapping, no Java reference, 0 rows in both databases"
-reporting,report_runs,OPERATING,generated,66,66,1,0,0,2,0,1,1,mapped and carrying data
+reporting,report_runs,OPERATING,generated,68,68,1,0,0,2,0,1,1,mapped and carrying data
 reporting,report_schedules,OPERATING,generated,12,12,1,0,0,2,0,1,1,mapped and carrying data
 risk,appetite_breach_events,OPERATING,generated,5,5,1,0,0,1,0,0,0,mapped and carrying data
 risk,bowtie_analysis,OPERATING,generated,2,2,1,0,0,1,1,0,0,mapped and carrying data

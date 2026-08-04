@@ -11,6 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
+import com.tss.grc.module.change_mgmt.dto.ChangeConditionRequest;
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.repository.*;
 import com.tss.grc.module.change_mgmt.spi.CapaPort;
@@ -165,6 +166,22 @@ public class ChangeManagementService {
      *  directly need not supply it — the rollback hook then no-ops. */
     @Autowired(required = false)
     private IncidentPort incidentPort;
+
+    /**
+     * S7e/CE-5: the conditions register (V352).
+     *
+     * <p>⚠ <b>Field-injected, and the no-op when absent is a test affordance that must never reach
+     * production.</b> Six test classes construct this service positionally, so an eighth constructor
+     * argument would break them all — but a null repository means {@code assertConditionsSatisfied}
+     * cannot see the blockers, which is the fail-OPEN direction. That is acceptable only because it
+     * is unreachable in the running app (Spring Data always provides the bean) and because
+     * {@code ChangeConditionRegisterTest.theRegisterRepositoryIsActuallyWired} asserts the injection
+     * point exists rather than trusting it — the exact "green-because-absent" trap
+     * {@code ChangeAuthorityFailClosedTest} documented after three of its assertions passed
+     * vacuously.
+     */
+    @Autowired(required = false)
+    private ChangeConditionRepository conditionRepo;
 
     /** S7d/CE-7: a PIR follow-up becomes a tracked CAPA in the Base universal tracker.
      *  S5/CE-1: reached through {@link CapaPort} — {@code module.capa} is a peer, so the same
@@ -433,6 +450,11 @@ public class ChangeManagementService {
                 // (emergencies exempt where the window permits).
                 enforceFreeze(c);
             case "IMPLEMENTING" -> {
+                // S7e/CE-5: the conditions gate. FIRST in this branch, before any state is
+                // mutated — a refusal must leave the change exactly as it was, and arming the
+                // ratification clock for an implementation that is then refused would start an SLA
+                // against work that never began.
+                assertConditionsSatisfied(c);
                 if (c.getImplementationStarted() == null) c.setImplementationStarted(LocalDateTime.now());
                 // A17-D3: the clock starts HERE — first moment the change is live.
                 startRatificationClock(c);
@@ -605,6 +627,238 @@ public class ChangeManagementService {
     public List<ChangeApproval> approvals(Long changeId) {
         require(changeId);
         return approvalRepo.findByChangeRequestIdOrderByDecidedAtAsc(changeId);
+    }
+
+    // ── Conditions register (S7e / CE-5) ────────────────────────────────────
+    //
+    // G-5: "no approve-with-conditions; conditions not recorded or enforced before
+    // implementation". A CAB that approved "subject to the DR rehearsal being re-run" had one place
+    // to put that — `cab_decision_notes`, free text nothing reads — and the change then proceeded to
+    // IMPLEMENTING with the obligation unrecorded, unowned and unchecked. Measured 2026-08-04: zero
+    // conditions concept anywhere in either database.
+    //
+    // The register is a table, not a status word: conditionality is DERIVED from carrying
+    // conditions, so it cannot disagree with them (see ChangeConditionStatus).
+
+    @Transactional(readOnly = true)
+    public List<ChangeCondition> conditions(Long changeId) {
+        require(changeId);
+        return conditionRepo.findByOrganisationIdAndChangeRequestIdOrderBySortOrderAscIdAsc(
+            TenantContext.getCurrentTenant(), changeId);
+    }
+
+    /** The tenant-wide blocker list — every open obligation, soonest due first, undated last. */
+    @Transactional(readOnly = true)
+    public List<ChangeCondition> openConditions() {
+        return conditionRepo.findOpenForOrg(TenantContext.getCurrentTenant());
+    }
+
+    /**
+     * Attach a condition to a change.
+     *
+     * <p>An approval act, so it is guarded by {@code CHANGE:APPROVE} at the controller and stamps its
+     * author here — F2-93/F2-103's lesson applied at the point a new authored record is introduced
+     * rather than after someone notices the column is empty. An obligation with no named imposer
+     * cannot be appealed, varied or audited.
+     *
+     * <p>Deliberately permitted at any lifecycle state. A CAB imposes conditions when it approves,
+     * but an ECAB ratifying an emergency change after the fact imposes them on an already-implemented
+     * one, and a condition discovered during implementation is exactly the case a register exists to
+     * catch. Restricting the state would lose the governance fact to keep the model tidy — S7c's rule.
+     */
+    @Transactional
+    public ChangeCondition addCondition(Long changeId, ChangeConditionRequest req) {
+        ChangeRequest c = require(changeId);
+        ChangeCondition body = new ChangeCondition();
+        body.setTextEn(req.textEn());
+        body.setTextAr(req.textAr());
+        body.setOwnerName(req.ownerName());
+        body.setDueAt(req.dueAt());
+        body.setSortOrder(req.sortOrder());
+        // The entity is built HERE from a narrow DTO, never bound from the body — MassAssignmentRatchet
+        // rejected the first draft by name, and it was right: a scrub is a list of fields somebody
+        // remembered, a DTO is the set of fields that exist. These four lines stay because addCondition
+        // is reachable from inside the module too, and a caller that builds the entity itself must not
+        // be able to hand over a closed one.
+        body.setId(null);
+        body.setChangeRequestId(changeId);
+        body.setOrganisationId(c.getOrganisationId());
+        body.setStatus(ChangeConditionStatus.OPEN);
+        body.setClosedById(null);
+        body.setClosedByName(null);
+        body.setClosedAt(null);
+        body.setClosureNotes(null);
+        body.setImposedAt(LocalDateTime.now());
+        stampImposer(body);
+        if (body.getSortOrder() == null) body.setSortOrder(0);
+        ChangeCondition saved = conditionRepo.save(body);
+        audit.log("CONDITION_IMPOSED", "ChangeRequest", changeId,
+            "Condition #" + saved.getId() + " imposed on change " + nullSafeMsg(c.getChangeCode())
+                + " by " + nullSafeMsg(saved.getImposedByName()) + ": "
+                + nullSafeMsg(saved.getTextEn())
+                + (saved.getDueAt() != null ? " (due " + saved.getDueAt() + ")" : ""));
+        return saved;
+    }
+
+    /**
+     * Record that a condition was met. Operational — {@code CHANGE:WRITE}.
+     *
+     * <p>S8's {@code ConditionsSatisfiedGuard} will require a <em>verified</em> evidence link here;
+     * {@code closureNotes} is the seam it grows into. Until then the notes are the reference, and the
+     * author is stamped either way so the eventual four-eyes check has something to compare.
+     */
+    @Transactional
+    public ChangeCondition satisfyCondition(Long conditionId, String notes) {
+        return closeCondition(conditionId, ChangeConditionStatus.SATISFIED, notes);
+    }
+
+    /**
+     * Remove a condition without it being met. An approval act — {@code CHANGE:APPROVE} — because it
+     * forgives an obligation a governance body imposed.
+     *
+     * <p>A reason is mandatory (`ck_cc_waiver_reason` enforces it in the schema too): satisfaction
+     * can stand on its evidence, but removing an obligation cannot stand on nothing. And the waiver
+     * may not be the change's requester — the same self-review refusal as the CAB vote's SoD gate,
+     * for the same reason: otherwise anyone able to raise a change could impose a condition on it
+     * and forgive it in the next request, which is a conditional approval that means nothing.
+     */
+    @Transactional
+    public ChangeCondition waiveCondition(Long conditionId, String reason) {
+        if (reason == null || reason.isBlank())
+            throw new IllegalArgumentException(
+                "A waiver reason is required — removing an obligation the approving authority "
+                    + "imposed cannot be recorded without one");
+        return closeCondition(conditionId, ChangeConditionStatus.WAIVED, reason);
+    }
+
+    private ChangeCondition closeCondition(Long conditionId, String target, String notes) {
+        Long org = TenantContext.getCurrentTenant();
+        ChangeCondition cond = conditionRepo.findByIdAndOrganisationId(conditionId, org)
+            .orElseThrow(() -> new EntityNotFoundException("Condition not found: " + conditionId));
+        if (ChangeConditionStatus.isClosed(cond.getStatus()))
+            throw new IllegalStateException(
+                "Condition #" + conditionId + " is already " + cond.getStatus()
+                    + " — reopening a closed condition would erase who closed it and when. "
+                    + "Impose a new condition instead.");
+        ChangeRequest c = require(cond.getChangeRequestId());
+
+        if (ChangeConditionStatus.WAIVED.equals(target)) assertNotSelfWaiver(c);
+
+        cond.setStatus(target);
+        cond.setClosedAt(LocalDateTime.now());
+        cond.setClosureNotes(notes);
+        stampCloser(cond);
+        // ck_cc_closure refuses a closed row with no author, so a principal-less context (a
+        // scheduler, a test that forgot to authenticate) must fail loudly here rather than at the
+        // database with an opaque constraint violation.
+        if (cond.getClosedByName() == null || cond.getClosedByName().isBlank())
+            throw new IllegalStateException(
+                "Cannot close condition #" + conditionId + ": no authenticated principal to record "
+                    + "as the author, and a condition closed by nobody is the defect this register "
+                    + "replaces");
+        ChangeCondition saved = conditionRepo.save(cond);
+        audit.log("CONDITION_" + target, "ChangeRequest", cond.getChangeRequestId(),
+            "Condition #" + conditionId + " on change " + nullSafeMsg(c.getChangeCode()) + " "
+                + target.toLowerCase(Locale.ROOT) + " by " + nullSafeMsg(saved.getClosedByName())
+                + (notes != null && !notes.isBlank() ? " — " + notes : ""));
+        return saved;
+    }
+
+    /**
+     * CE-5's enforcement half — {@code SCHEDULED → IMPLEMENTING} is refused while any condition is
+     * {@code OPEN}.
+     *
+     * <p><b>Why the guard ships with the register and not with S8.</b> The plan lists
+     * {@code ConditionsSatisfiedGuard} under S8, and S8's version adds a real requirement — the
+     * satisfaction must carry <em>verified</em> evidence. But a register nothing consults is a dead
+     * control, and this programme has spent four slices closing exactly that shape (F2-62's invented
+     * role, F2-95's 33 configured requirements enforced zero times, F2-89's outcome nothing could
+     * represent). So S7e ships the gate and S8 strengthens what counts as satisfying it.
+     *
+     * <p>Measured safe: zero conditions exist in either database, so this can refuse no change that
+     * exists today. Enforcement begins with the first condition a CAB actually imposes — which is
+     * also why V352 refuses to seed the table.
+     */
+    private void assertConditionsSatisfied(ChangeRequest c) {
+        if (conditionRepo == null) return;   // see the field's javadoc — test affordance only
+        long open = conditionRepo.countByOrganisationIdAndChangeRequestIdAndStatus(
+            c.getOrganisationId(), c.getId(), ChangeConditionStatus.OPEN);
+        if (open == 0) return;
+        List<ChangeCondition> blocking =
+            conditionRepo.findByOrganisationIdAndChangeRequestIdOrderBySortOrderAscIdAsc(
+                    c.getOrganisationId(), c.getId())
+                .stream().filter(x -> ChangeConditionStatus.OPEN.equals(x.getStatus())).toList();
+        // Name them. The A17-D2/F2-96 remedy rule: an operator told "conditions are outstanding"
+        // has to go looking, and the thing they must do is in the message.
+        String list = blocking.stream()
+            .map(x -> "#" + x.getId() + " " + nullSafeStr(x.getTextEn()))
+            .collect(java.util.stream.Collectors.joining("; "));
+        throw new IllegalStateException(
+            "Cannot start implementation: " + open + " condition"
+                + (open == 1 ? "" : "s") + " attached to this approval "
+                + (open == 1 ? "is" : "are") + " still open — " + list
+                + ". Record each as satisfied, or have an approver waive it with a reason.");
+    }
+
+    /** True when this change was approved subject to conditions — derived, never stored. */
+    @Transactional(readOnly = true)
+    public boolean isConditional(Long changeId) {
+        require(changeId);
+        return ChangeConditionStatus.isConditional(
+            conditionRepo.countByOrganisationIdAndChangeRequestId(
+                TenantContext.getCurrentTenant(), changeId));
+    }
+
+    private void stampImposer(ChangeCondition cond) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return;
+        if (auth.getPrincipal() instanceof com.tss.grc.security.GrcUserDetails u) {
+            cond.setImposedById(u.getUserId());
+            cond.setImposedByName(u.getUsername());
+        } else if (auth.getName() != null) {
+            cond.setImposedByName(auth.getName());
+        }
+    }
+
+    private void stampCloser(ChangeCondition cond) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return;
+        if (auth.getPrincipal() instanceof com.tss.grc.security.GrcUserDetails u) {
+            cond.setClosedById(u.getUserId());
+            cond.setClosedByName(u.getUsername());
+        } else if (auth.getName() != null) {
+            cond.setClosedByName(auth.getName());
+        }
+    }
+
+    /**
+     * A waiver may not come from the change's own requester or owner.
+     *
+     * <p>Resolved on the user id where the change captured one, falling back to the name only for
+     * legacy rows — the ordering DF-4/F2-24 established for the CAB vote's SoD gate, because a
+     * name-only comparison is exactly what let a requester approve their own change by claiming
+     * somebody else's name.
+     */
+    private void assertNotSelfWaiver(ChangeRequest c) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return;
+        Long actorId = null;
+        String actorName = auth.getName();
+        if (auth.getPrincipal() instanceof com.tss.grc.security.GrcUserDetails u) {
+            actorId = u.getUserId();
+            actorName = u.getUsername();
+        }
+        boolean isRequester = actorId != null && actorId.equals(c.getRequestedById());
+        boolean isOwner     = actorId != null && actorId.equals(c.getChangeOwnerId());
+        if (actorId == null || (c.getRequestedById() == null && c.getChangeOwnerId() == null)) {
+            isRequester = actorName != null && actorName.equalsIgnoreCase(c.getRequestedByName());
+            isOwner     = actorName != null && actorName.equalsIgnoreCase(c.getChangeOwnerName());
+        }
+        if (isRequester || isOwner)
+            throw new IllegalStateException(
+                "You raised or own this change, so you may not waive a condition attached to its "
+                    + "approval — a condition the requester can forgive is not a condition. Ask "
+                    + "another CHANGE:APPROVE holder to waive it, or record it as satisfied.");
     }
 
     // ── Tasks ───────────────────────────────────────────────────────────────

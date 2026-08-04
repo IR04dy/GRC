@@ -27,6 +27,7 @@ import { getUser, canExport } from '../../lib/auth';
 import { STATUS_TONE, TYPE_TONE, RISK_TONE } from './changeVocabulary';
 import { mayTransitionTo, nextStatus } from './changeLifecycle';
 import { Field, Block } from './ChangeFields';
+import { ConditionsCard } from './ChangeConditionsCard';
 import { PirCard } from './ChangePirCard';
 
 // ─── Workflow detail panel ─────────────────────────────────────────────────
@@ -203,6 +204,10 @@ export function WorkflowPanel({ items, detailId, setDetailId, onTransition, onCh
             )}
           </div>
         </Card>
+
+        {/* S7e/CE-5 — above the PIR, because a condition blocks implementation and the PIR
+            comes after it. Reading order follows the lifecycle. */}
+        <ConditionsCard change={change} onChanged={onChanged} toast={toast} />
 
         <PirCard change={change} onChanged={onChanged} toast={toast} />
 
