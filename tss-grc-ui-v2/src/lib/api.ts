@@ -634,12 +634,45 @@ export interface ChangeCommentDto {
   authorName: string; body: string;
   createdAt?: string;
 }
+/**
+ * S8b/CE-12 — one ITIL/ISO KPI, with the population it was computed over.
+ *
+ * `basis` answers *how much of the population is covered*; `provenance` answers *whether the covered
+ * rows were measured or asserted*. They are independent: the CAB quorum-met rate is `COMPUTED` (2 of 2
+ * held meetings recorded a basis) **and** `ASSERTED` (both bases were typed by a human, not derived
+ * from the roster). Rendering only the value would present that as a passed control.
+ */
+export interface ChangeKpi {
+  key: string;
+  /** null when `basis` is NO_DATA or NOT_MEASURABLE — never render a 0 in its place. */
+  value: number | null;
+  unit: 'PCT' | 'DAYS' | 'COUNT' | 'RATIO_PER_MEETING';
+  numerator?: number | null;
+  /** What the value was divided by. For DAYS metrics this is the sample size. */
+  denominator?: number | null;
+  /** The population the metric ideally covers. Below `denominator` ⇒ the figure is partial. */
+  population?: number | null;
+  basis: 'COMPUTED' | 'COMPUTED_PARTIAL' | 'NO_DATA' | 'NOT_MEASURABLE';
+  provenance?: 'MEASURED' | 'ASSERTED' | 'MIXED' | null;
+  /** Stable code naming what is missing, translated by the FE. Set only when NOT_MEASURABLE. */
+  blockedBy?: string | null;
+}
+
 export interface ChangeAnalyticsDto {
   total: number;
   byStatus: Record<string, number>;
   byType: Record<string, number>;
   byOutcome: Record<string, number>;
+  /**
+   * ⚠ F2-107: this divided by *rows that have an outcome* until S8b, so it rendered 100% in dev off
+   * 2 rows out of 17. The denominator is now changes that reached a terminal status, and the two keys
+   * below expose it — a rate whose denominator the caller cannot see is the defect, not the number.
+   */
   successRatePct: number;
+  successRateDenominator?: number;
+  successRateOutcomesRecorded?: number;
+  /** The full §12 pack, keyed by metric. Absent on a deployment without the KPI service. */
+  kpis?: Record<string, ChangeKpi>;
 }
 /** Used by other modules to render a "Linked Changes" panel for any entity. */
 export interface LinkedChangeView {

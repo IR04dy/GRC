@@ -88,7 +88,7 @@ PUBLISHED = {
     "migration_files": 341,
     "migration_head": 353,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
-    "fe_pages": 338,
+    "fe_pages": 339,
     "fe_page_folders": 114,
     "fe_routes": 328,
     "fe_nav_entries": 193,

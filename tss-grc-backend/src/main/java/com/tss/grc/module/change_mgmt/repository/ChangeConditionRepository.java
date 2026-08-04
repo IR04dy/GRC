@@ -31,6 +31,15 @@ public interface ChangeConditionRepository extends JpaRepository<ChangeCondition
     long countByOrganisationIdAndChangeRequestId(Long organisationId, Long changeRequestId);
 
     /**
+     * S8b/CE-12 — every condition in the tenant, the population the overdue count is a fraction of.
+     *
+     * <p>Needed because "0 overdue out of 0 conditions" and "0 overdue out of 40" are different
+     * governance facts, and the KPI pack reports the first as {@code NO_DATA} rather than as a clean
+     * bill of health. {@code @Where(clause = "is_deleted = 0")} on the entity covers the filter.
+     */
+    long countByOrganisationId(Long organisationId);
+
+    /**
      * The tenant-wide register: every open condition, soonest due first, nulls last.
      *
      * <p>Ordering is explicit because an obligation with no due date must not sort ahead of one due

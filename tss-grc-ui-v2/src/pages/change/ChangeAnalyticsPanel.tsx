@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Progress } from '../../components/ui/Progress';
 import type { ChangeAnalyticsDto } from '../../lib/api';
 import { STATUS_TONE } from './changeVocabulary';
+import { ChangeKpiPack } from './ChangeKpiPack';
 
 // ─── Analytics ─────────────────────────────────────────────────────────────
 export function AnalyticsPanel({ analytics, t }: { analytics: ChangeAnalyticsDto | null; t: (k: string) => string }) {
@@ -15,6 +16,11 @@ export function AnalyticsPanel({ analytics, t }: { analytics: ChangeAnalyticsDto
   const status = analytics.byStatus, type = analytics.byType, outcome = analytics.byOutcome;
   const max = (m: Record<string, number>) => Math.max(1, ...Object.values(m));
   return (
+    <>
+    {/* S8b/CE-12 — above the distribution charts: the KPIs answer "how is change governance
+        performing?", the charts answer "what is in flight?". The first question is the one an
+        auditor asks. */}
+    <ChangeKpiPack analytics={analytics} />
     <div className="changes-analytics-grid">
       <Card title={t('changeAnalyticsStatus')} Icon={BarChart3}>
         {Object.entries(status).filter(([, v]) => v > 0).map(([k, v]) => (
@@ -34,7 +40,17 @@ export function AnalyticsPanel({ analytics, t }: { analytics: ChangeAnalyticsDto
           <Progress key={k} label={`${k.replace(/_/g, ' ')} · ${v}`} value={Math.round((v / max(outcome)) * 100)}
                     tone={k === 'SUCCESS' ? 'success' : k === 'PARTIAL_SUCCESS' ? 'primary' : 'danger'} />
         ))}
+        {/* F2-107 — the success badge above is a percentage, and a percentage without its
+            denominator is what shipped 100% off two rows. State the population under it. */}
+        {analytics.successRateDenominator != null && (
+          <p className="changes-kpi-hint">
+            {t('changeSuccessRateBasis')
+              .replace('{d}', String(analytics.successRateDenominator))
+              .replace('{r}', String(analytics.successRateOutcomesRecorded ?? 0))}
+          </p>
+        )}
       </Card>
     </div>
+    </>
   );
 }

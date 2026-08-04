@@ -520,3 +520,62 @@
   direction: ltr; unicode-bidi: isolate;
 }
 .changes-ev-hint { margin: 0; font-size: var(--text-2xs); color: var(--ink-3); }
+
+/* ─── S8b / CE-12: the KPI pack ──────────────────────────────────────────── */
+.changes-kpi-sub {
+  margin: 0 0 var(--sp-5);
+  font-size: var(--text-xs); color: var(--ink-3); line-height: 1.6;
+}
+.changes-kpi-group + .changes-kpi-group { margin-top: var(--sp-6); }
+.changes-kpi-group-title {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--text-2xs); font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.changes-kpi-grid {
+  display: grid; gap: var(--sp-3);
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+}
+.changes-kpi-tile {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-4);
+  background: var(--surface-2); border-radius: var(--r-sm);
+  /* The left edge encodes the basis, so scanning the grid shows coverage before reading a word. */
+  border-inline-start: 3px solid var(--border);
+}
+.changes-kpi-tile[data-basis="COMPUTED"]         { border-inline-start-color: var(--success); }
+.changes-kpi-tile[data-basis="COMPUTED_PARTIAL"] { border-inline-start-color: var(--warning-fg); }
+.changes-kpi-tile[data-basis="NO_DATA"]          { border-inline-start-color: var(--border); }
+.changes-kpi-tile[data-basis="NOT_MEASURABLE"]   { border-inline-start-color: var(--border); opacity: .78; }
+/* Asserted overrides the basis colour: complete coverage of typed values must not read as measured. */
+.changes-kpi-tile[data-provenance="ASSERTED"],
+.changes-kpi-tile[data-provenance="MIXED"] { border-inline-start-color: var(--warning-fg); }
+
+.changes-kpi-head { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
+.changes-kpi-label { font-size: var(--text-2xs); color: var(--ink-2); font-weight: 500; }
+.changes-kpi-asserted {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: var(--text-2xs); color: var(--warning-fg); font-weight: 600;
+}
+.changes-kpi-value {
+  font-size: var(--text-xl); font-weight: 650; color: var(--ink-1);
+  /* Figures are LTR even in an Arabic page — "5.9%" must not mirror. */
+  direction: ltr; unicode-bidi: isolate;
+}
+.changes-kpi-value[data-empty="1"] { color: var(--ink-3); font-weight: 500; }
+.changes-kpi-meta {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
+  font-size: var(--text-2xs); color: var(--ink-3);
+}
+.changes-kpi-over { direction: ltr; unicode-bidi: isolate; }
+.changes-kpi-partial {
+  display: inline-flex; align-items: center; gap: 3px; color: var(--warning-fg);
+}
+.changes-kpi-blocked {
+  display: flex; align-items: flex-start; gap: var(--sp-2);
+  margin: 0; font-size: var(--text-2xs); color: var(--ink-3); line-height: 1.55;
+}
+.changes-kpi-blocked svg { flex-shrink: 0; margin-top: 2px; }
+.changes-kpi-hint {
+  margin: var(--sp-3) 0 0; font-size: var(--text-2xs); color: var(--ink-3);
+}

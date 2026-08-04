@@ -199,6 +199,15 @@ public class ChangeManagementService {
     @Autowired(required = false)
     private EvidencePort evidencePort;
 
+    /**
+     * S8b/CE-12: the §12 KPI pack. Optional for the same reason as the ports — 50-odd unit tests
+     * construct this service directly, and analytics() must keep working without a Spring context.
+     * When absent the {@code kpis} key is simply not present, which the frontend already tolerates
+     * (it renders the pack only when the server sends one).
+     */
+    @Autowired(required = false)
+    private ChangeKpiService kpiService;
+
     /** S7d/CE-7: a PIR follow-up becomes a tracked CAPA in the Base universal tracker.
      *  S5/CE-1: reached through {@link CapaPort} — {@code module.capa} is a peer, so the same
      *  boundary rule applies as for incidents. Optional (field-injected) so unit tests that
@@ -1142,9 +1151,21 @@ public class ChangeManagementService {
             byOutcome.put(o, changeRepo.countByOrganisationIdAndOutcome(org, o));
         out.put("byOutcome", byOutcome);
 
+        // F2-107 — the denominator was `rows that have an outcome`, which in dev is 2 of 17, so this
+        // rendered 100% on the dashboard while 15 changes had no recorded outcome at all. The honest
+        // denominator is changes that REACHED AN END and therefore should have one; a change sitting
+        // at IMPLEMENTED with a null outcome is a missing record, and dividing it away hid it.
+        // The key stays (the FE reads it) and now carries the population beside it.
         long success = byOutcome.getOrDefault("SUCCESS", 0L);
         long withOutcome = byOutcome.values().stream().mapToLong(Long::longValue).sum();
-        out.put("successRatePct", withOutcome == 0 ? 0 : Math.round(success * 1000.0 / withOutcome) / 10.0);
+        long reachedEnd = 0;
+        for (String s : ChangeKpiService.TERMINAL_STATUSES) reachedEnd += byStatus.getOrDefault(s, 0L);
+        out.put("successRatePct", reachedEnd == 0 ? 0 : Math.round(success * 1000.0 / reachedEnd) / 10.0);
+        out.put("successRateDenominator", reachedEnd);
+        out.put("successRateOutcomesRecorded", withOutcome);
+
+        // S8b/CE-12 — the full §12 pack, each metric carrying its own coverage and provenance.
+        if (kpiService != null) out.put("kpis", kpiService.kpis());
 
         // CH-5: overdue open tasks (dueAt passed, not DONE/SKIPPED) — the SLA KPI.
         out.put("overdueTasks", taskRepo.countOverdueOpen(org, java.time.LocalDateTime.now()));

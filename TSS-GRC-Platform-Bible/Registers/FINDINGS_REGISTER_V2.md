@@ -2122,6 +2122,37 @@ Start-Service TssGrcBackend
 | **References** | `EvidenceItemService.addLink` · `EvidenceLinkRequest` · `V353__evidence_link_change_module.sql` · `module/change_adapters/EvidenceAdapter.java` (the defended side) · [[F2-91]] (the same duplicated-vocabulary shape) · [[F2-94]] (a closed vocabulary plus a migration ratchet, as the pattern to copy) |
 | **Lesson** | **A database CHECK is not input validation, and the difference is a 500 instead of a 400.** Every closed vocabulary in the schema needs an application-layer counterpart *and* a test binding the two — which is what F2-94 built for escalation recipient keys and what `ck_ca_source` still lacks. Second: **writing an adapter over a peer is a free audit of that peer**, because a port's contract forces you to ask what the far side actually guarantees |
 
+## F2-107 · The change success rate divided by the wrong denominator and rendered 100%
+
+|  |  |
+|---|---|
+| **ID** | F2-107 *(found by S8b's CE-12 feasibility census, before any code was written)* |
+| **Module** | `change_mgmt` — `ChangeManagementService.analytics()` → `successRatePct`, on the change dashboard and the KPI strip |
+| **Severity** | **P2** — a headline governance figure reading 100% when the population it measures is almost empty. Not a crash; a false assurance |
+| **Current State** | ✅ **FIXED 2026-08-04** (S8b). Denominator is now changes that reached a terminal status, and the response carries `successRateDenominator` + `successRateOutcomesRecorded` beside it |
+| **Problem** | `successRatePct = SUCCESS ÷ (rows that have an outcome)`. Measured: dev holds **17** live changes of which **2** carry an outcome, both `SUCCESS` — so the dashboard rendered **100.0%**. Prod: 15 changes, 3 outcomes, 2 SUCCESS → 66.7%. The denominator silently excluded every change that reached an end and never had its outcome recorded, which is exactly the population a success rate is supposed to hold to account. Over changes that actually reached a terminal status the figures are **66.7%** (dev) and **50.0%** (prod) |
+| **How it was found** | Not by looking at the metric. S8b set out to build §12's KPI pack and began by measuring whether each metric's source columns were populated — the S7f discipline applied before writing code rather than after. `outcome` at 2 of 17 made the existing rate's denominator obviously wrong on the way past |
+| **What it is NOT** | Not a data-quality issue to be fixed by backfilling outcomes — inventing outcomes for 15 changes would be far worse. Not solved by hiding the metric either: the honest rate is *lower*, and a governance platform that only shows flattering numbers when the data is thin has the same defect pointed the other way |
+| **Fix** | Denominator = `IMPLEMENTED + ROLLED_BACK + CLOSED` (published as `ChangeKpiService.TERMINAL_STATUSES` and pinned by name in a test). The key is unchanged so the frontend keeps working, and two new keys expose the population. The full §12 pack reports the same rate as a `ChangeKpi` carrying `basis`, `denominator` and `population`, so a thin denominator is visible rather than inferable |
+| **Blast radius, measured** | One key, three call sites in the frontend. ⚠ The *pattern* is wider and worth a sweep: any `x ÷ (rows where x is recorded)` has this shape. [[F2-42]] was the same defect in a board pack, and this register's own §12 spec lists twelve more bare percentages that would have inherited it had the KPI pack been built as specified |
+| **References** | `ChangeManagementService.analytics()` · `ChangeKpiService` · `ChangeKpi` · [[F2-42]] (fabricated aggregate) · S7f (the export-provenance precedent) |
+| **Lesson** | **A percentage without its denominator is not a measurement, it is a mood.** The fix that matters is structural: the KPI type now makes it impossible to emit a rate without saying what it was computed over, and impossible to emit `0%` where the truthful answer is "nothing has happened yet". ⚠ And my own first drafts of two new metrics made the same mistake in the same hour — "0 conditions overdue" over 0 conditions, "0 terms expiring" over 0 terms — both caught by the live probe, not by review |
+
+## F2-108 · The module boundary ratchet inspects imports, so native SQL crosses it unseen
+
+|  |  |
+|---|---|
+| **ID** | F2-108 *(found by S8b while deciding where the CAB throughput query belonged)* |
+| **Module** | `security` — `ChangeModuleBoundaryTest`; instances in `change_mgmt/service/ChangeGovernanceHealthService` |
+| **Severity** | **P3** — no live defect. A ratchet narrower than the rule it is believed to enforce, which is how a boundary erodes while CI stays green |
+| **Current State** | ⬜ **OPEN.** Named in the javadoc of the query that relies on it, so the next reader is not misled about what the ratchet proves |
+| **Problem** | ADR-012's rule is that `module/change**` may not depend on another `module.<peer>`, and `ChangeModuleBoundaryTest` enforces it by scanning **import statements**. `ChangeGovernanceHealthService` reaches `admin.committee_gate_map`, `admin.committee_meetings`, `admin.committee_resolutions`, `admin.committee_meeting_attendee` and `admin.committee_member_terms` through `EntityManager.createNativeQuery` — no import, no failure, full coupling to the peer's **table and column names**, which are a less stable contract than its Java types. A column rename in `admin` breaks `change_mgmt` at runtime with nothing in CI objecting |
+| **How it was found** | S8b needed CAB throughput for §12. The clean-looking option was a new `CommitteePort` method; reading the existing code showed A17-D2 and F2-96 had already answered the same class of question with native SQL from inside `change_mgmt`, so adding a port would have given the platform two mechanisms for one concern — the thing `CommitteePort`'s own javadoc warns against. Following the established mechanism was the right call *and* exposed that the ratchet never saw it |
+| **What it is NOT** | Not an argument for ripping out the native SQL now — that would reverse A17-D2's shipped design mid-programme for no functional gain, and the interpolated `CONFIGURED_PREDICATE` exists precisely so the report and the enforcement path cannot drift. Also not a claim that native SQL is wrong: the single-statement aggregate is the right tool. The defect is that the **ratchet's name over-promises** |
+| **Fix, proposed** | Extend `ChangeModuleBoundaryTest` to scan string literals in `module/change**` for `<peer_schema>.` table prefixes, with an explicit allow-list carrying a stated reason per entry — the shape `EXPORT_WIDER_THAN_READ` uses in `ExportAuthorizationRatchetTest`. That converts an invisible dependency into a reviewed one, which is the whole distinction CLAUDE.md draws between a ceiling and an invariant |
+| **References** | `ChangeModuleBoundaryTest` · `ChangeGovernanceHealthService.CAB_THROUGHPUT_SQL` / `CONFIGURED_PREDICATE` · `CommitteePort` (the javadoc that reserves quorum) · ADR-012 |
+| **Lesson** | **A ratchet enforces its implementation, not its title.** "The change module has no peer dependencies" was true of imports and false of SQL, and the gap was invisible precisely because the test passed. Worth asking of every ratchet on this platform: *what representation of the rule does it actually read?* |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

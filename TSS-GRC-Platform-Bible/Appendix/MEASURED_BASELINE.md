@@ -47,7 +47,7 @@ that will be read as current forever.
 | **Database** schemas holding tables (dev & prod) | **51** | *not measured* | the 51st is `audit`, which JPA does not know — §7 |
 | Flyway migrations on disk | **341** files, `V1`–`V353`, 4.37 MB | 304 / `V1`–`V314` | next free **V354** |
 | **Deployed** Flyway baseline / head | **baseline `V292`**, head **`V336`**, **8 pending** | *pub. "baseline V312"* | ⚠ see §0.1 — load-bearing and wrong |
-| Frontend pages (`.tsx` under `pages/`) | **338** in **114** folders | 329 / 114 | S5c split the 1,036-line `ChangesPage` into `pages/change/` — +7 files, same folder count; S7e added `ChangeConditionsCard`, S8a `ChangeEvidence` |
+| Frontend pages (`.tsx` under `pages/`) | **339** in **114** folders | 329 / 114 | S5c split the 1,036-line `ChangesPage` into `pages/change/` — +7 files, same folder count; S7e added `ChangeConditionsCard`, S8a `ChangeEvidence`, S8b `ChangeKpiPack` |
 | Routes registered in `App.tsx` | **328** | 328 | — |
 | Sidebar navigation entries | **193** | 184 | — |
 | Mock-data import statements | **30** in **26** files | 44 / 29 | W2-1 removed 14 |
@@ -318,7 +318,7 @@ is unadopted", and now to "adopted in code, not yet in the deployed data".)
 
 | Metric | Measured (08-01) | Reading |
 |---|---:|---|
-| Pages | **338** in **114** folders | More screens than ServiceNow GRC exposes in its entire IRM suite |
+| Pages | **339** in **114** folders | More screens than ServiceNow GRC exposes in its entire IRM suite |
 | Routes in `App.tsx` | **328** | One flat route table |
 | Sidebar entries | **193** (was 184) | **~135 routed pages are not in the navigation** — reachable only by URL |
 | Largest page folders | `bcm` 30, `socops` 25, `detail` 10, `workflow` 10, `cyber` 9, `risk` 9 | `bcm` alone has more screens than most competitors' whole BCM product |

@@ -59,6 +59,57 @@ public class ChangeGovernanceHealthService {
     public record GateGap(Long organisationId, String gate, long matrixRows) {}
 
     /**
+     * S8b / CE-12 — CAB throughput for §12's KPI pack, as a finished aggregate.
+     *
+     * <p><b>Why this lives here rather than behind {@code CommitteePort}.</b> This service already
+     * owns "what does the committee engine say about change authority?" and already answers it with
+     * native SQL over {@code admin.committee*} — A17-D2 and F2-96 both shipped that way. Putting the
+     * neighbouring metric behind a new port method would give the platform <em>two</em> mechanisms
+     * for one concern, which is the thing {@code CommitteePort}'s own javadoc warns against. One
+     * mechanism, stated once. ⚠ Note the honest cost: {@code ChangeModuleBoundaryTest} inspects
+     * <em>imports</em>, and native SQL is not an import, so this route crosses the module boundary
+     * without the ratchet seeing it (filed as F2-108).
+     *
+     * <p><b>Scoped to the tenant's gate-mapped committees, never to every committee.</b> Measured
+     * 2026-08-04: CAB and ECAB together hold <b>4 of 34</b> meetings in dev and 4 of 32 in prod — the
+     * other thirty belong to the audit committee, the Sharia board and the rest. A "CAB quorum-met
+     * rate" over all committees would be a figure about bodies that never see a change: S7b's trap
+     * (a queue whose population was never defined) in KPI form.
+     *
+     * @param quorumBasisRecorded of {@code meetingsHeld}, how many recorded a quorum basis at all
+     * @param quorumMet           of {@code quorumBasisRecorded}, how many were quorate
+     * @param quorumBasisAsserted of {@code quorumBasisRecorded}, how many were <em>asserted</em>
+     *                            rather than computed from the roster. Measured: <b>2 of 2</b> in both
+     *                            databases, which is why {@link ChangeKpi} needs a provenance axis at
+     *                            all — the rate is 100% and it rests entirely on what a human typed.
+     */
+    public record CabThroughput(
+        List<Long> committeeIds,
+        long meetingsHeld,
+        long meetingsScheduled,
+        long meetingsTotal,
+        long quorumBasisRecorded,
+        long quorumMet,
+        long quorumBasisAsserted,
+        long resolutions,
+        long resolutionsDecided,
+        long resolutionsDeferred,
+        long attendanceRowsRecorded,
+        long decidedReferrals,
+        long memberTerms,
+        long termsExpiringSoon
+    ) {
+        /** The horizon "expiring soon" means. 90 days is one quarter — a board's planning cycle. */
+        public static final int EXPIRY_HORIZON_DAYS = 90;
+
+        /** Nothing mapped — A17-D2's unconfigured tenant. Distinct from "mapped and idle". */
+        public static CabThroughput unconfigured() {
+            return new CabThroughput(List.of(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        }
+        public boolean isUnconfigured() { return committeeIds.isEmpty(); }
+    }
+
+    /**
      * <b>The single definition of "this tenant's gate is configured".</b> Correlated on
      * {@code :orgCol} / {@code :gateCol} so both the aggregate report and the single-gate
      * lookup below use the same text. A gate is configured when a live gate-map row points
@@ -200,6 +251,98 @@ public class ChangeGovernanceHealthService {
     public boolean isGateConfigured(Long organisationId, String gate) {
         return gateConfigurationFault(organisationId, gate) == null;
     }
+
+    /**
+     * S8b / CE-12 — one aggregate row of CAB/ECAB throughput for the current tenant.
+     *
+     * <p>Read-only, one statement, scoped by the tenant's own gate map. Returns
+     * {@link CabThroughput#unconfigured()} when the tenant has mapped no committee — distinct from a
+     * mapped-but-idle CAB, because the KPI layer must not render "0 meetings held" as a performance
+     * figure when the real fact is that no authority is configured (A17-D2).
+     *
+     * <p>⚠ {@code quorum_source} is read, not just {@code quorum_met}. S7f established why: 32 of 34
+     * meetings carry an <em>asserted</em> basis, so a quorum-met rate without that count would present
+     * a typed claim as a measured control.
+     */
+    @Transactional(readOnly = true)
+    public CabThroughput cabThroughput() {
+        Long org = TenantContext.getCurrentTenant();
+        if (org == null) return CabThroughput.unconfigured();
+
+        @SuppressWarnings("unchecked")
+        List<Number> ids = em.createNativeQuery(GATE_COMMITTEES_SQL)
+            .setParameter(1, org).getResultList();
+        List<Long> committeeIds = ids.stream().filter(java.util.Objects::nonNull)
+            .map(Number::longValue).distinct().sorted().toList();
+        if (committeeIds.isEmpty()) return CabThroughput.unconfigured();
+
+        Object[] r = (Object[]) em.createNativeQuery(CAB_THROUGHPUT_SQL)
+            .setParameter(1, org).getSingleResult();
+        return new CabThroughput(committeeIds,
+            n(r[0]), n(r[1]), n(r[2]), n(r[3]), n(r[4]), n(r[5]),
+            n(r[6]), n(r[7]), n(r[8]), n(r[9]), n(r[10]), n(r[11]), n(r[12]));
+    }
+
+    private static long n(Object o) { return o == null ? 0L : ((Number) o).longValue(); }
+
+    /** The tenant's gate-mapped committees — the only bodies whose meetings are CAB meetings. */
+    private static final String GATE_COMMITTEES_SQL = """
+        SELECT gm.committee_id
+          FROM admin.committee_gate_map gm
+         WHERE gm.organisation_id = ?1 AND gm.is_deleted = 0 AND gm.committee_id IS NOT NULL
+        """;
+
+    /**
+     * Every CAB figure in one statement, over the gate-mapped committees only.
+     *
+     * <p>⚠ Each sub-select filters {@code is_deleted} where the table has it — landmine #6, and the
+     * mistake I had just made in this slice's own census (a bare {@code COUNT(*)} that swept in 25
+     * soft-deleted evidence rows). {@code committee_resolutions} and {@code committee_member_terms}
+     * carry no {@code is_deleted} column, which is why they are not filtered: verified against
+     * {@code sys.columns}, not assumed from the others.
+     */
+    private static final String CAB_THROUGHPUT_SQL = """
+        WITH cab AS (
+            SELECT gm.committee_id AS cid
+              FROM admin.committee_gate_map gm
+             WHERE gm.organisation_id = ?1 AND gm.is_deleted = 0 AND gm.committee_id IS NOT NULL
+        ), mtg AS (
+            SELECT m.* FROM admin.committee_meetings m
+             WHERE m.organisation_id = ?1 AND m.is_deleted = 0
+               AND m.committee_id IN (SELECT cid FROM cab)
+        )
+        SELECT
+          (SELECT COUNT(*) FROM mtg WHERE status IN ('MINUTES_APPROVED','COMPLETED')),
+          (SELECT COUNT(*) FROM mtg WHERE status = 'SCHEDULED'),
+          (SELECT COUNT(*) FROM mtg),
+          (SELECT COUNT(*) FROM mtg WHERE status IN ('MINUTES_APPROVED','COMPLETED')
+                                      AND quorum_source IS NOT NULL),
+          (SELECT COUNT(*) FROM mtg WHERE status IN ('MINUTES_APPROVED','COMPLETED')
+                                      AND quorum_source IS NOT NULL AND quorum_met = 1),
+          (SELECT COUNT(*) FROM mtg WHERE status IN ('MINUTES_APPROVED','COMPLETED')
+                                      AND quorum_source IS NOT NULL AND quorum_source <> 'COMPUTED'),
+          (SELECT COUNT(*) FROM admin.committee_resolutions r
+             WHERE r.organisation_id = ?1 AND r.meeting_id IN (SELECT id FROM mtg)),
+          (SELECT COUNT(*) FROM admin.committee_resolutions r
+             WHERE r.organisation_id = ?1 AND r.meeting_id IN (SELECT id FROM mtg)
+               AND r.outcome IN ('APPROVED','REJECTED','NOTED')),
+          (SELECT COUNT(*) FROM admin.committee_resolutions r
+             WHERE r.organisation_id = ?1 AND r.meeting_id IN (SELECT id FROM mtg)
+               AND r.outcome = 'DEFERRED'),
+          (SELECT COUNT(*) FROM admin.committee_meeting_attendee a
+             WHERE a.organisation_id = ?1 AND a.is_deleted = 0
+               AND a.committee_meeting_id IN (SELECT id FROM mtg)),
+          (SELECT COUNT(*) FROM admin.committee_referral f
+             WHERE f.organisation_id = ?1 AND f.is_deleted = 0 AND f.source_module = 'CHANGE'
+               AND f.status = 'DECIDED'),
+          (SELECT COUNT(*) FROM admin.committee_member_terms t
+             WHERE t.organisation_id = ?1 AND t.committee_id IN (SELECT cid FROM cab)
+               AND t.ended_at IS NULL),
+          (SELECT COUNT(*) FROM admin.committee_member_terms t
+             WHERE t.organisation_id = ?1 AND t.committee_id IN (SELECT cid FROM cab)
+               AND t.ended_at IS NULL AND t.term_ends_at IS NOT NULL
+               AND t.term_ends_at <= DATEADD(DAY, 90, SYSUTCDATETIME()))
+        """;
 
     /** The calling tenant's gaps only — what the change module's own UI should show. */
     @Transactional(readOnly = true)
