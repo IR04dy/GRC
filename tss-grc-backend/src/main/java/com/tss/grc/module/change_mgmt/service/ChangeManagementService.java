@@ -13,6 +13,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.repository.*;
+import com.tss.grc.module.change_mgmt.spi.CapaPort;
 import com.tss.grc.module.change_mgmt.spi.CommitteePort;
 import com.tss.grc.module.change_mgmt.spi.IncidentPort;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
@@ -165,6 +166,14 @@ public class ChangeManagementService {
     @Autowired(required = false)
     private IncidentPort incidentPort;
 
+    /** S7d/CE-7: a PIR follow-up becomes a tracked CAPA in the Base universal tracker.
+     *  S5/CE-1: reached through {@link CapaPort} — {@code module.capa} is a peer, so the same
+     *  boundary rule applies as for incidents. Optional (field-injected) so unit tests that
+     *  construct the service directly need not supply it; the follow-up hook then no-ops, which
+     *  is the right polarity — losing the derived CAPA must not block recording the review. */
+    @Autowired(required = false)
+    private CapaPort capaPort;
+
     /** CH-17: per-tenant (type x risk) authorisation matrix driving the CAB
      *  quorum. Optional — when absent the flat cab-min-approvals default applies
      *  (keeps unit tests that construct the service directly working). */
@@ -316,6 +325,12 @@ public class ChangeManagementService {
         ChangeRequest saved = changeRepo.save(c);
         audit.log("UPDATE", "ChangeRequest", saved.getId(),
             "Change " + nullSafeMsg(saved.getChangeCode()) + " metadata updated");
+        // S7d/CE-7: CH-11 lets a reviewer refine the retrospective after POST_REVIEW, and the
+        // frontend's PIR card saves through exactly this path — so a follow-up first written here
+        // must raise its CAPA here too, or the hook would only ever fire for reviewers who got the
+        // text right on the transition body. Idempotent, so the transition and the edit cannot
+        // both raise one.
+        syncPirFollowUpCapa(saved);
         emitChange(saved);
         return saved;
     }
@@ -455,6 +470,8 @@ public class ChangeManagementService {
                 String reviewer = strFromBody(body, "reviewer");
                 if (reviewer == null) reviewer = strFromBody(body, "reviewedBy");
                 if (reviewer != null && !reviewer.isBlank()) c.setPirReviewedBy(reviewer);
+                // S7d/CE-7: the follow-up the reviewer just wrote becomes tracked work.
+                syncPirFollowUpCapa(c);
             }
             case "CLOSED" -> {
                 // CH-11 (mandatory retrospective): a NORMAL/EMERGENCY change cannot be
@@ -466,6 +483,29 @@ public class ChangeManagementService {
                     throw new IllegalStateException(
                         "Cannot close: a post-implementation review (PIR) summary is required "
                             + "for " + nullSafeStr(c.getChangeType()) + " changes before closure");
+                // ── S7d / CE-7 — a change that failed its objectives may not close silently ──────
+                // Without this, the follow-up CAPA is opt-in on the one path where it matters: a
+                // reviewer records "objectives not met", leaves the follow-up blank, closes the
+                // change, and the platform holds a recorded failure with nothing tracking it. That
+                // is the "configured but never enforced" shape (F2-62/F2-95), and the gate is what
+                // makes syncPirFollowUpCapa reachable rather than optional.
+                //
+                // Deliberately NOT at POST_REVIEW: refusing the transition would stop the reviewer
+                // recording the honest finding at all, the trap S7c avoided for CAB_DEFERRED. State
+                // the failure freely; say what you are doing about it before you close.
+                //
+                // Deliberately NOT exempting STANDARD, unlike the summary gate above. That exemption
+                // exists because a pre-approved low-risk change needs no retrospective — but this
+                // gate fires only on a review someone volunteered AND recorded as failed, so the
+                // exemption's reason does not reach it. Measured safe: zero rows in either database
+                // carry any PIR field, so nothing already closed is affected.
+                if (Boolean.FALSE.equals(c.getPirObjectivesMet())
+                        && (c.getPirFollowUp() == null || c.getPirFollowUp().isBlank()))
+                    throw new IllegalStateException(
+                        "Cannot close: the post-implementation review records that this change did "
+                            + "not meet its objectives, so a follow-up action is required before "
+                            + "closure. Record it in the PIR follow-up field — it is raised as a "
+                            + "tracked CAPA. If no further action is needed, say why there.");
                 if (c.getClosureDate() == null) c.setClosureDate(LocalDate.now());
             }
             default -> { /* no extra side-effects */ }
@@ -1657,5 +1697,111 @@ public class ChangeManagementService {
         audit.log("ROLLBACK_INCIDENT", "ChangeRequest", c.getId(),
             "Rolled-back change " + nullSafeMsg(code) + " auto-raised incident #" + raised.get().id()
                 + " and linked it (INCIDENT / TRIGGERED_BY)");
+    }
+
+    // ── S7d / CE-7 — the PIR follow-up becomes tracked work ─────────────────────────────────────
+
+    /**
+     * How long a PIR follow-up gets before it counts as overdue.
+     *
+     * <p>A stated constant rather than a derivation or a setting. The change module has no CAPA SLA
+     * config surface, and inventing a per-risk ladder here would be a governance judgement with no
+     * owner and no UI — while the CAPA's own screen lets the owner move the date the moment it has
+     * one. Thirty days says "this is improvement work with a deadline", which is the honest
+     * description of a retrospective action.
+     */
+    static final int PIR_FOLLOW_UP_TARGET_DAYS = 30;
+
+    /**
+     * Classify a PIR follow-up from what the reviewer actually recorded.
+     *
+     * <p>Objectives met → the change worked and the follow-up is improvement, so {@code PREVENTIVE}.
+     * Anything else → {@code CORRECTIVE}. Note the polarity on <b>unset</b>: {@code null} means the
+     * reviewer did not say, and "we do not know whether it worked" is not evidence that it did, so an
+     * unset objective classifies corrective. That also matches the sustainability tracker's
+     * convention that an auto-raised action is corrective unless something says otherwise.
+     */
+    static String pirCapaType(Boolean objectivesMet) {
+        return Boolean.TRUE.equals(objectivesMet) ? "PREVENTIVE" : "CORRECTIVE";
+    }
+
+    /**
+     * CE-7: raise a CAPA carrying the change's PIR follow-up, and back-link it
+     * ({@code CAPA} / {@code FOLLOW_UP}) so the change record shows its own remediation.
+     *
+     * <p>CH-11 shipped {@code pir_follow_up} as free text and nothing consumed it: measured across
+     * dev and prod, <b>no CAPA has ever been raised from a PIR</b> — and with zero rows carrying any
+     * PIR field, the field had never been used at all. A reviewer's stated commitment lived in a
+     * text column that no rollup, no overdue sweep and no committee pack ever read.
+     *
+     * <p>Called from two places, because the PIR can be written in two: the {@code POST_REVIEW}
+     * transition (where {@code capturePir} first records it) and {@code update()} (CH-11 lets a
+     * reviewer refine the retrospective afterwards). Hooking only the transition would have meant a
+     * follow-up added on the second pass — the likely pass, since the first is often written in
+     * haste — silently raised nothing.
+     *
+     * <p>Idempotent by the same marker CH-13 uses: a change carrying a {@code CAPA} /
+     * {@code FOLLOW_UP} link already has its action, so repeated saves and a re-entered
+     * {@code POST_REVIEW} do not multiply CAPAs. The consequence is deliberate and worth stating: the
+     * hook opens <b>one</b> CAPA per change, not one per edit. Later follow-up text refines the
+     * change record; it does not fork new tracked work, because a reviewer rewording a sentence is
+     * not a reviewer committing to a second action. Raising more is a manual act with a named author.
+     *
+     * <p>No-op when the port is absent, and it never throws: the review must be recordable even if
+     * the CAPA tracker is not.
+     *
+     * <p><b>Deliberately does not demand the actor's {@code CAPA:WRITE}.</b> A derived record raised
+     * as a consequence of an authorised act is not the actor exercising a second privilege — the same
+     * reason CH-13's rollback hook opens an incident without {@code INCIDENT:WRITE} and every
+     * sustainability auto-CAPA opens one without asking. Requiring it would mean a reviewer with
+     * {@code CHANGE:WRITE} alone could record "we will fix the runbook" and have it silently dropped,
+     * which is the gap this method exists to close. (Not demonstrable against dev either way: of the
+     * seven seeded users only {@code admin} lacks {@code CAPA:WRITE}, and PLATFORM_ADMIN bypasses.)
+     */
+    private void syncPirFollowUpCapa(ChangeRequest c) {
+        if (capaPort == null) return;
+        String followUp = c.getPirFollowUp();
+        if (followUp == null || followUp.isBlank()) return;
+        boolean already = linkRepo.findByChangeRequestId(c.getId()).stream()
+            .anyMatch(l -> "CAPA".equals(l.getEntityType()) && "FOLLOW_UP".equals(l.getLinkType()));
+        if (already) return;
+
+        String code = nullSafeStr(c.getChangeCode());
+        // owner NOT NULL on capa.tasks — prefer the person who signed the review off, then the
+        // change owner, then the requester. The final fallback is a label, never a blank: an
+        // unowned CAPA is a CAPA nobody chases, so it must at least say it is unassigned.
+        String owner = firstNonBlank(c.getPirReviewedBy(), c.getChangeOwnerName(),
+                                     c.getRequestedByName(), "Unassigned (change PIR)");
+        var raised = capaPort.raiseFromChangePir(
+            code,
+            "PIR follow-up: " + code,
+            "متابعة مراجعة ما بعد التنفيذ: " + code,
+            "Raised from the post-implementation review of change " + code
+                + " (" + nullSafeStr(c.getTitleEn()) + "). Reviewer's follow-up: " + followUp,
+            "أُنشئ من مراجعة ما بعد التنفيذ للتغيير " + code + ". متابعة المراجع: " + followUp,
+            pirCapaType(c.getPirObjectivesMet()),
+            mapRiskToSeverity(c.getRiskLevel()),
+            owner,
+            LocalDate.now().plusDays(PIR_FOLLOW_UP_TARGET_DAYS));
+        if (raised.isEmpty()) return;
+
+        ChangeLink link = new ChangeLink();
+        link.setChangeRequestId(c.getId());
+        link.setEntityType("CAPA");
+        link.setEntityId(raised.get().id());
+        link.setLinkType("FOLLOW_UP");
+        link.setNotes("Auto-linked: CAPA " + nullSafeStr(raised.get().capaCode())
+            + " raised from the PIR follow-up of " + code);
+        linkRepo.save(link);
+
+        audit.log("PIR_FOLLOW_UP_CAPA", "ChangeRequest", c.getId(),
+            "PIR follow-up on change " + nullSafeMsg(code) + " raised CAPA "
+                + nullSafeStr(raised.get().capaCode()) + " (#" + raised.get().id() + ", "
+                + pirCapaType(c.getPirObjectivesMet()) + ") and linked it (CAPA / FOLLOW_UP)");
+    }
+
+    private static String firstNonBlank(String... candidates) {
+        for (String s : candidates) if (s != null && !s.isBlank()) return s;
+        return null;   // unreachable: the last candidate is always a literal
     }
 }

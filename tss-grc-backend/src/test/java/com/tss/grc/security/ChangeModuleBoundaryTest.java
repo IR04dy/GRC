@@ -43,6 +43,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * imports both sides and is therefore the only place in the platform that may. It lives outside
  * both modules so neither depends on the other, and it is asserted to exist — a boundary with no
  * adapter means the behaviour was deleted rather than relocated.
+ *
+ * <p><b>The peer list is a decision log, not a tally.</b> It was {@code (admin, incident)} until
+ * S7d/CE-7 needed a third: a PIR follow-up has to become a tracked CAPA, and the Base universal
+ * tracker is a peer module like any other. Widening it is the intended way through — but only in the
+ * commit that adds the port and states why the dependency is worth having. Widening it to quiet a
+ * red build turns the boundary into a record of what leaked past it, which is the failure mode the
+ * whole file exists to prevent.
  */
 class ChangeModuleBoundaryTest {
 
@@ -163,10 +170,13 @@ class ChangeModuleBoundaryTest {
             .as("the adapters must import the change module's spi — otherwise they implement nothing")
             .isTrue();
         assertThat(peersReached)
-            .as("the adapters exist to reach exactly the peers the change module gave up: "
-              + "admin (the committee engine) and incident (CH-13's rollback hook). Reaching a third "
-              + "means a new dependency arrived without a port decision")
-            .containsExactly("admin", "incident");
+            .as("""
+                the adapters exist to reach exactly the peers the change module gave up: \
+                admin (the committee engine), capa (S7d/CE-7's PIR follow-up tracker) and \
+                incident (CH-13's rollback hook). Reaching a fourth means a new dependency \
+                arrived without a port decision — widen this list only together with a new \
+                port and the reason it exists, never to make a red build green.""")
+            .containsExactly("admin", "capa", "incident");
     }
 
     @Test

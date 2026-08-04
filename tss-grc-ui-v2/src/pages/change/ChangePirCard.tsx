@@ -45,7 +45,17 @@ export function PirCard({ change, onChanged, toast }: {
   async function save() {
     setSaving(true);
     try {
+      // ⚠ F2-105 — this must send the whole record, not just the PIR fields.
+      // PUT /api/v1/changes/{id} binds the ChangeRequest entity with @Valid, and F2-30 put
+      // @NotBlank on titleAr. The server's apply() is a partial merge (null fields are skipped), but
+      // @Valid runs first and rejects a body with no titleAr — so this card 400'd on every save from
+      // the day F2-30 landed, and "Follow-up actions" could not be recorded at all. That is why
+      // pir_follow_up was empty in both databases: not unused, unreachable.
+      // The register's edit form has always sent `{...c}` for the same reason; this now matches it,
+      // which also means a future @NotBlank cannot silently break the card again. `status` is safe to
+      // resend: apply() deliberately never copies it (CM-C3).
       await changeApi.update(change.id, {
+        ...change,
         pirSummary: summary || undefined,
         pirObjectivesMet: met === '' ? undefined : met === 'true',
         pirLessons: lessons || undefined,
@@ -91,6 +101,11 @@ export function PirCard({ change, onChanged, toast }: {
         <textarea rows={2} value={lessons} onChange={e => setLessons(e.target.value)} className="changes-pir-input" />
         <label className="changes-block-label">{t('changePirFollowUp')}</label>
         <textarea rows={2} value={followUp} onChange={e => setFollowUp(e.target.value)} className="changes-pir-input" />
+        {/* S7d/CE-7 — say what saving this does. The follow-up is no longer a note: the server
+            opens a tracked CAPA carrying this text, owned, dated and reported overdue. A field that
+            silently creates a governance record elsewhere is the F2-98 shape in reverse — there the
+            badge announced something untrue, here the consequence went unannounced. */}
+        <p className="changes-pir-hint">{t('changePirFollowUpHint')}</p>
         {change.pirReviewedBy && <Field label={t('changePirReviewedBy')} value={change.pirReviewedBy} />}
         <div className="changes-actions-row">
           <Button variant="primary" Icon={ClipboardCheck} onClick={save} disabled={saving}>{t('changePirSave')}</Button>

@@ -53,11 +53,15 @@ export const CATEGORY_OPTIONS = [
 ].map(v => ({ value: v, label: v.replace(/_/g, ' ') }));
 export const RISK_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map(v => ({ value: v, label: v }));
 
+// S7d/CE-7 added CAPA + FOLLOW_UP. The server auto-creates exactly that pair when a PIR follow-up
+// is recorded, and change_links has no CHECK on either column — so without them here the register
+// could render a link the user had no way to create, which reads as an inconsistency rather than as
+// the deliberate asymmetry it would be.
 export const ENTITY_TYPE_OPTIONS = [
   'RISK', 'CONTROL', 'INCIDENT', 'VENDOR', 'BCM_PLAN', 'AUDIT_FINDING',
-  'POLICY', 'REGULATORY_CHANGE', 'DPIA', 'KRI', 'ASSET', 'EVIDENCE',
+  'POLICY', 'REGULATORY_CHANGE', 'DPIA', 'KRI', 'ASSET', 'EVIDENCE', 'CAPA',
 ].map(v => ({ value: v, label: v.replace(/_/g, ' ') }));
-export const LINK_TYPE_OPTIONS = ['AFFECTS', 'TRIGGERED_BY', 'MITIGATES', 'TARGETS', 'REMEDIATES', 'DEPENDS_ON', 'INFORMS']
+export const LINK_TYPE_OPTIONS = ['AFFECTS', 'TRIGGERED_BY', 'MITIGATES', 'TARGETS', 'REMEDIATES', 'DEPENDS_ON', 'INFORMS', 'FOLLOW_UP']
   .map(v => ({ value: v, label: v.replace(/_/g, ' ') }));
 
 export const EMPTY: Partial<ChangeRequestDto> = {

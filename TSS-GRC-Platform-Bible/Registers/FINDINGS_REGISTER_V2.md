@@ -2090,6 +2090,22 @@ Start-Service TssGrcBackend
 | **References** | `platform.audit_log` · `AuditLogService` · [[F2-31]] (the hash chain, which is unaffected) · [[F2-90]] |
 | **Lesson** | **A probe that asserts the wrong column finds a real gap.** My assertion read `workflow_status_after`, failed, and the honest answer was neither "my probe is wrong" nor "the code is broken" but "these columns are populated by 4 of 32 producers". ⚠ Also worth noting the shape: a nullable column that *one* module fills in looks like a feature and behaves like a convention
 
+## F2-105 · The post-implementation review card could not save, and that is why the retrospective looked unused
+
+|  |  |
+|---|---|
+| **ID** | F2-105 *(found by S7d's live probe — three legs 400'd on their first run)* |
+| **Module** | `tss-grc-ui-v2` — `pages/change/ChangePirCard.tsx` against `PUT /api/v1/changes/{id}` |
+| **Severity** | **P2** — a whole governance feature was unusable, and its emptiness read as "nobody uses this" |
+| **Current State** | ✅ **FIXED 2026-08-04** (S7d). The card now sends `{...change, …pirFields}`, the shape the register's edit form has always used |
+| **Problem** | `PUT /api/v1/changes/{id}` binds the `ChangeRequest` **entity** with `@Valid`, and [[F2-30]] put `@NotBlank` on `titleAr` ("Arabic names are backend-mandatory" — asserted in CLAUDE.md and enforced nowhere until then). The server's `apply()` is a deliberate *partial merge* that skips null fields, but `@Valid` runs **before** it, so a body carrying only the four PIR fields is rejected 400 with `errors: {titleAr: "must not be blank"}` and `apply()` is never reached. `PirCard.save()` sent exactly those four fields. So **the PIR card had been unsaveable since F2-30 landed** — every "Save review" click produced a bare validation toast |
+| **How it was found** | S7d set out to consume `pir_follow_up`, having measured **zero** populated PIR fields across dev and prod and concluded the field went nowhere. The live probe's `PUT` legs then 400'd, and the sharper truth appeared: the column was not unused, it was **unreachable**. The measurement that opened the slice had been reading the *consequence* of this defect and attributing it to indifference |
+| **What it is NOT** | Not a server defect and not a reason to relax the server. Dropping `@Valid` from the PUT, or moving `@NotBlank` off `titleAr`, would reverse F2-30 — bilingual records are a product requirement (house rule 7) and the constraint was measured safe (0 blank rows) before it landed. A partial-merge API with required fields legitimately demands the caller resend them, and the register's edit form always did |
+| **Fix** | `ChangePirCard.save()` spreads the record. `status` is safe to resend because `apply()` deliberately never copies it ([[CM-C3]]). Pinned by `pirCardSavePayload.test.ts`, which reads the **entity's own** bean-validation annotations rather than hard-coding `titleAr`, so a future `@NotBlank` on another column cannot quietly break the card again — mutation-proven by removing the spread |
+| **Blast radius, measured** | `changeApi.update` has three call sites. The register's edit form sends `{...c}` (`reqFromDto`) and worked; `updateTask` is a different endpoint; the PIR card was the only partial sender. No other module's card was affected — this is a change-module instance of a general trap, not a platform-wide sweep |
+| **References** | `ChangePirCard.tsx` · `ChangeManagementController.update` · `ChangeRequest.titleAr` · [[F2-30]] (the constraint that exposed it) · [[F2-98]] (the same module's other honesty defect) |
+| **Lesson** | **"Nothing consumes this column" and "nothing can write this column" produce identical data.** Zero populated rows was the finding I built a slice on, and it had two possible causes; I checked the read side and inferred the write side. ⚠ And the general trap: **adding a constraint to an entity that doubles as a partial-update DTO breaks every caller that was legitimately sending a subset** — `@Valid` on a merge endpoint validates the *patch* as if it were the whole record, and there is nothing at the point of the annotation to warn you |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

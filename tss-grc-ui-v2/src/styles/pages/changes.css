@@ -284,6 +284,12 @@
   font: inherit;
   resize: vertical;
 }
+/* S7d/CE-7 — discloses that a saved follow-up opens a tracked CAPA. */
+.changes-pir-hint {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
 
 /* ─── Field / Block helpers ───────────────────────────────── */
 .changes-field-label {

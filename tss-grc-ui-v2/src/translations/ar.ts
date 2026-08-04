@@ -287,6 +287,7 @@ export const ar = {
   changePirObjectives:       'هل تحققت الأهداف؟',
   changePirLessons:          'الدروس المستفادة',
   changePirFollowUp:         'إجراءات المتابعة',
+  changePirFollowUpHint:     'حفظ إجراء المتابعة يفتح إجراءً تصحيحياً متابعاً على هذا التغيير، بمالك وتاريخ استحقاق.',
   changePirReviewedBy:       'روجعت بواسطة',
   changePirReviewed:         'تمت المراجعة',
   changePirPending:          'مراجعة معلّقة',

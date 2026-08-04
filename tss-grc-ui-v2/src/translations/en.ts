@@ -289,6 +289,7 @@ export const en = {
   changePirObjectives:       'Objectives met?',
   changePirLessons:          'Lessons learned',
   changePirFollowUp:         'Follow-up actions',
+  changePirFollowUpHint:     'Saving a follow-up opens a tracked CAPA against this change, with an owner and a due date.',
   changePirReviewedBy:       'Reviewed by',
   changePirReviewed:         'Reviewed',
   changePirPending:          'PIR pending',
