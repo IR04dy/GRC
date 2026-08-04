@@ -92,6 +92,18 @@ public class ExportController {
     private static final String BOARD_EXPORT =
         "hasPermission('BOARD','EXPORT') and hasPermission('ADMIN','READ')";
 
+    /**
+     * S7f/CE-14a — the committee engine's tier. Same-module containment, unlike BOARD above:
+     * {@code ADMIN:READ} <em>is</em> catalogued, so the rule is satisfiable rather than substituted.
+     *
+     * <p>Measured in both databases before adding it: {@code ADMIN:EXPORT} is 7 roles,
+     * {@code ADMIN:READ} is 21, and the set of roles holding EXPORT <b>without</b> READ is
+     * <b>empty</b> — so ANDing the read loses nobody, which is the containment the F2-61(c)
+     * invariant asks each of these constants to be able to claim.
+     */
+    private static final String ADMIN_EXPORT =
+        "hasPermission('ADMIN','EXPORT') and hasPermission('ADMIN','READ')";
+
     private static final MediaType XLSX_TYPE =
         MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     private static final MediaType ZIP_TYPE = MediaType.parseMediaType("application/zip");
@@ -202,6 +214,39 @@ public class ExportController {
         + "tasks, links, PIR). Pass ?lang=ar for Arabic RTL.")
     public ResponseEntity<byte[]> cabPackPdf(@PathVariable Long id, @RequestParam(defaultValue = "en") String lang) {
         return pdf(exportService.cabPackPdf(id, lang), ExportNaming.build("Change", "CABPack-" + id, lang, "pdf"));
+    }
+
+    // ── S7f / CE-14a: the committee meeting's own records ───────────────────
+    //
+    // Distinct from the CAB pack above, which is a pack for ONE CHANGE. These are the artifacts a
+    // secretary circulates before a sitting and files after it, and the committee module had no
+    // export at all beyond a blank form template — while holding 34 meetings in dev and 32 in prod.
+    //
+    // Guarded ADMIN, not CHANGE: the committee engine is generic (19 committees in dev, of which the
+    // CAB and ECAB are two), its screens carry `hasPermission('ADMIN', …)`, and a minutes document
+    // for the Audit Committee is not a change-management artifact. Measured before choosing:
+    // ADMIN:EXPORT is 7 roles, ADMIN:READ is 21, and **no role holds EXPORT without READ in either
+    // database** — so the composed guard (F2-61(c)'s invariant) loses nobody.
+
+    @GetMapping("/committee/meeting/{id}/agenda.pdf")
+    @PreAuthorize(ADMIN_EXPORT)
+    @Operation(summary = "CE-14a: agenda pack for one committee meeting, from the meeting's own "
+        + "agenda snapshot. Pass ?lang=ar for Arabic RTL.")
+    public ResponseEntity<byte[]> committeeAgendaPdf(@PathVariable Long id,
+                                                     @RequestParam(defaultValue = "en") String lang) {
+        return pdf(exportService.committeeAgendaPdf(id, lang),
+                   ExportNaming.build("Committee", "Agenda-" + id, lang, "pdf"));
+    }
+
+    @GetMapping("/committee/meeting/{id}/minutes.pdf")
+    @PreAuthorize(ADMIN_EXPORT)
+    @Operation(summary = "CE-14a: minutes for one committee meeting — attendance, quorum and tally "
+        + "PROVENANCE (computed vs asserted), resolutions, dissents, actions, approval. Pass "
+        + "?lang=ar for Arabic RTL.")
+    public ResponseEntity<byte[]> committeeMinutesPdf(@PathVariable Long id,
+                                                      @RequestParam(defaultValue = "en") String lang) {
+        return pdf(exportService.committeeMinutesPdf(id, lang),
+                   ExportNaming.build("Committee", "Minutes-" + id, lang, "pdf"));
     }
 
     @GetMapping("/policy/{id}/document.pdf")

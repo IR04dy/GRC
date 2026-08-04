@@ -5409,6 +5409,10 @@ export const en = {
   comStart:                    'Start',
   comComplete:                 'Complete',
   comApproveMinutes:           'Approve minutes',
+  // S7f/CE-14a — the meeting's agenda pack and minutes
+  comExportAgenda: 'Agenda PDF',
+  comExportMinutes: 'Minutes PDF',
+  comExportFailed: 'Export failed',
   comCancel:                   'Cancel',
   // CH-14 attendance + quorum
   comAttendanceQuorum:         'Attendance & quorum',

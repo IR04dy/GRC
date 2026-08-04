@@ -823,6 +823,10 @@ export const reportingApi = {
   changeRegisterDocx: (lang: string) => downloadFile(`/api/v1/reporting/change-register.docx?lang=${encodeURIComponent(lang)}`, 'change-register.docx'),
   cabPackPdf:         (id: number, lang: string) => downloadFile(`/api/v1/reporting/change/${id}/cab-pack.pdf?lang=${encodeURIComponent(lang)}`, `cab-pack-${id}.pdf`),
   policyDocumentPdf:  (id: number, lang: string) => downloadFile(`/api/v1/reporting/policy/${id}/document.pdf?lang=${encodeURIComponent(lang)}`, `policy-${id}.pdf`),
+  // S7f/CE-14a — the MEETING's records, distinct from cabPackPdf above (which packs one change).
+  // Guarded ADMIN:EXPORT + ADMIN:READ server-side: the committee engine is generic, not change-only.
+  committeeAgendaPdf:  (meetingId: number, lang: string) => downloadFile(`/api/v1/reporting/committee/meeting/${meetingId}/agenda.pdf?lang=${encodeURIComponent(lang)}`, `committee-agenda-${meetingId}.pdf`),
+  committeeMinutesPdf: (meetingId: number, lang: string) => downloadFile(`/api/v1/reporting/committee/meeting/${meetingId}/minutes.pdf?lang=${encodeURIComponent(lang)}`, `committee-minutes-${meetingId}.pdf`),
   findingsPdf:      (lang: string) => downloadFile(`/api/v1/reporting/findings-aging.pdf?lang=${encodeURIComponent(lang)}`, 'findings.pdf'),
   findingsXlsx:     () => downloadFile('/api/v1/reporting/findings-aging.xlsx', 'findings.xlsx'),
   findingsDocx:     (lang: string) => downloadFile(`/api/v1/reporting/findings-aging.docx?lang=${encodeURIComponent(lang)}`, 'findings.docx'),

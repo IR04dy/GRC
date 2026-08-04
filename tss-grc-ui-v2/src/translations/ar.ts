@@ -5388,6 +5388,10 @@ export const ar = {
   comStart:                    'بدء',
   comComplete:                 'إكمال',
   comApproveMinutes:           'اعتماد المحضر',
+  // S7f/CE-14a — the meeting's agenda pack and minutes
+  comExportAgenda: 'جدول الأعمال PDF',
+  comExportMinutes: 'المحضر PDF',
+  comExportFailed: 'فشل التصدير',
   comCancel:                   'إلغاء',
   // CH-14 attendance + quorum
   comAttendanceQuorum:         'الحضور والنصاب',

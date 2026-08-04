@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Landmark, CheckCircle2, XCircle, Calendar, Play, FileCheck2, Users,
   ChevronRight, ChevronDown, Gavel, ClipboardList, ListChecks, RefreshCw, Vote,
-  ExternalLink, AlertTriangle, ShieldAlert, Plus, Ban,
+  ExternalLink, AlertTriangle, ShieldAlert, Plus, Ban, FileDown,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -19,6 +19,8 @@ import { ChangeAuthorityPanel } from '../../components/committees/ChangeAuthorit
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
+import { canExport } from '../../lib/auth';
+import { reportingApi, ApiError } from '../../lib/api';
 import {
   listCommittees, listMeetings, startMeeting, completeMeeting, approveMinutes, cancelMeeting,
   listResolutions, listActions, generateAnnualCalendar, populateAgenda, createResolution, createMeeting,
@@ -517,6 +519,18 @@ export function CommitteesPage() {
     catch { toast.danger(t('comActionFailed')); }
     finally { setBusyId(null); }
   }
+  // S7f/CE-14a — the meeting's own records. Downloads, so failures surface as a toast rather than
+  // a silently-empty file: `downloadFile` throws ApiError on a non-2xx (a 403 from ADMIN:EXPORT
+  // included), and swallowing that is how F2-68's "dead buttons" family started.
+  async function onExportAgenda(meetingId: number) {
+    try { await reportingApi.committeeAgendaPdf(meetingId, lang); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : t('comExportFailed')); }
+  }
+  async function onExportMinutes(meetingId: number) {
+    try { await reportingApi.committeeMinutesPdf(meetingId, lang); }
+    catch (e) { toast.danger(e instanceof ApiError ? e.message : t('comExportFailed')); }
+  }
+
   async function onApproveMinutes(id: number) {
     setBusyId(id);
     try { await approveMinutes(id); toast.success(t('comMinutesApproved')); await reload(); }
@@ -816,6 +830,26 @@ export function CommitteesPage() {
                                   disabled={busyId === m.id} onClick={() => onApproveMinutes(m.id)}>
                                   {t('comApproveMinutes')}
                                 </Button>
+                              )}
+                              {/* S7f/CE-14a — the records a secretary circulates and files. Offered on
+                                  every meeting, including SCHEDULED (an agenda is *for* circulating
+                                  before the sitting) and drafts (the minutes PDF marks itself DRAFT
+                                  rather than being withheld). Gated on CHANGE-free ADMIN:EXPORT
+                                  server-side; canExport keeps a button the caller would be 403'd on
+                                  out of the row. */}
+                              {canExport('ADMIN') && (
+                                <>
+                                  {' '}
+                                  <Button size="sm" variant="ghost" Icon={FileDown}
+                                    onClick={() => onExportAgenda(m.id)}>
+                                    {t('comExportAgenda')}
+                                  </Button>
+                                  {' '}
+                                  <Button size="sm" variant="ghost" Icon={FileDown}
+                                    onClick={() => onExportMinutes(m.id)}>
+                                    {t('comExportMinutes')}
+                                  </Button>
+                                </>
                               )}
                             </td>
                           </tr>

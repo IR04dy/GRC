@@ -1,5 +1,11 @@
 package com.tss.grc.module.reporting.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
+import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
+import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeResolutionRepository;
 import com.tss.grc.module.platform.export.PdfFonts;
 import com.tss.grc.module.platform.export.PdfTheme;
 import com.tss.grc.module.platform.export.XlsxStyler;
@@ -38,6 +44,7 @@ import com.tss.grc.module.risk.kri.repository.KriMeasurementRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
 import com.tss.grc.module.platform.export.ExportAuditContext;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.PageRequest;
@@ -75,6 +82,7 @@ import java.util.Map;
  * Latin fragments (R-00012 codes) coexist as LTR runs within RTL lines.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ExportService {
 
@@ -91,6 +99,11 @@ public class ExportService {
     private final ChangeTaskRepository changeTaskRepo;         // CH-11: CAB pack
     private final ChangeLinkRepository changeLinkRepo;         // CH-11: CAB pack
     private final PolicyDocumentRepository policyDocRepo;      // CH-10: controlled policy PDF
+    private final CommitteeMeetingRepository meetingRepo;      // S7f/CE-14a: agenda + minutes
+    private final CommitteeResolutionRepository resolutionRepo; // S7f/CE-14a: minutes
+
+    /** S7f: the meetings' `*_json` snapshot columns. One mapper, not one per call. */
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     // ── Risk Register ──────────────────────────────────────────────────────
 
@@ -408,6 +421,390 @@ public class ExportService {
                 }
             },
             false); // portrait
+    }
+
+    // ── S7f / CE-14a: the committee meeting's agenda pack and its minutes ───────────────────────
+    //
+    // G-14: "No agenda pack / minutes / decision-register exports for change governance." The CAB
+    // pack above is a pack for ONE CHANGE (CH-11); these are the MEETING's records — the artifacts a
+    // secretary circulates before a sitting and files after it. Measured 2026-08-04: the committee
+    // module had **no export at all** beyond a blank form template, while holding 34 meetings in dev
+    // and 32 in prod, 16/15 of them MINUTES_APPROVED with agenda and decision content.
+    //
+    // ⚠ THE HONESTY REQUIREMENT, AND IT IS THE POINT OF THE SLICE. An export is where a governance
+    // record becomes evidence, so it must not upgrade an assertion into a computation. Measured
+    // across both databases:
+    //
+    //     quorum_source        15 NULL / 17 ASSERTED_LEGACY / 2 COMPUTED  (dev), 0 COMPUTED in prod
+    //     quorum_present       populated on 2 of 34 (dev), 0 of 32 (prod)
+    //     tally_source         20 ASSERTED_LEGACY / 2 COMPUTED (dev), 0 COMPUTED in prod
+    //     resolution_vote      4 rows (dev), 0 (prod)
+    //
+    // So a minutes PDF printing "Quorum: 4 of 7, required 4" would be inventing numbers for 32 of 34
+    // meetings, and printing "For 0 / Against 0" would read as unanimous abstention where in truth
+    // no per-member vote was ever recorded. Both are the F2-42 shape — a page that presents computed
+    // confidence over data that does not support it. F2-28 added `quorum_source` and S-era work added
+    // `tally_source` precisely so the distinction can be stated; this export states it.
+
+    /**
+     * CE-14a — the agenda pack for one committee meeting (RTL + bilingual).
+     *
+     * <p>Built from the meeting's own `agenda_json` snapshot, which is what S7b's `populateAgenda`
+     * writes and what the sitting is actually run from. Deliberately a snapshot read rather than a
+     * live re-derivation: an agenda pack records what was tabled, and re-deriving it at export time
+     * would produce a document that disagrees with the one the members received.
+     */
+    @Transactional(readOnly = true)
+    public byte[] committeeAgendaPdf(Long meetingId, String lang) {
+        Long org = TenantContext.getCurrentTenant();
+        Organisation o = orgRepo.findById(org).orElse(null);
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        CommitteeMeeting m = meetingRepo.findByIdAndOrganisationId(meetingId, org)
+            .orElseThrow(() -> new EntityNotFoundException("Committee meeting not found: " + meetingId));
+        List<Map<String, Object>> items = readJsonArray(m.getAgendaJson());
+        String title = ar && !isBlank(m.getTitleAr()) ? m.getTitleAr() : m.getTitleEn();
+
+        return buildReportPdf(o, ar,
+            "Committee Agenda Pack", "حزمة جدول أعمال اللجنة",
+            (ar ? "جدول الأعمال — " : "Agenda — ") + safe(m.getMeetingCode()),
+            (ar ? "جدول الأعمال — " : "Agenda — ") + safe(m.getMeetingCode()),
+            List.of(
+                new PdfTheme.Kpi(ar ? "اللجنة" : "Committee", safe(m.getCommitteeNameEn()), ""),
+                new PdfTheme.Kpi(ar ? "الحالة" : "Status",    safe(m.getStatus()), ""),
+                new PdfTheme.Kpi(ar ? "البنود" : "Items",     String.valueOf(items.size()), ""),
+                new PdfTheme.Kpi(ar ? "الموعد" : "Scheduled",
+                    m.getScheduledAt() == null ? "—" : m.getScheduledAt().toString(), "")
+            ),
+            new ReportMetadata("Committee", ar ? "حزمة جدول الأعمال" : "Agenda Pack",
+                (ar ? "حتى " : "As of ") + DATE_FMT.format(LocalDate.now()),
+                safe(m.getMeetingCode()), lang, "Internal", 1),
+            (doc) -> {
+                PdfPTable bar = fullTable(ar);
+                headerCell(bar, safe(title));
+                doc.add(bar);
+
+                cabSection(doc, ar, "Meeting", "الاجتماع");
+                PdfPTable d = kvTable(ar);
+                kvRow(d, ar, "Committee", "اللجنة", safe(m.getCommitteeNameEn()));
+                kvRow(d, ar, "Meeting code", "رمز الاجتماع", safe(m.getMeetingCode()));
+                kvRow(d, ar, "Scheduled", "الموعد",
+                    m.getScheduledAt() == null ? "—" : m.getScheduledAt().toString());
+                kvRow(d, ar, "Location / link", "المكان أو الرابط", safe(m.getLocationOrLink()));
+                kvRow(d, ar, "Chair", "الرئيس", safe(m.getChairName()));
+                kvRow(d, ar, "Secretary", "أمين السر", safe(m.getSecretaryName()));
+                kvRow(d, ar, "Status", "الحالة", safe(m.getStatus()));
+                doc.add(d);
+
+                cabSection(doc, ar, "Agenda", "جدول الأعمال");
+                if (items.isEmpty()) {
+                    // Stated, not blank. An agenda pack with an empty item table reads as "a meeting
+                    // with nothing to discuss"; the truth is that the agenda has not been built, and
+                    // 2 of 34 dev meetings are in exactly that state.
+                    PdfPTable none = kvTable(ar);
+                    kvRow(none, ar, "—", "—", ar
+                        ? "لم يُبنَ جدول الأعمال لهذا الاجتماع بعد."
+                        : "The agenda for this meeting has not been built yet.");
+                    doc.add(none);
+                } else {
+                    PdfPTable t = new PdfPTable(new float[]{ 0.7f, 4.6f, 1.4f, 1.1f });
+                    t.setWidthPercentage(100);
+                    t.setRunDirection(PdfTheme.runDir(ar));
+                    t.setSpacingBefore(4);
+                    headerCell(t, ar ? "#" : "#");
+                    headerCell(t, ar ? "البند" : "Item");
+                    headerCell(t, ar ? "النوع" : "Type");
+                    headerCell(t, ar ? "الدقائق" : "Minutes");
+                    for (Map<String, Object> it : items) {
+                        cell(t, str(it.get("seq")));
+                        cell(t, safe(agendaItemText(it, ar)));
+                        // S7b's referral items carry a kind/mandatory marker; standing items do not,
+                        // so an absent marker is rendered as standing rather than as unknown.
+                        cell(t, itemType(it, ar));
+                        cell(t, str(it.get("minutes")));
+                    }
+                    doc.add(t);
+                }
+            },
+            false); // portrait — a circulated pack, not a register dump
+    }
+
+    /**
+     * CE-14a — the minutes of one committee meeting (RTL + bilingual), including the quorum and
+     * tally <em>provenance</em>.
+     *
+     * <p>Every figure that could be either computed or asserted is labelled with which it was. That
+     * is not decoration: `quorum_source` is `ASSERTED_LEGACY` on 17 of 34 dev meetings and NULL on
+     * 15 more, so a minutes document that printed the numbers plainly would be presenting a
+     * caller-authored claim as a measured fact — the defect F2-28 exists to have made visible.
+     */
+    @Transactional(readOnly = true)
+    public byte[] committeeMinutesPdf(Long meetingId, String lang) {
+        Long org = TenantContext.getCurrentTenant();
+        Organisation o = orgRepo.findById(org).orElse(null);
+        boolean ar = "ar".equalsIgnoreCase(lang);
+        CommitteeMeeting m = meetingRepo.findByIdAndOrganisationId(meetingId, org)
+            .orElseThrow(() -> new EntityNotFoundException("Committee meeting not found: " + meetingId));
+        List<Map<String, Object>> attendees = readJsonArray(m.getAttendeesJson());
+        List<Map<String, Object>> actions   = readJsonArray(m.getActionItemsJson());
+        List<CommitteeResolution> resolutions =
+            resolutionRepo.findByOrganisationIdAndMeetingIdOrderBySeqAsc(org, meetingId);
+        long present = attendees.stream().filter(a -> Boolean.TRUE.equals(a.get("present"))).count();
+        String title = ar && !isBlank(m.getTitleAr()) ? m.getTitleAr() : m.getTitleEn();
+        boolean approved = "MINUTES_APPROVED".equals(m.getStatus());
+
+        return buildReportPdf(o, ar,
+            "Committee Minutes", "محضر اجتماع اللجنة",
+            (ar ? "المحضر — " : "Minutes — ") + safe(m.getMeetingCode()),
+            (ar ? "المحضر — " : "Minutes — ") + safe(m.getMeetingCode()),
+            List.of(
+                new PdfTheme.Kpi(ar ? "اللجنة" : "Committee", safe(m.getCommitteeNameEn()), ""),
+                new PdfTheme.Kpi(ar ? "الحضور" : "Present",
+                    attendees.isEmpty() ? "—" : present + "/" + attendees.size(), ""),
+                new PdfTheme.Kpi(ar ? "القرارات" : "Resolutions",
+                    String.valueOf(resolutions.size()), ""),
+                // The KPI band states approval, never assumes it — an unapproved minute is a draft,
+                // and a document that looks approved because it was exported is the F2-98 shape.
+                new PdfTheme.Kpi(ar ? "الاعتماد" : "Approval",
+                    approved ? (ar ? "معتمد" : "Approved") : (ar ? "مسوّدة" : "Draft"),
+                    approved ? "" : (ar ? "غير معتمد" : "not approved"))
+            ),
+            new ReportMetadata("Committee", ar ? "محضر الاجتماع" : "Minutes",
+                (ar ? "حتى " : "As of ") + DATE_FMT.format(LocalDate.now()),
+                safe(m.getMeetingCode()), lang, "Internal", 1),
+            (doc) -> {
+                PdfPTable bar = fullTable(ar);
+                headerCell(bar, safe(title));
+                doc.add(bar);
+
+                if (!approved) {
+                    // Say it on the page, not only in the KPI band. Minutes circulate as files.
+                    PdfPTable warn = fullTable(ar);
+                    cell(warn, ar
+                        ? "مسوّدة — لم يُعتمد هذا المحضر بعد (الحالة: " + safe(m.getStatus()) + ")."
+                        : "DRAFT — these minutes have not been approved (status: "
+                            + safe(m.getStatus()) + ").");
+                    doc.add(warn);
+                }
+
+                cabSection(doc, ar, "Meeting", "الاجتماع");
+                PdfPTable d = kvTable(ar);
+                kvRow(d, ar, "Committee", "اللجنة", safe(m.getCommitteeNameEn()));
+                kvRow(d, ar, "Meeting code", "رمز الاجتماع", safe(m.getMeetingCode()));
+                kvRow(d, ar, "Held", "تاريخ الانعقاد",
+                    m.getStartedAt() != null ? m.getStartedAt().toString()
+                        : m.getScheduledAt() == null ? "—" : m.getScheduledAt().toString());
+                kvRow(d, ar, "Chair", "الرئيس", safe(m.getChairName()));
+                kvRow(d, ar, "Secretary", "أمين السر", safe(m.getSecretaryName()));
+                doc.add(d);
+
+                // ── Attendance and quorum, with provenance ──────────────────────────────────────
+                cabSection(doc, ar, "Attendance & Quorum", "الحضور والنصاب");
+                if (attendees.isEmpty()) {
+                    PdfPTable none = kvTable(ar);
+                    kvRow(none, ar, "—", "—", ar
+                        ? "لم يُسجَّل حضور لهذا الاجتماع."
+                        : "No attendance was recorded for this meeting.");
+                    doc.add(none);
+                } else {
+                    PdfPTable t = new PdfPTable(new float[]{ 3.4f, 1.8f, 1.1f, 1.3f });
+                    t.setWidthPercentage(100);
+                    t.setRunDirection(PdfTheme.runDir(ar));
+                    t.setSpacingBefore(4);
+                    headerCell(t, ar ? "العضو" : "Member");
+                    headerCell(t, ar ? "الصفة" : "Role");
+                    headerCell(t, ar ? "حاضر" : "Present");
+                    headerCell(t, ar ? "له صوت" : "Voting");
+                    for (Map<String, Object> a : attendees) {
+                        cell(t, safe(str(a.get("name"))));
+                        cell(t, safe(str(a.get("role"))));
+                        cell(t, yesNo(a.get("present"), ar));
+                        cell(t, yesNo(a.get("votingMember"), ar));
+                    }
+                    doc.add(t);
+                }
+                PdfPTable q = kvTable(ar);
+                kvRow(q, ar, "Quorum met", "تحقق النصاب",
+                    m.getQuorumMet() == null ? "—"
+                        : (m.getQuorumMet() != 0 ? (ar ? "نعم" : "Yes") : (ar ? "لا" : "No")));
+                // ⚠ The provenance line, and the figures ONLY where they were recorded.
+                kvRow(q, ar, "Quorum basis", "أساس النصاب", quorumBasis(m, ar));
+                if (m.getQuorumPresent() != null || m.getQuorumRequired() != null
+                        || m.getQuorumDenominator() != null) {
+                    kvRow(q, ar, "Counted", "المحتسب",
+                        str(m.getQuorumPresent()) + " / " + str(m.getQuorumDenominator())
+                            + (ar ? "  (المطلوب " : "  (required ") + str(m.getQuorumRequired()) + ")");
+                    if (m.getQuorumComputedAt() != null)
+                        kvRow(q, ar, "Computed at", "وقت الحساب", m.getQuorumComputedAt().toString());
+                }
+                if (m.getAttendanceRecordedAt() != null)
+                    kvRow(q, ar, "Attendance recorded", "تسجيل الحضور",
+                        m.getAttendanceRecordedAt().toString());
+                doc.add(q);
+
+                // ── Resolutions, with tally provenance ─────────────────────────────────────────
+                cabSection(doc, ar, "Resolutions", "القرارات");
+                if (resolutions.isEmpty()) {
+                    PdfPTable none = kvTable(ar);
+                    kvRow(none, ar, "—", "—", ar
+                        ? "لم تُسجَّل قرارات لهذا الاجتماع."
+                        : "No resolutions were recorded for this meeting.");
+                    doc.add(none);
+                } else {
+                    PdfPTable t = new PdfPTable(new float[]{ 0.7f, 3.6f, 1.3f, 1.5f, 1.6f });
+                    t.setWidthPercentage(100);
+                    t.setRunDirection(PdfTheme.runDir(ar));
+                    t.setSpacingBefore(4);
+                    headerCell(t, "#");
+                    headerCell(t, ar ? "القرار" : "Resolution");
+                    headerCell(t, ar ? "النتيجة" : "Outcome");
+                    headerCell(t, ar ? "الأصوات" : "Votes");
+                    headerCell(t, ar ? "أساس العد" : "Tally basis");
+                    for (CommitteeResolution r : resolutions) {
+                        cell(t, str(r.getSeq()));
+                        cell(t, safe(ar && !isBlank(r.getTitleAr()) ? r.getTitleAr() : r.getTitleEn()));
+                        cell(t, safe(r.getOutcome()));
+                        cell(t, voteSummary(r, ar));
+                        cell(t, tallyBasis(r, ar));
+                    }
+                    doc.add(t);
+                    for (CommitteeResolution r : resolutions) {
+                        String dissent = ar ? r.getDissentNotesAr() : r.getDissentNotesEn();
+                        if (isBlank(dissent)) dissent = r.getDissentNotesEn();
+                        if (isBlank(dissent)) continue;
+                        // A recorded dissent is the part of a minute an auditor reads first; losing
+                        // it to a summary table would be the point of the document going missing.
+                        PdfPTable dt = kvTable(ar);
+                        kvRow(dt, ar, "Dissent · #" + str(r.getSeq()),
+                              "اعتراض · #" + str(r.getSeq()), dissent);
+                        doc.add(dt);
+                    }
+                }
+
+                // ── Action items ──────────────────────────────────────────────────────────────
+                if (!actions.isEmpty()) {
+                    cabSection(doc, ar, "Action Items", "بنود العمل");
+                    PdfPTable t = new PdfPTable(new float[]{ 4.2f, 1.8f, 1.4f });
+                    t.setWidthPercentage(100);
+                    t.setRunDirection(PdfTheme.runDir(ar));
+                    t.setSpacingBefore(4);
+                    headerCell(t, ar ? "البند" : "Action");
+                    headerCell(t, ar ? "المسؤول" : "Owner");
+                    headerCell(t, ar ? "الاستحقاق" : "Due");
+                    for (Map<String, Object> a : actions) {
+                        cell(t, safe(firstNonBlankStr(a, ar ? "titleAr" : "titleEn", "titleEn", "title")));
+                        cell(t, safe(firstNonBlankStr(a, "owner", "ownerName", "assignedTo")));
+                        cell(t, safe(firstNonBlankStr(a, "dueAt", "dueDate", "due")));
+                    }
+                    doc.add(t);
+                }
+
+                // ── The narrative ─────────────────────────────────────────────────────────────
+                String narrative = ar && !isBlank(m.getMinutesAr()) ? m.getMinutesAr() : m.getMinutesEn();
+                cabSection(doc, ar, "Minutes", "نص المحضر");
+                PdfPTable n = fullTable(ar);
+                cell(n, isBlank(narrative)
+                    ? (ar ? "لم يُسجَّل نص للمحضر." : "No minutes narrative was recorded.")
+                    : narrative);
+                doc.add(n);
+
+                // ── Approval + e-signature ────────────────────────────────────────────────────
+                cabSection(doc, ar, "Approval", "الاعتماد");
+                PdfPTable ap = kvTable(ar);
+                kvRow(ap, ar, "Status", "الحالة", safe(m.getStatus()));
+                kvRow(ap, ar, "Approved at", "تاريخ الاعتماد",
+                    m.getMinutesApprovedAt() == null ? "—" : m.getMinutesApprovedAt().toString());
+                kvRow(ap, ar, "Approved by", "المعتمد", safe(m.getApproverName()));
+                doc.add(ap);
+            },
+            false); // portrait
+    }
+
+    // ── S7f helpers: JSON snapshots and provenance wording ──────────────────────────────────────
+
+    /** Read a `*_json` snapshot column into rows. A malformed snapshot yields no rows rather than a
+     *  500: the export must still produce the rest of the minutes, and the empty section states
+     *  itself. */
+    private List<Map<String, Object>> readJsonArray(String json) {
+        if (isBlank(json)) return List.of();
+        try {
+            return JSON.readValue(json, new TypeReference<List<Map<String, Object>>>() { });
+        } catch (Exception e) {
+            log.warn("S7f: unreadable JSON snapshot in a committee meeting export — rendering the "
+                + "section as absent rather than failing the document: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private static String str(Object o) { return o == null ? "—" : String.valueOf(o); }
+
+    private static String yesNo(Object o, boolean ar) {
+        if (o == null) return "—";
+        boolean v = Boolean.TRUE.equals(o) || "true".equalsIgnoreCase(String.valueOf(o));
+        return v ? (ar ? "نعم" : "Yes") : (ar ? "لا" : "No");
+    }
+
+    private static String agendaItemText(Map<String, Object> item, boolean ar) {
+        String t = str(item.get(ar ? "titleAr" : "titleEn"));
+        if ("—".equals(t)) t = str(item.get("titleEn"));
+        return t;
+    }
+
+    private static String itemType(Map<String, Object> item, boolean ar) {
+        Object mandatory = item.get("mandatory");
+        if (Boolean.TRUE.equals(mandatory) || "true".equalsIgnoreCase(String.valueOf(mandatory)))
+            return ar ? "إلزامي" : "Mandatory";
+        return ar ? "قياسي" : "Standing";
+    }
+
+    private static String firstNonBlankStr(Map<String, Object> m, String... keys) {
+        for (String k : keys) {
+            Object v = m.get(k);
+            if (v != null && !String.valueOf(v).isBlank()) return String.valueOf(v);
+        }
+        return null;
+    }
+
+    /**
+     * How the quorum was established — the sentence that stops this export laundering an assertion
+     * into evidence (F2-28's {@code quorum_source} is what makes it sayable).
+     */
+    private static String quorumBasis(CommitteeMeeting m, boolean ar) {
+        String src = m.getQuorumSource();
+        if (isBlank(src))
+            return ar ? "غير مسجَّل" : "Not recorded";
+        return switch (src) {
+            case "COMPUTED" -> ar ? "محسوب من سجل الأعضاء" : "Computed from the member roster";
+            case "ASSERTED_LEGACY" -> ar
+                ? "مُقرَّر من قِبل المُدخِل (سجل قديم) — غير محسوب"
+                : "Asserted by the recorder (legacy row) — not computed";
+            default -> src;
+        };
+    }
+
+    /**
+     * The vote summary, and it refuses to print zeros as a tally. Measured: 20 of 22 resolutions in
+     * dev and 20 of 20 in prod carry {@code tally_source = ASSERTED_LEGACY}, and
+     * {@code committee_resolution_vote} holds 4 rows in dev and 0 in prod — so "For 0 / Against 0"
+     * would read as unanimous abstention where no vote was ever recorded.
+     */
+    private static String voteSummary(CommitteeResolution r, boolean ar) {
+        int f = r.getVoteFor() == null ? 0 : r.getVoteFor();
+        int a = r.getVoteAgainst() == null ? 0 : r.getVoteAgainst();
+        int b = r.getVoteAbstain() == null ? 0 : r.getVoteAbstain();
+        if (f == 0 && a == 0 && b == 0)
+            return ar ? "لم تُسجَّل أصوات" : "No votes recorded";
+        return (ar ? "مع " : "For ") + f + (ar ? " · ضد " : " · Against ") + a
+             + (ar ? " · ممتنع " : " · Abstain ") + b;
+    }
+
+    private static String tallyBasis(CommitteeResolution r, boolean ar) {
+        String src = r.getTallySource();
+        if (isBlank(src)) return ar ? "غير مسجَّل" : "Not recorded";
+        return switch (src) {
+            case "COMPUTED" -> ar ? "محسوب من الأصوات" : "Computed from recorded votes";
+            case "ASSERTED_LEGACY" -> ar ? "مُقرَّر (سجل قديم)" : "Asserted (legacy)";
+            default -> src;
+        };
     }
 
     // ── CAB-pack layout helpers ─────────────────────────────────────────────
