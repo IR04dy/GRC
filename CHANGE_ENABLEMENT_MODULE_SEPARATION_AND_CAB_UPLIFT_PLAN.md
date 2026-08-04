@@ -36,29 +36,40 @@
 > provenance — actor from `Authentication`, `CHANGE:APPROVE`, one vote per approver). **CE-15's RBAC half is
 > partly done:** V317 created `CHANGE_MANAGER` and took `CHANGE:APPROVE` to 9 roles (ADR-015).
 
+> ⚠ **Reconciled 2026-08-04 by S8c/CE-16, and the reconciliation was itself the finding.** Every one of
+> the seventeen rows below read **NOT STARTED** while eleven epics had shipped and merged — in a table
+> whose own header calls it the *"single source of truth for progress"* with the instruction to update
+> it in the same commit as the slice. A reader planning work from it would have rebuilt CAB governance
+> from scratch. Statuses and commits are taken from the delivery rows of
+> [`UNIFIED_IMPLEMENTATION_PLAN.md`](UNIFIED_IMPLEMENTATION_PLAN.md) §6c (each verified, live-probed and
+> merged at the time); this pass copied them, it did not re-verify the epics.
+
 | Epic | Content | Size | Status | Commit | Migration |
 |---|---|---|---|---|---|
-| **CE-0** | **Lift Change out of the Risk nav group** — own `navChange` sidebar group with CAB / calendar-FSC / decision-register beneath it (`Sidebar.tsx:106`) | XS | NOT STARTED | — | none |
-| **CE-1** | Module separation: `change_mgmt` → `module/change` w/ sub-packages, ports/adapters, import-boundary ratchet test | L | **NOT STARTED** | — | none (code-only) |
-| **CE-2** | Change **model catalogue** (standard/pre-approved change templates) | M | NOT STARTED | — | **V328** |
-| **CE-3** | **CAB as a governed body**: charter/ToR, membership matrix + roles, quorum policy, term review | M | NOT STARTED | — | **V322** |
-| **CE-4** | **CAB meeting cycle** + agenda auto-build from the CAB queue + papers pack | L | NOT STARTED | — | **V324** |
-| **CE-5** | **Decision write-back**: APPROVE/REJECT/DEFER/MORE_INFO/CONDITIONAL + conditions register | M | NOT STARTED | — | **V325** |
-| **CE-6** | **ECAB** emergency path + mandatory retrospective **ratification** with SLA | M | NOT STARTED | — | **V326** |
-| **CE-7** | Real **PIR** object (findings, actions, lessons) + auto-CAPA link | M | NOT STARTED | — | **V327** |
-| **CE-8** | **FSC** (forward schedule of change) + **PSO** + conflict/collision hardening | M | NOT STARTED | — | **V329** |
-| **CE-9** | Change **records & evidence** — adopt the platform evidence/attachment subsystem + retention | M | NOT STARTED | — | **V330** |
-| **CE-10** | **Workflow-engine adoption** for change authorisations (15th module) | M | NOT STARTED | — | none |
-| **CE-11** | **Unauthorised-change detection** + reconciliation register | S | NOT STARTED | — | **V331** |
-| **CE-12** | ITIL/ISO **KPI pack** + CAB throughput analytics | S | NOT STARTED | — | none |
-| **CE-13** | FE: split `ChangesPage` → Change workspace + **CAB workspace** (agenda builder, voting, minutes) | L | NOT STARTED | — | none |
-| **CE-14** | Exports/records pack: agenda pack, minutes, decision register (RTL + bilingual) | M | NOT STARTED | — | none |
-| **CE-15** | RBAC: CAB roles + `CHANGE`/`CAB` permissions + SoD gates | S | NOT STARTED | — | **V323** |
-| **CE-16** | Docs: PROJECT_CHRONICLE §, `package-info`, CAB operating runbook | S | NOT STARTED | — | none |
+| **CE-0** | **Lift Change out of the Risk nav group** — own `navChange` sidebar group with CAB / calendar-FSC / decision-register beneath it (`Sidebar.tsx:106`) | XS | ✅ **DONE** — only the routes that resolve are listed; the CAB queue and decision register join as they land | `29925f3e` | none |
+| **CE-1** | Module separation: `change_mgmt` → `module/change` w/ sub-packages, ports/adapters, import-boundary ratchet test | L | ✅ **DONE (S5a + S5c)** — 7 peer imports → 0, ports in `spi/`, adapters in `module/change_adapters`, mutation-proven `ChangeModuleBoundaryTest`. ⚠ The **package rename** was closed as **superseded** by ADR-017 D-4, not performed (§15.3's own reasoning, ratified); the schema name stays `change_mgmt` and so does the package | `764a41a4`, `d19e6d86` | none (code-only) |
+| **CE-2** | Change **model catalogue** (standard/pre-approved change templates) | M | ⬜ NOT STARTED — `STANDARD` is still an unbacked string | — | V-next |
+| **CE-3** | **CAB as a governed body**: charter/ToR, membership matrix + roles, quorum policy, term review | M | ✅ **DONE (S6, S6a–S6c)** — closed **mostly by measurement**: `cab_profile`/`cab_member_role` are subsumed 12-of-15 and 6-of-7 by the generic committee engine and are pinned against being built; the one field that genuinely belonged needed a flag (`quorum_requires_chair`, opt-in) | `a06ea46b`, `78df5906`, `6f2c0b60`, `3219786f` | **V348** |
+| **CE-4** | **CAB meeting cycle** + agenda auto-build from the CAB queue + papers pack | L | ✅ **DONE (S7a, S7b)** — the queue had to be *defined* first: its two definitions disagreed and the only referrals pointed at changes in no organisation | `453b6ea9`, `f7219422` | **V349**, **V350** |
+| **CE-5** | **Decision write-back**: APPROVE/REJECT/DEFER/MORE_INFO/CONDITIONAL + conditions register | M | ✅ **DONE (S7c, S7e)** — 14 → **16** states, not 17: `PENDING_RATIFICATION` has no producer. **No `CONDITIONAL` literal** — conditionality is derived from carrying open conditions, and V352's self-check THROWs if one enters `ck_change_status` | `ebfbc5f1`, `5fad1646` | **V351**, **V352** |
+| **CE-6** | **ECAB** emergency path + mandatory retrospective **ratification** with SLA | M | ✅ **DONE (ADR-017 D-3)** — ratification modelled **orthogonally** to `status`, and `ck_change_ratification_clock` makes the breach predicate total by constraint | `cf2f9ebf` | **V345** |
+| **CE-7** | Real **PIR** object (findings, actions, lessons) + auto-CAPA link | M | ✅ **DONE (S7d)** — **no migration**: the CAPA store this plan named is ESG-SKU-gated, while the Base universal tracker has no CHECK on `origin_type`. Produced F2-105 — the PIR card had 400'd on every save since F2-30 | `d82e6a7f` | none |
+| **CE-8** | **FSC** (forward schedule of change) + **PSO** + conflict/collision hardening | M | 🟡 **PARTIAL** — calendar, freeze windows and the conflict *report* shipped with CH-17; a **published** forward schedule and a **declared** service outage do not exist | — | V-next |
+| **CE-9** | Change **records & evidence** — adopt the platform evidence/attachment subsystem + retention | M | ✅ **DONE (S8a)** — and **not** `change_links`, whose un-hashed, un-reviewed pointer *is* the deficiency G-9 describes. The satisfaction gate fails **closed**; every read fails open | `0440272c` | **V353** |
+| **CE-10** | **Workflow-engine adoption** for change authorisations (15th module) | M | ⬜ NOT STARTED | — | none |
+| **CE-11** | **Unauthorised-change detection** + reconciliation register | S | 🟡 **PARTIAL** — A17-D3 ships an interim sink declaring itself `registerScope: EMERGENCY_RATIFICATION_ONLY`; CE-11 widens it to drift-detected unapproved changes and becomes an **additional** sink | — | V-next |
+| **CE-12** | ITIL/ISO **KPI pack** + CAB throughput analytics | S | ✅ **DONE (S8b)** — **no migration**. 19 metrics carrying coverage **and** provenance as separate axes; 7 report `NOT_MEASURABLE` with a named blocker because nothing populates their source. Produced F2-107 and F2-108 | `04193b09` | none |
+| **CE-13** | FE: split `ChangesPage` → Change workspace + **CAB workspace** (agenda builder, voting, minutes) | L | 🟡 **PARTIAL (S5c)** — 1,036 lines → nine files, proven token-identical. The **CAB workspace** and the retirement of `mockChanges.ts` remain | `d19e6d86` | none |
+| **CE-14** | Exports/records pack: agenda pack, minutes, decision register (RTL + bilingual) | M | 🟡 **PARTIAL (S7f = CE-14a)** — agenda pack + minutes, each **stating the provenance** of every figure it prints, because `quorum_source` is `ASSERTED_LEGACY` or NULL on 32 of 34 meetings. The **decision register** (CE-14b) remains | `d6ce008b` | none |
+| **CE-15** | RBAC: CAB roles + `CHANGE`/`CAB` permissions + SoD gates | S | 🟡 **PARTIAL** — V317 created `CHANGE_MANAGER` and took `CHANGE:APPROVE` to 9 roles (ADR-015); the SoD gates shipped across S6b/S7c/S7e/A17-D3. §10's *PIR approver ≠ implementer* and *condition `satisfied_by` ≠ owner* are **not** built | — | **V317** |
+| **CE-16** | Docs: PROJECT_CHRONICLE §, `package-info`, CAB operating runbook | S | ✅ **DONE (S8c)** — `PROJECT_CHRONICLE` §3.10 (the handbook mentioned this module **zero** times in 1,145 lines), a rewritten module contract (it described a **ten**-state machine and called emergency a CAB bypass), the operating runbook, **and a freshness test** so all three are gated against the code rather than trusted | *this slice* | none |
 
-**Migrations reserved: V322 – V331** *(in DELIVERY order — S6 first, then S7, then S8; V318–V321 belong to F2-28, `ck_change_status`, W2-0 and F2-04)* .
-Every migration idempotent, `GO`-separated, applied to dev **twice**. **The unified plan's §4 ledger is
-authoritative** — reserved numbers have already moved twice, so re-check it before creating a file.
+⚠ **The `V322–V331` reservation this line used to publish is void, and the delivered numbers show why:**
+the epics landed on **V345, V348–V353** — every reserved number had been taken by other work before the
+slice that reserved it was written. **Reserving a version number in prose does not hold it.** Read the
+directory (`ls tss-grc-backend/src/main/resources/db/migration/sqlserver | tail -3`) immediately before
+creating a file; the unified plan's §4 ledger records intent, not ownership.
+Every migration idempotent, `GO`-separated, applied to dev **twice**.
 **Open decisions requiring the user: §19** — do not start CE-3/CE-4 before the **unified plan's** D-1 and D-2 are answered (not CD-1/CD-2),
 **and not before F2-28 (quorum integrity) is closed.**
 

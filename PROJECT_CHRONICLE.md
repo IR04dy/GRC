@@ -252,6 +252,78 @@ Break-glass / Analytics), `/sso`, `/sso/nafath`, `/account/sessions`.
   knowledge base, onboarding, AI suggestions (`/controls/ai-mapper`), issues,
   incidents + RCA.
 
+### 3.10 Change Enablement & CAB — `module/change_mgmt` (+ `module/change_adapters`) · schema `change_mgmt` · API `/api/v1/changes/**`
+ITIL 4 change enablement with the CAB as a governed body rather than a status name.
+**16-state lifecycle** — `DRAFT → SUBMITTED → IMPACT_ASSESSED → CAB_PENDING →
+CAB_APPROVED | CAB_REJECTED | CAB_DEFERRED | MORE_INFO_REQUIRED → SCHEDULED →
+IMPLEMENTING → IMPLEMENTED | ROLLED_BACK → POST_REVIEW → CLOSED`, plus
+`EMERGENCY_APPROVED` and `CANCELLED`. `change_authorisation_matrix` maps *type × risk*
+to a gate (`AUTO` / `CAB` / `ECAB`) and a minimum approval count; the gate resolves to a
+real committee per tenant through `admin.committee_gate_map`, over the generic committee
+engine (`module/admin/committee`) rather than a second one. Peer modules are reached
+only through ports in `spi/` (`CommitteePort`, `EvidencePort`, `CapaPort`,
+`IncidentPort`) whose adapters live outside both modules in `module/change_adapters`.
+
+**What is server-enforced (all 409s — a refusal here is the feature working):**
+- **No authority, no decision.** A `CAB`/`ECAB` gate whose committee is unmapped, or
+  mapped to a body with no voting seats, refuses the transition and names what is
+  missing. There is no default CAB (ADR-017 D-2).
+- **A decision must be recorded by someone entitled to take it.** All five decision
+  targets stamp author and timestamp. The requester/owner cannot cast a CAB vote on
+  their own change, cannot ratify it, and cannot waive its conditions — resolved on user
+  id, with name comparison only as a legacy fallback. ⚠ One residual: a raiser holding
+  `CHANGE:APPROVE` can still take the `DRAFT → EMERGENCY_APPROVED` hop on their own
+  change; mandatory ratification *by someone else* is what catches that, not the hop.
+- **Conditions.** A CAB may approve subject to conditions (`change_condition`). Imposing
+  and waiving need `CHANGE:APPROVE`; a waiver needs a stated reason and may not come
+  from the requester or owner. `SCHEDULED → IMPLEMENTING` refuses while any condition
+  is open.
+- **Evidence.** Recording a condition satisfied requires an evidence item the evidence
+  subsystem has **APPROVED** — not merely uploaded, and not expired. The gate fails
+  closed if the evidence module is absent; reads fail open.
+- **Emergency is not a bypass.** `EMERGENCY_APPROVED` stamps a ratification clock
+  (`ck_change_ratification_clock` makes a pending state without a due date
+  unrepresentable), swept daily at 01:55, escalating to the CISO with an audit-ledger
+  event on breach.
+- **Closure needs a retrospective.** A `NORMAL`/`EMERGENCY` change cannot reach `CLOSED`
+  without a recorded PIR summary (`STANDARD` is exempt — it is pre-approved, low-risk
+  work). And a PIR that records objectives *not* met cannot close without a follow-up
+  action, which is raised as a tracked CAPA in the platform's universal tracker.
+- **Freeze windows.** `→ SCHEDULED` refuses when the change's window overlaps an active
+  freeze whose scope covers it (`ALL`, or a matching `CATEGORY`); an `EMERGENCY` change
+  is exempt only where the window itself sets `allow_emergency`. Collisions with other
+  scheduled changes are **detected and reported** (`GET /{id}/conflicts`), not refused —
+  overlapping work is often legitimate, so the platform surfaces it for the CAB rather
+  than deciding for it.
+
+**Records for an auditor:** change register (`/api/v1/reporting/change-register.{pdf,xlsx,docx}`,
+`CHANGE:EXPORT` **and** `CHANGE:READ`), per-change CAB pack
+(`/api/v1/reporting/change/{id}/cab-pack.pdf`), and the committee's own agenda pack and
+minutes (`/api/v1/reporting/committee/meeting/{id}/{agenda,minutes}.pdf`, guarded `ADMIN`
+because the engine is generic). All bilingual with real Arabic RTL shaping (`?lang=ar`).
+
+**Analytics** — `GET /api/v1/changes/analytics` carries `kpis`: 19 ITIL/ISO metrics, each
+with its numerator, denominator, population, **basis** (how much of the population is
+covered) and **provenance** (whether the covered rows were measured or asserted). Seven
+report `NOT_MEASURABLE` with a named blocker rather than a figure — reading a `—` as a
+gap and a `0%` as a measurement is the point, not a limitation.
+
+**Screens:** `/changes` with tabs `register`, `kanban`, `workflow`, `analytics`,
+`integrations`, `governance` (calendar + freeze windows), `comms`.
+
+⚠ **Operational prerequisite.** Because the authority model fails closed, a fresh tenant
+must constitute its CAB and map the gates before any `CAB`/`ECAB` change can be approved
+— otherwise every such approval is refused, correctly, with a message naming the missing
+configuration. Step-by-step: **`docs/change-manager/CAB_OPERATING_RUNBOOK.md`**.
+
+**Not built yet** (tracked as CE-2, CE-8, CE-10, CE-11, CE-13 in
+`CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md`): a change-model catalogue,
+so `STANDARD` is still an unbacked string rather than a recorded pre-approval; a
+*published* forward schedule of change and declared service outage (the calendar, freeze
+windows and conflict detection exist, the publication act does not); workflow-engine
+adoption as the 15th module; the unauthorised-change register (emergency ratification is
+its interim sink); and the CAB workspace as its own frontend surface.
+
 ---
 
 ## 4. Users, roles & demo tenants

@@ -289,7 +289,17 @@ cloud VM also open port 80 in the provider's security group / NSG.)
 schtasks /Create /TN "TSS GRC DB backup" /SC DAILY /ST 02:00 /RU SYSTEM /TR "sqlcmd -S localhost\SQLEXPRESS -E -Q \"BACKUP DATABASE TSS_GRC TO DISK = N'C:\tss-grc\backup\TSS_GRC_nightly.bak' WITH INIT, CHECKSUM\""
 ```
 
-4. **Plan TLS**: when a domain is available — cert (Let's Encrypt via
+4. **Constitute the CAB before anyone raises a change** — this one *will* look
+   like a bug if you skip it. Change authorisation **fails closed** by design
+   (ADR-017 D-2): a `CAB`/`ECAB` gate whose committee is unmapped, or mapped to
+   a committee with no active voting members, **refuses every approval** with a
+   409 rather than approving without an authority. Measured on the deployment
+   database: the `CAB` gate points at committee 13 and `ECAB` at committee 12,
+   and **both hold zero member terms**. Check with
+   `GET /api/v1/changes/governance-health` (it names which half is missing) and
+   follow **`docs/change-manager/CAB_OPERATING_RUNBOOK.md`** §0–§2. Appointing
+   members is a tenant decision, so no migration can do it for you.
+5. **Plan TLS**: when a domain is available — cert (Let's Encrypt via
    win-acme, or purchased PKCS12), add a `listen 443 ssl` server block to
    nginx, redirect 80→443, and flip
    `server.servlet.session.cookie.secure` traffic to HTTPS. Nothing in the
