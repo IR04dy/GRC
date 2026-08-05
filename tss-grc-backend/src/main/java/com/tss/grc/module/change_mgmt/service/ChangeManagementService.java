@@ -1031,13 +1031,18 @@ public class ChangeManagementService {
     /**
      * CE-15 — what each self-review gate can actually decide, and over how much of its population.
      *
-     * <p>The instrument F2-112 needed and nobody had. Three gates are enabled; measured on dev at build
-     * time, the waiver refusal could decide <b>0 of 17</b> changes because the ids it compares were never
-     * written and the labels are teams. A green test suite says the rule is correct; only this says
-     * whether it can run.
+     * <p>The instrument F2-112 needed and nobody had. Measured on dev at build time, the waiver refusal
+     * could decide <b>0 of 17</b> changes because the ids it compares were never written and the labels
+     * are teams. A green test suite says the rule is correct; only this says whether it can run.
      *
-     * <p>Deliberately three separate rows rather than one number: the remedies differ. A label-only
+     * <p>Deliberately one row per gate rather than one number: the remedies differ. A label-only
      * record needs its people captured as users; an absent one needs the field filled in at all.
+     *
+     * <p><b>F2-113 added a fourth row, and finding the gate it reports is what the first three were
+     * for.</b> Track D's bar on the deciding committee vote was the same defect one layer up — a
+     * name-to-label comparison that could never match — and it went unnoticed through S6, S7 and S8
+     * because nothing asked the question this endpoint asks. That row is the only one this module does
+     * not compute: see {@link CommitteePort#recusalCoverage}.
      */
     @Transactional(readOnly = true)
     public List<ChangeSoD.Coverage> sodCoverage() {
@@ -1076,7 +1081,14 @@ public class ChangeManagementService {
             new ChangeSoD.Coverage(ChangeSoD.GATE_PIR_NOT_IMPLEMENTER, pirPop.size(), 0, pirLabel,
                 pirPop.size() - pirLabel),
             new ChangeSoD.Coverage(ChangeSoD.GATE_CONDITION_NOT_OWNER, openConds.size(), condCheckable,
-                condLabel, openConds.size() - condCheckable - condLabel));
+                condLabel, openConds.size() - condCheckable - condLabel),
+            // F2-113 — the fourth gate, and the one this module does not enforce. Its population is
+            // referrals rather than changes, and its reach depends on the committee's roster as much
+            // as on the change's captured people, so the count comes from the engine (see
+            // CommitteePort.recusalCoverage for why computing it here would have overstated it).
+            committeePort == null
+                ? new ChangeSoD.Coverage(ChangeSoD.GATE_COMMITTEE_VOTE_NOT_REQUESTER, 0, 0, 0, 0)
+                : committeePort.recusalCoverage("CHANGE"));
     }
 
     private static boolean notBlank(String s) { return s != null && !s.isBlank(); }
@@ -2084,19 +2096,45 @@ public class ChangeManagementService {
         if ("AUTO".equalsIgnoreCase(gate))
             throw new IllegalArgumentException("This change is AUTO-authorised (no CAB) — nothing to refer");
         String mode = "EMERGENCY".equals(c.getChangeType()) ? "RATIFICATION" : "APPROVAL";
-        // SoD: the requester/owner will be force-RECUSED from the committee vote.
-        String recusal = java.util.stream.Stream.of(c.getRequestedByName(), c.getChangeOwnerName())
-            .filter(x -> x != null && !x.isBlank()).map(String::trim).distinct()
-            .collect(java.util.stream.Collectors.joining(","));
+        // ── SoD: the requester/owner is force-RECUSED from the committee vote ────────────────────
+        // ⚠ F2-113 — this list used to carry names ONLY, and the gate on the far side compared them
+        // to committee_member_terms.member_name. A change's people are team labels ('CloudOps',
+        // 'IAM Team', 'AppSec'); a committee's members are people ('Khalid Al-Rashidi'). Measured
+        // 2026-08-05: 15 of 15 owner labels and 13 of 13 requester labels resolved to no user, and
+        // 0 of 4 live referrals carried a name at all — so the bar had never engaged for any change
+        // in either database. The third instance of F2-112's shape: a correct rule over data that
+        // cannot satisfy it.
+        //
+        // The ids are what can match. CE-15 made `create` capture requested_by_id and b901faec
+        // seated the CAB/ECAB with member_user_id, so both sides of the comparison exist for the
+        // first time — which is why this was unfixable yesterday and is fixable now.
+        //
+        // ⚠ The names still travel, and must. 29 of dev's 42 active seats carry no member_user_id
+        // (committee_member_terms has a `no_platform_user` column because an external director
+        // legitimately never gets one), and for those the label is the only comparable thing there
+        // is. Adding the ids must not retire the comparison the unlinked seats depend on.
+        CommitteePort.Recusal recusal = new CommitteePort.Recusal(
+            java.util.stream.Stream.of(c.getRequestedById(), c.getChangeOwnerId())
+                .filter(java.util.Objects::nonNull).distinct().toList(),
+            java.util.stream.Stream.of(c.getRequestedByName(), c.getChangeOwnerName())
+                .filter(x -> x != null && !x.isBlank()).map(String::trim).distinct().toList());
         // S7b / CE-4 — state what the committee is being asked to decide. Without this the
         // referral routes correctly and never appears on the committee's agenda, which is how a
         // change could be "before the CAB" and invisible to it.
         CommitteePort.SubjectRef subject = new CommitteePort.SubjectRef(
             c.getChangeCode(), c.getTitleEn(), c.getTitleAr());
         CommitteePort.ReferralView r = committeePort.refer("CHANGE", id, gate, mode, committeeId, referredBy,
-            recusal.isBlank() ? null : recusal, subject);
+            recusal, subject);
+        // The audit line says what the referral can actually enforce, not merely that it happened.
+        // "Referred to committee 13" over an empty recusal list is the sentence that let F2-113 sit
+        // undetected: it reads identically whether the SoD bar is armed or unarmed.
         audit.log("REFER_TO_COMMITTEE", "ChangeRequest", id,
-            "Referred to committee " + r.committeeId() + " (gate " + gate + ", mode " + mode + ")");
+            "Referred to committee " + r.committeeId() + " (gate " + gate + ", mode " + mode + ")"
+                + (recusal.isPresent()
+                    ? " — recusing " + recusal.userIds().size() + " user id(s) and "
+                      + recusal.names().size() + " label(s) from the vote"
+                    : " — NO party recused: this change records neither a requester nor an owner, "
+                      + "so nobody can be barred from casting its deciding vote"));
         return r;
     }
 

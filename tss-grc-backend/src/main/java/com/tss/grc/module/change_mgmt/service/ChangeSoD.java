@@ -145,7 +145,26 @@ public final class ChangeSoD {
         return Strength.BY_LABEL;
     }
 
-    /** SAME if the actor matches any party; otherwise DIFFERENT when at least one was checkable. */
+    /**
+     * SAME if the actor matches any party; otherwise DIFFERENT when at least one was checkable.
+     *
+     * <p><b>F2-113 — an actor that may itself be unlinked.</b> Every caller until now passed an
+     * authenticated principal, which always carries an id. The committee force-recusal passes a
+     * {@code committee_member_terms} seat, and 29 of dev's 42 active seats carry no
+     * {@code member_user_id} — the table has a {@code no_platform_user} column because an external
+     * director legitimately never gets one. That does <b>not</b> need a second rule: rule 2 above keys
+     * the name fallback on the <em>party</em>, so a party carrying only a name is compared by name
+     * whatever the actor holds, and an unlinked seat keeps every refusal it had.
+     *
+     * <p>⚠ What it does need is that the caller build one party <b>per bar</b> rather than per person
+     * — {@code Party(id, null)} and {@code Party(null, label)} as separate entries, never
+     * {@code Party(id, label)}. Merging them re-engages rule 1 ("the id decides when the party has
+     * one") and silently retires the name comparison for every unlinked seat, which is a refusal
+     * removed by a change that looks like a tidy-up.
+     * {@code CommitteeVoteRecusalTallyTest.an_unlinked_seat_is_still_recused_by_name_even_though_the_referral_carries_ids}
+     * is the test that catches it, and the reason it exists is that CE-15 nearly shipped the same
+     * weakening from the other side.
+     */
     public static Verdict compareAny(Actor actor, List<Party> parties) {
         boolean anyVerified = false;
         for (Party p : parties) {
@@ -198,6 +217,22 @@ public final class ChangeSoD {
     public static final String GATE_SELF_WAIVER = "CONDITION_WAIVER_NOT_SELF";
     public static final String GATE_PIR_NOT_IMPLEMENTER = "PIR_REVIEWER_NOT_IMPLEMENTER";
     public static final String GATE_CONDITION_NOT_OWNER = "CONDITION_SATISFIER_NOT_OWNER";
-    public static final List<String> GATES =
-        List.of(GATE_SELF_WAIVER, GATE_PIR_NOT_IMPLEMENTER, GATE_CONDITION_NOT_OWNER);
+
+    /**
+     * F2-113 — Track D's bar on the deciding committee vote: the change's requester/owner may not
+     * cast it.
+     *
+     * <p>The fourth gate on this report and the first that does not live in this module — it is
+     * enforced by {@code CommitteeResolutionService.recordVote}, over data <em>this</em> module hands
+     * the engine at referral time. Its coverage therefore comes back through {@code CommitteePort},
+     * because the reach depends on two facts that no single module holds: whether the referred change
+     * recorded who raised it, and whether the deciding committee's seats are linked to platform users.
+     * Reporting only the first would have read as full coverage while 29 of 42 dev seats remained
+     * uncomparable — F2-112's own shape, one report down.
+     */
+    public static final String GATE_COMMITTEE_VOTE_NOT_REQUESTER = "COMMITTEE_VOTE_NOT_REQUESTER";
+
+    public static final List<String> GATES = List.of(
+        GATE_SELF_WAIVER, GATE_PIR_NOT_IMPLEMENTER, GATE_CONDITION_NOT_OWNER,
+        GATE_COMMITTEE_VOTE_NOT_REQUESTER);
 }

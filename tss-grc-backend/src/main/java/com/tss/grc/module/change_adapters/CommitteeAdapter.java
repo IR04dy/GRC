@@ -5,6 +5,7 @@ import com.tss.grc.module.admin.committee.service.CommitteeAgendaJson;
 import com.tss.grc.module.admin.committee.service.CommitteeGateMapService;
 import com.tss.grc.module.admin.committee.service.CommitteeReferralService;
 import com.tss.grc.module.admin.committee.service.CommitteeService;
+import com.tss.grc.module.change_mgmt.service.ChangeSoD;
 import com.tss.grc.module.change_mgmt.spi.CommitteePort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -54,7 +55,7 @@ public class CommitteeAdapter implements CommitteePort {
 
     @Override
     public ReferralView refer(String sourceModule, Long sourceEntityId, String gate, String mode,
-                              Long committeeId, String referredBy, String recusalNames,
+                              Long committeeId, String referredBy, Recusal recusal,
                               SubjectRef subject) {
         requireEngine();
         // S7b — translate the change-owned SubjectRef into the committee-owned one. The two are
@@ -64,8 +65,32 @@ public class CommitteeAdapter implements CommitteePort {
             ? CommitteeReferralService.SubjectRef.NONE
             : new CommitteeReferralService.SubjectRef(
                 subject.code(), subject.titleEn(), subject.titleAr());
+        // F2-113 — the same translation for the recusal list. Both halves cross: the ids are what can
+        // match a seat, the labels are what the 29 unlinked seats of 42 still need.
+        var engineRecusal = recusal == null
+            ? CommitteeReferralService.Recusal.NONE
+            : new CommitteeReferralService.Recusal(recusal.userIds(), recusal.names());
         return view(referrals.refer(sourceModule, sourceEntityId, gate, mode,
-                                    committeeId, referredBy, recusalNames, engineSubject));
+                                    committeeId, referredBy, engineRecusal, engineSubject));
+    }
+
+    /**
+     * F2-113 — the engine's own count of what the force-recusal gate can decide.
+     *
+     * <p>Translation only, as everything here is: the count is taken in
+     * {@code CommitteeReferralService.recusalCoverage} because the roster linkage is the engine's
+     * fact, and re-deriving it on this side would be the second answer this class exists not to
+     * create.
+     */
+    @Override
+    public ChangeSoD.Coverage recusalCoverage(String sourceModule) {
+        // No engine means an UNKNOWN reach, and an unknown reach must not read as a covered one:
+        // a zero population reports honestly (coveragePct 0, enabledButBlind false — the gate is
+        // not blind, it is not present).
+        if (referrals == null)
+            return new ChangeSoD.Coverage(
+                ChangeSoD.GATE_COMMITTEE_VOTE_NOT_REQUESTER, 0, 0, 0, 0);
+        return referrals.recusalCoverage(sourceModule);
     }
 
     @Override
@@ -184,7 +209,7 @@ public class CommitteeAdapter implements CommitteePort {
             r.getId(), r.getOrganisationId(), r.getSourceModule(), r.getSourceEntityId(),
             r.getCommitteeId(), r.getMeetingId(), r.getResolutionId(), r.getGate(),
             r.getMode(), r.getStatus(), r.getReferredBy(), r.getRecusalNames(), r.getCreatedAt(),
-            r.getSourceCode(), r.getSubjectEn(), r.getSubjectAr());
+            r.getSourceCode(), r.getSubjectEn(), r.getSubjectAr(), r.getRecusalUserIds());
     }
 
     /** A write that needs the engine fails loudly rather than pretending to succeed. */

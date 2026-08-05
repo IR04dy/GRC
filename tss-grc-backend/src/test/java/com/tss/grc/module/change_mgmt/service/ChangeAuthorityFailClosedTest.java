@@ -255,7 +255,7 @@ class ChangeAuthorityFailClosedTest {
         gateFault("CAB", ChangeAuthorityNotConfiguredException.NOT_MAPPED);
         CommitteePort.ReferralView ref = new CommitteePort.ReferralView(
             5L, ORG_ID, "CHANGE", CHANGE_ID, 77L, null, null, "CAB", "APPROVAL",
-            "PENDING", "secretary", null, null, "CHG-TEST", "Subject", null);
+            "PENDING", "secretary", null, null, "CHG-TEST", "Subject", null, null);
         when(committeePort.activeReferral("CHANGE", CHANGE_ID)).thenReturn(Optional.of(ref));
 
         service.transition(CHANGE_ID, "CAB_APPROVED", new HashMap<>());

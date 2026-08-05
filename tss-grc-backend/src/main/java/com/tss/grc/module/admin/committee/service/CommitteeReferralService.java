@@ -7,10 +7,17 @@ import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
 import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
 import com.tss.grc.module.admin.committee.repository.CommitteeGateMapRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeReferralRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeResolutionRepository;
+// F2-113 — an INBOUND read of the change module's SoD vocabulary, which ChangeModuleBoundaryTest
+// permits and by design ("peers may read the change module"); the ban is on change_mgmt reaching
+// out. ChangeSoD is a static, bean-free rule holder, so this adds no wiring in either direction —
+// and it is the alternative to a fourth private copy of "is this the same person?", which is the
+// defect class F2-112/F2-113 belong to.
+import com.tss.grc.module.change_mgmt.service.ChangeSoD;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,6 +46,10 @@ public class CommitteeReferralService {
     private final CommitteeResolutionRepository resolutionRepo;
     private final CommitteeMeetingRepository    meetingRepo;
 
+    /** F2-113 — the roster, for {@link #recusalCoverage}: a committee with no seat linked to a
+     *  platform user cannot be recused by id however well the referred record captured its people. */
+    private final CommitteeMemberTermRepository memberTermRepo;
+
     /**
      * S7b / V350 — what the committee is being asked to decide, as the referring module states it.
      *
@@ -53,11 +64,53 @@ public class CommitteeReferralService {
     }
 
     /**
+     * F2-113 / V358 — who must not cast the deciding vote on the referred item, as the referring
+     * module knows them: platform user ids where it captured identity, labels where it has only text.
+     *
+     * <p><b>Why a type and not two String parameters.</b> This replaced a positional
+     * {@code String recusalNames}, and adding {@code String recusalUserIds} beside it would have put
+     * two adjacent same-typed parameters into an eight-argument method — transposable at every call
+     * site, and transposing them writes names into the id column, where they parse as nothing and
+     * the gate goes quiet again. {@code List<Long>} and {@code List<String>} cannot be swapped by
+     * accident, and the compiler now forces every existing caller to say which it has.
+     *
+     * <p>Ids and names are deliberately <b>unpaired</b> — see
+     * {@link CommitteeReferral#getRecusalUserIds()}. Both are read; neither supersedes the other.
+     */
+    public record Recusal(List<Long> userIds, List<String> names) {
+
+        /** For callers that genuinely bar nobody. */
+        public static final Recusal NONE = new Recusal(List.of(), List.of());
+
+        public Recusal {
+            userIds = userIds == null ? List.of()
+                : userIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+            names = names == null ? List.of()
+                : names.stream().filter(n -> n != null && !n.isBlank())
+                    .map(String::trim).distinct().toList();
+        }
+
+        /** A caller that has labels and no captured identity — the pre-CE-15 world. */
+        public static Recusal byName(String... names) {
+            return new Recusal(List.of(), java.util.Arrays.asList(names));
+        }
+
+        public boolean isPresent() { return !userIds.isEmpty() || !names.isEmpty(); }
+
+        String idCsv()   { return csv(userIds.stream().map(String::valueOf).toList()); }
+        String nameCsv() { return csv(names); }
+
+        private static String csv(List<String> parts) {
+            return parts.isEmpty() ? null : String.join(",", parts);
+        }
+    }
+
+    /**
      * Create (or reuse) the active referral of a source item to its CAB/ECAB
      * committee. {@code committeeId} is optional — when null the per-tenant gate
-     * map resolves it (user decision #1). {@code recusalNames} is a CSV of the
-     * requester/author names to force-RECUSE from the vote. Idempotent: one
-     * active referral per item.
+     * map resolves it (user decision #1). {@code recusal} names the requester/author
+     * to force-RECUSE from the vote — by user id where the referring module captured
+     * one, by label where it did not. Idempotent: one active referral per item.
      *
      * <p><b>{@code subject} is a required parameter, not an overload.</b> A referral with no
      * subject never reaches an agenda (see {@link CommitteeReferral#getSourceCode()}), so an
@@ -67,7 +120,7 @@ public class CommitteeReferralService {
      */
     @Transactional
     public CommitteeReferral refer(String sourceModule, Long sourceEntityId, String gate,
-                                   String mode, Long committeeId, String referredBy, String recusalNames,
+                                   String mode, Long committeeId, String referredBy, Recusal recusal,
                                    SubjectRef subject) {
         Long org = TenantContext.getCurrentTenant();
 
@@ -96,7 +149,9 @@ public class CommitteeReferralService {
         r.setMode(mode == null || mode.isBlank() ? "APPROVAL" : mode);
         r.setStatus("PENDING");
         r.setReferredBy(referredBy);
-        r.setRecusalNames(recusalNames);
+        Recusal rec = recusal == null ? Recusal.NONE : recusal;
+        r.setRecusalNames(rec.nameCsv());
+        r.setRecusalUserIds(rec.idCsv());
         if (subject != null) {
             r.setSourceCode(blankToNull(subject.code()));
             r.setSubjectEn(blankToNull(subject.titleEn()));
@@ -171,6 +226,62 @@ public class CommitteeReferralService {
     public record Queue(List<CommitteeReferral> stated, List<CommitteeReferral> unstated) {
         public int total() { return stated.size() + unstated.size(); }
     }
+
+    /**
+     * F2-113 — how much of the force-recusal gate's population the gate can actually decide.
+     *
+     * <p><b>Why the engine computes this and not the referring module.</b> The gate is blind for two
+     * independent reasons, and no single module can see both: the referral may carry no captured
+     * identity for the item's people, <em>or</em> the deciding committee may have no seat linked to a
+     * platform user. Reporting only the first — the natural thing to do from {@code change_mgmt},
+     * which owns {@code requested_by_id} — would have read as full coverage the moment CE-15's
+     * changes accumulated, while 29 of dev's 42 active seats stayed uncomparable. That is F2-112's
+     * own shape reproduced inside the instrument built to detect it. Both facts live here, so the
+     * count is taken here and handed back through {@code CommitteePort}.
+     *
+     * <p><b>The buckets, precisely.</b> {@link ChangeSoD.Coverage} has three and this gate has four
+     * states, so one bucket carries two:
+     * <ul>
+     *   <li>{@code checkable} — the referral carries at least one user id <b>and</b> its committee has
+     *       at least one linked active seat. The id comparison can fire.</li>
+     *   <li>{@code labelOnly} — something is recorded and only a <em>name</em> comparison can fire.
+     *       This is the bucket's documented meaning ("the gate is UNVERIFIABLE"), so it also holds the
+     *       referral that carries ids nobody on its committee can be matched against.</li>
+     *   <li>{@code absent} — nothing is recorded to compare. Measured 2026-08-05: <b>4 of 4</b> live
+     *       referrals, because the CSV builder produced blank from two NULL labels. The gate was not
+     *       weakly enforced; it was unarmed.</li>
+     * </ul>
+     *
+     * <p>The population is {@link #OPEN_STATUSES} — the engine's own definition of "still the
+     * committee's to decide", reused rather than restated, because a referral it has finished with
+     * cannot be re-gated and counting it would report coverage the gate will never be asked for.
+     */
+    @Transactional(readOnly = true)
+    public ChangeSoD.Coverage recusalCoverage(String sourceModule) {
+        Long org = TenantContext.getCurrentTenant();
+        List<CommitteeReferral> open = referralRepo
+            .findByOrganisationIdAndSourceModuleAndStatusInOrderByIdAsc(org, sourceModule, OPEN_STATUSES);
+
+        Map<Long, Boolean> committeeHasLinkedSeat = new java.util.HashMap<>();
+        long checkable = 0, labelOnly = 0, absent = 0;
+        for (CommitteeReferral r : open) {
+            boolean hasIds   = notBlank(r.getRecusalUserIds());
+            boolean recorded = hasIds || notBlank(r.getRecusalNames());
+            boolean byId = hasIds && committeeHasLinkedSeat.computeIfAbsent(
+                r.getCommitteeId(),
+                // findActiveByCommittee, not a COUNT query: the active-term predicate is the
+                // roster's and a second copy of it here would be a mirror maintained by assertion.
+                cid -> memberTermRepo.findActiveByCommittee(org, cid).stream()
+                    .anyMatch(t -> t.getMemberUserId() != null));
+            if (byId) checkable++;
+            else if (recorded) labelOnly++;
+            else absent++;
+        }
+        return new ChangeSoD.Coverage(ChangeSoD.GATE_COMMITTEE_VOTE_NOT_REQUESTER,
+            open.size(), checkable, labelOnly, absent);
+    }
+
+    private static boolean notBlank(String s) { return s != null && !s.isBlank(); }
 
     /**
      * Bind the committee resolution that will decide this referred item. Sets the

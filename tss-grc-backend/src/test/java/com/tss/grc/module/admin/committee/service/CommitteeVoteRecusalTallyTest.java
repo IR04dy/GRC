@@ -170,11 +170,32 @@ class CommitteeVoteRecusalTallyTest {
     }
 
     private void givenReferralRecusing(String csvNames) {
+        givenReferral(null, csvNames);
+    }
+
+    /** F2-113 — a referral barring parties by platform user id, as V358 stores them. */
+    private void givenReferralRecusingIds(String csvUserIds) {
+        givenReferral(csvUserIds, null);
+    }
+
+    private void givenReferral(String csvUserIds, String csvNames) {
         CommitteeReferral ref = new CommitteeReferral();
+        ref.setId(4242L);
         ref.setOrganisationId(ORG);
         ref.setResolutionId(RES_ID);
+        ref.setRecusalUserIds(csvUserIds);
         ref.setRecusalNames(csvNames);
         when(referralRepo.findByResolutionId(RES_ID)).thenReturn(Optional.of(ref));
+    }
+
+    /** A seat on the roster that carries NO platform user id — 29 of dev's 42 active seats. */
+    private void givenUnlinkedSeat(String name) {
+        List<CommitteeMemberTerm> roster = new ArrayList<>();
+        for (int i = 0; i < ROSTER.size(); i++) roster.add(term(ROSTER.get(i), 100L + i, 1));
+        CommitteeMemberTerm unlinked = term(name, 999L, 1);
+        unlinked.setMemberUserId(null);
+        roster.add(unlinked);
+        when(memberTermRepo.findActiveByCommittee(ORG, COMMITTEE_ID)).thenReturn(roster);
     }
 
     private String voteOf(String member) {
@@ -272,6 +293,128 @@ class CommitteeVoteRecusalTallyTest {
         givenReferralRecusing("Sara Al-Otaibi");
         CommitteeResolution out = vote("Ali Hassan", "FOR", "MEMBER", null);
         assertThat(voteOf("Ali Hassan")).isEqualTo("FOR");
+        assertThat(out.getVoteFor()).isEqualTo(1);
+    }
+
+    // ── F2-113: recusal mechanic 2 could never fire, because it compared a label to a person ──
+
+    /**
+     * ⚠ <b>THE MUTATION CHECK.</b> Delete the id comparison from {@code recordVote} — revert to
+     * {@code sameName(member, nm)} over {@code recusal_names} alone — and this test fails, because
+     * there is no name to match: the referral carries only an id, which is what
+     * {@code referToCommittee} now produces for a change whose people were captured as identity.
+     *
+     * <p>It is also the finding itself, in miniature. 'Mansour Bin Ali' is user 106 on the roster; the
+     * referral bars user 106 while naming nobody. Before V358 the only thing that crossed the port was
+     * a CSV of the change's team labels ('CloudOps', 'IAM Team'), and the seat names are people — so
+     * measured in dev, 15 of 15 owner labels and 13 of 13 requester labels resolved to no user and 0
+     * of 4 live referrals carried a name at all. The bar had never engaged for any change in either
+     * database, and every test in this class was green throughout.
+     */
+    @Test
+    void the_requester_is_recused_by_user_id_when_no_name_is_carried_at_all() {
+        givenReferralRecusingIds("106");            // 'Mansour Bin Ali' — roster index 6
+
+        CommitteeResolution out = vote("Mansour Bin Ali", "FOR", "CHAIR", null);
+
+        assertThat(voteOf("Mansour Bin Ali"))
+            .as("the change's requester cannot cast its deciding vote — resolved on identity, which "
+              + "is the only thing a team label and a person's name have in common")
+            .isEqualTo("RECUSED");
+        assertThat(out.getVoteFor()).as("a recusal leaves the tally, it does not join it").isZero();
+    }
+
+    /**
+     * The finding's exact dev shape: the label is a team, the seat is a person, and they are the same
+     * user. The name comparison answers DIFFERENT — correctly, and uselessly.
+     */
+    @Test
+    void the_id_recuses_even_when_the_carried_label_could_never_match_the_seat_name() {
+        givenReferral("106", "CloudOps,IAM Team");
+
+        vote("Mansour Bin Ali", "FOR", "MEMBER", null);
+
+        assertThat(voteOf("Mansour Bin Ali")).isEqualTo("RECUSED");
+    }
+
+    @Test
+    void a_member_whose_id_is_not_on_the_recusal_list_votes_normally() {
+        givenReferralRecusingIds("106");
+
+        CommitteeResolution out = vote("Ali Hassan", "FOR", "MEMBER", null);   // user 101
+
+        assertThat(voteOf("Ali Hassan")).isEqualTo("FOR");
+        assertThat(out.getVoteFor()).isEqualTo(1);
+    }
+
+    /**
+     * ⚠ THE REGRESSION THE FIX MUST NOT INTRODUCE — the CE-15 lesson, from the far side.
+     *
+     * <p>29 of dev's 42 active seats carry no {@code member_user_id}, and
+     * {@code committee_member_terms.no_platform_user} exists because an external director legitimately
+     * never gets one. If the id comparison had been written as "the party has an id, so only an id can
+     * answer" — {@code ChangeSoD.compare}'s rule, which is correct for an authenticated principal —
+     * every one of those seats would have gone from refused to UNVERIFIABLE the moment referrals
+     * started carrying ids. A refactor that stops refusing something is not a refactor.
+     */
+    @Test
+    void an_unlinked_seat_is_still_recused_by_name_even_though_the_referral_carries_ids() {
+        givenUnlinkedSeat("External Director B");
+        givenReferral("106", "External Director B");
+
+        vote("External Director B", "FOR", "MEMBER", null);
+
+        assertThat(voteOf("External Director B"))
+            .as("this seat has no platform user id, so the name is the only comparable thing there "
+              + "is — and adding the id half must not have taken it away")
+            .isEqualTo("RECUSED");
+    }
+
+    /** Both halves are read, and either one refusing is enough. */
+    @Test
+    void the_name_half_and_the_id_half_are_both_live() {
+        givenReferral("106", "Sara Al-Otaibi");
+
+        vote("Sara Al-Otaibi",   "FOR", "MEMBER", null);   // matched by name
+        vote("Mansour Bin Ali",  "FOR", "CHAIR",  null);   // matched by id
+        CommitteeResolution out = vote("Ali Hassan", "FOR", "MEMBER", null);   // matched by neither
+
+        assertThat(voteOf("Sara Al-Otaibi")).isEqualTo("RECUSED");
+        assertThat(voteOf("Mansour Bin Ali")).isEqualTo("RECUSED");
+        assertThat(voteOf("Ali Hassan")).isEqualTo("FOR");
+        assertThat(out.getVoteFor()).isEqualTo(1);
+    }
+
+    /**
+     * A malformed CSV must not stop a committee voting. The gate's inability to compare a party is
+     * reported by {@code GET /api/v1/changes/sod-coverage}, not thrown at the member trying to vote —
+     * S6b-i's rule that weakness belongs in the instrument and not in the verdict.
+     */
+    @Test
+    void an_unparsable_recusal_id_is_skipped_rather_than_breaking_the_vote() {
+        givenReferral("not-a-number,106", "Sara Al-Otaibi");
+
+        vote("Ali Hassan",      "FOR", "MEMBER", null);
+        vote("Mansour Bin Ali", "FOR", "CHAIR",  null);
+
+        assertThat(voteOf("Ali Hassan")).as("the vote still records").isEqualTo("FOR");
+        assertThat(voteOf("Mansour Bin Ali"))
+            .as("and the parsable id beside it still bars its party").isEqualTo("RECUSED");
+    }
+
+    /**
+     * ⚠ Dev's real state on 2026-08-05: <b>4 of 4</b> live referrals carried neither an id nor a name,
+     * because {@code referToCommittee} built its CSV from two NULL labels and stored blank. A referral
+     * that bars nobody must not accidentally bar somebody — an empty list is UNVERIFIABLE, and
+     * UNVERIFIABLE never refuses.
+     */
+    @Test
+    void a_referral_barring_nobody_recuses_nobody() {
+        givenReferral(null, null);
+
+        CommitteeResolution out = vote("Mansour Bin Ali", "FOR", "CHAIR", null);
+
+        assertThat(voteOf("Mansour Bin Ali")).isEqualTo("FOR");
         assertThat(out.getVoteFor()).isEqualTo(1);
     }
 

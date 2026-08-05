@@ -52,9 +52,37 @@ public class CommitteeReferral {
     private String referredBy;
 
     /** CSV of names (requester/author + owner) force-RECUSED from the committee
-     *  vote on this item — SoD, so the requester can't cast the deciding vote. */
+     *  vote on this item — SoD, so the requester can't cast the deciding vote.
+     *
+     *  <p>⚠ F2-113 — <b>this is the fallback, not the primary, and it must not be
+     *  retired.</b> Measured 2026-08-05: a change's people are team labels
+     *  ('CloudOps', 'IAM Team') and a committee's members are people
+     *  ('Khalid Al-Rashidi'), so on its own this column could never match — the bar
+     *  had never engaged for any change in either database. {@link #recusalUserIds}
+     *  is what makes it able to. But 29 of dev's 42 active seats carry no
+     *  {@code member_user_id} (and {@code committee_member_terms.no_platform_user}
+     *  exists because an external director legitimately never gets one), so for those
+     *  seats the name is the only comparable thing there is. Both columns are read. */
     @Column(name = "recusal_names", length = 500)
     private String recusalNames;
+
+    /**
+     * F2-113 / V358 — CSV of <b>platform user ids</b> force-RECUSED from the vote on this item.
+     *
+     * <p>The half of the comparison that can actually match. Populated from the referred record's
+     * captured identity ({@code change_requests.requested_by_id} / {@code change_owner_id}, which
+     * CE-15 began writing) and compared against {@code committee_member_terms.member_user_id},
+     * which b901faec began populating. Before those two commits neither side existed, which is why
+     * this arrives after {@link #recusalNames} rather than instead of it.
+     *
+     * <p>Unpaired with the names by design: {@code recordVote} asks set membership on each side
+     * independently, exactly as the name CSV was always read. The cost is a possible refusal on two
+     * different people who share a label where one side is unlinked — a spurious RECUSED, which
+     * subtracts one member from a tally and is the safe direction, and is what the name-only
+     * comparison already did.
+     */
+    @Column(name = "recusal_user_ids", length = 200)
+    private String recusalUserIds;
 
     // ── S7b / V350 — the agenda line's label, snapshotted at referral time ───────────
 

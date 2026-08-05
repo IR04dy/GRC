@@ -458,7 +458,7 @@ class ChangeCabQueueTest {
 
     private static CommitteePort.ReferralView referral(Long id, Long changeId, String code) {
         return new CommitteePort.ReferralView(id, ORG, "CHANGE", changeId, 13L, null, null,
-            "CAB", "APPROVAL", "PENDING", "admin", null, LocalDateTime.now(), code, "subject", "موضوع");
+            "CAB", "APPROVAL", "PENDING", "admin", null, LocalDateTime.now(), code, "subject", "موضوع", null);
     }
 
     private static CommitteePort.Sitting sitting(List<String> tabled) {

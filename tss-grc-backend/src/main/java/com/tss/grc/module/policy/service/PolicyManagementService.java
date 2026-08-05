@@ -464,16 +464,22 @@ public class PolicyManagementService {
     public CommitteeReferral referToCommittee(Long id, Long committeeId, String referredBy) {
         if (referralService == null) throw new IllegalStateException("Committee referral is not available");
         PolicyDocument p = get(id);
-        String recusal = java.util.stream.Stream.of(p.getCreatedBy(), p.getOwnerName(), p.getOwnerEmail())
-            .filter(x -> x != null && !x.isBlank()).map(String::trim).distinct()
-            .collect(java.util.stream.Collectors.joining(","));
+        // F2-113 — names only, and deliberately: PolicyDocument carries NO identity column at all.
+        // `created_by` is an nvarchar(100) username and owner_name/owner_email are free text, so
+        // there is no policy-side id to pass and none is invented here (V358's stance, and V357's
+        // before it — a fabricated id is fabricated attribution). Recusal.byName states that on the
+        // record rather than leaving an empty id list to be read as "captured, and nobody matched".
+        // Giving policies an owner id is its own change, in the policy module, with its own backfill
+        // decision; the CHANGE side is what F2-113 is about and it now passes ids.
+        CommitteeReferralService.Recusal recusal = CommitteeReferralService.Recusal.byName(
+            p.getCreatedBy(), p.getOwnerName(), p.getOwnerEmail());
         // S7b / CE-4 — a referred policy belongs on the committee's agenda for the same reason a
         // referred change does. Policy has no separate code column, so the document reference is
         // its own code.
         CommitteeReferralService.SubjectRef subject = new CommitteeReferralService.SubjectRef(
             p.getPolicyCode(), p.getTitleEn(), p.getTitleAr());
         CommitteeReferral r = referralService.refer("POLICY", id, "CAB", "APPROVAL", committeeId, referredBy,
-            recusal.isBlank() ? null : recusal, subject);
+            recusal, subject);
         audit.log("REFER_TO_COMMITTEE", "PolicyDocument", id, "Referred to committee " + r.getCommitteeId());
         return r;
     }
