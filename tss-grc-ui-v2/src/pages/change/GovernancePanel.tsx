@@ -15,6 +15,7 @@ import {
 import { canExport } from '../../lib/auth';
 import { ChangeModelCatalogue } from './ChangeModelCatalogue';
 import { UnauthorisedChangeRegister } from './UnauthorisedChangeRegister';
+import { ForwardSchedulePanel } from './ForwardSchedulePanel';
 
 const GATE_TONE: Record<string, BadgeTone> = { AUTO: 'success', CAB: 'info', ECAB: 'warning' };
 const RISK_TONE: Record<string, BadgeTone> = { LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger' };
@@ -122,6 +123,12 @@ export function GovernancePanel({ toast }: { toast: ReturnType<typeof useToast> 
           "did anything go ahead without authority?", and the two cards below it explain what authority
           was supposed to be. G-11 is the module's last open High. */}
       <UnauthorisedChangeRegister toast={toast} />
+
+      {/* S8g/CE-8 — the forward schedule sits directly above the freeze windows it is checked
+          against, and below the unauthorised register: "did anything go ahead without authority?"
+          is about the past, "what is coming and does it collide?" is about the future, and an
+          operator reads the first to know whether to trust the second. */}
+      <ForwardSchedulePanel toast={toast} />
 
       {/* S8e/CE-2 — the model catalogue sits directly above the authorisation matrix, because the
           matrix's AUTO cell is exactly what a model backs. Reading them in the other order tells you

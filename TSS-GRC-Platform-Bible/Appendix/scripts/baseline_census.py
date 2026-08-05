@@ -73,8 +73,8 @@ PUBLISHED_AS_OF = "2026-08-05"          # ← bump ONLY when the doc is regenera
 PUBLISHED = {
     "module_packages": 59,
     "module_loc": 192_113,
-    "entities_strict": 418,             # FILES declaring an entity (the doc published 417: a substring
-    "entity_decls": 431,                # count). Entity CLASSES — 13 more, all in data_officer.
+    "entities_strict": 419,             # FILES declaring an entity (the doc published 417: a substring
+    "entity_decls": 432,                # count). Entity CLASSES — 13 more, all in data_officer.
     "endpoints": 2_168,
     "writes": 1_219,
     "main_preauthorize": 2_156,
@@ -85,10 +85,10 @@ PUBLISHED = {
     "zero_test_packages": 15,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 343,
-    "migration_head": 355,
+    "migration_files": 344,
+    "migration_head": 356,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
-    "fe_pages": 341,
+    "fe_pages": 342,
     "fe_page_folders": 114,
     "fe_routes": 328,
     "fe_nav_entries": 193,

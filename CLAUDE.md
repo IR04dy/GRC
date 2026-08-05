@@ -98,13 +98,13 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V355 packaged; next free V356** (343 files; ⚠ this line said "V1→V295 / next free
+— **V1→V356 packaged; next free V357** (344 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V355 are pending** the
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V356 are pending** the
 next jar). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials

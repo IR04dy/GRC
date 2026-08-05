@@ -92,6 +92,44 @@ public class ChangeRequest {
     @Column(name = "scheduled_end")
     private LocalDateTime scheduledEnd;
 
+    // ── S8g / CE-8: the PSO — projected service outage (V356) ────────────────
+    //
+    // ⚠ These sit on the change rather than in a `change_schedule_entry` table, and the plan
+    // specified otherwise. `scheduled_start`/`scheduled_end` above already answer "when is this
+    // change happening?" on 15 of 17 dev rows, so a second table holding the same window would give
+    // the platform two answers that can disagree — and the FSC and the change register would each be
+    // able to cite themselves. The outage window IS this change's implementation window; what was
+    // missing is whether service is lost during it, for how long, and to whom.
+    //
+    // `ck_change_pso` (V356) refuses `outageExpected = true` without a positive duration AND named
+    // services: "there will be an outage" with no length and no service is a rumour, not a
+    // declaration. It arrives inert — 0 on every existing row, asserted by the migration.
+
+    @Column(name = "outage_expected", nullable = false)
+    private Boolean outageExpected = false;
+
+    /** Expected minutes of lost service. Must be > 0 when {@link #outageExpected} is true. */
+    @Column(name = "outage_minutes")
+    private Integer outageMinutes;
+
+    /** Free text naming the services that lose availability. Mandatory when an outage is declared. */
+    @Column(name = "services_affected", length = 1000)
+    private String servicesAffected;
+
+    /**
+     * Whether this change carries a complete outage declaration.
+     *
+     * <p>Mirrors {@code ck_change_pso} in Java so the FSC can label an entry without re-testing three
+     * fields at every call site. Kept as a method rather than a stored flag for S8f's reason: a
+     * derived truth that is also stored is a truth that can disagree with itself.
+     */
+    @Transient
+    public boolean hasDeclaredOutage() {
+        return Boolean.TRUE.equals(outageExpected)
+            && outageMinutes != null && outageMinutes > 0
+            && servicesAffected != null && !servicesAffected.isBlank();
+    }
+
     @Column(name = "implementation_started")
     private LocalDateTime implementationStarted;
 

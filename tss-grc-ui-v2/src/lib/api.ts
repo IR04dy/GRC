@@ -715,6 +715,55 @@ export interface ChangeModelDto {
   status: 'DRAFT' | 'APPROVED' | 'SUSPENDED' | 'RETIRED';
   createdBy?: string | null; createdAt?: string | null;
 }
+/** S8g/CE-8 — one entry on the forward schedule of change. */
+export interface ScheduleEntryDto {
+  changeId: number;
+  changeCode?: string | null;
+  titleEn?: string | null; titleAr?: string | null;
+  changeType: string; riskLevel: string; status: string;
+  windowStart?: string | null; windowEnd?: string | null;
+  outageExpected: boolean;
+  outageMinutes?: number | null;
+  servicesAffected?: string | null;
+  /** ⚠ The complete declaration — flag AND duration AND named services. Not the raw flag. */
+  outageDeclared: boolean;
+  /** Set when the entry sits inside an active freeze window that does not exempt it. */
+  freezeCode?: string | null;
+}
+/** A schedule collision: two changes overlapping, or a change inside a freeze window. */
+export interface ScheduleCollisionDto {
+  reasonCode: 'WINDOW_OVERLAP' | 'OUTAGE_OVERLAP' | 'INSIDE_FREEZE_WINDOW';
+  changeId: number; changeCode?: string | null;
+  otherChangeId?: number | null; otherChangeCode?: string | null;
+  freezeCode?: string | null; freezeNameEn?: string | null; freezeNameAr?: string | null;
+  overlapFrom?: string | null; overlapTo?: string | null;
+  sameCategory: boolean;
+}
+/** A publication of the forward schedule, without its snapshot payload. */
+export interface SchedulePublicationDto {
+  id: number;
+  windowFrom: string; windowTo: string;
+  entryCount: number; outageCount: number; freezeCount: number;
+  contentSha256: string;
+  publishedByName: string; publishedAt: string;
+  notes?: string | null;
+}
+/** The forward schedule, its collisions, and — deliberately — what it could not see. */
+export interface ForwardScheduleDto {
+  from: string; to: string;
+  entries: ScheduleEntryDto[];
+  collisions: ScheduleCollisionDto[];
+  outageCount: number;
+  totalOutageMinutes: number;
+  freezeCount: number;
+  /** ⚠ Forward-status changes with no window at all — invisible to collision detection. */
+  unscheduledCount: number;
+  collisionsByReason: Record<string, number>;
+  /** null when the schedule has never been published — different from "published but stale". */
+  latestPublication?: SchedulePublicationDto | null;
+  latestPublicationStale: boolean;
+}
+
 /**
  * S8f/CE-11 — one reconciliation failure between the authorisation a change required and the
  * authorisation the platform can show it received.
@@ -921,6 +970,28 @@ export const changeApi = {
     api.post<UnauthorisedDispositionDto>(
       `/api/v1/changes/unauthorised-register/${changeId}/${encodeURIComponent(reasonCode)}/dispose`,
       { state, note }),
+
+  // S8g/CE-8 — the forward schedule. Reading is CHANGE:READ; PUBLISHING is CHANGE:APPROVE, because
+  // issuing the schedule the business plans around is a governance act, not change authorship.
+  // Declaring an outage is CHANGE:WRITE — it describes the change rather than authorising it.
+  forwardSchedule: (from?: string, to?: string) => {
+    const p = new URLSearchParams();
+    if (from) p.set('from', from);
+    if (to)   p.set('to', to);
+    const q = p.toString();
+    return api.get<ForwardScheduleDto>(`/api/v1/changes/forward-schedule${q ? '?' + q : ''}`);
+  },
+  schedulePublications: () =>
+    api.get<SchedulePublicationDto[]>('/api/v1/changes/schedule-publications'),
+  publishSchedule: (from: string, to: string, notes?: string) =>
+    api.post<SchedulePublicationDto>('/api/v1/changes/schedule-publications', { from, to, notes }),
+  schedulePublication: (id: number) =>
+    api.get<{ publication: SchedulePublicationDto; entriesJson: string;
+              digestMatches: boolean; recomputedSha256: string }>(
+      `/api/v1/changes/schedule-publications/${id}`),
+  declareOutage: (id: number, outageExpected: boolean, outageMinutes?: number, servicesAffected?: string) =>
+    api.post<ChangeRequestDto>(`/api/v1/changes/${id}/outage`,
+      { outageExpected, outageMinutes, servicesAffected }),
 
   freezeWindows: () => api.get<ChangeFreezeWindowDto[]>('/api/v1/changes/freeze-windows'),
   createFreeze:  (body: Partial<ChangeFreezeWindowDto>) => api.post<ChangeFreezeWindowDto>('/api/v1/changes/freeze-windows', body),

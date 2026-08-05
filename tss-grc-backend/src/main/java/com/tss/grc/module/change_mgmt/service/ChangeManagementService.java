@@ -2032,6 +2032,49 @@ public class ChangeManagementService {
         return out;
     }
 
+    /**
+     * S8g / CE-8 — declare, amend or withdraw a change's projected service outage.
+     *
+     * <p>Validated here as well as by {@code ck_change_pso} and the DTO's {@code @Min}, because this
+     * method is reachable from server-side callers that never see a DTO — the three-layer rule V345's
+     * SLA setter records.
+     *
+     * <p><b>Withdrawing clears the detail.</b> Leaving {@code outage_minutes} and
+     * {@code services_affected} behind after {@code outageExpected = false} would let the FSC show a
+     * duration for a change that no longer claims an outage, and the next reader could not tell whether
+     * the declaration was withdrawn or the flag was lost.
+     */
+    @Transactional
+    public ChangeRequest declareOutage(Long id, Boolean expected, Integer minutes,
+                                       String services, Long actorUserId) {
+        ChangeRequest c = require(id);
+        boolean on = Boolean.TRUE.equals(expected);
+        if (on) {
+            if (minutes == null || minutes <= 0)
+                throw new IllegalArgumentException(
+                    "A declared outage needs an expected duration in minutes. \"There will be an outage\" "
+                  + "with no length is not something a service owner can plan around — and "
+                  + "ck_change_pso refuses the row.");
+            if (services == null || services.isBlank())
+                throw new IllegalArgumentException(
+                    "A declared outage must name the services that lose availability. An unnamed outage "
+                  + "tells every service owner to assume it is theirs.");
+            c.setOutageExpected(true);
+            c.setOutageMinutes(minutes);
+            c.setServicesAffected(services.trim());
+        } else {
+            c.setOutageExpected(false);
+            c.setOutageMinutes(null);
+            c.setServicesAffected(null);
+        }
+        c.setUpdatedAt(LocalDateTime.now());
+        c.setUpdatedBy(actorUserId);
+        ChangeRequest saved = changeRepo.save(c);
+        audit.log(on ? "OUTAGE_DECLARED" : "OUTAGE_WITHDRAWN", "ChangeRequest", saved.getId(),
+                  on ? (minutes + " min — " + services.trim()) : "outage declaration withdrawn");
+        return saved;
+    }
+
     /** CH-17: schedule conflicts — other live changes whose window overlaps this
      *  change's, flagged where they also share a linked entity or category. */
     @Transactional(readOnly = true)

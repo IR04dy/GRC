@@ -10,13 +10,16 @@ import com.tss.grc.security.GrcUserDetails;
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
 import com.tss.grc.module.change_mgmt.dto.ChangeConditionRequest;
 import com.tss.grc.module.change_mgmt.dto.ChangeModelRequest;
+import com.tss.grc.module.change_mgmt.dto.OutageDeclarationRequest;
 import com.tss.grc.module.change_mgmt.dto.RatificationDtos;
+import com.tss.grc.module.change_mgmt.dto.SchedulePublishRequest;
 import com.tss.grc.module.change_mgmt.dto.UnauthorisedDispositionRequest;
 
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService;
 import com.tss.grc.module.change_mgmt.service.ChangeManagementService;
 import com.tss.grc.module.change_mgmt.service.ChangeModelService;
+import com.tss.grc.module.change_mgmt.service.ChangeScheduleService;
 import com.tss.grc.module.change_mgmt.service.UnauthorisedChangeRegisterService;
 import com.tss.grc.module.change_mgmt.spi.CommitteePort;
 import com.tss.grc.module.change_mgmt.spi.EvidencePort;
@@ -27,11 +30,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -55,6 +60,7 @@ public class ChangeManagementController {
     private final ChangeGovernanceHealthService governanceHealth;
     private final ChangeModelService modelService;   // S8e/CE-2
     private final UnauthorisedChangeRegisterService unauthorisedRegister;   // S8f/CE-11
+    private final ChangeScheduleService scheduleService;                    // S8g/CE-8
 
     /** Read a string out of a raw body. These endpoints take Maps, not DTOs, because {@code @Valid}
      *  fires BEFORE {@code @PreAuthorize} and a bean-validated body answers 400 to a caller who
@@ -557,6 +563,94 @@ public class ChangeManagementController {
             Authentication auth) {
         return unauthorisedRegister.dispose(changeId, reasonCode, body.state(), body.note(),
                                             userIdOf(auth), usernameOf(auth));
+    }
+
+    // ── S8g / CE-8: the forward schedule (FSC), the PSO, and schedule-wide collisions ──
+
+    /**
+     * The forward schedule of change for a window, with its collisions and its blind spot.
+     *
+     * <p>Distinct from {@code /calendar}, which lists changes and freezes for a period. This adds the
+     * three things G-8 asked for: declared outages, collisions across the <em>whole</em> window rather
+     * than for one named change, and whether any of it has been published.
+     */
+    @GetMapping("/forward-schedule")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Forward schedule of change: entries, declared outages, collisions — CE-8.")
+    public ChangeScheduleService.ForwardSchedule forwardSchedule(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+        LocalDateTime f = from != null ? from : LocalDateTime.now().minusDays(1);
+        LocalDateTime t = to != null ? to : f.plusDays(90);
+        return scheduleService.forwardSchedule(f, t);
+    }
+
+    /**
+     * Schedule-wide collisions.
+     *
+     * <p>⚠ Not the same endpoint as {@code /{id}/conflicts}, which needs you to already suspect a
+     * specific change — you cannot find a collision you have not guessed at, and that is what G-8's
+     * "collision detection unpublished" clause meant.
+     */
+    @GetMapping("/schedule-collisions")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Every schedule collision in a window, including freeze-window violations — CE-8.")
+    public List<ChangeScheduleService.Collision> scheduleCollisions(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+        LocalDateTime f = from != null ? from : LocalDateTime.now().minusDays(1);
+        LocalDateTime t = to != null ? to : f.plusDays(90);
+        return scheduleService.collisions(f, t);
+    }
+
+    /**
+     * Publish the forward schedule — the act that turns a query into a communication.
+     *
+     * <p>{@code CHANGE:APPROVE} rather than {@code CHANGE:WRITE}: issuing the schedule the business
+     * plans around is a governance act, not change authorship, and it must not sit inside the privilege
+     * of the 33 roles that can raise a change but not decide one. Same reasoning as the ratification
+     * SLA and the unauthorised-finding disposition.
+     */
+    @PostMapping("/schedule-publications")
+    @PreAuthorize("hasPermission('CHANGE','APPROVE')")
+    @Operation(summary = "Publish the forward schedule for a window, snapshotted and digested — CE-8.")
+    public ChangeSchedulePublication publishSchedule(
+            @Valid @RequestBody SchedulePublishRequest body, Authentication auth) {
+        return scheduleService.publish(body.from(), body.to(), body.notes(),
+                                       userIdOf(auth), usernameOf(auth));
+    }
+
+    @GetMapping("/schedule-publications")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Publication history of the forward schedule, newest first — CE-8.")
+    public List<ChangeScheduleService.PublicationView> schedulePublications() {
+        return scheduleService.publications();
+    }
+
+    /** One published schedule with its snapshot, and whether the stored digest still verifies. */
+    @GetMapping("/schedule-publications/{id}")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "What the forward schedule said when it was published — CE-8.")
+    public Map<String, Object> schedulePublication(@PathVariable Long id) {
+        return scheduleService.publication(id);
+    }
+
+    /**
+     * Declare (or withdraw) the projected service outage for a change.
+     *
+     * <p>{@code CHANGE:WRITE}: stating that a change takes a service down is part of describing the
+     * change, not of authorising it. The database refuses an incomplete declaration
+     * ({@code ck_change_pso}), so a missing duration or an unnamed service is a 400 rather than a row
+     * that claims an outage nobody can plan around.
+     */
+    @PostMapping("/{id}/outage")
+    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    @Operation(summary = "Declare the projected service outage (PSO) for a change — CE-8.")
+    public ChangeRequest declareOutage(@PathVariable Long id,
+                                      @Valid @RequestBody OutageDeclarationRequest body,
+                                      Authentication auth) {
+        return service.declareOutage(id, body.outageExpected(), body.outageMinutes(),
+                                     body.servicesAffected(), userIdOf(auth));
     }
 
     // ── CH-17: freeze windows + change calendar + conflicts ───────────────────

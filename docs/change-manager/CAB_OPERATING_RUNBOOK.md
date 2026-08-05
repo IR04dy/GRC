@@ -245,6 +245,38 @@ A *published* forward schedule of change (FSC) and a declared service outage (PS
 
 ---
 
+### §7.1 Publishing the forward schedule (FSC) and declaring an outage
+
+`Governance` tab -> **Forward schedule of change**. It lists every approved or in-flight change with a
+window for the next 90 days, what each takes down, and where any two collide.
+
+**Declare the outage before you publish.** `POST /api/v1/changes/{id}/outage` (`CHANGE:WRITE`) needs
+three things together: that there will be an outage, how many minutes of service are lost, and which
+services. The database refuses any two of the three — an outage with no length is not something a
+service owner can plan around, and an unnamed one tells every service owner to assume it is theirs.
+Withdrawing the declaration clears the duration and the services with it.
+
+**Then publish.** `CHANGE:APPROVE`, because issuing the schedule the business plans around is a
+governance act rather than change authorship. Publishing takes a **snapshot** and digests it, so the
+document stays readable as what was issued that day even after somebody reschedules. Verify a
+published copy any time with **Verify the published copy** — a digest mismatch means treat that copy
+as untrustworthy and investigate, not that the schedule is wrong.
+
+**A published schedule cannot be edited.** There is no revise action and no status field. To change
+what was issued, publish again — the history keeps both, which is the point.
+
+**Read `No date set` before you trust `Collisions: 0`.** A change that is approved or in flight with
+no window cannot collide with anything, so an empty collision list does not cover it. The count is on
+the card for that reason.
+
+**The three collisions, and what each means:**
+
+| Collision | Read it as |
+|---|---|
+| **Two outages at once** | Two changes both declaring lost service in the same window. A business-visible incident being scheduled on purpose — fix this one first. |
+| **Windows overlap** | Two changes running at once. Often fine; check whether they touch the same systems. |
+| **Scheduled inside a freeze** | A change planned inside an active blackout. Emergency changes are exempt where the window allows it, so anything listed here is not exempt. |
+
 ## §8 What to hand an auditor
 
 | Artefact | Endpoint | Guard |
@@ -252,6 +284,8 @@ A *published* forward schedule of change (FSC) and a declared service outage (PS
 | Change register | `/api/v1/reporting/change-register.{pdf,xlsx,docx}` | `CHANGE:EXPORT` **and** `CHANGE:READ` |
 | CAB pack for one change | `/api/v1/reporting/change/{id}/cab-pack.pdf` | `CHANGE:EXPORT` **and** `CHANGE:READ` |
 | **CAB decision register** | `/api/v1/reporting/change-decision-register.{pdf,xlsx}` | `CHANGE:EXPORT` **and** `CHANGE:READ` |
+| **Published forward schedule** (with its SHA-256, re-verified on read) | `/api/v1/changes/schedule-publications/{id}` | `CHANGE:READ` |
+| **Unauthorised-change register** | `/api/v1/changes/unauthorised-register` | `CHANGE:READ` |
 | Meeting agenda pack | `/api/v1/reporting/committee/meeting/{id}/agenda.pdf` | `ADMIN:EXPORT` **and** `ADMIN:READ` |
 | Meeting minutes | `/api/v1/reporting/committee/meeting/{id}/minutes.pdf` | `ADMIN:EXPORT` **and** `ADMIN:READ` |
 

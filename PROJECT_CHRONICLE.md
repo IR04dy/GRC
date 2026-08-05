@@ -369,10 +369,39 @@ implementation inside a freeze window, because `implementation_started` is NULL 
 the predicate would compare against NULL and report every change compliant forever (A17-D3's
 `ratification_due_at` defect, avoided by declaring it).
 
-**Not built yet** (tracked as CE-8, CE-10, CE-13 in
-`CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md`): a *published* forward
-schedule of change and declared service outage (the calendar, freeze windows and conflict
-detection exist, the publication act does not); workflow-engine adoption as the 15th
+**The forward schedule of change** (`GET /api/v1/changes/forward-schedule`, `CHANGE:READ`)
+closes G-8, and closes it in three parts because G-8 was three gaps:
+
+- **Publication.** `POST /schedule-publications` (`CHANGE:APPROVE`) snapshots the schedule and
+  digests it with SHA-256, so "what did we tell the business on the 4th?" has an answer today's
+  rows cannot contradict. Following `board_pack.packs` (V26), whose own migration explains why a
+  publication captures its content. The row is **immutable** — no `updated_at`, no `status`, and
+  V356 THROWs if either appears: superseding a published schedule means publishing again.
+  `GET /schedule-publications/{id}` returns the snapshot and re-verifies the digest.
+- **The PSO** (`POST /{id}/outage`, `CHANGE:WRITE`). `ck_change_pso` refuses `outage_expected = 1`
+  without a positive duration **and** named services — "there will be an outage" with neither is a
+  rumour, not a declaration. Withdrawing clears both, so the FSC can never show a duration for a
+  change that no longer claims an outage.
+- **Schedule-wide collisions** (`GET /schedule-collisions`). `GET /{id}/conflicts` has existed since
+  CH-17 but needs you to already suspect a specific change, and you cannot find a collision you have
+  not guessed at — that is what "collision detection unpublished" meant. Three reasons:
+  `WINDOW_OVERLAP`, `OUTAGE_OVERLAP` (two simultaneous declared outages — a business-visible incident
+  being scheduled on purpose) and `INSIDE_FREEZE_WINDOW`, which honours `allow_emergency`.
+
+**`scheduled_start`/`scheduled_end` were not re-modelled.** The uplift plan specifies a
+`change_schedule_entry` table carrying the window, but `change_requests` already holds it on 15 of 17
+dev rows — a second copy would give the platform two answers to "when is this change happening?", and
+the FSC and the change register could each cite themselves.
+
+**And a freeze violation is detectable here where S8f had to declare it undetectable.** The
+unauthorised-change register cannot ask "was this *implemented* during a freeze" because
+`implementation_started` is NULL on every change. This asks "is it *scheduled* inside one", from a
+column populated on 15 of 17 — a different and more useful question, because it can still be acted
+on. What stays blind is published as `unscheduledCount`: a forward-status change with no window
+cannot collide with anything, so an empty collision list does not cover it.
+
+**Not built yet** (tracked as CE-10, CE-13 in
+`CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md`): workflow-engine adoption as the 15th
 module; and the CAB workspace as its own frontend surface.
 
 ---

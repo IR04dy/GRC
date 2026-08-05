@@ -112,6 +112,40 @@ public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, Lo
     java.util.List<Object[]> countByRatificationStateGrouped(@Param("orgId") Long orgId);
 
     /**
+     * S8g / CE-8 — the forward schedule: changes in a forward status whose window touches [from, to].
+     *
+     * <p>Overlap, not containment: a change starting before the window and ending inside it is on the
+     * schedule for that window, and requiring {@code scheduled_start} to fall inside would silently
+     * drop every long-running change from the FSC an operator reads.
+     */
+    @Query("""
+        SELECT c FROM ChangeRequest c
+        WHERE c.organisationId = :orgId AND c.status IN :statuses
+          AND c.scheduledStart IS NOT NULL
+          AND c.scheduledStart <= :to
+          AND COALESCE(c.scheduledEnd, c.scheduledStart) >= :from
+        ORDER BY c.scheduledStart ASC, c.id ASC
+        """)
+    java.util.List<ChangeRequest> findForwardScheduled(@Param("orgId") Long orgId,
+                                                       @Param("statuses") java.util.List<String> statuses,
+                                                       @Param("from") java.time.LocalDateTime from,
+                                                       @Param("to") java.time.LocalDateTime to);
+
+    /**
+     * S8g / CE-8 — changes in a forward status carrying NO window at all.
+     *
+     * <p>The FSC's declared blind spot. These cannot collide with anything because there is nothing to
+     * compare, and a schedule that omits them silently would report a clean window while work with no
+     * date sits behind it. Published as {@code unscheduledCount} rather than filtered away.
+     */
+    @Query("""
+        SELECT COUNT(c) FROM ChangeRequest c
+        WHERE c.organisationId = :orgId AND c.status IN :statuses AND c.scheduledStart IS NULL
+        """)
+    long countForwardWithoutWindow(@Param("orgId") Long orgId,
+                                   @Param("statuses") java.util.List<String> statuses);
+
+    /**
      * S8f / CE-11 — changes that have passed the point where authorisation should already exist.
      *
      * <p>The population the unauthorised-change reconciliation runs over. The status set is supplied
