@@ -395,6 +395,58 @@ the XLSX — a member who stood aside is a governance fact an auditor asks about
 
 ---
 
+### §8.4 The CAB queue — reading it, and clearing it
+
+**Screen:** *Change Enablement → CAB queue & decisions* (`/changes/cab`). Needs `CHANGE:READ`; the referral
+button needs `CHANGE:WRITE`.
+
+It answers one question the register next door cannot: **is the work that needs this committee
+actually in front of it?** Two things make that a real question rather than a formality — referral is a
+deliberate act (nothing refers a change automatically when it reaches `CAB_PENDING`), and a referral only
+appears on an agenda after the meeting's agenda is rebuilt.
+
+**Each gate names its committee.** Under ADR-017 D-2 the CAB is a committee your tenant nominates, so
+the card header reads e.g. *CAB · IT Steering Committee*. The agenda, the vote and the minutes live in
+the **committee workspace** — the *Open the committee* link goes there. This screen never shows a tally:
+there is one system of record for a decision and it is not this page.
+
+**Two facts about a gate, and they differ.**
+
+| | means | if it is false |
+|---|---|---|
+| **mapped** | a live committee is named | nothing can be referred at all — name one under *Committees* |
+| **can decide** | that committee has at least one active voting member | referral and tabling work, but the **approval will be refused** (a 409) until seats are filled |
+
+⚠ Both are true in dev today for neither gate: committees 12 and 13 are correctly mapped and have **no
+voting seats**, so the card says so with A17-D2's own fault code (`ROSTER_EMPTY`). Do not re-map the gate
+— the mapping is right; appoint members.
+
+**The "Why" column is a ladder.** Fix from the top; each rung is only reachable once the one above it is
+satisfied.
+
+| Why | What to do |
+|---|---|
+| **No committee named** | Name one for this gate (*Committees* → authority mapping) |
+| **Never referred** | Use *Refer to the committee* — the button appears on this rung only |
+| **No change reference** | The change has no `change_code`, so no agenda line can name it (F2-109). Set one on the change |
+| **No sitting scheduled** | Schedule a meeting, or the item will not be heard |
+| **Not on the agenda** | Open the committee and **refresh the agenda** — the referral exists, the agenda predates it |
+| **Tabled** | Nothing. It is named on the next sitting's agenda |
+
+**"Referrals the committee holds" includes rows it can never table**, dimmed and labelled:
+
+- **Change missing** — the referral names a change that does not exist in this organisation. **Clear the
+  row.** Dev has two, pointing at change ids 101 and 102. They are excluded from every agenda by design,
+  and before this screen nothing reported them.
+- **Unnamed** — the referral carries no subject reference, so the agenda builder skips it. Re-refer the
+  change so the reference is captured.
+
+⚠ **"Change items tabled: 0 / 11" is not an empty agenda.** It counts the lines *this module* tabled
+against the total. Zero with a non-empty queue means the agenda has not been rebuilt since the referral —
+the *Not on the agenda* rung, and a one-click fix in the committee workspace.
+
+---
+
 ## §9 KPIs — and how to read them
 
 `GET /api/v1/changes/analytics` returns `kpis`: **19** ITIL/ISO metrics. Each one carries its

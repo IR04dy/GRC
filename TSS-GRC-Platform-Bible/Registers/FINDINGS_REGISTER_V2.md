@@ -2168,6 +2168,33 @@ Start-Service TssGrcBackend
 | **References** | `ChangeModuleBoundaryTest` · `ChangeGovernanceHealthService.CAB_THROUGHPUT_SQL` / `CONFIGURED_PREDICATE` · `CommitteePort` (the javadoc that reserves quorum) · ADR-012 |
 | **Lesson** | **A ratchet enforces its implementation, not its title.** "The change module has no peer dependencies" was true of imports and false of SQL, and the gap was invisible precisely because the test passed. Worth asking of every ratchet on this platform: *what representation of the rule does it actually read?* |
 
+## F2-110 · The meeting agenda is written in two key shapes, and each reader handled only one
+
+|  |  |
+|---|---|
+| **ID** | F2-110 *(found by CE-13 while pointing the CAB workspace at a sitting's agenda)* |
+| **Module** | `admin.committee` — `CommitteeCalendarService.rowOf` vs the seeded agendas + `reporting` — `ExportService.agendaItemText` + `tss-grc-ui-v2` — `CommitteesPage` agenda list |
+| **Severity** | **P2** — no data loss, and a blank page in two governance artefacts: the on-screen agenda for 24 of 34 dev meetings, and the circulated agenda pack for every agenda the platform builds |
+| **Current State** | ✅ **FIXED in CE-13.** One reader (`CommitteeAgendaJson`) accepting either shape, used by the export and the adapter; `agendaTopic()` on the frontend; `CommitteeAgendaVocabularyTest` pins both halves |
+| **Problem** | An agenda item's title is written under `topicEn`/`topicAr` by `rowOf` — the documented V40 convention — and under `titleEn`/`titleAr` by the seeder that created the twelve real committees' meetings. Nothing wrote both. The frontend agenda list read `topicEn` only, so it rendered an **ordered list of empty bullets** for the seeded ones; the CE-14a agenda-pack PDF read `titleEn` only, so it printed `—` for the built ones. Two more keys ran the same way in the same table: `isMandatory` vs `mandatory` (every built item printed "Standing") and `minutesAllocated` vs `minutes` (every built item's time column printed `—`) |
+| **The measurement** | All 34 dev meetings: **24** agendas keyed `titleEn` — every one of the twelve real committees, in **both** quarters, including the CAB's own next sitting `MTG-IT-26Q3` — and **8** keyed `topicEn` (the older DEMO meetings), plus 2 with no agenda at all. Zero carried both keys |
+| **Why the S7f probe passed** | It exported a **seeded** meeting, which is the shape that export could read. The failing population is the one `populateAgenda` produces — that is, precisely the agendas S7b taught to carry the CAB queue. A control verified against the one input it handles is not verified |
+| **What it is NOT** | Not a data-migration job. Rewriting 24 rows of JSON would fix only the rows that exist today and the next seeder or import would reintroduce the shape. `topicEn` stays canonical **for writers**; readers tolerate either. Nor is it cosmetic: an agenda pack with blank item titles reads as a meeting with nothing to discuss |
+| **Lesson** | **A reader that knows one shape of its own data is a control that fails silently on the other half.** Two independent readers, each correct against a different population, produced a platform where 100% of agendas were unreadable *somewhere*. When a structure is written by more than one producer, the reader is the place to reconcile them — and the reconciliation belongs in one function, not in each caller |
+
+## F2-111 · A charter standing item counted as a tabled change, because a module tag is not a reference
+
+|  |  |
+|---|---|
+| **ID** | F2-111 *(found in the browser, on CE-13's own first screen)* |
+| **Module** | `admin.committee` — `CommitteeCalendarService.rowOf` vs the seeded agendas — the agenda builder's item shape; consumed by `CommitteePort.Sitting` |
+| **Severity** | **P3** — a wrong count on one governance screen, in the flattering direction |
+| **Current State** | ✅ **FIXED in CE-13.** Referral lines now carry a `decisionRef` field naming the record they table, and `CommitteeAgendaJson.tabledRefs` reads that instead of counting module tags. Pre-CE-13 lines fall back to their title so nothing already tabled reads as untabled |
+| **Problem** | "Is this change on the next sitting's agenda?" was answered by counting agenda items whose `sourceModule` was `CHANGE`. But a **charter template's standing item** carries a source module too — dev's CAB agenda holds *Change-management major changes* — so the CAB workspace's header read **"Change items tabled: 1"** on a sitting with no change tabled at all |
+| **How it was found** | Reading the finished screen in the browser against the database, not from a failing test. The per-change verdict was already right (it matched on the change's reference), so every unit test passed; only the gate-level header overcounted |
+| **The rejected alternative** | Matching the `For decision: ` prefix on the item title. That prefix is display copy in two languages and would stop matching the first time anyone reworded it — the same class of fragility as keying a test on a comment |
+| **Lesson** | **A tag says what a row is about; only a reference says which record it is.** The distinction is invisible while the only producer of tagged rows is the one you are counting — and a second producer arriving later turns an exact count into an approximate one with no error anywhere |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

@@ -78,6 +78,69 @@ public interface CommitteePort {
      */
     record SubjectRef(String code, String titleEn, String titleAr) { }
 
+    /**
+     * CE-13 — a committee's open queue, split by whether the item can be named on an agenda.
+     *
+     * <p>Mirrors {@code CommitteeReferralService.Queue}. The partition is the engine's, computed by the
+     * engine's own predicate: this module must not re-derive "does this referral carry a subject
+     * snapshot?", because a second copy of a rule is a mirror maintained by assertion and it lies the
+     * first time one side changes (S8h's keeper, one subsystem across).
+     *
+     * @param stated   agenda-ready — the committee has been told what it is deciding
+     * @param unstated real, open, unnameable referrals: excluded from every agenda for a stated reason
+     *                 and, until CE-13, reported to nobody
+     */
+    record CommitteeQueue(List<ReferralView> stated, List<ReferralView> unstated) {
+        public static CommitteeQueue empty() { return new CommitteeQueue(List.of(), List.of()); }
+        public int total() { return stated.size() + unstated.size(); }
+    }
+
+    /**
+     * CE-13 — the committee's next sitting, as the CAB workspace needs to name it.
+     *
+     * <p><b>Why this does not breach the exclusion list above.</b> This port must not carry quorum,
+     * attendance, minutes, e-signatures or tallies, because those are the engine's answers and a second
+     * answer is the defect. A sitting's <em>identity</em> — which meeting, when, in what lifecycle
+     * state, how many items are on its agenda and how many of them were tabled by this module — is
+     * none of those. Nothing here can be used to decide whether a decision was quorate; it exists so a
+     * reader can be sent to the meeting rather than told a decision is "pending" with no idea where.
+     *
+     * <p>{@code tabledSubjects} is the agenda text of every line this module put there (S7b). Empty
+     * while {@link CommitteeQueue#stated} is non-empty is exactly the gap the workspace exists to show:
+     * the queue exists and the agenda has not been rebuilt to carry it. Each line names the record by
+     * the reference it was tabled under, which is how a caller tells "three items are tabled" from
+     * "<em>this</em> item is tabled".
+     */
+    record Sitting(
+        Long id,
+        String code,
+        String titleEn,
+        String titleAr,
+        LocalDateTime scheduledAt,
+        String status,
+        int agendaItems,
+        List<String> tabledSubjects
+    ) {
+        public int itemsForDecision() { return tabledSubjects == null ? 0 : tabledSubjects.size(); }
+
+        /**
+         * True when an agenda line tables this reference.
+         *
+         * <p>An exact match on the line's own reference field, with {@code contains} as the fallback for
+         * lines written before that field existed — those carry only their title, which embeds the
+         * reference. Tolerant on read; the builder now writes the field.
+         *
+         * <p>Blank references never match — and that is a distinct finding, not a false negative: a
+         * change with no {@code change_code} cannot be named on any agenda at all (F2-109). The caller
+         * must report that separately rather than let it read as "not tabled yet".
+         */
+        public boolean tables(String reference) {
+            if (reference == null || reference.isBlank() || tabledSubjects == null) return false;
+            return tabledSubjects.stream()
+                .anyMatch(s -> s != null && (s.equals(reference) || s.contains(reference)));
+        }
+    }
+
     /** One row of the tenant's gate → committee map (A17-D2's config surface). */
     record GateMapping(
         Long id,
@@ -133,6 +196,19 @@ public interface CommitteePort {
 
     /** Add resolution outcome/tally and meeting status/quorum to a response map. */
     void describe(ReferralView referral, Map<String, Object> out);
+
+    // ── CE-13: the queue, and where it will be heard ─────────────────────────
+
+    /** Everything this committee has open, partitioned. Empty (never null) when the engine is absent. */
+    CommitteeQueue queue(Long committeeId);
+
+    /**
+     * The committee's next sitting, or empty when it has none scheduled ahead of now.
+     *
+     * <p>Empty is a real answer and must be rendered as one: a queue with no sitting is an item nobody
+     * will hear, not a missing field.
+     */
+    Optional<Sitting> nextSitting(Long committeeId);
 
     // ── the tenant's gate → committee map (A17-D2) ───────────────────────────
 

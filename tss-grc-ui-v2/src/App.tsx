@@ -179,6 +179,8 @@ const AdminPage              = lazy(() => import('./pages/admin/AdminPage').then
 const LicensingPage          = lazy(() => import('./pages/admin/LicensingPage').then(m => ({ default: m.LicensingPage })));
 const HelpTopicsAdminPage    = lazy(() => import('./pages/admin/HelpTopicsAdminPage').then(m => ({ default: m.HelpTopicsAdminPage })));
 const ChangesPage            = lazy(() => import('./pages/change/ChangesPage').then(m => ({ default: m.ChangesPage })));
+// CE-13 — the CAB workspace: a route of its own, so the sidebar row CE-0 withheld has somewhere to go.
+const CabWorkspacePage       = lazy(() => import('./pages/change/CabWorkspacePage').then(m => ({ default: m.CabWorkspacePage })));
 const EthicsPage             = lazy(() => import('./pages/ethics/EthicsPage').then(m => ({ default: m.EthicsPage })));
 // Sprint 13 — Whistleblower / Ethics Hotline.
 const WhistleblowerSubmitPublicPage = lazy(() => import('./pages/ethics/WhistleblowerSubmitPublicPage').then(m => ({ default: m.WhistleblowerSubmitPublicPage })));
@@ -626,6 +628,7 @@ export function App() {
                   former duplicate route to the legacy WorkflowsPage was unreachable dead
                   code (React Router used the first match) and has been removed. */}
               <Route path="/changes"    element={<ChangesPage />} />
+              <Route path="/changes/cab" element={<CabWorkspacePage />} />
               <Route path="/ethics"     element={<EthicsPage />} />
               {/* Sprint 13 — Whistleblower / Ethics Hotline.
                   Public surfaces are wired permitAll in backend SecurityConfig. */}

@@ -847,6 +847,97 @@ export interface TaskAddressabilityDto {
 }
 
 /**
+ * CE-13 — one referral in a committee's open queue, with what the change module knows of its subject.
+ *
+ * ⚠ `subjectState` is the whole point. `PRESENT` is a real queue item; `SUBJECT_NOT_STATED` and
+ * `SUBJECT_NOT_FOUND` are rows the committee can never table, and they need a different remedy —
+ * clear them, not decide them. Dev's only two open CAB referrals are both `SUBJECT_NOT_FOUND`.
+ */
+export interface CabQueueRowDto {
+  referralId: number;
+  changeId?: number;
+  changeCode?: string;
+  subjectEn?: string;
+  subjectAr?: string;
+  referralStatus?: string;
+  mode?: string;
+  meetingId?: number;
+  resolutionId?: number;
+  subjectState: string;
+  /** Null exactly when the subject could not be found — never a fabricated status. */
+  changeStatus?: string;
+}
+
+/** CE-13 — a change whose committee decision is still ahead, and why it is not in front of them. */
+export interface CabPendingDto {
+  id: number;
+  changeCode?: string;
+  titleEn: string;
+  titleAr?: string;
+  changeType?: string;
+  riskLevel?: string;
+  status: string;
+  gate: string;
+  minApprovals?: number;
+  scheduledStart?: string;
+  reason: string;
+}
+
+/** CE-13 — the sitting a queue will be heard at. Identity only: no quorum, minutes or tally. */
+export interface CabSittingDto {
+  id: number;
+  code?: string;
+  titleEn?: string;
+  titleAr?: string;
+  scheduledAt?: string;
+  status?: string;
+  agendaItems: number;
+  /** Agenda lines this module tabled. Empty with a non-empty queue = the agenda needs rebuilding. */
+  tabledSubjects: string[];
+}
+
+/** CE-13 — one gate (CAB or ECAB): which committee holds it, when it sits, what is in front of it. */
+export interface CabGateDto {
+  gate: string;
+  committeeId?: number;
+  committeeNameEn?: string;
+  committeeNameAr?: string;
+  committeeStatus?: string;
+  /** A live committee is named, so a change can be referred here. */
+  mapped: boolean;
+  /**
+   * The gate will actually carry a decision (A17-D2 additionally requires an active voting seat).
+   *
+   * ⚠ Distinct from `mapped`, and they differ in dev right now: the CAB is correctly mapped to a
+   * committee with zero voting seats, so referral and tabling work while the approval is refused
+   * (F2-96). One flag would send an operator to re-map a mapping that is already right.
+   */
+  canDecide: boolean;
+  /** A17-D2's own fault code when the gate cannot decide. Rendered verbatim — never re-worded. */
+  fault?: string;
+  sitting?: CabSittingDto;
+  queue: CabQueueRowDto[];
+  awaiting: CabPendingDto[];
+}
+
+/**
+ * CE-13 — the CAB queue.
+ *
+ * ⚠ `engineAbsent` must be honoured: with no committee engine every gate is unresolvable, and an
+ * empty queue rendered as good news would report a clean CAB that nobody checked (S8h's rule).
+ */
+export interface CabQueueDto {
+  gates: CabGateDto[];
+  awaiting: number;
+  notReferred: number;
+  notTabled: number;
+  orphans: number;
+  tabled: number;
+  byReason: Record<string, number>;
+  engineAbsent: boolean;
+}
+
+/**
  * S8f/CE-11 — one reconciliation failure between the authorisation a change required and the
  * authorisation the platform can show it received.
  *
@@ -1086,6 +1177,10 @@ export const changeApi = {
     api.post<EngineRequestRefDto>(`/api/v1/changes/${id}/engine-requests`, body),
   routeTaskThroughEngine: (taskId: number, body: RaiseEngineRequestBody) =>
     api.post<EngineRequestRefDto>(`/api/v1/changes/tasks/${taskId}/engine-requests`, body),
+
+  // CE-13 — the CAB queue. Read-only: the actions the workspace offers are referToCommittee (below)
+  // and the committee module's own agenda rebuild, not new write endpoints.
+  cabQueue: () => api.get<CabQueueDto>('/api/v1/changes/cab-queue'),
 
   freezeWindows: () => api.get<ChangeFreezeWindowDto[]>('/api/v1/changes/freeze-windows'),
   createFreeze:  (body: Partial<ChangeFreezeWindowDto>) => api.post<ChangeFreezeWindowDto>('/api/v1/changes/freeze-windows', body),

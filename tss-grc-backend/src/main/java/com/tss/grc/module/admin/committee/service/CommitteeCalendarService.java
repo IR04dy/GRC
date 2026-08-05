@@ -285,7 +285,7 @@ public class CommitteeCalendarService {
             out.add(rowOf(seq++,
                 "For decision: " + en,
                 "للقرار: " + ar,
-                "Secretary", 15, true, ref.getSourceModule()));
+                "Secretary", 15, true, ref.getSourceModule(), code));
         }
 
         // Items 4+ — standing items in defined sequence.
@@ -319,6 +319,22 @@ public class CommitteeCalendarService {
     private static Map<String, Object> rowOf(int seq, String en, String ar,
                                               String presenter, int minutes,
                                               boolean mandatory, String sourceModule) {
+        return rowOf(seq, en, ar, presenter, minutes, mandatory, sourceModule, null);
+    }
+
+    /**
+     * @param decisionRef CE-13 — the reference of the referral this line tables, and <b>only</b> for a
+     *     referral line. It exists because {@code sourceModule} cannot answer "is this record tabled?":
+     *     a charter template's standing item carries a source module too, so dev's CAB agenda reported
+     *     one item "tabled" that was the standing row *Change-management major changes*. Matching on the
+     *     title text instead would depend on the {@code "For decision: "} prefix, which is display copy
+     *     in two languages. A reference field is the join key, and {@link CommitteeAgendaJson#tabledRefs}
+     *     reads it.
+     */
+    private static Map<String, Object> rowOf(int seq, String en, String ar,
+                                              String presenter, int minutes,
+                                              boolean mandatory, String sourceModule,
+                                              String decisionRef) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("seq", seq);
         row.put("topicEn", en);
@@ -327,6 +343,7 @@ public class CommitteeCalendarService {
         row.put("minutesAllocated", minutes);
         row.put("isMandatory", mandatory);
         if (sourceModule != null) row.put("sourceModule", sourceModule);
+        if (decisionRef != null) row.put(CommitteeAgendaJson.DECISION_REF, decisionRef);
         return row;
     }
 }

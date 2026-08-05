@@ -31,6 +31,7 @@ import java.time.Year;
 import java.util.Collections;
 import java.util.Map;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -223,6 +224,29 @@ public class CommitteeService {
     public CommitteeMeeting getMeeting(Long id) {
         return meetingRepo.findByIdAndOrganisationId(id, TenantContext.getCurrentTenant())
                 .orElseThrow(() -> new EntityNotFoundException("CommitteeMeeting " + id));
+    }
+
+    /**
+     * CE-13 — the committee's next sitting: the earliest meeting scheduled from now on that has not
+     * been cancelled.
+     *
+     * <p><b>Deliberately empty rather than falling back to a past meeting.</b> A queue with nowhere to
+     * be heard is the finding, not a presentation problem: if the CAB has items awaiting decision and
+     * no future sitting, the workspace has to be able to say exactly that. Returning the most recent
+     * past meeting instead would read as "it is scheduled" and hide the gap — the shape of defect this
+     * programme has now found five times (a status worn without a mechanism behind it).
+     *
+     * <p>{@code IN_PROGRESS} counts: a meeting under way is where an item can still be tabled.
+     * {@code CANCELLED} never counts. Past meetings never count, whatever their status.
+     */
+    @Transactional(readOnly = true)
+    public Optional<CommitteeMeeting> nextSitting(Long committeeId) {
+        if (committeeId == null) return Optional.empty();
+        LocalDateTime now = LocalDateTime.now();
+        return meetingsForCommittee(committeeId).stream()
+            .filter(m -> m.getScheduledAt() != null && !m.getScheduledAt().isBefore(now))
+            .filter(m -> !"CANCELLED".equals(m.getStatus()))
+            .min(java.util.Comparator.comparing(CommitteeMeeting::getScheduledAt));
     }
 
     @Transactional

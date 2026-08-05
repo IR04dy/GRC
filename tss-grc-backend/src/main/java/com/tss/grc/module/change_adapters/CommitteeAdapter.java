@@ -1,8 +1,10 @@
 package com.tss.grc.module.change_adapters;
 
 import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
+import com.tss.grc.module.admin.committee.service.CommitteeAgendaJson;
 import com.tss.grc.module.admin.committee.service.CommitteeGateMapService;
 import com.tss.grc.module.admin.committee.service.CommitteeReferralService;
+import com.tss.grc.module.admin.committee.service.CommitteeService;
 import com.tss.grc.module.change_mgmt.spi.CommitteePort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -31,11 +33,15 @@ public class CommitteeAdapter implements CommitteePort {
 
     private final CommitteeReferralService referrals;
     private final CommitteeGateMapService gateMap;
+    /** CE-13 — meeting reads only (the next sitting). Optional for the same reason as the other two. */
+    private final CommitteeService committees;
 
     public CommitteeAdapter(@Autowired(required = false) CommitteeReferralService referrals,
-                            @Autowired(required = false) CommitteeGateMapService gateMap) {
+                            @Autowired(required = false) CommitteeGateMapService gateMap,
+                            @Autowired(required = false) CommitteeService committees) {
         this.referrals = referrals;
         this.gateMap = gateMap;
+        this.committees = committees;
     }
 
     // ── referrals ────────────────────────────────────────────────────────────
@@ -112,6 +118,38 @@ public class CommitteeAdapter implements CommitteePort {
         if (referrals == null || referral == null) return;
         referrals.activeReferral(referral.sourceModule(), referral.sourceEntityId())
                  .ifPresent(entity -> referrals.enrich(entity, out));
+    }
+
+    // ── CE-13: the queue, and where it will be heard ─────────────────────────
+
+    /**
+     * Translation only — the partition is {@code CommitteeReferralService.queue}'s, not this class's.
+     *
+     * <p>Writing {@code filter(r -> r.sourceCode() != null)} here instead would have been shorter and
+     * wrong for the reason the port's javadoc gives: the subject-snapshot rule is a control living in
+     * the engine, and a copy of it in the adapter is the mirror that eventually disagrees.
+     */
+    @Override
+    public CommitteeQueue queue(Long committeeId) {
+        if (referrals == null) return CommitteeQueue.empty();
+        var q = referrals.queue(committeeId);
+        return new CommitteeQueue(
+            q.stated().stream().map(CommitteeAdapter::view).toList(),
+            q.unstated().stream().map(CommitteeAdapter::view).toList());
+    }
+
+    @Override
+    public Optional<Sitting> nextSitting(Long committeeId) {
+        if (committees == null) return Optional.empty();
+        return committees.nextSitting(committeeId).map(m -> new Sitting(
+            m.getId(), m.getMeetingCode(), m.getTitleEn(), m.getTitleAr(),
+            m.getScheduledAt(), m.getStatus(),
+            CommitteeAgendaJson.items(m.getAgendaJson()).size(),
+            // The references THIS module has tabled — not every line carrying its source module, which
+            // counted a charter standing item as a tabled change. Read through the shared agenda reader
+            // so the adapter cannot drift from what the builder writes or the agenda pack prints; that
+            // drift left 24 of 34 dev agendas blank in one reader and dashes in the other.
+            CommitteeAgendaJson.tabledRefs(m.getAgendaJson(), "CHANGE")));
     }
 
     // ── gate map (A17-D2) ────────────────────────────────────────────────────

@@ -14,6 +14,7 @@ import { ShieldCheck, LayoutDashboard, AlertTriangle, LockKeyhole,
          ShieldX, Shield, ClipboardList, CalendarDays, Banknote, Moon,
          Cloud, ChevronRight, ScrollText, Archive, GraduationCap, Download,
          Calculator, Radar, Spline, Gauge, Sparkles, HelpCircle,
+         Gavel,
          type LucideIcon } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n';
@@ -132,9 +133,10 @@ const NAV_GROUPS: NavGroup[] = [
   // change is authorised by the CAB under its own policy, and the backend was never under risk
   // (module/change_mgmt is its own package). The nav was the only place the two were conflated.
   //
-  // ⚠ Only the entries that resolve TODAY are listed. The CAB queue and the decision register are
-  // S7/CE-13 work and have no route yet; adding them now would be nav-to-nowhere, which is the
-  // F2-02 defect this programme has spent two slices removing. They join this group as they land.
+  // ⚠ Only the entries that resolve TODAY are listed — nav-to-nowhere is the F2-02 defect this
+  // programme spent two slices removing, and `navChangeGroup.test.ts` now holds the invariant
+  // directly: every row here must have a matching <Route> in App.tsx. CE-13 gave the CAB queue one,
+  // so it has a row; the decision register is still a download inside the governance tab.
   {
     id: 'change', titleKey: 'navChange',
     items: [
@@ -143,6 +145,10 @@ const NAV_GROUPS: NavGroup[] = [
       // query link — the pattern the NDI group established. `queryAwareActive` below is what
       // keeps only one of the two rows highlighted.
       { id: 'change-gov', to: '/changes?tab=governance', Icon: Calendar,  labelKey: 'ceNavCalendarFsc' },
+      // CE-13 — the row CE-0 deliberately withheld: "the CAB queue and decision register are
+      // deliberately absent until S7/CE-13 give them routes", because nav-to-nowhere is the F2-02
+      // defect that slice removed from this very group. It now has a route, so it gets a row.
+      { id: 'change-cab', to: '/changes/cab',            Icon: Gavel,     labelKey: 'cabNavQueue' },
     ],
   },
 
@@ -578,10 +584,26 @@ function pathMatches(pathname: string, to: string): boolean {
  *  `/changes?tab=governance` as **top-level** siblings, and both highlighted at once — the same wart
  *  one level up. Applied only where a sibling set actually mixes query and bare paths, so no
  *  existing group's behaviour changes. */
-function queryAwareActive(to: string, pathname: string, search: string): boolean {
+function queryAwareActive(to: string, pathname: string, search: string,
+                          siblings: string[] = []): boolean {
   const qIdx = to.indexOf('?');
   const path = qIdx >= 0 ? to.slice(0, qIdx) : to;
   if (pathname !== path && !pathname.startsWith(path + '/')) return false;
+  // CE-13 — a row wins its prefix match only if no SIBLING claims a longer one.
+  //
+  // The prefix rule above exists so a detail route keeps its section highlighted. But CE-13 added
+  // `/changes/cab` beside `/changes`, and on that page all three rows in the group lit up at once:
+  // the register by prefix, the calendar because it also has no conflicting query, and the CAB queue
+  // exactly. That is CE-0's own wart at a third level — one location, three highlighted rows — and the
+  // narrow fix is the same shape: yield the prefix match to whichever sibling matches more of the path.
+  if (pathname !== path) {
+    const deeper = siblings.some(s => {
+      const sPath = s.indexOf('?') >= 0 ? s.slice(0, s.indexOf('?')) : s;
+      return sPath.length > path.length
+        && (pathname === sPath || pathname.startsWith(sPath + '/'));
+    });
+    if (deeper) return false;
+  }
   const current = new URLSearchParams(search);
   if (qIdx < 0) return [...current.keys()].length === 0;
   const want = new URLSearchParams(to.slice(qIdx + 1));
@@ -750,6 +772,7 @@ export function Sidebar({ open = false }: { open?: boolean }) {
                     pathname={pathname}
                     search={search}
                     siblingsUseQuery={group.items.some(s => s.to.includes('?'))}
+                    siblingPaths={group.items.map(s => s.to)}
                     expandedItems={expandedItems}
                     autoExpandItems={autoExpandItems}
                     onToggleChildren={toggleItem}
@@ -771,7 +794,7 @@ interface NavBadge { value: number; title: string; tone?: 'danger'; }
  *  with a vertical guide line + reduced size so the hierarchy reads at
  *  a glance. */
 function NavRowWithChildren({
-  item, t, badge, pathname, search, siblingsUseQuery, expandedItems, autoExpandItems,
+  item, t, badge, pathname, search, siblingsUseQuery, siblingPaths, expandedItems, autoExpandItems,
   onToggleChildren,
 }: {
   item: NavItem;
@@ -782,6 +805,8 @@ function NavRowWithChildren({
   /** CE-0: true when this row's own group mixes query-tab and bare paths, so its highlight has to
    *  respect the query the way children already did. */
   siblingsUseQuery: boolean;
+  /** Every `to` in this row's sibling set, so a prefix match can yield to a deeper sibling. */
+  siblingPaths: string[];
   expandedItems: Set<string>;
   autoExpandItems: Set<string>;
   onToggleChildren: (id: string) => void;
@@ -791,7 +816,9 @@ function NavRowWithChildren({
   const childrenOpen = hasChildren && (
     expandedItems.has(item.id) || autoExpandItems.has(item.id) || pathMatches(pathname, item.to)
   );
-  const forcedSelf = siblingsUseQuery ? queryAwareActive(item.to, pathname, search) : null;
+  const forcedSelf = siblingsUseQuery
+    ? queryAwareActive(item.to, pathname, search, siblingPaths)
+    : null;
 
   return (
     <>
@@ -823,7 +850,7 @@ function NavRowWithChildren({
             // When a parent's children use query-string tabs (NDI), match on
             // path+query so only the active tab highlights — not all of them.
             const forced = childrenUseQuery
-              ? queryAwareActive(child.to, pathname, search)
+              ? queryAwareActive(child.to, pathname, search, item.children!.map(c => c.to))
               : null;
             return (
               <NavLink key={child.id} to={child.to}

@@ -26,7 +26,7 @@ import {
   listResolutions, listActions, generateAnnualCalendar, populateAgenda, createResolution, createMeeting,
   createCommittee, createAction, dissolveCommittee,
   startAction, completeAction, cancelAction, deferAction,
-  parseAgenda, parseAttendees, parseDecisions, parseActions, parseMembers,
+  parseAgenda, agendaTopic, parseAttendees, parseDecisions, parseActions, parseMembers,
   COM_STATUS_TONE, MTG_STATUS_TONE, OUTCOME_TONE, ACTION_STATUS_TONE, ACTION_PRIORITY_TONE,
   type Committee, type CommitteeMeeting, type Resolution, type ActionItemRecord,
   type ResolutionOutcome, type ConfidentialityLevel, type CommitteeType, type MeetingCadence,
@@ -870,7 +870,10 @@ export function CommitteesPage() {
                                       <ol style={{ paddingInlineStart: 18, marginTop: 4 }}>
                                         {agenda.map(a => (
                                           <li key={a.seq}>
-                                            {lang === 'ar' && a.topicAr ? a.topicAr : a.topicEn}
+                                            {/* CE-13: was `a.topicAr ?? a.topicEn`, and 24 of 34 dev
+                                                agendas key their items titleEn/titleAr — so this list
+                                                rendered empty bullets for every real committee. */}
+                                            {agendaTopic(a, lang === 'ar')}
                                             {a.presenter && <span style={{ color:'var(--ink-3)' }}> — {a.presenter}</span>}
                                             {a.minutesAllocated && <span className="mono"> ({a.minutesAllocated}m)</span>}
                                           </li>

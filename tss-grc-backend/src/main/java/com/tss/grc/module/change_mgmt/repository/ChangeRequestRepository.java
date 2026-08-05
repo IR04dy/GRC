@@ -146,22 +146,29 @@ public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, Lo
                                    @Param("statuses") java.util.List<String> statuses);
 
     /**
-     * S8f / CE-11 — changes that have passed the point where authorisation should already exist.
+     * This tenant's changes in the given statuses, oldest first.
      *
-     * <p>The population the unauthorised-change reconciliation runs over. The status set is supplied
-     * by {@code UnauthorisedChangeRegisterService.PAST_AUTHORISATION} rather than inlined here, so the
-     * definition of "past authorisation" lives in one place and a test can read it.
+     * <p>The status set is always supplied by the caller's own named constant — S8f's
+     * {@code UnauthorisedChangeRegisterService.PAST_AUTHORISATION} ("past the point where
+     * authorisation should already exist"), CE-13's {@code ChangeCabQueueService.AWAITING_CAB}
+     * ("the committee's decision is still ahead") — because the status set <em>is</em> the rule and it
+     * belongs beside the feature that means it, not inlined here where two features would have to
+     * share one definition or quietly diverge from it.
      *
-     * <p>Ordered by id so the register is stable between reads — a findings list that reshuffles
-     * makes two exports of the same data look like different data.
+     * <p>⚠ It was named {@code findPastAuthorisation} while S8f was its only caller. The name described
+     * one caller's list rather than the query, so the second caller either had to read "past" and mean
+     * "pending" or copy the JPQL. Renamed rather than duplicated: one query, two status sets.
+     *
+     * <p>Ordered by id so a register is stable between reads — a findings list that reshuffles makes
+     * two exports of the same data look like different data.
      */
     @Query("""
         SELECT c FROM ChangeRequest c
         WHERE c.organisationId = :orgId AND c.status IN :statuses
         ORDER BY c.id ASC
         """)
-    java.util.List<ChangeRequest> findPastAuthorisation(@Param("orgId") Long orgId,
-                                                        @Param("statuses") java.util.List<String> statuses);
+    java.util.List<ChangeRequest> findByStatuses(@Param("orgId") Long orgId,
+                                                 @Param("statuses") java.util.List<String> statuses);
 
     /**
      * A17-D3: stamp the escalation timestamp without loading or saving the entity.

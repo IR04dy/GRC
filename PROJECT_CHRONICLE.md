@@ -463,9 +463,83 @@ need opposite actions.
 
 Operators: `docs/change-manager/CAB_OPERATING_RUNBOOK.md` §8.2.
 
-**Not built yet** (tracked as CE-13 in
-`CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md`): the CAB workspace as its own
-frontend surface, and the retirement of `mockChanges.ts` with it.
+**Built next, as CE-13** — the CAB workspace, below.
+
+---
+
+#### The CAB workspace (CE-13) — the row asked for three screens that already existed
+
+`/changes/cab` is the Change Enablement group's third nav row, and the one CE-0 deliberately withheld
+("the CAB queue and decision register are absent until S7/CE-13 give them routes — nav-to-nowhere is
+the F2-02 defect two slices just removed"). No migration.
+
+**What the row asked for, and why building it literally would have been wrong.** CE-13 reads "CAB
+workspace (agenda builder, voting panel, minutes)". All three exist — in the **committee** workspace,
+generically — because under ADR-017 D-2 the CAB *is* a committee: `admin.committee_gate_map` names which one per tenant
+(dev: CAB → committee 13 *IT Steering*, ECAB → 12 *Executive*), and S6 measured `cab_profile` and
+`cab_member_role` to be 12-of-15 and 6-of-7 subsumed by the generic engine and **pinned them against
+being built**. A second agenda, a second tally and a second set of minutes on the change side is
+precisely the duplication `CommitteePort`'s javadoc forbids — it reserves quorum, attendance, minutes
+and tallies to the engine so the platform has one answer to "was this decision quorate?".
+
+**What was actually missing.** The queue, and a signpost to where it will be heard:
+
+- `CommitteeReferralService.awaitingDecision` — the CAB queue, built for S7b's agenda populator — was reachable over **no HTTP
+  route at all**. A CAB member could not see their own queue.
+- **Referral is manual.** Nothing in `ChangeManagementService.transition` refers a change on its way into `CAB_PENDING`; only
+  the detail panel's button does. So `CAB_PENDING` is a status the change *wears*, not a request anybody
+  received — and dev held **2 changes** there with no referral.
+- The CAB's own next sitting (`MTG-IT-26Q3`, 17 Aug) carried a three-line agenda naming **no change**, while
+  its only two open referrals named change ids **101** and **102**, which exist in no organisation.
+
+**The three populations, kept apart.** F2-94's distinction on its third outing, because all three look
+like "the CAB queue" from a distance and each needs a different action:
+
+| population | what it means | remedy |
+|---|---|---|
+| **unreferred** | a change at a CAB/ECAB gate, decision still ahead, no live referral | refer it — the screen offers the button on this rung only |
+| **orphaned** | a referral that can never be tabled: `SUBJECT_NOT_STATED` (no V350 snapshot) or `SUBJECT_NOT_FOUND` (its change does not exist here) | clear the row |
+| **tabled** | the committee has it, named on the next sitting's agenda | nothing |
+
+The orphan check is the half the committee module is **structurally unable** to perform: S5a took its
+`change_requests` imports to zero, so it cannot see whether a referral's subject exists. Until CE-13
+nothing on the change side looked either.
+
+**A per-change ladder, not a per-gate flag.** `GATE_UNMAPPED` → `NOT_REFERRED` → `SUBJECT_UNCITEABLE`
+(F2-109 live: nothing generates `change_code`, so an API-created change can never be named on an agenda)
+→ `NO_SITTING_SCHEDULED` → `NOT_TABLED` → `TABLED`. Ordered by what a reader must fix first; collapsing any two
+produces a count a CAB secretary cannot act on.
+
+**Two rungs were corrected by verification, not by review.**
+
+1. **The live probe caught the first rung keyed on the wrong flag.** It read the gate map's
+   `configured`, and reported *every* row unfixable on a gate whose referral had just returned **201**
+   and whose agenda line had appeared. That flag folds F2-96's three faults into one — `NOT_MAPPED`,
+   `COMMITTEE_UNAVAILABLE`, `ROSTER_EMPTY` — and dev's CAB is the third: correctly mapped, zero voting
+   seats. So `mapped` (a referral can be made) and `canDecide` (the approval will land) are now
+   separate facts, and only the first gates the ladder. Collapsing them told an operator to re-map a
+   mapping that was already right, which is the remedy F2-96 exists to prevent.
+2. **The browser caught a standing item counted as a tabled change** — *Change items tabled: 1* on a
+   sitting tabling nothing. A charter template's standing item carries a `sourceModule` too, so
+   referral lines now carry a `decisionRef` and tabling is an exact reference match (**F2-111**).
+
+**And one defect the slice was not looking for: F2-110.** Pointing a reader at "the agenda of the next
+sitting" meant reading `agenda_json`, which the platform writes in **two key shapes**. Across all 34 dev
+meetings, 24 — every real committee, both quarters — key their items `titleEn`, and the 8 older DEMO
+ones plus *everything* `populateAgenda` builds key them `topicEn`. The frontend read `topicEn` and
+rendered an ordered list of **empty bullets** for those 24; the CE-14a agenda pack read `titleEn` and
+printed a dash for the rest. Both readers were wrong, in opposite directions, and S7f's probe passed
+because the meeting it exported happened to be seeded. One reader (`CommitteeAgendaJson`) now accepts either
+shape, and two sibling keys had the same fault (`isMandatory`/`mandatory`,
+`minutesAllocated`/`minutes`).
+
+**`mockChanges.ts` is deliberately kept.** The row says "only then delete" it; that clause is now subsumed.
+It is 1 of **15** peer demo fallbacks, and `demoFallbackContract.test.ts` already ratchets the population while
+recording in its own javadoc that removing demo mode is "a product decision, not an engineering one"
+pending the owner. Deleting Change's copy alone would make it the only module of fifteen without a
+disclosed fallback and would settle that decision for one module — F2-15's sweep, not CE-13's.
+
+Operators: `docs/change-manager/CAB_OPERATING_RUNBOOK.md` §8.4.
 
 ---
 

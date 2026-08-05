@@ -44,7 +44,41 @@ export interface CommitteeMeeting {
   createdAt: string; updatedAt: string;
 }
 
-export interface AgendaItem { seq: number; topicEn: string; topicAr?: string; presenter?: string; minutesAllocated?: number; }
+/**
+ * One agenda line.
+ *
+ * ⚠ CE-13 — the platform writes the title under **two** key shapes and this interface declared one.
+ * Measured across all 34 dev meetings: 24 agendas — every real committee, both quarters, including the
+ * CAB's own next sitting — key their items `titleEn`/`titleAr`, while the 8 older DEMO meetings and
+ * *everything* `populateAgenda` builds key them `topicEn`/`topicAr`. So the agenda list rendered an
+ * ordered list of **empty bullets** for 24 of 34 meetings, and the CE-14a agenda-pack PDF (which read
+ * only `titleEn`) printed a dash for the rest. Both readers were wrong, in opposite directions.
+ *
+ * `topicEn` stays canonical for writers; readers accept either through {@link agendaTopic}.
+ */
+export interface AgendaItem {
+  seq: number;
+  topicEn?: string;
+  topicAr?: string;
+  /** The shape the twelve real committees are seeded with. Read, never written. */
+  titleEn?: string;
+  titleAr?: string;
+  presenter?: string;
+  minutesAllocated?: number;
+  /** Set by the S7b decision block — 'CHANGE' for a change referred to this committee. */
+  sourceModule?: string;
+}
+
+/**
+ * The item's text in the reader's language, falling through to the other language rather than to a
+ * blank line: a title someone can read in English beats an empty bullet for an Arabic reader.
+ */
+export function agendaTopic(item: AgendaItem, isAr: boolean): string {
+  const pick = isAr
+    ? [item.topicAr, item.titleAr, item.topicEn, item.titleEn]
+    : [item.topicEn, item.titleEn];
+  return pick.find(v => v != null && String(v).trim() !== '') ?? '';
+}
 export interface AttendeeEntry { name: string; role?: string; present?: boolean | null; votingMember?: boolean; }
 export interface Decision { seq: number; decisionEn: string; decisionAr?: string; voteFor?: number; voteAgainst?: number; voteAbstain?: number; outcome?: string; }
 export interface ActionItem { seq: number; actionEn: string; owner?: string; dueDate?: string; status?: string; }

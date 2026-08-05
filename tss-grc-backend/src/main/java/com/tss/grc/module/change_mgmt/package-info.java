@@ -77,6 +77,28 @@
  * and the boundary ratchet rejected it, which was right — a mirror maintained by assertion lies
  * eventually.
  *
+ * <h3>Is the work that needs the committee actually in front of it?</h3>
+ * <p>{@code ChangeCabQueueService} (CE-13) answers that, and it needed asking because the two facts can
+ * disagree indefinitely: <b>referral is a deliberate act</b> — nothing in {@link
+ * com.tss.grc.module.change_mgmt.service.ChangeManagementService} refers a change on its way into
+ * {@code CAB_PENDING} — so the status is worn, not received. Measured: 2 dev changes at
+ * {@code CAB_PENDING} with no referral, while the CAB's only 2 open referrals named change ids that
+ * exist in <b>no</b> organisation and its next sitting's agenda named no change at all.
+ *
+ * <p>Three populations, never merged, because each needs a different action: a change nobody referred,
+ * a referral nobody can table ({@code SUBJECT_NOT_STATED} / {@code SUBJECT_NOT_FOUND}), and an item the
+ * committee holds. The second is the check the committee module is <b>structurally unable</b> to make —
+ * S5a took its {@code change_requests} imports to zero, so it cannot see whether its own queue's
+ * subjects exist.
+ *
+ * <p>⚠ The screen is a <b>queue and a signpost</b>, not a second committee workspace. Agenda, votes and
+ * minutes belong to {@code admin.committee}; {@link
+ * com.tss.grc.module.change_mgmt.spi.CommitteePort} reserves quorum, attendance, minutes and tallies to
+ * it so the platform keeps one answer to "was this decision quorate?". And a gate carries <b>two</b>
+ * facts, not one: {@code mapped} (a referral can be made) and {@code canDecide} (A17-D2's stricter
+ * predicate — the approval will land). They differ in dev right now, and collapsing them tells an
+ * operator to re-map a mapping that is already correct, which is the remedy F2-96 exists to prevent.
+ *
  * <h3>Reconciling what was authorised against what went ahead</h3>
  * <p>{@code UnauthorisedChangeRegisterService} (S8f/CE-11) answers "did anything go ahead without
  * authority?" for every change past its authorisation point. Findings are <b>derived on each read</b>

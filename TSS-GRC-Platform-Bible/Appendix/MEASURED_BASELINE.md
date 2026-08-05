@@ -47,9 +47,9 @@ that will be read as current forever.
 | **Database** schemas holding tables (dev & prod) | **51** | *not measured* | the 51st is `audit`, which JPA does not know — §7 |
 | Flyway migrations on disk | **344** files, `V1`–`V356`, 4.38 MB | 304 / `V1`–`V314` | next free **V357** |
 | **Deployed** Flyway baseline / head | **baseline `V292`**, head **`V336`**, **8 pending** | *pub. "baseline V312"* | ⚠ see §0.1 — load-bearing and wrong |
-| Frontend pages (`.tsx` under `pages/`) | **343** in **114** folders | 329 / 114 | S5c split the 1,036-line `ChangesPage` into `pages/change/` — +7 files, same folder count; then `ChangeConditionsCard` (S7e), `ChangeEvidence` (S8a), `ChangeKpiPack` (S8b), `ChangeModelCatalogue` (S8e), `UnauthorisedChangeRegister` (S8f), `ForwardSchedulePanel` (S8g) and `EngineRoutingPanel` (S8h) |
-| Routes registered in `App.tsx` | **328** | 328 | — |
-| Sidebar navigation entries | **193** | 184 | — |
+| Frontend pages (`.tsx` under `pages/`) | **344** in **114** folders | 329 / 114 | S5c split the 1,036-line `ChangesPage` into `pages/change/` — +7 files, same folder count; then `ChangeConditionsCard` (S7e), `ChangeEvidence` (S8a), `ChangeKpiPack` (S8b), `ChangeModelCatalogue` (S8e), `UnauthorisedChangeRegister` (S8f), `ForwardSchedulePanel` (S8g), `EngineRoutingPanel` (S8h) and `CabWorkspacePage` (CE-13 — the first of these with a **route** of its own, not a card) |
+| Routes registered in `App.tsx` | **329** | 328 | CE-13 added `/changes/cab` — the CAB workspace, and the route CE-0 withheld its sidebar row for |
+| Sidebar navigation entries | **194** | 184 | CE-13 added the CAB-queue row |
 | Mock-data import statements | **30** in **26** files | 44 / 29 | W2-1 removed 14 |
 | Mock data files still shipped | **15**, **3,550 lines** | 15 / *pub. 3,650* | ⚠ see §0.1 |
 | Unguarded write endpoints (enforced ratchet) | **≤ 21** (`ControllerAuthorizationRatchetTest`) | 21 | ⚠ `CLAUDE.md` house rule says "**≤ 62**" — the enforced constant is **21** |
@@ -73,7 +73,7 @@ today's tree, and against **an export of `99a719da`, the commit this page's own 
 (`baseline_census.py --root <exported tree>`).
 
 **17 of the 20 published figures reproduce at that commit to the digit** — module LoC to the unit
-(186,285), endpoints (2,160), pages (329), routes (328), nav (184), mock statements (44), suite tests
+(186,285), endpoints (2,160), pages (344), routes (329), nav (194), mock statements (44), suite tests
 (2,415), zero-test packages (19), and every per-module row in §1 (`bcm` 25,130 / 50 / 261 / 139 / 395 /
 7 out / 88 edges / 2 in — identical). That is what makes the three misses *findings*: the method
 reproduces, so a figure that does not reproduce is a defect in the document, not in the measurement.
@@ -319,8 +319,8 @@ is unadopted", and now to "adopted in code, not yet in the deployed data".)
 | Metric | Measured (08-01) | Reading |
 |---|---:|---|
 | Pages | **339** in **114** folders | More screens than ServiceNow GRC exposes in its entire IRM suite |
-| Routes in `App.tsx` | **328** | One flat route table |
-| Sidebar entries | **193** (was 184) | **~135 routed pages are not in the navigation** — reachable only by URL |
+| Routes in `App.tsx` | **329** | One flat route table |
+| Sidebar entries | **194** (was 184) | **~135 routed pages are not in the navigation** — reachable only by URL |
 | Largest page folders | `bcm` 30, `socops` 25, `detail` 10, `workflow` 10, `cyber` 9, `risk` 9 | `bcm` alone has more screens than most competitors' whole BCM product |
 | Mock imports | **30** statements, **26** files (was 44 / 29) | See concentration below |
 | Mock files shipped | **15** files, **3,550 lines** | Still in the production bundle |

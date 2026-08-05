@@ -17,6 +17,7 @@ import com.tss.grc.module.change_mgmt.dto.SchedulePublishRequest;
 import com.tss.grc.module.change_mgmt.dto.UnauthorisedDispositionRequest;
 
 import com.tss.grc.module.change_mgmt.entity.*;
+import com.tss.grc.module.change_mgmt.service.ChangeCabQueueService;
 import com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService;
 import com.tss.grc.module.change_mgmt.service.ChangeManagementService;
 import com.tss.grc.module.change_mgmt.service.ChangeModelService;
@@ -65,6 +66,7 @@ public class ChangeManagementController {
     private final UnauthorisedChangeRegisterService unauthorisedRegister;   // S8f/CE-11
     private final ChangeScheduleService scheduleService;                    // S8g/CE-8
     private final ChangeWorkflowService changeWorkflow;                     // S8h/CE-10
+    private final ChangeCabQueueService cabQueueService;                     // CE-13
 
     /** Read a string out of a raw body. These endpoints take Maps, not DTOs, because {@code @Valid}
      *  fires BEFORE {@code @PreAuthorize} and a bean-validated body answers 400 to a caller who
@@ -727,6 +729,27 @@ public class ChangeManagementController {
         return new WorkflowPort.Addressee(b.addresseeType(), b.addresseeId(),
                                           b.addresseeKey(), b.addresseeLabel());
     }
+
+    // ── CE-13: the CAB queue ──────────────────────────────────────────────────
+
+    /**
+     * What this tenant's change authority has been asked to decide — and what is waiting without
+     * having been asked.
+     *
+     * <p>The read {@code CommitteeReferralService.awaitingDecision} never had: measured 2026-08-05, the
+     * CAB queue was reachable over no HTTP route at all, its only caller being the agenda builder. So a
+     * CAB member could not see their own queue, and nothing reconciled it against the register next
+     * door — where two changes sat at {@code CAB_PENDING} with no referral, while the CAB's only two
+     * open referrals named change ids that exist in no organisation.
+     *
+     * <p>{@code CHANGE:READ}, and read-only: the actions this screen offers (refer a change, rebuild an
+     * agenda) are the existing guarded endpoints, not new ones. A queue that could also authorise would
+     * be the third authorisation route S8f and S8h both refused to create.
+     */
+    @GetMapping("/cab-queue")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "The CAB/ECAB queue: referred, orphaned and unreferred changes — CE-13.")
+    public ChangeCabQueueService.CabQueue cabQueue() { return cabQueueService.queue(); }
 
     // ── CH-17: freeze windows + change calendar + conflicts ───────────────────
 

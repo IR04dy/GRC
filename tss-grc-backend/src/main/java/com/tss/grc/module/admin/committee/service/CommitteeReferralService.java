@@ -125,13 +125,51 @@ public class CommitteeReferralService {
      */
     @Transactional(readOnly = true)
     public List<CommitteeReferral> awaitingDecision(Long committeeId) {
-        if (committeeId == null) return List.of();
-        return referralRepo
+        return queue(committeeId).stated();
+    }
+
+    /** The open statuses — a referral in either is still the committee's to decide. */
+    public static final List<String> OPEN_STATUSES = List.of("PENDING", "SCHEDULED");
+
+    /**
+     * CE-13 — the same query as {@link #awaitingDecision}, partitioned rather than filtered.
+     *
+     * <p><b>Why this exists.</b> {@code awaitingDecision} drops the referrals with no subject snapshot
+     * because putting them on an agenda would table an item nobody can read (see its javadoc). That is
+     * the right call for the agenda and the wrong call for a workspace: dropped silently, the two dev
+     * orphans are excluded from the agenda for a stated reason and reported to <em>nobody</em>, so the
+     * queue looks empty when it is in fact two rows of unfinished business. The CAB workspace shows
+     * both partitions with different remedies — table it, or clear it.
+     *
+     * <p><b>And why the partition, not a second finder.</b> The subject-snapshot predicate is the
+     * control; a second query applying "the same" rule is a mirror maintained by assertion, and it
+     * lies the first time one side changes. There is one query, one predicate, and
+     * {@code awaitingDecision} is now a view over this method rather than a peer of it.
+     */
+    @Transactional(readOnly = true)
+    public Queue queue(Long committeeId) {
+        if (committeeId == null) return new Queue(List.of(), List.of());
+        List<CommitteeReferral> open = referralRepo
             .findByOrganisationIdAndCommitteeIdAndStatusInOrderByIdAsc(
-                TenantContext.getCurrentTenant(), committeeId, List.of("PENDING", "SCHEDULED"))
-            .stream()
-            .filter(r -> r.getSourceCode() != null && !r.getSourceCode().isBlank())
-            .toList();
+                TenantContext.getCurrentTenant(), committeeId, OPEN_STATUSES);
+        List<CommitteeReferral> stated = open.stream().filter(CommitteeReferralService::states).toList();
+        List<CommitteeReferral> unstated = open.stream().filter(r -> !states(r)).toList();
+        return new Queue(stated, unstated);
+    }
+
+    /** Carries a V350 subject snapshot, and so can be named on an agenda. */
+    private static boolean states(CommitteeReferral r) {
+        return r.getSourceCode() != null && !r.getSourceCode().isBlank();
+    }
+
+    /**
+     * A committee's open queue, split by whether the item can be named.
+     *
+     * @param stated   referrals carrying a V350 subject snapshot — agenda-ready
+     * @param unstated referrals with no snapshot: real rows, unnameable, and invisible until CE-13
+     */
+    public record Queue(List<CommitteeReferral> stated, List<CommitteeReferral> unstated) {
+        public int total() { return stated.size() + unstated.size(); }
     }
 
     /**

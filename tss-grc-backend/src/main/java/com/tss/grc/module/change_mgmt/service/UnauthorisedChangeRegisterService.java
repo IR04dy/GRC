@@ -148,7 +148,7 @@ public class UnauthorisedChangeRegisterService {
         Long org = TenantContext.getCurrentTenant();
         LocalDateTime now = LocalDateTime.now();
 
-        List<ChangeRequest> population = changeRepo.findPastAuthorisation(org, PAST_AUTHORISATION);
+        List<ChangeRequest> population = changeRepo.findByStatuses(org, PAST_AUTHORISATION);
 
         // The cell for each (type x risk), read once. A missing cell is a finding, not a default.
         Map<String, ChangeAuthorisationMatrix> cells = new HashMap<>();
@@ -268,7 +268,7 @@ public class UnauthorisedChangeRegisterService {
     /** The population the count is a fraction of — changes past their authorisation point. */
     @Transactional(readOnly = true)
     public long populationSize() {
-        return changeRepo.findPastAuthorisation(TenantContext.getCurrentTenant(), PAST_AUTHORISATION).size();
+        return changeRepo.findByStatuses(TenantContext.getCurrentTenant(), PAST_AUTHORISATION).size();
     }
 
     // ── disposition ──────────────────────────────────────────────────────────────────────────────

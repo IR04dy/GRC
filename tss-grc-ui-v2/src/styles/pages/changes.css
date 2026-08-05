@@ -585,3 +585,32 @@
 .changes-kpi-hint {
   margin: var(--sp-3) 0 0; font-size: var(--text-2xs); color: var(--ink-3);
 }
+
+/* ── CE-13 — the CAB workspace ──────────────────────────────────────────────
+   Its own selectors rather than reused governance ones: this is a route, not a
+   card in the governance stack, and the two will drift. */
+.cab-alert {
+  display: flex; align-items: flex-start; gap: var(--sp-2);
+  color: var(--danger-fg);
+}
+.cab-alert svg { flex-shrink: 0; margin-top: 2px; }
+.cab-alert p { margin: 2px 0 0; }
+.cab-fault {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  font-size: var(--text-2xs); color: var(--danger-fg); line-height: 1.55;
+}
+.cab-fault svg { flex-shrink: 0; }
+.cab-sitting {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
+  margin-bottom: var(--sp-3); font-size: var(--text-xs); color: var(--ink-2);
+}
+.cab-section {
+  margin: var(--sp-4) 0 2px; font-size: var(--text-xs);
+  font-weight: 650; color: var(--ink-1);
+}
+.cab-row-action { text-align: end; white-space: nowrap; }
+/* An untableable referral is dimmed, not hidden: it is real unfinished business
+   and hiding it is how two dead rows stayed invisible for a month. */
+.cab-orphan { background: var(--danger-bg-subtle, transparent); }
+.cab-orphan td { opacity: 0.85; }

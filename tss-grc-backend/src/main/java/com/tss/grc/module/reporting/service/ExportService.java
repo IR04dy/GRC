@@ -6,6 +6,7 @@ import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeResolutionRepository;
+import com.tss.grc.module.admin.committee.service.CommitteeAgendaJson;
 import com.tss.grc.module.platform.export.PdfFonts;
 import com.tss.grc.module.platform.export.PdfTheme;
 import com.tss.grc.module.platform.export.XlsxStyler;
@@ -691,7 +692,7 @@ public class ExportService {
                         // S7b's referral items carry a kind/mandatory marker; standing items do not,
                         // so an absent marker is rendered as standing rather than as unknown.
                         cell(t, itemType(it, ar));
-                        cell(t, str(it.get("minutes")));
+                        cell(t, str(firstNonBlankStr(it, "minutesAllocated", "minutes")));
                     }
                     doc.add(t);
                 }
@@ -914,16 +915,28 @@ public class ExportService {
         return v ? (ar ? "نعم" : "Yes") : (ar ? "لا" : "No");
     }
 
+    /**
+     * ⚠ CE-13 — this read the {@code titleEn}/{@code titleAr} keys only, and the platform writes the
+     * item title under <b>two</b> key shapes.
+     *
+     * <p>Measured across all 34 dev meetings: 24 agendas — every real committee, both quarters — key
+     * their items {@code titleEn}, and the 8 older DEMO ones plus <b>everything
+     * {@code populateAgenda} builds</b> key them {@code topicEn}. So this pack printed {@code —} for
+     * exactly the agendas S7b taught to carry the CAB queue, while the frontend's agenda list (which
+     * reads {@code topicEn}) printed empty bullets for the other 24. Both readers were wrong, in
+     * opposite directions, and S7f's probe passed because the meeting it exported was a seeded one.
+     *
+     * <p>Now delegated to {@link CommitteeAgendaJson} so there is one reader, and it accepts either
+     * shape. The same fault ran one field over — {@code isMandatory} vs {@code mandatory} in
+     * {@link #itemType}, and {@code minutesAllocated} vs {@code minutes} in the row builder.
+     */
     private static String agendaItemText(Map<String, Object> item, boolean ar) {
-        String t = str(item.get(ar ? "titleAr" : "titleEn"));
-        if ("—".equals(t)) t = str(item.get("titleEn"));
-        return t;
+        String t = CommitteeAgendaJson.topic(item, ar);
+        return t == null ? "—" : t;
     }
 
     private static String itemType(Map<String, Object> item, boolean ar) {
-        Object mandatory = item.get("mandatory");
-        if (Boolean.TRUE.equals(mandatory) || "true".equalsIgnoreCase(String.valueOf(mandatory)))
-            return ar ? "إلزامي" : "Mandatory";
+        if (CommitteeAgendaJson.mandatory(item)) return ar ? "إلزامي" : "Mandatory";
         return ar ? "قياسي" : "Standing";
     }
 

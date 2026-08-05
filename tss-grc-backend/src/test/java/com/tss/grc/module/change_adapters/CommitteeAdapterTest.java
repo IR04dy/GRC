@@ -3,6 +3,7 @@ package com.tss.grc.module.change_adapters;
 import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
 import com.tss.grc.module.admin.committee.service.CommitteeGateMapService;
 import com.tss.grc.module.admin.committee.service.CommitteeReferralService;
+import com.tss.grc.module.admin.committee.service.CommitteeService;
 import com.tss.grc.module.change_mgmt.spi.CommitteePort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,8 +44,9 @@ class CommitteeAdapterTest {
 
     @Mock private CommitteeReferralService referrals;
     @Mock private CommitteeGateMapService gateMap;
+    @Mock private CommitteeService committees;   // CE-13: meeting reads (the next sitting)
 
-    private CommitteeAdapter adapter() { return new CommitteeAdapter(referrals, gateMap); }
+    private CommitteeAdapter adapter() { return new CommitteeAdapter(referrals, gateMap, committees); }
 
     private static CommitteeReferral entity() {
         CommitteeReferral r = new CommitteeReferral();
@@ -131,7 +133,7 @@ class CommitteeAdapterTest {
 
     @Test
     void aWriteWithNoCommitteeEngineFailsLoudlyRatherThanPretending() {
-        CommitteeAdapter noEngine = new CommitteeAdapter(null, null);
+        CommitteeAdapter noEngine = new CommitteeAdapter(null, null, null);
 
         assertThatThrownBy(() -> noEngine.refer("CHANGE", 1L, "CAB", "APPROVAL", 13L, "x", null,
             new CommitteePort.SubjectRef("CHG-1", "t", null)))
@@ -146,7 +148,7 @@ class CommitteeAdapterTest {
 
     @Test
     void aReadWithNoEngineIsEmptyRatherThanAnError() {
-        CommitteeAdapter noEngine = new CommitteeAdapter(null, null);
+        CommitteeAdapter noEngine = new CommitteeAdapter(null, null, null);
 
         // Reads degrade; writes throw. A change register that 500s because no committee is wired
         // would make the whole module unusable on a tenant that has not constituted one yet.
