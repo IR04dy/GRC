@@ -24,13 +24,24 @@ public final class DataOfficerDtos {
     ) {}
 
     // ─── 1. DSR ────────────────────────────────────────────────────────
+    /**
+     * F2-123 — {@code receivedAt} is the moment the data subject's request reached the organisation,
+     * which is <b>not</b> the moment it was registered here. 9 of dev's 17 requests arrive by a
+     * channel where receipt necessarily precedes entry: {@code EMAIL}, {@code SDAIA_PORTAL},
+     * {@code CALL}, {@code BRANCH}, {@code SERVICE_CENTER}. PDPL Art.10's 30-day window runs from
+     * receipt, so it must be computed from this and not from {@code now()}.
+     *
+     * <p>Optional, and absence still means "arrived now" — so every existing caller, including the
+     * frontend, behaves exactly as before. This is a widening, not a break.
+     */
     public record CreateDsrRequest(
         @NotBlank String reference, @NotBlank String requestType,
         String channel,
         String requesterNameEn, String requesterNameAr,
         String requesterNationalId, String requesterEmail, String requesterPhone,
         String requestSummaryEn, String requestSummaryAr,
-        Long assignedUserId
+        Long assignedUserId,
+        java.time.LocalDateTime receivedAt
     ) {}
     public record TransitionDsrRequest(
         @NotBlank String toStatus,

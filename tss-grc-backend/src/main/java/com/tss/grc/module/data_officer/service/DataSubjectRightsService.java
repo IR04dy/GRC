@@ -80,8 +80,30 @@ public class DataSubjectRightsService {
         d.setRequestSummaryAr(req.requestSummaryAr());
         d.setAssignedUserId(req.assignedUserId());
         d.setStatus("RECEIVED");
-        d.setReceivedAt(LocalDateTime.now());
-        d.setSlaDeadline(LocalDateTime.now().plusDays(30));   // PDPL Art.10 — 30-day response window
+        // ── F2-123: PDPL Art.10's clock runs from RECEIPT, not from registration ────────────────
+        //
+        // This previously stamped LocalDateTime.now() for both, so a request that arrived by post,
+        // phone or branch last week and was entered today got a fresh 30-day window — up to 30 extra
+        // days beyond the statute, silently, in the organisation's favour. Measured in dev: 9 of 17
+        // requests arrive by a channel where receipt precedes entry (EMAIL, SDAIA_PORTAL, CALL,
+        // BRANCH, SERVICE_CENTER), and all 17 carried deadline = entry + 30d.
+        //
+        // ⚠ The breach path next door already did this correctly — sdaiaDeadline is
+        // req.detectedAt().plusHours(72), from the caller's real-world moment. Same module, same
+        // regulation family, opposite treatment; the inconsistency is what identified the defect.
+        //
+        // ⚠ A future receipt is refused; a PAST one is not, because late registration is precisely
+        // the case being fixed. Bounding a caller-supplied real-world moment is the right treatment
+        // when the caller is its only source — F2-121's reasoning, one module over. Stamping now()
+        // would be the mirror-image error.
+        LocalDateTime receivedAt = req.receivedAt() != null ? req.receivedAt() : LocalDateTime.now();
+        if (receivedAt.isAfter(LocalDateTime.now())) {
+            throw new IllegalStateException(
+                "Received-at " + receivedAt + " is in the future — a data-subject request cannot "
+                + "have arrived before it was sent.");
+        }
+        d.setReceivedAt(receivedAt);
+        d.setSlaDeadline(receivedAt.plusDays(30));   // PDPL Art.10 — 30 days from RECEIPT
         dsrRepo.save(d);
         support.writeTimeline("DSR", d.getId(), "DSR_RECEIVED", "RECEIVED",
             "DSR " + req.requestType() + " received via " + DataOfficerSupport.nullSafe(req.channel()),

@@ -2363,6 +2363,39 @@ Start-Service TssGrcBackend
 | **Fix** | Decide, then make one writer authoritative: either `ShariaService.purifyNcEvent` routes through `NC_ALLOWED` (and `DETECTED` leaves its allowed-from set), or `NC_ALLOWED` gains `DETECTED → INCOME_PURIFIED` so the map states what the module actually permits. Either way the two must agree — RC-A at the level of a single service |
 | **Lesson** | A state-machine test that reads the service's own map proves implementation-against-declaration for **that writer**. It says nothing about a second writer of the same field. Count the writers before trusting a machine test |
 
+## F2-123 · The PDPL 30-day clock started when the DPO typed the request in — FIXED
+
+|  |  |
+|---|---|
+| **ID** | F2-123 *(found writing F2-03's floor for `data_officer`; identified by an inconsistency inside the module rather than by reading the statute)* |
+| **Module** | `data_officer` — `DataSubjectRightsService.createDsr` |
+| **Severity** | **P1** — a statutory deadline silently extended, in the organisation's favour, on the majority of records |
+| **Current State** | ✅ **CLOSED 2026-08-06** (no migration — the column already existed and is already populated) |
+| **Problem** | PDPL Art.10 gives a controller 30 days to respond to a data-subject request, measured from **receipt**. `createDsr` stamped `receivedAt = LocalDateTime.now()` and `slaDeadline = LocalDateTime.now().plusDays(30)`, so the clock started when the request was *registered in the platform*, not when it *arrived at the organisation* |
+| **Measured 2026-08-06** | 17 requests in dev. **9 of them arrived by a channel where receipt necessarily precedes entry**: `EMAIL` 3, `SDAIA_PORTAL` 2, `CALL` 2, `BRANCH` 1, `SERVICE_CENTER` 1 — against `WEB` 6 and `MOBILE` 2 that are genuinely self-service. All 17 carried `sla_deadline = received_at + exactly 30d`. So a request that came in by post or telephone last week and was logged today received a **fresh 30-day window** — up to 30 days beyond the statute |
+| **⚠ How it was identified** | Not by reading PDPL, but by noticing that **the breach path next door does it correctly**: `sdaiaDeadline` is `req.detectedAt().plusHours(72)`, computed from the caller's real-world detection moment. Same module, same author, same regulation family, opposite treatment of the same question. **An inconsistency inside one module is a cheaper detector than any external standard** — one path is usually right |
+| **Fix** | `createDsr` takes an optional `receivedAt`; the deadline is `receivedAt.plusDays(30)`. A **future** receipt is refused (a request cannot have arrived before it was sent); a **past** one is not, because late registration is precisely the case being fixed |
+| **⚠ Not a break** | `receivedAt` is optional and absence still means "arrived now", so every existing caller — including the frontend, which does not send it — behaves exactly as before. A widening, not a change |
+| **⚠ Not server-stamped, deliberately** | F2-121's reasoning one module over: when the caller is the only source of a real-world moment, **bound their value rather than replace it**. Stamping `LocalDateTime.now()` is what produced the defect |
+| **Verified** | 11 unit checks, **10/10 mutations caught** — including reverting the clock to `LocalDateTime.now()`, ignoring `receivedAt`, removing the future bound, widening 30 days to 60, widening 72 hours to 168, and both overdue finders losing their exclusions |
+| **What this module gets RIGHT, recorded because three predecessors did not** | `data_officer` is the best-built of the four modules floored so far. **37 `hasPermission` guards and no business role named** — only `PLATFORM_ADMIN` appears, so none of F2-116's or F2-120's fictional-role class. **The statutory clocks exist and are consulted**: both deadlines are computed, remaining hours are surfaced per record, and `findOverdue`/`findOverdueSdaia` are counted on the dashboard, each excluding terminal statuses and the breach one additionally requiring `sdaiaNotifiedAt IS NULL`. That is the direct counter-example to **F2-119**, the same platform one module over with three deadline claims and no clock at all |
+| **Lesson** | Two paths in one module that treat the same question differently — a caller-supplied moment versus `LocalDateTime.now()` — are a defect detector that costs nothing to run and needs no domain expertise. **Diff the module against itself before diffing it against the regulation.** |
+
+## F2-124 · `spring.jackson.time-zone: UTC` shifts timezone-less `LocalDateTime` inputs by the client's offset
+
+|  |  |
+|---|---|
+| **ID** | F2-124 *(observed live while probing F2-123; recorded rather than concluded, because the fix is a platform-wide config decision)* |
+| **Module** | platform-wide — `application.yml:109 — spring.jackson.time-zone: UTC` |
+| **Severity** | **P3** — no arithmetic is wrong today, but a wall-clock a user typed is not the wall-clock that gets stored, and it can change the DATE |
+| **Current State** | 🔴 **OPEN**, needs measurement then a decision. Deliberately not changed by F2-03(d): altering a global Jackson timezone shifts every temporal field across 2,168 mappings |
+| **Observed** | Sending `2026-07-28T01:11:16` to `POST /api/v1/data-officer/dsr` stored `2026-07-27 22:11:16` — the field is `LocalDateTime`, which by definition carries **no** timezone, yet it moved by exactly the client/JVM offset (3h; JVM runs UTC, SQL Server and the client run UTC+3) |
+| **Why it is not a deadline bug** | Verified before filing: every deadline comparison uses the **JVM** clock on both sides — `sla_deadline` is written from a JVM value and `findOverdue` takes `now` as a parameter, and a grep confirms **no** SQL in the module compares these columns to `GETDATE()`. So the arithmetic is internally consistent and F2-123's fix is sound |
+| **Why it still matters** | A DPO in Riyadh recording *"the request arrived 2026-07-28 00:30"* stores `2026-07-27 21:30` — the **date changes**, and a statutory register that reports by day would show the wrong one. The same applies to every `LocalDateTime` the API accepts: breach detection moments, purification dates, meeting times |
+| **What to measure before deciding** | How many API-facing `LocalDateTime` fields represent a **user-asserted wall clock** (receipt, detection, a donation date) versus a **machine instant**. The two want opposite treatment: a wall clock must be stored verbatim, an instant must be normalised. `application.yml:109 — spring.jackson.time-zone: UTC` applies one rule to both |
+| **Candidate fixes, not yet chosen** | (a) leave the global setting and let `LocalDateTime` bind verbatim, which is Jackson's documented behaviour when the type is timezone-less — the shift suggests something else is converting, so **find that first**; (b) move user-asserted moments to `OffsetDateTime` so the caller's offset is explicit and preserved; (c) keep UTC and make every client send UTC, which is a frontend contract change |
+| **⚠ Where it came from** | My own probe asserted a stored value against the local-time string it sent, and failed. The failure was my instrument, not the platform — but chasing it surfaced a real question nobody had asked. **A probe assertion that fails for a timezone reason is worth reading rather than relaxing** |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.
