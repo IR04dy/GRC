@@ -137,6 +137,27 @@ public class OutsourcingService {
     public ArrangementResponse transitionArrangement(Long id, TransitionRequest req) {
         OutsourcingArrangement a = loadArrangement(id);
         validate(ARRANGEMENT_ALLOWED, a.getStatus(), req.toStatus(), "Arrangement");
+        // ── SAMA §4: material outsourcing must have PASSED THROUGH SAMA_NOTIFIED before LIVE ──
+        //
+        // F2-115. OutsourcingArrangement's class javadoc has said "Material outsourcing must
+        // transition through SAMA_NOTIFIED" since the module shipped, and nothing enforced it: the
+        // only gate below keys on isCoreActivity, which DEFAULTS TO FALSE. Measured 2026-08-05 in
+        // dev — 7 MATERIAL non-core arrangements are LIVE and one has no sama_notified_at at all.
+        //
+        // ⚠ The condition is `samaNotifiedAt == null`, deliberately NOT "a non-objection ref was
+        // supplied". The rule is about having passed through a state; a reference handed over in
+        // the same request that flips the record LIVE is caller-authored truth, which is RC-E and
+        // the defect F2-93/F2-103 closed elsewhere. ARRANGEMENT_ALLOWED keeps its
+        // BOARD_APPROVED → LIVE edge because that path is correct for NON_MATERIAL work; the
+        // materiality rule belongs in a gate, not in the edge set.
+        if ("LIVE".equals(req.toStatus())
+                && "MATERIAL".equals(a.getMateriality())
+                && a.getSamaNotifiedAt() == null) {
+            throw new IllegalStateException(
+                "Material outsourcing must transition through SAMA_NOTIFIED before LIVE "
+                + "(SAMA Outsourcing Regulation §4). Arrangement " + a.getReference()
+                + " is MATERIAL with no SAMA notification recorded.");
+        }
         // SAMA §5 gate: core activity requires non-objection ref before LIVE
         if ("LIVE".equals(req.toStatus())
                 && Boolean.TRUE.equals(a.getIsCoreActivity())

@@ -2240,6 +2240,39 @@ Start-Service TssGrcBackend
 | **Evidence** | `TSS-GRC-Platform-Bible/UX/UX_REDESIGN_BLUEPRINT.md` §"12 workspaces" table, read 2026-08-05: workspaces 2–13 name 42 packages, `ndi` absent · `module-registry.yaml` records 17 nulls, of which 16 are Base or adapters · ADR-018 §3 homes `ndi` to `DATA_AI_GOV` alongside `ai` |
 | **Lesson** | The field a review insists on "from day one" is worth carrying precisely because writing it down is what finds the hole. Had the registry omitted `workspace:` as undecided, this would have surfaced during Wave 4 as a missing screen instead of during Wave 1 as a row in a register |
 
+## F2-115 · Material outsourcing could go live unnotified — the rule was in the javadoc and nowhere else
+
+|  |  |
+|---|---|
+| **ID** | F2-115 *(found writing F2-03's test floor for `outsourcing` — the floor could not be written honestly until this was fixed)* |
+| **Module** | `outsourcing` — SAMA outsourcing governance, sold under the `TPRM` SKU |
+| **Severity** | **P1** — a Saudi bank could take material outsourcing live with no SAMA notification, in a module whose purpose is proving it did not |
+| **Current State** | 🟡 **The materiality gate is CLOSED 2026-08-05. The 60-day deadline is still absent — see the deferred half** |
+| **Problem** | `OutsourcingArrangement`'s class javadoc has stated since the module shipped: *"Material outsourcing must transition through `SAMA_NOTIFIED` within 60 calendar days of `BOARD_APPROVED`."* Nothing enforced any of it. The only gate on the `LIVE` transition keyed on `isCoreActivity`, which **defaults to `false`** — so a MATERIAL arrangement took the `BOARD_APPROVED → LIVE` edge with no notification and no error |
+| **Measured** | dev, 2026-08-05: **7 MATERIAL non-core arrangements are LIVE**, one with no `sama_notified_at` at all; 5 MATERIAL core-activity are LIVE and 3 of those carry no non-objection reference either (seeded rows, inserted below the service). 20 arrangements total |
+| **Why it is the F2-112 shape** | A documented control with no code, which no test could see because the module had **zero** tests — one of seven regulator-facing modules with none, out of 331 test files. Same family: the rule is written down, a reader believes it, and nothing can enforce it |
+| **⚠ Why it had to be fixed before the test floor, not after** | F2-03 asks the floor to cover *every state transition*. Written against the code as it stood, that floor would have asserted `BOARD_APPROVED → LIVE` succeeds for a MATERIAL arrangement — **pinning the defect as correct behaviour inside a ratchet**, which is worse than no test at all. The gate came first; the floor tests the corrected machine |
+| **Fix** | `OutsourcingService.transitionArrangement` refuses `LIVE` when materiality is MATERIAL and `sama_notified_at` is null. ⚠ The condition is deliberately **the stamp, not a supplied reference**: a non-objection ref typed into the same request that flips the record LIVE is caller-authored truth (RC-E), the shape F2-93/F2-103 closed elsewhere. `ARRANGEMENT_ALLOWED` keeps its `BOARD_APPROVED → LIVE` edge, because that path is correct for non-material work — a materiality rule belongs in a gate, not in the edge set |
+| **Deferred half, stated rather than quietly dropped** | The **60-day** clock is not built. Nothing computes a notification deadline, nothing reports one overdue, and there is no column for it. That is a clock plus a scheduler plus a KPI — the A17-D3 shape — not a conditional, and it needs the same treatment: a due date that is NULL when the start moment is missing, or it reports every arrangement compliant forever |
+| **Verified** | Unit: `OutsourcingLifecycleTest` — 11 checks, **8/8 mutations caught**, including one that weakens the gate back to accepting an inline reference. Live: **19/19** over real HTTP — 409 `ProblemDetail` naming the rule, the record unmutated by the refusal, LIVE succeeding after a genuine notification, NON_MATERIAL still direct, and an undeclared transition still refused |
+| **Lesson** | A class javadoc is a specification that no build step reads. When one states a rule in the imperative — *must*, *may only*, *within N days* — that sentence is a test case, and its absence from the code is a finding waiting to be written |
+
+## F2-116 · Half of the approval authority for material outsourcing does not exist
+
+|  |  |
+|---|---|
+| **ID** | F2-116 *(measured writing F2-03's authorisation-branch coverage for `outsourcing`)* |
+| **Module** | `outsourcing` — `OutsourcingController` |
+| **Severity** | **P2** — the officers the guard was written for cannot approve anything, silently and permanently. Not an exposure; an unusable control |
+| **Current State** | 🔴 **OPEN.** Pinned by `OutsourcingLifecycleTest` so a silent edit to any of the three guards fails the build |
+| **Problem** | Every state transition in the SAMA outsourcing register is gated by `APPROVE_GUARD` = `hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','CRO','CIO')`. Measured against `iam.roles` (58 roles, dev, 2026-08-05): **`CRO` and `CIO` do not exist.** So the effective approval authority is `PLATFORM_ADMIN` and `RISK_MANAGER` — the Chief Risk Officer and CIO the guard names cannot approve material outsourcing, and never could |
+| **Why it fails silently** | `hasAnyRole` gets **no** PLATFORM_ADMIN bypass and validates nothing against the role table, so a name that does not exist simply never matches. There is no error, no log line and no startup warning — the guard reads as a four-way authority and behaves as a two-way one. RC-C, and F2-52's measured ~50% miss rate across 647 guards, landing in a module that sells as regulatory evidence |
+| **Also affected** | `WRITE_GUARD` names `CIO` too, so its four become three. `READ_GUARD` names both, so its seven become five |
+| **⚠ Why it is filed and not fixed** | Two remedies exist and they are not equivalent. **(a)** Create `CRO`/`CIO` as roles and grant them — a governance decision about who holds authority in a customer's organisation, which is exactly what ADR-018/F2-56 treat as owner territory. **(b)** Convert the guards to `hasPermission` under F2-05, which is the ratified direction and would make the names irrelevant. Inventing two privileged roles in a data file to make a guard true would be the F2-14 anti-pattern, and inventing them here would pre-empt F2-05's design |
+| **Fix** | Fold into **F2-05** for this module: convert the three constants to `hasPermission` with a `TPRM:APPROVE` permission, grant to the roles that actually exist, and delete the fictional names. Until then the pin records the truth |
+| **Verified** | `OutsourcingLifecycleTest` asserts the three guard constants verbatim and records `CRO`/`CIO` as recited. A mutation that widens `APPROVE_GUARD` by one role is caught |
+| **Lesson** | A guard listing four roles looks twice as strong as one listing two. Reading role names as authority, without joining them to the role table, is how this platform accumulated 537 of these |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.
