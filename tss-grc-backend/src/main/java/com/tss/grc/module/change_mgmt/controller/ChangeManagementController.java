@@ -11,11 +11,13 @@ import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
 import com.tss.grc.module.change_mgmt.dto.ChangeConditionRequest;
 import com.tss.grc.module.change_mgmt.dto.ChangeModelRequest;
 import com.tss.grc.module.change_mgmt.dto.RatificationDtos;
+import com.tss.grc.module.change_mgmt.dto.UnauthorisedDispositionRequest;
 
 import com.tss.grc.module.change_mgmt.entity.*;
 import com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService;
 import com.tss.grc.module.change_mgmt.service.ChangeManagementService;
 import com.tss.grc.module.change_mgmt.service.ChangeModelService;
+import com.tss.grc.module.change_mgmt.service.UnauthorisedChangeRegisterService;
 import com.tss.grc.module.change_mgmt.spi.CommitteePort;
 import com.tss.grc.module.change_mgmt.spi.EvidencePort;
 import io.swagger.v3.oas.annotations.Operation;
@@ -52,6 +54,7 @@ public class ChangeManagementController {
     private final ChangeManagementService service;
     private final ChangeGovernanceHealthService governanceHealth;
     private final ChangeModelService modelService;   // S8e/CE-2
+    private final UnauthorisedChangeRegisterService unauthorisedRegister;   // S8f/CE-11
 
     /** Read a string out of a raw body. These endpoints take Maps, not DTOs, because {@code @Valid}
      *  fires BEFORE {@code @PreAuthorize} and a bean-validated body answers 400 to a caller who
@@ -515,6 +518,45 @@ public class ChangeManagementController {
             @Valid @RequestBody RatificationDtos.RatificationPolicyRequest body,
             Authentication auth) {
         return service.updateRatificationPolicy(body.slaBusinessDays(), body.escalationRole(), userIdOf(auth));
+    }
+
+    // ── S8f / CE-11: the unauthorised-change register ─────────────────────────
+
+    /**
+     * Reconcile every change past its authorisation point against the authorisation its cell demanded.
+     *
+     * <p>Closes G-11 (High). Distinct from {@code /ratification-register}, which is A17-D3's narrower
+     * sink and declares itself {@code EMERGENCY_RATIFICATION_ONLY}: this one covers the whole recorded
+     * population and declares its own blind spots in {@code undetectable}.
+     */
+    @GetMapping("/unauthorised-register")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Changes that went ahead without the authorisation their matrix cell required — CE-11.")
+    public UnauthorisedChangeRegisterService.Register unauthorisedRegister() {
+        return unauthorisedRegister.register();
+    }
+
+    /**
+     * Record an investigator's outcome for one finding.
+     *
+     * <p>{@code CHANGE:APPROVE}, not {@code CHANGE:WRITE}. Signing off an unauthorised change is a
+     * governance act about work that has already happened, and it must not sit inside the privilege of
+     * the people whose changes the register measures — the same reasoning that put the ratification
+     * SLA behind {@code APPROVE}.
+     *
+     * <p>⚠ A disposition annotates a finding; it never erases one. The finding stays derived and the
+     * KPI keeps counting it, so a clean dashboard cannot be reached by signing findings off.
+     */
+    @PostMapping("/unauthorised-register/{changeId}/{reasonCode}/dispose")
+    @PreAuthorize("hasPermission('CHANGE','APPROVE')")
+    @Operation(summary = "Record the outcome of investigating one unauthorised-change finding — CE-11.")
+    public UnauthorisedChangeDisposition disposeFinding(
+            @PathVariable Long changeId,
+            @PathVariable String reasonCode,
+            @Valid @RequestBody UnauthorisedDispositionRequest body,
+            Authentication auth) {
+        return unauthorisedRegister.dispose(changeId, reasonCode, body.state(), body.note(),
+                                            userIdOf(auth), usernameOf(auth));
     }
 
     // ── CH-17: freeze windows + change calendar + conflicts ───────────────────

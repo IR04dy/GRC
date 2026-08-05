@@ -715,6 +715,55 @@ export interface ChangeModelDto {
   status: 'DRAFT' | 'APPROVED' | 'SUSPENDED' | 'RETIRED';
   createdBy?: string | null; createdAt?: string | null;
 }
+/**
+ * S8f/CE-11 — one reconciliation failure between the authorisation a change required and the
+ * authorisation the platform can show it received.
+ *
+ * ⚠ `UNATTRIBUTED_AUTHORISATION` is **not** an unauthorised change: the votes satisfy the cell and
+ * only `cab_decision_at` is missing. Six of dev's eleven findings are that code, so a UI that styled
+ * them like the rest would show eight breaches where three exist.
+ */
+export interface UnauthorisedFindingDto {
+  changeId: number;
+  changeCode?: string | null;
+  titleEn?: string | null; titleAr?: string | null;
+  changeType: string; riskLevel: string; status: string;
+  reasonCode: 'NO_AUTHORISATION_RECORD' | 'INSUFFICIENT_APPROVALS' | 'UNATTRIBUTED_AUTHORISATION'
+            | 'NO_AUTHORISATION_POLICY' | 'EXPIRED_MODEL_APPLIED' | 'RATIFICATION_BREACHED';
+  severity: 'HIGH' | 'MEDIUM';
+  /** Whether the change is live. The difference between a breach and a catch. */
+  effective: boolean;
+  gateRequired?: string | null;
+  minApprovalsRequired?: number | null;
+  approvalsRecorded?: number | null;
+  cabDecisionStamped: boolean;
+  ratificationState?: string | null;
+  dispositionState?: 'ACCEPTED_RISK' | 'RETROSPECTIVELY_AUTHORISED' | 'REVERSED' | 'FALSE_POSITIVE' | null;
+  dispositionByName?: string | null;
+  dispositionAt?: string | null;
+  dispositionNote?: string | null;
+}
+/** The register, with the population it was found in and — deliberately — what it cannot look for. */
+export interface UnauthorisedRegisterDto {
+  scope: string;
+  findings: UnauthorisedFindingDto[];
+  population: number;
+  /** Genuine authority gaps. Excludes UNATTRIBUTED_AUTHORISATION, and counts disposed gaps too. */
+  authorityGaps: number;
+  unattributed: number;
+  open: number;
+  disposed: number;
+  /** Changes that took effect on an AUTO cell alone — a fact, not an accusation (S8e's territory). */
+  autoAuthorisedEffective: number;
+  byReason: Record<string, number>;
+  bySeverity: Record<string, number>;
+  /** Failure classes this reconciliation is blind to, each with a translated reason on screen. */
+  undetectable: string[];
+}
+export interface UnauthorisedDispositionDto {
+  id: number; changeRequestId: number; reasonCode: string; state: string;
+  note?: string | null; disposedByName: string; disposedAt: string;
+}
 /** Why a change is or is not backed by a live pre-approval. `reason` is always present. */
 export interface ChangeModelBacking {
   modelBacked: boolean;
@@ -862,6 +911,16 @@ export const changeApi = {
   changeModel:   (id: number) => api.get<ChangeModelBacking>(`/api/v1/changes/${id}/model`),
   applyModel:    (id: number, modelId: number, deviationNotes?: string) =>
     api.post<ChangeModelBacking>(`/api/v1/changes/${id}/model`, { modelId, deviationNotes }),
+
+  // S8f/CE-11 — the unauthorised-change register. Reading is CHANGE:READ; recording an outcome is
+  // CHANGE:APPROVE, because signing off work that already happened must not sit inside the privilege
+  // of the people whose changes the register measures.
+  unauthorisedRegister: () =>
+    api.get<UnauthorisedRegisterDto>('/api/v1/changes/unauthorised-register'),
+  disposeFinding: (changeId: number, reasonCode: string, state: string, note?: string) =>
+    api.post<UnauthorisedDispositionDto>(
+      `/api/v1/changes/unauthorised-register/${changeId}/${encodeURIComponent(reasonCode)}/dispose`,
+      { state, note }),
 
   freezeWindows: () => api.get<ChangeFreezeWindowDto[]>('/api/v1/changes/freeze-windows'),
   createFreeze:  (body: Partial<ChangeFreezeWindowDto>) => api.post<ChangeFreezeWindowDto>('/api/v1/changes/freeze-windows', body),

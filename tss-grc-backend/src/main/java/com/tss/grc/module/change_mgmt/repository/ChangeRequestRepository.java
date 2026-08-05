@@ -112,6 +112,24 @@ public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, Lo
     java.util.List<Object[]> countByRatificationStateGrouped(@Param("orgId") Long orgId);
 
     /**
+     * S8f / CE-11 — changes that have passed the point where authorisation should already exist.
+     *
+     * <p>The population the unauthorised-change reconciliation runs over. The status set is supplied
+     * by {@code UnauthorisedChangeRegisterService.PAST_AUTHORISATION} rather than inlined here, so the
+     * definition of "past authorisation" lives in one place and a test can read it.
+     *
+     * <p>Ordered by id so the register is stable between reads — a findings list that reshuffles
+     * makes two exports of the same data look like different data.
+     */
+    @Query("""
+        SELECT c FROM ChangeRequest c
+        WHERE c.organisationId = :orgId AND c.status IN :statuses
+        ORDER BY c.id ASC
+        """)
+    java.util.List<ChangeRequest> findPastAuthorisation(@Param("orgId") Long orgId,
+                                                        @Param("statuses") java.util.List<String> statuses);
+
+    /**
      * A17-D3: stamp the escalation timestamp without loading or saving the entity.
      *
      * <p>Native single-statement UPDATE on purpose. The sweep runs off-request and

@@ -15,5 +15,11 @@ public interface ChangeModelUsageRepository extends JpaRepository<ChangeModelUsa
     List<ChangeModelUsage> findByOrganisationIdAndChangeModelId(
         Long organisationId, Long changeModelId);
 
+    /**
+     * Every live binding in the tenant — S8f reads them all to check each still rests on an
+     * unexpired model, rather than issuing one query per change in the register's population.
+     */
+    List<ChangeModelUsage> findByOrganisationId(Long organisationId);
+
     long countByOrganisationId(Long organisationId);
 }

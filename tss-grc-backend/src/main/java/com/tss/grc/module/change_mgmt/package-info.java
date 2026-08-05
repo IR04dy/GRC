@@ -42,6 +42,31 @@
  * and F2-96 — both gates once pointed at committees with zero voting seats while governance-health
  * reported healthy). Operators: {@code docs/change-manager/CAB_OPERATING_RUNBOOK.md}.
  *
+ * <p>⚠ <b>Two routes satisfy that gate, and code which reads only one of them is wrong.</b> A change
+ * reaches {@code CAB_APPROVED} either on recorded {@code change_approvals} votes or — when it has
+ * been referred — on the committee's carried resolution, which is the system of record for that
+ * route and writes <b>no</b> vote rows in this module at all. Ask
+ * {@link com.tss.grc.module.change_mgmt.spi.CommitteePort#decisionApproves} rather than counting
+ * votes; the reconciliation below was drafted counting votes only and would have reported every
+ * committee-routed change — the platform's preferred path — as unauthorised.
+ *
+ * <h3>Reconciling what was authorised against what went ahead</h3>
+ * <p>{@code UnauthorisedChangeRegisterService} (S8f/CE-11) answers "did anything go ahead without
+ * authority?" for every change past its authorisation point. Findings are <b>derived on each read</b>
+ * from the matrix, the approval trail, the committee route and the status, so a verdict cannot drift
+ * from the rows behind it; only the investigator's outcome is stored
+ * ({@code change_unauthorised_disposition}, V355) because a human judgement cannot be recomputed.
+ *
+ * <p>An <b>authority gap</b> (approvals short of the cell) and an <b>unattributed authorisation</b>
+ * (approvals present, {@code cab_decision_at} absent — F2-103's legacy) are separate reason codes at
+ * separate severities, and only the first is counted as an unauthorised change. A disposition
+ * annotates a finding and never erases it; there is no {@code CLOSED} outcome and the KPI counts
+ * disposed gaps, so the number cannot be cleared by signing findings off. Two failure classes are
+ * declared <b>undetectable</b> in every response rather than omitted: an unticketed production change
+ * (no drift feed exists) and implementation inside a freeze window
+ * ({@code implementation_started} is NULL on every change, so the predicate would be UNKNOWN and
+ * report compliance forever — the defect A17-D3 hit with {@code ratification_due_at}).
+ *
  * <h3>Obligations and their proof</h3>
  * <p>A CAB may approve <em>subject to conditions</em> ({@code change_condition}). Imposing and
  * waiving are approval acts ({@code CHANGE:APPROVE}); recording one satisfied is operational work

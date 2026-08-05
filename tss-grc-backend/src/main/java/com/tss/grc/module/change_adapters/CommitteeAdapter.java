@@ -75,6 +75,33 @@ public class CommitteeAdapter implements CommitteePort {
     }
 
     /**
+     * S8f / CE-11 — the non-throwing form, and deliberately implemented by <b>calling the assertion</b>.
+     *
+     * <p>The obvious alternative is to read the resolution tally here and compare it to
+     * {@code minApprovals}. That is precisely the second, weaker answer to "was this quorate?" that
+     * this port's javadoc warns about: the engine's assertion also consults the meeting's quorum
+     * source and the minutes' approval state, and a local tally would silently disagree with it the
+     * first time either changes.
+     *
+     * <p>The narrow catch is the cost of reusing one answer. {@code IllegalStateException} is the
+     * engine-unavailable signal from {@link #requireEngine()} and is <b>not</b> swallowed — a
+     * reconciliation that treated "the engine is missing" as "the committee did not approve" would
+     * invent findings, which is the opposite failure to the one this method fixes.
+     */
+    @Override
+    public boolean decisionApproves(String sourceModule, Long sourceEntityId, int minApprovals) {
+        requireEngine();
+        try {
+            referrals.assertDecisionApproves(sourceModule, sourceEntityId, minApprovals);
+            return true;
+        } catch (IllegalStateException engineUnavailable) {
+            throw engineUnavailable;
+        } catch (RuntimeException notApproved) {
+            return false;
+        }
+    }
+
+    /**
      * Re-reads the referral before enriching, because the engine's {@code enrich} takes its own
      * entity and the port carries a projection. One extra read on a detail-panel path, and the
      * alternative — widening {@link ReferralView} until it could be converted back — is how a

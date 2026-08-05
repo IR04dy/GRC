@@ -340,12 +340,40 @@ must constitute its CAB and map the gates before any `CAB`/`ECAB` change can be 
 — otherwise every such approval is refused, correctly, with a message naming the missing
 configuration. Step-by-step: **`docs/change-manager/CAB_OPERATING_RUNBOOK.md`**.
 
-**Not built yet** (tracked as CE-2, CE-8, CE-10, CE-11, CE-13 in
+**The unauthorised-change register** (`GET /api/v1/changes/unauthorised-register`,
+`CHANGE:READ`) reconciles every change past its authorisation point against the authorisation
+its `(type × risk)` cell required, and closes G-11. Findings are **derived on every read** from
+the matrix, the approval trail and the status, so they cannot drift from the rows; only the
+investigator's outcome is stored (`POST .../{changeId}/{reasonCode}/dispose`, `CHANGE:APPROVE`,
+V355).
+
+Two distinctions carry the feature:
+
+- **An authority gap is not the same as an unattributed authorisation.** Six of dev's eleven
+  findings satisfy their cell's `min_approvals` in full and lack only `cab_decision_at` (F2-103's
+  legacy). Those are reported as `UNATTRIBUTED_AUTHORISATION` at MEDIUM and are excluded from the
+  headline count — folding them in would report eight unauthorised changes where three is the truth.
+- **Authorisation has two routes.** A referred change is authorised by the committee's carried
+  resolution, which writes no `change_approvals` rows at all (Track D). The reconciliation asks the
+  engine through `CommitteePort.decisionApproves`, because a check that read only the vote table
+  would flag the platform's *preferred* route as the defect.
+
+A disposition **annotates** a finding and never erases one: there is no `CLOSED` state, and the
+`unauthorisedChangeCount` KPI counts disposed gaps too, so a clean dashboard cannot be reached by
+signing findings off.
+
+⚠ **What it cannot see is published in the payload and on screen** (`undetectable`): a production
+change that was never ticketed here — that needs a configuration-drift feed and this deployment has
+none (measured: no CMDB, no baseline table, no tables in the `integrations` schema) — and
+implementation inside a freeze window, because `implementation_started` is NULL on every change, so
+the predicate would compare against NULL and report every change compliant forever (A17-D3's
+`ratification_due_at` defect, avoided by declaring it).
+
+**Not built yet** (tracked as CE-8, CE-10, CE-13 in
 `CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md`): a *published* forward
 schedule of change and declared service outage (the calendar, freeze windows and conflict
 detection exist, the publication act does not); workflow-engine adoption as the 15th
-module; the unauthorised-change register (emergency ratification is its interim sink);
-and the CAB workspace as its own frontend surface.
+module; and the CAB workspace as its own frontend surface.
 
 ---
 

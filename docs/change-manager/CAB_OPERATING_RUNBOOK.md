@@ -261,7 +261,33 @@ a change-management artefact.
 
 Every export is written to the audit ledger.
 
-### §8.1 Reading the decision register
+### §8.1 The unauthorised-change register
+
+`Governance` tab → **Unauthorised changes**. One row per change that went ahead without the
+authorisation its risk cell required. Read the two headline numbers separately:
+
+| Number | Means |
+|---|---|
+| **Authority gaps** | The approvals fall short of what the cell demanded, or no cell defines it, or an emergency change was never ratified, or the change model behind it has lapsed. These are the compliance findings. |
+| **Approved but unattributed** | The votes are on record and satisfy the cell — only `cab_decision_at` is missing, on changes decided before the stamp was written. **Not** unauthorised. |
+| **Took effect on AUTO alone** | Not a finding: the tenant's own matrix says `STANDARD`/`LOW` needs nobody. Shown because a CAB chair should be able to see how much went live on a type label — see §3.1. |
+
+⚠ **The gap count includes findings you have already investigated.** Recording an outcome annotates
+a finding; it does not remove it, and there is no "closed" outcome. You cannot reach zero by signing
+things off — only by recording the missing authority.
+
+Recording an outcome needs `CHANGE:APPROVE`, not `CHANGE:WRITE`: signing off work that already
+happened must not sit inside the privilege of the people whose changes the register measures. The
+four outcomes are risk accepted, authorised after the fact, change reversed, and finding incorrect.
+The last is deliberate — a detector you cannot contradict is one people route around.
+
+⚠ **What the register cannot see** is listed at the bottom of the card. It reconciles *recorded*
+changes: a change made in production that never got a ticket here is invisible to it, and so is an
+implementation inside a freeze window (the implementation start time is not recorded on any change
+yet). Both are stated rather than omitted, because a register with invisible gaps reads exactly like
+one with none.
+
+### §8.2 Reading the decision register
 
 One row per change **past a decision point** — which includes deferrals and requests for more
 information, because those are decisions the committee took. Each row answers two separate

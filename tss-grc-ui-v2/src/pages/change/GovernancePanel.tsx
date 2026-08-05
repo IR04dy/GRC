@@ -14,6 +14,7 @@ import {
 } from '../../lib/api';
 import { canExport } from '../../lib/auth';
 import { ChangeModelCatalogue } from './ChangeModelCatalogue';
+import { UnauthorisedChangeRegister } from './UnauthorisedChangeRegister';
 
 const GATE_TONE: Record<string, BadgeTone> = { AUTO: 'success', CAB: 'info', ECAB: 'warning' };
 const RISK_TONE: Record<string, BadgeTone> = { LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger' };
@@ -115,6 +116,12 @@ export function GovernancePanel({ toast }: { toast: ReturnType<typeof useToast> 
           </div>
         </Card>
       )}
+
+      {/* S8f/CE-11 — the unauthorised-change register goes above the matrix and the catalogue for the
+          same reason the decision register goes above everything: it is the one card that answers
+          "did anything go ahead without authority?", and the two cards below it explain what authority
+          was supposed to be. G-11 is the module's last open High. */}
+      <UnauthorisedChangeRegister toast={toast} />
 
       {/* S8e/CE-2 — the model catalogue sits directly above the authorisation matrix, because the
           matrix's AUTO cell is exactly what a model backs. Reading them in the other order tells you

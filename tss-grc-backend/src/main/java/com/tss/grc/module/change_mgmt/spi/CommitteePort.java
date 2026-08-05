@@ -111,6 +111,26 @@ public interface CommitteePort {
      */
     void assertDecisionApproves(String sourceModule, Long sourceEntityId, int minApprovals);
 
+    /**
+     * S8f / CE-11 — the same question as {@link #assertDecisionApproves}, asked without throwing.
+     *
+     * <p><b>Why this had to exist.</b> {@code CAB_APPROVED} has <b>two</b> legitimate routes: recorded
+     * {@code change_approvals} votes, or — for a referred change — the committee's carried resolution,
+     * which is the system of record and writes <em>no</em> vote rows in this module (Track D). The
+     * unauthorised-change reconciliation reads the vote table, so without this method it would report
+     * every committee-routed change as having no authorisation on record — reporting the platform's
+     * <em>preferred</em> route, the one S6 and S7 exist to provide, as an unauthorised change.
+     *
+     * <p>It is a predicate and not a re-derivation: the implementation delegates to the same engine
+     * call {@link #assertDecisionApproves} uses, so there is still exactly one answer to "was this
+     * quorate?" — the thing this port's javadoc warns about two paragraphs up. What it must never
+     * become is a local tally.
+     *
+     * <p>Returns {@code false} when there is no referral, no carried resolution, or the resolution
+     * does not approve — a reconciliation that cannot see authority must not assume it (S6b-i).
+     */
+    boolean decisionApproves(String sourceModule, Long sourceEntityId, int minApprovals);
+
     /** Add resolution outcome/tally and meeting status/quorum to a response map. */
     void describe(ReferralView referral, Map<String, Object> out);
 

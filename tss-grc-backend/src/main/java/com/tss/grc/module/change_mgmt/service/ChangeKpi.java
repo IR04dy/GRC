@@ -103,8 +103,17 @@ public record ChangeKpi(
         public static final String NO_SUBMISSION_TIMESTAMP = "NO_SUBMISSION_TIMESTAMP";
         /** {@code pir_reviewed_at}: 0 of 17 — and F2-105 is why (the card 400'd on every save). */
         public static final String NO_PIR_TIMESTAMPS = "NO_PIR_TIMESTAMPS";
-        /** CE-11's unauthorised-change register is not built; A17-D3's interim sink is scoped narrower. */
-        public static final String CE11_REGISTER_ABSENT = "CE11_REGISTER_ABSENT";
+        /**
+         * The unauthorised-change register bean is absent on this deployment.
+         *
+         * <p>⚠ Renamed from {@code CE11_REGISTER_ABSENT} by S8f, and the rename is the point: that code
+         * meant "CE-11 has not been built", which stopped being true the moment
+         * {@code UnauthorisedChangeRegisterService} shipped. A blocker that describes a gap the
+         * platform has since closed is the stale-documentation defect
+         * {@code ChangeDocumentationFreshnessTest} exists to catch, one layer down — it would have gone
+         * on telling an operator to wait for a register they already had.
+         */
+        public static final String CE11_REGISTER_UNAVAILABLE = "CE11_REGISTER_UNAVAILABLE";
         /** S7b measured it and pinned it: {@code CommitteeMeeting} has no publication act at all. */
         public static final String NO_PUBLICATION_ACT = "NO_PUBLICATION_ACT";
         /** Attendance rows: 4 of 34 meetings in dev, 0 of 32 in prod. */
@@ -116,7 +125,7 @@ public record ChangeKpi(
 
         public static final java.util.List<String> VALUES = java.util.List.of(
             NO_IMPLEMENTATION_TIMESTAMPS, NO_SUBMISSION_TIMESTAMP, NO_PIR_TIMESTAMPS,
-            CE11_REGISTER_ABSENT, NO_PUBLICATION_ACT, NO_ATTENDANCE_RECORDS,
+            CE11_REGISTER_UNAVAILABLE, NO_PUBLICATION_ACT, NO_ATTENDANCE_RECORDS,
             NO_DECIDED_REFERRALS, COMMITTEE_ENGINE_UNAVAILABLE);
 
         private Blocked() { }

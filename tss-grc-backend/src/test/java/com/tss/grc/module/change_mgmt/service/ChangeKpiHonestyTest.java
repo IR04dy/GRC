@@ -149,7 +149,7 @@ class ChangeKpiHonestyTest {
 
         for (ChangeKpi k : List.of(ChangeKpi.noData("e", ChangeKpi.PCT, 0L),
                                    ChangeKpi.notMeasurable("f", ChangeKpi.PCT,
-                                       ChangeKpi.Blocked.CE11_REGISTER_ABSENT)))
+                                       ChangeKpi.Blocked.CE11_REGISTER_UNAVAILABLE)))
             assertThat(k.value())
                 .as("%s is %s — a number here is the fabrication this class exists to prevent",
                     k.key(), k.basis())

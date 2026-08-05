@@ -88,15 +88,19 @@ public class ChangeKpiService {
     private final ChangeRequestRepository changeRepo;
     private final ChangeConditionRepository conditionRepo;
     private final ChangeGovernanceHealthService health;
+    /** S8f/CE-11. Optional so a unit test can build the pack without the reconciliation wired. */
+    private final UnauthorisedChangeRegisterService unauthorisedRegister;
     private final EntityManager em;
 
     public ChangeKpiService(ChangeRequestRepository changeRepo,
                             @Autowired(required = false) ChangeConditionRepository conditionRepo,
                             @Autowired(required = false) ChangeGovernanceHealthService health,
+                            @Autowired(required = false) UnauthorisedChangeRegisterService unauthorisedRegister,
                             EntityManager em) {
         this.changeRepo = changeRepo;
         this.conditionRepo = conditionRepo;
         this.health = health;
+        this.unauthorisedRegister = unauthorisedRegister;
         this.em = em;
     }
 
@@ -138,10 +142,22 @@ public class ChangeKpiService {
         out.add(ChangeKpi.pctOfSubset(FAILED_CHANGE_RATE, failed,  reachedEnd, reachedEnd));
         out.add(ChangeKpi.pctOfSubset(ROLLBACK_RATE,      rolled,  reachedEnd, reachedEnd));
 
-        // CE-11's register does not exist. A zero here would assert "no unauthorised changes", which
-        // is a compliance claim nothing in the platform can currently support.
-        out.add(ChangeKpi.notMeasurable(UNAUTHORISED_COUNT, ChangeKpi.COUNT,
-            ChangeKpi.Blocked.CE11_REGISTER_ABSENT));
+        // S8f/CE-11 — this was the pack's NOT_MEASURABLE entry until the register existed, and it is
+        // now computed. ⚠ Three things about the number:
+        //   * it counts CHANGES, not findings — one change failing for two reasons is one unauthorised
+        //     change, and counting findings would inflate a compliance figure;
+        //   * it counts only genuine AUTHORITY GAPS. Six of dev's eleven findings are
+        //     UNATTRIBUTED_AUTHORISATION (the votes are on record; the decision stamp is not), and
+        //     folding those in would report eight where three is the truth — more than double;
+        //   * it counts DISPOSED gaps too, so the figure cannot be cleared by signing findings off.
+        // The population is changes past their authorisation point, not all changes: dividing by rows
+        // that were never due for authorisation is F2-107 in a new denominator.
+        if (unauthorisedRegister != null)
+            out.add(ChangeKpi.count(UNAUTHORISED_COUNT,
+                unauthorisedRegister.authorityGapChangeCount(), unauthorisedRegister.populationSize()));
+        else
+            out.add(ChangeKpi.notMeasurable(UNAUTHORISED_COUNT, ChangeKpi.COUNT,
+                ChangeKpi.Blocked.CE11_REGISTER_UNAVAILABLE));
 
         // Lead time to CAB decision. There is no submitted_at column — created_at is the record's
         // birth, not its submission — so this is reported against what exists and named for it.

@@ -69,12 +69,12 @@ PROD_DB = "TSS_GRC_Deployment"
 # ── the published figures this script exists to check ────────────────────────────────────────────
 # Every entry is "what MEASURED_BASELINE.md says today". Updating the doc means updating this dict
 # in the same commit; that pairing is the whole point — a number with no checker goes stale silently.
-PUBLISHED_AS_OF = "2026-08-03"          # ← bump ONLY when the doc is regenerated
+PUBLISHED_AS_OF = "2026-08-05"          # ← bump ONLY when the doc is regenerated
 PUBLISHED = {
     "module_packages": 59,
     "module_loc": 192_113,
-    "entities_strict": 417,             # FILES declaring an entity (the doc published 417: a substring
-    "entity_decls": 430,                # count). Entity CLASSES — 13 more, all in data_officer.
+    "entities_strict": 418,             # FILES declaring an entity (the doc published 417: a substring
+    "entity_decls": 431,                # count). Entity CLASSES — 13 more, all in data_officer.
     "endpoints": 2_168,
     "writes": 1_219,
     "main_preauthorize": 2_156,
@@ -85,10 +85,10 @@ PUBLISHED = {
     "zero_test_packages": 15,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 342,
-    "migration_head": 354,
+    "migration_files": 343,
+    "migration_head": 355,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
-    "fe_pages": 340,
+    "fe_pages": 341,
     "fe_page_folders": 114,
     "fe_routes": 328,
     "fe_nav_entries": 193,
