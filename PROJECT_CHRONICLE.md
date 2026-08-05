@@ -543,6 +543,60 @@ Operators: `docs/change-manager/CAB_OPERATING_RUNBOOK.md` §8.4.
 
 ---
 
+#### The last two SoD gates (CE-15) — and the one that was already there and could not fire
+
+`§10` listed two separation-of-duties gates as unbuilt: *PIR approver ≠ change implementer* and
+*condition satisfied_by ≠ the condition's own owner*. Both compare people, so the first question was
+what identity those fields carry. V357 — two nullable columns, **no backfill**.
+
+**What the measurement said.** Every one of the four fields is a free-text label with no id, and in dev
+the labels are **teams**: `implementer_name` holds 4 values, 0 of which resolve to a user (`'AppSec on-call'`, `'HR Comms'`); the
+PIR reviewer came from `strFromBody(body, "reviewer")` — a string the caller supplies in the same request; `change_condition.owner_name` has no id
+column at all. A gate over the first pair compares two strings one caller types; a gate over the second
+compares a real user id to a label.
+
+**And the same measurement found a shipped control with the same hollow core — F2-112.**
+`assertNotSelfWaiver` refuses a change's requester or owner from waiving a condition on its own approval. It is
+written correctly, preferring ids and falling back to names. But **nothing ever wrote the ids**:
+`requested_by_id` and `change_owner_id` are NULL on **17 of 17** dev changes because `create` never captured the principal.
+So it always compared a username (`admin`) against a team label (`'CloudOps'`) — 0 of 28 such labels
+resolve to a user. The refusal could not fire for any change in either database, and its unit tests were
+green the whole time: they prove the rule, and nothing asked whether the rule could run.
+
+**So the slice fixed the root cause before building anything on top of it.** `create` now captures the
+raiser's **id** — and deliberately not the name, because a team is a legitimate requesting party and
+overwriting what the tenant typed would destroy information to satisfy a gate. The PIR reviewer becomes
+the authenticated principal, exactly as F2-93/F2-103 made the CAB decision author the principal; a
+client-supplied name is still accepted when there is **no** principal, and can never override one.
+
+**Three answers, not two.** `ChangeSoD` is now the platform's single self-review comparison, with three
+callers (the waiver, the PIR, the condition closure) where there were three inline copies waiting to
+happen. Its verdict is SAME / DIFFERENT / UNVERIFIABLE, and `strength()` separately reports whether an
+answer rested on ids or on a label. `GET /api/v1/changes/sod-coverage` publishes `enabledButBlind` per gate — a gate switched on over a
+population it cannot decide for a single record. That row is the instrument F2-112 needed.
+
+⚠ **My first draft of that comparison weakened the control it was extracting.** It keyed the name
+fallback on *both* sides lacking an id, so a signed-in user whose name matched a legacy change's
+requester got UNVERIFIABLE and was **not** refused. S7e's own
+`ChangeConditionLifecycleTest.theLegacyFallbackIsAFallbackNotThePrimaryTest` — written for DF-4/F2-24 — caught it. A refactor that stops refusing something is not a
+refactor, and the worry that produced the draft (a name match against a team label reading as clean)
+belongs in the *instrument*, never in the *verdict*.
+
+⚠ **§10's qualifier has no source.** It scopes the closure gate to "where the model demands
+independence"; no independence flag exists for a change model anywhere — the only such columns are on
+`admin.committee_templates.independence_required`, `admin.committee_member_terms.is_independent` and `compliance.findings`. Inventing one would be F2-62's shape, a control keyed on a
+field nobody sets. The gate is unconditional and the qualifier is recorded as refuted, the way S6's two
+deferred columns were. It ships enabled safely: `change_mgmt.change_condition` holds **0 rows** in both databases.
+
+⚠ **And CE-13's finding blocked this slice's own probe.** The first PIR walk used a NORMAL/LOW change,
+which is CAB-gated — and dev's CAB has no voting seats, so A17-D2 refused it with a 409 at
+`CAB_APPROVED`. The walk moved to the STANDARD/LOW AUTO cell. A programme's findings start showing up in
+its own test fixtures.
+
+Operators: `docs/change-manager/CAB_OPERATING_RUNBOOK.md` §8.5.
+
+---
+
 ## 4. Users, roles & demo tenants
 
 ### 4.1 Seeded logins (dev/demo — **rotate all of these on any real deployment**)

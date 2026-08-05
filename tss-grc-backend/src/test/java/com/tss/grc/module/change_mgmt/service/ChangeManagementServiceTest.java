@@ -253,6 +253,7 @@ class ChangeManagementServiceTest {
         body.put("pirObjectivesMet", true);
         body.put("pirLessons", "Stage the config change earlier next time.");
         body.put("pirFollowUp", "Open CAPA to automate the pre-flight check.");
+        // CE-15: still supplied, and deliberately IGNORED now — see the assertion below.
         body.put("reviewer", "Dana Reviewer");
         ChangeRequest out = service.transition(CHANGE_ID, "POST_REVIEW", body);
 
@@ -262,7 +263,15 @@ class ChangeManagementServiceTest {
         assertThat(out.getPirObjectivesMet()).isTrue();
         assertThat(out.getPirLessons()).contains("Stage the config");
         assertThat(out.getPirFollowUp()).contains("CAPA");
-        assertThat(out.getPirReviewedBy()).isEqualTo("Dana Reviewer");
+        // ⚠ CE-15 changed this assertion, and the change IS the point. The reviewer used to be
+        // whatever string the caller put in `reviewer` — which made "the PIR approver may not be the
+        // implementer" unenforceable, because one request supplied both sides of the comparison. The
+        // reviewer is now the authenticated principal, exactly as F2-93/F2-103 made the CAB decision
+        // author the principal. A client-supplied name is still recorded when there is NO principal at
+        // all (an off-request path), but it can never override one — that override would be the bypass.
+        assertThat(out.getPirReviewedBy())
+            .as("the signed-in principal, not the name in the body")
+            .isEqualTo("cab-member");
         assertThat(out.getPirReviewedAt()).isNotNull();
     }
 

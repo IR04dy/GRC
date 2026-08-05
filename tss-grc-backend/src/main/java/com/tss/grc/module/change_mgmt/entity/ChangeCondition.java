@@ -65,6 +65,17 @@ public class ChangeCondition {
     @Column(name = "owner_name", length = 255)
     private String ownerName;
 
+    /**
+     * CE-15 / V357 — the owner's user id when the imposer named a real user.
+     *
+     * ⚠ {@code ownerName} alone cannot carry a SoD gate: measured across the sibling fields on
+     * {@code change_requests}, 0 of 32 such labels resolve to any user — they are teams and roles
+     * ('IAM Team', 'CISO', 'CloudOps'). Nullable, and its absence makes the closure gate report
+     * UNVERIFIABLE rather than clean (F2-112).
+     */
+    @Column(name = "owner_id")
+    private Long ownerId;
+
     @Column(name = "due_at")
     private LocalDateTime dueAt;
 

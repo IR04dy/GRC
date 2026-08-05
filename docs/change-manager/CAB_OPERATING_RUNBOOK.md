@@ -447,6 +447,39 @@ the *Not on the agenda* rung, and a one-click fix in the committee workspace.
 
 ---
 
+### §8.5 Separation of duties — what the gates refuse, and what they cannot see
+
+Three self-review refusals are live. Each answers 409 and names the reason:
+
+| Rule | Refused when |
+|---|---|
+| You may not waive a condition on your own change | you raised or own the change |
+| You may not review your own implementation | you are the change's `implementerName` |
+| You may not close your own condition | you are the condition's `ownerName` |
+
+The PIR reviewer is **whoever is signed in** — not a name typed into a form. A `reviewer` field in a
+request body is ignored while a real session exists. That is deliberate: while the reviewer was a
+supplied string, "the approver may not be the implementer" compared two values the same person chose.
+
+**⚠ Read `GET /api/v1/changes/sod-coverage` before trusting any of the three.** A gate can only decide a record whose people the
+platform captured as *users*. Where a change names a **team** — `'CloudOps'`, `'IAM Team'` — the comparison
+rests on a text match that will never fire, and the report says so:
+
+| Column | Means |
+|---|---|
+| **population** | records the gate applies to |
+| **checkable** | records whose compared party is a real user — the gate can decide these |
+| **labelOnly** | the party is a free-text label; the gate is effectively blind |
+| **absent** | the party is not recorded at all |
+| **enabledButBlind** | ⚠ **the gate is on and can decide nothing.** Measured on this platform: true for the waiver rule over all 17 existing changes (F2-112) |
+
+**How to drive it down.** Changes raised from now on capture the raiser automatically, so coverage
+improves as work flows through. For the older records there is no safe automatic fix — no one can map
+`'CloudOps'` to a person — so either name a user on the change, or accept that the gate is advisory for
+those rows. What you must not do is read a green transition as evidence the gate checked something.
+
+---
+
 ## §9 KPIs — and how to read them
 
 `GET /api/v1/changes/analytics` returns `kpis`: **19** ITIL/ISO metrics. Each one carries its

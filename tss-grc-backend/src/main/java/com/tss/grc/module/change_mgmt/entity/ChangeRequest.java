@@ -217,6 +217,16 @@ public class ChangeRequest {
     @Column(name = "pir_reviewed_by", length = 255)
     private String pirReviewedBy;
 
+    /**
+     * CE-15 / V357 — the principal who recorded the review.
+     *
+     * ⚠ Until CE-15 the reviewer was {@code pirReviewedBy} alone, set from a client-supplied
+     * {@code reviewer} string in the same request. A gate comparing that to the implementer would have
+     * compared two strings the same caller types. This is the id the server knows.
+     */
+    @Column(name = "pir_reviewed_by_id")
+    private Long pirReviewedById;
+
     @Column(name = "pir_reviewed_at")
     private LocalDateTime pirReviewedAt;
 

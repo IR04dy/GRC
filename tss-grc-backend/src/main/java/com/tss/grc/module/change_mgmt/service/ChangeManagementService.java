@@ -365,6 +365,12 @@ public class ChangeManagementService {
         if (c.getStatus() == null) c.setStatus("DRAFT");
         if (c.getChangeType() == null) c.setChangeType("NORMAL");
         if (c.getRequestedDate() == null) c.setRequestedDate(LocalDate.now());
+        // CE-15/F2-112 — capture the raiser's identity, because nothing did and the self-review gates
+        // compare it. Only the ID: `requested_by_name` stays whatever the tenant typed, since a team
+        // ('CloudOps') is a legitimate thing to record as the requesting party even though it is not a
+        // person. The id is the part a gate can stand on, and only the server can know it.
+        ChangeSoD.Actor raiser = ChangeSoD.actor();
+        if (c.getRequestedById() == null && raiser.id() != null) c.setRequestedById(raiser.id());
         ChangeRequest saved = changeRepo.save(c);
         audit.log("CREATE", "ChangeRequest", saved.getId(),
             "Change drafted: " + nullSafeMsg(saved.getChangeCode())
@@ -531,10 +537,11 @@ public class ChangeManagementService {
                 // be supplied via the transition body; the review sign-off (who/when)
                 // is system-stamped so it cannot be back-dated or forged by the client.
                 capturePir(c, body);
+                // CE-15/§10 — the gate, then the stamp. Both need the principal: the reviewer is who
+                // is signed in, not who the caller typed (see capturePirReviewer).
+                assertPirReviewerIsNotImplementer(c);
                 c.setPirReviewedAt(LocalDateTime.now());
-                String reviewer = strFromBody(body, "reviewer");
-                if (reviewer == null) reviewer = strFromBody(body, "reviewedBy");
-                if (reviewer != null && !reviewer.isBlank()) c.setPirReviewedBy(reviewer);
+                capturePirReviewer(c, body);
                 // S7d/CE-7: the follow-up the reviewer just wrote becomes tracked work.
                 syncPirFollowUpCapa(c);
             }
@@ -790,7 +797,13 @@ public class ChangeManagementService {
         // "verified evidence says so", not "somebody typed a note". Waiving is untouched, because a
         // waiver is an authority act with a reason and an independent approver — so the path is
         // strengthened, never trapped.
-        if (ChangeConditionStatus.SATISFIED.equals(target)) requireVerifiedEvidence(conditionId);
+        if (ChangeConditionStatus.SATISFIED.equals(target)) {
+            // CE-15/§10: the owner may not close their own condition. Ordered AFTER the waiver check
+            // and BEFORE the evidence read, because "you may not do this at all" is a clearer answer
+            // than "your evidence is not approved yet" to someone who cannot do it either way.
+            assertNotSelfSatisfaction(cond);
+            requireVerifiedEvidence(conditionId);
+        }
 
         cond.setStatus(target);
         cond.setClosedAt(LocalDateTime.now());
@@ -991,26 +1004,133 @@ public class ChangeManagementService {
      * name-only comparison is exactly what let a requester approve their own change by claiming
      * somebody else's name.
      */
+    /**
+     * ⚠ CE-15 — the comparison moved to {@link ChangeSoD}, unchanged in behaviour and no longer the
+     * only copy of it. There are now three self-review refusals over a change's people (this waiver,
+     * the PIR review, the condition closure), and three inline copies of one rule is the mirror
+     * maintained by assertion that S8h and CE-13 each refused.
+     *
+     * <p>⚠ And the extraction is what exposed <b>F2-112</b>: this refusal has never been able to fire.
+     * {@code requested_by_id} and {@code change_owner_id} are NULL on 17 of 17 dev changes because
+     * nothing wrote them, so the rule always took its name branch and compared a username against a
+     * team label ('CloudOps', 'IAM Team') — 0 of 28 such labels resolve to any user. {@link #create}
+     * now captures the principal's id, so this begins to bite for changes raised from here on, and
+     * {@code /sod-coverage} publishes how much of the population it still cannot check.
+     */
     private void assertNotSelfWaiver(ChangeRequest c) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) return;
-        Long actorId = null;
-        String actorName = auth.getName();
-        if (auth.getPrincipal() instanceof com.tss.grc.security.GrcUserDetails u) {
-            actorId = u.getUserId();
-            actorName = u.getUsername();
-        }
-        boolean isRequester = actorId != null && actorId.equals(c.getRequestedById());
-        boolean isOwner     = actorId != null && actorId.equals(c.getChangeOwnerId());
-        if (actorId == null || (c.getRequestedById() == null && c.getChangeOwnerId() == null)) {
-            isRequester = actorName != null && actorName.equalsIgnoreCase(c.getRequestedByName());
-            isOwner     = actorName != null && actorName.equalsIgnoreCase(c.getChangeOwnerName());
-        }
-        if (isRequester || isOwner)
+        ChangeSoD.Verdict v = ChangeSoD.compareAny(ChangeSoD.actor(), List.of(
+            new ChangeSoD.Party("requestedBy", c.getRequestedById(), c.getRequestedByName()),
+            new ChangeSoD.Party("changeOwner", c.getChangeOwnerId(), c.getChangeOwnerName())));
+        if (v.refuses())
             throw new IllegalStateException(
                 "You raised or own this change, so you may not waive a condition attached to its "
                     + "approval — a condition the requester can forgive is not a condition. Ask "
                     + "another CHANGE:APPROVE holder to waive it, or record it as satisfied.");
+    }
+
+    /**
+     * CE-15 — what each self-review gate can actually decide, and over how much of its population.
+     *
+     * <p>The instrument F2-112 needed and nobody had. Three gates are enabled; measured on dev at build
+     * time, the waiver refusal could decide <b>0 of 17</b> changes because the ids it compares were never
+     * written and the labels are teams. A green test suite says the rule is correct; only this says
+     * whether it can run.
+     *
+     * <p>Deliberately three separate rows rather than one number: the remedies differ. A label-only
+     * record needs its people captured as users; an absent one needs the field filled in at all.
+     */
+    @Transactional(readOnly = true)
+    public List<ChangeSoD.Coverage> sodCoverage() {
+        Long org = TenantContext.getCurrentTenant();
+        // Simple name deliberately: the local `org` shadows the `org.springframework` package,
+        // so the fully-qualified form does not compile here.
+        List<ChangeRequest> all = changeRepo
+            .findByOrganisationIdOrderByCreatedAtDesc(org, Pageable.unpaged())
+            .getContent();
+
+        long waiverPop = all.size();
+        long waiverCheckable = all.stream()
+            .filter(c -> c.getRequestedById() != null || c.getChangeOwnerId() != null).count();
+        long waiverLabel = all.stream()
+            .filter(c -> c.getRequestedById() == null && c.getChangeOwnerId() == null)
+            .filter(c -> notBlank(c.getRequestedByName()) || notBlank(c.getChangeOwnerName())).count();
+
+        // The PIR gate's population is the changes that can still reach a review — one already reviewed
+        // cannot be re-gated, and counting it would report coverage the gate will never be asked for.
+        List<ChangeRequest> pirPop = all.stream().filter(c -> c.getPirReviewedAt() == null).toList();
+        long pirLabel = pirPop.stream().filter(c -> notBlank(c.getImplementerName())).count();
+
+        // `findOpenForOrg` is the register's own definition of an open condition — reusing it rather
+        // than re-filtering on status here keeps one answer to "which conditions are outstanding".
+        List<ChangeCondition> openConds = conditionRepo == null ? List.of()
+            : conditionRepo.findOpenForOrg(org);
+        long condCheckable = openConds.stream().filter(k -> k.getOwnerId() != null).count();
+        long condLabel = openConds.stream()
+            .filter(k -> k.getOwnerId() == null && notBlank(k.getOwnerName())).count();
+
+        return List.of(
+            new ChangeSoD.Coverage(ChangeSoD.GATE_SELF_WAIVER, waiverPop, waiverCheckable, waiverLabel,
+                waiverPop - waiverCheckable - waiverLabel),
+            // implementer_name has no id column at all (V357 did not add one — see its header), so this
+            // gate's checkable count is 0 by construction and its honest number is the label population.
+            new ChangeSoD.Coverage(ChangeSoD.GATE_PIR_NOT_IMPLEMENTER, pirPop.size(), 0, pirLabel,
+                pirPop.size() - pirLabel),
+            new ChangeSoD.Coverage(ChangeSoD.GATE_CONDITION_NOT_OWNER, openConds.size(), condCheckable,
+                condLabel, openConds.size() - condCheckable - condLabel));
+    }
+
+    private static boolean notBlank(String s) { return s != null && !s.isBlank(); }
+
+    /**
+     * CE-15 / §10 — <b>the PIR approver may not be the change's implementer.</b>
+     *
+     * <p>ITIL's post-implementation review asks whether the change achieved its objective; the person
+     * who performed it reviewing their own work is the self-review this platform refuses everywhere
+     * else (the CAB vote, the condition waiver, break-glass).
+     *
+     * <p>⚠ The gate is only meaningful because {@link #capturePirReviewer} now takes the reviewer from
+     * the authenticated principal. Before CE-15 it came from {@code strFromBody(body, "reviewer")} — a
+     * string the same caller types in the same request, so the "gate" would have been defeated by
+     * typing a different name. That is not a weak control; it is a control that cannot fail.
+     *
+     * <p>Refuses on a positive match only. {@code implementer_name} is free text and 0 of its 4 dev
+     * values resolve to a user — they are teams ('AppSec on-call', 'HR Comms') — so most comparisons
+     * are UNVERIFIABLE, and refusing on those would block every review of every existing change.
+     * {@code /sod-coverage} reports that population rather than letting a green path imply coverage.
+     */
+    private void assertPirReviewerIsNotImplementer(ChangeRequest c) {
+        ChangeSoD.Verdict v = ChangeSoD.compare(ChangeSoD.actor(),
+            new ChangeSoD.Party("implementer", null, c.getImplementerName()));
+        if (v.refuses())
+            throw new IllegalStateException(
+                "You implemented this change, so you may not record its post-implementation review — "
+                    + "a review of your own work is not an independent one. Ask another CHANGE:WRITE "
+                    + "holder to record the PIR.");
+    }
+
+    /**
+     * CE-15 / §10 — <b>a condition may not be recorded satisfied by its own owner.</b>
+     *
+     * <p>Unconditional, and §10's qualifier "where the model demands independence" is deliberately not
+     * honoured: <b>no such flag exists</b>. The only independence columns on the platform are
+     * {@code admin.committee_templates.independence_required},
+     * {@code admin.committee_member_terms.is_independent} and four on {@code compliance.findings} —
+     * nothing for a change model. Inventing one would be F2-62's shape (a control keyed on a field
+     * nobody sets). A condition its own owner can close is not a condition, which is the sentence
+     * {@code assertNotSelfWaiver} already uses for the waiver, so the rule stands on its own.
+     *
+     * <p>Safe to ship enabled: {@code change_condition} holds <b>0 rows</b> in both databases, so this
+     * can refuse nothing that exists — the S7e pattern, where enforcement begins with the first
+     * condition a CAB actually imposes.
+     */
+    private void assertNotSelfSatisfaction(ChangeCondition cond) {
+        ChangeSoD.Verdict v = ChangeSoD.compare(ChangeSoD.actor(),
+            new ChangeSoD.Party("conditionOwner", cond.getOwnerId(), cond.getOwnerName()));
+        if (v.refuses())
+            throw new IllegalStateException(
+                "You are the owner of condition #" + cond.getId() + ", so you may not record it "
+                    + "satisfied — a condition its own owner can close is not a condition. Ask another "
+                    + "CHANGE:WRITE holder to record the satisfaction, with the evidence.");
     }
 
     // ── Tasks ───────────────────────────────────────────────────────────────
@@ -1486,6 +1606,31 @@ public class ChangeManagementService {
         } else if (auth.getName() != null) {
             c.setCabDecisionByName(auth.getName());
         }
+    }
+
+    /**
+     * CE-15 — the PIR reviewer is the authenticated principal, not a name from the body.
+     *
+     * <p>⚠ It used to be {@code strFromBody(body, "reviewer")}. That made the reviewer a claim the
+     * caller made about themselves, which is why "PIR approver != implementer" could not be enforced:
+     * the same request supplied both sides of the comparison. Same reasoning as F2-93/F2-103's
+     * {@code stampDecisionAuthor} for CAB decisions — a governance act records who performed it, and
+     * only the server knows that.
+     *
+     * <p>A client-supplied name is still accepted <b>as a note</b> when there is no principal at all
+     * (an off-request path), so nothing that used to record a reviewer stops recording one — but it can
+     * never override a real principal, or the override would be the bypass.
+     */
+    private void capturePirReviewer(ChangeRequest c, Map<String, Object> body) {
+        ChangeSoD.Actor actor = ChangeSoD.actor();
+        if (actor.id() != null || (actor.name() != null && !actor.name().isBlank())) {
+            c.setPirReviewedById(actor.id());
+            c.setPirReviewedBy(actor.name());
+            return;
+        }
+        String claimed = strFromBody(body, "reviewer");
+        if (claimed == null) claimed = strFromBody(body, "reviewedBy");
+        if (claimed != null && !claimed.isBlank()) c.setPirReviewedBy(claimed);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

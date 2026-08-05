@@ -22,6 +22,7 @@ import com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService;
 import com.tss.grc.module.change_mgmt.service.ChangeManagementService;
 import com.tss.grc.module.change_mgmt.service.ChangeModelService;
 import com.tss.grc.module.change_mgmt.service.ChangeScheduleService;
+import com.tss.grc.module.change_mgmt.service.ChangeSoD;
 import com.tss.grc.module.change_mgmt.service.ChangeWorkflowService;
 import com.tss.grc.module.change_mgmt.service.UnauthorisedChangeRegisterService;
 import com.tss.grc.module.change_mgmt.spi.CommitteePort;
@@ -729,6 +730,25 @@ public class ChangeManagementController {
         return new WorkflowPort.Addressee(b.addresseeType(), b.addresseeId(),
                                           b.addresseeKey(), b.addresseeLabel());
     }
+
+    // ── CE-15: what the self-review gates can actually check ──────────────────
+
+    /**
+     * Per SoD gate: how much of its population it can decide, and how much it cannot.
+     *
+     * <p>The instrument F2-112 needed. Three self-review refusals are enabled — the condition waiver
+     * (S7e), the PIR review and the condition closure (CE-15) — and measured on dev at build time the
+     * first could decide <b>0 of 17</b> changes, because the ids it compares were never written and the
+     * labels are teams ('CloudOps', 'IAM Team'). Its unit tests were green throughout: they prove the
+     * rule is right, not that it can run.
+     *
+     * <p>{@code enabledButBlind} is the row worth alerting on — a gate switched on over a population it
+     * has never been able to refuse anything in.
+     */
+    @GetMapping("/sod-coverage")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Per self-review gate: the population it can decide vs the part it cannot — CE-15.")
+    public List<ChangeSoD.Coverage> sodCoverage() { return service.sodCoverage(); }
 
     // ── CE-13: the CAB queue ──────────────────────────────────────────────────
 
