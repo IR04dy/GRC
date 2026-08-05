@@ -38,6 +38,7 @@ import com.tss.grc.module.outsourcing.repository.ExitPlanRepository;
 import com.tss.grc.module.outsourcing.repository.OngoingReviewRepository;
 import com.tss.grc.module.outsourcing.repository.OutsourcingArrangementRepository;
 import com.tss.grc.module.outsourcing.repository.OutsourcingEventRepository;
+import com.tss.grc.testsupport.StateMachineContract;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -183,55 +184,18 @@ class OutsourcingLifecycleTest {
     }
 
     /**
-     * The shared exhaustive check. For every {@code from} the map declares and every {@code to} any
-     * state in that machine can be, the transition must be permitted exactly when the map says so.
-     * A terminal state (empty target set) therefore has to refuse every single target, which is the
-     * property a hand-written test set is most likely to omit.
+     * Delegates to {@link StateMachineContract}, which is where this loop now lives because F2-03
+     * has six more modules to cover and the version written here first contained a real defect: it
+     * derived the state universe from {@code allowed.keySet()} alone. That is complete only when
+     * every state appears as a key, which is true of all four maps in <em>this</em> module purely by
+     * accident, and false for {@code nca_ecc} — whose {@code ACKNOWLEDGED} and {@code CANCELLED}
+     * appear only as targets and would therefore have gone untested in both directions. The shared
+     * version derives the universe as keys ∪ values.
      */
     private void assertMachineHonoursItsMap(String mapField, String label,
                                             Consumer<String> seedAtState, Consumer<String> attempt) {
-        Map<String, Set<String>> allowed = allowedMap(mapField);
-        Set<String> states = new TreeSet<>(allowed.keySet());
-        assertThat(states).as("%s: the machine must declare states", mapField).hasSizeGreaterThan(2);
-
-        List<String> wrong = new ArrayList<>();
-        int permitted = 0;
-        int refused = 0;
-        for (String from : states) {
-            for (String to : states) {
-                if (from.equals(to)) {
-                    continue;                      // self-transition is not modelled either way
-                }
-                boolean declared = allowed.getOrDefault(from, Set.of()).contains(to);
-                seedAtState.accept(from);
-                if (declared) {
-                    permitted++;
-                    try {
-                        attempt.accept(to);
-                    } catch (RuntimeException ex) {
-                        wrong.add(from + " -> " + to + " is DECLARED but was refused: "
-                            + ex.getClass().getSimpleName() + ": " + ex.getMessage());
-                    }
-                } else {
-                    refused++;
-                    try {
-                        attempt.accept(to);
-                        wrong.add(from + " -> " + to + " is NOT declared but was permitted");
-                    } catch (IllegalStateException expected) {
-                        if (!String.valueOf(expected.getMessage()).contains("cannot transition")) {
-                            wrong.add(from + " -> " + to + " was refused for the wrong reason: "
-                                + expected.getMessage());
-                        }
-                    }
-                }
-            }
-        }
-        assertThat(wrong).as("%s (%s): %d declared transitions and %d undeclared pairs checked.%n  %s",
-            label, mapField, permitted, refused, String.join("\n  ", wrong)).isEmpty();
-        assertThat(permitted).as("%s: no declared transition was exercised — the map read empty and "
-            + "this test would pass while checking nothing", label).isGreaterThan(0);
-        assertThat(refused).as("%s: no undeclared pair was exercised, so the refusal half of the "
-            + "machine is unverified", label).isGreaterThan(0);
+        StateMachineContract.assertHonoursItsMap(
+            allowedMap(mapField), seedAtState, attempt, "cannot transition", label + " " + mapField);
     }
 
     // ── F2-115: the SAMA materiality gate ────────────────────────────────────

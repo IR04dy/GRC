@@ -119,8 +119,9 @@ Full persona list: PROJECT_CHRONICLE §4.
 
 Grants matter as much as passwords when probing authorization. Read them from
 `iam.role_permissions` rather than inferring from the username — the useful shapes
-are `so_officer` (EVIDENCE_READ+WRITE, RISK_READ, CYBER_READ, **no** COMPLIANCE/BCM;
-ROLE_CISO), `ranalyst` (EVIDENCE+RISK+COMPLIANCE reads, **no** BCM/CYBER/PRIVACY/TPRM)
+are `so_officer` (EVIDENCE_READ+WRITE, RISK_READ, **CYBER_READ *and* CYBER_WRITE** — this
+line said READ only until 2026-08-06 and the omission cost a probe iteration; **no**
+COMPLIANCE/BCM; ROLE_CISO), `ranalyst` (EVIDENCE+RISK+COMPLIANCE reads, **no** BCM/CYBER/PRIVACY/TPRM)
 and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them they cover
 "holds the module permission", "holds the role but not the permission", and neither.
 

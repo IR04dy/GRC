@@ -2273,6 +2273,22 @@ Start-Service TssGrcBackend
 | **Verified** | `OutsourcingLifecycleTest` asserts the three guard constants verbatim and records `CRO`/`CIO` as recited. A mutation that widens `APPROVE_GUARD` by one role is caught |
 | **Lesson** | A guard listing four roles looks twice as strong as one listing two. Reading role names as authority, without joining them to the role table, is how this platform accumulated 537 of these |
 
+## F2-117 · The NCA ECC filing's four-eyes assurance chain is caller-asserted text
+
+|  |  |
+|---|---|
+| **ID** | F2-117 *(found writing F2-03's floor for `nca_ecc` — the fourth instance of F2-112's shape, and the second found by asking the same question of a different module)* |
+| **Module** | `nca_ecc` — the annual NCA ECC filing, sold under the `COMPLIANCE` SKU |
+| **Severity** | **P1** — a filing submitted to the National Cybersecurity Authority records a peer review and a CISO approval that the platform never verified, and cannot |
+| **Current State** | 🔴 **OPEN**, with a live tripwire: `NcaEccFilingLifecycleTest` fails the build if the service starts reading a principal, so the fix cannot land without closing this row |
+| **Problem** | The filing's assurance chain is `drafted → peer-reviewed → CISO-approved`. `peer_reviewer` and `ciso_approver` are **plain strings taken from the request body**; the service consults no security context and compares the two to nothing. One caller can drive `DRAFT → PEER_REVIEW → CISO_APPROVAL → SUBMITTED` while typing both names — so the filing that reaches the regulator evidences a four-eyes review that may never have happened |
+| **Proven live, not read** | The F2-03(b) probe walked exactly that path and submitted a filing whose `peer_reviewer` and `ciso_approver` are **the same person**. 28/28 legs passed, including this one: the platform accepted it without complaint. The probe asked for the self-review; the platform is what allowed it |
+| **⚠ Why the comparison was NOT built in this slice** | Because building it would knowingly reproduce **F2-112** — a shipped, tested, documented refusal that could never fire. Measured in dev: **0 of the 4 people-labels** across `drafted_by`/`peer_reviewer`/`ciso_approver` resolve to a platform user (they are display names — *Mohammed Al-Faraj*, *Sara Al-Anezi* — plus an email address in `drafted_by`). A gate comparing those strings would answer "cannot tell" on every filing in the database and refuse nothing, while reporting as a control that exists. That is the exact defect this programme has now closed three times |
+| **Fix — V357's shape, in this order** | **(1)** A migration adding `peer_reviewer_user_id` and `ciso_approver_user_id` to `nca_ecc.filings`, with **no backfill** — there is no correct mapping from *Sara Al-Anezi* to a user id, and inventing one would fabricate an assurance record. **(2)** Principal capture on the transitions that assert review and approval, per F2-93/F2-103's rule: the acting principal wins, the body is honoured only when there is no principal. **(3)** Then the refusal — and it must answer **three** ways, not two: same → refuse, different → permit, **unverifiable → permit and report**, because 4 legacy filings carry names that resolve to nobody and a two-valued gate would either refuse them forever or wave them through silently. `ChangeSoD` already encodes exactly this and its coverage surface already publishes `enabledButBlind` per gate |
+| **Also worth carrying** | `drafted_by` holds an email address while the other two hold display names, in the same three-column chain. Whatever identity columns land should make that inconsistency unrepresentable rather than tolerated |
+| **Evidence** | `NcaEccFilingService.transition` lines 107–116, read 2026-08-06 · dev `nca_ecc.filings`: 4 filings, 4 distinct people-labels, 0 resolving to `iam.users` by username or full name, 3 filings carrying both a reviewer and an approver · live probe leg 5 |
+| **Lesson** | Asking *"what does this control compare, and does that data exist?"* has now produced F2-112, F2-113, F2-116 and this. It costs one query per module and it is the cheapest finding generator on this programme |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.
