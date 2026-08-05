@@ -150,6 +150,99 @@ class ChangeSoDGateTest {
             .isEqualTo(ChangeSoD.Verdict.SAME);
     }
 
+    // ── F2-113: the committee force-recusal, whose actor is a seat and not a principal ──────────
+
+    /**
+     * <b>The finding, as a comparison.</b> A change's requester is a real user (id 8) whose recorded
+     * label is a team ('CloudOps'); the CAB seat that user occupies is named 'SO Test Officer'. All the
+     * committee gate ever had was the name comparison, and those two strings never match — which is
+     * why Track D's bar on the deciding vote had never engaged for any change in either database.
+     *
+     * <p>⚠ <b>And the rule that makes the fix work is that a referral is a list of BARS, not of
+     * people.</b> The parties below are built one per bar — an id with no name, a name with no id —
+     * because that is all V358's two unpaired CSVs can express, and because it is what keeps
+     * {@link ChangeSoD#compareAny}'s existing rule 2 in play for the name half. My first draft of this
+     * slice instead added a whole new comparison method, {@code compareUnlinkedActor}, keyed on
+     * "ids decide when BOTH sides carry one" — and a mutation test proved it <b>indistinguishable</b>
+     * from {@code compare} for every party shape this caller produces, because no party here ever
+     * carries an id and a name at once. It was a second copy of one rule wearing a javadoc claiming a
+     * difference it did not have: the exact defect class F2-112 and F2-113 are instances of, added by
+     * the fix for them. Deleted.
+     */
+    @Test
+    @DisplayName("F2-113 — an id bar recuses the seat it names even though the labels disagree")
+    void theSeatIsRecusedByIdWhenTheNamesCannotMatch() {
+        ChangeSoD.Actor seat = withId(8, "SO Test Officer");
+
+        assertThat(ChangeSoD.compare(seat, party(8L, null)))
+            .as("dev's actual shape: user 8 raised the change and the seat is called 'SO Test "
+              + "Officer'. Only the id can answer, and it does")
+            .isEqualTo(ChangeSoD.Verdict.SAME);
+        assertThat(ChangeSoD.compare(seat, party(null, "CloudOps")))
+            .as("and this is everything the gate used to compute — the name bar the CSV gave it, "
+              + "against a label that is a team")
+            .isEqualTo(ChangeSoD.Verdict.DIFFERENT);
+    }
+
+    /**
+     * ⚠ THE WEAKENING THIS SLICE HAD TO AVOID — CE-15's lesson, arriving from the far side.
+     *
+     * <p>29 of dev's 42 active committee seats carry no {@code member_user_id}, and
+     * {@code committee_member_terms.no_platform_user} exists because an external director legitimately
+     * never gets one. Rule 1 says a party's id supersedes its name, so a bar that carried
+     * <em>both</em> — {@code Party(8L, "External Director B")} — would answer UNVERIFIABLE against
+     * every unlinked seat and stop refusing what the name list refuses today. Keeping the halves
+     * separate is what prevents that, and it is the only reason the split matters.
+     */
+    @Test
+    @DisplayName("F2-113 — a name bar still decides against an UNLINKED seat, whatever ids exist")
+    void addingIdsMustNotRetireTheNameComparisonForUnlinkedSeats() {
+        ChangeSoD.Actor unlinkedSeat = nameOnly("External Director B");
+
+        assertThat(ChangeSoD.compare(unlinkedSeat, party(null, "External Director B")))
+            .as("the seat has no user id, so the name bar is all there is — and it matches, so it "
+              + "refuses, exactly as it did before F2-113")
+            .isEqualTo(ChangeSoD.Verdict.SAME);
+        assertThat(ChangeSoD.compare(unlinkedSeat, party(8L, "External Director B")))
+            .as("⚠ and this is what MERGING the two halves into one party would compute instead: the "
+              + "id wins, the seat has none, and the refusal disappears")
+            .isEqualTo(ChangeSoD.Verdict.UNVERIFIABLE);
+    }
+
+    @Test
+    @DisplayName("F2-113 — an id bar cannot be satisfied by a name, so a homonym is not recused by it")
+    void anIdBarIsAnsweredOnlyByAnId() {
+        assertThat(ChangeSoD.compare(withId(2, "Khalid Al-Rashidi"), party(8L, null)))
+            .as("two different people: user 2's seat is not barred by a bar on user 8")
+            .isEqualTo(ChangeSoD.Verdict.DIFFERENT);
+        assertThat(ChangeSoD.compare(nameOnly("Khalid Al-Rashidi"), party(8L, null)))
+            .as("an unlinked seat against an id bar: nothing comparable, and UNVERIFIABLE never "
+              + "refuses — so the name bar beside it is what has to catch this")
+            .isEqualTo(ChangeSoD.Verdict.UNVERIFIABLE);
+    }
+
+    @Test
+    @DisplayName("F2-113 — compareAny over the real dev shape: any one bar refuses")
+    void anyBarMatchingRecuses() {
+        // Exactly how recordVote builds the list from V358's two unpaired CSVs.
+        List<ChangeSoD.Party> bars = List.of(
+            party(8L, null), party(null, "CloudOps"), party(null, "IAM Team"));
+
+        assertThat(ChangeSoD.compareAny(withId(8, "SO Test Officer"), bars))
+            .as("the linked seat belongs to the requester — the id bar matches")
+            .isEqualTo(ChangeSoD.Verdict.SAME);
+        assertThat(ChangeSoD.compareAny(nameOnly("IAM Team"), bars))
+            .as("an unlinked seat labelled with one of the barred labels — the fallback matches")
+            .isEqualTo(ChangeSoD.Verdict.SAME);
+        assertThat(ChangeSoD.compareAny(withId(2, "Khalid Al-Rashidi"), bars))
+            .as("a seated member who neither raised nor owns the change votes normally")
+            .isEqualTo(ChangeSoD.Verdict.DIFFERENT);
+        assertThat(ChangeSoD.compareAny(withId(2, "Khalid"), List.of()))
+            .as("an empty bar list bars nobody — dev's state on 4 of 4 live referrals, and "
+              + "UNVERIFIABLE must not refuse or every referral in existence is trapped")
+            .isEqualTo(ChangeSoD.Verdict.UNVERIFIABLE);
+    }
+
     @Test
     @DisplayName("the actor comes from the principal, and a plain token yields a name with no id")
     void actorReadsThePrincipal() {
@@ -190,16 +283,29 @@ class ChangeSoDGateTest {
     }
 
     @Test
-    @DisplayName("all three gates are named in one place, so the report cannot drift from the refusals")
+    @DisplayName("every gate is named in one place, so the report cannot drift from the refusals")
     void gateNamesAreShared() {
         assertThat(ChangeSoD.GATES).containsExactly(
-            "CONDITION_WAIVER_NOT_SELF", "PIR_REVIEWER_NOT_IMPLEMENTER", "CONDITION_SATISFIER_NOT_OWNER");
+            "CONDITION_WAIVER_NOT_SELF", "PIR_REVIEWER_NOT_IMPLEMENTER", "CONDITION_SATISFIER_NOT_OWNER",
+            // F2-113 — the fourth gate, enforced in the committee engine over data this module hands it.
+            "COMMITTEE_VOTE_NOT_REQUESTER");
+
+        // ⚠ The previous form of this loop asserted `svc.contains("ChangeSoD.GATE_")` once per gate —
+        // true for all four the moment ANY one of them is referenced, so it could not fail. Named
+        // constants, so a gate added to GATES and forgotten in the report is a red build.
         String svc = strip(read(SRC.resolve("service/ChangeManagementService.java")));
-        for (String gate : ChangeSoD.GATES) {
+        for (String constant : List.of("GATE_SELF_WAIVER", "GATE_PIR_NOT_IMPLEMENTER",
+                                       "GATE_CONDITION_NOT_OWNER", "GATE_COMMITTEE_VOTE_NOT_REQUESTER")) {
             assertThat(svc)
-                .as("gate %s must appear in the coverage report built by the service", gate)
-                .contains("ChangeSoD.GATE_");
+                .as("ChangeSoD.%s must appear in the coverage report built by the service — a gate in "
+                  + "GATES and absent from /sod-coverage is a control nobody can see the reach of, "
+                  + "which is the state F2-112 and F2-113 were both found in", constant)
+                .contains("ChangeSoD." + constant);
         }
+        assertThat(ChangeSoD.GATES)
+            .as("one constant per gate, no duplicates")
+            .doesNotHaveDuplicates()
+            .hasSize(4);
     }
 
     // ── the structural claims ───────────────────────────────────────────────────────────────────
@@ -222,6 +328,53 @@ class ChangeSoDGateTest {
               + "waiver's blindness invisible")
             .doesNotContain("equalsIgnoreCase(c.getRequestedByName())")
             .doesNotContain("equalsIgnoreCase(c.getChangeOwnerName())");
+    }
+
+    /**
+     * F2-113 — <b>the fourth self-review refusal is the committee vote, and it must not be a fourth
+     * copy of the comparison.</b>
+     *
+     * <p>It lives one module across, in {@code CommitteeResolutionService.recordVote}, and it had its
+     * own inline rule: {@code sameName(member, nm)} over a CSV. That is how it came to compare a change's
+     * team label against a committee member's name and match nothing, while three copies of the same
+     * question in this module were being consolidated for exactly that reason. A private copy in a peer
+     * module is the worst version of the mirror-maintained-by-assertion problem — the two rules disagree
+     * and nothing anywhere fails.
+     */
+    @Test
+    @DisplayName("F2-113 — the committee's recusal goes through ChangeSoD, not a local name loop")
+    void theCommitteeRecusalHasNoCopyOfTheComparison() {
+        Path engine = Path.of("src/main/java/com/tss/grc/module/admin/committee/service",
+                              "CommitteeResolutionService.java");
+        String code = strip(read(engine));
+
+        String vote = methodBody(engine, "public CommitteeResolution recordVote(");
+        assertThat(vote)
+            .as("the recusal must resolve through the one comparison the platform has")
+            .contains("ChangeSoD.compareAny");
+        assertThat(vote)
+            .as("the pre-F2-113 loop must not come back: it walked recusal_names inline and compared "
+              + "each entry with sameName, so a referral carrying captured identity and no label — "
+              + "the shape every change raised after CE-15 produces — barred nobody at all")
+            .doesNotContain("getRecusalNames()");
+        assertThat(vote)
+            .as("the seat's own user id is what the comparison now rests on, and it must come from "
+              + "the resolved roster seat rather than from anything the caller supplied")
+            .contains("seat.getMemberUserId()");
+
+        String body = methodBody(engine, "private static List<ChangeSoD.Party> recusedParties(");
+        assertThat(body)
+            .as("both halves are read — dropping the names would remove the only comparison the 29 "
+              + "of 42 unlinked seats have")
+            .contains("getRecusalUserIds()")
+            .contains("getRecusalNames()");
+        // ⚠ The bars must stay unpaired. Party(id, label) re-engages ChangeSoD rule 1 and silently
+        // retires the name fallback for every unlinked seat — see the test named below, which is what
+        // caught that mutation.
+        assertThat(body)
+            .as("one party per BAR, not per person: an id bar carries no name and a name bar no id")
+            .contains("Long.valueOf(norm(raw)), null")
+            .contains("null, norm(nm)");
     }
 
     @Test
@@ -285,6 +438,30 @@ class ChangeSoDGateTest {
             .as("no UPDATE anywhere: backfilling 'CloudOps' to a user id is the owner's call (F2-109 "
               + "took the same position on change_code)")
             .doesNotContain("UPDATE CHANGE_MGMT.CHANGE_REQUESTS SET");
+    }
+
+    @Test
+    @DisplayName("F2-113 / V358 adds capacity, writes no attribution, and keeps the name fallback")
+    void theCommitteeRecusalMigrationWritesNoAttribution() {
+        String sql = read(Path.of("src/main/resources/db/migration/sqlserver",
+                                  "V358__committee_referral_recusal_identity.sql"));
+        assertThat(sql).contains("recusal_user_ids NVARCHAR(200) NULL");
+        assertThat(sql)
+            .as("no backfill: there is no correct mapping from 'CloudOps' to a user id, and inventing "
+              + "one would fabricate the attribution this gate exists to check (V357's stance)")
+            .contains("this migration must write no attribution");
+        assertThat(sql.toUpperCase())
+            .as("and no UPDATE anywhere")
+            .doesNotContain("UPDATE ADMIN.COMMITTEE_REFERRAL SET");
+        assertThat(sql)
+            .as("⚠ a self-check must refuse to let recusal_names be dropped as 'superseded' — it is "
+              + "what recuses the seats that carry no user id, and dropping it would re-introduce "
+              + "the very failure this migration fixes")
+            .contains("unlinked committee seats have nothing left to compare");
+        assertThat(sql)
+            .as("and self-checks on both sides of the id comparison, or only names can ever match")
+            .contains("member_user_id is gone")
+            .contains("requested_by_id is gone");
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────────────────────

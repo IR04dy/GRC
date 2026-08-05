@@ -4,6 +4,7 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.admin.committee.entity.CommitteeMeeting;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolution;
+import com.tss.grc.module.admin.committee.entity.CommitteeReferral;
 import com.tss.grc.module.admin.committee.entity.CommitteeResolutionVote;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingAttendeeRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
@@ -13,6 +14,12 @@ import com.tss.grc.module.admin.committee.repository.CommitteeResolutionVoteRepo
 import com.tss.grc.module.admin.committee.repository.CommitteeReferralRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
+// F2-113 — an INBOUND read of the change module's SoD vocabulary. ChangeModuleBoundaryTest bans
+// change_mgmt reaching OUT to a peer and deliberately permits the reverse ("peers may read the
+// change module"); ChangeSoD is a static, bean-free rule holder, so this adds no wiring. The
+// alternative was a fourth private copy of "is this the same person?" — which is the defect class
+// F2-112 and F2-113 are both instances of.
+import com.tss.grc.module.change_mgmt.service.ChangeSoD;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -126,6 +133,55 @@ public class CommitteeResolutionService {
     }
 
     /**
+     * F2-113 — the parties a referral bars from voting, as {@link ChangeSoD} compares them.
+     *
+     * <p><b>The defect this replaced.</b> The Track-D recusal read {@code recusal_names} only and
+     * matched it with {@code sameName} against {@code member_name}. A change's people are team labels
+     * ('CloudOps', 'IAM Team', 'AppSec'); a committee's members are people ('Khalid Al-Rashidi').
+     * Measured 2026-08-05 in dev: 15 of 15 owner labels and 13 of 13 requester labels resolved to no
+     * user, and <b>0 of 4</b> live referrals carried a name at all — so the deciding-vote bar had never
+     * engaged for any change in either database. Its tests were green throughout, because they supplied
+     * the CSV the production path never produces. The third instance of F2-112's shape.
+     *
+     * <p><b>Why {@code ChangeSoD} and not a fourth comparison here.</b> There were three copies of
+     * "is the acting principal this named party?" before CE-15 extracted them; a fourth, in a
+     * different module, is the mirror-maintained-by-assertion problem at its worst — it would lie the
+     * first time one copy learned something the others did not, and the lie would be a security
+     * control silently disagreeing with itself.
+     *
+     * <p>⚠ <b>Ids and names are separate parties, one per BAR rather than one per person, and that is
+     * load-bearing.</b> A referral is a list of bars — "user 8 may not vote", "anyone called
+     * 'CloudOps' may not vote" — not a list of people with two attributes each, which is also all
+     * V358's two unpaired CSVs can express. Merging them into {@code Party(id, label)} would look
+     * tidier and would re-engage {@code ChangeSoD}'s rule that a party's id supersedes its name,
+     * silently retiring the name comparison for the 29 of 42 active seats that carry no
+     * {@code member_user_id} — a refusal removed by a change that reads as a cleanup. CE-15 nearly
+     * shipped that weakening from the other side and an existing test caught it; here the test is
+     * {@code CommitteeVoteRecusalTallyTest.an_unlinked_seat_is_still_recused_by_name_even_though_the_referral_carries_ids}.
+     *
+     * <p>Unparsable ids are skipped rather than thrown: a malformed CSV must not stop a committee
+     * voting, and a gate's inability to compare belongs in the coverage report rather than in a
+     * member's face (S6b-i — weakness belongs in the instrument, not in the verdict).
+     */
+    private static List<ChangeSoD.Party> recusedParties(CommitteeReferral r) {
+        List<ChangeSoD.Party> parties = new java.util.ArrayList<>();
+        if (r.getRecusalUserIds() != null)
+            for (String raw : r.getRecusalUserIds().split(",")) {
+                try {
+                    parties.add(new ChangeSoD.Party("recusalUserId", Long.valueOf(norm(raw)), null));
+                } catch (NumberFormatException notAnId) {
+                    log.warn("Referral {} carries an unparsable recusal user id \"{}\" — that party "
+                           + "cannot be barred by identity", r.getId(), norm(raw));
+                }
+            }
+        if (r.getRecusalNames() != null)
+            for (String nm : r.getRecusalNames().split(","))
+                if (!norm(nm).isEmpty())
+                    parties.add(new ChangeSoD.Party("recusalName", null, norm(nm)));
+        return parties;
+    }
+
+    /**
      * Record (or update) one member's vote on a resolution, then re-derive the
      * aggregate tally + outcome.
      *
@@ -145,6 +201,17 @@ public class CommitteeResolutionService {
      * this class of defect returns. {@code ADR-006} requires "immutable authenticated
      * user IDs" and "forged-actor tests"; {@link CommitteeVoteProvenanceTest} is that
      * test, and it fails if any of these guards is removed.
+     *
+     * <p><b>⚠ F2-113 — and provenance was not enough, because the Track-D recusal had nothing
+     * comparable to compare.</b> DF-3 closed the evasion route (the claimed name) and left the
+     * comparison itself intact: a CSV of the change's people matched against
+     * {@code member_name}. Nobody asked whether those two vocabularies overlap. They do not — a
+     * change's people are team labels, a committee's are people — so the bar was unevadable and
+     * also unable to fire, for every change in both databases. The recusal below now resolves on
+     * the seat's {@code member_user_id} against the referral's {@code recusal_user_ids}, with the
+     * name comparison kept as the fallback for the seats that carry no user id. See
+     * {@link #recusedParties}, and {@code GET /api/v1/changes/sod-coverage} for how much of the
+     * population it can still not decide.
      */
     @Transactional
     public CommitteeResolution recordVote(Long resolutionId, String requestedMember, String voteRaw,
@@ -245,11 +312,11 @@ public class CommitteeResolutionService {
         // mechanic as COI) — they cannot cast the deciding committee vote.
         if (!"RECUSED".equals(vote) && referralRepo != null) {
             var refOpt = referralRepo.findByResolutionId(resolutionId);
-            if (refOpt.isPresent() && refOpt.get().getRecusalNames() != null) {
-                for (String nm : refOpt.get().getRecusalNames().split(",")) {
-                    if (sameName(member, nm)) { vote = "RECUSED"; break; }
-                }
-            }
+            if (refOpt.isPresent()
+                    && ChangeSoD.compareAny(
+                            new ChangeSoD.Actor(seat.getMemberUserId(), member),
+                            recusedParties(refOpt.get())).refuses())
+                vote = "RECUSED";
         }
 
         // Vote ownership is already settled above: reaching this line means the actor is

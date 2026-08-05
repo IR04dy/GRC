@@ -10,7 +10,9 @@ import com.tss.grc.module.admin.committee.repository.CommitteeGateMapRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeMeetingRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeReferralRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeRepository;
+import com.tss.grc.module.admin.committee.repository.CommitteeMemberTermRepository;
 import com.tss.grc.module.admin.committee.repository.CommitteeResolutionRepository;
+import com.tss.grc.module.change_mgmt.service.ChangeSoD;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +69,9 @@ class CommitteeReferralGateTest {
     @Mock CommitteeRepository           committeeRepo;
     @Mock CommitteeResolutionRepository resolutionRepo;
     @Mock CommitteeMeetingRepository    meetingRepo;
+    /** F2-113 — the roster, for recusalCoverage: a committee with no linked seat cannot be
+     *  recused by id however well the referred record captured its people. */
+    @Mock CommitteeMemberTermRepository memberTermRepo;
 
     @InjectMocks CommitteeReferralService service;
 
@@ -293,7 +298,8 @@ class CommitteeReferralGateTest {
         when(committeeRepo.findByIdAndOrganisationId(7L, ORG)).thenReturn(Optional.of(c));
         when(referralRepo.save(any(CommitteeReferral.class))).thenAnswer(i -> i.getArgument(0));
 
-        CommitteeReferral saved = service.refer(MODULE, ENTITY, "CAB", null, null, "admin", "Requester Name", SUBJECT);
+        CommitteeReferral saved = service.refer(MODULE, ENTITY, "CAB", null, null, "admin",
+            CommitteeReferralService.Recusal.byName("Requester Name"), SUBJECT);
 
         assertThat(saved.getCommitteeId()).isEqualTo(7L);
         assertThat(saved.getMode()).isEqualTo("APPROVAL");          // defaulted from null
@@ -489,5 +495,147 @@ class CommitteeReferralGateTest {
         assertThat(service.awaitingDecision(null)).isEmpty();
         verify(referralRepo, never()).findByOrganisationIdAndCommitteeIdAndStatusInOrderByIdAsc(
             any(), any(), any());
+    }
+
+    // ── F2-113: what the referral persists, and how far the recusal can reach ───────────────
+
+    @Test
+    @DisplayName("F2-113 — both halves of the recusal list are persisted, as two unpaired CSVs")
+    void bothHalvesOfTheRecusalListArePersisted() {
+        givenActiveCommittee(7L);
+        when(referralRepo.findByOrganisationIdAndSourceModuleAndSourceEntityId(ORG, MODULE, ENTITY))
+            .thenReturn(Optional.empty());
+        when(referralRepo.save(any(CommitteeReferral.class))).thenAnswer(i -> i.getArgument(0));
+
+        CommitteeReferral saved = service.refer(MODULE, ENTITY, "CAB", "APPROVAL", 7L, "admin",
+            new CommitteeReferralService.Recusal(List.of(8L, 3L), List.of("CloudOps", "IAM Team")),
+            SUBJECT);
+
+        assertThat(saved.getRecusalUserIds())
+            .as("the half that can match committee_member_terms.member_user_id — before V358 the "
+              + "referral had nowhere to put it and the gate could never fire")
+            .isEqualTo("8,3");
+        assertThat(saved.getRecusalNames())
+            .as("⚠ and the labels are still stored: 29 of dev's 42 active seats carry no user id, so "
+              + "for those the name is the only comparable thing there is")
+            .isEqualTo("CloudOps,IAM Team");
+    }
+
+    @Test
+    @DisplayName("F2-113 — an absent or empty recusal stores NULL rather than an empty string")
+    void barringNobodyStoresNothing() {
+        givenActiveCommittee(7L);
+        when(referralRepo.findByOrganisationIdAndSourceModuleAndSourceEntityId(ORG, MODULE, ENTITY))
+            .thenReturn(Optional.empty());
+        when(referralRepo.save(any(CommitteeReferral.class))).thenAnswer(i -> i.getArgument(0));
+
+        CommitteeReferral saved = service.refer(MODULE, ENTITY, "CAB", "APPROVAL", 7L, "admin",
+            null, SUBJECT);
+
+        assertThat(saved.getRecusalUserIds()).isNull();
+        assertThat(saved.getRecusalNames()).isNull();
+        // Blanks are dropped at construction, so a caller holding two NULL labels — the state of the
+        // only two referred dev changes — cannot produce a "," that parses as two empty parties.
+        assertThat(new CommitteeReferralService.Recusal(null, java.util.Arrays.asList(null, "  "))
+                       .isPresent())
+            .isFalse();
+        assertThat(CommitteeReferralService.Recusal.byName((String) null).names()).isEmpty();
+    }
+
+    /**
+     * F2-113 — coverage over the gate the engine enforces, and it must count <b>both</b> causes of
+     * blindness. A referral carrying ids is only decidable if its committee has a seat linked to a
+     * platform user; counting the referral's half alone would report reach the gate does not have.
+     */
+    @Test
+    @DisplayName("F2-113 — coverage counts a referral checkable only if its committee has a linked seat")
+    void coverageNeedsBothTheIdAndALinkedSeat() {
+        CommitteeReferral withIds = referralFor(101L, 7L, "8", null);
+        CommitteeReferral labelOnly = referralFor(102L, 7L, null, "CloudOps");
+        CommitteeReferral idsButBlindCommittee = referralFor(103L, 8L, "8", null);
+        CommitteeReferral barsNobody = referralFor(104L, 7L, null, null);
+        when(referralRepo.findByOrganisationIdAndSourceModuleAndStatusInOrderByIdAsc(
+                eq(ORG), eq(MODULE), any()))
+            .thenReturn(List.of(withIds, labelOnly, idsButBlindCommittee, barsNobody));
+        when(memberTermRepo.findActiveByCommittee(ORG, 7L)).thenReturn(List.of(seat(8L), seat(null)));
+        when(memberTermRepo.findActiveByCommittee(ORG, 8L)).thenReturn(List.of(seat(null)));
+
+        var cov = service.recusalCoverage(MODULE);
+
+        assertThat(cov.gate()).isEqualTo(ChangeSoD.GATE_COMMITTEE_VOTE_NOT_REQUESTER);
+        assertThat(cov.population()).isEqualTo(4);
+        assertThat(cov.checkable())
+            .as("only the referral that carries an id AND sits with a committee that has a linked seat")
+            .isEqualTo(1);
+        assertThat(cov.labelOnly())
+            .as("the label-only referral, plus the one whose ids no seat on its committee can meet — "
+              + "both are recorded and both leave the gate UNVERIFIABLE, which is this bucket's "
+              + "documented meaning")
+            .isEqualTo(2);
+        assertThat(cov.absent())
+            .as("nothing recorded to compare — dev's state on 4 of 4 live referrals on 2026-08-05")
+            .isEqualTo(1);
+        assertThat(cov.coveragePct()).isEqualTo(25);
+        assertThat(cov.enabledButBlind()).isFalse();
+    }
+
+    @Test
+    @DisplayName("F2-113 — coverage is measured over the open statuses only, and reuses that definition")
+    void coverageMeasuresOnlyWhatTheCommitteeStillHasToDecide() {
+        when(referralRepo.findByOrganisationIdAndSourceModuleAndStatusInOrderByIdAsc(
+                eq(ORG), eq(MODULE), any())).thenReturn(List.of());
+
+        var cov = service.recusalCoverage(MODULE);
+
+        org.mockito.ArgumentCaptor<java.util.Collection<String>> statuses =
+            org.mockito.ArgumentCaptor.forClass(java.util.Collection.class);
+        verify(referralRepo).findByOrganisationIdAndSourceModuleAndStatusInOrderByIdAsc(
+            eq(ORG), eq(MODULE), statuses.capture());
+        assertThat(statuses.getValue())
+            .as("a referral the committee has finished with cannot be re-gated, so counting it would "
+              + "report coverage the gate will never be asked for — OPEN_STATUSES reused, not restated")
+            .containsExactlyInAnyOrderElementsOf(CommitteeReferralService.OPEN_STATUSES);
+        assertThat(cov.population()).isZero();
+        assertThat(cov.enabledButBlind())
+            .as("an empty population is not a blind gate")
+            .isFalse();
+        verify(memberTermRepo, never()).findActiveByCommittee(any(), any());
+    }
+
+    @Test
+    @DisplayName("F2-113 — a committee's roster is read once however many referrals it holds")
+    void theRosterIsNotReReadPerReferral() {
+        when(referralRepo.findByOrganisationIdAndSourceModuleAndStatusInOrderByIdAsc(
+                eq(ORG), eq(MODULE), any()))
+            .thenReturn(List.of(referralFor(101L, 7L, "8", null), referralFor(102L, 7L, "3", null),
+                                referralFor(103L, 7L, "2", null)));
+        when(memberTermRepo.findActiveByCommittee(ORG, 7L)).thenReturn(List.of(seat(8L)));
+
+        assertThat(service.recusalCoverage(MODULE).checkable()).isEqualTo(3);
+        verify(memberTermRepo, org.mockito.Mockito.times(1)).findActiveByCommittee(ORG, 7L);
+    }
+
+    private CommitteeReferral referralFor(Long entityId, Long committeeId, String ids, String names) {
+        CommitteeReferral r = new CommitteeReferral();
+        r.setId(entityId);
+        r.setOrganisationId(ORG);
+        r.setSourceModule(MODULE);
+        r.setSourceEntityId(entityId);
+        r.setCommitteeId(committeeId);
+        r.setGate("CAB");
+        r.setStatus("PENDING");
+        r.setRecusalUserIds(ids);
+        r.setRecusalNames(names);
+        return r;
+    }
+
+    /** An active seat, linked to {@code userId} or — for 29 of dev's 42 — to nobody. */
+    private com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm seat(Long userId) {
+        var t = new com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm();
+        t.setOrganisationId(ORG);
+        t.setMemberName("Seat " + userId);
+        t.setMemberUserId(userId);
+        t.setRenewalStatus("ACTIVE");
+        return t;
     }
 }

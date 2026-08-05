@@ -21,9 +21,11 @@ import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -62,6 +64,7 @@ class CommitteeAdapterTest {
         r.setStatus("DECIDED");
         r.setReferredBy("compliance");
         r.setRecusalNames("raiser,owner");
+        r.setRecusalUserIds("8,2");   // F2-113 — the half that can actually match a seat
         return r;
     }
 
@@ -83,6 +86,53 @@ class CommitteeAdapterTest {
         assertThat(v.status()).isEqualTo("DECIDED");
         assertThat(v.referredBy()).isEqualTo("compliance");
         assertThat(v.recusalNames()).isEqualTo("raiser,owner");
+        assertThat(v.recusalUserIds())
+            .as("F2-113 — the id half of the recusal list must cross the port. It is the only half "
+              + "that can match a committee seat: a change's people are team labels and a "
+              + "committee's members are people, which is why the name-only list barred nobody")
+            .isEqualTo("8,2");
+    }
+
+    /**
+     * F2-113 — the recusal list crosses the port <b>whole</b>, ids and names both.
+     *
+     * <p>The bug this pins is a translation that drops one half. If the ids stop crossing, the gate
+     * on the far side silently reverts to comparing a team label against a person's name — which
+     * matched nothing in either database and is the entire finding. If the <em>names</em> stop
+     * crossing, the 29 of 42 active seats that carry no {@code member_user_id} stop being comparable
+     * at all, and the fix would have removed a refusal while appearing to strengthen one.
+     */
+    @Test
+    void bothHalvesOfTheRecusalListCrossTheBoundary() {
+        when(referrals.refer(eq("CHANGE"), eq(500L), eq("CAB"), eq("APPROVAL"), eq(13L), eq("admin"),
+                             any(CommitteeReferralService.Recusal.class), any()))
+            .thenReturn(entity());
+
+        adapter().refer("CHANGE", 500L, "CAB", "APPROVAL", 13L, "admin",
+            new CommitteePort.Recusal(List.of(8L, 2L), List.of("CloudOps", "IAM Team")),
+            new CommitteePort.SubjectRef("CHG-1", "t", null));
+
+        var captured = org.mockito.ArgumentCaptor.forClass(CommitteeReferralService.Recusal.class);
+        verify(referrals).refer(any(), anyLong(), any(), any(), anyLong(), any(),
+                                captured.capture(), any());
+        assertThat(captured.getValue().userIds()).containsExactly(8L, 2L);
+        assertThat(captured.getValue().names()).containsExactly("CloudOps", "IAM Team");
+    }
+
+    /** A caller barring nobody must not be turned into a null the engine has to defend against. */
+    @Test
+    void anAbsentRecusalCrossesAsNoneRatherThanNull() {
+        when(referrals.refer(any(), anyLong(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(entity());
+
+        adapter().refer("CHANGE", 500L, "CAB", "APPROVAL", 13L, "admin", null,
+            new CommitteePort.SubjectRef("CHG-1", "t", null));
+
+        var captured = org.mockito.ArgumentCaptor.forClass(CommitteeReferralService.Recusal.class);
+        verify(referrals).refer(any(), anyLong(), any(), any(), any(), any(),
+                                captured.capture(), any());
+        assertThat(captured.getValue()).isEqualTo(CommitteeReferralService.Recusal.NONE);
+        assertThat(captured.getValue().isPresent()).isFalse();
     }
 
     /**
@@ -173,7 +223,7 @@ class CommitteeAdapterTest {
 
         adapter().describe(new CommitteePort.ReferralView(
             41L, 1L, "CHANGE", 500L, 13L, null, null, "CAB", "APPROVAL", "PENDING", "x", null,
-            LocalDateTime.now(), "CHG-1", "Subject", null), out);
+            LocalDateTime.now(), "CHG-1", "Subject", null, null), out);
 
         assertThat(out).as("a referral the engine no longer has must enrich nothing").isEmpty();
         verify(referrals, never()).enrich(org.mockito.ArgumentMatchers.any(),

@@ -16,4 +16,9 @@ public interface CommitteeReferralRepository extends JpaRepository<CommitteeRefe
     /** S7b / CE-4 — the CAB queue for one committee. Org-scoped, like every query here. */
     java.util.List<CommitteeReferral> findByOrganisationIdAndCommitteeIdAndStatusInOrderByIdAsc(
         Long organisationId, Long committeeId, java.util.Collection<String> statuses);
+
+    /** F2-113 — one referring module's open referrals, across every committee: the population the
+     *  force-recusal gate applies to, and so the population its coverage is measured over. */
+    java.util.List<CommitteeReferral> findByOrganisationIdAndSourceModuleAndStatusInOrderByIdAsc(
+        Long organisationId, String sourceModule, java.util.Collection<String> statuses);
 }

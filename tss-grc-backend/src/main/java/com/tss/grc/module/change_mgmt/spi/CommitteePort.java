@@ -1,5 +1,7 @@
 package com.tss.grc.module.change_mgmt.spi;
 
+import com.tss.grc.module.change_mgmt.service.ChangeSoD;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +63,11 @@ public interface CommitteePort {
         // payload the frontend already reads is unchanged, and these are additive.
         String sourceCode,
         String subjectEn,
-        String subjectAr
+        String subjectAr,
+        // F2-113 / V358 — appended for the same reason. The id half of the recusal list is on the
+        // payload rather than hidden because a reader who can see who is barred by name and not by
+        // id cannot tell an armed gate from an unarmed one, which is the whole finding.
+        String recusalUserIds
     ) { }
 
     /**
@@ -77,6 +83,29 @@ public interface CommitteePort {
      * once, at referral time, and the referral keeps it (V350).
      */
     record SubjectRef(String code, String titleEn, String titleAr) { }
+
+    /**
+     * F2-113 — who must not cast the deciding vote on the referred item, as this module knows them.
+     *
+     * <p>A change-owned record mirroring {@code CommitteeReferralService.Recusal}, for the same
+     * reason {@link SubjectRef} mirrors its engine twin.
+     *
+     * <p><b>Why both halves travel.</b> Before V358 only the names did, and the gate on the far side
+     * compared them against {@code committee_member_terms.member_name}. A change's people are team
+     * labels ('CloudOps', 'IAM Team'); a committee's members are people ('Khalid Al-Rashidi').
+     * Measured 2026-08-05: 15 of 15 owner labels and 13 of 13 requester labels resolved to no user,
+     * and 0 of 4 live referrals carried a name at all — so Track D's bar on the requester casting
+     * the deciding vote had never once engaged. {@code userIds} is the half that can match; the
+     * names stay because 29 of 42 active seats carry no user id and for those the label is all
+     * there is.
+     */
+    record Recusal(List<Long> userIds, List<String> names) {
+        /** For callers that genuinely bar nobody. */
+        public static final Recusal NONE = new Recusal(List.of(), List.of());
+        public boolean isPresent() {
+            return (userIds != null && !userIds.isEmpty()) || (names != null && !names.isEmpty());
+        }
+    }
 
     /**
      * CE-13 — a committee's open queue, split by whether the item can be named on an agenda.
@@ -159,7 +188,7 @@ public interface CommitteePort {
 
     /** Refer a record to a committee under a gate. Idempotent on (tenant, module, record). */
     ReferralView refer(String sourceModule, Long sourceEntityId, String gate, String mode,
-                       Long committeeId, String referredBy, String recusalNames,
+                       Long committeeId, String referredBy, Recusal recusal,
                        SubjectRef subject);
 
     /** Bind a carried committee resolution to the referral — the decision write-back. */
@@ -196,6 +225,25 @@ public interface CommitteePort {
 
     /** Add resolution outcome/tally and meeting status/quorum to a response map. */
     void describe(ReferralView referral, Map<String, Object> out);
+
+    /**
+     * F2-113 — how much of the force-recusal gate's population the engine can actually decide, as one
+     * row of {@code GET /api/v1/changes/sod-coverage}.
+     *
+     * <p><b>Why the answer comes from the engine.</b> The gate is blind for two independent reasons
+     * and this module can only see one of them. It knows whether a change recorded who raised it;
+     * only the engine knows whether the deciding committee has a seat linked to a platform user. A
+     * coverage figure computed here would have read 100% the moment CE-15's changes accumulated while
+     * 29 of dev's 42 active seats remained uncomparable — the F2-112 shape reproduced inside the
+     * instrument built to detect it, which is why this is a port call and not a local count.
+     *
+     * <p>Not a breach of the exclusion list at the top of this file: nothing here bears on whether a
+     * decision was quorate. It reports whether a <em>refusal</em> can fire.
+     *
+     * <p>Returns a zero-population row when the engine is absent — an unknown reach must not read as
+     * a covered one (S6b-i).
+     */
+    ChangeSoD.Coverage recusalCoverage(String sourceModule);
 
     // ── CE-13: the queue, and where it will be heard ─────────────────────────
 
