@@ -2289,6 +2289,80 @@ Start-Service TssGrcBackend
 | **Evidence** | `NcaEccFilingService.transition` lines 107–116, read 2026-08-06 · dev `nca_ecc.filings`: 4 filings, 4 distinct people-labels, 0 resolving to `iam.users` by username or full name, 3 filings carrying both a reviewer and an approver · live probe leg 5 |
 | **Lesson** | Asking *"what does this control compare, and does that data exist?"* has now produced F2-112, F2-113, F2-116 and this. It costs one query per module and it is the cheapest finding generator on this programme |
 
+## F2-118 · 43 enabled automation rules cannot express their own condition, and every one reports SKIPPED
+
+|  |  |
+|---|---|
+| **ID** | F2-118 *(found writing F2-03's floor for `sharia` — a Sharia rule declined the exact case it exists for, and the cause is in the platform kernel, not the module)* |
+| **Module** | `platform/automation` — `AutomationRuleEngine.conditionMatches` |
+| **Severity** | **P1** — escalations keyed on money thresholds, severity and regulator identity never fire, in `fraud`, `opres`, `reginspect`, `regreporting` and `sharia` |
+| **Current State** | 🔴 **OPEN**, with a tripwire: `ShariaLifecycleTest` pins every broken operator form using the exact condition JSON of a real enabled rule, and fails the moment the vocabulary is implemented |
+| **How it was found** | AR-253 — *"HIGH Sharia audit finding → escalate Audit Committee Chair"* — was raised through the API against a genuinely `severity = HIGH` finding. The executor recorded `SKIPPED · "Condition did not match"`. Its condition is `{"severity":{"eq":"HIGH"}}` and `emit("SHARIA_AUDIT_FINDING_RAISED", …)` does publish `severity`, so it should have matched |
+| **Root cause** | `AutomationRuleEngine.matches` compares only **scalars**: `isBoolean` / `isNumber` / `isTextual`, falling back to `Objects.equals(expected.asText(), String.valueOf(actual))`. An operator object like `{"eq":"HIGH"}` is an `ObjectNode` — none of the three type tests match, and **`asText()` on an ObjectNode returns the empty string**. So the comparison is `"" == "HIGH"` and the rule can never match, for any payload. There is no operator support in the evaluator at all; the 43 rules were authored assuming there was |
+| **Measured 2026-08-05** | 214 rules: **134** empty condition (always match) · **37** scalar (work) · **43 operator-object (cannot match — all enabled, 0 have ever fired)** · 0 unparseable. Operators used: `eq` 33 · `in` 3 · `>` 3 · `gte` 2 · `gt` 2 · `ne` 2 · `lt` 1 |
+| **⚠ The silence is the defect's worst property** | Each broken rule records `SKIPPED · "Condition did not match"` — the same outcome a correctly-evaluated negative produces. **293 SKIPPED runs exist.** Nothing distinguishes *"considered the event and declined"* from *"cannot express its own condition"*. A reader auditing the run log sees a functioning engine |
+| **⚠ And a threshold rule that skips looks right while being unconditional** | AR-255 (*"Material SNCI > SAR 500k → escalate Board Risk Committee"*) skipped an 18,500 SAR event — the correct answer, for the wrong reason. **A 750,000 SAR event skips identically.** Same for AR-182 (fraud loss > SAR 1M), AR-185 (confirmed loss > SAR 500k), AR-183 (>100 affected customers), AR-202/AR-203 (NCA / CMA inspection opened → notify CISO) |
+| **Fix** | Implement the operator vocabulary in `AutomationRuleEngine.matches`: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, plus the symbolic `>`/`<` three rules already use. Numeric comparisons must go through the existing `toDouble` so a decimal string compares correctly, and an unknown operator must fail **closed** — a condition the engine cannot understand must not fire, which is the one behaviour the current code gets right |
+| **⚠ The owner decision this carries** | Implementing it **arms 43 dormant rules at once**, across five modules, each of which then begins escalating and notifying. That is the S6c/S8e situation — an enforcement change switched on at deploy, acting on work already under way — and F2-94 measured that most escalation audiences do not resolve anyway (69 of 84 addressed role names do not exist). Recommend: implement the evaluator, ship it with the rules **disabled**, then enable per rule after checking each audience resolves. Do not ship the evaluator and the arming in one commit |
+| **Related** | Same family as **F2-94** (the fan-out reached nobody) and **F2-100** (the rule fired on the wrong thing), different mechanism. AR-254's own run summary states F2-120 out loud: `ESCALATE → RISK_MANAGER,COMPLIANCE_OFFICER (2 recipients); no active holder of CFO; NOT A ROLE: SHARIA_OFFICER` |
+| **Lesson** | A rule engine that fails a condition it cannot parse *the same way* it fails a condition that evaluates false has no observable difference between "working" and "broken". Distinguish **declined** from **could not evaluate** in the run record, or 293 rows of evidence prove nothing |
+
+## F2-119 · Three deadline claims in `sharia`, no clock anywhere in the module
+
+|  |  |
+|---|---|
+| **ID** | F2-119 *(found writing F2-03's floor for `sharia`; the third module in a row whose imperative javadoc names a deadline nothing computes)* |
+| **Module** | `sharia` |
+| **Severity** | **P2** — SAMA §5.7 and §6.4 / AAOIFI FAS 1 deadlines are documented, displayed and unenforced |
+| **Current State** | 🔴 **OPEN**, tripwired by `ShariaLifecycleTest.theModuleHasNoDeadlineEnforcement` — the test fails if a scheduler appears, so the finding cannot be silently superseded |
+| **Problem** | Three deadline claims, zero enforcement: **(1)** `ShariaAuditFinding` — *"HIGH-severity findings trigger AR-253 Board-Audit-Committee escalation **within 30 days** per SAMA §5.7"* — AR-253 fires on a **creation** event, which is a notification, not a deadline (and per **F2-118** it cannot fire at all). **(2)** `ShariaNonComplianceEvent` — SNCI *"purified … **within 90 days** of detection per SAMA §6.4 + AAOIFI FAS 1"* — and there is **no column** to hold or measure that window. **(3)** AR-260, *"SSB scholar term expiring → T-90/T-30 reminders"*, has **no producer**: the trigger `SHARIA_SCHOLAR_TERM_EXPIRING` is emitted nowhere, because a term-expiry sweep does not exist |
+| **Measured** | `@Scheduled` appears nowhere in the module. `remediation_due_at` is written at creation and echoed back in two DTOs, and **nothing ever compares it to the current date**. `sharia.sharia_nc_event` has 28 columns and not one is a due date or deadline |
+| **Fix** | A17-D3's shape, and its discipline: a due date that is **NULL when the start moment is missing**, or every row reports compliant forever — the exact trap A17-D3's own row fell into with one EMERGENCY change that had no implementation timestamp. Then a sweep, then a KPI. Also give AR-260 the producer it needs, or disable it: an enabled rule with no producer is indistinguishable from a rule whose condition never matched |
+| **Evidence** | `ShariaAuditFinding` javadoc lines 24–26 · `ShariaNonComplianceEvent` javadoc lines 21–26 · `ShariaService` carries one date comparison in total, the F2-121 bound added by this slice · `platform.automation_rules` AR-260 enabled, fire_count 0, trigger emitted 0 times in the module |
+| **Lesson** | Three modules in three slices — F2-115's 60-day SAMA notification, A17-D3's ratification SLA, and this — have had a deadline in prose and no clock in code. **Grep every module's imperative javadoc for a number followed by "days" before believing any of its deadlines.** |
+
+## F2-120 · The Sharia Supervisory Board cannot act in the Sharia module
+
+|  |  |
+|---|---|
+| **ID** | F2-120 *(measured writing F2-03's authorisation-branch coverage for `sharia`; F2-116's shape, three times worse)* |
+| **Module** | `sharia` — `ShariaController` |
+| **Severity** | **P2** — the body whose independent authority is the entire regulatory purpose of the module holds no role that exists |
+| **Current State** | 🔴 **OPEN.** Pinned by `ShariaLifecycleTest` so a silent edit to any of the three guards fails the build |
+| **Problem** | Measured against `iam.roles` (58 roles, dev, 2026-08-06), of the eight distinct names the three guard constants recite, **four do not exist**: `SHARIA_OFFICER`, `SHARIA_AUDITOR`, `SHARIA_BOARD_CHAIR` and `CRO`. So `READ_GUARD` has 4 real holders of the 7 it names, **`WRITE_GUARD` 2 of 4**, and **`APPROVE_GUARD` 2 of 5** — leaving `PLATFORM_ADMIN` and `COMPLIANCE_OFFICER` as the only parties who can write or approve an SSB resolution, a Sharia audit finding, a non-compliance event or an Islamic product approval |
+| **Confirmed by the platform itself** | AR-254's own run summary, recorded by the executor during this slice's probe: `ESCALATE → RISK_MANAGER,COMPLIANCE_OFFICER (2 recipients); no active holder of CFO; NOT A ROLE: SHARIA_OFFICER`. The engine says *NOT A ROLE* in a stored field and nothing reads it |
+| **Why it fails silently** | `hasAnyRole` gets no `PLATFORM_ADMIN` bypass and has no referential integrity to the role table, so a name that does not exist simply never matches. No error, no log line, no startup warning. RC-C, and F2-52's ~50% miss rate across 647 guards, landing in the flagship Saudi SKU |
+| **⚠ Why filed and not fixed** | Two remedies, not equivalent: **(a)** create `SHARIA_OFFICER`/`SHARIA_AUDITOR`/`SHARIA_BOARD_CHAIR` as roles and grant them, which is a governance decision about who holds authority in a customer's organisation; **(b)** convert to `hasPermission` under **F2-05**, the ratified direction, which makes the names irrelevant. Inventing four privileged roles to make a guard true is the F2-14 anti-pattern, and doing it here would pre-empt F2-05's design |
+| **Commercial weight** | §6d's contention rule calls F2-03 revenue critical-path *because* `sharia` and `data_officer` had no tests — W3-5 makes the flagship Saudi SKU unsellable until it lands. A prospect asking *"can our Sharia Board approve rulings in the platform?"* is answered *no* today, by data rather than by design |
+| **Lesson** | Same as F2-116's, and the repetition is the point: reading role names as authority without joining them to the role table is how this platform accumulated 537 of these |
+
+## F2-121 · The SNCI purification date was unbounded — FIXED
+
+|  |  |
+|---|---|
+| **ID** | F2-121 |
+| **Module** | `sharia` — `ShariaService.purifyNcEvent` |
+| **Severity** | **P2** — the date an AAOIFI FAS 1 disclosure and the SAMA §6.4 window are both computed from accepted any value |
+| **Current State** | ✅ **CLOSED 2026-08-06** (no migration) |
+| **Problem** | `purifiedAt` is `@NotNull` and otherwise unconstrained. Two values are simply incoherent and neither was refused: a **future** date, which asserts a donation that has not happened; and a date **before `detected_at`**, i.e. income purified before the breach that produced it was discovered |
+| **Fix** | Both bounded in `ShariaService.purifyNcEvent`, refused as 409 `ProblemDetail` naming the offending date and the detection date |
+| **⚠ Deliberately NOT server-derived** | Purification genuinely happens outside the platform and is recorded afterwards from a charity receipt, so a back-dated value is **legitimate** and stamping `LocalDate.now()` would overwrite the real donation date with the data-entry date — the mirror image of RC-E, corrupting the disclosure it feeds. **Bounding a caller's value is the correct treatment when the caller is the only source of it**; a mutation replacing the bound with a server stamp is caught |
+| **Verified** | 12 unit checks, **11/11 mutations caught** (including the server-stamp mutation and both bound removals); live **15/16** on the first pass and the one failure was the probe's own instrument, not the platform — see F2-118 |
+| **Refuted while investigating** | Four hypotheses about this module were tested and **all four failed**, which is worth recording: the purification evidence **is** mandatory (`@NotBlank` destination + charity receipt); `snciAmountSar` is `@NotNull` at detection so the `Map.of` NPE is unreachable; `subject_area` is NOT NULL so the transition NPE is unreachable; and every entity carries `@Where` so soft deletes are filtered. This module is in better shape than `outsourcing` was |
+
+## F2-122 · One status, two writers, different rules
+
+|  |  |
+|---|---|
+| **ID** | F2-122 *(found writing F2-03's floor for `sharia` — a green machine test would have certified a machine a sibling method bypasses)* |
+| **Module** | `sharia` — `transitionNcEvent` vs `ShariaService.purifyNcEvent` |
+| **Severity** | **P3** — a documented divergence, not a exploit; but it makes the non-compliance lifecycle two different lifecycles depending on which endpoint you call |
+| **Current State** | 🔴 **OPEN.** Pinned by `ShariaLifecycleTest.purifyIsASecondWriterThatBypassesTheMap` so neither writer can move without the other being reconsidered |
+| **Problem** | `NC_ALLOWED` declares `DETECTED → {INVESTIGATION}` — `DETECTED` may become `INVESTIGATION` and nothing else. `transitionNcEvent` enforces that. `ShariaService.purifyNcEvent` never consults the map: it sets `INCOME_PURIFIED` directly from **either** `INVESTIGATION` **or `DETECTED`**, so the shortcut the map forbids is reachable through a different endpoint |
+| **⚠ Why it is not "fixed"** | Whether purifying Sharia non-compliance income may precede investigation is a business decision under SAMA §6.4 / AAOIFI FAS 1, and the `DETECTED` branch in `ShariaService.purifyNcEvent` was **written deliberately** — it is a guard listing two statuses, not an omission. Silently reversing another author's decision because a test was easier to write that way is not a fix. What the floor does instead is make the divergence impossible to miss |
+| **Fix** | Decide, then make one writer authoritative: either `ShariaService.purifyNcEvent` routes through `NC_ALLOWED` (and `DETECTED` leaves its allowed-from set), or `NC_ALLOWED` gains `DETECTED → INCOME_PURIFIED` so the map states what the module actually permits. Either way the two must agree — RC-A at the level of a single service |
+| **Lesson** | A state-machine test that reads the service's own map proves implementation-against-declaration for **that writer**. It says nothing about a second writer of the same field. Count the writers before trusting a machine test |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

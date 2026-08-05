@@ -433,6 +433,32 @@ public class ShariaService {
             throw new IllegalStateException(
                     "Cannot purify SNCI in status " + n.getStatus());
         }
+        // ── F2-121: the purification date is caller-supplied, so it must be bounded ─────────────
+        //
+        // `purifiedAt` is @NotNull but otherwise unconstrained, and it is the date an AAOIFI FAS 1
+        // disclosure and the SAMA §6.4 90-day window are both computed from. Two values are simply
+        // incoherent and neither was refused:
+        //
+        //   * a FUTURE date — the record would assert a donation that has not happened;
+        //   * a date BEFORE detected_at — income purified before the breach was discovered.
+        //
+        // ⚠ Deliberately NOT server-derived. Purification genuinely happens outside the platform and
+        // is recorded afterwards from a charity receipt, so a back-dated value is legitimate and
+        // stamping LocalDate.now() would overwrite the real date with the data-entry date — the
+        // mirror image of the RC-E defect, and it would corrupt the disclosure it feeds. Bounding a
+        // caller's value is the correct treatment when the caller is the only source of it.
+        LocalDate purifiedOn = req.getPurifiedAt();
+        if (purifiedOn.isAfter(LocalDate.now())) {
+            throw new IllegalStateException(
+                    "Purification date " + purifiedOn + " is in the future — SNCI cannot be "
+                    + "recorded as purified before the donation has been made.");
+        }
+        if (n.getDetectedAt() != null && purifiedOn.isBefore(n.getDetectedAt().toLocalDate())) {
+            throw new IllegalStateException(
+                    "Purification date " + purifiedOn + " precedes detection on "
+                    + n.getDetectedAt().toLocalDate() + " — income cannot be purified before the "
+                    + "non-compliance that produced it was detected.");
+        }
         n.setStatus("INCOME_PURIFIED");
         n.setPurificationDestination(req.getPurificationDestination());
         n.setCharityReceiptRef(req.getCharityReceiptRef());
