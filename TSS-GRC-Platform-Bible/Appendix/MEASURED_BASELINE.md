@@ -32,7 +32,7 @@ that will be read as current forever.
 
 | Metric | Measured (08-01) | 07-25 | Where the platform's own docs say otherwise |
 |---|---:|---:|---|
-| Backend module packages | **59** (57 with code + 1 empty + `change_adapters`, added by S5/CE-1) | 58 | `CLAUDE.md` now lists all 58 ✅ (it said **24** until F2-19). ⚠ The 59th is deliberate and needed an ADR-018 homing decision, not just a directory — `SkuRegistry.requiredSkuForPackage` THROWS for an unhomed `module.*` package |
+| Backend module packages | **59** (57 with code + 1 empty + `change_adapters`, added by S5/CE-1) | 58 | ⚠ **now enforced, not merely measured** — `module-registry.yaml` enumerates all 59 and `ModuleRegistryContractTest` fails the build when this row, `CLAUDE.md`, the directory listing or `SkuRegistry` disagree (F2-01). `CLAUDE.md` read **58** until 2026-08-05 ✅ (it said **24** until F2-19). ⚠ The 59th is deliberate and needed an ADR-018 homing decision, not just a directory — `SkuRegistry.requiredSkuForPackage` THROWS for an unhomed `module.*` package |
 | Module Java LoC | **192,113** | 186,285 | — |
 | Files declaring a JPA entity | **419** | *pub. 419* | S8g/CE-8 added `ChangeSchedulePublication`; S8f/CE-11 added `UnauthorisedChangeDisposition`; S8e/CE-2 added `ChangeModel` + `ChangeModelUsage`. ⚠ The measured count now **coincides** with the figure §0.1 records as wrong: 417 was published from a substring count when the true figure was 413, and it is 417 today for unrelated reasons. Do not read the match as the old error returning |
 | JPA entity **classes** declared | **432** | — | 13 of them live in one file (`data_officer`); +1 from S8g/CE-8, +1 from S8f/CE-11, +2 from S8e/CE-2 |

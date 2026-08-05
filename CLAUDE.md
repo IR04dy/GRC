@@ -164,9 +164,15 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
 
-Backend modules under `module/` — **58 packages** (57 with code; `datagov` is an empty
-placeholder), 186 kLoC, 417 entities, 2,160 endpoints. Each follows
+Backend modules under `module/` — **59 packages** (58 with code; `datagov` is an empty
+placeholder), 192 kLoC, 432 entities, 2,168 endpoints. Each follows
 `controller / dto / entity / repository / service`.
+
+⚠ **Do not edit that count by hand — it is enforced.** `module-registry.yaml`
+(`tss-grc-backend/src/main/resources/`) enumerates all 59 exactly once, and
+`ModuleRegistryContractTest` fails the build if the registry, the directory listing,
+`SkuRegistry`'s ADR-018 homing or *this sentence* disagree. Adding a package means an entry
+there, a homing in `SkuRegistry`, and a workspace decision — or the build refuses it.
 
 - **Largest:** `bcm` 25k · `sust` 16.7k (+`finance`/`ghg`/`capa`/`vendor`) ·
   `platform` 10k · `risk` 9k · `ndi` 7.7k · `integrations` 7.6k · `cyber` 7.3k ·
@@ -177,9 +183,10 @@ placeholder), 186 kLoC, 417 entities, 2,160 endpoints. Each follows
   `dataclass`, `data_officer`, `regchange`
 - **Kernel-ish:** `auth`, `attachment`, `signature`, `approvals`, `capa`, `intake`,
   `dashboard`, `knowledge`, `controlmap`, `workflow_submission`
-- **Other:** `change_mgmt`, `policy`, `incident`, `governance`, `ccm`, `audit_committee`,
-  `audit_eng`, `board_pack`, and the `*_lc` lifecycle packages (`risk_lc`, `cyber_lc`,
-  `bcm_lc`, `privacy_lc`)
+- **Other:** `change_mgmt`, `change_adapters` (the 59th — S5a's ports/adapters bridging
+  Change to `admin.committee` and `incident`; no entities), `policy`, `incident`,
+  `governance`, `ccm`, `audit_committee`, `audit_eng`, `board_pack`, and the `*_lc`
+  lifecycle packages (`risk_lc`, `cyber_lc`, `bcm_lc`, `privacy_lc`)
 
 ⚠ **This file previously listed 24 modules** — a 40% understatement that silently scoped
 34 packages out of the RBAC catalogue, the test bar and every remediation plan. Full census

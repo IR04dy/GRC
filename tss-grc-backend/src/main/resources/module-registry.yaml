@@ -1,0 +1,219 @@
+# ─────────────────────────────────────────────────────────────────────────────────────────────────
+# F2-01 — the module registry, v1
+#
+# One entry per top-level package under `com.tss.grc.module`. 59 entries, and the count is the
+# point: this platform's documents have claimed 24, 57, 58 and 59 simultaneously, and every
+# remediation plan that scoped work "per module" inherited whichever number its author had read.
+# `ModuleRegistryContractTest` fails the build when this file, the packages on disk, `SkuRegistry`
+# or the doc corpus disagree.
+#
+# ── WHAT v1 ENFORCES, AND WHY IT IS NOT THE ROW'S FULL FIELD LIST ────────────────────────────────
+# The §3 Wave-1 row asks for owner, SKU, maturity, tier, schema, permission prefix, test floor, FE
+# route root and docs. §6d then re-scoped it: "v1 enforces only package↔entry parity, schema
+# agreement and module-count claims. `sku`/`owner`/`test_floor` become enforceable as they are
+# actually decided — otherwise a CI-enforced registry stuffed with placeholder SKUs is the F2-14
+# anti-pattern." This file follows the re-scope, and records what it left out rather than implying
+# the fields were forgotten:
+#
+#   sku            KEPT — decided by ADR-018 and already total over all 59 packages. But it is NOT
+#                  re-declared here: `homing:` is asserted against SkuRegistry in both directions,
+#                  so this file cannot become a second authority that drifts from the code. That
+#                  failure mode is RC-A, the root cause behind the largest cluster of findings on
+#                  this programme; reproducing it inside the register meant to prevent it would be
+#                  a poor joke.
+#   schemas        KEPT — measured by reflection over compiled annotations.
+#   workspace      KEPT — decided by UX_REDESIGN_BLUEPRINT §"12 workspaces" (now 13, per §6d).
+#                  `null` where the blueprint genuinely assigns none; see `workspace_note`.
+#   owner          OMITTED — no document assigns a human or team owner to any package. A registry
+#                  column reading "TBD" 59 times enforces nothing.
+#   maturity       OMITTED — decided for exactly one package (`datagov` = PLANNED, F2-20), which
+#                  `homing: unassigned` already records. One real value and 58 invented ones is
+#                  the anti-pattern §6d names.
+#   tier           OMITTED — "Tier-1 regulator-facing" exists as a sentence in F2-03's row naming
+#                  six packages, not as a ratified classification of all 59.
+#   test_floor     OMITTED — F2-03 is ⬜. A floor nobody has set cannot be unmet.
+#   permissions    OMITTED, and this one is a measurement, not a deferral: a single "permission
+#                  prefix" per module is FALSE for 12 of the 42 packages that carry guards.
+#                  `platform` names nine codes (PLATFORM, CONTROL_LIB, REGULATORY, RISK, AUDIT_LOG,
+#                  PRIVACY, AUTOMATION, EVIDENCE, AI); `workflow` names ten, because the engine
+#                  serves fourteen modules and guards each caller's own permission. Recording one
+#                  prefix per module would have been wrong, and enforcing it would fail the build
+#                  on every legitimate new cross-module guard.
+#   fe_route_root  OMITTED from v1 — F2-07a's route matrix is the measured artefact for this and it
+#                  keys on route, not package. Wave 4's registry-generated navigation is what needs
+#                  the join; `workspace:` is the field that decision actually turns on.
+#
+# ── HOW TO READ `schemas:` ───────────────────────────────────────────────────────────────────────
+# The set of database schemas the package's JPA mappings name — @Table, @SecondaryTable, @JoinTable
+# and @CollectionTable — with a bare `@Table(name=…)` resolved to `platform`, because
+# `application.yml` sets `spring.jpa.properties.hibernate.default_schema: platform`.
+#
+# ⚠ A package's schemas are NOT its name, and co-location is deliberate. `controlmap` maps into
+# `evidence`, `incident` into `cyber`, `knowledge` into `kb`, `workflow_submission` into `workflow`,
+# and `attachment`/`auth`/`governance`/`integrations` into `platform`. So the enforceable property
+# is CONTAINMENT — every schema an entity names is declared by its own package — and not "one
+# schema per module", which would fail on eight correct packages. F2-06a's row says "every @Entity
+# schema == its registry schema"; measured, that equality does not hold and should not.
+#
+# ⚠ Measured by REFLECTION, never by grep. `SchemaContractRatchetTest.mappedTables()` records why:
+# source regexes have reported this repository's entity count as 418, 417 and 413, because
+# @EntityListeners, @EntityGraph and Javadoc prose all look like entities to a pattern. A Python
+# pass written for this very file reported 423 and silently missed multi-entity files (13 of
+# `data_officer`'s entities share one file), @JoinTable and @CollectionTable.
+#
+# ── MAINTENANCE ──────────────────────────────────────────────────────────────────────────────────
+# A new package needs: an entry here, a homing in SkuRegistry, and a workspace decision or an
+# explicit note that there is none. Creating one without all three fails the build — which is the
+# whole purpose, since seven packages once became unsold revenue by being quietly filed under Base.
+# ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+version: 1
+measured_at: "2026-08-05"
+package_root: com.tss.grc.module
+
+# The workspaces of UX_REDESIGN_BLUEPRINT, listed so `workspace:` below is checkable against a
+# closed set rather than any integer. 13 exists because §6d caught that a 12-workspace blueprint
+# would have re-filed Change Enablement under "Governance & Administration", silently reversing the
+# owner's CE-0 direction through a generated navigation.
+workspaces:
+  1: My Work
+  2: Risk
+  3: Compliance & Policy
+  4: Internal Audit
+  5: Cyber & SOC
+  6: Resilience
+  7: Privacy
+  8: Third Party & Supply Chain
+  9: Sustainability
+  10: Ethics & Conduct
+  11: Financial-Sector Regulatory
+  12: Governance & Administration
+  13: Change Enablement
+
+modules:
+
+  # ── RISK ──────────────────────────────────────────────────────────────────────────────────────
+  risk:      { homing: sku, sku: RISK, schemas: [risk],    workspace: 2 }
+  risk_lc:   { homing: sku, sku: RISK, schemas: [risk_lc], workspace: 2 }
+  ccm:       { homing: sku, sku: RISK, schemas: [ccm],     workspace: 2 }
+
+  # ── COMPLIANCE ────────────────────────────────────────────────────────────────────────────────
+  compliance:   { homing: sku, sku: COMPLIANCE, schemas: [compliance],   workspace: 3 }
+  policy:       { homing: sku, sku: COMPLIANCE, schemas: [policy],       workspace: 3 }
+  nca_ecc:      { homing: sku, sku: COMPLIANCE, schemas: [nca_ecc],      workspace: 3 }
+  regchange:    { homing: sku, sku: COMPLIANCE, schemas: [regchange],    workspace: 3 }
+  reginspect:   { homing: sku, sku: COMPLIANCE, schemas: [reginspect],   workspace: 11 }
+  regreporting: { homing: sku, sku: COMPLIANCE, schemas: [regreporting], workspace: 11 }
+
+  # ── AUDIT_LC ──────────────────────────────────────────────────────────────────────────────────
+  audit_lc:        { homing: sku, sku: AUDIT_LC, schemas: [audit_lc],        workspace: 4 }
+  audit_eng:       { homing: sku, sku: AUDIT_LC, schemas: [audit_eng],       workspace: 4 }
+  audit_committee: { homing: sku, sku: AUDIT_LC, schemas: [audit_committee], workspace: 4 }
+
+  # ── CYBER / SOCOPS ────────────────────────────────────────────────────────────────────────────
+  cyber:    { homing: sku, sku: CYBER,  schemas: [cyber],    workspace: 5 }
+  cyber_lc: { homing: sku, sku: CYBER,  schemas: [cyber_lc], workspace: 5 }
+  socops:   { homing: sku, sku: SOCOPS, schemas: [socops],   workspace: 5 }
+  # `incident` maps into the `cyber` schema, not an `incident` one. Deliberate: ADR-017 dissolved
+  # the incident→cyber schema-move question, so the co-location is ratified, not pending.
+  incident: { homing: sku, sku: SOCOPS, schemas: [cyber],    workspace: 5 }
+
+  # ── BCM ───────────────────────────────────────────────────────────────────────────────────────
+  bcm:    { homing: sku, sku: BCM, schemas: [bcm],    workspace: 6 }
+  bcm_lc: { homing: sku, sku: BCM, schemas: [bcm_lc], workspace: 6 }
+  opres:  { homing: sku, sku: BCM, schemas: [opres],  workspace: 6 }
+
+  # ── PDPL ──────────────────────────────────────────────────────────────────────────────────────
+  privacy:      { homing: sku, sku: PDPL, schemas: [privacy],      workspace: 7 }
+  privacy_lc:   { homing: sku, sku: PDPL, schemas: [privacy_lc],   workspace: 7 }
+  data_officer: { homing: sku, sku: PDPL, schemas: [data_officer], workspace: 7 }
+  dataclass:    { homing: sku, sku: PDPL, schemas: [dataclass],    workspace: 7 }
+
+  # ── TPRM ──────────────────────────────────────────────────────────────────────────────────────
+  tprm:        { homing: sku, sku: TPRM, schemas: [tprm],        workspace: 8 }
+  scm:         { homing: sku, sku: TPRM, schemas: [scm],         workspace: 8 }
+  outsourcing: { homing: sku, sku: TPRM, schemas: [outsourcing], workspace: 8 }
+
+  # ── ESG ───────────────────────────────────────────────────────────────────────────────────────
+  sust: { homing: sku, sku: ESG, schemas: [sust], workspace: 9 }
+
+  # ── ETHICS ────────────────────────────────────────────────────────────────────────────────────
+  ethics:   { homing: sku, sku: ETHICS, schemas: [ethics],   workspace: 10 }
+  consumer: { homing: sku, sku: ETHICS, schemas: [consumer], workspace: 10 }
+  aml:      { homing: sku, sku: ETHICS, schemas: [aml],      workspace: 11 }
+  fraud:    { homing: sku, sku: ETHICS, schemas: [fraud],    workspace: 11 }
+
+  # ── SAUDI_FS ──────────────────────────────────────────────────────────────────────────────────
+  sharia:      { homing: sku, sku: SAUDI_FS, schemas: [sharia],      workspace: 11 }
+  openbanking: { homing: sku, sku: SAUDI_FS, schemas: [openbanking], workspace: 11 }
+  rrp:         { homing: sku, sku: SAUDI_FS, schemas: [rrp],         workspace: 11 }
+  cpty:        { homing: sku, sku: SAUDI_FS, schemas: [cpty],        workspace: 8 }
+
+  # ── DATA_AI_GOV ───────────────────────────────────────────────────────────────────────────────
+  ai: { homing: sku, sku: DATA_AI_GOV, schemas: [ai, ai_governance], workspace: 12 }
+  # ⚠ `ndi` is a sold module with NO workspace. The blueprint's 13 workspaces do not mention it,
+  # and it is the platform's fourth-largest package (7.7 kLoC, 15 tables). Wave 4 generates
+  # navigation from this registry, so a null here is the difference between a screen and no screen
+  # for a paid SKU — recorded as F2-114 rather than assigned a workspace here, because inventing
+  # the answer in a data file is how CE-0's direction nearly got reversed.
+  ndi:
+    homing: sku
+    sku: DATA_AI_GOV
+    schemas: [ndi]
+    workspace: null
+    workspace_note: >-
+      F2-114 — sold under DATA_AI_GOV but absent from all 13 blueprint workspaces. Needs an owner
+      decision, not a default.
+
+  # ── BOARD ─────────────────────────────────────────────────────────────────────────────────────
+  board_pack: { homing: sku, sku: BOARD, schemas: [board_pack], workspace: 12 }
+
+  # ── CHANGE ────────────────────────────────────────────────────────────────────────────────────
+  change_mgmt: { homing: sku, sku: CHANGE, schemas: [change_mgmt], workspace: 13 }
+  # No entities and no UI: ports/adapters bridging Change to admin.committee and incident (S5a).
+  # `workspace: null` is correct rather than missing — a workspace is a screen, and adapters have
+  # none. Homed to CHANGE all the same, because they ship and are licensed with it.
+  change_adapters:
+    homing: sku
+    sku: CHANGE
+    schemas: []
+    workspace: null
+    workspace_note: adapters have no UI surface; the SKU they serve is workspace 13.
+
+  # ── BASE — mandatory, licence-row-less, never annotated with @RequireModule (ADR-018 R4) ──────
+  platform:            { homing: base, schemas: [platform],  workspace: null }
+  iam:                 { homing: base, schemas: [iam],       workspace: 12 }
+  auth:                { homing: base, schemas: [platform],  workspace: null }
+  admin:               { homing: base, schemas: [admin],     workspace: 12 }
+  evidence:            { homing: base, schemas: [evidence],  workspace: null }
+  attachment:          { homing: base, schemas: [platform],  workspace: null }
+  signature:           { homing: base, schemas: [platform, signature], workspace: null }
+  workflow:            { homing: base, schemas: [workflow],  workspace: null }
+  workflow_submission: { homing: base, schemas: [workflow],  workspace: null }
+  approvals:           { homing: base, schemas: [approvals], workspace: null }
+  intake:              { homing: base, schemas: [intake],    workspace: null }
+  capa:                { homing: base, schemas: [capa],      workspace: null }
+  reporting:           { homing: base, schemas: [reporting], workspace: null }
+  integrations:        { homing: base, schemas: [platform],  workspace: null }
+  knowledge:           { homing: base, schemas: [kb],        workspace: null }
+  controlmap:          { homing: base, schemas: [evidence],  workspace: 3 }
+  governance:          { homing: base, schemas: [platform],  workspace: 12 }
+  # No entities of its own — it composes other modules' repositories.
+  dashboard:           { homing: base, schemas: [],          workspace: 1 }
+
+  # ── UNASSIGNED — recorded, not quietly filed under Base (ADR-018 §4) ──────────────────────────
+  # One package-info.java, no code. F2-20's row: register it PLANNED, do not delete it — its
+  # package-info argues a deliberate v2 deferral.
+  datagov:
+    homing: unassigned
+    schemas: []
+    workspace: null
+    workspace_note: PLANNED (F2-20) — no code yet, so nothing to place.
+
+# ── The two entitlement units that are NOT packages (ADR-018 R6) ─────────────────────────────────
+# Sub-packages of a Base parent, sold separately. Consulted before the package homing, which is why
+# `admin` and `iam` above are Base while these two are SKUs. Kept here so the registry describes
+# every sellable unit, not merely every directory.
+carve_outs:
+  admin.committee: { sku: BOARD,      workspace: 12 }
+  iam.governance:  { sku: ACCESS_GOV, workspace: 12 }

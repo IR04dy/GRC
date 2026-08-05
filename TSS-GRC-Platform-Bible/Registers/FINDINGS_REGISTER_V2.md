@@ -2225,6 +2225,21 @@ Start-Service TssGrcBackend
 | **Evidence** | `CommitteeResolutionService.recordVote` lines 246–253, read 2026-08-05 · dev: 15 of 15 change owner labels and 13 of 13 requester labels resolve to no user; the 6 CAB/ECAB seats are linked, the other 37 roster rows are not · the referral path was unreachable in dev before today because both gates failed closed, which is why this sat undetected |
 | **Lesson** | Fixing one instance of a defect class is the moment to grep for the others. F2-112 was found by asking "what does this compare, and does that data exist?" — the same question asked of the committee vote answers immediately |
 
+## F2-114 · A paid module has no workspace, so generated navigation would give it no screen
+
+|  |  |
+|---|---|
+| **ID** | F2-114 *(found authoring F2-01's registry — the field §6d insisted on carrying "from day one" is exactly the field that had a hole)* |
+| **Module** | `ndi` — sold under the `DATA_AI_GOV` SKU |
+| **Severity** | **P2** — latent today, becomes a missing screen for a paid module the moment Wave 4 generates navigation from the registry |
+| **Current State** | 🔴 **OPEN.** Recorded in `module-registry.yaml` as `workspace: null` with a `workspace_note`, and `ModuleRegistryContractTest` refuses any *other* SKU'd package that tries the same thing silently |
+| **Problem** | `TSS-GRC-Platform-Bible/UX/UX_REDESIGN_BLUEPRINT.md` enumerates 13 workspaces and assigns 42 of the 59 backend packages to them. `ndi` is not among them — yet it is the platform's fourth-largest package (7.7 kLoC, 15 tables) and ADR-018 sells it under `DATA_AI_GOV`. Seventeen packages have no workspace and sixteen of those are correct: Base/kernel packages have no screen of their own, and `change_adapters` is glue. `ndi` is the one paid module with nowhere to render |
+| **Why it matters later, not now** | Navigation is currently a hand-maintained 184-entry sidebar, and `ndi` appears in it. Wave 4 (F2-07c) retires that sidebar and **generates** navigation from this registry plus entitlements. At that moment a null workspace stops being a documentation gap and becomes a tenant paying for `DATA_AI_GOV` with no route to it. This is the same mechanism §6d caught for Change Enablement — a 12-workspace blueprint would have re-filed it under "Governance & Administration" and silently reversed CE-0 — except that one was caught by a human reading a table, and this one is now caught by a test |
+| **⚠ Why it is filed rather than fixed** | Assigning a workspace is an information-architecture decision about where a user goes to find data-and-AI governance, and the honest options differ materially: a **14th workspace** of its own (it is large enough), folded into **12 Governance & Administration** (where `ai` already sits, and `DATA_AI_GOV` sells the two together), or into **3 Compliance & Policy**. Picking one in a data file to make a test pass would be inventing the answer — the F2-14 anti-pattern §6d names in the same bullet that demanded the field |
+| **Fix** | An owner or UX decision, then one line in `module-registry.yaml`. `ModuleRegistryContractTest` already fails any SKU'd package whose workspace is null without a stated reason, so the gap cannot recur unnoticed |
+| **Evidence** | `TSS-GRC-Platform-Bible/UX/UX_REDESIGN_BLUEPRINT.md` §"12 workspaces" table, read 2026-08-05: workspaces 2–13 name 42 packages, `ndi` absent · `module-registry.yaml` records 17 nulls, of which 16 are Base or adapters · ADR-018 §3 homes `ndi` to `DATA_AI_GOV` alongside `ai` |
+| **Lesson** | The field a review insists on "from day one" is worth carrying precisely because writing it down is what finds the hole. Had the registry omitted `workspace:` as undecided, this would have surfaced during Wave 4 as a missing screen instead of during Wave 1 as a row in a register |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.
