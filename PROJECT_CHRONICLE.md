@@ -597,6 +597,69 @@ Operators: `docs/change-manager/CAB_OPERATING_RUNBOOK.md` §8.5.
 
 ---
 
+#### The third instance — F2-113, the deciding committee vote, and 4 of 4 referrals that barred nobody
+
+Fixing one instance of a defect class is the moment to grep for the others. The question that found
+F2-112 — *what does this compare, and does that data exist?* — asked of Track D's bar on a change's
+requester casting the deciding committee vote answers immediately, and it answers worse.
+
+`referToCommittee` built a CSV from `getRequestedByName()` + `getChangeOwnerName()`;
+`CommitteeResolutionService.recordVote` matched it with `sameName(member, nm)` against
+`committee_member_terms.member_name`. **A change's people are team labels and a committee's members are
+people.** Measured 2026-08-05: 13 requester labels and 15 owner labels, of which **0** resolve to any
+user — `'AppSec'`, `'CIO Office'`, `'SRE'`, `'IAM Team'`, `'CloudOps'`; the seats are
+`'Khalid Al-Rashidi'`, `'Noura Al-Zahrani'`. The two vocabularies do not overlap, so the bar had never
+engaged for any change in either database.
+
+**And it was worse than a mismatch — the register's own account understated it.** Of dev's 4 live
+referrals, **0** carried a non-empty `recusal_names` at all: #7 and #8 predate the list, and #86/#87
+came from changes whose requester and owner *names* are NULL, so the builder turned two blanks into
+nothing. The gate was not weakly enforced; it was **unarmed** — and `"Referred to committee 13"` reads
+identically either way, which is how it stayed invisible through S6, S7 and S8.
+
+**Why it was unfixable the day before.** Both sides of an id comparison had to exist first, and they
+began to on the same day: CE-15 made `create` capture `requested_by_id`, and the roster fix seated the
+CAB and ECAB with `member_user_id` populated — 13 of 42 active seats linked, including all 3 CAB seats
+and all 3 ECAB seats, the two the gate map resolves. V358 adds `recusal_user_ids` **alongside**
+`recusal_names`, `CommitteePort.refer` carries a `Recusal(List<Long>, List<String>)` rather than two
+adjacent `String` parameters in an eight-argument method, and the comparison is `ChangeSoD`'s.
+
+⚠ **The name comparison stays, and that is the load-bearing part.** 29 of 42 active seats carry no
+`member_user_id`, and `committee_member_terms.no_platform_user` exists because an external director
+legitimately never gets one. So the recusal list is built one party **per bar** — `Party(id, null)` and
+`Party(null, label)` as separate entries, never `Party(id, label)`. Merging them would look like a
+tidy-up and would re-engage `ChangeSoD`'s rule that a party's id supersedes its name, silently retiring
+the fallback those 29 seats depend on. V358 self-check 4 THROWs if `recusal_names` is ever dropped as
+"superseded", and a unit test fails if the halves are merged.
+
+⚠ **And the fix's own first draft added a rule that did not exist.** It introduced
+`ChangeSoD.compareUnlinkedActor` — "ids decide when *both* sides carry one" — with a javadoc arguing at
+length why it had to differ from `compare`. Swapping one for the other changed **no test**, which read
+at first like a missing test and was in fact the answer: because every bar carries an id *or* a name and
+never both, the two rules are **indistinguishable** for every input this caller produces. It was a
+second copy of one comparison asserting a difference it did not have — the very defect class F2-112 and
+F2-113 are instances of, added by the fix for them. Deleted; `compareAny` does the work. **A mutation
+that changes no test is not always proof the test is weak; it can be proof the code is redundant.**
+
+**The reach is published, not assumed.** `/sod-coverage` gained a fourth row,
+`COMMITTEE_VOTE_NOT_REQUESTER` — and it is the only row `change_mgmt` does not compute. The gate is blind
+for two independent reasons and no single module sees both: whether the referral captured identity, and
+whether the deciding committee has a seat linked to a user. A count taken in the change module would have
+read as full coverage once CE-15's changes accumulated while 29 seats stayed uncomparable — F2-112's own
+shape reproduced *inside the instrument built to detect it*. So the engine counts it where both facts
+live and hands it back through the port. On dev the row reads 4 of 4 `absent`: honest, and a number an
+operator can drive down.
+
+**Live-proven 28/28.** `so_officer` (user 8, CAB seat `'SO Test Officer'`) raised a NORMAL/MEDIUM change
+labelled `'CloudOps'`, referred it to the committee the gate map resolves, and their own `FOR` came back
+**RECUSED** — in a scenario where **0** seat names match **any** carried label, so the pre-V358 basis
+provably could not have refused it. `rmanager`'s `FOR` on the same motion counted (tally 1, APPROVED), so
+the gate is discriminating rather than simply refusing.
+
+Operators: `docs/change-manager/CAB_OPERATING_RUNBOOK.md` §8.5.
+
+---
+
 ## 4. Users, roles & demo tenants
 
 ### 4.1 Seeded logins (dev/demo — **rotate all of these on any real deployment**)
