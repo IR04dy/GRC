@@ -206,6 +206,11 @@ export interface DashboardResponse {
   flowsCrossBorder: number;
   exceptionsActive: number;
   exceptionsExpiringNext30d: number;
+  /**
+   * F2-128 — ACTIVE exceptions whose validity has already lapsed. Distinct from
+   * `exceptionsExpiringNext30d`, whose window starts at today and so excludes these entirely.
+   */
+  exceptionsLapsed: number;
   assetsByStatus: Record<string, number>;
   flowsByStatus: Record<string, number>;
   exceptionsByType: Record<string, number>;

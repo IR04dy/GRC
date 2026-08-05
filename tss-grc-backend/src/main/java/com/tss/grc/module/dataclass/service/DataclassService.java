@@ -326,6 +326,25 @@ public class DataclassService {
                 .filter(e -> e.getValidUntil() != null
                         && !e.getValidUntil().isBefore(today)
                         && !e.getValidUntil().isAfter(today.plusDays(30))).count();
+        // ── F2-128: an ACTIVE exception whose validity has already lapsed ───────────────────────
+        //
+        // The window above is [today, today+30], so its lower bound EXCLUDES anything already past
+        // its valid_until — and nothing else in the module looks at that column. A lapsed control
+        // waiver therefore appeared in no metric: it was counted in `eAct` as though still valid,
+        // and absent from "expiring soon" precisely because it had already expired.
+        //
+        // Measured 2026-08-06 in dev: 3 of the 4 ACTIVE exceptions are past their valid_until by
+        // 46–54 days, and all three waive a data-protection control (two MASKING_WAIVER, one
+        // ENCRYPTION_AT_REST_WAIVER). The dashboard reported "4 active, 0 expiring".
+        //
+        // ⚠ Reported, not auto-expired. Nothing here changes state: whether a lapsed exception
+        // should be swept to EXPIRED or derived as expired on read is the same open decision as
+        // F2-125 in `openbanking`, and it should be taken once for both rather than differently in
+        // each module. Making the population visible needs no such decision.
+        long eLapsed = allE.stream()
+                .filter(e -> "ACTIVE".equals(e.getStatus()))
+                .filter(e -> e.getValidUntil() != null && e.getValidUntil().isBefore(today))
+                .count();
 
         Map<String, Long> assetsByStatus = allA.stream()
                 .collect(Collectors.groupingBy(DataAsset::getStatus, Collectors.counting()));
@@ -343,7 +362,7 @@ public class DataclassService {
 
         return new DashboardResponse(
                 aTotal, aTop, aConf, aInt, aPub, aSpec,
-                fAct, fCross, eAct, eExpiring,
+                fAct, fCross, eAct, eExpiring, eLapsed,
                 assetsByStatus, flowsByStatus, excByType,
                 recentAssets, recentXborder);
     }

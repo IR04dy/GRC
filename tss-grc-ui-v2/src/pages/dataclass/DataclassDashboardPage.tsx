@@ -165,6 +165,11 @@ export function DataclassDashboardPage() {
         <Kpi label={lang === 'ar' ? 'تدفقات عبر الحدود' : 'Cross-border flows'} value={data?.flowsCrossBorder ?? 0} tone="warning" Icon={Globe} to="/dataclass/flows" />
         <Kpi label={lang === 'ar' ? 'استثناءات نشطة' : 'Active exceptions'} value={data?.exceptionsActive ?? 0} tone="info" Icon={FileWarning} onClick={() => document.getElementById('dataclass-exceptions-by-type')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         <Kpi label={lang === 'ar' ? 'تنتهي خلال ٣٠ يوماً' : 'Expiring ≤30d'} value={data?.exceptionsExpiringNext30d ?? 0} tone={data && data.exceptionsExpiringNext30d > 0 ? 'warning' : 'neutral'} Icon={BadgeAlert} onClick={() => document.getElementById('dataclass-exceptions-by-type')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        {/* F2-128 — lapsed, not merely expiring. `Expiring ≤30d` counts a window starting today, so
+            an exception already past its valid_until appeared in NO tile: it was inside `Active
+            exceptions` as though still valid. Tone is danger rather than warning because these are
+            waivers of a data-protection control that are no longer authorised. */}
+        <Kpi label={lang === 'ar' ? 'استثناءات منتهية وما زالت نشطة' : 'Lapsed but still active'} value={data?.exceptionsLapsed ?? 0} tone={data && data.exceptionsLapsed > 0 ? 'danger' : 'neutral'} Icon={ShieldAlert} onClick={() => document.getElementById('dataclass-exceptions-by-type')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 16 }}>

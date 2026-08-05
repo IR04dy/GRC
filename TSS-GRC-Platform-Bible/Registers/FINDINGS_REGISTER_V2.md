@@ -2438,6 +2438,36 @@ Start-Service TssGrcBackend
 | **⚠ Why filed and not fixed** | Same as F2-116 and F2-120: creating privileged roles is a governance decision about a customer's organisation, and converting to `hasPermission` is **F2-05**'s ratified direction, which makes the names irrelevant. Fixing three modules' fictional roles one guard at a time is the wrong shape — it belongs in F2-05, and these three findings are now its evidence base |
 | **Lesson** | Three modules, three sets of fictional specialist roles, one cause. **F2-05 should be sequenced on this evidence rather than on the guard count** — the count says 537 sites; these say what the conversion actually buys |
 
+## F2-128 · Lapsed data-protection waivers were in no metric at all — REPORTED (state decision still open)
+
+|  |  |
+|---|---|
+| **ID** | F2-128 *(found writing F2-03's floor for `dataclass`; the manifest twin of F2-125 in `openbanking`)* |
+| **Module** | `dataclass` — `DataclassService.dashboard` |
+| **Severity** | **P1** — a waiver of a data-protection control, no longer authorised, counted as active and visible nowhere |
+| **Current State** | 🟡 **The population is now REPORTED (2026-08-06). The state question is deliberately still open** — see below |
+| **Problem** | `EXCEPTION_ALLOWED` declares `ACTIVE → EXPIRED` and **nothing anywhere sets** `status = "EXPIRED"`. So an ACTIVE exception past its `valid_until` stays ACTIVE. That is F2-125's shape — but here it is **manifest**, and the reason it stayed invisible is sharper than an absent sweep |
+| **⚠ The window was half-open in the wrong direction** | The only code in the module reading `valid_until` was the *expiring-soon* metric: `!e.getValidUntil().isBefore(today) && !e.getValidUntil().isAfter(today.plusDays(30))`. Its lower bound **excludes everything already lapsed**. So a lapsed waiver appeared in **no metric**: absent from expiring-soon precisely *because* it had expired, and counted inside `exceptionsActive` as though still valid. Somebody did think about expiry, and wrote a half-open window the wrong way round |
+| **Measured 2026-08-06, per tenant** | ⚠ **Corrected by the live probe**: the first pass counted across all organisations and would have presented a platform aggregate as one operator's view. Per tenant: **org 1 — 2 ACTIVE, 1 lapsed · org 2 — 1 ACTIVE, 1 lapsed (100%) · org 3 — 1 ACTIVE, 1 lapsed (100%)**. Platform-wide 4 ACTIVE, 3 lapsed, by 46–54 days. **Every tenant has at least one**, which is stronger than the single-tenant reading: it is not one demo dataset's quirk. Two are `MASKING_WAIVER`, one `ENCRYPTION_AT_REST_WAIVER` |
+| **What shipped** | A separate `exceptionsLapsed` count, plus a matching `Lapsed but still active` tile toned **danger**. Kept distinct from expiring-soon on purpose: *about to lapse* and *already lapsed* demand different responses, and folding them together hides the urgent case inside the routine one. The tile ships with the count because **a metric nobody renders is this programme's own "a ratchet nobody runs is a comment"** |
+| **⚠ What deliberately did NOT ship** | Any state change. Whether a lapsed exception should be **swept** to EXPIRED or **derived** as expired on read is the same open decision as **F2-125**, and it should be taken once for both modules rather than differently in each. S7e's reasoning favours deriving — a stored word can disagree with the rows. Making the population visible needs no such decision, so that is all this slice did |
+| **Verified** | 11 unit checks, **13/13 mutations caught** — including deleting the lapsed count, removing the expiring window's lower bound (which would fold the two together), and dropping its terminal-status exclusion so REVOKED waivers would be counted as live. Live: the API returns `exceptionsLapsed` = 1 for org 1, against `exceptionsActive` = 2 and expiring-soon = 0 — the exact operator view that was previously blind |
+| **Lesson** | When a metric over a date window reports nothing, check the **bounds** before concluding nobody looked. A half-open window that excludes the overdue population is worse than no metric: it renders a zero that reads as reassurance |
+
+## F2-129 · Reclassifying an asset upward does not re-examine its already-approved transfers
+
+|  |  |
+|---|---|
+| **ID** | F2-129 *(found writing F2-03's floor for `dataclass`, by reading why the Art.7 gate sits where it does)* |
+| **Module** | `dataclass` — `transitionAsset` vs `transitionFlow` |
+| **Severity** | **P3** — latent, and structurally real: the obligation attaches to a property that can change after it is checked |
+| **Current State** | 🔴 **OPEN**, tripwired by `DataclassLifecycleTest.reclassificationDoesNotRecheckArticleSeven` — the test fails if the asset path starts consulting flows |
+| **Problem** | PDPL Art.7 requires a transfer authorisation reference for a **cross-border** flow of **CONFIDENTIAL/TOP_SECRET** data. The gate runs once, on `PROPOSED → APPROVED`, reading the asset's classification at that moment. But `ASSET_ALLOWED` makes `IN_USE → RECLASSIFY → CLASSIFIED → APPROVED → IN_USE` a first-class path, so an asset can become sensitive **after** its flows were approved — and nothing re-examines a running flow when that happens |
+| **⚠ The gate's placement is otherwise correct, and worth recording** | My first test drove `APPROVED → ACTIVE` and failed, which sent me to read the placement. `FLOW_ALLOWED` makes `PROPOSED → APPROVED` the **only** entry to the approved-and-onward region, so every ACTIVE flow has passed the gate, and `SUSPENDED → ACTIVE` reactivates a flow whose reference is already on the row. Checking at approval rather than at activation is the right single point — the gap is not the placement, it is that the checked property is mutable |
+| **Measured 2026-08-06** | ⚠ **Latent: 0 rows.** Both ACTIVE cross-border flows in dev are correct — `DF-TXN-AWS-001` carries `PDPL-ART7-2024-014` for its CONFIDENTIAL asset, and `DF-ATC-MKT-REF-001` is INTERNAL and needs none. Stated plainly rather than implied, because a structural gap with no instances is still worth documenting and not worth alarm |
+| **Fix** | On an upward reclassification, re-examine the asset's ACTIVE and APPROVED flows and either refuse the reclassification until each cross-border transfer carries a reference, or flag them for review. Refusing is the stronger control but couples two registers; flagging is cheaper and matches how F2-128 now reports rather than blocks. **A decision, not an oversight** |
+| **Lesson** | A gate reads a property at a moment. If that property is mutable and the thing it authorises is long-lived, the check needs a second trigger — on the property, not only on the act. Ask of any gate: *can what I just checked change while the thing I authorised is still running?* |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

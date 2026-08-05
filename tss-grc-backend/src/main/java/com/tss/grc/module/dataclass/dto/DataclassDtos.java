@@ -111,6 +111,17 @@ public final class DataclassDtos {
             long assetsSpecialCategory,
             long flowsActive, long flowsCrossBorder,
             long exceptionsActive, long exceptionsExpiringNext30d,
+            /**
+             * F2-128 — ACTIVE exceptions whose {@code valid_until} has already passed.
+             *
+             * <p>Separate from {@code exceptionsExpiringNext30d} on purpose: that window is
+             * {@code [today, today+30]}, so it <b>excludes</b> anything already lapsed, and until this
+             * field existed a lapsed control waiver appeared in no metric at all — it was counted in
+             * {@code exceptionsActive} as though still valid. "About to lapse" and "already lapsed"
+             * also demand different responses, so folding them together would hide the urgent case
+             * inside the routine one.
+             */
+            long exceptionsLapsed,
             Map<String, Long> assetsByStatus,
             Map<String, Long> flowsByStatus,
             Map<String, Long> exceptionsByType,
