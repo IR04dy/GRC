@@ -50,6 +50,33 @@
  * votes; the reconciliation below was drafted counting votes only and would have reported every
  * committee-routed change — the platform's preferred path — as unauthorised.
  *
+ * <p>⚠ <b>And it is two, not three — the workflow engine is not one of them.</b> S8h/CE-10 makes
+ * change the 15th module to adopt {@code workflow.requests}, and the port that does it
+ * ({@link com.tss.grc.module.change_mgmt.spi.WorkflowPort}) <b>refuses</b> the {@code APPROVAL}
+ * request type outright. Measured 2026-08-05: {@code WorkflowRequestService} has no callback into any
+ * of the 14 existing adopters and emits domain events only for {@code SENT} and {@code ESCALATED}, so
+ * an engine request cannot move a change's status even in principle — but an approval-shaped one
+ * would sit in the audit trail conferring no authority, and an auditor reconciling it against the
+ * register above would find a contradiction with no explanation. The engine routes <em>work</em>;
+ * authority stays with the CAB and the committee.
+ *
+ * <h3>Routing work, and refusing to route it into a void</h3>
+ * <p>What G-10 actually names is task handling. {@code change_tasks} carries a due date and nothing
+ * else — no assignee id, no SLA, no reminder, no escalation, no timeline — while
+ * {@code workflow.requests} carries sixteen such columns. Measured: of 26 open change tasks, <b>23
+ * are overdue and 0 have an owner the platform can notify</b> (14 labels match nothing at all, 12
+ * name a department with no members, and 0 of 7 users carry a {@code department_id}), so CH-5's
+ * {@code CHANGE_TASK_OVERDUE} sweep has been escalating to nobody since it shipped.
+ *
+ * <p>So {@code WorkflowPort.raise} refuses an addressee that reaches no active user rather than let
+ * the engine stamp a recipient row {@code NOTIFIED} having notified no one, and
+ * {@code /task-addressability} reports the gap per owner label — distinguishing a name that matches
+ * nothing (a data fix) from a real-but-empty target (an appointment), because they need different
+ * actions. The reachability rule itself lives in {@code WorkflowRequestService.reachOf}, beside the
+ * fan-out it predicts: it was first drafted in {@code change_adapters} with its own copy of each rule
+ * and the boundary ratchet rejected it, which was right — a mirror maintained by assertion lies
+ * eventually.
+ *
  * <h3>Reconciling what was authorised against what went ahead</h3>
  * <p>{@code UnauthorisedChangeRegisterService} (S8f/CE-11) answers "did anything go ahead without
  * authority?" for every change past its authorisation point. Findings are <b>derived on each read</b>

@@ -16,6 +16,7 @@ import { canExport } from '../../lib/auth';
 import { ChangeModelCatalogue } from './ChangeModelCatalogue';
 import { UnauthorisedChangeRegister } from './UnauthorisedChangeRegister';
 import { ForwardSchedulePanel } from './ForwardSchedulePanel';
+import { EngineRoutingPanel } from './EngineRoutingPanel';
 
 const GATE_TONE: Record<string, BadgeTone> = { AUTO: 'success', CAB: 'info', ECAB: 'warning' };
 const RISK_TONE: Record<string, BadgeTone> = { LOW: 'success', MEDIUM: 'info', HIGH: 'warning', CRITICAL: 'danger' };
@@ -129,6 +130,12 @@ export function GovernancePanel({ toast }: { toast: ReturnType<typeof useToast> 
           is about the past, "what is coming and does it collide?" is about the future, and an
           operator reads the first to know whether to trust the second. */}
       <ForwardSchedulePanel toast={toast} />
+
+      {/* S8h/CE-10 - engine routing sits below the schedule and above the model catalogue. The two
+          cards above it say what is coming and whether anything went ahead unauthorised; this one
+          says whether the people who have to DO the work can be reached at all. An operator who
+          reads it in the other order plans a schedule for owners the platform cannot notify. */}
+      <EngineRoutingPanel toast={toast} />
 
       {/* S8e/CE-2 — the model catalogue sits directly above the authorisation matrix, because the
           matrix's AUTO cell is exactly what a model backs. Reading them in the other order tells you

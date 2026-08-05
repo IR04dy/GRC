@@ -10,6 +10,7 @@ import com.tss.grc.security.GrcUserDetails;
 import com.tss.grc.module.change_mgmt.dto.CabVoteRequest;
 import com.tss.grc.module.change_mgmt.dto.ChangeConditionRequest;
 import com.tss.grc.module.change_mgmt.dto.ChangeModelRequest;
+import com.tss.grc.module.change_mgmt.dto.EngineRequestDtos;
 import com.tss.grc.module.change_mgmt.dto.OutageDeclarationRequest;
 import com.tss.grc.module.change_mgmt.dto.RatificationDtos;
 import com.tss.grc.module.change_mgmt.dto.SchedulePublishRequest;
@@ -20,9 +21,11 @@ import com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService;
 import com.tss.grc.module.change_mgmt.service.ChangeManagementService;
 import com.tss.grc.module.change_mgmt.service.ChangeModelService;
 import com.tss.grc.module.change_mgmt.service.ChangeScheduleService;
+import com.tss.grc.module.change_mgmt.service.ChangeWorkflowService;
 import com.tss.grc.module.change_mgmt.service.UnauthorisedChangeRegisterService;
 import com.tss.grc.module.change_mgmt.spi.CommitteePort;
 import com.tss.grc.module.change_mgmt.spi.EvidencePort;
+import com.tss.grc.module.change_mgmt.spi.WorkflowPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -61,6 +64,7 @@ public class ChangeManagementController {
     private final ChangeModelService modelService;   // S8e/CE-2
     private final UnauthorisedChangeRegisterService unauthorisedRegister;   // S8f/CE-11
     private final ChangeScheduleService scheduleService;                    // S8g/CE-8
+    private final ChangeWorkflowService changeWorkflow;                     // S8h/CE-10
 
     /** Read a string out of a raw body. These endpoints take Maps, not DTOs, because {@code @Valid}
      *  fires BEFORE {@code @PreAuthorize} and a bean-validated body answers 400 to a caller who
@@ -651,6 +655,77 @@ public class ChangeManagementController {
                                       Authentication auth) {
         return service.declareOutage(id, body.outageExpected(), body.outageMinutes(),
                                      body.servicesAffected(), userIdOf(auth));
+    }
+
+    // ── S8h / CE-10: workflow-engine adoption (the 15th module) ───────────────
+
+    /**
+     * Which task owners the platform could actually notify.
+     *
+     * <p>The reason CE-10 is not plumbing. Measured on dev at build time: 41 change tasks, 23 of them
+     * overdue, 14 distinct {@code owner_name} labels, <b>none</b> resolving to a user — so CH-5's
+     * overdue sweep has been escalating to nobody, and no screen said so.
+     */
+    @GetMapping("/task-addressability")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Open change tasks whose owner the workflow engine can actually reach — CE-10.")
+    public ChangeWorkflowService.Addressability taskAddressability() {
+        return changeWorkflow.addressability();
+    }
+
+    /** Addressees that currently reach at least one active user — what a picker may offer. */
+    @GetMapping("/engine-addressees")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Roles, departments and committees that reach a real person — CE-10.")
+    public List<WorkflowPort.Candidate> engineAddressees() { return changeWorkflow.candidates(); }
+
+    /** Every engine request raised about this change or any of its tasks. */
+    @GetMapping("/{id}/engine-requests")
+    @PreAuthorize("hasPermission('CHANGE','READ')")
+    @Operation(summary = "Workflow-engine requests anchored to this change and its tasks — CE-10.")
+    public List<WorkflowPort.RequestRef> engineRequests(@PathVariable Long id) {
+        return changeWorkflow.requestsFor(id);
+    }
+
+    /**
+     * Route work about this change through the platform workflow engine.
+     *
+     * <p>{@code CHANGE:WRITE}, not {@code APPROVE}: asking someone to do or review something is part
+     * of running the change. It cannot be an authorisation — {@code WorkflowPort.raise} refuses the
+     * {@code APPROVAL} request type outright, because a change is authorised only by recorded CAB
+     * votes or a carried committee resolution, and an approval-shaped engine request would contradict
+     * the unauthorised-change register without explaining itself.
+     */
+    @PostMapping("/{id}/engine-requests")
+    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    @Operation(summary = "Raise a routed, SLA'd workflow-engine request about this change — CE-10.")
+    public WorkflowPort.RequestRef raiseEngineRequest(@PathVariable Long id,
+                                                     @Valid @RequestBody EngineRequestDtos.RaiseEngineRequest body) {
+        return changeWorkflow.raiseForChange(id, body.requestType(), body.titleEn(), body.titleAr(),
+            body.description(), addressee(body), body.dueDate(), body.slaHours(),
+            body.priority(), body.escalationRole());
+    }
+
+    /**
+     * Route one implementation task through the engine — the case G-10 is actually about.
+     *
+     * <p>Refused with a 400 when the addressee reaches nobody. A task routed to an empty department
+     * would be marked {@code NOTIFIED} by the engine having notified no one, which is the defect this
+     * endpoint exists to make impossible rather than merely unlikely.
+     */
+    @PostMapping("/tasks/{taskId}/engine-requests")
+    @PreAuthorize("hasPermission('CHANGE','WRITE')")
+    @Operation(summary = "Route a change task through the engine with a real assignee and SLA — CE-10.")
+    public WorkflowPort.RequestRef raiseTaskEngineRequest(@PathVariable Long taskId,
+                                                         @Valid @RequestBody EngineRequestDtos.RaiseEngineRequest body) {
+        return changeWorkflow.raiseForTask(taskId, body.requestType(), body.titleEn(), body.titleAr(),
+            body.description(), addressee(body), body.dueDate(), body.slaHours(),
+            body.priority(), body.escalationRole());
+    }
+
+    private static WorkflowPort.Addressee addressee(EngineRequestDtos.RaiseEngineRequest b) {
+        return new WorkflowPort.Addressee(b.addresseeType(), b.addresseeId(),
+                                          b.addresseeKey(), b.addresseeLabel());
     }
 
     // ── CH-17: freeze windows + change calendar + conflicts ───────────────────

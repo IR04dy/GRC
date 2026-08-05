@@ -47,7 +47,7 @@ that will be read as current forever.
 | **Database** schemas holding tables (dev & prod) | **51** | *not measured* | the 51st is `audit`, which JPA does not know — §7 |
 | Flyway migrations on disk | **344** files, `V1`–`V356`, 4.38 MB | 304 / `V1`–`V314` | next free **V357** |
 | **Deployed** Flyway baseline / head | **baseline `V292`**, head **`V336`**, **8 pending** | *pub. "baseline V312"* | ⚠ see §0.1 — load-bearing and wrong |
-| Frontend pages (`.tsx` under `pages/`) | **342** in **114** folders | 329 / 114 | S5c split the 1,036-line `ChangesPage` into `pages/change/` — +7 files, same folder count; then `ChangeConditionsCard` (S7e), `ChangeEvidence` (S8a), `ChangeKpiPack` (S8b), `ChangeModelCatalogue` (S8e) `UnauthorisedChangeRegister` (S8f) and `ForwardSchedulePanel` (S8g) |
+| Frontend pages (`.tsx` under `pages/`) | **343** in **114** folders | 329 / 114 | S5c split the 1,036-line `ChangesPage` into `pages/change/` — +7 files, same folder count; then `ChangeConditionsCard` (S7e), `ChangeEvidence` (S8a), `ChangeKpiPack` (S8b), `ChangeModelCatalogue` (S8e), `UnauthorisedChangeRegister` (S8f), `ForwardSchedulePanel` (S8g) and `EngineRoutingPanel` (S8h) |
 | Routes registered in `App.tsx` | **328** | 328 | — |
 | Sidebar navigation entries | **193** | 184 | — |
 | Mock-data import statements | **30** in **26** files | 44 / 29 | W2-1 removed 14 |

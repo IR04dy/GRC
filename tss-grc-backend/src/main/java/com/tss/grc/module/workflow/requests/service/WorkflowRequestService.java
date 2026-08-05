@@ -13,6 +13,7 @@ import com.tss.grc.module.evidence.dto.EvidenceRequestCreateDto;
 import com.tss.grc.module.evidence.dto.EvidenceRequestResponse;
 import com.tss.grc.module.evidence.service.EvidenceRequestService;
 import com.tss.grc.module.iam.entity.User;
+import com.tss.grc.module.iam.repository.RoleRepository;
 import com.tss.grc.module.iam.repository.UserRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -109,6 +110,8 @@ public class WorkflowRequestService {
     private final WorkflowRequestRecipientRepository recipientRepo;
     private final WorkflowRequestEventRepository     eventRepo;
     private final UserRepository                     userRepo;
+    /** S8h — role reachability + the addressee picker. Same module as {@link #userRepo}. */
+    private final RoleRepository                     roleRepo;
     private final DepartmentRepository               departmentRepo;
     /** WF-5 — COMMITTEE recipients resolve + fan out through the committees module. */
     private final CommitteeRepository                committeeRepo;
@@ -853,8 +856,213 @@ public class WorkflowRequestService {
         Map.entry("SUST",       List.of("SUSTAINABILITY_OFFICER")),
         Map.entry("EVIDENCE",   List.of("EVIDENCE_OWNER", "CONTROL_OWNER")),
         Map.entry("NDI",        List.of("DATA_OWNER")),
-        Map.entry("AUDIT",      List.of("INTERNAL_AUDITOR"))
+        Map.entry("AUDIT",      List.of("INTERNAL_AUDITOR")),
+        // S8h / CE-10 — change becomes the 15th adopting module. Only CHANGE_MANAGER, because it is
+        // the only change-ish role that exists: CAB_CHAIR, CHANGE_OWNER, IT_OPERATIONS and IT_MANAGER
+        // were all measured absent from iam.roles on 2026-08-05. Suggesting a role name that is not a
+        // role is F2-05/F2-52's defect, and here it would be worse than useless — the suggestion
+        // dropdown would offer an addressee the notifier can never resolve.
+        Map.entry("CHANGE",     List.of("CHANGE_MANAGER"))
     );
+
+    /**
+     * S8h — every request anchored to one source record, unpaged.
+     *
+     * <p>Returns DTOs rather than entities so an adopting module's adapter needs no repository of its
+     * own: an adapter that injects {@code WorkflowRequestRepository} to read what a service already
+     * exposes is a second door onto the same rows, with its own chance of forgetting the tenant filter.
+     */
+    @Transactional(readOnly = true)
+    public List<RequestResponse> listForRecord(String sourceRecordType, Long sourceRecordId) {
+        if (sourceRecordType == null || sourceRecordType.isBlank() || sourceRecordId == null)
+            return List.of();
+        Long org = TenantContext.getCurrentTenant();
+        return requestRepo
+            .findByOrganisationIdAndSourceRecordTypeAndSourceRecordIdOrderByCreatedAtDesc(
+                org, sourceRecordType.trim(), sourceRecordId)
+            .stream().map(this::toResponse).toList();
+    }
+
+    /** S8h — the same, for many records of one type in a single query. */
+    @Transactional(readOnly = true)
+    public List<RequestResponse> listForRecords(String sourceRecordType, List<Long> sourceRecordIds) {
+        if (sourceRecordType == null || sourceRecordType.isBlank()
+                || sourceRecordIds == null || sourceRecordIds.isEmpty())
+            return List.of();
+        Long org = TenantContext.getCurrentTenant();
+        return requestRepo
+            .findByOrganisationIdAndSourceRecordTypeAndSourceRecordIdInOrderByCreatedAtDesc(
+                org, sourceRecordType.trim(), sourceRecordIds)
+            .stream().map(this::toResponse).toList();
+    }
+
+    // ── S8h — recipient reachability, answered where notifyStep lives ─────────
+
+    /**
+     * Whether a recipient would reach anybody, and if not, why not.
+     *
+     * <p><b>Why this is here and not in a caller.</b> {@link #notifyStep} marks a recipient row
+     * {@code NOTIFIED} after its per-type fan-out <em>whether or not that fan-out reached anyone</em>.
+     * So a request can be sent, tracked, SLA'd and escalated against an audience of zero, and every
+     * counter the engine keeps looks identical to a delivered one — the same blind spot F2-94 found in
+     * the automation executor, one subsystem across.
+     *
+     * <p>Measured on dev 2026-08-05: <b>0 of 7</b> users carry a {@code department_id}, so <em>every</em>
+     * DEPARTMENT recipient in this database reaches nobody. That is not a change-module fact, which is
+     * why the check is not in the change module: any of the 15 adopting modules composing a request has
+     * the same exposure.
+     *
+     * <p>⚠ It lives in this class specifically so it cannot drift from the fan-out it predicts. The
+     * first draft of CE-10 computed reach in {@code module/change_adapters} — a different file, with
+     * its own copy of each rule, asserting by test that the two agreed. The architecture boundary test
+     * rejected the import that made that possible, and it was right to: a mirror maintained by
+     * assertion is a mirror that eventually lies.
+     *
+     * @param reason {@code null} when reachable; otherwise UNKNOWN_TYPE / USER_NOT_FOUND /
+     *               ROLE_NOT_FOUND / ROLE_HELD_BY_NOBODY / DEPARTMENT_NOT_FOUND /
+     *               DEPARTMENT_HAS_NO_MEMBERS / COMMITTEE_NOT_FOUND / COMMITTEE_HAS_NO_LINKED_USERS
+     */
+    public record RecipientReach(int users, boolean reachable, String reason) {
+        static RecipientReach ok(int users) { return new RecipientReach(users, true, null); }
+        static RecipientReach no(String reason) { return new RecipientReach(0, false, reason); }
+    }
+
+    /** An addressee that currently reaches at least one active user. */
+    public record ReachableAddressee(String recipientType, Long recipientId, String recipientKey,
+                                     String label, int users) { }
+
+    /** What a free-text owner label resolves to, and whether that resolution reaches anybody. */
+    public record LabelResolution(String label, String recipientType, Long recipientId,
+                                  String recipientKey, String matchedLabel, RecipientReach reach) { }
+
+    /** Reason used when a label matches no role, department, committee or user at all. */
+    public static final String LABEL_MATCHES_NOTHING = "LABEL_MATCHES_NOTHING";
+
+    @Transactional(readOnly = true)
+    public RecipientReach reachOf(String recipientType, Long recipientId, String recipientKey) {
+        Long org = TenantContext.getCurrentTenant();
+        if (recipientType == null || recipientType.isBlank()) return RecipientReach.no("UNKNOWN_TYPE");
+        return switch (recipientType.trim().toUpperCase()) {
+            // Each branch resolves exactly what notifyStep's matching branch resolves.
+            case "USER" -> recipientId == null ? RecipientReach.no("USER_NOT_FOUND")
+                : userRepo.findById(recipientId)
+                    .filter(u -> org != null && org.equals(u.getOrganisationId()))
+                    .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
+                    .map(u -> RecipientReach.ok(1))
+                    .orElseGet(() -> RecipientReach.no("USER_NOT_FOUND"));
+            case "ROLE" -> {
+                NotificationService.RoleAudience a = notifications.roleAudience(org, recipientKey);
+                yield !a.known() ? RecipientReach.no("ROLE_NOT_FOUND")
+                    : a.holders() > 0 ? RecipientReach.ok(a.holders())
+                    : RecipientReach.no("ROLE_HELD_BY_NOBODY");
+            }
+            case "DEPARTMENT" -> {
+                if (recipientId == null || departmentRepo.findByIdAndOrganisationId(recipientId, org).isEmpty())
+                    yield RecipientReach.no("DEPARTMENT_NOT_FOUND");
+                int n = userRepo.findByOrganisationIdAndDepartmentIdAndIsActiveTrue(org, recipientId).size();
+                yield n > 0 ? RecipientReach.ok(n) : RecipientReach.no("DEPARTMENT_HAS_NO_MEMBERS");
+            }
+            case "COMMITTEE" -> {
+                if (recipientId == null || committeeRepo.findByIdAndOrganisationId(recipientId, org).isEmpty())
+                    yield RecipientReach.no("COMMITTEE_NOT_FOUND");
+                long n = committeeMembers.findActiveByCommittee(org, recipientId).stream()
+                    .map(CommitteeMemberTerm::getMemberUserId).filter(Objects::nonNull).distinct().count();
+                yield n > 0 ? RecipientReach.ok((int) n)
+                            : RecipientReach.no("COMMITTEE_HAS_NO_LINKED_USERS");
+            }
+            // EXTERNAL reaches a token holder rather than a platform user — a different question, and
+            // deliberately not answered here rather than answered wrongly.
+            default -> RecipientReach.no("UNKNOWN_TYPE");
+        };
+    }
+
+    /**
+     * Every role, department and committee in the tenant that reaches at least one active user.
+     *
+     * <p>Sorted fewest-holders first: a task addressed to a forty-person role is addressed to nobody
+     * in particular, which is the same problem in a more reassuring shape.
+     */
+    @Transactional(readOnly = true)
+    public List<ReachableAddressee> reachableAddressees(int limit) {
+        Long org = TenantContext.getCurrentTenant();
+        List<ReachableAddressee> out = new java.util.ArrayList<>();
+        for (com.tss.grc.module.iam.entity.Role r : roleRepo.findByOrganisationIdOrOrganisationIdIsNull(org)) {
+            if (r.getRoleName() == null || Boolean.FALSE.equals(r.getIsActive())) continue;
+            NotificationService.RoleAudience a = notifications.roleAudience(org, r.getRoleName());
+            if (a.reachesAnybody())
+                out.add(new ReachableAddressee("ROLE", null, r.getRoleName(),
+                    r.getDisplayNameEn() != null ? r.getDisplayNameEn() : r.getRoleName(), a.holders()));
+        }
+        departmentRepo.findByOrganisationIdOrderByCodeAsc(org).forEach(d -> {
+            int n = userRepo.findByOrganisationIdAndDepartmentIdAndIsActiveTrue(org, d.getId()).size();
+            if (n > 0) out.add(new ReachableAddressee("DEPARTMENT", d.getId(), d.getCode(), d.getNameEn(), n));
+        });
+        committeeRepo.findByOrganisationId(org).forEach(c -> {
+            long n = committeeMembers.findActiveByCommittee(org, c.getId()).stream()
+                .map(CommitteeMemberTerm::getMemberUserId).filter(Objects::nonNull).distinct().count();
+            if (n > 0) out.add(new ReachableAddressee("COMMITTEE", c.getId(), c.getCode(), c.getNameEn(), (int) n));
+        });
+        out.sort(java.util.Comparator.comparingInt(ReachableAddressee::users)
+            .thenComparing(x -> String.valueOf(x.label())));
+        return limit > 0 && out.size() > limit ? List.copyOf(out.subList(0, limit)) : out;
+    }
+
+    /**
+     * Resolve free-text owner labels to addressees, reading each directory once.
+     *
+     * <p>Resolution order is role → department → committee → user, stated rather than incidental: a
+     * label that is both a role name and a department name should route the way the notifier would,
+     * and ROLE is the only kind the notifier addresses by name.
+     */
+    @Transactional(readOnly = true)
+    public List<LabelResolution> resolveAddresseeLabels(List<String> labels) {
+        if (labels == null || labels.isEmpty()) return List.of();
+        Long org = TenantContext.getCurrentTenant();
+        List<com.tss.grc.module.iam.entity.Role> allRoles = roleRepo.findByOrganisationIdOrOrganisationIdIsNull(org);
+        List<com.tss.grc.module.platform.entity.Department> allDepts = departmentRepo.findByOrganisationIdOrderByCodeAsc(org);
+        List<Committee> allCommittees = committeeRepo.findByOrganisationId(org);
+
+        List<LabelResolution> out = new java.util.ArrayList<>();
+        for (String raw : labels) {
+            if (raw == null || raw.isBlank()) continue;
+            String label = raw.trim();
+            LabelResolution hit = null;
+
+            for (com.tss.grc.module.iam.entity.Role r : allRoles)
+                if (label.equalsIgnoreCase(r.getRoleName()) || label.equalsIgnoreCase(r.getDisplayNameEn())) {
+                    hit = new LabelResolution(label, "ROLE", null, r.getRoleName(),
+                        r.getDisplayNameEn() != null ? r.getDisplayNameEn() : r.getRoleName(),
+                        reachOf("ROLE", null, r.getRoleName()));
+                    break;
+                }
+            if (hit == null)
+                for (com.tss.grc.module.platform.entity.Department d : allDepts)
+                    if (label.equalsIgnoreCase(d.getNameEn()) || label.equalsIgnoreCase(d.getNameAr())
+                            || label.equalsIgnoreCase(d.getCode())) {
+                        hit = new LabelResolution(label, "DEPARTMENT", d.getId(), d.getCode(),
+                            d.getNameEn(), reachOf("DEPARTMENT", d.getId(), null));
+                        break;
+                    }
+            if (hit == null)
+                for (Committee c : allCommittees)
+                    if (label.equalsIgnoreCase(c.getNameEn()) || label.equalsIgnoreCase(c.getNameAr())
+                            || label.equalsIgnoreCase(c.getCode())) {
+                        hit = new LabelResolution(label, "COMMITTEE", c.getId(), c.getCode(),
+                            c.getNameEn(), reachOf("COMMITTEE", c.getId(), null));
+                        break;
+                    }
+            if (hit == null) {
+                java.util.Optional<User> u = userRepo.findByUsernameAndOrganisationId(label, org);
+                if (u.isPresent())
+                    hit = new LabelResolution(label, "USER", u.get().getId(), u.get().getUsername(),
+                        u.get().getFullNameEn(), reachOf("USER", u.get().getId(), null));
+            }
+            out.add(hit != null ? hit
+                : new LabelResolution(label, null, null, null, null,
+                    RecipientReach.no(LABEL_MATCHES_NOTHING)));
+        }
+        return out;
+    }
 
     @Transactional(readOnly = true)
     public List<RecipientSuggestion> recipientSuggestions(String sourceModule, String sourceRecordType, Long sourceRecordId) {

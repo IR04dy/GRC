@@ -173,10 +173,19 @@ class ChangeModuleBoundaryTest {
             .as("""
                 the adapters exist to reach exactly the peers the change module gave up: \
                 admin (the committee engine), capa (S7d/CE-7's PIR follow-up tracker), evidence \
-                (S8a/CE-9's change evidence) and incident (CH-13's rollback hook). Reaching a fifth \
+                (S8a/CE-9's change evidence), incident (CH-13's rollback hook) and workflow \
+                (S8h/CE-10's WorkflowPort — the 15th adopting module). Reaching a sixth \
                 arrived without a port decision — widen this list only together with a new \
-                port and the reason it exists, never to make a red build green.""")
-            .containsExactly("admin", "capa", "evidence", "incident");
+                port and the reason it exists, never to make a red build green.
+
+                ⚠ S8h is the worked example of that rule paying off. Its first draft also reached \
+                iam, to compute recipient reachability inside WorkflowAdapter from RoleRepository and \
+                UserRepository. This assertion refused it, and refusing was right: reachability is a \
+                fact about the engine's own fan-out, so a copy of it here would have been a second \
+                implementation of notifyStep's four resolution rules, kept honest only by a unit test \
+                asserting the two agreed. It moved to WorkflowRequestService.reachOf, beside the \
+                fan-out it predicts, and the adapter went from 387 lines to a translation layer.""")
+            .containsExactly("admin", "capa", "evidence", "incident", "workflow");
     }
 
     @Test

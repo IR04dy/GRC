@@ -137,13 +137,7 @@ public class NotificationService {
             return RoleFanout.NOTHING_ADDRESSED;
         }
 
-        // Case-insensitive, because a rule author types CISO and the seed may hold Ciso.
-        Set<String> knownRoles = roleRepository
-            .findByOrganisationIdOrOrganisationIdIsNull(organisationId).stream()
-            .map(Role::getRoleName)
-            .filter(Objects::nonNull)
-            .map(r -> r.toUpperCase(Locale.ROOT))
-            .collect(Collectors.toSet());
+        Set<String> knownRoles = visibleRoleNames(organisationId);
 
         List<String> deliveredRoles = new ArrayList<>();
         List<String> unheld = new ArrayList<>();
@@ -204,6 +198,49 @@ public class NotificationService {
         }
         return new RoleFanout(delivered, List.copyOf(deliveredRoles),
             List.copyOf(unheld), List.copyOf(unknown));
+    }
+
+    /**
+     * The tenant's visible role names, upper-cased — its own roles plus the global ones.
+     *
+     * <p>Case-insensitive, because a rule author types CISO and the seed may hold Ciso.
+     *
+     * <p>Extracted so {@link #broadcastToRoles} and {@link #roleAudience} cannot disagree about what
+     * "is a role in this tenant" means. A dry-run that answers by a second rule is not a preview of
+     * anything — S8h needed the preview, and two copies of this predicate would drift the moment one
+     * of them learned about, say, inactive roles.
+     */
+    private Set<String> visibleRoleNames(Long organisationId) {
+        return roleRepository
+            .findByOrganisationIdOrOrganisationIdIsNull(organisationId).stream()
+            .map(Role::getRoleName)
+            .filter(Objects::nonNull)
+            .map(r -> r.toUpperCase(Locale.ROOT))
+            .collect(Collectors.toSet());
+    }
+
+    /**
+     * Whether a role exists in this tenant and how many active users hold it — <b>without sending
+     * anything</b>.
+     *
+     * <p>S8h / CE-10. {@code known=false} and {@code holders=0} are different defects with different
+     * fixes, which is F2-94's finding restated: "a name that is not a role cannot be fixed by granting
+     * anything". A caller that merges them would tell an operator to appoint somebody to a role that
+     * does not exist.
+     */
+    public record RoleAudience(boolean known, int holders) {
+        public boolean reachesAnybody() { return known && holders > 0; }
+    }
+
+    @Transactional(readOnly = true)
+    public RoleAudience roleAudience(Long organisationId, String roleName) {
+        if (organisationId == null || roleName == null || roleName.isBlank())
+            return new RoleAudience(false, 0);
+        String role = roleName.trim();
+        if (!visibleRoleNames(organisationId).contains(role.toUpperCase(Locale.ROOT)))
+            return new RoleAudience(false, 0);
+        return new RoleAudience(true,
+            userRepository.findActiveByOrganisationIdAndRoleName(organisationId, role).size());
     }
 
     /**

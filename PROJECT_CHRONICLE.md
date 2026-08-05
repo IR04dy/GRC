@@ -400,9 +400,72 @@ column populated on 15 of 17 — a different and more useful question, because i
 on. What stays blind is published as `unscheduledCount`: a forward-status change with no window
 cannot collide with anything, so an empty collision list does not cover it.
 
-**Not built yet** (tracked as CE-10, CE-13 in
-`CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md`): workflow-engine adoption as the 15th
-module; and the CAB workspace as its own frontend surface.
+#### Workflow-engine adoption (S8h / CE-10) — and what “adoption” turned out to mean
+
+Change is now the **15th module** to use the platform workflow engine, via
+`WorkflowPort` → `WorkflowAdapter`. No migration: an engine request is anchored by
+`source_module`/`source_record_type`/`source_record_id` on the engine's own row, which
+is how the other fourteen do it, so a link column on `change_tasks` would have been a second copy
+of a pointer that already exists.
+
+**The plan's wording named the wrong subject, and measurement said so before any code was written.**
+CE-10 reads “change authorisations become workflow requests”. But `WorkflowRequestService`
+imports evidence, committee, iam and platform — and **none of the 14 adopting modules**. There is no
+callback into a source record, and it publishes domain events for `SENT` and `ESCALATED`
+**only**, never for respond/approve/reject/close. An engine request therefore cannot move a source
+record's state anywhere on this platform. In all fourteen, adoption means a tracked, routed, SLA'd
+human task anchored to a record; the record's own state machine is untouched.
+
+Building it literally would have created a **third** authorisation route one slice after S8f
+established that there are two — and because the engine writes no vote rows and no referral, every
+engine-authorised change would then have been reported `NO_AUTHORISATION_RECORD` by the register
+next door. So `WorkflowPort.RAISABLE_TYPES` omits `APPROVAL` and `raise` **refuses** it,
+before it resolves anything else. Not a convention: a 400 with a message naming the two real routes.
+
+**What G-10's “inconsistent task/SLA/escalation behaviour” actually is.**
+
+| | columns | routing / SLA / escalation |
+|---|---|---|
+| `change_mgmt.change_tasks` | 10 | none — a due date and a free-text owner name |
+| `workflow.requests` | 47 | 16, incl. reminders, an escalation ladder and a level |
+
+And the owner side is worse than missing plumbing. Of **26 open change tasks, 23 are overdue and 0
+have an owner the platform can notify**: 14 labels (like `'IT — Information Technology'`) match
+no role, department, committee or user at all; 12 name a department that exists and contains nobody,
+because **0 of 7 users carry a `department_id`**. CH-5's `CHANGE_TASK_OVERDUE` sweep has been
+running correctly and reaching no one since it shipped, and no screen said so.
+
+That is why the port **refuses an unreachable addressee** rather than raising the request anyway. The
+engine's `notifyStep` marks a recipient row `NOTIFIED` after its per-type fan-out whether or
+not that fan-out reached anybody — the same blind spot F2-94 found in the automation executor, one
+subsystem across. `/task-addressability` publishes the gap per owner label, keeping **“matches
+nothing”** (a data fix) separate from **“department has no members”** (an appointment), because they
+need opposite actions.
+
+**Three things only the running system taught.**
+
+1. **The reach check was in the wrong package, and an architecture test said so.** Drafted inside
+   `change_adapters` with its own copy of each of `notifyStep`'s four resolution rules and a
+   unit test asserting the two agreed, it was rejected by `ChangeModuleBoundaryTest`: “reaching a
+   fifth peer arrived without a port decision”. Correct, and for a deeper reason than package
+   hygiene — **a mirror maintained by assertion is a mirror that eventually lies**. It moved to
+   `WorkflowRequestService.reachOf`, beside the fan-out it predicts, where the other 14 adopters
+   can use it too; the adapter shrank to a translation layer.
+2. **The engine refuses a response requirement with no deadline**, and it is right to: an SLA clock,
+   a reminder ladder and an escalation path all measure from one. This is the common case, not the
+   edge — 18 of 41 change tasks have no `due_at` at all — so `raise` derives a date from
+   `slaHours` when only that is given and refuses clearly when neither is.
+3. **`create` + `send` in one transaction is the ROWVERSION double-flush landmine** in a new
+   place: both persist the same `workflow.requests` row, so an outer transaction flushes it twice
+   and the second read is stale (“Row was updated or deleted by another transaction”). Neither
+   `raise` nor its callers are `@Transactional` — which is also exactly what the platform's
+   own `RaiseRequestButton` does, as two HTTP calls.
+
+Operators: `docs/change-manager/CAB_OPERATING_RUNBOOK.md` §8.2.
+
+**Not built yet** (tracked as CE-13 in
+`CHANGE_ENABLEMENT_MODULE_SEPARATION_AND_CAB_UPLIFT_PLAN.md`): the CAB workspace as its own
+frontend surface, and the retirement of `mockChanges.ts` with it.
 
 ---
 

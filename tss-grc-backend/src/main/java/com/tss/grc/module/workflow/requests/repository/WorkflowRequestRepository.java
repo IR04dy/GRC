@@ -37,6 +37,16 @@ public interface WorkflowRequestRepository extends JpaRepository<WorkflowRequest
     Page<WorkflowRequest> findByOrganisationIdAndSourceRecordTypeAndSourceRecordIdOrderByCreatedAtDesc(
         Long organisationId, String sourceRecordType, Long sourceRecordId, Pageable pageable);
 
+    /**
+     * S8h — requests anchored to <em>many</em> records of one type, in one query.
+     *
+     * <p>Module-agnostic on purpose. CE-10 needs "every engine request about this change and all of
+     * its 41 tasks"; looping the single-record finder would be 42 round trips to answer one question,
+     * and a page that costs a query per child row is a page that gets removed later.
+     */
+    List<WorkflowRequest> findByOrganisationIdAndSourceRecordTypeAndSourceRecordIdInOrderByCreatedAtDesc(
+        Long organisationId, String sourceRecordType, Collection<Long> sourceRecordIds);
+
     /** WF-2 sweep — open requests past their due date (cross-tenant; scheduler runs system-wide). */
     List<WorkflowRequest> findByStatusInAndDueDateBefore(Collection<String> statuses, LocalDate date);
 

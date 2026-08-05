@@ -765,6 +765,88 @@ export interface ForwardScheduleDto {
 }
 
 /**
+ * S8h/CE-10 — an addressee the workflow engine can actually notify.
+ *
+ * <p>`users` is how many active people the engine's own fan-out would reach. Only addressees with
+ * `users > 0` are ever returned, because a picker that offers an empty department is a picker that
+ * helps you route work into a void.
+ */
+export interface EngineAddresseeDto {
+  type: string;              // ROLE | DEPARTMENT | COMMITTEE | USER
+  id?: number | null;        // null for ROLE
+  key?: string | null;       // role name, or department/committee code
+  label: string;
+  users: number;
+}
+
+/** One engine request anchored to a change or a change task. */
+export interface EngineRequestRefDto {
+  id: number;
+  code: string;
+  requestType: string;
+  status: string;
+  titleEn?: string | null;
+  titleAr?: string | null;
+  dueDate?: string | null;
+  slaHours?: number | null;
+  priority?: string | null;
+  /** NONE | ON_TRACK | DUE_TODAY | OVERDUE — the engine's own countdown, not recomputed here. */
+  countdown?: string | null;
+  recipientCategory?: string | null;
+  recipientCount: number;
+  subjectType: string;       // ChangeRequest | ChangeTask
+  subjectId: number;
+}
+
+export interface RaiseEngineRequestBody {
+  requestType: string;
+  titleEn?: string;
+  titleAr?: string;
+  description?: string;
+  addresseeType: string;
+  addresseeId?: number | null;
+  addresseeKey?: string | null;
+  addresseeLabel?: string | null;
+  dueDate?: string;
+  slaHours?: number;
+  priority?: string;
+  escalationRole?: string;
+}
+
+/** One distinct task-owner label and whether the engine could reach it. */
+export interface OwnerVerdictDto {
+  label: string;
+  matchedType?: string | null;   // null when the label matches nothing at all
+  matchedLabel?: string | null;
+  reachable: boolean;
+  reason?: string | null;
+  users: number;
+  openTasks: number;
+  overdueTasks: number;
+}
+
+/**
+ * Which open change tasks have an owner the platform can notify.
+ *
+ * ⚠ `reachable`/`unreachable` count TASKS, not labels: one unreachable label carrying nine overdue
+ * tasks is nine people who were never told. And `engineAbsent` must be honoured — with no engine
+ * every verdict is unknown, so rendering `unreachable: 0` as good news would be reporting an absence
+ * as a measurement.
+ */
+export interface TaskAddressabilityDto {
+  scope: string;
+  openTasks: number;
+  overdueOpen: number;
+  /** Open tasks with no owner label at all — not fixable by appointing anybody. */
+  unnamed: number;
+  reachable: number;
+  unreachable: number;
+  byReason: Record<string, number>;
+  owners: OwnerVerdictDto[];
+  engineAbsent: boolean;
+}
+
+/**
  * S8f/CE-11 — one reconciliation failure between the authorisation a change required and the
  * authorisation the platform can show it received.
  *
@@ -992,6 +1074,18 @@ export const changeApi = {
   declareOutage: (id: number, outageExpected: boolean, outageMinutes?: number, servicesAffected?: string) =>
     api.post<ChangeRequestDto>(`/api/v1/changes/${id}/outage`,
       { outageExpected, outageMinutes, servicesAffected }),
+
+  // S8h / CE-10 — workflow-engine adoption (the 15th module)
+  taskAddressability: () =>
+    api.get<TaskAddressabilityDto>('/api/v1/changes/task-addressability'),
+  engineAddressees: () =>
+    api.get<EngineAddresseeDto[]>('/api/v1/changes/engine-addressees'),
+  engineRequests: (id: number) =>
+    api.get<EngineRequestRefDto[]>(`/api/v1/changes/${id}/engine-requests`),
+  raiseEngineRequest: (id: number, body: RaiseEngineRequestBody) =>
+    api.post<EngineRequestRefDto>(`/api/v1/changes/${id}/engine-requests`, body),
+  routeTaskThroughEngine: (taskId: number, body: RaiseEngineRequestBody) =>
+    api.post<EngineRequestRefDto>(`/api/v1/changes/tasks/${taskId}/engine-requests`, body),
 
   freezeWindows: () => api.get<ChangeFreezeWindowDto[]>('/api/v1/changes/freeze-windows'),
   createFreeze:  (body: Partial<ChangeFreezeWindowDto>) => api.post<ChangeFreezeWindowDto>('/api/v1/changes/freeze-windows', body),

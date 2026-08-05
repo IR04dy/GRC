@@ -33,4 +33,21 @@ public interface ChangeTaskRepository extends JpaRepository<ChangeTask, Long> {
           AND t.changeRequestId IN (SELECT c.id FROM ChangeRequest c WHERE c.organisationId = :org)
         """)
     long countOverdueOpen(@Param("org") Long org, @Param("now") LocalDateTime now);
+
+    /**
+     * S8h — every open task in the tenant, whatever its due date.
+     *
+     * <p>⚠ Deliberately not {@link #findOverdueOpen}: that one requires {@code dueAt < now}, which
+     * silently excludes the 18 of 41 tasks that have no due date at all. An addressability report
+     * built on it would have reported only the tasks somebody already dated, and a task with no owner
+     * AND no due date is the worse record of the two.
+     */
+    @Query("""
+        SELECT t FROM ChangeTask t
+        WHERE t.status IN :statuses
+          AND t.changeRequestId IN (SELECT c.id FROM ChangeRequest c WHERE c.organisationId = :org)
+        ORDER BY t.dueAt ASC, t.id ASC
+        """)
+    List<ChangeTask> findOpenByOrganisation(@Param("org") Long org,
+                                           @Param("statuses") List<String> statuses);
 }

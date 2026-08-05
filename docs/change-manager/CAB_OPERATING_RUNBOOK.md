@@ -286,6 +286,7 @@ the card for that reason.
 | **CAB decision register** | `/api/v1/reporting/change-decision-register.{pdf,xlsx}` | `CHANGE:EXPORT` **and** `CHANGE:READ` |
 | **Published forward schedule** (with its SHA-256, re-verified on read) | `/api/v1/changes/schedule-publications/{id}` | `CHANGE:READ` |
 | **Unauthorised-change register** | `/api/v1/changes/unauthorised-register` | `CHANGE:READ` |
+| **Task-owner addressability** (can the platform notify whoever owns the work?) | `/api/v1/changes/task-addressability` | `CHANGE:READ` |
 | Meeting agenda pack | `/api/v1/reporting/committee/meeting/{id}/agenda.pdf` | `ADMIN:EXPORT` **and** `ADMIN:READ` |
 | Meeting minutes | `/api/v1/reporting/committee/meeting/{id}/minutes.pdf` | `ADMIN:EXPORT` **and** `ADMIN:READ` |
 
@@ -321,7 +322,53 @@ implementation inside a freeze window (the implementation start time is not reco
 yet). Both are stated rather than omitted, because a register with invisible gaps reads exactly like
 one with none.
 
-### §8.2 Reading the decision register
+### §8.2 Routing work through the workflow engine — and who can actually be reached
+
+`Governance` tab → **Workflow engine — who can actually be told**.
+
+Two different things live on this card, and the first is the one to read.
+
+**Can the owner of this work be notified at all?** A change task's owner is a free-text label. The
+card resolves every label against the tenant's roles, departments, committees and users, and reports
+what it found *in tasks*, not in labels — one bad label carrying nine overdue tasks is nine people
+who were never told.
+
+Two verdicts that look alike and need opposite actions:
+
+| Verdict | What it means | What fixes it |
+|---|---|---|
+| **Matches nothing** | The label is not a role, a department, a committee or a user | Correct the label, or route the task to a real addressee |
+| **Department has no members** / **Role held by nobody** | The target is real and empty | Appoint somebody — or assign users to the department |
+| **Committee has no linked users** | Every seat is external or unlinked | Link the roster seats to platform users (see §2) |
+
+⚠ As shipped on the reference data, **0 of 26 open change tasks had a notifiable owner and 23 of
+them were overdue**. That is not a reporting quirk: the overdue sweep runs, writes its audit row, and
+reaches nobody. If your tenant shows the same, the tasks are not being chased no matter what the
+overdue count says.
+
+**Routing a task or a change through the engine.** `Route through the engine` raises a real
+workflow request: a named assignee, an SLA clock, a reminder ladder and an escalation path, all owned
+by the platform engine that fourteen other modules already use. The change keeps its own status.
+
+Three things it will refuse, each with a message naming the reason:
+
+1. **An addressee that reaches nobody.** Deliberate. An SLA and an escalation aimed at an empty
+   department are worse than none, because the counters all look healthy. The picker only offers
+   addressees that currently reach an active user, so you should not meet this unless the directory
+   changed under you.
+2. **No deadline.** The SLA clock, the reminders and the escalation ladder all measure from one. Give
+   a due date, or an SLA in hours to derive it from. Note that many seeded tasks have no due date of
+   their own to inherit.
+3. **An `APPROVAL` request.** This is not a limitation to work around. **A change is authorised
+   only by recorded CAB votes or by a carried committee resolution** — an engine request grants no
+   authority whatever its type, and an approval-shaped one would leave an artefact in the trail that
+   contradicts the unauthorised-change register in §8.1. Raise a `REVIEW` or a `TASK`, or use
+   the CAB path.
+
+For an auditor: engine requests against a change are **evidence of chasing**, never evidence of
+authorisation. §8.1 remains the only place authority is reconciled.
+
+### §8.3 Reading the decision register
 
 One row per change **past a decision point** — which includes deferrals and requests for more
 information, because those are decisions the committee took. Each row answers two separate
