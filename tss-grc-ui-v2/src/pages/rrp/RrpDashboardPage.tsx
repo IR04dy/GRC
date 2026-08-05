@@ -155,6 +155,13 @@ export function RrpDashboardPage() {
           label={lang === 'ar' ? 'دورات نشطة' : 'Active cycles'}
           value={data?.activeCycleCount ?? 0}
           to="/rrp/cycles" />
+        {/* F2-132 — placed beside "Active cycles" on purpose: an overdue cycle is counted in
+            that tile too, so the two must be read together. Nothing in this module compared
+            submissionDueDate to anything before this. */}
+        <Kpi Icon={AlertTriangle} tone={(data?.overdueCycleCount ?? 0) > 0 ? 'danger' : 'neutral'}
+          label={lang === 'ar' ? 'متأخّرة عن موعد التقديم' : 'Past submission due date'}
+          value={data?.overdueCycleCount ?? 0}
+          to="/rrp/cycles" />
         <Kpi Icon={CheckCircle2} tone="success"
           label={lang === 'ar' ? 'مُقدَّمة لساما' : 'Submitted to SAMA'}
           value={data?.submittedCycleCount ?? 0}

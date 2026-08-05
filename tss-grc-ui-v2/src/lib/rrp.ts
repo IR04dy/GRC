@@ -251,6 +251,12 @@ export interface DashboardResponse {
   activeCycleCount: number;
   submittedCycleCount: number;
   closedCycleCount: number;
+  /**
+   * F2-132 — cycles still awaiting submission whose `submissionDueDate` has already passed.
+   * `submissionDueDate` was stored, echoed and compared to nothing, so a late SAMA filing showed
+   * only as "active".
+   */
+  overdueCycleCount: number;
   indicatorsRed: number;
   indicatorsAmber: number;
   currentRecoveryCapacitySarM: number;

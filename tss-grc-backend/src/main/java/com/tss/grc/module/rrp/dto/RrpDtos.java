@@ -270,6 +270,21 @@ public final class RrpDtos {
         private long activeCycleCount;
         private long submittedCycleCount;
         private long closedCycleCount;
+        /**
+         * F2-132 — cycles still in a pre-submission status whose {@code submission_due_date} has
+         * already passed.
+         *
+         * <p>{@code submission_due_date} was written at creation, updatable, echoed in every cycle
+         * response, and <b>compared to nothing</b>. So a SAMA recovery-plan submission could be
+         * months late and this dashboard would report it only as "active". Measured 2026-08-06:
+         * <b>all three tenants</b> hold an {@code IN_PREPARATION} FY2026 cycle <b>128 days past</b> its
+         * 2026-03-31 due date.
+         *
+         * <p>⚠ Reported, not enforced. Nothing refuses a late submission or moves a cycle's status —
+         * lateness is a fact about a date, not a state, and inventing a LATE status would put a stored
+         * word where a comparison belongs (S7e's reasoning). This counts; the operator decides.
+         */
+        private long overdueCycleCount;
         /** Across all cycles for tenant, indicators currently RED. */
         private long indicatorsRed;
         /** Across all cycles for tenant, indicators currently AMBER. */

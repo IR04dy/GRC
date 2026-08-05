@@ -2468,6 +2468,51 @@ Start-Service TssGrcBackend
 | **Fix** | On an upward reclassification, re-examine the asset's ACTIVE and APPROVED flows and either refuse the reclassification until each cross-border transfer carries a reference, or flag them for review. Refusing is the stronger control but couples two registers; flagging is cheaper and matches how F2-128 now reports rather than blocks. **A decision, not an oversight** |
 | **Lesson** | A gate reads a property at a moment. If that property is mutable and the thing it authorises is long-lived, the check needs a second trigger — on the property, not only on the act. Ask of any gate: *can what I just checked change while the thing I authorised is still running?* |
 
+## F2-130 · Only the platform superuser can approve a SAMA recovery plan — and one dead role passes the existence check
+
+|  |  |
+|---|---|
+| **ID** | F2-130 *(found writing F2-03's floor for `rrp`; the fourth instance of F2-116's shape, and the one that refines how the shape must be measured)* |
+| **Module** | `rrp` — `RrpController` |
+| **Severity** | **P2** — no business role can approve a Recovery &amp; Resolution Plan; approval authority is the platform superuser alone |
+| **Current State** | 🔴 **OPEN.** Pinned by `RrpLifecycleTest.theGuardConstantsArePinnedWithTheirUnusableRoles` |
+| **Problem** | `APPROVE_GUARD` names three roles. Measured against `iam.roles` **and `iam.user_roles`** on 2026-08-06, exactly **one** is satisfiable: `PLATFORM_ADMIN` exists with 1 holder; **`CRO` does not exist**; **`CFO` exists with 0 holders**. `WRITE_GUARD` is 2 of 4 for the same reason (`BCM_MANAGER` exists, 0 holders) and `READ_GUARD` 4 of 8 |
+| **⚠ THE REFINEMENT, and it changes how F2-52 should be read** | F2-116, F2-120 and F2-127 were each measured by asking *does this name exist in `iam.roles`* — and **`CFO` passes that check**. A role that exists with **no holders** is equally unusable and fails differently: a name-existence join reports it as fine. So **F2-52's platform-wide figure (~50% of 74 recited names do not exist) is a LOWER BOUND** on the unusable population. There are two ways a role-name guard authorises nobody, and only one of them has been counted |
+| **The pattern, four for four** | `outsourcing` (F2-116) · `sharia` (F2-120) · `openbanking` (F2-127) · `rrp`. Each recites the **domain-specialist** role it was designed around — Chief Risk Officer, Sharia Officer, Open Banking Officer, CRO/CFO — and none of those is usable. **The guards were written from an org chart, not from the role table** |
+| **⚠ Why filed and not fixed** | Unchanged from F2-116/120/127: creating a role or granting it is a governance decision about a customer's organisation, and converting to `hasPermission` is **F2-05**'s ratified direction, which makes the names irrelevant. This is the fourth data point for sequencing F2-05, not a fourth patch |
+| **What F2-05 must therefore measure** | Both failure modes. A conversion planned on *name existence* alone would leave `CFO`-style guards looking healthy while still authorising nobody. The check is a join to `iam.user_roles`, not to `iam.roles` |
+| **Lesson** | Ask of an authorisation list not *do these names exist* but **can anybody satisfy it today**. Existence is a weaker question than holding, and the weaker question is the one four findings had been asking |
+
+## F2-131 · WITHDRAWN before filing — the RRP submit split is deliberate, not a second-writer defect
+
+|  |  |
+|---|---|
+| **ID** | F2-131 — **number allocated and withdrawn on 2026-08-06.** Recorded rather than left as a gap, so nobody hunts for a lost finding |
+| **Module** | `rrp` — `RrpService.transitionCycle` vs `RrpService.submitCycle` |
+| **Severity** | n/a — **not a defect** |
+| **The hypothesis** | `ALLOWED` does **not** contain `APPROVED → SUBMITTED`, yet `RrpService.submitCycle` performs exactly that transition. On the evidence of **F2-122** (`sharia`, where `purifyNcEvent` silently bypassed `NC_ALLOWED`), this looked like the same defect: one status, two writers, contradictory rules — and worse, a map that *forbids* what the sibling writer does |
+| **Why it is refuted** | `RrpService.transitionCycle` intercepts `to == "SUBMITTED"` **before** consulting the map and refuses it with *"Use the dedicated /submit endpoint to lodge with SAMA"*. The split is deliberate, the refusal is **actionable — it names the other door** — and the dedicated endpoint exists for a real reason: lodging captures a `regulator_ack_reference` that the generic transition DTO has no field for. Folding submission into the generic path would lose the acknowledgement or force a nullable field on every transition |
+| **So it is the counter-example to F2-122** | Both modules split one status across two writers. `sharia` does it silently; `rrp` refuses explicitly and points at the correct endpoint. **The difference between a defect and a design here is a message**, which is worth carrying: two writers of one field are defensible exactly when the one that refuses says where to go instead |
+| **Pinned anyway** | `RrpLifecycleTest.theGenericTransitionRoutesSubmissionToItsOwnEndpoint` asserts the refusal message names `/submit` and that `ALLOWED` still omits the edge — so if the map ever gains `APPROVED → SUBMITTED`, the arrangement has decayed into F2-122's version and the build says so |
+| **Lesson** | A hypothesis carried over from a previous module is a good prior, not a finding. Four modules into a pattern, the temptation is to file the fifth on resemblance; reading eleven lines of the refusal branch was the whole cost of not doing that |
+
+## F2-132 · A SAMA submission was 128 days overdue in every tenant, and nothing compared the date — REPORTED
+
+|  |  |
+|---|---|
+| **ID** | F2-132 *(found writing F2-03's floor for `rrp`; the fourth deadline-with-no-clock in this row)* |
+| **Module** | `rrp` — `RrpService.dashboard` |
+| **Severity** | **P1** — a regulatory filing deadline stored, displayed, and compared to nothing, while overdue in all three tenants |
+| **Current State** | 🟡 **REPORTED 2026-08-06** (no migration). Deliberately not enforced — see below |
+| **Problem** | `submission_due_date` was written at creation, updatable via `updateCycle`, echoed in every cycle response — and **compared to nothing anywhere in the module**. The dashboard counted cycles by status only, so a late filing appeared merely as *active* |
+| **Measured 2026-08-06** | **All three tenants** hold an `IN_PREPARATION` FY2026 cycle **128 days past** its 2026-03-31 due date. Orgs 1 and 3 additionally hold FY2025 cycles 493 days past due — correctly *not* overdue, because those are `CLOSED` |
+| **What shipped** | `overdueCycleCount` on the dashboard plus a UI tile, placed beside *Active cycles* because an overdue cycle is counted in that tile too and the two must be read together |
+| **⚠ The population is the pre-submission statuses, and that mattered** | `ACTIVE_STATUSES` — DRAFT/IN_PREPARATION/BOARD_REVIEW/APPROVED — not *everything not closed*. Once a cycle is `SUBMITTED` or `ACKNOWLEDGED` the filing has happened, so a passed due date is **history rather than an outstanding obligation**; counting those would report a permanent, unfixable overdue figure. That is precisely the trap **A17-D3** fell into by measuring a clock whose start moment was absent. A null due date is likewise not overdue: no deadline was set |
+| **⚠ Reported, never enforced** | Nothing refuses a late submission and no status changes. Lateness is a fact about a date; a stored LATE word could disagree with the date it derives from — S7e's reasoning. Consistent with **F2-128** one module over, where the same choice was made for the same reason |
+| **The row's fourth instance** | F2-115 (60-day SAMA notification, deferred) · F2-119 (`sharia`, three claims and no clock at all) · F2-126 (`openbanking`, 24 hours tracked as a binary) · this. ⚠ And the counter-example is in the same codebase: `data_officer` computes both of its statutory clocks and counts the overdue population on its dashboard. **The capability was never missing — it was never copied** |
+| **Verified** | 8 unit checks, **13/13 mutations caught**, including counting lodged cycles as overdue, treating a null due date as overdue, and widening `ACTIVE_STATUSES` to include `SUBMITTED` |
+| **Lesson** | Four modules stored a regulatory deadline and never compared it, while a fifth in the same repository did it properly. When a capability exists once, the finding is not *build it* — it is **why did the pattern not travel**, and that is a review question rather than an engineering one |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.

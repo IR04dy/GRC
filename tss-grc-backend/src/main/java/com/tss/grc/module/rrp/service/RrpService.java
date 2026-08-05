@@ -40,6 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -475,6 +476,29 @@ public class RrpService {
         // Sum indicators across all cycles for this org.
         Page<RrpCycle> all = cycleRepo.findByOrganisationIdOrderByFiscalYearDesc(
                 org(), PageRequest.of(0, 50));
+
+        // ── F2-132: a cycle still awaiting submission, past its own due date ────────────────────
+        //
+        // submission_due_date was written at creation, updatable, echoed in every cycle response —
+        // and compared to nothing anywhere in the module. So a SAMA recovery-plan submission could be
+        // months late while this dashboard reported it merely as "active". Measured 2026-08-06: all
+        // three tenants hold an IN_PREPARATION FY2026 cycle 128 days past its 2026-03-31 due date.
+        //
+        // ⚠ ACTIVE_STATUSES is the right population, not "everything not CLOSED": once a cycle is
+        // SUBMITTED or ACKNOWLEDGED the filing has happened, so a passed due date is history rather
+        // than an outstanding obligation. Counting those would report a permanent, unfixable overdue
+        // figure — the trap A17-D3 fell into by measuring a clock with no start.
+        //
+        // ⚠ Reported, not enforced. Nothing refuses a late submission and no status changes:
+        // lateness is a fact about a date, and a stored LATE word could disagree with the date
+        // (S7e's reasoning). This counts; the operator decides.
+        LocalDate today = LocalDate.now();
+        long overdue = all.getContent().stream()
+                .filter(c -> ACTIVE_STATUSES.contains(c.getStatus()))
+                .filter(c -> c.getSubmissionDueDate() != null
+                        && c.getSubmissionDueDate().isBefore(today))
+                .count();
+
         long red = 0, amber = 0;
         long capCurrent = 0;
         for (int i = 0; i < all.getContent().size(); i++) {
@@ -499,6 +523,7 @@ public class RrpService {
                 .activeCycleCount(activeCount)
                 .submittedCycleCount(submitted)
                 .closedCycleCount(closed)
+                .overdueCycleCount(overdue)
                 .indicatorsRed(red)
                 .indicatorsAmber(amber)
                 .currentRecoveryCapacitySarM(capCurrent)

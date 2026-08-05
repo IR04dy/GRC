@@ -63,7 +63,31 @@ public final class StateMachineContract {
                                             Consumer<String> attempt,
                                             String refusalMarker,
                                             String label) {
+        return assertHonoursItsMap(allowed, seedAtState, attempt, Set.of(refusalMarker), label);
+    }
+
+    /**
+     * As above, but accepting <b>several</b> legitimate refusal messages.
+     *
+     * <p>⚠ Added for {@code rrp}, the seventh module through this harness, and the reason generalises.
+     * A service may refuse an undeclared pair for more than one correct reason: {@code RrpService}
+     * intercepts {@code to == SUBMITTED} <em>before</em> consulting its map and answers <em>"Use the
+     * dedicated /submit endpoint to lodge with SAMA"</em>, because lodging captures a regulator
+     * acknowledgement the generic DTO cannot carry. That is a correct refusal with a different
+     * message, and the single-marker form reported it as <b>"refused for the WRONG reason"</b> — a
+     * false positive that would have pushed a test author to weaken the marker to something vacuous.
+     *
+     * <p>Insisting on <em>a</em> recognised reason rather than <em>one</em> reason keeps the check
+     * strict: an unrelated failure (a null, a missing mock) still fails, because its message matches
+     * none of them.
+     */
+    public static Result assertHonoursItsMap(Map<String, Set<String>> allowed,
+                                            Consumer<String> seedAtState,
+                                            Consumer<String> attempt,
+                                            Set<String> refusalMarkers,
+                                            String label) {
         assertThat(allowed).as("%s: the transition map must not be empty", label).isNotEmpty();
+        assertThat(refusalMarkers).as("%s: at least one refusal marker is required, or the refusal half of this contract checks nothing", label).isNotEmpty();
 
         Set<String> states = new TreeSet<>(allowed.keySet());
         allowed.values().forEach(states::addAll);          // ← the fix; see the class javadoc
@@ -97,10 +121,11 @@ public final class StateMachineContract {
                         // IllegalTransitionException extends IllegalStateException, so both the
                         // structured and the plain refusal land here — but the message still has to
                         // say it was the machine that refused.
-                        if (!String.valueOf(expected.getMessage()).contains(refusalMarker)) {
+                        String msg = String.valueOf(expected.getMessage());
+                        if (refusalMarkers.stream().noneMatch(msg::contains)) {
                             wrong.add(from + " -> " + to + " was refused for the WRONG reason "
-                                + "(expected a message containing \"" + refusalMarker + "\"): "
-                                + expected.getMessage());
+                                + "(expected a message containing one of " + refusalMarkers + "): "
+                                + msg);
                         }
                     }
                 }
