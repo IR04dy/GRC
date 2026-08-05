@@ -29,7 +29,8 @@
 // bypasses in code. Do not "make them consistent" — they are consistent with
 // their own server-side enforcers, which is the property that matters.
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useState, type ReactNode } from 'react';
+import { stableContext } from './stableContext';
 import { moduleEnabled, myEnabled, type MyEnabledModulesResponse, type RatifiedSku } from './licensing';
 import { isBarePath } from './publicPaths';
 import { isAuthenticated } from './auth';
@@ -291,7 +292,10 @@ const FAIL_OPEN: EntitlementState = {
   refresh: () => {},
 };
 
-const EntitlementContext = createContext<EntitlementState>(FAIL_OPEN);
+// ⚠ This one matters most. Its default is FAIL_OPEN, so a duplicated module does not throw — it
+// silently serves the fail-open default to every consumer, which is entitlement quietly switching
+// itself off (F2-04's territory). A crash is loud; this would not have been.
+const EntitlementContext = stableContext<EntitlementState>('grc.entitlement', FAIL_OPEN);
 
 /**
  * `useEntitlement()` outside a provider returns the fail-open state rather than

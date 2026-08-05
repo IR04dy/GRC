@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { stableContext } from './stableContext';
 
 // ─── Tunable design tokens ───────────────────────────────────────────────────
 // These are the CSS variables exposed to the user via /settings.
@@ -221,7 +222,7 @@ interface ThemeContextValue {
   effectiveMode: 'light' | 'dark';
 }
 
-const ThemeContext = createContext<ThemeContextValue | null>(null);
+const ThemeContext = stableContext<ThemeContextValue | null>('grc.theme', null);
 
 function readStored(): ThemeOverrides {
   try {

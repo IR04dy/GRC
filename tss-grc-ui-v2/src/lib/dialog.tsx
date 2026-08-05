@@ -26,9 +26,10 @@
 // pull the hook without each page wiring its own modal state.
 
 import {
-  createContext, useCallback, useContext, useEffect, useRef, useState,
+  useCallback, useContext, useEffect, useRef, useState,
   type FormEvent, type ReactNode,
 } from 'react';
+import { stableContext } from './stableContext';
 import { Modal } from '../components/ui/Modal';
 import { Input, Textarea } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -76,7 +77,7 @@ interface DialogContextValue {
   confirm: (opts: ConfirmOptions) => Promise<boolean>;
 }
 
-const DialogContext = createContext<DialogContextValue | null>(null);
+const DialogContext = stableContext<DialogContextValue | null>('grc.dialog', null);
 
 // ─── Provider ────────────────────────────────────────────────────────
 

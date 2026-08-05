@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { stableContext } from './stableContext';
 import { CheckCircle2, AlertCircle, Info, RotateCcw } from 'lucide-react';
 import { useI18n } from './i18n';
 
@@ -30,7 +31,7 @@ interface ToastContextValue {
   undoable: (message: string, undo: () => void, opts?: { variant?: ToastVariant; ttl?: number }) => void;
 }
 
-const ToastContext = createContext<ToastContextValue | null>(null);
+const ToastContext = stableContext<ToastContextValue | null>('grc.toast', null);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);

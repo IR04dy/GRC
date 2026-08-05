@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { stableContext } from './stableContext';
 
 export type Lang = 'en' | 'ar';
 export type Dir  = 'ltr' | 'rtl';
@@ -20,7 +21,11 @@ interface I18nContextValue {
   t: (key: string, fallback?: string) => string;
 }
 
-const I18nContext = createContext<I18nContextValue | null>(null);
+// ⚠ stableContext, not createContext: an HMR update that reloaded this module used to give the
+// provider and its consumers two DIFFERENT context objects, so `ToastProvider` — a child of
+// `I18nProvider` — threw "useI18n must be used inside <I18nProvider>" on every hot reload. See
+// stableContext.ts for the module-timestamp evidence.
+const I18nContext = stableContext<I18nContextValue | null>('grc.i18n', null);
 const LANG_KEY = 'grc.lang';
 
 // PERF-FE-002: load only the ACTIVE locale's dictionary instead of statically
