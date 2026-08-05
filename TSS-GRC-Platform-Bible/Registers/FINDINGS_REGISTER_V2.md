@@ -2396,6 +2396,48 @@ Start-Service TssGrcBackend
 | **Candidate fixes, not yet chosen** | (a) leave the global setting and let `LocalDateTime` bind verbatim, which is Jackson's documented behaviour when the type is timezone-less — the shift suggests something else is converting, so **find that first**; (b) move user-asserted moments to `OffsetDateTime` so the caller's offset is explicit and preserved; (c) keep UTC and make every client send UTC, which is a frontend contract change |
 | **⚠ Where it came from** | My own probe asserted a stored value against the local-time string it sent, and failed. The failure was my instrument, not the platform — but chasing it surfaced a real question nobody had asked. **A probe assertion that fails for a timezone reason is worth reading rather than relaxing** |
 
+## F2-125 · The open-banking consent lifecycle is documented, has no machine, and cannot expire
+
+|  |  |
+|---|---|
+| **ID** | F2-125 *(found writing F2-03's floor for `openbanking`)* |
+| **Module** | `openbanking` — `ObService` |
+| **Severity** | **P2** — latent today, and the register asserts a TPP's access is authorised after the customer's consent has lapsed |
+| **Current State** | 🔴 **OPEN**, tripwired by `ObLifecycleTest.theConsentLifecycleIsDocumentedButUnenforced`: the test fails the moment a consent machine appears, so the finding cannot be silently superseded |
+| **Problem** | `ObService`'s class javadoc states `Consent: AUTHORISED → ACTIVE → EXPIRED | REVOKED`. There is **no** `CONSENT_ALLOWED` map, no validator call on that path, and **nothing anywhere sets** `status = "EXPIRED"` — the sole occurrence of the literal is a read-side terminal check that refuses re-revoking an already finished consent. So an `ACTIVE` consent whose `expires_at` passes stays `ACTIVE` indefinitely |
+| **Measured 2026-08-06** | 25 consents: 13 `ACTIVE` (all carrying an expiry), 1 `EXPIRED`, 11 `REVOKED`. ⚠ **Latent, not manifest: 0 of the 13 ACTIVE are currently past their expiry** — stated plainly, because a finding that overstates its own blast radius gets discounted. The single `EXPIRED` row was seeded directly; no code path could have produced it |
+| **Refuted while investigating** | The 11 consents with no `expires_at` at all are **all REVOKED**, where an expiry is meaningless — so there is no never-expiring-consent defect, which was the first hypothesis. And the 180-day SAMA OBF default **is** applied when a caller omits an expiry |
+| **Fix — a decision first** | Two shapes, not equivalent. **(a) A sweep** moving ACTIVE→EXPIRED past the date: gives the register a real state, but the status lags reality between runs. **(b) A derived read** treating a past-expiry ACTIVE consent as expired wherever it is consulted: cannot lag, and is the position **S7e** took for exactly this reason — a stored word can disagree with the rows. (b) is the better default; either way the machine and every writer must agree, which is F2-122's lesson one module over |
+| **Lesson** | A lifecycle in a class javadoc is not a lifecycle. Four states documented, two with transitions, one with no producer at all — the same shape as `sharia`'s AR-260 and CE-13's `PENDING_RATIFICATION` |
+
+## F2-126 · SAMA's 24-hour OB incident window is tracked as a binary, not a deadline
+
+|  |  |
+|---|---|
+| **ID** | F2-126 *(found writing F2-03's floor for `openbanking`)* |
+| **Module** | `openbanking` — `ObService.notifySama` |
+| **Severity** | **P2** — the obligation OBF v2 §11.4 imposes is a *time limit*, and time is the only thing the platform cannot report about it |
+| **Current State** | 🔴 **OPEN**, tripwired by `ObLifecycleTest.theSamaTwentyFourHourWindowIsNotComputed` |
+| **Problem** | `ObIncident`'s javadoc: an incident affecting the OB service *must be reported to SAMA's OBF unit* **within 24 hours** *under OBF v2 §11.4*. `ObService.notifySama` records `sama_notification_ref`, stamps `sama_notified_at` and sets `sama_reportable` — and **never computes or stores anything about the 24 hours**. An incident notified in two hours and one notified in five days are byte-identical in the record |
+| **⚠ What makes this small to fix and worth filing** | Every input is already on the row: `detected_at`, `sama_reportable`, `sama_notified_at`. There is no missing column and no missing act — **only the subtraction**. This module does more than `sharia` did (F2-119): the flag is settable at creation and `countByOrganisationIdAndSamaReportableAndStatusNotIn` feeds a `samaReportableOpen` dashboard metric. The gap is precisely the time dimension |
+| **Measured 2026-08-06** | 3 incidents. Incident #1 is flagged reportable, was detected **2026-05-26** and has **never** been notified — roughly **72 days** against a 24-hour obligation. The dashboard reports `samaReportableOpen` = 1. It cannot report *72 days late*, because nothing subtracts two timestamps it already holds |
+| **Corrected while investigating** | The first hypothesis was that `sama_reportable` is only ever set *by* notifying, making should-report-but-has-not unrepresentable. **False** — it is settable at creation (`i.setSamaReportable(req.getSamaReportable())`), 1 row is in that state, and a finder counts it. Recorded because the module is better instrumented than the guess assumed |
+| **Fix** | Derive lateness on read, as `data_officer` already does for its own two statutory clocks — remaining hours per record plus an overdue count, each excluding notified and terminal incidents. No migration: `detected_at` and `sama_notified_at` are enough. `data_officer` is the working pattern to copy, in the same codebase |
+| **Lesson** | An obligation with a deadline needs three things — the moment it starts, the moment it is discharged, and the **comparison**. Two of three looks complete on a schema review and reports nothing an examiner would ask for |
+
+## F2-127 · `OPEN_BANKING_OFFICER` does not exist, so the module's own owner role cannot write
+
+|  |  |
+|---|---|
+| **ID** | F2-127 *(the third instance of F2-116's shape, after F2-120)* |
+| **Module** | `openbanking` — `ObController` |
+| **Severity** | **P2** — the named owner of the SAMA Open Banking function holds no role that exists |
+| **Current State** | 🔴 **OPEN.** Pinned by `ObLifecycleTest.theGuardConstantsArePinnedWithTheirDeadRoles` so a silent edit to any of the three guards fails the build |
+| **Problem** | Measured against `iam.roles` (58 roles, dev, 2026-08-06): `OPEN_BANKING_OFFICER` — the module's own named owner role — and `CRO` **do not exist**. `READ_GUARD` has 5 real holders of the 6 it names, **`WRITE_GUARD` 2 of 3**, and **`APPROVE_GUARD` 2 of 3**, leaving `PLATFORM_ADMIN` and `COMPLIANCE_OFFICER` as the only parties who can onboard, suspend or revoke a TPP |
+| **The pattern, now measured three times** | `outsourcing` recites `CRO`/`CIO` (F2-116), `sharia` recites four fictional names (F2-120), `openbanking` recites two. Every one is the **domain-specialist** role the module was designed around — Chief Risk Officer, Sharia Officer, Open Banking Officer — and none was ever created. **The guards were written from an org chart, not from `iam.roles`** |
+| **⚠ Why filed and not fixed** | Same as F2-116 and F2-120: creating privileged roles is a governance decision about a customer's organisation, and converting to `hasPermission` is **F2-05**'s ratified direction, which makes the names irrelevant. Fixing three modules' fictional roles one guard at a time is the wrong shape — it belongs in F2-05, and these three findings are now its evidence base |
+| **Lesson** | Three modules, three sets of fictional specialist roles, one cause. **F2-05 should be sequenced on this evidence rather than on the guard count** — the count says 537 sites; these say what the conversion actually buys |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.
