@@ -240,3 +240,27 @@ or IDE that later closes, they stop. To keep them up independently:
 - `CLAUDE.md` — full command reference, env vars, architecture, known landmines.
 - `STATUS.md` — module-by-module completion state.
 - `README.md` — public overview and regulatory mapping.
+
+### Staff the CAB/ECAB authority gates (once, after seeding)
+
+```bash
+py seed_change_authority_roster.py
+```
+
+⚠ **Without this, no change can be approved in dev** except the single `STANDARD/LOW` cell.
+The seeded gate map points `CAB` and `ECAB` at committees 13 and 12, which the demo seed
+leaves with **zero** members, so `ChangeGovernanceHealthService` fails closed on 11 of the 12
+authorisation-matrix cells (ADR-017 D-2) and every CAB transition answers 409 `ROSTER_EMPTY`.
+
+The script appoints the three `CHANGE:APPROVE` personas (`rmanager`, `compliance`,
+`so_officer`) to both gates as active voting members **linked to their user ids** — three
+distinct voters, so the two cells needing `min_approvals=2` work. Idempotent.
+
+It is a seed script and not a migration on purpose: a committee seat is a governance fact
+established by a board resolution, and a migration would fabricate appointments on every
+tenant. Same reasoning as `seed_committee_member_links.py` (F2-26) and V357's refusal to
+backfill.
+
+⚠ The warning will still name **orgs 2 and 3** afterwards. That is correct — those demo
+tenants have 0 users, 0 changes and 0 committees, so there is nobody to appoint. The warning
+is their onboarding checklist, not a fault.

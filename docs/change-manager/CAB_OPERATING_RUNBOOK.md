@@ -480,6 +480,40 @@ those rows. What you must not do is read a green transition as evidence the gate
 
 ---
 
+### §8.6 ⚠ "No committee can authorise" — the gate is mapped to an empty committee
+
+If every CAB-gated approval fails with a 409 and the log says
+
+```
+[change-governance] N authority gate(s) demand a committee but none can authorise —
+approvals routed to them now FAIL CLOSED (ADR-017 D-2)
+```
+
+the platform is refusing correctly and the **configuration** is wrong. Three different faults
+produce it, and the message names which one you have:
+
+| Fault | Meaning | Remedy |
+|---|---|---|
+| `NOT_MAPPED` | no committee is mapped to this gate | map one: `PUT /api/v1/changes/authority/{gate}` |
+| `COMMITTEE_UNAVAILABLE` | the mapped committee is deleted or DISSOLVED | map a live one |
+| `ROSTER_EMPTY` | the mapped committee exists but **has no active voting member** | appoint members, or map a committee that is already staffed |
+
+⚠ **`ROSTER_EMPTY` is the easy one to create by accident.** Mapping a gate to a committee is
+allowed before that committee is staffed — which is reasonable, since you may be about to
+appoint people. But nothing reminds you afterwards, so a gate can sit mapped-and-useless.
+This is exactly what dev shipped with: both gates were mapped on 2026-07-25 to the only two
+committees in the tenant that had **zero** members, while five other committees carried 3–6
+active voters each. Every non-`STANDARD/LOW` change was unapprovable for ten days.
+
+**A gate needs enough voting members to satisfy its cells' `min_approvals`, by different
+people** — two cells demand 2. And appoint members **linked to platform users**: an unlinked
+seat cannot be matched to whoever is voting, so quorum-with-recusal and every self-review
+check go quiet rather than wrong (see §8.5's coverage table, and F2-113).
+
+Check the current state any time with `GET /api/v1/changes/governance-health`.
+
+---
+
 ## §9 KPIs — and how to read them
 
 `GET /api/v1/changes/analytics` returns `kpis`: **19** ITIL/ISO metrics. Each one carries its
