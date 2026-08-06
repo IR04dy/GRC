@@ -376,6 +376,23 @@ class RoleGuardConversionRatchetTest {
      * {@code SHARIA_AUDITOR}, {@code SHARIA_BOARD_CHAIR}, {@code SHARIA_OFFICER}, {@code SOC_LEAD},
      * {@code TPRM_LEAD}, {@code USER}.
      *
+     * <p><b>⚠ This count conflates two different defects.</b> {@code COMPLIANCE_READ},
+     * {@code CYBER_READ}, {@code RISK_READ}, {@code INCIDENT_READ} and {@code PRIVACY_READ} are not
+     * role names anybody mistyped — they are <b>permissions spelled as raw authorities</b>, the
+     * {@code RAW_AUTHORITY} case this class's own header describes: {@code hasAuthority('RISK_READ')}
+     * reads like {@code hasPermission('RISK','READ')} and is not the same expression, because
+     * {@code ModulePermissionEvaluator} is never called and everything it does is skipped —
+     * <b>including the hardcoded PLATFORM_ADMIN bypass every other guard relies on</b>. They are
+     * absent from {@code iam.roles} for the same reason {@code KB_WRITE} was in F2-53: they were never
+     * meant to be roles.
+     *
+     * <p>"Absent from the catalogue" is still the right test; "ghost role name" is the wrong label for
+     * those five. The remedy differs too — a typo is dropped or corrected, whereas these need
+     * rewriting as {@code hasPermission(...)}, and per F2-53 that direction fails <b>too tight rather
+     * than too loose</b>. Each of the five also has <b>no real non-admin role left beside it</b>, so
+     * they are candidates for being reachable by nobody at all. Not verified here, and deliberately
+     * not swept with the typos.
+     *
      * <p><b>Sized on one name, because the shape generalises.</b> {@code TPRM_LEAD} is <b>11
      * occurrences across 5 files</b>, and they are not all guards: {@code MtpdInheritanceController}
      * (3) and {@code ProcessVendorDependencyController} (5) recite it in {@code @PreAuthorize}, while
