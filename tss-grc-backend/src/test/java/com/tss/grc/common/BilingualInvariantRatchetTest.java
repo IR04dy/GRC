@@ -69,8 +69,32 @@ class BilingualInvariantRatchetTest {
      * <p>Do NOT raise this to make a new entity pass. Add {@code @NotBlank} to the {@code *_ar}
      * field instead — and check the column's blank-row count first, because on a populated
      * column the constraint blocks edits to existing records.
+     *
+     * <p><b>⚠ 157 → 158 on 2026-08-06 (F2-38), and this is the one shape of increase that is not a
+     * regression.</b> {@code Notification.messageAr} was added to the entity. The asymmetry it
+     * reports is <b>not new</b> — {@code platform.notifications.message_ar} has existed since
+     * {@code V1__core_schemas.sql} beside a {@code NOT NULL message_en}, and 42 of 445 rows hold
+     * Arabic. What changed is that the column became <i>visible to this scan</i>, because
+     * <b>this test reads entity declarations, and the column was mapped by nothing.</b>
+     *
+     * <p><b>Which makes 157 a lower bound, and that was measured rather than assumed.</b> There are
+     * <b>631</b> live {@code *_ar} columns; <b>11</b> are mapped by no entity at all, and <b>5</b> of
+     * those sit beside a {@code NOT NULL *_en} sibling — five rule-7 asymmetries this test cannot
+     * count: {@code bcm_lc.drills.scenario_ar} (0/5 blank),
+     * {@code reporting.report_definitions.report_name_ar} (0/20),
+     * {@code risk_lc.kri_breaches.kri_name_ar} (0/12), plus
+     * {@code privacy_lc.ropa_activities.purposes_ar} and {@code risk_lc.kri_escalation_log.step_ar}
+     * on empty tables. So the true figure was at least <b>163</b>. All five hold <b>zero</b> blank
+     * rows, so they are not data-blocked — they are <i>unreachable</i>, which is a different and
+     * quieter problem than being unfixable.
+     *
+     * <p>🔑 <b>The transferable lesson, which this programme has now hit twice:</b> an instrument
+     * that asks about <i>mapped</i> things cannot see <i>unmapped</i> ones, and its green reading is
+     * not evidence of absence. F2-140 found the same shape in the schema ratchets — a table with no
+     * JPA entity was invisible to a control asserting that every mapped table has DDL. <b>Mapping a
+     * column made this number worse and the codebase better.</b>
      */
-    private static final int BASELINE_ASYMMETRIC_PAIRS = 157;
+    private static final int BASELINE_ASYMMETRIC_PAIRS = 158;
 
     /**
      * The 35 pairs whose columns already hold blank Arabic, with the row counts measured
@@ -86,6 +110,11 @@ class BilingualInvariantRatchetTest {
      * newest modules conform only because their seed data happened to be bilingual.
      */
     private static final Map<String, String> DATA_BLOCKED = Map.ofEntries(
+        // F2-38. Worst ratio in the list, and the constraint would do active harm: markRead() saves
+        // the entity, so @NotBlank here makes 403 existing notifications impossible to mark as read.
+        // The 39 call sites cannot supply Arabic either — the three notify methods take titleAr and
+        // no Arabic body, so the signature itself is where the gap lives.
+        Map.entry("Notification.messageAr", "403/445"),
         Map.entry("Risk.titleAr", "66/132"),
         Map.entry("RiskTreatment.descriptionAr", "53/54"),
         Map.entry("EvidenceRequest.titleAr", "26/44"),

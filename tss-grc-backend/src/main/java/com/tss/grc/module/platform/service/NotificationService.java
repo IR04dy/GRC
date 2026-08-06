@@ -289,17 +289,24 @@ public class NotificationService {
             });
     }
 
+    /**
+     * F2-38 — every field here is read from the row. It previously passed {@code null} four times:
+     * twice for fields with no column at all ({@code severity}, {@code linkUrl}, both now gone from
+     * the record) and once for {@code messageAr}, which <b>is</b> a column and holds Arabic on 42 of
+     * the 445 live rows. Dropping it meant an Arabic-primary product served an English-only body.
+     * {@code entityType}/{@code entityId} were populated on all 445 rows and exposed by nothing.
+     */
     private NotificationResponse toResponse(Notification n) {
         return new NotificationResponse(
             n.getId(),
             n.getTitleEn(),
             n.getTitleAr(),
             n.getMessageEn(),
-            null,
+            n.getMessageAr(),
             n.getNotificationType(),
-            null,
             n.getIsRead(),
-            null,
+            n.getEntityType(),
+            n.getEntityId(),
             n.getCreatedAt()
         );
     }

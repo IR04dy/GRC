@@ -30,6 +30,22 @@ public class Notification {
     @Column(name = "message_en", nullable = false, columnDefinition = "NVARCHAR(MAX)")
     private String messageEn;
 
+    /**
+     * F2-38 — {@code message_ar} has existed since {@code V1__core_schemas.sql} and was mapped by
+     * nothing. The column holds real Arabic on <b>42 of the 445 live rows</b>, and no Java code could
+     * read or write it: the entity mapped {@code title_ar} but not this, so notifications were
+     * <i>half</i> bilingual. Adding the mapping is what makes those 42 rows reachable at all.
+     *
+     * <p>⚠ Reachable is not the same as written. The three public notify methods on
+     * {@link com.tss.grc.module.platform.service.NotificationService} take {@code titleAr} as a
+     * parameter and do <b>not</b> take a message body in Arabic — the signature itself encodes the
+     * gap — so all <b>39 call sites across 14 files</b> leave this null by construction. Closing that
+     * needs real Saudi GRC Arabic copy for 39 messages, not a mechanical edit, and is tracked
+     * separately rather than filled with machine translation.
+     */
+    @Column(name = "message_ar", columnDefinition = "NVARCHAR(MAX)")
+    private String messageAr;
+
     @Column(name = "notification_type", length = 50)
     private String notificationType;
 
