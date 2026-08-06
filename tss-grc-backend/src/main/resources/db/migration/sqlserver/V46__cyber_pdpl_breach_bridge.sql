@@ -100,9 +100,21 @@ BEGIN
     DECLARE @inc1 BIGINT, @inc1num NVARCHAR(64);
     DECLARE @inc2 BIGINT, @inc2num NVARCHAR(64);
 
-    SELECT TOP 1 @inc1 = id, @inc1num = incident_number
+    -- F2-77: `cyber.incidents` has no `incident_number` column and never had one — V1
+    -- creates it without, and no migration adds it. The name belongs to the SIBLING table
+    -- `cyber.cyber_incidents`, which does carry `incident_number`. So this seed read a
+    -- column off the wrong table, and because SQL Server binds column names for the whole
+    -- batch at compile time, the runtime guard above could not save it: V46 failed even
+    -- though the branch would not have executed on an empty database.
+    --
+    -- The value is used in 14 string concatenations below, so it must be non-NULL: in
+    -- SQL Server `N'text ' + NULL` is NULL, and a NULL here would silently blank every
+    -- description this seed writes. `cyber.incidents` identifies a row by `id` alone, so
+    -- the reference is that identifier formatted — not an invented code, which is the
+    -- fabricated-seed-data problem F2-139 records one table over.
+    SELECT TOP 1 @inc1 = id, @inc1num = CONCAT(N'INC-', id)
       FROM cyber.incidents WHERE is_deleted = 0 ORDER BY id ASC;
-    SELECT TOP 1 @inc2 = id, @inc2num = incident_number
+    SELECT TOP 1 @inc2 = id, @inc2num = CONCAT(N'INC-', id)
       FROM cyber.incidents WHERE is_deleted = 0 AND id <> @inc1 ORDER BY id ASC;
 
     -- Classify incidents as affecting personal data
@@ -126,8 +138,18 @@ BEGIN
 
     -- Create matching DataBreach rows (auto-generated)
     DECLARE @newBreach1 BIGINT, @newBreach2 BIGINT;
-    DECLARE @ext1 NVARCHAR(64) = N'DBR_AUTO_' + LEFT(REPLACE(CAST(NEWID() AS NVARCHAR(36)),N'-',N''),12);
-    DECLARE @ext2 NVARCHAR(64) = N'DBR_AUTO_' + LEFT(REPLACE(CAST(NEWID() AS NVARCHAR(36)),N'-',N''),12);
+    -- F2-77: `privacy.data_breaches.external_id` is a UNIQUEIDENTIFIER in V1 and in the live
+    -- schema, and this seed was inserting a `DBR_AUTO_<hex>` STRING into it — written against
+    -- an imagined nvarchar 'code' column. Two distinct values are needed, and conflating them
+    -- is what broke the file:
+    --   @extId*  the row's real external_id, a GUID, as every other table uses.
+    --   @ext*    the human-readable label, which belongs in the columns that are nvarchar --
+    --            cyber_breach_bridge_log.data_breach_external_id and
+    --            cyber.incidents.linked_data_breach_code.
+    DECLARE @extId1 UNIQUEIDENTIFIER = NEWID();
+    DECLARE @extId2 UNIQUEIDENTIFIER = NEWID();
+    DECLARE @ext1 NVARCHAR(64) = N'DBR_AUTO_' + LEFT(REPLACE(CAST(@extId1 AS NVARCHAR(36)),N'-',N''),12);
+    DECLARE @ext2 NVARCHAR(64) = N'DBR_AUTO_' + LEFT(REPLACE(CAST(@extId2 AS NVARCHAR(36)),N'-',N''),12);
 
     INSERT INTO privacy.data_breaches
         (organisation_id, external_id, title_en, description_en,
@@ -137,7 +159,7 @@ BEGIN
          auto_generated, auto_generation_rule, auto_generated_at,
          is_deleted, created_at)
     VALUES
-        (1, @ext1,
+        (1, @extId1,
          N'Auto-generated breach from cyber incident ' + @inc1num,
          N'Cyber → PDPL bridge rule v1 created this breach automatically when cyber incident ' + @inc1num + N' was classified as affecting personal data. 1,450 data subjects estimated. See linked cyber incident for full IR detail.',
          N'UNAUTHORIZED_ACCESS',
@@ -156,7 +178,7 @@ BEGIN
          auto_generated, auto_generation_rule, auto_generated_at,
          is_deleted, created_at)
     VALUES
-        (1, @ext2,
+        (1, @extId2,
          N'Auto-generated breach from cyber incident ' + @inc2num,
          N'Cyber → PDPL bridge rule v1 created this breach automatically when cyber incident ' + @inc2num + N' was classified as affecting personal data. 380 data subjects estimated. Lower severity — no national-ID category affected.',
          N'ACCIDENTAL_DISCLOSURE',
