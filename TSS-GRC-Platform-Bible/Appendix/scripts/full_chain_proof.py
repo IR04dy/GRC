@@ -126,6 +126,15 @@ try:
     for x in missing[:25]:
         print("      %s.%s" % x)
 finally:
-    mcur.execute("IF DB_ID(?) IS NOT NULL BEGIN ALTER DATABASE [%s] SET SINGLE_USER WITH ROLLBACK "
-                 "IMMEDIATE; DROP DATABASE [%s]; END" % (SCRATCH, SCRATCH), SCRATCH)
-    print("\ndropped %s" % SCRATCH)
+    # --keep leaves the built database in place so another instrument can read it.
+    #
+    # F2-09 asks what a migration-built database contains versus the Python-bootstrapped dev schema,
+    # and that question needs the artefact, not just the exit point. Dropping unconditionally made
+    # this script answer "where does the chain stop" and nothing else; the build is the expensive part
+    # (330 files, minutes) and throwing it away forced every downstream question to pay for it again.
+    if "--keep" in sys.argv:
+        print("\nkept %s for inspection (re-run without --keep to drop it)" % SCRATCH)
+    else:
+        mcur.execute("IF DB_ID(?) IS NOT NULL BEGIN ALTER DATABASE [%s] SET SINGLE_USER WITH ROLLBACK "
+                     "IMMEDIATE; DROP DATABASE [%s]; END" % (SCRATCH, SCRATCH), SCRATCH)
+        print("\ndropped %s" % SCRATCH)
