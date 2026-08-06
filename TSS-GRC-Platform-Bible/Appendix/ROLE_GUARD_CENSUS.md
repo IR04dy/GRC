@@ -27,11 +27,11 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 | … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **532** |
 | … composed (role leg ANDed onto a permission — already tight) | 73 |
 | Module packages holding pure role guards | 35 |
-| Distinct role names recited by any role guard | 54 |
-| … **that do not exist in `iam.roles`** | **10** |
+| Distinct role names recited by any role guard | 53 |
+| … **that do not exist in `iam.roles`** | **9** |
 | Pure guards **closed to everyone** (no named role exists, no live authority leg) | **0** |
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
-| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **1** |
+| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **0** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
 | Pure guards whose surviving roles are held by no user | 0 |
 | Pure guards reachable by at least one seeded user | 532 |
@@ -49,7 +49,6 @@ shows what that closes.
 | `FACILITATOR` | 18 |
 | `AUDIT_COMMITTEE_MEMBER` | 16 |
 | `MODEL_OWNER` | 14 |
-| `BOARD_MEMBER` | 13 |
 | `AUDIT_COMMITTEE_CHAIR` | 6 |
 | `PRIVACY_OFFICER` | 5 |
 | `SHARIA_BOARD_CHAIR` | 4 |
@@ -71,9 +70,7 @@ decision (settings reset, token revocation, platform administration) and belongs
 different conversation. The distinction is invisible in the code, which is why it is
 computed here rather than eyeballed.
 
-| Module | Guard site | Roles named | Unsatisfiable legs (absent role, or dead authority) |
-|---|---|---|---|
-| `module.bcm` | `BiaQuantitativeController#boardApprove` | `BOARD_MEMBER`, `PLATFORM_ADMIN` | `BOARD_MEMBER` |
+None.
 
 ## B3. Wide despite dead role names — the camouflage sites
 

@@ -36,7 +36,7 @@ import java.util.UUID;
  * {@code ROLE_}. Same shape as PR #174's socops fix and the Slice 9-C
  * BIA controller.
  *
- * <p>Read-side is open to a wider audience (AUDITOR, CFO, BOARD_MEMBER)
+ * <p>Read-side is open to a wider audience (AUDITOR, CFO)
  * because the ROI table is a board-pack artifact. Write-side stays tight
  * (BCM_MANAGER, CISO, RISK_MANAGER, PLATFORM_ADMIN). The recommendation
  * transition is tighter still — only CFO / CISO / PLATFORM_ADMIN can
@@ -53,19 +53,19 @@ public class StrategyRoiController {
     private final StrategyRoiService service;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN','CFO','BOARD_MEMBER','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN','CFO','RISK_MANAGER')")
     public List<StrategyRoiResponse> list(@RequestParam(value = "biaId", required = false) Long biaId) {
         return biaId == null ? service.list() : service.listForBia(biaId);
     }
 
     @GetMapping("/comparison")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN','CFO','BOARD_MEMBER','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN','CFO','RISK_MANAGER')")
     public StrategyRoiComparison comparison(@RequestParam("ids") List<Long> ids) {
         return service.comparison(ids);
     }
 
     @GetMapping("/{externalId}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN','CFO','BOARD_MEMBER','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN','CFO','RISK_MANAGER')")
     public StrategyRoiResponse get(@PathVariable UUID externalId) {
         return service.get(externalId);
     }

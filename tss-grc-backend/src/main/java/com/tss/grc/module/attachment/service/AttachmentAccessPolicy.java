@@ -147,7 +147,7 @@ public class AttachmentAccessPolicy {
         DECLARED.put("AUDIT_FINDING",    ParentGuard.perm("AUDIT"));
         DECLARED.put("IA_ENGAGEMENT",    ParentGuard.roles(
             "PLATFORM_ADMIN", "CHIEF_AUDIT_EXECUTIVE", "AUDIT_DIRECTOR", "INTERNAL_AUDITOR_LEAD",
-            "INTERNAL_AUDITOR", "AUDIT_COMMITTEE_MEMBER", "BOARD_MEMBER", "RISK_MANAGER",
+            "INTERNAL_AUDITOR", "AUDIT_COMMITTEE_MEMBER", "RISK_MANAGER",
             "COMPLIANCE_OFFICER", "EXTERNAL_AUDITOR", "AUDITOR", "CISO"));
 
         // ── BCM ─────────────────────────────────────────────────────────────

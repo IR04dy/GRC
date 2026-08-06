@@ -1906,6 +1906,25 @@ Start-Service TssGrcBackend
 | **Lesson** | **A control that is off in dev and on in prod is not tested — it is deployed and hoped for.** This is the same shape as F2-62's dead flag and A17-D2's fail-open WARN, with the polarity reversed: instead of a control that did nothing, a control that did far too much. Both were invisible for the same reason — *the only environment that runs it is the one nobody probes.* Its javadoc named the gap ("never this bean") and its config named the missing precondition ("only after the documented staging soak"); **two accurate warnings, written by us, consumed by nobody** |
 
 
+## F2-152 · A board approval records no approver, and the CFO approval's approver is whatever the request says
+
+|  |  |
+|---|---|
+| **ID** | F2-152 *(measured fixing [[F2-52]]'s last attrition lockout, 2026-08-06)* |
+| **Category** | Attribution — [[F2-22b]]'s forgeable-authorship shape, on a three-stage approval chain |
+| **Severity** | **P2.** The audit ledger records the acting principal, so the act is traceable; the **record** is not. A quantitative BIA is BCM evidence read by an examiner from the row, not from the ledger |
+| **Current State** | ⬜ **Open, filed not fixed.** [[F2-52]] fixed *who may* board-approve; this is *what gets written when they do* |
+| **Provenance** | Not sought. F2-52 asked what the board-approve stage records, to judge whether the guard was the only control. It is |
+| **🔑 Half one — the board approval has no signer** | `QuantitativeBiaService.boardApprove` sets `status`, `boardApprovedAt`, `boardMinutesRef` and `updatedAt`. **There is no `board_approved_by` column and none is written.** So the row says *a board approved this, at this time, per these minutes* and cannot say who signed. Compare the stage before it, which has `cfo_approved_at`, `cfo_approver_name` **and** `cfo_comments` |
+| **⚠ Half two — and the CFO's approver name is supplied by the caller** | `CfoApprovalRequest` carries `@NotBlank String approverName`, written to `cfo_approver_name`. It is never compared to the principal. So the one stage that *does* record a signer records **whatever the request body says** — exactly [[F2-22b]](vi)'s `draftedBy` defect, which the board-pack slice fixed by stamping from the principal and marking the field READ_ONLY. The same fix applies here and was not in this slice's scope |
+| **Why the guard is the only control** | `guardTransition` enforces the **order** of the stages (`DRAFT → … → CFO_APPROVED → BOARD_APPROVED`) and nothing enforces that the stages are **different people**. With no approver recorded on the board stage and a forgeable one on the CFO stage, the row cannot even be audited for self-approval after the fact. That is why [[F2-52]] refused `BCM:APPROVE` here: it contains `BCM_MANAGER`, the stage-one role, and the guard was the only thing keeping stage 1 and stage 3 apart |
+| **Measured state** | dev `bcm.bia_quantitative`: **1 row, status `CFO_APPROVED`**, `board_approved_at` and `board_minutes_ref` both NULL — the row was parked at the stage the ghost role had closed. So there is **no existing board approval to re-attribute**, which makes the fix additive and cheap |
+| **The remedy** | Add `board_approved_by_user_id` (nullable, no default, no backfill — [[F2-109]]/CE-15's position: capacity, never invented attribution), stamp it from the principal, and make `cfoApproverName` READ_ONLY + stamped the way `draftedBy` now is. Then an SoD check across the three stages becomes possible at all |
+| **Effort** | **S** for the stamping, **S** for one migration. The reason it is filed rather than done is that adding an approver column while `cfo_approver_name` stays forgeable would leave the chain half-attributed, and both halves belong in one reviewed change |
+| **Verification** | `QuantitativeBiaService:221-238` read from source — no approver assignment. `BiaQuantitative` entity: `cfo_approved_at`, `cfo_approver_name`, `cfo_comments`, `board_approved_at`, `board_minutes_ref`, and no board approver field. `CfoApprovalRequest` at `BiaQuantitativeDtos:92`. Live: `EXECUTIVE_REVIEWER` board-approved a cloned row **200 → BOARD_APPROVED** with `minutesRef` and no signer stored |
+| **References** | `QuantitativeBiaService#boardApprove` · `BiaQuantitativeController` · `BiaQuantitativeDtos.CfoApprovalRequest` · `BiaQuantitative` · `BiaApprovalChainGuardTest` · [[F2-52]] · [[F2-22b]] · [[F2-109]] · [[F2-151]] |
+| **Lesson** | **Fixing who may act is half a control; the other half is what the act records.** Three slices in a row have now found the second half missing right behind the first — [[F2-151]]'s self-declared `attestedRole`, [[F2-150]]'s commander-as-a-label, and here an approval with no approver. **After correcting a guard, read the write path it now admits people to.** |
+
 ## F2-151 · No audit-committee member can sign the committee's attestation, and anyone who can may sign as its Chair
 
 |  |  |

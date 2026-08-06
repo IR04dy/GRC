@@ -42,7 +42,7 @@ public class ThreeLinesController {
     /** Per-band counts (risks/findings/CAPA/policies/DSR + overdue/escalations). */
     @GetMapping("/overview")
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','COMPLIANCE_OFFICER','INTERNAL_AUDITOR',"
-                + "'AUDIT_DIRECTOR','BOARD_MEMBER','AUDIT_COMMITTEE_CHAIR','BOARD_SECRETARY',"
+                + "'AUDIT_DIRECTOR','AUDIT_COMMITTEE_CHAIR','BOARD_SECRETARY',"
                 + "'DPO','AUDITOR','EXECUTIVE_REVIEWER')")
     public ThreeLinesOverviewDto overview() {
         return service.overview();
@@ -51,7 +51,7 @@ public class ThreeLinesController {
     /** Drill-down: list of artefacts assigned to the band. */
     @GetMapping("/line/{band}")
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','COMPLIANCE_OFFICER','INTERNAL_AUDITOR',"
-                + "'AUDIT_DIRECTOR','BOARD_MEMBER','AUDIT_COMMITTEE_CHAIR','BOARD_SECRETARY',"
+                + "'AUDIT_DIRECTOR','AUDIT_COMMITTEE_CHAIR','BOARD_SECRETARY',"
                 + "'DPO','AUDITOR','EXECUTIVE_REVIEWER')")
     public List<ThreeLinesArtefactDto> drillDown(@PathVariable("band") String band) {
         return service.drillDown(band);
@@ -60,7 +60,7 @@ public class ThreeLinesController {
     /** Effective LoD band(s) for a user — drives the frontend "my band" highlighter. */
     @GetMapping("/user/{userId}/role-band")
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','COMPLIANCE_OFFICER','INTERNAL_AUDITOR',"
-                + "'AUDIT_DIRECTOR','BOARD_MEMBER','AUDIT_COMMITTEE_CHAIR','BOARD_SECRETARY',"
+                + "'AUDIT_DIRECTOR','AUDIT_COMMITTEE_CHAIR','BOARD_SECRETARY',"
                 + "'DPO','AUDITOR','EXECUTIVE_REVIEWER')")
     public UserBandDto userBand(@PathVariable("userId") Long userId) {
         return service.userBandFor(userId);

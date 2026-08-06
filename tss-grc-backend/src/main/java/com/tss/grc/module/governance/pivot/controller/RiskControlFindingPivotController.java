@@ -42,7 +42,7 @@ public class RiskControlFindingPivotController {
             "hasAnyRole('RISK_MANAGER','CISO','COMPLIANCE_OFFICER',"
                     + "'INTERNAL_AUDITOR','EXTERNAL_AUDITOR','AUDITOR',"
                     + "'AUDIT_COMMITTEE_MEMBER','AUDIT_COMMITTEE_CHAIR',"
-                    + "'BOARD_MEMBER','PLATFORM_ADMIN')";
+                    + "'PLATFORM_ADMIN')";
 
     private final RiskControlFindingPivotService service;
 

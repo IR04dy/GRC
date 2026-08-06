@@ -177,7 +177,7 @@ public class SanctionsScreeningController {
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','AML_OFFICER','COMPLIANCE_OFFICER','CISO',"
-        + "'INTERNAL_AUDITOR','AUDIT_COMMITTEE_MEMBER','BOARD_MEMBER','AUDITOR')")
+        + "'INTERNAL_AUDITOR','AUDIT_COMMITTEE_MEMBER','AUDITOR')")
     public DashboardResponse dashboard() {
         return dashboardService.dashboard();
     }

@@ -474,7 +474,7 @@ class RoleGuardConversionRatchetTest {
      * a 5-row board with terms). Seating them would have been <em>looser</em> than the column — the owner
      * of model A could act on model B — so this baseline is not simply "make it fall".
      */
-    private static final int BASELINE_GHOST_ROLE_NAMES = 10;
+    private static final int BASELINE_GHOST_ROLE_NAMES = 9;
 
     // ── extraction ────────────────────────────────────────────────────────────────────────────
 

@@ -68,14 +68,14 @@ public class BcpBinderController {
 
     /** Newest-first list of binder versions for the given plan. */
     @GetMapping("/plans/{planId}/binders")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR','BOARD_MEMBER','CFO')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR','CFO')")
     public List<BinderResponse> list(@PathVariable Long planId) {
         return service.listForPlan(planId);
     }
 
     /** Detail (status, page count, byte size, download count) of one binder. */
     @GetMapping("/binders/{exportId}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR','BOARD_MEMBER','CFO')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','PLATFORM_ADMIN','RISK_MANAGER','AUDITOR','CFO')")
     public BinderResponse get(@PathVariable Long exportId) {
         return service.get(exportId);
     }
