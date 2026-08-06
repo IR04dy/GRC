@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,347; ~1 min hot, 3–5 min cold)
+mvn -o clean package        # full build + all UNIT tests (3,349; ~1 min hot, 3–5 min cold)
                             # hermetic: needs no database and no secrets — keep it that way
 
 # Integration tests (*IT.java) — real HTTP + the real dev SQL Server. W1-5/F2-18.

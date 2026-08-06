@@ -65,8 +65,18 @@ BEGIN
         row_version         BIGINT        NOT NULL DEFAULT 0,
 
         CONSTRAINT CK_com_type CHECK (committee_type IN
+            -- F2-77 (2026-08-06): V40 listed 8 of these 22 and no migration ever extended it,
+            -- so a migration-built database rejected 14 committee types the platform validates
+            -- and uses. The live CHECK and CommitteeTypes.VALUES already agree on all 22; only
+            -- this file was behind, which is why V159 could not seed AI_ETHICS/CYBER_SECURITY/
+            -- PRIVACY_DPO. Sourced from CommitteeTypes.VOCABULARY and gated by
+            -- CommitteeTypeVocabularyContractTest so the two cannot drift again.
             (N'BOARD', N'EXEC_COMMITTEE', N'RISK_COMMITTEE', N'AUDIT_COMMITTEE',
-             N'BCM_COMMITTEE', N'COMPLIANCE_COMMITTEE', N'TECH_COMMITTEE', N'OTHER')),
+             N'BCM_COMMITTEE', N'COMPLIANCE_COMMITTEE', N'TECH_COMMITTEE', N'NOMINATION_REMUNERATION',
+             N'CYBER_SECURITY', N'DATA_GOVERNANCE', N'PRIVACY_DPO', N'CRISIS_MANAGEMENT',
+             N'AML', N'IT_STEERING', N'ALCO', N'INVESTMENT',
+             N'AI_ETHICS', N'ANTI_FRAUD', N'INTERNAL_CONTROL', N'ESG_SUSTAINABILITY',
+             N'ARCH_REVIEW', N'OTHER')),
         CONSTRAINT CK_com_cadence CHECK (meeting_cadence IN
             (N'WEEKLY', N'BIWEEKLY', N'MONTHLY', N'QUARTERLY', N'AD_HOC')),
         CONSTRAINT CK_com_status CHECK (status IN
