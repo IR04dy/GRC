@@ -52,13 +52,103 @@ FROM (VALUES
     ('TPRM',           'WRITE',  'Create/update third-party risk records'),
     ('TPRM',           'DELETE', 'Delete third-party risk records'),
     ('WORKFLOW',       'APPROVE','Approve workflow submissions/approval chains'),
-    ('WORKFLOW',       'DELETE', 'Delete workflow definitions/records')
+    ('WORKFLOW',       'DELETE', 'Delete workflow definitions/records'),
+
+    -- ── F2-143 (2026-08-06) ────────────────────────────────────────────────────
+    -- Added when F2-77's chain proof first executed V1->V320 and showed that a
+    -- database built from this folder held 79 of 115 permissions. This file's own
+    -- header claims "every hasPermission() pair catalogued"; it was true for the 32
+    -- pairs measured on 2026-07-06 and has not been true since.
+    --
+    -- Each pair below is enforced by hasPermission(...) in compiled code, present in
+    -- the live catalogue, and created by no migration that runs before V321 — whose
+    -- THROW ("REPORTING:WRITE is still held by no role") is what surfaced this.
+    -- Sourced from that three-way intersection, derived twice and compared.
+    --
+    -- Deliberately EXCLUDED: PRIVACY:EXPORT and SCM:EXPORT are live and absent from a
+    -- chain build but enforced by no code. A catalogued permission that guards nothing
+    -- is F2-13b's anti-pattern and 15 such rows already exist.
+    ('ADMIN',          'READ',   'View Admin records'),
+    ('ADMIN',          'WRITE',  'Create/update Admin records'),
+    ('ADMIN',          'EXPORT', 'Export/download ADMIN registers and reports'),
+    ('AUTOMATION',     'READ',   'View automation rules, their fires, and notification reachability'),
+    ('BCM',            'READ',   'View Bcm records'),
+    ('BCM',            'WRITE',  'Create/update Bcm records'),
+    ('BCM',            'DELETE', 'Delete Bcm records'),
+    ('BCM',            'EXPORT', 'Export/download BCM registers and reports'),
+    ('BOARD',          'EXPORT', 'Download the board pack (PDF/PPTX) — board and committee reporting material'),
+    ('COMPLIANCE',     'READ',   'View Compliance records'),
+    ('COMPLIANCE',     'WRITE',  'Create/update Compliance records'),
+    ('COMPLIANCE',     'EXPORT', 'Export/download COMPLIANCE registers and reports'),
+    ('CYBER',          'READ',   'View Cyber records'),
+    ('CYBER',          'WRITE',  'Create/update Cyber records'),
+    ('CYBER',          'DELETE', 'Delete Cyber records'),
+    ('CYBER',          'EXPORT', 'Export/download CYBER registers and reports'),
+    ('FRAUD',          'READ',   'View fraud cases, typologies and the fraud dashboard'),
+    ('FRAUD',          'WRITE',  'Open, triage, update, resolve and close fraud cases'),
+    ('INTEGRATIONS',   'READ',   'View integration health, bound configuration (secrets masked) and transmission timestamps'),
+    ('INTEGRATIONS',   'WRITE',  'Administer integrations: transmit to a third party and read recorded request payloads'),
+    ('KB',             'WRITE',  'Create, edit, publish and archive knowledge-base articles'),
+    ('PRIVACY',        'READ',   'View Privacy records'),
+    ('PRIVACY',        'WRITE',  'Create/update Privacy records'),
+    ('REPORTING',      'READ',   'View Reporting records'),
+    ('REPORTING',      'WRITE',  'Create/update Reporting records'),
+    ('REPORTING',      'EXPORT', 'Export/download REPORTING registers and reports'),
+    ('RISK',           'READ',   'View Risk records'),
+    ('RISK',           'WRITE',  'Create/update Risk records'),
+    ('RISK',           'DELETE', 'Delete Risk records'),
+    ('RISK',           'EXPORT', 'Export/download RISK registers and reports'),
+    ('SCM',            'READ',   'View supply chain vendors, assessments, dependencies and incidents'),
+    ('SCM',            'WRITE',  'Create and update supply chain records, manage onboarding and assessments'),
+    ('SCM',            'DELETE', 'Delete supply chain records'),
+    ('TPRM',           'APPROVE','Approve or retire a third-party cyber assessment')
 ) v(module, action, descr)
 WHERE NOT EXISTS (SELECT 1 FROM iam.permissions p
                   WHERE p.module = v.module AND p.action = v.action);
 GO
 
+-- ── F2-143 (2026-08-06): global system roles this folder grants to and never creates ──
+-- ⚠ PLACED BEFORE PART 2 ON PURPOSE. Part 2 grants by role_name, so a role
+-- created after it receives nothing. Appending this block at the end of the file instead made
+-- V325 fail with "ORG_ADMIN lost WORKFLOW:DELETE" -- one of this programme's own verification
+-- THROWs catching an ordering mistake inside a fix for an ordering defect.
+
+-- ⚠ Minimal column set on purpose. iam.roles gains is_privileged, is_system_role and
+-- description_en in migrations LATER than V272, and SQL Server binds column names at compile time
+-- for the whole batch -- naming them here made the batch fail with "Invalid column name" on a
+-- first ordered run. Only the NOT NULL columns are supplied; the rest take their defaults, and
+-- whichever migration adds them owns their values.
+--
+-- A chain-built database held 54 of 58 roles. ORG_ADMIN is the primary tenant administrator, so
+-- F2-81's tenant onboarding provisioned a first administrator into a role a fresh installation
+-- did not have; VIEWER and RISK_ANALYST are documented dev personas that could not be assigned.
+--
+-- Which roles are missing comes from diffing a chain build against the live catalogue. The
+-- bilingual labels are the platform's own human-authored ones -- display_name_ar is NOT NULL
+-- (house rule 7), and copying an existing translation is not fabricating a fact.
+IF NOT EXISTS (SELECT 1 FROM iam.roles WHERE role_name = N'ORG_ADMIN')
+    INSERT INTO iam.roles (role_name, display_name_en, display_name_ar, organisation_id)
+    VALUES (N'ORG_ADMIN', N'Organisation Administrator', N'مدير المنظمة', NULL);
+
+IF NOT EXISTS (SELECT 1 FROM iam.roles WHERE role_name = N'VIEWER')
+    INSERT INTO iam.roles (role_name, display_name_en, display_name_ar, organisation_id)
+    VALUES (N'VIEWER', N'Read-Only Viewer', N'مشاهد', NULL);
+
+IF NOT EXISTS (SELECT 1 FROM iam.roles WHERE role_name = N'RISK_ANALYST')
+    INSERT INTO iam.roles (role_name, display_name_en, display_name_ar, organisation_id)
+    VALUES (N'RISK_ANALYST', N'Risk Analyst', N'محلل المخاطر', NULL);
+
+IF NOT EXISTS (SELECT 1 FROM iam.roles WHERE role_name = N'FRAUD_INVESTIGATOR')
+    INSERT INTO iam.roles (role_name, display_name_en, display_name_ar, organisation_id)
+    VALUES (N'FRAUD_INVESTIGATOR', N'Fraud Investigator', N'مُحقِّق الاحتيال', NULL);
+GO
+
 -- ── Part 2: persona grant matrix (by role_name, idempotent) ─────────────────
+-- ⚠ F2-143/V324: WORKFLOW:READ added beside every WORKFLOW:APPROVE below. This file has
+-- granted APPROVE to three roles since 2026-07-06 and READ to none of them, so each could decide a
+-- request it could not read. V324 has a guard for exactly that and it never fired, because the
+-- roles did not exist in a folder-built database -- the grants were silent no-ops. Creating the
+-- roles is what made the guard able to speak.
 INSERT INTO iam.role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM (VALUES
@@ -78,7 +168,7 @@ FROM (VALUES
     ('ORG_ADMIN','AUTOMATION','WRITE'),('ORG_ADMIN','AUTOMATION','DELETE'),
     ('ORG_ADMIN','PLATFORM','READ'),('ORG_ADMIN','PLATFORM','WRITE'),
     ('ORG_ADMIN','IAM','READ'),
-    ('ORG_ADMIN','WORKFLOW','APPROVE'),('ORG_ADMIN','WORKFLOW','DELETE'),
+    ('ORG_ADMIN','WORKFLOW','READ'),('ORG_ADMIN','WORKFLOW','APPROVE'),('ORG_ADMIN','WORKFLOW','DELETE'),
 
     ('GRC_ADMINISTRATOR','RISK','READ'),('GRC_ADMINISTRATOR','RISK','WRITE'),('GRC_ADMINISTRATOR','RISK','DELETE'),
     ('GRC_ADMINISTRATOR','PRIVACY','READ'),('GRC_ADMINISTRATOR','PRIVACY','WRITE'),('GRC_ADMINISTRATOR','PRIVACY','DELETE'),
@@ -91,13 +181,13 @@ FROM (VALUES
     ('GRC_ADMINISTRATOR','AUDIT_LOG','READ'),
     ('GRC_ADMINISTRATOR','INTAKE','READ'),('GRC_ADMINISTRATOR','INTAKE','WRITE'),('GRC_ADMINISTRATOR','INTAKE','TRIAGE'),
     ('GRC_ADMINISTRATOR','AUTOMATION','WRITE'),('GRC_ADMINISTRATOR','AUTOMATION','DELETE'),
-    ('GRC_ADMINISTRATOR','WORKFLOW','APPROVE'),
+    ('GRC_ADMINISTRATOR','WORKFLOW','READ'),('GRC_ADMINISTRATOR','WORKFLOW','APPROVE'),
 
     -- Risk pillar
     ('RISK_MANAGER','RISK','READ'),('RISK_MANAGER','RISK','WRITE'),('RISK_MANAGER','RISK','DELETE'),
     ('RISK_MANAGER','INCIDENT','READ'),('RISK_MANAGER','INCIDENT','WRITE'),
     ('RISK_MANAGER','CAPA','READ'),('RISK_MANAGER','CAPA','WRITE'),
-    ('RISK_MANAGER','CONTROL_LIB','READ'),('RISK_MANAGER','WORKFLOW','APPROVE'),
+    ('RISK_MANAGER','CONTROL_LIB','READ'),('RISK_MANAGER','WORKFLOW','READ'),('RISK_MANAGER','WORKFLOW','APPROVE'),
     ('RISK_ANALYST','RISK','READ'),('RISK_ANALYST','RISK','WRITE'),
     ('RISK_ANALYST','INCIDENT','READ'),('RISK_ANALYST','INCIDENT','WRITE'),
     ('RISK_ANALYST','CAPA','READ'),('RISK_ANALYST','CAPA','WRITE'),('RISK_ANALYST','CONTROL_LIB','READ'),
@@ -200,3 +290,60 @@ JOIN iam.permissions p ON p.module = m.module AND p.action = m.action
 WHERE NOT EXISTS (SELECT 1 FROM iam.role_permissions rp
                   WHERE rp.role_id = r.id AND rp.permission_id = p.id);
 GO
+
+-- ── F2-143 verification: this file's header claim, made checkable ──
+-- V272 has asserted since 2026-07-06 that every hasPermission() pair is catalogued. It stopped
+-- being true and nothing noticed for a month, because the catalogue was widened in the database
+-- instead. These THROWs mean the claim now fails loudly rather than ageing quietly.
+DECLARE @permGap INT = (
+    SELECT COUNT(*) FROM (VALUES
+        (N'ADMIN', N'READ'),
+        (N'ADMIN', N'WRITE'),
+        (N'ADMIN', N'EXPORT'),
+        (N'AUTOMATION', N'READ'),
+        (N'BCM', N'READ'),
+        (N'BCM', N'WRITE'),
+        (N'BCM', N'DELETE'),
+        (N'BCM', N'EXPORT'),
+        (N'BOARD', N'EXPORT'),
+        (N'COMPLIANCE', N'READ'),
+        (N'COMPLIANCE', N'WRITE'),
+        (N'COMPLIANCE', N'EXPORT'),
+        (N'CYBER', N'READ'),
+        (N'CYBER', N'WRITE'),
+        (N'CYBER', N'DELETE'),
+        (N'CYBER', N'EXPORT'),
+        (N'FRAUD', N'READ'),
+        (N'FRAUD', N'WRITE'),
+        (N'INTEGRATIONS', N'READ'),
+        (N'INTEGRATIONS', N'WRITE'),
+        (N'KB', N'WRITE'),
+        (N'PRIVACY', N'READ'),
+        (N'PRIVACY', N'WRITE'),
+        (N'REPORTING', N'READ'),
+        (N'REPORTING', N'WRITE'),
+        (N'REPORTING', N'EXPORT'),
+        (N'RISK', N'READ'),
+        (N'RISK', N'WRITE'),
+        (N'RISK', N'DELETE'),
+        (N'RISK', N'EXPORT'),
+        (N'SCM', N'READ'),
+        (N'SCM', N'WRITE'),
+        (N'SCM', N'DELETE'),
+        (N'TPRM', N'APPROVE')
+    ) AS req(module, action)
+    WHERE NOT EXISTS (SELECT 1 FROM iam.permissions p
+                       WHERE p.module = req.module AND p.action = req.action));
+IF @permGap > 0
+    THROW 51272, 'V272/F2-143: the permission catalogue is still short of the code''s enforced set.', 1;
+
+DECLARE @roleGap INT = (
+    SELECT COUNT(*) FROM (VALUES
+        (N'ORG_ADMIN'), (N'VIEWER'), (N'RISK_ANALYST'), (N'FRAUD_INVESTIGATOR')
+    ) AS req(role_name)
+    WHERE NOT EXISTS (SELECT 1 FROM iam.roles r
+                       WHERE r.role_name = req.role_name AND r.is_deleted = 0));
+IF @roleGap > 0
+    THROW 51273, 'V272/F2-143: a role the migrations grant to is still absent.', 1;
+GO
+
