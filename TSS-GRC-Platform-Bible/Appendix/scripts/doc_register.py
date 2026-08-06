@@ -3,7 +3,12 @@
 # with git provenance and a corpus/currency classification).
 import os, subprocess, csv, collections
 
-ROOT = r"D:\AYMAN\GRC"
+# ⚠ Derived from this file's own location, never hardcoded. F2-19b: three of the four
+# measurement scripts pinned ROOT to "D:\AYMAN\GRC", so none of them could run on a CI
+# runner — the reason the guards existed and nothing enforced them was a path, not a
+# database. baseline_census.py already did it this way; the pattern simply had not spread.
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.environ.get("GRC_ROOT") or os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 OUT  = os.path.join(ROOT, "TSS-GRC-Platform-Bible", "Appendix", "DOCUMENT_REGISTER.csv")
 os.chdir(ROOT)
 

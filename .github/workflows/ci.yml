@@ -93,6 +93,74 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+  # F2-19b — run the measurement scripts in CI so the baseline cannot drift.
+  #
+  # ⚠ The guard already existed and nothing ran it. `baseline_census.py` has carried `--no-db
+  # --check` (exit 1 when a gated figure drifts) since F2-69 built it, and it was never wired to a
+  # runner — the same shape as `vitess`/`vitest` being absent from CI, which let 8 unreachable
+  # screens ship. On its first run in anger it immediately found live drift: MEASURED_BASELINE.md
+  # said 15 zero-test packages against a tree holding 8, because F2-03 floored seven of them.
+  #
+  # ⚠ What actually blocked this was a PATH, not a database. Three of the four scripts hardcoded
+  # `ROOT = r"D:\AYMAN\GRC"`, so none could run on a Linux runner; `baseline_census.py` already
+  # derived its root from `__file__` and the pattern had simply not spread. All four now do, with
+  # `GRC_ROOT` as an override, and a bogus root fails loudly rather than measuring the wrong tree.
+  #
+  # No database here on purpose: `--no-db` skips the two dev/prod row-count sections and every
+  # source-derived figure — packages, entities, schemas, migrations, permissions — is still checked.
+  # Those are also gated inside the Java suite by MeasuredBaselineFreshnessTest, so this job is the
+  # belt to that braces: it catches the figures the test does not cover, and it catches the scripts
+  # themselves breaking.
+  measurement:
+    name: Measurement scripts (the baseline cannot drift)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: TSS-GRC-Platform-Bible/Appendix/scripts
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # doc_register.py reads `git log` per .md for provenance; a shallow clone reports none.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Baseline census — fails when a gated figure drifts from MEASURED_BASELINE.md
+        run: python baseline_census.py --no-db --check
+
+      # Each of the three below carries a non-vacuity floor and exits 1 when its scan collapses.
+      # F2-69 is why: the entity predicate broke once and the document published 417 for a tree of
+      # 413, because nothing checked that the measurement was plausible. A scan that finds nothing
+      # must never read as a clean one.
+      - name: Coupling graph — fails when the census collapses
+        run: python coupling.py
+
+      - name: Boundary readings — F2-34's two readings, priced (fails when the import scan collapses)
+        run: python boundary_readings.py
+
+      - name: Documentation register — fails on a crash; regenerates DOCUMENT_REGISTER.csv
+        run: python doc_register.py
+
+      # ⚠ Deliberately NOT a `git diff --exit-code` on the generated artefacts. `coupling.json` moves
+      # with every code change and `DOCUMENT_REGISTER.csv` embeds git dates, so a byte-diff would fail
+      # on essentially every commit and be disabled within a week — §1c's own rule that a ratchet
+      # nobody runs is a comment. The drift that matters is a PUBLISHED FIGURE going stale, and
+      # `--check` is the assertion for exactly that.
+      - name: Upload regenerated measurement artefacts
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: measurement-artefacts
+          path: |
+            TSS-GRC-Platform-Bible/Appendix/scripts/coupling.json
+            TSS-GRC-Platform-Bible/Appendix/DOCUMENT_REGISTER.csv
+          if-no-files-found: ignore
+          retention-days: 3
+
   docker:
     name: Docker image build (smoke)
     runs-on: ubuntu-latest

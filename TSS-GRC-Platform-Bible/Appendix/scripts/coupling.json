@@ -2,31 +2,32 @@
  "modules": [
   {
    "module": "admin",
-   "loc": 6116,
-   "files": 52,
+   "loc": 7489,
+   "files": 56,
    "entities": 14,
    "entity_classes": 14,
    "controllers": 7,
    "endpoints": 62,
    "repos": 14,
-   "services": 9,
+   "services": 10,
    "schemas": [
     "admin"
    ],
    "perms": [
     "ADMIN"
    ],
-   "tests": 165,
-   "testfiles": 9,
-   "fan_out": 3,
-   "fan_out_edges": 29,
-   "fan_in": 5,
+   "tests": 257,
+   "testfiles": 20,
+   "fan_out": 4,
+   "fan_out_edges": 33,
+   "fan_in": 6,
    "peers": {
-    "platform": 26,
+    "platform": 27,
+    "change_mgmt": 3,
     "iam": 2,
     "signature": 1
    },
-   "kernel": 14
+   "kernel": 16
   },
   {
    "module": "ai",
@@ -242,7 +243,7 @@
   },
   {
    "module": "bcm",
-   "loc": 25305,
+   "loc": 25307,
    "files": 198,
    "entities": 50,
    "entity_classes": 50,
@@ -299,7 +300,7 @@
   },
   {
    "module": "board_pack",
-   "loc": 449,
+   "loc": 460,
    "files": 6,
    "entities": 1,
    "entity_classes": 1,
@@ -321,7 +322,7 @@
    "peers": {
     "platform": 1
    },
-   "kernel": 4
+   "kernel": 5
   },
   {
    "module": "capa",
@@ -343,7 +344,7 @@
    "testfiles": 1,
    "fan_out": 1,
    "fan_out_edges": 2,
-   "fan_in": 6,
+   "fan_in": 7,
    "peers": {
     "platform": 2
    },
@@ -374,32 +375,58 @@
    "kernel": 4
   },
   {
+   "module": "change_adapters",
+   "loc": 743,
+   "files": 6,
+   "entities": 0,
+   "entity_classes": 0,
+   "controllers": 0,
+   "endpoints": 0,
+   "repos": 0,
+   "services": 0,
+   "schemas": [],
+   "perms": [],
+   "tests": 24,
+   "testfiles": 2,
+   "fan_out": 6,
+   "fan_out_edges": 24,
+   "fan_in": 0,
+   "peers": {
+    "change_mgmt": 6,
+    "admin": 5,
+    "evidence": 4,
+    "workflow": 4,
+    "incident": 3,
+    "capa": 2
+   },
+   "kernel": 1
+  },
+  {
    "module": "change_mgmt",
-   "loc": 2290,
-   "files": 20,
-   "entities": 7,
-   "entity_classes": 7,
-   "controllers": 1,
-   "endpoints": 30,
-   "repos": 7,
-   "services": 2,
+   "loc": 9978,
+   "files": 58,
+   "entities": 13,
+   "entity_classes": 13,
+   "controllers": 2,
+   "endpoints": 69,
+   "repos": 13,
+   "services": 8,
    "schemas": [
     "change_mgmt"
    ],
    "perms": [
+    "ADMIN",
     "CHANGE"
    ],
-   "tests": 56,
-   "testfiles": 4,
-   "fan_out": 3,
-   "fan_out_edges": 13,
-   "fan_in": 1,
+   "tests": 313,
+   "testfiles": 24,
+   "fan_out": 1,
+   "fan_out_edges": 15,
+   "fan_in": 3,
    "peers": {
-    "platform": 7,
-    "admin": 3,
-    "incident": 3
+    "platform": 15
    },
-   "kernel": 5
+   "kernel": 17
   },
   {
    "module": "compliance",
@@ -509,7 +536,7 @@
   },
   {
    "module": "cyber",
-   "loc": 7285,
+   "loc": 7289,
    "files": 68,
    "entities": 16,
    "entity_classes": 16,
@@ -594,7 +621,7 @@
   },
   {
    "module": "data_officer",
-   "loc": 2375,
+   "loc": 2408,
    "files": 23,
    "entities": 1,
    "entity_classes": 14,
@@ -608,8 +635,8 @@
    "perms": [
     "PRIVACY"
    ],
-   "tests": 0,
-   "testfiles": 0,
+   "tests": 11,
+   "testfiles": 1,
    "fan_out": 1,
    "fan_out_edges": 2,
    "fan_in": 0,
@@ -620,7 +647,7 @@
   },
   {
    "module": "dataclass",
-   "loc": 990,
+   "loc": 1020,
    "files": 12,
    "entities": 4,
    "entity_classes": 4,
@@ -632,8 +659,8 @@
     "dataclass"
    ],
    "perms": [],
-   "tests": 0,
-   "testfiles": 0,
+   "tests": 11,
+   "testfiles": 1,
    "fan_out": 1,
    "fan_out_edges": 2,
    "fan_in": 0,
@@ -708,7 +735,7 @@
    "testfiles": 2,
    "fan_out": 2,
    "fan_out_edges": 12,
-   "fan_in": 7,
+   "fan_in": 8,
    "peers": {
     "iam": 6,
     "platform": 6
@@ -774,7 +801,7 @@
   },
   {
    "module": "iam",
-   "loc": 4140,
+   "loc": 4187,
    "files": 37,
    "entities": 9,
    "entity_classes": 9,
@@ -920,8 +947,8 @@
     "COMPLIANCE",
     "CYBER"
    ],
-   "tests": 0,
-   "testfiles": 0,
+   "tests": 12,
+   "testfiles": 1,
    "fan_out": 1,
    "fan_out_edges": 1,
    "fan_in": 0,
@@ -932,7 +959,7 @@
   },
   {
    "module": "ndi",
-   "loc": 7863,
+   "loc": 7877,
    "files": 62,
    "entities": 15,
    "entity_classes": 15,
@@ -971,8 +998,8 @@
     "openbanking"
    ],
    "perms": [],
-   "tests": 0,
-   "testfiles": 0,
+   "tests": 10,
+   "testfiles": 1,
    "fan_out": 1,
    "fan_out_edges": 3,
    "fan_in": 0,
@@ -1007,7 +1034,7 @@
   },
   {
    "module": "outsourcing",
-   "loc": 1657,
+   "loc": 1678,
    "files": 14,
    "entities": 5,
    "entity_classes": 5,
@@ -1019,8 +1046,8 @@
     "outsourcing"
    ],
    "perms": [],
-   "tests": 0,
-   "testfiles": 0,
+   "tests": 11,
+   "testfiles": 1,
    "fan_out": 1,
    "fan_out_edges": 2,
    "fan_in": 0,
@@ -1031,14 +1058,14 @@
   },
   {
    "module": "platform",
-   "loc": 12904,
-   "files": 113,
+   "loc": 13402,
+   "files": 115,
    "entities": 24,
    "entity_classes": 24,
    "controllers": 19,
-   "endpoints": 125,
+   "endpoints": 126,
    "repos": 22,
-   "services": 21,
+   "services": 23,
    "schemas": [
     "platform"
    ],
@@ -1053,27 +1080,27 @@
     "REGULATORY",
     "RISK"
    ],
-   "tests": 246,
-   "testfiles": 31,
+   "tests": 275,
+   "testfiles": 36,
    "fan_out": 9,
-   "fan_out_edges": 34,
+   "fan_out_edges": 38,
    "fan_in": 50,
    "peers": {
     "risk": 14,
+    "iam": 6,
     "evidence": 5,
     "privacy": 3,
     "audit_lc": 2,
     "capa": 2,
     "ndi": 2,
     "bcm": 2,
-    "privacy_lc": 2,
-    "iam": 2
+    "privacy_lc": 2
    },
    "kernel": 42
   },
   {
    "module": "policy",
-   "loc": 1778,
+   "loc": 1789,
    "files": 13,
    "entities": 5,
    "entity_classes": 5,
@@ -1230,18 +1257,19 @@
   },
   {
    "module": "reporting",
-   "loc": 4193,
-   "files": 17,
+   "loc": 5159,
+   "files": 18,
    "entities": 2,
    "entity_classes": 2,
    "controllers": 2,
-   "endpoints": 28,
+   "endpoints": 32,
    "repos": 2,
-   "services": 8,
+   "services": 9,
    "schemas": [
     "reporting"
    ],
    "perms": [
+    "ADMIN",
     "BOARD",
     "CHANGE",
     "COMPLIANCE",
@@ -1249,22 +1277,23 @@
     "REPORTING",
     "RISK"
    ],
-   "tests": 26,
-   "testfiles": 9,
-   "fan_out": 8,
-   "fan_out_edges": 85,
+   "tests": 50,
+   "testfiles": 11,
+   "fan_out": 9,
+   "fan_out_edges": 102,
    "fan_in": 0,
    "peers": {
     "platform": 37,
+    "change_mgmt": 17,
     "risk": 16,
-    "change_mgmt": 11,
     "compliance": 11,
+    "admin": 11,
     "policy": 4,
     "evidence": 3,
     "ethics": 2,
     "sust": 1
    },
-   "kernel": 11
+   "kernel": 12
   },
   {
    "module": "risk",
@@ -1324,7 +1353,7 @@
   },
   {
    "module": "rrp",
-   "loc": 1912,
+   "loc": 1952,
    "files": 14,
    "entities": 5,
    "entity_classes": 5,
@@ -1336,8 +1365,8 @@
     "rrp"
    ],
    "perms": [],
-   "tests": 0,
-   "testfiles": 0,
+   "tests": 8,
+   "testfiles": 1,
    "fan_out": 1,
    "fan_out_edges": 3,
    "fan_in": 0,
@@ -1375,7 +1404,7 @@
   },
   {
    "module": "sharia",
-   "loc": 2236,
+   "loc": 2262,
    "files": 16,
    "entities": 6,
    "entity_classes": 6,
@@ -1387,8 +1416,8 @@
     "sharia"
    ],
    "perms": [],
-   "tests": 0,
-   "testfiles": 0,
+   "tests": 12,
+   "testfiles": 1,
    "fan_out": 1,
    "fan_out_edges": 3,
    "fan_in": 0,
@@ -1426,7 +1455,7 @@
   },
   {
    "module": "socops",
-   "loc": 6799,
+   "loc": 6806,
    "files": 101,
    "entities": 25,
    "entity_classes": 25,
@@ -1454,7 +1483,7 @@
   },
   {
    "module": "sust",
-   "loc": 16776,
+   "loc": 16814,
    "files": 140,
    "entities": 34,
    "entity_classes": 34,
@@ -1514,7 +1543,7 @@
   },
   {
    "module": "workflow",
-   "loc": 5266,
+   "loc": 5484,
    "files": 45,
    "entities": 14,
    "entity_classes": 14,
@@ -1540,13 +1569,13 @@
    "tests": 114,
    "testfiles": 8,
    "fan_out": 4,
-   "fan_out_edges": 26,
-   "fan_in": 1,
+   "fan_out_edges": 27,
+   "fan_in": 2,
    "peers": {
     "platform": 14,
     "admin": 6,
-    "evidence": 3,
-    "iam": 3
+    "iam": 4,
+    "evidence": 3
    },
    "kernel": 16
   },
@@ -1578,8 +1607,8 @@
   }
  ],
  "fe": {
-  "pages": 330,
-  "api_files": 239,
+  "pages": 344,
+  "api_files": 240,
   "mock_sites": 69,
   "mock_files": [
    "lib/auditLifecycle.ts",
@@ -1597,7 +1626,7 @@
    "pages/authority/AuthoritiesIndexPage.tsx",
    "pages/authority/AuthorityWorkspacePage.tsx",
    "pages/bcm/BcmPage.tsx",
-   "pages/changes/ChangesPage.tsx",
+   "pages/change/ChangesPage.tsx",
    "pages/compliance/CompliancePage.tsx",
    "pages/cyber/CyberPage.tsx",
    "pages/detail/ControlDetailPage.tsx",

@@ -12,7 +12,12 @@ import os, re, json, collections
 
 from baseline_census import strip_java, ENTITY_STRICT
 
-ROOT = r"D:\AYMAN\GRC"
+# ⚠ Derived from this file's own location, never hardcoded. F2-19b: three of the four
+# measurement scripts pinned ROOT to "D:\AYMAN\GRC", so none of them could run on a CI
+# runner — the reason the guards existed and nothing enforced them was a path, not a
+# database. baseline_census.py already did it this way; the pattern simply had not spread.
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.environ.get("GRC_ROOT") or os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 MOD  = os.path.join(ROOT, r"tss-grc-backend\src\main\java\com\tss\grc\module")
 TEST = os.path.join(ROOT, r"tss-grc-backend\src\test\java\com\tss\grc")
 FE   = os.path.join(ROOT, r"tss-grc-ui-v2\src")
@@ -116,6 +121,14 @@ out = dict(modules=rows,
                    mock_sites=len(mock_sites), mock_files=sorted(mock_files)))
 sp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "coupling.json")
 json.dump(out, open(sp, "w", encoding="utf-8"), indent=1, default=str)
+
+# ⚠ F2-19b floor. This script is now run in CI, so it must fail loudly rather than publish a
+# collapsed census. F2-69 is the precedent: the entity predicate broke and the document
+# published 417 for a tree of 413 because nothing checked the measurement was plausible.
+if len(rows) < 55 or sum(r["loc"] for r in rows) < 150_000 or pages < 200:
+    raise SystemExit("coupling.py measured implausibly little (modules=%d loc=%d pages=%d) "
+                     "— the scan broke; a near-empty census must never read as a clean one"
+                     % (len(rows), sum(r["loc"] for r in rows), pages))
 
 print(f"modules={len(rows)}  FE pages={pages}  mock-import-sites={len(mock_sites)} in {len(mock_files)} files")
 print(f"{'module':22} {'LoC':>6} {'ent':>4} {'ep':>4} {'tests':>6} {'out':>4} {'edges':>6} {'in':>3}  schemas")

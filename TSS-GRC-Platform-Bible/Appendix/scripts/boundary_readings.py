@@ -47,7 +47,12 @@ import sys
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-ROOT = r"D:\AYMAN\GRC"
+# ⚠ Derived from this file's own location, never hardcoded. F2-19b: three of the four
+# measurement scripts pinned ROOT to "D:\AYMAN\GRC", so none of them could run on a CI
+# runner — the reason the guards existed and nothing enforced them was a path, not a
+# database. baseline_census.py already did it this way; the pattern simply had not spread.
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.environ.get("GRC_ROOT") or os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 MOD = os.path.join(ROOT, r"tss-grc-backend\src\main\java\com\tss\grc\module")
 IMPORT = re.compile(r"^import\s+(?:static\s+)?com\.tss\.grc\.([A-Za-z0-9_.]+);", re.M)
 
@@ -115,6 +120,15 @@ for label, wide in (("A  narrow kernel (module.platform is a PEER)", False),
     print("    kernel import lines ........ %4d  (free under §2)" % g["kernel_lines"])
 
 a, b = res["A"], res["B"]
+# ⚠ F2-19b floor, on my own script for the same reason as coupling.py: an import
+# regex that stops matching this codebase would report a beautifully clean graph. It happened
+# to me once already this session — the pattern for RrpService.ALLOWED required the
+# closing paren on its own line and silently reported "no state machines at all".
+if len(modules) < 55 or a["lines"] < 700 or a["pairs"] < 100:
+    raise SystemExit(
+        "boundary_readings.py measured implausibly little (modules=%d lines=%d pairs=%d) "
+        "— the import scan broke" % (len(modules), a["lines"], a["pairs"]))
+
 print("\n" + "=" * 96)
 print("WHAT THE CHOICE COSTS")
 print("=" * 96)

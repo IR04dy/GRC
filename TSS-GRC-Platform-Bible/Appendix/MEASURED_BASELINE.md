@@ -42,7 +42,7 @@ that will be read as current forever.
 | Distinct permission modules used by guards | **31** | 27 | matches `CLAUDE.md` "31 modules / 114 permissions" ✅ |
 | Module packages with **zero** `hasPermission` usage | **17 of 59** | 21 | F2-05 converted 5 (`fraud`, `integrations`, `knowledge`, `board_pack`, `socops`); the 17th is `change_adapters`, which is **correct** — adapters carry no endpoint, so a guard there would be a second unguarded door (`ChangeModuleBoundaryTest` asserts they hold no `@RestController`) |
 | Tests attributed to modules | **2,669** (suite total **2,797**) | 2,339 / 2,415 | `CLAUDE.md` says "~2,700 tests" ✅ |
-| Module packages with **zero tests** | **15**, totalling **18,011 LoC (9.4%)** | 19 / 20,503 / 11.0% | — |
+| Module packages with **zero tests** | **8**, totalling **6,556 LoC (3.2%)** | 15 / 18,011 / 9.4% | ⚠ **F2-03 closed 2026-08-06 — all seven Tier-1 regulator-facing modules floored** (`outsourcing`, `nca_ecc`, `sharia`, `data_officer`, `openbanking`, `dataclass`, `rrp`), removing 7 packages and 11,455 LoC from this set. The remaining 8: `cpty`, `regreporting`, `reginspect`, `opres`, `controlmap`, `dashboard`, `audit_eng`, `datagov` — and `datagov` is the empty placeholder (F2-20), so 7 are real |
 | Distinct **JPA** schemas | **50** | 50 | matches `CLAUDE.md` "50+" ✅ |
 | **Database** schemas holding tables (dev & prod) | **51** | *not measured* | the 51st is `audit`, which JPA does not know — §7 |
 | Flyway migrations on disk | **346** files, `V1`–`V358`, 4.40 MB | 304 / `V1`–`V314` | next free **V359** |
@@ -407,7 +407,7 @@ highest-risk square metre of the codebase. (Finding F2-06.)
 
 ## 6. Test coverage by module — and where the gap sits
 
-**15 packages / 18,011 LoC / 9.4% of module code have zero tests** (was 19 / 20,503 / 11.0%). The
+**8 packages / 6,556 LoC / 3.2% of module code have zero tests** (was 15 / 18,011 / 9.4%, and 19 / 20,503 / 11.0% before that). ⚠ **F2-03 is the reason**: all seven Tier-1 regulator-facing modules were floored on 2026-08-05/06 and every one of them produced findings. The
 distribution is not random:
 
 | Module | LoC | Tests | Saudi / regulatory relevance |
