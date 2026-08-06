@@ -50,9 +50,9 @@ import java.util.UUID;
 public class AttackSurfaceController {
 
     private static final String READ_GUARD =
-            "hasAnyRole('CISO','SOC_LEAD','RISK_MANAGER','COMPLIANCE_OFFICER','AUDITOR','INTERNAL_AUDITOR','PLATFORM_ADMIN')";
+            "hasAnyRole('CISO','RISK_MANAGER','COMPLIANCE_OFFICER','AUDITOR','INTERNAL_AUDITOR','PLATFORM_ADMIN')";
     private static final String WRITE_GUARD =
-            "hasAnyRole('CISO','SOC_LEAD','PLATFORM_ADMIN')";
+            "hasAnyRole('CISO','PLATFORM_ADMIN')";
 
     private final AttackSurfaceAssetService assetService;
     private final AttackSurfaceFindingService findingService;

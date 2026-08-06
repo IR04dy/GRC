@@ -201,7 +201,7 @@ public class AttachmentAccessPolicy {
         // ── Cyber ────────────────────────────────────────────────────────────
         DECLARED.put("CYBER_EVIDENCE", ParentGuard.perm("CYBER"));
         DECLARED.put("ASM_ASSET",      ParentGuard.roles(
-            "CISO", "SOC_LEAD", "RISK_MANAGER", "COMPLIANCE_OFFICER", "AUDITOR",
+            "CISO", "RISK_MANAGER", "COMPLIANCE_OFFICER", "AUDITOR",
             "INTERNAL_AUDITOR", "PLATFORM_ADMIN"));
 
         // ── Third party / supply chain ────────────────────────────────────────
