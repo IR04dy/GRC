@@ -251,6 +251,25 @@ class RoleGuardConversionRatchetTest {
      * {@code iam.roles} is UPPER_SNAKE, so anything else is dead on arrival — the identical
      * argument {@link PermissionCatalogueUsageTest} makes for malformed permission names, which is
      * enforced there and was unenforced here.
+     *
+     * <p><b>⚠ F2-52 (noted 2026-08-06): this checks SHAPE, and the half that matters is EXISTENCE.</b>
+     * A name can be perfectly UPPER_SNAKE and still match no row in {@code iam.roles}, in which case
+     * the OR leg is exactly as dead as a malformed one — and the measured miss rate against the
+     * catalogue is around <b>50% of the 74 names recited</b> across 537 pure role sites. That half is
+     * delegated, in the sentence below, to {@code Appendix/scripts/role_guard_census.py}.
+     *
+     * <p><b>A script is not a gate.</b> It answers the question only when someone remembers to run it,
+     * which is the same structural weakness this programme has recorded repeatedly: F2-77's chain
+     * proof found defects that had sat for a year because nothing executed the folder; V272's header
+     * claimed a complete catalogue and quietly stopped being true for a month. <b>This test runs on
+     * every build and deliberately does not ask the question it identifies as the important one.</b>
+     *
+     * <p>It <i>can</i> be gated without a database, which is the constraint that pushed it to a
+     * script: pin the catalogue's role names as a constant sourced from {@code iam.roles}, assert that
+     * every recited name is in it, and ratchet the ghost count downward from its current value rather
+     * than demanding zero. That keeps the unit suite hermetic — the property {@code CLAUDE.md}
+     * requires — while making the 50% miss rate fail the build when it grows. Scoped, not done; doing
+     * it needs the catalogue read once, and it is the concrete next step on F2-52.
      */
     @Test
     void noRoleGuardNamesAnUnmatchableRole() throws Exception {
