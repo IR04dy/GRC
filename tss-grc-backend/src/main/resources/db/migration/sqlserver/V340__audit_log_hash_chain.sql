@@ -40,8 +40,7 @@ GO
 -- The sealing pass asks "which tenants have unsealed rows, oldest id first"; verification asks
 -- "give me this tenant's sealed rows in id order". Both are covered by one filtered index plus the
 -- ordering key.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'ix_audit_log_unsealed' AND object_id = OBJECT_ID('platform.audit_log'))
+IF OBJECT_ID('platform.audit_log') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_audit_log_unsealed' AND object_id = OBJECT_ID('platform.audit_log'))
 BEGIN
     CREATE INDEX ix_audit_log_unsealed
         ON platform.audit_log (organisation_id, id)
@@ -49,8 +48,7 @@ BEGIN
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'ix_audit_log_sealed' AND object_id = OBJECT_ID('platform.audit_log'))
+IF OBJECT_ID('platform.audit_log') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_audit_log_sealed' AND object_id = OBJECT_ID('platform.audit_log'))
 BEGIN
     CREATE INDEX ix_audit_log_sealed
         ON platform.audit_log (organisation_id, id)

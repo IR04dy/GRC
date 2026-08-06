@@ -25,8 +25,7 @@
 
 -- Unique + covering index for the login path: a single seek by username returns
 -- the auth columns (no key lookup to the clustered PK) AND enforces uniqueness.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'ix_users_username' AND object_id = OBJECT_ID('iam.users'))
+IF OBJECT_ID('iam.users') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_users_username' AND object_id = OBJECT_ID('iam.users'))
     CREATE UNIQUE NONCLUSTERED INDEX ix_users_username
         ON iam.users (username)
         INCLUDE (organisation_id, password_hash, is_active, is_locked,
@@ -34,16 +33,14 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes
 GO
 
 -- Unique email ("email already in use" / account recovery).
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'ix_users_email' AND object_id = OBJECT_ID('iam.users'))
+IF OBJECT_ID('iam.users') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_users_email' AND object_id = OBJECT_ID('iam.users'))
     CREATE UNIQUE NONCLUSTERED INDEX ix_users_email
         ON iam.users (email);
 GO
 
 -- Org-scoped listing / user-admin screens filter by organisation_id; give them
 -- a supporting index instead of a clustered scan.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'ix_users_org' AND object_id = OBJECT_ID('iam.users'))
+IF OBJECT_ID('iam.users') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_users_org' AND object_id = OBJECT_ID('iam.users'))
     CREATE NONCLUSTERED INDEX ix_users_org
         ON iam.users (organisation_id);
 GO

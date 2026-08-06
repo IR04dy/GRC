@@ -1,3 +1,19 @@
+-- ⚠ F2-77 (2026-08-06): GUARDED ON THE LEGACY TABLE EXISTING.
+--
+-- This is a DATA migration out of a legacy register, and it read compliance.policies
+-- unguarded. That table is created by V341__spine_bootstrap_schema_tables.sql -- 109 files
+-- LATER -- so on a first run in version order it does not exist yet and the whole file failed
+-- with "Invalid object name". One of the 8 spine-ordering cases this row already names.
+--
+-- A no-op is the correct behaviour rather than a workaround: on a fresh installation there is
+-- no legacy register to merge. Guarded with IF EXISTS instead of reordering, because moving
+-- V341 earlier would rewrite the schema history of every environment that already ran it.
+IF OBJECT_ID(N'compliance.policies', N'U') IS NULL
+BEGIN
+    PRINT 'V232 skipped: compliance.policies does not exist (fresh install, nothing to merge).';
+END
+ELSE
+BEGIN
 -- =====================================================================
 -- V232 — C-4: merge legacy compliance.policies into canonical policy.documents
 -- ---------------------------------------------------------------------
@@ -81,3 +97,4 @@ WHERE p.is_deleted = 0
       SELECT 1 FROM policy.documents d
        WHERE d.external_id = CONVERT(NVARCHAR(64), p.external_id)
   );
+END

@@ -23,8 +23,7 @@ GO
 
 -- Sweep predicate is (workflow_status not terminal AND due_date < today); a filtered
 -- index keeps that scan cheap as the register grows.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_cap_due_open'
-               AND object_id = OBJECT_ID('cyber.cyber_action_plans'))
+IF OBJECT_ID('cyber.cyber_action_plans') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_cap_due_open' AND object_id = OBJECT_ID('cyber.cyber_action_plans'))
     CREATE INDEX ix_cap_due_open
         ON cyber.cyber_action_plans (organisation_id, due_date)
         WHERE is_deleted = 0 AND due_date IS NOT NULL;

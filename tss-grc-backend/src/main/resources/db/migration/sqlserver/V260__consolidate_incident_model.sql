@@ -36,9 +36,7 @@ GO
 -- 3) At most one live register mirror per workspace incident (idempotency guard
 --    for both the create hook and any future backfill). Filtered so it only
 --    constrains real, non-deleted links.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'UX_incidents_source_workspace'
-                 AND object_id = OBJECT_ID('cyber.incidents'))
+IF OBJECT_ID('cyber.incidents') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_incidents_source_workspace' AND object_id = OBJECT_ID('cyber.incidents'))
     CREATE UNIQUE INDEX UX_incidents_source_workspace
         ON cyber.incidents (source_workspace_incident_id)
         WHERE source_workspace_incident_id IS NOT NULL AND is_deleted = 0;

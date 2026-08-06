@@ -93,15 +93,15 @@ IF COL_LENGTH('bcm.exercise_scenarios', 'usage_count') IS NULL
 GO
 
 -- Indexes for the library filters (idempotent — re-run safe).
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_exercise_scenarios_scenario_type' AND object_id = OBJECT_ID('bcm.exercise_scenarios'))
+IF OBJECT_ID('bcm.exercise_scenarios') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_exercise_scenarios_scenario_type' AND object_id = OBJECT_ID('bcm.exercise_scenarios'))
     CREATE INDEX IX_exercise_scenarios_scenario_type ON bcm.exercise_scenarios(scenario_type);
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_exercise_scenarios_complexity' AND object_id = OBJECT_ID('bcm.exercise_scenarios'))
+IF OBJECT_ID('bcm.exercise_scenarios') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_exercise_scenarios_complexity' AND object_id = OBJECT_ID('bcm.exercise_scenarios'))
     CREATE INDEX IX_exercise_scenarios_complexity ON bcm.exercise_scenarios(complexity);
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_exercise_scenarios_usage_count' AND object_id = OBJECT_ID('bcm.exercise_scenarios'))
+IF OBJECT_ID('bcm.exercise_scenarios') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_exercise_scenarios_usage_count' AND object_id = OBJECT_ID('bcm.exercise_scenarios'))
     CREATE INDEX IX_exercise_scenarios_usage_count ON bcm.exercise_scenarios(usage_count DESC);
 GO
 
@@ -121,7 +121,7 @@ BEGIN
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_exercises_scenario_id' AND object_id = OBJECT_ID('bcm.exercises'))
+IF OBJECT_ID('bcm.exercises') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_exercises_scenario_id' AND object_id = OBJECT_ID('bcm.exercises'))
     CREATE INDEX IX_exercises_scenario_id ON bcm.exercises(scenario_id) WHERE scenario_id IS NOT NULL;
 GO
 

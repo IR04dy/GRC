@@ -89,20 +89,17 @@ GO
 
 -- One live survey per (tenant, vendor, reporting year). FILTERED on is_deleted=0
 -- so a soft-deleted survey does not block re-surveying the same vendor next cycle.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_ves_org_vendor_year'
-               AND object_id = OBJECT_ID('sust.vendor_esg_survey'))
+IF OBJECT_ID('sust.vendor_esg_survey') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_ves_org_vendor_year' AND object_id = OBJECT_ID('sust.vendor_esg_survey'))
     CREATE UNIQUE INDEX uq_ves_org_vendor_year
         ON sust.vendor_esg_survey (organisation_id, tprm_vendor_id, reporting_year)
         WHERE is_deleted = 0;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ves_org_status'
-               AND object_id = OBJECT_ID('sust.vendor_esg_survey'))
+IF OBJECT_ID('sust.vendor_esg_survey') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ves_org_status' AND object_id = OBJECT_ID('sust.vendor_esg_survey'))
     CREATE INDEX ix_ves_org_status ON sust.vendor_esg_survey (organisation_id, status);
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ves_org_year'
-               AND object_id = OBJECT_ID('sust.vendor_esg_survey'))
+IF OBJECT_ID('sust.vendor_esg_survey') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ves_org_year' AND object_id = OBJECT_ID('sust.vendor_esg_survey'))
     CREATE INDEX ix_ves_org_year ON sust.vendor_esg_survey (organisation_id, reporting_year);
 GO
 

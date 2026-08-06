@@ -50,7 +50,7 @@ CREATE TABLE risk.risk_reviews (
 );
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_risk_reviews_org_risk' AND object_id = OBJECT_ID('risk.risk_reviews'))
+IF OBJECT_ID('risk.risk_reviews') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_risk_reviews_org_risk' AND object_id = OBJECT_ID('risk.risk_reviews'))
     CREATE INDEX IX_risk_reviews_org_risk ON risk.risk_reviews (organisation_id, risk_id, reviewed_at DESC);
 GO
 

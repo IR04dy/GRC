@@ -134,9 +134,7 @@ BEGIN
 
     -- Filtered index for the "what's still unreported past the 72h
     -- PDPL Art. 31 window?" CISO dashboard query.
-    IF NOT EXISTS (SELECT 1 FROM sys.indexes
-                   WHERE name = 'IX_data_breaches_sdaia_pending'
-                     AND object_id = OBJECT_ID('privacy.data_breaches'))
+    IF OBJECT_ID('privacy.data_breaches') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_data_breaches_sdaia_pending' AND object_id = OBJECT_ID('privacy.data_breaches'))
     BEGIN
         EXEC('CREATE INDEX IX_data_breaches_sdaia_pending
               ON privacy.data_breaches(organisation_id, discovered_at)

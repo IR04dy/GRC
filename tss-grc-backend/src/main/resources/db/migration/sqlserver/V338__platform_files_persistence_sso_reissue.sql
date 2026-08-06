@@ -90,13 +90,11 @@ BEGIN
     );
 END
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_persistence_org_key'
-               AND object_id = OBJECT_ID('platform.persistence_row'))
+IF OBJECT_ID('platform.persistence_row') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_persistence_org_key' AND object_id = OBJECT_ID('platform.persistence_row'))
     CREATE INDEX idx_persistence_org_key ON platform.persistence_row (organisation_id, store_key)
         WHERE is_deleted = 0;
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_persistence_created'
-               AND object_id = OBJECT_ID('platform.persistence_row'))
+IF OBJECT_ID('platform.persistence_row') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_persistence_created' AND object_id = OBJECT_ID('platform.persistence_row'))
     CREATE INDEX idx_persistence_created ON platform.persistence_row (created_at);
 
 /* ── 2. platform.file_metadata (backs lib/fileUpload.ts) ─────────────────── */
@@ -129,18 +127,15 @@ BEGIN
     );
 END
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_file_org_attached'
-               AND object_id = OBJECT_ID('platform.file_metadata'))
+IF OBJECT_ID('platform.file_metadata') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_file_org_attached' AND object_id = OBJECT_ID('platform.file_metadata'))
     CREATE INDEX idx_file_org_attached ON platform.file_metadata (organisation_id, attached_to)
         WHERE is_deleted = 0;
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_file_org_sha'
-               AND object_id = OBJECT_ID('platform.file_metadata'))
+IF OBJECT_ID('platform.file_metadata') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_file_org_sha' AND object_id = OBJECT_ID('platform.file_metadata'))
     CREATE INDEX idx_file_org_sha ON platform.file_metadata (organisation_id, sha256)
         WHERE is_deleted = 0;
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_file_uploaded'
-               AND object_id = OBJECT_ID('platform.file_metadata'))
+IF OBJECT_ID('platform.file_metadata') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_file_uploaded' AND object_id = OBJECT_ID('platform.file_metadata'))
     CREATE INDEX idx_file_uploaded ON platform.file_metadata (uploaded_at);
 
 /* ── 3. platform.sso_provider_config ─────────────────────────────────────── */
@@ -169,13 +164,11 @@ BEGIN
     );
 END
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_sso_org_kind'
-               AND object_id = OBJECT_ID('platform.sso_provider_config'))
+IF OBJECT_ID('platform.sso_provider_config') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_sso_org_kind' AND object_id = OBJECT_ID('platform.sso_provider_config'))
     CREATE UNIQUE INDEX uq_sso_org_kind ON platform.sso_provider_config (organisation_id, kind)
         WHERE is_deleted = 0;
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_sso_org'
-               AND object_id = OBJECT_ID('platform.sso_provider_config'))
+IF OBJECT_ID('platform.sso_provider_config') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_sso_org' AND object_id = OBJECT_ID('platform.sso_provider_config'))
     CREATE INDEX idx_sso_org ON platform.sso_provider_config (organisation_id);
 
 /* ── 4. platform.nafath_transaction ──────────────────────────────────────── */
@@ -204,12 +197,10 @@ BEGIN
     );
 END
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_nafath_org'
-               AND object_id = OBJECT_ID('platform.nafath_transaction'))
+IF OBJECT_ID('platform.nafath_transaction') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_nafath_org' AND object_id = OBJECT_ID('platform.nafath_transaction'))
     CREATE INDEX idx_nafath_org ON platform.nafath_transaction (organisation_id);
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_nafath_started'
-               AND object_id = OBJECT_ID('platform.nafath_transaction'))
+IF OBJECT_ID('platform.nafath_transaction') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_nafath_started' AND object_id = OBJECT_ID('platform.nafath_transaction'))
     CREATE INDEX idx_nafath_started ON platform.nafath_transaction (started_at);
 
 /* ── 5. All four must exist, in `platform`, where the mappings resolve. ───── */

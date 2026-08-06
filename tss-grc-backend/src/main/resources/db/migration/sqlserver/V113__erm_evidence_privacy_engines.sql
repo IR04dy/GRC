@@ -103,9 +103,7 @@ GO
 -- ─── §5.9 #5 — Evidence freshness — ensure review_due_date is indexed ─
 -- The column was already there per V47; add an index so the sweep query
 -- (where review_due_date < today AND status not in terminal) is cheap.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'IX_evidence_items_review_due'
-                 AND object_id = OBJECT_ID('evidence.evidence_items'))
+IF OBJECT_ID('evidence.evidence_items') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_evidence_items_review_due' AND object_id = OBJECT_ID('evidence.evidence_items'))
 BEGIN
     CREATE INDEX IX_evidence_items_review_due
         ON evidence.evidence_items(organisation_id, review_due_date)

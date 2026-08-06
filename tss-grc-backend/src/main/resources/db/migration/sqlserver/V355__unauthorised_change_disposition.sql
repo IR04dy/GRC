@@ -107,16 +107,14 @@ GO
 
 -- One live disposition per (change, reason) — re-dispositioning UPDATEs rather than appending, so
 -- "what is the current judgement on this finding?" has exactly one answer.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_ucd_change_reason'
-               AND object_id = OBJECT_ID('change_mgmt.change_unauthorised_disposition'))
+IF OBJECT_ID('change_mgmt.change_unauthorised_disposition') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_ucd_change_reason' AND object_id = OBJECT_ID('change_mgmt.change_unauthorised_disposition'))
     CREATE UNIQUE INDEX ux_ucd_change_reason
         ON change_mgmt.change_unauthorised_disposition (organisation_id, change_request_id, reason_code)
         WHERE is_deleted = 0;
 GO
 
 -- The register reads every disposition for a tenant in one query and indexes them by finding key.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ucd_org'
-               AND object_id = OBJECT_ID('change_mgmt.change_unauthorised_disposition'))
+IF OBJECT_ID('change_mgmt.change_unauthorised_disposition') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ucd_org' AND object_id = OBJECT_ID('change_mgmt.change_unauthorised_disposition'))
     CREATE INDEX ix_ucd_org
         ON change_mgmt.change_unauthorised_disposition (organisation_id) WHERE is_deleted = 0;
 GO
@@ -205,8 +203,7 @@ IF @rejectedState = 0
 GO
 
 -- 6. The uniqueness guarantee, without which one finding can carry two contradictory judgements.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_ucd_change_reason'
-               AND object_id = OBJECT_ID('change_mgmt.change_unauthorised_disposition'))
+IF OBJECT_ID('change_mgmt.change_unauthorised_disposition') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_ucd_change_reason' AND object_id = OBJECT_ID('change_mgmt.change_unauthorised_disposition'))
     THROW 55007, 'V355: ux_ucd_change_reason is missing — one finding could hold two dispositions.', 1;
 GO
 

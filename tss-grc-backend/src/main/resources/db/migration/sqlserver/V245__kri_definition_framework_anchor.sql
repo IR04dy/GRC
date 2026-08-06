@@ -12,6 +12,6 @@ IF COL_LENGTH('risk.kri_definition', 'clause_ref') IS NULL
     ALTER TABLE risk.kri_definition ADD clause_ref NVARCHAR(100) NULL;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kri_definition_framework' AND object_id = OBJECT_ID('risk.kri_definition'))
+IF OBJECT_ID('risk.kri_definition') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kri_definition_framework' AND object_id = OBJECT_ID('risk.kri_definition'))
     CREATE INDEX IX_kri_definition_framework ON risk.kri_definition (organisation_id, linked_framework_id) WHERE linked_framework_id IS NOT NULL;
 GO

@@ -34,9 +34,7 @@
 --   DROP INDEX ux_change_approval_one_vote_per_approver ON change_mgmt.change_approvals;
 -- =====================================================================
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'ux_change_approval_one_vote_per_approver'
-                 AND object_id = OBJECT_ID('change_mgmt.change_approvals'))
+IF OBJECT_ID('change_mgmt.change_approvals') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_change_approval_one_vote_per_approver' AND object_id = OBJECT_ID('change_mgmt.change_approvals'))
 BEGIN
     CREATE UNIQUE INDEX ux_change_approval_one_vote_per_approver
         ON change_mgmt.change_approvals (change_request_id, approver_id)
@@ -47,9 +45,7 @@ GO
 -- Reporting/diagnostic helper: how many pre-fix rows have no captured actor. Surfaced
 -- rather than silently fixed, so an assessor can see the boundary between
 -- provenance-unknown history and provenance-enforced records.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'ix_change_approval_approver'
-                 AND object_id = OBJECT_ID('change_mgmt.change_approvals'))
+IF OBJECT_ID('change_mgmt.change_approvals') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_change_approval_approver' AND object_id = OBJECT_ID('change_mgmt.change_approvals'))
 BEGIN
     CREATE INDEX ix_change_approval_approver
         ON change_mgmt.change_approvals (approver_id)

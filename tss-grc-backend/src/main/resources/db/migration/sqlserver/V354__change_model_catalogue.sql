@@ -136,14 +136,12 @@ BEGIN
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_change_model_code'
-               AND object_id = OBJECT_ID('change_mgmt.change_model'))
+IF OBJECT_ID('change_mgmt.change_model') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_change_model_code' AND object_id = OBJECT_ID('change_mgmt.change_model'))
     CREATE UNIQUE INDEX ux_change_model_code
         ON change_mgmt.change_model (organisation_id, code) WHERE is_deleted = 0;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_change_model_org_status'
-               AND object_id = OBJECT_ID('change_mgmt.change_model'))
+IF OBJECT_ID('change_mgmt.change_model') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_change_model_org_status' AND object_id = OBJECT_ID('change_mgmt.change_model'))
     CREATE INDEX ix_change_model_org_status
         ON change_mgmt.change_model (organisation_id, status, is_deleted);
 GO
@@ -181,8 +179,7 @@ GO
 
 -- One model per change. A second row would make "which model authorised this?" ambiguous, and an
 -- ambiguous authority is the thing this whole slice removes.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_change_model_usage_one_per_change'
-               AND object_id = OBJECT_ID('change_mgmt.change_model_usage'))
+IF OBJECT_ID('change_mgmt.change_model_usage') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_change_model_usage_one_per_change' AND object_id = OBJECT_ID('change_mgmt.change_model_usage'))
     CREATE UNIQUE INDEX ux_change_model_usage_one_per_change
         ON change_mgmt.change_model_usage (organisation_id, change_request_id) WHERE is_deleted = 0;
 GO
@@ -274,13 +271,11 @@ GO
 
 -- 5. The uniqueness guarantees. Without ux_change_model_code two live models can share a code, and
 --    "which model authorised this change?" stops having one answer.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_change_model_code'
-               AND object_id = OBJECT_ID('change_mgmt.change_model'))
+IF OBJECT_ID('change_mgmt.change_model') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_change_model_code' AND object_id = OBJECT_ID('change_mgmt.change_model'))
     THROW 54007, 'V354: ux_change_model_code is missing — two live models could share a code.', 1;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_change_model_usage_one_per_change'
-               AND object_id = OBJECT_ID('change_mgmt.change_model_usage'))
+IF OBJECT_ID('change_mgmt.change_model_usage') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_change_model_usage_one_per_change' AND object_id = OBJECT_ID('change_mgmt.change_model_usage'))
     THROW 54008, 'V354: ux_change_model_usage_one_per_change is missing — a change could cite two models.', 1;
 GO
 

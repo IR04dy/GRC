@@ -46,14 +46,12 @@ CREATE TABLE socops.ir_playbook_run (
 );
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ir_run_org_status'
-               AND object_id = OBJECT_ID('socops.ir_playbook_run'))
+IF OBJECT_ID('socops.ir_playbook_run') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ir_run_org_status' AND object_id = OBJECT_ID('socops.ir_playbook_run'))
     CREATE INDEX ix_ir_run_org_status
         ON socops.ir_playbook_run(organisation_id, status) WHERE is_deleted = 0;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ir_run_org_playbook'
-               AND object_id = OBJECT_ID('socops.ir_playbook_run'))
+IF OBJECT_ID('socops.ir_playbook_run') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ir_run_org_playbook' AND object_id = OBJECT_ID('socops.ir_playbook_run'))
     CREATE INDEX ix_ir_run_org_playbook
         ON socops.ir_playbook_run(organisation_id, playbook_id, started_at DESC) WHERE is_deleted = 0;
 GO
@@ -93,14 +91,12 @@ CREATE TABLE socops.ir_playbook_run_task (
 );
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ir_run_task_org_run'
-               AND object_id = OBJECT_ID('socops.ir_playbook_run_task'))
+IF OBJECT_ID('socops.ir_playbook_run_task') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ir_run_task_org_run' AND object_id = OBJECT_ID('socops.ir_playbook_run_task'))
     CREATE INDEX ix_ir_run_task_org_run
         ON socops.ir_playbook_run_task(organisation_id, run_id, step_order) WHERE is_deleted = 0;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ir_run_task_org_status'
-               AND object_id = OBJECT_ID('socops.ir_playbook_run_task'))
+IF OBJECT_ID('socops.ir_playbook_run_task') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ir_run_task_org_status' AND object_id = OBJECT_ID('socops.ir_playbook_run_task'))
     CREATE INDEX ix_ir_run_task_org_status
         ON socops.ir_playbook_run_task(organisation_id, status, due_at) WHERE is_deleted = 0;
 GO

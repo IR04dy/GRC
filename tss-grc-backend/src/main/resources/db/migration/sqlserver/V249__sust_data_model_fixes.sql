@@ -23,11 +23,11 @@ ALTER TABLE sust.tcfd_sector_impact ALTER COLUMN physical_risk_score DECIMAL(5,2
 GO
 
 -- (2) unique business codes per tenant (filtered on live, non-null rows).
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_mt_org_topic_code' AND object_id = OBJECT_ID('sust.material_topic'))
+IF OBJECT_ID('sust.material_topic') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_mt_org_topic_code' AND object_id = OBJECT_ID('sust.material_topic'))
     CREATE UNIQUE INDEX uq_mt_org_topic_code ON sust.material_topic(organisation_id, topic_code)
         WHERE is_deleted = 0 AND topic_code IS NOT NULL;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_esg_m_org_metric_code' AND object_id = OBJECT_ID('sust.esg_metric'))
+IF OBJECT_ID('sust.esg_metric') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_esg_m_org_metric_code' AND object_id = OBJECT_ID('sust.esg_metric'))
     CREATE UNIQUE INDEX uq_esg_m_org_metric_code ON sust.esg_metric(organisation_id, metric_code)
         WHERE is_deleted = 0 AND metric_code IS NOT NULL;
 GO

@@ -10,11 +10,7 @@ SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
 
-IF NOT EXISTS (
-    SELECT 1 FROM sys.indexes
-     WHERE name = 'UQ_crisis_aar_org_report_code'
-       AND object_id = OBJECT_ID('bcm.crisis_aar')
-)
+IF OBJECT_ID('bcm.crisis_aar') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UQ_crisis_aar_org_report_code' AND object_id = OBJECT_ID('bcm.crisis_aar'))
 BEGIN
     -- First defuse any duplicates that V117 demo seeds + a prior race may
     -- have left behind — suffix collisions with a short hex tag so the

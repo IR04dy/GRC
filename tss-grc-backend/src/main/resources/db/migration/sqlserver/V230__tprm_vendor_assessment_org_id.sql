@@ -32,8 +32,7 @@ UPDATE va
 GO
 
 -- Supporting index for the new paged org-scoped finder.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'ix_vendor_assessments_org' AND object_id = OBJECT_ID('tprm.vendor_assessments'))
+IF OBJECT_ID('tprm.vendor_assessments') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_vendor_assessments_org' AND object_id = OBJECT_ID('tprm.vendor_assessments'))
     CREATE NONCLUSTERED INDEX ix_vendor_assessments_org
         ON tprm.vendor_assessments (organisation_id);
 GO

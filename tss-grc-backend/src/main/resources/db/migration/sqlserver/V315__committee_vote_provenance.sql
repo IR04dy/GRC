@@ -61,9 +61,7 @@ END
 GO
 
 -- Who recorded what, for the minutes pack and the audit sample an assessor takes.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'ix_committee_resolution_vote_recorded_by'
-                 AND object_id = OBJECT_ID('admin.committee_resolution_vote'))
+IF OBJECT_ID('admin.committee_resolution_vote') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_committee_resolution_vote_recorded_by' AND object_id = OBJECT_ID('admin.committee_resolution_vote'))
 BEGIN
     CREATE INDEX ix_committee_resolution_vote_recorded_by
         ON admin.committee_resolution_vote (organisation_id, recorded_by_user_id)

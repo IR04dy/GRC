@@ -95,9 +95,7 @@ GO
 -- "list binder versions for a plan, newest first" query that the UI
 -- versions-tab fires on every plan open. Filtered to is_deleted=0 so the
 -- index is smaller and matches the entity's @Where clause.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'IX_bcp_binder_export_plan_generated'
-                 AND object_id = OBJECT_ID('bcm.bcp_binder_export'))
+IF OBJECT_ID('bcm.bcp_binder_export') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_bcp_binder_export_plan_generated' AND object_id = OBJECT_ID('bcm.bcp_binder_export'))
     CREATE INDEX IX_bcp_binder_export_plan_generated
         ON bcm.bcp_binder_export(organisation_id, bcp_plan_id, generated_at DESC)
         WHERE is_deleted = 0;
@@ -105,9 +103,7 @@ GO
 
 -- Secondary index on (org_id, status) for status-filtered admin views
 -- (e.g. "list all FAILED generations to triage").
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'IX_bcp_binder_export_status'
-                 AND object_id = OBJECT_ID('bcm.bcp_binder_export'))
+IF OBJECT_ID('bcm.bcp_binder_export') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_bcp_binder_export_status' AND object_id = OBJECT_ID('bcm.bcp_binder_export'))
     CREATE INDEX IX_bcp_binder_export_status
         ON bcm.bcp_binder_export(organisation_id, status)
         WHERE is_deleted = 0;

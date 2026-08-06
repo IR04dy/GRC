@@ -76,7 +76,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_audit_logs_org_ts' AND object_id = OBJECT_ID('audit.audit_logs'))
+IF OBJECT_ID('audit.audit_logs') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_audit_logs_org_ts' AND object_id = OBJECT_ID('audit.audit_logs'))
     CREATE INDEX [IX_audit_logs_org_ts] ON audit.audit_logs ([event_type], [entity_type], [user_id], [organisation_id], [event_timestamp]);
 GO
 
@@ -211,7 +211,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ccd_org_sent' AND object_id = OBJECT_ID('bcm.crisis_comms_distributions'))
+IF OBJECT_ID('bcm.crisis_comms_distributions') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ccd_org_sent' AND object_id = OBJECT_ID('bcm.crisis_comms_distributions'))
     CREATE INDEX [IX_ccd_org_sent] ON bcm.crisis_comms_distributions ([organisation_id], [sent_at]);
 GO
 
@@ -359,10 +359,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_pdep_org_proc' AND object_id = OBJECT_ID('bcm.process_dependencies'))
+IF OBJECT_ID('bcm.process_dependencies') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_pdep_org_proc' AND object_id = OBJECT_ID('bcm.process_dependencies'))
     CREATE INDEX [IX_pdep_org_proc] ON bcm.process_dependencies ([organisation_id], [process_id]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_pdep_upstream' AND object_id = OBJECT_ID('bcm.process_dependencies'))
+IF OBJECT_ID('bcm.process_dependencies') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_pdep_upstream' AND object_id = OBJECT_ID('bcm.process_dependencies'))
     CREATE INDEX [IX_pdep_upstream] ON bcm.process_dependencies ([depends_on_process_id]) WHERE ([is_deleted]=(0));
 GO
 
@@ -411,7 +411,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chapp_req' AND object_id = OBJECT_ID('change_mgmt.change_approvals'))
+IF OBJECT_ID('change_mgmt.change_approvals') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chapp_req' AND object_id = OBJECT_ID('change_mgmt.change_approvals'))
     CREATE INDEX [IX_chapp_req] ON change_mgmt.change_approvals ([change_request_id]);
 GO
 
@@ -429,7 +429,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chcom_req' AND object_id = OBJECT_ID('change_mgmt.change_comments'))
+IF OBJECT_ID('change_mgmt.change_comments') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chcom_req' AND object_id = OBJECT_ID('change_mgmt.change_comments'))
     CREATE INDEX [IX_chcom_req] ON change_mgmt.change_comments ([change_request_id]);
 GO
 
@@ -449,10 +449,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chlink_req' AND object_id = OBJECT_ID('change_mgmt.change_links'))
+IF OBJECT_ID('change_mgmt.change_links') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chlink_req' AND object_id = OBJECT_ID('change_mgmt.change_links'))
     CREATE INDEX [IX_chlink_req] ON change_mgmt.change_links ([change_request_id]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chlink_target' AND object_id = OBJECT_ID('change_mgmt.change_links'))
+IF OBJECT_ID('change_mgmt.change_links') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chlink_target' AND object_id = OBJECT_ID('change_mgmt.change_links'))
     CREATE INDEX [IX_chlink_target] ON change_mgmt.change_links ([entity_type], [entity_id]) WHERE ([is_deleted]=(0));
 GO
 
@@ -500,10 +500,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chreq_org_status' AND object_id = OBJECT_ID('change_mgmt.change_requests'))
+IF OBJECT_ID('change_mgmt.change_requests') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chreq_org_status' AND object_id = OBJECT_ID('change_mgmt.change_requests'))
     CREATE INDEX [IX_chreq_org_status] ON change_mgmt.change_requests ([organisation_id], [status]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chreq_org_type' AND object_id = OBJECT_ID('change_mgmt.change_requests'))
+IF OBJECT_ID('change_mgmt.change_requests') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chreq_org_type' AND object_id = OBJECT_ID('change_mgmt.change_requests'))
     CREATE INDEX [IX_chreq_org_type] ON change_mgmt.change_requests ([organisation_id], [change_type]) WHERE ([is_deleted]=(0));
 GO
 
@@ -525,7 +525,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chtask_req' AND object_id = OBJECT_ID('change_mgmt.change_tasks'))
+IF OBJECT_ID('change_mgmt.change_tasks') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_chtask_req' AND object_id = OBJECT_ID('change_mgmt.change_tasks'))
     CREATE INDEX [IX_chtask_req] ON change_mgmt.change_tasks ([change_request_id]);
 GO
 
@@ -777,7 +777,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_cyber_inc_nist' AND object_id = OBJECT_ID('cyber.incidents'))
+IF OBJECT_ID('cyber.incidents') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_cyber_inc_nist' AND object_id = OBJECT_ID('cyber.incidents'))
     CREATE INDEX [IX_cyber_inc_nist] ON cyber.incidents ([nist_phase]) WHERE ([is_deleted]=(0));
 GO
 
@@ -885,10 +885,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_aml_org_status' AND object_id = OBJECT_ID('ethics.aml_alerts'))
+IF OBJECT_ID('ethics.aml_alerts') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_aml_org_status' AND object_id = OBJECT_ID('ethics.aml_alerts'))
     CREATE INDEX [IX_aml_org_status] ON ethics.aml_alerts ([organisation_id], [status]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_aml_org_type' AND object_id = OBJECT_ID('ethics.aml_alerts'))
+IF OBJECT_ID('ethics.aml_alerts') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_aml_org_type' AND object_id = OBJECT_ID('ethics.aml_alerts'))
     CREATE INDEX [IX_aml_org_type] ON ethics.aml_alerts ([organisation_id], [alert_type]) WHERE ([is_deleted]=(0));
 GO
 
@@ -909,7 +909,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ethics_act_case' AND object_id = OBJECT_ID('ethics.case_actions'))
+IF OBJECT_ID('ethics.case_actions') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ethics_act_case' AND object_id = OBJECT_ID('ethics.case_actions'))
     CREATE INDEX [IX_ethics_act_case] ON ethics.case_actions ([case_id], [action_at]);
 GO
 
@@ -929,10 +929,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ethics_link_case' AND object_id = OBJECT_ID('ethics.case_links'))
+IF OBJECT_ID('ethics.case_links') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ethics_link_case' AND object_id = OBJECT_ID('ethics.case_links'))
     CREATE INDEX [IX_ethics_link_case] ON ethics.case_links ([case_id]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ethics_link_target' AND object_id = OBJECT_ID('ethics.case_links'))
+IF OBJECT_ID('ethics.case_links') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ethics_link_target' AND object_id = OBJECT_ID('ethics.case_links'))
     CREATE INDEX [IX_ethics_link_target] ON ethics.case_links ([entity_type], [entity_id]) WHERE ([is_deleted]=(0));
 GO
 
@@ -983,10 +983,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ethics_case_category' AND object_id = OBJECT_ID('ethics.cases'))
+IF OBJECT_ID('ethics.cases') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ethics_case_category' AND object_id = OBJECT_ID('ethics.cases'))
     CREATE INDEX [IX_ethics_case_category] ON ethics.cases ([organisation_id], [category]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ethics_case_org_status' AND object_id = OBJECT_ID('ethics.cases'))
+IF OBJECT_ID('ethics.cases') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ethics_case_org_status' AND object_id = OBJECT_ID('ethics.cases'))
     CREATE INDEX [IX_ethics_case_org_status] ON ethics.cases ([organisation_id], [status]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1028,10 +1028,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_disc_org_status' AND object_id = OBJECT_ID('ethics.disclosures'))
+IF OBJECT_ID('ethics.disclosures') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_disc_org_status' AND object_id = OBJECT_ID('ethics.disclosures'))
     CREATE INDEX [IX_disc_org_status] ON ethics.disclosures ([organisation_id], [status]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_disc_org_type' AND object_id = OBJECT_ID('ethics.disclosures'))
+IF OBJECT_ID('ethics.disclosures') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_disc_org_type' AND object_id = OBJECT_ID('ethics.disclosures'))
     CREATE INDEX [IX_disc_org_type] ON ethics.disclosures ([organisation_id], [disclosure_type]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1074,10 +1074,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kyc_subj_org_risk' AND object_id = OBJECT_ID('ethics.kyc_subjects'))
+IF OBJECT_ID('ethics.kyc_subjects') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kyc_subj_org_risk' AND object_id = OBJECT_ID('ethics.kyc_subjects'))
     CREATE INDEX [IX_kyc_subj_org_risk] ON ethics.kyc_subjects ([organisation_id], [risk_rating]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kyc_subj_org_status' AND object_id = OBJECT_ID('ethics.kyc_subjects'))
+IF OBJECT_ID('ethics.kyc_subjects') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kyc_subj_org_status' AND object_id = OBJECT_ID('ethics.kyc_subjects'))
     CREATE INDEX [IX_kyc_subj_org_status] ON ethics.kyc_subjects ([organisation_id], [status]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1102,7 +1102,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kyc_hit_subj' AND object_id = OBJECT_ID('ethics.screening_hits'))
+IF OBJECT_ID('ethics.screening_hits') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kyc_hit_subj' AND object_id = OBJECT_ID('ethics.screening_hits'))
     CREATE INDEX [IX_kyc_hit_subj] ON ethics.screening_hits ([subject_id], [disposition]);
 GO
 
@@ -1336,7 +1336,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_notif_recipient_unread' AND object_id = OBJECT_ID('platform.notifications'))
+IF OBJECT_ID('platform.notifications') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_notif_recipient_unread' AND object_id = OBJECT_ID('platform.notifications'))
     CREATE INDEX [IX_notif_recipient_unread] ON platform.notifications ([recipient_id], [is_read], [created_at]);
 GO
 
@@ -1510,10 +1510,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_dpia_framework' AND object_id = OBJECT_ID('privacy.dpia'))
+IF OBJECT_ID('privacy.dpia') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_dpia_framework' AND object_id = OBJECT_ID('privacy.dpia'))
     CREATE INDEX [IX_dpia_framework] ON privacy.dpia ([framework_id]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_dpia_org' AND object_id = OBJECT_ID('privacy.dpia'))
+IF OBJECT_ID('privacy.dpia') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_dpia_org' AND object_id = OBJECT_ID('privacy.dpia'))
     CREATE INDEX [IX_dpia_org] ON privacy.dpia ([organisation_id]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1534,7 +1534,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_dpiam_dpia' AND object_id = OBJECT_ID('privacy.dpia_mitigation'))
+IF OBJECT_ID('privacy.dpia_mitigation') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_dpiam_dpia' AND object_id = OBJECT_ID('privacy.dpia_mitigation'))
     CREATE INDEX [IX_dpiam_dpia] ON privacy.dpia_mitigation ([dpia_id]);
 GO
 
@@ -1554,7 +1554,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_dpiaq_dpia' AND object_id = OBJECT_ID('privacy.dpia_question'))
+IF OBJECT_ID('privacy.dpia_question') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_dpiaq_dpia' AND object_id = OBJECT_ID('privacy.dpia_question'))
     CREATE INDEX [IX_dpiaq_dpia] ON privacy.dpia_question ([dpia_id]);
 GO
 
@@ -1573,7 +1573,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_dpiar_dpia' AND object_id = OBJECT_ID('privacy.dpia_review'))
+IF OBJECT_ID('privacy.dpia_review') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_dpiar_dpia' AND object_id = OBJECT_ID('privacy.dpia_review'))
     CREATE INDEX [IX_dpiar_dpia] ON privacy.dpia_review ([dpia_id]);
 GO
 
@@ -1711,7 +1711,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_rrun_sched' AND object_id = OBJECT_ID('reporting.report_runs'))
+IF OBJECT_ID('reporting.report_runs') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_rrun_sched' AND object_id = OBJECT_ID('reporting.report_runs'))
     CREATE INDEX [IX_rrun_sched] ON reporting.report_runs ([schedule_id], [triggered_at]);
 GO
 
@@ -1748,10 +1748,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_rsched_due' AND object_id = OBJECT_ID('reporting.report_schedules'))
+IF OBJECT_ID('reporting.report_schedules') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_rsched_due' AND object_id = OBJECT_ID('reporting.report_schedules'))
     CREATE INDEX [IX_rsched_due] ON reporting.report_schedules ([is_active], [next_run_at]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_rsched_org' AND object_id = OBJECT_ID('reporting.report_schedules'))
+IF OBJECT_ID('reporting.report_schedules') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_rsched_org' AND object_id = OBJECT_ID('reporting.report_schedules'))
     CREATE INDEX [IX_rsched_org] ON reporting.report_schedules ([organisation_id]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1774,7 +1774,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_appb_app_status' AND object_id = OBJECT_ID('risk.appetite_breach_events'))
+IF OBJECT_ID('risk.appetite_breach_events') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_appb_app_status' AND object_id = OBJECT_ID('risk.appetite_breach_events'))
     CREATE INDEX [IX_appb_app_status] ON risk.appetite_breach_events ([appetite_id], [status]);
 GO
 
@@ -1798,7 +1798,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_krib_kri_status' AND object_id = OBJECT_ID('risk.kri_breach_events'))
+IF OBJECT_ID('risk.kri_breach_events') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_krib_kri_status' AND object_id = OBJECT_ID('risk.kri_breach_events'))
     CREATE INDEX [IX_krib_kri_status] ON risk.kri_breach_events ([kri_id], [status]);
 GO
 
@@ -1837,10 +1837,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kri_framework' AND object_id = OBJECT_ID('risk.kri_definitions'))
+IF OBJECT_ID('risk.kri_definitions') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kri_framework' AND object_id = OBJECT_ID('risk.kri_definitions'))
     CREATE INDEX [IX_kri_framework] ON risk.kri_definitions ([framework_id]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kri_org_risk' AND object_id = OBJECT_ID('risk.kri_definitions'))
+IF OBJECT_ID('risk.kri_definitions') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_kri_org_risk' AND object_id = OBJECT_ID('risk.kri_definitions'))
     CREATE INDEX [IX_kri_org_risk] ON risk.kri_definitions ([organisation_id], [risk_id]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1859,7 +1859,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_krir_kri_at' AND object_id = OBJECT_ID('risk.kri_readings'))
+IF OBJECT_ID('risk.kri_readings') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_krir_kri_at' AND object_id = OBJECT_ID('risk.kri_readings'))
     CREATE INDEX [IX_krir_kri_at] ON risk.kri_readings ([kri_id], [reading_at]);
 GO
 
@@ -1892,7 +1892,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_rapp_org' AND object_id = OBJECT_ID('risk.risk_appetite_statements'))
+IF OBJECT_ID('risk.risk_appetite_statements') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_rapp_org' AND object_id = OBJECT_ID('risk.risk_appetite_statements'))
     CREATE INDEX [IX_rapp_org] ON risk.risk_appetite_statements ([organisation_id]) WHERE ([is_deleted]=(0));
 GO
 
@@ -2029,13 +2029,13 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_risk_compfw' AND object_id = OBJECT_ID('risk.risks'))
+IF OBJECT_ID('risk.risks') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_risk_compfw' AND object_id = OBJECT_ID('risk.risks'))
     CREATE INDEX [IX_risk_compfw] ON risk.risks ([compliance_framework_id]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_risk_riskfw' AND object_id = OBJECT_ID('risk.risks'))
+IF OBJECT_ID('risk.risks') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_risk_riskfw' AND object_id = OBJECT_ID('risk.risks'))
     CREATE INDEX [IX_risk_riskfw] ON risk.risks ([risk_framework_id]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_risks_heatmap' AND object_id = OBJECT_ID('risk.risks'))
+IF OBJECT_ID('risk.risks') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_risks_heatmap' AND object_id = OBJECT_ID('risk.risks'))
     CREATE INDEX [IX_risks_heatmap] ON risk.risks ([organisation_id], [inherent_likelihood], [inherent_impact]) WHERE ([is_deleted]=(0));
 GO
 
@@ -2072,7 +2072,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_contract_vendor' AND object_id = OBJECT_ID('scm.contracts'))
+IF OBJECT_ID('scm.contracts') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_contract_vendor' AND object_id = OBJECT_ID('scm.contracts'))
     CREATE INDEX [IX_scm_contract_vendor] ON scm.contracts ([vendor_id]);
 GO
 
@@ -2105,7 +2105,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_dep_vendor' AND object_id = OBJECT_ID('scm.dependencies'))
+IF OBJECT_ID('scm.dependencies') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_dep_vendor' AND object_id = OBJECT_ID('scm.dependencies'))
     CREATE INDEX [IX_scm_dep_vendor] ON scm.dependencies ([vendor_id]);
 GO
 
@@ -2138,7 +2138,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_sla_vendor' AND object_id = OBJECT_ID('scm.slas'))
+IF OBJECT_ID('scm.slas') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_sla_vendor' AND object_id = OBJECT_ID('scm.slas'))
     CREATE INDEX [IX_scm_sla_vendor] ON scm.slas ([vendor_id]);
 GO
 
@@ -2175,10 +2175,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_inc_status' AND object_id = OBJECT_ID('scm.supplier_incidents'))
+IF OBJECT_ID('scm.supplier_incidents') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_inc_status' AND object_id = OBJECT_ID('scm.supplier_incidents'))
     CREATE INDEX [IX_scm_inc_status] ON scm.supplier_incidents ([status]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_inc_vendor' AND object_id = OBJECT_ID('scm.supplier_incidents'))
+IF OBJECT_ID('scm.supplier_incidents') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_inc_vendor' AND object_id = OBJECT_ID('scm.supplier_incidents'))
     CREATE INDEX [IX_scm_inc_vendor] ON scm.supplier_incidents ([vendor_id]);
 GO
 
@@ -2212,7 +2212,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_assess_vendor' AND object_id = OBJECT_ID('scm.vendor_assessments'))
+IF OBJECT_ID('scm.vendor_assessments') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_assess_vendor' AND object_id = OBJECT_ID('scm.vendor_assessments'))
     CREATE INDEX [IX_scm_assess_vendor] ON scm.vendor_assessments ([vendor_id]);
 GO
 
@@ -2243,7 +2243,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_ob_vendor' AND object_id = OBJECT_ID('scm.vendor_onboarding'))
+IF OBJECT_ID('scm.vendor_onboarding') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_ob_vendor' AND object_id = OBJECT_ID('scm.vendor_onboarding'))
     CREATE INDEX [IX_scm_ob_vendor] ON scm.vendor_onboarding ([vendor_id]);
 GO
 
@@ -2281,10 +2281,10 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_vendors_org' AND object_id = OBJECT_ID('scm.vendors'))
+IF OBJECT_ID('scm.vendors') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_vendors_org' AND object_id = OBJECT_ID('scm.vendors'))
     CREATE INDEX [IX_scm_vendors_org] ON scm.vendors ([organisation_id]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_vendors_status' AND object_id = OBJECT_ID('scm.vendors'))
+IF OBJECT_ID('scm.vendors') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_scm_vendors_status' AND object_id = OBJECT_ID('scm.vendors'))
     CREATE INDEX [IX_scm_vendors_status] ON scm.vendors ([status]);
 GO
 
@@ -2307,7 +2307,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_wf_log_inst' AND object_id = OBJECT_ID('workflow.action_log'))
+IF OBJECT_ID('workflow.action_log') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_wf_log_inst' AND object_id = OBJECT_ID('workflow.action_log'))
     CREATE INDEX [IX_wf_log_inst] ON workflow.action_log ([instance_id]);
 GO
 
@@ -2354,7 +2354,7 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_wf_inst_target' AND object_id = OBJECT_ID('workflow.instances'))
+IF OBJECT_ID('workflow.instances') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_wf_inst_target' AND object_id = OBJECT_ID('workflow.instances'))
     CREATE INDEX [IX_wf_inst_target] ON workflow.instances ([target_module], [target_entity], [target_entity_id]);
 GO
 
@@ -2463,6 +2463,6 @@ BEGIN
     );
 END;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_wf_tasks_assigned' AND object_id = OBJECT_ID('workflow.workflow_tasks'))
+IF OBJECT_ID('workflow.workflow_tasks') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_wf_tasks_assigned' AND object_id = OBJECT_ID('workflow.workflow_tasks'))
     CREATE INDEX [IX_wf_tasks_assigned] ON workflow.workflow_tasks ([assigned_to], [status], [due_date]);
 GO

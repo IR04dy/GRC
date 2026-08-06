@@ -60,9 +60,7 @@ GO
 
 -- An operator reading the ledger filters on this column; without an index the "show me every
 -- row whose actor role is trustworthy" query scans the whole table.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes
-               WHERE name = 'ix_audit_log_user_role_source'
-                 AND object_id = OBJECT_ID('platform.audit_log'))
+IF OBJECT_ID('platform.audit_log') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_audit_log_user_role_source' AND object_id = OBJECT_ID('platform.audit_log'))
 BEGIN
     CREATE INDEX ix_audit_log_user_role_source
         ON platform.audit_log (organisation_id, user_role_source);

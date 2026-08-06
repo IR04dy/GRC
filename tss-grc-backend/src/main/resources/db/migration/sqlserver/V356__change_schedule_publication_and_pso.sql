@@ -132,8 +132,7 @@ BEGIN
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='ix_csp_org_published'
-               AND object_id=OBJECT_ID('change_mgmt.change_schedule_publication'))
+IF OBJECT_ID('change_mgmt.change_schedule_publication') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_csp_org_published' AND object_id = OBJECT_ID('change_mgmt.change_schedule_publication'))
     CREATE INDEX ix_csp_org_published
         ON change_mgmt.change_schedule_publication (organisation_id, published_at DESC)
         WHERE is_deleted = 0;

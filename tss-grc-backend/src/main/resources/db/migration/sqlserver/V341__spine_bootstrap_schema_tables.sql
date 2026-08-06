@@ -92,7 +92,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ai_lifecycle_event_model' AND object_id = OBJECT_ID('ai_governance.ai_lifecycle_event'))
+IF OBJECT_ID('ai_governance.ai_lifecycle_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ai_lifecycle_event_model' AND object_id = OBJECT_ID('ai_governance.ai_lifecycle_event'))
     CREATE INDEX [ix_ai_lifecycle_event_model] ON [ai_governance].[ai_lifecycle_event] ([organisation_id], [model_id], [occurred_at]);
 GO
 
@@ -133,10 +133,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_model_validation_model' AND object_id = OBJECT_ID('ai_governance.model_validation'))
+IF OBJECT_ID('ai_governance.model_validation') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_model_validation_model' AND object_id = OBJECT_ID('ai_governance.model_validation'))
     CREATE INDEX [ix_model_validation_model] ON [ai_governance].[model_validation] ([organisation_id], [model_id], [status]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_model_validation_ref' AND object_id = OBJECT_ID('ai_governance.model_validation'))
+IF OBJECT_ID('ai_governance.model_validation') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_model_validation_ref' AND object_id = OBJECT_ID('ai_governance.model_validation'))
     CREATE UNIQUE INDEX [ux_model_validation_ref] ON [ai_governance].[model_validation] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -174,10 +174,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_recertification_model' AND object_id = OBJECT_ID('ai_governance.recertification'))
+IF OBJECT_ID('ai_governance.recertification') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_recertification_model' AND object_id = OBJECT_ID('ai_governance.recertification'))
     CREATE INDEX [ix_recertification_model] ON [ai_governance].[recertification] ([organisation_id], [model_id], [status], [due_date]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_recertification_ref' AND object_id = OBJECT_ID('ai_governance.recertification'))
+IF OBJECT_ID('ai_governance.recertification') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_recertification_ref' AND object_id = OBJECT_ID('ai_governance.recertification'))
     CREATE UNIQUE INDEX [ux_recertification_ref] ON [ai_governance].[recertification] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -217,10 +217,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_retraining_event_model' AND object_id = OBJECT_ID('ai_governance.retraining_event'))
+IF OBJECT_ID('ai_governance.retraining_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_retraining_event_model' AND object_id = OBJECT_ID('ai_governance.retraining_event'))
     CREATE INDEX [ix_retraining_event_model] ON [ai_governance].[retraining_event] ([organisation_id], [model_id], [status]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_retraining_event_ref' AND object_id = OBJECT_ID('ai_governance.retraining_event'))
+IF OBJECT_ID('ai_governance.retraining_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_retraining_event_ref' AND object_id = OBJECT_ID('ai_governance.retraining_event'))
     CREATE UNIQUE INDEX [ux_retraining_event_ref] ON [ai_governance].[retraining_event] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -259,7 +259,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_aeng_org_status' AND object_id = OBJECT_ID('compliance.audit_engagements'))
+IF OBJECT_ID('compliance.audit_engagements') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_aeng_org_status' AND object_id = OBJECT_ID('compliance.audit_engagements'))
     CREATE INDEX [IX_aeng_org_status] ON [compliance].[audit_engagements] ([organisation_id], [status]) WHERE ([is_deleted]=(0));
 GO
 
@@ -323,16 +323,16 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_policy_code_org' AND object_id = OBJECT_ID('compliance.policies'))
+IF OBJECT_ID('compliance.policies') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_policy_code_org' AND object_id = OBJECT_ID('compliance.policies'))
     CREATE UNIQUE INDEX [IX_policy_code_org] ON [compliance].[policies] ([organisation_id], [code]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_policy_org' AND object_id = OBJECT_ID('compliance.policies'))
+IF OBJECT_ID('compliance.policies') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_policy_org' AND object_id = OBJECT_ID('compliance.policies'))
     CREATE INDEX [IX_policy_org] ON [compliance].[policies] ([organisation_id]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_policy_review' AND object_id = OBJECT_ID('compliance.policies'))
+IF OBJECT_ID('compliance.policies') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_policy_review' AND object_id = OBJECT_ID('compliance.policies'))
     CREATE INDEX [IX_policy_review] ON [compliance].[policies] ([next_review_date]) WHERE ([is_deleted]=(0) AND [status]='PUBLISHED');
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_policy_status' AND object_id = OBJECT_ID('compliance.policies'))
+IF OBJECT_ID('compliance.policies') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_policy_status' AND object_id = OBJECT_ID('compliance.policies'))
     CREATE INDEX [IX_policy_status] ON [compliance].[policies] ([status], [organisation_id]) WHERE ([is_deleted]=(0));
 GO
 
@@ -356,10 +356,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_pfm_framework' AND object_id = OBJECT_ID('compliance.policy_framework_mappings'))
+IF OBJECT_ID('compliance.policy_framework_mappings') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_pfm_framework' AND object_id = OBJECT_ID('compliance.policy_framework_mappings'))
     CREATE INDEX [IX_pfm_framework] ON [compliance].[policy_framework_mappings] ([framework_id]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_pfm_policy' AND object_id = OBJECT_ID('compliance.policy_framework_mappings'))
+IF OBJECT_ID('compliance.policy_framework_mappings') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_pfm_policy' AND object_id = OBJECT_ID('compliance.policy_framework_mappings'))
     CREATE INDEX [IX_pfm_policy] ON [compliance].[policy_framework_mappings] ([policy_id]) WHERE ([is_deleted]=(0));
 GO
 
@@ -399,16 +399,16 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_reg_change_authority' AND object_id = OBJECT_ID('compliance.regulatory_changes'))
+IF OBJECT_ID('compliance.regulatory_changes') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_reg_change_authority' AND object_id = OBJECT_ID('compliance.regulatory_changes'))
     CREATE INDEX [IX_reg_change_authority] ON [compliance].[regulatory_changes] ([source_authority], [organisation_id]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_reg_change_effective' AND object_id = OBJECT_ID('compliance.regulatory_changes'))
+IF OBJECT_ID('compliance.regulatory_changes') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_reg_change_effective' AND object_id = OBJECT_ID('compliance.regulatory_changes'))
     CREATE INDEX [IX_reg_change_effective] ON [compliance].[regulatory_changes] ([effective_date]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_reg_change_org' AND object_id = OBJECT_ID('compliance.regulatory_changes'))
+IF OBJECT_ID('compliance.regulatory_changes') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_reg_change_org' AND object_id = OBJECT_ID('compliance.regulatory_changes'))
     CREATE INDEX [IX_reg_change_org] ON [compliance].[regulatory_changes] ([organisation_id]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_reg_change_status' AND object_id = OBJECT_ID('compliance.regulatory_changes'))
+IF OBJECT_ID('compliance.regulatory_changes') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_reg_change_status' AND object_id = OBJECT_ID('compliance.regulatory_changes'))
     CREATE INDEX [IX_reg_change_status] ON [compliance].[regulatory_changes] ([status], [organisation_id]) WHERE ([is_deleted]=(0));
 GO
 
@@ -453,13 +453,13 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_cpty_parent_group' AND object_id = OBJECT_ID('cpty.counterparty'))
+IF OBJECT_ID('cpty.counterparty') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_cpty_parent_group' AND object_id = OBJECT_ID('cpty.counterparty'))
     CREATE INDEX [ix_cpty_parent_group] ON [cpty].[counterparty] ([organisation_id], [parent_group_reference]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_cpty_status' AND object_id = OBJECT_ID('cpty.counterparty'))
+IF OBJECT_ID('cpty.counterparty') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_cpty_status' AND object_id = OBJECT_ID('cpty.counterparty'))
     CREATE INDEX [ix_cpty_status] ON [cpty].[counterparty] ([organisation_id], [status], [sector]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_cpty_reference' AND object_id = OBJECT_ID('cpty.counterparty'))
+IF OBJECT_ID('cpty.counterparty') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_cpty_reference' AND object_id = OBJECT_ID('cpty.counterparty'))
     CREATE UNIQUE INDEX [ux_cpty_reference] ON [cpty].[counterparty] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -495,7 +495,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_cpty_event_cpty' AND object_id = OBJECT_ID('cpty.cpty_event'))
+IF OBJECT_ID('cpty.cpty_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_cpty_event_cpty' AND object_id = OBJECT_ID('cpty.cpty_event'))
     CREATE INDEX [ix_cpty_event_cpty] ON [cpty].[cpty_event] ([organisation_id], [counterparty_id], [occurred_at]);
 GO
 
@@ -533,7 +533,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rating_cpty' AND object_id = OBJECT_ID('cpty.credit_rating'))
+IF OBJECT_ID('cpty.credit_rating') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rating_cpty' AND object_id = OBJECT_ID('cpty.credit_rating'))
     CREATE INDEX [ix_rating_cpty] ON [cpty].[credit_rating] ([organisation_id], [counterparty_id], [effective_date]);
 GO
 
@@ -570,10 +570,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_limit_band' AND object_id = OBJECT_ID('cpty.large_exposure_limit'))
+IF OBJECT_ID('cpty.large_exposure_limit') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_limit_band' AND object_id = OBJECT_ID('cpty.large_exposure_limit'))
     CREATE INDEX [ix_limit_band] ON [cpty].[large_exposure_limit] ([organisation_id], [band], [utilisation_pct]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_limit_cpty' AND object_id = OBJECT_ID('cpty.large_exposure_limit'))
+IF OBJECT_ID('cpty.large_exposure_limit') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_limit_cpty' AND object_id = OBJECT_ID('cpty.large_exposure_limit'))
     CREATE INDEX [ix_limit_cpty] ON [cpty].[large_exposure_limit] ([organisation_id], [counterparty_id]);
 GO
 
@@ -608,7 +608,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_action_cpty' AND object_id = OBJECT_ID('cpty.rating_action'))
+IF OBJECT_ID('cpty.rating_action') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_action_cpty' AND object_id = OBJECT_ID('cpty.rating_action'))
     CREATE INDEX [ix_action_cpty] ON [cpty].[rating_action] ([organisation_id], [counterparty_id], [action_date]);
 GO
 
@@ -661,7 +661,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_breach_status' AND object_id = OBJECT_ID('data_officer.breach'))
+IF OBJECT_ID('data_officer.breach') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_breach_status' AND object_id = OBJECT_ID('data_officer.breach'))
     CREATE INDEX [ix_breach_status] ON [data_officer].[breach] ([organisation_id], [status], [sdaia_deadline]);
 GO
 
@@ -728,7 +728,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_catalog_lineage_org' AND object_id = OBJECT_ID('data_officer.catalog_lineage'))
+IF OBJECT_ID('data_officer.catalog_lineage') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_catalog_lineage_org' AND object_id = OBJECT_ID('data_officer.catalog_lineage'))
     CREATE INDEX [ix_catalog_lineage_org] ON [data_officer].[catalog_lineage] ([organisation_id], [is_deleted]);
 GO
 
@@ -770,7 +770,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_consent_subject' AND object_id = OBJECT_ID('data_officer.consent_record'))
+IF OBJECT_ID('data_officer.consent_record') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_consent_subject' AND object_id = OBJECT_ID('data_officer.consent_record'))
     CREATE INDEX [ix_consent_subject] ON [data_officer].[consent_record] ([organisation_id], [data_subject_id], [purpose_code], [status]);
 GO
 
@@ -834,7 +834,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_do_event_lookup' AND object_id = OBJECT_ID('data_officer.do_event'))
+IF OBJECT_ID('data_officer.do_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_do_event_lookup' AND object_id = OBJECT_ID('data_officer.do_event'))
     CREATE INDEX [ix_do_event_lookup] ON [data_officer].[do_event] ([organisation_id], [entity_type], [entity_id], [occurred_at]);
 GO
 
@@ -880,7 +880,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_dpia_status' AND object_id = OBJECT_ID('data_officer.dpia'))
+IF OBJECT_ID('data_officer.dpia') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_dpia_status' AND object_id = OBJECT_ID('data_officer.dpia'))
     CREATE INDEX [ix_dpia_status] ON [data_officer].[dpia] ([organisation_id], [status], [next_review_due]);
 GO
 
@@ -929,7 +929,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_dsr_status' AND object_id = OBJECT_ID('data_officer.dsr_request'))
+IF OBJECT_ID('data_officer.dsr_request') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_dsr_status' AND object_id = OBJECT_ID('data_officer.dsr_request'))
     CREATE INDEX [ix_dsr_status] ON [data_officer].[dsr_request] ([organisation_id], [status], [sla_deadline]);
 GO
 
@@ -1099,7 +1099,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_quality_run_org' AND object_id = OBJECT_ID('data_officer.quality_run'))
+IF OBJECT_ID('data_officer.quality_run') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_quality_run_org' AND object_id = OBJECT_ID('data_officer.quality_run'))
     CREATE INDEX [ix_quality_run_org] ON [data_officer].[quality_run] ([organisation_id], [is_deleted]);
 GO
 
@@ -1182,10 +1182,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_data_asset_class' AND object_id = OBJECT_ID('dataclass.data_asset'))
+IF OBJECT_ID('dataclass.data_asset') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_data_asset_class' AND object_id = OBJECT_ID('dataclass.data_asset'))
     CREATE INDEX [ix_data_asset_class] ON [dataclass].[data_asset] ([organisation_id], [classification], [pdpl_special_category]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_data_asset_ref' AND object_id = OBJECT_ID('dataclass.data_asset'))
+IF OBJECT_ID('dataclass.data_asset') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_data_asset_ref' AND object_id = OBJECT_ID('dataclass.data_asset'))
     CREATE UNIQUE INDEX [ux_data_asset_ref] ON [dataclass].[data_asset] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1226,10 +1226,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_data_exception_status' AND object_id = OBJECT_ID('dataclass.data_exception'))
+IF OBJECT_ID('dataclass.data_exception') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_data_exception_status' AND object_id = OBJECT_ID('dataclass.data_exception'))
     CREATE INDEX [ix_data_exception_status] ON [dataclass].[data_exception] ([organisation_id], [status], [valid_until]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_data_exception_ref' AND object_id = OBJECT_ID('dataclass.data_exception'))
+IF OBJECT_ID('dataclass.data_exception') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_data_exception_ref' AND object_id = OBJECT_ID('dataclass.data_exception'))
     CREATE UNIQUE INDEX [ux_data_exception_ref] ON [dataclass].[data_exception] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1270,13 +1270,13 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_data_flow_asset' AND object_id = OBJECT_ID('dataclass.data_flow'))
+IF OBJECT_ID('dataclass.data_flow') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_data_flow_asset' AND object_id = OBJECT_ID('dataclass.data_flow'))
     CREATE INDEX [ix_data_flow_asset] ON [dataclass].[data_flow] ([organisation_id], [data_asset_id], [status]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_data_flow_xborder' AND object_id = OBJECT_ID('dataclass.data_flow'))
+IF OBJECT_ID('dataclass.data_flow') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_data_flow_xborder' AND object_id = OBJECT_ID('dataclass.data_flow'))
     CREATE INDEX [ix_data_flow_xborder] ON [dataclass].[data_flow] ([organisation_id], [destination_country], [status]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_data_flow_ref' AND object_id = OBJECT_ID('dataclass.data_flow'))
+IF OBJECT_ID('dataclass.data_flow') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_data_flow_ref' AND object_id = OBJECT_ID('dataclass.data_flow'))
     CREATE UNIQUE INDEX [ux_data_flow_ref] ON [dataclass].[data_flow] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1310,7 +1310,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_dataclass_event_asset' AND object_id = OBJECT_ID('dataclass.dataclass_event'))
+IF OBJECT_ID('dataclass.dataclass_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_dataclass_event_asset' AND object_id = OBJECT_ID('dataclass.dataclass_event'))
     CREATE INDEX [ix_dataclass_event_asset] ON [dataclass].[dataclass_event] ([organisation_id], [data_asset_id], [occurred_at]);
 GO
 
@@ -1378,10 +1378,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_evver_chain' AND object_id = OBJECT_ID('evidence.evidence_versions'))
+IF OBJECT_ID('evidence.evidence_versions') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_evver_chain' AND object_id = OBJECT_ID('evidence.evidence_versions'))
     CREATE INDEX [IX_evver_chain] ON [evidence].[evidence_versions] ([evidence_id], [chain_position]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_evver_evidence' AND object_id = OBJECT_ID('evidence.evidence_versions'))
+IF OBJECT_ID('evidence.evidence_versions') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_evver_evidence' AND object_id = OBJECT_ID('evidence.evidence_versions'))
     CREATE INDEX [IX_evver_evidence] ON [evidence].[evidence_versions] ([evidence_id]);
 GO
 
@@ -1440,13 +1440,13 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_fraud_case_org_detected' AND object_id = OBJECT_ID('fraud.fraud_case'))
+IF OBJECT_ID('fraud.fraud_case') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_fraud_case_org_detected' AND object_id = OBJECT_ID('fraud.fraud_case'))
     CREATE INDEX [ix_fraud_case_org_detected] ON [fraud].[fraud_case] ([organisation_id], [detected_at]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_fraud_case_org_status' AND object_id = OBJECT_ID('fraud.fraud_case'))
+IF OBJECT_ID('fraud.fraud_case') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_fraud_case_org_status' AND object_id = OBJECT_ID('fraud.fraud_case'))
     CREATE INDEX [ix_fraud_case_org_status] ON [fraud].[fraud_case] ([organisation_id], [status], [detected_at]) WHERE ([is_deleted]=(0));
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_fraud_case_typology_id' AND object_id = OBJECT_ID('fraud.fraud_case'))
+IF OBJECT_ID('fraud.fraud_case') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_fraud_case_typology_id' AND object_id = OBJECT_ID('fraud.fraud_case'))
     CREATE INDEX [ix_fraud_case_typology_id] ON [fraud].[fraud_case] ([typology_id]);
 GO
 
@@ -1479,10 +1479,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_fraud_case_update_case_id' AND object_id = OBJECT_ID('fraud.fraud_case_update'))
+IF OBJECT_ID('fraud.fraud_case_update') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_fraud_case_update_case_id' AND object_id = OBJECT_ID('fraud.fraud_case_update'))
     CREATE INDEX [ix_fraud_case_update_case_id] ON [fraud].[fraud_case_update] ([case_id]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_fraud_upd_case_occ' AND object_id = OBJECT_ID('fraud.fraud_case_update'))
+IF OBJECT_ID('fraud.fraud_case_update') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_fraud_upd_case_occ' AND object_id = OBJECT_ID('fraud.fraud_case_update'))
     CREATE INDEX [ix_fraud_upd_case_occ] ON [fraud].[fraud_case_update] ([organisation_id], [case_id], [occurred_at]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1552,10 +1552,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_call_status' AND object_id = OBJECT_ID('openbanking.ob_api_call'))
+IF OBJECT_ID('openbanking.ob_api_call') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_call_status' AND object_id = OBJECT_ID('openbanking.ob_api_call'))
     CREATE INDEX [ix_ob_call_status] ON [openbanking].[ob_api_call] ([organisation_id], [status_code], [occurred_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_call_tpp_time' AND object_id = OBJECT_ID('openbanking.ob_api_call'))
+IF OBJECT_ID('openbanking.ob_api_call') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_call_tpp_time' AND object_id = OBJECT_ID('openbanking.ob_api_call'))
     CREATE INDEX [ix_ob_call_tpp_time] ON [openbanking].[ob_api_call] ([organisation_id], [tpp_id], [occurred_at]);
 GO
 
@@ -1597,13 +1597,13 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_consent_status' AND object_id = OBJECT_ID('openbanking.ob_consent'))
+IF OBJECT_ID('openbanking.ob_consent') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_consent_status' AND object_id = OBJECT_ID('openbanking.ob_consent'))
     CREATE INDEX [ix_ob_consent_status] ON [openbanking].[ob_consent] ([organisation_id], [status]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_consent_tpp' AND object_id = OBJECT_ID('openbanking.ob_consent'))
+IF OBJECT_ID('openbanking.ob_consent') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_consent_tpp' AND object_id = OBJECT_ID('openbanking.ob_consent'))
     CREATE INDEX [ix_ob_consent_tpp] ON [openbanking].[ob_consent] ([organisation_id], [tpp_id], [granted_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_ob_consent_reference' AND object_id = OBJECT_ID('openbanking.ob_consent'))
+IF OBJECT_ID('openbanking.ob_consent') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_ob_consent_reference' AND object_id = OBJECT_ID('openbanking.ob_consent'))
     CREATE UNIQUE INDEX [ux_ob_consent_reference] ON [openbanking].[ob_consent] ([organisation_id], [consent_reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1637,13 +1637,13 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_event_consent' AND object_id = OBJECT_ID('openbanking.ob_event'))
+IF OBJECT_ID('openbanking.ob_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_event_consent' AND object_id = OBJECT_ID('openbanking.ob_event'))
     CREATE INDEX [ix_ob_event_consent] ON [openbanking].[ob_event] ([organisation_id], [consent_id], [occurred_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_event_incident' AND object_id = OBJECT_ID('openbanking.ob_event'))
+IF OBJECT_ID('openbanking.ob_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_event_incident' AND object_id = OBJECT_ID('openbanking.ob_event'))
     CREATE INDEX [ix_ob_event_incident] ON [openbanking].[ob_event] ([organisation_id], [incident_id], [occurred_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_event_tpp' AND object_id = OBJECT_ID('openbanking.ob_event'))
+IF OBJECT_ID('openbanking.ob_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_event_tpp' AND object_id = OBJECT_ID('openbanking.ob_event'))
     CREATE INDEX [ix_ob_event_tpp] ON [openbanking].[ob_event] ([organisation_id], [tpp_id], [occurred_at]);
 GO
 
@@ -1685,10 +1685,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_incident_status' AND object_id = OBJECT_ID('openbanking.ob_incident'))
+IF OBJECT_ID('openbanking.ob_incident') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_incident_status' AND object_id = OBJECT_ID('openbanking.ob_incident'))
     CREATE INDEX [ix_ob_incident_status] ON [openbanking].[ob_incident] ([organisation_id], [status], [severity], [detected_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_ob_incident_reference' AND object_id = OBJECT_ID('openbanking.ob_incident'))
+IF OBJECT_ID('openbanking.ob_incident') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_ob_incident_reference' AND object_id = OBJECT_ID('openbanking.ob_incident'))
     CREATE UNIQUE INDEX [ux_ob_incident_reference] ON [openbanking].[ob_incident] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1732,13 +1732,13 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_tpp_cert_expiry' AND object_id = OBJECT_ID('openbanking.ob_tpp'))
+IF OBJECT_ID('openbanking.ob_tpp') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_tpp_cert_expiry' AND object_id = OBJECT_ID('openbanking.ob_tpp'))
     CREATE INDEX [ix_ob_tpp_cert_expiry] ON [openbanking].[ob_tpp] ([organisation_id], [cert_expires_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_tpp_status' AND object_id = OBJECT_ID('openbanking.ob_tpp'))
+IF OBJECT_ID('openbanking.ob_tpp') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ob_tpp_status' AND object_id = OBJECT_ID('openbanking.ob_tpp'))
     CREATE INDEX [ix_ob_tpp_status] ON [openbanking].[ob_tpp] ([organisation_id], [status]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_ob_tpp_reference' AND object_id = OBJECT_ID('openbanking.ob_tpp'))
+IF OBJECT_ID('openbanking.ob_tpp') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_ob_tpp_reference' AND object_id = OBJECT_ID('openbanking.ob_tpp'))
     CREATE UNIQUE INDEX [ux_ob_tpp_reference] ON [openbanking].[ob_tpp] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1777,7 +1777,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_opres_a_org_fy' AND object_id = OBJECT_ID('opres.opres_assessment'))
+IF OBJECT_ID('opres.opres_assessment') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_opres_a_org_fy' AND object_id = OBJECT_ID('opres.opres_assessment'))
     CREATE INDEX [ix_opres_a_org_fy] ON [opres].[opres_assessment] ([organisation_id], [fiscal_year], [created_at]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1811,10 +1811,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_opres_assessment_cell_pillar_id' AND object_id = OBJECT_ID('opres.opres_assessment_cell'))
+IF OBJECT_ID('opres.opres_assessment_cell') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_opres_assessment_cell_pillar_id' AND object_id = OBJECT_ID('opres.opres_assessment_cell'))
     CREATE INDEX [ix_opres_assessment_cell_pillar_id] ON [opres].[opres_assessment_cell] ([pillar_id]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_opres_c_assessment' AND object_id = OBJECT_ID('opres.opres_assessment_cell'))
+IF OBJECT_ID('opres.opres_assessment_cell') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_opres_c_assessment' AND object_id = OBJECT_ID('opres.opres_assessment_cell'))
     CREATE INDEX [ix_opres_c_assessment] ON [opres].[opres_assessment_cell] ([organisation_id], [assessment_id], [pillar_id]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1891,13 +1891,13 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_cloud_service_classification' AND object_id = OBJECT_ID('outsourcing.cloud_service'))
+IF OBJECT_ID('outsourcing.cloud_service') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_cloud_service_classification' AND object_id = OBJECT_ID('outsourcing.cloud_service'))
     CREATE INDEX [ix_cloud_service_classification] ON [outsourcing].[cloud_service] ([organisation_id], [data_classification], [data_residency]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_cloud_service_status' AND object_id = OBJECT_ID('outsourcing.cloud_service'))
+IF OBJECT_ID('outsourcing.cloud_service') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_cloud_service_status' AND object_id = OBJECT_ID('outsourcing.cloud_service'))
     CREATE INDEX [ix_cloud_service_status] ON [outsourcing].[cloud_service] ([organisation_id], [status]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_cloud_service_ref' AND object_id = OBJECT_ID('outsourcing.cloud_service'))
+IF OBJECT_ID('outsourcing.cloud_service') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_cloud_service_ref' AND object_id = OBJECT_ID('outsourcing.cloud_service'))
     CREATE UNIQUE INDEX [ux_cloud_service_ref] ON [outsourcing].[cloud_service] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1934,10 +1934,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_exit_plan_arr' AND object_id = OBJECT_ID('outsourcing.exit_plan'))
+IF OBJECT_ID('outsourcing.exit_plan') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_exit_plan_arr' AND object_id = OBJECT_ID('outsourcing.exit_plan'))
     CREATE INDEX [ix_exit_plan_arr] ON [outsourcing].[exit_plan] ([organisation_id], [arrangement_id], [status]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_exit_plan_ref' AND object_id = OBJECT_ID('outsourcing.exit_plan'))
+IF OBJECT_ID('outsourcing.exit_plan') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_exit_plan_ref' AND object_id = OBJECT_ID('outsourcing.exit_plan'))
     CREATE UNIQUE INDEX [ux_exit_plan_ref] ON [outsourcing].[exit_plan] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -1973,10 +1973,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ongoing_review_arr' AND object_id = OBJECT_ID('outsourcing.ongoing_review'))
+IF OBJECT_ID('outsourcing.ongoing_review') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_ongoing_review_arr' AND object_id = OBJECT_ID('outsourcing.ongoing_review'))
     CREATE INDEX [ix_ongoing_review_arr] ON [outsourcing].[ongoing_review] ([organisation_id], [arrangement_id], [status]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_ongoing_review_ref' AND object_id = OBJECT_ID('outsourcing.ongoing_review'))
+IF OBJECT_ID('outsourcing.ongoing_review') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_ongoing_review_ref' AND object_id = OBJECT_ID('outsourcing.ongoing_review'))
     CREATE UNIQUE INDEX [ux_ongoing_review_ref] ON [outsourcing].[ongoing_review] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -2033,13 +2033,13 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_outsourcing_arrangement_review' AND object_id = OBJECT_ID('outsourcing.outsourcing_arrangement'))
+IF OBJECT_ID('outsourcing.outsourcing_arrangement') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_outsourcing_arrangement_review' AND object_id = OBJECT_ID('outsourcing.outsourcing_arrangement'))
     CREATE INDEX [ix_outsourcing_arrangement_review] ON [outsourcing].[outsourcing_arrangement] ([organisation_id], [next_review_due]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_outsourcing_arrangement_status' AND object_id = OBJECT_ID('outsourcing.outsourcing_arrangement'))
+IF OBJECT_ID('outsourcing.outsourcing_arrangement') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_outsourcing_arrangement_status' AND object_id = OBJECT_ID('outsourcing.outsourcing_arrangement'))
     CREATE INDEX [ix_outsourcing_arrangement_status] ON [outsourcing].[outsourcing_arrangement] ([organisation_id], [status], [materiality]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_outsourcing_arrangement_ref' AND object_id = OBJECT_ID('outsourcing.outsourcing_arrangement'))
+IF OBJECT_ID('outsourcing.outsourcing_arrangement') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_outsourcing_arrangement_ref' AND object_id = OBJECT_ID('outsourcing.outsourcing_arrangement'))
     CREATE UNIQUE INDEX [ux_outsourcing_arrangement_ref] ON [outsourcing].[outsourcing_arrangement] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -2074,10 +2074,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_outsourcing_event_arr' AND object_id = OBJECT_ID('outsourcing.outsourcing_event'))
+IF OBJECT_ID('outsourcing.outsourcing_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_outsourcing_event_arr' AND object_id = OBJECT_ID('outsourcing.outsourcing_event'))
     CREATE INDEX [ix_outsourcing_event_arr] ON [outsourcing].[outsourcing_event] ([organisation_id], [arrangement_id], [occurred_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_outsourcing_event_cloud' AND object_id = OBJECT_ID('outsourcing.outsourcing_event'))
+IF OBJECT_ID('outsourcing.outsourcing_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_outsourcing_event_cloud' AND object_id = OBJECT_ID('outsourcing.outsourcing_event'))
     CREATE INDEX [ix_outsourcing_event_cloud] ON [outsourcing].[outsourcing_event] ([organisation_id], [cloud_service_id], [occurred_at]);
 GO
 
@@ -2115,10 +2115,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_reginspect_dr_inspection' AND object_id = OBJECT_ID('reginspect.reginspect_document_request'))
+IF OBJECT_ID('reginspect.reginspect_document_request') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_reginspect_dr_inspection' AND object_id = OBJECT_ID('reginspect.reginspect_document_request'))
     CREATE INDEX [ix_reginspect_dr_inspection] ON [reginspect].[reginspect_document_request] ([organisation_id], [inspection_id], [requested_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_reginspect_dr_overdue' AND object_id = OBJECT_ID('reginspect.reginspect_document_request'))
+IF OBJECT_ID('reginspect.reginspect_document_request') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_reginspect_dr_overdue' AND object_id = OBJECT_ID('reginspect.reginspect_document_request'))
     CREATE INDEX [ix_reginspect_dr_overdue] ON [reginspect].[reginspect_document_request] ([organisation_id], [status], [due_date]);
 GO
 
@@ -2161,13 +2161,13 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_reginspect_created' AND object_id = OBJECT_ID('reginspect.reginspect_inspection'))
+IF OBJECT_ID('reginspect.reginspect_inspection') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_reginspect_created' AND object_id = OBJECT_ID('reginspect.reginspect_inspection'))
     CREATE INDEX [ix_reginspect_created] ON [reginspect].[reginspect_inspection] ([organisation_id], [created_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_reginspect_status' AND object_id = OBJECT_ID('reginspect.reginspect_inspection'))
+IF OBJECT_ID('reginspect.reginspect_inspection') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_reginspect_status' AND object_id = OBJECT_ID('reginspect.reginspect_inspection'))
     CREATE INDEX [ix_reginspect_status] ON [reginspect].[reginspect_inspection] ([organisation_id], [status]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_reginspect_external_reference' AND object_id = OBJECT_ID('reginspect.reginspect_inspection'))
+IF OBJECT_ID('reginspect.reginspect_inspection') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_reginspect_external_reference' AND object_id = OBJECT_ID('reginspect.reginspect_inspection'))
     CREATE UNIQUE INDEX [ux_reginspect_external_reference] ON [reginspect].[reginspect_inspection] ([organisation_id], [external_reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -2200,7 +2200,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_reginspect_update_inspection' AND object_id = OBJECT_ID('reginspect.reginspect_inspection_update'))
+IF OBJECT_ID('reginspect.reginspect_inspection_update') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_reginspect_update_inspection' AND object_id = OBJECT_ID('reginspect.reginspect_inspection_update'))
     CREATE INDEX [ix_reginspect_update_inspection] ON [reginspect].[reginspect_inspection_update] ([organisation_id], [inspection_id], [occurred_at]);
 GO
 
@@ -2232,7 +2232,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_regreport_event_filing' AND object_id = OBJECT_ID('regreporting.regreport_event'))
+IF OBJECT_ID('regreporting.regreport_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_regreport_event_filing' AND object_id = OBJECT_ID('regreporting.regreport_event'))
     CREATE INDEX [ix_regreport_event_filing] ON [regreporting].[regreport_event] ([organisation_id], [filing_id], [occurred_at]);
 GO
 
@@ -2278,16 +2278,16 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_regreport_filing_due' AND object_id = OBJECT_ID('regreporting.regreport_filing'))
+IF OBJECT_ID('regreporting.regreport_filing') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_regreport_filing_due' AND object_id = OBJECT_ID('regreporting.regreport_filing'))
     CREATE INDEX [ix_regreport_filing_due] ON [regreporting].[regreport_filing] ([organisation_id], [due_date]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_regreport_filing_obligation' AND object_id = OBJECT_ID('regreporting.regreport_filing'))
+IF OBJECT_ID('regreporting.regreport_filing') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_regreport_filing_obligation' AND object_id = OBJECT_ID('regreporting.regreport_filing'))
     CREATE INDEX [ix_regreport_filing_obligation] ON [regreporting].[regreport_filing] ([organisation_id], [obligation_id], [period_end]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_regreport_filing_status' AND object_id = OBJECT_ID('regreporting.regreport_filing'))
+IF OBJECT_ID('regreporting.regreport_filing') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_regreport_filing_status' AND object_id = OBJECT_ID('regreporting.regreport_filing'))
     CREATE INDEX [ix_regreport_filing_status] ON [regreporting].[regreport_filing] ([organisation_id], [status], [due_date]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_regreport_filing_reference' AND object_id = OBJECT_ID('regreporting.regreport_filing'))
+IF OBJECT_ID('regreporting.regreport_filing') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_regreport_filing_reference' AND object_id = OBJECT_ID('regreporting.regreport_filing'))
     CREATE UNIQUE INDEX [ux_regreport_filing_reference] ON [regreporting].[regreport_filing] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -2325,10 +2325,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_regreport_obligation_active' AND object_id = OBJECT_ID('regreporting.regreport_obligation'))
+IF OBJECT_ID('regreporting.regreport_obligation') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_regreport_obligation_active' AND object_id = OBJECT_ID('regreporting.regreport_obligation'))
     CREATE INDEX [ix_regreport_obligation_active] ON [regreporting].[regreport_obligation] ([organisation_id], [active], [regulator]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_regreport_obligation_code' AND object_id = OBJECT_ID('regreporting.regreport_obligation'))
+IF OBJECT_ID('regreporting.regreport_obligation') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_regreport_obligation_code' AND object_id = OBJECT_ID('regreporting.regreport_obligation'))
     CREATE UNIQUE INDEX [ux_regreport_obligation_code] ON [regreporting].[regreport_obligation] ([organisation_id], [code]) WHERE ([is_deleted]=(0));
 GO
 
@@ -2367,7 +2367,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rrp_cf_cycle' AND object_id = OBJECT_ID('rrp.rrp_critical_function'))
+IF OBJECT_ID('rrp.rrp_critical_function') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rrp_cf_cycle' AND object_id = OBJECT_ID('rrp.rrp_critical_function'))
     CREATE INDEX [ix_rrp_cf_cycle] ON [rrp].[rrp_critical_function] ([organisation_id], [cycle_id], [function_code]);
 GO
 
@@ -2414,10 +2414,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rrp_cycle_status' AND object_id = OBJECT_ID('rrp.rrp_cycle'))
+IF OBJECT_ID('rrp.rrp_cycle') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rrp_cycle_status' AND object_id = OBJECT_ID('rrp.rrp_cycle'))
     CREATE INDEX [ix_rrp_cycle_status] ON [rrp].[rrp_cycle] ([organisation_id], [status], [fiscal_year]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_rrp_cycle_reference' AND object_id = OBJECT_ID('rrp.rrp_cycle'))
+IF OBJECT_ID('rrp.rrp_cycle') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_rrp_cycle_reference' AND object_id = OBJECT_ID('rrp.rrp_cycle'))
     CREATE UNIQUE INDEX [ux_rrp_cycle_reference] ON [rrp].[rrp_cycle] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -2454,7 +2454,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rrp_event_cycle' AND object_id = OBJECT_ID('rrp.rrp_event'))
+IF OBJECT_ID('rrp.rrp_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rrp_event_cycle' AND object_id = OBJECT_ID('rrp.rrp_event'))
     CREATE INDEX [ix_rrp_event_cycle] ON [rrp].[rrp_event] ([organisation_id], [cycle_id], [occurred_at]);
 GO
 
@@ -2494,10 +2494,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rrp_indicator_band' AND object_id = OBJECT_ID('rrp.rrp_indicator'))
+IF OBJECT_ID('rrp.rrp_indicator') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rrp_indicator_band' AND object_id = OBJECT_ID('rrp.rrp_indicator'))
     CREATE INDEX [ix_rrp_indicator_band] ON [rrp].[rrp_indicator] ([organisation_id], [current_band], [cycle_id]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rrp_indicator_cycle' AND object_id = OBJECT_ID('rrp.rrp_indicator'))
+IF OBJECT_ID('rrp.rrp_indicator') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rrp_indicator_cycle' AND object_id = OBJECT_ID('rrp.rrp_indicator'))
     CREATE INDEX [ix_rrp_indicator_cycle] ON [rrp].[rrp_indicator] ([organisation_id], [cycle_id], [indicator_code]);
 GO
 
@@ -2538,7 +2538,7 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rrp_option_cycle' AND object_id = OBJECT_ID('rrp.rrp_recovery_option'))
+IF OBJECT_ID('rrp.rrp_recovery_option') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_rrp_option_cycle' AND object_id = OBJECT_ID('rrp.rrp_recovery_option'))
     CREATE INDEX [ix_rrp_option_cycle] ON [rrp].[rrp_recovery_option] ([organisation_id], [cycle_id], [option_code]);
 GO
 
@@ -2581,10 +2581,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_finding_status_sev' AND object_id = OBJECT_ID('sharia.sharia_audit_finding'))
+IF OBJECT_ID('sharia.sharia_audit_finding') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_finding_status_sev' AND object_id = OBJECT_ID('sharia.sharia_audit_finding'))
     CREATE INDEX [ix_sharia_finding_status_sev] ON [sharia].[sharia_audit_finding] ([organisation_id], [status], [severity], [raised_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_sharia_finding_reference' AND object_id = OBJECT_ID('sharia.sharia_audit_finding'))
+IF OBJECT_ID('sharia.sharia_audit_finding') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_sharia_finding_reference' AND object_id = OBJECT_ID('sharia.sharia_audit_finding'))
     CREATE UNIQUE INDEX [ux_sharia_finding_reference] ON [sharia].[sharia_audit_finding] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -2620,16 +2620,16 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_event_finding' AND object_id = OBJECT_ID('sharia.sharia_event'))
+IF OBJECT_ID('sharia.sharia_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_event_finding' AND object_id = OBJECT_ID('sharia.sharia_event'))
     CREATE INDEX [ix_sharia_event_finding] ON [sharia].[sharia_event] ([organisation_id], [audit_finding_id], [occurred_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_event_nc' AND object_id = OBJECT_ID('sharia.sharia_event'))
+IF OBJECT_ID('sharia.sharia_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_event_nc' AND object_id = OBJECT_ID('sharia.sharia_event'))
     CREATE INDEX [ix_sharia_event_nc] ON [sharia].[sharia_event] ([organisation_id], [nc_event_id], [occurred_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_event_product' AND object_id = OBJECT_ID('sharia.sharia_event'))
+IF OBJECT_ID('sharia.sharia_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_event_product' AND object_id = OBJECT_ID('sharia.sharia_event'))
     CREATE INDEX [ix_sharia_event_product] ON [sharia].[sharia_event] ([organisation_id], [product_approval_id], [occurred_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_event_resolution' AND object_id = OBJECT_ID('sharia.sharia_event'))
+IF OBJECT_ID('sharia.sharia_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_event_resolution' AND object_id = OBJECT_ID('sharia.sharia_event'))
     CREATE INDEX [ix_sharia_event_resolution] ON [sharia].[sharia_event] ([organisation_id], [resolution_id], [occurred_at]);
 GO
 
@@ -2671,10 +2671,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_nc_status' AND object_id = OBJECT_ID('sharia.sharia_nc_event'))
+IF OBJECT_ID('sharia.sharia_nc_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_nc_status' AND object_id = OBJECT_ID('sharia.sharia_nc_event'))
     CREATE INDEX [ix_sharia_nc_status] ON [sharia].[sharia_nc_event] ([organisation_id], [status], [detected_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_sharia_nc_reference' AND object_id = OBJECT_ID('sharia.sharia_nc_event'))
+IF OBJECT_ID('sharia.sharia_nc_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_sharia_nc_reference' AND object_id = OBJECT_ID('sharia.sharia_nc_event'))
     CREATE UNIQUE INDEX [ux_sharia_nc_reference] ON [sharia].[sharia_nc_event] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -2717,10 +2717,10 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_product_status' AND object_id = OBJECT_ID('sharia.sharia_product_approval'))
+IF OBJECT_ID('sharia.sharia_product_approval') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_product_status' AND object_id = OBJECT_ID('sharia.sharia_product_approval'))
     CREATE INDEX [ix_sharia_product_status] ON [sharia].[sharia_product_approval] ([organisation_id], [status], [submitted_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_sharia_product_reference' AND object_id = OBJECT_ID('sharia.sharia_product_approval'))
+IF OBJECT_ID('sharia.sharia_product_approval') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_sharia_product_reference' AND object_id = OBJECT_ID('sharia.sharia_product_approval'))
     CREATE UNIQUE INDEX [ux_sharia_product_reference] ON [sharia].[sharia_product_approval] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -2763,13 +2763,13 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_resolution_status' AND object_id = OBJECT_ID('sharia.sharia_resolution'))
+IF OBJECT_ID('sharia.sharia_resolution') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_resolution_status' AND object_id = OBJECT_ID('sharia.sharia_resolution'))
     CREATE INDEX [ix_sharia_resolution_status] ON [sharia].[sharia_resolution] ([organisation_id], [status], [submitted_at]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_resolution_subject' AND object_id = OBJECT_ID('sharia.sharia_resolution'))
+IF OBJECT_ID('sharia.sharia_resolution') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_resolution_subject' AND object_id = OBJECT_ID('sharia.sharia_resolution'))
     CREATE INDEX [ix_sharia_resolution_subject] ON [sharia].[sharia_resolution] ([organisation_id], [subject_area]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_sharia_resolution_reference' AND object_id = OBJECT_ID('sharia.sharia_resolution'))
+IF OBJECT_ID('sharia.sharia_resolution') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_sharia_resolution_reference' AND object_id = OBJECT_ID('sharia.sharia_resolution'))
     CREATE UNIQUE INDEX [ux_sharia_resolution_reference] ON [sharia].[sharia_resolution] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 
@@ -2809,13 +2809,13 @@ BEGIN
     );
 END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_scholar_status' AND object_id = OBJECT_ID('sharia.sharia_scholar'))
+IF OBJECT_ID('sharia.sharia_scholar') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_scholar_status' AND object_id = OBJECT_ID('sharia.sharia_scholar'))
     CREATE INDEX [ix_sharia_scholar_status] ON [sharia].[sharia_scholar] ([organisation_id], [status]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_scholar_term_end' AND object_id = OBJECT_ID('sharia.sharia_scholar'))
+IF OBJECT_ID('sharia.sharia_scholar') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_sharia_scholar_term_end' AND object_id = OBJECT_ID('sharia.sharia_scholar'))
     CREATE INDEX [ix_sharia_scholar_term_end] ON [sharia].[sharia_scholar] ([organisation_id], [term_end]);
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_sharia_scholar_reference' AND object_id = OBJECT_ID('sharia.sharia_scholar'))
+IF OBJECT_ID('sharia.sharia_scholar') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_sharia_scholar_reference' AND object_id = OBJECT_ID('sharia.sharia_scholar'))
     CREATE UNIQUE INDEX [ux_sharia_scholar_reference] ON [sharia].[sharia_scholar] ([organisation_id], [reference]) WHERE ([is_deleted]=(0));
 GO
 

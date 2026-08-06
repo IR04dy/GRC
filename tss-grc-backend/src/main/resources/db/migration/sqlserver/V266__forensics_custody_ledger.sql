@@ -34,14 +34,12 @@ GO
 
 -- Ordered chain per artefact; the unique (org, artefact, seq) prevents a duplicate
 -- or out-of-order sequence number sneaking in.
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_fce_artefact_seq'
-               AND object_id = OBJECT_ID('socops.forensics_custody_event'))
+IF OBJECT_ID('socops.forensics_custody_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_fce_artefact_seq' AND object_id = OBJECT_ID('socops.forensics_custody_event'))
 CREATE UNIQUE INDEX uq_fce_artefact_seq
     ON socops.forensics_custody_event (organisation_id, artefact_id, seq_no);
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_fce_artefact'
-               AND object_id = OBJECT_ID('socops.forensics_custody_event'))
+IF OBJECT_ID('socops.forensics_custody_event') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_fce_artefact' AND object_id = OBJECT_ID('socops.forensics_custody_event'))
 CREATE INDEX ix_fce_artefact
     ON socops.forensics_custody_event (artefact_id, seq_no);
 GO
