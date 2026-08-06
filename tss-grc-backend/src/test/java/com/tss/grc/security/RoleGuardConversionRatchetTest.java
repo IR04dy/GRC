@@ -289,6 +289,109 @@ class RoleGuardConversionRatchetTest {
             .isEmpty();
     }
 
+    /**
+     * F2-52 — a role name that matches no row in {@code iam.roles} is a permanently false OR leg.
+     *
+     * <p>This is the half {@link #noRoleGuardNamesAnUnmatchableRole()} explicitly delegated to a
+     * script. A script answers only when someone runs it; this runs on every build. The catalogue is
+     * pinned as a constant precisely so the check stays <b>hermetic</b> — {@code CLAUDE.md} requires
+     * {@code mvn -o clean package} to need no database, and that constraint is what pushed this
+     * question out of the suite in the first place.
+     *
+     * <p><b>A ratchet, not zero.</b> Ghost names already exist; demanding zero would block unrelated
+     * work on a pre-existing sweep. The count may only fall.
+     *
+     * <p><b>⚠ The pinned catalogue is a copy, and copies drift.</b> {@link #ROLE_CATALOGUE} was read
+     * from {@code iam.roles} on 2026-08-06 (58 active rows). If a genuinely new role is added, this
+     * test fails until the name is pinned — which is the correct outcome, not friction: a role the
+     * guards rely on should be declared somewhere the build can see. It is <b>not</b> the authority on
+     * what roles exist; {@code Appendix/scripts/role_guard_census.py} still owns that. This asserts
+     * only that no guard names something absent from both.
+     */
+    @Test
+    void noRoleGuardNamesARoleThatDoesNotExist() throws Exception {
+        Census census = scan();
+
+        List<String> ghosts = new ArrayList<>();
+        for (String name : census.roleNames) {
+            if (!ROLE_CATALOGUE.contains(name)) {
+                ghosts.add(name);
+            }
+        }
+        java.util.Collections.sort(ghosts);
+        System.out.println("[F2-52] role names recited by guards = " + census.roleNames.size()
+            + " ; not in the catalogue = " + ghosts.size() + " -> " + ghosts);
+
+        // The instrument must be able to speak: a scan that finds no names would report zero ghosts.
+        assertThat(census.roleNames.size())
+            .as("the guard scan found %d role names; the codebase recites dozens across 537 pure role "
+                + "sites. A collapsed scan reports zero ghosts, which is the reassuring direction.",
+                census.roleNames.size())
+            .isGreaterThanOrEqualTo(40);
+
+        assertThat(ghosts.size())
+            .as("%d role names recited by @PreAuthorize match no row in iam.roles, against a baseline "
+                + "of %d. Each is a permanently false OR leg: hasAnyRole('X') tests for the authority "
+                + "ROLE_X, so a guard reciting a non-existent role is strictly tighter than it reads, "
+                + "and a reader auditing authorisation is told a role can reach an endpoint when "
+                + "nothing can. Either correct the name or drop the leg — do not raise the baseline. "
+                + "Ghosts: %s", ghosts.size(), BASELINE_GHOST_ROLE_NAMES, ghosts)
+            .isLessThanOrEqualTo(BASELINE_GHOST_ROLE_NAMES);
+    }
+
+    /**
+     * Active role names in {@code iam.roles}, read 2026-08-06 (58 rows).
+     *
+     * <p>Pinned rather than queried so the unit suite stays database-free. See
+     * {@link #noRoleGuardNamesARoleThatDoesNotExist()} for why a copy is acceptable here and what it
+     * is deliberately not claiming.
+     */
+    private static final Set<String> ROLE_CATALOGUE = Set.of(
+        "APPSEC_INGEST", "APPSEC_LEAD", "ASSET_OWNER", "AUDITOR",
+        "BCM_MANAGER", "BIA_OWNER", "BOARD_SECRETARY", "BRAND_INGEST",
+        "BRAND_MONITORING", "CFO", "CHANGE_MANAGER", "CISO",
+        "COMPLIANCE_OFFICER", "CONTROL_OWNER", "CRISIS_MANAGER", "CYBER_MANAGER",
+        "DATA_OWNER", "DLP_INGEST", "DLP_REVIEWER", "DPO",
+        "DR_OWNER", "EMERGENCY_RESPONDER", "EVIDENCE_OWNER", "EXECUTIVE_REVIEWER",
+        "EXTERNAL_AUDITOR", "FINANCE_LEAD", "FORENSICS_LEAD", "FRAUD_INVESTIGATOR",
+        "GRC_ADMINISTRATOR", "HR_LEAD", "IAM_LEAD", "INTERNAL_AUDITOR",
+        "IR_LEAD", "JML_INGEST", "LEGAL_COUNSEL", "LEGAL_REVIEWER",
+        "MA_LEAD", "NCA_COMPLIANCE", "ORG_ADMIN", "OT_LEAD",
+        "PLATFORM_ADMIN", "PRIVACY_MANAGER", "PROCUREMENT_OWNER", "REGULATOR_VIEWER",
+        "RISK_ANALYST", "RISK_MANAGER", "RISK_OWNER", "SBOM_INGEST",
+        "SCANNER_INGEST", "SECURITY_ANALYST", "SERVICE_OWNER", "SIEM_INGEST",
+        "SUPPLIER_MANAGER", "SUPPLIER_USER", "SUSTAINABILITY_OFFICER", "TI_INGEST",
+        "VIEWER", "VULN_MANAGER");
+
+    /**
+     * Ghost names measured 2026-08-06: <b>28</b>. <b>MUST only ever decrease.</b>
+     *
+     * <p>The full set, so the work is scoped rather than merely counted: {@code AML_OFFICER},
+     * {@code AUDIT_COMMITTEE_CHAIR}, {@code AUDIT_COMMITTEE_MEMBER}, {@code AUDIT_DIRECTOR},
+     * {@code BOARD_MEMBER}, {@code CIO}, {@code CISO_GOVERNANCE}, {@code COMPANY_SECRETARY},
+     * {@code CONSUMER_PROTECTION_OFFICER}, {@code CONTENT_EDITOR}, {@code CREDIT_OFFICER},
+     * {@code CRISIS_COMMANDER}, {@code CRO}, {@code ETHICS_OFFICER}, {@code FACILITATOR},
+     * {@code HR_DIRECTOR}, {@code INCIDENT_COMMANDER}, {@code KYC_OFFICER}, {@code MODEL_OWNER},
+     * {@code ONBOARDING_AGENT}, {@code OPEN_BANKING_OFFICER}, {@code PRIVACY_OFFICER},
+     * {@code SHARIA_AUDITOR}, {@code SHARIA_BOARD_CHAIR}, {@code SHARIA_OFFICER}, {@code SOC_LEAD},
+     * {@code TPRM_LEAD}, {@code USER}.
+     *
+     * <p>Several are near-misses for a role that <i>does</i> exist and read as typos rather than
+     * policy: {@code PRIVACY_OFFICER} beside the real {@code PRIVACY_MANAGER}, {@code SOC_LEAD} beside
+     * {@code SECURITY_ANALYST}/{@code IR_LEAD}, {@code TPRM_LEAD} beside {@code SUPPLIER_MANAGER}.
+     * Others are governance identities the platform models as committee <i>seats</i> rather than roles
+     * ({@code BOARD_MEMBER}, {@code AUDIT_COMMITTEE_CHAIR}, {@code COMPANY_SECRETARY}) — for those the
+     * guard is asking the wrong question, not misspelling the answer, which is F2-26's territory.
+     * {@code CONTENT_EDITOR} is already named in F2-53's row as a ghost.
+     *
+     * <p>⚠ The plan records "40 of the 74 recited names do not exist". This measures <b>28</b> against
+     * the 58 active rows. The figures are not comparable without knowing what the earlier one counted
+     * — it may have included the malformed names the sibling test now bans, or run against a smaller
+     * catalogue. <b>28 is what this instrument measures today; it does not refute the 40 and should not
+     * be read as doing so.</b>
+     */
+    private static final int BASELINE_GHOST_ROLE_NAMES = 28;
+
     // ── extraction ────────────────────────────────────────────────────────────────────────────
 
     private record Census(int controllers, int roleSites, int pureSites, int pureUnderModule,
