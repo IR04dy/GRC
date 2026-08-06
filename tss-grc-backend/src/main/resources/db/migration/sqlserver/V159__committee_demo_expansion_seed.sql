@@ -30,6 +30,57 @@ DECLARE @org BIGINT = 1;
 -- 1. Instantiate 5 new demo committees from V154 templates
 -- ═════════════════════════════════════════════════════════════════════
 
+
+-- ═════════════════════════════════════════════════════════════════════
+-- 1b. The Executive Committee (F2-77 / V331, added 2026-08-06)
+-- ═════════════════════════════════════════════════════════════════════
+--
+-- WHY THIS ARRIVED LATE, AND WHY IT IS IN *THIS* FILE.
+--
+-- V331 verifies that every board_pack.packs.audience matches an
+-- admin.committees.committee_type, and THROWS otherwise. On a Flyway-built database it
+-- threw: three demo packs carry audiences BOARD, RISK_COMMITTEE and EXEC_COMMITTEE, and
+-- the first two are seeded here while EXEC_COMMITTEE was created only by the Python
+-- bootstrap. Dev and prod both hold COM-EXEC "Executive Committee" (organisation 1),
+-- so V331 passed everywhere anyone looked and failed on the one build no one ran: a
+-- fresh install. Same shape as F2-146 — data that exists because a script made it, not
+-- because a migration did.
+--
+-- It belongs in V159 rather than a new V361 for a mechanical reason: V331 runs FIRST, so
+-- a later file cannot satisfy its guard. Editing V159 is checksum-safe because the
+-- deployed server is baselined at 292, which never recorded a checksum for V1-V291.
+--
+-- Values are copied from the live dev row, not invented. EXEC_COMMITTEE is already in
+-- CommitteeTypes.VALUES and in the CK_com_type CHECK, so the vocabulary always intended
+-- this committee to exist; only the seed was missing.
+
+IF NOT EXISTS (SELECT 1 FROM admin.committees WHERE code = N'COM-EXEC')
+BEGIN
+    INSERT INTO admin.committees
+        (organisation_id, code, name_en, name_ar, description_en, description_ar,
+         committee_type, chairperson_name, chairperson_role, secretary_name,
+         members_json, charter_en, charter_ar,
+         meeting_cadence, quorum_pct, status, external_id,
+         charter_template_code, regulatory_domain, regulator_anchors)
+    VALUES
+        (@org, N'COM-EXEC',
+         N'Executive Committee', N'اللجنة التنفيذية',
+         N'Top management committee; drives execution of strategy and operational decisions.',
+         N'لجنة الإدارة العليا؛ تقود تنفيذ الاستراتيجية والقرارات التشغيلية.',
+         N'EXEC_COMMITTEE',
+         N'President of the Authority', N'Chair',
+         N'Board & Committees Secretariat',
+         N'[{"name": "President of the Authority", "role": "Chair", "votingMember": true}, {"name": "Deputy for Shared Services", "role": "Member", "votingMember": true}, {"name": "Deputy for Digital Transformation & Data", "role": "Member", "votingMember": true}, {"name": "Deputy for Operations & Services", "role": "Member", "votingMember": true}, {"name": "Director of Strategy & Performance", "role": "Member", "votingMember": true}]',
+         N'Coordinates execution of the approved strategy, budgets and cross-deputyship operational decisions.',
+         N'تنسق تنفيذ الاستراتيجية المعتمدة والميزانيات والقرارات التشغيلية بين الوكالات.',
+         N'MONTHLY', 60, N'ACTIVE', N'EXT-COM-EXEC',
+         NULL, N'PUBLIC', N'Vision2030');
+END
+
+-- ⚠ No GO here, deliberately. @org is declared in an earlier batch of this file and T-SQL
+-- variables do not survive a batch boundary; the first version of this block ended with GO
+-- and every insert below it failed with "Must declare the scalar variable @org".
+
 IF NOT EXISTS (SELECT 1 FROM admin.committees WHERE code = N'COM-COMPLIANCE')
 BEGIN
     INSERT INTO admin.committees
