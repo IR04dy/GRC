@@ -39,11 +39,43 @@ import java.util.List;
  *   <li>Campaign management (create/open/close), review,
  *       recusal record → {@code PLATFORM_ADMIN}, {@code ETHICS_OFFICER},
  *       {@code BOARD_SECRETARY}, {@code COMPLIANCE_OFFICER}.</li>
- *   <li>Declaration submission additionally allows {@code USER} (any
- *       authenticated employee can submit their own attestation).</li>
+ *   <li>Declaration submission is {@code isAuthenticated()} — see below.</li>
  *   <li>Read endpoints share the management role set — a future
  *       slice will scope per-user reads via row-level checks.</li>
  * </ul>
+ *
+ * <h3>⚠ F2-144 — submission was open to nobody, and the obvious fix would have opened impersonation</h3>
+ * <p>This javadoc used to say <i>"Declaration submission additionally allows {@code USER} (any
+ * authenticated employee can submit their own attestation)"</i>. <b>That capability had never worked.</b>
+ * {@code SUBMIT_GUARD} recited {@code 'ETHICS_OFFICER'} and {@code 'USER'} and <b>neither name exists in
+ * any row of {@code iam.roles}</b> — both legs were permanently false — so submission reduced to
+ * {@code PLATFORM_ADMIN │ BOARD_SECRETARY │ COMPLIANCE_OFFICER}: a Nazaha conflict-of-interest campaign
+ * ran with every declarant locked out and three administrators filing on everyone's behalf.
+ *
+ * <p><b>The order of the fix was not optional.</b> Widening this guard was unsafe while
+ * {@code submitDeclaration} took {@code userId} from the request body and stored it verbatim, because any
+ * authenticated caller could then have attested <i>in another person's name</i> — the one outcome a COI
+ * process exists to prevent. F2-144(a) moved the choice of declarant to the server
+ * ({@code CoiService#declarantFor}: a holder of a COI management authority may still file on an
+ * employee's behalf, everyone else declares for themselves and the body's {@code userId} is ignored).
+ * Only then did (b) open the guard.
+ *
+ * <p><b>Why {@code isAuthenticated()} and not a permission.</b> ADR-010 makes
+ * {@code hasPermission(MODULE, ACTION)} the rule for writes; its §Sanctioned exceptions carves out
+ * endpoints that discharge an obligation every employee is under, following ADR-017 D-7's ruling on
+ * knowledge-base reads. Declaring a conflict of interest is such an obligation: a grant list can only
+ * ever wrongly <em>exclude</em> a declarant, and an employee who cannot file is a compliance failure
+ * that looks like the employee's fault. Reading how to declare is already open for that reason — the
+ * <i>"Disclosing a Conflict of Interest (Nazaha)"</i> article is one of D-7's worked examples — so gating
+ * the act itself behind a grant would have left the platform explaining the duty to people it then
+ * refused. Pinned by {@code CoiSubmitGuardTest} and enumerated in
+ * {@code ControllerAuthorizationRatchetTest.SELF_SCOPED} so a uniformity sweep cannot quietly "fix" it.
+ *
+ * <p>Campaign management, review and recusal keep the role set: those are authority acts over
+ * <em>other people's</em> declarations, and they are the correct target for a later F2-05 conversion to
+ * {@code ETHICS:*} permissions. {@code ETHICS_OFFICER} stays a ghost leg there — dropping it would
+ * silently ratify compliance-officer ownership of ethics oversight, which is F2-145's reasoning, and no
+ * such decision has been made.
  */
 @RestController
 @RequestMapping("/api/v1/coi")
@@ -55,8 +87,9 @@ public class CoiController {
 
     private static final String MANAGE_GUARD =
             "hasAnyRole('PLATFORM_ADMIN','ETHICS_OFFICER','BOARD_SECRETARY','COMPLIANCE_OFFICER')";
-    private static final String SUBMIT_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','ETHICS_OFFICER','BOARD_SECRETARY','COMPLIANCE_OFFICER','USER')";
+    /** See the class javadoc. Every employee is under the obligation this endpoint discharges, and the
+     *  declarant is chosen by the server (F2-144a), not by the caller's body. */
+    private static final String SUBMIT_GUARD = "isAuthenticated()";
 
     private final CoiService service;
 

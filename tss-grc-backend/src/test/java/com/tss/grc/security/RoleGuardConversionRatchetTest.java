@@ -431,8 +431,17 @@ class RoleGuardConversionRatchetTest {
      * — it may have included the malformed names the sibling test now bans, or run against a smaller
      * catalogue. <b>28 is what this instrument measures today; it does not refute the 40 and should not
      * be read as doing so.</b>
+     *
+     * <p><b>24 → 23 (F2-144b, 2026-08-06): {@code USER} is gone.</b> It occurred exactly once in the
+     * whole of {@code src/main/java} — {@code CoiController.SUBMIT_GUARD} — which is now
+     * {@code isAuthenticated()}, so the name has left the source entirely rather than moved. ⚠ Note what
+     * did <b>not</b> happen: {@code ETHICS_OFFICER}, the other ghost in that same expression, is still
+     * counted, because it also sits in {@code MANAGE_GUARD} and dropping it there would silently ratify
+     * compliance-officer ownership of ethics oversight — F2-145's reasoning, applied to a second module.
+     * A one-line change removing two dead names therefore moves this baseline by one, which is the
+     * clearest illustration available of why this number is a <em>name</em> count and not a defect count.
      */
-    private static final int BASELINE_GHOST_ROLE_NAMES = 24;
+    private static final int BASELINE_GHOST_ROLE_NAMES = 23;
 
     // ── extraction ────────────────────────────────────────────────────────────────────────────
 

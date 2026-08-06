@@ -907,10 +907,62 @@ the principal answers; "who drafted it" is a different fact that may legitimatel
 
 ---
 
+## D-13 — F2-144(b): filing a conflict of interest is **`isAuthenticated()`**, and the exception becomes a rule (closes F2-144)
+
+**The decision asked for:** may `CoiController#submitDeclaration` be guarded by `isAuthenticated()`, which
+ADR-010 forbids for writes?
+
+**Decision: yes — and D-7 stops being a one-off.** ADR-010 gains a §Sanctioned exceptions section defining
+the class both members belong to: **an endpoint that discharges an obligation every employee is under is
+guarded by `isAuthenticated()`, not by a permission.** Admission needs a universal duty, a
+**server-bound subject**, and a pinning test. Two members today: knowledge-base reads (D-7) and COI
+submission (this decision).
+
+**Why not a permission.** Symmetrically-wrong guards are not symmetrically costly. A grant list can only
+ever wrongly *exclude* — and for an endpoint that is how a person *complies with a duty*, exclusion means
+the obligation still stands, the platform records no discharge of it, and the gap reads as the employee's
+fault. D-7 reached this by reading the knowledge base's corpus; the same logic transfers to the act
+itself. Note the platform had **already** agreed for the instructions: D-7 deliberately keeps *"Disclosing
+a Conflict of Interest (Nazaha)"* readable by every employee. Gating the *doing* behind a grant while the
+*explaining* is open would have left the product describing a duty to people it then refused.
+
+**Why this was not safe to decide before now, which is the part worth keeping.** F2-144 found the guard
+reciting `'ETHICS_OFFICER'` and `'USER'` — **neither is a role** — so submission had collapsed to three
+administrators and the stated capability had never worked. The obvious remedy, opening the guard, would
+have been **worse than the defect**: `submitDeclaration` took `userId` from the request body, so any
+authenticated caller could have attested in a colleague's name. The dead legs were the only thing
+preventing an unbound write. Part (a) moved the choice of declarant to the server; only then did (b)
+become a decision about authorisation rather than a hole. **Server-bound subject is therefore condition 2
+of the new rule, not a footnote to it** — without it the exception is an impersonation path.
+
+➕ **A second, quieter change came with it, and it is the more durable one.**
+`ControllerAuthorizationRatchetTest` asserted `count <= 21` while its javadoc *enumerated* those 21 in
+three reasoned buckets. Prose is not an assertion. A count ceiling tolerates the population it measures:
+any member could have been swapped for a different unguarded endpoint, or all 21 guarded and 21 fresh ones
+introduced, and the test would have read green — the `BARE_EXPORT_CEILING` defect house rule 3 already
+records. Granting this exception was the first request to *add* a floor member since the enumeration was
+written, so the floor became a **pinned set** asserted in both directions. It now fails when a member is
+guarded and not removed, which a ceiling can never do, and the count (22) is derived from the reviewed set
+rather than declared beside it.
+
+⚠ **What was deliberately not done:** `ETHICS_OFFICER` remains in `CoiController.MANAGE_GUARD` as a dead
+leg. Dropping it there would silently ratify **compliance-officer ownership of ethics oversight** — F2-145's
+reasoning applied to a second module — and no such decision has been made. Reviewing, opening and closing
+campaigns and recording recusals are authority acts over *other people's* declarations; they keep the role
+set and are the correct target for a later F2-05 conversion to `ETHICS:*`. So a one-line change removing
+two dead names moves the ghost baseline by **one** (24 → 23), which is the clearest illustration to hand
+that the ghost count is a *name* count, not a defect count.
+
+**No migration.** Nothing is catalogued: the point of the decision is that no permission is created. Had
+one been, F2-13b's anti-pattern — a catalogued permission guarding no endpoint — would apply.
+
+---
+
 ## Consequences
 
 **Unblocked immediately:** Wave 2 (W2-0, F2-04) via D-1; S6/S7/S8/CE-13 via D-2 and D-3; F2-42, F2-49,
-F2-53, and the fraud/integration/export tails.
+F2-53, and the fraud/integration/export tails. F2-144 via D-13, which also converts the authorisation
+ratchet from a count ceiling to a pinned set.
 
 **Newly scheduled work this ADR creates**, in dependency order — each needs its own verified slice, none is
 done by this document: the module-registry SKU reconciliation (D-1); per-tenant CAB configuration with

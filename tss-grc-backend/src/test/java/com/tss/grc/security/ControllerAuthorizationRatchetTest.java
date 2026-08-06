@@ -16,6 +16,8 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -143,21 +145,158 @@ class ControllerAuthorizationRatchetTest {
      * APPROVE, which VIEWER does not hold (403 verified). A grant-tightness audit —
      * "which permissions are so widely granted that guarding on them is cosmetic?" — is
      * a separate exercise from this endpoint-coverage ratchet.
+     *
+     * <h3>⚠ 2026-08-06 (F2-144b) — the floor is now a PINNED SET, not a count</h3>
+     * <p>Everything above stays true and is kept as the derivation of the number. What changed is the
+     * assertion. For a year this test asserted {@code count <= 21} while the javadoc *enumerated* the
+     * 21 in three reasoned buckets — so the prose was an invariant and the code was a ceiling, and only
+     * the code runs. A ceiling tolerates the population it measures: any of the 21 could have been
+     * swapped for a different unguarded endpoint, or all 21 guarded and 21 fresh ones introduced, and
+     * this test would have read green both times. That is the same defect house rule 3 records against
+     * {@code BARE_EXPORT_CEILING} — <b>once a residue is enumerated and reviewed, leaving a count in
+     * place makes a tolerated endpoint indistinguishable from a reviewed one</b>.
+     *
+     * <p>The three buckets are now {@link #PUBLIC_BY_DESIGN}, {@link #SELF_SCOPED} and
+     * {@link #PENDING_OWNERSHIP_FIX}, and the scan must equal their union <b>exactly</b>. That makes the
+     * test honest in the direction a ceiling can never be: when an endpoint on this list is finally
+     * guarded, renamed or deleted, the test <b>fails</b> and the entry must be removed — so the floor
+     * cannot silently retain members that no longer exist, and the count is derived from the reviewed
+     * set rather than declared beside it.
+     *
+     * <p>What prompted the conversion: F2-144(b) is the first request to <em>add</em> a member since the
+     * floor was enumerated, and the honest way to grant one is to make admission a reviewed act with a
+     * stated reason instead of a number bump. See {@link #SELF_SCOPED}'s note on
+     * {@code CoiController#submitDeclaration}.
      */
-    private static final int BASELINE_UNGUARDED_WRITE_ENDPOINTS = 21;
+    private static final Set<String> PUBLIC_BY_DESIGN = Set.of(
+            "AuthController#login",
+            "AuthController#logout",
+            "AuthController#refresh",
+            "ComplaintController#submitPublic",
+            "PublicWorkflowRequestController#respond",
+            "VendorBcpAttestationController#submitByToken",
+            "WhistleblowerCaseController#publicReply",
+            "WhistleblowerCaseController#publicSubmit");
+
+    /**
+     * The principal IS the authority: the handler resolves the row from the caller, so there is no
+     * subject for a permission to be wrong about.
+     *
+     * <p><b>{@code CoiController#submitDeclaration} — admitted 2026-08-06 (F2-144b), and the order of
+     * the two halves is the whole point.</b> The guard was
+     * {@code hasAnyRole(…,'ETHICS_OFFICER','USER')} where <b>both of those names exist in no row of
+     * {@code iam.roles}</b>, so a Nazaha conflict-of-interest campaign ran with every declarant locked
+     * out and three administrators able to file on their behalf. Opening it to
+     * {@code isAuthenticated()} was <em>unsafe until F2-144(a) landed</em>, because
+     * {@code submitDeclaration} took {@code userId} from the request body — so a wider guard would have
+     * let any authenticated user attest in another person's name, the one thing a COI process exists to
+     * prevent. Part (a) made the server choose the declarant, which is exactly what qualifies this
+     * endpoint for <em>this</em> bucket rather than for a raised ceiling: it is self-scoped <b>now</b>,
+     * and it was not before. A permission is the wrong instrument here for F2-53/ADR-017 D-7's reason —
+     * an obligation every employee is under cannot be gated by a grant list, because a grant list can
+     * only ever wrongly exclude someone, and an employee who cannot file their declaration is a
+     * compliance failure that looks like the employee's fault. ADR-010's amended §Sanctioned exceptions
+     * states the rule; {@code CoiSubmitGuardTest} pins the expression.
+     */
+    private static final Set<String> SELF_SCOPED = Set.of(
+            "CoiController#submitDeclaration",
+            "HelpController#trackView",
+            "NotificationController#markAllRead",
+            "NotificationController#markRead",
+            "RefreshTokenAdminController#revokeAllMine",
+            "RefreshTokenAdminController#revokeOne",
+            "SavedViewController#create",
+            "SavedViewController#delete",
+            "SavedViewController#update",
+            "WebPushController#register",
+            "WebPushController#unregister");
+
+    /** Deliberately NOT permission-guarded — see the class javadoc: the real defect is recipient
+     *  ownership, and a BCM permission here would lock out the ordinary staff who are the participants. */
+    private static final Set<String> PENDING_OWNERSHIP_FIX = Set.of(
+            "ExerciseRuntimeController#respond",
+            "PlanDistributionController#acknowledge",
+            "PlanDistributionController#decline");
+
+    private static Set<String> sanctionedFloor() {
+        Set<String> all = new TreeSet<>(PUBLIC_BY_DESIGN);
+        all.addAll(SELF_SCOPED);
+        all.addAll(PENDING_OWNERSHIP_FIX);
+        return all;
+    }
+
+    /**
+     * Anti-vacuity, and not a formality: both set comparisons below are satisfied by a scan that resolved
+     * nothing at all. A classpath scan that silently matches no controller — a renamed base package, a
+     * shaded jar, an annotation swap — would make "no new offenders" pass for the most reassuring possible
+     * wrong reason. This is its own test rather than a first assertion inside the others, because an
+     * earlier assertion in the same method masks the ones after it.
+     */
+    @Test
+    void theScanResolvesARealCorpus() {
+        int total = totalWriteEndpoints();
+        System.out.println("[WS2 ratchet] total write endpoints scanned = " + total);
+        assertThat(total)
+            .as("the classpath scan resolved almost no write endpoints — the SCAN is broken, not the "
+                + "codebase clean. Every other assertion in this class is vacuous until this passes.")
+            .isGreaterThan(900);
+    }
 
     @Test
-    void noNewUnguardedWriteEndpoints() {
+    void noUnsanctionedUnguardedWriteEndpoint() {
+        Set<String> unsanctioned = new TreeSet<>(scan());
+        unsanctioned.removeAll(sanctionedFloor());
+        assertThat(unsanctioned)
+            .as("New write endpoint(s) with no hasPermission/hasAnyRole guard. Add the correct "
+                + "@PreAuthorize(\"hasPermission('MODULE','ACTION')\"). Admitting one to the floor "
+                + "instead requires a bucket above, a stated reason, and an ADR-010 exception if it is "
+                + "neither public nor self-scoped — see F2-144(b) for the worked example.")
+            .isEmpty();
+    }
+
+    /**
+     * The direction the old count ceiling could never fail in — which is the whole reason for the
+     * conversion. When a floor member is finally guarded, renamed or deleted, this fails until the entry
+     * is removed, so the floor cannot go on tolerating endpoints that no longer exist.
+     */
+    @Test
+    void theSanctionedFloorHasNoStaleMembers() {
+        Set<String> stale = new TreeSet<>(sanctionedFloor());
+        stale.removeAll(scan());
+        assertThat(stale)
+            .as("Sanctioned floor member(s) no longer appear in the scan — they were guarded, renamed "
+                + "or deleted. Remove them from the set above: a floor that keeps entries for endpoints "
+                + "that no longer exist stops being a record of what is tolerated.")
+            .isEmpty();
+    }
+
+    private static List<String> scan() {
         List<String> unguarded = scanUnguardedWriteEndpoints();
         Collections.sort(unguarded);
-        System.out.println("[WS2 ratchet] unguarded write endpoints = " + unguarded.size());
+        System.out.println("[WS2 ratchet] unguarded write endpoints = " + unguarded.size()
+                + " (sanctioned floor = " + sanctionedFloor().size() + ")");
         unguarded.forEach(s -> System.out.println("  - " + s));
+        return unguarded;
+    }
 
-        assertThat(unguarded.size())
-            .as("A write endpoint lacks a hasPermission/hasAnyRole guard. Add the correct "
-                + "@PreAuthorize(\"hasPermission('MODULE','ACTION')\") — do not raise the baseline. "
-                + "Offenders are printed above.")
-            .isLessThanOrEqualTo(BASELINE_UNGUARDED_WRITE_ENDPOINTS);
+    /** Total write endpoints reachable by the same scan, guarded or not — the denominator that proves
+     *  the scan is looking at something. */
+    private static int totalWriteEndpoints() {
+        var scanner = new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new AnnotationTypeFilter(RestController.class));
+        int n = 0;
+        for (var bd : scanner.findCandidateComponents("com.tss.grc")) {
+            Class<?> c;
+            try {
+                c = Class.forName(bd.getBeanClassName());
+            } catch (Throwable t) {
+                continue;
+            }
+            for (Method m : c.getDeclaredMethods()) {
+                if (isWriteMapping(m)) n++;
+            }
+        }
+        return n;
     }
 
     static List<String> scanUnguardedWriteEndpoints() {
