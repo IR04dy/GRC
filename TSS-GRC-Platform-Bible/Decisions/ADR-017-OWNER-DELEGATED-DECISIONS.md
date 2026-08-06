@@ -1227,6 +1227,76 @@ recorded in the test rather than in a commit message.
 
 ---
 
+## D-16 — F2-92: the guard was **never switched off**, so the supervised experiment has already run
+
+**The decision asked for:** re-enable the production tenant-write guard under supervision. Four
+hypotheses eliminated; the deployed runtime is the last variable.
+
+**Answer: there is nothing to re-enable.** The mitigation never took effect. The guard has been ON in
+production continuously since 2026-08-02, and the four-day soak the decision was waiting for has been
+running unobserved ever since.
+
+### The evidence, from artifacts nobody had opened
+
+F2-92's investigation eliminated the code, the schema, the database options and the profile, and named
+"the deployed runtime" as what remained. Two of those artifacts were readable on this machine the whole
+time: `D:\Deployment\tss-grc\app\external.properties` and 24 days of WinSW logs.
+
+| what the log says | so |
+|---|---|
+| **2026-08-03 11:02:18** — `[TenantWriteGuard] interceptor WIRED` | `TenantWriteGuardConfig` emits this line **only** in the `enabled == true` branch (the `false` branch logs *"interceptor NOT wired"*). The flag was **true** on that boot, the day *after* the mitigation |
+| 08-02 is the **only** day in 24 with the error, and it occurs **once**, at 14:25:37, on one login for `userId=1` — 2 log lines, one event, `err.log` empty | Not "every insert" and not "nothing could log in" |
+| refresh-token rows: **2026-08-02 11:32:13 and 11:34:17 succeeded** — three hours before the failure, with the flag already true | The guard had been on for days *with working logins*. What changed at 14:23 was a deploy that applied V337–V344, not the flag |
+| 08-03 → 08-06: service up, 34 audit rows/day, **zero** occurrences | Four days of production soak with the guard ON |
+
+### Why the mitigation was inert — Spring Boot precedence, and a comment that said otherwise
+
+`external.properties` reaches the app through `spring.config.import` in `application.yml`. An imported
+document sits **below** the file that imports it, and a **profile-specific** document
+(`application-prod.yml`) outranks `application.yml` and everything it imports. That file set
+`grc.security.tenant-write-guard.enabled: true` **literally**, so the operator's
+`grc.security.tenant-write-guard.enabled=false` was outranked and discarded. No error. No warning.
+
+The other **18** keys in the deployed file work perfectly, because every one of them is a
+`SCREAMING_SNAKE` **placeholder name** that the yml *consumes* — `${DB_URL}`, `${SERVER_PORT:8443}` —
+and a placeholder resolves from any source at any precedence. **The one key written as a real property
+path is the one that failed, and it was the only line in the file in that style.** Filed separately as
+**F2-149**, because two config headers asserted the opposite in prose: `application.yml` said *"raw
+spring keys work too"* and the template called a raw key a *"full override"*.
+
+### What ships
+
+`grc.security.tenant-write-guard.enabled` becomes `${TENANT_WRITE_GUARD_ENABLED:true}` — **default
+unchanged, ON** — so the kill-switch is real for the first time; the four `grc.*` SLA schedulers get the
+same treatment, because all five were literal booleans no operator could throw in an incident. Both
+config headers are corrected, the template gains the 20 knobs it never documented, `DEPLOYMENT.md`
+carries the rule, and `ExternalConfigOverrideContractTest` (4 tests, **5 of 5 mutations caught**) fails
+the build if any of it drifts back.
+
+⚠ **Deploying this does not change production behaviour.** `application-prod.yml` still defines the
+path, so the deployed file's stale `grc.security.tenant-write-guard.enabled=false` line stays inert, and
+`TENANT_WRITE_GUARD_ENABLED` is absent so the default `true` applies — the guard stays on, exactly as it
+is now. The operator action is to **delete** that stale line, and use `TENANT_WRITE_GUARD_ENABLED=false`
+if the switch is ever genuinely wanted.
+
+### What is still open, stated precisely
+
+**The single failure at 14:25:37 is not root-caused**, and this decision does not claim it is. The stack
+trace narrows the mechanism — `GetGeneratedKeysDelegate.performMutation` → `ResultSetReturnImpl
+.executeUpdate` → the driver throwing `A result set was generated for update.` with **SQL Error 0,
+SQLState null**, i.e. thrown by the JDBC driver, not by SQL Server — on the boot that had just applied
+eight migrations in-process. It has not recurred in four days under the same flag, so it is a **P3
+one-off to reproduce**, not a P0 control to disable.
+
+⚠ **And nobody has logged into production since 2026-08-02 11:34.** The finding records the mitigation as
+verified with *"login 200 … refresh-token rows written again"*; production's own table has **no row after
+11:34:17**, which is before the mitigation was written at 14:33. So the login path is **unverified since
+the incident** — not demonstrated broken, but not demonstrated working either, and it should be smoke-
+tested at the next restart. That verification is an operator action against production and is deliberately
+not taken here.
+
+---
+
 ## Consequences
 
 **Unblocked immediately:** Wave 2 (W2-0, F2-04) via D-1; S6/S7/S8/CE-13 via D-2 and D-3; F2-42, F2-49,

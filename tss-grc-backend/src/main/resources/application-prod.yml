@@ -139,23 +139,36 @@ grc:
     # write across tenants. Activate only after the documented staging soak
     # (docs/security/MASS_ASSIGNMENT_DEFENSE.md) — watch the audit log for any
     # SECURITY_BLOCK entries on legitimate flows before relying on it.
+    #
+    # ⚠ F2-149 — this MUST stay a ${PLACEHOLDER}, never a bare `true`.
+    # It was `enabled: true` written literally here, and on 2026-08-02 an operator
+    # put `grc.security.tenant-write-guard.enabled=false` in external.properties to
+    # mitigate a P0. It had NO EFFECT: external.properties arrives through
+    # `spring.config.import` in application.yml, and a profile-specific document
+    # outranks application.yml and everything it imports. Production booted the next
+    # day still logging "[TenantWriteGuard] interceptor WIRED" — which this bean emits
+    # only when enabled=true — and the finding recorded the flag as OFF for four days.
+    # A kill-switch that cannot be thrown is not a kill-switch.
+    # `ExternalConfigOverrideContractTest` now fails the build if this reverts.
     tenant-write-guard:
-      enabled: true
+      enabled: ${TENANT_WRITE_GUARD_ENABLED:true}
   # CY-D — the risk-based vulnerability-SLA escalation clock MUST run in production
   # (the scheduler defaults OFF; its Javadoc says prod flips it on but no config did,
   # so last_escalation_at / breach notifications never fired). 5-min default cadence.
+  # Placeholder per F2-149: a scheduler that misfires in production must be stoppable
+  # without a rebuild.
   vuln-sla:
-    scheduler-enabled: true
+    scheduler-enabled: ${VULN_SLA_SCHEDULER_ENABLED:true}
   # CY-E — cyber CAPA/action-plan reminder + overdue-escalation clock (5-min default cadence).
   cyber-capa-sla:
-    scheduler-enabled: true
+    scheduler-enabled: ${CYBER_CAPA_SLA_SCHEDULER_ENABLED:true}
   # CY-J — cyber evidence expiry sweep MUST run in production so expired evidence is caught +
   # re-requested for NCA/SAMA reviews (1-hour default cadence).
   cyber-evidence-expiry:
-    scheduler-enabled: true
+    scheduler-enabled: ${CYBER_EVIDENCE_EXPIRY_SCHEDULER_ENABLED:true}
   # WF-2 — workflow-request SLA clock (reminders + overdue escalation; 5-min default cadence).
   workflow-request-sla:
-    scheduler-enabled: true
+    scheduler-enabled: ${WORKFLOW_REQUEST_SLA_SCHEDULER_ENABLED:true}
   storage:
     base-path: ${FILE_STORAGE_PATH:/var/data/tss-grc/uploads}
   notifications:

@@ -2,10 +2,28 @@
 # TSS GRC Platform — EXTERNAL configuration (lives NEXT TO the jar)
 #
 # Loaded via spring.config.import (application.yml). Edit + restart the
-# service to apply — no rebuild needed. Two kinds of entries work here:
-#   1. The UPPER_CASE names below — they feed the ${PLACEHOLDER} references
-#      inside the packaged application*.yml files.
-#   2. Any raw Spring key (e.g. grc.cors.allowed-origins=...) — full override.
+# service to apply — no rebuild needed.
+#
+# ⚠ ONLY THE UPPER_CASE NAMES BELOW WORK. This header used to say a raw Spring
+# key such as `grc.cors.allowed-origins=...` was a "full override". THAT IS FALSE,
+# and it cost four days of wrong belief about a P0 (F2-149):
+#
+#   * The UPPER_CASE names feed ${PLACEHOLDER} references inside the packaged
+#     application*.yml files. A placeholder resolves from ANY property source at
+#     ANY precedence, so these always win. Set them freely.
+#
+#   * A raw Spring property path is SILENTLY IGNORED whenever a profile-specific
+#     file also sets it. This file arrives through `spring.config.import` in
+#     application.yml, and application-prod.yml outranks application.yml and
+#     everything it imports. On 2026-08-02 an operator wrote
+#     `grc.security.tenant-write-guard.enabled=false` here to mitigate a P0 and it
+#     had no effect at all — production kept booting with the guard ON, logging
+#     "[TenantWriteGuard] interceptor WIRED", while the finding recorded it as OFF.
+#     No error. No warning. The switch simply was not connected to anything.
+#
+# So: if you need to change something that has no UPPER_CASE name here, do not
+# invent a raw key — add the placeholder to the yml and the name to this file.
+# ExternalConfigOverrideContractTest fails the build if the two drift apart.
 #
 # This file contains secrets: restrict it to Administrators/SYSTEM
 #   icacls C:\tss-grc\app\external.properties /inheritance:r /grant:r "Administrators:F" "SYSTEM:F"
@@ -107,3 +125,55 @@ NOTIFY_FROM_EMAIL=noreply@tss-grc.com
 #AUDIT_INTEGRITY_KEY=
 #AUDIT_SEALING_ENABLED=true
 #AUDIT_SEAL_INTERVAL_MS=300000
+#AUDIT_SEAL_INITIAL_DELAY_MS=60000
+
+# ── Runtime kill-switches (F2-149) ───────────────────────────────────
+# Every one of these was a literal `true` inside application-prod.yml, so no
+# operator could turn it off without a rebuild. They are placeholders now, and
+# these are the names. All default to ON in prod — uncomment only to stop
+# something that is misbehaving, and record why.
+#
+# TENANT_WRITE_GUARD_ENABLED is the Hibernate-level cross-tenant write backstop.
+# It is defence-in-depth: the per-service setOrganisationId() stamps remain the
+# primary control, so turning it off degrades assurance rather than opening a
+# hole. This is the switch that did not work on 2026-08-02.
+#TENANT_WRITE_GUARD_ENABLED=true
+# The four SLA/expiry clocks. Turning one off stops reminders and overdue
+# escalations for that module — which is a compliance gap on NCA/SAMA reviews,
+# not merely a quiet inbox.
+#VULN_SLA_SCHEDULER_ENABLED=true
+#CYBER_CAPA_SLA_SCHEDULER_ENABLED=true
+#CYBER_EVIDENCE_EXPIRY_SCHEDULER_ENABLED=true
+#WORKFLOW_REQUEST_SLA_SCHEDULER_ENABLED=true
+
+# ── Storage, schema and API surface ─────────────────────────────
+# STORAGE_BASE_PATH is the base-profile default; prod reads FILE_STORAGE_PATH
+# above. Both exist, and they are different keys — set the one your profile uses.
+#STORAGE_BASE_PATH=./uploads
+# Flyway's history-table schema. Changing it on a live deployment orphans the
+# existing history and re-runs everything: do not.
+#FLYWAY_DEFAULT_SCHEMA=platform
+# Swagger is OFF in prod by design (it publishes the whole API surface).
+#SWAGGER_ENABLED=false
+
+# ── SQL Server Express capacity monitor ────────────────────────
+# Express caps a database at 10 GB. These are the warn/alert/halt thresholds in
+# MB and the check cadence. HALT stops non-essential writes — it is the last
+# line before the engine refuses everything.
+#GRC_DB_SIZE_WARN_MB=7168
+#GRC_DB_SIZE_ALERT_MB=9216
+#GRC_DB_SIZE_HALT_MB=9728
+#GRC_DB_SIZE_CHECK_CRON=0 0 */6 * * *
+
+# ── BCM economics ────────────────────────────────────────
+# Discount rate (percent) behind BCP/DRP return-on-investment figures. It feeds
+# numbers a board sees, so change it deliberately and note the source.
+#GRC_BCM_ROI_DISCOUNT_RATE=8.00
+
+# ── Error tracking / connectors (optional) ──────────────────────
+#SENTRY_ENV=prod
+#SENTRY_RELEASE=tss-grc-platform@0.1.0-SNAPSHOT
+#SERVICENOW_USERNAME=
+#SERVICENOW_PASSWORD=
+#SERVICENOW_TOKEN_URL=
+#SPLUNK_WEBHOOK_SECRET=

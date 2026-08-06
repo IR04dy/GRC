@@ -1,0 +1,259 @@
+package com.tss.grc.config;
+
+import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * F2-149 — {@code external.properties} overrides <b>placeholders</b>, not properties, and the build
+ * now knows the difference.
+ *
+ * <h3>What went wrong, and why no test existed</h3>
+ *
+ * On 2026-08-02 production could not complete a login. The mitigation was to write
+ * {@code grc.security.tenant-write-guard.enabled=false} into {@code external.properties} beside the
+ * jar. <b>It had no effect whatsoever.</b> That file arrives through
+ * {@code spring.config.import} in {@code application.yml}, and a profile-specific document
+ * ({@code application-prod.yml}) outranks {@code application.yml} <em>and everything it imports</em>
+ * — so a property path set literally in the profile can never be overridden from here. Production
+ * booted the following day still logging {@code [TenantWriteGuard] interceptor WIRED}, a line
+ * {@link com.tss.grc.config.TenantWriteGuardConfig} emits <em>only</em> when the flag is true, and
+ * the finding recorded the guard as OFF for four days.
+ *
+ * <p>No error. No warning. Spring resolved the higher-precedence value exactly as documented, and
+ * the operator's switch was simply not connected to anything. <b>Both</b> config headers said the
+ * opposite in prose: {@code application.yml} claimed "raw spring keys work too" and the template
+ * called a raw key a "full override".
+ *
+ * <h3>Why a placeholder is different</h3>
+ *
+ * {@code ${SERVER_PORT:8443}} is a <em>reference</em>, resolved against the whole
+ * {@code Environment} when the containing document is bound. It therefore picks up a value from any
+ * property source at any precedence — which is why the other eighteen keys in the deployed file
+ * always worked, and why the one key written as a real property path did not. The tell was visible
+ * in the file: one line in a different style from the other eighteen, and it was the broken one.
+ *
+ * <h3>What this asserts</h3>
+ *
+ * <ol>
+ *   <li>No key in the template names a Spring property <em>path</em> — those are silently inert.</li>
+ *   <li>Every {@code ${SCREAMING_SNAKE}} the packaged yml files read is documented in the template,
+ *       so the operator surface is complete rather than a third of itself.</li>
+ *   <li>The five {@code grc.*} runtime kill-switches stay placeholders. Each was a literal
+ *       {@code true}, so none could be thrown in an incident without a rebuild.</li>
+ * </ol>
+ *
+ * DB-free and infrastructure-free: it reads four files off disk.
+ */
+class ExternalConfigOverrideContractTest {
+
+    /**
+     * The switches an operator must be able to throw during an incident, with the placeholder each
+     * one has to keep. Pinned deliberately rather than derived: the property is not "every boolean
+     * is overridable" — 18 other literal booleans in {@code application-prod.yml} are settled
+     * platform policy (Swagger off, Flyway clean disabled, secure cookies) and making those
+     * operator-tunable would be a regression, not a fix. What matters is the set that stops
+     * something happening.
+     */
+    private static final List<String[]> KILL_SWITCHES = List.of(
+        new String[] { "grc.security.tenant-write-guard.enabled", "TENANT_WRITE_GUARD_ENABLED" },
+        new String[] { "grc.vuln-sla.scheduler-enabled", "VULN_SLA_SCHEDULER_ENABLED" },
+        new String[] { "grc.cyber-capa-sla.scheduler-enabled", "CYBER_CAPA_SLA_SCHEDULER_ENABLED" },
+        new String[] { "grc.cyber-evidence-expiry.scheduler-enabled",
+                       "CYBER_EVIDENCE_EXPIRY_SCHEDULER_ENABLED" },
+        new String[] { "grc.workflow-request-sla.scheduler-enabled",
+                       "WORKFLOW_REQUEST_SLA_SCHEDULER_ENABLED" });
+
+    /** 59 placeholders across the two packaged files today. A collapse means the scan broke. */
+    private static final int MIN_PLACEHOLDERS_READ = 40;
+    /** 60 documented keys in the template today. */
+    private static final int MIN_TEMPLATE_KEYS = 40;
+
+    /** {@code ${NAME}} or {@code ${NAME:default}} — the reference form that always resolves. */
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([A-Z][A-Z0-9_]{2,})[:}]");
+
+    /** {@code KEY=} or {@code #KEY=} — a commented example still documents the knob. */
+    private static final Pattern TEMPLATE_KEY =
+        Pattern.compile("(?m)^\\s*#?\\s*([A-Z][A-Z0-9_]{2,})\\s*=");
+
+    /** A lower-case dotted key is a Spring property path, which cannot be overridden from here. */
+    private static final Pattern TEMPLATE_PROPERTY_PATH =
+        Pattern.compile("(?m)^\\s*([a-z][a-zA-Z0-9]*(?:[.-][a-zA-Z0-9]+)+)\\s*=(.*)$");
+
+    @Test
+    void theTemplateNamesNoSpringPropertyPathBecauseThoseAreSilentlyInert() throws IOException {
+        List<String> paths = new ArrayList<>();
+        Matcher m = TEMPLATE_PROPERTY_PATH.matcher(template());
+        while (m.find()) {
+            paths.add(m.group(1) + "=" + m.group(2).trim());
+        }
+
+        assertThat(paths).as("""
+            The external-config template names %d Spring property path(s). Those do NOT override \
+            anything a profile-specific file also sets: external.properties is imported from \
+            application.yml, and application-prod.yml outranks it. There is no error and no \
+            warning — the operator throws a switch that is not connected.
+
+            This is F2-149 exactly. On 2026-08-02 `grc.security.tenant-write-guard.enabled=false` \
+            was written into the deployed file to mitigate a P0; production booted the next day \
+            still logging "[TenantWriteGuard] interceptor WIRED" and the finding recorded the guard \
+            as OFF for four days.
+
+            Fix: give the setting a ${SCREAMING_SNAKE:default} placeholder in the yml and put the \
+            UPPER_CASE name here instead.
+
+            %s""".formatted(paths.size(), String.join("\n            ", paths)))
+            .isEmpty();
+    }
+
+    @Test
+    void everyPlaceholderTheYmlReadsIsDocumentedInTheTemplate() throws IOException {
+        Set<String> read = placeholdersRead();
+        Set<String> documented = new LinkedHashSet<>();
+        Matcher m = TEMPLATE_KEY.matcher(template());
+        while (m.find()) {
+            documented.add(m.group(1));
+        }
+
+        assertThat(read.size()).as(
+            "Only %d ${PLACEHOLDER} references found across the packaged yml files. Under %d means "
+            + "the scan broke, and the assertion below would compare an empty set to a full one — "
+            + "passing for the wrong reason.", read.size(), MIN_PLACEHOLDERS_READ)
+            .isGreaterThanOrEqualTo(MIN_PLACEHOLDERS_READ);
+        assertThat(documented.size()).as(
+            "Only %d keys documented in the template. Under %d means the file was truncated or the "
+            + "key pattern stopped matching it.", documented.size(), MIN_TEMPLATE_KEYS)
+            .isGreaterThanOrEqualTo(MIN_TEMPLATE_KEYS);
+
+        List<String> undocumented = new ArrayList<>(read);
+        undocumented.removeAll(documented);
+        undocumented.sort(null);
+
+        assertThat(undocumented).as("""
+            %d configuration knob(s) are read by the packaged yml files and appear nowhere in \
+            external.properties.template, so an operator cannot know they exist. That is how the \
+            deployed file came to document a third of the surface while the boot log warned about a \
+            key — AUDIT_INTEGRITY_KEY — the template did not name.
+
+            Add each to tss-grc-backend/external.properties.template, commented out with its \
+            default and a sentence on what changing it costs. A commented example counts: the point \
+            is discoverability, not a value.
+
+            %s""".formatted(undocumented.size(), String.join("\n            ", undocumented)))
+            .isEmpty();
+    }
+
+    @Test
+    void everyRuntimeKillSwitchStaysOperatorOverridable() throws IOException {
+        String prod = read("src/main/resources/application-prod.yml");
+        String tpl = template();
+
+        List<String> broken = new ArrayList<>();
+        for (String[] pair : KILL_SWITCHES) {
+            String path = pair[0];
+            String name = pair[1];
+            String leaf = path.substring(path.lastIndexOf('.') + 1);
+
+            // The leaf must be bound to the placeholder, not to a literal. Matching the leaf plus
+            // the placeholder name together is what makes this specific: `enabled: true` under a
+            // different parent is somebody else's setting.
+            boolean wired = Pattern.compile(Pattern.quote(leaf) + ":\\s*\\$\\{" + name + "[:}]")
+                .matcher(prod).find();
+            if (!wired) {
+                broken.add("%s must be `%s: ${%s:true}` in application-prod.yml".formatted(path, leaf, name));
+            }
+            if (!Pattern.compile("(?m)^\\s*#?\\s*" + name + "\\s*=").matcher(tpl).find()) {
+                broken.add("%s is not documented in external.properties.template".formatted(name));
+            }
+        }
+
+        assertThat(broken).as("""
+            A runtime kill-switch is not overridable from external.properties, so it cannot be \
+            thrown during an incident without rebuilding and redeploying the jar.
+
+            All five of these were literal booleans in application-prod.yml until F2-149. The \
+            tenant write guard is the one that mattered: an operator tried to turn it off in the \
+            middle of a P0 and could not, and nobody found out for four days because nothing \
+            reports an outranked property.
+
+            %s""".formatted(String.join("\n            ", broken)))
+            .isEmpty();
+    }
+
+    @Test
+    void bothConfigHeadersStateTheOverrideRuleTheOperatorNeeds() throws IOException {
+        // ⚠ Asserted positively, on purpose. The first version of this test looked for the OLD
+        // wording and skipped the check whenever the corrective paragraph was present — which the
+        // corrected files always are, so it could only fire if a reverter deleted the explanation
+        // too. A negative assertion with an escape hatch for the fix is a test that passes because
+        // of the thing it is supposed to be checking. Requiring the correction cannot go vacuous.
+        //
+        // The claim lived in prose, in two files, and prose is what the operator acted on during a
+        // P0. A doc fix with no test is a doc fix the next comment-tidy reverts.
+        List<String> missing = new ArrayList<>();
+        for (String f : List.of("src/main/resources/application.yml", "external.properties.template")) {
+            String body = read(f).toLowerCase();
+            if (!body.contains("spring.config.import")) {
+                missing.add(f + " no longer explains where external.properties is loaded from");
+            }
+            boolean namesTheRule = body.contains("outranks") || body.contains("silently ignored")
+                                   || body.contains("only the upper_case");
+            if (!namesTheRule) {
+                missing.add(f + " does not state that a raw Spring property path is outranked and "
+                            + "silently ignored — only ${PLACEHOLDER} names override");
+            }
+        }
+
+        assertThat(missing).as("""
+            A config header no longer tells the operator the one rule that matters: external \
+            .properties overrides ${PLACEHOLDER} names, and a raw Spring property path set in a \
+            profile-specific file is silently outranked. An operator acted on the previous, false \
+            wording during a P0 (F2-149) and the switch they threw did nothing for four days.
+
+            %s""".formatted(String.join("\n            ", missing)))
+            .isEmpty();
+    }
+
+    // ── evidence ─────────────────────────────────────────────────────────────
+
+    private static Set<String> placeholdersRead() throws IOException {
+        Set<String> out = new LinkedHashSet<>();
+        for (String f : List.of("src/main/resources/application.yml",
+                                "src/main/resources/application-prod.yml")) {
+            // Strip comments first. A ${PLACEHOLDER} named inside prose — this class's own headers
+            // do it — is documentation, not a binding, and counting it would demand a template
+            // entry for a word in a sentence. Same rule this repo keeps relearning in the other
+            // direction: strip comments before asserting what a file does.
+            String body = read(f).replaceAll("(?m)^\\s*#.*$", " ").replaceAll("\\s#.*$", " ");
+            Matcher m = PLACEHOLDER.matcher(body);
+            while (m.find()) {
+                out.add(m.group(1));
+            }
+        }
+        return out;
+    }
+
+    private static String template() throws IOException {
+        return read("external.properties.template");
+    }
+
+    private static String read(String relative) throws IOException {
+        Path p = Paths.get(relative).toAbsolutePath().normalize();
+        assertThat(Files.exists(p)).as(
+            "Expected %s to exist. This class reads configuration off disk, so a wrong path would "
+            + "make every assertion vacuous rather than failing.", p)
+            .isTrue();
+        return Files.readString(p);
+    }
+}

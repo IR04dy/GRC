@@ -119,6 +119,21 @@ packaged `application.yml`) — **edit the file, restart the service, done; no
 environment variables, no rebuild.** The shipped file is pre-filled for this
 topology; you only have to replace two values:
 
+> ⚠ **It overrides the `UPPER_CASE` names, not arbitrary Spring properties (F2-149).**
+> The names in the template feed `${PLACEHOLDER}` references inside the packaged
+> `application*.yml`, and a placeholder resolves from any property source, so those always
+> win. A **raw Spring property path** — `grc.something.enabled=false` — is *silently
+> outranked* whenever `application-prod.yml` sets the same path: this file is imported *from*
+> `application.yml`, and a profile-specific document beats it. There is no error and no
+> warning.
+>
+> This is not hypothetical. On **2026-08-02** an operator wrote
+> `grc.security.tenant-write-guard.enabled=false` here to mitigate a P0 and it did nothing at
+> all — production kept booting with the guard on, logging `[TenantWriteGuard] interceptor
+> WIRED`, and the incident record said the flag was off for four days. **If a setting has no
+> `UPPER_CASE` name in the template, it cannot be changed from here**; add the placeholder to
+> the yml first (`ExternalConfigOverrideContractTest` enforces that the two stay in step).
+
 1. `JWT_SECRET` — generate one:
 
 ```powershell

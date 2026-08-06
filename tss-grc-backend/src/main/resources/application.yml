@@ -11,10 +11,25 @@ spring:
     name: tss-grc-platform
 
   # External configuration file — lives NEXT TO the jar (working directory), so
-  # operators can change any property without rebuilding. Values defined there
-  # win over the packaged defaults (they feed the ${PLACEHOLDER} references
-  # below and in the profile files; raw spring keys work too). `optional:` so
-  # dev runs and the test suite still boot when the file is absent.
+  # operators can change configuration without rebuilding.
+  #
+  # ⚠ IT OVERRIDES PLACEHOLDERS, NOT PROPERTIES. This comment used to end with
+  # "raw spring keys work too", and that sentence is FALSE — it cost four days of
+  # wrong belief about a P0 (F2-149). The file arrives through the
+  # `spring.config.import` below; an imported document sits BELOW the file that
+  # imports it, and a profile-specific document (application-prod.yml) outranks
+  # application.yml and everything it imports. So:
+  #
+  #   works   — SERVER_PORT=8090, because application-prod.yml reads ${SERVER_PORT:8443}
+  #             and a placeholder resolves from any property source, at any precedence.
+  #   INERT   — grc.security.tenant-write-guard.enabled=false, if a profile yml also
+  #             sets that path literally. No error, no warning: the value is simply
+  #             outranked and the operator believes the switch was thrown.
+  #
+  # Rule: anything an operator must be able to change at runtime is expressed here and
+  # in the profile files as ${SCREAMING_SNAKE:default}, and is documented in
+  # external.properties.template. ExternalConfigOverrideContractTest enforces both.
+  # `optional:` so dev runs and the test suite still boot when the file is absent.
   config:
     import: optional:file:./external.properties
 
