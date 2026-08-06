@@ -16,8 +16,11 @@ import com.tss.grc.module.consumer.complaints.repository.ComplaintAggregateRepor
 import com.tss.grc.module.consumer.complaints.repository.ComplaintRepository;
 import com.tss.grc.module.consumer.complaints.repository.ComplaintUpdateRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.tenancy.PublicPortalTenantResolver;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import org.junit.jupiter.api.AfterEach;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -66,12 +69,15 @@ import static org.mockito.Mockito.when;
 class ComplaintServiceTest {
 
     private static final Long ORG_ID = 1L;
+    /** Deliberately NOT 1: a test whose expected org is also the old default proves nothing. */
+    private static final Long NAMED_ORG = 3L;
 
     @Mock private ComplaintRepository complaintRepo;
     @Mock private ComplaintUpdateRepository updateRepo;
     @Mock private ComplaintAggregateReportRepository reportRepo;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
+    @Mock private PublicPortalTenantResolver publicTenant;
 
     @InjectMocks private ComplaintService service;
 
@@ -141,7 +147,8 @@ class ComplaintServiceTest {
         // a pre-call instant instead: intra-day noise cannot affect the result.
         LocalDate startedOn = LocalDate.now();
 
-        SubmitComplaintResponse resp = service.submitPublicComplaint(publicReq());
+        when(publicTenant.resolve(any())).thenReturn(ORG_ID);
+        SubmitComplaintResponse resp = service.submitPublicComplaint(publicReq(), null);
 
         assertThat(resp.complaintNo()).matches("CMP-\\d{4}-000001");
         assertThat(resp.submissionToken()).isNotNull();
@@ -174,9 +181,29 @@ class ComplaintServiceTest {
         verify(audit).log(eq("CREATE"), eq("Complaint"), eq(100L), anyString());
     }
 
+    // ⚠ F2-83. `submitPublicComplaint_falsbackToDefaultOrgWhenNoTenantContext` used to live here and
+    // it PASSED, asserting that an anonymous complaint — carrying customer name, phone, email and
+    // ID-document type — is written to org 1 and that this is correct. All 12 complaints on the dev
+    // database were filed there. Inverted below.
+
     @Test
-    void submitPublicComplaint_falsbackToDefaultOrgWhenNoTenantContext() {
+    void submitPublicComplaint_refusesWhenNoTenantCanBeResolved() {
         TenantContext.clear();
+        when(publicTenant.resolve(any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        PublicPortalTenantResolver.REFUSAL));
+
+        assertThatThrownBy(() -> service.submitPublicComplaint(publicReq(), null))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Unknown or inactive organisation");
+
+        verify(complaintRepo, never()).save(any(Complaint.class));
+    }
+
+    @Test
+    void submitPublicComplaint_writesToTheTenantNamedByTheShortCode() {
+        TenantContext.clear();
+        when(publicTenant.resolve("STCB")).thenReturn(NAMED_ORG);
         when(complaintRepo.findTopByOrderByComplaintNoDesc()).thenReturn(Optional.empty());
         when(complaintRepo.existsByComplaintNo(anyString())).thenReturn(false);
         when(complaintRepo.save(any(Complaint.class))).thenAnswer(inv -> {
@@ -185,13 +212,13 @@ class ComplaintServiceTest {
             return c;
         });
 
-        service.submitPublicComplaint(publicReq());
+        service.submitPublicComplaint(publicReq(), "STCB");
 
-        // Verify the saved row had org_id = 1 (PUBLIC_PORTAL_DEFAULT_ORG).
         ArgumentCaptor<Complaint> saved = ArgumentCaptor.forClass(Complaint.class);
         verify(complaintRepo).save(saved.capture());
         assertThat(saved.getValue().getOrganisationId())
-                .isEqualTo(ComplaintService.PUBLIC_PORTAL_DEFAULT_ORG);
+                .as("the complaint belongs to the bank whose portal received it, not org 1")
+                .isEqualTo(NAMED_ORG);
     }
 
     @Test
@@ -206,7 +233,8 @@ class ComplaintServiceTest {
             return c;
         });
 
-        SubmitComplaintResponse resp = service.submitPublicComplaint(publicReq());
+        when(publicTenant.resolve(any())).thenReturn(ORG_ID);
+        SubmitComplaintResponse resp = service.submitPublicComplaint(publicReq(), null);
 
         assertThat(resp.complaintNo()).endsWith("-000043");
     }

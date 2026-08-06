@@ -19,6 +19,7 @@ import com.tss.grc.module.ethics.whistleblower.repository.WhistleblowerCaseUpdat
 import com.tss.grc.module.platform.auditlog.entity.AuditLogEntry;
 import com.tss.grc.module.platform.auditlog.repository.AuditLogRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.tenancy.PublicPortalTenantResolver;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -84,19 +85,12 @@ public class WhistleblowerCaseService {
             "CLOSED_REMEDIATED",   Set.of()
     );
 
-    /**
-     * TODO: when a host-based tenant resolver lands, derive the org_id
-     * from the request host (e.g. ethics.<bank>.sa). For now the public
-     * portal defaults to org 1 — the demo bank. The constant is here so
-     * the substitution is a single grep target.
-     */
-    static final Long PUBLIC_PORTAL_DEFAULT_ORG = 1L;
-
     private final WhistleblowerCaseRepository caseRepo;
     private final WhistleblowerCaseUpdateRepository updateRepo;
     private final AuditLogService audit;
     private final AuditLogRepository auditRepo;
     private final ApplicationEventPublisher publisher;
+    private final PublicPortalTenantResolver publicTenant;
 
     // ─── Reads (internal) ─────────────────────────────────────────────
 
@@ -147,16 +141,19 @@ public class WhistleblowerCaseService {
     // ─── Public-portal submission ─────────────────────────────────────
 
     /**
-     * Public-portal submission. No tenant context required — the org_id
-     * is resolved from the request host or defaults to
-     * {@link #PUBLIC_PORTAL_DEFAULT_ORG}.
+     * Public-portal submission. No tenant context required — but the tenant must be
+     * <i>named</i>: see {@link PublicPortalTenantResolver}. An unresolvable tenant is a 404, never
+     * org 1 (F2-83).
      *
      * <p>This path is the ONLY one that uses {@link #anonymousAudit}: no
      * IP, no user-agent, no source endpoint written to the audit ledger.
+     *
+     * @param orgShortCode the tenant's public short code from the portal link's {@code ?org=};
+     *                     ignored when a logged-in employee files through the same form
      */
     @Transactional
-    public CaseSubmissionResponse submitCase(CaseSubmissionRequest req) {
-        Long orgId = resolvePublicOrg();
+    public CaseSubmissionResponse submitCase(CaseSubmissionRequest req, String orgShortCode) {
+        Long orgId = publicTenant.resolve(orgShortCode);
 
         WhistleblowerCase c = new WhistleblowerCase();
         c.setOrganisationId(orgId);
@@ -438,19 +435,6 @@ public class WhistleblowerCaseService {
 
     private static Long org() {
         return TenantContext.requireOrganisationId();
-    }
-
-    /**
-     * Resolves the org for a public-portal submission. Today: defaults
-     * to {@link #PUBLIC_PORTAL_DEFAULT_ORG} unless a tenant is already
-     * set on the thread (e.g. a logged-in employee using the same form).
-     *
-     * <p>TODO: when host-based tenant resolution lands, look up
-     * {@code organisation} by host header (ethics.<bank>.sa).
-     */
-    Long resolvePublicOrg() {
-        Long fromContext = TenantContext.getCurrentTenant();
-        return fromContext != null ? fromContext : PUBLIC_PORTAL_DEFAULT_ORG;
     }
 
     private String generateCode(Long orgId) {

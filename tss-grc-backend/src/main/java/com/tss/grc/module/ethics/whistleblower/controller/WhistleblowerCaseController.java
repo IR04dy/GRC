@@ -62,9 +62,16 @@ public class WhistleblowerCaseController {
 
     @PostMapping("/public/submit")
     @PreAuthorize("permitAll()")
-    @Operation(summary = "Public submission — anonymous-by-default. Token returned ONCE; not recoverable.")
-    public ResponseEntity<CaseSubmissionResponse> publicSubmit(@Valid @RequestBody CaseSubmissionRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.submitCase(req));
+    @Operation(summary = "Public submission — anonymous-by-default. Token returned ONCE; not recoverable.",
+               description = "The portal link MUST carry the tenant's public short code as ?org=. "
+                           + "There is no JWT on this path, so nothing else identifies the receiving "
+                           + "organisation; an unknown or inactive code is refused with 404 and never "
+                           + "defaulted (F2-83). A logged-in employee filing through the same form is "
+                           + "scoped by their own tenant and the parameter is ignored.")
+    public ResponseEntity<CaseSubmissionResponse> publicSubmit(
+            @Valid @RequestBody CaseSubmissionRequest req,
+            @RequestParam(name = "org", required = false) String org) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.submitCase(req, org));
     }
 
     @GetMapping("/public/status/{token}")

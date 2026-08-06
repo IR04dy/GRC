@@ -83,20 +83,20 @@ class WhistleblowerCaseControllerTest {
 
     @Test
     void publicSubmit_dispatchesAndReturns201() {
-        when(service.submitCase(any(CaseSubmissionRequest.class))).thenReturn(stubSubmissionResponse());
+        when(service.submitCase(any(CaseSubmissionRequest.class), any())).thenReturn(stubSubmissionResponse());
 
         ResponseEntity<CaseSubmissionResponse> resp = controller.publicSubmit(new CaseSubmissionRequest(
                 "PUBLIC_PORTAL", "ANONYMOUS",
                 null, null, null, null, true,
                 "FRAUD", "HIGH",
                 "subject", "الموضوع", "narrative", "السرد",
-                null, null, null, false));
+                null, null, null, false), "STCB");
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody().caseCode()).isEqualTo("WB-2026-001");
         assertThat(resp.getBody().submissionToken()).isNotNull();
-        verify(service).submitCase(any(CaseSubmissionRequest.class));
+        verify(service).submitCase(any(CaseSubmissionRequest.class), any());
     }
 
     @Test

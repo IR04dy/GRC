@@ -212,8 +212,12 @@ const PREFIX = '/api/v1/complaints';
 
 export const complaintsApi = {
   // Public — anonymous, MUST NOT send Authorization header.
-  publicSubmit: (body: SubmitComplaintRequest) =>
-    api.post<SubmitComplaintResponse>(`${PREFIX}/public`, body, { anonymous: true }),
+  // F2-83: `org` is the tenant's opaque short code from the portal link. There is no JWT on this
+  // path, so it is the only thing that says which bank the complaint belongs to; the server 404s an
+  // unknown or inactive code rather than defaulting to org 1, which is what it used to do.
+  publicSubmit: (body: SubmitComplaintRequest, org: string) =>
+    api.post<SubmitComplaintResponse>(
+      `${PREFIX}/public?org=${encodeURIComponent(org)}`, body, { anonymous: true }),
 
   publicTrack: (token: string) =>
     api.get<PublicTrackingResponse>(

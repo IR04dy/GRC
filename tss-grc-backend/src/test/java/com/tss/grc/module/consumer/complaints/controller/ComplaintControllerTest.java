@@ -103,16 +103,16 @@ class ComplaintControllerTest {
 
     @Test
     void publicSubmit_dispatchesAndReturns200() {
-        when(service.submitPublicComplaint(any(SubmitComplaintRequest.class)))
+        when(service.submitPublicComplaint(any(SubmitComplaintRequest.class), any()))
                 .thenReturn(stubSubmission());
 
-        ResponseEntity<SubmitComplaintResponse> resp = controller.submitPublic(publicReq());
+        ResponseEntity<SubmitComplaintResponse> resp = controller.submitPublic(publicReq(), "STCB");
 
         assertThat(resp.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody().complaintNo()).isEqualTo("CMP-2026-000001");
         assertThat(resp.getBody().submissionToken()).isNotNull();
-        verify(service).submitPublicComplaint(any(SubmitComplaintRequest.class));
+        verify(service).submitPublicComplaint(any(SubmitComplaintRequest.class), any());
     }
 
     @Test
@@ -139,7 +139,10 @@ class ComplaintControllerTest {
 
     @Test
     void publicEndpoints_arePermitAll() throws Exception {
-        Method submit = ComplaintController.class.getMethod("submitPublic", SubmitComplaintRequest.class);
+        // F2-83 added the ?org= short code: an anonymous caller carries no JWT, so nothing else
+        // identifies the receiving tenant and this used to default to org 1.
+        Method submit = ComplaintController.class.getMethod("submitPublic",
+                SubmitComplaintRequest.class, String.class);
         Method track = ComplaintController.class.getMethod("trackByToken", UUID.class);
 
         assertThat(submit.getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class).value())

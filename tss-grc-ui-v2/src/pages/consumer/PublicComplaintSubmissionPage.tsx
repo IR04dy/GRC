@@ -5,6 +5,7 @@ import { PublicShell } from '../../components/layout/PublicShell';
 import { Card } from '../../components/ui/Card';
 import { useI18n } from '../../lib/i18n';
 import { ApiError } from '../../lib/api';
+import { readPortalOrg, portalLinkMisconfigured } from '../../lib/publicPortalOrg';
 import {
   complaintsApi, CATEGORY_LABEL, CHANNEL_LABEL, SEVERITY_LABEL, CUSTOMER_ID_TYPE_LABEL,
   type Category, type Channel, type Severity, type CustomerIdType,
@@ -24,6 +25,9 @@ export function PublicComplaintSubmissionPage() {
   const navigate = useNavigate();
 
   const [channel, setChannel] = useState<Channel>('WEB');
+  // The bank whose complaints portal this link belongs to (F2-83). Read once from the URL.
+  const portalOrg = readPortalOrg();
+
   const [category, setCategory] = useState<Category>('ACCOUNT_ACCESS');
   const [subcategory, setSubcategory] = useState('');
   const [severity, setSeverity] = useState<Severity>('MEDIUM');
@@ -50,6 +54,9 @@ export function PublicComplaintSubmissionPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Unreachable in practice — the misconfigured-link screen renders instead of this form — but
+    // the form must never post without a tenant, so the invariant is stated where it is enforced.
+    if (!portalOrg) return;
     setError(null);
     if (!descriptionAr.trim()) {
       setError(lang === 'ar' ? 'وصف الشكوى بالعربية مطلوب.' : 'Arabic description is required.');
@@ -83,7 +90,7 @@ export function PublicComplaintSubmissionPage() {
       descriptionAr,
     };
     try {
-      const resp = await complaintsApi.publicSubmit(req);
+      const resp = await complaintsApi.publicSubmit(req, portalOrg);
       setSubmitted(resp);
     } catch (err) {
       setError(err instanceof ApiError ? err.message :
@@ -99,6 +106,23 @@ export function PublicComplaintSubmissionPage() {
       setTokenCopied(true);
       setTimeout(() => setTokenCopied(false), 2500);
     }).catch(() => { /* clipboard blocked — user can still select-copy */ });
+  }
+
+  // F2-83 — the portal link must name the receiving bank. Detected before the customer types
+  // anything: this form collects name, phone, email and ID-document type, and a page that accepts
+  // all of it and then discards it because the link was misconfigured is the worse failure.
+  if (!portalOrg) {
+    const msg = portalLinkMisconfigured(lang);
+    return (
+      <PublicShell title={msg.title} sub="">
+        <Card padded>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }} dir={dir}>
+            <AlertCircle size={28} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+            <div style={{ fontSize: 14, lineHeight: 1.7 }}>{msg.body}</div>
+          </div>
+        </Card>
+      </PublicShell>
+    );
   }
 
   if (submitted) {

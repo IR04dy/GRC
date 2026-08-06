@@ -5,6 +5,7 @@ import { PublicShell } from '../../components/layout/PublicShell';
 import { Card } from '../../components/ui/Card';
 import { useI18n } from '../../lib/i18n';
 import { ApiError } from '../../lib/api';
+import { readPortalOrg, portalLinkMisconfigured } from '../../lib/publicPortalOrg';
 import {
   whistleblowerApi,
   CATEGORY_LABEL, SEVERITY_LABEL,
@@ -23,6 +24,9 @@ import {
 export function WhistleblowerSubmitPublicPage() {
   const { lang, dir } = useI18n();
   const navigate = useNavigate();
+
+  // The tenant whose hotline this link belongs to (F2-83). Read once from the URL.
+  const portalOrg = readPortalOrg();
 
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [reporterType, setReporterType] = useState<ReporterType>('ANONYMOUS');
@@ -49,6 +53,10 @@ export function WhistleblowerSubmitPublicPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Unreachable in practice — the misconfigured-link screen renders instead of this form — but
+    // the form must never post without a tenant, so the invariant is stated where it is enforced
+    // rather than relied on from three screens away.
+    if (!portalOrg) return;
     setError(null);
     setSubmitting(true);
     const req: CaseSubmissionRequest = {
@@ -71,7 +79,7 @@ export function WhistleblowerSubmitPublicPage() {
       involvesSeniorExecutive,
     };
     try {
-      const resp = await whistleblowerApi.publicSubmit(req);
+      const resp = await whistleblowerApi.publicSubmit(req, portalOrg);
       setSubmitted(resp);
     } catch (err) {
       setError(err instanceof ApiError ? err.message :
@@ -87,6 +95,24 @@ export function WhistleblowerSubmitPublicPage() {
       setTokenCopied(true);
       setTimeout(() => setTokenCopied(false), 2000);
     }).catch(() => { /* clipboard blocked — user can still select-copy */ });
+  }
+
+  // F2-83 — the portal link must name the receiving tenant. Detected here, before the reporter
+  // types anything: this form collects a confidential account of misconduct, and a page that
+  // accepts one and then discards it because the link was misconfigured is a worse failure than
+  // one that says so up front.
+  if (!portalOrg) {
+    const msg = portalLinkMisconfigured(lang);
+    return (
+      <PublicShell title={msg.title} sub="">
+        <Card padded>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }} dir={dir}>
+            <AlertCircle size={28} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+            <div style={{ fontSize: 14, lineHeight: 1.7 }}>{msg.body}</div>
+          </div>
+        </Card>
+      </PublicShell>
+    );
   }
 
   if (submitted) {

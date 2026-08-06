@@ -16,8 +16,11 @@ import com.tss.grc.module.ethics.whistleblower.repository.WhistleblowerCaseUpdat
 import com.tss.grc.module.platform.auditlog.entity.AuditLogEntry;
 import com.tss.grc.module.platform.auditlog.repository.AuditLogRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
+import com.tss.grc.module.platform.tenancy.PublicPortalTenantResolver;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import org.junit.jupiter.api.AfterEach;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,7 +49,7 @@ import static org.mockito.Mockito.when;
  *
  * <p>Coverage:
  * <ul>
- *   <li>Public submission — anonymous + identified flavours, default-org fallback</li>
+ *   <li>Public submission — anonymous + identified flavours; tenant named, never defaulted</li>
  *   <li>IP-non-logging via the anonymous audit path</li>
  *   <li>lookupByToken returns ONLY reporter-visible updates</li>
  *   <li>Reporter reply via token records an update with NULL actor</li>
@@ -69,6 +72,7 @@ class WhistleblowerCaseServiceTest {
     @Mock private AuditLogService audit;
     @Mock private AuditLogRepository auditRepo;
     @Mock private ApplicationEventPublisher publisher;
+    @Mock private PublicPortalTenantResolver publicTenant;
 
     @InjectMocks private WhistleblowerCaseService service;
 
@@ -140,7 +144,8 @@ class WhistleblowerCaseServiceTest {
         });
         when(caseRepo.countByOrganisationIdAndIsDeletedFalse(ORG_ID)).thenReturn(0L);
 
-        CaseSubmissionResponse out = service.submitCase(anonReq());
+        when(publicTenant.resolve(any())).thenReturn(ORG_ID);
+        CaseSubmissionResponse out = service.submitCase(anonReq(), null);
 
         assertThat(out.caseCode()).startsWith("WB-").matches("WB-\\d{4}-\\d{3}");
         assertThat(out.submissionToken()).isNotNull();
@@ -167,7 +172,8 @@ class WhistleblowerCaseServiceTest {
         });
         when(caseRepo.countByOrganisationIdAndIsDeletedFalse(ORG_ID)).thenReturn(1L);
 
-        service.submitCase(identifiedReq());
+        when(publicTenant.resolve(any())).thenReturn(ORG_ID);
+        service.submitCase(identifiedReq(), null);
 
         ArgumentCaptor<WhistleblowerCase> captor = ArgumentCaptor.forClass(WhistleblowerCase.class);
         verify(caseRepo).save(captor.capture());
@@ -188,7 +194,8 @@ class WhistleblowerCaseServiceTest {
         });
         when(caseRepo.countByOrganisationIdAndIsDeletedFalse(ORG_ID)).thenReturn(2L);
 
-        service.submitCase(seniorExecReq());
+        when(publicTenant.resolve(any())).thenReturn(ORG_ID);
+        service.submitCase(seniorExecReq(), null);
 
         ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
         verify(publisher, times(2)).publishEvent(captor.capture());
@@ -210,7 +217,8 @@ class WhistleblowerCaseServiceTest {
         });
         when(caseRepo.countByOrganisationIdAndIsDeletedFalse(ORG_ID)).thenReturn(3L);
 
-        service.submitCase(anonReq());
+        when(publicTenant.resolve(any())).thenReturn(ORG_ID);
+        service.submitCase(anonReq(), null);
 
         // Anonymous path goes through auditRepo.save() — NOT audit.log().
         // The log() path is what would auto-pull IP / user-agent.
@@ -226,24 +234,49 @@ class WhistleblowerCaseServiceTest {
         verify(audit, never()).log(any(), any(), any(), any());
     }
 
+    // ⚠ F2-83. The test that used to live here was `submit_fallsBackToDefaultOrgWhenNoTenantContext`,
+    // and it PASSED: it asserted that an anonymous whistleblower report with no tenant context is
+    // written to PUBLIC_PORTAL_DEFAULT_ORG — org 1 — and called that correct. The defect was not an
+    // untested gap; it was a tested behaviour, specified and locked in by a green assertion. On the
+    // dev database all 9 cases sat in org 1 as a direct result. The two tests below are that test
+    // inverted: an unresolvable tenant must refuse, and a named tenant must receive the report.
+
     @Test
-    void submit_fallsBackToDefaultOrgWhenNoTenantContext() {
-        // No tenant context set — simulate true unauthenticated public path.
+    void submit_refusesWhenNoTenantCanBeResolved() {
+        // A genuine anonymous caller whose portal link names no tenant. There is nothing to scope
+        // the write to, so the only safe answer is to refuse — filing a confidential report into
+        // whichever tenant happens to be first is a confidentiality failure, not a fallback.
         TenantContext.clear();
+        when(publicTenant.resolve(any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        PublicPortalTenantResolver.REFUSAL));
+
+        assertThatThrownBy(() -> service.submitCase(anonReq(), null))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Unknown or inactive organisation");
+
+        // Nothing may be written — least of all to org 1.
+        verify(caseRepo, never()).save(any(WhistleblowerCase.class));
+    }
+
+    @Test
+    void submit_writesToTheTenantNamedByTheShortCode() {
+        TenantContext.clear();
+        when(publicTenant.resolve("STCB")).thenReturn(OTHER_ORG);
         when(caseRepo.save(any(WhistleblowerCase.class))).thenAnswer(inv -> {
             WhistleblowerCase c = inv.getArgument(0);
             c.setId(105L);
             return c;
         });
-        when(caseRepo.countByOrganisationIdAndIsDeletedFalse(
-                WhistleblowerCaseService.PUBLIC_PORTAL_DEFAULT_ORG)).thenReturn(0L);
+        when(caseRepo.countByOrganisationIdAndIsDeletedFalse(OTHER_ORG)).thenReturn(0L);
 
-        service.submitCase(anonReq());
+        service.submitCase(anonReq(), "STCB");
 
         ArgumentCaptor<WhistleblowerCase> captor = ArgumentCaptor.forClass(WhistleblowerCase.class);
         verify(caseRepo).save(captor.capture());
         assertThat(captor.getValue().getOrganisationId())
-                .isEqualTo(WhistleblowerCaseService.PUBLIC_PORTAL_DEFAULT_ORG);
+                .as("the report belongs to the tenant whose portal received it, not org 1")
+                .isEqualTo(OTHER_ORG);
     }
 
     // ─── Public lookup / reply via token ───────────────────────────

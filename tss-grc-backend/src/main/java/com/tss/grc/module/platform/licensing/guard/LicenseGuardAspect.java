@@ -136,15 +136,23 @@ public class LicenseGuardAspect {
      * <p>⚠ {@code AnonymousAuthenticationToken.isAuthenticated()} returns {@code true}, so the
      * type check is not redundant with the {@code isAuthenticated()} call next to it.
      *
-     * <p>⚠ <b>Known asymmetry, and it is not this aspect's to fix.</b> A <em>logged-in</em> user
-     * posting to one of those public endpoints does have a tenant, so they are entitlement-checked
-     * while an anonymous caller is not. That reads backwards until you see why the anonymous path
-     * cannot be checked: {@code WhistleblowerCaseService.PUBLIC_PORTAL_DEFAULT_ORG} and
-     * {@code ComplaintService.PUBLIC_PORTAL_DEFAULT_ORG} are both the literal {@code 1L}, so an
-     * anonymous submission is not merely unentitled — it is filed against the wrong tenant
-     * (F2-83). Once the portal resolves its own organisation the way
-     * {@code SubprocessorController.publicList} already does, entitlement can apply uniformly and
-     * this asymmetry disappears.
+     * <p>⚠ <b>Known asymmetry.</b> A <em>logged-in</em> user posting to one of those public
+     * endpoints does have a tenant, so they are entitlement-checked while an anonymous caller is
+     * not.
+     *
+     * <p><b>Updated 2026-08-06 — the reason changed, the asymmetry did not.</b> This used to say the
+     * anonymous path <em>could not</em> be checked, because
+     * {@code WhistleblowerCaseService.PUBLIC_PORTAL_DEFAULT_ORG} and
+     * {@code ComplaintService.PUBLIC_PORTAL_DEFAULT_ORG} were both the literal {@code 1L} — an
+     * anonymous submission was not merely unentitled, it was filed against the wrong tenant. F2-83
+     * deleted both constants; the tenant now comes from the portal link's {@code ?org=} short code
+     * via {@code PublicPortalTenantResolver}, and an unresolvable one is a 404.
+     *
+     * <p>So the tenant <em>is</em> knowable on this path now, and the blocker is gone. But it is
+     * resolved <b>inside the service</b>, which runs after this advice, so the asymmetry does not
+     * close by itself: this aspect would have to resolve {@code ?org=} from the request before the
+     * service does. That is a real follow-on rather than an impossibility — which is the only part
+     * of this note that changed, and the part worth knowing.
      */
     private static boolean isAnonymousHttpRequest() {
         if (RequestContextHolder.getRequestAttributes() == null) {

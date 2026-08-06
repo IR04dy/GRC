@@ -21,6 +21,7 @@ import com.tss.grc.module.consumer.complaints.repository.ComplaintRepository;
 import com.tss.grc.module.consumer.complaints.repository.ComplaintUpdateRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
+import com.tss.grc.module.platform.tenancy.PublicPortalTenantResolver;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -82,8 +83,10 @@ import java.util.UUID;
  *
  * <h3>Public submission tenant resolution</h3>
  * Public-portal complaints are anonymous — there is no JWT and so no
- * {@code TenantContext}. We default to {@link #PUBLIC_PORTAL_DEFAULT_ORG}
- * (the demo bank, org_id = 1) until a host-based tenant resolver lands.
+ * {@code TenantContext}. The tenant must therefore be <i>named</i> by the portal link's
+ * {@code ?org=} short code; see {@link PublicPortalTenantResolver}. An unresolvable tenant is a
+ * 404, never a default (F2-83 — this used to default to org 1, and for an anonymous caller that
+ * default was the only path, so every complaint on the platform was filed into org 1).
  */
 @Slf4j
 @Service
@@ -95,12 +98,6 @@ public class ComplaintService {
 
     /** SAMA Banking Consumer Protection Principles — 20 working-day resolution. */
     public static final int RESOLUTION_SLA_BUSINESS_DAYS = 20;
-
-    /**
-     * Default tenant for anonymous public submissions until a host-based
-     * tenant resolver lands. See package Javadoc.
-     */
-    public static final Long PUBLIC_PORTAL_DEFAULT_ORG = 1L;
 
     /** Lifecycle state machine. */
     private static final Map<String, Set<String>> ALLOWED = Map.ofEntries(
@@ -120,6 +117,7 @@ public class ComplaintService {
     private final ComplaintAggregateReportRepository reportRepo;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
+    private final PublicPortalTenantResolver publicTenant;
 
     // ─── Reads (internal — tenant-scoped) ───────────────────────────
 
@@ -163,8 +161,9 @@ public class ComplaintService {
      * recover it.
      */
     @Transactional
-    public SubmitComplaintResponse submitPublicComplaint(SubmitComplaintRequest req) {
-        Long orgId = resolvePublicOrg();
+    public SubmitComplaintResponse submitPublicComplaint(SubmitComplaintRequest req,
+                                                        String orgShortCode) {
+        Long orgId = publicTenant.resolve(orgShortCode);
 
         Complaint c = new Complaint();
         c.setOrganisationId(orgId);
@@ -438,16 +437,6 @@ public class ComplaintService {
 
     private static Long org() {
         return TenantContext.requireOrganisationId();
-    }
-
-    /**
-     * Resolve org for an anonymous public submission. Defaults to
-     * {@link #PUBLIC_PORTAL_DEFAULT_ORG} unless a tenant is already on
-     * the thread (e.g. a logged-in employee using the same form).
-     */
-    Long resolvePublicOrg() {
-        Long fromContext = TenantContext.getCurrentTenant();
-        return fromContext != null ? fromContext : PUBLIC_PORTAL_DEFAULT_ORG;
     }
 
     /**

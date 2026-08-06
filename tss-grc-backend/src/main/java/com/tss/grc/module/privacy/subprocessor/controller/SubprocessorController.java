@@ -9,8 +9,7 @@ import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.Subprocessor
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.SubprocessorEventResponse;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.SubprocessorRequest;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.SubprocessorResponse;
-import com.tss.grc.module.platform.entity.Organisation;
-import com.tss.grc.module.platform.repository.OrganisationRepository;
+import com.tss.grc.module.platform.tenancy.PublicPortalTenantResolver;
 import com.tss.grc.module.privacy.subprocessor.service.SubprocessorEventService;
 import com.tss.grc.module.privacy.subprocessor.service.SubprocessorPublicListService;
 import com.tss.grc.module.privacy.subprocessor.service.SubprocessorService;
@@ -25,7 +24,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -61,7 +59,7 @@ public class SubprocessorController {
     private final SubprocessorService service;
     private final SubprocessorEventService eventService;
     private final SubprocessorPublicListService publicListService;
-    private final OrganisationRepository organisationRepository;
+    private final PublicPortalTenantResolver publicTenant;
 
     // ─── List + get ───────────────────────────────────────────────
 
@@ -173,19 +171,23 @@ public class SubprocessorController {
         // unauthenticated caller iterate org=1,2,3,… and harvest every
         // tenant's approved sub-processor / vendor map.
         //
-        // Hardening (no schema change): the caller must name the tenant by
-        // its opaque, non-enumerable short code (the public
-        // ethics.<bank>.sa-style identifier), NOT a sequential DB id. The
-        // org must exist and be active; otherwise we return 404 — we never
-        // silently fall back to org 1, and an unknown/inactive org is
-        // indistinguishable from one that has not published a list.
-        if (orgCode == null || orgCode.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
-        Organisation org = organisationRepository.findByShortCode(orgCode.trim())
-                .filter(o -> Boolean.TRUE.equals(o.getIsActive()))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        return publicListService.publicList(org.getId());
+        // The hardening it received — demand the opaque, non-enumerable short
+        // code, require it to exist and be active, 404 otherwise, never fall
+        // back to org 1 — was inlined here and nowhere else. F2-83 then found
+        // the identical defect still live in the two channels where the data is
+        // most confidential (whistleblower reports, consumer complaints), both
+        // defaulting to org 1. A fix applied to one endpoint is not a pattern
+        // until it is applied to the others that share the flaw, so the logic
+        // now lives in PublicPortalTenantResolver and this call site uses it.
+        //
+        // resolveNamed, NOT resolve: this is a read of a *named* tenant's
+        // published list, so it must ignore TenantContext. The submission
+        // variant prefers the caller's own tenant, which is right for a form an
+        // employee might be logged in to but wrong here — it would silently
+        // hand an authenticated caller their own list instead of the one they
+        // asked for. Behaviour at this endpoint is unchanged: same 404, same
+        // silence about whether the org exists.
+        return publicListService.publicList(publicTenant.resolveNamed(orgCode));
     }
 
     // ─── Helpers ──────────────────────────────────────────────────

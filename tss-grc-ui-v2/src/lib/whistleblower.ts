@@ -203,8 +203,14 @@ const PREFIX = '/api/v1/ethics/whistleblower';
 
 export const whistleblowerApi = {
   // Public — no auth required.
-  publicSubmit: (body: CaseSubmissionRequest) =>
-    api.post<CaseSubmissionResponse>(`${PREFIX}/public/submit`, body, { anonymous: true }),
+  // F2-83: `org` is the tenant's opaque short code from the portal link. There is no JWT on this
+  // path, so it is the only thing that says whose hotline received the report; the server 404s an
+  // unknown or inactive code rather than defaulting to org 1, which is what it used to do — and
+  // filing a confidential report into another bank's tenant is a confidentiality failure, not a
+  // routing bug.
+  publicSubmit: (body: CaseSubmissionRequest, org: string) =>
+    api.post<CaseSubmissionResponse>(
+      `${PREFIX}/public/submit?org=${encodeURIComponent(org)}`, body, { anonymous: true }),
   publicStatus: (token: string) =>
     api.get<PublicCaseResponse>(`${PREFIX}/public/status/${encodeURIComponent(token)}`, { anonymous: true }),
   publicReply: (token: string, body: ReporterReplyRequest) =>

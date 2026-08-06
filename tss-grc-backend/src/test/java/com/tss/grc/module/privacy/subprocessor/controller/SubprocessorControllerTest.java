@@ -1,8 +1,7 @@
 package com.tss.grc.module.privacy.subprocessor.controller;
 
 import com.tss.grc.common.tenant.TenantContext;
-import com.tss.grc.module.platform.entity.Organisation;
-import com.tss.grc.module.platform.repository.OrganisationRepository;
+import com.tss.grc.module.platform.tenancy.PublicPortalTenantResolver;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.LifecycleTransitionRequest;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.MaterialChangeRequest;
 import com.tss.grc.module.privacy.subprocessor.dto.SubprocessorDtos.PublicSubprocessorResponse;
@@ -27,7 +26,6 @@ import com.tss.grc.security.GrcUserDetails;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,17 +54,8 @@ class SubprocessorControllerTest {
     @Mock private SubprocessorService service;
     @Mock private SubprocessorEventService eventService;
     @Mock private SubprocessorPublicListService publicListService;
-    @Mock private OrganisationRepository organisationRepository;
+    @Mock private PublicPortalTenantResolver publicTenant;
     @InjectMocks private SubprocessorController controller;
-
-    private static Organisation activeOrg(Long id, String shortCode) {
-        Organisation o = new Organisation();
-        o.setId(id);
-        o.setNameEn("Demo Bank");
-        o.setShortCode(shortCode);
-        o.setIsActive(true);
-        return o;
-    }
 
     @BeforeEach
     void setUp() { TenantContext.setCurrentTenant(ORG_ID); }
@@ -158,14 +147,15 @@ class SubprocessorControllerTest {
         assertThat(out.lifecycleStage()).isEqualTo("SUSPENDED");
     }
 
+    // SEC-PRIV-003's lookup itself (missing / unknown / inactive short code -> 404) moved to
+    // PublicPortalTenantResolverTest when F2-83 extracted it, and is asserted there against the real
+    // repository behaviour. What remains this endpoint's own responsibility, and is asserted here:
+    // it consults the resolver rather than defaulting, it uses the CONTEXT-IGNORING variant, and it
+    // serves nothing at all when the tenant cannot be resolved.
+
     @Test
     void publicList_resolvesTenantByOpaqueShortCode() {
-        // SEC-PRIV-003: the /public endpoint is permitAll, so the caller
-        // names the tenant by its opaque short code (NOT an enumerable
-        // numeric id). An active org resolves to its internal id and the
-        // approved list is served.
-        when(organisationRepository.findByShortCode("DEMOBANK"))
-                .thenReturn(Optional.of(activeOrg(7L, "DEMOBANK")));
+        when(publicTenant.resolveNamed("DEMOBANK")).thenReturn(7L);
         when(publicListService.publicList(7L)).thenReturn(List.of(
                 new PublicSubprocessorResponse(
                         "SUBP-2026-001", "Microsoft Saudi Arabia", "مايكروسوفت",
@@ -178,15 +168,31 @@ class SubprocessorControllerTest {
     }
 
     @Test
-    void publicList_rejectsMissingOrgParamWith404_andNeverDefaultsToOrg1() {
-        // SEC-PRIV-003: a missing org code must 404, NOT silently fall
-        // back to org 1 — that default was the enumeration vector.
-        assertThatThrownBy(() -> controller.publicList(null))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+    void publicList_usesTheContextIgnoringResolverSoAnAuthenticatedCallerGetsTheListTheyAskedFor() {
+        // A published transparency list must be the tenant NAMED in the query, never the caller's
+        // own. resolve() prefers TenantContext — correct for a submission form, wrong here — so this
+        // endpoint must use resolveNamed(). Nothing else in the codebase enforces the difference.
+        TenantContext.setCurrentTenant(99L);
+        when(publicTenant.resolveNamed("DEMOBANK")).thenReturn(7L);
+        when(publicListService.publicList(7L)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> controller.publicList("   "))
+        controller.publicList("DEMOBANK");
+
+        verify(publicTenant).resolveNamed("DEMOBANK");
+        verify(publicTenant, never()).resolve(any());
+        verify(publicListService).publicList(7L);
+    }
+
+    @Test
+    void publicList_rejectsMissingOrgParamWith404_andNeverDefaultsToOrg1() {
+        // SEC-PRIV-003: a missing org code must 404, NOT silently fall back to org 1 — that default
+        // was the enumeration vector. F2-83 then found the same default still live in the
+        // whistleblower and complaint portals.
+        when(publicTenant.resolveNamed(null))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        PublicPortalTenantResolver.REFUSAL));
+
+        assertThatThrownBy(() -> controller.publicList(null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
@@ -196,10 +202,11 @@ class SubprocessorControllerTest {
 
     @Test
     void publicList_unknownOrgReturns404() {
-        // An unknown short code is indistinguishable from one that has
-        // not published a list — return 404, do not leak existence.
-        when(organisationRepository.findByShortCode("GHOST"))
-                .thenReturn(Optional.empty());
+        // An unknown short code is indistinguishable from one that has not published a list —
+        // return 404, do not leak existence.
+        when(publicTenant.resolveNamed("GHOST"))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        PublicPortalTenantResolver.REFUSAL));
 
         assertThatThrownBy(() -> controller.publicList("GHOST"))
                 .isInstanceOf(ResponseStatusException.class)

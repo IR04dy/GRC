@@ -56,10 +56,15 @@ public class ComplaintController {
 
     @PostMapping("/public")
     @PreAuthorize("permitAll()")
-    @Operation(summary = "Submit a new customer complaint (anonymous public endpoint)")
+    @Operation(summary = "Submit a new customer complaint (anonymous public endpoint)",
+               description = "The portal link MUST carry the tenant's public short code as ?org=. "
+                           + "There is no JWT on this path, so nothing else identifies the receiving "
+                           + "organisation; an unknown or inactive code is refused with 404 and never "
+                           + "defaulted (F2-83).")
     public ResponseEntity<SubmitComplaintResponse> submitPublic(
-            @Valid @RequestBody SubmitComplaintRequest req) {
-        return ResponseEntity.ok(service.submitPublicComplaint(req));
+            @Valid @RequestBody SubmitComplaintRequest req,
+            @RequestParam(name = "org", required = false) String org) {
+        return ResponseEntity.ok(service.submitPublicComplaint(req, org));
     }
 
     @GetMapping("/public/track/{token}")
