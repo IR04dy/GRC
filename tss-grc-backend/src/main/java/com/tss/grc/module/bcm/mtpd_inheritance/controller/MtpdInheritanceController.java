@@ -49,13 +49,13 @@ public class MtpdInheritanceController {
     }
 
     @GetMapping("/assessments")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','RISK_MANAGER','CISO','TPRM_LEAD','AUDITOR','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','RISK_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN')")
     public List<AssessmentResponse> list() {
         return service.listAssessments();
     }
 
     @GetMapping("/assessments/{id}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','RISK_MANAGER','CISO','TPRM_LEAD','AUDITOR','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','RISK_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN')")
     public AssessmentDetailResponse detail(@PathVariable Long id) {
         return service.getAssessmentDetail(id);
     }
@@ -77,7 +77,7 @@ public class MtpdInheritanceController {
     }
 
     @GetMapping("/processes/{processId}/history")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','RISK_MANAGER','CISO','TPRM_LEAD','AUDITOR','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','RISK_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN')")
     public List<FindingResponse> processHistory(@PathVariable Long processId) {
         return service.getProcessBreachHistory(processId);
     }

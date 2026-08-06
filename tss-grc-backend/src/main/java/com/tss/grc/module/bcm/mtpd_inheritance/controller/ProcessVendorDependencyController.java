@@ -41,32 +41,32 @@ public class ProcessVendorDependencyController {
     private final MtpdInheritanceService service;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','TPRM_LEAD','RISK_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','RISK_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN')")
     public List<DependencyResponse> list() {
         return service.listDependencies();
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','TPRM_LEAD','RISK_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','RISK_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN')")
     public DependencyResponse get(@PathVariable Long id) {
         return service.getDependency(id);
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','TPRM_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')")
     public DependencyResponse create(@RequestBody @Valid DependencyCreateRequest req) {
         return service.createDependency(req);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','TPRM_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')")
     public DependencyResponse update(@PathVariable Long id,
                                       @RequestBody @Valid DependencyUpdateRequest req) {
         return service.updateDependency(id, req);
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','TPRM_LEAD','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.deleteDependency(id);
         return ResponseEntity.noContent().build();
