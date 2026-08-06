@@ -201,7 +201,7 @@ class RoleGuardConversionRatchetTest {
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 537;
+    private static final int BASELINE_PURE_ROLE_SITES = 532;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"
@@ -471,7 +471,7 @@ class RoleGuardConversionRatchetTest {
      * a 5-row board with terms). Seating them would have been <em>looser</em> than the column — the owner
      * of model A could act on model B — so this baseline is not simply "make it fall".
      */
-    private static final int BASELINE_GHOST_ROLE_NAMES = 14;
+    private static final int BASELINE_GHOST_ROLE_NAMES = 13;
 
     // ── extraction ────────────────────────────────────────────────────────────────────────────
 

@@ -22,9 +22,14 @@ import {
  * pages where users will hit "No help for this page yet" and gives
  * the content team a prioritised authoring backlog.
  *
- * <p>Auth: gated by {@code PLATFORM_ADMIN} or {@code CONTENT_EDITOR}
- * at the backend; the page itself is reachable from /admin/help-topics
- * and renders a friendly forbidden state when the API returns 403.
+ * <p>Auth: gated by {@code KB:WRITE} at the backend — the same permission that guards KB-article
+ * authoring, held by GRC_ADMINISTRATOR, ORG_ADMIN and COMPLIANCE_OFFICER. The page is reachable
+ * from /admin/help-topics and renders a friendly forbidden state when the API returns 403.
+ *
+ * <p>⚠ This comment used to say {@code PLATFORM_ADMIN} or {@code CONTENT_EDITOR}. F2-52:
+ * CONTENT_EDITOR exists in no database, so the authoring surface was the platform administrator's
+ * alone — including for the compliance officer this page was built for, who could list every topic
+ * and save none. Deletion remains PLATFORM_ADMIN-only.
  */
 export function HelpTopicsAdminPage() {
   const { t, lang } = useI18n();
