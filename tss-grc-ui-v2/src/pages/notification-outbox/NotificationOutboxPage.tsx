@@ -6,7 +6,7 @@ import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { Avatar } from '../../components/ui/UserPicker';
+import { Avatar } from '../../components/ui/Avatar';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {

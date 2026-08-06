@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, Clock, ArrowRight, UserPlus, FileText, CheckCircle2, RotateCcw } from 'lucide-react';
 import { activityFor, activityUser, subscribeActivity, type ActivityEvent } from '../../lib/activityLog';
 import { getUser } from '../../lib/userDirectory';
-import { Avatar } from '../ui/UserPicker';
+import { Avatar } from '../ui/Avatar';
 import { useI18n } from '../../lib/i18n';
 
 /**

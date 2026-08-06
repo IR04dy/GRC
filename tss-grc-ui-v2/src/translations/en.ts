@@ -3476,6 +3476,7 @@ export const en = {
   noxRetryBtn:             'Retry',
   noxCancelBtn:            'Cancel',
   noxNotifBellTip:         'Notifications',
+  notifMarkAllRead:       'Mark all read',
 
   // Backend wiring (mode badge tooltip)
   bwRestMode:              'REST API',

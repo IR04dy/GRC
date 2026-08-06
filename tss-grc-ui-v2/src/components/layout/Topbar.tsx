@@ -9,8 +9,13 @@ import { useTheme, type ThemeMode } from '../../lib/theme';
 import { applyToDom as applyWhiteLabel } from '../../lib/whiteLabel';
 import { useToast } from '../../lib/toast';
 import { currentMode, MODE_LABEL, MODE_TONE, subscribeMode, type Mode } from '../../lib/productionMode';
-import { unreadInApp, subscribeNotifs, markRead } from '../../lib/notificationOutbox';
-import { getUser as getDirUser } from '../../lib/userDirectory';
+// F2-38 — the bell reads the server. It used to read lib/notificationOutbox (localStorage, zero
+// network calls) and resolve each "recipient" through lib/userDirectory's invented people, which put
+// fabricated identities on every page in the product. platform.notifications holds 445 real rows.
+import {
+  notificationsApi, routeForEntity, notificationTitle, notificationBody,
+  type ServerNotification,
+} from '../../lib/notifications';
 
 export function Topbar({ title, sub, onOpenPalette, onToggleSidebar }: { title?: string; sub?: string; onOpenPalette?: () => void; onToggleSidebar?: () => void }) {
   const { t, lang, toggleLang } = useI18n();
@@ -286,10 +291,50 @@ function OrgSwitcher() {
 function NotificationBellButton() {
   const { t, lang } = useI18n();
   const navigate = useNavigate();
-  const [, setTick] = useState(0);
   const [open, setOpen] = useState(false);
-  useEffect(() => subscribeNotifs(() => setTick(x => x + 1)), []);
-  const unread = unreadInApp();
+  const [count, setCount] = useState(0);
+  const [unread, setUnread] = useState<ServerNotification[]>([]);
+
+  // The badge polls; the list is fetched when the panel opens. Two calls rather than one because the
+  // count is cheap (a COUNT query) and the list is a page — polling the page to render a number
+  // would fetch 20 rows a minute to display one integer.
+  useEffect(() => {
+    let live = true;
+    const refresh = () => notificationsApi.unreadCount()
+      .then(r => { if (live) setCount(r.count); })
+      .catch(() => { /* a failed poll must not surface a toast on every page */ });
+    refresh();
+    const id = window.setInterval(refresh, 60_000);
+    return () => { live = false; window.clearInterval(id); };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    notificationsApi.list(0, 20)
+      .then(p => { if (live) setUnread((p.content || []).filter(n => !n.isRead)); })
+      .catch(() => { if (live) setUnread([]); });
+    return () => { live = false; };
+  }, [open]);
+
+  async function openItem(n: ServerNotification) {
+    const to = routeForEntity(n.entityType, n.entityId);
+    try {
+      await notificationsApi.markRead(n.id);
+      setUnread(list => list.filter(x => x.id !== n.id));
+      setCount(c => Math.max(0, c - 1));
+    } catch { /* navigate anyway — failing to mark read must not strand the user */ }
+    if (to) { setOpen(false); navigate(to); }
+  }
+
+  async function markAll() {
+    try {
+      await notificationsApi.markAllRead();
+      setUnread([]);
+      setCount(0);
+    } catch { /* leave the panel as it is; the next poll corrects the badge */ }
+  }
+
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -304,14 +349,14 @@ function NotificationBellButton() {
       <button className="icon-btn" title={t('noxNotifBellTip')} aria-label={t('noxNotifBellTip')}
         onClick={() => setOpen(o => !o)}>
         <Bell size={18} />
-        {unread.length > 0 && (
+        {count > 0 && (
           <span style={{
             position: 'absolute', top: 2, insetInlineEnd: 2,
             minWidth: 16, height: 16, padding: '0 4px',
             background: 'var(--danger)', color: 'white',
             borderRadius: 8, fontSize: 9, fontWeight: 700,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          }}>{unread.length > 9 ? '9+' : unread.length}</span>
+          }}>{count > 9 ? '9+' : count}</span>
         )}
       </button>
       {open && (
@@ -329,10 +374,18 @@ function NotificationBellButton() {
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>
             <div style={{ fontSize: 12, fontWeight: 700 }}>{t('noxNotifBellTip')}</div>
-            <button onClick={() => { setOpen(false); navigate('/notifications/outbox'); }}
-              style={{ fontSize: 11, color: 'var(--primary)', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-              {t('noxTitle')} →
-            </button>
+            {/*
+              F2-38 — this was a link to /notifications/outbox, which is a fabricated multi-channel
+              delivery page backed by localStorage (F2-142). Sending users from a real inbox into
+              invented delivery records is the wrong direction, so it is now `mark all read`: a real
+              server capability (PATCH /read-all) that already existed and nothing called.
+            */}
+            {unread.length > 0 && (
+              <button onClick={markAll}
+                style={{ fontSize: 11, color: 'var(--primary)', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                {t('notifMarkAllRead')}
+              </button>
+            )}
           </div>
           <div style={{ flex: 1, overflow: 'auto' }}>
             {unread.length === 0 ? (
@@ -340,9 +393,12 @@ function NotificationBellButton() {
                 —
               </div>
             ) : unread.slice(0, 8).map(n => {
-              const recipient = getDirUser(n.recipientId);
+              // F2-38 — no recipient lookup: the inbox is per-user, so every row here belongs to the
+              // reader. Resolving a "recipient" was what pulled the invented directory in, and it was
+              // displaying a fabricated name for the person already looking at the screen.
+              const to = routeForEntity(n.entityType, n.entityId);
               return (
-                <button key={n.id} onClick={() => { markRead(n.id); if (n.link) { setOpen(false); navigate(n.link); } }}
+                <button key={n.id} onClick={() => { void openItem(n); }}
                   style={{
                     width: '100%', padding: '10px 12px',
                     border: 'none', background: 'transparent',
@@ -354,19 +410,21 @@ function NotificationBellButton() {
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, flex: 1 }}>
-                      {lang === 'ar' ? n.subjectAr : n.subjectEn}
+                      {notificationTitle(n, lang)}
                     </span>
-                    <span style={{
-                      fontSize: 9, color: 'white', padding: '1px 5px',
-                      background: n.priority === 'P1' ? 'var(--danger)' : n.priority === 'P2' ? 'var(--warning)' : 'var(--ink-3)',
-                      borderRadius: 3, fontWeight: 700,
-                    }}>{n.priority}</span>
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.4 }}>
-                    {(lang === 'ar' ? n.bodyAr : n.bodyEn).slice(0, 100)}
+                    {notificationBody(n, lang).slice(0, 100)}
                   </div>
+                  {/*
+                    The type replaces the old priority badge and the recipient name. It is real
+                    (`notification_type`, populated on all 445 rows) where those were not: there is no
+                    severity column, and the recipient is the reader. ⚠ It carries two vocabularies —
+                    INFO/WARNING/DANGER on 48 rows, event names on 397 — so it is shown as-is rather
+                    than styled by severity, which would have been a guess dressed as a signal.
+                  */}
                   <div style={{ fontSize: 9, color: 'var(--ink-3)', marginTop: 4 }} className="mono">
-                    {recipient ? (lang === 'ar' ? recipient.nameAr : recipient.nameEn) : n.recipientId} · {new Date(n.createdAt).toLocaleTimeString()}
+                    {n.type}{to ? '' : ' ·'} {new Date(n.createdAt).toLocaleString()}
                   </div>
                 </button>
               );

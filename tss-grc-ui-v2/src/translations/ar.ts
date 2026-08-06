@@ -3456,6 +3456,7 @@ export const ar = {
   noxRetryBtn:             'إعادة المحاولة',
   noxCancelBtn:            'إلغاء',
   noxNotifBellTip:         'الإشعارات',
+  notifMarkAllRead:       'تعليم الكل كمقروء',
 
   // Backend wiring (mode badge tooltip)
   bwRestMode:              'واجهة REST',
