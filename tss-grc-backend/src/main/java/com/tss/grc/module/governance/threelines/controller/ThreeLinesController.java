@@ -43,7 +43,7 @@ public class ThreeLinesController {
     @GetMapping("/overview")
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','COMPLIANCE_OFFICER','INTERNAL_AUDITOR',"
                 + "'AUDIT_DIRECTOR','BOARD_MEMBER','AUDIT_COMMITTEE_CHAIR','BOARD_SECRETARY',"
-                + "'CISO_GOVERNANCE','DPO','AUDITOR','EXECUTIVE_REVIEWER')")
+                + "'DPO','AUDITOR','EXECUTIVE_REVIEWER')")
     public ThreeLinesOverviewDto overview() {
         return service.overview();
     }
@@ -52,7 +52,7 @@ public class ThreeLinesController {
     @GetMapping("/line/{band}")
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','COMPLIANCE_OFFICER','INTERNAL_AUDITOR',"
                 + "'AUDIT_DIRECTOR','BOARD_MEMBER','AUDIT_COMMITTEE_CHAIR','BOARD_SECRETARY',"
-                + "'CISO_GOVERNANCE','DPO','AUDITOR','EXECUTIVE_REVIEWER')")
+                + "'DPO','AUDITOR','EXECUTIVE_REVIEWER')")
     public List<ThreeLinesArtefactDto> drillDown(@PathVariable("band") String band) {
         return service.drillDown(band);
     }
@@ -61,7 +61,7 @@ public class ThreeLinesController {
     @GetMapping("/user/{userId}/role-band")
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','COMPLIANCE_OFFICER','INTERNAL_AUDITOR',"
                 + "'AUDIT_DIRECTOR','BOARD_MEMBER','AUDIT_COMMITTEE_CHAIR','BOARD_SECRETARY',"
-                + "'CISO_GOVERNANCE','DPO','AUDITOR','EXECUTIVE_REVIEWER')")
+                + "'DPO','AUDITOR','EXECUTIVE_REVIEWER')")
     public UserBandDto userBand(@PathVariable("userId") Long userId) {
         return service.userBandFor(userId);
     }

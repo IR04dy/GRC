@@ -405,7 +405,7 @@ class RoleGuardConversionRatchetTest {
      * catalogue. <b>28 is what this instrument measures today; it does not refute the 40 and should not
      * be read as doing so.</b>
      */
-    private static final int BASELINE_GHOST_ROLE_NAMES = 26;
+    private static final int BASELINE_GHOST_ROLE_NAMES = 25;
 
     // ── extraction ────────────────────────────────────────────────────────────────────────────
 

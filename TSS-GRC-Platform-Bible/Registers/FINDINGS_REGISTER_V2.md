@@ -2807,6 +2807,23 @@ Start-Service TssGrcBackend
 | **References** | [[F2-77]] · [[F2-09]] · [[F2-81]] · `PermissionCatalogueUsageTest` · V321 |
 | **Lesson** | **This is what F2-77 was for.** The chain was never the deliverable — it is the instrument, and the first thing it produced on reaching V320 is a P1 nobody could have measured while the folder went unexecuted. **A migration set that has never been run is not a deployment mechanism, it is a description of one** |
 
+## F2-145 — The Sharia module has no working Sharia role, and compliance holds it instead
+
+|  |  |
+|---|---|
+| **ID** | F2-145 *(found 2026-08-06 working F2-52's ghost sweep with reflection instead of grep)* |
+| **Category** | Authorisation — a governance separation that exists in the guard text and nowhere else |
+| **Severity** | **P2** — no data is exposed to an outsider, but Sharia oversight is not independent of compliance, and for a Saudi Islamic-finance module that independence *is* the control |
+| **Current State** | ⬜ **OPEN — owner decision.** Deliberately not "fix the names" |
+| **The measurement** | Every guard on `ShariaController` reads `PLATFORM_ADMIN │ COMPLIANCE_OFFICER │ … │ SHARIA_OFFICER │ SHARIA_AUDITOR`, plus `SHARIA_BOARD_CHAIR` on the scholar path. **All three exist in no row of `iam.roles`** — and neither does `CRO`, which the read guards also recite. So the effective population for the whole module is `PLATFORM_ADMIN`, `COMPLIANCE_OFFICER`, `RISK_MANAGER`, `INTERNAL_AUDITOR` |
+| **🔑 Why that is a governance defect and not a typo** | **A Sharia scholar, auditor or board chair cannot reach the Sharia module at all, and a compliance officer can do everything in it.** A Sharia board exists to be independent of the compliance function; here the guard *says* that and the database does not deliver it. The endpoints work, the register fills, and the separation is absent |
+| **⚠ Why the ghost legs must NOT be dropped** | The reflex from the rest of this sweep is wrong here. For `CISO_GOVERNANCE` — one dead leg among eleven real roles — dropping it loses nothing and was done. For Sharia the ghosts are **the only surviving record of intended access**: delete them and the guard reads as a deliberate decision to hand Sharia oversight to compliance, which nobody made. *Removing evidence of unmet intent is not the same as meeting it* |
+| **How it was found** | Reading `target/role-guard-sites.txt`, the reflection dump `RoleGuardConversionRatchetTest` writes. ⚠ A `grep` over `hasAnyRole(...)` for the same names returned **one** guard, because these span source lines — the trap that test's own javadoc records (F2-13a: **3 by grep, 73 by reflection**) and which I reached for first anyway |
+| **Recommendation** | **(a)** catalogue and seat the three Sharia bodies as roles, making the guards work as written; or **(b)** convert the module to `SHARIA:READ/WRITE/APPROVE` per F2-05's standing direction and grant to whichever real roles a tenant's Sharia governance uses. **(b)** is the platform's stated direction and survives a tenant whose scholars are external — and [[F2-26]] already models governance **seats** separately from roles, which may be where a board chair belongs |
+| **Effort** | **M** — and it is a decision first |
+| **References** | [[F2-52]] · [[F2-05]] · [[F2-26]] · `ShariaController` · `target/role-guard-sites.txt` |
+| **Lesson** | **A guard that names a role nobody created is a design document, not a control.** It reads as separation of duties, passes review, and delegates the module to whoever else is on the list. The ghost-name gate found it in a week; the guard had been asserting that separation for months |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.
