@@ -48,6 +48,19 @@ import java.util.Map;
 @Tag(name = "BCM Crisis Events")
 public class CrisisEventController {
 
+    /**
+     * The commander-tier audience for the live crisis-room summary. F2-52 — see
+     * {@link #activeSummary()} for why each name is here, why two invented ones were removed, and
+     * why no catalogued BCM permission fits.
+     *
+     * <p>Declared here and <b>referenced</b> by {@code MobileCrisisController}, which serves the same
+     * service method under the mobile URL family. A shared constant makes the two guards identical by
+     * construction rather than by review — the failure mode being a narrowed endpoint that stays
+     * reachable through its other URL.
+     */
+    public static final String CRISIS_ROOM_GUARD =
+        "hasAnyRole('CRISIS_MANAGER','CISO','BCM_MANAGER','PLATFORM_ADMIN')";
+
     public record TransitionBody(String to) {}
     public record ActivateBcpBody(Long bcpId) {}
     public record ActivateDrpBody(Long drpId) {}
@@ -68,13 +81,45 @@ public class CrisisEventController {
     public List<CrisisEvent> active() { return service.listActive(); }
 
     /**
-     * Slice 9-F — mobile-optimised summary of active crises with the
-     * shortest regulatory deadline pre-computed. Restricted to
-     * commander-tier roles because the {@code nextActionLabel} and tier
+     * Slice 9-F — mobile-optimised summary of active crises with the shortest regulatory deadline
+     * pre-computed. Restricted to commander-tier roles because the {@code nextActionLabel} and tier
      * fields are part of the live command loop, not the wider read view.
+     *
+     * <h3>F2-52 — the guard excluded the crisis manager and named an invented role instead</h3>
+     * It read {@code hasAnyRole('CRISIS_COMMANDER','CISO','BCM_MANAGER','PLATFORM_ADMIN',
+     * 'INCIDENT_COMMANDER')}. Neither {@code CRISIS_COMMANDER} nor {@code INCIDENT_COMMANDER} exists
+     * in {@code iam.roles} in either database, so both legs were permanently false and the real
+     * population was three roles. 🔑 <b>Meanwhile the platform ships a role called
+     * {@code CRISIS_MANAGER}</b> — display name "Crisis Manager", holding {@code BCM:READ} — and the
+     * crisis room excluded it. The guard named a near-miss of a role that was right there.
+     *
+     * <p>{@code INCIDENT_COMMANDER} is <b>dropped rather than substituted</b>: no role expresses it.
+     * The closest name, {@code EMERGENCY_RESPONDER}, is <i>"Emergency Responder (Break-glass)"</i> —
+     * the IAM break-glass role — and putting break-glass on a routine command-loop read would
+     * conflate an emergency override with day-to-day access. Dropping a leg that never matched is
+     * behaviour-preserving; inventing an equivalence is not.
+     *
+     * <h3>Why this stays a role guard, measured rather than assumed</h3>
+     * No catalogued BCM action expresses "commander-tier". {@code BCM:READ} is <b>17 roles including
+     * VIEWER and REGULATOR_VIEWER</b> — converting would take this endpoint from 3 roles to 17, on
+     * the one surface whose own comment says it is the live command loop. {@code BCM:APPROVE} is 5
+     * roles and <b>does not include CISO</b>, who is on the guard today, while adding two tenant
+     * administrators and an executive reviewer. Neither is this audience.
+     *
+     * <p>⬜ So the residual is a catalogue question, recorded rather than guessed: a
+     * {@code BCM:COMMAND}-style action would let this be re-granted without a jar, but a new action
+     * verb outside READ/WRITE/APPROVE/DELETE/TRIAGE/EXPORT is an owner decision plus a migration,
+     * for an audience of two endpoints. F2-52's own rule — <i>do not seed roles to make old guards
+     * work</i> — is satisfied either way: nothing was seeded here, and the two real names were
+     * already there.
+     *
+     * <p>⚠ {@code MobileCrisisController#activeSummary} is a façade over the same service method and
+     * <b>must carry the identical guard</b>. {@code CrisisRoomGuardTest} asserts that, because a
+     * façade and its canonical twin drifting apart is how a narrowed endpoint stays reachable by its
+     * other URL.
      */
     @GetMapping("/active-summary")
-    @PreAuthorize("hasAnyRole('CRISIS_COMMANDER','CISO','BCM_MANAGER','PLATFORM_ADMIN','INCIDENT_COMMANDER')")
+    @PreAuthorize(CRISIS_ROOM_GUARD)
     public List<CrisisEventService.ActiveCrisisSummaryRow> activeSummary() {
         return service.getActiveCrisisSummary();
     }

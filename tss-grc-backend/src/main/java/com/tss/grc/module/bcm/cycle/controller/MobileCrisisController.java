@@ -38,8 +38,15 @@ public class MobileCrisisController {
 
     private final CrisisEventService crisisEventService;
 
+    /**
+     * F2-52 — the guard is <b>referenced</b>, not restated. It used to be a copy of
+     * {@code CrisisEventController}'s, ghost names and all: {@code CRISIS_COMMANDER} and
+     * {@code INCIDENT_COMMANDER} exist in no database, and the real {@code CRISIS_MANAGER} role was
+     * excluded from the crisis room. A façade that duplicates its twin's guard string is a guard that
+     * will eventually disagree with itself, and the mobile URL is the copy nobody re-reads.
+     */
     @GetMapping("/active-summary")
-    @PreAuthorize("hasAnyRole('CRISIS_COMMANDER','CISO','BCM_MANAGER','PLATFORM_ADMIN','INCIDENT_COMMANDER')")
+    @PreAuthorize(CrisisEventController.CRISIS_ROOM_GUARD)
     public List<CrisisEventService.ActiveCrisisSummaryRow> activeSummary() {
         return crisisEventService.getActiveCrisisSummary();
     }

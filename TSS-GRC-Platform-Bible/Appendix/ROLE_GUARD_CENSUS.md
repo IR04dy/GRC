@@ -27,8 +27,8 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 | … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **532** |
 | … composed (role leg ANDed onto a permission — already tight) | 73 |
 | Module packages holding pure role guards | 35 |
-| Distinct role names recited by any role guard | 56 |
-| … **that do not exist in `iam.roles`** | **13** |
+| Distinct role names recited by any role guard | 55 |
+| … **that do not exist in `iam.roles`** | **11** |
 | Pure guards **closed to everyone** (no named role exists, no live authority leg) | **0** |
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
 | Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **4** |
@@ -55,8 +55,6 @@ shows what that closes.
 | `PRIVACY_OFFICER` | 5 |
 | `SHARIA_BOARD_CHAIR` | 4 |
 | `AUDIT_DIRECTOR` | 3 |
-| `CRISIS_COMMANDER` | 2 |
-| `INCIDENT_COMMANDER` | 2 |
 
 ## B. Pure role guards closed to everyone
 

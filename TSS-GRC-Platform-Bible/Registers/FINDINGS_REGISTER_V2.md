@@ -1906,6 +1906,24 @@ Start-Service TssGrcBackend
 | **Lesson** | **A control that is off in dev and on in prod is not tested — it is deployed and hoped for.** This is the same shape as F2-62's dead flag and A17-D2's fail-open WARN, with the polarity reversed: instead of a control that did nothing, a control that did far too much. Both were invisible for the same reason — *the only environment that runs it is the one nobody probes.* Its javadoc named the gap ("never this bean") and its config named the missing precondition ("only after the documented staging soak"); **two accurate warnings, written by us, consumed by nobody** |
 
 
+## F2-150 · The crisis commander is a free-text label inside a JSON blob, and the column that could name them is empty on every row
+
+|  |  |
+|---|---|
+| **ID** | F2-150 *(measured while fixing [[F2-52]]'s crisis-room guard, 2026-08-06)* |
+| **Category** | Identity vs label — the same defect shape as [[F2-26]] and [[F2-113]], one table over |
+| **Severity** | **P2.** Nothing is exposed and nothing 500s. The cost is that *“who is commanding this crisis”* cannot be answered by a query, so no guard, notification, escalation or handover can key on it — during the one event where that matters most |
+| **Current State** | ⬜ **Open, filed not fixed.** The remedy is a product decision about who a crisis commander is, and a backfill nobody can derive |
+| **Provenance** | Not sought. [[F2-52]]'s crisis-room slice asked whether *commander-tier* could be expressed as data rather than as a role list, so I read `bcm.crisis_events`. `crisis_manager_id` exists — and is the answer to that question only if it is populated |
+| **🔑 The measurement** | dev `bcm.crisis_events`: **5 rows, `crisis_manager_id` set on 0 of them**. Meanwhile `crisis_team_json` is populated on **5 of 5**, and it names the commander — as prose: `[{"userId":1,"role":"Crisis Manager"},{"userId":2,"role":"Cards Lead"}]`. So the identity is *there* (`userId` is a real id) but the **role is a label**, and the column designed to hold the link is unused |
+| **Why the JSON is not good enough** | `"role":"Crisis Manager"` is not `CRISIS_MANAGER`. It is a display string typed by whoever seeded the row, in a JSON array with no CHECK, no FK and no index. Nothing can join it, and a second spelling (`"Crisis Lead"`, `"crisis manager"`) is indistinguishable from a third person. This is exactly what [[F2-113]] had to fix on `committee_referral.recusal_names` — team labels compared against a table of people — and what [[F2-26]] built the roster→user linkage for |
+| **What it blocks, concretely** | (a) the crisis-room guard cannot be entity-bound, so it stays a role list — [[F2-52]] recorded that as the reason `BCM:COMMAND` was not invented; (b) `CrisisEventService` cannot notify *the* commander, only a role; (c) a handover between commanders leaves no record; (d) an auditor asking *“who was in command at 02:00”* gets a JSON blob |
+| **⚠ What this finding does NOT claim** | That `crisis_manager_id` is dead code — it is a **column with no writer**, which is the [[F2-141]] shape, and the entity may well map it. Nor that the JSON should be deleted: `crisis_team_json` carries the whole team, which no single FK can. The fix is to populate the column **and** give the team array a closed role vocabulary, not to choose between them |
+| **Effort** | **M** — the schema change is trivial; deciding whether the commander is a user, a roster seat ([[F2-26]]) or a per-event appointment is not, and the 5 existing rows have no derivable answer |
+| **Verification** | `SELECT COUNT(*), COUNT(crisis_manager_id) FROM bcm.crisis_events WHERE is_deleted=0` → `5, 0`. `crisis_team_json` non-empty on 5. The five events' team arrays name `userId` 1, 2, 4, 5 and 6 with role strings `Crisis Manager`, `Cards Lead`, `CISO`, `Branch Ops Lead`, `Cloud Lead` — three of which are not role names in `iam.roles` either |
+| **References** | `bcm.crisis_events` · `CrisisEventController#activeSummary` · `CrisisEventService` · [[F2-52]] · [[F2-26]] · [[F2-113]] · [[F2-141]] |
+| **Lesson** | **A role list in a guard and a role label in a JSON blob fail the same way, and finding one is a reason to look for the other.** F2-52 is a programme about names where identities are needed; this is the same defect on the data side of the same feature, and it is why the guard could not be converted to something better than a role list. **When a guard cannot be entity-bound, ask whether the entity actually carries the identity** — twice now the answer has been "there is a column for it and nobody writes it" ([[F2-112]]'s ids that were never written, and this) |
+
 ## F2-149 · `external.properties` overrides placeholders, not properties — so the deployment's only config file cannot change most of the configuration
 
 |  |  |
