@@ -14,6 +14,34 @@
 -- Child tables use FK so deleting a crisis event cascades — but we soft-
 -- delete parent rows so the cascade only matters for hard cleanups.
 
+-- ⚠ F2-77 — REPLACE THE V1 STUB FIRST, OR THE GUARD BELOW SILENTLY SKIPS.
+--
+-- V1__core_schemas.sql created a 16-column sprint-0 bcm.crisis_events (crisis_type,
+-- occurred_at, incident_commander, activated_plan_id, description_en, resolved_at). This file
+-- creates the real 36-column table under the same name — but behind IF NOT EXISTS(sys.tables),
+-- which is TRUE-skipped on every database that applied V1, i.e. on every ordered run. The
+-- proper schema therefore never landed, and V108's crisis-event seed then failed at COMPILE
+-- time on event_code / trigger_source / *_json / detection_time, none of which the stub has.
+--
+-- This is the same collision V93 repairs for platform.controls, and it uses V93's pattern:
+-- detect the stub by a column only the stub has, drop it, and let the CREATE below run.
+--
+-- Safe, and each part was checked rather than assumed:
+--   • crisis_type exists ONLY in the V1 shape, so the test cannot match the real table.
+--   • NOTHING inserts into or updates bcm.crisis_events at or before V102, so the stub is
+--     empty when this runs and no data can be lost.
+--   • The three inbound foreign keys to this table are created BY THIS FILE, after the
+--     CREATE below, so at this point nothing references it.
+--   • On a database that already holds the real table (both live databases do — 41 columns)
+--     the test is false and this is a no-op.
+IF EXISTS (SELECT 1 FROM sys.columns
+           WHERE object_id = OBJECT_ID(N'bcm.crisis_events')
+             AND name = N'crisis_type')
+BEGIN
+    DROP TABLE bcm.crisis_events;
+END
+GO
+
 -- ─── Crisis events ────────────────────────────────────────────────
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'crisis_events' AND schema_id = SCHEMA_ID('bcm'))
 BEGIN
