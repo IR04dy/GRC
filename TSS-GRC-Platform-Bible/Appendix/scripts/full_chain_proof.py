@@ -33,7 +33,27 @@ def master():
 mcur = master().cursor()
 mcur.execute("IF DB_ID(?) IS NOT NULL BEGIN ALTER DATABASE [%s] SET SINGLE_USER WITH ROLLBACK "
              "IMMEDIATE; DROP DATABASE [%s]; END" % (SCRATCH, SCRATCH), SCRATCH)
-mcur.execute("CREATE DATABASE [%s]" % SCRATCH)
+"""Scratch files go on D:, deliberately, and this is not a preference.
+
+SQL Server Express keeps its data directory under C:\\Program Files\\...\\MSSQL\\DATA, and C: on this
+machine has been hostile to it twice in one day:
+
+  1. With C: near zero, CREATE DATABASE failed with OS error 112 (out of space).
+  2. After ~22 GB was freed — by NTFS-compressing C:, it turned out — CREATE DATABASE failed with
+     error 5118: "the file is compressed but does not reside in a read-only database or filegroup".
+     Fixing the disk broke it a second way.
+
+Neither failure names the disk in a way that points at the disk, which is the landmine CLAUDE.md now
+records. Putting the scratch files on D: (388 GB, uncompressed, where the repo already lives) removes
+the whole class: this instrument no longer depends on the state of C: at all. It also means the proof
+can run on a machine whose C: is locked down, which any build agent's will be.
+"""
+DATA_DIR = os.environ.get("CHAIN_PROOF_DATA_DIR", r"D:\AYMAN\GRC\.chain-proof-data")
+os.makedirs(DATA_DIR, exist_ok=True)
+mcur.execute(
+    "CREATE DATABASE [{db}] ON (NAME='{db}_dat', FILENAME='{d}\\{db}.mdf', SIZE=64MB, FILEGROWTH=64MB) "
+    "LOG ON (NAME='{db}_log', FILENAME='{d}\\{db}.ldf', SIZE=32MB, FILEGROWTH=32MB)".format(
+        db=SCRATCH, d=DATA_DIR))
 print("empty database %s created\n" % SCRATCH)
 
 files = []
@@ -50,7 +70,15 @@ try:
     for ver, f in files:
         if ver > STOP_AFTER:
             break
-        body = io.open(os.path.join(G.MIG_DIR, f), encoding="utf-8", errors="replace").read()
+        # utf-8-sig, not utf-8 — and the difference is a whole instrument's credibility.
+        #
+        # ⚠ This script reported FIRST FAILURE at V55 with "Incorrect syntax near '﻿'" while its
+        # sibling chain_proof.py reached V330 over the same files. V55 is not broken: many migrations
+        # here are BOM-prefixed, and plain utf-8 keeps the BOM as a character, so it lands at the head
+        # of batch 1 where SQL Server cannot parse it. chain_proof.py has always used utf-8-sig, which
+        # strips it. Two instruments over one subject disagreed by 275 files, and the subject was
+        # innocent both times — the reader was the variable.
+        body = io.open(os.path.join(G.MIG_DIR, f), encoding="utf-8-sig", errors="replace").read()
         batches = [b.strip() for b in re.split(r"(?im)^\s*GO\s*$", body) if b.strip()]
         for i, b in enumerate(batches, 1):
             try:

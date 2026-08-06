@@ -122,3 +122,6 @@ external.properties
 DB-*.sql
 # Machine-specific LAN exposure helper (embeds this host's network details).
 expose-lan.ps1
+
+# Scratch data files for full_chain_proof.py (SQL Server .mdf/.ldf, kept off C: — see the script)
+.chain-proof-data/
