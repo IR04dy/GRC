@@ -81,7 +81,7 @@ PUBLISHED = {
     "perm_modules": 31,
     "packages_no_haspermission": 17,
     "module_tests": 3_199,
-    "suite_tests": 3_358,
+    "suite_tests": 3_362,
     # F2-03 floored all seven Tier-1 regulator-facing modules (2026-08-05/06), so this
     # fell 15 -> 8. The --check mode caught the drift the moment it was first run in
     # anger, which is F2-19b in one line: the guard existed and nothing ran it.

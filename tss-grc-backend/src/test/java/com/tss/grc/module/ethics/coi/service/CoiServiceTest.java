@@ -80,8 +80,32 @@ class CoiServiceTest {
 
     @InjectMocks private CoiService service;
 
-    @BeforeEach void setUp() { TenantContext.setCurrentTenant(ORG_ID); }
-    @AfterEach  void tearDown() { TenantContext.clear(); }
+    /**
+     * F2-144 — a principal is now required to submit a declaration.
+     *
+     * <p>The five {@code submitDeclaration_*} tests below exercise the auto-flag thresholds and never
+     * authenticated anyone, which worked only because the service stored the request body's
+     * {@code userId} verbatim. That is the defect F2-144 records: nothing bound a conflict-of-interest
+     * attestation to the person filing it. The service now refuses a declaration it cannot attribute,
+     * so these tests supply a declarant — the identity rules themselves are covered by
+     * {@link CoiDeclarantBindingTest}, and nothing here asserts on who the declarant is.
+     */
+    @BeforeEach void setUp() {
+        TenantContext.setCurrentTenant(ORG_ID);
+        var principal = new com.tss.grc.security.GrcUserDetails(
+                7L, ORG_ID, "declarant", "pw", true, true,
+                java.util.List.of(new org.springframework.security.core.authority
+                        .SimpleGrantedAuthority("ROLE_VIEWER")));
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .setAuthentication(new org.springframework.security.authentication
+                        .UsernamePasswordAuthenticationToken(
+                                principal, "pw", principal.getAuthorities()));
+    }
+
+    @AfterEach  void tearDown() {
+        TenantContext.clear();
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
 
     // ─── Fixtures ──────────────────────────────────────────────────
 

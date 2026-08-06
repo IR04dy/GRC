@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import com.tss.grc.common.security.CurrentActor;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -193,6 +194,59 @@ public class CoiService {
 
     // ─── Declaration submission with auto-flag ──────────────────────
 
+    /**
+     * F2-144 part (a) — who the declaration is FOR, decided by the server.
+     *
+     * <p>{@code submitDeclaration} took {@code userId} from the request body and stored it verbatim,
+     * so nothing bound a declaration to the person filing it. That was latent only because
+     * {@code SUBMIT_GUARD} recites two role names that exist in no role ({@code ETHICS_OFFICER},
+     * {@code USER}), leaving three administrators as the only callers — a lockout that happened to be
+     * the sole thing preventing an unbound write. <b>Opening the guard first would have traded the
+     * lockout for an impersonation path</b>, which is why this lands before part (b).
+     *
+     * <p>The rule keeps both real behaviours. An administrator legitimately files on someone's behalf
+     * (that is all that has ever worked here), so a caller holding a COI management authority may name
+     * any {@code userId}. Everyone else declares for themselves, and the body's {@code userId} is
+     * <b>ignored rather than validated</b> — a rejection would leak whether another id exists, and
+     * there is no reason for a self-declaration to carry one at all.
+     *
+     * <p>⚠ The name fields stay caller-supplied and that is now bounded rather than fixed: the row is
+     * attributed to a server-chosen {@code user_id}, so a mislabelled name is a data-quality problem
+     * against a known declarant, not an attestation attributed to someone who never made it.
+     * Resolving names from {@code iam.users} is worth doing and is not this change.
+     */
+    private Long declarantFor(SubmitDeclarationRequest req) {
+        Long caller = CurrentActor.userId();
+        boolean mayFileForOthers = CurrentActor.isPlatformAdmin() || hasAnyAuthority(
+                "ROLE_BOARD_SECRETARY", "ROLE_COMPLIANCE_OFFICER", "ROLE_ETHICS_OFFICER");
+        if (mayFileForOthers && req.userId() != null) {
+            return req.userId();
+        }
+        if (caller == null) {
+            throw new IllegalStateException(
+                    "Cannot submit a conflict-of-interest declaration without an authenticated "
+                    + "declarant — the declaration would be attributable to nobody.");
+        }
+        return caller;
+    }
+
+    private static boolean hasAnyAuthority(String... authorities) {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .getAuthentication();
+        if (auth == null) {
+            return false;
+        }
+        Set<String> held = auth.getAuthorities().stream()
+                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                .collect(java.util.stream.Collectors.toSet());
+        for (String a : authorities) {
+            if (held.contains(a)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Transactional
     public DeclarationResponse submitDeclaration(SubmitDeclarationRequest req) {
         Long orgId = org();
@@ -206,7 +260,7 @@ public class CoiService {
         CoiDeclaration d = new CoiDeclaration();
         d.setOrganisationId(orgId);
         d.setCampaignId(campaign.getId());
-        d.setUserId(req.userId());
+        d.setUserId(declarantFor(req));
         d.setEmployeeNo(req.employeeNo());
         d.setFullNameEn(req.fullNameEn());
         d.setFullNameAr(req.fullNameAr());
