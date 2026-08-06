@@ -376,6 +376,21 @@ class RoleGuardConversionRatchetTest {
      * {@code SHARIA_AUDITOR}, {@code SHARIA_BOARD_CHAIR}, {@code SHARIA_OFFICER}, {@code SOC_LEAD},
      * {@code TPRM_LEAD}, {@code USER}.
      *
+     * <p><b>Sized on one name, because the shape generalises.</b> {@code TPRM_LEAD} is <b>11
+     * occurrences across 5 files</b>, and they are not all guards: {@code MtpdInheritanceController}
+     * (3) and {@code ProcessVendorDependencyController} (5) recite it in {@code @PreAuthorize}, while
+     * {@code AttachmentAccessPolicy} and {@code IntakeService} carry it in a Java role {@code Set} that
+     * no {@code @PreAuthorize} scan sees. This test's own note on the {@code fraud} conversion already
+     * records why that matters — <i>"converting a controller is not finished until every route that
+     * serves the record agrees"</i> — and it means the ghost count falling is <b>not</b> evidence the
+     * name is gone from the authorisation surface.
+     *
+     * <p>⚠ It also means the sweep cannot be a rename pass. Dropping a dead leg is
+     * behaviour-preserving (it never matched), but <i>correcting</i> one widens access, and F2-144
+     * showed a case where the dead leg was the only thing preventing an unbound write. <b>Each site
+     * needs its intent recovered before its name is touched</b>, and where the intent is unmet the
+     * honest move is to drop the leg and say so rather than substitute a role that happens to exist.
+     *
      * <p>Several are near-misses for a role that <i>does</i> exist and read as typos rather than
      * policy: {@code PRIVACY_OFFICER} beside the real {@code PRIVACY_MANAGER}, {@code SOC_LEAD} beside
      * {@code SECURITY_ANALYST}/{@code IR_LEAD}, {@code TPRM_LEAD} beside {@code SUPPLIER_MANAGER}.
