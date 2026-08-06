@@ -148,6 +148,7 @@ def main():
           % (len(missing_t) + len(extra_t) + len(missing_c) + len(extra_c)))
 
     report_partition(missing_t, int(stop) if stop else None)
+    report_column_partition(missing_c, int(stop) if stop else None)
 
 
 MIG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..",
@@ -231,6 +232,87 @@ def report_partition(missing, stop):
 
     print("\npartition summary: %d expected-missing · %d guard-skipped · %d never-created"
           % (len(later), len(skipped), len(never)))
+
+
+ALTER_ADD = re.compile(
+    r"ALTER\s+TABLE\s+\[?(\w+)\]?\s*\.\s*\[?(\w+)\]?\s+ADD\s+(.*?)(?=\bGO\b|;|\Z)", re.I | re.S)
+CREATE_BODY = re.compile(
+    r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?\[?(\w+)\]?\s*\.\s*\[?(\w+)\]?\s*\((.*?)\)\s*(?:;|\bGO\b)",
+    re.I | re.S)
+
+
+def column_sources():
+    """{schema.table: [(version, text)]} for every ALTER…ADD and CREATE TABLE body.
+
+    Why ALTER…ADD is the precise instrument here, not a heuristic: these columns sit on tables that
+    exist in BOTH databases, so the table's CREATE already ran. A column present in dev and absent
+    from the build was therefore added afterwards — by an ALTER — or the two CREATEs disagree. Those
+    are the only two possibilities, and both are covered below.
+
+    ⚠ Still a text search WITHIN the matched clause, not a column-list parse. A clause adding
+    ``recusal_user_ids NVARCHAR(MAX)`` also contains the word ``NVARCHAR``; that is harmless because
+    we only ever ask about names we already know are real columns in dev. It would NOT be safe to run
+    this in reverse to discover column names.
+    """
+    out = {}
+    for f in sorted(os.listdir(MIG_DIR)):
+        m = re.match(r"^V(\d+)__", f)
+        if not m:
+            continue
+        version = int(m.group(1))
+        body = io.open(os.path.join(MIG_DIR, f), encoding="utf-8-sig", errors="replace").read()
+        body = LINE_COMMENT.sub(" ", BLOCK_COMMENT.sub(" ", body))
+        for schema, table, clause in ALTER_ADD.findall(body):
+            out.setdefault("%s.%s" % (schema.lower(), table.lower()), []).append((version, clause))
+        for schema, table, clause in CREATE_BODY.findall(body):
+            out.setdefault("%s.%s" % (schema.lower(), table.lower()), []).append((version, clause))
+    return out
+
+
+def report_column_partition(missing_c, stop):
+    src = column_sources()
+    later, below, never = [], [], []
+    word = {}
+    for full in sorted(missing_c):
+        table, col = full.rsplit(".", 1)
+        versions = [v for v, text in src.get(table.lower(), [])
+                    if re.search(r"\b%s\b" % re.escape(col), text, re.I)]
+        if not versions:
+            never.append(full)
+        elif stop is not None and min(versions) > stop:
+            later.append((min(versions), full))
+        else:
+            below.append((min(versions), full))
+        word[full] = versions
+
+    print("\n" + "=" * 78)
+    print("PARTITION — the missing COLUMNS (on tables present in both databases)")
+    print("=" * 78)
+
+    print("\n[1] Added by a migration ABOVE the stop (V%s) — expected-missing: %d" % (stop, len(later)))
+    for v, c in later[:15]:
+        print("    V%-4d %s" % (v, c))
+    if len(later) > 15:
+        print("    ... and %d more" % (len(later) - 15))
+
+    print("\n[2] ⚠ A migration AT OR BELOW the stop names it and the column is absent: %d" % len(below))
+    print("    Either an idempotency guard skipped the ALTER, or the migration's CREATE TABLE and the "
+          "bootstrap's disagree about the column set. Both ship a fresh install that the code expects "
+          "to have this column.")
+    for v, c in below[:20]:
+        print("    V%-4d %s" % (v, c))
+    if len(below) > 20:
+        print("    ... and %d more" % (len(below) - 20))
+
+    print("\n[3] No migration anywhere adds it — bootstrap-only column on a migration-created "
+          "table: %d" % len(never))
+    for c in never[:25]:
+        print("    %s" % c)
+    if len(never) > 25:
+        print("    ... and %d more" % (len(never) - 25))
+
+    print("\ncolumn partition summary: %d expected-missing · %d below-the-stop · %d never-added"
+          % (len(later), len(below), len(never)))
 
 
 if __name__ == "__main__":
