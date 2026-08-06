@@ -122,9 +122,30 @@ public class BcpBinderService {
         b.setGeneratedAt(LocalDateTime.now());
         b.setGeneratedByUserId(currentUserId());
         b.setGeneratedByName(currentUserName());
-        // Pre-save so we have an external_id + DB-side id before render.
-        // This is what the UI polls on (status == GENERATING / READY).
-        b = binders.save(b);
+
+        // F2-78 — ⚠ THERE IS DELIBERATELY NO PRE-SAVE HERE, and removing it is the fix.
+        //
+        // This used to `binders.save(b)` before the render and save again after it. Two flushes of
+        // the same row, and `BcpBinderExport.row_version` is a SQL Server ROWVERSION mapped
+        // `@Version ... insertable = false, updatable = false` — the database assigns it, so
+        // Hibernate cannot predict the value it gets on the first flush. The second UPDATE therefore
+        // carried the pre-insert version in its WHERE clause, matched nothing, and threw
+        // StaleObjectStateException. **Every binder generation failed, on every call, with a 500.**
+        // That is the ROWVERSION double-flush landmine in CLAUDE.md, and this is an instance of it
+        // that had never been caught because the register's rows were seeded rather than generated
+        // (F2-139) — so nobody had ever successfully pressed the button.
+        //
+        // The pre-save's stated reasons do not survive inspection:
+        //   • "so we have an external_id" — `externalId` defaults to UUID.randomUUID() in the
+        //     entity, so it exists before any save, and it is what the file path is built from.
+        //   • "a DB-side id before render" — the render does not use the id.
+        //   • "This is what the UI polls on (GENERATING / READY)" — the render is SYNCHRONOUS and
+        //     the controller returns 202 with the terminal status already set, so no client can ever
+        //     observe GENERATING. The comment described an asynchronous design this code is not.
+        //
+        // So each path below saves exactly once. GENERATING is still set, and is only ever persisted
+        // if something fails before the row reaches a terminal state.
+        boolean attemptedSave = false;
 
         try {
             List<BcpSection> secs = sections.findByOrganisationIdAndPlanIdOrderBySectionOrderAsc(org, plan.getId());
@@ -147,7 +168,8 @@ public class BcpBinderService {
             b.setGenerationDurationMs((int) (System.currentTimeMillis() - t0));
             b.setStatus("READY");
             b.setUpdatedAt(LocalDateTime.now());
-            b = binders.save(b);
+            attemptedSave = true;
+            b = binders.save(b);   // the only save on the success path
 
             audit.log("BCP_BINDER_GENERATED", "BcpBinderExport", b.getId(),
                 "Generated " + b.getExportCode() + " for plan " + plan.getPlanCode()
@@ -157,11 +179,19 @@ public class BcpBinderService {
 
             return BinderResponse.from(b);
         } catch (IOException | RuntimeException ex) {
+            // If the READY save itself is what threw, do NOT save again — the session is already in
+            // an unknown state and a second write is how one failure becomes two. Record it and
+            // rethrow; the transaction rolls back and no half-written row survives.
+            if (attemptedSave) {
+                log.error("BCP binder persist failed after render (planId={}, lang={})", planId, lang, ex);
+                throw (ex instanceof RuntimeException re) ? re
+                    : new ExportException("PDF", "Failed to persist binder", ex);
+            }
             b.setStatus("FAILED");
             b.setErrorMessage(truncate(ex.getMessage(), 4000));
             b.setGenerationDurationMs((int) (System.currentTimeMillis() - t0));
             b.setUpdatedAt(LocalDateTime.now());
-            binders.save(b);
+            binders.save(b);   // the only save on the failure path
 
             audit.log("BCP_BINDER_FAILED", "BcpBinderExport", b.getId(),
                 "Failed to generate " + b.getExportCode() + ": " + ex.getMessage());
@@ -194,10 +224,40 @@ public class BcpBinderService {
             throw new IllegalStateException("Binder has no file_path");
         }
         Path full = Paths.get(storageBasePath, b.getFilePath()).toAbsolutePath().normalize();
+
+        // F2-78 — a READY binder whose artefact is absent is a STATE problem, not a generation
+        // failure, and the two had been collapsed into one 500.
+        //
+        // Everything here answered "PDF export failed / Document generation failed. Please try again
+        // or contact your administrator." Every clause of that is wrong for this case: nothing was
+        // generating (the bytes were written at generate time, before the row was marked READY), and
+        // retrying cannot help because the file will still be missing. So the caller was told to do
+        // the one thing guaranteed not to work, and an operator reading the log saw an export bug
+        // rather than a missing artefact.
+        //
+        // Measured on dev: binders 1 and 2 are READY with byte_size 2,915,000 and 2,310,000 and
+        // NO FILE ON DISK — `uploads/` has never contained a `binders` directory. Their file_path
+        // uses `binders/<year>/<code>_<slug>_<version>.pdf`, a scheme `generate` above does not
+        // produce (it writes `binders/<org>/<uuid>.pdf`), so those rows were seeded rather than
+        // generated. See F2-139.
+        //
+        // Refused as a 409 to match the "not READY" refusal three lines up: from the caller's side
+        // both mean "this binder is not downloadable right now", and the message carries the
+        // difference. A distinct status would need frontend handling that has no other consumer.
+        if (!Files.isRegularFile(full)) {
+            throw new IllegalStateException(
+                "Binder " + b.getExportCode() + " is marked READY but its PDF is missing from "
+                + "storage, so there is nothing to download. Retrying will not help. Generate a new "
+                + "binder version for this plan — a binder is an immutable record of what was "
+                + "distributed, so the missing file is not silently rebuilt under the same code.");
+        }
         byte[] bytes;
         try {
             bytes = Files.readAllBytes(full);
         } catch (IOException io) {
+            // A file that exists and cannot be read IS an export/IO failure — permissions, a bad
+            // mount, a truncated volume. That is what ExportException and the 500 are for, and the
+            // distinction is the whole point of the check above.
             throw new ExportException("PDF", "Cannot read binder file: " + full, io);
         }
 

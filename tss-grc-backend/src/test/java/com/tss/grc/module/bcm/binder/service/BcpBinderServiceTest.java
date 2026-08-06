@@ -1,6 +1,7 @@
 package com.tss.grc.module.bcm.binder.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.exception.ExportException;
 import com.tss.grc.module.bcm.binder.dto.BcpBinderDtos.BinderResponse;
 import com.tss.grc.module.bcm.binder.entity.BcpBinderExport;
 import com.tss.grc.module.bcm.binder.repository.BcpBinderExportRepository;
@@ -164,8 +165,10 @@ class BcpBinderServiceTest {
 
         // File actually landed on disk under base-path/binders/<org>/<uuid>.pdf
         ArgumentCaptor<BcpBinderExport> cap = ArgumentCaptor.forClass(BcpBinderExport.class);
-        verify(binders, times(2)).save(cap.capture());
-        BcpBinderExport saved = cap.getAllValues().get(1);
+        // F2-78: exactly ONE save. Two flushes of a ROWVERSION row is what made every
+        // generation fail; asserting times(2) here had pinned that as correct.
+        verify(binders, times(1)).save(cap.capture());
+        BcpBinderExport saved = cap.getAllValues().get(0);
         Path full = tempStorage.resolve(saved.getFilePath());
         assertThat(Files.exists(full)).isTrue();
         assertThat(Files.size(full)).isEqualTo(out.byteSize().longValue());
@@ -252,8 +255,10 @@ class BcpBinderServiceTest {
         // Step 2: stub findByOrganisationIdAndId to return the row we just
         // saved (capture from save calls).
         ArgumentCaptor<BcpBinderExport> cap = ArgumentCaptor.forClass(BcpBinderExport.class);
-        verify(binders, times(2)).save(cap.capture());
-        BcpBinderExport saved = cap.getAllValues().get(1);
+        // F2-78: exactly ONE save. Two flushes of a ROWVERSION row is what made every
+        // generation fail; asserting times(2) here had pinned that as correct.
+        verify(binders, times(1)).save(cap.capture());
+        BcpBinderExport saved = cap.getAllValues().get(0);
         // Set the id explicitly so findByOrganisationIdAndId matches.
         saved.setId(out.id());
         when(binders.findByOrganisationIdAndId(ORG_ID, out.id()))
@@ -267,6 +272,43 @@ class BcpBinderServiceTest {
         // Counter incremented (saved.downloadCount started at 0 → 1)
         assertThat(saved.getDownloadCount()).isEqualTo(1);
         assertThat(saved.getLastDownloadedAt()).isNotNull();
+    }
+
+    /**
+     * F2-78 — a READY binder whose PDF is absent must not answer "Document generation failed.
+     * Please try again."
+     *
+     * <p>That was the shipped behaviour for <b>every</b> caller including {@code admin}, and every
+     * clause of it was wrong: nothing was generating (the bytes are written before the row is marked
+     * READY), and retrying cannot help. Measured on dev, binders 1 and 2 are READY with
+     * {@code byte_size} 2,915,000 and 2,310,000 and no file on disk — {@code uploads/} has never held
+     * a {@code binders} directory — because those rows were seeded rather than generated (F2-139).
+     *
+     * <p>The refusal has to be distinguishable from a real IO failure, which is the next test.
+     */
+    @Test void download_readyButArtefactMissing_refusesWithAnActionableMessage() {
+        BcpBinderExport b = new BcpBinderExport();
+        b.setId(12L); b.setOrganisationId(ORG_ID); b.setStatus("READY");
+        b.setExportCode("EXP-2026-0001");
+        // The path shape the dev rows actually carry — a scheme `generate` never produces.
+        b.setFilePath("binders/2026/EXP-2026-0001_core-gov-service-bcp_v3.0.pdf");
+        b.setDownloadCount(3);   // an explicit prior value, so "unchanged" is an assertion
+        when(binders.findByOrganisationIdAndId(ORG_ID, 12L)).thenReturn(Optional.of(b));
+
+        assertThatThrownBy(() -> service.download(12L))
+            .as("a missing artefact is a state problem (409), not an export failure (500)")
+            .isInstanceOf(IllegalStateException.class)
+            .isNotInstanceOf(ExportException.class)
+            .hasMessageContaining("EXP-2026-0001")
+            .hasMessageContaining("missing from storage")
+            // The two things the old message got wrong, asserted so they cannot come back.
+            .hasMessageContaining("Retrying will not help")
+            .hasMessageContaining("Generate a new binder version");
+
+        // A refusal must not look like a download in the register — the counter feeds the
+        // offline-distribution log auditors read.
+        assertThat(b.getDownloadCount()).as("a refused download must not be counted").isEqualTo(3);
+        assertThat(b.getLastDownloadedAt()).isNull();
     }
 
     @Test void download_notReady_throwsIllegalState() {
@@ -285,8 +327,10 @@ class BcpBinderServiceTest {
         BinderResponse out = service.generate(PLAN_ID, "BILINGUAL");
 
         ArgumentCaptor<BcpBinderExport> cap = ArgumentCaptor.forClass(BcpBinderExport.class);
-        verify(binders, times(2)).save(cap.capture());
-        BcpBinderExport saved = cap.getAllValues().get(1);
+        // F2-78: exactly ONE save. Two flushes of a ROWVERSION row is what made every
+        // generation fail; asserting times(2) here had pinned that as correct.
+        verify(binders, times(1)).save(cap.capture());
+        BcpBinderExport saved = cap.getAllValues().get(0);
         saved.setId(out.id());
         when(binders.findByOrganisationIdAndId(ORG_ID, out.id()))
             .thenReturn(Optional.of(saved));
