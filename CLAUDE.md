@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,326; ~1 min hot, 3–5 min cold)
+mvn -o clean package        # full build + all UNIT tests (3,333; ~1 min hot, 3–5 min cold)
                             # hermetic: needs no database and no secrets — keep it that way
 
 # Integration tests (*IT.java) — real HTTP + the real dev SQL Server. W1-5/F2-18.
@@ -98,13 +98,13 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V358 packaged; next free V359** (346 files; ⚠ this line said "V1→V295 / next free
+— **V1→V359 packaged; next free V360** (347 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V358 are pending** the
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V359 are pending** the
 next jar). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials

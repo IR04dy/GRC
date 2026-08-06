@@ -45,7 +45,27 @@ public class UserService {
 
     @Transactional
     public UserResponse create(UserRequest req) {
-        Long orgId = TenantContext.getCurrentTenant();
+        return createIn(TenantContext.getCurrentTenant(), req);
+    }
+
+    /**
+     * Create a user in a <b>named</b> organisation rather than the caller's own.
+     *
+     * <p>F2-81 needs this: tenant onboarding creates the new tenant's first administrator, and at
+     * that moment {@link TenantContext} still holds the <i>host operator's</i> organisation — so
+     * {@link #create(UserRequest)} would have filed the new bank's admin under whoever onboarded
+     * them. Splitting the explicit case out rather than copying the body keeps the rules that matter
+     * in one place: the username/email uniqueness checks, {@code @StrongPassword} hashing, and
+     * {@link #assignRolesByNameOrId}'s refusal to grant an inactive role (F2-62). A second
+     * implementation of those would drift, which is the shape this programme keeps finding.
+     *
+     * <p>Note {@code assignRolesByNameOrId} resolves roles from {@code user.getOrganisationId()},
+     * not from the thread — so it is already correct for a foreign organisation, and global roles
+     * ({@code organisation_id IS NULL}, which is how every role in {@code iam.roles} is stored) are
+     * visible to the new tenant without creating any.
+     */
+    @Transactional
+    public UserResponse createIn(Long orgId, UserRequest req) {
         if (userRepository.existsByUsernameAndOrganisationId(req.username(), orgId)) {
             throw new IllegalArgumentException("Username already exists: " + req.username());
         }
