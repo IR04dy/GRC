@@ -182,6 +182,55 @@ class SchemaContractRatchetTest {
     private static final Map<String, String> NOT_MIGRATION_CREATED = Map.of();
 
     /**
+     * F2-141 — the register codes that mean <b>no JPA mapping and no Java reference at all</b>.
+     *
+     * <p>{@code table_xref.py} assigns these three when a table is named by no {@code @Table},
+     * {@code @JoinTable} or {@code @CollectionTable} and by no {@code schema.table} string anywhere
+     * in Java. They differ only in how the rows got there: {@code ORPHAN_CONFIRMED} has none,
+     * {@code SEED_ONLY}'s only writer is a Python seed script, {@code LEGACY} holds rows that arrived
+     * from a migration or by hand. For the purpose below the distinction does not matter — <b>the
+     * application cannot read any of them</b>.
+     */
+    private static final Set<String> NO_CODE_CODES =
+        Set.of("ORPHAN_CONFIRMED", "SEED_ONLY", "LEGACY");
+
+    /**
+     * <b>36, measured 2026-08-06, and it must only ever decrease.</b>
+     *
+     * <p>Tables in both databases that the application cannot read: 10 {@code ORPHAN_CONFIRMED},
+     * 16 {@code SEED_ONLY}, 10 {@code LEGACY}, holding <b>381 rows</b> in dev and the same 381 in
+     * production, which inherited them when it was restored from a dev dump.
+     *
+     * <h4>Why the number is 36 and F2-141 said 5</h4>
+     *
+     * F2-141 found its five through a <em>bilingual column</em> scan, so its population is an
+     * artifact of its instrument: it could only see a dead table that happens to carry an
+     * {@code *_ar} column beside a {@code NOT NULL} {@code *_en}. Same class as the finding itself —
+     * <b>an instrument's population is narrower than its subject</b> — one level up.
+     *
+     * <h4>Why this one is a ratchet while the two gates below are hard zeros</h4>
+     *
+     * These 36 are <b>historical debt awaiting an owner-authorised {@code DROP}</b> (house rule 6:
+     * destructive DB operations need explicit OK), so a red build here would be unfixable by
+     * engineering alone. The forward-looking property — <em>no new dead table can be shipped</em> —
+     * is asserted at zero by {@link #noMigrationAboveTheBaselineCreatesATableNothingMaps} and
+     * {@link #noMigrationAboveTheBaselineWritesToATableTheApplicationCannotRead}. Keep that split:
+     * <b>never widen this ratchet to admit a new dead table.</b> A ceiling tolerates the population
+     * it measures, which is why F2-144(b) replaced the authorisation ceiling with a pinned set —
+     * here the register already names all 36, and re-listing them in Java would create the second
+     * authority RC-A exists to prevent.
+     */
+    private static final int BASELINE_NO_CODE_TABLES = 36;
+
+    /**
+     * Anti-vacuity for the two hard gates: 88 tables are created by migrations above the baseline
+     * today. If this scan ever sees a handful, the {@code CREATE TABLE} parse or the version filter
+     * broke, and both gates would report a clean zero over an empty population — the direction a
+     * broken scan always fails in.
+     */
+    private static final int MIN_TABLES_CREATED_ABOVE_BASELINE = 50;
+
+    /**
      * The register's exact column order, asserted rather than assumed.
      *
      * <p>The F2-64 gate reads {@code rows_dev} and {@code rows_prod} positionally. If
@@ -202,6 +251,10 @@ class SchemaContractRatchetTest {
     private static final Pattern MIGRATION_NAME = Pattern.compile("^V(\\d+)__.*\\.sql$");
     private static final Pattern CREATE_SCHEMA = Pattern.compile(
         "CREATE\\s+SCHEMA\\s+\\[?(\\w+)\\]?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern INSERT_INTO = Pattern.compile(
+        "INSERT\\s+INTO\\s+\\[?(\\w+)\\]?\\s*\\.\\s*\\[?(\\w+)\\]?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ALTER_TABLE = Pattern.compile(
+        "ALTER\\s+TABLE\\s+\\[?(\\w+)\\]?\\s*\\.\\s*\\[?(\\w+)\\]?", Pattern.CASE_INSENSITIVE);
 
     // ── the assertions ───────────────────────────────────────────────────────
 
@@ -353,6 +406,195 @@ class SchemaContractRatchetTest {
 
             %s""".formatted(unregistered.size(), String.join("\n            ", unregistered)))
             .isEmpty();
+    }
+
+    /**
+     * F2-141's asked-for <b>schema-side companion scan</b>, and the forward half of the answer to
+     * "should these tables exist?".
+     *
+     * <p>Every gate in this class until now asked about <em>mapped</em> tables. That is the blind
+     * spot F2-140 and F2-141 both name: <b>a control that asks about mapped things cannot see
+     * unmapped ones, and its green reading is not evidence of absence.</b> Thirty-six tables carry
+     * 381 rows the application cannot read, and nothing in the build had an opinion about a
+     * thirty-seventh.
+     *
+     * <p>This asserts the one thing the source tree can settle without a database and without an
+     * owner decision: <b>a migration above the Flyway baseline may not create a table that no JPA
+     * mapping names.</b> The baseline matters because DDL at or below V292 is inert on a baselined
+     * deployment — the 33 dead tables that <em>are</em> in migrations all sit at V1–V123, authored
+     * before the modular monolith existed. So this gate says nothing about them and everything about
+     * what ships next.
+     *
+     * <p>Measured 2026-08-06: <b>88 tables created above the baseline, 88 mapped, zero violations.</b>
+     * A hard zero rather than a ratchet, because a new migration creating dead schema is never
+     * correct and there is no population to work down.
+     *
+     * <p>⚠ <b>Its sibling {@link #everyTableCreatedAboveTheBaselineIsInTheCommittedRegister} was
+     * carved out of this method after a mutation.</b> Both lived here, and injecting one scratch
+     * migration creating an unmapped, unregistered table failed on <em>unmapped</em> and never
+     * reached the register leg — AssertJ stops at the first failure, so the second assertion was
+     * unverifiable by the only mutation that reaches it. Third time in this programme that two
+     * assertions in one test let the first mask the second.
+     */
+    @Test
+    void noMigrationAboveTheBaselineCreatesATableNothingMaps() throws IOException {
+        Map<String, List<Integer>> aboveBaseline = tablesCreatedAboveBaseline();
+        Map<String, String> mapped = mappedTables();
+
+        List<String> unmapped = new ArrayList<>();
+        for (var e : aboveBaseline.entrySet()) {
+            if (!mapped.containsKey(e.getKey())) {
+                unmapped.add("%s  created by V%s".formatted(e.getKey(), e.getValue()));
+            }
+        }
+
+        assertThat(unmapped).as("""
+            %d table(s) are created by a migration ABOVE the Flyway baseline (V%d) and named by no \
+            JPA mapping. Every customer built from these migrations gets them, empty, and no code \
+            path can read a row. That is how the platform accumulated the 36 tables holding 381 \
+            unreadable rows that F2-141 is about — this gate exists so the count cannot grow.
+
+            Either map the table, or do not create it. If it is deliberately unmapped — a pure \
+            reference table read only by SQL, say — declare it in \
+            TSS-GRC-Platform-Bible/Appendix/table_disposition_exceptions.csv with an owner and a \
+            date, regenerate the register, and it stops being invisible.
+
+            %s""".formatted(unmapped.size(), FLYWAY_BASELINE, String.join("\n            ", unmapped)))
+            .isEmpty();
+    }
+
+    /**
+     * The staleness half, in its own method so the mutation that reaches it is not swallowed by the
+     * one above — see that method's javadoc.
+     *
+     * <p>{@link #theRegisterIsWellFormedAndAccountsForEveryMappedTable} catches staleness from the
+     * <em>mapped</em> side. This catches it from the <em>migration</em> side, which is the side that
+     * matters for a table nothing maps: an unmapped table is invisible to the mapped-side check by
+     * construction, and that is F2-140's and F2-141's shared lesson stated as a gate.
+     */
+    @Test
+    void everyTableCreatedAboveTheBaselineIsInTheCommittedRegister() throws IOException {
+        Set<String> registered = new LinkedHashSet<>();
+        for (String[] f : registerRows()) {
+            registered.add(key(f[0].trim(), f[1].trim()));
+        }
+
+        List<String> unregistered = new ArrayList<>();
+        for (var e : tablesCreatedAboveBaseline().entrySet()) {
+            if (!registered.contains(e.getKey())) {
+                unregistered.add("%s  created by V%s".formatted(e.getKey(), e.getValue()));
+            }
+        }
+
+        assertThat(unregistered).as("""
+            %d table(s) created above the baseline have no row in the committed register, so the \
+            register is STALE and every population gate in this class is reading a world that no \
+            longer exists. Regenerate it:
+
+              py TSS-GRC-Platform-Bible/Appendix/scripts/table_xref.py
+
+            %s""".formatted(unregistered.size(), String.join("\n            ", unregistered)))
+            .isEmpty();
+    }
+
+    /**
+     * The second half of the forward guard: <b>do not ship demo ballast to a customer.</b>
+     *
+     * <p>This is the mechanism by which production came to hold 381 rows nothing reads. Fifteen of
+     * the 36 dead tables are written by a migration — {@code V120}–{@code V123} insert governance
+     * demo data into {@code compliance.compliance_findings}, {@code bcm_lc.drills},
+     * {@code privacy_lc.ropa_activities} and others — and all four sit below the baseline, so on the
+     * deployed server they never ran and the rows arrived by dump restore instead. On a genuinely
+     * fresh install they <em>would</em> run.
+     *
+     * <p>⚠ Several of those inserts cannot even work: this repo has measured that SQL Server's
+     * deferred name resolution covers a missing <em>table</em> but not a missing <em>column</em>, so
+     * 7 of 7 "guarded" V121 demo inserts were compile-time failures whose {@code CATCH} had never
+     * printed. A migration writing to a table the application cannot read is therefore either dead
+     * weight or a silent failure — never a feature.
+     *
+     * <p>Measured 2026-08-06: <b>zero</b> INSERT and <b>zero</b> ALTER above the baseline against
+     * any of the 36. Hard zero, same reasoning as the gate above.
+     */
+    @Test
+    void noMigrationAboveTheBaselineWritesToATableTheApplicationCannotRead() throws IOException {
+        Set<String> deadTables = noCodeTables();
+        assertThat(deadTables).as(
+            "The register classifies no table as %s. Either every dead table was dropped — in which "
+            + "case lower BASELINE_NO_CODE_TABLES and delete this floor — or the `code` column moved "
+            + "and this gate is checking an empty set.", NO_CODE_CODES)
+            .isNotEmpty();
+
+        List<String> writes = new ArrayList<>();
+        try (Stream<Path> files = Files.list(migrationDir())) {
+            for (Path p : files.filter(f -> f.getFileName().toString().endsWith(".sql")).sorted().toList()) {
+                Matcher nm = MIGRATION_NAME.matcher(p.getFileName().toString());
+                if (!nm.matches() || Integer.parseInt(nm.group(1)) <= FLYWAY_BASELINE) {
+                    continue;
+                }
+                String sql = stripSqlComments(Files.readString(p));
+                for (Pattern rx : List.of(INSERT_INTO, ALTER_TABLE)) {
+                    Matcher m = rx.matcher(sql);
+                    while (m.find()) {
+                        String table = key(m.group(1), m.group(2));
+                        if (deadTables.contains(table)) {
+                            writes.add("%s writes to %s".formatted(p.getFileName(), table));
+                        }
+                    }
+                }
+            }
+        }
+
+        assertThat(writes.stream().distinct().toList()).as("""
+            A migration above the Flyway baseline (V%d) writes to a table the application cannot \
+            read — no JPA mapping, no Java reference. Every customer would receive those rows and no \
+            screen, export or API could ever show them.
+
+            If the data matters, the table needs a mapping first (and then it is no longer in this \
+            set). If it does not, do not ship it.
+
+            %s""".formatted(FLYWAY_BASELINE, String.join("\n            ", writes.stream().distinct().toList())))
+            .isEmpty();
+    }
+
+    /**
+     * The debt itself, recorded so that dropping it registers as progress — see
+     * {@link #BASELINE_NO_CODE_TABLES} for why this one is a ratchet and its two companions are
+     * hard zeros.
+     *
+     * <p>It also catches the one path the hard gates cannot see: a table added by the <b>Python
+     * bootstrap</b> rather than by a migration. {@code setup_bcm_db.py} and friends create dev
+     * schema directly, so a new dead table can appear there with no migration to fail — but the next
+     * register regeneration would count 37, and this fires.
+     */
+    @Test
+    void theNoCodeTablePopulationOnlyEverDecreases() throws IOException {
+        Map<String, String> dead = new TreeMap<>();
+        for (String[] f : registerRows()) {
+            if (NO_CODE_CODES.contains(f[2].trim().toUpperCase(Locale.ROOT))) {
+                dead.put(key(f[0].trim(), f[1].trim()), f[2].trim() + "  rows dev/prod " + f[4].trim()
+                         + "/" + f[5].trim());
+            }
+        }
+
+        assertThat(dead.size()).as("""
+            %d tables in the committed register are classified %s — no JPA mapping and no Java \
+            reference anywhere — against a baseline of %d.
+
+            If it went UP, something added a table the application cannot read. A migration would \
+            have failed noMigrationAboveTheBaselineCreatesATableNothingMaps, so this is almost \
+            certainly the Python bootstrap (setup_*.py) or a hand-run DDL. Do not raise this number \
+            to make it pass.
+
+            If it went DOWN, a drop or a mapping landed: lower the baseline, which is the ratchet \
+            working. The 36 are historical debt from before the modular monolith and their DROP is \
+            owner-authorised (house rule 6), which is why this is a ratchet and not a zero.
+
+            %s""".formatted(dead.size(), NO_CODE_CODES, BASELINE_NO_CODE_TABLES,
+                            dead.entrySet().stream()
+                                .map(e -> e.getKey() + "  " + e.getValue())
+                                .reduce((a, b) -> a + "\n            " + b).orElse("")))
+            .isLessThanOrEqualTo(BASELINE_NO_CODE_TABLES);
     }
 
     /**
@@ -712,5 +954,53 @@ class SchemaContractRatchetTest {
 
     private static String key(String schema, String table) {
         return (schema + "." + table).toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Tables created by a migration <em>above</em> the Flyway baseline, with the versions.
+     *
+     * <p>Carries its own anti-vacuity floor, because both callers assert an <em>emptiness</em>: if
+     * the {@code CREATE TABLE} parse or the version filter ever broke, each would iterate nothing
+     * and report a clean zero. A shared population needs the floor in the shared place.
+     */
+    private static Map<String, List<Integer>> tablesCreatedAboveBaseline() throws IOException {
+        Map<String, List<Integer>> out = new TreeMap<>();
+        for (var e : createdByMigration().entrySet()) {
+            List<Integer> above = e.getValue().stream().filter(v -> v > FLYWAY_BASELINE).sorted().toList();
+            if (!above.isEmpty()) {
+                out.put(e.getKey(), above);
+            }
+        }
+
+        assertThat(out.size()).as(
+            "Only %d tables parsed as created by a migration above V%d. Under %d means the "
+            + "CREATE TABLE parse or the version filter broke, and every caller would read a clean "
+            + "zero over an empty population.",
+            out.size(), FLYWAY_BASELINE, MIN_TABLES_CREATED_ABOVE_BASELINE)
+            .isGreaterThanOrEqualTo(MIN_TABLES_CREATED_ABOVE_BASELINE);
+        return out;
+    }
+
+    /** The register's {@link #NO_CODE_CODES} rows as {@code schema.table} keys. */
+    private static Set<String> noCodeTables() throws IOException {
+        Set<String> out = new LinkedHashSet<>();
+        for (String[] f : registerRows()) {
+            if (NO_CODE_CODES.contains(f[2].trim().toUpperCase(Locale.ROOT))) {
+                out.add(key(f[0].trim(), f[1].trim()));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * ⚠ Strip comments before asserting a file does <em>not</em> do something. No textual shape
+     * distinguishes code from a comment quoting code, and this programme has read a comment as code
+     * four times in one day — a header naming a table, a whole migration that was commentary, and
+     * twice in prose. The direction that failure runs in is the reassuring one: a commented-out
+     * {@code INSERT INTO bcm_lc.drills} would report a violation that is not there, and a reviewer
+     * who checks and finds nothing learns to distrust the gate.
+     */
+    private static String stripSqlComments(String sql) {
+        return sql.replaceAll("(?s)/\\*.*?\\*/", " ").replaceAll("(?m)--.*$", " ");
     }
 }
