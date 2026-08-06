@@ -393,6 +393,16 @@ class RoleGuardConversionRatchetTest {
      * they are candidates for being reachable by nobody at all. Not verified here, and deliberately
      * not swept with the typos.
      *
+     * <p><b>⚠ Correction, same day: these guards work.</b> I first recorded them as sites with no real
+     * non-admin role beside them, possibly reachable by nobody. {@code ModulePermissionEvaluator}
+     * documents granted authorities as {@code MODULE_ACTION} and matches that exact string, so
+     * {@code RISK_READ} <i>is</i> a granted authority and {@code hasAnyAuthority('RISK_READ')} admits
+     * every user holding the permission. What is lost is only the {@code ROLE_PLATFORM_ADMIN} bypass
+     * the evaluator applies first — <b>too tight for admins, not open to nobody</b>. Worth rewriting as
+     * {@code hasPermission(...)} to regain the bypass and read consistently; not broken authorisation.
+     * Their presence in this list is a labelling artefact of asking {@code iam.roles} about a string
+     * that was never a role.
+     *
      * <p><b>Sized on one name, because the shape generalises.</b> {@code TPRM_LEAD} is <b>11
      * occurrences across 5 files</b>, and they are not all guards: {@code MtpdInheritanceController}
      * (3) and {@code ProcessVendorDependencyController} (5) recite it in {@code @PreAuthorize}, while
