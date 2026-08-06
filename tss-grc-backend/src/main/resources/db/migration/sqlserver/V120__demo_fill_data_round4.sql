@@ -12,6 +12,20 @@ SET NOCOUNT ON;
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 GO
+-- ⚠ F2-77 / F2-140: guarded because compliance.compliance_assessments and
+-- compliance.compliance_findings are created by NO migration in the set. Measured: the folder
+-- CREATEs 470 tables, the live database holds 470, and three differ in each direction — these
+-- two are among the three that exist live (10 and 18 rows) with no DDL anywhere. They are not
+-- in the V341/V342 spine bootstrap either, and they have no JPA entity, which is why F2-70's
+-- ratchets never asked about them and read as closed.
+--
+-- This is DEMO data, so skipping is the right answer and not a compromise: a demo fill for a
+-- table the migration set does not build should be absent, not fatal. Whether those tables
+-- ought to exist at all is F2-140's owner decision — they carry rows, have no entity, and sit
+-- beside a live sibling (compliance.assessments) — and guarding here deliberately does not
+-- pre-empt it. On both live databases the tables exist, so this runs exactly as before.
+IF OBJECT_ID(N'compliance.compliance_assessments', N'U') IS NOT NULL
+BEGIN
 
 -- ══════════════════════════════════════════════════════════════════
 -- (1) compliance.compliance_assessments — 6 cross-framework runs
@@ -57,7 +71,22 @@ BEGIN
            0, DATEADD(DAY, -(r.rn * 25), GETUTCDATE())
       FROM rows_ r;
 END
+END
 GO
+-- ⚠ F2-77 / F2-140: guarded because compliance.compliance_assessments and
+-- compliance.compliance_findings are created by NO migration in the set. Measured: the folder
+-- CREATEs 470 tables, the live database holds 470, and three differ in each direction — these
+-- two are among the three that exist live (10 and 18 rows) with no DDL anywhere. They are not
+-- in the V341/V342 spine bootstrap either, and they have no JPA entity, which is why F2-70's
+-- ratchets never asked about them and read as closed.
+--
+-- This is DEMO data, so skipping is the right answer and not a compromise: a demo fill for a
+-- table the migration set does not build should be absent, not fatal. Whether those tables
+-- ought to exist at all is F2-140's owner decision — they carry rows, have no entity, and sit
+-- beside a live sibling (compliance.assessments) — and guarding here deliberately does not
+-- pre-empt it. On both live databases the tables exist, so this runs exactly as before.
+IF OBJECT_ID(N'compliance.compliance_assessments', N'U') IS NOT NULL
+BEGIN
 
 -- ══════════════════════════════════════════════════════════════════
 -- (2) compliance.compliance_findings — 2 per assessment = 12
@@ -89,6 +118,7 @@ BEGIN
            DATEADD(DAY, 30 + (a.rn * 15), CAST(GETUTCDATE() AS DATE)),
            0, GETUTCDATE()
       FROM ax a CROSS JOIN flv f;
+END
 END
 GO
 

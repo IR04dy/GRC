@@ -59,17 +59,28 @@ DECLARE @org_x BIGINT = 1;
 
 IF NOT EXISTS (SELECT 1 FROM privacy_lc.cross_border_transfers WHERE organisation_id = @org_x)
 BEGIN
+    -- ⚠ F2-77: external_id was MISSING from this insert. It is NVARCHAR(64) NOT NULL with no
+    -- DEFAULT and a UNIQUE (organisation_id, external_id) constraint, so this statement could
+    -- never have inserted a row — and it never has. privacy_lc.cross_border_transfers holds
+    -- ZERO rows in both live databases, and the guard above is "seed if empty", so the block
+    -- would have executed if it had ever been reached. It has not: dev runs no Flyway (its
+    -- schema is Python-bootstrapped) and prod baselined at V292, above this file. The ordered
+    -- chain-proof run is the FIRST execution of this migration in the project's history, which
+    -- is precisely why the defect surfaced now and not in three years of deploys.
+    --
+    -- The value is deterministic rather than NEWID() so a re-run cannot violate the unique
+    -- constraint, and it is visibly demo data — the six rows carry distinct ropa_ids 1-6.
     INSERT INTO privacy_lc.cross_border_transfers
-        (organisation_id, ropa_id, destination_country, purpose_en, purpose_ar,
+        (external_id, organisation_id, ropa_id, destination_country, purpose_en, purpose_ar,
          adequacy, safeguard, safeguard_date, pre_risk_score, post_risk_score,
          review_interval_months, status, created_at, is_deleted)
     VALUES
-    (@org_x,  1, N'Ireland',         N'EU analytics processing',                N'معالجة تحليلات في الاتحاد الأوروبي', N'ADEQUATE', N'SCC',                  DATEADD(MONTH, -6, GETUTCDATE()),  14, 6,  12, N'APPROVED',    GETUTCDATE(), 0),
-    (@org_x,  2, N'United States',   N'Salesforce support tickets',             N'تذاكر دعم في الولايات المتحدة',     N'NONE',     N'DATA_OFFICE_APPROVAL', DATEADD(MONTH, -3, GETUTCDATE()),  20, 10, 6,  N'APPROVED',    GETUTCDATE(), 0),
-    (@org_x,  3, N'Netherlands',     N'ML model training in Azure West-EU',     N'تدريب نموذج التعلم الآلي',           N'PARTIAL',  N'BCR',                  DATEADD(MONTH, -4, GETUTCDATE()),  16, 8,  12, N'APPROVED',    GETUTCDATE(), 0),
-    (@org_x,  4, N'India',           N'24/7 helpdesk processing',               N'مكتب مساعدة على مدار الساعة',        N'NONE',     N'EXPLICIT_CONSENT',     DATEADD(MONTH, -2, GETUTCDATE()),  18, 12, 6,  N'UNDER_REVIEW',GETUTCDATE(), 0),
-    (@org_x,  5, N'UAE',             N'GCC payments clearing house',            N'مقاصة مدفوعات الخليج',               N'ADEQUATE', N'INTRA_GROUP',          DATEADD(MONTH, -8, GETUTCDATE()),  10, 4,  24, N'APPROVED',    GETUTCDATE(), 0),
-    (@org_x,  6, N'United Kingdom',  N'UK insurance underwriting partner',      N'شريك التأمين في المملكة المتحدة',    N'ADEQUATE', N'SCC',                  DATEADD(MONTH, -5, GETUTCDATE()),  12, 5,  12, N'APPROVED',    GETUTCDATE(), 0);
+    (N'CBT-DEMO-001', @org_x, 1, N'Ireland',         N'EU analytics processing',                N'معالجة تحليلات في الاتحاد الأوروبي', N'ADEQUATE', N'SCC',                  DATEADD(MONTH, -6, GETUTCDATE()),  14, 6,  12, N'APPROVED',    GETUTCDATE(), 0),
+    (N'CBT-DEMO-002', @org_x, 2, N'United States',   N'Salesforce support tickets',             N'تذاكر دعم في الولايات المتحدة',     N'NONE',     N'DATA_OFFICE_APPROVAL', DATEADD(MONTH, -3, GETUTCDATE()),  20, 10, 6,  N'APPROVED',    GETUTCDATE(), 0),
+    (N'CBT-DEMO-003', @org_x, 3, N'Netherlands',     N'ML model training in Azure West-EU',     N'تدريب نموذج التعلم الآلي',           N'PARTIAL',  N'BCR',                  DATEADD(MONTH, -4, GETUTCDATE()),  16, 8,  12, N'APPROVED',    GETUTCDATE(), 0),
+    (N'CBT-DEMO-004', @org_x, 4, N'India',           N'24/7 helpdesk processing',               N'مكتب مساعدة على مدار الساعة',        N'NONE',     N'EXPLICIT_CONSENT',     DATEADD(MONTH, -2, GETUTCDATE()),  18, 12, 6,  N'UNDER_REVIEW',GETUTCDATE(), 0),
+    (N'CBT-DEMO-005', @org_x, 5, N'UAE',             N'GCC payments clearing house',            N'مقاصة مدفوعات الخليج',               N'ADEQUATE', N'INTRA_GROUP',          DATEADD(MONTH, -8, GETUTCDATE()),  10, 4,  24, N'APPROVED',    GETUTCDATE(), 0),
+    (N'CBT-DEMO-006', @org_x, 6, N'United Kingdom',  N'UK insurance underwriting partner',      N'شريك التأمين في المملكة المتحدة',    N'ADEQUATE', N'SCC',                  DATEADD(MONTH, -5, GETUTCDATE()),  12, 5,  12, N'APPROVED',    GETUTCDATE(), 0);
 END
 GO
 
