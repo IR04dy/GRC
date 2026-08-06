@@ -213,11 +213,23 @@ def report_partition(missing, stop):
     if len(later) > 12:
         print("    ... and %d more" % (len(later) - 12))
 
-    print("\n[2] ⚠ A migration AT OR BELOW the stop contains its CREATE TABLE, and the table is NOT "
-          "in the built database: %d" % len(skipped))
-    print("    These are the interesting ones. The file ran (the chain got past it) and the table is "
-          "absent, so an idempotency guard skipped the CREATE — the shape F2-112 and the V121 demo "
-          "inserts had: a control that cannot fire over a statement that cannot run.")
+    if stop:
+        print("\n[2] ⚠ A migration AT OR BELOW the stop contains its CREATE TABLE, and the table "
+              "is NOT in the built database: %d" % len(skipped))
+        print("    These are the interesting ones. The file ran (the chain got past it) and the "
+              "table is absent, so an idempotency guard skipped the CREATE — the shape F2-112 and "
+              "the V121 demo inserts had: a control that cannot fire over a statement that cannot "
+              "run.")
+    else:
+        # ⚠ Without a stop this bucket holds everything a migration creates, whether that
+        # migration ran or not, so calling it "the interesting ones" asserts a defect class the
+        # run cannot distinguish. Measured 2026-08-06: with no --stop the whole population landed
+        # here and read as suspicious; with `--stop 320` it was 0 and the one item was
+        # expected-missing.
+        print("\n[2] A migration creates it and the built database lacks it: %d" % len(skipped))
+        print("    ⚠ NO STOP GIVEN, so this cannot be read as a defect: it mixes migrations that "
+              "ran and had their CREATE skipped with migrations that never ran at all. Re-run "
+              "with --stop <version> to separate them.")
     for v, t in skipped[:20]:
         print("    V%-4d %s" % (v, t))
     if len(skipped) > 20:
@@ -295,10 +307,17 @@ def report_column_partition(missing_c, stop):
     if len(later) > 15:
         print("    ... and %d more" % (len(later) - 15))
 
-    print("\n[2] ⚠ A migration AT OR BELOW the stop names it and the column is absent: %d" % len(below))
-    print("    Either an idempotency guard skipped the ALTER, or the migration's CREATE TABLE and the "
-          "bootstrap's disagree about the column set. Both ship a fresh install that the code expects "
-          "to have this column.")
+    if stop:
+        print("\n[2] ⚠ A migration AT OR BELOW the stop names it and the column is absent: %d"
+              % len(below))
+        print("    Either an idempotency guard skipped the ALTER, or the migration's CREATE TABLE "
+              "and the bootstrap's disagree about the column set. Both ship a fresh install that "
+              "the code expects to have this column.")
+    else:
+        print("\n[2] A migration names it and the built database lacks it: %d" % len(below))
+        print("    ⚠ NO STOP GIVEN, so this cannot be read as a defect. This is exactly how one "
+              "run reported V363's bcm.crisis_comms_cascade.simulated as suspicious: the column "
+              "is expected-missing because the chain database predates that migration entirely.")
     for v, c in below[:20]:
         print("    V%-4d %s" % (v, c))
     if len(below) > 20:

@@ -1000,14 +1000,21 @@ class SchemaContractRatchetTest {
         "compliance.evidence_items");          // 83 / 83
 
     /**
-     * The converse: created by a migration and absent from dev. Correct history, checked — E-E's KRI
-     * consolidation dropped these three and the drop lives in a bootstrap script, so `V1` still
-     * creates them and dev no longer has them.
+     * ⚠ <b>This used to be a tolerated set of three, on a false premise.</b> It listed
+     * {@code risk.kri_definitions}, {@code kri_readings} and {@code kri_breach_events} as "created by
+     * a migration and absent from dev", with a javadoc claiming <i>"the drop lives in a bootstrap
+     * script"</i>. It does not: <b>V247 and V337 drop them as migrations</b>. The scan was
+     * CREATE-only, so it saw the {@code CREATE TABLE} in V1 and never the {@code DROP TABLE} that
+     * retires it. Found by running the two-database convergence diff, which reported <b>0 extra
+     * tables</b> in the Flyway-built database — the chain drops them exactly as it should, and my
+     * hermetic gate was the thing that disagreed with reality.
+     *
+     * <p>With DROP subtracted the population is <b>empty</b>, so this is now a hard zero rather than
+     * a set — see {@link #everyMigrationCreatedTableIsLiveOrDeliberatelyRetired()}. Nine tables are
+     * net-dropped by the migration set today: the six legacy {@code platform.workflow_*} tables the
+     * workflow engine replaced (V114) and the three KRI tables (V337).
      */
-    private static final Set<String> CREATED_BUT_RETIRED_FROM_DEV = Set.of(
-        "risk.kri_breach_events",
-        "risk.kri_definitions",
-        "risk.kri_readings");
+    private static final int MIN_NET_CREATED_TABLES = 400;
 
     /** 470 today, in both directions. Under this and a scan broke rather than a platform shrank. */
     private static final int MIN_CONVERGENCE_POPULATION = 400;
@@ -1030,7 +1037,7 @@ class SchemaContractRatchetTest {
      */
     @Test
     void everyLiveTableIsCreatedBySomeMigration() throws IOException {
-        Set<String> created = createdByMigration().keySet();
+        Set<String> created = netCreatedByMigration();
         Set<String> live = liveTablesPerRegister();
 
         List<String> residue = live.stream().filter(t -> !created.contains(t)).sorted().toList();
@@ -1052,22 +1059,31 @@ class SchemaContractRatchetTest {
     /**
      * The other direction, separately — because two assertions in one method let the first mask the
      * second, which has happened three times in this programme.
+     *
+     * <p>A <b>hard zero</b>, not a tolerated set, now that the scan subtracts DROPs: every table the
+     * migration set leaves standing must exist in dev. A table that is created and later dropped by
+     * migrations is correct history fully expressed in migrations, and does not belong in a
+     * findings-shaped list.
      */
     @Test
     void everyMigrationCreatedTableIsLiveOrDeliberatelyRetired() throws IOException {
-        Set<String> created = createdByMigration().keySet();
+        Set<String> created = netCreatedByMigration();
         Set<String> live = liveTablesPerRegister();
 
         List<String> orphans = created.stream().filter(t -> !live.contains(t)).sorted().toList();
 
         assertThat(orphans).as("""
-            %d table(s) are created by a migration and are absent from the live dev schema. Each is \
-            either a table dropped after its CREATE shipped — in which case the drop belongs in a \
-            migration, not only in a bootstrap script — or a CREATE nobody ever ran.
+            %d table(s) are left standing by the migration set and are absent from the live dev \
+            schema. Either dev dropped something the migrations still create — in which case the \
+            DROP belongs in a migration too, or a fresh install will carry a table nobody uses — or \
+            the register is stale.
 
-            unexpected: %s""".formatted(orphans.size(),
-                orphans.stream().filter(t -> !CREATED_BUT_RETIRED_FROM_DEV.contains(t)).toList()))
-            .containsExactlyInAnyOrderElementsOf(CREATED_BUT_RETIRED_FROM_DEV);
+            Do NOT resolve this by adding names to an allow-list: this assertion is a zero on \
+            purpose, and it became one because the previous tolerated set of three turned out to be \
+            an artefact of a CREATE-only scan.
+
+            %s""".formatted(orphans.size(), orphans))
+            .isEmpty();
     }
 
     /**
@@ -1113,6 +1129,72 @@ class SchemaContractRatchetTest {
             reference really was a mistake.""".formatted(nowRead))
             .isEmpty();
     }
+
+    private static final Pattern DROP_TABLE = Pattern.compile(
+        "DROP\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?\\[?(\\w+)\\]?\\s*\\.\\s*\\[?(\\w+)\\]?",
+        Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Tables the migration set leaves <b>standing</b> — every table whose last {@code CREATE}/
+     * {@code DROP} act, in migration order, is a CREATE.
+     *
+     * <p>⚠ <b>Ordering is (version, offset-in-file), and the offset half is load-bearing.</b> Comparing
+     * versions alone reports a table as dropped when one migration does
+     * {@code DROP TABLE x; CREATE TABLE x;} — a recreate — because both acts share a version.
+     * Measured: a version-only rule moved {@code bcm.crisis_events} (V102) and
+     * {@code platform.controls} (V93) into the "not created by any migration" bucket, <b>inventing
+     * two defects</b> on tables that are live, mapped and populated. That is the same failure as a
+     * regex that matches too little: the scan is wrong in the alarming direction, and an alarming
+     * wrong answer costs a reviewer's trust as surely as a reassuring one.
+     *
+     * <p>Comments are stripped with the ordinary collapsing stripper. ⚠ The first version of this
+     * method used a length-preserving blanker instead, with a javadoc claiming that collapsing
+     * "shifts every later offset, which can reorder two statements". <b>That is false</b>: deleting
+     * text shifts all later offsets by the same amount, so the <em>relative</em> order of what
+     * remains is unchanged — removing text cannot reorder text. Measured before deleting the helper:
+     * swapping the blanker for {@link #stripSqlComments(String)} leaves all 14 tests green. What the
+     * offsets are actually for is intra-file ordering, and any consistent stripping preserves it.
+     */
+    private static Set<String> netCreatedByMigration() throws IOException {
+        // table -> {version, offset, wasCreate}
+        Map<String, long[]> last = new TreeMap<>();
+        try (Stream<Path> files = Files.list(migrationDir())) {
+            for (Path p : files.filter(f -> f.getFileName().toString().endsWith(".sql")).sorted().toList()) {
+                Matcher nm = MIGRATION_NAME.matcher(p.getFileName().toString());
+                if (!nm.matches()) {
+                    continue;
+                }
+                long version = Long.parseLong(nm.group(1));
+                String sql = stripSqlComments(Files.readString(p));
+                record Act(Pattern rx, long isCreate) {}
+                for (Act act : List.of(new Act(CREATE_TABLE, 1), new Act(DROP_TABLE, 0))) {
+                    Matcher m = act.rx().matcher(sql);
+                    while (m.find()) {
+                        String table = key(m.group(1), m.group(2));
+                        long[] prev = last.get(table);
+                        if (prev == null || version > prev[0]
+                            || (version == prev[0] && m.start() > prev[1])) {
+                            last.put(table, new long[]{version, m.start(), act.isCreate()});
+                        }
+                    }
+                }
+            }
+        }
+
+        Set<String> standing = new TreeSet<>();
+        for (var e : last.entrySet()) {
+            if (e.getValue()[2] == 1) {
+                standing.add(e.getKey());
+            }
+        }
+        assertThat(standing.size()).as(
+            "Only %d tables are left standing by the migration set. Under %d means the CREATE or "
+            + "DROP parse broke, and both callers assert over a difference against this set.",
+            standing.size(), MIN_NET_CREATED_TABLES)
+            .isGreaterThanOrEqualTo(MIN_NET_CREATED_TABLES);
+        return standing;
+    }
+
 
     /**
      * Tables the register reports as present in dev.
