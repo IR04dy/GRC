@@ -1,4 +1,7 @@
 # Secrets Management
+> **HISTORIC — point-in-time snapshot (all files 2026-05-02). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 **Status:** dev profile cleaned up (this commit) · prod still requires deployment-time wiring · long-term move to a dedicated secrets manager is recommended
 

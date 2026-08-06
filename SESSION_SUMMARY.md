@@ -1,4 +1,8 @@
 # TSS GRC Platform — Full Session Summary
+
+> **HISTORIC — point-in-time snapshot (all files 2026-04-30). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](CLAUDE.md) and [`PROJECT_CHRONICLE.md`](PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 > **Generated**: 2026-04-07
 > **Purpose**: Complete handoff document for continuation in a new session
 > **Sprint Implemented**: Sprint 1 only (Sprints 2 & 3 not started)

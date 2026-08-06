@@ -1,4 +1,8 @@
 # Sprint 2 — Domain Modules Expansion
+
+> **HISTORIC — point-in-time snapshot (all files 2026-04-30). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 **Duration:** 6 weeks
 **Theme:** Activate Cybersecurity, BCM, Privacy, Compliance, and Data Governance modules. All cross-module risk linkages wired. Reporting foundation in place.
 

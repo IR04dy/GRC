@@ -1,4 +1,7 @@
 # BCM Module — Independent Audit & End-User Acceptance Test
+> **HISTORIC — point-in-time snapshot (all files 2026-05-18). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 **Auditor stance:** independent, expert. Acting as a GRC tools-leader (the way a ServiceNow IRM, MetricStream, OneTrust GRC, RSA Archer, Riskonnect, or LogicGate evaluator would walk a customer demo), an ISO 22301 lead implementer, a SAMA Cyber & Operational Resilience reviewer, and an NCEMA crisis-management specialist.
 

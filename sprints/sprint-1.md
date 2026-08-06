@@ -1,4 +1,8 @@
 # Sprint 1 — Foundation & Core Platform
+
+> **HISTORIC — point-in-time snapshot (all files 2026-04-30). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 **Duration:** 6 weeks
 **Theme:** Make the platform runnable end-to-end with JWT-authenticated REST API, standalone HTML/CSS/JS frontend, administration, and the Risk Management module fully functional.
 

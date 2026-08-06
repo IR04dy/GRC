@@ -1,8 +1,11 @@
 # Saudi GRC Platform — Gap Analysis vs Implementation Prompt
+> **HISTORIC — point-in-time snapshot (all files 2026-05-11). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 **Date:** 2026-05-11 (last refresh — final session, after V50-V54 close the 5 remaining ⚠ items)
 **Reference:** `Saudi_GRC_Platform_Claude_Code_Implementation_Prompt.md`
-**Branch surveyed:** `feat/pdpl-extensions`
+**Commit surveyed:** `c6f116f` (2026-05-11) — formerly cited as branch `feat/pdpl-extensions`, which no longer exists
 
 This document maps the prompt's 40+ required capabilities against the
 current platform and flags concrete gaps. It is the input to subsequent

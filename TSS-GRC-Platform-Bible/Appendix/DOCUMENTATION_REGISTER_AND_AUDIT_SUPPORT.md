@@ -71,6 +71,8 @@ code, schema, and seed data at HEAD of branch `feat/pdpl-extensions`" — **that
 exists** (`git branch -a --list "*pdpl*"` returns nothing). The pack's own stated provenance is
 unverifiable.
 
+✔ **Resolved 2026-08-06 (W0-6).** All three citations now name commit `c6f116f` (2026-05-11), the commit that branch pointed at — a SHA outlives its branch, which is the point. `GovernanceDocumentIntegrityTest` fails if the dead branch is ever cited again without it. The *“which generation governs”* half of the fix is **not** resolved and **could not be**: neither pack contains the other, so either answer deletes content — see **F2-135**.
+
 **Fix:** decide which generation governs, stamp the other `SUPERSEDED BY <path>`, and replace the dead
 branch anchor with a commit SHA.
 

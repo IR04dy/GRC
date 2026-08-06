@@ -1,4 +1,8 @@
 # 05 · BIA Template
+
+> **HISTORIC — point-in-time snapshot (all files 2026-05-23). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 **Document owner:** BIA Owner (per process) · **Cadence:** Annual · **Backing entity:** `bcm.bia_records`
 
 > Fill in every `[FILL]` placeholder. Attach evidence via the platform. Do not delete sections — mark "N/A" if not applicable so reviewers can see they weren't skipped.

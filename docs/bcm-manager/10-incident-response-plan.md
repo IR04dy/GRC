@@ -1,4 +1,8 @@
 # 10 · Incident Response Plan (IRP)
+
+> **HISTORIC — point-in-time snapshot (all files 2026-05-23). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 **Document owner:** BCM Manager + CISO · **Backing entity:** `bcm.crisis_events`, `cyber.cyber_incidents`
 
 > Integrated with cyber IR. Same plan for both worlds — different sub-procedures.

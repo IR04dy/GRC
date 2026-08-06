@@ -1,4 +1,7 @@
 # Unified Risk View — Data Aggregation Diagram
+> **HISTORIC — point-in-time snapshot (all files 2026-04-30). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 ## Purpose
 Shows how risk data from all five GRC modules aggregates into the Unified Risk View, which is the key executive dashboard feature.

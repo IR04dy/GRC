@@ -1,4 +1,8 @@
 # 19 · Lessons Learned / AAR Template
+
+> **HISTORIC — point-in-time snapshot (all files 2026-05-23). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 **Document owner:** BCM Manager · **Cadence:** Within 48h of all-clear OR within 1 week of exercise · **Backing entity:** `bcm.lessons_learned`, `bcm.crisis_aar`
 
 > Every real incident + every exercise produces an AAR. Capture once, distil patterns over time. The library of lessons is one of the BCM programme's most valuable assets.

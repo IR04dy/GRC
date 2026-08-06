@@ -1,4 +1,8 @@
 # TSS GRC Platform — Version 2 Status
+
+> **HISTORIC — point-in-time snapshot (last substantive commit 2026-06-01). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](CLAUDE.md) and [`PROJECT_CHRONICLE.md`](PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 **Last update:** 26 May 2026 (Sprints 30-32 Compliance-overlay tri-arc frontend closeout — PRs #272, #273, #274 add the dashboard + register UI slices for the three modules)
 
 ---

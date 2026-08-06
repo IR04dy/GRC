@@ -1,4 +1,7 @@
 # SDAIA breach-notification workflow (PDPL Article 31)
+> **HISTORIC — point-in-time snapshot (all files 2026-05-24). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 > Closes Open Issue **#006** — "PDPC notification API" in
 > `docs/roadmap/04-open-issues-register.md`. Note: PDPC (Personal Data

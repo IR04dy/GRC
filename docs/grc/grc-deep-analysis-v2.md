@@ -1,4 +1,7 @@
 # GRC.html — Deep Analysis v2 (Exhaustive Re-read)
+> **HISTORIC — point-in-time snapshot (all files 2026-04-30). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 > Source: `C:\AYMAN\Gafaar-GRC-HTML\GRC.html` — 20,233 lines  
 > Re-analyzed: 2026-04-09 from scratch  

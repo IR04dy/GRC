@@ -1,4 +1,7 @@
 # TSS GRC Platform — Complete Build History
+> **HISTORIC — point-in-time snapshot (all files 2026-06-21). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](CLAUDE.md) and [`PROJECT_CHRONICLE.md`](PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 A detailed catalogue of **everything built** in this repository: every module, the
 sprint-by-sprint feature arcs, the forms / evidence infrastructure, the design-system

@@ -1,4 +1,7 @@
 # Cross-border data-transfer safeguards — template wording
+> **HISTORIC — point-in-time snapshot (all files 2026-05-23). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 Closes Open Issue **#012** (template legal language for `processing_activities.transfer_safeguards_en` and the matching `_ar` field).
 

@@ -1,4 +1,7 @@
 # Risk-Advanced Module — QA Checklist
+> **HISTORIC — point-in-time snapshot (last substantive commit 2026-06-21). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 Manual-QA gate for the Risk-Advanced extensions on top of the base ERM
 module — risk appetite, periodic assessments, and ISO 31000 treatment

@@ -1,4 +1,7 @@
 # MFA TOTP library — decision record
+> **HISTORIC — point-in-time snapshot (all files 2026-05-24). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 Closes Open Issue **#008** — selects the TOTP library, documents the backup-code strategy, and adds the dependency + API stub. Full MFA enrollment UI is the Sprint 13 follow-up.
 

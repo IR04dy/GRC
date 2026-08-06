@@ -1,4 +1,8 @@
 # TSS GRC Platform — Visual-Craft Review & Improvement Plan
+
+> **HISTORIC — point-in-time snapshot (all files 2026-06-02). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 ## Committee of GRC-tool design leaders · pixel/token-level polish (sizing · alignment · colour · type · spacing)
 
 > **Third companion** to `frontend-design-review.md` (systemic findings) and `frontend-visualization-playbook.md` (per-page hero charts). This one is **granular visual craft**: relative component sizing & proportion, item positioning & alignment, colour matching/harmony, text (margins, alignment, font sizes, hierarchy), spacing rhythm, radius/elevation, page composition, and RTL/responsive precision.

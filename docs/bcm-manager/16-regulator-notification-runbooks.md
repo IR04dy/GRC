@@ -1,4 +1,8 @@
 # 16 · Regulator Notification Runbooks
+
+> **HISTORIC — point-in-time snapshot (all files 2026-05-23). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 **Document owner:** GC + DPO + BCM Manager · **Backing entity:** `bcm.crisis_regulatory_notifications`
 
 > Every regulator has its own deadline, form, channel, and follow-up cadence. Run the right runbook the moment a notifiable event is suspected.

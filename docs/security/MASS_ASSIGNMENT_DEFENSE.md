@@ -1,4 +1,7 @@
 # Mass-Assignment Defense Pattern
+> **HISTORIC — point-in-time snapshot (all files 2026-05-23). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 **Status**: Implemented per-service (PR #121 + #123 — 19 services patched). Sprint-6 proposes a platform-wide AOP backstop.
 

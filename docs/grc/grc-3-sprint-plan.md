@@ -1,4 +1,7 @@
 # GRC Platform — 3-Sprint Delivery Plan (Post Sprint 1.5)
+> **HISTORIC — point-in-time snapshot (all files 2026-04-30). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 > Reference: GRC.html analysis + BRD alignment  
 > Sprints are numbered 2, 3, 4 (Sprints 1 and 1.5 are complete)  

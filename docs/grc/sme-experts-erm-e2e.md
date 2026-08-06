@@ -1,4 +1,7 @@
 # Independent SME / GRC-Expert Audit — NCA · NDI · Data Management · PDPL · BCM · ERM
+> **HISTORIC — point-in-time snapshot (all files 2026-06-01). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 **Date:** 2026-06-01
 **Mode:** Independent multi-agent workflow (`grc-sme-experts-erm-e2e`, run `wf_991931a2-0c9`) — 17 agents, 4 phases, ~12 min, live against the running backend (`localhost:8084`) + direct SQL Server introspection.

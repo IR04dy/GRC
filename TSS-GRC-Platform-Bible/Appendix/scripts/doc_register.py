@@ -60,7 +60,25 @@ def role(p):
 
 # Currency: anything not touched since the remediation programmes began (2026-07) is
 # a staleness candidate; that is a fact about the file, not a judgement on its content.
-def currency(d):
+#
+# ⚠ W0-6 broke that heuristic and had to supersede it. Stamping the point-in-time corpus
+# `HISTORIC` rewrote 217 documents in a single commit, so their newest-commit date became
+# today and the classifier called every one of them `current` — the act of marking a
+# snapshot as historic made this script report it as fresh. A document that declares its
+# own status outranks anything inferred from when it was last touched, so the banner wins.
+# (This is why the banner text is a stable sentinel: GovernanceDocumentIntegrityTest and
+# w06_stamp.py match the same string.)
+HISTORIC_BANNER = "**HISTORIC"
+
+def declares_itself_historic(p):
+    try:
+        with open(p, encoding="utf-8", errors="replace") as fh:
+            return HISTORIC_BANNER in fh.read(1500)
+    except OSError:
+        return False
+
+def currency(d, p):
+    if declares_itself_historic(p): return "historic"
     if d is None: return "unknown"
     if d >= "2026-07-01": return "current"
     if d >= "2026-06-01": return "recent"
@@ -76,7 +94,7 @@ for p in sorted(tracked):
     rows.append(dict(path=p, corpus=corpus(p), role=role(p), lines=lines,
                      bytes=os.path.getsize(p) if os.path.exists(p) else 0,
                      newest_commit=n or "", oldest_commit=oldest.get(p, ""),
-                     commits=commits.get(p, 0), currency=currency(n)))
+                     commits=commits.get(p, 0), currency=currency(n, p)))
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, "w", newline="", encoding="utf-8") as fh:

@@ -1,4 +1,7 @@
 # W3 — ERM: KRI threshold engine + Risk appetite vs. exposure
+> **HISTORIC — point-in-time snapshot (all files 2026-05-02). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 Buyer-assessment §5.1 ERM remainder:
 

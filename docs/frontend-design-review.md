@@ -1,4 +1,7 @@
 # TSS GRC Platform — Front-End Design Review & Improvement Plan
+> **HISTORIC — point-in-time snapshot (all files 2026-06-02). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 > **Scope:** `tss-grc-ui-v2` (React 18 + Vite + TypeScript), the bilingual (Arabic‑primary / English), RTL‑first GRC web application.
 > **Lens:** GRC subject‑matter expert + UI/UX designer + data‑visualization specialist + accessibility & RTL architect.

@@ -1,4 +1,7 @@
 # Audit, History, and Versioning Strategy
+> **HISTORIC — point-in-time snapshot (all files 2026-04-30). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 ## Purpose
 Defines the SQL Server 2019 approach to audit logging, change history, and data versioning, including system-versioned temporal tables, application-level audit capture, and concurrency control.

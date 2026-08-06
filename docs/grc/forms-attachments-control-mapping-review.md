@@ -1,4 +1,7 @@
 # Platform-wide Forms Review — File Attachments + Cross-Framework Control Mapping
+> **HISTORIC — point-in-time snapshot (all files 2026-06-01). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 **Date:** 2026-06-01
 **Method:** 5 independent reviewers, one per domain, inventorying every create/edit form in `tss-grc-ui-v2/src/pages` on two dimensions: (A) needs file upload/preview, (B) needs multi-control mapping across frameworks.

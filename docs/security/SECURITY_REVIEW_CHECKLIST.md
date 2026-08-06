@@ -1,4 +1,7 @@
 # Security Review Checklist
+> **HISTORIC — point-in-time snapshot (all files 2026-05-23). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 A condensed checklist code reviewers run against any PR that adds or modifies a write endpoint. Drawn from the patterns found during the May 2026 bug-hunt arc (PRs #117–#128). Most items are 30-second checks.
 

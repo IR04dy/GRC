@@ -1,4 +1,7 @@
 # AI Governance / Model-Risk Module — Deep Review & Improvement Roadmap
+> **HISTORIC — point-in-time snapshot (all files 2026-06-01). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 **Date:** 2026-06-01
 **Method:** Standards-grounded code review of `module.ai` (backend) + `pages/{ai,ai-governance,aiLifecycle}` (frontend), mapped to ISO/IEC 42001, NIST AI RMF, EU AI Act, SDAIA AI Ethics Principles, and SAMA-style model-risk management; benchmarked vs Credo AI, Holistic AI, IBM watsonx.governance, ServiceNow & OneTrust AI Governance.

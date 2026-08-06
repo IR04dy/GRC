@@ -1,4 +1,7 @@
 # Policy Management Module — QA Checklist
+> **HISTORIC — point-in-time snapshot (all files 2026-05-17). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 Manual-QA gate for the Policy Management module (`module.policy`, schema
 `policy.*`, migration V79). This document is walkable without source

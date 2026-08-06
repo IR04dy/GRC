@@ -1,4 +1,7 @@
 # Risk Domain Model
+> **HISTORIC — point-in-time snapshot (all files 2026-04-30). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 ## Purpose
 Defines the complete risk domain model for the TSS GRC Platform, covering the risk register, risk assessment methodology, risk treatment, risk appetite, key risk indicators, and cross-module risk aggregation.

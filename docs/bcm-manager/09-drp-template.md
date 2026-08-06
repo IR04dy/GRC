@@ -1,4 +1,8 @@
 # 09 · DRP Template (Disaster Recovery Plan)
+
+> **HISTORIC — point-in-time snapshot (all files 2026-05-23). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 **Document owner:** IT Ops Lead / OT Lead · **Backing entity:** `bcm.dr_plans`
 
 > Two variants: **IT-DRP** (general IT systems) and **OT-DRP** (refinery DCS, pipeline SCADA, ATM switch, payment switch). Use the variant headers below.

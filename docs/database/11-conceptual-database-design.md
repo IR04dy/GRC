@@ -1,4 +1,7 @@
 # Conceptual Database Design
+> **HISTORIC — point-in-time snapshot (all files 2026-04-30). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 ## Purpose
 Provides the conceptual view of the TSS GRC Platform database — the major entity groups, their purpose, and relationships at a business abstraction level, independent of physical implementation details.

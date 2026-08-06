@@ -1,4 +1,7 @@
 # Change Management module — ITIL v4 Change Enablement
+> **HISTORIC — point-in-time snapshot (all files 2026-05-03). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 A new top-level module providing end-to-end change lifecycle management with
 formal CAB approval, implementation tasks, post-implementation review, and

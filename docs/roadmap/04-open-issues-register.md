@@ -1,4 +1,7 @@
 # 04 - Open Issues Register
+> **HISTORIC — point-in-time snapshot (last substantive commit 2026-05-24). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 Issues and decisions that require resolution before or during Sprint 1. Updated as items are resolved.
 

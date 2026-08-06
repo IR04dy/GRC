@@ -1,8 +1,12 @@
 # Saudi GRC Platform — Integration Deliverable Package
+> **HISTORIC — point-in-time snapshot (last substantive commit 2026-05-14). Not a statement of current state.**
+> ⚠ **This is PACK A of two generations, and neither supersedes the other** — finding **F2-135**. PACK B (`docs/Saudi-GRC-Platform-Integration/`, 2026-05-18) covers 16 shared sections more deeply, but **dropped sections 16–18 of this pack entirely** (AI features, frontend requirements, Excel workbook — 1,010 lines found only here) and reused the number `16` for different content. Which pack governs is an **open owner decision**.
+> For what the platform is today read [`CLAUDE.md`](../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 Structured deliverables for the TSS GRC platform. Every document in this
 package is anchored to the running code, schema, and seed data at HEAD
-of branch `feat/pdpl-extensions`.
+of commit `c6f116f` (2026-05-11), formerly cited as branch `feat/pdpl-extensions` — which no longer exists.
 
 **Read order:** start with `01-Product-Blueprint`, then read whichever
 section is relevant to your role (see "Owner / development usage" column

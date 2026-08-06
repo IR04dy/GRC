@@ -1,4 +1,7 @@
 # BCM Module — Implementation Status & Roadmap
+> **HISTORIC — point-in-time snapshot (all files 2026-05-02). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 **Module:** `tss-grc-backend/src/main/java/com/tss/grc/module/bcm`
 **Frontend:** `tss-grc-ui-v2/src/pages/bcm/BcmPage.tsx`

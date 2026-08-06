@@ -1,4 +1,8 @@
 # TSS GRC Platform — Visualization & Interaction Playbook
+
+> **HISTORIC — point-in-time snapshot (all files 2026-06-02). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 ## Committee of GRC-Tool Design Leaders · page-by-page hero charts, diagrams, effects & high-end modern design
 
 > **Companion to** `frontend-design-review.md`. Where the review says *what to fix*, this playbook says *what to build* — the **signature visualization, interactions, and premium treatment for every page**, benchmarked against the category leaders.

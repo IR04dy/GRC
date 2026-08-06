@@ -1,4 +1,7 @@
 # Workflow Engine Architecture
+> **HISTORIC — point-in-time snapshot (all files 2026-04-30). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 ## Purpose
 Defines the design of the TSS GRC Platform's built-in workflow engine — a lightweight, configurable approval and review engine that supports multi-step workflows, SLA enforcement, delegation, escalation, and full audit history without requiring an external BPMN engine.

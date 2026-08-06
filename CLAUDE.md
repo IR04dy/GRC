@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (2,818; ~1 min hot, 3–5 min cold)
+mvn -o clean package        # full build + all UNIT tests (3,308; ~1 min hot, 3–5 min cold)
                             # hermetic: needs no database and no secrets — keep it that way
 
 # Integration tests (*IT.java) — real HTTP + the real dev SQL Server. W1-5/F2-18.
@@ -166,7 +166,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
 
 Backend modules under `module/` — **59 packages** (58 with code; `datagov` is an empty
-placeholder), 192 kLoC, 432 entities, 2,168 endpoints. Each follows
+placeholder), 204 kLoC, 432 entities, 2,212 endpoints. Each follows
 `controller / dto / entity / repository / service`.
 
 ⚠ **Do not edit that count by hand — it is enforced.** `module-registry.yaml`

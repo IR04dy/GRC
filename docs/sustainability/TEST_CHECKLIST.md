@@ -1,4 +1,7 @@
 # Sustainability & Environmental Governance — Manual QA Checklist
+> **HISTORIC — point-in-time snapshot (all files 2026-05-16). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 Slice-13 deliverable for the Saudi-market Sustainability module. Covers
 every surface, button, and workflow rule across slices V55–V64.

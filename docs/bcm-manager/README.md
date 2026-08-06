@@ -1,4 +1,7 @@
 # BCM Manager Document Library — Saudi Bank Edition
+> **HISTORIC — point-in-time snapshot (all files 2026-05-23). Not a statement of current state.**
+> For what the platform is today read [`CLAUDE.md`](../../CLAUDE.md) and [`PROJECT_CHRONICLE.md`](../../PROJECT_CHRONICLE.md); for measured figures, [`MEASURED_BASELINE.md`](../../TSS-GRC-Platform-Bible/Appendix/MEASURED_BASELINE.md). Kept for provenance. *(W0-6)*
+
 
 > **For:** the BCM Manager (and the team) running ISO 22301 + SAMA BCF + NCA OTCC + NRC-aligned business continuity at a Saudi bank / TASI-listed company.
 > **What this is:** the operational document set you need to actually do the job — templates, runbooks, methodologies, procedures. Not theory; not abstract guidance.
