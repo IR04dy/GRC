@@ -1,0 +1,27 @@
+bcm.crisis_events|cycle_id|cycle_id BIGINT NULL
+compliance.findings|audit_signoff_at|audit_signoff_at DATETIME2(7) NULL
+compliance.findings|audit_signoff_by_id|audit_signoff_by_id BIGINT NULL
+compliance.findings|audit_signoff_notes|audit_signoff_notes NVARCHAR(MAX) NULL
+compliance.findings|capa_stage|capa_stage NVARCHAR(40) NULL DEFAULT (N'IDENTIFIED')
+compliance.findings|clause_ref|clause_ref NVARCHAR(100) NULL
+compliance.findings|independent_test_at|independent_test_at DATETIME2(7) NULL
+compliance.findings|independent_test_by_id|independent_test_by_id BIGINT NULL
+compliance.findings|independent_test_notes|independent_test_notes NVARCHAR(MAX) NULL
+compliance.findings|independent_test_result|independent_test_result NVARCHAR(20) NULL
+compliance.findings|owner_test_at|owner_test_at DATETIME2(7) NULL
+compliance.findings|owner_test_evidence_id|owner_test_evidence_id BIGINT NULL
+compliance.findings|owner_test_notes|owner_test_notes NVARCHAR(MAX) NULL
+compliance.findings|owner_test_result|owner_test_result NVARCHAR(20) NULL
+cyber.cyber_sub_controls|description_ar|description_ar NVARCHAR(MAX) NULL
+evidence.evidence_items|collected_at|collected_at DATETIME2(7) NULL
+evidence.evidence_items|collection_method|collection_method NVARCHAR(50) NULL
+evidence.evidence_items|collector_id|collector_id BIGINT NULL
+evidence.evidence_items|collector_name|collector_name NVARCHAR(255) NULL
+evidence.evidence_items|connector_code|connector_code NVARCHAR(50) NULL
+evidence.evidence_items|current_version_no|current_version_no INT NULL DEFAULT ((1))
+evidence.evidence_items|evidence_hash|evidence_hash NVARCHAR(128) NULL
+evidence.evidence_items|merkle_anchor|merkle_anchor NVARCHAR(255) NULL
+evidence.evidence_items|previous_hash|previous_hash NVARCHAR(128) NULL
+evidence.evidence_items|tool_version|tool_version NVARCHAR(100) NULL
+evidence.evidence_items|witness_id|witness_id BIGINT NULL
+evidence.sub_controls|evidence_guidance_ar|evidence_guidance_ar NVARCHAR(MAX) NULL
