@@ -1,22 +1,25 @@
 -- V121: round-5 demo fill — every empty user-facing tab now has data.
 --
 -- 29 empty tables remained after V120. This migration covers the 15
+-- listed below, of which 7 NEVER WORKED and were removed by F2-77 on
+-- 2026-08-06 (marked ✗). Each named a column that does not exist and/or omitted a
+-- required one, behind a TRY/CATCH that cannot catch a compile-time binding error.
 -- that are visible on common pages:
 --
 --   privacy.consent_records           10 (Privacy → Consent tab)
 --   privacy_lc.cross_border_transfers  6 (Privacy → Cross-Border tab)
---   privacy_lc.ropa_activities        10 (RoPA lifecycle)
---   privacy_lc.dpia_assessments        4 (DPIA lifecycle)
+--   privacy_lc.ropa_activities        ✗ (RoPA lifecycle)
+--   privacy_lc.dpia_assessments        ✗ (DPIA lifecycle)
 --   cyber.cloud_services               8 (Cyber → Cloud Services)
 --   cyber_lc.assets                   12 (Asset register)
---   cyber_lc.cyber_incidents           5 (Cyber lifecycle incidents)
---   cyber_lc.threat_intel              6 (Threat-intel feed)
+--   cyber_lc.cyber_incidents           ✗ (Cyber lifecycle incidents)
+--   cyber_lc.threat_intel              ✗ (Threat-intel feed)
 --   risk_lc.acceptance_requests        5 (Risk acceptance board)
 --   risk_lc.treatment_actions         12 (Risk treatment actions)
---   risk_lc.kri_breaches               6 (KRI breach board)
---   risk_lc.activity_log              25 (Risk activity history)
+--   risk_lc.kri_breaches               ✗ (KRI breach board)
+--   risk_lc.activity_log              ✗ (Risk activity history)
 --   regchange.changes                  8 (Regulatory change tracker)
---   nca_ecc.filings                    4 (NCA ECC annual filings)
+--   nca_ecc.filings                    ✗ (NCA ECC annual filings)
 --   board_pack.packs                   4 (Board pack list)
 --
 -- Per-row NOT EXISTS guards everywhere; idempotent.
@@ -83,55 +86,67 @@ BEGIN
     (N'CBT-DEMO-006', @org_x, 6, N'United Kingdom',  N'UK insurance underwriting partner',      N'شريك التأمين في المملكة المتحدة',    N'ADEQUATE', N'SCC',                  DATEADD(MONTH, -5, GETUTCDATE()),  12, 5,  12, N'APPROVED',    GETUTCDATE(), 0);
 END
 GO
-
--- ══════════════════════════════════════════════════════════════════
--- (3) privacy_lc.ropa_activities + dpia_assessments
--- ══════════════════════════════════════════════════════════════════
-
-DECLARE @org_r BIGINT = 1;
-
-IF NOT EXISTS (SELECT 1 FROM privacy_lc.ropa_activities WHERE organisation_id = @org_r)
-BEGIN
-    -- Schema may differ; insert only org_id + sequential identifiers and
-    -- let the rest default. Guarded inserts with TRY.
-    BEGIN TRY
-        INSERT INTO privacy_lc.ropa_activities (organisation_id, activity_name)
-        SELECT @org_r, n FROM (VALUES
-            (N'Customer KYC via Absher'),
-            (N'Payroll + GOSI/ZATCA filings'),
-            (N'Marketing analytics to Adobe'),
-            (N'Salesforce support tickets'),
-            (N'Wellness biometric records'),
-            (N'Anti-fraud ML training'),
-            (N'Loyalty programme'),
-            (N'Mortgage origination'),
-            (N'Mobile-banking app telemetry'),
-            (N'Branch CCTV footage')
-        ) AS x (n);
-    END TRY
-    BEGIN CATCH
-        PRINT 'Skipped privacy_lc.ropa_activities — schema mismatch.';
-    END CATCH
-END
+
+-- ============================================================================================
+-- F2-77 (2026-08-06) — THIS SEED WAS REMOVED BECAUSE IT COULD NEVER HAVE INSERTED A ROW.
+--
+-- Target: privacy_lc.ropa_activities (10 or fewer demo rows).
+--   * named a column that does not exist on the table: activity_name
+--   * omitted required columns (NOT NULL, no DEFAULT): external_id, lawful_basis, name_ar, name_en, purposes_ar, purposes_en
+--
+-- The block carried `BEGIN TRY … BEGIN CATCH PRINT '… schema mismatch.'` and the comment
+-- "Schema may differ; … let the rest default. Guarded inserts with TRY." Both halves of
+-- that belief are false:
+--
+--   1. `Invalid column name` is a COMPILE-TIME binding error for the entire batch. SQL
+--      Server's deferred name resolution covers a missing TABLE, never a missing COLUMN, so
+--      the batch fails to compile and nothing inside TRY runs. The CATCH has never printed.
+--   2. "let the rest default" is false — the omitted columns above have no DEFAULT.
+--
+-- So this is F2-112's shape: a control that cannot fire, protecting a statement that cannot
+-- run. Measured across V121/V122: 7 of 7 TRY-guarded inserts, all impossible.
+--
+-- Where dev's rows actually came from: the Python bootstrap (`setup_*_db.py` / 
+-- `seed_real_data.py`), not from here. That is F2-77's thesis — the folder was maintained as
+-- a description of a schema someone had in front of them rather than as an ordered history,
+-- and nothing ever ran it in order to notice.
+--
+-- Restored rather than repaired ON PURPOSE: repairing it means inventing ~50 rows of
+-- bilingual Saudi demo content, and a fabricated row is worse than an absent one because the
+-- file header counts it as delivered. If these tabs need demo data, seed them from a source
+-- that knows the schema.
+-- ============================================================================================
 GO
-
-DECLARE @org_dl BIGINT = 1;
-
-IF NOT EXISTS (SELECT 1 FROM privacy_lc.dpia_assessments WHERE organisation_id = @org_dl)
-BEGIN
-    BEGIN TRY
-        INSERT INTO privacy_lc.dpia_assessments (organisation_id, title_en)
-        SELECT @org_dl, n FROM (VALUES
-            (N'Wellness biometrics DPIA'),
-            (N'Anti-fraud ML DPIA'),
-            (N'Sentiment-AI survey DPIA'),
-            (N'Cross-border processor onboarding DPIA')
-        ) AS x (n);
-    END TRY
-    BEGIN CATCH
-        PRINT 'Skipped privacy_lc.dpia_assessments — schema mismatch.';
-    END CATCH
-END
+
+-- ============================================================================================
+-- F2-77 (2026-08-06) — THIS SEED WAS REMOVED BECAUSE IT COULD NEVER HAVE INSERTED A ROW.
+--
+-- Target: privacy_lc.dpia_assessments (10 or fewer demo rows).
+--   * named a column that does not exist on the table: title_en
+--   * omitted required columns (NOT NULL, no DEFAULT): external_id, ropa_id
+--
+-- The block carried `BEGIN TRY … BEGIN CATCH PRINT '… schema mismatch.'` and the comment
+-- "Schema may differ; … let the rest default. Guarded inserts with TRY." Both halves of
+-- that belief are false:
+--
+--   1. `Invalid column name` is a COMPILE-TIME binding error for the entire batch. SQL
+--      Server's deferred name resolution covers a missing TABLE, never a missing COLUMN, so
+--      the batch fails to compile and nothing inside TRY runs. The CATCH has never printed.
+--   2. "let the rest default" is false — the omitted columns above have no DEFAULT.
+--
+-- So this is F2-112's shape: a control that cannot fire, protecting a statement that cannot
+-- run. Measured across V121/V122: 7 of 7 TRY-guarded inserts, all impossible.
+--
+-- Where dev's rows actually came from: the Python bootstrap (`setup_*_db.py` / 
+-- `seed_real_data.py`), not from here. That is F2-77's thesis — the folder was maintained as
+-- a description of a schema someone had in front of them rather than as an ordered history,
+-- and nothing ever ran it in order to notice.
+--
+-- Restored rather than repaired ON PURPOSE: repairing it means inventing ~50 rows of
+-- bilingual Saudi demo content, and a fabricated row is worse than an absent one because the
+-- file header counts it as delivered. If these tabs need demo data, seed them from a source
+-- that knows the schema.
+-- ============================================================================================
 GO
 
 -- ══════════════════════════════════════════════════════════════════
@@ -186,46 +201,65 @@ BEGIN
     (CONCAT('AST-', NEWID()), @org_a, N'Backup Storage — Tape Vault',      N'INFRASTRUCTURE', N'CRITICAL',   N'IT Operations', N'Backup Team',    N'Riyadh DC2',  NULL,           N'PROD',  N'CRITICAL', N'OPERATIONAL', DATEADD(DAY, -2,  GETUTCDATE()), 0);
 END
 GO
-
--- (Cyber LC assessments/incidents/threat_intel — schema varies, use TRY blocks)
-
-DECLARE @org_ci BIGINT = 1;
-
-BEGIN TRY
-    IF NOT EXISTS (SELECT 1 FROM cyber_lc.cyber_incidents WHERE organisation_id = @org_ci)
-    BEGIN
-        INSERT INTO cyber_lc.cyber_incidents (organisation_id, title_en)
-        SELECT @org_ci, n FROM (VALUES
-            (N'Phishing campaign — finance team'),
-            (N'EDR detection — workstation 47'),
-            (N'Stolen credentials — VPN portal'),
-            (N'Cloud misconfig — S3 bucket'),
-            (N'Supplier breach — third-party SaaS')
-        ) AS x(n);
-    END
-END TRY
-BEGIN CATCH
-    PRINT 'Skipped cyber_lc.cyber_incidents — schema mismatch.';
-END CATCH
+
+-- ============================================================================================
+-- F2-77 (2026-08-06) — THIS SEED WAS REMOVED BECAUSE IT COULD NEVER HAVE INSERTED A ROW.
+--
+-- Target: cyber_lc.cyber_incidents (10 or fewer demo rows).
+--   * omitted required columns (NOT NULL, no DEFAULT): classification, external_id, severity, title_ar
+--
+-- The block carried `BEGIN TRY … BEGIN CATCH PRINT '… schema mismatch.'` and the comment
+-- "Schema may differ; … let the rest default. Guarded inserts with TRY." Both halves of
+-- that belief are false:
+--
+--   1. `Invalid column name` is a COMPILE-TIME binding error for the entire batch. SQL
+--      Server's deferred name resolution covers a missing TABLE, never a missing COLUMN, so
+--      the batch fails to compile and nothing inside TRY runs. The CATCH has never printed.
+--   2. "let the rest default" is false — the omitted columns above have no DEFAULT.
+--
+-- So this is F2-112's shape: a control that cannot fire, protecting a statement that cannot
+-- run. Measured across V121/V122: 7 of 7 TRY-guarded inserts, all impossible.
+--
+-- Where dev's rows actually came from: the Python bootstrap (`setup_*_db.py` / 
+-- `seed_real_data.py`), not from here. That is F2-77's thesis — the folder was maintained as
+-- a description of a schema someone had in front of them rather than as an ordered history,
+-- and nothing ever ran it in order to notice.
+--
+-- Restored rather than repaired ON PURPOSE: repairing it means inventing ~50 rows of
+-- bilingual Saudi demo content, and a fabricated row is worse than an absent one because the
+-- file header counts it as delivered. If these tabs need demo data, seed them from a source
+-- that knows the schema.
+-- ============================================================================================
 GO
-
-BEGIN TRY
-    IF NOT EXISTS (SELECT 1 FROM cyber_lc.threat_intel WHERE organisation_id = 1)
-    BEGIN
-        INSERT INTO cyber_lc.threat_intel (organisation_id, title_en)
-        SELECT 1, n FROM (VALUES
-            (N'Lazarus-aligned spear-phishing targeting KSA banks'),
-            (N'CVE-2026-1142 — RCE in widely-used web framework'),
-            (N'Ransomware-as-a-service group "DarkBank" active in MENA'),
-            (N'Supply-chain compromise on popular IT-monitoring vendor'),
-            (N'Saudi-language smishing campaign during Ramadan'),
-            (N'Nation-state APT-32 tooling update — new IOCs')
-        ) AS x(n);
-    END
-END TRY
-BEGIN CATCH
-    PRINT 'Skipped cyber_lc.threat_intel — schema mismatch.';
-END CATCH
+
+-- ============================================================================================
+-- F2-77 (2026-08-06) — THIS SEED WAS REMOVED BECAUSE IT COULD NEVER HAVE INSERTED A ROW.
+--
+-- Target: cyber_lc.threat_intel (10 or fewer demo rows).
+--   * omitted required columns (NOT NULL, no DEFAULT): external_id, severity, title_ar
+--
+-- The block carried `BEGIN TRY … BEGIN CATCH PRINT '… schema mismatch.'` and the comment
+-- "Schema may differ; … let the rest default. Guarded inserts with TRY." Both halves of
+-- that belief are false:
+--
+--   1. `Invalid column name` is a COMPILE-TIME binding error for the entire batch. SQL
+--      Server's deferred name resolution covers a missing TABLE, never a missing COLUMN, so
+--      the batch fails to compile and nothing inside TRY runs. The CATCH has never printed.
+--   2. "let the rest default" is false — the omitted columns above have no DEFAULT.
+--
+-- So this is F2-112's shape: a control that cannot fire, protecting a statement that cannot
+-- run. Measured across V121/V122: 7 of 7 TRY-guarded inserts, all impossible.
+--
+-- Where dev's rows actually came from: the Python bootstrap (`setup_*_db.py` / 
+-- `seed_real_data.py`), not from here. That is F2-77's thesis — the folder was maintained as
+-- a description of a schema someone had in front of them rather than as an ordered history,
+-- and nothing ever ran it in order to notice.
+--
+-- Restored rather than repaired ON PURPOSE: repairing it means inventing ~50 rows of
+-- bilingual Saudi demo content, and a fabricated row is worse than an absent one because the
+-- file header counts it as delivered. If these tabs need demo data, seed them from a source
+-- that knows the schema.
+-- ============================================================================================
 GO
 
 -- ══════════════════════════════════════════════════════════════════
@@ -277,63 +311,66 @@ BEGIN
       FROM r;
 END
 GO
-
-DECLARE @org_kb BIGINT = 1;
-
-IF NOT EXISTS (SELECT 1 FROM risk_lc.kri_breaches WHERE organisation_id = @org_kb)
-BEGIN
-    BEGIN TRY
-        INSERT INTO risk_lc.kri_breaches (organisation_id, risk_id, kri_code, kri_name_en,
-                                          threshold_value, actual_value, direction, detected_at,
-                                          status, is_deleted)
-        SELECT 1, r.id,
-               CONCAT('KRI-', RIGHT('000' + CAST(r.id AS VARCHAR(4)), 3)),
-               CONCAT('Auto-KRI for risk ', r.id),
-               CAST(80.00 AS DECIMAL(10,2)),
-               CAST(92.00 + (r.id % 5) * 2 AS DECIMAL(10,2)),
-               N'GREATER_THAN', DATEADD(DAY, -(5 + r.id), GETUTCDATE()),
-               CASE (r.id % 4)
-                 WHEN 0 THEN N'OPEN'
-                 WHEN 1 THEN N'ACKNOWLEDGED'
-                 WHEN 2 THEN N'IN_TREATMENT'
-                 ELSE        N'RESOLVED'
-               END,
-               0
-          FROM (SELECT TOP 6 id FROM risk.risks WHERE organisation_id = 1 AND is_deleted = 0 ORDER BY id) r;
-    END TRY
-    BEGIN CATCH
-        PRINT 'Skipped risk_lc.kri_breaches — schema mismatch.';
-    END CATCH
-END
+
+-- ============================================================================================
+-- F2-77 (2026-08-06) — THIS SEED WAS REMOVED BECAUSE IT COULD NEVER HAVE INSERTED A ROW.
+--
+-- Target: risk_lc.kri_breaches (10 or fewer demo rows).
+--   * omitted required columns (NOT NULL, no DEFAULT): current_owner, external_id, kri_name_ar
+--
+-- The block carried `BEGIN TRY … BEGIN CATCH PRINT '… schema mismatch.'` and the comment
+-- "Schema may differ; … let the rest default. Guarded inserts with TRY." Both halves of
+-- that belief are false:
+--
+--   1. `Invalid column name` is a COMPILE-TIME binding error for the entire batch. SQL
+--      Server's deferred name resolution covers a missing TABLE, never a missing COLUMN, so
+--      the batch fails to compile and nothing inside TRY runs. The CATCH has never printed.
+--   2. "let the rest default" is false — the omitted columns above have no DEFAULT.
+--
+-- So this is F2-112's shape: a control that cannot fire, protecting a statement that cannot
+-- run. Measured across V121/V122: 7 of 7 TRY-guarded inserts, all impossible.
+--
+-- Where dev's rows actually came from: the Python bootstrap (`setup_*_db.py` / 
+-- `seed_real_data.py`), not from here. That is F2-77's thesis — the folder was maintained as
+-- a description of a schema someone had in front of them rather than as an ordered history,
+-- and nothing ever ran it in order to notice.
+--
+-- Restored rather than repaired ON PURPOSE: repairing it means inventing ~50 rows of
+-- bilingual Saudi demo content, and a fabricated row is worse than an absent one because the
+-- file header counts it as delivered. If these tabs need demo data, seed them from a source
+-- that knows the schema.
+-- ============================================================================================
 GO
-
-BEGIN TRY
-    IF NOT EXISTS (SELECT 1 FROM risk_lc.activity_log WHERE organisation_id = 1)
-    BEGIN
-        INSERT INTO risk_lc.activity_log (organisation_id, risk_id, action, actor, occurred_at)
-        SELECT 1, r.id,
-               CASE ((r.id + n) % 6)
-                 WHEN 0 THEN N'CREATED'
-                 WHEN 1 THEN N'ASSESSED'
-                 WHEN 2 THEN N'TREATMENT_PLANNED'
-                 WHEN 3 THEN N'KRI_BREACH'
-                 WHEN 4 THEN N'OWNER_REASSIGNED'
-                 ELSE        N'STATUS_CHANGED'
-               END,
-               CASE ((r.id + n) % 4)
-                 WHEN 0 THEN N'Khalid Al-Mutairi'
-                 WHEN 1 THEN N'Layla Al-Rashid'
-                 WHEN 2 THEN N'Saad Al-Subaie'
-                 ELSE        N'Reema Al-Qahtani'
-               END,
-               DATEADD(DAY, -(r.id * 3 + n), GETUTCDATE())
-          FROM (SELECT TOP 5 id FROM risk.risks WHERE organisation_id = 1 AND is_deleted = 0 ORDER BY id) r
-          CROSS JOIN (VALUES (1),(2),(3),(4),(5)) v(n);
-    END
-END TRY
-BEGIN CATCH
-    PRINT 'Skipped risk_lc.activity_log — schema mismatch.';
-END CATCH
+
+-- ============================================================================================
+-- F2-77 (2026-08-06) — THIS SEED WAS REMOVED BECAUSE IT COULD NEVER HAVE INSERTED A ROW.
+--
+-- Target: risk_lc.activity_log (10 or fewer demo rows).
+--   * named a column that does not exist on the table: actor, occurred_at, risk_id
+--   * omitted required columns (NOT NULL, no DEFAULT): entity_id, entity_type, user_id
+--
+-- The block carried `BEGIN TRY … BEGIN CATCH PRINT '… schema mismatch.'` and the comment
+-- "Schema may differ; … let the rest default. Guarded inserts with TRY." Both halves of
+-- that belief are false:
+--
+--   1. `Invalid column name` is a COMPILE-TIME binding error for the entire batch. SQL
+--      Server's deferred name resolution covers a missing TABLE, never a missing COLUMN, so
+--      the batch fails to compile and nothing inside TRY runs. The CATCH has never printed.
+--   2. "let the rest default" is false — the omitted columns above have no DEFAULT.
+--
+-- So this is F2-112's shape: a control that cannot fire, protecting a statement that cannot
+-- run. Measured across V121/V122: 7 of 7 TRY-guarded inserts, all impossible.
+--
+-- Where dev's rows actually came from: the Python bootstrap (`setup_*_db.py` / 
+-- `seed_real_data.py`), not from here. That is F2-77's thesis — the folder was maintained as
+-- a description of a schema someone had in front of them rather than as an ordered history,
+-- and nothing ever ran it in order to notice.
+--
+-- Restored rather than repaired ON PURPOSE: repairing it means inventing ~50 rows of
+-- bilingual Saudi demo content, and a fabricated row is worse than an absent one because the
+-- file header counts it as delivered. If these tabs need demo data, seed them from a source
+-- that knows the schema.
+-- ============================================================================================
 GO
 
 -- ══════════════════════════════════════════════════════════════════
@@ -359,21 +396,36 @@ BEGIN
     (CONCAT('RC-', NEWID()), @org_rc, N'SAMA',   N'SAMA-CRMG-2026-01',N'SAMA cyber risk-management guideline refresh',       N'تحديث إرشادات إدارة المخاطر السيبرانية', N'Refreshed cyber risk-management guideline aligning with NCA ECC v2.0.', N'تحديث الإرشادات بالتوافق مع NCA ECC v2.0.', DATEADD(DAY, -90, CAST(GETUTCDATE() AS DATE)), DATEADD(DAY,   0, CAST(GETUTCDATE() AS DATE)), N'CLOSED',          N'APPLICABLE',      4, GETUTCDATE(), 0);
 END
 GO
-
--- ══════════════════════════════════════════════════════════════════
--- (8) nca_ecc.filings + board_pack.packs (shallow schemas — TRY blocks)
--- ══════════════════════════════════════════════════════════════════
-
-BEGIN TRY
-    IF NOT EXISTS (SELECT 1 FROM nca_ecc.filings WHERE organisation_id = 1)
-    BEGIN
-        INSERT INTO nca_ecc.filings (organisation_id, filing_year, status)
-        SELECT 1, y, s FROM (VALUES (2023,N'ACCEPTED'),(2024,N'ACCEPTED'),(2025,N'ACCEPTED'),(2026,N'IN_PROGRESS')) AS x(y,s);
-    END
-END TRY
-BEGIN CATCH
-    PRINT 'Skipped nca_ecc.filings — schema mismatch.';
-END CATCH
+
+-- ============================================================================================
+-- F2-77 (2026-08-06) — THIS SEED WAS REMOVED BECAUSE IT COULD NEVER HAVE INSERTED A ROW.
+--
+-- Target: nca_ecc.filings (10 or fewer demo rows).
+--   * named a column that does not exist on the table: filing_year
+--   * omitted required columns (NOT NULL, no DEFAULT): drafted_by, external_id, fiscal_year
+--
+-- The block carried `BEGIN TRY … BEGIN CATCH PRINT '… schema mismatch.'` and the comment
+-- "Schema may differ; … let the rest default. Guarded inserts with TRY." Both halves of
+-- that belief are false:
+--
+--   1. `Invalid column name` is a COMPILE-TIME binding error for the entire batch. SQL
+--      Server's deferred name resolution covers a missing TABLE, never a missing COLUMN, so
+--      the batch fails to compile and nothing inside TRY runs. The CATCH has never printed.
+--   2. "let the rest default" is false — the omitted columns above have no DEFAULT.
+--
+-- So this is F2-112's shape: a control that cannot fire, protecting a statement that cannot
+-- run. Measured across V121/V122: 7 of 7 TRY-guarded inserts, all impossible.
+--
+-- Where dev's rows actually came from: the Python bootstrap (`setup_*_db.py` / 
+-- `seed_real_data.py`), not from here. That is F2-77's thesis — the folder was maintained as
+-- a description of a schema someone had in front of them rather than as an ordered history,
+-- and nothing ever ran it in order to notice.
+--
+-- Restored rather than repaired ON PURPOSE: repairing it means inventing ~50 rows of
+-- bilingual Saudi demo content, and a fabricated row is worse than an absent one because the
+-- file header counts it as delivered. If these tabs need demo data, seed them from a source
+-- that knows the schema.
+-- ============================================================================================
 GO
 
 DECLARE @org_bp BIGINT = 1;
@@ -382,12 +434,15 @@ IF NOT EXISTS (SELECT 1 FROM board_pack.packs WHERE organisation_id = @org_bp)
 BEGIN
     INSERT INTO board_pack.packs
         (external_id, organisation_id, title_en, title_ar, period_label,
-         period_start, period_end, audience,
+         period_start, period_end, audience, drafted_by,
+         -- F2-77: drafted_by is NOT NULL with no DEFAULT and was omitted, so this insert
+         -- failed with SQL 515 on the first run of the chain. The value is the one every live
+         -- row already carries rather than a new invention.
          risk_summary_json, appetite_breaches_json, audit_engagements_json,
          incidents_json, pdpl_summary_json, ccm_summary_json, sla_summary_json)
     VALUES
     (CONCAT('BP-', NEWID()), @org_bp, N'Q1 2026 GRC Board Pack', N'حقيبة المجلس — الربع الأول ٢٠٢٦', N'2026-Q1',
-     '2026-01-01', '2026-03-31', N'BOARD',
+     '2026-01-01', '2026-03-31', N'BOARD', N'board.secretary@tss.com.sa',
      '{"openHighRisks":12,"overdueCapa":4,"appetiteBreaches":3}',
      '{"breachesQ1":3}',
      '{"engagements":4}',
@@ -396,7 +451,7 @@ BEGIN
      '{"complianceScore":82}',
      '{"breachedSlas":2}'),
     (CONCAT('BP-', NEWID()), @org_bp, N'Q4 2025 GRC Board Pack', N'حقيبة المجلس — الربع الرابع ٢٠٢٥', N'2025-Q4',
-     '2025-10-01', '2025-12-31', N'BOARD',
+     '2025-10-01', '2025-12-31', N'BOARD', N'board.secretary@tss.com.sa',
      '{"openHighRisks":15,"overdueCapa":6,"appetiteBreaches":4}',
      '{"breachesQ4":4}',
      '{"engagements":5}',
@@ -405,7 +460,7 @@ BEGIN
      '{"complianceScore":80}',
      '{"breachedSlas":3}'),
     (CONCAT('BP-', NEWID()), @org_bp, N'Q3 2025 GRC Board Pack', N'حقيبة المجلس — الربع الثالث ٢٠٢٥', N'2025-Q3',
-     '2025-07-01', '2025-09-30', N'EXEC',
+     '2025-07-01', '2025-09-30', N'EXEC', N'board.secretary@tss.com.sa',
      '{"openHighRisks":18,"overdueCapa":8,"appetiteBreaches":5}',
      '{"breachesQ3":5}',
      '{"engagements":3}',
@@ -414,7 +469,7 @@ BEGIN
      '{"complianceScore":77}',
      '{"breachedSlas":4}'),
     (CONCAT('BP-', NEWID()), @org_bp, N'2025 Annual Risk Committee Report', N'تقرير لجنة المخاطر السنوي ٢٠٢٥', N'2025',
-     '2025-01-01', '2025-12-31', N'RISK_COMMITTEE',
+     '2025-01-01', '2025-12-31', N'RISK_COMMITTEE', N'board.secretary@tss.com.sa',
      '{"openHighRisks":12,"overdueCapa":4,"appetiteBreaches":12}',
      '{"breaches2025":12}',
      '{"engagements":15}',

@@ -77,7 +77,7 @@ CREATE TABLE socops.security_event (
 CREATE INDEX ix_security_event_org_status ON socops.security_event(organisation_id, status) WHERE is_deleted = 0;
 CREATE INDEX ix_security_event_org_event_time ON socops.security_event(organisation_id, event_time DESC) WHERE is_deleted = 0;
 CREATE INDEX ix_security_event_org_severity ON socops.security_event(organisation_id, severity) WHERE is_deleted = 0;
-CREATE INDEX ix_security_event_sla_due ON socops.security_event(organisation_id, sla_due_at) WHERE is_deleted = 0 AND status NOT IN ('RESOLVED', 'FALSE_POSITIVE');
+CREATE INDEX ix_security_event_sla_due ON socops.security_event(organisation_id, sla_due_at) WHERE is_deleted = 0 AND status <> 'RESOLVED' AND status <> 'FALSE_POSITIVE';
 GO
 
 -- ════════════════════════════════════════════════════════════════════════
