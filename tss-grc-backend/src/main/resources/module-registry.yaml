@@ -182,9 +182,9 @@ modules:
 
   # ── BASE — mandatory, licence-row-less, never annotated with @RequireModule (ADR-018 R4) ──────
   platform:            { homing: base, schemas: [platform],  workspace: null }
-  iam:                 { homing: base, schemas: [iam],       workspace: 12 }
+  iam:                 { homing: base, schemas: [iam],       workspace: 12, carve_outs: { governance: ACCESS_GOV } }
   auth:                { homing: base, schemas: [platform],  workspace: null }
-  admin:               { homing: base, schemas: [admin],     workspace: 12 }
+  admin:               { homing: base, schemas: [admin],     workspace: 12, carve_outs: { committee: BOARD } }
   evidence:            { homing: base, schemas: [evidence],  workspace: null }
   attachment:          { homing: base, schemas: [platform],  workspace: null }
   signature:           { homing: base, schemas: [platform, signature], workspace: null }

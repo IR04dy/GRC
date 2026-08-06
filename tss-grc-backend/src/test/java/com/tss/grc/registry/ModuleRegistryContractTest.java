@@ -172,6 +172,76 @@ class ModuleRegistryContractTest {
             .containsAll(homedInCode);
     }
 
+    /**
+     * F2-57 — a SKU whose boundary is not a package boundary must still be expressible here.
+     *
+     * <p><b>The gap this closes.</b> Two of the fifteen ratified SKUs are carved out of packages that
+     * are otherwise Base: {@code BOARD} covers {@code board_pack} (6 files) <b>and
+     * {@code admin.committee}</b> (51 files inside the kernel {@code admin} package), and
+     * {@code ACCESS_GOV} is {@code iam.governance} (22 files) with <b>no top-level package at all</b>.
+     * {@link SkuRegistry#CARVE_OUTS} has enforced this correctly since ADR-018 R6 — but
+     * {@link #theHomingAgreesWithSkuRegistryInBothDirections()} compares <b>top-level packages only</b>,
+     * so no test consulted that map. A carve-out could be added or deleted in code and nothing would
+     * notice, while the registry went on declaring {@code admin: homing: base} over 51 files of paid
+     * content.
+     *
+     * <p>🔑 <b>Why that is worth a test rather than a comment.</b> The registry is what a reader
+     * consults to answer "what does this tenant pay for". A register that <i>cannot express</i> a
+     * truth reads as asserting its absence — the same shape as F2-140 (tables no entity maps) and
+     * F2-141 (Arabic columns no entity maps), where the instrument's silence was mistaken for a clean
+     * result. So the YAML now carries {@code carve_outs}, and this asserts it against the code in both
+     * directions, exactly as the top-level homing is asserted, and for the same stated reason: the
+     * registry must not become a second authority that drifts (RC-A).
+     *
+     * <p>It also asks the question this programme asks of every control — <i>does the thing it names
+     * exist?</i> A carve-out pointing at a directory that is not there would be a declaration about
+     * nothing, so the sub-package is checked on disk.
+     */
+    @Test
+    void everySkuCarveOutIsDeclaredInBothPlacesAndExistsOnDisk() throws IOException {
+        Map<String, Map<String, Object>> mods = modules();
+
+        Map<String, String> fromYaml = new TreeMap<>();
+        for (var e : mods.entrySet()) {
+            Object raw = e.getValue().get("carve_outs");
+            if (raw == null) {
+                continue;
+            }
+            assertThat(raw).as("carve_outs on %s must be a mapping of sub-package to SKU", e.getKey())
+                .isInstanceOf(Map.class);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> carves = (Map<String, Object>) raw;
+            carves.forEach((sub, sku) -> fromYaml.put(e.getKey() + "." + sub, String.valueOf(sku)));
+        }
+
+        Map<String, String> fromCode = new TreeMap<>(SkuRegistry.CARVE_OUTS);
+
+        assertThat(fromYaml).as(
+            "%s and SkuRegistry.CARVE_OUTS must agree in BOTH directions. These are the SKUs whose "
+            + "boundary is not a package boundary, and they are the ones a package-keyed reading gets "
+            + "wrong: BOARD also covers admin.committee (51 files), ACCESS_GOV is iam.governance (22 "
+            + "files) and has no top-level package. Until F2-57 the registry could not express either, "
+            + "so it declared `admin: homing: base` over 51 files of paid content and no test "
+            + "disagreed. Differences:%n%s",
+            REGISTRY, diff(fromYaml, fromCode))
+            .isEqualTo(fromCode);
+
+        // The floor: if this ever reads empty, the carve-outs did not vanish — the scan did.
+        assertThat(fromCode).as(
+            "SkuRegistry.CARVE_OUTS is empty. Two carve-outs are ratified by ADR-018 R6; an empty map "
+            + "here means the constant was gutted, not that the boundaries became package-shaped.")
+            .isNotEmpty();
+
+        for (String key : fromCode.keySet()) {
+            Path dir = Path.of("src", "main", "java", "com", "tss", "grc", "module")
+                .resolve(key.replace('.', '/'));
+            assertThat(Files.isDirectory(dir)).as(
+                "carve-out %s names %s, which is not a directory. A carve-out that points at nothing "
+                + "is a paid boundary declared over no code.", key, dir)
+                .isTrue();
+        }
+    }
+
     @Test
     void everySchemaAnEntityNamesIsDeclaredByItsOwnPackage() throws IOException {
         Map<String, Map<String, Object>> mods = modules();

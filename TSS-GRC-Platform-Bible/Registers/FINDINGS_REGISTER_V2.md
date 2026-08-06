@@ -2771,6 +2771,24 @@ Start-Service TssGrcBackend
 | **References** | [[F2-38]] · [[F2-137]] · [[F2-42]] · [[F2-139]] · `lib/notificationOutbox` |
 | **Lesson** | **A client-side store with a delivery lifecycle is not a mock, it is a false claim with a schema.** The tell is not the fake data — it is that `markSent` exists at all: nothing that actually sends a message needs the sender to mark it sent |
 
+## F2-57 — Two SKUs have boundaries that are not package boundaries, and the register could not say so
+
+|  |  |
+|---|---|
+| **ID** | F2-57 *(found ratifying the SKU catalogue, 2026-07-30; closed 2026-08-06)* |
+| **Category** | Commercial register integrity — an instrument that cannot express a truth |
+| **Severity** | **P3** — no runtime exposure (entitlement enforces correctly), but the document a reader consults to answer *"what does this tenant pay for"* was wrong about 73 files |
+| **Current State** | ✔ **CLOSED 2026-08-06** (no migration). `carve_outs` on the two affected registry entries, asserted against `SkuRegistry.CARVE_OUTS` in both directions and checked on disk |
+| **⚠ Half the row was already true** | The *enforcement* half has been correct since **ADR-018 R6**: `SkuRegistry.CARVE_OUTS` maps `admin.committee → BOARD` and `iam.governance → ACCESS_GOV`, and is consulted **before** `PACKAGE_TO_SKU` precisely because the parent package is Base in both cases. ⚠ Which is why this row could not be closed by reading its own text — the fix it implies was already shipped, and the defect it names is one layer up |
+| **The actual defect** | `theHomingAgreesWithSkuRegistryInBothDirections()` compares **top-level packages only**. `SkuRegistry.CARVE_OUTS` is consulted by **no test**. So a carve-out could be added or deleted in code and nothing would notice, while `module-registry.yaml` went on declaring `admin: homing: base` over **51 files** of paid `BOARD` content, and `ACCESS_GOV` — 22 files in `iam/governance` — appeared nowhere as a boundary at all |
+| **The measurement that makes it commercial, not cosmetic** | `BOARD` = `board_pack` (**6 files**) **+** `admin/committee` (**51 files, inside a kernel package**). `ACCESS_GOV` = `iam/governance` (**22 files**) and **no top-level package**. **73 of the 79 files behind these two paid SKUs live under a package the register called Base** |
+| **🔑 Why this is a class, not a one-off** | **A register that cannot express a truth reads as asserting its absence.** Third instance in two days: [[F2-140]] (live tables no entity maps, so a DDL ratchet could not see them), [[F2-141]] (Arabic columns no entity maps, so the bilingual ratchet's 157 was a lower bound), and this. In each case the instrument was *correct about its own population* and was read as a statement about the platform |
+| **What shipped** | `carve_outs` on `admin` and `iam`, plus `everySkuCarveOutIsDeclaredInBothPlacesAndExistsOnDisk()`. It **asserts** against the code and never re-declares it: a registry that restates the homing becomes the second authority it exists to prevent, which is **RC-A**, the root cause this programme's queue is ordered by. ➕ Includes a **floor** — if `SkuRegistry.CARVE_OUTS` ever reads empty, the carve-outs did not become package-shaped, the constant was gutted |
+| **➕ And it asks whether the thing exists** | A carve-out naming a sub-package that is not a directory is *a paid boundary declared over no code*, so both are checked against disk. That is the question four findings on this programme have turned on: **what does this compare, and does that data exist?** |
+| **Verification** | Suite **3,347/0/0**; contract test 6 → 7 checks. **Mutation-proven 3/3.** ⚠ The third needed isolating: renaming the sub-package in the YAML alone trips the *agreement* assertion and **masks** the directory check, so both sides had to be mutated consistently. *Two assertions in one test let the first hide the second* — second time this session |
+| **References** | `SkuRegistry.CARVE_OUTS` · `everySkuCarveOutIsDeclaredInBothPlacesAndExistsOnDisk()` · `module-registry.yaml` · ADR-018 R6 · [[F2-01]] · [[F2-140]] · [[F2-141]] |
+| **Lesson** | **Ask what a register can express before trusting what it says.** This one was internally consistent, CI-enforced and green, and wrong about 73 files — because the question *"which package is this SKU"* has no answer for two of the fifteen, and a schema with one row per package cannot represent that. **Enforcement being right is not the same as the record being right, and only the record is what a customer or an auditor reads** |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.
