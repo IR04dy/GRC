@@ -22,6 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -979,6 +980,176 @@ class SchemaContractRatchetTest {
             out.size(), FLYWAY_BASELINE, MIN_TABLES_CREATED_ABOVE_BASELINE)
             .isGreaterThanOrEqualTo(MIN_TABLES_CREATED_ABOVE_BASELINE);
         return out;
+    }
+
+    // ── F2-09 — does the migration folder build the schema the platform runs? ──
+
+    /**
+     * The three tables live in dev that <b>no migration creates</b> — F2-140's residue, and after
+     * V361 closed the column half, all of it.
+     *
+     * <p>A <b>pinned set, not a count</b>. A count of three tolerates any three, so swapping one for
+     * a newly-arrived bootstrap-only table would keep a count-ratchet green — and "a new table the
+     * migrations do not create" is the entire defect. Each of these is authorised only by the reason
+     * beside it in the register: no JPA entity, no Java reference, sole writer a seed script.
+     * ADR-017 D-2 decided against adding DDL for them, so they stay listed here rather than fixed.
+     */
+    private static final Set<String> LIVE_WITH_NO_CREATING_MIGRATION = Set.of(
+        "compliance.compliance_assessments",   // 10 rows dev / 10 prod, seed_gov_compliance.py
+        "compliance.compliance_findings",      // 18 / 18
+        "compliance.evidence_items");          // 83 / 83
+
+    /**
+     * The converse: created by a migration and absent from dev. Correct history, checked — E-E's KRI
+     * consolidation dropped these three and the drop lives in a bootstrap script, so `V1` still
+     * creates them and dev no longer has them.
+     */
+    private static final Set<String> CREATED_BUT_RETIRED_FROM_DEV = Set.of(
+        "risk.kri_breach_events",
+        "risk.kri_definitions",
+        "risk.kri_readings");
+
+    /** 470 today, in both directions. Under this and a scan broke rather than a platform shrank. */
+    private static final int MIN_CONVERGENCE_POPULATION = 400;
+
+    /**
+     * F2-09 — every table the platform actually has must be created by some migration.
+     *
+     * <p>The measurement F2-09 was written for needs two databases: one built by Flyway from `V1`,
+     * one bootstrapped by Python. {@code Appendix/scripts/schema_convergence.py} does that and takes
+     * minutes. This is the hermetic half, and it answers the same question from committed evidence
+     * only — the register (a generated snapshot of both live schemas) against the migration folder —
+     * so it runs in {@code mvn -o clean package} with no SQL Server. What it cannot see is column
+     * definitions and constraint bodies; that is why the script still exists.
+     *
+     * <p>🔑 <b>Why a set-based check and not the obvious count.</b> Measured 2026-08-06: the
+     * migration set CREATEs <b>470</b> distinct tables and the register lists <b>470</b> live in dev.
+     * The totals are identical <em>and three differ in each direction</em>. Anyone comparing the two
+     * numbers — the cheapest possible version of this test — would have concluded the folder was
+     * complete, which is precisely how F2-70 read as closed while F2-140 was true.
+     */
+    @Test
+    void everyLiveTableIsCreatedBySomeMigration() throws IOException {
+        Set<String> created = createdByMigration().keySet();
+        Set<String> live = liveTablesPerRegister();
+
+        List<String> residue = live.stream().filter(t -> !created.contains(t)).sorted().toList();
+
+        assertThat(residue).as("""
+            %d live table(s) are created by no migration in the folder, and this set is pinned. \
+            A fresh installation provisioned from the migrations would not have them.
+
+            Either add the DDL, or — if the table is genuinely bootstrap-only ballast that no Java \
+            reads — regenerate the register and add it to LIVE_WITH_NO_CREATING_MIGRATION with its \
+            reason. Do not raise a count: the population is named on purpose, because a count of \
+            three tolerates any three.
+
+            unexpected: %s""".formatted(residue.size(),
+                residue.stream().filter(t -> !LIVE_WITH_NO_CREATING_MIGRATION.contains(t)).toList()))
+            .containsExactlyInAnyOrderElementsOf(LIVE_WITH_NO_CREATING_MIGRATION);
+    }
+
+    /**
+     * The other direction, separately — because two assertions in one method let the first mask the
+     * second, which has happened three times in this programme.
+     */
+    @Test
+    void everyMigrationCreatedTableIsLiveOrDeliberatelyRetired() throws IOException {
+        Set<String> created = createdByMigration().keySet();
+        Set<String> live = liveTablesPerRegister();
+
+        List<String> orphans = created.stream().filter(t -> !live.contains(t)).sorted().toList();
+
+        assertThat(orphans).as("""
+            %d table(s) are created by a migration and are absent from the live dev schema. Each is \
+            either a table dropped after its CREATE shipped — in which case the drop belongs in a \
+            migration, not only in a bootstrap script — or a CREATE nobody ever ran.
+
+            unexpected: %s""".formatted(orphans.size(),
+                orphans.stream().filter(t -> !CREATED_BUT_RETIRED_FROM_DEV.contains(t)).toList()))
+            .containsExactlyInAnyOrderElementsOf(CREATED_BUT_RETIRED_FROM_DEV);
+    }
+
+    /**
+     * The residue is tolerable <b>only</b> because nothing reads those tables.
+     *
+     * <p>This is the assertion that makes the toleration honest rather than permanent. The day one of
+     * the three gains a JPA entity or a Java reference, "no migration creates it" stops being dead
+     * ballast and becomes a fresh install that cannot serve a request — F2-146's shape exactly, where
+     * thirteen columns `AuditFinding` maps by name were absent from every migration. The register
+     * counts those references, so the check costs nothing and fires on the commit that introduces the
+     * problem rather than on the first customer provisioning.
+     */
+    @Test
+    void nothingInTheResidueMayAcquireAReader() throws IOException {
+        List<String> nowRead = new ArrayList<>();
+        int checked = 0;
+
+        for (String[] f : registerRows()) {
+            String table = key(f[0].trim(), f[1].trim());
+            if (!LIVE_WITH_NO_CREATING_MIGRATION.contains(table)) {
+                continue;
+            }
+            checked++;
+            int jpa = parseCount(f[6]);
+            int refs = parseCount(f[7]);
+            if (jpa > 0 || refs > 0) {
+                nowRead.add("%s (jpa_files=%d, code_refs=%d)".formatted(table, jpa, refs));
+            }
+        }
+
+        assertThat(checked).as(
+            "Only %d of the %d pinned residue tables were found in the register. The register is "
+            + "stale or a name changed, and this test would otherwise check nothing.",
+            checked, LIVE_WITH_NO_CREATING_MIGRATION.size())
+            .isEqualTo(LIVE_WITH_NO_CREATING_MIGRATION.size());
+
+        assertThat(nowRead).as("""
+            %s now has a reader, and no migration creates it. That combination ships an installation \
+            where the code queries a table the schema does not have.
+
+            Write the DDL as a new migration and remove the table from \
+            LIVE_WITH_NO_CREATING_MIGRATION. Do not resolve this by deleting the entity unless the \
+            reference really was a mistake.""".formatted(nowRead))
+            .isEmpty();
+    }
+
+    /**
+     * Tables the register reports as present in dev.
+     *
+     * <p>{@code rows_dev} is {@code ABSENT} for a table JPA maps that neither database has (F2-64's
+     * population, 1 row today) and a number otherwise — <b>including 0</b>, which is a real, empty,
+     * existing table. ⚠ <b>45 of the 470 live tables are empty</b>, among them
+     * {@code bcm.crisis_comms_cascade} (F2-147) and six that pending migrations created in dev only.
+     * Treating "0 rows" as "does not exist" is the plausible tidy-up, and it moves all 45 into the
+     * orphan list — mutation-tested: the count goes 3 → 48. Emptiness is not absence.
+     *
+     * <p>Carries the anti-vacuity floor because both callers assert over a difference: an empty
+     * {@code live} makes the residue empty and the orphan list total.
+     */
+    private static Set<String> liveTablesPerRegister() throws IOException {
+        Set<String> out = new TreeSet<>();
+        for (String[] f : registerRows()) {
+            if (!"ABSENT".equalsIgnoreCase(f[4].trim())) {
+                out.add(key(f[0].trim(), f[1].trim()));
+            }
+        }
+        assertThat(out.size()).as(
+            "Only %d live tables read from the register. Under %d means a truncated register or a "
+            + "broken rows_dev read, and the convergence assertions would compare against nothing.",
+            out.size(), MIN_CONVERGENCE_POPULATION)
+            .isGreaterThanOrEqualTo(MIN_CONVERGENCE_POPULATION);
+        return out;
+    }
+
+    /** A register count cell — blank or non-numeric reads as 0 rather than throwing. */
+    private static int parseCount(String cell) {
+        String v = cell == null ? "" : cell.trim();
+        try {
+            return v.isEmpty() ? 0 : Integer.parseInt(v);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     /** The register's {@link #NO_CODE_CODES} rows as {@code schema.table} keys. */
