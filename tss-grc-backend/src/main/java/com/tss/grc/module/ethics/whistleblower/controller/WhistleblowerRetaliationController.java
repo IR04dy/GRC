@@ -36,9 +36,9 @@ public class WhistleblowerRetaliationController {
 
     private static final String READ_GUARD =
             "hasAnyRole('ETHICS_OFFICER','COMPLIANCE_OFFICER','INTERNAL_AUDITOR'," +
-            "'AUDIT_COMMITTEE_MEMBER','HR_DIRECTOR','PLATFORM_ADMIN')";
+            "'AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN')";
     private static final String WRITE_GUARD =
-            "hasAnyRole('HR_DIRECTOR','COMPLIANCE_OFFICER','PLATFORM_ADMIN')";
+            "hasAnyRole('COMPLIANCE_OFFICER','PLATFORM_ADMIN')";
 
     private final WhistleblowerRetaliationService service;
 
