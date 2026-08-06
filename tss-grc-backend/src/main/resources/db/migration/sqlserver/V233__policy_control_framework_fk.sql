@@ -41,7 +41,15 @@ BEGIN
     );
     CREATE INDEX ix_pdcl_doc ON policy.document_control_links (policy_document_id);
 END
-GO
+GO-- ⚠ F2-77 (2026-08-06): batch guarded on a spine-created table.
+-- compliance.frameworks is created by V341__spine_bootstrap_schema_tables.sql, which
+-- runs LATER than this file, so on a first run in version order it does not exist and this
+-- batch failed with "Invalid object name". A no-op is correct: on a fresh installation
+-- there is no legacy data to read. Guarded rather than reordered, because moving V341
+-- earlier would rewrite the schema history of every environment that already ran it.
+IF OBJECT_ID(N'compliance.frameworks', N'U') IS NOT NULL
+BEGIN
+
 
 -- Backfill framework_id from the free-text related_framework (exact name match).
 UPDATE d
@@ -50,6 +58,7 @@ UPDATE d
   JOIN compliance.frameworks f ON f.name_en = d.related_framework
  WHERE d.framework_id IS NULL
    AND d.related_framework IS NOT NULL;
+END
 GO
 
 -- Backfill control links from the free-text related_controls. Delimiters in the

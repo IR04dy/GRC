@@ -45,7 +45,15 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_policy_doc_fw_map_doc_fw_clause')
     CREATE UNIQUE INDEX ux_policy_doc_fw_map_doc_fw_clause
         ON policy.document_framework_mappings (document_id, framework_id, clause_ref) WHERE is_deleted = 0;
-GO
+GO-- ⚠ F2-77 (2026-08-06): batch guarded on a spine-created table.
+-- compliance.policies, compliance.policy_framework_mappings is created by V341__spine_bootstrap_schema_tables.sql, which
+-- runs LATER than this file, so on a first run in version order it does not exist and this
+-- batch failed with "Invalid object name". A no-op is correct: on a fresh installation
+-- there is no legacy data to read. Guarded rather than reordered, because moving V341
+-- earlier would rewrite the schema history of every environment that already ran it.
+IF OBJECT_ID(N'compliance.policies', N'U') IS NOT NULL AND OBJECT_ID(N'compliance.policy_framework_mappings', N'U') IS NOT NULL
+BEGIN
+
 
 -- Migrate the legacy mappings, resolving legacy policy_id -> canonical document_id
 -- through the external_id bridge (V232). organisation_id comes from the parent
@@ -77,4 +85,5 @@ WHERE m.is_deleted = 0
          AND ISNULL(x.clause_ref, N'~NULL~') COLLATE DATABASE_DEFAULT
            = ISNULL(LEFT(m.clause_ref, 100), N'~NULL~') COLLATE DATABASE_DEFAULT
   );
+END
 GO
