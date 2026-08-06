@@ -84,9 +84,15 @@ class FindingsRegisterCoverageTest {
 
     /**
      * Specs owed as measured on 2026-08-06: the plan references 137 distinct ids and the register
-     * carries 107, leaving 33; 31 after this slice wrote the specs for F2-78 and F2-79. May only decrease.
+     * carries 107, leaving 33; 31 after that slice wrote the specs for F2-78 and F2-79.
+     *
+     * <p><b>30 later the same day, and the way it got there is the point.</b> The F2-38 slice filed two
+     * new findings (F2-141, F2-142), which pushed the owed count back to 33 and <b>failed this
+     * ratchet</b> — the gate catching its own author adding to the debt it measures. Paying all three
+     * specs in the same slice took it to 30. <b>Filing two findings and still ending lower is what
+     * pay-as-you-go looks like from the outside.</b> May only decrease.
      */
-    private static final int BASELINE_SPECS_OWED = 31;
+    private static final int BASELINE_SPECS_OWED = 30;
 
     /** Floors, so a collapsed scan cannot read as a clean one (F2-69). */
     private static final int MIN_REFERENCED = 120;
