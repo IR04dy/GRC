@@ -27,11 +27,11 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 | … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **532** |
 | … composed (role leg ANDed onto a permission — already tight) | 73 |
 | Module packages holding pure role guards | 35 |
-| Distinct role names recited by any role guard | 55 |
-| … **that do not exist in `iam.roles`** | **11** |
+| Distinct role names recited by any role guard | 54 |
+| … **that do not exist in `iam.roles`** | **10** |
 | Pure guards **closed to everyone** (no named role exists, no live authority leg) | **0** |
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
-| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **4** |
+| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **1** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
 | Pure guards whose surviving roles are held by no user | 0 |
 | Pure guards reachable by at least one seeded user | 532 |
@@ -46,12 +46,11 @@ shows what that closes.
 |---|---|
 | `CRO` | 68 |
 | `CIO` | 41 |
-| `AUDIT_COMMITTEE_MEMBER` | 20 |
 | `FACILITATOR` | 18 |
-| `BOARD_MEMBER` | 16 |
+| `AUDIT_COMMITTEE_MEMBER` | 16 |
 | `MODEL_OWNER` | 14 |
-| `AUDIT_COMMITTEE_CHAIR` | 13 |
-| `COMPANY_SECRETARY` | 7 |
+| `BOARD_MEMBER` | 13 |
+| `AUDIT_COMMITTEE_CHAIR` | 6 |
 | `PRIVACY_OFFICER` | 5 |
 | `SHARIA_BOARD_CHAIR` | 4 |
 | `AUDIT_DIRECTOR` | 3 |
@@ -74,9 +73,6 @@ computed here rather than eyeballed.
 
 | Module | Guard site | Roles named | Unsatisfiable legs (absent role, or dead authority) |
 |---|---|---|---|
-| `module.audit_committee` | `AuditCommitteeDashboardController#finalizeSnapshot` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY`, `PLATFORM_ADMIN` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY` |
-| `module.audit_committee` | `AuditCommitteeDashboardController#generate` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY`, `PLATFORM_ADMIN` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY` |
-| `module.audit_committee` | `AuditCommitteeDashboardController#recordResolution` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY`, `PLATFORM_ADMIN` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY` |
 | `module.bcm` | `BiaQuantitativeController#boardApprove` | `BOARD_MEMBER`, `PLATFORM_ADMIN` | `BOARD_MEMBER` |
 
 ## B3. Wide despite dead role names — the camouflage sites

@@ -38,9 +38,13 @@ import java.util.UUID;
  *       module services. Broad read guard so every assurance-side role
  *       can see the same view the Committee will see.</li>
  *   <li><b>Snapshot</b> — frozen JSON tied to a meeting moment. Listed
- *       and individually fetchable; mutated only by the
- *       Chair / Secretary / Platform Admin trio.</li>
+ *       and individually fetchable; mutated by the Board Secretary and the
+ *       platform administrator.</li>
  * </ul>
+ *
+ * <p>⚠ That last line used to read "mutated only by the Chair / Secretary / Platform Admin trio",
+ * which was wrong in both directions: two of the three names did not exist, so it was the platform
+ * administrator alone. F2-52 corrected the names; the Chair still cannot, and F2-151 records why.
  *
  * <p>SAMA Corporate Governance Regulations §6 and CMA Listed-Companies
  * CG Code Article 54 frame this surface — Audit Committee
@@ -56,20 +60,59 @@ import java.util.UUID;
 @SecurityRequirement(name = "bearerAuth")
 public class AuditCommitteeDashboardController {
 
-    /** Broad read — every assurance role consumes the live dashboard. */
+    /**
+     * Broad read — every assurance role consumes the live dashboard.
+     *
+     * <p>F2-52 — was the same list plus {@code AUDIT_COMMITTEE_MEMBER},
+     * {@code AUDIT_COMMITTEE_CHAIR} and {@code BOARD_MEMBER}. None of the three is a row in
+     * {@code iam.roles} in either database, so they narrowed nothing here: six real roles already
+     * read the dashboard. Removed because a guard should read as tightly as it behaves.
+     * {@code COMPANY_SECRETARY} became {@code BOARD_SECRETARY} — see {@link #WRITE_GUARD}.
+     */
     private static final String READ_GUARD =
-            "hasAnyRole('AUDIT_COMMITTEE_MEMBER','AUDIT_COMMITTEE_CHAIR','BOARD_MEMBER',"
-                    + "'CISO','RISK_MANAGER','COMPLIANCE_OFFICER','INTERNAL_AUDITOR',"
-                    + "'EXTERNAL_AUDITOR','COMPANY_SECRETARY','PLATFORM_ADMIN')";
+            "hasAnyRole('CISO','RISK_MANAGER','COMPLIANCE_OFFICER','INTERNAL_AUDITOR',"
+                    + "'EXTERNAL_AUDITOR','BOARD_SECRETARY','PLATFORM_ADMIN')";
 
-    /** Generate / record / finalize is restricted to the Chair + Secretary + Platform Admin. */
+    /**
+     * Generate / record / finalize.
+     *
+     * <h3>F2-52 — this said "restricted to the Chair + Secretary + Platform Admin" and admitted the
+     * platform administrator alone</h3>
+     * It was {@code hasAnyRole('AUDIT_COMMITTEE_CHAIR','COMPANY_SECRETARY','PLATFORM_ADMIN')}.
+     * <b>Two of those three names exist in no database</b>, and a role guard never reaches
+     * {@code ModulePermissionEvaluator}, so it never reaches the PLATFORM_ADMIN bypass either: the
+     * committee's own snapshot — the artefact SAMA CG §6 and CMA CG Article 54 require it to report
+     * from — could be generated, resolved and finalised by nobody but the platform administrator.
+     *
+     * <p>🔑 <b>{@code COMPANY_SECRETARY} was a near-miss.</b> The platform ships
+     * {@code BOARD_SECRETARY} ("Board Secretary"), which is that person, and the guard did not name
+     * it. Corrected, which restores one of the two intended personas.
+     *
+     * <p>⚠ <b>The Chair cannot be restored, and that is a finding rather than an omission.</b> No
+     * role expresses committee membership, and the roster that could — F2-26's
+     * {@code committee_member_terms.member_user_id} — is <b>NULL on all five audit-committee seats</b>,
+     * so "is this user the Chair" is unanswerable from data. Adding an entity-bound leg that can never
+     * be true would be a control that cannot fire (F2-112's shape). Filed as F2-151 instead.
+     */
     private static final String WRITE_GUARD =
-            "hasAnyRole('AUDIT_COMMITTEE_CHAIR','COMPANY_SECRETARY','PLATFORM_ADMIN')";
+            "hasAnyRole('BOARD_SECRETARY','PLATFORM_ADMIN')";
 
-    /** Attestation is open to every voting Committee member + the Chair + external auditor. */
+    /**
+     * Attestation.
+     *
+     * <p>F2-52 — this said "open to every voting Committee member + the Chair + external auditor" and
+     * was open to <b>neither a member nor the Chair</b>: those two names are ghosts, leaving the two
+     * auditors, the secretary-that-wasn't, and the platform administrator. An audit-committee
+     * attestation that only the auditors can sign inverts who is assuring whom.
+     *
+     * <p>⚠ And the capacity is still self-declared — {@code AttestRequest.attestedRole} is written
+     * to the row verbatim, so an admitted {@code INTERNAL_AUDITOR} can record an attestation as
+     * {@code CHAIR}. The signer's <em>identity</em> is stamped from the principal and hashed; the
+     * <em>role they signed in</em> is not checked against anything. F2-151 covers both halves,
+     * because validating it needs the same roster linkage the Chair leg needs.
+     */
     private static final String ATTEST_GUARD =
-            "hasAnyRole('AUDIT_COMMITTEE_MEMBER','AUDIT_COMMITTEE_CHAIR',"
-                    + "'EXTERNAL_AUDITOR','COMPANY_SECRETARY','INTERNAL_AUDITOR','PLATFORM_ADMIN')";
+            "hasAnyRole('EXTERNAL_AUDITOR','INTERNAL_AUDITOR','BOARD_SECRETARY','PLATFORM_ADMIN')";
 
     private final AuditCommitteeDashboardService service;
 
