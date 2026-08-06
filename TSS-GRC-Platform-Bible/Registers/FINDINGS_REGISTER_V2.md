@@ -2789,6 +2789,24 @@ Start-Service TssGrcBackend
 | **References** | `SkuRegistry.CARVE_OUTS` · `everySkuCarveOutIsDeclaredInBothPlacesAndExistsOnDisk()` · `module-registry.yaml` · ADR-018 R6 · [[F2-01]] · [[F2-140]] · [[F2-141]] |
 | **Lesson** | **Ask what a register can express before trusting what it says.** This one was internally consistent, CI-enforced and green, and wrong about 73 files — because the question *"which package is this SKU"* has no answer for two of the fifteen, and a schema with one row per package cannot represent that. **Enforcement being right is not the same as the record being right, and only the record is what a customer or an auditor reads** |
 
+## F2-143 — A migration-built database is 36 permissions and 4 roles short, and one is the tenant administrator
+
+|  |  |
+|---|---|
+| **ID** | F2-143 *(measured 2026-08-06, the moment [[F2-77]]'s chain first reached V320)* |
+| **Category** | Deployment integrity — the authorisation catalogue a fresh installation gets is not the one the code enforces |
+| **Severity** | **P1** — a customer provisioned from the folder cannot be given the primary tenant-administrator role, and 36 permissions guard endpoints only `PLATFORM_ADMIN` can reach, through a code bypass, fail-closed and silent |
+| **Current State** | ⬜ **OPEN.** Filed, not fixed: the fix is a generated migration and belongs in its own slice |
+| **The measurement** | Chain-built vs live, same instance: **79 of 115 permissions** (**36 missing, 31%**) across **14 modules** — `ADMIN`, `BCM`, `COMPLIANCE`, `CYBER`, `PRIVACY`, `RISK`, `TPRM`, `SCM`, `BOARD`, `KB`, `FRAUD`, `INTEGRATIONS`, `AUTOMATION`, `REPORTING` — and **54 of 58 roles**, missing `ORG_ADMIN`, `VIEWER`, `RISK_ANALYST`, `FRAUD_INVESTIGATOR` |
+| **🔑 Why it is P1 and not paperwork** | `ORG_ADMIN` is the primary tenant administrator. **[[F2-81]]'s tenant onboarding, closed earlier the same day, provisions a first administrator into a role that does not exist in a fresh build.** The endpoint is correct; the database it would run against is not. Every one of the 36 permissions guards live endpoints, and a missing catalogue row means the guard can never be satisfied by a grant — only by `ModulePermissionEvaluator`'s hardcoded `PLATFORM_ADMIN` path |
+| **V321's THROW was right** | The chain stops at `V321__reporting_write_grant.sql` with `50321: REPORTING:WRITE is still held by no role`. Its grant JOINs `iam.role_permissions` against `iam.permissions`, and a chain build holds only `REPORTING:DELETE` — `READ`, `WRITE` and `EXPORT` are absent — so the JOIN matches nothing. **A guard written months ago caught exactly what it was written to catch, on a database nobody had ever built.** It is not an obstacle to route around |
+| **⚠ Why nothing detected this** | The catalogue is seeded by the Python bootstrap and by migrations a baselined production never re-ran. So the two authorities anyone would compare — the code's `@PreAuthorize` set and the live catalogue — **agreed**, and the drifting copy was the folder nobody executed. Identical shape to the V40 committee vocabulary closed hours earlier: **when two authorities agree, suspect a third** |
+| **Recommendation** | A catalogue-completion migration **generated from the code's own `@PreAuthorize` set**, plus rows for the 4 missing roles. ⚠ Not hand-typed, and **not copied from the live database** — that is a third authority of unknown provenance, and this register's standing rule is that a fabricated row reads as data. `PermissionCatalogueUsageTest` already computes the code's set; generating from it makes the migration checkable against the same source that enforces it |
+| **Effort** | **M** — and it unblocks V321—V335's guards in one step, which is most of the chain's remaining distance |
+| **Verification** | Reproducible: run `Appendix/scripts/chain_proof.py --keep`, then diff `iam.permissions` and `iam.roles` between `TSS_GRC_ChainProof` and `TSS_GRC` |
+| **References** | [[F2-77]] · [[F2-09]] · [[F2-81]] · `PermissionCatalogueUsageTest` · V321 |
+| **Lesson** | **This is what F2-77 was for.** The chain was never the deliverable — it is the instrument, and the first thing it produced on reaching V320 is a P1 nobody could have measured while the folder went unexecuted. **A migration set that has never been run is not a deployment mechanism, it is a description of one** |
+
 ## Sequencing — what to do, in what order
 
 Dependency-ordered, not severity-ordered. Severity says what matters; this says what is *possible*.
