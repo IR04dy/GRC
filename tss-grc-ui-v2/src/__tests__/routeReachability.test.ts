@@ -73,6 +73,13 @@ const INTENTIONALLY_OFF_NAV: Record<string, string> = {
   '/pdpl':                          'legacy alias for the privacy workspace',
   '/bcm-dependency/legacy':         'legacy alias retained for old bookmarks',
 
+  // F2-142 — retired screens, kept as redirects to the REAL inbox. They are deliberately NOT linked:
+  // linking them back would restore the nav entries whose whole problem was advertising a delivery
+  // subsystem that had no server. A redirect with no inbound link is the intended end state, and
+  // `/notifications/channels` is absent from this list only because nothing ever linked it either.
+  '/notifications/outbox':          'F2-142 — retired fake outbox; redirect only, must stay unlinked',
+  '/notifications/dispatch':        'F2-142 — retired fake dispatch console; redirect only, unlinked',
+
   // Opened by direct/QR link during an incident, when the operator is not browsing a sidebar.
   '/bcm/crisis/mobile':             'mobile crisis view — opened by direct link during an incident',
   '/crisis-management':             'crisis console entry — opened by direct link / incident comms',

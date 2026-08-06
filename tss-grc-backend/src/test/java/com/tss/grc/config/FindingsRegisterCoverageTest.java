@@ -91,8 +91,15 @@ class FindingsRegisterCoverageTest {
      * ratchet</b> — the gate catching its own author adding to the debt it measures. Paying all three
      * specs in the same slice took it to 30. <b>Filing two findings and still ending lower is what
      * pay-as-you-go looks like from the outside.</b> May only decrease.
+     *
+     * <p><b>29 on the same day again, and the mechanism repeated exactly.</b> The F2-142 slice filed
+     * {@code F2-147} — the server-side crisis senders reporting success for messages no gateway sent —
+     * which pushed the count to 31 and failed this ratchet a second time, in the same session, on the
+     * same author. Paying the specs for {@code F2-144} (closed end-to-end that morning) and
+     * {@code F2-147} (filed minutes earlier) took it to 29. The alternative on offer was raising the
+     * number by one and moving on, which is the whole reason the ceiling exists.
      */
-    private static final int BASELINE_SPECS_OWED = 30;
+    private static final int BASELINE_SPECS_OWED = 29;
 
     /** Floors, so a collapsed scan cannot read as a clean one (F2-69). */
     private static final int MIN_REFERENCED = 120;

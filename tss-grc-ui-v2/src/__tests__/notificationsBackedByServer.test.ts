@@ -39,20 +39,43 @@ describe('F2-38 — the notification bell reads the server, and the invented dir
    * reuse for the F2-26 committee seat picker and would have bound governance seats to invented
    * identities.
    *
-   * The remaining six are one cluster, not six problems: three `localStorage` stores
+   * The remaining six were one cluster, not six problems: three `localStorage` stores
    * (`activityLog`, `notificationOutbox`, `recordRegistry`) and the three surfaces that render them.
-   * `notificationOutbox` is **F2-142** — a multi-channel delivery subsystem (EMAIL, SMS, WHATSAPP,
-   * NAFATH, TADAWUL_PORTAL) with a QUEUED/SENDING/SENT/FAILED lifecycle and no server at all, where
-   * the browser calls `markSent` on itself. Retiring it is an owner decision, so these stay listed
-   * rather than being quietly rewired.
+   *
+   * **6 → 3 on 2026-08-06, when F2-142 was decided: retire.** `notificationOutbox` and everything that
+   * rendered it are deleted, so three entries left this list by having their files removed rather than
+   * by being rewired — and the *stale* half of this test is what reported all three, on the same run,
+   * by name. What remains is `activityLog` + `recordRegistry` and the drawer that renders them.
+   *
+   * @see it('the fabricated delivery estate stays deleted') for what may not come back
    */
   const DIRECTORY_IMPORTERS: readonly string[] = [
     'components/lifecycle/ActivityFeedDrawer.tsx',
     'lib/activityLog.ts',
-    'lib/notificationOutbox.ts',
     'lib/recordRegistry.ts',
+  ];
+
+  /**
+   * F2-142 — the five files retired on 2026-08-06, and why a deletion needs a test at all.
+   *
+   * <p>The filed finding named ONE page. Measuring found the same defect three times, and the second
+   * instance was worse than the one filed: `lib/notificationDispatch` (341 lines) was an *"operator
+   * console for the notification dispatch runtime"* naming real commercial providers — `AWS SES (KSA
+   * region)`, `WhatsApp Business Cloud API`, `CITC-licensed Saudi SMS gateway` — with a `dailyQuota:
+   * 50_000` and a `lastVerifiedAt` documented as *"when this channel was last verified by smoke-test"*
+   * that was `_hoursAgo(6)` evaluated at module load. The screen therefore always said "verified 6
+   * hours ago", about nothing.
+   *
+   * <p>The reason to pin the deletion rather than trust it: every one of these was plausible,
+   * well-built and demo-ready, which is exactly why it survived so long. The cheapest way to undo this
+   * slice is for someone to want a delivery screen for a demo and rebuild the nearest thing.
+   */
+  const RETIRED_BY_F2_142: readonly string[] = [
+    'lib/notificationOutbox.ts',
+    'lib/notificationDispatch.ts',
     'pages/notification-outbox/NotificationOutboxPage.tsx',
-    'pages/risk-lifecycle/RiskLifecyclePage.tsx',
+    'pages/notifications/NotificationDispatchPage.tsx',
+    'pages/notifications-channels/NotificationChannelsPage.tsx',
   ];
 
   /**
@@ -168,6 +191,59 @@ describe('F2-38 — the notification bell reads the server, and the invented dir
     expect(stale,
       `${stale.join(', ')} no longer imports the directory (or was renamed). Remove it from `
       + 'DIRECTORY_IMPORTERS so the list keeps measuring what it claims.').toEqual([]);
+  });
+
+  it('the fabricated delivery estate stays deleted', () => {
+    const alive = RETIRED_BY_F2_142.filter(f => existsSync(join(SRC, f)));
+    expect(alive,
+      `${alive.join(', ')} is back. F2-142 retired these: they modelled multi-channel delivery — `
+      + 'EMAIL / SMS / WHATSAPP / SLACK / TEAMS / NAFATH / TADAWUL_PORTAL — entirely in localStorage, '
+      + 'with the browser calling markSent on its own messages. Naming Nafath and the Tadawul portal '
+      + 'makes a screen that reports SENT a regulatory claim, not a cosmetic one. Real delivery needs '
+      + 'server-side gateways and is an owner decision; a screen is not a substitute for one.').toEqual([]);
+
+    // The routes must still resolve — retiring a page is not licence to 404 a link a user bookmarked.
+    // F2-137's precedent: delete the fake, redirect the route at something true.
+    const app = readFileSync(join(SRC, '..', 'src', 'App.tsx'), 'utf8');
+    for (const route of ['/notifications/outbox', '/notifications/dispatch', '/notifications/channels']) {
+      const row = app.split('\n').find(l => l.includes(`path="${route}"`));
+      expect(row, `${route} has no route at all — a bookmark to it now 404s`).toBeTruthy();
+      expect(row!.includes('RedirectPreservingQuery'),
+        `${route} must redirect through RedirectPreservingQuery, not raw <Navigate> — since F2-83 the `
+        + '`?org=` parameter is the only thing naming the tenant, and Navigate drops the query string').toBe(true);
+    }
+
+    // And the destination has to be real. InboxPage is server-paginated over platform.notifications.
+    const inbox = readFileSync(join(SRC, 'pages/inbox/InboxPage.tsx'), 'utf8');
+    expect(/notificationApi\./.test(codeOnly(inbox)),
+      'the redirect target no longer calls notificationApi — retiring three fakes only helps if the '
+      + 'page they point at reads the server').toBe(true);
+  });
+
+  it('no page rebuilds a client-side delivery lifecycle under a new name', () => {
+    // The names are replaceable; the SHAPE is the tell. A module that owns a delivery status vocabulary
+    // AND persists it locally is a delivery subsystem with no server, whatever it is called.
+    //
+    // ⚠ Comments are stripped first. This file already learned that once (see the localStorage check
+    // below, whose first version failed on lib/notifications' own note about what it replaced) and the
+    // F2-142 slice itself re-learned it twice inside ten minutes — a replacement comment explaining
+    // what was removed necessarily contains the words being banned. There is no textual shape that
+    // distinguishes code from a comment quoting code.
+    const offenders = walk(SRC).filter(f => {
+      const code = codeOnly(readFileSync(f, 'utf8'));
+      const marksItselfSent = /\bmarkSent\b|\bmarkFailed\b/.test(code);
+      const persistsLocally = /localStorage/.test(code);
+      return marksItselfSent && persistsLocally;
+    }).map(relative).sort();
+
+    expect(offenders,
+      `${offenders.join(', ')} calls markSent/markFailed against localStorage. That is F2-142 rebuilt: `
+      + 'the tell for a fake delivery subsystem is not the fake data, it is that markSent exists at all '
+      + '— nothing that really sends needs the sender to mark it sent. Delivery status belongs to '
+      + 'whatever performed the delivery, which is a server.').toEqual([]);
+
+    // Anti-vacuity: a walk that resolved nothing satisfies the assertion above.
+    expect(walk(SRC).length).toBeGreaterThan(500);
   });
 
   it('the bell reads the server and not the browser', () => {

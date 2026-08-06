@@ -91,8 +91,8 @@ PUBLISHED = {
     "migration_files": 349,
     "migration_head": 361,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
-    "fe_pages": 343,
-    "fe_page_folders": 114,
+    "fe_pages": 340,          # F2-142 retired 3 fabricated pages
+    "fe_page_folders": 111,   # each was the only file in its folder, so -3 folders too
     "fe_routes": 329,
     "fe_nav_entries": 194,
     "mock_import_statements": 30,

@@ -306,7 +306,6 @@ const RegulatoryChangePage   = lazy(() => import('./pages/regulatory-change/Regu
 const VendorPortalPage       = lazy(() => import('./pages/portal/VendorPortalPage').then(m => ({ default: m.VendorPortalPage })));
 const NcaEccExportPage       = lazy(() => import('./pages/nca-ecc/NcaEccExportPage').then(m => ({ default: m.NcaEccExportPage })));
 const NcaEccFilingsPage      = lazy(() => import('./pages/nca-ecc/NcaEccFilingsPage').then(m => ({ default: m.NcaEccFilingsPage })));
-const NotificationDispatchPage = lazy(() => import('./pages/notifications/NotificationDispatchPage').then(m => ({ default: m.NotificationDispatchPage })));
 const ControlCrosswalkPage   = lazy(() => import('./pages/control-crosswalk/ControlCrosswalkPage').then(m => ({ default: m.ControlCrosswalkPage })));
 // ─── Sprint 4 §3.3 — Culled pages (imports removed; folders kept on disk
 //    for one cycle so cherry-picks can be reviewed before physical delete):
@@ -323,7 +322,6 @@ const NdiPage                = lazy(() => import('./pages/ndi/NdiPage').then(m =
 const WorkflowVersionsPage   = lazy(() => import('./pages/workflow-versions/WorkflowVersionsPage').then(m => ({ default: m.WorkflowVersionsPage })));
 const CrisisManagementPage   = lazy(() => import('./pages/crisis/CrisisManagementPage').then(m => ({ default: m.CrisisManagementPage })));
 const FileUploadDemoPage     = lazy(() => import('./pages/file-upload/FileUploadDemoPage').then(m => ({ default: m.FileUploadDemoPage })));
-const NotificationChannelsPage = lazy(() => import('./pages/notifications-channels/NotificationChannelsPage').then(m => ({ default: m.NotificationChannelsPage })));
 const SsoConfigPage          = lazy(() => import('./pages/sso/SsoConfigPage').then(m => ({ default: m.SsoConfigPage })));
 const NafathLoginPage        = lazy(() => import('./pages/sso/NafathLoginPage').then(m => ({ default: m.NafathLoginPage })));
 const AttestationCampaignsPage = lazy(() => import('./pages/intake/AttestationCampaignsPage').then(m => ({ default: m.AttestationCampaignsPage })));
@@ -337,7 +335,6 @@ const PrivacyLifecyclePage   = lazy(() => import('./pages/privacy-lifecycle/Priv
 const BcmLifecyclePage       = lazy(() => import('./pages/bcm-lifecycle/BcmLifecyclePage').then(m => ({ default: m.BcmLifecyclePage })));
 const CyberLifecyclePage     = lazy(() => import('./pages/cyber-lifecycle/CyberLifecyclePage').then(m => ({ default: m.CyberLifecyclePage })));
 const LifecycleOverviewPage  = lazy(() => import('./pages/lifecycle-overview/LifecycleOverviewPage').then(m => ({ default: m.LifecycleOverviewPage })));
-const NotificationOutboxPage = lazy(() => import('./pages/notification-outbox/NotificationOutboxPage').then(m => ({ default: m.NotificationOutboxPage })));
 const PdplExtensionsPage     = lazy(() => import('./pages/pdpl-extensions/PdplExtensionsPage').then(m => ({ default: m.PdplExtensionsPage })));
 const RcaPage                = lazy(() => import('./pages/rca/RcaPage').then(m => ({ default: m.RcaPage })));
 const RiskScenariosPage      = lazy(() => import('./pages/risk-scenarios/RiskScenariosPage').then(m => ({ default: m.RiskScenariosPage })));
@@ -783,7 +780,14 @@ export function App() {
               <Route path="/nca-ecc/filings"    element={<NcaEccFilingsPage />} />
 
               {/* Notification dispatch console (Sprint 6) */}
-              <Route path="/notifications/dispatch" element={<NotificationDispatchPage />} />
+              {/* F2-142 — retired. These three routes rendered a multi-channel delivery
+                  subsystem with no server: localStorage stores where the browser called
+                  markSent on itself, over channels including NAFATH and TADAWUL_PORTAL, and a
+                  channel grid naming AWS SES / WhatsApp Business Cloud API with a
+                  "last verified 6 hours ago" that was a constant. They redirect to the REAL
+                  inbox (InboxPage, server-paginated over platform.notifications) rather than
+                  404ing, per the F2-137 precedent — a bookmark must land somewhere true. */}
+              <Route path="/notifications/dispatch" element={<RedirectPreservingQuery to="/notifications" />} />
 
               {/* Control inheritance / crosswalks (Sprint 6 follow-on B5) */}
               <Route path="/control-crosswalk"  element={<ControlCrosswalkPage />} />
@@ -821,7 +825,7 @@ export function App() {
               <Route path="/file-upload"        element={<FileUploadDemoPage />} />
 
               {/* Production hardening — channels */}
-              <Route path="/notifications/channels" element={<NotificationChannelsPage />} />
+              <Route path="/notifications/channels" element={<RedirectPreservingQuery to="/notifications" />} />
 
               {/* SSO / SAML / Nafath */}
               <Route path="/sso"                element={<SsoConfigPage />} />
@@ -857,7 +861,7 @@ export function App() {
               <Route path="/lifecycle-overview" element={<LifecycleOverviewPage />} />
 
               {/* Notification outbox — Phase E infrastructure */}
-              <Route path="/notifications/outbox" element={<NotificationOutboxPage />} />
+              <Route path="/notifications/outbox" element={<RedirectPreservingQuery to="/notifications" />} />
 
               {/* Triager inbox (DD-58) */}
               <Route path="/intake-inbox"       element={<IntakeInboxPage />} />

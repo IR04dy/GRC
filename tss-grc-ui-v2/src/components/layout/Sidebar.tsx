@@ -476,13 +476,9 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'sso',         to: '/sso',               Icon: LockKeyhole,  labelKey: 'ssoSidebar' },
       { id: 'wf-versions', to: '/workflow-versions', Icon: Layers,       labelKey: 'wvSidebar' },
       { id: 'connectors',  to: '/connectors',        Icon: Plug,         labelKey: 'connectorsTitle' },
-      {
-        id: 'notif-dispatch', to: '/notifications/dispatch', Icon: Send, labelKey: 'ndSidebar',
-        children: [
-          { id: 'nc',          to: '/notifications/channels', Icon: Send,  labelKey: 'ncSidebar' },
-          { id: 'notif-outbox', to: '/notifications/outbox',  Icon: Inbox, labelKey: 'noxSidebar' },
-        ],
-      },
+      // F2-142 — the 'Notification dispatch / Channels / Outbox' group is gone. All three
+      // rendered client-side fakes, and they duplicated a capability that already works: the
+      // real server-backed inbox is the 'notifications' entry above.
       { id: 'audit-log',   to: '/audit-log',         Icon: ScrollText,   labelKey: 'auditLogTitle' },
       { id: 'access-gov',  to: '/access-governance', Icon: KeyRound,     labelKey: 'accessGovTitle' },
       { id: 'export-hist', to: '/export-history',    Icon: Download,     labelKey: 'exportHistoryTitle' },

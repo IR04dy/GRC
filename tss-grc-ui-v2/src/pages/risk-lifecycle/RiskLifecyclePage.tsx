@@ -32,8 +32,6 @@ import { LifecyclePipeline, type PipelineStage, type PipelineCard } from '../../
 import { Activity as ActivityIcon, Send as SendIcon, ThumbsUp as ThumbsUpIcon, Play, CheckCircle2 as CheckCircle2Icon, ThumbsDown as ThumbsDownIcon, FileText as FileTextIcon } from 'lucide-react';
 import { ActivityFeedDrawer } from '../../components/lifecycle/ActivityFeedDrawer';
 import { logTransition } from '../../lib/activityLog';
-import { notify } from '../../lib/notificationOutbox';
-import { lookupUserByName } from '../../lib/userDirectory';
 import '../../styles/pages/risk-lifecycle.css';
 
 /**
@@ -106,21 +104,16 @@ export function RiskLifecyclePage() {
             const priorPlan = loadTreatmentPlans().find(p => p.id === planId);
             const priorStatus = priorPlan?.status;
             transitionPlan(planId, target, by);
-            // Activity log + notify.
             logTransition('treatment-plan', planId, fromStatus, target);
-            // Notify the CRO when a plan is submitted or approved.
-            if (target === 'SUBMITTED' || target === 'APPROVED') {
-              const cro = lookupUserByName('Mohammed Al-Mahmoud');
-              if (cro) {
-                notify(cro.id, target === 'APPROVED' ? 'P3' : 'P2',
-                  `Treatment plan ${planId} ${target.toLowerCase()}`,
-                  `خطة المعالجة ${planId} ${target === 'APPROVED' ? 'مُعتمَدة' : 'مُقدَّمة'}`,
-                  `Plan moved from ${fromStatus} to ${target}.`,
-                  `الخطة انتقلت من ${fromStatus} إلى ${target}.`,
-                  'risk-lifecycle',
-                  { link: '/risk-lifecycle', refId: planId });
-              }
-            }
+            /* F2-142 — the CRO notification on submit/approve is removed, not repointed.
+             *
+             * It was three fabrications stacked: the recipient was resolved by display name against
+             * the invented user directory, so the id existed in no row of `iam.users`; the notify call
+             * wrote to a localStorage store with zero network calls; and nothing rendered that store,
+             * so the message was unreadable even in principle. There is no client endpoint to repoint
+             * it at — `platform.notifications` rows are written server-side by the F8 engine, which is
+             * the correct place for a transition-triggered notification and where CE-10 already puts
+             * them. Making the risk lifecycle notify for real is server work, not a swapped import. */
             // Undoable toast.
             toast.undoable(`${t('lpcAdvancedToast')} → ${target}`, () => {
               if (priorStatus) transitionPlan(planId, priorStatus as TreatmentStatus);

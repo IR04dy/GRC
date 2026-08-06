@@ -392,8 +392,12 @@ export function CrisisCommsDispatchWizard() {
             display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16,
           }}>
             <Kpi label={isAr ? 'القنوات' : 'Channels'} value={String(result.cascades.length)} to="/notifications/channels" />
-            <Kpi label={isAr ? 'المستلمون' : 'Recipients'} value={String(result.totalRecipients)} to="/notifications/outbox" />
-            <Kpi label={isAr ? 'نجح' : 'Success'} value={String(result.totalSuccess)} tone="success" to="/notifications/outbox" />
+            {/* F2-142: these two counted THIS cascade but linked to the fabricated global outbox.
+                 The drill-through is removed rather than repointed at the inbox — a cascade's
+                 recipient count does not live there, and a link that goes somewhere wrong is worse
+                 than no link (F2-38's KRI ruling). */}
+            <Kpi label={isAr ? 'المستلمون' : 'Recipients'} value={String(result.totalRecipients)} />
+            <Kpi label={isAr ? 'نجح' : 'Success'} value={String(result.totalSuccess)} tone="success" />
             <Kpi label={isAr ? 'الزمن' : 'Elapsed'} value={`${result.elapsedMillis} ms`} to="/bcm/comms/dispatch" />
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
