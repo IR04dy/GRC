@@ -980,12 +980,18 @@ where 279 had never been executed by anything. Closed on the way: F2-38, F2-42, 
 F2-143, F2-144(a), plus F2-16's page-size ratchet and F2-52's role-existence gate. Filed with
 measurements: F2-140, F2-141, F2-142, F2-143, F2-144.
 
-🔑 **Nothing further can be verified on this machine until C: has space.** SQL Server Express keeps
-its data directory there and C: is at ~0.25 GB, so `CREATE DATABASE` fails (OS error 112) and with it
-the chain proof, F2-09, every migration and every live probe. The scratchpad and `npx vitest run`
-fail too. ⚠ **And it does not present as a disk problem** — see the landmine in `CLAUDE.md`: a full
-C: surfaces as test errors in whichever class the runner reached. Backend single-class and
-whole-suite `mvn test` still work, which is what makes the failures look like code.
+✔ **The disk blocker CLEARED later the same day — C: went from ~0.25 GB to 22.8 GB free.** For
+several hours it stopped everything that needs C:, because SQL Server Express keeps its data
+directory there: `CREATE DATABASE` failed with OS error 112, and with it the chain proof, F2-09,
+every migration and every live probe, plus the session scratchpad (`ENOSPC`) and `npx vitest run`
+(a V8 crash). ⚠ **Keep the landmine in `CLAUDE.md` regardless of the current free figure** — the
+lasting lesson is not that a disk filled up, it is that **a full C: surfaces as test errors in
+whichever class the runner happened to reach**, never as a disk error. It cost one wrong conclusion
+here. Check `shutil.disk_usage('C:/')` before debugging a test that passes when run alone.
+
+🔑 **So the chain, F2-09 and live probing are available again**, and the next slice is whichever of
+those a session has the context to finish. The chain's own next break, V331, is an owner decision
+below.
 
 **Blocked on an owner decision, not on effort** — each has its evidence in its row:
 
