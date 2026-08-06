@@ -39,7 +39,9 @@ USAGE
   py full_chain_proof.py --keep        # build the chain database first (minutes)
   py schema_convergence.py            # then diff it against dev
 """
+import io
 import os
+import re
 import sys
 
 import pyodbc
@@ -144,6 +146,91 @@ def main():
           % (len(missing_t), len(extra_t), len(missing_c), len(extra_c)))
     print("a fresh install differs from dev in %d objects"
           % (len(missing_t) + len(extra_t) + len(missing_c) + len(extra_c)))
+
+    report_partition(missing_t, int(stop) if stop else None)
+
+
+MIG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..",
+                       "tss-grc-backend", "src", "main", "resources", "db", "migration", "sqlserver")
+
+BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.S)
+LINE_COMMENT = re.compile(r"--[^\n]*")
+CREATE_TABLE = re.compile(
+    r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?\[?(\w+)\]?\s*\.\s*\[?(\w+)\]?", re.I)
+
+
+def creators():
+    """{schema.table: lowest migration version whose file contains its CREATE TABLE}.
+
+    ⚠ Comments are stripped first, and that is not defensive tidiness — it has produced false
+    positives four separate times in this programme (a V233 header, the whole of V312, register prose,
+    and a javadoc's example guard). A migration that *documents* a table in a header comment does not
+    create it.
+    """
+    out = {}
+    for f in sorted(os.listdir(MIG_DIR)):
+        m = re.match(r"^V(\d+)__", f)
+        if not m:
+            continue
+        version = int(m.group(1))
+        body = io.open(os.path.join(MIG_DIR, f), encoding="utf-8-sig", errors="replace").read()
+        body = LINE_COMMENT.sub(" ", BLOCK_COMMENT.sub(" ", body))
+        for schema, table in CREATE_TABLE.findall(body):
+            key = "%s.%s" % (schema.lower(), table.lower())
+            if key not in out or version < out[key]:
+                out[key] = version
+        # A table is also "created" by a migration that renames one into place.
+    return out
+
+
+def partition(missing, stop):
+    """Split the missing tables into the three things 'missing' can actually mean."""
+    made = creators()
+    later, skipped, never = [], [], []
+    for t in sorted(missing):
+        v = made.get(t.lower())
+        if v is None:
+            never.append(t)
+        elif stop is not None and v > stop:
+            later.append((v, t))
+        else:
+            skipped.append((v, t))
+    return later, skipped, never
+
+
+def report_partition(missing, stop):
+    later, skipped, never = partition(missing, stop)
+
+    print("\n" + "=" * 78)
+    print("PARTITION — what each 'missing' table actually means")
+    print("=" * 78)
+
+    print("\n[1] Created by a migration ABOVE the stop (V%s) — expected-missing, NOT a defect: %d"
+          % (stop, len(later)))
+    for v, t in later[:12]:
+        print("    V%-4d %s" % (v, t))
+    if len(later) > 12:
+        print("    ... and %d more" % (len(later) - 12))
+
+    print("\n[2] ⚠ A migration AT OR BELOW the stop contains its CREATE TABLE, and the table is NOT "
+          "in the built database: %d" % len(skipped))
+    print("    These are the interesting ones. The file ran (the chain got past it) and the table is "
+          "absent, so an idempotency guard skipped the CREATE — the shape F2-112 and the V121 demo "
+          "inserts had: a control that cannot fire over a statement that cannot run.")
+    for v, t in skipped[:20]:
+        print("    V%-4d %s" % (v, t))
+    if len(skipped) > 20:
+        print("    ... and %d more" % (len(skipped) - 20))
+
+    print("\n[3] No migration anywhere creates it — bootstrap-only, absent from every fresh "
+          "install: %d" % len(never))
+    for t in never[:25]:
+        print("    %s" % t)
+    if len(never) > 25:
+        print("    ... and %d more" % (len(never) - 25))
+
+    print("\npartition summary: %d expected-missing · %d guard-skipped · %d never-created"
+          % (len(later), len(skipped), len(never)))
 
 
 if __name__ == "__main__":
