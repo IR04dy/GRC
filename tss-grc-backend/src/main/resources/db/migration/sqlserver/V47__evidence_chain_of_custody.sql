@@ -14,7 +14,26 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 -- ─── 1. New columns on evidence_versions ────────────────────────────
-IF NOT EXISTS (SELECT 1 FROM sys.columns
+-- ⚠ F2-77: the table-existence test is load-bearing, and it was missing.
+--
+-- A COLUMN-existence guard is not a TABLE-existence guard. When
+-- evidence.evidence_versions does not exist, OBJECT_ID() returns NULL, no sys.columns row
+-- matches, so NOT EXISTS is TRUE — the guard ADMITS the block and the ALTER then throws
+-- "Cannot find the object". That made this file idempotent but not order-safe, which are
+-- different properties, and only the first was ever exercised.
+--
+-- It matters because evidence.evidence_versions is created in V341 (the spine bootstrap
+-- that F2-70 added for tables which existed in the live database with no DDL anywhere) —
+-- 294 versions AFTER this file references it. On a fresh database V47 therefore runs before
+-- the table exists. This same file already uses the correct pattern 30 lines below, for its
+-- index.
+--
+-- Skipping is end-state-equivalent and that was verified, not assumed: all seven columns
+-- added here (content_hash_sha256, chain_hash_sha256, chain_position, chain_status,
+-- chain_verified_at, chain_verified_by, chain_break_reason) are already declared in V341's
+-- CREATE TABLE, because that file was retrofitted from the live schema this ALTER produced.
+IF OBJECT_ID(N'evidence.evidence_versions', N'U') IS NOT NULL
+AND NOT EXISTS (SELECT 1 FROM sys.columns
                WHERE object_id = OBJECT_ID(N'evidence.evidence_versions')
                  AND name = N'content_hash_sha256')
 BEGIN
@@ -53,6 +72,13 @@ BEGIN
         (evidence_id, chain_position);
 END
 GO
+-- F2-77: guarded because evidence.evidence_versions is created in V341 (the spine
+-- bootstrap F2-70 added for tables that existed in the live database with no DDL), which is
+-- 294 versions after this file. On a fresh database the table is not there yet, and V341
+-- creates it already carrying every column this file adds — so skipping is
+-- end-state-equivalent. On any database where the table DOES exist this runs unchanged.
+IF OBJECT_ID(N'evidence.evidence_versions', N'U') IS NOT NULL
+BEGIN
 
 -- ─── 4. Backfill: compute chain hashes for existing versions ────────
 -- For each evidence_item, walk versions ordered by version_no. The first
@@ -75,13 +101,29 @@ UPDATE evidence.evidence_versions
                  ), 2))
        END
  WHERE content_hash_sha256 IS NULL;
+END
 GO
+-- F2-77: guarded because evidence.evidence_versions is created in V341 (the spine
+-- bootstrap F2-70 added for tables that existed in the live database with no DDL), which is
+-- 294 versions after this file. On a fresh database the table is not there yet, and V341
+-- creates it already carrying every column this file adds — so skipping is
+-- end-state-equivalent. On any database where the table DOES exist this runs unchanged.
+IF OBJECT_ID(N'evidence.evidence_versions', N'U') IS NOT NULL
+BEGIN
 
 -- Set chain_position = version_no for backfill (assumes version_no is monotonic per evidence)
 UPDATE evidence.evidence_versions
    SET chain_position = version_no
  WHERE chain_position IS NULL;
+END
 GO
+-- F2-77: guarded because evidence.evidence_versions is created in V341 (the spine
+-- bootstrap F2-70 added for tables that existed in the live database with no DDL), which is
+-- 294 versions after this file. On a fresh database the table is not there yet, and V341
+-- creates it already carrying every column this file adds — so skipping is
+-- end-state-equivalent. On any database where the table DOES exist this runs unchanged.
+IF OBJECT_ID(N'evidence.evidence_versions', N'U') IS NOT NULL
+BEGIN
 
 -- Walk each evidence_id's versions ordered, compute chain_hash.
 -- (Use a cursor — backfill is a one-shot operation.)
@@ -126,7 +168,15 @@ BEGIN
     FETCH NEXT FROM evidence_cursor INTO @evidence_id;
 END
 CLOSE evidence_cursor; DEALLOCATE evidence_cursor;
+END
 GO
+-- F2-77: guarded because evidence.evidence_versions is created in V341 (the spine
+-- bootstrap F2-70 added for tables that existed in the live database with no DDL), which is
+-- 294 versions after this file. On a fresh database the table is not there yet, and V341
+-- creates it already carrying every column this file adds — so skipping is
+-- end-state-equivalent. On any database where the table DOES exist this runs unchanged.
+IF OBJECT_ID(N'evidence.evidence_versions', N'U') IS NOT NULL
+BEGIN
 
 -- Roll up to evidence_items
 UPDATE ei
@@ -140,7 +190,15 @@ UPDATE ei
          WHERE chain_status = N'VALID'
          GROUP BY evidence_id) vc ON vc.evidence_id = ei.id
  WHERE ei.chain_status IS NULL;
+END
 GO
+-- F2-77: guarded because evidence.evidence_versions is created in V341 (the spine
+-- bootstrap F2-70 added for tables that existed in the live database with no DDL), which is
+-- 294 versions after this file. On a fresh database the table is not there yet, and V341
+-- creates it already carrying every column this file adds — so skipping is
+-- end-state-equivalent. On any database where the table DOES exist this runs unchanged.
+IF OBJECT_ID(N'evidence.evidence_versions', N'U') IS NOT NULL
+BEGIN
 
 -- ─── 5. Inject a deliberately BROKEN chain for demo purposes ────────
 -- Pick one evidence_item with >= 2 versions and corrupt the second version's
@@ -173,6 +231,7 @@ BEGIN
                chain_first_break_version = 2
          WHERE id = @target_evidence;
     END
+END
 END
 GO
 
