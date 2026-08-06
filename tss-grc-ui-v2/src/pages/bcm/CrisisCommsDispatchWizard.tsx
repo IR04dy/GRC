@@ -10,12 +10,13 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { ApiError } from '../../lib/api';
 import {
-  listTemplates, dispatchCascade,
+  listTemplates, dispatchCascade, listCascades, listChannelReadiness,
   AUDIENCES, SCENARIO_CATEGORIES, CHANNELS,
   AUDIENCE_LABELS, SCENARIO_LABELS, CHANNEL_LABELS,
-  cascadeStatusTone, parsePlaceholders,
+  cascadeStatusTone, parsePlaceholders, isSimulatedChannel,
   type CrisisCommsTemplate, type Audience, type ScenarioCategory,
-  type ChannelType, type DispatchResult,
+  type ChannelType, type DispatchResult, type ChannelReadiness,
+  type CascadeResponse,
 } from '../../lib/crisisComms';
 
 /**
@@ -60,6 +61,12 @@ export function CrisisCommsDispatchWizard() {
   const [result, setResult] = useState<DispatchResult | null>(null);
   const [sending, setSending] = useState(false);
 
+  // F2-147 — per-channel readiness, and the cascades already sent for this
+  // event. Both exist so the operator is not learning what this tool actually
+  // does from a provider string after they have pulled the trigger.
+  const [readiness, setReadiness] = useState<ChannelReadiness[]>([]);
+  const [history, setHistory] = useState<CascadeResponse[]>([]);
+
   // Load only APPROVED_BY_CISO templates for dispatch.
   useEffect(() => {
     setLoading(true);
@@ -70,6 +77,43 @@ export function CrisisCommsDispatchWizard() {
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Channel readiness. A failure here is not fatal to dispatch, but it must not
+  // fail *quietly* into an empty list — an empty list renders no warnings, which
+  // reads exactly like "every channel is live".
+  useEffect(() => {
+    listChannelReadiness()
+      .then(list => setReadiness(Array.isArray(list) ? list : []))
+      .catch(() => toast.danger(isAr
+        ? 'تعذّر التحقق من جاهزية القنوات — قد تكون بعض القنوات محاكاة دون تنبيه'
+        : 'Could not check channel readiness — simulated channels may go unlabelled'));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cascades already dispatched for this crisis event.
+  useEffect(() => {
+    if (crisisEventId === '') { setHistory([]); return; }
+    listCascades(Number(crisisEventId))
+      .then(list => setHistory(Array.isArray(list) ? list : []))
+      .catch(() => setHistory([]));
+  }, [crisisEventId]);
+
+  const readinessOf = useMemo(() => {
+    const map = new Map<string, ChannelReadiness>();
+    for (const r of readiness) map.set(r.channelType, r);
+    return map;
+  }, [readiness]);
+
+  /** Channels the operator has selected that will not reach a gateway. */
+  const selectedSimulated = useMemo(
+    () => channels.filter(c => {
+      const r = readinessOf.get(c);
+      return r ? isSimulatedChannel(r) : false;
+    }),
+    [channels, readinessOf]);
+
+  /** Did the dispatch that just ran involve any channel with no gateway? */
+  const anySimulated = (result?.simulatedChannels?.length ?? 0) > 0;
 
   const filteredTemplates = useMemo(() => templates.filter(t => {
     if (audienceFilter && t.audience !== audienceFilter) return false;
@@ -121,9 +165,19 @@ export function CrisisCommsDispatchWizard() {
       });
       setResult(out);
       setStep(5);
-      toast.success(isAr
-        ? `تم الإرسال — ${out.totalSuccess}/${out.totalRecipients}`
-        : `Dispatched — ${out.totalSuccess}/${out.totalRecipients}`);
+      // F2-147 — the toast is the one thing every operator reads, so it is the
+      // one place the qualification cannot be optional. A cascade with any
+      // simulated channel is not reported as a send, and not with a green tick.
+      const sim = out.simulatedChannels ?? [];
+      if (sim.length > 0) {
+        toast.warning(isAr
+          ? `تم التسجيل دون إرسال فعلي — ${sim.join('، ')} محاكاة (${out.totalSuccess}/${out.totalRecipients} مُسجَّل)`
+          : `Recorded, not sent — ${sim.join(', ')} simulated (${out.totalSuccess}/${out.totalRecipients} logged)`);
+      } else {
+        toast.success(isAr
+          ? `تم الإرسال — ${out.totalSuccess}/${out.totalRecipients}`
+          : `Dispatched — ${out.totalSuccess}/${out.totalRecipients}`);
+      }
     } catch (e) {
       toast.danger(e instanceof ApiError ? e.message
         : (isAr ? 'فشل الإرسال' : 'Dispatch failed'));
@@ -233,6 +287,57 @@ export function CrisisCommsDispatchWizard() {
               <ChevronRight size={16} style={{ marginInlineStart: 6 }} />
             </Button>
           </div>
+
+          {/* F2-147 — the cascades already dispatched against this event. The server
+              has served this list since Slice 9-E and nothing had ever read it
+              (`listCascades` sat in apiClientReachability's KNOWN_UNREACHED), so the
+              only view of a cascade was the transient result step, discarded on "Send
+              another". It belongs here: what has already gone out for this event is
+              what an operator needs before deciding to send again. */}
+          {history.length > 0 && (
+            <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', marginBottom: 8 }}>
+                {isAr
+                  ? `تدفّقات سابقة لهذا الحدث (${history.length})`
+                  : `Cascades already dispatched for this event (${history.length})`}
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={th}>{isAr ? 'التاريخ' : 'When'}</th>
+                    <th style={th}>{isAr ? 'القناة' : 'Channel'}</th>
+                    <th style={th}>{isAr ? 'الحالة' : 'Status'}</th>
+                    <th style={th}>{isAr ? 'نجح/المستلمون' : 'Success/Recipients'}</th>
+                    <th style={th}>{isAr ? 'المُرسِل' : 'Dispatched by'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.slice(0, 10).map(c => (
+                    <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={td}>{(c.dispatchedAt ?? '').replace('T', ' ').slice(0, 16)}</td>
+                      <td style={td}>{CHANNEL_LABELS[c.channel]?.[isAr ? 'ar' : 'en'] ?? c.channel}</td>
+                      <td style={td}>
+                        <Badge tone={c.simulated ? 'warning' : cascadeStatusTone(c.status)} size="sm">
+                          {c.simulated
+                            ? `${c.status} · ${isAr ? 'محاكاة' : 'SIMULATED'}`
+                            : c.status}
+                        </Badge>
+                      </td>
+                      <td style={td}>{c.successCount}/{c.recipientCount}</td>
+                      <td style={td}>{c.dispatchedByName ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {history.length > 10 && (
+                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--ink-3)' }}>
+                  {isAr
+                    ? `تُعرض أحدث 10 من ${history.length}`
+                    : `Showing the 10 most recent of ${history.length}`}
+                </div>
+              )}
+            </div>
+          )}
         </Card>
       )}
 
@@ -258,9 +363,38 @@ export function CrisisCommsDispatchWizard() {
                 <span style={{ fontWeight: 600 }}>
                   {CHANNEL_LABELS[c][isAr ? 'ar' : 'en']}
                 </span>
+                {/* F2-147 — before the trigger, not after. Absent readiness renders
+                    nothing rather than an unearned reassurance. */}
+                {(() => {
+                  const r = readinessOf.get(c);
+                  if (!r) return null;
+                  return isSimulatedChannel(r)
+                    ? <Badge tone="warning" size="sm"
+                        title={isAr
+                          ? 'لا توجد بوابة مُهيّأة — سيُسجَّل الإرسال دون إرساله'
+                          : 'No gateway configured — the dispatch is recorded, not sent'}>
+                        {isAr ? 'محاكاة' : 'SIMULATED'}
+                      </Badge>
+                    : <Badge tone="success" size="sm">{isAr ? 'مباشر' : 'LIVE'}</Badge>;
+                })()}
               </label>
             ))}
           </div>
+          {selectedSimulated.length > 0 && (
+            <div style={{
+              marginTop: 12, padding: 10, borderRadius: 6, fontSize: 13,
+              background: 'var(--warning-soft, var(--surface-2))',
+              border: '1px solid var(--warning)', color: 'var(--ink-2)',
+            }}>
+              <AlertTriangle size={14} color="var(--warning)"
+                style={{ marginInlineEnd: 6, verticalAlign: 'text-bottom' }} />
+              {isAr
+                ? `${selectedSimulated.join('، ')}: لا توجد بوابة مُهيّأة. سيُسجَّل التدفّق كاملًا للتدقيق `
+                  + 'ولن تصل أي رسالة إلى المستلمين.'
+                : `${selectedSimulated.join(', ')}: no gateway is configured. The cascade will be `
+                  + 'recorded in full for audit and no message will reach anyone.'}
+            </div>
+          )}
           <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between' }}>
             <Button variant="ghost" onClick={() => setStep(1)}>
               <ChevronLeft size={16} style={{ marginInlineEnd: 6 }} />
@@ -388,16 +522,52 @@ export function CrisisCommsDispatchWizard() {
 
       {step === 5 && result && (
         <Card title={isAr ? 'نتيجة الإرسال' : 'Dispatch result'}>
+          {/* F2-147 — the honest headline. Placed above the counters, because the
+              counters are what an operator reads as "people were told". */}
+          {(result.simulatedChannels?.length ?? 0) > 0 && (
+            <div style={{
+              display: 'flex', gap: 10, alignItems: 'flex-start',
+              padding: 12, marginBottom: 16, borderRadius: 6,
+              background: 'var(--warning-soft, var(--surface-2))',
+              border: '1px solid var(--warning)',
+            }}>
+              <AlertTriangle size={18} color="var(--warning)" style={{ flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 13, color: 'var(--ink-1)' }}>
+                <strong>
+                  {isAr
+                    ? 'لم يتم إرسال هذه الرسائل فعليًا'
+                    : 'These messages were not actually sent'}
+                </strong>
+                <div style={{ marginTop: 4, color: 'var(--ink-2)' }}>
+                  {isAr
+                    ? `القنوات ${result.simulatedChannels!.join('، ')} مُحاكاة — لا توجد بوابة مُهيّأة لها، `
+                      + 'فالأعداد أدناه تسجّل ما كان سيُرسل. سجل التدفّق مكتمل للتدقيق، '
+                      + 'ولكنه ليس دليلًا على إبلاغ المستلمين.'
+                    : `${result.simulatedChannels!.join(', ')} ${result.simulatedChannels!.length === 1 ? 'has' : 'have'} `
+                      + 'no configured gateway, so the counters below record what would have been '
+                      + 'sent. The cascade is a complete audit record — it is not evidence that '
+                      + 'anyone was notified.'}
+                </div>
+              </div>
+            </div>
+          )}
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16,
           }}>
-            <Kpi label={isAr ? 'القنوات' : 'Channels'} value={String(result.cascades.length)} to="/notifications/channels" />
-            {/* F2-142: these two counted THIS cascade but linked to the fabricated global outbox.
+            {/* F2-142: these counted THIS cascade but linked to the fabricated global outbox.
                  The drill-through is removed rather than repointed at the inbox — a cascade's
-                 recipient count does not live there, and a link that goes somewhere wrong is worse
-                 than no link (F2-38's KRI ruling). */}
+                 channel and recipient counts do not live there, and a link that goes somewhere
+                 wrong is worse than no link (F2-38's KRI ruling). ⚠ The Channels KPI kept its
+                 `to` until F2-147 noticed the comment covered only its two neighbours; the route
+                 is an F2-142 redirect stub that lands on the notification inbox. */}
+            <Kpi label={isAr ? 'القنوات' : 'Channels'} value={String(result.cascades.length)} />
             <Kpi label={isAr ? 'المستلمون' : 'Recipients'} value={String(result.totalRecipients)} />
-            <Kpi label={isAr ? 'نجح' : 'Success'} value={String(result.totalSuccess)} tone="success" />
+            <Kpi
+              label={anySimulated
+                ? (isAr ? 'مُسجَّل (محاكاة)' : 'Logged (simulated)')
+                : (isAr ? 'نجح' : 'Success')}
+              value={String(result.totalSuccess)}
+              tone={anySimulated ? 'warning' : 'success'} />
             <Kpi label={isAr ? 'الزمن' : 'Elapsed'} value={`${result.elapsedMillis} ms`} to="/bcm/comms/dispatch" />
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -415,10 +585,17 @@ export function CrisisCommsDispatchWizard() {
                 <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={td}>{CHANNEL_LABELS[c.channel][isAr ? 'ar' : 'en']}</td>
                   <td style={td}>
-                    <Badge tone={cascadeStatusTone(c.status)}>
-                      {c.status === 'COMPLETED' && <CheckCircle2 size={12} style={{ marginInlineEnd: 4 }} />}
-                      {c.status === 'FAILED' && <AlertTriangle size={12} style={{ marginInlineEnd: 4 }} />}
-                      {c.status}
+                    {/* F2-147 — a simulated channel never renders COMPLETED with a green
+                        tick. The status is a real fact about the dispatch attempt, so it
+                        is kept; the tone and the tick are what implied delivery. */}
+                    <Badge tone={c.simulated ? 'warning' : cascadeStatusTone(c.status)}>
+                      {c.status === 'COMPLETED' && !c.simulated
+                        && <CheckCircle2 size={12} style={{ marginInlineEnd: 4 }} />}
+                      {(c.status === 'FAILED' || c.simulated)
+                        && <AlertTriangle size={12} style={{ marginInlineEnd: 4 }} />}
+                      {c.simulated
+                        ? `${c.status} · ${isAr ? 'محاكاة' : 'SIMULATED'}`
+                        : c.status}
                     </Badge>
                   </td>
                   <td style={td}>{c.successCount}</td>

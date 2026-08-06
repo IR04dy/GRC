@@ -81,15 +81,15 @@ PUBLISHED = {
     "perm_modules": 31,
     "packages_no_haspermission": 17,
     "module_tests": 3_199,
-    "suite_tests": 3_362,
+    "suite_tests": 3_379,
     # F2-03 floored all seven Tier-1 regulator-facing modules (2026-08-05/06), so this
     # fell 15 -> 8. The --check mode caught the drift the moment it was first run in
     # anger, which is F2-19b in one line: the guard existed and nothing ran it.
     "zero_test_packages": 8,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 350,
-    "migration_head": 362,
+    "migration_files": 351,
+    "migration_head": 363,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
     "fe_pages": 340,          # F2-142 retired 3 fabricated pages
     "fe_page_folders": 111,   # each was the only file in its folder, so -3 folders too

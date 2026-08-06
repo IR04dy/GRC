@@ -251,6 +251,111 @@ class CrisisCommsDispatchServiceTest {
             .log(any(), any(), any(), any());
     }
 
+    // ─── F2-147 — simulated dispatch must reach the row and the roll-up ──
+
+    @Test void dispatch_carriesSimulatedFlagOntoTheCascadeRowAndTheRollup() {
+        when(templateRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, 501L))
+            .thenReturn(Optional.of(approvedTemplate()));
+        // EMAIL really sent; SMS and WHATSAPP only logged.
+        when(emailSender.send(any(), any(), any(), any()))
+            .thenReturn(ChannelSender.SendResult.ok(2, "email: 2 ok, 0 failed"));
+        when(smsSender.send(any(), any(), any(), any()))
+            .thenReturn(ChannelSender.SendResult.simulated(2, "stub-sms: 2 recipients logged"));
+        when(whatsappSender.send(any(), any(), any(), any()))
+            .thenReturn(ChannelSender.SendResult.simulated(2, "stub-whatsapp: 2 recipients logged"));
+
+        DispatchResult out = service.dispatch(dispatchReq(
+            List.of("EMAIL", "SMS", "WHATSAPP"),
+            List.of("a@b.com", "b@b.com"),
+            Map.of("service_name", "mada", "eta_restored_at", "soon")));
+
+        // The counters are unchanged — a simulated cascade is still a complete
+        // audit row. What must not happen is the counters standing alone.
+        assertThat(out.totalSuccess()).isEqualTo(6);
+        assertThat(out.simulatedChannels()).containsExactly("SMS", "WHATSAPP");
+
+        assertThat(out.cascades())
+            .filteredOn(c -> "EMAIL".equals(c.channel()))
+            .allMatch(c -> Boolean.FALSE.equals(c.simulated()));
+        assertThat(out.cascades())
+            .filteredOn(c -> !"EMAIL".equals(c.channel()))
+            .allMatch(c -> Boolean.TRUE.equals(c.simulated()));
+
+        // And the row that goes to the database carries it, not just the DTO —
+        // the cascade row is what an auditor reads months later.
+        ArgumentCaptor<CrisisCommsCascade> rows = ArgumentCaptor.forClass(CrisisCommsCascade.class);
+        verify(cascadeRepo, times(3)).save(rows.capture());
+        assertThat(rows.getAllValues())
+            .filteredOn(r -> "SMS".equals(r.getChannel()))
+            .allMatch(r -> Boolean.TRUE.equals(r.getSimulated()));
+    }
+
+    @Test void dispatch_allLiveChannels_namesNoSimulatedChannel() {
+        when(templateRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, 501L))
+            .thenReturn(Optional.of(approvedTemplate()));
+        when(emailSender.send(any(), any(), any(), any()))
+            .thenReturn(ChannelSender.SendResult.ok(1, "email ok"));
+
+        DispatchResult out = service.dispatch(dispatchReq(
+            List.of("EMAIL"), List.of("a@b.com"),
+            Map.of("service_name", "mada", "eta_restored_at", "soon")));
+
+        assertThat(out.simulatedChannels()).isEmpty();
+        assertThat(out.cascades().get(0).simulated()).isFalse();
+    }
+
+    @Test void dispatch_simulatedFlagReachesTheF8Payload() {
+        when(templateRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, 501L))
+            .thenReturn(Optional.of(approvedTemplate()));
+        when(smsSender.send(any(), any(), any(), any()))
+            .thenReturn(ChannelSender.SendResult.simulated(1, "stub-sms: 1 recipient logged"));
+
+        service.dispatch(dispatchReq(
+            List.of("SMS"), List.of("+966500000000"),
+            Map.of("service_name", "mada", "eta_restored_at", "soon")));
+
+        ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+        verify(publisher, times(2)).publishEvent(captor.capture());
+        assertThat(captor.getAllValues().get(0).payload()).containsEntry("simulated", "true");
+        assertThat(captor.getAllValues().get(1).payload())
+            .containsEntry("simulatedChannels", "SMS");
+    }
+
+    // ─── F2-147 — readiness, so the operator learns before dispatching ──
+
+    @Test void channelReadiness_reportsEveryDispatchableChannel() {
+        when(emailSender.isHealthy()).thenReturn(true);
+        when(emailSender.deliveryMode()).thenReturn(ChannelSender.DeliveryMode.LIVE);
+        when(smsSender.isHealthy()).thenReturn(true);
+        when(smsSender.deliveryMode()).thenReturn(ChannelSender.DeliveryMode.SIMULATED);
+        when(whatsappSender.isHealthy()).thenReturn(true);
+        when(whatsappSender.deliveryMode()).thenReturn(ChannelSender.DeliveryMode.SIMULATED);
+
+        var readiness = service.channelReadiness();
+
+        // Every channel the request vocabulary accepts, including the two with
+        // no bean at all — "nothing would happen" is the answer that matters most.
+        assertThat(readiness).extracting("channelType")
+            .containsExactly("EMAIL", "SMS", "WHATSAPP", "TEAMS", "VOICE_BLAST");
+        assertThat(readiness).filteredOn(r -> r.channelType().equals("EMAIL"))
+            .allMatch(r -> r.registered() && r.healthy() && r.deliveryMode().equals("LIVE"));
+        assertThat(readiness).filteredOn(r -> r.channelType().equals("SMS"))
+            .allMatch(r -> r.registered() && r.deliveryMode().equals("SIMULATED"));
+        assertThat(readiness).filteredOn(r -> r.channelType().equals("TEAMS"))
+            .allMatch(r -> !r.registered() && !r.healthy()
+                && r.deliveryMode().equals("UNREGISTERED"));
+    }
+
+    @Test void channelReadiness_aSenderThatWontAnswerIsUnknownNotLive() {
+        // deliveryMode() unstubbed → null. The reassuring reading of a missing
+        // answer is "LIVE"; that is precisely what must not happen.
+        when(emailSender.isHealthy()).thenReturn(true);
+
+        assertThat(service.channelReadiness())
+            .filteredOn(r -> r.channelType().equals("EMAIL"))
+            .allMatch(r -> r.deliveryMode().equals("UNKNOWN"));
+    }
+
     // ─── Placeholder substitution ────────────────────────────────────
 
     @Test void applyPlaceholders_replacesDoubleBraceKeys() {

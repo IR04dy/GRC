@@ -24,14 +24,18 @@ public class SmsChannelSender implements ChannelSender {
     private static final Logger log = LoggerFactory.getLogger(SmsChannelSender.class);
 
     @Override public String channelType() { return "SMS"; }
-    @Override public boolean isHealthy() { return true; } // stub always healthy
+
+    /** Healthy — the stub works. {@link #deliveryMode()} is where it admits what it is. */
+    @Override public boolean isHealthy() { return true; }
+
+    @Override public DeliveryMode deliveryMode() { return DeliveryMode.SIMULATED; }
 
     @Override
     public SendResult send(List<String> recipients, String subject, String body, String correlationId) {
         int n = recipients == null ? 0 : recipients.size();
         log.info("[sms-stub] would dispatch corr={} to {} recipients (body={} chars)",
             correlationId, n, body == null ? 0 : body.length());
-        return SendResult.ok(n,
+        return SendResult.simulated(n,
             "stub-sms: " + n + " recipients logged; integrate STC/Mobily HTTP gateway in Sprint 12");
     }
 }

@@ -106,6 +106,12 @@ export interface CascadeResponse {
   dispatchedByName?: string;
   status: CascadeStatus;
   responsePayload?: string;
+  /**
+   * F2-147 — true when no gateway was involved: the counters above are what
+   * *would* have been sent. Persisted (V363), so it is still true on a cascade
+   * read back months later, which is when it matters.
+   */
+  simulated?: boolean;
 }
 
 export interface DispatchResult {
@@ -116,6 +122,26 @@ export interface DispatchResult {
   totalSuccess: number;
   totalFailure: number;
   elapsedMillis: number;
+  /**
+   * Channels that only logged. `totalSuccess` reads as "how many people were
+   * told"; the two are the same number only when this is empty — which is why
+   * no success figure in the UI may be rendered without consulting it.
+   */
+  simulatedChannels?: string[];
+}
+
+/** Per-channel readiness, so an operator learns this before a crisis (F2-147). */
+export interface ChannelReadiness {
+  channelType: ChannelType;
+  registered: boolean;
+  healthy: boolean;
+  /** LIVE | SIMULATED | UNREGISTERED | UNKNOWN — anything but LIVE means nothing is sent. */
+  deliveryMode: string;
+}
+
+/** True when this channel does not hand the message to any gateway. */
+export function isSimulatedChannel(r: ChannelReadiness): boolean {
+  return r.deliveryMode !== 'LIVE';
 }
 
 export interface PlaceholderDescriptor {
@@ -301,4 +327,8 @@ export function listCascades(crisisEventId?: number): Promise<CascadeResponse[]>
     ? `${CASCADE_BASE}/cascades?crisisEventId=${crisisEventId}`
     : `${CASCADE_BASE}/cascades`;
   return api.get<CascadeResponse[]>(url);
+}
+
+export function listChannelReadiness(): Promise<ChannelReadiness[]> {
+  return api.get<ChannelReadiness[]>(`${CASCADE_BASE}/channels`);
 }

@@ -22,11 +22,13 @@ public class WhatsAppChannelSender implements ChannelSender {
     @Override public String channelType() { return "WHATSAPP"; }
     @Override public boolean isHealthy() { return true; }
 
+    @Override public DeliveryMode deliveryMode() { return DeliveryMode.SIMULATED; }
+
     @Override
     public SendResult send(List<String> recipients, String subject, String body, String correlationId) {
         int n = recipients == null ? 0 : recipients.size();
         log.info("[whatsapp-stub] would dispatch corr={} to {} recipients", correlationId, n);
-        return SendResult.ok(n,
+        return SendResult.simulated(n,
             "stub-whatsapp: " + n + " recipients logged; integrate Meta Cloud API in Sprint 12");
     }
 }

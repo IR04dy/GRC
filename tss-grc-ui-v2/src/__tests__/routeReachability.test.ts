@@ -75,10 +75,18 @@ const INTENTIONALLY_OFF_NAV: Record<string, string> = {
 
   // F2-142 — retired screens, kept as redirects to the REAL inbox. They are deliberately NOT linked:
   // linking them back would restore the nav entries whose whole problem was advertising a delivery
-  // subsystem that had no server. A redirect with no inbound link is the intended end state, and
-  // `/notifications/channels` is absent from this list only because nothing ever linked it either.
+  // subsystem that had no server. A redirect with no inbound link is the intended end state.
+  //
+  // ⚠ This comment used to add that `/notifications/channels` was "absent from this list only
+  // because nothing ever linked it either". That was wrong, and this test proved it: the crisis
+  // dispatch wizard's `Channels` KPI carried `to="/notifications/channels"`, so the route had
+  // exactly one inbound link. F2-147 removed it — the drill-through landed on the notification
+  // inbox, where a cascade's channel count does not live — and this assertion fired immediately.
+  // A negative claim in a comment is not a measurement; the guard beside it was the measurement.
   '/notifications/outbox':          'F2-142 — retired fake outbox; redirect only, must stay unlinked',
   '/notifications/dispatch':        'F2-142 — retired fake dispatch console; redirect only, unlinked',
+  '/notifications/channels':        'F2-142 — retired fake channel console; redirect only. Its one '
+                                  + 'inbound link (the crisis wizard KPI) was removed by F2-147',
 
   // Opened by direct/QR link during an incident, when the operator is not browsing a sidebar.
   '/bcm/crisis/mobile':             'mobile crisis view — opened by direct link during an incident',

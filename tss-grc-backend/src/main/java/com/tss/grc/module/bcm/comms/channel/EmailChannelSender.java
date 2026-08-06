@@ -58,19 +58,32 @@ public class EmailChannelSender implements ChannelSender {
         return mailSender != null;
     }
 
+    /**
+     * Derived, not declared — so configuring {@code spring.mail.host} flips
+     * this channel to LIVE with no code change, and un-configuring it flips
+     * back. The one thing that must never happen is the two disagreeing.
+     */
+    @Override
+    public DeliveryMode deliveryMode() {
+        return mailSender == null ? DeliveryMode.SIMULATED : DeliveryMode.LIVE;
+    }
+
     @Override
     public SendResult send(List<String> recipients, String subject, String body, String correlationId) {
         if (recipients == null || recipients.isEmpty()) {
             return SendResult.ok(0, "no recipients");
         }
 
-        // No mail bean → dev-mode log-and-succeed so the cascade row is still
+        // No mail bean → dev-mode log-and-count so the cascade row is still
         // recorded against the crisis event (audit trail integrity wins over
-        // realism in environments where SMTP is not configured).
+        // realism in environments where SMTP is not configured) — but the row
+        // is flagged simulated, which is what keeps that trade honest. F2-147:
+        // before the flag existed, this branch was indistinguishable from a
+        // delivered send in the response, on the record and on screen.
         if (mailSender == null) {
             log.info("[email-stub] would dispatch corr={} to {} recipients (subject='{}')",
                 correlationId, recipients.size(), subject);
-            return SendResult.ok(recipients.size(),
+            return SendResult.simulated(recipients.size(),
                 "stub: JavaMailSender not configured; logged " + recipients.size() + " recipients");
         }
 

@@ -22,11 +22,13 @@ public class TeamsChannelSender implements ChannelSender {
     @Override public String channelType() { return "TEAMS"; }
     @Override public boolean isHealthy() { return true; }
 
+    @Override public DeliveryMode deliveryMode() { return DeliveryMode.SIMULATED; }
+
     @Override
     public SendResult send(List<String> recipients, String subject, String body, String correlationId) {
         int n = recipients == null ? 0 : recipients.size();
         log.info("[teams-stub] would post corr={} to {} channels", correlationId, n);
-        return SendResult.ok(n,
+        return SendResult.simulated(n,
             "stub-teams: " + n + " channels logged; integrate Microsoft Graph API in Sprint 12");
     }
 }

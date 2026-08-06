@@ -78,6 +78,19 @@ public class CrisisCommsCascade {
     @Column(name = "response_payload", columnDefinition = "NVARCHAR(MAX)")
     private String responsePayload;
 
+    /**
+     * True when no gateway was involved — the counters above are what
+     * <em>would</em> have been sent (F2-147, V363).
+     *
+     * <p>This column is why the flag is not merely a response field. A
+     * cascade row is the BCM evidence that people were notified, and it is
+     * read months later by an auditor who never saw the dispatch screen. A
+     * row that says {@code COMPLETED, 12/12} and cannot say "simulated" is
+     * an assertion that twelve people were told.
+     */
+    @Column(name = "simulated", nullable = false)
+    private Boolean simulated = false;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 

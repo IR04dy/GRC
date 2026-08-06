@@ -106,7 +106,9 @@ const KNOWN_UNREACHED: readonly string[] = [
   'lib/biaAssessments.ts#generateBcpFromBia',
   'lib/biaAssessments.ts#generateDrpFromBia',
   'lib/crisisComms.ts#archiveTemplate',
-  'lib/crisisComms.ts#listCascades',
+  // 'lib/crisisComms.ts#listCascades' — wired by F2-147: the dispatch wizard now shows the
+  // cascades already sent for the selected crisis event. Until then the only view of a cascade
+  // was the transient result step, which "Send another" discards.
   'lib/exerciseObserver.ts#listObservations',
   'lib/exerciseObserver.ts#observationsByType',
   'lib/exerciseRuntime.ts#getRunTimeline',

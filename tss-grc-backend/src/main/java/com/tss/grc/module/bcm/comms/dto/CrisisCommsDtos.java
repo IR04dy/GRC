@@ -102,10 +102,20 @@ public final class CrisisCommsDtos {
         LocalDateTime completedAt,
         String dispatchedByName,
         String status,
-        String responsePayload
+        String responsePayload,
+        /** F2-147 — true when nothing left the building on this channel. */
+        Boolean simulated
     ) {}
 
-    /** Multi-row response for one dispatch action (one row per channel). */
+    /**
+     * Multi-row response for one dispatch action (one row per channel).
+     *
+     * <p>{@code simulatedChannels} is the honest half of the roll-up
+     * (F2-147). {@code totalSuccess} answers "how many were counted", which
+     * an operator reads as "how many were told"; the two are the same number
+     * only when this list is empty. It is a list rather than a count so the
+     * UI can name the channels without walking the cascade rows.
+     */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record DispatchResult(
         Long crisisEventId,
@@ -114,6 +124,23 @@ public final class CrisisCommsDtos {
         Integer totalRecipients,
         Integer totalSuccess,
         Integer totalFailure,
-        Long elapsedMillis
+        Long elapsedMillis,
+        List<String> simulatedChannels
+    ) {}
+
+    /**
+     * Per-channel readiness — what an operator needs <em>before</em> pulling
+     * the trigger, not after (F2-147).
+     *
+     * @param channelType  EMAIL | SMS | WHATSAPP | TEAMS | VOICE_BLAST
+     * @param registered   a {@code ChannelSender} bean exists for this type
+     * @param healthy      the sender reports itself wired and ready
+     * @param deliveryMode LIVE | SIMULATED — whether a gateway is involved
+     */
+    public record ChannelReadiness(
+        String channelType,
+        boolean registered,
+        boolean healthy,
+        String deliveryMode
     ) {}
 }

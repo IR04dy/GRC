@@ -1,6 +1,7 @@
 package com.tss.grc.module.bcm.comms.controller;
 
 import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.CascadeResponse;
+import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.ChannelReadiness;
 import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.DispatchRequest;
 import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.DispatchResult;
 import com.tss.grc.module.bcm.comms.service.CrisisCommsDispatchService;
@@ -24,6 +25,7 @@ import java.util.UUID;
  *   GET  /api/v1/bcm/comms/v2/cascades                   — all cascades
  *   GET  /api/v1/bcm/comms/v2/cascades?crisisEventId=N   — per-event timeline
  *   GET  /api/v1/bcm/comms/v2/cascades/{externalId}      — one row
+ *   GET  /api/v1/bcm/comms/v2/channels                  — per-channel readiness
  * </pre>
  *
  * <p>Dispatch is restricted to operators who can actually pull the trigger
@@ -60,5 +62,16 @@ public class CrisisCommsDispatchController {
     @PreAuthorize("hasPermission('BCM','READ')")
     public CascadeResponse get(@PathVariable UUID externalId) {
         return service.get(externalId);
+    }
+
+    /**
+     * Per-channel readiness — which channels reach a gateway and which only
+     * log (F2-147). A READ, deliberately: an operator has to be able to see
+     * this while planning a cascade, not only after firing one.
+     */
+    @GetMapping("/channels")
+    @PreAuthorize("hasPermission('BCM','READ')")
+    public List<ChannelReadiness> channels() {
+        return service.channelReadiness();
     }
 }

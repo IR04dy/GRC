@@ -3,6 +3,7 @@ package com.tss.grc.module.bcm.comms.service;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.comms.channel.ChannelSender;
 import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.CascadeResponse;
+import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.ChannelReadiness;
 import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.DispatchRequest;
 import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.DispatchResult;
 import com.tss.grc.module.bcm.comms.entity.CrisisCommsCascade;
@@ -46,6 +47,15 @@ import java.util.stream.Collectors;
 public class CrisisCommsDispatchService {
 
     private static final Logger log = LoggerFactory.getLogger(CrisisCommsDispatchService.class);
+
+    /**
+     * The channel vocabulary {@code DispatchRequest} accepts — kept in step
+     * with the {@code @Pattern} on {@code DispatchRequest.channels}. Readiness
+     * reports every one of these, including any with no registered sender,
+     * because "nothing would happen" is the answer an operator most needs.
+     */
+    static final List<String> DISPATCHABLE_CHANNELS =
+        List.of("EMAIL", "SMS", "WHATSAPP", "TEAMS", "VOICE_BLAST");
 
     private final CrisisCommsTemplateV2Repository templateRepo;
     private final CrisisCommsCascadeRepository cascadeRepo;
@@ -178,6 +188,7 @@ public class CrisisCommsDispatchService {
                 c.setSuccessCount(result.successCount());
                 c.setFailureCount(result.failureCount());
                 c.setResponsePayload(result.responsePayload());
+                c.setSimulated(result.simulated());
                 c.setCompletedAt(LocalDateTime.now());
                 if (result.failureCount() == 0 && result.successCount() > 0) {
                     c.setStatus("COMPLETED");
@@ -207,14 +218,57 @@ public class CrisisCommsDispatchService {
         }
 
         long elapsed = System.currentTimeMillis() - started;
+
+        // F2-147 — which channels only logged. Named in the roll-up so the UI
+        // never has to infer it from a free-text provider string, and carried
+        // into the F8 event so the automation trail is honest too.
+        List<String> simulatedChannels = persisted.stream()
+            .filter(c -> Boolean.TRUE.equals(c.getSimulated()))
+            .map(CrisisCommsCascade::getChannel)
+            .toList();
+
         emitCompletedRollupEvent(req.crisisEventId(), template, persisted.size(),
-            totalRecipients, totalSuccess, totalFailure, elapsed, correlationId);
+            totalRecipients, totalSuccess, totalFailure, elapsed, correlationId,
+            simulatedChannels);
+
+        if (!simulatedChannels.isEmpty()) {
+            log.warn("[cascade] crisisEvent={} template={} — {} of {} channels SIMULATED ({}): "
+                    + "counters record intent, not delivery",
+                req.crisisEventId(), template.getTemplateCode(),
+                simulatedChannels.size(), persisted.size(),
+                String.join(",", simulatedChannels));
+        }
 
         return new DispatchResult(
             req.crisisEventId(),
             template.getId(),
             persisted.stream().map(CrisisCommsDispatchService::toResponse).toList(),
-            totalRecipients, totalSuccess, totalFailure, elapsed);
+            totalRecipients, totalSuccess, totalFailure, elapsed,
+            simulatedChannels);
+    }
+
+    // ─── Channel readiness ──────────────────────────────────────────
+
+    /**
+     * Per-channel readiness for every channel the dispatch request accepts.
+     *
+     * <p>F2-147: this is the surface that lets an operator find out a channel
+     * is simulated <em>before</em> a crisis rather than from a payload string
+     * afterwards, and it is the first caller {@code isHealthy()} has ever had
+     * — until now the SPI's health signal was a literal {@code true} that
+     * nothing read.
+     */
+    public List<ChannelReadiness> channelReadiness() {
+        return DISPATCHABLE_CHANNELS.stream().map(type -> {
+            ChannelSender sender = sendersByType.get(type);
+            if (sender == null) {
+                return new ChannelReadiness(type, false, false, "UNREGISTERED");
+            }
+            // A sender that declines to answer is reported UNKNOWN, never LIVE.
+            ChannelSender.DeliveryMode mode = sender.deliveryMode();
+            return new ChannelReadiness(type, true, sender.isHealthy(),
+                mode == null ? "UNKNOWN" : mode.name());
+        }).toList();
     }
 
     // ─── Placeholder substitution ───────────────────────────────────
@@ -255,6 +309,7 @@ public class CrisisCommsDispatchService {
         payload.put("successCount",    str(c.getSuccessCount()));
         payload.put("failureCount",    str(c.getFailureCount()));
         payload.put("status",          str(c.getStatus()));
+        payload.put("simulated",       str(Boolean.TRUE.equals(c.getSimulated())));
         publisher.publishEvent(new DomainEvent(
             c.getOrganisationId(),
             "CRISIS_COMMS_CASCADE_DISPATCHED",
@@ -267,7 +322,8 @@ public class CrisisCommsDispatchService {
     private void emitCompletedRollupEvent(Long crisisEventId, CrisisCommsTemplateV2 t,
                                           int channelCount, int totalRecipients,
                                           int totalSuccess, int totalFailure,
-                                          long elapsedMillis, String correlationId) {
+                                          long elapsedMillis, String correlationId,
+                                          List<String> simulatedChannels) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("crisisEventId",   str(crisisEventId));
         payload.put("templateId",      str(t.getId()));
@@ -277,6 +333,7 @@ public class CrisisCommsDispatchService {
         payload.put("totalSuccess",    str(totalSuccess));
         payload.put("totalFailure",    str(totalFailure));
         payload.put("elapsedMillis",   str(elapsedMillis));
+        payload.put("simulatedChannels", String.join(",", simulatedChannels));
         publisher.publishEvent(new DomainEvent(
             t.getOrganisationId(),
             "CRISIS_COMMS_CASCADE_COMPLETED",
@@ -307,7 +364,8 @@ public class CrisisCommsDispatchService {
             c.getCompletedAt(),
             c.getDispatchedByName(),
             c.getStatus(),
-            c.getResponsePayload()
+            c.getResponsePayload(),
+            Boolean.TRUE.equals(c.getSimulated())
         );
     }
 }
