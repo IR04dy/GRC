@@ -1,5 +1,5 @@
 ﻿import { lazy, Suspense } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { I18nProvider } from './lib/i18n';
 import { ToastProvider } from './lib/toast';
 import { ThemeProvider } from './lib/theme';
@@ -275,7 +275,6 @@ const CommunicationsPage     = lazy(() => import('./pages/comms/CommunicationsPa
 const CapaPage               = lazy(() => import('./pages/capa/CapaPage').then(m => ({ default: m.CapaPage })));
 const CapaDetailPage         = lazy(() => import('./pages/detail/CapaDetailPage').then(m => ({ default: m.CapaDetailPage })));
 const DsrPortalPage          = lazy(() => import('./pages/portal/DsrPortalPage').then(m => ({ default: m.DsrPortalPage })));
-const SpeakUpPortalPage      = lazy(() => import('./pages/portal/SpeakUpPortalPage').then(m => ({ default: m.SpeakUpPortalPage })));
 const CaseTrackerPage        = lazy(() => import('./pages/portal/CaseTrackerPage').then(m => ({ default: m.CaseTrackerPage })));
 const TrustCenterPage        = lazy(() => import('./pages/portal/TrustCenterPage').then(m => ({ default: m.TrustCenterPage })));
 const IntakeInboxPage        = lazy(() => import('./pages/intake/IntakeInboxPage').then(m => ({ default: m.IntakeInboxPage })));
@@ -366,6 +365,18 @@ const RiskBowTieDetailPage   = lazy(() => import('./pages/risk/RiskBowTieDetailP
 const GrcExpertPage          = lazy(() => import('./pages/expert/GrcExpertPage').then(m => ({ default: m.GrcExpertPage })));
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { AppLayout } from './components/layout/AppLayout';
+
+/**
+ * Redirect that carries the query string across.
+ *
+ * `<Navigate to="/x">` drops `?org=`, and since F2-83 that parameter is the only thing telling a
+ * public portal which tenant a submission belongs to — losing it would turn a link a bank already
+ * published into a 404.
+ */
+function RedirectPreservingQuery({ to }: { to: string }) {
+  const { search } = useLocation();
+  return <Navigate to={to + search} replace />;
+}
 
 export function App() {
   return (
@@ -753,7 +764,14 @@ export function App() {
 
               {/* Public-facing intake portals (DD-55..57) — no auth */}
               <Route path="/portal/dsr"         element={<DsrPortalPage />} />
-              <Route path="/portal/speakup"     element={<SpeakUpPortalPage />} />
+              {/* F2-137 — /portal/speakup was a SECOND whistleblower intake, and it never reached
+                  the server: it wrote reports to the reporter's own browser via lib/intake's
+                  localStorage overlay, showed them a reference code, and no ethics officer could
+                  ever see them. Retired in favour of the real page, which posts to
+                  /api/v1/ethics/whistleblower/public/submit. The query string is carried across
+                  because F2-83 made ?org= load-bearing and a bank may already have published a
+                  /portal/speakup?org=... link. */}
+              <Route path="/portal/speakup"     element={<RedirectPreservingQuery to="/ethics/whistleblower/submit" />} />
               <Route path="/portal/track"       element={<CaseTrackerPage />} />
               <Route path="/portal/trust-center" element={<TrustCenterPage />} />
 

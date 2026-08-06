@@ -47,7 +47,7 @@ that will be read as current forever.
 | **Database** schemas holding tables (dev & prod) | **51** | *not measured* | the 51st is `audit`, which JPA does not know — §7 |
 | Flyway migrations on disk | **346** files, `V1`–`V358`, 4.40 MB | 304 / `V1`–`V314` | next free **V359** |
 | **Deployed** Flyway baseline / head | **baseline `V292`**, head **`V336`**, **8 pending** | *pub. "baseline V312"* | ⚠ see §0.1 — load-bearing and wrong |
-| Frontend pages (`.tsx` under `pages/`) | **344** in **114** folders | 329 / 114 | S5c split the 1,036-line `ChangesPage` into `pages/change/` — +7 files, same folder count; then `ChangeConditionsCard` (S7e), `ChangeEvidence` (S8a), `ChangeKpiPack` (S8b), `ChangeModelCatalogue` (S8e), `UnauthorisedChangeRegister` (S8f), `ForwardSchedulePanel` (S8g), `EngineRoutingPanel` (S8h) and `CabWorkspacePage` (CE-13 — the first of these with a **route** of its own, not a card) |
+| Frontend pages (`.tsx` under `pages/`) | **343** in **114** folders | 329 / 114 | S5c split the 1,036-line `ChangesPage` into `pages/change/` — +7 files, same folder count; then `ChangeConditionsCard` (S7e), `ChangeEvidence` (S8a), `ChangeKpiPack` (S8b), `ChangeModelCatalogue` (S8e), `UnauthorisedChangeRegister` (S8f), `ForwardSchedulePanel` (S8g), `EngineRoutingPanel` (S8h) and `CabWorkspacePage` (CE-13 — the first of these with a **route** of its own, not a card). **343 after F2-137 deleted `SpeakUpPortalPage.tsx`** — a second whistleblower intake that wrote to `localStorage`; the F2-19b census gate caught the -1 on its first run after the delete |
 | Routes registered in `App.tsx` | **329** | 328 | CE-13 added `/changes/cab` — the CAB workspace, and the route CE-0 withheld its sidebar row for |
 | Sidebar navigation entries | **194** | 184 | CE-13 added the CAB-queue row |
 | Mock-data import statements | **30** in **26** files | 44 / 29 | W2-1 removed 14 |
@@ -73,7 +73,7 @@ today's tree, and against **an export of `99a719da`, the commit this page's own 
 (`baseline_census.py --root <exported tree>`).
 
 **17 of the 20 published figures reproduce at that commit to the digit** — module LoC to the unit
-(186,285), endpoints (2,160), pages (344), routes (329), nav (194), mock statements (44), suite tests
+(186,285), endpoints (2,160), pages (343), routes (329), nav (194), mock statements (44), suite tests
 (2,415), zero-test packages (19), and every per-module row in §1 (`bcm` 25,130 / 50 / 261 / 139 / 395 /
 7 out / 88 edges / 2 in — identical). That is what makes the three misses *findings*: the method
 reproduces, so a figure that does not reproduce is a defect in the document, not in the measurement.
