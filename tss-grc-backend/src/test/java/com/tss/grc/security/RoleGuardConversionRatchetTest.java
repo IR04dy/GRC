@@ -361,7 +361,16 @@ class RoleGuardConversionRatchetTest {
         "RISK_ANALYST", "RISK_MANAGER", "RISK_OWNER", "SBOM_INGEST",
         "SCANNER_INGEST", "SECURITY_ANALYST", "SERVICE_OWNER", "SIEM_INGEST",
         "SUPPLIER_MANAGER", "SUPPLIER_USER", "SUSTAINABILITY_OFFICER", "TI_INGEST",
-        "VIEWER", "VULN_MANAGER");
+        "VIEWER", "VULN_MANAGER",
+        // ── seated by V362 (F2-145 / ADR-017 D-14), 58 -> 67 ────────────────────────────────────
+        // ⚠ This copy MUST be updated in the same commit as the migration that seats a role, and
+        // that is the cost of pinning it. A stale catalogue does not fail: it reports nine roles
+        // that now exist as ghosts, i.e. it INVENTS defects — the reassuring direction is the other
+        // one, so this is the direction worth stating. The nine are what F2-145 measured as domain
+        // roles living only in guard text across six Saudi/financial modules.
+        "SHARIA_OFFICER", "SHARIA_AUDITOR", "ETHICS_OFFICER", "OPEN_BANKING_OFFICER",
+        "AML_OFFICER", "KYC_OFFICER", "ONBOARDING_AGENT", "CONSUMER_PROTECTION_OFFICER",
+        "CREDIT_OFFICER");
 
     /**
      * Ghost names measured 2026-08-06: <b>28</b>. <b>MUST only ever decrease.</b>
@@ -440,8 +449,29 @@ class RoleGuardConversionRatchetTest {
      * compliance-officer ownership of ethics oversight — F2-145's reasoning, applied to a second module.
      * A one-line change removing two dead names therefore moves this baseline by one, which is the
      * clearest illustration available of why this number is a <em>name</em> count and not a defect count.
+     *
+     * <p><b>23 → 14 (F2-145 / ADR-017 D-14, V362): the biggest single fall, and by the opposite
+     * mechanism to every previous one.</b> Every earlier drop removed a name from a <em>guard</em>. This
+     * one changes nothing in {@code module/**}: {@code V362} seats the nine roles — {@code SHARIA_OFFICER},
+     * {@code SHARIA_AUDITOR}, {@code ETHICS_OFFICER}, {@code OPEN_BANKING_OFFICER}, {@code AML_OFFICER},
+     * {@code KYC_OFFICER}, {@code ONBOARDING_AGENT}, {@code CONSUMER_PROTECTION_OFFICER},
+     * {@code CREDIT_OFFICER} — so the guards that always named them start matching. {@code hasAnyRole}
+     * compares names, so this required no annotation edit at all; live-proven 403 → 200 on
+     * {@code /api/v1/sharia/scholars} with {@code ShariaController} untouched.
+     *
+     * <p>⚠ <b>A falling count here is now ambiguous and the javadoc has to say so.</b> Two very different
+     * events reduce it: a dead leg is <em>deleted</em> from a guard (access unchanged, the record of intent
+     * lost) or the named role is <em>seated</em> (access granted, intent met). This drop is entirely the
+     * second kind. Reading the number alone, they are indistinguishable — which is exactly why F2-52's
+     * sweep is a per-site review rather than a rename pass.
+     *
+     * <p>⚠ The four remaining {@code MODEL_OWNER}/{@code SHARIA_BOARD_CHAIR}-style names were
+     * <b>deliberately not seated</b>: D-14 resolves them by binding to data the platform already holds
+     * ({@code ml_model.model_owner_user_id}, populated on 25 of 25 rows; {@code sharia_scholar.ssb_role},
+     * a 5-row board with terms). Seating them would have been <em>looser</em> than the column — the owner
+     * of model A could act on model B — so this baseline is not simply "make it fall".
      */
-    private static final int BASELINE_GHOST_ROLE_NAMES = 23;
+    private static final int BASELINE_GHOST_ROLE_NAMES = 14;
 
     // ── extraction ────────────────────────────────────────────────────────────────────────────
 

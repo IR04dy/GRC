@@ -32,6 +32,16 @@ Conversion is behaviour-preserving: catalogue the permission, then grant it to e
 `hasAnyRole` list named, so day-one behaviour is identical. This is a refactor, not a policy change —
 which is what makes it safe to do at scale.
 
+> ### ⚠ Amended 2026-08-06 (ADR-017 D-14) — behaviour-preserving conversion is only safe where the behaviour is correct
+>
+> The rule above is right in general and **wrong for every guard that names a role which does not exist**. *“The roles the old list named”* is ambiguous, and the ambiguity only bites when a name is a ghost: it can mean **the names written in the expression** or **the roles that could ever match**. Behaviour-preservation picks the second.
+>
+> F2-145 measured six Saudi/financial modules where those differ. `consumer` recites `CONSUMER_PROTECTION_OFFICER` on all 9 of its guards and that role exists nowhere, so the only non-administrator holder is `COMPLIANCE_OFFICER`. Converting behaviour-preservingly would catalogue `CONSUMER:*` and grant it to compliance — **encoding in the grant table the attrition the finding exists to report**. A dead guard leg is at least evidence of unmet intent; a grant is a decision, and it is the artefact an auditor reads.
+>
+> **The rule, restated:** where a `hasAnyRole` list names a role that does not exist, resolve the ghost **first** — by ADR-017 D-14's three mechanisms (seat the role · bind to the record · seat on a body) — and grant the new permission to the **intended** population, which the ghost name is the only surviving record of. Never fold the resolution into the conversion.
+>
+> 🔑 Same ordering D-13 required for the same reason: **fix what the guard is asking about before you change which guard asks it.** A conversion is a refactor only when it preserves something worth preserving.
+
 Two ratchets, both monotonic: **coverage** (unguarded write endpoints — at 21, enumerated floor) and
 **tightness** (`hasAnyRole` occurrences in `module/**` — to zero). A third report, not yet a ratchet:
 roles-per-permission, flagging any business-write permission held by more than half of roles or by any

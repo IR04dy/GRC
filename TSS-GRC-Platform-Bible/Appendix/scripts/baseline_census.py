@@ -88,8 +88,8 @@ PUBLISHED = {
     "zero_test_packages": 8,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 349,
-    "migration_head": 361,
+    "migration_files": 350,
+    "migration_head": 362,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
     "fe_pages": 340,          # F2-142 retired 3 fabricated pages
     "fe_page_folders": 111,   # each was the only file in its folder, so -3 folders too

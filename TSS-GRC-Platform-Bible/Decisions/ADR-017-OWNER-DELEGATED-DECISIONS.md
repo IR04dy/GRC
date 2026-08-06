@@ -958,11 +958,132 @@ one been, F2-13b's anti-pattern — a catalogued permission guarding no endpoint
 
 ---
 
+## D-14 — F2-145: the seven Saudi/financial modules' domain roles — **three mechanisms, not two options**
+
+**The decision asked for:** which of the seven modules' ghost domain roles should exist?
+
+**The finding offered a binary and it is the wrong frame.** F2-145 recommends either *(a)* seat the roles
+or *(b)* convert to `MODULE:*` permissions per ADR-010. Measuring what the platform **already models**
+shows the eleven ghost names are not one kind of thing, and two of them already have their answer built
+and populated in the database. Answering (a)-or-(b) uniformly would have created a role for a fact the
+schema already records.
+
+### The measurement (re-taken from the authorities, not from the row)
+
+Read from `iam.roles`, `iam.permissions` and the reflection dump — **611 guard sites across 38 packages**;
+a `grep` is not admissible here, because these guards span source lines (F2-13a: 3 by grep, 73 by
+reflection).
+
+| module | perm module | ghost names (guard sites) | who actually holds it today |
+|---|---|---|---|
+| `sharia` | **none** | `SHARIA_OFFICER` 21 · `SHARIA_AUDITOR` 17 · `SHARIA_BOARD_CHAIR` 4 · `CRO` 13 | PLATFORM_ADMIN 21, COMPLIANCE_OFFICER 21, RISK_MANAGER 9, INTERNAL_AUDITOR 9 |
+| `ethics` | **none** | `ETHICS_OFFICER` **22** · `AUDIT_COMMITTEE_MEMBER` 6 | PLATFORM_ADMIN 26, COMPLIANCE_OFFICER 26, BOARD_SECRETARY 11 |
+| `openbanking` | **none** | `OPEN_BANKING_OFFICER` 15 · `CRO` 3 | PLATFORM_ADMIN 18, COMPLIANCE_OFFICER 18, RISK_MANAGER 9, CISO 9 |
+| `aml` | **none** | `AML_OFFICER` 14 · `KYC_OFFICER` 6 · `ONBOARDING_AGENT` 5 | PLATFORM_ADMIN 14, COMPLIANCE_OFFICER 13, CISO 7 |
+| `cpty` | **none** | `CRO` 14 · `CREDIT_OFFICER` 12 | PLATFORM_ADMIN 14, RISK_MANAGER 12, CFO 10 |
+| `consumer` | **none** | `CONSUMER_PROTECTION_OFFICER` 9 | **PLATFORM_ADMIN 9 and COMPLIANCE_OFFICER 9 — nobody else at all** |
+| `ai` | **`AI` (READ/WRITE/EXPORT)** | `MODEL_OWNER` 14 · `CIO` 11 · `CRO` 8 | RISK_MANAGER 23, CISO 20, DPO 19, AUDITOR 14 |
+
+Three corrections to the row fall straight out of this:
+
+1. **`ETHICS_OFFICER` is 22 sites, not 23** — D-13 removed one when `SUBMIT_GUARD` became
+   `isAuthenticated()`. The row was right when written.
+2. **`ai` does not belong in the seven.** It is the only one with a catalogued permission module, and its
+   surviving population — risk manager, CISO, DPO, auditor — *is* a defensible AI-governance population.
+   The row's own criterion is *"the module belongs to whoever else the guard lists — usually
+   `COMPLIANCE_OFFICER`"*; in `ai`, `COMPLIANCE_OFFICER` appears on 5 of 26 sites. **So it is six modules
+   with the F2-145 defect, and `ai` has a different one** (below).
+3. **`cpty` is the mildest and `consumer` the most severe.** `cpty` loses *both* its domain names (`CRO`
+   14, `CREDIT_OFFICER` 12) but keeps RISK_MANAGER and the CFO, so counterparty credit is at least held by
+   risk. `consumer` has **no non-administrator holder except compliance on any of its 9 guards**: the SAMA
+   consumer-protection module is compliance's, entirely, by attrition.
+
+**And one fact that makes the cost of (a) much lower than assumed:** all **58** rows in `iam.roles` carry
+`organisation_id = NULL` and `is_system_role = 1`. Roles here are **global**, not per-tenant — so seating
+one is a single insert plus grants, not a per-tenant provisioning exercise. That was worth measuring
+before choosing, because "seat eight roles across every tenant" and "insert eight rows" are different
+decisions.
+
+### Decision — classify by asking what the platform already models
+
+| mechanism | the test | applies to |
+|---|---|---|
+| **1. Seat the role** | the ghost names a **job family** inside the institution, and nothing in the schema records who holds it | `SHARIA_OFFICER`, `SHARIA_AUDITOR`, `ETHICS_OFFICER`, `OPEN_BANKING_OFFICER`, `AML_OFFICER`, `KYC_OFFICER`, `ONBOARDING_AGENT`, `CONSUMER_PROTECTION_OFFICER`, `CREDIT_OFFICER` — **9 roles** |
+| **2. Bind to the record** | the platform already stores **who, on this row** | `MODEL_OWNER` |
+| **3. Seat on a body, not a role** | the person holds a **term-limited seat**, may be external, and is already a row | `SHARIA_BOARD_CHAIR` |
+
+**Mechanism 2 — `MODEL_OWNER` is a category error, not a missing role.**
+`ai_governance.ml_model.model_owner_user_id` **exists and is populated on 25 of 25 rows**, resolving to
+real `iam.users` (`admin`, `ranalyst`). So the platform knows exactly who owns each model, per model, and
+`hasAnyRole('MODEL_OWNER')` asks instead whether the caller belongs to a job family called MODEL_OWNER —
+a question the data cannot answer and was never meant to. **The fix is an entity-bound guard against
+`model_owner_user_id`**, which the platform already does at scale (`BASELINE_ENTITY_BOUND_WRITES` = 214).
+Seating a `MODEL_OWNER` role would have been actively wrong: it would let the owner of model A act on
+model B, which is looser than what the column supports today. ➕ Separately, `ai` has **4 APPROVE-shaped
+methods and no `AI:APPROVE`** catalogued — noted for the conversion, not a live gap, since those guards
+are role-based today.
+
+**Mechanism 3 — the Sharia board is already a roster.**
+`sharia.sharia_scholar` holds **5 rows** — `ssb_role` ∈ {`CHAIRMAN`, `MEMBER`×3, `SECRETARY`}, one
+`TERM_EXPIRING`, with `term_start`/`term_end`, `credentials`, `coi_declared_at`, `annual_fee_sar`,
+`meetings_attended_ytd` and institutional emails. **A Sharia board chair is a seat with a term, not a job
+family** — and the table has **no `user_id` column**, which is [[F2-26]]'s roster→user linkage problem
+exactly. So `SHARIA_BOARD_CHAIR` is not seated as a role; the scholar path binds to
+`sharia_scholar.ssb_role = 'CHAIRMAN'` once that linkage exists, and until then it stays a **declared gap
+rather than a fabricated role**. `SHARIA_OFFICER` and `SHARIA_AUDITOR` *are* job families — the
+institution's internal Sharia-compliance and Sharia-audit functions, distinct from the external board —
+and they are seated.
+
+**The permission layer is orthogonal and still required.** Six of the seven modules have **no catalogued
+permission module at all**, so ADR-010 conversion applies on top. Action sets derived from the guarded
+method names rather than convention: `SHARIA` READ/WRITE/APPROVE · `ETHICS` READ/WRITE/APPROVE ·
+`OPENBANKING` READ/WRITE/APPROVE · `AML` READ/WRITE/APPROVE · `CPTY` READ/WRITE (**no APPROVE-shaped
+method exists**) · `CONSUMER` READ/WRITE/APPROVE = **17 permissions**. **No `EXPORT` for any of them** —
+none has an export handler, and a catalogued permission guarding no endpoint is F2-13b's anti-pattern
+(15 already exist).
+
+### ⚠ The part that changes another ADR: behaviour-preserving conversion would ratify the defect
+
+ADR-010 says conversion is *"behaviour-preserving: catalogue the permission, then grant it to exactly the
+roles the old `hasAnyRole` list named, so day-one behaviour is identical. This is a refactor, not a policy
+change — which is what makes it safe to do at scale."*
+
+**That rule is correct in general and wrong for exactly this set.** "The roles the old list named" is
+ambiguous in a way that only matters when a name is a ghost: it can mean *the names written in the
+expression* or *the roles that could ever match*. For these six modules the two differ, and the
+behaviour-preserving reading picks the second — so converting `consumer` would catalogue `CONSUMER:*` and
+grant it to `PLATFORM_ADMIN` + `COMPLIANCE_OFFICER`, **permanently encoding in data the attrition that
+F2-145 exists to report**. The guard's dead leg is at least evidence of intent; a grant table is a
+decision.
+
+**Amendment (carried into ADR-010 §Conversion):** *behaviour-preserving conversion is only safe where the
+current behaviour is correct.* Where a `hasAnyRole` list names a role that does not exist, the conversion
+must grant to the **intended** population — which the ghost name records — and the ghost must be resolved
+by this decision's three mechanisms **before** the conversion, not dropped as part of it. This is the same
+ordering D-13 needed: **bind the subject first, then move the guard.**
+
+### What ships, in order
+
+1. **A migration** seating the 9 roles (global, `is_system_role = 1`), cataloguing the 17 permissions, and
+   granting them to the intended population — the ghost names plus the real ones already on each guard.
+2. **The guard conversion** per module, `hasAnyRole` → `hasPermission`, which is F2-05's backlog and now
+   has an approved grantee list to convert *to*.
+3. **`MODEL_OWNER`** → entity-bound guard on `model_owner_user_id`. Not a role, not a permission.
+4. **`SHARIA_BOARD_CHAIR`** → waits on [[F2-26]]'s roster linkage. Recorded as a gap, deliberately not
+   filled with a role.
+
+⚠ **`CRO`, `CIO`, `AUDIT_COMMITTEE_MEMBER` and `BOARD_MEMBER` are NOT in scope here.** They appear across
+these modules (`CRO` on 13 sharia + 14 cpty + 8 ai + 3 openbanking) but they are platform-wide governance
+identities, not any module's domain role — F2-52's own remaining queue, and `BOARD_MEMBER` /
+`AUDIT_COMMITTEE_MEMBER` are [[F2-26]] seats by the same reasoning as the Sharia chair.
+
+---
+
 ## Consequences
 
 **Unblocked immediately:** Wave 2 (W2-0, F2-04) via D-1; S6/S7/S8/CE-13 via D-2 and D-3; F2-42, F2-49,
 F2-53, and the fraud/integration/export tails. F2-144 via D-13, which also converts the authorisation
-ratchet from a count ceiling to a pinned set.
+ratchet from a count ceiling to a pinned set. F2-145 via D-14 — which also amends ADR-010's conversion rule, because behaviour-preserving conversion of a guard whose behaviour is wrong ratifies the defect.
 
 **Newly scheduled work this ADR creates**, in dependency order — each needs its own verified slice, none is
 done by this document: the module-registry SKU reconciliation (D-1); per-tenant CAB configuration with

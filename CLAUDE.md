@@ -98,13 +98,13 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V361 packaged; next free V362** (349 files; ⚠ this line said "V1→V295 / next free
+— **V1→V362 packaged; next free V363** (350 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V361 are pending** the
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V362 are pending** the
 next jar). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
@@ -199,7 +199,7 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   query filters `organisation_id`** (developer responsibility); prod adds a
   tenant write-guard interceptor. Schedulers/async must be org-explicit.
 - **Authorization** — `@PreAuthorize("hasPermission('MODULE','ACTION')")` via
-  `ModulePermissionEvaluator`; **114-permission catalogue across 31 modules**
+  `ModulePermissionEvaluator`; **131-permission catalogue across 37 modules** (V362 added 17 across 6)
   (READ/WRITE/APPROVE/DELETE/TRIAGE/EXPORT), measured 2026-08-01 in both dev and
   prod — this line said "94 / 24" for months; **PLATFORM_ADMIN bypasses in code**,
   so `admin` proves nothing about authorization: probe with a real persona.
