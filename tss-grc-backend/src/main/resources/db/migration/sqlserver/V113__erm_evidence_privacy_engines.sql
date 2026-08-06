@@ -73,6 +73,33 @@ BEGIN
 END
 GO
 
+-- ⚠ F2-77 — THE COLUMN THIS INDEXES IS CREATED BY NO MIGRATION. IT IS CREATED HERE.
+--
+-- The comment below says "The column was already there per V47". It was not: V47's
+-- evidence_items ALTER adds five chain_* columns and no review_due_date. Measured across all
+-- 348 migrations, NOTHING adds review_due_date to evidence.evidence_items — V8 creates the
+-- table (31 columns) without it, and V197 creates a same-named column on a different table.
+-- The live databases have it (date NULL, 77 populated rows), so it arrived from the Python
+-- bootstrap in dev and from the pre-baseline restore in prod.
+--
+-- This file's own header is the category error in one sentence: "A surprising amount of the
+-- schema was already in place (… EvidenceItem chain-of-custody + review_due_date …)". It was
+-- already in place IN THE DATABASE. The author checked the database, not the migration
+-- history, and the folder has been maintained that way throughout — which is F2-77's thesis.
+--
+-- Creating it here rather than backdating it into V8: this is the file where the
+-- evidence-freshness feature appears and the first that needs the column, so this is where it
+-- belongs in an ordered history. Guarded, so it is a no-op on every database that already has
+-- it — which is both live databases — and V113 is below Flyway baseline 292, so prod never
+-- runs it at all.
+IF NOT EXISTS (SELECT 1 FROM sys.columns
+               WHERE object_id = OBJECT_ID(N'evidence.evidence_items')
+                 AND name = N'review_due_date')
+BEGIN
+    ALTER TABLE evidence.evidence_items ADD review_due_date DATE NULL;
+END
+GO
+
 -- ─── §5.9 #5 — Evidence freshness — ensure review_due_date is indexed ─
 -- The column was already there per V47; add an index so the sweep query
 -- (where review_due_date < today AND status not in terminal) is cheap.
