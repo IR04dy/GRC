@@ -969,6 +969,41 @@ Start-Service TssGrcBackend
 Invoke-RestMethod http://localhost:8091/actuator/health
 ```
 
+### ⚠ State as of 2026-08-06 — read this before the ordered list below
+
+The numbered list that follows is **historical**: items 0–4 are struck through and the sequencing
+line in §3 ends at W0-6. This block is what is actually true now, so a reader does not plan against
+a finished queue.
+
+**The migration chain runs V1→V330 of 360**, up from V120 that morning — 210 files, from a folder
+where 279 had never been executed by anything. Closed on the way: F2-38, F2-42, F2-57, F2-79, F2-88,
+F2-143, F2-144(a), plus F2-16's page-size ratchet and F2-52's role-existence gate. Filed with
+measurements: F2-140, F2-141, F2-142, F2-143, F2-144.
+
+🔑 **Nothing further can be verified on this machine until C: has space.** SQL Server Express keeps
+its data directory there and C: is at ~0.25 GB, so `CREATE DATABASE` fails (OS error 112) and with it
+the chain proof, F2-09, every migration and every live probe. The scratchpad and `npx vitest run`
+fail too. ⚠ **And it does not present as a disk problem** — see the landmine in `CLAUDE.md`: a full
+C: surfaces as test errors in whichever class the runner reached. Backend single-class and
+whole-suite `mvn test` still work, which is what makes the failures look like code.
+
+**Blocked on an owner decision, not on effort** — each has its evidence in its row:
+
+| | decision |
+|---|---|
+| **V331** | a board pack targets `EXEC_COMMITTEE`; the committee seed creates no such committee. Seed one, or retarget the demo pack |
+| **F2-140** | three live `compliance.*` tables (111 rows) built by no migration and mapped by no entity — drop, or give DDL + entity |
+| **F2-141** | five tables (37 rows) referenced by **no Java code at all**. Should they exist? `reporting.report_definitions` looks like a superseded duplicate of `ndi.report_definition` |
+| **F2-142** | `/notifications/outbox` claims delivery over EMAIL/SMS/WHATSAPP/**NAFATH**/**TADAWUL_PORTAL** with no server. Retire the page (the F2-137 precedent), or scope real delivery |
+| **F2-92** | re-enable the prod tenant-write guard under supervision. Four hypotheses eliminated; the deployed runtime is the last variable |
+| **F2-144(b)** | `isAuthenticated()` on the COI submit endpoint needs an ADR exception, following F2-53's ruling for knowledge-base reads. Part (a) has landed, so it is now safe |
+
+**Unblocked but multi-session, so not started rather than half-started:** F2-11 (`ndi` containment,
+82 writes), F2-12 + F2-16 (`NdiPage.tsx` 4,969 lines, `EsgPage.tsx` 5,582 — split `EsgPage` first,
+`sust` has the tests to catch mistakes), F2-17 (k6 at realistic volumes), F2-14 (ControlHealth SPI),
+and F2-52's remaining 27 ghost role names — a **per-site review, not a rename pass**: F2-144 showed
+the first one's dead leg was the only thing preventing an unbound write.
+
 ### Next engineering slices, in order
 
 **0. Resolve F2-28's open design questions first.** ⚠ *Corrected: a reviewer said F2-28's "whole
