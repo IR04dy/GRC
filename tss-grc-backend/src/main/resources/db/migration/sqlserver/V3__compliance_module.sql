@@ -45,6 +45,19 @@ BEGIN
         name_en         NVARCHAR(255)         NOT NULL,
         name_ar         NVARCHAR(255)         NULL,
         framework       NVARCHAR(100)         NOT NULL,
+        -- ⚠ framework_id added 2026-08-06 (F2-77/V342). V342 creates
+        -- FK_controls_framework on compliance.controls.framework_id, and on a Flyway-built
+        -- database that failed with SQL 1769 "references invalid column": NO migration ever
+        -- added the column. Dev and prod both have it (bigint, nullable) because the Python
+        -- bootstrap added it, so V342 succeeded in prod against a column a script had put
+        -- there. Third instance of F2-146's shape in one chain run, after COM-EXEC and the
+        -- four unflagged system roles.
+        --
+        -- It is declared HERE, in the CREATE, because V341 and V342 are both at or below the
+        -- deployed head (V344) and their checksums are recorded — they cannot be edited. V3 is
+        -- far below the baseline of 292, so it can. Column only, no FK: V342 owns the
+        -- constraint, and compliance.frameworks does not exist yet at V3.
+        framework_id    BIGINT                NULL,
         domain          NVARCHAR(100)         NULL,
         maturity_level  TINYINT               NOT NULL DEFAULT 1,
         status          NVARCHAR(50)          NOT NULL DEFAULT 'PLANNED',
@@ -108,6 +121,12 @@ BEGIN
         id              BIGINT IDENTITY(1,1)  NOT NULL,
         organisation_id BIGINT                NOT NULL,
         title           NVARCHAR(255)         NOT NULL,
+        -- ⚠ framework_id added 2026-08-06 (F2-77/V342), same defect as compliance.controls
+        -- above: V342 creates FK_findings_framework on this column and NO migration ever
+        -- added it. Measured across all 16 foreign keys in V342 — 15 create cleanly, these
+        -- two were the only blockers, and ZERO reference a column that is absent from dev as
+        -- well, so V342 is incomplete rather than wrong.
+        framework_id    BIGINT                NULL,
         assessment_id   BIGINT                NULL,
         severity        NVARCHAR(20)          NOT NULL,
         owner           NVARCHAR(255)         NULL,

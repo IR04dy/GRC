@@ -126,21 +126,42 @@ GO
 -- Which roles are missing comes from diffing a chain build against the live catalogue. The
 -- bilingual labels are the platform's own human-authored ones -- display_name_ar is NOT NULL
 -- (house rule 7), and copying an existing translation is not fabricating a fact.
+
+-- ⚠ is_system_role = 1 on all four, added 2026-08-06 (F2-77/V334).
+--
+-- These four went in with organisation_id NULL and no is_system_role, so it defaulted to 0:
+-- global roles that the platform does not consider platform-shipped. V334 exists to make
+-- system roles global and then VERIFY that nothing non-system became global, and on a
+-- Flyway-built database its third check threw on exactly these rows.
+--
+-- ⚠ V334's message says "the UPDATE predicate must key on is_system_role = 1 only" and that
+-- is a misdiagnosis: the predicate already does. The rows were global BEFORE V334 ran,
+-- inserted that way here. V334 cannot be corrected (it is above the deployed baseline of 292
+-- and its checksum is recorded), so the note lives here instead.
+--
+-- What the flag protects, measured rather than assumed: AccessGovernanceService blocks
+-- rename (:182), deactivation (:208) and deletion (:225) for system roles. Without it these
+-- four -- including ORG_ADMIN, the role F2-81's onboarding provisions into -- are
+-- deletable. ⚠ NOT cross-tenant: mustOwnRole (:349) makes any global role read-only from a
+-- tenant unless the caller is PLATFORM_ADMIN, so the reachable blast radius is a platform
+-- admin deleting a shipped persona, not one tenant touching another's. Recorded because
+-- overstating it would be as wrong as missing it.
+
 IF NOT EXISTS (SELECT 1 FROM iam.roles WHERE role_name = N'ORG_ADMIN')
-    INSERT INTO iam.roles (role_name, display_name_en, display_name_ar, organisation_id)
-    VALUES (N'ORG_ADMIN', N'Organisation Administrator', N'مدير المنظمة', NULL);
+    INSERT INTO iam.roles (role_name, display_name_en, display_name_ar, organisation_id, is_system_role)
+    VALUES (N'ORG_ADMIN', N'Organisation Administrator', N'مدير المنظمة', NULL, 1);
 
 IF NOT EXISTS (SELECT 1 FROM iam.roles WHERE role_name = N'VIEWER')
-    INSERT INTO iam.roles (role_name, display_name_en, display_name_ar, organisation_id)
-    VALUES (N'VIEWER', N'Read-Only Viewer', N'مشاهد', NULL);
+    INSERT INTO iam.roles (role_name, display_name_en, display_name_ar, organisation_id, is_system_role)
+    VALUES (N'VIEWER', N'Read-Only Viewer', N'مشاهد', NULL, 1);
 
 IF NOT EXISTS (SELECT 1 FROM iam.roles WHERE role_name = N'RISK_ANALYST')
-    INSERT INTO iam.roles (role_name, display_name_en, display_name_ar, organisation_id)
-    VALUES (N'RISK_ANALYST', N'Risk Analyst', N'محلل المخاطر', NULL);
+    INSERT INTO iam.roles (role_name, display_name_en, display_name_ar, organisation_id, is_system_role)
+    VALUES (N'RISK_ANALYST', N'Risk Analyst', N'محلل المخاطر', NULL, 1);
 
 IF NOT EXISTS (SELECT 1 FROM iam.roles WHERE role_name = N'FRAUD_INVESTIGATOR')
-    INSERT INTO iam.roles (role_name, display_name_en, display_name_ar, organisation_id)
-    VALUES (N'FRAUD_INVESTIGATOR', N'Fraud Investigator', N'مُحقِّق الاحتيال', NULL);
+    INSERT INTO iam.roles (role_name, display_name_en, display_name_ar, organisation_id, is_system_role)
+    VALUES (N'FRAUD_INVESTIGATOR', N'Fraud Investigator', N'مُحقِّق الاحتيال', NULL, 1);
 GO
 
 -- ── Part 2: persona grant matrix (by role_name, idempotent) ─────────────────

@@ -215,10 +215,22 @@ GO
 
 -- 5. ⚠ Prove ck_change_pso REJECTS. Reading sys.check_constraints proves a NAME; only an
 --    attempted write proves the rule fires. Inside a transaction that always rolls back.
+-- ⚠ F2-77 (2026-08-06): this probe was `UPDATE TOP (1) ... WHERE is_deleted = 0`, which updates
+-- ZERO rows on a migration-built database — dev has 17 change requests, a fresh install has none.
+-- Zero rows updated violates nothing, raises nothing, CATCH never runs, and the THROW then accuses
+-- ck_change_pso of accepting a bodiless outage. The constraint is fine; it was never exercised.
+-- Same root cause as V355's two probes, different statement shape — which is why a scan for
+-- `SELECT TOP 1` reported zero and had to be widened to `UPDATE TOP` before it could see this.
+--
+-- It now INSERTs a row that violates ck_change_pso directly. organisation_id and title_en are the
+-- only NOT NULL columns without defaults, so nothing else can reject the row first and hand back a
+-- false pass.
 DECLARE @rejPso BIT = 0;
+DECLARE @psoOrg BIGINT = COALESCE((SELECT MIN(organisation_id) FROM admin.committees), 1);
 BEGIN TRANSACTION;
 BEGIN TRY
-    UPDATE TOP (1) change_mgmt.change_requests SET outage_expected = 1 WHERE is_deleted = 0;
+    INSERT INTO change_mgmt.change_requests (organisation_id, title_en, outage_expected)
+    VALUES (@psoOrg, N'V356 pso self-check probe — rolled back, never committed', 1);
 END TRY
 BEGIN CATCH
     SET @rejPso = 1;

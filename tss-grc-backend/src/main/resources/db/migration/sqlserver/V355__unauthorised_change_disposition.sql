@@ -161,14 +161,39 @@ GO
 
 -- 4. ⚠ Prove ck_ucd_disposed REJECTS. Reading sys.check_constraints proves a NAME exists; only an
 --    attempted insert proves the rule fires. Inside a transaction that always rolls back.
+-- ⚠ F2-77 (2026-08-06): THIS PROBE PASSED IN DEV AND FAILED ON A FRESH INSTALL, AND THE
+-- CONSTRAINT WAS NEVER AT FAULT.
+--
+-- It used `SELECT TOP 1 ... FROM change_mgmt.change_requests WHERE is_deleted = 0`. Dev has 17
+-- such rows; a migration-built database has ZERO. With no source row the INSERT inserts nothing,
+-- violates nothing, raises nothing, CATCH never runs, @rejectedBlank stays 0 — and the THROW then
+-- accuses ck_ucd_disposed of accepting whitespace. It does not: LTRIM('   ') is '' and LEN('') is
+-- 0, so the CHECK is correct and was simply never exercised.
+--
+-- F2-112's shape exactly: a control that cannot fire over a statement that cannot run. The probe
+-- now builds its own parent, so it proves the same thing on an empty database.
+--
+-- ⚠ The parent INSERT sits deliberately OUTSIDE the TRY. Inside it, a failure to create the
+-- parent would be caught, set @rejectedBlank = 1 and report a PASS — a probe that succeeds because
+-- its own setup broke is worse than one that cannot run.
 DECLARE @rejectedBlank BIT = 0;
+DECLARE @probeOrg BIGINT = COALESCE((SELECT MIN(organisation_id) FROM admin.committees), 1);
+DECLARE @probeChange BIGINT;
 BEGIN TRANSACTION;
+SELECT TOP 1 @probeChange = c.id FROM change_mgmt.change_requests c
+ WHERE c.is_deleted = 0 ORDER BY c.id;
+IF @probeChange IS NULL
+BEGIN
+    INSERT INTO change_mgmt.change_requests (organisation_id, title_en)
+    VALUES (@probeOrg, N'V355 self-check probe — rolled back, never committed');
+    SET @probeChange = SCOPE_IDENTITY();
+END
+SET @probeOrg = (SELECT organisation_id FROM change_mgmt.change_requests WHERE id = @probeChange);
 BEGIN TRY
     INSERT INTO change_mgmt.change_unauthorised_disposition
         (organisation_id, change_request_id, reason_code, state, disposed_by_name, disposed_at)
-    SELECT TOP 1 c.organisation_id, c.id, 'INSUFFICIENT_APPROVALS', 'ACCEPTED_RISK', '   ',
-                 SYSUTCDATETIME()
-    FROM change_mgmt.change_requests c WHERE c.is_deleted = 0 ORDER BY c.id;
+    VALUES (@probeOrg, @probeChange, 'INSUFFICIENT_APPROVALS', 'ACCEPTED_RISK', '   ',
+            SYSUTCDATETIME());
 END TRY
 BEGIN CATCH
     SET @rejectedBlank = 1;
@@ -182,14 +207,29 @@ IF @rejectedBlank = 0
 GO
 
 -- 5. ⚠ And prove ck_ucd_state REJECTS an invented state, for the same reason.
+-- ⚠ This probe declares and builds its OWN parent rather than reusing the one above, because a GO
+-- separates the two batches and T-SQL variables do not survive a batch boundary. My first attempt
+-- referenced @probeOrg from the previous batch and failed with "Must declare the scalar variable"
+-- — the identical mistake made in V159 the same afternoon, where the comment warning about it is
+-- now also written. Knowing the rule and applying it are apparently two different things.
 DECLARE @rejectedState BIT = 0;
+DECLARE @probeOrg2 BIGINT = COALESCE((SELECT MIN(organisation_id) FROM admin.committees), 1);
+DECLARE @probeChange2 BIGINT;
 BEGIN TRANSACTION;
+SELECT TOP 1 @probeChange2 = c.id FROM change_mgmt.change_requests c
+ WHERE c.is_deleted = 0 ORDER BY c.id;
+IF @probeChange2 IS NULL
+BEGIN
+    INSERT INTO change_mgmt.change_requests (organisation_id, title_en)
+    VALUES (@probeOrg2, N'V355 state self-check probe — rolled back, never committed');
+    SET @probeChange2 = SCOPE_IDENTITY();
+END
+SET @probeOrg2 = (SELECT organisation_id FROM change_mgmt.change_requests WHERE id = @probeChange2);
 BEGIN TRY
     INSERT INTO change_mgmt.change_unauthorised_disposition
         (organisation_id, change_request_id, reason_code, state, disposed_by_name, disposed_at)
-    SELECT TOP 1 c.organisation_id, c.id, 'INSUFFICIENT_APPROVALS', 'WAIVED_BY_ME', 'V355 self-check',
-                 SYSUTCDATETIME()
-    FROM change_mgmt.change_requests c WHERE c.is_deleted = 0 ORDER BY c.id;
+    VALUES (@probeOrg2, @probeChange2, 'INSUFFICIENT_APPROVALS', 'WAIVED_BY_ME', 'V355 self-check',
+            SYSUTCDATETIME());
 END TRY
 BEGIN CATCH
     SET @rejectedState = 1;
