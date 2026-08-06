@@ -72,7 +72,7 @@ PROD_DB = "TSS_GRC_Deployment"
 PUBLISHED_AS_OF = "2026-08-05"          # ← bump ONLY when the doc is regenerated
 PUBLISHED = {
     "module_packages": 59,
-    "module_loc": 204_436,
+    "module_loc": 204_557,
     "entities_strict": 419,             # FILES declaring an entity (the doc published 417: a substring
     "entity_decls": 432,                # count). Entity CLASSES — 13 more, all in data_officer.
     "endpoints": 2_213,
@@ -80,16 +80,16 @@ PUBLISHED = {
     "main_preauthorize": 2_201,
     "perm_modules": 31,
     "packages_no_haspermission": 17,
-    "module_tests": 3_190,
-    "suite_tests": 3_342,
+    "module_tests": 3_194,
+    "suite_tests": 3_346,
     # F2-03 floored all seven Tier-1 regulator-facing modules (2026-08-05/06), so this
     # fell 15 -> 8. The --check mode caught the drift the moment it was first run in
     # anger, which is F2-19b in one line: the guard existed and nothing ran it.
     "zero_test_packages": 8,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 347,
-    "migration_head": 359,
+    "migration_files": 348,
+    "migration_head": 360,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
     "fe_pages": 343,
     "fe_page_folders": 114,
