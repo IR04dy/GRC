@@ -24,7 +24,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.access.AccessDeniedException;
+import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -218,7 +218,7 @@ public class CommitteeResolutionService {
                                           String memberRole, String rationale, VoteActor actor) {
         CommitteeResolution r = get(resolutionId);   // org-scoped — must stay first
         if (actor == null || (actor.userId() == null && norm(actor.username()).isEmpty()))
-            throw new AccessDeniedException(
+            throw new DomainAccessDeniedException(
                 "A committee vote must be recorded by an identified user.");
         String vote = norm(voteRaw).toUpperCase();
         if (!VOTE_VALUES.contains(vote))
@@ -274,7 +274,7 @@ public class CommitteeResolutionService {
             // No name supplied = "my own vote". This is the common, safe path.
             seat = actorSeat;
             if (seat == null)
-                throw new AccessDeniedException(
+                throw new DomainAccessDeniedException(
                     "You are not an active member of this committee, so you cannot cast a vote. "
                   + "A committee secretary or chair may record a vote on a member's behalf by "
                   + "naming that member.");
@@ -286,9 +286,14 @@ public class CommitteeResolutionService {
                   + "be recorded for a member on the committee's active roster."));
             if (!(actorSeat != null && sameName(actorSeat.getMemberName(), seat.getMemberName()))
                     && !actor.mayRecordOnBehalf())
-                throw new AccessDeniedException(
-                    "You may only cast your own vote. Recording a vote on behalf of "
-                  + seat.getMemberName() + " requires committee secretary or chair authority.");
+                // F2-80: this message is now DELIVERED to the caller, so it must not name the
+                // member. It used to interpolate seat.getMemberName(), which was harmless only
+                // because handleAccessDenied threw the whole string away — an unauthorised caller
+                // would otherwise learn a colleague's name from a 403. Name the authority required,
+                // never the person holding it.
+                throw new DomainAccessDeniedException(
+                    "You may only cast your own vote. Recording a vote on another member's "
+                  + "behalf requires committee secretary or chair authority.");
         }
         if (seat.getIsVotingMember() != null && seat.getIsVotingMember() == 0)
             throw new IllegalArgumentException(seat.getMemberName()

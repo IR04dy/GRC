@@ -23,6 +23,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
+import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -355,7 +356,7 @@ public class ApprovalChainInstanceService {
             throw new IllegalTransitionException(i.getStatus(), "WITHDRAWN", TERMINAL_STATUSES);
         }
         if (!Objects.equals(i.getOriginatorUserId(), actingUserId)) {
-            throw new AccessDeniedException("Only the originator can withdraw the chain");
+            throw new DomainAccessDeniedException("Only the originator can withdraw the chain");
         }
         i.setStatus("WITHDRAWN");
         i.setCompletedAt(LocalDateTime.now());
@@ -491,7 +492,7 @@ public class ApprovalChainInstanceService {
                 return s;
             }
         }
-        throw new AccessDeniedException(
+        throw new DomainAccessDeniedException(
             "Not an authorised approver for step "
                 + (rows.isEmpty() ? "?" : String.valueOf(rows.get(0).getStepOrder())));
     }

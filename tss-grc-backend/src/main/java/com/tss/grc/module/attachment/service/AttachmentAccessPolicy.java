@@ -2,7 +2,7 @@ package com.tss.grc.module.attachment.service;
 
 import com.tss.grc.security.GrcUserDetails;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.AccessDeniedException;
+import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -315,7 +315,7 @@ public class AttachmentAccessPolicy {
             // should use the storage service directly rather than acquire an implicit exemption.
             log.warn("Attachment {} refused for entityType '{}' — no authentication in context",
                 operation, entityType);
-            throw new AccessDeniedException("Not authorised for this attachment.");
+            throw new DomainAccessDeniedException("Not authorised for this attachment.");
         }
         // The unknown-type check runs BEFORE the platform-admin bypass, deliberately. `admin` is the
         // persona everything gets tested with, so if admins skipped this check a missing registry
@@ -330,7 +330,7 @@ public class AttachmentAccessPolicy {
             // made the endpoint an oracle for guessing types and ids.
             log.warn("Attachment {} refused: unknown entityType '{}' (user={})",
                 operation, entityType, username(auth));
-            throw new AccessDeniedException("Unknown attachment entity type.");
+            throw new DomainAccessDeniedException("Unknown attachment entity type.");
         }
         if (isPlatformAdmin(auth)) {
             return;                       // same bypass ModulePermissionEvaluator applies
@@ -354,7 +354,7 @@ public class AttachmentAccessPolicy {
                  + "(needs {}{})", operation, entityType, username(auth),
             guard.modules().isEmpty() ? "" : guard.modules() + "_READ",
             guard.roles().isEmpty() ? "" : " or one of " + guard.roles());
-        throw new AccessDeniedException("You do not have access to this record's attachments.");
+        throw new DomainAccessDeniedException("You do not have access to this record's attachments.");
     }
 
     // ── read-only views, for the tests and for reporting ─────────────────────

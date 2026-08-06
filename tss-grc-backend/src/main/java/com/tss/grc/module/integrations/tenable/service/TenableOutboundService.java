@@ -15,7 +15,7 @@ import com.tss.grc.security.GrcUserDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.access.AccessDeniedException;
+import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -329,7 +329,7 @@ public class TenableOutboundService {
         if (!owned) {
             log.warn("[Tenable] {} rejected — plugin {} asset {} is not in tenant {}'s finding inventory",
                 actionType, pluginId, assetUuid, orgId);
-            throw new AccessDeniedException("Tenable finding is not in this tenant's inventory");
+            throw new DomainAccessDeniedException("Tenable finding is not in this tenant's inventory");
         }
     }
 

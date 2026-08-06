@@ -34,7 +34,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.access.AccessDeniedException;
+import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -377,7 +377,7 @@ public class ExerciseObserverService {
         // Only the original observer can flag their own observation. (Auditors
         // and BCM_MANAGER can read but cannot rewrite another observer's flag.)
         if (!Objects.equals(o.getObserverUserId(), userId)) {
-            throw new AccessDeniedException(
+            throw new DomainAccessDeniedException(
                 "Only the observation author can change the AAR flag");
         }
 
@@ -581,14 +581,15 @@ public class ExerciseObserverService {
     private void requireAssignedObserver(Long orgId, Long runId, Long userId) {
         assignmentRepo
             .findByOrganisationIdAndExerciseRunIdAndObserverUserId(orgId, runId, userId)
-            .orElseThrow(() -> new AccessDeniedException(
-                "User #" + userId + " is not an assigned observer on run " + runId));
+            .orElseThrow(() -> new DomainAccessDeniedException(
+                "You are not an assigned observer on exercise run " + runId
+                    + ". Ask the exercise director to add you as an observer."));
     }
 
     private static Long requireCurrentUserId() {
         Long uid = currentUserId();
         if (uid == null) {
-            throw new AccessDeniedException(
+            throw new DomainAccessDeniedException(
                 "No authenticated user — cannot record observation");
         }
         return uid;

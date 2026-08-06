@@ -6,7 +6,7 @@ import com.tss.grc.common.util.SaudiWorkdayUtil;
 import com.tss.grc.module.change_mgmt.model.RatificationStates;
 import com.tss.grc.module.platform.calendar.service.SaudiWorkdayCalendar;
 import com.tss.grc.module.platform.service.RoleDirectoryService;
-import org.springframework.security.access.AccessDeniedException;
+import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -634,7 +634,7 @@ public class ChangeManagementService {
 
         // The approver is the authenticated caller — never a name from the body.
         if (actorUserId == null && nullSafeStr(actorName).isBlank())
-            throw new AccessDeniedException("A CAB vote must be cast by an identified user.");
+            throw new DomainAccessDeniedException("A CAB vote must be cast by an identified user.");
         String approver = nullSafeStr(actorName).isBlank() ? ("user#" + actorUserId) : actorName.trim();
 
         // CM-C2 (SoD): the change requester / owner cannot cast a CAB vote on their own
@@ -1457,7 +1457,7 @@ public class ChangeManagementService {
               + "(ADR-017 D-3); approve or reject it through the normal CAB path instead.");
 
         if (actorUserId == null && nullSafeStr(actorName).isBlank())
-            throw new AccessDeniedException("A ratification decision must be recorded by an identified user.");
+            throw new DomainAccessDeniedException("A ratification decision must be recorded by an identified user.");
         String ratifier = nullSafeStr(actorName).isBlank() ? ("user#" + actorUserId) : actorName.trim();
 
         requireRatificationSeparation(c, actorUserId, ratifier);
@@ -1715,13 +1715,13 @@ public class ChangeManagementService {
         if (target == null || !DECISION_TARGETS.contains(target)) return;
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated())
-            throw new AccessDeniedException(
+            throw new DomainAccessDeniedException(
                 "A CAB decision must be recorded by an identified user.");
         boolean authorised = auth.getAuthorities().stream()
             .map(GrantedAuthority::getAuthority)
             .anyMatch(a -> "CHANGE_APPROVE".equals(a) || "ROLE_PLATFORM_ADMIN".equals(a));
         if (!authorised)
-            throw new AccessDeniedException(
+            throw new DomainAccessDeniedException(
                 "Recording the CAB decision '" + target + "' requires CHANGE:APPROVE. "
               + "CHANGE:WRITE authorises raising and editing a change, not deciding it.");
     }

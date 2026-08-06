@@ -21,7 +21,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.access.AccessDeniedException;
+import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -410,7 +410,7 @@ public class PolicyManagementService {
                 && (actor.equalsIgnoreCase(p.getCreatedBy())
                     || actor.equalsIgnoreCase(p.getOwnerName())
                     || actor.equalsIgnoreCase(p.getOwnerEmail()))) {
-            throw new AccessDeniedException(
+            throw new DomainAccessDeniedException(
                 "Segregation of duty: the policy author/owner cannot approve their own policy");
         }
         // Track D (S5): a policy referred to a committee is APPROVED there — the
@@ -825,7 +825,7 @@ public class PolicyManagementService {
         // override) may complete an attestation-of-record.
         boolean isAssignee = currentUsername != null && currentUsername.equalsIgnoreCase(a.getUserUsername());
         if (!isAssignee && !callerIsAdmin)
-            throw new AccessDeniedException("Attestation may only be completed by its assignee");
+            throw new DomainAccessDeniedException("Attestation may only be completed by its assignee");
         if (!"PENDING".equals(a.getStatus()))
             throw new IllegalStateException("Only PENDING attestations can be attested (was " + a.getStatus() + ")");
         a.setStatus("ATTESTED");
@@ -860,7 +860,7 @@ public class PolicyManagementService {
         // override) may decline an attestation-of-record.
         boolean isAssignee = currentUsername != null && currentUsername.equalsIgnoreCase(a.getUserUsername());
         if (!isAssignee && !callerIsAdmin)
-            throw new AccessDeniedException("Attestation may only be declined by its assignee");
+            throw new DomainAccessDeniedException("Attestation may only be declined by its assignee");
         if (!"PENDING".equals(a.getStatus()))
             throw new IllegalStateException("Only PENDING attestations can be declined (was " + a.getStatus() + ")");
         if (reason == null || reason.isBlank())

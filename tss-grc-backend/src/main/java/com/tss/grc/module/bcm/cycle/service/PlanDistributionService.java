@@ -8,7 +8,7 @@ import com.tss.grc.module.bcm.cycle.repository.BcpPlanRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.AccessDeniedException;
+import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -149,9 +149,13 @@ public class PlanDistributionService {
         // you may only act on your own row, unless you hold BCM WRITE, in which case
         // it is recorded explicitly as acting on behalf of the recipient.
         if (!canActOnBehalf && !isDesignatedRecipient(row, actorUserId, byName))
-            throw new AccessDeniedException(
-                "Only the designated recipient (" + row.getRecipientName() + ") may "
-                    + to.toLowerCase() + " this plan distribution.");
+            // F2-80: this message is now DELIVERED, so the recipient's name comes out. It used to
+            // interpolate row.getRecipientName(), safe only while handleAccessDenied discarded it.
+            // The caller learns the rule and the remedy without learning who the recipient is.
+            throw new DomainAccessDeniedException(
+                "Only the designated recipient may " + to.toLowerCase()
+                    + " this plan distribution. Someone holding BCM write access can record the "
+                    + "action on their behalf.");
         boolean onBehalf = !isDesignatedRecipient(row, actorUserId, byName);
 
         // Pre-existing rule, kept: a superseded distribution cannot be acted on.

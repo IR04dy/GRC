@@ -33,7 +33,7 @@ that will be read as current forever.
 | Metric | Measured (08-01) | 07-25 | Where the platform's own docs say otherwise |
 |---|---:|---:|---|
 | Backend module packages | **59** (57 with code + 1 empty + `change_adapters`, added by S5/CE-1) | 58 | ⚠ **now enforced, not merely measured** — `module-registry.yaml` enumerates all 59 and `ModuleRegistryContractTest` fails the build when this row, `CLAUDE.md`, the directory listing or `SkuRegistry` disagree (F2-01). `CLAUDE.md` read **58** until 2026-08-05 ✅ (it said **24** until F2-19). ⚠ The 59th is deliberate and needed an ADR-018 homing decision, not just a directory — `SkuRegistry.requiredSkuForPackage` THROWS for an unhomed `module.*` package |
-| Module Java LoC | **203,992** | 186,285 | — |
+| Module Java LoC | **204,003** | 186,285 | — |
 | Files declaring a JPA entity | **419** | *pub. 419* | S8g/CE-8 added `ChangeSchedulePublication`; S8f/CE-11 added `UnauthorisedChangeDisposition`; S8e/CE-2 added `ChangeModel` + `ChangeModelUsage`. ⚠ The measured count now **coincides** with the figure §0.1 records as wrong: 417 was published from a substring count when the true figure was 413, and it is 417 today for unrelated reasons. Do not read the match as the old error returning |
 | JPA entity **classes** declared | **432** | — | ⚠ **14**, not 13, live in one file (`data_officer`/`entity/Entities.java`) — corrected 2026-08-06 by F2-03(d), which counted them and cross-checked against the 14 tables the schema holds. Pinned by `DataOfficerLifecycleTest` so the figure cannot drift again. This is the file that makes a per-file entity scan undercount the platform by 13, and the reason F2-01's registry is built by reflection; +1 from S8g/CE-8, +1 from S8f/CE-11, +2 from S8e/CE-2 |
 | REST endpoint mappings | **2,212** | 2,160 | `CLAUDE.md` updated to 2,212 |
@@ -41,7 +41,7 @@ that will be read as current forever.
 | `@PreAuthorize` annotations (comment-stripped) | **2,200** | *pub. 2,268* | ⚠ see §0.1 — never reproducible |
 | Distinct permission modules used by guards | **31** | 27 | matches `CLAUDE.md` "31 modules / 114 permissions" ✅ |
 | Module packages with **zero** `hasPermission` usage | **17 of 59** | 21 | F2-05 converted 5 (`fraud`, `integrations`, `knowledge`, `board_pack`, `socops`); the 17th is `change_adapters`, which is **correct** — adapters carry no endpoint, so a guard there would be a second unguarded door (`ChangeModuleBoundaryTest` asserts they hold no `@RestController`) |
-| Tests attributed to modules | **3,182** (suite total **3,330**) | 2,339 / 2,415 | `CLAUDE.md` says **3,322** run by surefire ✅ *(the census counts declarations, surefire counts executions incl. parameterised expansion — the two never match exactly and neither is wrong)* |
+| Tests attributed to modules | **3,182** (suite total **3,334**) | 2,339 / 2,415 | `CLAUDE.md` says **3,326** run by surefire ✅ *(the census counts declarations, surefire counts executions incl. parameterised expansion — the two never match exactly and neither is wrong)* |
 | Module packages with **zero tests** | **8**, totalling **6,556 LoC (3.2%)** | 15 / 18,011 / 9.4% | ⚠ **F2-03 closed 2026-08-06 — all seven Tier-1 regulator-facing modules floored** (`outsourcing`, `nca_ecc`, `sharia`, `data_officer`, `openbanking`, `dataclass`, `rrp`), removing 7 packages and 11,455 LoC from this set. The remaining 8: `cpty`, `regreporting`, `reginspect`, `opres`, `controlmap`, `dashboard`, `audit_eng`, `datagov` — and `datagov` is the empty placeholder (F2-20), so 7 are real |
 | Distinct **JPA** schemas | **50** | 50 | matches `CLAUDE.md` "50+" ✅ |
 | **Database** schemas holding tables (dev & prod) | **51** | *not measured* | the 51st is `audit`, which JPA does not know — §7 |
@@ -582,7 +582,7 @@ central tokens (§5.3), so the fix is likely a small number of token changes rat
 
 | Metric | Value | Note |
 |---|---:|---|
-| Backend tests then | 1,858 | **now 3,330** (`mvn -o clean package`, 2026-08-01, 0 failures) |
+| Backend tests then | 1,858 | **now 3,334** (`mvn -o clean package`, 2026-08-01, 0 failures) |
 | **Instruction coverage** | **37.1%** | JaCoCo, 1,324 classes — **not re-measured since; the suite has since grown 51%** |
 | **Branch coverage** | **26.0%** | |
 | **Line coverage** | **38.5%** | |
@@ -616,10 +616,10 @@ this review until the documentation register was compiled, which is itself the a
 Stated so no reader over-reads it:
 
 - **Runtime performance beyond one endpoint** — a k6 load test exists (§7.2) covering `GET /api/v1/risk/risks` only. No profiling, no write-path or export load test, no capacity model.
-- **Test *quality*** — 3,330 passing tests is a count, not an assertion-strength measure. Spot mutation
+- **Test *quality*** — 3,334 passing tests is a count, not an assertion-strength measure. Spot mutation
   checks were done on the committee engine and `ModulePermissionEvaluator` only. JaCoCo coverage from
   2026-06-18 was **37.1% instruction / 26.0% branch / 38.5% line** (§7.4); it has not been re-measured
-  since the suite grew from 1,858 to 3,330 tests. **F2-21 is the proof that coverage is not provenance:**
+  since the suite grew from 1,858 to 3,334 tests. **F2-21 is the proof that coverage is not provenance:**
   the committee engine's 38 tests all pass and none of them notices that the voter's identity is
   attacker-supplied.
 - **Functional correctness of the 19 zero-test modules** — they may work perfectly; the point is that

@@ -12,7 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
+import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -168,7 +168,7 @@ public class DigitalSignatureService {
      */
     private void requireDesignatedSigner(DigitalSignatureTransaction d, Long callerUserId) {
         if (d.getSignerUserId() == null || !Objects.equals(d.getSignerUserId(), callerUserId)) {
-            throw new AccessDeniedException("Only the designated signer may sign or reject this transaction");
+            throw new DomainAccessDeniedException("Only the designated signer may sign or reject this transaction");
         }
     }
 

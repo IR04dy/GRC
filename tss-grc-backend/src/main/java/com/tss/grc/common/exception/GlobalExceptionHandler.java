@@ -202,6 +202,42 @@ public class GlobalExceptionHandler {
         return pd;
     }
 
+    /**
+     * <b>F2-80 — twenty-three denial messages were written and none was delivered.</b>
+     *
+     * <p>{@link #handleAccessDenied} above discards {@code ex.getMessage()} on purpose: for the
+     * denials Spring Security raises, any detail is a hint about the guard. But <b>23</b> service
+     * sites threw {@code AccessDeniedException} carrying a composed explanation, and inherited a
+     * message policy written for a different sender. Every one surfaced as the flat
+     * <i>"You do not have permission to perform this action."</i> — including the segregation-of-duty
+     * gate, where the caller <i>has</i> the permission and was told to go and get it.
+     *
+     * <p>This handler is the other policy, and it is the same one {@link #handleBusinessRule} has
+     * always applied two handlers down: <i>403 with the rule's own message, since explaining the rule
+     * is the point.</i> The split is by <b>who threw it</b>, which is the only thing that reliably
+     * distinguishes "the framework said no" from "the domain said no and knows why".
+     *
+     * <p>⚠ Deliberately NOT done by passing {@code ex.getMessage()} through
+     * {@link #handleAccessDenied}. That is one line and it would have shipped a disclosure: two of
+     * the 23 messages interpolated a colleague's name, so an unauthorised caller would have learned
+     * it from a 403, and Spring's own {@code @PreAuthorize} denial text would have been echoed as
+     * well. Opting in per throw site is what makes the per-message disclosure review possible;
+     * {@code DomainAccessDeniedExceptionRatchetTest} keeps the boundary from eroding.
+     *
+     * <p>Logged at {@code info}: a refusal that explains itself to the caller should also be
+     * findable by whoever they then ask about it. F2-80's own provenance is the argument — a probe
+     * spent a false lead on a 403 whose cause was sitting in the log and not in the response.
+     */
+    @ExceptionHandler(DomainAccessDeniedException.class)
+    public ProblemDetail handleDomainAccessDenied(DomainAccessDeniedException ex) {
+        log.info("[access-denied] domain refusal: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        pd.setTitle("Access Denied");
+        pd.setType(URI.create("https://grc.tss.com/errors/forbidden"));
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
     /** Business-rule violation (e.g. segregation of duties) — 403 with the
      *  rule's own message, since explaining the rule is the point. */
     @ExceptionHandler(BusinessRuleException.class)

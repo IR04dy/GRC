@@ -13,7 +13,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.access.AccessDeniedException;
+import com.tss.grc.common.exception.DomainAccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -170,7 +170,7 @@ public class ApprovalRequestService {
         // decide/delegate. PLATFORM_ADMIN may override (admin reassignment / cleanup).
         boolean isAssignee = callerUsername != null && callerUsername.equals(r.getAssignedTo());
         if (!isAssignee && !callerIsAdmin) {
-            throw new AccessDeniedException(
+            throw new DomainAccessDeniedException(
                 "Only the assignee may transition this approval request");
         }
 

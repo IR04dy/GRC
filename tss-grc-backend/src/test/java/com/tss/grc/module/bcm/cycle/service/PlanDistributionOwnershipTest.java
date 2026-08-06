@@ -113,7 +113,14 @@ class PlanDistributionOwnershipTest {
         assertThatThrownBy(() -> service.acknowledge(ACK_ID, "not mine", "mansour", 99L, false))
             .isInstanceOf(AccessDeniedException.class)
             .hasMessageContaining("Only the designated recipient")
-            .hasMessageContaining("Sara Al-Otaibi");
+            // ⚠ F2-80. This line used to read `.hasMessageContaining("Sara Al-Otaibi")`, pinning the
+            // recipient's name in the refusal as correct. It was harmless only because
+            // handleAccessDenied discarded the whole string; the moment the message became
+            // deliverable, that assertion was demanding a disclosure — an unauthorised caller
+            // learning a colleague's name from a 403. The refusal now names the authority required
+            // instead of the person holding it, and this asserts the name stays out.
+            .hasMessageNotContaining("Sara Al-Otaibi")
+            .hasMessageContaining("BCM write access");
         verify(acks, never()).save(any());
     }
 
