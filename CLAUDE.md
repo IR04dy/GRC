@@ -240,6 +240,17 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   `TenantContext` isn't set off-request.
 - `[REVIEW-TEST]` in `LIKE` is a character class — `CHARINDEX` for literals.
 - Reboot port-steal: keep default MSSQLSERVER **Manual**; Express owns 1433.
+- **A full C: drive fails as a test failure, not as a disk error** (2026-08-06). With C: near
+  zero, `mvn -o clean package` reported **4 errors in `EntityValidationHandlerTest`** —
+  which passes **5/5** when run alone. Mockito/byte-buddy needs a temp dir and C: holds it,
+  so the errors land in whatever class the runner reached, never in the class at fault.
+  Same signature as the mass "Could not initialize MockMaker" seen with two JVMs competing.
+  ⚠ **Do not debug the named class.** Check `shutil.disk_usage('C:/')` first, then re-run the
+  class alone: if it passes, the full-run result is noise. Also blocked at that point:
+  `CREATE DATABASE` (OS error 112 — SQL Express's data dir is on C:), the session scratchpad
+  (`ENOSPC` on write), and `npx vitest run` (V8 crash part-way). The repo on D: is unaffected,
+  so Read/Edit/git and single-class `mvn test` keep working — which is what makes the failures
+  look like code.
 - Nested Spring Data repositories aren't scanned; lazy-collection entities 500
   outside the session — return DTOs.
 - `seed_real_data.py` batches must start `SET NOCOUNT ON;`.
