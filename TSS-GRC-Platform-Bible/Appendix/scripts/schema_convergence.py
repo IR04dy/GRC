@@ -149,6 +149,7 @@ def main():
 
     report_partition(missing_t, int(stop) if stop else None)
     report_column_partition(missing_c, int(stop) if stop else None)
+    report_constraints(int(stop) if stop else None)
 
 
 MIG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..",
@@ -332,6 +333,123 @@ def report_column_partition(missing_c, stop):
 
     print("\ncolumn partition summary: %d expected-missing · %d below-the-stop · %d never-added"
           % (len(later), len(below), len(never)))
+
+
+
+# ── constraint bodies ───────────────────────────────────────────────────────────────────────────
+# The third axis, and the one that took longest to add because it looked unmeasurable. It is not:
+# every CHECK and every foreign key in BOTH databases is user-named (0 system-named out of 416 and
+# 385), so they can be compared by name, and of the 384 CHECKs present on both sides **0 differ in
+# definition**. DEFAULT constraints are the opposite — 1,910 of dev's 2,259 are system-named
+# (DF__table__col__ABC123), so a name comparison there is noise and is deliberately NOT attempted.
+
+CONSTRAINT_SQL = {
+    "CHECK": """SELECT LOWER(s.name + '.' + t.name), LOWER(cc.name), cc.definition
+                  FROM sys.check_constraints cc
+                  JOIN sys.tables t ON t.object_id = cc.parent_object_id
+                  JOIN sys.schemas s ON s.schema_id = t.schema_id
+                 WHERE s.name NOT IN ('dbo','sys') AND cc.is_system_named = 0""",
+    "FOREIGN KEY": """SELECT LOWER(s.name + '.' + t.name), LOWER(fk.name), NULL
+                        FROM sys.foreign_keys fk
+                        JOIN sys.tables t ON t.object_id = fk.parent_object_id
+                        JOIN sys.schemas s ON s.schema_id = t.schema_id
+                       WHERE s.name NOT IN ('dbo','sys') AND fk.is_system_named = 0""",
+}
+
+
+def constraints(db, sql):
+    """{(table, name): definition} for the user-named constraints of one kind."""
+    with connect(db) as cn:
+        cur = cn.cursor()
+        cur.execute(sql)
+        return {(r[0], r[1]): r[2] for r in cur.fetchall()}
+
+
+def migration_corpus():
+    """version -> stripped, lowered SQL. Comments out FIRST: this repo names constraints in prose
+    constantly (reverse recipes, 'was ck_x', finding narratives), and V261 mentions all three
+    CK_incidents_* names in comments alone. Attributing a constraint to a migration that only talks
+    about it is the comment-as-code trap this programme has paid for repeatedly."""
+    out = {}
+    for f in sorted(os.listdir(MIG_DIR)):
+        m = re.match(r"^V(\d+)__.*\.sql$", f)
+        if not m:
+            continue
+        body = io.open(os.path.join(MIG_DIR, f), encoding="utf-8-sig", errors="replace").read()
+        out[int(m.group(1))] = LINE_COMMENT.sub(" ", BLOCK_COMMENT.sub(" ", body)).lower()
+    return out
+
+
+def report_constraints(stop):
+    print("\n" + "=" * 78)
+    print("CONSTRAINT BODIES — CHECK and FOREIGN KEY (user-named only)")
+    print("=" * 78)
+    corpus = migration_corpus()
+    if len(corpus) < 300:
+        print("⚠ only %d migrations parsed from %s — skipping, the partition would be meaningless"
+              % (len(corpus), MIG_DIR))
+        return
+
+    for kind, sql in CONSTRAINT_SQL.items():
+        try:
+            dev = constraints(DEV, sql)
+            built = constraints(BUILT, sql)
+        except pyodbc.Error as e:
+            print("cannot read %s constraints: %s" % (kind, e))
+            continue
+
+        missing = sorted(set(dev) - set(built))
+        extra = sorted(set(built) - set(dev))
+        shared = set(dev) & set(built)
+        differ = sorted(k for k in shared
+                        if "".join((dev[k] or "").split()).lower()
+                        != "".join((built[k] or "").split()).lower())
+
+        later, skipped, never = [], [], []
+        for tbl, name in missing:
+            vs = sorted(v for v, txt in corpus.items() if name in txt)
+            if not vs:
+                never.append("%s.%s" % (tbl, name))
+            elif stop is not None and min(vs) > stop:
+                later.append((min(vs), "%s.%s" % (tbl, name)))
+            else:
+                skipped.append((min(vs), "%s.%s" % (tbl, name)))
+
+        print("\n%s: dev %d · built %d · missing %d · extra %d · definition differs %d"
+              % (kind, len(dev), len(built), len(missing), len(extra), len(differ)))
+        if stop is not None:
+            print("  [1] first named ABOVE V%s — expected-missing: %d" % (stop, len(later)))
+        else:
+            print("  [1] (no --stop given, cannot separate expected-missing): %d" % len(later))
+        for v, n in sorted(later)[:8]:
+            print("        V%-4d %s" % (v, n))
+
+        print("  [2] ⚠ named by a migration at or below the stop and ABSENT from the build: %d"
+              % len(skipped))
+        if skipped:
+            print("      The migration ran and the constraint is not there. The usual cause is an"
+                  " idempotency-guarded CREATE TABLE that was skipped because an EARLIER migration"
+                  " already made the table — every inline CONSTRAINT in that CREATE goes with it."
+                  " Worked example: V1 creates cyber.incidents with no value CHECKs, V4 re-creates"
+                  " it with three, V4's IF NOT EXISTS skips, and a fresh install accepts"
+                  " severity='BANANA'.")
+        for v, n in sorted(skipped)[:15]:
+            print("        V%-4d %s" % (v, n))
+
+        print("  [3] ⚠ NO migration anywhere names it — a fresh install never enforces it: %d"
+              % len(never))
+        for n in never[:20]:
+            print("        %s" % n)
+        if len(never) > 20:
+            print("        ... and %d more" % (len(never) - 20))
+
+        if extra:
+            print("  [4] the migrations create it and DEV lacks it — dev is the lenient one: %d"
+                  % len(extra))
+            for tbl, name in extra[:10]:
+                print("        %s.%s" % (tbl, name))
+        for k in differ[:10]:
+            print("  ⚠ definition differs: %s.%s" % k)
 
 
 if __name__ == "__main__":
