@@ -23,18 +23,18 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 
 | Measure | Count |
 |---|---|
-| Guard sites with a role leg | 634 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **561** |
+| Guard sites with a role leg | 605 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **532** |
 | … composed (role leg ANDed onto a permission — already tight) | 73 |
 | Module packages holding pure role guards | 35 |
-| Distinct role names recited by any role guard | 66 |
-| … **that do not exist in `iam.roles`** | **32** |
+| Distinct role names recited by any role guard | 56 |
+| … **that do not exist in `iam.roles`** | **13** |
 | Pure guards **closed to everyone** (no named role exists, no live authority leg) | **0** |
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
-| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **8** |
+| Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **4** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user | 561 |
+| Pure guards reachable by at least one seeded user | 532 |
 | `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 2 |
 
 ## A. Role names no role table contains
@@ -46,36 +46,17 @@ shows what that closes.
 |---|---|
 | `CRO` | 68 |
 | `CIO` | 41 |
-| `SOC_LEAD` | 31 |
-| `ETHICS_OFFICER` | 23 |
-| `SHARIA_OFFICER` | 21 |
 | `AUDIT_COMMITTEE_MEMBER` | 20 |
-| `BOARD_MEMBER` | 18 |
 | `FACILITATOR` | 18 |
-| `SHARIA_AUDITOR` | 17 |
-| `OPEN_BANKING_OFFICER` | 15 |
-| `AML_OFFICER` | 14 |
+| `BOARD_MEMBER` | 16 |
 | `MODEL_OWNER` | 14 |
 | `AUDIT_COMMITTEE_CHAIR` | 13 |
-| `CREDIT_OFFICER` | 12 |
-| `COMMS_LEAD` | 9 |
-| `CONSUMER_PROTECTION_OFFICER` | 9 |
-| `TPRM_LEAD` | 8 |
 | `COMPANY_SECRETARY` | 7 |
-| `CRISIS_COMMANDER` | 7 |
-| `HR_DIRECTOR` | 6 |
-| `KYC_OFFICER` | 6 |
-| `CONTENT_EDITOR` | 5 |
-| `INCIDENT_COMMANDER` | 5 |
-| `ONBOARDING_AGENT` | 5 |
 | `PRIVACY_OFFICER` | 5 |
 | `SHARIA_BOARD_CHAIR` | 4 |
-| `SOC_ANALYST` | 4 |
-| `SOC_AUTOMATION` | 4 |
 | `AUDIT_DIRECTOR` | 3 |
-| `CISO_GOVERNANCE` | 3 |
-| `SOC_TIER_2` | 3 |
-| `USER` | 1 |
+| `CRISIS_COMMANDER` | 2 |
+| `INCIDENT_COMMANDER` | 2 |
 
 ## B. Pure role guards closed to everyone
 
@@ -95,14 +76,10 @@ computed here rather than eyeballed.
 
 | Module | Guard site | Roles named | Unsatisfiable legs (absent role, or dead authority) |
 |---|---|---|---|
-| `module.aml` | `SanctionsScreeningController#refreshList` | `PLATFORM_ADMIN`, `AML_OFFICER` | `AML_OFFICER` |
 | `module.audit_committee` | `AuditCommitteeDashboardController#finalizeSnapshot` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY`, `PLATFORM_ADMIN` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY` |
 | `module.audit_committee` | `AuditCommitteeDashboardController#generate` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY`, `PLATFORM_ADMIN` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY` |
 | `module.audit_committee` | `AuditCommitteeDashboardController#recordResolution` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY`, `PLATFORM_ADMIN` | `AUDIT_COMMITTEE_CHAIR`, `COMPANY_SECRETARY` |
 | `module.bcm` | `BiaQuantitativeController#boardApprove` | `BOARD_MEMBER`, `PLATFORM_ADMIN` | `BOARD_MEMBER` |
-| `module.platform` | `HelpController#create` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
-| `module.platform` | `HelpController#delete` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
-| `module.platform` | `HelpController#update` | `PLATFORM_ADMIN`, `CONTENT_EDITOR` | `CONTENT_EDITOR` |
 
 ## B3. Wide despite dead role names — the camouflage sites
 
@@ -138,14 +115,13 @@ closed guards is a correctness fix, not only a modelling one.
 | Module package | Pure role guards | Closed to everyone |
 |---|---|---|
 | `module.socops` | 110 |  |
-| `module.bcm` | 65 |  |
+| `module.bcm` | 56 |  |
 | `module.cyber` | 31 |  |
 | `module.risk` | 28 |  |
-| `module.ethics` | 27 |  |
 | `module.compliance` | 26 |  |
+| `module.ethics` | 26 |  |
 | `module.ai` | 25 |  |
 | `module.sharia` | 21 |  |
-| `module.integrations` | 20 |  |
 | `module.openbanking` | 18 |  |
 | `module.outsourcing` | 17 |  |
 | `module.regreporting` | 17 |  |
@@ -159,10 +135,11 @@ closed guards is a correctness fix, not only a modelling one.
 | `module.reginspect` | 10 |  |
 | `module.consumer` | 9 |  |
 | `module.opres` | 9 |  |
-| `module.platform` | 8 |  |
 | `module.audit_committee` | 7 |  |
 | `module.governance` | 7 |  |
+| `module.integrations` | 5 |  |
 | `module.iam` | 4 |  |
+| `module.platform` | 4 |  |
 | `module.approvals` | 1 |  |
 | `module.auth` | 1 |  |
 | `module.board_pack` | 1 |  |

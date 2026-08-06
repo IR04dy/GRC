@@ -9,9 +9,12 @@ import org.springframework.web.bind.annotation.RestController;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -478,6 +481,85 @@ class RoleGuardConversionRatchetTest {
     private record Census(int controllers, int roleSites, int pureSites, int pureUnderModule,
                           int rawAuthoritySites, Set<String> modulePackages, Set<String> roleNames,
                           Set<String> rawAuthorities, List<String> lines) { }
+
+    // ── the committed census must agree with what the build measures ──────────
+
+    /**
+     * ⚠ <b>Why this gate exists.</b> {@code Appendix/ROLE_GUARD_CENSUS.md} opens with <i>"Do not
+     * hand-edit: the next run overwrites it"</i> — but nothing <em>runs</em> it. Measured 2026-08-06,
+     * the committed copy still said <b>32 ghosts, 66 names recited, 561 pure sites</b> while this
+     * test enforced <b>13 / 56 / 532</b>: nineteen ghosts of drift, accumulated across several slices
+     * that each fixed guards and left the document describing the platform before them. A generated
+     * artefact nobody regenerates is a stale assertion with a "generated" byline — which reads as
+     * <em>more</em> authoritative than prose, not less. Third register in this programme to drift
+     * while the build was right.
+     *
+     * <p>Only the figures this test computes <b>hermetically</b> are gated. The census also joins
+     * {@code iam.roles} and {@code iam.role_permissions}, which a database-free suite cannot check,
+     * so the script remains the authority for the per-role tables.
+     */
+    private static final Pattern CENSUS_ROLE_SITES = Pattern.compile(
+        "(?m)^\\|\\s*Guard sites with a role leg\\s*\\|\\s*\\**(\\d+)\\**\\s*\\|");
+    private static final Pattern CENSUS_PURE = Pattern.compile(
+        "(?m)^\\|\\s*…\\s*\\*\\*pure\\*\\*[^|]*\\|\\s*\\**(\\d+)\\**\\s*\\|");
+    private static final Pattern CENSUS_NAMES = Pattern.compile(
+        "(?m)^\\|\\s*Distinct role names recited by any role guard\\s*\\|\\s*\\**(\\d+)\\**\\s*\\|");
+    private static final Pattern CENSUS_GHOSTS = Pattern.compile(
+        "(?m)^\\|\\s*…\\s*\\*\\*that do not exist[^|]*\\|\\s*\\**(\\d+)\\**\\s*\\|");
+
+    @Test
+    void theCommittedCensusStatesWhatTheBuildMeasures() throws Exception {
+        Path census = Paths.get("..", "TSS-GRC-Platform-Bible", "Appendix",
+                                "ROLE_GUARD_CENSUS.md").toAbsolutePath().normalize();
+        assertThat(Files.exists(census)).as(
+            "The committed role-guard census is missing at %s. Regenerate it with "
+            + "`PYTHONIOENCODING=utf-8 py TSS-GRC-Platform-Bible/Appendix/scripts/"
+            + "role_guard_census.py`.", census)
+            .isTrue();
+        String md = Files.readString(census);
+
+        Census scan = scan();
+        int ghosts = (int) scan.roleNames.stream().filter(n -> !ROLE_CATALOGUE.contains(n)).count();
+
+        Map<String, int[]> claims = new LinkedHashMap<>();
+        claims.put("guard sites with a role leg",
+            new int[]{censusFigure(md, CENSUS_ROLE_SITES), scan.roleSites});
+        claims.put("pure role sites",
+            new int[]{censusFigure(md, CENSUS_PURE), scan.pureSites});
+        claims.put("distinct role names recited",
+            new int[]{censusFigure(md, CENSUS_NAMES), scan.roleNames.size()});
+        claims.put("names absent from iam.roles",
+            new int[]{censusFigure(md, CENSUS_GHOSTS), ghosts});
+
+        List<String> drift = new ArrayList<>();
+        for (var e : claims.entrySet()) {
+            if (e.getValue()[0] != e.getValue()[1]) {
+                drift.add("%s: census says %d, the build measures %d"
+                    .formatted(e.getKey(), e.getValue()[0], e.getValue()[1]));
+            }
+        }
+
+        assertThat(drift).as("""
+            The committed role-guard census disagrees with this build. It is a GENERATED document \
+            and the generator has not been run since the guards changed, so it publishes figures for \
+            a platform that no longer exists.
+
+            Fix by regenerating, never by editing the numbers:
+              PYTHONIOENCODING=utf-8 py TSS-GRC-Platform-Bible/Appendix/scripts/role_guard_census.py
+            (it needs the live database and target/role-guard-sites.txt, which this test has just \
+            rewritten)
+
+            %s""".formatted(String.join("\n            ", drift)))
+            .isEmpty();
+    }
+
+    /** One figure from the census summary table; -1 when the row is missing, never 0. */
+    private static int censusFigure(String md, Pattern p) {
+        Matcher m = p.matcher(md);
+        // -1 rather than 0 so a renamed row fails loudly instead of coincidentally matching a
+        // genuine zero — the day the ghost count really reaches 0 is the day that would matter.
+        return m.find() ? Integer.parseInt(m.group(1)) : -1;
+    }
 
     private static Census scan() {
         int controllers = 0, roleSites = 0, pureSites = 0, pureUnderModule = 0, rawAuthoritySites = 0;
