@@ -52,15 +52,27 @@ import java.util.List;
 @SecurityRequirement(name = "bearerAuth")
 public class ShariaController {
 
-    private static final String READ_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','COMPLIANCE_OFFICER','RISK_MANAGER',"
-            + "'INTERNAL_AUDITOR','CRO','SHARIA_OFFICER','SHARIA_AUDITOR')";
-    private static final String WRITE_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','COMPLIANCE_OFFICER','SHARIA_OFFICER',"
-            + "'SHARIA_AUDITOR')";
-    private static final String APPROVE_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','COMPLIANCE_OFFICER','SHARIA_OFFICER',"
-            + "'SHARIA_BOARD_CHAIR','CRO')";
+    // F2-145(e) / F2-05 — these three guards authorise by PERMISSION, not by role name.
+    //
+    // They used to recite role names via hasAnyRole, which never reaches ModulePermissionEvaluator and
+    // therefore validates nothing: two of the names it recited (CRO on read+approve, SHARIA_BOARD_CHAIR
+    // on approve) do not exist in iam.roles at all, so those legs were permanently false and the module
+    // was narrower than it read. The conversion is population-preserving — V362 catalogued the SHARIA
+    // permissions FROM these guards, so each action is granted to exactly the surviving names:
+    //
+    //     READ     COMPLIANCE_OFFICER, RISK_MANAGER, INTERNAL_AUDITOR, SHARIA_OFFICER, SHARIA_AUDITOR
+    //     WRITE    COMPLIANCE_OFFICER, SHARIA_OFFICER, SHARIA_AUDITOR
+    //     APPROVE  COMPLIANCE_OFFICER, SHARIA_OFFICER
+    //
+    // PLATFORM_ADMIN keeps access through ModulePermissionEvaluator's in-code bypass rather than by
+    // being named, which is why it disappears from the expressions without widening or narrowing.
+    //
+    // The APPROVE row is where V367 becomes load-bearing: it revoked SHARIA:APPROVE from SHARIA_AUDITOR
+    // so the audit function cannot approve what it audits. That migration was inert while these guards
+    // recited roles — from this commit it decides requests.
+    private static final String READ_GUARD = "hasPermission('SHARIA','READ')";
+    private static final String WRITE_GUARD = "hasPermission('SHARIA','WRITE')";
+    private static final String APPROVE_GUARD = "hasPermission('SHARIA','APPROVE')";
 
     private final ShariaService service;
 

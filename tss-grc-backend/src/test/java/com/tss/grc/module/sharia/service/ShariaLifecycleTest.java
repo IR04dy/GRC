@@ -88,13 +88,22 @@ import org.springframework.test.util.ReflectionTestUtils;
  *   <li>Soft deletes are filtered: every entity carries {@code @Where}.</li>
  * </ul>
  *
- * <h3>What the floor pins rather than fixes</h3>
- * <b>F2-120</b> — every Sharia-specific role in the three guard constants is absent from
- * {@code iam.roles}: {@code SHARIA_OFFICER}, {@code SHARIA_AUDITOR}, {@code SHARIA_BOARD_CHAIR}. So
- * WRITE and APPROVE reduce to {@code PLATFORM_ADMIN} and {@code COMPLIANCE_OFFICER}, and the Sharia
- * Supervisory Board — whose independent authority is the entire regulatory point of the module —
- * cannot act in the platform. Creating privileged roles is a governance decision (F2-116's reasoning,
- * one module over), so the constants are pinned and the finding filed.
+ * <h3>What the floor used to pin rather than fix — now fixed</h3>
+ * <b>F2-120 — CLOSED 2026-08-07.</b> Every Sharia-specific role in the three guard constants was
+ * absent from {@code iam.roles} ({@code SHARIA_OFFICER}, {@code SHARIA_AUDITOR},
+ * {@code SHARIA_BOARD_CHAIR}), so WRITE and APPROVE reduced to {@code PLATFORM_ADMIN} and
+ * {@code COMPLIANCE_OFFICER} and the Sharia Supervisory Board — whose independent authority is the
+ * entire regulatory point of the module — could not act in the platform. It closed in three steps, and
+ * it took all three: <b>V362</b> seated {@code SHARIA_OFFICER} and {@code SHARIA_AUDITOR} (F2-145's
+ * access half), <b>V367</b> revoked {@code SHARIA:APPROVE} from the auditor so the audit function
+ * cannot approve what it audits, and <b>F2-145(e)</b> converted these guards to
+ * {@code hasPermission('SHARIA', …)} — which is what made the first two decide requests instead of
+ * describing an intention. {@code SHARIA_BOARD_CHAIR} was never seated and no longer needs to be: the
+ * conversion deleted every name the guards recited, ghosts included.
+ *
+ * <p>Live-probed 15/15 across five personas: a seated {@code SHARIA_AUDITOR} writes 200 and approves
+ * <b>403</b>, {@code INTERNAL_AUDITOR} reads 200 and writes 403, {@code viewer} 403 throughout, and
+ * {@code admin} still passes on the evaluator's in-code bypass despite no longer being named.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -286,31 +295,42 @@ class ShariaLifecycleTest {
     // ── the authorisation branches ───────────────────────────────────────────
 
     /**
-     * F2-120, pinned. Measured against {@code iam.roles} (58 roles, dev, 2026-08-06): of the eight
-     * distinct role names these three guards recite, <b>four do not exist</b> —
-     * {@code SHARIA_OFFICER}, {@code SHARIA_AUDITOR}, {@code SHARIA_BOARD_CHAIR} and {@code CRO}.
-     * WRITE therefore has 2 real holders of the 4 it names and APPROVE 2 of 5.
+     * <b>F2-120 CLOSED 2026-08-07 by F2-145(e).</b> This test used to pin the four fictional role
+     * names <em>as present</em> — {@code SHARIA_OFFICER}, {@code SHARIA_AUDITOR},
+     * {@code SHARIA_BOARD_CHAIR}, {@code CRO} — with the handoff its own assertion message carried:
+     * <em>"when they are created or the guards convert to hasPermission under F2-05, close F2-120 and
+     * update this"</em>. Two of the four were then seated by V362 and the guards have now converted, so
+     * this asserts the destination instead of the defect.
+     *
+     * <p>🔑 <b>A test that pins a defect must say what would end it, because otherwise it outlives the
+     * fix and reads as a requirement.</b> F2-115 established that shape the hard way — a floor written
+     * over a defective control pins the defect as correct. This one survived contact with its own fix
+     * only because the previous author wrote the exit condition into the failure message.
+     *
+     * <p>➕ And the mechanical reason the conversion produced a <em>legible</em> failure rather than a
+     * stack trace: {@code rolesIn} asserted {@code m.find()} with the note <em>"a pattern that matches
+     * nothing passes forever"</em>. When the guards stopped being {@code hasAnyRole} strings the regex
+     * stopped matching, and that anti-vacuity line turned "my pattern is stale" into a named diagnosis.
+     * The helper is kept for exactly that reason, now pointed at the permission form.
      */
     @Test
-    @DisplayName("The three guard constants are exactly as reviewed, and their dead roles recorded")
-    void theGuardConstantsArePinnedWithTheirDeadRoles() throws IOException {
+    @DisplayName("The three guard constants are permissions, and no fictional role survives")
+    void theGuardConstantsAreConvertedToPermissions() throws IOException {
         String src = controllerSource();
 
-        assertThat(rolesIn(src, "READ_GUARD")).containsExactlyInAnyOrder(
-            "PLATFORM_ADMIN", "COMPLIANCE_OFFICER", "RISK_MANAGER", "INTERNAL_AUDITOR", "CRO",
-            "SHARIA_OFFICER", "SHARIA_AUDITOR");
-        assertThat(rolesIn(src, "WRITE_GUARD")).containsExactlyInAnyOrder(
-            "PLATFORM_ADMIN", "COMPLIANCE_OFFICER", "SHARIA_OFFICER", "SHARIA_AUDITOR");
-        assertThat(rolesIn(src, "APPROVE_GUARD")).containsExactlyInAnyOrder(
-            "PLATFORM_ADMIN", "COMPLIANCE_OFFICER", "SHARIA_OFFICER", "SHARIA_BOARD_CHAIR", "CRO");
+        assertThat(permissionIn(src, "READ_GUARD")).isEqualTo("SHARIA:READ");
+        assertThat(permissionIn(src, "WRITE_GUARD")).isEqualTo("SHARIA:WRITE");
+        assertThat(permissionIn(src, "APPROVE_GUARD")).isEqualTo("SHARIA:APPROVE");
 
-        Set<String> recited = new TreeSet<>();
-        recited.addAll(rolesIn(src, "READ_GUARD"));
-        recited.addAll(rolesIn(src, "WRITE_GUARD"));
-        recited.addAll(rolesIn(src, "APPROVE_GUARD"));
-        assertThat(recited).as("the four fictional names are still recited — when they are created "
-            + "or the guards convert to hasPermission under F2-05, close F2-120 and update this")
-            .contains("SHARIA_OFFICER", "SHARIA_AUDITOR", "SHARIA_BOARD_CHAIR", "CRO");
+        // Comments are stripped first: this class's javadoc and the controller's both NAME the four
+        // dead roles while explaining their removal, so a raw search would fail on the documentation.
+        String code = src.replaceAll("(?s)/\\*.*?\\*/", " ").replaceAll("(?m)//[^\\n]*", " ");
+        // The quoted form, not the bare word: a bare "CRO" would also match MACRO or ACROSS, and an
+        // assertion that can fire on an unrelated identifier is a defect generator.
+        assertThat(code).as("F2-120's fictional names must not reappear in any guard")
+            .doesNotContain("'SHARIA_BOARD_CHAIR'")
+            .doesNotContain("'CRO'")
+            .doesNotContain("hasAnyRole");
     }
 
     @Test
@@ -448,18 +468,17 @@ class ShariaLifecycleTest {
             StandardCharsets.UTF_8);
     }
 
-    private static Set<String> rolesIn(String src, String constant) {
+    /**
+     * {@code MODULE:ACTION} named by a guard constant. The {@code m.find()} assertion is the whole
+     * reason F2-145(e)'s conversion surfaced as a named failure in this class rather than as a stack
+     * trace — <b>a pattern that matches nothing passes forever</b>, so a stale extractor has to say so.
+     */
+    private static String permissionIn(String src, String constant) {
         Matcher m = Pattern.compile(
-            constant + "\\s*=\\s*\\n?\\s*\"hasAnyRole\\((.*?)\\)\"", Pattern.DOTALL).matcher(src);
-        assertThat(m.find()).as("guard constant %s must be a hasAnyRole string — a pattern that "
+            constant + "\\s*=\\s*\\n?\\s*\"hasPermission\\('([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\)\"",
+            Pattern.DOTALL).matcher(src);
+        assertThat(m.find()).as("guard constant %s must be a hasPermission string — a pattern that "
             + "matches nothing passes forever", constant).isTrue();
-        Set<String> out = new TreeSet<>();
-        for (String part : m.group(1).replace("\"", "").replace("+", "").split(",")) {
-            String r = part.trim().replace("'", "").replace("\n", "").trim();
-            if (!r.isEmpty()) {
-                out.add(r);
-            }
-        }
-        return out;
+        return m.group(1) + ":" + m.group(2);
     }
 }

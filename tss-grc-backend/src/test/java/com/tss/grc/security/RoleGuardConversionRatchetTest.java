@@ -204,7 +204,7 @@ class RoleGuardConversionRatchetTest {
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 532;
+    private static final int BASELINE_PURE_ROLE_SITES = 511;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"
@@ -468,13 +468,20 @@ class RoleGuardConversionRatchetTest {
      * second kind. Reading the number alone, they are indistinguishable — which is exactly why F2-52's
      * sweep is a per-site review rather than a rename pass.
      *
-     * <p>⚠ The four remaining {@code MODEL_OWNER}/{@code SHARIA_BOARD_CHAIR}-style names were
-     * <b>deliberately not seated</b>: D-14 resolves them by binding to data the platform already holds
-     * ({@code ml_model.model_owner_user_id}, populated on 25 of 25 rows; {@code sharia_scholar.ssb_role},
-     * a 5-row board with terms). Seating them would have been <em>looser</em> than the column — the owner
-     * of model A could act on model B — so this baseline is not simply "make it fall".
+     * <p>⚠ The remaining {@code MODEL_OWNER}-style names were <b>deliberately not seated</b>: D-14
+     * resolves them by binding to data the platform already holds ({@code ml_model.model_owner_user_id},
+     * populated on 25 of 25 rows). Seating them would have been <em>looser</em> than the column — the
+     * owner of model A could act on model B — so this baseline is not simply "make it fall".
+     *
+     * <p>{@code SHARIA_BOARD_CHAIR} left this population by a third route, and it is the one F2-145(e)
+     * generalises: <b>converting the guard to a permission deletes every name it recited</b>, ghosts
+     * included. It was 4 sites in one controller, all {@code SHARIA} APPROVE; {@code ShariaController}
+     * now asks {@code hasPermission('SHARIA','APPROVE')} and the name appears nowhere in {@code src/main}.
+     * Seating it was never needed — {@link com.tss.grc.module.sharia.ShariaControllerGuardTest} pins the
+     * result. That is cheaper than either of the other two routes and is why 102 sites across the six
+     * Saudi/financial modules are queued behind it rather than being individually adjudicated.
      */
-    private static final int BASELINE_GHOST_ROLE_NAMES = 9;
+    private static final int BASELINE_GHOST_ROLE_NAMES = 8;
 
     // ── extraction ────────────────────────────────────────────────────────────────────────────
 

@@ -39,8 +39,8 @@ that will be read as current forever.
 | REST endpoint mappings | **2,213** | 2,160 | `CLAUDE.md` updated to 2,212 |
 | Write endpoints (`POST/PUT/PATCH/DELETE`) | **1,239** | *pub. 1,151* | ⚠ see §0.1 — 1,151 reproduces under no rule |
 | `@PreAuthorize` annotations (comment-stripped) | **2,201** | *pub. 2,268* | ⚠ see §0.1 — never reproducible |
-| Distinct permission modules used by guards | **31** | 27 | matches `CLAUDE.md` "31 modules / 114 permissions" ✅ |
-| Module packages with **zero** `hasPermission` usage | **17 of 59** | 21 | F2-05 converted 5 (`fraud`, `integrations`, `knowledge`, `board_pack`, `socops`); the 17th is `change_adapters`, which is **correct** — adapters carry no endpoint, so a guard there would be a second unguarded door (`ChangeModuleBoundaryTest` asserts they hold no `@RestController`) |
+| Distinct permission modules used by guards | **32** | 27 | `SHARIA` joined 2026-08-07 when F2-145(e) converted `ShariaController` — V362 had catalogued the permissions a week earlier, so this figure is the moment the catalogue started deciding requests |
+| Module packages with **zero** `hasPermission` usage | **16 of 59** | 21 | F2-05 converted 5 (`fraud`, `integrations`, `knowledge`, `board_pack`, `socops`) and F2-145(e) converted `sharia` (21 sites, population-preserving); `change_adapters` is **correct** to be here — adapters carry no endpoint, so a guard there would be a second unguarded door (`ChangeModuleBoundaryTest` asserts they hold no `@RestController`). The remaining 5 Saudi/financial modules are F2-145(e)'s queue: `aml` 14, `consumer` 9, `cpty` 14, `openbanking` 18, plus `ethics` 26 (already part-converted) |
 | Tests attributed to modules | **3,199** (suite total **3,398**) | 2,339 / 2,415 | `CLAUDE.md` says **3,354** run by surefire ✅ *(the census counts declarations, surefire counts executions incl. parameterised expansion — the two never match exactly and neither is wrong)* |
 | Module packages with **zero tests** | **8**, totalling **6,556 LoC (3.2%)** | 15 / 18,011 / 9.4% | ⚠ **F2-03 closed 2026-08-06 — all seven Tier-1 regulator-facing modules floored** (`outsourcing`, `nca_ecc`, `sharia`, `data_officer`, `openbanking`, `dataclass`, `rrp`), removing 7 packages and 11,455 LoC from this set. The remaining 8: `cpty`, `regreporting`, `reginspect`, `opres`, `controlmap`, `dashboard`, `audit_eng`, `datagov` — and `datagov` is the empty placeholder (F2-20), so 7 are real |
 | Distinct **JPA** schemas | **50** | 50 | matches `CLAUDE.md` "50+" ✅ |
@@ -243,18 +243,23 @@ exported, or air-gapped independently. This is the hard floor under every per-mo
 
 ## 4. Authorisation coverage — guarded, but not *delegatably* guarded
 
-- **31** distinct permission modules are referenced by `hasPermission(MODULE, ACTION)` guards
-  (was 27 — F2-05 added `FRAUD`, `INTEGRATIONS`, `KB`, and `socops` moved onto `CYBER`).
-- **17 of 59** module packages contain **no `hasPermission` call at all** (was 21). They are *not*
+- **32** distinct permission modules are referenced by `hasPermission(MODULE, ACTION)` guards
+  (was 27 — F2-05 added `FRAUD`, `INTEGRATIONS`, `KB`, `socops` moved onto `CYBER`, and F2-145(e)
+  added `SHARIA`).
+- **16 of 59** module packages contain **no `hasPermission` call at all** (was 21). They are *not*
   unguarded — they use hard-coded `hasAnyRole('ROLE_A','ROLE_B',…)` lists:
 
-  `sharia` · `aml` · `ccm` · `openbanking` · `rrp` · `governance` · `cpty` · `outsourcing` ·
+  `aml` · `ccm` · `openbanking` · `rrp` · `governance` · `cpty` · `outsourcing` ·
   `regreporting` · `audit_committee` · `consumer` · `reginspect` · `dataclass` · `opres` · `auth` ·
-  `datagov` *(which has no code at all, so 15 with code)*
+  `change_adapters` *(no endpoints — correctly here)* · `datagov` *(no code at all, so 14 with
+  endpoints)*
+
+  `sharia` **left this set on 2026-08-07** — F2-145(e) converted all 21 of its sites to
+  `hasPermission('SHARIA', …)`, which is also what closed F2-120 and made V362/V367 load-bearing.
 
   | Module | Guard as written |
   |---|---|
-  | `sharia` | `hasAnyRole('PLATFORM_ADMIN','COMPLIANCE_OFFICER','RISK_MANAGER','INTERNAL_AUDITOR','CRO','SHARIA_OFFICER','SHARIA_AUDITOR')` (read) |
+  | `sharia` | ~~`hasAnyRole('PLATFORM_ADMIN','COMPLIANCE_OFFICER','RISK_MANAGER','INTERNAL_AUDITOR','CRO','SHARIA_OFFICER','SHARIA_AUDITOR')`~~ → **`hasPermission('SHARIA','READ')`** (2026-08-07) |
   | `outsourcing` | `hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','COMPLIANCE_OFFICER','CIO')` |
   | `audit_committee` | `hasAnyRole('AUDIT_COMMITTEE_CHAIR','COMPANY_SECRETARY','PLATFORM_ADMIN')` |
   | ~~`socops`~~ | ✅ **converted** — now `hasPermission('CYBER',…)` across 111 endpoints |
