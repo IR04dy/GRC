@@ -79,8 +79,18 @@ DevTools' `RestartLauncher` swallows the app's failure, so Maven printed `BUILD 
 5.059 s over an application that never bound a port. **Grep `Started GrcApplication in`**
 instead. That run died on `ApplicationTemp`: *"Existing directory 'C:\…\Temp\<hash>' is
 not owned by BUILTIN\Administrators"*, reported under a Tomcat `prepareContext` trace that
-reads like a port conflict. Cause: the dir was created by a **non-elevated** run and this
-shell is elevated — ownership, not permissions. Fix: `takeown /f <dir> /a /r /d y`.
+reads like a port conflict. Cause: the dir was created by a **non-elevated** run and that
+shell was elevated — ownership, not permissions.
+⚠⚠ **`takeown` is the WRONG fix and this line recommended it for one session.** The assertion
+is bidirectional: `takeown /f <dir> /a /r /d y` gives the dir to `BUILTIN\Administrators`, and
+the next **non-elevated** launch then fails with the mirror message (*"is not owned by
+`<HOST>\User`"*). Elevation is not stable across this repo's tool surface — the Bash tool and
+the PowerShell tool do not necessarily agree — so ownership-flipping trades one broken launch
+for the other. **Give the JVM its own temp dir instead** (measured working from both):
+
+```
+mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Djava.io.tmpdir=<a dir this shell created>"
+```
 
 ### Frontend — `tss-grc-ui-v2` (React + Vite + TS; the primary UI)
 
