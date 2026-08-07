@@ -115,14 +115,21 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V371 packaged; next free V372** (359 files; ⚠ this line said "V1→V295 / next free
+— **V1→V372 packaged; next free V373** (360 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
+⚠ **A grant migration must DECLARE its (role, module, action) triples as literals.** The house idiom
+`INSERT … SELECT … JOIN iam.roles JOIN iam.permissions WHERE NOT EXISTS` grants **nothing** when
+either side is catalogued later in the chain, and `NOT EXISTS` cannot tell *already granted* from
+*nothing matched* — so it succeeds silently. Measured 2026-08-07: a fresh install was **225 grants**
+short of dev (`ORG_ADMIN` −30, unable to read seven modules), and re-running the same folder adds
+**875**. Never derive the pair from `iam.role_permissions` itself — V284's "READ-parity" clause is a
+*snapshot*, not a rule; `RoleGrantDerivationRatchetTest` pins the 6 legacy sites and fails a 7th.
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V371 are pending** the
-next jar — 27 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V372 are pending** the
+next jar — 28 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -177,7 +184,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 |---|---|
 | Backend | Spring Boot 3.5.x, **Java 17 (pinned — Lombok breaks on newer)**, Spring Security 6 |
 | Auth | JJWT — Bearer access token + HttpOnly refresh cookie; FE auto-refreshes on 401 |
-| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V371 (OFF in dev) |
+| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V372 (OFF in dev) |
 | ORM | Hibernate 6 / Spring Data JPA, `ddl-auto=none` |
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
@@ -276,6 +283,15 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   (`ENOSPC` on write), and `npx vitest run` (V8 crash part-way). The repo on D: is unaffected,
   so Read/Edit/git and single-class `mvn test` keep working — which is what makes the failures
   look like code.
+  ⚠⚠ **And the disk FIX broke `CREATE DATABASE` a second way, permanently.** The ~22 GB was freed
+  by NTFS-compressing C:, so the SQL data directory carries the `Compressed` attribute, new files
+  inherit it, and SQL Server refuses with *error 5118 — the file is compressed but does not reside
+  in a read-only database or filegroup*. Existing databases are unaffected, so only NEW scratch
+  databases fail — which is every chain/schema proof. **Never let a scratch database pick its own
+  path**: give it explicit files on D: (`CREATE DATABASE [x] ON (NAME=..., FILENAME='D:/.../x.mdf',
+  SIZE=64MB) LOG ON (...)`). `full_chain_proof.py` and `chain_proof.py` both do now
+  (`CHAIN_PROOF_DATA_DIR` overrides). Do **not** `compact /u` the SQL data dir — that edits the
+  user's SQL Server installation to work around a script's own default.
 - Nested Spring Data repositories aren't scanned; lazy-collection entities 500
   outside the session — return DTOs.
 - `seed_real_data.py` batches must start `SET NOCOUNT ON;`.

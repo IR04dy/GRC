@@ -13,7 +13,24 @@ ordered history*, and nothing ever ran it in order to notice.
 ⚠ Only ever touches the database named below, which it creates. It does not read or write TSS_GRC
 or TSS_GRC_Deployment.
 
+⚠⚠ 2026-08-07 — THIS SCRIPT COULD NOT RUN AT ALL, and nothing said so. It let SQL Server choose the
+data-file location, which on this machine is C:\\Program Files\\...\\MSSQL15.SQLEXPRESS\\MSSQL\\DATA —
+and that directory carries the NTFS `Compressed` attribute, a side-effect of the 08-06 disk
+remediation that freed ~22 GB by compressing C:. New files inherit it, and SQL Server refuses:
+
+    error 5118: the file "…\\TSS_GRC_ChainProof.mdf" is compressed but does not reside in a
+                read-only database or filegroup. The file must be decompressed.
+
+So the instrument F2-143's row names as its reproduction recipe failed on its first statement, months
+after the row was filed, for a reason on the FILESYSTEM. `full_chain_proof.py` had already solved this
+by putting its files on D: and recorded why; this copy had not been carried across — F2-134's shape
+exactly, a committed script that hardcodes an assumption about one machine. Fixed the same way: the
+files go where the repo lives, so the proof no longer depends on the state of C: at all, and it can
+run on a build agent whose C: is locked down. Decompressing the SQL data directory was rejected —
+it modifies the user's SQL Server installation to work around a script's own default.
+
 Usage:  py chain_proof.py [--stop-after V123] [--keep]
+        CHAIN_PROOF_DATA_DIR=<dir>   override where the scratch .mdf/.ldf are written
 """
 import os
 import re
@@ -67,8 +84,13 @@ mc = master.cursor()
 mc.execute("IF DB_ID(?) IS NOT NULL BEGIN ALTER DATABASE [" + PROOF_DB
            + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [" + PROOF_DB + "]; END",
            PROOF_DB)
-mc.execute("CREATE DATABASE [" + PROOF_DB + "] COLLATE Latin1_General_100_CI_AS_SC_UTF8")
-print("created %s (dropped any previous copy)" % PROOF_DB)
+DATA_DIR = os.environ.get("CHAIN_PROOF_DATA_DIR", os.path.join(ROOT, ".chain-proof-data"))
+os.makedirs(DATA_DIR, exist_ok=True)
+mc.execute(
+    "CREATE DATABASE [{db}] ON (NAME='{db}_dat', FILENAME='{d}\\{db}.mdf', SIZE=64MB, "
+    "FILEGROWTH=64MB) LOG ON (NAME='{db}_log', FILENAME='{d}\\{db}.ldf', SIZE=32MB, "
+    "FILEGROWTH=32MB) COLLATE Latin1_General_100_CI_AS_SC_UTF8".format(db=PROOF_DB, d=DATA_DIR))
+print("created %s in %s (dropped any previous copy)" % (PROOF_DB, DATA_DIR))
 
 cn = pyodbc.connect(BASE % PROOF_DB, autocommit=True)
 cu = cn.cursor()
