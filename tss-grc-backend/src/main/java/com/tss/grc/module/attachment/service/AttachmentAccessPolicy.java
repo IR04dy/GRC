@@ -161,8 +161,15 @@ public class AttachmentAccessPolicy {
     private static final Map<String, ParentGuard> DECLARED = new LinkedHashMap<>();
     static {
         // ── AI / model governance ────────────────────────────────────────────
+        // F2-159: MODEL_OWNER dropped — it matched no row in iam.roles, so it admitted nobody. The
+        // parent (MlModelController#get) now reads `oversight roles OR hasPermission(#externalId,
+        // 'ML_MODEL','OWNER')`, and ⚠ this registry has no way to express the second half: ParentGuard
+        // speaks modules, roles and exact authorities, none of which can ask "is the caller this
+        // record's owner". So a model owner can open their model and is still refused its attachments.
+        // Stated rather than silently wrong — an entity-bound ParentGuard kind is the fix and it is
+        // filed, because inventing one for a single entry is how F2-156's drift started.
         DECLARED.put("AI_MODEL", ParentGuard.roles(
-            "RISK_MANAGER", "CISO", "MODEL_OWNER", "DPO", "AUDITOR", "PLATFORM_ADMIN"));
+            "RISK_MANAGER", "CISO", "DPO", "AUDITOR", "PLATFORM_ADMIN"));
         DECLARED.put("AI_RECERTIFICATION", ParentGuard.roles(AI_LC_READ));
         DECLARED.put("AI_RETRAINING",      ParentGuard.roles(AI_LC_READ));
         DECLARED.put("AI_VALIDATION",      ParentGuard.roles(AI_LC_READ));

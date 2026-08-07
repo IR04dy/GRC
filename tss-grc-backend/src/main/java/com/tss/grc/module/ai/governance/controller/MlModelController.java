@@ -42,10 +42,48 @@ import java.util.List;
 @SecurityRequirement(name = "bearerAuth")
 public class MlModelController {
 
+    /**
+     * F2-52 / F2-159 — {@code MODEL_OWNER} is gone from these two constants, and it is <b>not</b> simply
+     * deleted: the four endpoints that carry an {@code externalId} now ask the real question via
+     * {@link #READ_OWN_GUARD} / {@link #WRITE_OWN_GUARD}. {@code MODEL_OWNER} matched no row in
+     * {@code iam.roles}, so removing the leg changes nobody's access; what changes access is the
+     * ownership check replacing it.
+     *
+     * <p>⚠ These two constants stay role-only because they guard endpoints with <b>no record to own</b>:
+     * {@code list}, {@code highRiskWithoutFairness}, {@code highRiskWithoutAia} (collections) and
+     * {@code create} (the model does not exist yet). Appending {@code or hasPermission(#externalId, …)}
+     * to a shared constant would have put {@code #externalId} in the expression of methods that have no
+     * such parameter — a SpEL evaluation error, i.e. a <b>500 on the model list</b>. The two guards had
+     * to split; that is measured, not stylistic.
+     */
     private static final String READ_GUARD =
-            "hasAnyRole('RISK_MANAGER','CISO','MODEL_OWNER','DPO','AUDITOR','PLATFORM_ADMIN')";
+            "hasAnyRole('RISK_MANAGER','CISO','DPO','AUDITOR','PLATFORM_ADMIN')";
     private static final String WRITE_GUARD =
-            "hasAnyRole('RISK_MANAGER','MODEL_OWNER','CISO','PLATFORM_ADMIN')";
+            "hasAnyRole('RISK_MANAGER','CISO','PLATFORM_ADMIN')";
+
+    /**
+     * F2-159 / ADR-017 D-14 — the oversight roles <b>or the model's own owner</b>, for the endpoints that
+     * name a single model. {@code ml_model.model_owner_user_id} is populated 25/25, which is why D-14
+     * refused to seat a role of this name: a role would let the owner of model A act on model B.
+     */
+    private static final String READ_OWN_GUARD =
+            "hasAnyRole('RISK_MANAGER','CISO','DPO','AUDITOR','PLATFORM_ADMIN') "
+            + "or hasPermission(#externalId, 'ML_MODEL', 'OWNER')";
+
+    /**
+     * F2-159 — the owner may edit their own model's record.
+     *
+     * <p>⚠ <b>Deliberately NOT applied to {@code transition} or {@code decommission}</b>, which do carry an
+     * {@code externalId} and could have used it. Both move the model's lifecycle state, and letting the
+     * owner drive that is self-approval on a governance gate — the defect V367 fixed when it took
+     * {@code SHARIA:APPROVE} away from the Sharia auditor. "It has an id, so bind it" is the wrong rule;
+     * the right question is whether the action is a judgement about the record or work on it. Same
+     * reasoning keeps the owner off {@code MlModelAuditController#record} (auditing your own model) and
+     * the drift verdicts. Filed rather than smuggled in: who may transition a model is a policy decision.
+     */
+    private static final String WRITE_OWN_GUARD =
+            "hasAnyRole('RISK_MANAGER','CISO','PLATFORM_ADMIN') "
+            + "or hasPermission(#externalId, 'ML_MODEL', 'OWNER')";
     /**
      * F2-27 — extracting the model inventory as a file needs the catalogued AI:EXPORT
      * permission, AND-ed in front of the role list rather than replacing it, so this
@@ -97,7 +135,7 @@ public class MlModelController {
     }
 
     @GetMapping("/{externalId}")
-    @PreAuthorize(READ_GUARD)
+    @PreAuthorize(READ_OWN_GUARD)
     @Operation(summary = "Get one model by external id.")
     public MlModelResponse get(@PathVariable String externalId) {
         return service.get(AiModelIds.parse(externalId));
@@ -125,7 +163,7 @@ public class MlModelController {
     }
 
     @PutMapping("/{externalId}")
-    @PreAuthorize(WRITE_GUARD)
+    @PreAuthorize(WRITE_OWN_GUARD)
     @Operation(summary = "Update metadata on a model that is not DECOMMISSIONED.")
     public MlModelResponse update(@PathVariable String externalId, @Valid @RequestBody MlModelRequest req) {
         return service.update(AiModelIds.parse(externalId), req);

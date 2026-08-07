@@ -245,6 +245,21 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   comment already said *"It has to move WITH the parent, not later"* — an instruction with no
   enforcement, ignored by two converting slices. **`RoleNameSurfaceRatchetTest` enforces it now:
   change a guard's roles and change that registry in the same commit.**
+  ⚠ **There is a THIRD authorisation shape now: entity ownership** (F2-159/D-14).
+  `@PreAuthorize("hasAnyRole(...) or hasPermission(#externalId,'ML_MODEL','OWNER')")` resolves the
+  record's owner via `EntityOwnershipRegistry` + an `EntityOwnershipResolver` per type. Use it where a
+  column already names the owner and a role would be **looser** than the column
+  (`ml_model.model_owner_user_id` 25/25, `bcm.exercise_run.facilitator_user_id` 4/4). ⚠⚠ **Until
+  2026-08-07 this hook was a DECOY**: `PermissionEvaluator`'s 4-arg overload silently **discarded the
+  id** and answered the module-level question, so `hasPermission(#id,'RISK','READ')` meant "may I read
+  risks?" — **and a test asserted that as correct** (`the_targetId_overload_delegates_to_the_module_
+  level_check`). Four register rows recorded this mechanism as "does not exist" without opening the
+  file. 🔑 **A test can lock in a defect; it is hardest to spot when it describes the code accurately.**
+  ⚠ Adding a resolver? **Unit-test the resolver itself**, not just the registry — mutation proved a
+  fake resolver hides a missing tenant filter and an ownership check reduced to mere existence.
+  ⚠ And do **not** bind an id just because the route has one: `transition`/`decommission`/audit-record/
+  drift-verdict are judgements *about* the record and the owner is their subject (V367's defect).
+  `MlModelOwnershipGuardTest` pins that boundary in both directions.
   ⚠ **A catalogued permission is inert until a guard consults it**, and a catalogue
   *derived* from guards is not *faithful* to them: V362 classified actions by method
   shape and so promoted whole WRITE tiers to APPROVE in 4 of the 6 modules it touched

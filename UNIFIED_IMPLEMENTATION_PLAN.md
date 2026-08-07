@@ -714,6 +714,57 @@ modules — `dataclass`, `outsourcing`, `regreporting`, `rrp`, `governance` — 
 permissions**, which is what makes them unconvertible; and `CIO`/`CRO` hold **no permissions at all**, so
 which ones these two executives should carry is a provisioning decision for the platform owner.
 
+✔ **2026-08-07 — F2-52 slice 6 / [[F2-159]] SHIPPED: the ownership mechanism, which turned out to
+already exist as a decoy.** 🔑🔑 **Four register items — [[F2-52]]'s `MODEL_OWNER` (14 sites) and
+`FACILITATOR` (18), F2-145(c), F2-145(d) — each recorded their remedy as "blocked on an ownership/SpEL
+mechanism that does not exist". It existed.** `ModulePermissionEvaluator`'s four-argument
+`PermissionEvaluator` overload, the standard hook for per-record checks, was
+`return hasPermission(authentication, targetType, permission)` — it **discarded the record id**, so
+`hasPermission(#id, 'RISK', 'READ')` would have answered "may I read risks?" while reading as "may I read
+THIS risk?". Nothing used the form, so nothing was exposed; the trap was unsprung. **All four entries were
+written without opening the evaluator, three of them by me.**
+
+🔑 **And it survived because a test asserted it.** `the_targetId_overload_delegates_to_the_module_level_check`
+asserted the id is discarded, as intended behaviour — so anyone who questioned the overload found the suite
+agreeing. **A test can lock in a defect, and it is hardest to see when it describes the code accurately:**
+that test was not wrong about the behaviour, only about the behaviour being correct, and no suite
+distinguishes those.
+
+Shipped: `EntityOwnershipResolver` + `EntityOwnershipRegistry` + `MlModelOwnershipResolver`; the overload
+now refuses an unregistered type or a non-`OWNER` relation instead of falling through. `MODEL_OWNER` left
+the ghost list by the **third route** — bound to `ml_model.model_owner_user_id`, not seated, not dropped,
+not module-converted. Ghosts **5 → 4**, second surface **4 → 3**, pure role sites **430 → 425**.
+Live-proven on the sharpest available case: `ranalyst` owns **6 of 25** models, holds `AI:READ`/`AI:WRITE`,
+and could open **none** of them; now **200 on its six and 403 on the nineteen it does not own**, same
+token. ⚠ **Five `/{externalId}` endpoints are deliberately NOT bound** — `transition`, `decommission`, the
+audit `record` and both drift verdicts — because each is a judgement about the model and the owner is its
+subject (V367's defect, one module over). `MlModelOwnershipGuardTest` asserts that boundary by name in
+both directions, since [[F2-156]] proved an instruction without enforcement gets read past.
+
+⚠ **The mutation run caught a gap in my own testing that review did not**: dropping the resolver's
+`organisationId` filter and reducing ownership to *existence* both left the suite green, because the
+mechanism was tested against a **fake** and the real implementation was unasserted.
+🔑 **Testing the abstraction is not testing the implementation, and a well-behaved fake hides that.**
+
+➡ **Filed, not fixed**: `AttachmentAccessPolicy` cannot express ownership, so a model owner opens their
+model and is still refused its attachments; whether the owner may acknowledge drift or transition their own
+model is a policy call. ➡ **Next**: `FACILITATOR` needs only a second resolver
+(`bcm.exercise_run.facilitator_user_id`, populated 4/4). ⚠ Prod remains **29 migrations behind**
+(V345–V373); this slice adds no migration.
+
+✔ **2026-08-08 — [[F2-160]] fixed: the unit suite failed on Saturdays.** The date rolled over
+mid-session and `mvn -o clean package` went from green to **2 failures with an unchanged tree** —
+`EmergencyRatificationSlaSchedulerTest` (fixtures from `LocalDateTime.now()`, asserting "9 calendar days
+is at least 6 Saudi business days" — from a Saturday it is **5**) and
+`EmergencyRatificationTest.implementationStartsTheClockAtFiveSaudiBusinessDays` (asserting `>= +6`
+calendar days, but from a Saturday start the weekend is already behind you and 5 business days spans
+exactly **+5**: Sat 8 Aug → Thu 13 Aug). ⚠ **I proved it was pre-existing rather than asserting it** —
+both classes fail identically in a clean `git worktree` at HEAD. *"Unrelated to my change" needs the same
+proof as any other claim.* 🔑 **The fix removes the clock dependence rather than widening the band until
+today fits**: loosening `>= 6` to `>= 5` was one character and would have destroyed the very distinction
+between a business-day and a calendar-day SLA. Fixed instant for the scheduler, business-day distance
+(plus the original ≥ +7 claim, conditioned on a working-day start) for the service.
+
 ➡ **Next unblocked candidates**: F2-147 slice 2 (owner: commission the SMS/WhatsApp/SMTP gateways) ·
 F2-150/F2-151/F2-152 (need owner decisions) · F2-11/F2-12/F2-16/F2-17/F2-14 (unblocked but
 multi-session). ⚠ **Prod is now 29 migrations behind** (V345–V373).

@@ -43,6 +43,22 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class EmergencyRatificationSlaSchedulerTest {
 
+    /**
+     * F2-160 — a FIXED reference instant, because this class's arithmetic is weekday-sensitive.
+     *
+     * <p>Every fixture here was built from {@code LocalDateTime.now()}, and one assertion reads "9
+     * calendar days past the deadline is at least 6 Saudi business days". That holds on most days and
+     * not on all: measured from Saturday 8 August 2026, a 9-calendar-day window contains two Fridays
+     * and two Saturdays, so only <b>5</b> business days have elapsed. The suite passed six days a week
+     * and went red at midnight with no code change — <b>the clock is an input, and it was an untracked
+     * one</b>.
+     *
+     * <p>Anchored to <b>Sunday</b>, the first day of the Saudi working week, so the numbers below mean
+     * what they say. Loosening the assertion to {@code >= 5} was the other option and was rejected: that
+     * weakens a real control check to accommodate a test-design flaw.
+     */
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 3, 15, 9, 0);
+
     private static final Long ORG = 1L;
     private static final Long CHANGE = 501L;
 
@@ -81,7 +97,7 @@ class EmergencyRatificationSlaSchedulerTest {
 
     @Test
     void anUnratifiedEmergencyChangePastItsDeadlineEscalatesToTheCiso() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = FIXED_NOW;
         LocalDateTime due = now.minusDays(9);
         when(changeRepo.findRatificationBreaches(eq(ORG), any())).thenReturn(List.of(breached(due)));
         when(auditRepo.findByOrganisationIdAndEntityTypeAndEntityIdOrderByCreatedAtDesc(
@@ -111,7 +127,7 @@ class EmergencyRatificationSlaSchedulerTest {
 
     @Test
     void theLedgerLineNamesTheConsequenceAndNotJustTheFact() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = FIXED_NOW;
         when(changeRepo.findRatificationBreaches(eq(ORG), any()))
             .thenReturn(List.of(breached(now.minusDays(3))));
         when(auditRepo.findByOrganisationIdAndEntityTypeAndEntityIdOrderByCreatedAtDesc(
@@ -130,7 +146,7 @@ class EmergencyRatificationSlaSchedulerTest {
 
     @Test
     void aRestartDoesNotDoubleEscalateTheSameDeadline() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = FIXED_NOW;
         LocalDateTime due = now.minusDays(4);
         when(changeRepo.findRatificationBreaches(eq(ORG), any())).thenReturn(List.of(breached(due)));
 
@@ -150,7 +166,7 @@ class EmergencyRatificationSlaSchedulerTest {
     void aMovedDeadlineReArmsTheEscalation() {
         // Dedup is keyed on the due date, not on "escalated once": if the tenant tightens
         // the SLA and a deadline moves, the new deadline deserves its own escalation.
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = FIXED_NOW;
         when(changeRepo.findRatificationBreaches(eq(ORG), any()))
             .thenReturn(List.of(breached(now.minusDays(2))));
 
@@ -167,7 +183,7 @@ class EmergencyRatificationSlaSchedulerTest {
         // ck_change_ratification_clock makes this unreachable through the API. It is
         // asserted anyway because the constraint is what makes it unreachable, and
         // "unreachable given today's schema" is the reasoning that leaves holes open.
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = FIXED_NOW;
         ChangeRequest c = breached(now.minusDays(5));
         c.setRatificationDueAt(null);
         when(changeRepo.findRatificationBreaches(eq(ORG), any())).thenReturn(List.of(c));
@@ -191,7 +207,7 @@ class EmergencyRatificationSlaSchedulerTest {
      */
     @Test
     void theEscalationWriteRunsInItsOwnTransaction() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = FIXED_NOW;
         when(changeRepo.findRatificationBreaches(eq(ORG), any()))
             .thenReturn(List.of(breached(now.minusDays(3))));
         when(auditRepo.findByOrganisationIdAndEntityTypeAndEntityIdOrderByCreatedAtDesc(
@@ -222,7 +238,7 @@ class EmergencyRatificationSlaSchedulerTest {
     void aQuietTenantProducesNoEscalations() {
         when(changeRepo.findRatificationBreaches(eq(ORG), any())).thenReturn(List.of());
 
-        assertThat(scheduler().sweep(ORG, LocalDateTime.now())).isZero();
+        assertThat(scheduler().sweep(ORG, FIXED_NOW)).isZero();
         verify(audit, never()).log(anyString(), anyString(), anyLong(), anyString());
     }
 }

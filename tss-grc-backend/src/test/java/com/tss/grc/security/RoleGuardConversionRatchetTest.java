@@ -333,8 +333,19 @@ class RoleGuardConversionRatchetTest {
      * instead. Where a role genuinely is the right unit — {@code PLATFORM_ADMIN}-only platform
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
+     *
+     * <p><b>430 → 425 (F2-159, 2026-08-07): drained by a third mechanism, and the count moved without
+     * anything being "converted" in the usual sense.</b> Five {@code ai} sites stopped being <em>pure</em>
+     * role guards by gaining an entity-ownership leg — {@code MlModelController#get}/{@code #update},
+     * {@code MlModelAuditController#list}/{@code #latest}, {@code MlModelDriftController#list} now read
+     * {@code hasAnyRole(…) or hasPermission(#externalId,'ML_MODEL','OWNER')}. ⚠ Note what this measures
+     * and what it does not: <b>composed</b> is not <b>converted</b>. The role legs are all still there and
+     * still authoritative; what changed is that the guard can now also admit the one person the platform
+     * always knew should be admitted. The number falling is real progress on <em>this</em> metric while
+     * the role list it counts is untouched — which is the same ambiguity
+     * {@link #BASELINE_GHOST_ROLE_NAMES} carries, in the sibling statistic.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 430;
+    private static final int BASELINE_PURE_ROLE_SITES = 425;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"
@@ -658,8 +669,25 @@ class RoleGuardConversionRatchetTest {
      * two entries that had drifted from the permission-guarded parents they mirror. A gap this class
      * documented for two slices was still an unmeasured gap: <b>writing the caveat down did not make the
      * number honest, and only the second scan did.</b>
+     *
+     * <p><b>5 → 4 (F2-159, 2026-08-07): {@code MODEL_OWNER} left by the THIRD route, the one this class
+     * kept describing as unavailable.</b> Not seated (a role would be looser than the column), not
+     * dropped (that would discard the intent), not converted to a module permission (that would admit
+     * every {@code AI:READ} holder to every model). Bound to the record:
+     * {@code hasPermission(#externalId, 'ML_MODEL', 'OWNER')} against
+     * {@code ml_model.model_owner_user_id}. ⚠ And the mechanism it needed turned out to be <b>worse than
+     * missing</b> — {@code PermissionEvaluator}'s four-argument overload existed and
+     * {@code ModulePermissionEvaluator} implemented it by <em>discarding the id</em> and answering the
+     * module-level question instead, so the idiomatic ownership guard would have compiled, read correctly
+     * and checked nothing about the record (F2-159). Every earlier slice recorded this remedy as "blocked
+     * on a mechanism that does not exist"; it existed and was a decoy.
+     *
+     * <p>{@code FACILITATOR} (18 sites) is the same shape and is the next consumer:
+     * {@code bcm.exercise_run.facilitator_user_id} is populated 4/4 and only needs a second
+     * {@code EntityOwnershipResolver}. The three {@code AUDIT_*} committee-seat names still need a
+     * different question — seat membership, not record ownership — so they remain out.
      */
-    private static final int BASELINE_GHOST_ROLE_NAMES = 5;
+    private static final int BASELINE_GHOST_ROLE_NAMES = 4;
 
     // ── extraction ────────────────────────────────────────────────────────────────────────────
 

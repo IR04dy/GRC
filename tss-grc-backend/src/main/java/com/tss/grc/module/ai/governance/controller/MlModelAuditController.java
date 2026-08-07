@@ -32,10 +32,21 @@ import java.util.List;
 @SecurityRequirement(name = "bearerAuth")
 public class MlModelAuditController {
 
+    /**
+     * F2-159 — every route here is under {@code /api/v1/ai/models/{externalId}/audits}, so the model's
+     * owner can be identified on all of them. The owner is admitted to the <b>reads</b> only.
+     *
+     * <p>⚠ {@code WRITE_GUARD} guards {@code record}, which files a fairness / bias / AIA audit result
+     * against the model. Admitting the owner there would let them author the audit <em>of their own
+     * model</em> — V367's defect (the Sharia auditor approving what it audits) transplanted into AI
+     * governance. The ability to bind an id is not a reason to bind it: {@code MODEL_OWNER} is dropped
+     * from this constant because it never matched anything, and no ownership leg replaces it.
+     */
     private static final String READ_GUARD =
-            "hasAnyRole('RISK_MANAGER','CISO','MODEL_OWNER','DPO','AUDITOR','PLATFORM_ADMIN')";
+            "hasAnyRole('RISK_MANAGER','CISO','DPO','AUDITOR','PLATFORM_ADMIN') "
+            + "or hasPermission(#externalId, 'ML_MODEL', 'OWNER')";
     private static final String WRITE_GUARD =
-            "hasAnyRole('RISK_MANAGER','MODEL_OWNER','CISO','AUDITOR','PLATFORM_ADMIN')";
+            "hasAnyRole('RISK_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN')";
 
     private final MlModelAuditService service;
 

@@ -36,10 +36,20 @@ import java.util.UUID;
 @SecurityRequirement(name = "bearerAuth")
 public class MlModelDriftController {
 
+    /**
+     * F2-159 — the owner may <b>see</b> the drift observed on their own model, and does not rule on it.
+     *
+     * <p>⚠ {@code WRITE_GUARD} covers {@code record} and {@code acknowledge}. Both carry the
+     * {@code externalId} and could have been bound; {@code acknowledge} is the model owner accepting or
+     * dismissing a drift alert against their own model, which is a verdict, not upkeep. Same line as the
+     * audit controller and {@code transition}. {@code MODEL_OWNER} is dropped here as a dead leg with no
+     * replacement, and whether the owner should be able to acknowledge drift is filed as a policy call.
+     */
     private static final String READ_GUARD =
-            "hasAnyRole('RISK_MANAGER','CISO','MODEL_OWNER','DPO','AUDITOR','PLATFORM_ADMIN')";
+            "hasAnyRole('RISK_MANAGER','CISO','DPO','AUDITOR','PLATFORM_ADMIN') "
+            + "or hasPermission(#externalId, 'ML_MODEL', 'OWNER')";
     private static final String WRITE_GUARD =
-            "hasAnyRole('RISK_MANAGER','MODEL_OWNER','CISO','PLATFORM_ADMIN')";
+            "hasAnyRole('RISK_MANAGER','CISO','PLATFORM_ADMIN')";
 
     private final MlModelDriftService service;
 

@@ -89,8 +89,17 @@ class RoleNameSurfaceRatchetTest {
      * {@code TPRM_LEAD} (deleted with the two drifted entries). Three of those four
      * — {@code CHIEF_AUDIT_EXECUTIVE}, {@code INTERNAL_AUDITOR_LEAD}, {@code TPRM_LEAD} — appeared in
      * <b>no {@code @PreAuthorize} anywhere</b>, so the guard ratchet never counted them and never could.
+     *
+     * <p><b>4 → 3 (F2-159): {@code MODEL_OWNER} is gone from {@code AI_MODEL} too.</b> ⚠ And this one
+     * exposes a limit of the registry rather than a defect in it: the parent
+     * ({@code MlModelController#get}) now admits the model's owner via
+     * {@code hasPermission(#externalId,'ML_MODEL','OWNER')}, and {@code ParentGuard} speaks modules, roles
+     * and exact authorities — <b>none of which can ask "is the caller this record's owner"</b>. So a model
+     * owner opens their model and is still refused its attachments. Recorded at the site and filed, not
+     * papered over: inventing an entity-bound {@code ParentGuard} kind for a single entry is how
+     * F2-156's drift began.
      */
-    private static final int BASELINE_SURFACE_GHOSTS = 4;
+    private static final int BASELINE_SURFACE_GHOSTS = 3;
 
     /**
      * Role collections in the class, so a collapsed extractor cannot report a clean surface.

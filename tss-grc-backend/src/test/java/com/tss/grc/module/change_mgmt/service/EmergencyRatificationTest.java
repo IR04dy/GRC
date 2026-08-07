@@ -2,6 +2,7 @@ package com.tss.grc.module.change_mgmt.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.change_mgmt.entity.ChangeRatificationPolicy;
+import com.tss.grc.common.util.SaudiWorkdayUtil;
 import com.tss.grc.module.change_mgmt.entity.ChangeRequest;
 import com.tss.grc.module.change_mgmt.model.RatificationStates;
 import com.tss.grc.module.change_mgmt.repository.*;
@@ -175,8 +176,33 @@ class EmergencyRatificationTest {
               + "the weekend — a calendar-day SLA would")
             .isNotIn(DayOfWeek.FRIDAY, DayOfWeek.SATURDAY);
         assertThat(out.getRatificationDueAt()).isAfter(out.getImplementationStarted());
-        // 5 business days spans at least 7 calendar days once the weekend is skipped.
-        assertThat(out.getRatificationDueAt()).isAfterOrEqualTo(out.getImplementationStarted().plusDays(6));
+        // F2-160 — assert the BUSINESS-day distance, not a calendar-day lower bound.
+        // ⚠ This line read `isAfterOrEqualTo(implementationStarted.plusDays(6))` under the comment
+        // "5 business days spans at least 7 calendar days once the weekend is skipped". That holds only
+        // when the clock starts on a WORKING day. The service stamps implementationStarted = now(), so
+        // on a Saturday the weekend is already behind you and 5 business days spans exactly 5 calendar
+        // days: Sat 8 Aug -> Thu 13 Aug. The suite passed six days a week and failed on Saturdays,
+        // which is how it went red at midnight with no code change. Counting business days is both
+        // stronger and weekday-independent.
+        assertThat(SaudiWorkdayUtil.businessDaysBetween(
+                out.getImplementationStarted(), out.getRatificationDueAt()))
+            .as("the SLA is five SAUDI BUSINESS days from the start, whatever weekday that is — the "
+              + "distinction from a calendar-day SLA is the whole point of the control")
+            .isEqualTo(5L);
+        // ⚠ That equality is not circular even though the service uses the same helper: a
+        // calendar-day implementation (`start.plusDays(5)`) lands on the Friday from a Sunday start,
+        // and businessDaysBetween would then be 4, not 5. But it is worth keeping the ORIGINAL
+        // claim too, stated with the condition that actually makes it true — a 5-business-day
+        // deadline outruns a 5-calendar-day one by the whole weekend, whenever the clock starts on a
+        // working day. From a Friday or Saturday start the weekend is already behind you, which is
+        // the case that broke the old unconditional form.
+        DayOfWeek startedOn = out.getImplementationStarted().getDayOfWeek();
+        if (startedOn != DayOfWeek.FRIDAY && startedOn != DayOfWeek.SATURDAY) {
+            assertThat(out.getRatificationDueAt())
+                .as("started on %s, a working day, so five business days must span the weekend and "
+                  + "land at least seven calendar days out", startedOn)
+                .isAfterOrEqualTo(out.getImplementationStarted().plusDays(7));
+        }
     }
 
     @Test
