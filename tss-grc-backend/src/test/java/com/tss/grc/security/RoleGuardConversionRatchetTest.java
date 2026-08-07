@@ -262,13 +262,46 @@ class RoleGuardConversionRatchetTest {
      * conversion <b>reveals</b> that narrowness rather than causing it (F2-52's attrition shape, and a
      * provisioning act to fix).
      *
+     * <p><b>456</b> after {@code aml} (slice 5): 14 sites over <b>six</b> distinct guard name-sets, the most
+     * of any module in the queue, onto <b>seven</b> actions. This one inverts the previous three. V367/V368
+     * found a grant that was <em>wrong</em>; V369 found an action that was <em>missing</em>; here three of
+     * the six sets map onto V362's {@code AML_READ}/{@code AML_WRITE}/{@code AML_APPROVE} <b>exactly</b> —
+     * the first time the classifier's output has survived measurement unaltered. What was absent is a
+     * <b>gradient</b>, and it sits in the READ tier, which is not where the plan queued this slice to look.
+     * Sets A/B/C differ only by which front-line roles they admit: lists and checks include
+     * {@code ONBOARDING_AGENT} and {@code KYC_OFFICER}; a list's <em>entries</em> drop the former; the
+     * <em>hit queue</em> and dashboard drop both. <b>V370</b> catalogues {@code READ_ENTRIES},
+     * {@code READ_HITS}, {@code MANAGE_LISTS} and {@code REFRESH_LISTS} — purely additive, nothing revoked.
+     *
+     * <p>🔑 ⚠ <b>The measurement discipline this programme runs on would have destroyed this control, and
+     * been right about the numbers.</b> The standing rule is "measure the per-action population diff before
+     * converting". Measured in dev, {@code A\B}, {@code B\C} and {@code A\C} are all <b>empty</b>: every read
+     * tier resolves to the same three users, because {@code AML_OFFICER}, {@code KYC_OFFICER} and
+     * {@code ONBOARDING_AGENT} — the only roles that differentiate them — each have <b>0 active users</b>.
+     * Collapsing 14 guards onto 3 actions would have measured population-preserving, probed 200/403 exactly
+     * as predicted, and handed the sanctions <em>hit queue</em> — which customers matched — to every
+     * onboarding agent a tenant ever hires. Disclosing a flagged customer to front-line staff is the FATF
+     * R.21 / SAMA tipping-off offence. <b>A zero population diff measured in a tenant that never provisioned
+     * the distinguishing roles is not evidence that there is no distinction; it is evidence that the
+     * instrument cannot see one.</b> When the population is unstaffed, the guard's own shape is the only
+     * surviving record of intent, and it has to outrank the count.
+     *
+     * <p>➕ Two by-products worth knowing when picking slice order. Names recited fell <b>47 → 44</b>:
+     * {@code AML_OFFICER}, {@code KYC_OFFICER} and {@code ONBOARDING_AGENT} now occur <b>0</b> times in the
+     * whole of {@code src/main} — this controller was their only site — and {@code AUDIT_COMMITTEE_MEMBER}
+     * fell from 16 occurrences to 3. ⚠ <b>Those three roles are not dead, and a future reader grepping the
+     * source will conclude they are.</b> They hold the AML grants (7, 3 and 2 actions respectively), so
+     * deleting them as unused would silently revoke the tiers this slice just built: the conversion moved
+     * their authority out of a string comparison and into {@code iam.role_permissions}, which is the whole
+     * point, and it is also what makes them invisible to {@code grep}.
+     *
      * <p>Raising this number means adding an endpoint that authorises by identity in a platform
      * whose authorisation model is permissions, and whose role names have a 54% miss rate. Convert
      * instead. Where a role genuinely is the right unit — {@code PLATFORM_ADMIN}-only platform
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 470;
+    private static final int BASELINE_PURE_ROLE_SITES = 456;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"

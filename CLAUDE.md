@@ -74,6 +74,13 @@ Stop the running backend before `mvn clean` (jar lock) — kill by port
 (`netstat -ano | findstr :8084`; DevTools = 2 java PIDs). When launching in a
 background wrapper, **grep the log for `BUILD SUCCESS` / `Tests run:`** — wrapper
 exit codes can lie.
+⚠ **For `spring-boot:run`, `BUILD SUCCESS` is not a start signal** (measured 2026-08-07).
+DevTools' `RestartLauncher` swallows the app's failure, so Maven printed `BUILD SUCCESS` in
+5.059 s over an application that never bound a port. **Grep `Started GrcApplication in`**
+instead. That run died on `ApplicationTemp`: *"Existing directory 'C:\…\Temp\<hash>' is
+not owned by BUILTIN\Administrators"*, reported under a Tomcat `prepareContext` trace that
+reads like a port conflict. Cause: the dir was created by a **non-elevated** run and this
+shell is elevated — ownership, not permissions. Fix: `takeown /f <dir> /a /r /d y`.
 
 ### Frontend — `tss-grc-ui-v2` (React + Vite + TS; the primary UI)
 
@@ -98,14 +105,14 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V369 packaged; next free V370** (357 files; ⚠ this line said "V1→V295 / next free
+— **V1→V370 packaged; next free V371** (358 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V369 are pending** the
-next jar — 25 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V370 are pending** the
+next jar — 26 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -137,7 +144,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
    ⚠ **This line said "≤ 62" for months** — three times the enforced ceiling, so it
    invited waving through 41 unguarded endpoints the build in fact rejects. No ratchet
    in the suite has ever been 62 (F2-69). The other enforced ceilings, for reference:
-   `BASELINE_ENTITY_BOUND_WRITES` 214, `BASELINE_PURE_ROLE_SITES` 470 — read the
+   `BASELINE_ENTITY_BOUND_WRITES` 214, `BASELINE_PURE_ROLE_SITES` 456 — read the
    constant, never a prose summary of it. ⚠ **`BARE_EXPORT_CEILING` 32 is GONE** — F2-61(c)
    swept it to zero and replaced it with an invariant
    (`ExportAuthorizationRatchetTest.everyExportHandlerAlsoDemandsARead`): every
@@ -199,12 +206,14 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   query filters `organisation_id`** (developer responsibility); prod adds a
   tenant write-guard interceptor. Schedulers/async must be org-explicit.
 - **Authorization** — `@PreAuthorize("hasPermission('MODULE','ACTION')")` via
-  `ModulePermissionEvaluator`; **131-permission catalogue across 37 modules** (V362 added 17 across 6)
+  `ModulePermissionEvaluator`; **137-permission catalogue across 37 modules** (measured 2026-08-07 in dev: V362 added 17 across 6,
+  V369 +1, V370 +4. ⚠ The prose said **131** and the migrations account for only 132 of the 133 that
+  preceded V370, so that figure was already 1 low when written — count the table, not this line)
   (READ/WRITE/APPROVE/DELETE/TRIAGE/EXPORT), measured 2026-08-01 in both dev and
   prod — this line said "94 / 24" for months; **PLATFORM_ADMIN bypasses in code**,
   so `admin` proves nothing about authorization: probe with a real persona.
   ⚠ **`hasAnyRole(...)` is a second, independent gate that gets NO admin bypass**
-  and validates nothing — **470 endpoints still authorise by role name, reciting
+  and validates nothing — **456 endpoints still authorise by role name, reciting
   role names with a ~50% miss rate against `iam.roles`** (F2-05/F2-52). Before
   trusting or writing one, check the names exist.
   ⚠ **A catalogued permission is inert until a guard consults it**, and a catalogue

@@ -236,7 +236,24 @@ type ActionPolicy = {
 
 const ACTION_POLICY: Record<string, ActionPolicy> = {
   READ:    { editable: true, labelEn: 'Read',    labelAr: 'قراءة' },
+
+  // AML's need-to-know read gradient (F2-145(e) slice 5, V370). Three tiers rather than one because
+  // the hit queue names customers who matched a sanctions list, and disclosing that to front-line
+  // onboarding staff is the FATF R.21 / SAMA tipping-off offence — so WHICH roles hold which tier is
+  // exactly the decision this screen exists to make, and each needs its own column to make it.
+  // Placed immediately after READ so the columns read as ascending sensitivity.
+  // (Single-module actions already have precedent here: TRIAGE is INTAKE's alone, BREAK_GLASS is IAM's.)
+  READ_ENTRIES: { editable: true, labelEn: 'Read entries', labelAr: 'قراءة مُدخلات القائمة' },
+  READ_HITS:    { editable: true, labelEn: 'Read hits',    labelAr: 'قراءة التطابقات' },
+
   WRITE:   { editable: true, labelEn: 'Write',   labelAr: 'كتابة' },
+
+  // AML list curation, split from WRITE (which is "run a screening") and from APPROVE (which is
+  // "dispose of a hit") so a tenant can grant curating the list without also granting disposal of the
+  // hits that curation produces — the two halves of a maker/checker pair.
+  MANAGE_LISTS:  { editable: true, labelEn: 'Manage lists',  labelAr: 'إدارة القوائم' },
+  REFRESH_LISTS: { editable: true, labelEn: 'Refresh lists', labelAr: 'تحديث القوائم' },
+
   APPROVE: { editable: true, labelEn: 'Approve', labelAr: 'اعتماد' },
   DELETE:  { editable: true, labelEn: 'Delete',  labelAr: 'حذف' },
   TRIAGE:  { editable: true, labelEn: 'Triage',  labelAr: 'فرز' },
