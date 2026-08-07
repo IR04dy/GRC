@@ -295,13 +295,46 @@ class RoleGuardConversionRatchetTest {
      * their authority out of a string comparison and into {@code iam.role_permissions}, which is the whole
      * point, and it is also what makes them invisible to {@code grep}.
      *
+     * <p><b>430</b> after {@code ethics} (slice 6), the last module F2-145(e) queued: 26 sites over four
+     * distinct name-sets, onto six actions. Two things here that no earlier slice showed.
+     *
+     * <p>➕ <b>The catalogue was inert, so its grants were not the population to preserve.</b>
+     * {@code ETHICS:READ/WRITE/APPROVE} carried grants for months while {@code hasPermission('ETHICS'}
+     * occurred <b>zero</b> times in {@code src/main} — catalogued <em>for</em> these controllers by their own
+     * descriptions and never wired to them. For every earlier slice the grant table was the fact to keep;
+     * here it conferred nothing, so the <b>guard</b> was the only ground truth and <b>V371</b> could both add
+     * and revoke ({@code INTERNAL_AUDITOR}'s {@code ETHICS:READ}) without changing one person's real access.
+     * ⚠ Worth generalising: <em>a catalogue entry's grants are evidence of intent only once something reads
+     * them.</em>
+     *
+     * <p>🔑 ⚠ <b>And the slice-5 trap recurred one module later, this time hiding an independence control
+     * rather than a disclosure one.</b> Measured as <em>users</em>, three of the four name-sets are the same
+     * two people ({@code admin}, {@code compliance}); as <em>roles</em> they are three different authorities,
+     * separated entirely by {@code ETHICS_OFFICER} and {@code BOARD_SECRETARY} — <b>0 active users</b> each.
+     * Mapping the hotline's triage tier and the retaliation tier onto {@code ETHICS:WRITE}, which the
+     * catalogue's description invited, would have measured population-preserving and let <em>the ethics
+     * officer who ran a whistleblower investigation rule on the retaliation complaint about it</em> — the
+     * identical self-review defect V367 removed from {@code sharia} in slice (b), re-introduced in another
+     * module inside the same programme. Separately it would have put a {@code BOARD_SECRETARY} inside hotline
+     * case files that may name or concern the board. V371 catalogues {@code READ_CASES}, {@code TRIAGE} and
+     * {@code PROTECT} and asserts both absences by name, because <b>an absence is what a population diff is
+     * worst at noticing</b>.
+     *
+     * <p>➕ Names recited fell <b>44 → 43</b> ({@code ETHICS_OFFICER} was named nowhere else) and two
+     * non-guard surfaces had to move with the guards: {@code CoiService#declarantFor}, which recited the same
+     * three role names to decide who may file a declaration on an employee's behalf, and
+     * {@code AttachmentAccessPolicy}'s {@code COI_CAMPAIGN} / {@code WHISTLEBLOWER_CASE} entries. The second
+     * needed a new expression — the registry could say {@code MODULE_READ} or a role name, and ethics is the
+     * first module whose read tier is a <em>named</em> action, so {@code perm("ETHICS")} would have been wrong
+     * in both directions at once.
+     *
      * <p>Raising this number means adding an endpoint that authorises by identity in a platform
      * whose authorisation model is permissions, and whose role names have a 54% miss rate. Convert
      * instead. Where a role genuinely is the right unit — {@code PLATFORM_ADMIN}-only platform
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 456;
+    private static final int BASELINE_PURE_ROLE_SITES = 430;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"

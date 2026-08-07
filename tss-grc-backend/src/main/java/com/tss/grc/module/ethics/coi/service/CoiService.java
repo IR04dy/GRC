@@ -199,8 +199,9 @@ public class CoiService {
      *
      * <p>{@code submitDeclaration} took {@code userId} from the request body and stored it verbatim,
      * so nothing bound a declaration to the person filing it. That was latent only because
-     * {@code SUBMIT_GUARD} recites two role names that exist in no role ({@code ETHICS_OFFICER},
-     * {@code USER}), leaving three administrators as the only callers — a lockout that happened to be
+     * {@code SUBMIT_GUARD} recited two role names that existed in no role at the time
+     * ({@code ETHICS_OFFICER} — since seated by V362 — and {@code USER}, which still does not exist),
+     * leaving three administrators as the only callers — a lockout that happened to be
      * the sole thing preventing an unbound write. <b>Opening the guard first would have traded the
      * lockout for an impersonation path</b>, which is why this lands before part (b).
      *
@@ -214,11 +215,21 @@ public class CoiService {
      * attributed to a server-chosen {@code user_id}, so a mislabelled name is a data-quality problem
      * against a known declarant, not an attestation attributed to someone who never made it.
      * Resolving names from {@code iam.users} is worth doing and is not this change.
+     *
+     * <p><b>F2-145(e) slice 6 — "a COI management authority" is now the permission, not three role
+     * names.</b> This check recited {@code ROLE_BOARD_SECRETARY │ ROLE_COMPLIANCE_OFFICER │
+     * ROLE_ETHICS_OFFICER}, which was exactly {@code CoiController}'s old {@code MANAGE_GUARD} minus the
+     * admin. Converting the controller to {@code ETHICS:WRITE} and leaving this list behind would have
+     * split one authority in two: a tenant granting {@code ETHICS:WRITE} to a fourth role would get
+     * campaign management but silently not the right to file on an employee's behalf — the same
+     * every-route-must-agree failure {@code AttachmentAccessPolicy} documents for attachments.
+     * {@code ETHICS_WRITE} is the authority {@code ModulePermissionEvaluator} resolves and
+     * {@code CustomUserDetailsService} mints, so the two are now the same fact. The population is
+     * unchanged: V371 grants {@code ETHICS:WRITE} to precisely those three roles.
      */
     private Long declarantFor(SubmitDeclarationRequest req) {
         Long caller = CurrentActor.userId();
-        boolean mayFileForOthers = CurrentActor.isPlatformAdmin() || hasAnyAuthority(
-                "ROLE_BOARD_SECRETARY", "ROLE_COMPLIANCE_OFFICER", "ROLE_ETHICS_OFFICER");
+        boolean mayFileForOthers = CurrentActor.isPlatformAdmin() || hasAnyAuthority("ETHICS_WRITE");
         if (mayFileForOthers && req.userId() != null) {
             return req.userId();
         }

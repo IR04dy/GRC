@@ -49,8 +49,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CoiSubmitGuardTest {
 
     private static final String OPEN_SUBMIT = "isAuthenticated()";
-    private static final String MANAGE_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','ETHICS_OFFICER','BOARD_SECRETARY','COMPLIANCE_OFFICER')";
+    /**
+     * The authority acts, as they read after F2-145(e) slice 6. This was one
+     * {@code hasAnyRole('PLATFORM_ADMIN','ETHICS_OFFICER','BOARD_SECRETARY','COMPLIANCE_OFFICER')} over all
+     * eleven; V371 splits it into the three ETHICS actions those same three roles hold, so the population is
+     * unchanged and this test's property — <b>the submit exception must not leak to acts over other
+     * people's declarations</b> — is unaffected by how the restriction is spelled. Any of the three counts
+     * as restricted; being {@code isAuthenticated()} or absent does not.
+     */
+    private static final List<String> RESTRICTED = List.of(
+            "hasPermission('ETHICS','READ')",
+            "hasPermission('ETHICS','WRITE')",
+            "hasPermission('ETHICS','APPROVE')");
 
     private static Map<String, String> guards() {
         Map<String, String> found = new TreeMap<>();
@@ -105,10 +115,11 @@ class CoiSubmitGuardTest {
                                       "archiveCampaign", "reviewDeclaration", "recordRecusal",
                                       "listCampaigns", "getCampaign", "getDeclaration",
                                       "listDeclarationsByCampaign", "recusalsByUser")) {
-            assertThat(g)
+            assertThat(g.get(managed))
                 .as("%s decides or discloses somebody else's declaration — it must NOT inherit the "
-                  + "submit exception", managed)
-                .containsEntry(managed, MANAGE_GUARD);
+                  + "submit exception. Any of the three ETHICS actions is restricted enough; "
+                  + "isAuthenticated() is not.", managed)
+                .isIn(RESTRICTED);
         }
     }
 

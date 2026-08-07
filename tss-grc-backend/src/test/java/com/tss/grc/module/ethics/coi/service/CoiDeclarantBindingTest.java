@@ -81,12 +81,18 @@ class CoiDeclarantBindingTest {
                 .isEqualTo(CALLER);
     }
 
+    /**
+     * F2-145(e) slice 6 changed <em>how</em> a COI management authority is recognised, not who has one.
+     * The check recited {@code ROLE_BOARD_SECRETARY │ ROLE_COMPLIANCE_OFFICER │ ROLE_ETHICS_OFFICER} —
+     * {@code CoiController}'s old role list minus the admin — and now reads {@code ETHICS_WRITE}, the
+     * authority those exact three roles hold after V371. Leaving the role list behind would have split one
+     * authority in two: a tenant granting {@code ETHICS:WRITE} to a fourth role would get campaign
+     * management and silently not the right to file on an employee's behalf.
+     */
     @Test
     @DisplayName("a COI management authority may still file on another employee's behalf")
     void anAdministratorMayNameAnotherDeclarant() throws Exception {
-        for (String authority : new String[] {
-                "ROLE_PLATFORM_ADMIN", "ROLE_BOARD_SECRETARY",
-                "ROLE_COMPLIANCE_OFFICER", "ROLE_ETHICS_OFFICER" }) {
+        for (String authority : new String[] { "ROLE_PLATFORM_ADMIN", "ETHICS_WRITE" }) {
             SecurityContextHolder.clearContext();
             authenticate(CALLER, authority);
 
@@ -98,10 +104,32 @@ class CoiDeclarantBindingTest {
         }
     }
 
+    /**
+     * The converse, and it is the half that would have gone unnoticed. Holding the ROLE is no longer
+     * enough — the permission is. If V371 were reverted, or a tenant revoked {@code ETHICS:WRITE} from
+     * {@code COMPLIANCE_OFFICER}, filing on behalf would stop working while the role name still looked
+     * right, and this test says so at the point of failure.
+     */
+    @Test
+    @DisplayName("the role name alone no longer files on somebody else's behalf — the permission does")
+    void aRoleNameWithoutThePermissionDeclaresForItself() throws Exception {
+        for (String roleOnly : new String[] {
+                "ROLE_COMPLIANCE_OFFICER", "ROLE_BOARD_SECRETARY", "ROLE_ETHICS_OFFICER" }) {
+            SecurityContextHolder.clearContext();
+            authenticate(CALLER, roleOnly);
+
+            assertThat(resolve(requestNaming(SOMEONE_ELSE)))
+                    .as("%s without ETHICS_WRITE must fall back to a self-declaration. The three roles do "
+                        + "hold that permission in the seeded matrix (V371), so this is about the "
+                        + "MECHANISM: authority comes from the grant table, not from the name.", roleOnly)
+                    .isEqualTo(CALLER);
+        }
+    }
+
     @Test
     @DisplayName("an administrator who names nobody declares for themselves")
     void anAdministratorWithoutAUserIdDeclaresForThemselves() throws Exception {
-        authenticate(CALLER, "ROLE_COMPLIANCE_OFFICER");
+        authenticate(CALLER, "ETHICS_WRITE");
 
         assertThat(resolve(requestNaming(null)))
                 .as("naming no declarant is a self-declaration, not an unattributed one")

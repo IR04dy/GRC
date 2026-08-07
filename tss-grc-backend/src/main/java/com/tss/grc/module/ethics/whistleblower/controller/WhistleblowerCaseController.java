@@ -37,10 +37,23 @@ import java.util.UUID;
  *   <li>{@code POST /api/v1/ethics/whistleblower/public/reply/{token}}</li>
  * </ul>
  *
- * <h3>Internal triage surface (role-gated)</h3>
- * Read is narrow per regulatory convention — Ethics Officer, Compliance
- * Officer, Internal Auditor, Audit Committee Member, Platform Admin only.
- * Write (triage / investigation / close) is the Ethics + Compliance subset.
+ * <h3>Internal triage surface</h3>
+ * <p>Authorisation is by permission, not by role name (F2-145(e) slice 6). Read is
+ * {@code ETHICS:READ_CASES} and write (triage / investigation / close) is {@code ETHICS:TRIAGE} — two
+ * actions V371 created, because the hotline is <em>not</em> the conflict-of-interest register and the
+ * module's pre-existing {@code ETHICS:READ} / {@code ETHICS:WRITE} are.
+ *
+ * <p><b>Why a separate read action rather than {@code ETHICS:READ}.</b> {@code ETHICS:READ} is held by
+ * {@code BOARD_SECRETARY}, and this controller's role list never was. A hotline case may name — or be
+ * about — the board, so the exclusion is the control; reusing the register's action would have put a
+ * board secretary inside every case file. ⚠ That widening was <b>invisible to a population diff</b>: with
+ * {@code BOARD_SECRETARY} at zero active users, before and after are the same set of people. See V371's
+ * header for the full measurement.
+ *
+ * <p>{@code AUDIT_COMMITTEE_MEMBER} was the fifth name in the old read list and has no row in
+ * {@code iam.roles} — a leg that could never be true. Dropped rather than laundered into a grant (F2-52):
+ * the intent, an audit committee reading the hotline, needs committee membership to be a <em>seat</em>
+ * (F2-26), which is where it is filed.
  */
 @RestController
 @RequestMapping("/api/v1/ethics/whistleblower")
@@ -50,11 +63,20 @@ import java.util.UUID;
 @SecurityRequirement(name = "bearerAuth")
 public class WhistleblowerCaseController {
 
-    private static final String READ_GUARD =
-            "hasAnyRole('ETHICS_OFFICER','COMPLIANCE_OFFICER','INTERNAL_AUDITOR'," +
-            "'AUDIT_COMMITTEE_MEMBER','PLATFORM_ADMIN')";
-    private static final String TRIAGE_GUARD =
-            "hasAnyRole('ETHICS_OFFICER','COMPLIANCE_OFFICER','PLATFORM_ADMIN')";
+    // ── Authorisation ────────────────────────────────────────────────────────
+    // F2-145(e) slice 6. Two hasAnyRole(...) recitations over 9 endpoints. Populations measured against
+    // iam.role_permissions and preserved exactly (PLATFORM_ADMIN keeps access through
+    // ModulePermissionEvaluator's bypass; AUDIT_COMMITTEE_MEMBER is absent from iam.roles and was never
+    // access at all):
+    //
+    //   READ_CASES  3  ETHICS_OFFICER COMPLIANCE_OFFICER INTERNAL_AUDITOR — the case file
+    //   TRIAGE      2  …minus INTERNAL_AUDITOR, which reads a case without directing it
+    //
+    // ⚠ Neither is ETHICS:READ / ETHICS:WRITE, and the difference is one role — BOARD_SECRETARY, who
+    // curates the COI register and is not inside hotline case files. Both are unstaffed in dev, so the
+    // distinction does not appear in a user-population diff; the guard's shape is the only record of it.
+    private static final String READ_GUARD   = "hasPermission('ETHICS','READ_CASES')";
+    private static final String TRIAGE_GUARD = "hasPermission('ETHICS','TRIAGE')";
 
     private final WhistleblowerCaseService service;
 

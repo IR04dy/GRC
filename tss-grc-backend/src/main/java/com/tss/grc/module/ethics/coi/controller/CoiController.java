@@ -33,22 +33,25 @@ import java.util.List;
  * REST surface for the Sprint 13 Conflict-of-Interest (COI) register.
  *
  * <p>All endpoints are tenant-scoped via the JWT-derived
- * {@link TenantContext}. Role guards:
+ * {@link TenantContext}. Authorisation is by permission, not by role name (F2-145(e) slice 6):
  *
  * <ul>
- *   <li>Campaign management (create/open/close), review,
- *       recusal record → {@code PLATFORM_ADMIN}, {@code ETHICS_OFFICER},
- *       {@code BOARD_SECRETARY}, {@code COMPLIANCE_OFFICER}.</li>
+ *   <li>Reads → {@code ETHICS:READ}; campaign transitions and recusal records →
+ *       {@code ETHICS:WRITE}; declaration review → {@code ETHICS:APPROVE}. All three are held by
+ *       exactly the three roles the single {@code MANAGE_GUARD} role list used to name, so the
+ *       population is unchanged and a tenant can now separate reading the register from running it.</li>
  *   <li>Declaration submission is {@code isAuthenticated()} — see below.</li>
- *   <li>Read endpoints share the management role set — a future
- *       slice will scope per-user reads via row-level checks.</li>
  * </ul>
+ *
+ * <p>The three actions existed in {@code iam.permissions} before this class consulted any of them, with
+ * descriptions naming COI declarations and recusals — they were catalogued <em>for</em> these endpoints
+ * and never wired to them. V371 makes them faithful and this class makes them observable.</p>
  *
  * <h3>⚠ F2-144 — submission was open to nobody, and the obvious fix would have opened impersonation</h3>
  * <p>This javadoc used to say <i>"Declaration submission additionally allows {@code USER} (any
  * authenticated employee can submit their own attestation)"</i>. <b>That capability had never worked.</b>
- * {@code SUBMIT_GUARD} recited {@code 'ETHICS_OFFICER'} and {@code 'USER'} and <b>neither name exists in
- * any row of {@code iam.roles}</b> — both legs were permanently false — so submission reduced to
+ * {@code SUBMIT_GUARD} recited {@code 'ETHICS_OFFICER'} and {@code 'USER'} and <b>neither name existed in
+ * any row of {@code iam.roles}</b> at the time — both legs were permanently false — so submission reduced to
  * {@code PLATFORM_ADMIN │ BOARD_SECRETARY │ COMPLIANCE_OFFICER}: a Nazaha conflict-of-interest campaign
  * ran with every declarant locked out and three administrators filing on everyone's behalf.
  *
@@ -71,11 +74,12 @@ import java.util.List;
  * refused. Pinned by {@code CoiSubmitGuardTest} and enumerated in
  * {@code ControllerAuthorizationRatchetTest.SELF_SCOPED} so a uniformity sweep cannot quietly "fix" it.
  *
- * <p>Campaign management, review and recusal keep the role set: those are authority acts over
- * <em>other people's</em> declarations, and they are the correct target for a later F2-05 conversion to
- * {@code ETHICS:*} permissions. {@code ETHICS_OFFICER} stays a ghost leg there — dropping it would
- * silently ratify compliance-officer ownership of ethics oversight, which is F2-145's reasoning, and no
- * such decision has been made.
+ * <p>Campaign management, review and recusal were the "correct target for a later F2-05 conversion to
+ * {@code ETHICS:*} permissions" that this class's previous comment predicted, and slice 6 is it.
+ * {@code ETHICS_OFFICER} is <b>no longer a ghost</b>: V362 seated it (id 10076), and V371 grants it all
+ * six ETHICS actions. That matters more as a warning than as trivia — the comment here said the leg was
+ * permanently false for as long as it was true, and a future reader deciding whether to drop it would
+ * have been reading about a state that had already changed underneath them.
  */
 @RestController
 @RequestMapping("/api/v1/coi")
@@ -85,8 +89,24 @@ import java.util.List;
 @SecurityRequirement(name = "bearerAuth")
 public class CoiController {
 
-    private static final String MANAGE_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','ETHICS_OFFICER','BOARD_SECRETARY','COMPLIANCE_OFFICER')";
+    // ── Authorisation ────────────────────────────────────────────────────────
+    // F2-145(e) slice 6. One hasAnyRole('PLATFORM_ADMIN','ETHICS_OFFICER','BOARD_SECRETARY',
+    // 'COMPLIANCE_OFFICER') recitation over 11 endpoints, split by what the endpoint does. Populations
+    // measured against iam.role_permissions and preserved exactly (PLATFORM_ADMIN keeps access through
+    // ModulePermissionEvaluator's bypass rather than through a name in a list):
+    //
+    //   READ     3  ETHICS_OFFICER BOARD_SECRETARY COMPLIANCE_OFFICER — the COI register
+    //   WRITE    3  …the same three                                   — campaign transitions, recusals
+    //   APPROVE  3  …the same three                                   — decide a declaration's outcome
+    //
+    // Same population, three actions: a tenant that wants a board secretary to read the register without
+    // running campaigns can now express it as two grants instead of a jar. ⚠ The three are deliberately
+    // NOT the hotline's actions — see WhistleblowerCaseController and V371's header. ETHICS:READ used to
+    // be granted to INTERNAL_AUDITOR as well; V371 revoked it, because the role list here never named
+    // internal audit and this action is now what that list means.
+    private static final String READ_GUARD   = "hasPermission('ETHICS','READ')";
+    private static final String WRITE_GUARD  = "hasPermission('ETHICS','WRITE')";
+    private static final String REVIEW_GUARD = "hasPermission('ETHICS','APPROVE')";
     /** See the class javadoc. Every employee is under the obligation this endpoint discharges, and the
      *  declarant is chosen by the server (F2-144a), not by the caller's body. */
     private static final String SUBMIT_GUARD = "isAuthenticated()";
@@ -96,49 +116,49 @@ public class CoiController {
     // ─── Campaigns ──────────────────────────────────────────────────
 
     @PostMapping("/campaigns")
-    @PreAuthorize(MANAGE_GUARD)
+    @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Create a COI declaration campaign (FY annual or ad-hoc).")
     public ResponseEntity<CampaignResponse> createCampaign(@Valid @RequestBody CreateCampaignRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.createCampaign(req));
     }
 
     @GetMapping("/campaigns")
-    @PreAuthorize(MANAGE_GUARD)
+    @PreAuthorize(READ_GUARD)
     @Operation(summary = "List COI campaigns for the current tenant.")
     public List<CampaignResponse> listCampaigns() {
         return service.listCampaignsByOrg(TenantContext.requireOrganisationId());
     }
 
     @GetMapping("/campaigns/{id}")
-    @PreAuthorize(MANAGE_GUARD)
+    @PreAuthorize(READ_GUARD)
     @Operation(summary = "Get a single COI campaign.")
     public CampaignResponse getCampaign(@PathVariable Long id) {
         return service.getCampaign(id);
     }
 
     @PostMapping("/campaigns/{id}/open")
-    @PreAuthorize(MANAGE_GUARD)
+    @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Transition campaign DRAFT → OPEN.")
     public CampaignResponse openCampaign(@PathVariable Long id) {
         return service.openCampaign(id);
     }
 
     @PostMapping("/campaigns/{id}/close")
-    @PreAuthorize(MANAGE_GUARD)
+    @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Transition campaign OPEN → CLOSED.")
     public CampaignResponse closeCampaign(@PathVariable Long id) {
         return service.closeCampaign(id);
     }
 
     @PostMapping("/campaigns/{id}/archive")
-    @PreAuthorize(MANAGE_GUARD)
+    @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Transition campaign CLOSED → ARCHIVED.")
     public CampaignResponse archiveCampaign(@PathVariable Long id) {
         return service.archiveCampaign(id);
     }
 
     @GetMapping("/campaigns/{id}/declarations")
-    @PreAuthorize(MANAGE_GUARD)
+    @PreAuthorize(READ_GUARD)
     @Operation(summary = "List declarations attached to a campaign.")
     public List<DeclarationResponse> listDeclarationsByCampaign(@PathVariable Long id) {
         return service.listDeclarationsByCampaign(id);
@@ -154,14 +174,14 @@ public class CoiController {
     }
 
     @GetMapping("/declarations/{id}")
-    @PreAuthorize(MANAGE_GUARD)
+    @PreAuthorize(READ_GUARD)
     @Operation(summary = "Get a single declaration with its disclosed items.")
     public DeclarationResponse getDeclaration(@PathVariable Long id) {
         return service.getDeclaration(id);
     }
 
     @PostMapping("/declarations/{id}/review")
-    @PreAuthorize(MANAGE_GUARD)
+    @PreAuthorize(REVIEW_GUARD)
     @Operation(summary = "Ethics Officer reviews a declaration: set outcome + notes.")
     public DeclarationResponse reviewDeclaration(@PathVariable Long id,
                                                    @Valid @RequestBody ReviewDeclarationRequest req,
@@ -172,14 +192,14 @@ public class CoiController {
     // ─── Recusals ───────────────────────────────────────────────────
 
     @PostMapping("/recusals")
-    @PreAuthorize(MANAGE_GUARD)
+    @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Record a recusal event applied at a specific meeting.")
     public ResponseEntity<RecusalEventResponse> recordRecusal(@Valid @RequestBody RecordRecusalRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.recordRecusal(req));
     }
 
     @GetMapping("/recusals/user/{userId}")
-    @PreAuthorize(MANAGE_GUARD)
+    @PreAuthorize(READ_GUARD)
     @Operation(summary = "List recusal events for a user, most recent first.")
     public List<RecusalEventResponse> recusalsByUser(@PathVariable Long userId) {
         return service.listRecusalsByUser(userId);

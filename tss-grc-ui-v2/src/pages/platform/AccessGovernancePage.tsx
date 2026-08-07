@@ -246,6 +246,12 @@ const ACTION_POLICY: Record<string, ActionPolicy> = {
   READ_ENTRIES: { editable: true, labelEn: 'Read entries', labelAr: 'قراءة مُدخلات القائمة' },
   READ_HITS:    { editable: true, labelEn: 'Read hits',    labelAr: 'قراءة التطابقات' },
 
+  // Ethics separates the conflict-of-interest register (READ) from the whistleblower hotline
+  // (F2-145(e) slice 6, V371). A board secretary curates the register and is deliberately outside case
+  // files that may name or concern the board, so the two reads cannot share a column: putting them in
+  // one is exactly the widening this action exists to prevent.
+  READ_CASES: { editable: true, labelEn: 'Read cases', labelAr: 'قراءة الحالات' },
+
   WRITE:   { editable: true, labelEn: 'Write',   labelAr: 'كتابة' },
 
   // AML list curation, split from WRITE (which is "run a screening") and from APPROVE (which is
@@ -257,6 +263,12 @@ const ACTION_POLICY: Record<string, ActionPolicy> = {
   APPROVE: { editable: true, labelEn: 'Approve', labelAr: 'اعتماد' },
   DELETE:  { editable: true, labelEn: 'Delete',  labelAr: 'حذف' },
   TRIAGE:  { editable: true, labelEn: 'Triage',  labelAr: 'فرز' },
+
+  // Disposing of a retaliation complaint, held apart from ETHICS:TRIAGE because a retaliation claim is
+  // usually about the handling of the case underneath it — so whoever investigated that case must not
+  // rule on the claim. Granting this to a role that also holds TRIAGE re-creates the self-review defect
+  // V367 removed from sharia, and V371's self-check refuses it.
+  PROTECT: { editable: true, labelEn: 'Protect', labelAr: 'حماية من الانتقام' },
 
   // Disclosed but not grantable here — each for a reason recorded in the programme,
   // not for tidiness. Both are still saved back exactly as loaded.

@@ -39,12 +39,18 @@ import java.util.Set;
  * how six of seven prescriptions in this programme were falsified when measured. So each entry
  * below was read off the parent controller rather than inferred from the entity's name.
  *
- * <p>The platform guards records in three different ways, and the registry has to speak all three:
+ * <p>The platform guards records in four different ways, and the registry has to speak all four:
  * <ul>
- *   <li>{@code hasPermission('MODULE','READ')} — the 94-permission catalogue (most modules)</li>
- *   <li>{@code hasAnyRole(...)} — the Saudi/financial-sector modules (cpty, fraud, openbanking,
- *       opres, rrp, regreporting, outsourcing, ccm, aml, ethics, dataclass, ai-lifecycle) and a
- *       number of BCM and privacy sub-controllers</li>
+ *   <li>{@code hasPermission('MODULE','READ')} — the permission catalogue (most modules)</li>
+ *   <li>the same call with a <em>named</em> action instead of {@code READ}, for a module whose read tier
+ *       is not the default. Ethics is the first: {@code ETHICS:READ} is the conflict-of-interest register
+ *       and {@code ETHICS:READ_CASES} is the whistleblower hotline (F2-145(e) slice 6). ⚠ Do not write
+ *       the guard expression with a placeholder action here — the FE permission-matrix invariant derives
+ *       its action list by regex over this source <em>including comments</em>, so an illustrative
+ *       {@code hasPermission(...)} in prose becomes a phantom action it then demands a column for</li>
+ *   <li>{@code hasAnyRole(...)} — the remaining Saudi/financial-sector modules (openbanking, opres,
+ *       rrp, regreporting, outsourcing, ccm, dataclass, ai-lifecycle) and a number of BCM and privacy
+ *       sub-controllers. F2-05 is draining this category; cpty, fraud, aml and ethics have left it</li>
  *   <li>{@code isAuthenticated()} — a handful of read endpoints have no authority to inherit</li>
  * </ul>
  *
@@ -70,9 +76,11 @@ public class AttachmentAccessPolicy {
 
     /**
      * Every authority that can see the parent record. {@code modules} are permission-catalogue codes
-     * ({@code MODULE_READ} / {@code MODULE_WRITE} authorities); {@code roles} are bare role names as
-     * they appear in {@code hasAnyRole(...)} (matched as {@code ROLE_x}). Either may be empty; both
-     * empty means the parent read is authenticated-only and {@code note} says so.
+     * ({@code MODULE_READ} / {@code MODULE_WRITE} authorities); {@code authorities} are exact granted
+     * authorities, for a parent whose read is a named action rather than {@code MODULE_READ}; and
+     * {@code roles} are bare role names as they appear in {@code hasAnyRole(...)} (matched as
+     * {@code ROLE_x}). Any may be empty; all three empty means the parent read is authenticated-only and
+     * {@code note} says so.
      *
      * <p>It is a <b>union</b>, and getting that wrong is how this slice nearly shipped a regression.
      * A record can be served by more than one module's controllers, and a single-route mapping
@@ -81,7 +89,8 @@ public class AttachmentAccessPolicy {
      * {@code PolicyDocument} rows arrive through {@code CYBER:READ} as well as {@code COMPLIANCE:READ}.
      * Same reason a parent may list both a module and roles: different endpoints over the same rows.
      */
-    public record ParentGuard(Set<String> modules, Set<String> roles, String note) {
+    public record ParentGuard(Set<String> modules, Set<String> roles, Set<String> authorities,
+                             String note) {
 
         /**
          * One or more module codes. More than one is not redundancy — some records are served by
@@ -90,24 +99,41 @@ public class AttachmentAccessPolicy {
          * {@code /api/v1/cyber/policies} is {@code CYBER:READ}, both over the same rows.
          */
         static ParentGuard perm(String... modules) {
-            return new ParentGuard(Set.of(modules), Set.of(), null);
+            return new ParentGuard(Set.of(modules), Set.of(), Set.of(), null);
         }
 
         static ParentGuard roles(String... roles) {
-            return new ParentGuard(Set.of(), Set.of(roles), null);
+            return new ParentGuard(Set.of(), Set.of(roles), Set.of(), null);
         }
 
         static ParentGuard permOrRoles(String module, String... roles) {
-            return new ParentGuard(Set.of(module), Set.of(roles), null);
+            return new ParentGuard(Set.of(module), Set.of(roles), Set.of(), null);
+        }
+
+        /**
+         * Exact granted authorities, for a parent whose read is a <em>named</em> action rather than
+         * {@code MODULE_READ}.
+         *
+         * <p>Added for {@code WHISTLEBLOWER_CASE} (F2-145(e) slice 6). {@link #perm} assumes every
+         * module's read authority is {@code MODULE_READ} or {@code MODULE_WRITE}, which held for every
+         * entry above and does not hold for ethics: {@code ETHICS_READ} is the conflict-of-interest
+         * register and the hotline is {@code ETHICS_READ_CASES}. Passing {@code perm("ETHICS")} here
+         * would have been wrong in both directions at once — it would admit a {@code BOARD_SECRETARY}
+         * holding {@code ETHICS_READ}, whose parent controller excludes them from case files, and refuse
+         * a role holding only {@code ETHICS_READ_CASES}, whose parent controller admits them. The
+         * registry has to be able to say the exact authority when the parent's read is not the default.
+         */
+        static ParentGuard authorities(String... authorities) {
+            return new ParentGuard(Set.of(), Set.of(), Set.of(authorities), null);
         }
 
         /** The parent's read endpoint is {@code isAuthenticated()} — nothing to inherit. */
         static ParentGuard authenticated(String note) {
-            return new ParentGuard(Set.of(), Set.of(), note);
+            return new ParentGuard(Set.of(), Set.of(), Set.of(), note);
         }
 
         public boolean inheritsNoAuthority() {
-            return modules.isEmpty() && roles.isEmpty();
+            return modules.isEmpty() && roles.isEmpty() && authorities.isEmpty();
         }
     }
 
@@ -216,11 +242,13 @@ public class AttachmentAccessPolicy {
             "CIO", "CRO"));
 
         // ── Ethics / conduct ─────────────────────────────────────────────────
-        DECLARED.put("WHISTLEBLOWER_CASE", ParentGuard.roles(
-            "ETHICS_OFFICER", "COMPLIANCE_OFFICER", "INTERNAL_AUDITOR", "AUDIT_COMMITTEE_MEMBER",
-            "PLATFORM_ADMIN"));
-        DECLARED.put("COI_CAMPAIGN", ParentGuard.roles(
-            "PLATFORM_ADMIN", "ETHICS_OFFICER", "BOARD_SECRETARY", "COMPLIANCE_OFFICER"));
+        // Both moved with their parents when F2-05/F2-145(e) slice 6 converted the ethics controllers
+        // (V371 catalogued ETHICS:READ_CASES / TRIAGE / PROTECT). Same requirement as FRAUD_CASE below:
+        // the entry has to move WITH the parent, or a role that can open the record 403s on its files.
+        // The hotline needs the exact authority, not the module — ETHICS_READ is the COI register, and
+        // a board secretary holding it is deliberately outside these case files.
+        DECLARED.put("WHISTLEBLOWER_CASE", ParentGuard.authorities("ETHICS_READ_CASES"));
+        DECLARED.put("COI_CAMPAIGN", ParentGuard.perm("ETHICS"));
         DECLARED.put("COMPLAINT", ParentGuard.roles(
             "PLATFORM_ADMIN", "CONSUMER_PROTECTION_OFFICER", "COMPLIANCE_OFFICER"));
         // FRAUD_CASE moved from roles to the permission when F2-05 converted FraudController
@@ -346,13 +374,17 @@ public class AttachmentAccessPolicy {
                                                    || hasAuthority(auth, m + "_WRITE"))) {
             return;
         }
+        if (guard.authorities().stream().anyMatch(a -> hasAuthority(auth, a))) {
+            return;
+        }
         if (guard.roles().stream().anyMatch(r -> hasAuthority(auth, "ROLE_" + r))) {
             return;
         }
 
         log.warn("Attachment {} refused for entityType '{}': user={} cannot see the parent record "
-                 + "(needs {}{})", operation, entityType, username(auth),
+                 + "(needs {}{}{})", operation, entityType, username(auth),
             guard.modules().isEmpty() ? "" : guard.modules() + "_READ",
+            guard.authorities().isEmpty() ? "" : " or " + guard.authorities(),
             guard.roles().isEmpty() ? "" : " or one of " + guard.roles());
         throw new DomainAccessDeniedException("You do not have access to this record's attachments.");
     }
