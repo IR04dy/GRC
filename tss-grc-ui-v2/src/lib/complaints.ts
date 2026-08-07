@@ -9,8 +9,15 @@
 //               on the backend. Used by the customer-facing submit and
 //               track pages — MUST be reachable without a JWT.
 //   • INTERNAL — every other endpoint is gated server-side by
+//               `hasPermission('CONSUMER', READ | WRITE | APPROVE)` since
+//               F2-145(e) slice 3. Reads are READ; acknowledge, transition,
+//               assign and the quarterly-report generation are WRITE; and
+//               `escalate-sama` alone is APPROVE, because telling the
+//               regulator is an outbound act with legal consequence (the
+//               analogue of openbanking's notify-sama). It read
 //               `hasAnyRole(PLATFORM_ADMIN, CONSUMER_PROTECTION_OFFICER,
-//                COMPLIANCE_OFFICER)`.
+//               COMPLIANCE_OFFICER)` on all nine identically until then;
+//               the population is unchanged.
 //
 // Saudi-native terminology (NOT literal translation):
 //   إدارة شكاوى العملاء         — Customer Complaints

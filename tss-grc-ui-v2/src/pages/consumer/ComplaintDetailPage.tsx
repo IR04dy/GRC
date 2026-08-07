@@ -11,7 +11,7 @@ import { ControlMappingPicker } from '../../components/ui/ControlMappingPicker';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
 import { ApiError } from '../../lib/api';
-import { hasAnyRole } from '../../lib/auth';
+import { canApprove, hasAnyRole } from '../../lib/auth';
 import {
   complaintsApi,
   CATEGORY_LABEL, SEVERITY_LABEL, SEVERITY_TONE,
@@ -27,7 +27,7 @@ import {
  * <p>Left column: customer + complaint details, channel, category,
  * bilingual description, product info, account_last4.
  * <p>Right column: timeline of update rows (chronological).
- * <p>Action bar: role-gated buttons mapped to the backend state machine
+ * <p>Action bar: permission-gated buttons mapped to the backend state machine
  * (acknowledge, transition, assign, escalate-to-SAMA, reopen).
  */
 export function ComplaintDetailPage() {
@@ -35,7 +35,16 @@ export function ComplaintDetailPage() {
   const { id: idParam } = useParams<{ id: string }>();
   const id = Number(idParam);
 
-  const canAct = hasAnyRole('PLATFORM_ADMIN', 'CONSUMER_PROTECTION_OFFICER', 'COMPLIANCE_OFFICER');
+  // F2-145(e) slice 3 — mirror the server, which now guards with hasPermission('CONSUMER', …).
+  // This read `hasAnyRole('PLATFORM_ADMIN','CONSUMER_PROTECTION_OFFICER','COMPLIANCE_OFFICER')`, and
+  // leaving it there would have been the divergence this programme objects to: a client gate that
+  // recites names the server has stopped consulting, so a role granted CONSUMER:WRITE some other way
+  // would see disabled buttons for an action the server allows. The populations are identical today,
+  // which is exactly why the mismatch would have gone unnoticed.
+  const canAct = hasAnyRole('PLATFORM_ADMIN', 'CONSUMER_WRITE');
+  // Escalating to SAMA is CONSUMER:APPROVE server-side — an outbound regulatory act, the analogue of
+  // openbanking's notifySama. Separate helper so a tenant that splits the two sees the split here.
+  const canEscalateToSama = canApprove('CONSUMER');
 
   const [complaint, setComplaint] = useState<ComplaintResponse | null>(null);
   const [updates, setUpdates] = useState<ComplaintUpdateResponse[]>([]);
@@ -207,7 +216,8 @@ export function ComplaintDetailPage() {
     && complaint.status !== 'CLOSED' && complaint.status !== 'RESOLVED';
   const canAssign = canAct
     && complaint.status !== 'CLOSED' && complaint.status !== 'REJECTED';
-  const canEscalate = canAct && complaint.status === 'UNDER_INVESTIGATION';
+  // canEscalateToSama, not canAct: the server guards this one with CONSUMER:APPROVE.
+  const canEscalate = canEscalateToSama && complaint.status === 'UNDER_INVESTIGATION';
   const canReopen = canAct && (complaint.status === 'RESOLVED' || complaint.status === 'CLOSED');
 
   return (

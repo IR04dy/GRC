@@ -223,13 +223,31 @@ class RoleGuardConversionRatchetTest {
      * it was recited in this controller and nowhere else, so its authority now flows only through the
      * grant — which is the end state, not a loss.
      *
+     * <p><b>484</b> after {@code consumer} (slice 3): 9 sites in {@code ComplaintController}, the module
+     * F2-145 called the severe case because {@code PLATFORM_ADMIN} and {@code COMPLIANCE_OFFICER} were
+     * the entire population of all nine guards. 🔑 <b>It was a FLAT guard</b> — the identical
+     * three-name literal on every authenticated endpoint, GET and POST alike — so the module had no tier
+     * distinction to preserve, and the catalogue grants {@code CONSUMER} READ, WRITE <em>and</em> APPROVE
+     * to exactly the guard's two surviving names. Any tiering is therefore population-preserving, which
+     * made the tier assignment a genuine design choice rather than a transcription: reads READ, the four
+     * operational writes WRITE, and {@code escalateToSama} alone APPROVE — the analogue of
+     * {@code ObController#notifySama}, since telling the regulator is an outbound act with legal
+     * consequence. <b>Tiering a flat guard changes no request today and is still worth doing</b>: it gives
+     * {@code CONSUMER:APPROVE} — catalogued by V362 and consulted by nothing anywhere — its first reader,
+     * and makes the split grantable later without a code change. Retired
+     * {@code CONSUMER_PROTECTION_OFFICER} from the guard vocabulary entirely (49 names → 48), the second
+     * such retirement in two slices. ⚠ <b>This is also the first conversion with a FRONT-END gate to
+     * match</b>: {@code ComplaintDetailPage} computed {@code canAct} from the same three role names, and
+     * leaving it would have left a client gate reciting names the server no longer consults — invisible
+     * precisely because the populations are identical.
+     *
      * <p>Raising this number means adding an endpoint that authorises by identity in a platform
      * whose authorisation model is permissions, and whose role names have a 54% miss rate. Convert
      * instead. Where a role genuinely is the right unit — {@code PLATFORM_ADMIN}-only platform
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 493;
+    private static final int BASELINE_PURE_ROLE_SITES = 484;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"

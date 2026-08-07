@@ -22,7 +22,10 @@ import org.springframework.http.ResponseEntity;
 import java.math.BigDecimal;
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -151,24 +154,56 @@ class ComplaintControllerTest {
                 .contains("permitAll");
     }
 
+    /**
+     * F2-145(e) slice 3 — the nine authenticated endpoints authorise by {@code CONSUMER} permission.
+     *
+     * <p>⚠ <b>This replaces a pin that could not have survived its own fix, and unlike the equivalents in
+     * {@code sharia} and {@code openbanking} it carried no exit condition.</b> The old version looped
+     * {@code getDeclaredMethods()}, skipped anything not in a name list, and asserted the expression
+     * contained three role names. Two defects: it said nothing about when it should stop being true, so
+     * the conversion reads as breakage rather than as progress; and <b>it was vacuous by construction</b>
+     * — rename every method and the loop matches nothing, asserts nothing, and passes. That is the third
+     * defect-pin of this programme and the first without the rescue sentence, which is the argument for
+     * writing the exit condition into the assertion rather than trusting it to be remembered.
+     *
+     * <p>The tiering is population-preserving: the catalogue grants {@code CONSUMER} READ, WRITE
+     * <em>and</em> APPROVE to exactly {@code {COMPLIANCE_OFFICER, CONSUMER_PROTECTION_OFFICER}}, the
+     * guard's two surviving names, so no request changes outcome. {@code escalateToSama} is the single
+     * APPROVE — the analogue of {@code ObController#notifySama} — and pinning it here is what stops a
+     * tidy-by-verb sweep from flattening the module back.
+     */
     @Test
-    void authenticatedEndpoints_requireConsumerProtectionRole() throws Exception {
-        // Spot-check the role guard on the four mutation endpoints + list.
-        String[] methodNames = {"list", "get", "listUpdates",
-                                "acknowledge", "transition", "escalateToSama", "assign",
-                                "listReports", "generateReport"};
+    void authenticatedEndpoints_areGuardedByConsumerPermissionAtTheReviewedTier() {
+        Map<String, String> expected = new LinkedHashMap<>();
+        expected.put("list", "READ");
+        expected.put("get", "READ");
+        expected.put("listUpdates", "READ");
+        expected.put("listReports", "READ");
+        expected.put("acknowledge", "WRITE");
+        expected.put("transition", "WRITE");
+        expected.put("assign", "WRITE");
+        expected.put("generateReport", "WRITE");
+        expected.put("escalateToSama", "APPROVE");   // telling the regulator is the approval
+
+        Map<String, String> actual = new TreeMap<>();
         for (Method m : ComplaintController.class.getDeclaredMethods()) {
-            if (!java.util.Arrays.asList(methodNames).contains(m.getName())) continue;
+            if (m.isSynthetic() || !expected.containsKey(m.getName())) continue;
             org.springframework.security.access.prepost.PreAuthorize ann =
                     m.getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
             assertThat(ann).as("Missing @PreAuthorize on " + m.getName()).isNotNull();
-            String expr = ann.value();
-            assertThat(expr)
-                    .as("@PreAuthorize on " + m.getName() + " must guard with CPO/Compliance/PlatformAdmin")
-                    .contains("PLATFORM_ADMIN")
-                    .contains("CONSUMER_PROTECTION_OFFICER")
-                    .contains("COMPLIANCE_OFFICER");
+            actual.put(m.getName(), ann.value());
         }
+        // Anti-vacuity — the flaw in the pin this replaces. A reflection read that resolves nothing
+        // satisfies every per-entry assertion below.
+        assertThat(actual)
+                .as("all 9 authenticated endpoints must be present; a name change that empties this map "
+                    + "would pass the tier assertions vacuously, which is how the previous pin worked")
+                .hasSize(expected.size());
+
+        expected.forEach((method, action) -> assertThat(actual.get(method))
+                .as("%s must be guarded by CONSUMER:%s — the tiers are not uniform by verb: "
+                    + "escalateToSama is the one APPROVE", method, action)
+                .isEqualTo("hasPermission('CONSUMER','" + action + "')"));
     }
 
     // ─── Authenticated dispatch ───────────────────────────────────

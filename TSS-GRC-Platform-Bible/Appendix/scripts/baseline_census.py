@@ -78,8 +78,8 @@ PUBLISHED = {
     "endpoints": 2_213,
     "writes": 1_239,
     "main_preauthorize": 2_201,
-    "perm_modules": 33,
-    "packages_no_haspermission": 15,
+    "perm_modules": 34,
+    "packages_no_haspermission": 14,
     "module_tests": 3_199,
     "suite_tests": 3_398,
     # F2-03 floored all seven Tier-1 regulator-facing modules (2026-08-05/06), so this

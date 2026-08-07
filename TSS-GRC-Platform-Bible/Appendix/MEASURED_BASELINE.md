@@ -39,8 +39,8 @@ that will be read as current forever.
 | REST endpoint mappings | **2,213** | 2,160 | `CLAUDE.md` updated to 2,212 |
 | Write endpoints (`POST/PUT/PATCH/DELETE`) | **1,239** | *pub. 1,151* | ⚠ see §0.1 — 1,151 reproduces under no rule |
 | `@PreAuthorize` annotations (comment-stripped) | **2,201** | *pub. 2,268* | ⚠ see §0.1 — never reproducible |
-| Distinct permission modules used by guards | **33** | 27 | `SHARIA` joined 2026-08-07 when F2-145(e) converted `ShariaController` — V362 had catalogued the permissions a week earlier, so this figure is the moment the catalogue started deciding requests. `OPENBANKING` joined the same day (slice 2), and needed **V368** first: the catalogue granted its APPROVE to a role no APPROVE guard names |
-| Module packages with **zero** `hasPermission` usage | **15 of 59** | 21 | F2-05 converted 5 (`fraud`, `integrations`, `knowledge`, `board_pack`, `socops`) and F2-145(e) converted `sharia` (21 sites, population-preserving) then `openbanking` (18 sites, population-preserving **after V368**); `change_adapters` is **correct** to be here — adapters carry no endpoint, so a guard there would be a second unguarded door (`ChangeModuleBoundaryTest` asserts they hold no `@RestController`). The remaining Saudi/financial modules are F2-145(e)'s queue, and three of them are **not** mechanical: `consumer` 9 (clean — one flat name-set on all 9 endpoints and the catalogue grants exactly it), `cpty` 14 (**no `CPTY:APPROVE` catalogued at all**, so its APPROVE tier has nothing to convert to, and `CFO` holds a mis-derived `CPTY:WRITE`), `aml` 14 (**6 distinct guard name-sets** over 14 sites — one `AML:WRITE` cannot express them, so converting as-is would let a KYC officer create sanctions lists), plus `ethics` 26 (part-converted; its TRIAGE tier has no `TRIAGE` permission catalogued) |
+| Distinct permission modules used by guards | **34** | 27 | `SHARIA` joined 2026-08-07 when F2-145(e) converted `ShariaController` — V362 had catalogued the permissions a week earlier, so this figure is the moment the catalogue started deciding requests. `OPENBANKING` joined the same day (slice 2), and needed **V368** first: the catalogue granted its APPROVE to a role no APPROVE guard names. `CONSUMER` joined on slice 3 — and it is the first module whose guard was **flat** (one identical name list on all 9 endpoints), so the tier assignment was a design choice rather than a transcription |
+| Module packages with **zero** `hasPermission` usage | **14 of 59** | 21 | F2-05 converted 5 (`fraud`, `integrations`, `knowledge`, `board_pack`, `socops`) and F2-145(e) converted `sharia` (21 sites, population-preserving) then `openbanking` (18 sites, population-preserving **after V368**); `change_adapters` is **correct** to be here — adapters carry no endpoint, so a guard there would be a second unguarded door (`ChangeModuleBoundaryTest` asserts they hold no `@RestController`). The remaining Saudi/financial modules are F2-145(e)'s queue, and **all three are blocked on a catalogue decision rather than on effort** (`consumer` 9 shipped on slice 3): `cpty` 14 (**no `CPTY:APPROVE` catalogued at all**, so its APPROVE tier has nothing to convert to, and `CFO` holds a mis-derived `CPTY:WRITE`), `aml` 14 (**6 distinct guard name-sets** over 14 sites — one `AML:WRITE` cannot express them, so converting as-is would let a KYC officer create sanctions lists), plus `ethics` 26 (part-converted; its TRIAGE tier has no `TRIAGE` permission catalogued) |
 | Tests attributed to modules | **3,199** (suite total **3,398**) | 2,339 / 2,415 | `CLAUDE.md` says **3,354** run by surefire ✅ *(the census counts declarations, surefire counts executions incl. parameterised expansion — the two never match exactly and neither is wrong)* |
 | Module packages with **zero tests** | **8**, totalling **6,556 LoC (3.2%)** | 15 / 18,011 / 9.4% | ⚠ **F2-03 closed 2026-08-06 — all seven Tier-1 regulator-facing modules floored** (`outsourcing`, `nca_ecc`, `sharia`, `data_officer`, `openbanking`, `dataclass`, `rrp`), removing 7 packages and 11,455 LoC from this set. The remaining 8: `cpty`, `regreporting`, `reginspect`, `opres`, `controlmap`, `dashboard`, `audit_eng`, `datagov` — and `datagov` is the empty placeholder (F2-20), so 7 are real |
 | Distinct **JPA** schemas | **50** | 50 | matches `CLAUDE.md` "50+" ✅ |
@@ -243,19 +243,32 @@ exported, or air-gapped independently. This is the hard floor under every per-mo
 
 ## 4. Authorisation coverage — guarded, but not *delegatably* guarded
 
-- **33** distinct permission modules are referenced by `hasPermission(MODULE, ACTION)` guards
+- **34** distinct permission modules are referenced by `hasPermission(MODULE, ACTION)` guards
   (was 27 — F2-05 added `FRAUD`, `INTEGRATIONS`, `KB`, `socops` moved onto `CYBER`, and F2-145(e)
-  added `SHARIA` then `OPENBANKING`).
-- **15 of 59** module packages contain **no `hasPermission` call at all** (was 21). They are *not*
+  added `SHARIA`, `OPENBANKING`, then `CONSUMER`).
+- **14 of 59** module packages contain **no `hasPermission` call at all** (was 21). They are *not*
   unguarded — they use hard-coded `hasAnyRole('ROLE_A','ROLE_B',…)` lists:
 
   `aml` · `ccm` · `rrp` · `governance` · `cpty` · `outsourcing` ·
-  `regreporting` · `audit_committee` · `consumer` · `reginspect` · `dataclass` · `opres` · `auth` ·
-  `change_adapters` *(no endpoints — correctly here)* · `datagov` *(no code at all, so 13 with
+  `regreporting` · `audit_committee` · `reginspect` · `dataclass` · `opres` · `auth` ·
+  `change_adapters` *(no endpoints — correctly here)* · `datagov` *(no code at all, so 12 with
   endpoints)*
 
   `sharia` **left this set on 2026-08-07** — F2-145(e) converted all 21 of its sites to
   `hasPermission('SHARIA', …)`, which is also what closed F2-120 and made V362/V367 load-bearing.
+
+  `consumer` **left it on slice 3**, and it is the instructive one: its guard was **flat** — the same
+  three-name literal on all nine authenticated endpoints, GET and POST alike — and the catalogue
+  grants `CONSUMER` READ, WRITE **and** APPROVE to exactly the guard's two surviving names. So every
+  possible tiering is population-preserving, which turned the tier assignment into a **design decision
+  rather than a transcription**: reads READ, the four operational writes WRITE, and `escalate-sama`
+  alone APPROVE (the analogue of `openbanking`'s `notify-sama` — telling the regulator is an
+  outbound act with legal consequence). 🔑 **Tiering a flat guard changes no request today and is
+  still worth doing**: `CONSUMER:APPROVE` had been catalogued by V362 and consulted by **nothing
+  anywhere**, and it now has a reader. ⚠ It is also the first conversion with a **front-end** gate to
+  match — `ComplaintDetailPage` computed `canAct` from the same three role names, and leaving it
+  would have left a client gate reciting names the server no longer consults, invisible precisely
+  because the populations are identical.
 
   `openbanking` **left it the same day** (slice 2) — 18 sites to `hasPermission('OPENBANKING', …)`,
   but only after **V368**, and the reason generalises to the rest of the queue. V362's grants are
@@ -274,6 +287,7 @@ exported, or air-gapped independently. This is the hard floor under every per-mo
   |---|---|
   | `sharia` | ~~`hasAnyRole('PLATFORM_ADMIN','COMPLIANCE_OFFICER','RISK_MANAGER','INTERNAL_AUDITOR','CRO','SHARIA_OFFICER','SHARIA_AUDITOR')`~~ → **`hasPermission('SHARIA','READ')`** (2026-08-07) |
   | `openbanking` | ~~`hasAnyRole('PLATFORM_ADMIN','COMPLIANCE_OFFICER','CRO')`~~ → **`hasPermission('OPENBANKING','APPROVE')`** (2026-08-07, after V368) |
+  | `consumer` | ~~`hasAnyRole('PLATFORM_ADMIN','CONSUMER_PROTECTION_OFFICER','COMPLIANCE_OFFICER')` × 9, identical on every endpoint~~ → **`hasPermission('CONSUMER', READ│WRITE│APPROVE)`** (2026-08-07, no migration) |
   | `outsourcing` | `hasAnyRole('PLATFORM_ADMIN','RISK_MANAGER','COMPLIANCE_OFFICER','CIO')` |
   | `audit_committee` | `hasAnyRole('AUDIT_COMMITTEE_CHAIR','COMPANY_SECRETARY','PLATFORM_ADMIN')` |
   | ~~`socops`~~ | ✅ **converted** — now `hasPermission('CYBER',…)` across 111 endpoints |

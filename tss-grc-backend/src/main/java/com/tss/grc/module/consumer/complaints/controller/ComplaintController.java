@@ -38,8 +38,10 @@ import java.util.UUID;
  *   <li>Public ({@code /api/v1/complaints/public/**}) — anonymous,
  *       no JWT, used by the customer-facing complaint form +
  *       tracking page.</li>
- *   <li>Authenticated — PLATFORM_ADMIN / CONSUMER_PROTECTION_OFFICER /
- *       COMPLIANCE_OFFICER only.</li>
+ *   <li>Authenticated — guarded by {@code hasPermission('CONSUMER', READ│WRITE│APPROVE)} since
+ *       F2-145(e) slice 3. It read <em>PLATFORM_ADMIN / CONSUMER_PROTECTION_OFFICER /
+ *       COMPLIANCE_OFFICER only</em> until then, on all nine endpoints identically; the population is
+ *       unchanged, but it is now a grant rather than a name list. See the guard constants below.</li>
  * </ul>
  */
 @RestController
@@ -49,6 +51,38 @@ import java.util.UUID;
 @Tag(name = "Customer Complaints",
      description = "SAMA Banking Consumer Protection — complaint intake, lifecycle, SAMA escalation")
 public class ComplaintController {
+
+    /*
+     * F2-145(e) slice 3 — these guards authorise by PERMISSION, not by role name.
+     *
+     * WHAT THEY WERE. The same nine-times-repeated literal
+     * hasAnyRole('PLATFORM_ADMIN','CONSUMER_PROTECTION_OFFICER','COMPLIANCE_OFFICER') on every
+     * authenticated endpoint — GET and POST alike. F2-145 recorded this module as the severe case of the
+     * six because CONSUMER_PROTECTION_OFFICER existed in no row of iam.roles until V362, leaving
+     * PLATFORM_ADMIN and COMPLIANCE_OFFICER and nobody else on all nine.
+     *
+     * POPULATION-PRESERVING, MEASURED PER ACTION BEFORE THE EDIT: the catalogue grants CONSUMER READ,
+     * WRITE **and** APPROVE to exactly {COMPLIANCE_OFFICER, CONSUMER_PROTECTION_OFFICER} — the guard's
+     * two surviving names — so every tiering below admits precisely who the flat guard admitted.
+     * PLATFORM_ADMIN is absent from the grants on purpose: hasPermission gets the in-code bypass.
+     *
+     * ⚠ WHY TIER AT ALL, IF THE POPULATION IS THE SAME. Because the flat guard could not express the
+     * module's own authority model, and CONSUMER:APPROVE was catalogued with nothing in the platform
+     * consulting it — a permission no guard reads is inert (the lesson V362/V367 taught in `sharia`).
+     * Tiering costs nothing today and makes the distinction grantable tomorrow without a code change,
+     * which is the capability this whole conversion buys.
+     *
+     * escalateToSama is the one APPROVE. Telling the regulator is an outbound act with legal
+     * consequence, and it is the direct analogue of ObController#notifySama, which this programme put on
+     * OPENBANKING:APPROVE in slice 2. Complaint transitions stay WRITE for the same reason
+     * transitionIncident does: handling the complaint is the officer's day job.
+     *
+     * The two /public endpoints keep permitAll() — they are the anonymous SAMA-mandated intake and
+     * tracking surface, and F2-83 is why the tracking response carries no PII.
+     */
+    private static final String READ_GUARD = "hasPermission('CONSUMER','READ')";
+    private static final String WRITE_GUARD = "hasPermission('CONSUMER','WRITE')";
+    private static final String APPROVE_GUARD = "hasPermission('CONSUMER','APPROVE')";
 
     private final ComplaintService service;
 
@@ -79,7 +113,7 @@ public class ComplaintController {
     // ─── Authenticated (CPO / Compliance / Platform Admin) ──────────
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CONSUMER_PROTECTION_OFFICER','COMPLIANCE_OFFICER')")
+    @PreAuthorize(READ_GUARD)
     @Operation(summary = "List complaints in the current tenant, optionally filtered")
     public ResponseEntity<List<ComplaintResponse>> list(
             @RequestParam(required = false) String status,
@@ -94,21 +128,21 @@ public class ComplaintController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CONSUMER_PROTECTION_OFFICER','COMPLIANCE_OFFICER')")
+    @PreAuthorize(READ_GUARD)
     @Operation(summary = "Get a single complaint by ID")
     public ResponseEntity<ComplaintResponse> get(@PathVariable Long id) {
         return ResponseEntity.ok(service.get(id));
     }
 
     @GetMapping("/{id}/updates")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CONSUMER_PROTECTION_OFFICER','COMPLIANCE_OFFICER')")
+    @PreAuthorize(READ_GUARD)
     @Operation(summary = "List the timeline of updates for a complaint")
     public ResponseEntity<List<ComplaintUpdateResponse>> listUpdates(@PathVariable Long id) {
         return ResponseEntity.ok(service.listUpdates(id));
     }
 
     @PostMapping("/{id}/acknowledge")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CONSUMER_PROTECTION_OFFICER','COMPLIANCE_OFFICER')")
+    @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Acknowledge receipt of a complaint (within the 5 working-day SAMA SLA)")
     public ResponseEntity<ComplaintResponse> acknowledge(
             @PathVariable Long id,
@@ -117,7 +151,7 @@ public class ComplaintController {
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CONSUMER_PROTECTION_OFFICER','COMPLIANCE_OFFICER')")
+    @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Transition a complaint to a new status (state-machine enforced)")
     public ResponseEntity<ComplaintResponse> transition(
             @PathVariable Long id,
@@ -126,7 +160,7 @@ public class ComplaintController {
     }
 
     @PostMapping("/{id}/escalate-sama")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CONSUMER_PROTECTION_OFFICER','COMPLIANCE_OFFICER')")
+    @PreAuthorize(APPROVE_GUARD)
     @Operation(summary = "Escalate a complaint to SAMA with the SAMA reference number")
     public ResponseEntity<ComplaintResponse> escalateToSama(
             @PathVariable Long id,
@@ -135,7 +169,7 @@ public class ComplaintController {
     }
 
     @PostMapping("/{id}/assign")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CONSUMER_PROTECTION_OFFICER','COMPLIANCE_OFFICER')")
+    @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Assign a complaint to an investigator")
     public ResponseEntity<ComplaintResponse> assign(
             @PathVariable Long id,
@@ -146,14 +180,14 @@ public class ComplaintController {
     // ─── Quarterly reports ──────────────────────────────────────────
 
     @GetMapping("/reports/quarterly")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CONSUMER_PROTECTION_OFFICER','COMPLIANCE_OFFICER')")
+    @PreAuthorize(READ_GUARD)
     @Operation(summary = "List quarterly aggregate reports (most recent first)")
     public ResponseEntity<List<QuarterlyReportResponse>> listReports() {
         return ResponseEntity.ok(service.listQuarterlyReports());
     }
 
     @PostMapping("/reports/quarterly/generate")
-    @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','CONSUMER_PROTECTION_OFFICER','COMPLIANCE_OFFICER')")
+    @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Generate (or refresh) the quarterly aggregate report for the given period")
     public ResponseEntity<QuarterlyReportResponse> generateReport(
             @Valid @RequestBody GenerateQuarterlyReportRequest req) {

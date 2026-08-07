@@ -563,8 +563,10 @@ export function App() {
 
               {/* Sprint 13 — Customer Complaints Management.
                   Two surfaces: authenticated register/detail (gated
-                  server-side to PLATFORM_ADMIN /
-                  CONSUMER_PROTECTION_OFFICER / COMPLIANCE_OFFICER), and
+                  server-side by hasPermission('CONSUMER', READ|WRITE|
+                  APPROVE) since F2-145(e) slice 3 — it was
+                  PLATFORM_ADMIN / CONSUMER_PROTECTION_OFFICER /
+                  COMPLIANCE_OFFICER by name, same population), and
                   two PUBLIC routes — these MUST stay reachable WITHOUT
                   login per SAMA Banking Consumer Protection Principles
                   (submit + track). The public surfaces use PublicShell
