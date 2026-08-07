@@ -51,8 +51,25 @@ import java.util.UUID;
 @SecurityRequirement(name = "bearerAuth")
 public class SubprocessorController {
 
+    /**
+     * F2-52: {@code PRIVACY_OFFICER} was corrected to {@code PRIVACY_MANAGER}, not dropped.
+     *
+     * <p>{@code PRIVACY_OFFICER} matches no row in {@code iam.roles} (67 active, measured), so the leg
+     * was permanently false and this list's effective size was 7, not 8. The real privacy job family is
+     * {@code PRIVACY_MANAGER} — <i>"Day-to-day privacy ops under the DPO"</i>, {@code is_privileged} — and
+     * {@code DPO} is already named beside it here, which is what makes this a misspelling rather than a
+     * policy: a register the DPO reads is exactly what their privacy manager reads. All five guarded
+     * endpoints are GETs over the sub-processor register, so the correction widens <em>reads</em> only.
+     *
+     * <p>⚠ Correcting a ghost widens access and dropping one does not, so the two are not
+     * interchangeable — F2-144 found a case where the dead leg was the only thing holding a write shut.
+     * The reason to correct here rather than drop is that a real role was intended and exists; where no
+     * such role exists the honest move is to drop the leg and say so. Whoever changes this must change
+     * {@code AttachmentAccessPolicy}'s {@code SUBPROCESSOR} entry in the same edit, or a privacy manager
+     * opens the register and 403s on its files.
+     */
     private static final String READ_GUARD =
-            "hasAnyRole('DPO','COMPLIANCE_OFFICER','PRIVACY_OFFICER','CISO','RISK_MANAGER','AUDITOR','INTERNAL_AUDITOR','PLATFORM_ADMIN')";
+            "hasAnyRole('DPO','COMPLIANCE_OFFICER','PRIVACY_MANAGER','CISO','RISK_MANAGER','AUDITOR','INTERNAL_AUDITOR','PLATFORM_ADMIN')";
     private static final String WRITE_GUARD =
             "hasAnyRole('DPO','PLATFORM_ADMIN')";
 

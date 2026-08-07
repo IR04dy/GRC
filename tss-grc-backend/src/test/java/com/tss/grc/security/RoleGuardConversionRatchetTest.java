@@ -473,13 +473,18 @@ class RoleGuardConversionRatchetTest {
     }
 
     /**
-     * Active role names in {@code iam.roles}, read 2026-08-06 (58 rows).
+     * Active role names in {@code iam.roles}, read 2026-08-06 (58 rows), then 2026-08-07 (69).
      *
      * <p>Pinned rather than queried so the unit suite stays database-free. See
      * {@link #noRoleGuardNamesARoleThatDoesNotExist()} for why a copy is acceptable here and what it
      * is deliberately not claiming.
+     *
+     * <p><b>Package-private on purpose:</b> {@link RoleNameSurfaceRatchetTest} scans the second
+     * authorisation surface — the Java role lists in {@code AttachmentAccessPolicy} — against this same
+     * set. One copy, read by both, because a duplicated catalogue is how the census document drifted
+     * nineteen ghosts behind the build (see {@code CENSUS_ROLE_SITES} below).
      */
-    private static final Set<String> ROLE_CATALOGUE = Set.of(
+    static final Set<String> ROLE_CATALOGUE = Set.of(
         "APPSEC_INGEST", "APPSEC_LEAD", "ASSET_OWNER", "AUDITOR",
         "BCM_MANAGER", "BIA_OWNER", "BOARD_SECRETARY", "BRAND_INGEST",
         "BRAND_MONITORING", "CFO", "CHANGE_MANAGER", "CISO",
@@ -503,7 +508,13 @@ class RoleGuardConversionRatchetTest {
         // roles living only in guard text across six Saudi/financial modules.
         "SHARIA_OFFICER", "SHARIA_AUDITOR", "ETHICS_OFFICER", "OPEN_BANKING_OFFICER",
         "AML_OFFICER", "KYC_OFFICER", "ONBOARDING_AGENT", "CONSUMER_PROTECTION_OFFICER",
-        "CREDIT_OFFICER");
+        "CREDIT_OFFICER",
+        // ── seated by V373 (F2-52), 67 -> 69 ────────────────────────────────────────────────────
+        // The two executive identities V362 explicitly deferred to "F2-52's own queue". CFO and CISO
+        // were already catalogued and these two sit beside them in the same expressions — CFO|CRO in
+        // RegReportingController#submitFiling and RrpController#submit, CISO|CIO in DataclassController
+        // — so a catalogued half-pair was the whole of the evidence for intent.
+        "CIO", "CRO");
 
     /**
      * Ghost names measured 2026-08-06: <b>28</b>. <b>MUST only ever decrease.</b>
@@ -610,8 +621,45 @@ class RoleGuardConversionRatchetTest {
      * Seating it was never needed — {@link com.tss.grc.module.sharia.ShariaControllerGuardTest} pins the
      * result. That is cheaper than either of the other two routes and is why 102 sites across the six
      * Saudi/financial modules are queued behind it rather than being individually adjudicated.
+     *
+     * <p><b>8 → 5 (F2-52, V373, 2026-08-07): all three routes used at once, and the population finally
+     * decomposed rather than counted.</b> The eight were not eight instances of one defect — they were
+     * four mechanisms, and asking which one each name belonged to is what made the remainder tractable:
+     * <ul>
+     *   <li><b>Seated</b> — {@code CIO} (41 sites) and {@code CRO} (38) by {@code V373}. The measured
+     *       argument is a <em>catalogued half-pair</em>: {@code CFO} and {@code CISO} exist and these two
+     *       sit beside them in the same expressions. ⚠ And the sharp end of it —
+     *       {@code RrpController#submit} is {@code hasAnyRole('PLATFORM_ADMIN','CRO','CFO')}, so with
+     *       {@code CRO} absent the only satisfiable non-admin leg was {@code CFO}, which has <b>0
+     *       users</b>: a SAMA recovery-plan filing was administrator-only and <em>no tenant
+     *       administrator could change that</em>, because you cannot assign a role the catalogue lacks.
+     *       Seating is not cosmetic when it is the difference between unsatisfiable and provisionable.</li>
+     *   <li><b>Corrected</b> — {@code PRIVACY_OFFICER} (5 sites) to the real {@code PRIVACY_MANAGER},
+     *       which {@code DPO} already sat beside. Reads only, so widening is bounded.</li>
+     *   <li><b>Entity-bound, still blocked</b> — {@code MODEL_OWNER} (14) and {@code FACILITATOR} (18).
+     *       {@code FACILITATOR} was measured into this bucket rather than assumed into it:
+     *       {@code bcm.exercise_run.facilitator_user_id} is populated <b>4/4</b>, the same evidence shape
+     *       ({@code ml_model.model_owner_user_id}, 25/25) that D-14 used to refuse seating
+     *       {@code MODEL_OWNER}. Seating either would be looser than the column.</li>
+     *   <li><b>Committee seats, wrong question</b> — {@code AUDIT_COMMITTEE_CHAIR} (6),
+     *       {@code AUDIT_COMMITTEE_MEMBER} (3), {@code AUDIT_DIRECTOR} (3). F2-26 shipped the
+     *       roster→user linkage, so the <em>data</em> exists now; the missing piece is a SpEL function
+     *       asking "is the caller a seated member of this committee", which is also what F2-145(c)
+     *       waits on. Blocked on a mechanism, no longer on data.</li>
+     * </ul>
+     *
+     * <p>⚠⚠ <b>And this count is INCOMPLETE, which the javadoc above suspected and F2-52 proved.</b> The
+     * {@code TPRM_LEAD} note said the number falling "is not evidence the name is gone from the
+     * authorisation surface". Measured 2026-08-07: {@code TPRM_LEAD} is gone from every
+     * {@code @PreAuthorize} in the platform and was still live in
+     * {@code AttachmentAccessPolicy} — along with {@code CHIEF_AUDIT_EXECUTIVE} and
+     * {@code INTERNAL_AUDITOR_LEAD}, which appear in <b>no guard anywhere</b> and so were invisible to
+     * this test by construction. {@link RoleNameSurfaceRatchetTest} now measures that surface, and found
+     * two entries that had drifted from the permission-guarded parents they mirror. A gap this class
+     * documented for two slices was still an unmeasured gap: <b>writing the caveat down did not make the
+     * number honest, and only the second scan did.</b>
      */
-    private static final int BASELINE_GHOST_ROLE_NAMES = 8;
+    private static final int BASELINE_GHOST_ROLE_NAMES = 5;
 
     // ── extraction ────────────────────────────────────────────────────────────────────────────
 

@@ -171,10 +171,17 @@ public class AttachmentAccessPolicy {
         // ── Audit ───────────────────────────────────────────────────────────
         DECLARED.put("AUDIT_ENGAGEMENT", ParentGuard.perm("AUDIT"));
         DECLARED.put("AUDIT_FINDING",    ParentGuard.perm("AUDIT"));
-        DECLARED.put("IA_ENGAGEMENT",    ParentGuard.roles(
-            "PLATFORM_ADMIN", "CHIEF_AUDIT_EXECUTIVE", "AUDIT_DIRECTOR", "INTERNAL_AUDITOR_LEAD",
-            "INTERNAL_AUDITOR", "AUDIT_COMMITTEE_MEMBER", "RISK_MANAGER",
-            "COMPLIANCE_OFFICER", "EXTERNAL_AUDITOR", "AUDITOR", "CISO"));
+        // F2-52: this WAS an 11-name role list and its parent had already stopped using one. IaController
+        // is hasPermission('AUDIT','READ') on every read — IaControllerGuardTest pins that, and its own
+        // javadoc records the four names the guard "used to recite". The mirror kept the pre-conversion
+        // list, which is the drift the FRAUD_CASE note below warns about, arrived at by not doing what
+        // that note says. Measured against iam.role_permissions: 11 roles hold AUDIT:READ and 5 of them
+        // were unnamed here — BOARD_SECRETARY, EXECUTIVE_REVIEWER, GRC_ADMINISTRATOR, ORG_ADMIN, VIEWER —
+        // so `compliance` and `viewer` could open an IA engagement and 403 on its files. Nothing is lost:
+        // of the 11 names, 4 (CHIEF_AUDIT_EXECUTIVE, AUDIT_DIRECTOR, INTERNAL_AUDITOR_LEAD,
+        // AUDIT_COMMITTEE_MEMBER) are absent from iam.roles and were permanently false, PLATFORM_ADMIN
+        // keeps access via the bypass, and the other 6 all hold AUDIT:READ.
+        DECLARED.put("IA_ENGAGEMENT",    ParentGuard.perm("AUDIT"));
 
         // ── BCM ─────────────────────────────────────────────────────────────
         DECLARED.put("BCM_CAPA",       ParentGuard.perm("BCM"));
@@ -202,8 +209,10 @@ public class AttachmentAccessPolicy {
         DECLARED.put("PROCESSOR_ASSESSMENT",   ParentGuard.perm("PRIVACY"));
         DECLARED.put("RETENTION_RULE",         ParentGuard.perm("PRIVACY"));
         DECLARED.put("ROPA",                   ParentGuard.perm("PRIVACY"));
+        // F2-52: PRIVACY_OFFICER -> PRIVACY_MANAGER, tracking SubprocessorController.READ_GUARD in the
+        // same edit. The parent is still a role guard, so this entry stays a role list.
         DECLARED.put("SUBPROCESSOR",           ParentGuard.roles(
-            "DPO", "COMPLIANCE_OFFICER", "PRIVACY_OFFICER", "CISO", "RISK_MANAGER",
+            "DPO", "COMPLIANCE_OFFICER", "PRIVACY_MANAGER", "CISO", "RISK_MANAGER",
             "AUDITOR", "INTERNAL_AUDITOR", "PLATFORM_ADMIN"));
 
         // ── Compliance / policy / controls ───────────────────────────────────
@@ -235,8 +244,13 @@ public class AttachmentAccessPolicy {
         DECLARED.put("THIRD_PARTY_CYBER_ASSESSMENT", ParentGuard.permOrRoles("TPRM",
             "CISO", "RISK_MANAGER", "PLATFORM_ADMIN"));
         DECLARED.put("FOURTH_PARTY_EXPOSURE",        ParentGuard.perm("SCM"));
-        DECLARED.put("VENDOR_BCP_CAMPAIGN",          ParentGuard.roles(
-            "TPRM_LEAD", "RISK_MANAGER", "AUDITOR", "CISO", "BCM_MANAGER", "PLATFORM_ADMIN"));
+        // F2-52: same drift, second instance, and the widest one measured. TprmPermissionConversionTest
+        // records that all 39 pure role guards in this module named TPRM_LEAD — absent from iam.roles —
+        // and were converted to TPRM:READ/WRITE/DELETE; VendorBcpCampaignController is hasPermission
+        // ('TPRM','READ') today. 17 roles hold TPRM:READ and 13 were unnamed here, so `auditor`,
+        // `compliance`, `so_officer` and `viewer` could all open a vendor BCP campaign and 403 on its
+        // attestation files. TPRM_LEAD was the only name this list added over the permission.
+        DECLARED.put("VENDOR_BCP_CAMPAIGN",          ParentGuard.perm("TPRM"));
         DECLARED.put("OUTSOURCING", ParentGuard.roles(
             "PLATFORM_ADMIN", "RISK_MANAGER", "COMPLIANCE_OFFICER", "AUDITOR", "CISO",
             "CIO", "CRO"));

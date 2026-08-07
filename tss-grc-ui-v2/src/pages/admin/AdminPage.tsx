@@ -24,15 +24,26 @@ import { ADMIN_USERS, ADMIN_ROLES, ADMIN_AUDIT_EVENTS } from './mockAdmin';
 
 type TabId = 'users' | 'roles' | 'orgs' | 'audit';
 
-const ROLE_OPTIONS = [
-  { value: 'PLATFORM_ADMIN', label: 'Platform Admin' },
-  { value: 'RISK_MANAGER',   label: 'Risk Manager' },
-  { value: 'AUDITOR',        label: 'Auditor' },
-  { value: 'PRIVACY_OFFICER',label: 'Privacy Officer' },
-  { value: 'COMPLIANCE_LEAD',label: 'Compliance Lead' },
-  { value: 'BCM_COORDINATOR',label: 'BCM Coordinator' },
-  { value: 'CYBER_ANALYST',  label: 'Cyber Analyst' },
-];
+/**
+ * F2-52 — the role picker offers the roles the SERVER has, not a hardcoded seven.
+ *
+ * The list here used to be a literal of 7 options and **4 of them did not exist** in `iam.roles`:
+ * `PRIVACY_OFFICER`, `COMPLIANCE_LEAD`, `BCM_COORDINATOR`, `CYBER_ANALYST` (measured against 69
+ * active rows). Assigning one produced a user holding a role no guard anywhere names — the same
+ * ghost-role defect as F2-05/F2-52, on the one surface an administrator actually operates. In the
+ * other direction the platform has 69 roles and this dropdown exposed 7, so `so_officer`'s CISO or
+ * the newly seated CRO could not be granted from the admin screen at all.
+ *
+ * `adminApi.roles()` is already loaded on this page for the Roles tab, so the fix is to use it. The
+ * fallback is deliberately **empty**: a role picker that invents options is worse than one that is
+ * briefly empty, because the invented choice fails silently at the far end.
+ */
+function roleOptions(roles: AdminRoleDto[]): { value: string; label: string }[] {
+  return roles
+    .filter(r => r.isActive !== false)
+    .map(r => ({ value: r.roleName, label: r.displayNameEn || r.roleName }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
 
 interface UserFormShape {
   username: string; email: string;
@@ -42,14 +53,15 @@ interface UserFormShape {
 const EMPTY: UserFormShape = {
   username: '', email: '', fullNameEn: '', fullNameAr: '', password: '', role: 'AUDITOR',
 };
-function fieldsFor(isEdit: boolean, t: (k: string, fb?: string) => string): FieldDef[] {
+function fieldsFor(isEdit: boolean, t: (k: string, fb?: string) => string,
+                   roles: AdminRoleDto[]): FieldDef[] {
   return [
     { kind: 'text', key: 'username',   label: t('adminFldUsername') + ' *', required: true, maxLength: 50, span: 6 },
     { kind: 'text', key: 'email',      label: t('fldEmail') + ' *',         required: true, maxLength: 200, span: 6 },
     { kind: 'text', key: 'fullNameEn', label: t('adminFldFullEn'), maxLength: 200, span: 6 },
     { kind: 'text', key: 'fullNameAr', label: t('adminFldFullAr'), maxLength: 200, span: 6 },
     { kind: 'text', key: 'password',   label: isEdit ? t('adminFldPwEdit') : t('adminFldPwInit') + ' *', required: !isEdit, maxLength: 100, span: 6 },
-    { kind: 'select', key: 'role',     label: t('adminFldRole') + ' *', options: ROLE_OPTIONS, required: true, span: 6 },
+    { kind: 'select', key: 'role',     label: t('adminFldRole') + ' *', options: roleOptions(roles), required: true, span: 6 },
   ];
 }
 function userToShape(u: AdminUserDto): UserFormShape {
@@ -91,6 +103,16 @@ export function AdminPage() {
 
   const [roles, setRoles] = useState<AdminRoleDto[]>([]);
   const [rolesLoading, setRolesLoading] = useState<boolean>(isAuthenticated());
+  /**
+   * F2-52 — provenance, because the mock fallback would otherwise smuggle the ghosts back in.
+   *
+   * Reading the picker's options off `roles` closes nothing on its own: three of the four code paths
+   * below fall back to `ADMIN_ROLES`, whose row 4 is `PRIVACY_OFFICER` — the very role that does not
+   * exist. A server-driven picker that silently accepts mock data when the server is unreachable is
+   * the hardcoded list again, arrived at less visibly. So the picker uses these rows **only when they
+   * came from the server**; the fallback still populates the read-only Roles tab, which is a display.
+   */
+  const [rolesAreReal, setRolesAreReal] = useState(false);
   useEffect(() => {
     if (!isAuthenticated()) {
       setRoles(ADMIN_ROLES);
@@ -98,7 +120,11 @@ export function AdminPage() {
       return;
     }
     adminApi.roles()
-      .then(r => setRoles(r && r.length > 0 ? r : (ADMIN_ROLES)))
+      .then(r => {
+        const real = !!r && r.length > 0;
+        setRolesAreReal(real);
+        setRoles(real ? r : ADMIN_ROLES);
+      })
       .catch(() => setRoles(ADMIN_ROLES))
       .finally(() => setRolesLoading(false));
   }, []);
@@ -220,7 +246,10 @@ export function AdminPage() {
         <Kpi Icon={UserPlus}  label={t('adminKpiPending')} value={pending} tone="warning"
           onClick={() => setAdvFilters({ isActive: 'false' })}
           active={advFilters.isActive === 'false'} />
-        <Kpi Icon={Shield}    label={t('adminKpiRoles')}   value={roles.length || ROLE_OPTIONS.length} tone="info"
+        {/* F2-52: `roles.length || 7` reported the hardcoded dropdown's length when the server
+            returned nothing — a role count that could not be zero, four of whose roles did not
+            exist. The real count is the real count, including 0. */}
+        <Kpi Icon={Shield}    label={t('adminKpiRoles')}   value={roles.length} tone="info"
           onClick={() => setTab('roles')}
           active={tab === 'roles'} />
       </div>
@@ -262,7 +291,7 @@ export function AdminPage() {
       <FormModal<UserFormShape>
         open={open}
         title={editing ? `${t('editPrefix')} · ${editing.username}` : t('newUserTitle')}
-        fields={fieldsFor(!!editing, t)}
+        fields={fieldsFor(!!editing, t, rolesAreReal ? roles : [])}
         initial={editing ? userToShape(editing) : EMPTY}
         onClose={() => { setOpen(false); setEditing(null); }}
         onSubmit={onSubmit}

@@ -28,7 +28,7 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 | … composed (role leg ANDed onto a permission — already tight) | 73 |
 | Module packages holding pure role guards | 29 |
 | Distinct role names recited by any role guard | 43 |
-| … **that do not exist in `iam.roles`** | **8** |
+| … **that do not exist in `iam.roles`** | **5** |
 | Pure guards **closed to everyone** (no named role exists, no live authority leg) | **0** |
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
 | Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **0** |
@@ -44,12 +44,9 @@ shows what that closes.
 
 | Role name recited in a guard | Guard sites naming it |
 |---|---|
-| `CIO` | 41 |
-| `CRO` | 38 |
 | `FACILITATOR` | 18 |
 | `MODEL_OWNER` | 14 |
 | `AUDIT_COMMITTEE_CHAIR` | 6 |
-| `PRIVACY_OFFICER` | 5 |
 | `AUDIT_COMMITTEE_MEMBER` | 3 |
 | `AUDIT_DIRECTOR` | 3 |
 
