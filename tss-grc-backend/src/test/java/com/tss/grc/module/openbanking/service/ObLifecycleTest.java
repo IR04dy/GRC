@@ -265,32 +265,56 @@ class ObLifecycleTest {
     // ── the authorisation branches ───────────────────────────────────────────
 
     /**
-     * F2-127 — the same shape as F2-116 ({@code outsourcing}) and F2-120 ({@code sharia}). Measured
-     * against {@code iam.roles} (58 roles, dev, 2026-08-06): {@code OPEN_BANKING_OFFICER} — the
-     * module's own named owner role — and {@code CRO} <b>do not exist</b>. So WRITE has 2 real holders
-     * of the 3 it names and APPROVE 2 of 3, leaving {@code PLATFORM_ADMIN} and
-     * {@code COMPLIANCE_OFFICER} as the only parties who can onboard, suspend or revoke a TPP.
+     * F2-127 — <b>CLOSED 2026-08-07</b>, and this test now asserts the closure rather than the defect.
+     *
+     * <p>What it recorded: measured against {@code iam.roles} (58 roles, dev, 2026-08-06),
+     * {@code OPEN_BANKING_OFFICER} — the module's own named owner role — and {@code CRO} did not exist,
+     * so WRITE had 2 real holders of the 3 it named and APPROVE 2 of 3, leaving {@code PLATFORM_ADMIN}
+     * and {@code COMPLIANCE_OFFICER} as the only parties who could onboard, suspend or revoke a TPP.
+     *
+     * <p>Closed in three steps, and the order is the whole lesson:
+     * <ol>
+     *   <li><b>V362</b> seated {@code OPEN_BANKING_OFFICER} and catalogued {@code OPENBANKING}
+     *       READ/WRITE/APPROVE. Immediately effective for {@code hasAnyRole}, which compares names.</li>
+     *   <li><b>V368</b> revoked {@code OPENBANKING:APPROVE} from {@code OPEN_BANKING_OFFICER}, because
+     *       V362's classifier had derived that grant from a transition-shaped method on the WRITE tier
+     *       and no APPROVE guard here has ever named the role. Inert when written.</li>
+     *   <li><b>F2-145(e) slice 2</b> converted all 18 guards to {@code hasPermission}, which is what made
+     *       steps 1 and 2 decide requests instead of describing an intention — and deleted {@code CRO}'s
+     *       three recitations outright, since a converted guard recites no names at all.</li>
+     * </ol>
+     *
+     * <p>⚠ <b>This test used to pin the two ghost names as PRESENT.</b> It survived its own fix only
+     * because its assertion message named the exit condition ("when these are created, or the guards
+     * convert to hasPermission under F2-05, close the finding and update this") — so the failure read as
+     * "the fix landed, update me" instead of "the conversion broke something". A test that pins a defect
+     * must state how it ends, or it outlives the fix and starts reading as a requirement (F2-115's shape).
      */
     @Test
-    @DisplayName("The guard constants are as reviewed, and their two fictional roles are recorded")
-    void theGuardConstantsArePinnedWithTheirDeadRoles() {
+    @DisplayName("F2-127 closed: the guard constants are permissions, and recite no role name at all")
+    void theGuardConstantsAreConvertedToPermissions() {
         String ctl = source("controller", "ObController.java");
 
-        assertThat(rolesIn(ctl, "READ_GUARD")).containsExactlyInAnyOrder(
-            "PLATFORM_ADMIN", "COMPLIANCE_OFFICER", "RISK_MANAGER", "INTERNAL_AUDITOR", "CISO",
-            "OPEN_BANKING_OFFICER");
-        assertThat(rolesIn(ctl, "WRITE_GUARD")).containsExactlyInAnyOrder(
-            "PLATFORM_ADMIN", "COMPLIANCE_OFFICER", "OPEN_BANKING_OFFICER");
-        assertThat(rolesIn(ctl, "APPROVE_GUARD")).containsExactlyInAnyOrder(
-            "PLATFORM_ADMIN", "COMPLIANCE_OFFICER", "CRO");
+        assertThat(permissionIn(ctl, "READ_GUARD")).isEqualTo("OPENBANKING:READ");
+        assertThat(permissionIn(ctl, "WRITE_GUARD")).isEqualTo("OPENBANKING:WRITE");
+        assertThat(permissionIn(ctl, "APPROVE_GUARD")).isEqualTo("OPENBANKING:APPROVE");
 
-        Set<String> recited = new TreeSet<>();
-        recited.addAll(rolesIn(ctl, "READ_GUARD"));
-        recited.addAll(rolesIn(ctl, "WRITE_GUARD"));
-        recited.addAll(rolesIn(ctl, "APPROVE_GUARD"));
-        assertThat(recited).as("F2-127 — when these are created, or the guards convert to "
-            + "hasPermission under F2-05, close the finding and update this")
-            .contains("OPEN_BANKING_OFFICER", "CRO");
+        // The ghost CRO is gone by DELETION, not by seating: a converted guard recites no names. Assert
+        // it over the declarations themselves rather than the file, because the controller's comment
+        // block still explains in prose what it was converted from — and a substring assertion over raw
+        // source would either fail on that documentation or pass because of it.
+        Matcher decls = Pattern.compile(
+            "private static final String\\s+\\w+\\s*=\\s*((?:\\s*\\+?\\s*\"[^\"]*\")+)\\s*;").matcher(ctl);
+        int found = 0;
+        while (decls.find()) {
+            found++;
+            assertThat(decls.group(1))
+                .as("guard constant #%d still authorises by role name; F2-127 closed by converting "
+                    + "every one of them", found)
+                .doesNotContain("hasAnyRole")
+                .doesNotContain("hasRole(");
+        }
+        assertThat(found).as("a declaration regex that matches nothing passes forever").isEqualTo(3);
     }
 
     @Test
@@ -377,18 +401,19 @@ class ObLifecycleTest {
         }
     }
 
-    private static Set<String> rolesIn(String src, String constant) {
+    /**
+     * The {@code MODULE:ACTION} a guard constant resolves to. Replaces {@code rolesIn}, which parsed the
+     * {@code hasAnyRole} name list this module no longer has. ⚠ The {@code m.find()} assertion is why the
+     * conversion produced a readable failure instead of an {@code IllegalStateException} from
+     * {@code m.group(1)} — a regex that matches nothing satisfies every downstream assertion forever, so
+     * the anti-vacuity check belongs in the <em>helper</em>, where every caller inherits it.
+     */
+    private static String permissionIn(String src, String constant) {
         Matcher m = Pattern.compile(
-            constant + "\\s*=\\s*\\n?\\s*\"hasAnyRole\\((.*?)\\)\"", Pattern.DOTALL).matcher(src);
-        assertThat(m.find()).as("guard constant %s must be a hasAnyRole string — a pattern matching "
-            + "nothing passes forever", constant).isTrue();
-        Set<String> out = new TreeSet<>();
-        for (String part : m.group(1).replace("\"", "").replace("+", "").split(",")) {
-            String r = part.trim().replace("'", "").trim();
-            if (!r.isEmpty()) {
-                out.add(r);
-            }
-        }
-        return out;
+            constant + "\\s*=\\s*\\n?\\s*\"hasPermission\\('([A-Z_]+)'\\s*,\\s*'([A-Z_]+)'\\)\"",
+            Pattern.DOTALL).matcher(src);
+        assertThat(m.find()).as("guard constant %s must be a hasPermission string — a pattern that "
+            + "matches nothing passes forever", constant).isTrue();
+        return m.group(1) + ":" + m.group(2);
     }
 }

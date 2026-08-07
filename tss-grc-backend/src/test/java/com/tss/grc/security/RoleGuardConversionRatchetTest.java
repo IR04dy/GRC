@@ -198,13 +198,38 @@ class RoleGuardConversionRatchetTest {
      * worked anyway (F2-64, V336). <b>A ghost role and a missing table hide each other: the 403 you
      * would have got masks the 503 you would have got.</b>
      *
+     * <p><b>511</b> after {@code sharia} (F2-145(e) slice 1): 21 sites to {@code SHARIA}
+     * READ/WRITE/APPROVE. That slice's value was not the count — it was that V362's catalogue and V367's
+     * revocation had both been <b>inert</b> until a guard consulted them. Catalogue, revoke, convert:
+     * three artefacts in order, and only the third is observable.
+     *
+     * <p><b>493</b> after {@code openbanking} (slice 2): 18 sites in {@code ObController} to
+     * {@code OPENBANKING} READ/WRITE/APPROVE, and the first conversion in this programme that was
+     * <b>not population-preserving until a migration made it so</b>. The catalogue granted
+     * {@code OPENBANKING:APPROVE} to {@code OPEN_BANKING_OFFICER}, a role no APPROVE guard there has ever
+     * named, so converting as-is would have let the officer who grants customer consents to a TPP also
+     * admit that TPP ({@code createTpp}, {@code transitionTpp}, {@code notifySama}). V368 revokes it.
+     * ⚠ The provenance generalises and is the finding worth keeping: V362 states its grants are
+     * <em>derived</em> — action from the HTTP verb, "or APPROVE when the method is
+     * approve/reject/transition/decide/sign-shaped" — and that classifier reads the <em>method</em> while
+     * a guard's tier is a <em>design decision</em> it never read. Every controller with a
+     * transition-shaped method on its WRITE tier therefore had that whole tier promoted to APPROVE.
+     * Measured across all six V362 modules: {@code SHARIA_AUDITOR}'s APPROVE (caught, V367),
+     * {@code OPEN_BANKING_OFFICER}'s APPROVE (V368), {@code CFO}'s {@code CPTY:WRITE} and
+     * {@code KYC_OFFICER}/{@code ONBOARDING_AGENT}'s {@code AML:WRITE} (both filed — each needs a
+     * catalogue decision, not a revoke). Four of six. <b>"Derived from the guards" is not "faithful to
+     * the guards", and the word <em>derived</em> is what made it feel already-checked.</b> This slice also
+     * retired {@code OPEN_BANKING_OFFICER} from the guard vocabulary entirely (50 distinct names → 49):
+     * it was recited in this controller and nowhere else, so its authority now flows only through the
+     * grant — which is the end state, not a loss.
+     *
      * <p>Raising this number means adding an endpoint that authorises by identity in a platform
      * whose authorisation model is permissions, and whose role names have a 54% miss rate. Convert
      * instead. Where a role genuinely is the right unit — {@code PLATFORM_ADMIN}-only platform
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 511;
+    private static final int BASELINE_PURE_ROLE_SITES = 493;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"

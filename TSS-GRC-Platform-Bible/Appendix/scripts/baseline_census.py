@@ -78,8 +78,8 @@ PUBLISHED = {
     "endpoints": 2_213,
     "writes": 1_239,
     "main_preauthorize": 2_201,
-    "perm_modules": 32,
-    "packages_no_haspermission": 16,
+    "perm_modules": 33,
+    "packages_no_haspermission": 15,
     "module_tests": 3_199,
     "suite_tests": 3_398,
     # F2-03 floored all seven Tier-1 regulator-facing modules (2026-08-05/06), so this
@@ -88,8 +88,8 @@ PUBLISHED = {
     "zero_test_packages": 8,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 355,
-    "migration_head": 367,
+    "migration_files": 356,
+    "migration_head": 368,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
     "fe_pages": 340,          # F2-142 retired 3 fabricated pages
     "fe_page_folders": 111,   # each was the only file in its folder, so -3 folders too

@@ -49,13 +49,42 @@ import java.util.List;
 @SecurityRequirement(name = "bearerAuth")
 public class ObController {
 
-    private static final String READ_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','COMPLIANCE_OFFICER','RISK_MANAGER',"
-            + "'INTERNAL_AUDITOR','CISO','OPEN_BANKING_OFFICER')";
-    private static final String WRITE_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','COMPLIANCE_OFFICER','OPEN_BANKING_OFFICER')";
-    private static final String APPROVE_GUARD =
-            "hasAnyRole('PLATFORM_ADMIN','COMPLIANCE_OFFICER','CRO')";
+    /*
+     * F2-145(e) slice 2 — these three guards authorise by PERMISSION, not by role name.
+     *
+     * They used to read hasAnyRole(...), which compares authority strings and so never reaches
+     * ModulePermissionEvaluator: the OPENBANKING permissions V362 catalogued decided nothing here. The
+     * populations were measured per action against iam.role_permissions BEFORE the change, because
+     * ADR-010's amendment requires the INTENDED population and not merely the current one:
+     *
+     *   READ     guard PLATFORM_ADMIN, COMPLIANCE_OFFICER, RISK_MANAGER, INTERNAL_AUDITOR, CISO,
+     *                  OPEN_BANKING_OFFICER
+     *            grant CISO, COMPLIANCE_OFFICER, INTERNAL_AUDITOR, OPEN_BANKING_OFFICER, RISK_MANAGER
+     *   WRITE    guard PLATFORM_ADMIN, COMPLIANCE_OFFICER, OPEN_BANKING_OFFICER
+     *            grant COMPLIANCE_OFFICER, OPEN_BANKING_OFFICER
+     *   APPROVE  guard PLATFORM_ADMIN, COMPLIANCE_OFFICER, CRO
+     *            grant COMPLIANCE_OFFICER
+     *
+     * PLATFORM_ADMIN is absent from every grant list on purpose: hasPermission gets the in-code
+     * platform-admin bypass, so naming it would be decoration. CRO was seated nowhere — a ghost whose
+     * APPROVE leg had always been false — and converting the guard is what finally retires its three
+     * recitations here (F2-52's third route: a converted guard deletes every name it recites).
+     *
+     * ⚠ V368 IS LOAD-BEARING FOR THE APPROVE TIER. The catalogue also granted OPENBANKING:APPROVE to
+     * OPEN_BANKING_OFFICER, which no APPROVE guard here has ever named — V362 derived actions from method
+     * shape, and this controller's WRITE tier carries two transition-shaped methods. Converting before
+     * V368 would have handed the module's operator the authority to admit the TPPs it operates:
+     * createTpp, transitionTpp (KYB approve / suspend / revoke) and notifySama. V368 revokes it, which is
+     * why the APPROVE population above is COMPLIANCE_OFFICER alone.
+     *
+     * ⚠ THE TIERS ARE NOT UNIFORM BY VERB, AND THAT IS THE DESIGN. createTpp is a POST on APPROVE
+     * because TPP admission is a compliance control gate under SAMA's Open Banking Framework, while
+     * transitionIncident is a POST on WRITE because incident handling is the operator's day job. Do not
+     * "tidy" them into verb order — ObControllerGuardTest pins all 18 sites and will fail.
+     */
+    private static final String READ_GUARD = "hasPermission('OPENBANKING','READ')";
+    private static final String WRITE_GUARD = "hasPermission('OPENBANKING','WRITE')";
+    private static final String APPROVE_GUARD = "hasPermission('OPENBANKING','APPROVE')";
 
     private final ObService service;
 
