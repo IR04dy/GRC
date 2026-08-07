@@ -98,14 +98,14 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V368 packaged; next free V369** (356 files; ⚠ this line said "V1→V295 / next free
+— **V1→V369 packaged; next free V370** (357 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V368 are pending** the
-next jar — 24 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V369 are pending** the
+next jar — 25 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -137,7 +137,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
    ⚠ **This line said "≤ 62" for months** — three times the enforced ceiling, so it
    invited waving through 41 unguarded endpoints the build in fact rejects. No ratchet
    in the suite has ever been 62 (F2-69). The other enforced ceilings, for reference:
-   `BASELINE_ENTITY_BOUND_WRITES` 214, `BASELINE_PURE_ROLE_SITES` 484 — read the
+   `BASELINE_ENTITY_BOUND_WRITES` 214, `BASELINE_PURE_ROLE_SITES` 470 — read the
    constant, never a prose summary of it. ⚠ **`BARE_EXPORT_CEILING` 32 is GONE** — F2-61(c)
    swept it to zero and replaced it with an invariant
    (`ExportAuthorizationRatchetTest.everyExportHandlerAlsoDemandsARead`): every
@@ -204,7 +204,7 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   prod — this line said "94 / 24" for months; **PLATFORM_ADMIN bypasses in code**,
   so `admin` proves nothing about authorization: probe with a real persona.
   ⚠ **`hasAnyRole(...)` is a second, independent gate that gets NO admin bypass**
-  and validates nothing — **484 endpoints still authorise by role name, reciting
+  and validates nothing — **470 endpoints still authorise by role name, reciting
   role names with a ~50% miss rate against `iam.roles`** (F2-05/F2-52). Before
   trusting or writing one, check the names exist.
   ⚠ **A catalogued permission is inert until a guard consults it**, and a catalogue

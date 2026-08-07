@@ -23,18 +23,18 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 
 | Measure | Count |
 |---|---|
-| Guard sites with a role leg | 557 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **484** |
+| Guard sites with a role leg | 543 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **470** |
 | … composed (role leg ANDed onto a permission — already tight) | 73 |
-| Module packages holding pure role guards | 32 |
-| Distinct role names recited by any role guard | 48 |
+| Module packages holding pure role guards | 31 |
+| Distinct role names recited by any role guard | 47 |
 | … **that do not exist in `iam.roles`** | **8** |
 | Pure guards **closed to everyone** (no named role exists, no live authority leg) | **0** |
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
 | Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **0** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user | 484 |
+| Pure guards reachable by at least one seeded user | 470 |
 | `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 2 |
 
 ## A. Role names no role table contains
@@ -44,8 +44,8 @@ shows what that closes.
 
 | Role name recited in a guard | Guard sites naming it |
 |---|---|
-| `CRO` | 52 |
 | `CIO` | 41 |
+| `CRO` | 38 |
 | `FACILITATOR` | 18 |
 | `AUDIT_COMMITTEE_MEMBER` | 16 |
 | `MODEL_OWNER` | 14 |
@@ -115,7 +115,6 @@ closed guards is a correctness fix, not only a modelling one.
 | `module.regreporting` | 17 |  |
 | `module.rrp` | 17 |  |
 | `module.aml` | 14 |  |
-| `module.cpty` | 14 |  |
 | `module.privacy` | 14 |  |
 | `module.dataclass` | 13 |  |
 | `module.workflow` | 11 |  |

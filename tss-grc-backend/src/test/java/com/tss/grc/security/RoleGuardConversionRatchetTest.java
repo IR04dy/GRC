@@ -241,13 +241,34 @@ class RoleGuardConversionRatchetTest {
      * leaving it would have left a client gate reciting names the server no longer consults — invisible
      * precisely because the populations are identical.
      *
+     * <p><b>470</b> after {@code cpty} (slice 4): 14 sites, and the first conversion blocked by a
+     * <b>missing action</b> rather than a wrong grant. {@code CPTY} was catalogued with READ and WRITE
+     * only, because V362's classifier assigns APPROVE by method shape and this controller's two approval
+     * endpoints are {@code assignRating} and {@code upsertLimit} — named like neither an approval nor a
+     * transition. So both were read as writes and the APPROVE tier's population was folded into WRITE,
+     * which is how {@code CFO} came to hold {@code CPTY:WRITE} while appearing on no WRITE guard.
+     * 🔑 <b>A missing catalogue entry is not a gap that makes a conversion impossible; it is a gap that
+     * makes the WRONG conversion easy.</b> With no {@code CPTY:APPROVE}, the obvious move is to point
+     * {@code APPROVE_GUARD} at the {@code CPTY:WRITE} that exists — which would take the approval
+     * population from {@code {PLATFORM_ADMIN, CFO}} to include {@code CREDIT_OFFICER} and
+     * {@code RISK_MANAGER}, letting a credit officer assign the internal credit rating on their own
+     * counterparty and set their own large-exposure limit. Under SAMA's large-exposure rules that
+     * separation is the control. <b>V369</b> catalogues the action, grants it to {@code CFO}, and revokes
+     * {@code CFO}'s mis-derived WRITE. ⚠ This is the <em>mirror image</em> of V368's defect: the same
+     * classifier promoted {@code openbanking}'s WRITE tier to APPROVE and demoted {@code cpty}'s APPROVE
+     * tier to WRITE — one cause, both directions, and which one you get depends on nothing but whether a
+     * method happens to be named like a transition. ⚠ {@code CFO} is held by no active user, so APPROVE is
+     * reachable only through the administrator's bypass; that was already true of the guard, so the
+     * conversion <b>reveals</b> that narrowness rather than causing it (F2-52's attrition shape, and a
+     * provisioning act to fix).
+     *
      * <p>Raising this number means adding an endpoint that authorises by identity in a platform
      * whose authorisation model is permissions, and whose role names have a 54% miss rate. Convert
      * instead. Where a role genuinely is the right unit — {@code PLATFORM_ADMIN}-only platform
      * administration is the honest case — say so in the guard's javadoc, because the next reader
      * cannot tell that apart from an unconverted one.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 484;
+    private static final int BASELINE_PURE_ROLE_SITES = 470;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"
