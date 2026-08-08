@@ -39,6 +39,9 @@ public class RiskAcceptanceService {
     private final RiskRepository risks;
     private final AuditLogService audit;
     private final ApplicationEventPublisher events;
+    /** F2-164 — the audited, event-emitting transition path. No cycle: RiskService
+     *  reads the acceptance REPOSITORY, never this service. */
+    private final RiskService riskService;
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
@@ -55,8 +58,14 @@ public class RiskAcceptanceService {
         Risk risk = risks.findById(riskId)
             .filter(r -> Objects.equals(r.getOrganisationId(), orgId))
             .orElseThrow(() -> new EntityNotFoundException("Risk not found: " + riskId));
-        if ("CLOSED".equals(risk.getStatus()))
-            throw new IllegalStateException("Cannot raise an acceptance for a CLOSED risk");
+        // ⚠ Reads RiskService's list rather than restating it. An acceptance that may be
+        // raised and cannot be approved is a dead end in the governed path — see the note
+        // on that constant. There is ONE list; do not add a second one here.
+        if (!RiskService.RETAINABLE_STATUSES.contains(risk.getStatus()))
+            throw new IllegalStateException(
+                "Cannot raise an acceptance for a " + risk.getStatus() + " risk"
+                + " — an acceptance is only approvable while the risk is live "
+                + RiskService.RETAINABLE_STATUSES);
         if (dto.expiresAt() == null || !dto.expiresAt().isAfter(LocalDate.now()))
             throw new IllegalArgumentException("Acceptance expiry must be a future date (acceptance is time-boxed)");
 
@@ -102,7 +111,21 @@ public class RiskAcceptanceService {
         a.setApprovedBy(approver);
         a.setApprovedAt(LocalDateTime.now());
         RiskAcceptance saved = acceptances.save(a);
-        setRiskStatus(saved.getRiskId(), "ACCEPTED");   // the acceptance record is the authority
+        // The acceptance record is the authority — and F2-164 made this the ONLY
+        // writer of ACCEPTED. It routes through RiskService's audited transition
+        // rather than the bare setRiskStatus() this line used to call, because
+        // that bare save emitted no RISK_TRANSITIONED event and wrote no
+        // TRANSITION audit row: V132's SAMA §10.4 rule (OPEN → ACCEPTED skipped
+        // formal review) was therefore reachable ONLY from the ungoverned
+        // endpoint it exists to flag. ⚠ A terminal risk is left alone, same as
+        // setRiskStatus did for CLOSED — reopening is RISK:APPROVE's own decision
+        // (E-J). Tested against that same list, not against "CLOSED": an ARCHIVED risk
+        // would otherwise be handed to a transition that rejects it, turning a
+        // legitimate approval into a 400.
+        Risk parent = risks.findById(saved.getRiskId()).orElse(null);
+        if (parent != null && RiskService.RETAINABLE_STATUSES.contains(parent.getStatus())) {
+            riskService.acceptOnApprovedAcceptance(saved.getRiskId());
+        }
         audit.log("APPROVE", "RiskAcceptance", saved.getId(),
             "Acceptance " + saved.getId() + " APPROVED by " + approver
             + " → " + code(saved.getRiskId()) + " ACCEPTED (expires " + saved.getExpiresAt() + ")");
@@ -168,6 +191,16 @@ public class RiskAcceptanceService {
         return n;
     }
 
+    /**
+     * Reopen path — deliberately NOT routed through {@code RiskService}'s audited
+     * transition, unlike {@link #approve}.
+     *
+     * <p>{@code expireSweep} runs system-wide off-request (scheduler or endpoint,
+     * all tenants), where {@code TenantContext} is unset and {@code mustGet}'s
+     * tenant filter would throw — the off-request audit landmine. {@code revoke}
+     * shares the helper because a revocation's audit record belongs to the
+     * acceptance, which is where the reason lives.
+     */
     private void setRiskStatus(Long riskId, String status) {
         risks.findById(riskId).ifPresent(r -> {
             if (!"CLOSED".equals(r.getStatus())) { r.setStatus(status); risks.save(r); }

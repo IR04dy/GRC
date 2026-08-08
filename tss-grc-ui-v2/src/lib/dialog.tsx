@@ -26,7 +26,7 @@
 // pull the hook without each page wiring its own modal state.
 
 import {
-  useCallback, useContext, useEffect, useRef, useState,
+  useCallback, useContext, useEffect, useId, useRef, useState,
   type FormEvent, type ReactNode,
 } from 'react';
 import { stableContext } from './stableContext';
@@ -141,6 +141,8 @@ function PromptModal({
   const { opts } = req;
   const [value, setValue] = useState<string>(opts.initial ?? '');
   const [error, setError] = useState<string | null>(null);
+  /** Stable per-mount id so the label can point at the field. */
+  const fieldId = useId();
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
   // Reset state when a new prompt request comes in (defensive — the
@@ -207,13 +209,17 @@ function PromptModal({
       }
     >
       <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* `htmlFor`/`id` — the label rendered unassociated, so a screen reader
+            announced an unlabelled text box on every one of these prompts, and
+            `getByLabelText` could not reach the input in a test. */}
         {opts.label && (
-          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+          <label htmlFor={fieldId} style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
             {opts.label}{opts.required && <span style={{ color: 'var(--danger-fg)' }}> *</span>}
           </label>
         )}
         {opts.type === 'textarea' ? (
           <Textarea
+            id={fieldId}
             ref={inputRef as React.RefObject<HTMLTextAreaElement>}
             value={value}
             onChange={e => { setValue(e.target.value); if (error) setError(null); }}
@@ -222,6 +228,7 @@ function PromptModal({
           />
         ) : (
           <Input
+            id={fieldId}
             ref={inputRef as React.RefObject<HTMLInputElement>}
             type={opts.type === 'number' ? 'number' : 'text'}
             value={value}

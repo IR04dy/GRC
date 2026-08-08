@@ -10,6 +10,7 @@ import com.tss.grc.module.risk.dto.RiskResponse;
 import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.entity.RiskCategory;
 import com.tss.grc.module.risk.entity.RiskAppetiteStatement;
+import com.tss.grc.module.risk.repository.RiskAcceptanceRepository;
 import com.tss.grc.module.risk.repository.RiskAppetiteStatementRepository;
 import com.tss.grc.module.risk.repository.RiskCategoryRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
@@ -17,6 +18,7 @@ import com.tss.grc.module.risk_lc.repository.TreatmentPlanRepository;
 import jakarta.persistence.EntityNotFoundException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -74,6 +76,8 @@ class RiskServiceTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private TreatmentPlanRepository treatmentPlanRepository;
     @Mock private RiskAppetiteStatementRepository appetiteRepository;
+    /** F2-164 — the close gate's exemption now reads this, not `status`. */
+    @Mock private RiskAcceptanceRepository acceptanceRepository;
     @InjectMocks private RiskService service;
 
     @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
@@ -228,16 +232,84 @@ class RiskServiceTest {
         assertThat(service.close(RISK_ID).status()).isEqualTo("CLOSED");
     }
 
+    // ─── F2-164: the exemption is the RECORD, never the status string ─────
+    //
+    // These four tests replace a single one — `close_highRisk_whenAccepted_
+    // isExempt_fromTreatmentGate` — which stubbed nothing but `status="ACCEPTED"`
+    // and asserted the gate was skipped. It described the code accurately and
+    // that is exactly what made it hard to see: it locked in a one-click,
+    // permanent bypass of ERM's headline control at RISK:WRITE. Same shape as
+    // F2-159's decoy. A control test has to name the artefact, not the claim.
+
     @Test
-    void close_highRisk_whenAccepted_isExempt_fromTreatmentGate() {
-        // ACCEPTED is the formal documented decision (E-A) — no plan required.
+    void close_highRisk_withLiveFormalAcceptance_isExempt_fromTreatmentGate() {
+        // The exemption survives, and it is earned: an APPROVED acceptance record
+        // inside its time-box carries justification, compensating controls, CRO
+        // sign-off and (above appetite) Board sign-off.
         Risk r = risk("ACCEPTED"); r.setRiskLevel("HIGH");
         when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(acceptanceRepository.existsByOrganisationIdAndRiskIdAndStatusAndExpiresAtGreaterThanEqual(
+                eq(ORG_ID), eq(RISK_ID), eq("APPROVED"), any(LocalDate.class))).thenReturn(true);
         when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
 
         assertThat(service.close(RISK_ID).status()).isEqualTo("CLOSED");
         verify(treatmentPlanRepository, never())
             .existsByOrganisationIdAndRiskIdAndStatusNot(anyLong(), anyLong(), anyString());
+    }
+
+    @Test
+    void close_highRisk_ACCEPTED_withNoAcceptanceRecord_isStillGated() {
+        // THE regression this slice exists to prevent. A HIGH risk sitting in
+        // ACCEPTED with no acceptance record behind it gets no exemption — the
+        // status is a projection, and an unbacked projection proves nothing.
+        Risk r = risk("ACCEPTED"); r.setRiskLevel("HIGH");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(acceptanceRepository.existsByOrganisationIdAndRiskIdAndStatusAndExpiresAtGreaterThanEqual(
+                eq(ORG_ID), eq(RISK_ID), eq("APPROVED"), any(LocalDate.class))).thenReturn(false);
+        when(treatmentPlanRepository.existsByOrganisationIdAndRiskIdAndStatusNot(ORG_ID, RISK_ID, "REJECTED"))
+            .thenReturn(false);
+
+        assertThatThrownBy(() -> service.close(RISK_ID))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("treatment plan");
+        verify(riskRepository, never()).save(any());
+    }
+
+    @Test
+    void close_highRisk_ACCEPTED_withLapsedAcceptance_isStillGated() {
+        // The repository query filters `expires_at >= today`, so a lapsed
+        // acceptance answers false here. The gate must not wait for expireSweep
+        // to catch up — an exemption that outlives its time-box is the permanence
+        // half of F2-164.
+        Risk r = risk("ACCEPTED"); r.setRiskLevel("CRITICAL");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(acceptanceRepository.existsByOrganisationIdAndRiskIdAndStatusAndExpiresAtGreaterThanEqual(
+                eq(ORG_ID), eq(RISK_ID), eq("APPROVED"), any(LocalDate.class))).thenReturn(false);
+        when(treatmentPlanRepository.existsByOrganisationIdAndRiskIdAndStatusNot(ORG_ID, RISK_ID, "REJECTED"))
+            .thenReturn(true);   // a plan is the OTHER way through — and it works
+        when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.close(RISK_ID).status()).isEqualTo("CLOSED");
+    }
+
+    @Test
+    void close_refusal_namesTheStoreTheGateActuallyReads() {
+        // (c) — there are two treatment tables. `risk.risk_treatments` is the
+        // simple list on the risk's Treatments tab; `risk_lc.treatment_plans` is
+        // the canonical plan the gate reads. The old message said "draft a
+        // treatment plan", which a user who had just added three treatments read
+        // as the system contradicting itself. Measured in dev: risks 21/22/23/24/
+        // 32 are HIGH+ with a legacy treatment each and zero canonical plans.
+        Risk r = risk("MITIGATING"); r.setRiskLevel("HIGH");
+        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
+        when(acceptanceRepository.existsByOrganisationIdAndRiskIdAndStatusAndExpiresAtGreaterThanEqual(
+                eq(ORG_ID), eq(RISK_ID), eq("APPROVED"), any(LocalDate.class))).thenReturn(false);
+        when(treatmentPlanRepository.existsByOrganisationIdAndRiskIdAndStatusNot(ORG_ID, RISK_ID, "REJECTED"))
+            .thenReturn(false);
+
+        assertThatThrownBy(() -> service.close(RISK_ID))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Treatments tab are not the same record");
     }
 
     @Test
@@ -280,15 +352,18 @@ class RiskServiceTest {
     }
 
     @Test
-    void accept_allowed_from_OPEN_and_UNDER_REVIEW() {
+    void acceptOnApprovedAcceptance_allowed_from_OPEN_and_UNDER_REVIEW() {
+        // F2-164 — renamed from `accept`, and no longer reachable from a
+        // controller. `RiskAcceptanceService.approve` is the only caller, so the
+        // state guard is now the second check rather than the only one.
         Risk a = risk("OPEN");
         when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(a));
         when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
-        assertThat(service.accept(RISK_ID).status()).isEqualTo("ACCEPTED");
+        assertThat(service.acceptOnApprovedAcceptance(RISK_ID).status()).isEqualTo("ACCEPTED");
 
         Risk b = risk("UNDER_REVIEW");
         when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(b));
-        assertThat(service.accept(RISK_ID).status()).isEqualTo("ACCEPTED");
+        assertThat(service.acceptOnApprovedAcceptance(RISK_ID).status()).isEqualTo("ACCEPTED");
     }
 
     // ─── lifecycle: illegal transitions ──────────────────────────────
@@ -312,11 +387,20 @@ class RiskServiceTest {
     }
 
     @Test
-    void accept_from_MITIGATING_throws() {
-        when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(risk("MITIGATING")));
-
-        assertThatThrownBy(() -> service.accept(RISK_ID))
-            .isInstanceOf(IllegalArgumentException.class);
+    void acceptOnApprovedAcceptance_from_a_terminal_status_throws() {
+        // ⚠ Was `_from_MITIGATING_throws`, and MITIGATING is now a legitimate source —
+        // stopping treatment to retain the risk is a real decision, and `request()` has
+        // always allowed raising an acceptance there. Refusing it made a raised acceptance
+        // un-approvable, which the live probe caught as a 400. The statuses that must still
+        // be refused are the terminal ones: retaining a CLOSED or ARCHIVED risk is a reopen
+        // decision (E-J), not an acceptance.
+        for (String terminal : new String[]{"CLOSED", "ARCHIVED"}) {
+            when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(risk(terminal)));
+            assertThatThrownBy(() -> service.acceptOnApprovedAcceptance(RISK_ID))
+                .as("a %s risk must not be flipped to ACCEPTED", terminal)
+                .isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(RiskService.RETAINABLE_STATUSES).contains("MITIGATING");
     }
 
     @Test
@@ -484,7 +568,7 @@ class RiskServiceTest {
     }
 
     @Test
-    void accept_from_OPEN_carriesPreviousStatus_OPEN() {
+    void acceptOnApprovedAcceptance_from_OPEN_carriesPreviousStatus_OPEN() {
         // The 'OPEN → ACCEPTED' path skips formal review — SAMA §10.4
         // flags this as a governance concern. A seed rule will match
         // ONLY on previousStatus=OPEN + status=ACCEPTED (and skip the
@@ -494,7 +578,7 @@ class RiskServiceTest {
         when(riskRepository.findById(RISK_ID)).thenReturn(Optional.of(r));
         when(riskRepository.save(any(Risk.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        service.accept(RISK_ID);
+        service.acceptOnApprovedAcceptance(RISK_ID);
 
         ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());

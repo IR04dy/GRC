@@ -98,12 +98,19 @@ function effLikelihood(r: RiskResponse): number { return r.residualLikelihood ??
 function effImpact(r: RiskResponse): number { return r.residualImpact ?? r.inherentImpact; }
 function effScore(r: RiskResponse): number { return r.residualScore ?? r.inherentScore; }
 
+/** ⚠ F2-164 — keyed on `CK_risks_status`. Three of the five keys here were invented
+ *  vocabulary (`IN_PROGRESS`, `MITIGATE`, `TREATED`) and three real statuses were
+ *  absent, so an UNDER_REVIEW risk — 30 of the 71 rows in dev, the largest single
+ *  bucket — fell through to `?? 'neutral'`. The detail page's table was wrong the same
+ *  way with different wrong words, which is how two screens disagreed about one risk. */
 const STATUS_TONES: Record<string, BadgeTone> = {
   OPEN: 'danger',
-  IN_PROGRESS: 'warning',
-  MITIGATE: 'info',
-  TREATED: 'success',
-  CLOSED: 'neutral',
+  UNDER_REVIEW: 'warning',
+  MITIGATING: 'info',
+  ACCEPTED: 'accent',
+  TRANSFERRED: 'primary',
+  CLOSED: 'success',
+  ARCHIVED: 'neutral',
 };
 
 // Replaced by lib/statusLabels.statusLabel — kept signature for callers
@@ -296,10 +303,14 @@ export function RiskRegisterPage() {
   }
   const submitForReview = (r: RiskResponse) => runWorkflow(riskApi.submitForReview, r, 'Risk submitted for review');
   const approveRisk     = (r: RiskResponse) => runWorkflow(riskApi.approveRisk,     r, 'Risk approved for treatment');
-  const acceptRisk      = (r: RiskResponse) => {
-    if (!window.confirm(`Formally accept risk "${r.titleEn}"? This indicates senior management acknowledges and accepts this risk without further treatment.`)) return;
-    runWorkflow(riskApi.acceptRisk, r, 'Risk formally accepted');
-  };
+  // F2-164 — this row action used to POST /risks/{id}/accept: a bare RISK:WRITE flip
+  // to ACCEPTED behind a window.confirm whose own words ("senior management
+  // acknowledges and accepts this risk") described a governance decision the request
+  // recorded nothing about — no justification, no compensating controls, no expiry,
+  // no sign-off, and no acceptance record for the expiry sweep to ever reopen. It
+  // also exempted the risk from the mandatory-treatment close gate. It now opens the
+  // acceptance wizard, whose approval step is RISK:APPROVE.
+  const acceptRisk      = (r: RiskResponse) => navigate(`/workflows/erm/risk-acceptance/${r.id}`);
   const closeRisk       = (r: RiskResponse) => runWorkflow(riskApi.closeRisk,  r, 'Risk closed');
   const reopenRisk      = (r: RiskResponse) => runWorkflow(riskApi.reopenRisk, r, 'Risk reopened');
 
@@ -331,7 +342,11 @@ export function RiskRegisterPage() {
   }, [risks, filters]);
 
   const criticalCount = risks.filter(r => effScore(r) >= 20).length;
-  const treatedCount  = risks.filter(r => r.status === 'TREATED' || r.status === 'CLOSED').length;
+  // ⚠ F2-164 — this counted 'TREATED' too, which `CK_risks_status` has never permitted
+  // (OPEN | UNDER_REVIEW | MITIGATING | ACCEPTED | TRANSFERRED | CLOSED | ARCHIVED), so the
+  // clause was dead and the KPI has always been the CLOSED count. Kept as the CLOSED count
+  // rather than folded into MITIGATING: 'mitigating' is treatment in flight, not treated.
+  const treatedCount  = risks.filter(r => r.status === 'CLOSED').length;
   const openCount     = risks.filter(r => r.status === 'OPEN').length;
 
   function onHeatCellClick(l: number, i: number) {
@@ -381,7 +396,7 @@ export function RiskRegisterPage() {
         if (r.status === 'UNDER_REVIEW') extras.push({ Icon: CheckCheck, onClick: () => approveRisk(r),     title: t('riskActApprove'),      tone: 'success' });
         if (r.status === 'OPEN' || r.status === 'UNDER_REVIEW')
                                          extras.push({ Icon: ShieldOff,  onClick: () => acceptRisk(r),      title: t('riskActAccept'),       tone: 'accent' });
-        if (r.status === 'MITIGATING' || r.status === 'TREATED' || r.status === 'ACCEPTED')
+        if (r.status === 'MITIGATING' || r.status === 'ACCEPTED')   // F2-164: 'TREATED' was a dead branch
                                          extras.push({ Icon: Archive,    onClick: () => closeRisk(r),       title: t('riskActClose'),        tone: 'primary' });
         if (r.status === 'CLOSED')       extras.push({ Icon: RotateCcw,  onClick: () => reopenRisk(r),      title: t('riskActReopen'),       tone: 'accent' });
         return <RowActions extras={extras} onEdit={() => startEdit(r)} onDelete={() => startDelete(r)} />;
@@ -436,7 +451,8 @@ export function RiskRegisterPage() {
         anchors={RISK_ANCHORS}
         lifecycles={[
           // ── 1. Risk Identification & Assessment ──
-          // Workflow: OPEN → UNDER_ASSESSMENT → APPROVED_FOR_TREATMENT
+          // Workflow: OPEN → UNDER_REVIEW → MITIGATING  (the statuses the server emits;
+          // this comment said UNDER_ASSESSMENT → APPROVED_FOR_TREATMENT, neither of which exists)
           // Trigger: opens the New Risk modal so the user can register a
           // new risk that immediately enters the assessment workflow.
           { ...RISK_LIFECYCLES[0],
@@ -446,7 +462,10 @@ export function RiskRegisterPage() {
           // ── 2. Risk Treatment Plan ──
           { ...RISK_LIFECYCLES[1],
             primary:   { label: 'Plan',       labelAr: 'خطة المعالجة', onClick: () => { setFilters(prev => ({ ...prev, status: 'UNDER_REVIEW' })); setTab('register'); } },
-            secondary: { label: 'Treatments', labelAr: 'المعالجات',    href: '/risk?status=TREATMENT_IN_PROGRESS' } },
+            // ⚠ F2-164 — this href read `status=TREATMENT_IN_PROGRESS`, a status the DB forbids.
+            // The register passes it to `riskApi.list(status)`, so the tile always opened an
+            // EMPTY register — a dead link that looks like a working one.
+            secondary: { label: 'Treatments', labelAr: 'المعالجات',    href: '/risk?status=MITIGATING' } },
 
           // ── 3. KRI Threshold Breach Response ──
           { ...RISK_LIFECYCLES[2],

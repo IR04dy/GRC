@@ -924,7 +924,7 @@ write a canonical `risk_lc.treatment_plans` row (which `RiskService.close` **req
 over-appetite risk may close) and a formal CRO-approved acceptance — and unbound, both toast *“open from
 a risk to record it”*, which nothing let the user do.
 
-➕ **Making the governed path reachable is what exposed [[F2-164]] (P2 High, filed not fixed).** The
+➕ **Making the governed path reachable is what exposed [[F2-164]] (P2 High — ~~filed not fixed~~ CLOSED the same day, see below).** The
 *reachable* `Accept` button on the same page is `hasPermission('RISK','WRITE')` → a bare
 `doTransition(…,"ACCEPTED")`, and `ACCEPTED` is **exempt** from the close gate — so `RISK:WRITE` reaches
 an outcome the design reserves for `RISK:APPROVE`, with no justification, no expiry and no sign-off. ⚠
@@ -933,6 +933,74 @@ route creates none. Live: 8 open HIGH+ risks, `risk 21` HIGH with 0 plans. 🔑 
 compliant path does not read as a control failure — it reads as an absent feature**, which is why
 audits of this module measured guards, statuses and screens without asking whether the compliant route
 had a button.
+
+✔ **2026-08-08 — [[F2-164]] CLOSED: the bypass is gone, and closing it required BUILDING the path
+this plan told me to retire it in favour of.** `POST /risks/{id}/accept` and `RiskService.accept` are
+retired; `close`'s exemption now reads a **live formal acceptance** (`APPROVED` + inside its time-box)
+instead of the string `status == 'ACCEPTED'`; the flip has exactly one writer, reachable only from
+`RiskAcceptanceService.approve`. Backend **3,468/0/0** (+11), FE **405/405** in 43 files (+17), `tsc` +
+`vite build` clean, mutation **3/3** caught, census drift **0**. New finding [[F2-165]].
+
+🔴🔴 **The governed path could not be completed, and the finding had no way to know.**
+`riskAcceptanceApi` has five methods; exactly **one** had a caller anywhere in `src/` — `create`, from
+the wizard [[F2-163]] had just made reachable. **`approve`, `reject`, `revoke` and `listForRisk` had
+none.** So an acceptance could be raised and never approved — and *approval is what flips the risk to
+ACCEPTED*. **The reason the ungoverned one-click flip was load-bearing is that it was the only path that
+worked.** This plan's own recommendation — *"retire it in favour of the E-A flow whose approve step
+already flips the status"* — would, followed literally, have removed the platform's only way to accept a
+risk. 🔑 **Before retiring a path in favour of another, check the other one all the way to the end, not
+to its entry point.** Third time in this programme a recommendation assumed a reachable path.
+
+⚠ **And [[F2-68]](c) could not see it: its scan resolves at the granularity of the exported OBJECT.**
+`riskAcceptanceApi` had a caller, so it counted as reached, and **four dead methods hid inside a live
+export**. ⚙ **An instrument's granularity is its blind spot** — the identical shape as F2-163's
+`rowHref`, one layer down. Filed as [[F2-165]]; a per-method check for this client shipped now, and
+generalising it needs the population measured first, because an unadjudicated list becomes an allow-list.
+
+⚠⚠ **Retiring the endpoint alone would have SILENCED a detective control.** V132 seeds an F8 rule on
+`RISK_TRANSITIONED` `{"status":"ACCEPTED","previousStatus":"OPEN"}` — the SAMA §10.4 flag for *accepting
+without formal review*. The governed `approve()` set the status with a bare `setRiskStatus()`: **no
+event, no `TRANSITION` audit row.** So that rule's only possible trigger was the **bypass it exists to
+flag**, and a governed acceptance left nothing on the risk's own timeline. 🔑 **The alarm for the
+ungoverned action was wired exclusively to the ungoverned action** — deleting the door would have read as
+a pure security win while switching the alarm off. `approve()` now goes through `doTransition`.
+
+⚠ **The live probe caught a regression the fix introduced, and no unit test would have.** Routing the
+flip through `doTransition` imposed the state machine — and the retired `accept()` allowed only
+`{OPEN, UNDER_REVIEW}` while the old governed flip had **no state guard at all**. Approving an acceptance
+for a `MITIGATING` risk had worked; afterwards it answered **400 *"Risk must be in [OPEN,
+UNDER_REVIEW]"*** — for a request `request()` had just created, since it refuses only CLOSED. **A
+governed path you can enter and cannot finish: the exact defect class F2-164 is about, re-created by its
+own fix.** Now ONE constant (`RETAINABLE_STATUSES`) is read by the precondition and the writer, so there
+is nothing to drift.
+
+🔴 **Two adjacent defects had to be fixed for the slice to be worth anything.** `RiskDetailPage` keyed
+three lifecycle buttons and its badge table on `UNDER_ASSESSMENT` / `TREATMENT_IN_PROGRESS` — statuses
+`CK_risks_status` has **never** permitted — so **Approve never rendered at all and Close never rendered
+for a `MITIGATING` risk, the population the close gate governs**; the register page has always used the
+real vocabulary, so one risk offered different actions on two screens. Between both tone tables, five
+invented statuses and three real ones missing, so `UNDER_REVIEW` (30 of 71 rows in dev, the largest
+bucket) rendered grey on both. 🔑 **A lookup table with a `?? 'neutral'` fallback is where a vocabulary
+error goes to hide.** And the overview's "Treatments" tile linked to `?status=TREATMENT_IN_PROGRESS`,
+handed straight to `riskApi.list(status)` — **the tile always opened an empty register.** ⚠ It is no use
+tightening what a gate reads if the button that trips it cannot render.
+
+⚠⚠ **My own scan invented six defects — third regex mistake in one slice.** The vocabulary check first
+matched `\w*.status === 'X'` — *any* object — and reported eight offenders; six were other vocabularies
+on the same page (`tr.status` a treatment, `b.status` a KRI breach, `s.status` an appetite statement).
+Then the tone-table key scan anchored to line start and found **two of seven**. Then a whole-file
+`doesNotContain("UNDER_REVIEW")` flagged `revoke`/`expireSweep`, which name it legitimately as the reopen
+*target*. 🔑 **A screen carries several status vocabularies and they are indistinguishable by shape** —
+the mirror of `rowHref`: too narrow hid five real routes, too wide manufactured six. Both times the fix
+was to open every hit before believing the count.
+
+⚙ Measured before acting, and it corrected the finding twice: the second treatment store is
+**`risk.risk_treatments`**, not `risk.treatments` (the finding inferred the table from the URL path);
+and **(a)'s blast radius in dev is zero** — the three ACCEPTED risks are LOW/LOW/MEDIUM and within
+appetite, so the gate never applied to them, against the finding's *"will refuse closes that succeed
+today… needs the owner's word"*. Also measured: **all four APPROVED acceptance rows in the database
+belong to soft-deleted probe risks**, so no acceptance has ever been recorded through the UI — which is
+what an unreachable approval step looks like from the data side.
 
 ✔ **2026-08-08 — [[F2-16]] TRANCHE 3: `EsgPage.tsx` 3,201 → 564 and OUT of the size ratchet — the
 `EsgPage` half of this row is DONE.** The seven operational tabs are a file each: `EsgClimateTab` 359,

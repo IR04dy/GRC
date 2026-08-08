@@ -10,6 +10,7 @@ import com.tss.grc.module.risk.dto.RiskResponse;
 import com.tss.grc.module.risk.entity.Risk;
 import com.tss.grc.module.risk.entity.RiskCategory;
 import com.tss.grc.module.risk.entity.RiskAppetiteStatement;
+import com.tss.grc.module.risk.repository.RiskAcceptanceRepository;
 import com.tss.grc.module.risk.repository.RiskAppetiteStatementRepository;
 import com.tss.grc.module.risk.repository.RiskCategoryRepository;
 import com.tss.grc.module.risk.repository.RiskRepository;
@@ -48,6 +49,8 @@ public class RiskService {
     private final TreatmentPlanRepository treatmentPlanRepository;
     /** E-H — approved appetite ceilings, used to extend the close-gate to over-appetite risks. */
     private final RiskAppetiteStatementRepository appetiteRepository;
+    /** F2-164 — the close gate's ACCEPTED exemption reads the acceptance RECORD, not the status. */
+    private final RiskAcceptanceRepository acceptanceRepository;
 
     /** Re-reads DB-computed columns after save — null in unit tests, set at runtime. */
     @PersistenceContext
@@ -169,8 +172,58 @@ public class RiskService {
     @Transactional
     public RiskResponse approve(Long id) { return doTransition(id, "MITIGATING", new String[]{"UNDER_REVIEW"}); }
 
+    /**
+     * F2-164 — the ONLY writer of {@code ACCEPTED}, and it is reachable only from
+     * {@link RiskAcceptanceService#approve}, which has already checked that the
+     * acceptance carries a justification, compensating controls, a future expiry,
+     * CRO sign-off and (above appetite) Board sign-off.
+     *
+     * <p>⚠ <b>This replaces a public {@code accept(id)} behind
+     * {@code POST /risks/{id}/accept} at {@code RISK:WRITE}</b> — a bare status
+     * flip with none of the above. Two outcomes shared one status: the design
+     * reserves retaining a HIGH risk for {@code RISK:APPROVE} and the reachable
+     * route asked nobody, while {@link #close}'s exemption read that status as
+     * proof of *"the documented, approval-gated decision to retain the risk"*.
+     * The bypass was also <b>permanent</b>: {@code expireSweep} reopens risks by
+     * iterating acceptance <i>records</i>, and the bare flip created none.
+     *
+     * <p>🔑 It goes through {@link #doTransition} deliberately. The old governed
+     * path set the status with a bare {@code save()}, so it emitted no
+     * {@code RISK_TRANSITIONED} event and wrote no {@code TRANSITION} audit row —
+     * which meant <b>V132's SAMA §10.4 rule (<i>OPEN → ACCEPTED skipped formal
+     * review</i>) could only ever be triggered by the bypass.</b> The detective
+     * control that exists to flag an ungoverned acceptance was fed exclusively by
+     * the ungoverned acceptance; retiring the bypass without this would have
+     * silenced it. Now either door emits, and the risk's own activity timeline
+     * shows the status change.
+     */
     @Transactional
-    public RiskResponse accept(Long id) { return doTransition(id, "ACCEPTED", new String[]{"OPEN", "UNDER_REVIEW"}); }
+    public RiskResponse acceptOnApprovedAcceptance(Long id) {
+        return doTransition(id, "ACCEPTED", RETAINABLE_STATUSES.toArray(new String[0]));
+    }
+
+    /**
+     * Every live status. ⚠ <b>Not</b> {@code {"OPEN","UNDER_REVIEW"}}, which is what the
+     * retired {@code accept()} allowed and what the first draft of this method copied.
+     * The live probe caught it: the old governed path used a bare {@code save()} with no
+     * state guard, so approving an acceptance for a {@code MITIGATING} risk worked —
+     * imposing the state machine on it answered <i>400 "Risk must be in [OPEN,
+     * UNDER_REVIEW]"</i>, and {@link RiskAcceptanceService#request} happily accepts a
+     * request for any non-CLOSED risk. That combination is a governed path you can enter
+     * and cannot finish, which is the exact defect class F2-164 exists to remove.
+     *
+     * <p>🔑 So the rule is one predicate, not two that drift: <b>if an acceptance may be
+     * raised for a risk, it must be approvable.</b> Rather than restate it, {@link
+     * RiskAcceptanceService#request} reads <i>this</i> constant — there is one list, so
+     * there is nothing to drift. {@code RiskLifecycleWriterTest} fails if a second one
+     * appears.
+     *
+     * <p>Deciding to stop treating a risk and retain it instead is a real decision, so
+     * {@code MITIGATING → ACCEPTED} is a legitimate edge; it just has to be an
+     * approval-gated one.
+     */
+    public static final Set<String> RETAINABLE_STATUSES =
+        Set.of("OPEN", "UNDER_REVIEW", "MITIGATING", "TRANSFERRED");
 
     @Transactional
     public RiskResponse close(Long id) {
@@ -179,18 +232,36 @@ public class RiskService {
         // E-D + E-H — mandatory-treatment gate. A risk that is either HIGH/
         // VERY_HIGH/CRITICAL by level OR over its category's approved appetite
         // ceiling may only be CLOSED once it carries a live (non-rejected)
-        // treatment plan. An ACCEPTED risk is exempt: the formal acceptance
-        // (E-A) is itself the documented, approval-gated decision to retain the
-        // risk. Lower-rated, within-appetite risks close freely.
-        if (!"ACCEPTED".equals(r.getStatus()) && (isHighLevel(r.getRiskLevel()) || isOverAppetite(r))
+        // treatment plan, unless it carries a LIVE FORMAL ACCEPTANCE instead.
+        // Lower-rated, within-appetite risks close freely.
+        //
+        // F2-164 — the exemption used to read `status == 'ACCEPTED'`. The status
+        // is a projection of the acceptance record and could be set without one,
+        // so the exemption trusted a claim rather than the artefact behind it.
+        // It now reads the record: APPROVED and inside its time-box.
+        if (!hasLiveFormalAcceptance(r) && (isHighLevel(r.getRiskLevel()) || isOverAppetite(r))
                 && !treatmentPlanRepository.existsByOrganisationIdAndRiskIdAndStatusNot(
                         r.getOrganisationId(), id, "REJECTED")) {
             String why = isHighLevel(r.getRiskLevel()) ? r.getRiskLevel() + " risk" : "risk over its appetite ceiling";
+            // ⚠ The remedy has to name the store the gate READS. There are two
+            // treatment tables — `risk.risk_treatments` (the simple per-risk list
+            // on the risk's Treatments tab) and `risk_lc.treatment_plans` (the
+            // canonical approved plan, E-D) — and only the second one counts. The
+            // old wording said "draft a treatment plan", which a user who had
+            // just added three treatments read as a contradiction.
             throw new IllegalStateException(
                 "A treatment plan is required before closing a " + why
-                + " — draft a treatment plan, or formally accept the risk first.");
+                + " — draft an approved treatment PLAN (Draft treatment plan; the simple entries on the "
+                + "Treatments tab are not the same record), or record a formal, time-boxed acceptance "
+                + "and have it approved.");
         }
         return doTransition(id, "CLOSED", new String[]{"MITIGATING", "ACCEPTED"});
+    }
+
+    /** F2-164 — an APPROVED acceptance record still inside its time-box. */
+    private boolean hasLiveFormalAcceptance(Risk r) {
+        return acceptanceRepository.existsByOrganisationIdAndRiskIdAndStatusAndExpiresAtGreaterThanEqual(
+            r.getOrganisationId(), r.getId(), "APPROVED", LocalDate.now());
     }
 
     private static boolean isHighLevel(String level) {

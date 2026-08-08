@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { AlertTriangle, Activity, ListChecks, MessageSquare, Edit, Send, CheckCheck, ShieldOff, Archive, RotateCcw, Calculator, GitBranch, ClipboardCheck } from 'lucide-react';
+import { AlertTriangle, Activity, ListChecks, MessageSquare, Edit, Send, CheckCheck, Archive, RotateCcw, Calculator, GitBranch, ClipboardCheck } from 'lucide-react';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
@@ -40,6 +40,7 @@ import { ermGap } from '../../lib/buyerGap';
 import { RiskLinksPanel } from '../../components/risk/RiskLinksPanel';
 import { ImpactDimensionsPanel } from '../../components/risk/ImpactDimensionsPanel';
 import { RiskReviewPanel } from '../../components/risk/RiskReviewPanel';
+import { RiskAcceptancesPanel } from '../../components/risk/RiskAcceptancesPanel';
 import { EmptyState } from '../../components/ui/EmptyState';
 import '../../styles/pages/risk-detail.css';
 
@@ -55,9 +56,13 @@ function scoreToneClass(score: number): string {
   return 'risk-tone-low';
 }
 
+/** ⚠ Keys are the statuses `CK_risks_status` permits — see F2-164. `UNDER_ASSESSMENT`
+ *  and `TREATMENT_IN_PROGRESS` sat here and in three render conditions, and the server
+ *  emits neither, so every UNDER_REVIEW / MITIGATING risk rendered a `neutral` badge
+ *  while the register page rendered the right one. */
 const STATUS_TONE: Record<string, BadgeTone> = {
-  OPEN: 'danger', UNDER_ASSESSMENT: 'warning', TREATMENT_IN_PROGRESS: 'info',
-  ACCEPTED: 'accent', TRANSFERRED: 'primary', CLOSED: 'success',
+  OPEN: 'danger', UNDER_REVIEW: 'warning', MITIGATING: 'info',
+  ACCEPTED: 'accent', TRANSFERRED: 'primary', CLOSED: 'success', ARCHIVED: 'neutral',
 };
 const RISK_LEVEL_TONE: Record<string, BadgeTone> = {
   LOW: 'success', MEDIUM: 'info', HIGH: 'warning', VERY_HIGH: 'accent', CRITICAL: 'danger',
@@ -351,18 +356,27 @@ export function RiskDetailPage() {
         </>}
         actions={<>
           <RaiseRequestButton sourceModule="RISK" sourceRecordType="Risk" sourceRecordId={Number(id)} />
-          {risk.status === 'OPEN'             && <Button variant="primary" Icon={Send}      onClick={() => workflow(riskApi.submitForReview, 'Submitted for review')}>{t('riskActSubmitReview')}</Button>}
-          {risk.status === 'UNDER_ASSESSMENT' && <Button variant="primary" Icon={CheckCheck} onClick={() => workflow(riskApi.approveRisk, 'Approved for treatment')}>{t('riskActApprove')}</Button>}
-          {(risk.status === 'OPEN' || risk.status === 'UNDER_ASSESSMENT') &&
-            <Button variant="secondary" Icon={ShieldOff} onClick={() => workflow(riskApi.acceptRisk, 'Risk accepted')}>{t('riskActAccept')}</Button>}
+          {/* ⚠ F2-164 — these three conditions read `UNDER_REVIEW` / `MITIGATING` because
+              those are the statuses the server actually emits. They previously read
+              `UNDER_ASSESSMENT` and `TREATMENT_IN_PROGRESS`, which `CK_risks_status` does not
+              permit (OPEN | UNDER_REVIEW | MITIGATING | ACCEPTED | TRANSFERRED | CLOSED |
+              ARCHIVED), so **Approve never rendered at all and Close never rendered for the
+              MITIGATING risks the close gate governs** — the register page has always used the
+              real vocabulary, so the same risk offered different actions on two screens.
+              That mattered here: it is no use fixing what the gate reads if the button that
+              trips it is unreachable. Pinned by `riskLifecycleVocabulary.test.ts`. */}
+          {risk.status === 'OPEN'         && <Button variant="primary" Icon={Send}      onClick={() => workflow(riskApi.submitForReview, 'Submitted for review')}>{t('riskActSubmitReview')}</Button>}
+          {risk.status === 'UNDER_REVIEW' && <Button variant="primary" Icon={CheckCheck} onClick={() => workflow(riskApi.approveRisk, 'Approved for treatment')}>{t('riskActApprove')}</Button>}
           {/* F2-163 — the two GOVERNED paths, which had no inbound link anywhere in the UI.
               Both wizards behave differently once a risk is bound: with `:riskId` the treatment
               wizard writes the canonical `risk_lc.treatment_plans` row that `RiskService.close`
               reads (ERM epic E-D), and the acceptance wizard writes a time-boxed, CRO-approved
               formal acceptance (E-A). Without it each saves a generic inbox draft whose own
               toast reads "open from a risk to record it" — which nothing let the user do.
-              ⚠ The plain "Accept" button above is a bare status transition and it EXEMPTS the
-              risk from the close gate; that asymmetry is filed as F2-164, not fixed here. */}
+              ⚠ F2-164: a plain "Accept" button used to sit above these, flipping the status
+              at RISK:WRITE and thereby EXEMPTING the risk from the close gate the left-hand
+              wizard exists to satisfy. It is gone, along with its endpoint. `ShieldOff` went
+              with it. */}
           {risk.status !== 'CLOSED' && <>
             <Link to={`/workflows/erm/risk-treatment/${id}`} className="link">
               <Button variant="secondary" Icon={GitBranch}
@@ -381,7 +395,7 @@ export function RiskDetailPage() {
               </Button>
             </Link>
           </>}
-          {(risk.status === 'TREATMENT_IN_PROGRESS' || risk.status === 'ACCEPTED' || risk.status === 'TRANSFERRED') &&
+          {(risk.status === 'MITIGATING' || risk.status === 'ACCEPTED' || risk.status === 'TRANSFERRED') &&
             <Button variant="secondary" Icon={Archive} onClick={() => workflow(riskApi.closeRisk, 'Risk closed')}>{t('riskActClose')}</Button>}
           {risk.status === 'CLOSED' && <Button variant="secondary" Icon={RotateCcw} onClick={() => workflow(riskApi.reopenRisk, 'Risk reopened')}>{t('riskActReopen')}</Button>}
           {risk.status !== 'CLOSED' &&
@@ -479,6 +493,12 @@ export function RiskDetailPage() {
               <ImpactDimensionsPanel riskId={risk.id} onSaved={() => void load()} />
               {/* E-J — scheduled review / reassessment (re-score + reset clock + audit trail). */}
               <RiskReviewPanel riskId={risk.id} reviewDate={risk.reviewDate} onSaved={() => void load()} />
+              {/* E-A — the formal acceptance record. F2-164: `approve`, `reject`, `revoke` and
+                  even `listForRisk` had no caller anywhere in the UI, so an acceptance could be
+                  raised and then never approved — and it is the approval that flips the risk to
+                  ACCEPTED. The governed path could not complete, which is why the ungoverned
+                  one-click flip was the only thing that worked. */}
+              <RiskAcceptancesPanel riskId={risk.id} onChanged={() => void load()} />
             </>
           )}
 

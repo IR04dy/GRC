@@ -647,11 +647,11 @@ central tokens (§5.3), so the fix is likely a small number of token changes rat
 
 | Metric | Value | Note |
 |---|---:|---|
-| Backend tests then | 1,858 | **now 3,457** (`mvn -o clean package`, 2026-08-08, 0 failures) — ⚠ this cell read **3,346** for a week; no test can gate a suite's own total, so treat it as dated rather than maintained ([[F2-162]]) |
+| Backend tests then | 1,858 | **now 3,468** (`mvn -o clean package`, 2026-08-08, 0 failures) — ⚠ this cell read **3,346** for a week; no test can gate a suite's own total, so treat it as dated rather than maintained ([[F2-162]]) |
 | **Instruction coverage** | **37.1%** | JaCoCo, 1,324 classes — **not re-measured since; the suite has since grown 51%** |
 | **Branch coverage** | **26.0%** | |
 | **Line coverage** | **38.5%** | |
-| Frontend tests then | **0** (`runner: none`) | **now 188** via vitest (`npx vitest run`) — 49 at the 07-25 baseline |
+| Frontend tests then | **0** (`runner: none`) | **now 405** via vitest (`npx vitest run`, 43 files, 2026-08-08) — 49 at the 07-25 baseline |
 | Code duplication | **5.41%** — 1,666 clones, 21,062 lines | jscpd over 389,021 lines |
 | **ESLint configured** | **`false`** | ⚠ a precondition for F2-11's lint ratchets — they cannot be added until ESLint exists |
 | trivy dependency vulns | 36 | not triaged by severity in `metrics.json` |

@@ -1347,7 +1347,12 @@ export const riskApi = {
   // Risk lifecycle workflow (ISO 31000 / COSO ERM)
   submitForReview: (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/submit-for-review`),
   approveRisk:     (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/approve`),
-  acceptRisk:      (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/accept`),
+  // F2-164 — `acceptRisk` (POST /risks/{id}/accept) is GONE, with its endpoint. It
+  // was a bare RISK:WRITE flip to ACCEPTED, and `RiskService.close` treated that
+  // status as an exemption from the mandatory-treatment gate — so one click retired
+  // a CRITICAL risk, permanently (the expiry sweep iterates acceptance RECORDS and
+  // this route created none). Use `riskAcceptanceApi` below: create → approve, the
+  // second at RISK:APPROVE. `RiskAcceptancesPanel` is the screen for it.
   closeRisk:       (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/close`),
   reopenRisk:      (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/reopen`),
   archiveRisk:     (id: number) => api.post<RiskResponse>(`/api/v1/risk/risks/${id}/archive`),

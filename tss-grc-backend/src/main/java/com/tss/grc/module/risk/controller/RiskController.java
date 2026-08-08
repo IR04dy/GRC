@@ -75,11 +75,20 @@ public class RiskController {
         return riskService.approve(id);
     }
 
-    @PostMapping("/{id}/accept")
-    @PreAuthorize("hasPermission('RISK', 'WRITE')")
-    public RiskResponse accept(@PathVariable Long id) {
-        return riskService.accept(id);
-    }
+    // F2-164 — `POST /{id}/accept` is GONE, deliberately. It was a bare
+    // `RISK:WRITE` status flip to ACCEPTED with no justification, no compensating
+    // controls, no expiry and no sign-off, and `RiskService.close` treated that
+    // status as an exemption from the mandatory-treatment gate — so any holder of
+    // RISK:WRITE could retire a CRITICAL risk in one click, permanently (the
+    // expiry sweep iterates acceptance RECORDS, and this route created none).
+    // `RiskAcceptance`'s own javadoc had said E-A "replaces the bare
+    // RiskService.accept() status flip" since the day it was written; the flip
+    // was never removed, so both lived and only one of them asked an approver.
+    // The governed route is:
+    //   POST /risks/{riskId}/acceptances     RISK:WRITE   — request (SUBMITTED)
+    //   POST /acceptances/{id}/approve       RISK:APPROVE — → risk ACCEPTED
+    // ⚠ Do not reinstate a convenience transition here. `RiskLifecycleWriterTest`
+    // fails the build if any controller regains a direct route to ACCEPTED.
 
     @PostMapping("/{id}/close")
     @PreAuthorize("hasPermission('RISK', 'WRITE')")
