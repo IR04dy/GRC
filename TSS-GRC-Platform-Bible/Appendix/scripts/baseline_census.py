@@ -91,7 +91,9 @@ PUBLISHED = {
     "migration_files": 361,
     "migration_head": 373,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
-    "fe_pages": 341,          # F2-142 retired 3; F2-16 tranche 1 added EsgOverviewTab
+    "fe_pages": 345,          # F2-142 retired 3; F2-16 tranche 1 +1, tranche 2 +4 (the four
+                             # regulatory tabs). A BUMP, not a narrowing — see MEASURED_BASELINE:
+                             # tab modules are what this metric has always counted.
     "fe_page_folders": 111,   # each was the only file in its folder, so -3 folders too
     "fe_routes": 329,
     "fe_nav_entries": 194,

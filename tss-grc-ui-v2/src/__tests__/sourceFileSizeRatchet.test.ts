@@ -17,7 +17,10 @@ import { join } from 'node:path';
  * all</b>. `EsgPage` still goes first, because it is the larger file and `ndi` needs F2-12's
  * characterisation tests over its 82 writes first; but <b>a test count for a backend module is not
  * coverage of the page that calls it</b>. Tranche 1 (2026-08-08) took it 5,583 → 4,994 and gave it
- * its first 9 tests, in `pages/esg/EsgOverviewTab.test.tsx`.
+ * its first 9 tests, in `pages/esg/EsgOverviewTab.test.tsx`; tranche 2 took it <b>4,994 → 3,201</b>
+ * by moving the four regulatory tabs (CMA / TCFD / materiality / metrics) into a file each, with 18
+ * more tests in `pages/esg/EsgRegulatoryTabs.test.tsx`. The page is now 43% of its original size and
+ * still the fourth-largest file in the frontend, so it stays pinned below.
  *
  * <b>Why a pinned SET and not a count.</b> A count ceiling lets a new 900-line page appear as long as
  * something else shrinks — which is precisely the trade the row is trying to prevent. Pinning the
@@ -160,8 +163,18 @@ describe('F2-16 — source files over 800 lines may only shrink in number, and n
       + 'walk reports zero oversized files.').toBeGreaterThan(500);
 
     expect(all).toContain('pages/esg/EsgPage.tsx');
+
+    // ⚠ This asserted `> 4000` and fired on tranche 2, exactly as its own message asked it to: the
+    // split happened, so the shape is updated deliberately rather than left stale. The bound tracks
+    // the work — it is `> 800` once F2-16 is finished, at which point EsgPage leaves OVERSIZE and the
+    // stale-entry check above becomes the guard. Keeping a bound at all is what makes the ratchet
+    // notice a REGRESSION: a tranche that grew the page instead of shrinking it would pass a
+    // one-sided "still oversized" assertion.
     expect(measure().get('pages/esg/EsgPage.tsx'),
-      'EsgPage.tsx is F2-16\'s headline file; if it is no longer oversized the split happened and this '
-      + 'test should be updated deliberately, not left asserting a stale shape.').toBeGreaterThan(4000);
+      'EsgPage.tsx is F2-16\'s headline file. Tranche 1 took it 5,583 → 4,994 and tranche 2 → 3,201; '
+      + 'if it has grown past 3,300 a tranche went backwards, and if it is under 800 the split is '
+      + 'finished and this test plus OVERSIZE should be updated deliberately.')
+      .toBeGreaterThan(800);
+    expect(measure().get('pages/esg/EsgPage.tsx')).toBeLessThan(3300);
   });
 });
