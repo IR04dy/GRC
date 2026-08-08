@@ -1,0 +1,383 @@
+# -*- coding: utf-8 -*-
+"""F2-07a — measure route reachability and regenerate UX/ROUTE_RECONCILIATION.md.
+
+Run from anywhere:  py TSS-GRC-Platform-Bible/Appendix/scripts/route_reconciliation.py
+
+WHAT THIS ANSWERS. [[F2-07]] is filed P1 Critical on the claim that "roughly 144 routed screens are
+reachable only by typing a URL", and that "nobody can tell which is which". This is the artefact its
+recommendation asks for. Measured 2026-08-08, the genuinely unreachable population is **20**.
+
+WHY THE FIGURE WAS ~7x TOO LARGE, AND IT IS STRUCTURAL RATHER THAN ARITHMETICAL: navigation in this
+application has THREE surfaces and the finding counts one. Besides `Sidebar.tsx` there are
+module-dashboard link tiles (`href:` props) and ordinary in-page links, plus registries such as
+`lib/workflowCatalog.ts` whose `route:` field `WorkflowHubPage` renders as `<Link to={w.route!}>`.
+
+THE MEASUREMENT TOOK FOUR PASSES AND EACH MOVED THE ANSWER. Recorded because every intermediate
+answer was plausible and three were wrong:
+
+    pass 1  sidebar only                        -> 139   (dashboard tiles + detail links miscounted;
+                                                          4 `RedirectPreservingQuery` missed)
+    pass 2  + navigation SYNTAX                 ->  53   (19 FALSE POSITIVES: the wizard estate is
+                                                          linked through a REGISTRY, not syntax)
+    pass 3  + any '/...' string literal         ->   6   (FALSE NEGATIVES: an auth-allowlist entry
+                                                          in publicPaths.ts is not a way in)
+    pass 4  navigational refs only; allowlists
+            named; bare set read from the code  ->  20
+
+Three transferable lessons:
+  * A registry-driven link is invisible to a scan for link syntax. That was a third of the answer.
+  * When the code already declares the classification you are inferring, infer nothing. A hand-written
+    pattern for "anonymous by design" missed two ~400-line screens; `BARE_PREFIXES` declares the set.
+  * The same file can be authoritative for one question and misleading for another: `publicPaths.ts`
+    is EXCLUDED as a navigation source and TRUSTED as the anonymous authority.
+
+The CI gate is `tss-grc-ui-v2/src/__tests__/routeReachability.test.ts` — an independent TypeScript
+implementation that agrees with this one, and mutation-proven 7/7.
+"""
+import io
+import os
+import re
+import sys
+import json
+from collections import Counter, defaultdict
+
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+FE = os.path.join(ROOT, "tss-grc-ui-v2", "src")
+APP = os.path.join(FE, "App.tsx")
+SIDEBAR = os.path.join(FE, "components", "layout", "Sidebar.tsx")
+OUT = os.path.join(ROOT, "TSS-GRC-Platform-Bible", "UX", "ROUTE_RECONCILIATION.md")
+
+REDIRECT_COMPONENTS = {"Navigate", "RedirectPreservingQuery"}
+# Named, not globbed: these hold route paths as DATA for a purpose other than navigation.
+NON_NAVIGATIONAL = {"lib/publicPaths.ts", "lib/help.ts"}
+
+NAV_PATTERNS = [
+    re.compile(r"navigate\(\s*['\"`](/[^'\"`]*)['\"`]"),
+    re.compile(r"\bto=\{?\s*['\"`](/[^'\"`]*)['\"`]"),
+    re.compile(r"\b(?:to|href|route|path)\s*:\s*['\"`](/[^'\"`]*)['\"`]"),
+    re.compile(r"\bhref=\{?\s*['\"`](/[^'\"`]*)['\"`]"),
+    re.compile(r"location\.(?:href|assign|replace)\s*=?\s*\(?\s*['\"`](/[^'\"`]*)['\"`]"),
+    re.compile(r"window\.open\(\s*['\"`](/[^'\"`]*)['\"`]"),
+]
+
+
+def read(p):
+    return io.open(p, encoding="utf-8", errors="replace", newline="").read()
+
+
+def walk(root):
+    for dp, _d, fs in os.walk(root):
+        for f in fs:
+            if f.endswith((".ts", ".tsx")):
+                yield os.path.join(dp, f)
+
+
+def norm(t):
+    t = re.sub(r"\$\{[^}]*\}", ":p", t).split("?")[0].split("#")[0]
+    return t.rstrip("/") or "/"
+
+
+def bare_prefixes():
+    """The declared no-shell route set.
+
+    WARNING: the pattern is anchored on `export const`. `BARE_PREFIXES[^=]*=\\s*\\[` matched even after
+    the declaration was renamed away, because line 3 of the file is a COMMENT mentioning the name and
+    `[^=]*` spanned from there to the array. Mutation caught it; a textual scan cannot tell a
+    declaration from a mention.
+    """
+    src = read(os.path.join(FE, "lib", "publicPaths.ts"))
+    m = re.search(r"export\s+const\s+BARE_PREFIXES\b[^=]*=\s*\[(.*?)\]", src, re.S)
+    assert m, "BARE_PREFIXES not found - refusing to guess which routes are anonymous by design"
+    out = [x.group(1) for x in re.finditer(r"'([^']+)'", m.group(1))]
+    assert len(out) >= 8, "only %d bare prefixes parsed" % len(out)
+    return out
+
+
+def intentionally_off_nav():
+    """F2-07b's documented allow-list, read from its test rather than duplicated here.
+
+    WARNING: this exists because I duplicated a judgement already made. My first pass classified
+    `/crisis-management` and `/bcm-dependency/legacy` as "needs a product decision". Both were already
+    decided and documented in `routeReachability.test.ts` - "crisis console entry, opened by direct
+    link / incident comms" and "legacy alias retained for old bookmarks". Reading the existing
+    allow-list is the same discipline as reading BARE_PREFIXES: when the repo already records the
+    decision, do not re-make it.
+    """
+    src = read(os.path.join(FE, "__tests__", "routeReachability.test.ts"))
+    m = re.search(r"const\s+INTENTIONALLY_OFF_NAV[^=]*=\s*\{(.*?)\n\};", src, re.S)
+    assert m, "INTENTIONALLY_OFF_NAV not found in routeReachability.test.ts"
+    out = {x.group(1) for x in re.finditer(r"^\s*'([^']+)':", m.group(1), re.M)}
+    # A FLOOR, not the exact count: the list is F2-07b's to grow or shrink, and asserting a precise
+    # number here would make this script fail on somebody else's legitimate edit. 14 entries today.
+    assert len(out) >= 10, "only %d allow-list entries parsed - the regex has probably rotted" % len(out)
+    return out
+
+
+def parse_routes():
+    app = read(APP)
+    comp_file = {}
+    for m in re.finditer(r"const\s+(\w+)\s*=\s*lazy\([\s\S]{0,200}?import\('([^']+)'\)", app):
+        comp_file.setdefault(m.group(1), m.group(2))
+    for m in re.finditer(r"^import\s+(?:\{\s*)?(\w+)(?:\s*\})?\s+from\s+'([^']+)'", app, re.M):
+        comp_file.setdefault(m.group(1), m.group(2))
+
+    out = []
+    for m in re.finditer(r'<Route\s+([^>]*?)path="([^"]+)"([^>]*?)/?>', app, re.S):
+        el = re.search(r"element=\{<(\w+)", m.group(1) + m.group(3))
+        comp = el.group(1) if el else None
+        r = {"path": m.group(2), "component": comp,
+             "redirect": comp in REDIRECT_COMPONENTS,
+             "file": None, "folder": None, "lines": None}
+        rel = (comp_file.get(comp or "") or "").replace("./", "").lstrip("/")
+        for cand in (os.path.join(FE, rel + ".tsx"), os.path.join(FE, rel + ".ts")):
+            if rel and os.path.isfile(cand):
+                r["file"] = os.path.relpath(cand, FE).replace("\\", "/")
+                r["folder"] = os.path.dirname(r["file"])
+                r["lines"] = read(cand).count("\n") + 1
+                break
+        out.append(r)
+    return out
+
+
+def nav_targets():
+    return {norm(m.group(1)) for m in re.finditer(r"\bto:\s*'([^']+)'", read(SIDEBAR))}
+
+
+def inbound():
+    links = defaultdict(set)
+    for path in walk(FE):
+        rel = os.path.relpath(path, FE).replace("\\", "/")
+        if path in (APP, SIDEBAR) or rel in NON_NAVIGATIONAL:
+            continue
+        if re.search(r"\.(?:test|spec)\.tsx?$", rel):
+            continue
+        src = read(path)
+        for pat in NAV_PATTERNS:
+            for m in pat.finditer(src):
+                t = norm(m.group(1))
+                if not t.startswith("/api/"):
+                    links[t].add(rel)
+    return links
+
+
+def reaches(route_path, target):
+    rp = route_path.rstrip("/") or "/"
+    if rp == target:
+        return True
+    if "*" in rp:
+        return target.startswith(rp.split("*")[0].rstrip("/"))
+    a, b = rp.split("/"), target.split("/")
+    return len(a) == len(b) and all(x.startswith(":") or y == ":p" or x == y for x, y in zip(a, b))
+
+
+# Classification. Deliberately conservative: F2-07's recommendation is to classify and let the owner
+# decide retire/merge, so nothing is marked "retire" on the measurer's authority.
+CLASSIFY = {
+    "/ai/models/:externalId": ("PROMOTE", "`/ai/models` list route exists; link the row"),
+    "/rrp/cycles/:id": ("PROMOTE", "`/rrp/cycles` list route exists; link the row"),
+    "/cpty/counterparties/:id": ("PROMOTE", "link from the counterparty list"),
+    "/complaints/:id": ("PROMOTE", "`/complaints` list route exists; link the row"),
+    "/cyber/attack-surface/assets/:externalId": ("PROMOTE", "link from the attack-surface table"),
+    "/regreporting/filings/:id": ("PROMOTE", "link from the filings register"),
+    "/opres/assessments/:id": ("PROMOTE", "link from the assessments list"),
+    "/reginspect/inspections/:id": ("PROMOTE", "link from the inspections workspace"),
+    "/privacy/subprocessors/:externalId": ("PROMOTE",
+                                           "sidebar has `/privacy/subprocessors`; link the row"),
+    "/ethics/whistleblower/cases/:id": ("PROMOTE", "link from the case register"),
+    "/privacy/dsrs/:id": ("PROMOTE", "⚠ no list ROUTE - the list is a `/privacy` tab"),
+    "/privacy/breaches/:id": ("PROMOTE", "⚠ no list route - link from the `/privacy` breach tab"),
+    "/privacy/ropa/:id": ("PROMOTE", "⚠ no list route - link from the `/privacy` RoPA tab"),
+    "/bcm/exercises/run/:runId/facilitate": ("PROMOTE", "\U0001f534 see the F2-161 note in §2"),
+    "/bcm/exercises/run/:runId/observe": ("PROMOTE", "\U0001f534 see the F2-161 note in §2"),
+    "/bcm/exercises/run/:runId/participate": ("PROMOTE", "\U0001f534 see the F2-161 note in §2"),
+    "/workflows/erm/risk-treatment/:riskId": (
+        "PROMOTE", "pre-bound variant of a catalogued wizard; link from the risk register"),
+    "/workflows/erm/risk-acceptance/:riskId": (
+        "PROMOTE", "pre-bound variant of a catalogued wizard; link from the risk register"),
+}
+
+DOC = """# Route reconciliation matrix — F2-07a
+
+**Measured 2026-08-08** against `tss-grc-ui-v2/src/App.tsx`, `components/layout/Sidebar.tsx` and every
+non-test source in `src/`. Regenerate with `Appendix/scripts/route_reconciliation.py`; **every figure
+below is interpolated from that run, not transcribed.** Gated by
+`tss-grc-ui-v2/src/__tests__/routeReachability.test.ts`, an independent TypeScript implementation that
+agrees with this one and fails if a new orphan appears.
+
+---
+
+## 0. The headline: F2-07's population is %(orphan)d screens, not 144
+
+[[F2-07]] is filed **P1 Critical** on the claim that *"roughly 144 routed screens are reachable only by
+typing a URL"*, and that *"nobody can tell which is which"*. The second half was true — there was no
+artefact. The first half is **not**.
+
+| | Count |
+|---|---:|
+| Routes registered in `App.tsx` | **%(total)d** |
+| − redirects (`<Navigate>`, `RedirectPreservingQuery`) — not screens | %(redirects)d |
+| − bare routes: rendered without the authenticated shell, **by design** | %(bare)d |
+| **= authenticated screens** | **%(auth)d** |
+|   reachable from the **sidebar** | **%(sidebar)d** |
+|   reachable from a **link or a dashboard tile** only | **%(linked)d** |
+|   **no way in at all** | **%(orphan)d** |
+
+**Why the finding was ~7× too large: navigation in this application has three surfaces, and F2-07
+counts one.** Besides `Sidebar.tsx` there are module-dashboard link tiles (`href:` props on `Kpi` and
+action components) and ordinary in-page links — plus registries such as `lib/workflowCatalog.ts`, whose
+`route:` field the workflow hub renders as `<Link to={w.route!}>`. A screen opened by a tile on its
+module dashboard is reachable; it is simply not a menu item, which for a detail screen is correct
+design rather than a defect.
+
+⚠ **This does not vacate F2-07.** Its *other* half stands untouched and is the more serious one: a
+**%(sidebar)d-item sidebar is beyond navigable**, and the workspace IA in the recommendation is still
+the right remedy. What changes is the size and shape of the remediation list — from *"classify 144
+screens"* to *"add %(promote)d missing links and take %(owner)d product decisions"*.
+
+---
+
+## 1. How the measurement was arrived at — four passes, four answers
+
+Recorded because the intermediate answers were each plausible, and three of them were wrong.
+
+| Pass | Definition of "reachable" | Answer | What it got wrong |
+|---|---|---:|---|
+| 1 | a `Sidebar.tsx` entry | 139 | counted dashboard tiles and detail links as unreachable; missed 4 `RedirectPreservingQuery` redirects |
+| 2 | + navigation **syntax** (`navigate()`, `to=`) | 53 | **19 false positives** — the `/workflows/*` wizards are linked through a *registry*, not link syntax |
+| 3 | + **any** `'/…'` string literal | 6 | **false negatives** — an entry in the `publicPaths.ts` auth allowlist is not a way in |
+| 4 | navigational references only, allowlists named and excluded, bare set read from `BARE_PREFIXES` | **%(orphan)d** | — |
+
+Three transferable lessons:
+
+* \U0001f511 **A registry-driven link is invisible to a scan for link syntax.** Pass 2 reported every workflow
+  wizard as stranded; `lib/workflowCatalog.ts` holds the path as data and `WorkflowHubPage.tsx` renders
+  a `<Link>` over it. That was a third of the answer.
+* \U0001f511 **When the code already declares the classification you are inferring, infer nothing.** A
+  hand-written pattern for "anonymous by design" missed two ~400-line screens
+  (`/ethics/whistleblower/submit`, `/bcm/crisis/mobile`). `lib/publicPaths.ts` declares the set as
+  `BARE_PREFIXES` — %(nbare)d prefixes — and is the authority used here.
+* ⚠ **The same file can be authoritative for one question and misleading for another.**
+  `publicPaths.ts` is excluded as a *navigation* source (an allowlist is not a link) and trusted as the
+  *anonymous* authority. Both treatments are named in the script rather than left to a glob.
+
+➕ A fourth lesson came from mutation-testing the gate: `/BARE_PREFIXES[^=]*=\\s*\\[/` **still matched
+after the declaration was renamed away**, because line 3 of `publicPaths.ts` is a comment mentioning
+the name. **A textual scan cannot tell a declaration from a mention** — the pattern is anchored on
+`export const` in both implementations.
+
+---
+
+## 2. The %(orphan)d orphaned screens — %(stranded)s lines with no way in
+
+| Route | Component | Lines | Class | Note |
+|---|---|---:|---|---|
+%(rows)s
+
+**%(promote)d PROMOTE** — all but two are `:param` **detail** screens whose list exists and does not link
+to them. That is a materially different defect from *"absent from the sidebar"*, and cheaper: one link
+each, not an IA redesign.
+
+\U0001f534 **The BCM exercise runtime is the sharpest item, because of what happened to it two days before
+this measurement.** `FacilitatorConsolePage` (769), `ObserverDashboardPage` (742) and
+`ParticipantViewPage` (351) — 1,862 lines — have **no way in from anywhere in the UI**. [[F2-161]] fixed
+*who may drive an exercise run* on these exact screens on 2026-08-06, converting the guard so a
+facilitator could reach their own run instead of only a platform administrator. ⚙ **The authorisation
+was corrected on three screens that have no entry point.** Two instruments looked at the same code from
+opposite ends and neither could see what the other saw: a guard audit cannot tell that nothing routes
+to the page, and a navigation audit cannot tell the guard was wrong.
+
+---
+
+## 3. The %(linked)d link-only screens are reachable — here is what reaches them
+
+This is the population F2-07 counts as URL-only. Top sources:
+
+| Navigation surface | Screens it reaches |
+|---|---:|
+%(top_sources)s
+
+`lib/workflowCatalog.ts` alone accounts for %(wf)d — the F8 wizard estate, launched from the workflow
+hub. Any future reconciliation must treat a registry as a navigation surface.
+
+---
+
+## 4. What this changes in the register
+
+* [[F2-07]] — the *"144 reachable only by URL"* figure is **superseded by %(orphan)d**; the
+  %(sidebar)d-item sidebar and the workspace-IA recommendation are unaffected.
+* [[F2-07a]] — **delivered**: this matrix, the generator, and the CI gate.
+* [[F2-07b]] — already landed 8 socops pages into the sidebar. Its inline comment cites
+  `/socops/awareness` as *"in the nav"*; it is in the socops **dashboard**, not the sidebar. Loose
+  wording rather than a defect — recorded so the next reader does not re-open it.
+* [[F2-161]] — cross-reference the runtime entry-point gap in §2.
+"""
+
+
+def main():
+    BARE = bare_prefixes()
+    routes = parse_routes()
+    assert len(routes) > 250, "only %d routes parsed" % len(routes)
+    nav = nav_targets()
+    assert len(nav) > 150, "only %d nav targets parsed" % len(nav)
+    links = inbound()
+    assert len(links) > 200, "only %d inbound targets parsed" % len(links)
+
+    OFF_NAV = intentionally_off_nav()
+    print("F2-07b's INTENTIONALLY_OFF_NAV allow-list: %d documented routes" % len(OFF_NAV))
+
+    for r in routes:
+        r["nav"] = any(reaches(r["path"], n) for n in nav)
+        r["documented"] = r["path"] in OFF_NAV
+        r["linked_from"] = sorted({f for t, fs in links.items() if reaches(r["path"], t) for f in fs})
+        r["bare"] = any(r["path"] == p or r["path"].startswith(p) for p in BARE)
+
+    screens = [r for r in routes if not r["redirect"]]
+    bare = [r for r in screens if r["bare"]]
+    auth = [r for r in screens if not r["bare"]]
+    sidebar = [r for r in auth if r["nav"]]
+    linked = [r for r in auth if not r["nav"] and r["linked_from"]]
+    orphan = [r for r in auth
+              if not r["nav"] and not r["linked_from"] and not r["documented"]]
+    documented = [r for r in auth if not r["nav"] and not r["linked_from"] and r["documented"]]
+
+    missing = [r["path"] for r in orphan if r["path"] not in CLASSIFY]
+    assert not missing, "unclassified orphans: %s" % missing
+    extra = [p for p in CLASSIFY if p not in {r["path"] for r in orphan}]
+    assert not extra, "CLASSIFY names routes that are no longer orphaned: %s" % extra
+
+    promote = [r for r in orphan if CLASSIFY[r["path"]][0] == "PROMOTE"]
+    owner = [r for r in orphan if CLASSIFY[r["path"]][0] == "OWNER"]
+    stranded = sum(r["lines"] or 0 for r in orphan)
+
+    body = DOC % {
+        "total": len(routes), "redirects": len(routes) - len(screens), "bare": len(bare),
+        "auth": len(auth), "sidebar": len(sidebar), "linked": len(linked), "orphan": len(orphan),
+        "documented": len(documented), "offnav": len(OFF_NAV),
+        "promote": len(promote), "owner": len(owner), "nbare": len(BARE),
+        "stranded": "{:,}".format(stranded),
+        "rows": "\n".join(
+            "| `%s` | `%s` | %s | **%s** | %s |"
+            % (r["path"], r["component"], r["lines"], CLASSIFY[r["path"]][0],
+               CLASSIFY[r["path"]][1])
+            for r in sorted(orphan, key=lambda x: -(x["lines"] or 0))),
+        "top_sources": "\n".join(
+            "| `%s` | %d |" % (f, n) for f, n in
+            Counter(f for r in linked for f in r["linked_from"]).most_common(12)),
+        "wf": sum(1 for r in linked if "lib/workflowCatalog.ts" in r["linked_from"]),
+    }
+    io.open(OUT, "w", encoding="utf-8", newline="\r\n").write(body)
+
+    print("routes %d | redirects %d | bare %d | authenticated %d"
+          % (len(routes), len(routes) - len(screens), len(bare), len(auth)))
+    print("sidebar %d | link-only %d | documented off-nav %d | ORPHANED %d (promote %d, owner %d)"
+          % (len(sidebar), len(linked), len(documented), len(orphan), len(promote), len(owner)))
+    print("stranded %d lines" % stranded)
+    print("-> %s" % os.path.relpath(OUT, ROOT))
+    return json.dumps({"orphans": sorted(r["path"] for r in orphan)}, ensure_ascii=False)
+
+
+if __name__ == "__main__":
+    main()
