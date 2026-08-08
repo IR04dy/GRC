@@ -91,7 +91,7 @@ PUBLISHED = {
     "migration_files": 361,
     "migration_head": 373,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
-    "fe_pages": 340,          # F2-142 retired 3 fabricated pages
+    "fe_pages": 341,          # F2-142 retired 3; F2-16 tranche 1 added EsgOverviewTab
     "fe_page_folders": 111,   # each was the only file in its folder, so -3 folders too
     "fe_routes": 329,
     "fe_nav_entries": 194,
@@ -245,7 +245,11 @@ def frontend():
         rel = os.path.relpath(path, FE).replace("\\", "/")
         raw = read(path)
         code = strip_ts(raw)
-        if rel.startswith("pages/") and rel.endswith(".tsx"):
+        # A colocated *.test.tsx is not a page. F2-16 tranche 1 put the first one under
+        # pages/, which pushed this count 340 -> 342 and fired the freshness gate. Counting a
+        # test as a page would also corrupt F2-07's pages-vs-routes comparison, which is the
+        # whole reason this number exists.
+        if rel.startswith("pages/") and rel.endswith(".tsx") and not rel.endswith(".test.tsx"):
             pages += 1
             folders.add("/".join(rel.split("/")[1:-1]) or "<root>")
         if rel.startswith("lib/"):

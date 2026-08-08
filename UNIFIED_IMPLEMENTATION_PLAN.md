@@ -370,7 +370,7 @@ it as evidence. Close F2-28 first — it is 3–5 days and already sequenced ahe
 | **F2-11** | — | ⬆ **Partly pulled into Wave 1 by the council** — it was silently moved from Wave 1 to Wave 4 with no stated reason. Wave 1 takes the ESLint ratchet + the pages on the five persona journeys; the rest stays here. **i18n convergence** — ESLint baseline first (**`eslint_configured: false` today**), then no-bare-Latin-JSX and no-`lang === 'ar'`-in-`pages/**` as **ratchets**; migrate the 439 hardcoded strings; fix the 49 zero-Arabic pages; per-module Arabic-coverage CI report | S→L | ⬜ |
 | **F2-A11Y** | Part 5 §7 | Fix the **68 `color-contrast` (WCAG 1.4.3, serious)** instances **at the design-token level**, not per component; re-run the existing axe harness; wire `@axe-core/playwright` into CI as a ratchet; then extend to focus/keyboard/screen-reader (genuinely unmeasured) | M | ⬜ |
 | **F2-12** | — | `ndi` containment — characterisation tests over its **82 writes** *first*, then split `NdiPage.tsx` (4,969 lines) along tab boundaries | L | ⬜ |
-| F2-16 | — | Split `EsgPage.tsx` (5,582) — **before** `ndi`, since `sust` has 200 tests to catch mistakes; page-size ratchet (no new file > 800 lines, existing may only shrink) | M | ⬜ |
+| F2-16 | — | Split `EsgPage.tsx` (5,582) — **before** `ndi` ~~since `sust` has 200 tests to catch mistakes~~ *(⚠ false — those are backend tests; the page had **zero**. It goes first because it is larger and `ndi` needs F2-12's characterisation tests)*; page-size ratchet (no new file > 800 lines, existing may only shrink) | M | 🔶 **ratchet DONE 2026-08-06 · tranche 1 DONE 2026-08-08** — 5,583 → 4,994, the 586-line executive dashboard extracted to `EsgOverviewTab.tsx` (639 lines) with a textual-identity proof and the page's **first 9 tests** |
 | **F2-17** | — | **Extend** the existing k6 harness: realistic seed volumes (10k risks / 50k controls / 200k evidence / 1M audit rows — this is also F2-02's demo tenant), 20 highest-traffic endpoints **including writes/exports/search**, raise dev Hikari above 10 so a ceiling can be found, publish p95 targets, top-5 in CI | L | ⬜ |
 | W3-1 | — | The 84 user stories as a CI probe suite | M | ⬜ |
 | W3-2 | — | Module scorecard **generated from the registry** — with *Assurance* and *Operating-evidence* columns | S | ⬜ |
@@ -827,6 +827,44 @@ from closed to open, every one genuinely half-done.
 **F2-22b** DTO conversion · **F2-12** (`ndi`) · **F2-11** (i18n) · **F2-A11Y**. Owner-blocked and not
 engineering: O-1 deploy (**29 migrations behind**), the three destructive drops, F2-150/151/152,
 F2-135, F2-147 slice 2, O-7.
+
+✔ **2026-08-08 — [[F2-16]] TRANCHE 1: the executive ESG dashboard leaves the monolith, and the
+reason this page was scheduled first turns out to be false.** `EsgPage.tsx` **5,583 → 4,994**; the
+586-line dashboard surface — `OverviewTab`, the fourteen widgets it composes, the emissions trend
+chart — is now `pages/esg/EsgOverviewTab.tsx` (639 lines, under the 800 ceiling). Self-contained by
+measurement: every widget is referenced only from `OverviewTab`'s JSX, and `OverviewTab` only from the
+page's tab switch.
+
+⚠ **The row said *"`EsgPage` first, since `sust` has 200 tests to catch mistakes"*. Those are BACKEND
+tests for `module/sust`.** Measured: the only file in the frontend that named `EsgPage.tsx` was
+`sourceFileSizeRatchet.test.ts`, which counts its lines — so the largest file in the frontend had **no
+behavioural test at all**, and the safety net this ordering assumed did not exist. ⚙ **A test count
+for the backend module is not coverage of the page that calls it**, and the conflation was in the
+register, this plan and the ratchet's own javadoc.
+
+🔑 **So the move was proven rather than trusted.** Two exact-text proofs instead of a suite: the
+moved range appears **verbatim** in the new file with one deliberate `export`, and everything in
+`EsgPage.tsx` below its imports is **byte-identical** to before minus that range. `noUnusedLocals`
+then makes `tsc` the checker for the import surgery — and it earned its place, catching `ghgYoy` kept
+because the block contains `data.ghgYoy`: **a property with the same name as an import reads as a use**
+to any textual scan.
+
+➕ **And the split is what made the tests possible.** Fourteen of these widgets are pure functions of
+`{ data, isAr }` — always testable, never tested, because they sat at lines 1315–1699 of a file whose
+import block alone is 130 lines. `EsgOverviewTab.test.tsx` is **9 tests, this page's first ever**: all
+fourteen widgets in **both locales**, payload-driven figures so a gutted widget fails, the deliberate
+soft-fail when the dashboard endpoint dies, and the three GF-3 tiles' `onNavigate` targets. FE
+**334/334**, tsc clean, `vite build` clean. ⚠ Its own settings mock was **inert** until the last test
+forced the issue — I had invented `esgWarnThreshold`; the real field is
+`esgReadinessWarningThreshold`, and every other test passed regardless because the page falls back to
+`?? 60`. **A mock with the wrong field names is a test that passes for the wrong reason.**
+
+➡ **Remaining tranches**, in the order the boundaries suggest: the four regulatory tabs (`CmaTab`
+467, `TcfdTab` 453, `MaterialityTab` 427, `MetricsTab` 419) · the operational four (`CapaTab` 558,
+`SgiTab` 537, `GhgInventoryTab` 337, `ClimateTab` 318) · then `EvidenceTab`, `AnnexTab`,
+`SettingsTab`, `SurveyTab`, `CalculatorTab` and the shared `Field`/`Stat` primitives. Each is a
+top-level function with no closure over page state, so each can use this slice's extractor and its
+two proofs.
 
 ➡ **Next unblocked candidates**: F2-147 slice 2 (owner: commission the SMS/WhatsApp/SMTP gateways) ·
 F2-150/F2-151/F2-152 (need owner decisions) · F2-11/F2-12/F2-16/F2-17/F2-14 (unblocked but

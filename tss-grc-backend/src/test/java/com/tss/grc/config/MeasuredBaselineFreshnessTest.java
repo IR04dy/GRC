@@ -417,8 +417,15 @@ class MeasuredBaselineFreshnessTest {
 
         List<Path> pages;
         try (Stream<Path> s = Files.walk(FE_PAGES)) {
+            // ⚠ A colocated `*.test.tsx` is not a page. F2-16 tranche 1 added the first one under
+            // `pages/` and this count went 340 → 342, firing the gate — correctly, but the fix is to
+            // narrow the scan rather than raise the number: this figure's job is to be compared with
+            // the 329 registered routes (F2-07's finding), and counting tests as pages would widen
+            // that gap with files that were never reachable in the first place. `baseline_census.py`
+            // carries the same exclusion, and `theCensusScriptAgreesWithTheDocument` keeps them equal.
             pages = s.filter(Files::isRegularFile)
                      .filter(p -> p.getFileName().toString().endsWith(".tsx"))
+                     .filter(p -> !p.getFileName().toString().endsWith(".test.tsx"))
                      .toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);

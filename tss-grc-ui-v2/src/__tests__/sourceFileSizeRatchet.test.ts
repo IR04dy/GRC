@@ -6,10 +6,18 @@ import { join } from 'node:path';
  * F2-16 — the page-size ratchet the plan asks for: "no new file > 800 lines".
  *
  * <b>Why a ratchet now, when the splits are not done.</b> F2-16 and F2-12 are the real work —
- * `EsgPage.tsx` (5,582 lines) and `NdiPage.tsx` (4,969) split along tab boundaries, `EsgPage` first
- * because `sust` has ~200 tests to catch mistakes and `ndi` has almost none. Those are multi-session
+ * `EsgPage.tsx` and `NdiPage.tsx` (4,969) split along tab boundaries. Those are multi-session
  * refactors. This is the cheap half that stops the problem growing in the meantime, and it is listed
  * in the row as part of the deliverable rather than invented here.
+ *
+ * <b>⚠ This javadoc said `EsgPage` goes first "because `sust` has ~200 tests to catch mistakes and
+ * `ndi` has almost none". That was false, and it was repeated from the F2-16 row.</b> Those ~200 are
+ * <b>backend</b> tests for `module/sust`. Measured 2026-08-08: the only file in the frontend that
+ * named `EsgPage.tsx` was this one, which counts its lines — the page had <b>no behavioural test at
+ * all</b>. `EsgPage` still goes first, because it is the larger file and `ndi` needs F2-12's
+ * characterisation tests over its 82 writes first; but <b>a test count for a backend module is not
+ * coverage of the page that calls it</b>. Tranche 1 (2026-08-08) took it 5,583 → 4,994 and gave it
+ * its first 9 tests, in `pages/esg/EsgOverviewTab.test.tsx`.
  *
  * <b>Why a pinned SET and not a count.</b> A count ceiling lets a new 900-line page appear as long as
  * something else shrinks — which is precisely the trade the row is trying to prevent. Pinning the

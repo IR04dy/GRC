@@ -510,11 +510,13 @@ Start-Service TssGrcBackend
 | **Technical Impact** | Unreviewable diffs; poor code-splitting; HMR and build cost. |
 | **UX Impact** | Deep tab hierarchies inside one route mean no deep-linking to a sub-view and browser Back behaving unexpectedly — both common complaints in large GRC UIs. |
 | **Sales Impact** | Indirect (velocity), plus the deep-linking gap is visible in demos. |
+| **Status** | 🔶 **RATCHET DONE 2026-08-06 · TRANCHE 1 DONE 2026-08-08.** `EsgPage.tsx` **5,583 → 4,994**; the executive-dashboard surface (586 lines — `OverviewTab`, the fourteen widgets it composes, the emissions trend chart) is now `pages/esg/EsgOverviewTab.tsx` at 639 lines, under the 800 ceiling. Moved **mechanically and proven textually**: the range appears verbatim in the new file with one deliberate `export`, and the page below its imports is byte-identical minus that range. `EsgOverviewTab.test.tsx` — **9 tests, this page's first ever** — renders all fourteen widgets in both locales, pins the payload-driven figures, the soft-fail on a dead endpoint, and the three GF-3 tiles' `onNavigate` targets. FE 334/334, tsc clean, `vite build` clean |
+| **⚠ The ordering premise below is FALSE, measured 2026-08-08** | *"`EsgPage` first, since `sust` has 200 tests to catch mistakes"* and *"safer, better tested"* — those are **backend** tests for `module/sust`. The only file in the frontend that named `EsgPage.tsx` was `sourceFileSizeRatchet.test.ts`, which counts its lines. **The page had no behavioural test of any kind**, so the safety net the ordering assumed did not exist, and a mistake in the split would have shipped. ⚙ The conclusion may still be right — this file is larger and `ndi` has 82 writes to characterise first — but *a test count for the backend module is not coverage of the page that calls it*, and the two were conflated in the register, the plan and the ratchet's own javadoc |
 | **Recommendation** | Split both along existing tab boundaries into route-level pages (which also fixes deep-linking); introduce a **page-size ratchet** — no new `.tsx` over 800 lines, existing offenders may only shrink. Do `NdiPage` **after** its characterisation tests (F2-12) and `EsgPage` first, since `sust` has 200 tests to catch mistakes. |
 | **Alternatives** | Extract shared sub-components without splitting routes — improves review but keeps the deep-linking defect. |
 | **Trade-offs** | Routing changes affect bookmarks; add redirects from old paths. |
 | **Effort** | **M** per page |
-| **Priority** | Medium — `EsgPage` first (safer, better tested). |
+| **Priority** | Medium — `EsgPage` first (larger, and `ndi` needs F2-12's characterisation tests first). ⚠ This cell read *"safer, better tested"* until 2026-08-08; see the premise correction above. |
 | **Expected ROI** | Medium — velocity and deep-linking. |
 | **References** | Baseline §5.4, §1. |
 
