@@ -55,6 +55,14 @@ REDIRECT_COMPONENTS = {"Navigate", "RedirectPreservingQuery"}
 NON_NAVIGATIONAL = {"lib/publicPaths.ts", "lib/help.ts"}
 
 NAV_PATTERNS = [
+    # ⚠⚠ The first version of this list omitted the next TWO entries and the script reported 18
+    # unreachable detail screens. THIRTEEN of them were linked, from exactly the list the finding
+    # said should link them. `rowHref` is `DataTable`'s per-row navigation prop -- its value is a
+    # FUNCTION returning a path (`rowHref={r: `/ai/models/${r.externalId}`}`), which `DataTable`
+    # turns into `onClick -> navigate(href)`. 34 sites; the canonical list->detail idiom here.
+    # `nav(...)` is `useNavigate()` destructured under another name, in four register pages.
+    re.compile(r"\b\w*(?:Href|Link|To|Route|Path)=\{[^}]*?['\"`](/[^'\"`]+)"),
+    re.compile(r"\b(?:nav|navigate|go|push)\(\s*['\"`](/[^'\"`]+)"),
     re.compile(r"navigate\(\s*['\"`](/[^'\"`]*)['\"`]"),
     re.compile(r"\bto=\{?\s*['\"`](/[^'\"`]*)['\"`]"),
     re.compile(r"\b(?:to|href|route|path)\s*:\s*['\"`](/[^'\"`]*)['\"`]"),
@@ -62,6 +70,13 @@ NAV_PATTERNS = [
     re.compile(r"location\.(?:href|assign|replace)\s*=?\s*\(?\s*['\"`](/[^'\"`]*)['\"`]"),
     re.compile(r"window\.open\(\s*['\"`](/[^'\"`]*)['\"`]"),
 ]
+
+# Witnesses for the blind spot above: each is reachable ONLY through one of the two patterns added
+# in the correction, so losing either fails the run instead of quietly inflating the orphan count.
+NAV_PATTERN_WITNESSES = {
+    "/ai/models/:p": "rowHref on AiModelRegisterPage -- DataTable row navigation",
+    "/opres/assessments/:p": "nav(...) on OpResDashboardPage -- a useNavigate alias",
+}
 
 
 def read(p):
@@ -160,6 +175,12 @@ def inbound():
                 t = norm(m.group(1))
                 if not t.startswith("/api/"):
                     links[t].add(rel)
+    for w, why in NAV_PATTERN_WITNESSES.items():
+        assert w in links, (
+            "%s is not in the inbound set, so NAV_PATTERNS has lost the pattern that finds it (%s). "
+            "That is the exact defect that made this script's first answer 18 instead of 5 -- the "
+            "orphan list would now be fiction. Fix NAV_PATTERNS, do not relax this assertion."
+            % (w, why))
     return links
 
 
@@ -173,30 +194,45 @@ def reaches(route_path, target):
     return len(a) == len(b) and all(x.startswith(":") or y == ":p" or x == y for x, y in zip(a, b))
 
 
-# Classification. Deliberately conservative: F2-07's recommendation is to classify and let the owner
-# decide retire/merge, so nothing is marked "retire" on the measurer's authority.
-CLASSIFY = {
-    "/ai/models/:externalId": ("PROMOTE", "`/ai/models` list route exists; link the row"),
-    "/rrp/cycles/:id": ("PROMOTE", "`/rrp/cycles` list route exists; link the row"),
-    "/cpty/counterparties/:id": ("PROMOTE", "link from the counterparty list"),
-    "/complaints/:id": ("PROMOTE", "`/complaints` list route exists; link the row"),
-    "/cyber/attack-surface/assets/:externalId": ("PROMOTE", "link from the attack-surface table"),
-    "/regreporting/filings/:id": ("PROMOTE", "link from the filings register"),
-    "/opres/assessments/:id": ("PROMOTE", "link from the assessments list"),
-    "/reginspect/inspections/:id": ("PROMOTE", "link from the inspections workspace"),
-    "/privacy/subprocessors/:externalId": ("PROMOTE",
-                                           "sidebar has `/privacy/subprocessors`; link the row"),
-    "/ethics/whistleblower/cases/:id": ("PROMOTE", "link from the case register"),
-    "/privacy/dsrs/:id": ("PROMOTE", "⚠ no list ROUTE - the list is a `/privacy` tab"),
-    "/privacy/breaches/:id": ("PROMOTE", "⚠ no list route - link from the `/privacy` breach tab"),
-    "/privacy/ropa/:id": ("PROMOTE", "⚠ no list route - link from the `/privacy` RoPA tab"),
-    "/bcm/exercises/run/:runId/facilitate": ("PROMOTE", "\U0001f534 see the F2-161 note in §2"),
-    "/bcm/exercises/run/:runId/observe": ("PROMOTE", "\U0001f534 see the F2-161 note in §2"),
-    "/bcm/exercises/run/:runId/participate": ("PROMOTE", "\U0001f534 see the F2-161 note in §2"),
+# ⚠⚠ The 18 routes this script's FIRST version reported as unreachable. THIRTEEN were its own false
+# positives -- see the rowHref note on NAV_PATTERNS. Five were real and F2-163 linked them. Kept as a
+# dict rather than deleted because the record of a wrong measurement is worth more than a clean file,
+# and because main() asserts every one of the 18 now measures as reachable: the false positives prove
+# the patterns were the bug, and the five prove the fix landed.
+WAS_REPORTED_ORPHAN = {
+    "/ai/models/:externalId": (
+        "FALSE POSITIVE", "`rowHref` on `AiModelRegisterPage:367` - linked all along"),
+    "/rrp/cycles/:id": (
+        "FALSE POSITIVE", "`rowHref` on `RrpCyclesPage:228` **and** `RrpDashboardPage:215`"),
+    "/cpty/counterparties/:id": (
+        "FALSE POSITIVE", "`rowHref` on `CptyCounterpartiesPage:263` + `CptyDashboardPage:285`"),
+    "/complaints/:id": ("FALSE POSITIVE", "`rowHref` on `ComplaintsRegisterPage:218`"),
+    "/cyber/attack-surface/assets/:externalId": (
+        "FALSE POSITIVE", "`rowHref` on `AttackSurfacePage:519`"),
+    "/regreporting/filings/:id": (
+        "FALSE POSITIVE", "`rowHref` on `RegReportingFilingsPage:146` + the dashboard, twice"),
+    "/opres/assessments/:id": (
+        "FALSE POSITIVE", "`rowHref` on `OpResAssessmentsPage:238`; `nav(...)` on the dashboard"),
+    "/reginspect/inspections/:id": (
+        "FALSE POSITIVE", "`rowHref` on `RegInspectInspectionsPage:296` + the dashboard"),
+    "/privacy/subprocessors/:externalId": (
+        "FALSE POSITIVE", "`rowHref` on `SubprocessorsPage:235`"),
+    "/ethics/whistleblower/cases/:id": (
+        "FALSE POSITIVE", "`rowHref` on `WhistleblowerCasesPage:229`"),
+    "/privacy/dsrs/:id": (
+        "FALSE POSITIVE", "`rowHref` on `PrivacyPage:384` - the tab table DOES link it"),
+    "/privacy/breaches/:id": ("FALSE POSITIVE", "`rowHref` on `PrivacyPage:402`"),
+    "/privacy/ropa/:id": ("FALSE POSITIVE", "`rowHref` on `PrivacyPage:414`"),
+    "/bcm/exercises/run/:runId/facilitate": (
+        "REAL - FIXED", "\U0001f534 `ExerciseRunsPage` - the run list that did not exist"),
+    "/bcm/exercises/run/:runId/observe": (
+        "REAL - FIXED", "\U0001f534 `ExerciseRunsPage`"),
+    "/bcm/exercises/run/:runId/participate": (
+        "REAL - FIXED", "\U0001f534 `ExerciseRunsPage`"),
     "/workflows/erm/risk-treatment/:riskId": (
-        "PROMOTE", "pre-bound variant of a catalogued wizard; link from the risk register"),
+        "REAL - FIXED", "`RiskDetailPage` - the only path writing `risk_lc.treatment_plans`"),
     "/workflows/erm/risk-acceptance/:riskId": (
-        "PROMOTE", "pre-bound variant of a catalogued wizard; link from the risk register"),
+        "REAL - FIXED", "`RiskDetailPage` - the only path writing a formal acceptance"),
 }
 
 DOC = """# Route reconciliation matrix — F2-07a
@@ -225,32 +261,52 @@ artefact. The first half is **not**.
 |   reachable from a **link or a dashboard tile** only | **%(linked)d** |
 |   **no way in at all** | **%(orphan)d** |
 
-**Why the finding was ~7× too large: navigation in this application has three surfaces, and F2-07
+**Why the finding was ~7× too large: navigation in this application has FOUR surfaces, and F2-07
 counts one.** Besides `Sidebar.tsx` there are module-dashboard link tiles (`href:` props on `Kpi` and
-action components) and ordinary in-page links — plus registries such as `lib/workflowCatalog.ts`, whose
-`route:` field the workflow hub renders as `<Link to={w.route!}>`. A screen opened by a tile on its
-module dashboard is reachable; it is simply not a menu item, which for a detail screen is correct
-design rather than a defect.
+action components), ordinary in-page links, registries such as `lib/workflowCatalog.ts` whose `route:`
+field the workflow hub renders as `<Link to={w.route!}>` — and **`rowHref`**, `DataTable`'s per-row
+navigation prop, which is how a list links its own detail screen (34 sites). A screen opened by a tile
+on its module dashboard, or by clicking its row in a table, is reachable; it is simply not a menu item,
+which for a detail screen is correct design rather than a defect.
 
 ⚠ **This does not vacate F2-07.** Its *other* half stands untouched and is the more serious one: a
 **%(sidebar)d-item sidebar is beyond navigable**, and the workspace IA in the recommendation is still
 the right remedy. What changes is the size and shape of the remediation list — from *"classify 144
-screens"* to *"add %(promote)d missing links and take %(owner)d product decisions"*.
+screens"* to *"add 5 missing links and take 0 product decisions"*, all 5 of which F2-163 has added.
 
 ---
 
-## 1. How the measurement was arrived at — four passes, four answers
+## 1. How the measurement was arrived at — six passes, and pass 4 SHIPPED WRONG
 
-Recorded because the intermediate answers were each plausible, and three of them were wrong.
+Recorded because the intermediate answers were each plausible, and **the one that got written into a
+finding, a register row and a CI gate was among the wrong ones.**
 
 | Pass | Definition of "reachable" | Answer | What it got wrong |
 |---|---|---:|---|
 | 1 | a `Sidebar.tsx` entry | 139 | counted dashboard tiles and detail links as unreachable; missed 4 `RedirectPreservingQuery` redirects |
 | 2 | + navigation **syntax** (`navigate()`, `to=`) | 53 | **19 false positives** — the `/workflows/*` wizards are linked through a *registry*, not link syntax |
-| 3 | + **any** `'/…'` string literal | 6 | **false negatives** — an entry in the `publicPaths.ts` auth allowlist is not a way in |
-| 4 | navigational references only, allowlists named and excluded, bare set read from `BARE_PREFIXES` | **%(orphan)d** | — |
+| 3 | + **any** `'/…'` string literal | 6 | dismissed for false negatives (an entry in the `publicPaths.ts` auth allowlist is not a way in) — but **this was the closest answer, and tightening moved away from it** |
+| 4 | navigational references only, allowlists named, bare set from `BARE_PREFIXES` | ~~18~~ | ⚠⚠ **SHIPPED, AND WRONG BY 13** — blind to `rowHref`, the prop that links a list row to its detail screen |
+| 5 | + `rowHref`-shaped props and `useNavigate()` aliases | **5** | — |
+| 6 | pass 5 cross-checked against an independent wide definition | **5** | both agree; 11 disagreements in between were all genuine `<Link to={`…`}>` and each was opened by hand |
 
-Three transferable lessons:
+🔑🔑 **The correction is the same error the finding it corrects was filed for.** F2-07 was ~7× too
+large because it counted one navigation surface. Pass 4 counted three and missed the fourth — the
+*dominant* one for detail screens. ⚙ **A plausible answer that confirms the story you are already
+telling is where measurement stops.** All 18 were `:param` routes and the narrative was tidy
+("detail screens absent from their own list"), so the 13 counter-examples were never opened one at a
+time. Eighteen is a small enough population to adjudicate by hand; it was not.
+
+⚙ **What could not have caught it, and this bounds what the two techniques are worth.** The gate's
+non-vacuity check passed — it saw 300+ link targets. Mutation testing the gate passed 7/7.
+**Mutation proves a gate notices changes to itself; it cannot prove the gate's definition matches the
+world.** What caught it was opening the first list page the finding accused, before writing a link
+into it. Two defences are now in place: a **witness assertion** per fragile pattern (a route reachable
+only via `rowHref`, and one only via a `nav()` alias — losing either pattern now fails the run instead
+of inflating the orphan count), and **two implementations with deliberately different definitions**
+that must agree.
+
+Three further transferable lessons:
 
 * \U0001f511 **A registry-driven link is invisible to a scan for link syntax.** Pass 2 reported every workflow
   wizard as stranded; `lib/workflowCatalog.ts` holds the path as data and `WorkflowHubPage.tsx` renders
@@ -270,24 +326,46 @@ the name. **A textual scan cannot tell a declaration from a mention** — the pa
 
 ---
 
-## 2. The %(orphan)d orphaned screens — %(stranded)s lines with no way in
+## 2. Orphaned screens today: **%(orphan)d**
 
-| Route | Component | Lines | Class | Note |
+%(orphan_table)s
+
+### 2a. The 5 that were real — %(real_lines)s lines, now linked
+
+| Route | Component | Lines | Verdict | Reached from |
 |---|---|---:|---|---|
-%(rows)s
+%(real_rows)s
 
-**%(promote)d PROMOTE** — all but two are `:param` **detail** screens whose list exists and does not link
-to them. That is a materially different defect from *"absent from the sidebar"*, and cheaper: one link
-each, not an IA redesign.
+\U0001f534 **The BCM exercise runtime was the sharpest item, because of what happened to it two days before
+the measurement.** `FacilitatorConsolePage` (769), `ObserverDashboardPage` (742) and
+`ParticipantViewPage` (351) — 1,862 lines — had **no textual reference anywhere in `src/`**, not merely
+no link: `listRunsForExercise` and `startRun` were imported by those three pages and nothing else, so
+**no screen listed a run**. [[F2-161]] fixed *who may drive an exercise run* on these exact screens on
+2026-08-06, converting the guard so a facilitator could reach their own run instead of only a platform
+administrator. ⚙ **The authorisation was corrected on three screens that had no entry point.** Two
+instruments looked at the same code from opposite ends and neither could see what the other saw: a
+guard audit cannot tell that nothing routes to the page, and a navigation audit cannot tell the guard
+was wrong. `ExerciseRunsPage` is now their list, reached from the exercise row in `/bcm?tab=exercises`.
 
-\U0001f534 **The BCM exercise runtime is the sharpest item, because of what happened to it two days before
-this measurement.** `FacilitatorConsolePage` (769), `ObserverDashboardPage` (742) and
-`ParticipantViewPage` (351) — 1,862 lines — have **no way in from anywhere in the UI**. [[F2-161]] fixed
-*who may drive an exercise run* on these exact screens on 2026-08-06, converting the guard so a
-facilitator could reach their own run instead of only a platform administrator. ⚙ **The authorisation
-was corrected on three screens that have no entry point.** Two instruments looked at the same code from
-opposite ends and neither could see what the other saw: a guard audit cannot tell that nothing routes
-to the page, and a navigation audit cannot tell the guard was wrong.
+\U0001f534 **The other two were worse than unreachable — they were the *governed* path.**
+`/workflows/erm/risk-{treatment,acceptance}/:riskId` are the only UI routes that write a canonical
+`risk_lc.treatment_plans` row and a formal, time-boxed, CRO-approved acceptance. `RiskService.close`
+**requires** such a plan before a HIGH or over-appetite risk may close. Unbound, both wizards save a
+generic inbox draft and toast *"open from a risk to record it"* — **which nothing in the UI let the
+user do.** Both are now launched from `RiskDetailPage`. ⚠ The asymmetry that remains is filed as
+**F2-164**: the plain *Accept* button on the same page is a bare status transition at `RISK:WRITE` and
+it **exempts** the risk from the close gate, so the reachable path bypasses the control the
+unreachable one enforced.
+
+### 2b. The 13 that were this script's own false positives
+
+Every one is linked from exactly the list the finding said should link it — by `rowHref`, which the
+first pass could not see. Kept in the record because a wrong measurement that is quietly deleted
+teaches nothing.
+
+| Route | Component | Lines | Verdict | The link that was always there |
+|---|---|---:|---|---|
+%(fp_rows)s
 
 ---
 
@@ -306,13 +384,19 @@ hub. Any future reconciliation must treat a registry as a navigation surface.
 
 ## 4. What this changes in the register
 
-* [[F2-07]] — the *"144 reachable only by URL"* figure is **superseded by %(orphan)d**; the
-  %(sidebar)d-item sidebar and the workspace-IA recommendation are unaffected.
+* [[F2-07]] — the *"144 reachable only by URL"* figure is **superseded by 5**, now **%(orphan)d**; the
+  %(sidebar)d-item sidebar and the workspace-IA recommendation are unaffected and remain open.
 * [[F2-07a]] — **delivered**: this matrix, the generator, and the CI gate.
 * [[F2-07b]] — already landed 8 socops pages into the sidebar. Its inline comment cites
   `/socops/awareness` as *"in the nav"*; it is in the socops **dashboard**, not the sidebar. Loose
   wording rather than a defect — recorded so the next reader does not re-open it.
-* [[F2-161]] — cross-reference the runtime entry-point gap in §2.
+* [[F2-163]] — **filed at 18, corrected to 5, and closed.** ⚠ Read §1 before quoting any figure from
+  this document: the finding shipped with a headline that this script's own patterns had inflated by
+  13, into a register row and a CI gate, and it was caught by opening a file rather than by any test.
+* [[F2-164]] — **filed by this slice, not fixed.** Making the treatment/acceptance wizards reachable
+  exposed that the *reachable* `Accept` button bypasses the very close gate the newly-reachable
+  wizard satisfies. A navigation fix surfaced an authorisation defect; see §2a.
+* [[F2-161]] — cross-reference the runtime entry-point gap in §2a.
 """
 
 
@@ -343,26 +427,50 @@ def main():
               if not r["nav"] and not r["linked_from"] and not r["documented"]]
     documented = [r for r in auth if not r["nav"] and not r["linked_from"] and r["documented"]]
 
-    missing = [r["path"] for r in orphan if r["path"] not in CLASSIFY]
-    assert not missing, "unclassified orphans: %s" % missing
-    extra = [p for p in CLASSIFY if p not in {r["path"] for r in orphan}]
-    assert not extra, "CLASSIFY names routes that are no longer orphaned: %s" % extra
+    by_path = {r["path"]: r for r in routes}
+    # Every one of the 18 the first pass accused must now measure as reachable -- the 13 because the
+    # patterns were the bug, the 5 because F2-163 linked them. This is the assertion that would have
+    # failed on the day the wrong answer was written, had the patterns been right.
+    still_orphan = {r["path"] for r in orphan}
+    regressed = sorted(p for p in WAS_REPORTED_ORPHAN if p in still_orphan)
+    assert not regressed, (
+        "%s was reported unreachable, then measured reachable, and is unreachable again. Either a "
+        "link was deleted or NAV_PATTERNS lost a shape." % regressed)
+    vanished = sorted(p for p in WAS_REPORTED_ORPHAN if p not in by_path)
+    assert not vanished, "WAS_REPORTED_ORPHAN names routes that no longer exist: %s" % vanished
 
-    promote = [r for r in orphan if CLASSIFY[r["path"]][0] == "PROMOTE"]
-    owner = [r for r in orphan if CLASSIFY[r["path"]][0] == "OWNER"]
+    def rows_for(verdict_prefix):
+        out = []
+        for p, (verdict, note) in sorted(
+                WAS_REPORTED_ORPHAN.items(), key=lambda kv: -(by_path[kv[0]]["lines"] or 0)):
+            if not verdict.startswith(verdict_prefix):
+                continue
+            r = by_path[p]
+            out.append("| `%s` | `%s` | %s | **%s** | %s |"
+                       % (p, r["component"], r["lines"], verdict, note))
+        return "\n".join(out)
+
+    real_lines = sum(by_path[p]["lines"] or 0
+                     for p, (v, _) in WAS_REPORTED_ORPHAN.items() if v.startswith("REAL"))
     stranded = sum(r["lines"] or 0 for r in orphan)
 
     body = DOC % {
         "total": len(routes), "redirects": len(routes) - len(screens), "bare": len(bare),
         "auth": len(auth), "sidebar": len(sidebar), "linked": len(linked), "orphan": len(orphan),
-        "documented": len(documented), "offnav": len(OFF_NAV),
-        "promote": len(promote), "owner": len(owner), "nbare": len(BARE),
+        "documented": len(documented), "offnav": len(OFF_NAV), "nbare": len(BARE),
         "stranded": "{:,}".format(stranded),
-        "rows": "\n".join(
-            "| `%s` | `%s` | %s | **%s** | %s |"
-            % (r["path"], r["component"], r["lines"], CLASSIFY[r["path"]][0],
-               CLASSIFY[r["path"]][1])
-            for r in sorted(orphan, key=lambda x: -(x["lines"] or 0))),
+        "real_lines": "{:,}".format(real_lines),
+        "real_rows": rows_for("REAL"),
+        "fp_rows": rows_for("FALSE"),
+        "orphan_table": (
+            "**Zero.** Every parameterised and static screen in the application is reachable from the "
+            "sidebar, a dashboard tile, an in-page link, a registry or its list row. The five that "
+            "were not are in §2a; the thirteen that only appeared to be are in §2b."
+            if not orphan else
+            "⚠ **%d unreachable screen(s):**\n\n| Route | Component | Lines |\n|---|---|---:|\n%s"
+            % (len(orphan), "\n".join(
+                "| `%s` | `%s` | %s |" % (r["path"], r["component"], r["lines"])
+                for r in sorted(orphan, key=lambda x: -(x["lines"] or 0))))),
         "top_sources": "\n".join(
             "| `%s` | %d |" % (f, n) for f, n in
             Counter(f for r in linked for f in r["linked_from"]).most_common(12)),
@@ -372,9 +480,10 @@ def main():
 
     print("routes %d | redirects %d | bare %d | authenticated %d"
           % (len(routes), len(routes) - len(screens), len(bare), len(auth)))
-    print("sidebar %d | link-only %d | documented off-nav %d | ORPHANED %d (promote %d, owner %d)"
-          % (len(sidebar), len(linked), len(documented), len(orphan), len(promote), len(owner)))
-    print("stranded %d lines" % stranded)
+    print("sidebar %d | link-only %d | documented off-nav %d | ORPHANED %d"
+          % (len(sidebar), len(linked), len(documented), len(orphan)))
+    print("stranded %d lines | the 18 first reported: all reachable (%d were false positives)"
+          % (stranded, sum(1 for v, _ in WAS_REPORTED_ORPHAN.values() if v.startswith("FALSE"))))
     print("-> %s" % os.path.relpath(OUT, ROOT))
     return json.dumps({"orphans": sorted(r["path"] for r in orphan)}, ensure_ascii=False)
 

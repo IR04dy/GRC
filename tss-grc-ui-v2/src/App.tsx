@@ -48,6 +48,8 @@ const OutsourcingDetailPage = lazy(() => import('./pages/outsourcing/Outsourcing
 const OutsourcingSamaPendingPage = lazy(() => import('./pages/outsourcing/OutsourcingSamaPendingPage').then(m => ({ default: m.OutsourcingSamaPendingPage })));
 const ExerciseScenarioLibraryPage = lazy(() => import('./pages/bcm/ExerciseScenarioLibraryPage').then(m => ({ default: m.ExerciseScenarioLibraryPage })));
 const ExerciseScenarioDetailPage  = lazy(() => import('./pages/bcm/ExerciseScenarioDetailPage').then(m => ({ default: m.ExerciseScenarioDetailPage })));
+// F2-163 — the list that gives the three runtime consoles below an entry point.
+const ExerciseRunsPage            = lazy(() => import('./pages/bcm/ExerciseRunsPage').then(m => ({ default: m.ExerciseRunsPage })));
 const FacilitatorConsolePage      = lazy(() => import('./pages/bcm/FacilitatorConsolePage').then(m => ({ default: m.FacilitatorConsolePage })));
 const ParticipantViewPage         = lazy(() => import('./pages/bcm/ParticipantViewPage').then(m => ({ default: m.ParticipantViewPage })));
 const ObserverDashboardPage       = lazy(() => import('./pages/bcm/ObserverDashboardPage').then(m => ({ default: m.ObserverDashboardPage })));
@@ -435,6 +437,9 @@ export function App() {
               <Route path="/bcm/mtpd-inheritance/:assessmentId" element={<MtpdInheritanceDetailPage />} />
               <Route path="/bcm/scenarios"        element={<ExerciseScenarioLibraryPage />} />
               <Route path="/bcm/scenarios/:id"    element={<ExerciseScenarioDetailPage />} />
+              {/* F2-163 — exercise -> its runs. Until this existed, the three consoles below
+                  were reachable only by typing a URL that contained a run id. */}
+              <Route path="/bcm/exercises/:exerciseId/runs"       element={<ExerciseRunsPage />} />
               <Route path="/bcm/exercises/run/:runId/facilitate"  element={<FacilitatorConsolePage />} />
               <Route path="/bcm/exercises/run/:runId/participate" element={<ParticipantViewPage />} />
               {/* Slice 10-C — read-only Observer Dashboard for auditors + CISO + regulator liaisons. */}

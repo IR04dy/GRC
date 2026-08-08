@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { AlertTriangle, Activity, ListChecks, MessageSquare, Edit, Send, CheckCheck, ShieldOff, Archive, RotateCcw, Calculator } from 'lucide-react';
+import { AlertTriangle, Activity, ListChecks, MessageSquare, Edit, Send, CheckCheck, ShieldOff, Archive, RotateCcw, Calculator, GitBranch, ClipboardCheck } from 'lucide-react';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 import { Shell } from '../../components/layout/Shell';
 import { DetailHeader } from '../../components/layout/DetailHeader';
@@ -355,6 +355,32 @@ export function RiskDetailPage() {
           {risk.status === 'UNDER_ASSESSMENT' && <Button variant="primary" Icon={CheckCheck} onClick={() => workflow(riskApi.approveRisk, 'Approved for treatment')}>{t('riskActApprove')}</Button>}
           {(risk.status === 'OPEN' || risk.status === 'UNDER_ASSESSMENT') &&
             <Button variant="secondary" Icon={ShieldOff} onClick={() => workflow(riskApi.acceptRisk, 'Risk accepted')}>{t('riskActAccept')}</Button>}
+          {/* F2-163 — the two GOVERNED paths, which had no inbound link anywhere in the UI.
+              Both wizards behave differently once a risk is bound: with `:riskId` the treatment
+              wizard writes the canonical `risk_lc.treatment_plans` row that `RiskService.close`
+              reads (ERM epic E-D), and the acceptance wizard writes a time-boxed, CRO-approved
+              formal acceptance (E-A). Without it each saves a generic inbox draft whose own
+              toast reads "open from a risk to record it" — which nothing let the user do.
+              ⚠ The plain "Accept" button above is a bare status transition and it EXEMPTS the
+              risk from the close gate; that asymmetry is filed as F2-164, not fixed here. */}
+          {risk.status !== 'CLOSED' && <>
+            <Link to={`/workflows/erm/risk-treatment/${id}`} className="link">
+              <Button variant="secondary" Icon={GitBranch}
+                title={lang === 'ar'
+                  ? 'صياغة خطة المعالجة المعتمدة التي يطلبها بند الإغلاق لخطر عالٍ أو متجاوز لسقف التحمّل'
+                  : 'Draft the canonical treatment plan the close gate requires for a HIGH or over-appetite risk'}>
+                {lang === 'ar' ? 'خطة معالجة معتمدة' : 'Draft treatment plan'}
+              </Button>
+            </Link>
+            <Link to={`/workflows/erm/risk-acceptance/${id}`} className="link">
+              <Button variant="secondary" Icon={ClipboardCheck}
+                title={lang === 'ar'
+                  ? 'قبول رسمي محدّد المدة مع مبرّر وضوابط تعويضية واعتماد رئيس المخاطر'
+                  : 'Formal, time-boxed acceptance with justification, compensating controls and CRO approval'}>
+                {lang === 'ar' ? 'قبول رسمي' : 'Formal acceptance'}
+              </Button>
+            </Link>
+          </>}
           {(risk.status === 'TREATMENT_IN_PROGRESS' || risk.status === 'ACCEPTED' || risk.status === 'TRANSFERRED') &&
             <Button variant="secondary" Icon={Archive} onClick={() => workflow(riskApi.closeRisk, 'Risk closed')}>{t('riskActClose')}</Button>}
           {risk.status === 'CLOSED' && <Button variant="secondary" Icon={RotateCcw} onClick={() => workflow(riskApi.reopenRisk, 'Risk reopened')}>{t('riskActReopen')}</Button>}

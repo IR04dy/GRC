@@ -206,7 +206,7 @@ are **one** piece of work, not two.
 | **W2-1a-ii** | F2-02 | **De-mock `pages/dashboard/widgets.tsx` and the executive dashboard** | S | 🟡 **DASHBOARD DONE 2026-07-26** (no migration). FE **54/54**, `tsc` clean, `vite build` clean, browser-verified EN+AR with a clean console on a fresh tab. All 4 mock imports removed from `widgets.tsx`; regulator-tile RAG now from `complianceApi.findings()`, CAB queue from `changeApi.list()`. ⚠ **Measurement found THREE fabrications the plan never counted, because none is a mock *import*** — so the planned `/mock/i` CI rule (W2-1b) would not have caught any of them, the same blind spot F2-33 has. **(1)** `ExecutiveDashboard.AttentionStrip` hardcoded all three columns: *Needs decision* listed `R-0042 — Concentration risk on AWS Riyadh region` (CRITICAL, 2d) and two more that do not exist; *Upcoming deadlines* listed four **regulatory** dates with regulator chips and day counts (SAMA H1 in 12d, NCA ECC in 28d, PDPL Art 8 in 45d, Nitaqat Q2 in 58d) — **the most dangerous of the set**, since a tenant could miss a real filing while trusting a comfortable runway to a deadline that was never theirs; *Recent activity* was four fake bilingual events. All three now read live (`riskApi`+`complianceApi`, `calendarApi.list`, `lib/activityLog`), each with its own empty state — *"nothing needs your decision"* and *"we could not load your calendar"* must not look alike. **(2)** `widgets.tsx` carried a **second copy** of the fake activity feed with different wording; fixing it changed nothing on screen because the executive card is a different component — only the browser check caught that. **(3)** Two live-data gaps found and NOT papered over: audit engagements have no list endpoint (4 regulator tiles now render an em dash and say *not measured here* rather than a fabricated or zero count), and the vendor **tier/reassessment cadence exists only in a frontend mock** — `TprmVendorDto` has neither, and `riskRating` does not map to `VendorTier`, so "overdue reassessments" was renamed to **"vendors never assessed"**, which live data can actually answer. Renaming a widget **id** silently drops it from every saved layout, so `RENAMED_WIDGET_IDS` migrates them (proven live: a seeded old-id layout kept the tile). **`lib/boardPack.ts` NOT rewired — deliberately.** Measuring it changed the task's *shape*, not just its size: it has **eight** hardcoded array inputs (not 3) across 13 sites — `SAUDI_APPETITES`, `APPROVAL_REQUESTS`, `CCM_CHECKS`, `ASSETS`, `CHAIN_RULES`, `ALL_WORKFLOWS`, `AUDIT_ENGAGEMENTS`, `BREACHES` — **and the backend already builds a real board pack** (`BoardPackService`/`BoardPackPptxService` read 8 live repositories; F2-27 probed `board-pack.pdf` at 40 KB and `.pptx` at 34 KB, both 200, both already linked from the dashboard). So `/board-pack` is a **façade beside a working subsystem** — the PM-C1 policy-façade shape again — and the screen and the PDF disagree with the PDF being right. Rewiring 8 fake arrays would duplicate server logic on the client and drift. Raised as **F2-42 (P1)**, blocked on a product decision: expose `BoardPackService`'s aggregate as JSON and render that, or retire the page for the real export. **Interim measure shipped:** a bilingual *sample data* banner on the page, deliberately visible in print too, since a printed pack is what gets quoted. | — |
 | W2-1b | F2-02/F2-15 | CI rule: no `/mock/i` import outside `**/*.test.*` + **backend-down acceptance test** (every register → error state, **zero rows**) | S | ✅ **GUARDS DONE 2026-07-29** · ⬜ **the "zero rows" question needs the user** (no migration). ⬅ **I expected a third W2-1a-style fabrication defect and the measurement said no.** `useApiResource` substitutes demo rows on a failed call *and* on a **successful empty one** ("prefer the rich demo set so the UI never looks broken on a fresh tenant") — but it **is disclosed**: `isDemo: true`, and **10 of 10 real consumers reference it**, rendering a warning `Demo mode` badge and disabling live refresh. So this is deliberate design, and the honest output was guards + a question, not the fix I set out to write. ⚠ **The plan line and the platform disagree:** the plan asks for "zero rows"; the platform shows badged demo rows. **That is a commercial call about how the product presents itself, so I did not change it** — overriding it on a plan line would be the F2-40 mistake of treating a designed assertion as a defect. If you want the plan's version the change is small and local to the `list.length === 0` branch. The real risk it leaves is a *screenshot*: an empty-but-healthy register showing another org's incidents can be cropped into an audit pack without the badge. **Shipped instead:** `demoFallbackContract.test.ts` — a **ratchet** on mock imports outside tests at the measured baseline **33 imports / 27 files** (a hard ban was impossible: those 33 exist, and **F2-15** is the row that drives them down — *a ratchet is what a ban becomes when you count first*) **plus** a guard that every `useApiList`/`useApiResource` consumer must reference `isDemo`, which is exactly how W2-1a-i/ii happened; and `useApiResource.test.ts` — 5 `renderHook` tests pinning the real contract (error → error+isDemo+demo rows; empty success → isDemo with **no** error; real rows → no substitution; unauthenticated → demo, no error, **fetcher never called**). **Both guards mutation-proven** (stripping `isDemo` from `IncidentsPage` fails naming the file; one new mock-importing file fails the ratchet; both reverted, `git diff` empty) and the ratchet carries an **anti-vacuity** test asserting the scan finds >20 known sites — a scan matching nothing would be green for the wrong reason. FE suite **63/63** (was 54), `tsc` clean | — |
 | **F2-08a** | F2-08 | **Promote the export toolkit to the kernel** — `PdfTheme`, `PdfFonts`, `XlsxStyler`, `ExportNaming`, `RegisterExport`, `TabularExport*` (+`DocxKit`) → `module/platform/export` | S | ✅ **DONE** `313dd6dd` — all 9 files present; `reporting` fan-in **25 → 0**; 22 files now import `platform.export`. *Was listed open in two places until the council caught it* | — |
-| **F2-07a** | F2-07 | **Route reconciliation matrix** — all **329** routes × {nav entry? · module owner? · real API or mock? · last touched}; classify the URL-only screens (**329** routes vs **184** nav entries — the unreachable set is larger than the 145 difference, because several entries are query-tab variants of one route) **promote / merge / retire** | S | ✔ **DONE 2026-08-08** — `UX/ROUTE_RECONCILIATION.md` + `Appendix/scripts/route_reconciliation.py` + `routeDetailReachability.test.ts`. **F2-07's “144 URL-only screens” is 18**, all `:param` detail routes; navigation has three surfaces and the finding counted one. The 183-item sidebar half of F2-07 is untouched. New finding [[F2-163]] |
+| **F2-07a** | F2-07 | **Route reconciliation matrix** — all **329** routes × {nav entry? · module owner? · real API or mock? · last touched}; classify the URL-only screens (**329** routes vs **184** nav entries — the unreachable set is larger than the 145 difference, because several entries are query-tab variants of one route) **promote / merge / retire** | S | ✔ **DONE 2026-08-08** — `UX/ROUTE_RECONCILIATION.md` + `Appendix/scripts/route_reconciliation.py` + `routeDetailReachability.test.ts`. **F2-07's “144 URL-only screens” is ~~18~~ → 5** (corrected same day: the 18 counted `rowHref`-linked rows as orphans — see [[F2-163]], now CLOSED, all 5 linked). Navigation has **four** surfaces and the finding counted one. The 183-item sidebar half of F2-07 is untouched |
 | F2-07b | F2-07 | CI test: every route has a nav path or explicit `detailOnly: true` | S | ✅ **DONE 2026-07-29** (no migration) — **and the test found 8 shipped-but-unreachable screens.** `App.tsx` declares **263 static routes**; eight had no link from anywhere: `/socops/appsec`, `/dlp`, `/forensics`, `/iam-jml`, `/zt-maturity`, `/brand-monitoring`, `/cyber-insurance`, `/ma-due-diligence` — each a **full page** with its own API calls, KPIs, tables and detail links, not a stub. **Their sibling `/socops/awareness` WAS in the sidebar**, which is what identifies an oversight rather than a decision: nine routes, nine pages, one nav entry. Two of the eight (forensics chain-of-custody, JML who-had-what) are ECC capabilities an assessor asks for by name. All eight added to the **existing** SOC-Ops nav group — *completing a group, not designing IA*, so F2-07c's restructure is not pre-empted — with labels taken from **each page's own bilingual title** so the nav matches the screen and no Arabic was invented (8 keys × EN+AR). `routeReachability.test.ts` holds the invariant via an `INTENTIONALLY_OFF_NAV` map where every one of the 9 legitimate entries carries its **reason** (public unauthenticated portals, legacy bookmark aliases, the router entry, the mobile crisis link). ⬅ **The lesson is the inverse of this month's others: a scan that matches too little doesn't under-report, it INVENTS defects.** v1 of the scan checked `to:`/`href:`/`to=`/`navigate(` and claimed **45** orphans; 22 were the per-workflow screens reached via a `route:` key in `lib/workflowCatalog.ts` it didn't know — adding the missing shapes gave **17**, of which 9 are deliberate and **8 real**. Four backend regexes under-counted and hid problems this month; this one over-counted and would have sent me rewiring working navigation. The test therefore asserts it finds >200 routes, >300 link targets and the `route:`-keyed `/workflows/pdpl/ropa`. **Mutation-proven** (drop the forensics entry → both the orphan test and the regression pin fail, naming it; reverted). **Browser-verified** all 8 entries with Arabic labels + 2 pages rendering, clean console. **Live RBAC:** all 8 endpoints **200 for `so_officer` (CISO), 403 for `compliance`** — usable by the intended persona, so the browser 403 was correct authorisation not a defect. FE suite **67/67** (was 63), `tsc` clean. ➕ Recorded for **F2-07c**: the sidebar does **not** filter by permission, so a GRC_ADMINISTRATOR now sees 8 entries that 403 — pre-existing platform-wide (184 entries shown regardless of grant), not introduced here | — |
 | **W0-1** | D-1 | `git worktree remove .claude/worktrees/vigilant-swartz-073bd4` (branch already merged) — removes 273 phantom doc files. *(Renamed from "D-1": it collided with decision D-1 in §6, which is a different thing entirely)* | XS | ✅ **DONE** — `git worktree list` shows only the main tree; corpus now 353 on disk / 335 tracked | — |
 | F2-20 | F2-20 | **Register** `module/datagov` as maturity `PLANNED` — **do not delete it.** Reading its `package-info.java` showed a deliberate, well-argued v2 deferral (scope + Collibra/Alation overlap + pointers to the live adjacent capabilities), not a stray placeholder | XS | ⬜ *(rides F2-01)* | — |
@@ -831,12 +831,14 @@ F2-135, F2-147 slice 2, O-7.
 ✔ **2026-08-08 — [[F2-07a]] DELIVERED: the route reconciliation matrix, and F2-07's P1 headline is
 off by ~8×.** `UX/ROUTE_RECONCILIATION.md`, generated by `Appendix/scripts/route_reconciliation.py`
 and gated by `routeDetailReachability.test.ts`. **329** routes − 9 redirects − 14 bare = **306**
-authenticated screens: **183** sidebar · **103** link/tile only · **2** documented off-nav · **18** with
+authenticated screens: **183** sidebar · ~~103~~ link/tile only · **2** documented off-nav · ~~18~~ with
 no way in. F2-07 is filed **P1 Critical** on *“roughly 144 routed screens are reachable only by typing
-a URL”*; the measured figure is **18**.
+a URL”*; the measured figure is ~~18~~.
 
-🔑 **The error is structural, not arithmetical: navigation here has THREE surfaces and the finding
-counts one.** Besides `Sidebar.tsx` there are module-dashboard link tiles (`href:` props), in-page
+⚠⚠ **THE STRUCK FIGURES ARE THIS SLICE'S OWN, AND THEY WERE WRONG BY 13.** Corrected hours later while starting [[F2-163]]: **116→122 link-only · 5 with no way in**, now **0**. The scan was blind to `rowHref`. Left struck rather than rewritten, because the interesting part of this block is that it was written with confidence — see the F2-163 entry below.
+
+🔑 **The error is structural, not arithmetical: navigation here has FOUR surfaces and the finding
+counts one** — and this sentence said THREE until F2-163 found the fourth. Besides `Sidebar.tsx` there are module-dashboard link tiles (`href:` props), in-page
 links, and **registries** — `lib/workflowCatalog.ts` holds each wizard's path as a `route:` field and
 `WorkflowHubPage` renders `<Link to={w.route!}>` over it. ⚠ **This does not vacate F2-07**: its other
 half is untouched and is the more serious one — a **183-item sidebar is beyond navigable**, and the
@@ -859,9 +861,9 @@ already decided there, which is why the count is 18 and not 20.
 ➕ **What is genuinely new is [[F2-163]], and it exists because of a filter.** F2-07b measures *static*
 routes and excludes parameterised ones as *“detail views, legitimately off-nav”*. 🔑 **That is right
 about the sidebar and wrong about reachability** — a detail view is legitimately absent from a *menu*,
-not from **its own list**. **18 detail routes, 9,253 lines** of built, API-wired screens, have no
-inbound link from anywhere. ⚙ **A filter that makes an instrument's answer clean is where the next
-defect hides.**
+not from **its own list**. ~~**18 detail routes, 9,253 lines**~~ — **5 routes, 2,338 lines** once the
+scan could see `rowHref`. ⚙ **A filter that makes an instrument's answer clean is where the next
+defect hides** — and so is a scan's own missing pattern.
 
 🔴 **The worst instance is a cross-instrument blind spot worth remembering.**
 `/bcm/exercises/run/:runId/{facilitate,observe,participate}` — **1,862 lines** — have no way in, and
@@ -876,6 +878,61 @@ socops dashboard. Loose wording, not a defect. 🔑 And one more from mutating t
 of `publicPaths.ts` is a *comment* mentioning the name. **A textual scan cannot tell a declaration from
 a mention** — third instance of that class in one day, after a property and a string literal each
 faked an import use. Both implementations now anchor on `export const`.
+
+✔ **2026-08-08 — [[F2-163]] CLOSED, and the headline it was filed on was my own scan's blind
+spot.** Filed at **18** unreachable detail screens hours earlier; the true figure is **5**, and all 5
+are now linked. `ExerciseRunsPage` (new, `/bcm/exercises/:exerciseId/runs`) + two governed-path buttons
+on `RiskDetailPage` + `ExerciseRuntimeReachability.test.tsx` (**9 tests**, the first this runtime has
+ever had). FE **388/388** in 41 files, `tsc` + `vite build` clean, census drift **0** (`fe_pages`
+352→**353**, `fe_routes` 329→**330**). New finding [[F2-164]].
+
+🔑🔑 **THIRTEEN OF THE EIGHTEEN WERE FALSE POSITIVES OF THE INSTRUMENT THAT PRODUCED THE FINDING.** The
+gate matched `to:`/`href:`/`route:`/`to=`/`navigate(` and was blind to **`rowHref`** — `DataTable`'s
+per-row navigation prop, whose value is a *function returning a path*
+(`rowHref={r => `/ai/models/${r.externalId}`}`), rendered as `onClick → navigate(href)`. **34
+sites, and it is THE canonical way this codebase links a list to its detail screen.** All 13 were
+linked from exactly the list the finding said should link them. Four register pages also destructure
+`useNavigate()` as `nav`, invisible to any `navigate\(` pattern.
+
+🔑 **The correction is the same error as the finding it corrects, one slice later.** F2-07 counted one
+navigation surface; F2-07a said so, counted three, and missed the fourth. ⚙ **A plausible answer that
+confirms the story you are already telling is where measurement stops.** All 18 were `:param` routes
+and the narrative was tidy, so the 13 counter-examples were never opened one at a time. **Eighteen is a
+small enough population to adjudicate by hand, and I did not.** What caught it: opening the first list
+page the finding accused, before writing a link into it.
+
+⚙ **What could NOT have caught it, and this bounds two techniques I lean on.** The gate's non-vacuity
+check passed (300+ targets seen). Mutation testing the gate passed **7/7**. **Mutation proves a gate
+notices changes to itself; it cannot prove its definition matches the world.** Nor did “two
+implementations agree” help — both shared the same *definition*, so agreement was worthless. Now: a
+**witness assertion** per fragile pattern (one route reachable only via `rowHref`, one only via a
+`nav()` alias, so losing either pattern fails the run instead of inflating the count), plus two
+implementations with *deliberately different* definitions, cross-checked at **5 = 5**.
+
+🔑 **A THIRD instrument already held the evidence, sitting in an allow-list.**
+`apiClientReachability.test.ts` ([[F2-68]](c)) listed `exerciseRuntime.ts#listRunsForExercise` and
+`#startRun` under `KNOWN_UNREACHED`. Read aloud that is *“no screen lists or starts an exercise run”* —
+the same defect from the API side, **tolerated**. It fired on this slice as progress. ⚙ **A tolerated
+entry in one instrument's allow-list can be the proof another instrument needs.**
+
+🔴 **What survived the correction was the half that mattered.** The three BCM runtime consoles (1,862
+lines) had **no textual reference anywhere in `src/`** — and a real run has sat in dev since
+**2026-06-27** (`RUN-2026-0004`, live-probed **200** on both reads), so the screens worked and nobody
+could open them; [[F2-161]] fixed their guards two days before. And the two ERM wizards were **worse
+than unreachable**: `/workflows/erm/risk-{treatment,acceptance}/:riskId` are the only UI routes that
+write a canonical `risk_lc.treatment_plans` row (which `RiskService.close` **requires** before a HIGH or
+over-appetite risk may close) and a formal CRO-approved acceptance — and unbound, both toast *“open from
+a risk to record it”*, which nothing let the user do.
+
+➕ **Making the governed path reachable is what exposed [[F2-164]] (P2 High, filed not fixed).** The
+*reachable* `Accept` button on the same page is `hasPermission('RISK','WRITE')` → a bare
+`doTransition(…,"ACCEPTED")`, and `ACCEPTED` is **exempt** from the close gate — so `RISK:WRITE` reaches
+an outcome the design reserves for `RISK:APPROVE`, with no justification, no expiry and no sign-off. ⚠
+And the bypass is **permanent**: `expireSweep` reopens risks by iterating *acceptance records*, and this
+route creates none. Live: 8 open HIGH+ risks, `risk 21` HIGH with 0 plans. 🔑 **An unreachable
+compliant path does not read as a control failure — it reads as an absent feature**, which is why
+audits of this module measured guards, statuses and screens without asking whether the compliant route
+had a button.
 
 ✔ **2026-08-08 — [[F2-16]] TRANCHE 3: `EsgPage.tsx` 3,201 → 564 and OUT of the size ratchet — the
 `EsgPage` half of this row is DONE.** The seven operational tabs are a file each: `EsgClimateTab` 359,

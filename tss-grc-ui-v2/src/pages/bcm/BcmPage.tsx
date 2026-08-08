@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   RefreshCw, Activity, TimerReset, Gauge, Filter, Download, Plus, BarChart3, Cpu, Calendar,
   CheckCheck, PlayCircle, RotateCcw, FileCheck2, Megaphone, Send,
@@ -567,7 +567,14 @@ export function BcmPage() {
                   return (
                     <div key={e.id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px 110px 130px 90px', gap: 12, alignItems: 'center', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', background: 'var(--surface-2)' }}>
                       <div>
-                        <div style={{ fontWeight: 600 }}>{e.exerciseNameEn}</div>
+                        {/* F2-163 — the exercise runtime's only entry point. The facilitator,
+                            observer and participant consoles are keyed by RUN id, and nothing
+                            listed a run, so 1,862 lines of exercise tooling could only be
+                            opened by typing a URL. This link leads to the run list. */}
+                        <Link to={`/bcm/exercises/${e.id}/runs`}
+                              style={{ fontWeight: 600, color: 'inherit' }}>
+                          {e.exerciseNameEn}
+                        </Link>
                         <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }} className="mono">{date}</div>
                       </div>
                       <Badge tone="info">{e.exerciseType}</Badge>

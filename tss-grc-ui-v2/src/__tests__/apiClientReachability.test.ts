@@ -112,8 +112,13 @@ const KNOWN_UNREACHED: readonly string[] = [
   'lib/exerciseObserver.ts#listObservations',
   'lib/exerciseObserver.ts#observationsByType',
   'lib/exerciseRuntime.ts#getRunTimeline',
-  'lib/exerciseRuntime.ts#listRunsForExercise',
-  'lib/exerciseRuntime.ts#startRun',
+  // 🔑 `listRunsForExercise` and `startRun` LEFT this list with F2-163, and the fact that they were
+  // on it is the lesson. This allow-list recorded "nothing calls these" — which, read out loud, is
+  // "no screen lists or starts an exercise run". That is exactly the defect F2-163 found from the
+  // navigation side (three consoles, 1,862 lines, no entry point), and F2-161 fixed the guards of,
+  // from the authorisation side. ⚙ Three instruments held a piece of one defect, and a tolerated
+  // entry in one of their allow-lists was the proof another needed. When an export sits here, ask
+  // what the USER cannot do — not just which function is unused.
   'lib/mobileCrisis.ts#listPushSubscriptions',
   'lib/mobileCrisis.ts#registerPushSubscription',
   'lib/mobileCrisis.ts#unregisterPushSubscription',

@@ -91,11 +91,15 @@ PUBLISHED = {
     "migration_files": 361,
     "migration_head": 373,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
-    "fe_pages": 352,          # F2-142 retired 3; F2-16 tranche 1 +1, tranche 2 +4, tranche 3 +7
+    "fe_pages": 353,          # F2-142 retired 3; F2-16 tranche 1 +1, tranche 2 +4, tranche 3 +7
                              # regulatory tabs). A BUMP, not a narrowing — see MEASURED_BASELINE:
                              # tab modules are what this metric has always counted.
+                             # +1 F2-163: ExerciseRunsPage, a real SCREEN with a route of its own.
     "fe_page_folders": 111,   # each was the only file in its folder, so -3 folders too
-    "fe_routes": 329,
+    # ⬆ 330 with F2-163. The FIRST route added since this row began tracking, and it moves the
+    # pages-vs-routes delta by 0 (+1 page, +1 route) — which is what a genuinely new screen looks
+    # like, as against the componentisation that made the delta 23.
+    "fe_routes": 330,
     "fe_nav_entries": 194,
     "mock_import_statements": 30,
     "mock_import_files": 26,
