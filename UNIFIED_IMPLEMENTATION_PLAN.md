@@ -370,7 +370,7 @@ it as evidence. Close F2-28 first — it is 3–5 days and already sequenced ahe
 | **F2-11** | — | ⬆ **Partly pulled into Wave 1 by the council** — it was silently moved from Wave 1 to Wave 4 with no stated reason. Wave 1 takes the ESLint ratchet + the pages on the five persona journeys; the rest stays here. **i18n convergence** — ESLint baseline first (**`eslint_configured: false` today**), then no-bare-Latin-JSX and no-`lang === 'ar'`-in-`pages/**` as **ratchets**; migrate the 439 hardcoded strings; fix the 49 zero-Arabic pages; per-module Arabic-coverage CI report | S→L | ⬜ |
 | **F2-A11Y** | Part 5 §7 | Fix the **68 `color-contrast` (WCAG 1.4.3, serious)** instances **at the design-token level**, not per component; re-run the existing axe harness; wire `@axe-core/playwright` into CI as a ratchet; then extend to focus/keyboard/screen-reader (genuinely unmeasured) | M | ⬜ |
 | **F2-12** | — | `ndi` containment — characterisation tests over its **82 writes** *first*, then split `NdiPage.tsx` (4,969 lines) along tab boundaries | L | ⬜ |
-| F2-16 | — | Split `EsgPage.tsx` (5,582) — **before** `ndi` ~~since `sust` has 200 tests to catch mistakes~~ *(⚠ false — those are backend tests; the page had **zero**. It goes first because it is larger and `ndi` needs F2-12's characterisation tests)*; page-size ratchet (no new file > 800 lines, existing may only shrink) | M | 🔶 **ratchet DONE 2026-08-06 · tranche 1 DONE 2026-08-08** — 5,583 → 4,994, the 586-line executive dashboard extracted to `EsgOverviewTab.tsx` (639 lines) with a textual-identity proof and the page's **first 9 tests** |
+| F2-16 | — | Split `EsgPage.tsx` (5,582) — **before** `ndi` ~~since `sust` has 200 tests to catch mistakes~~ *(⚠ false — those are backend tests; the page had **zero**. It goes first because it is larger and `ndi` needs F2-12's characterisation tests)*; page-size ratchet (no new file > 800 lines, existing may only shrink) | M | 🔶 **ratchet DONE 2026-08-06 · tranches 1–2 DONE 2026-08-08** — **5,583 → 3,201** (43% of the original). T1: the 586-line executive dashboard → `EsgOverviewTab.tsx` (639) with a textual-identity proof and the page's **first 9 tests**. T2: the four regulatory tabs → a file each (513/501/471/461) with **18 mutation-proven tests**; page diff +4 / −1797 |
 | **F2-17** | — | **Extend** the existing k6 harness: realistic seed volumes (10k risks / 50k controls / 200k evidence / 1M audit rows — this is also F2-02's demo tenant), 20 highest-traffic endpoints **including writes/exports/search**, raise dev Hikari above 10 so a ceiling can be found, publish p95 targets, top-5 in CI | L | ⬜ |
 | W3-1 | — | The 84 user stories as a CI probe suite | M | ⬜ |
 | W3-2 | — | Module scorecard **generated from the registry** — with *Assurance* and *Operating-evidence* columns | S | ⬜ |
@@ -827,6 +827,70 @@ from closed to open, every one genuinely half-done.
 **F2-22b** DTO conversion · **F2-12** (`ndi`) · **F2-11** (i18n) · **F2-A11Y**. Owner-blocked and not
 engineering: O-1 deploy (**29 migrations behind**), the three destructive drops, F2-150/151/152,
 F2-135, F2-147 slice 2, O-7.
+
+✔ **2026-08-08 — [[F2-16]] TRANCHE 2: the four regulatory tabs, and two instrument bugs that
+each caught themselves.** `EsgPage.tsx` **4,994 → 3,201** — 43% of the 5,583 it started at. CMA
+Articles 91–94, TCFD alignment, double materiality and the ESG metrics register sat **contiguously**
+at lines 1287–3055 and are now `EsgCmaTab` 513, `EsgTcfdTab` 501, `EsgMaterialityTab` 471,
+`EsgMetricsTab` 461 — every one under the 800 ceiling. Page diff **+4 / −1797**, the four added lines
+being the four new imports.
+
+🔑 **The block move was legitimate because it was measured, not because it looked tidy.** Before
+touching anything: all four tabs reference **zero** page-local identifiers outside their own range,
+each has exactly **one** call site (the tab switch), and nothing declared inside the span is used
+outside it. `FieldDef` looked like a shared page type on a first reading — it is imported from
+`components/ui/FormModal`, so the import-pruner handles it. ⚙ A contiguous span with no outward
+references is the cheapest possible refactor; **finding out whether that is true is the work.**
+
+⚠ **Two instrument bugs, and both were caught by the extractor's own assertions rather than by a
+test.** (1) Hand-read boundaries were off by one on **every** tab: these tabs are separated by a
+**blank line** as well as a banner, so the hand-read "last line" was `''`, not `}`. A range one line
+short still compiles — it leaves a stray brace behind and takes a brace with it. Bounds are derived
+now. (2) The import-usage predicate kept `Target` in `EsgMetricsTab` on the strength of
+`'Target value'`, `'Target year'` and a `<th>` label — the **exact mirror** of tranche 1's
+`data.ghgYoy`, where a property faked a use. 🔑 **A textual identifier scan cannot tell code from
+content, and both directions of that mistake compile.** ⚙ The reason a heuristic predicate is safe at
+all is that `tsc` is a **two-sided** backstop: over-keeping is TS6133 (`noUnusedLocals`),
+over-dropping is TS2304.
+
+➕ **18 tests, and they were mutation-proven because 18/18 green on the first run is not evidence.**
+12 mutants, 10 killed, 2 cosmetic ones deliberately left alive (a suite that fails on any edit is
+measuring bytes, not behaviour). What they pin: every tab's rows **in both locales** (each row here
+has an `*_ar` twin an English-only assertion cannot see); the headline figure taken from the payload
+— 73% / 41% / 29 / 37, none derivable, so a tab rendering an empty shell fails rather than passing on
+`?? 0`; each tab's per-call `.catch` soft-fail, **including TCFD's third read** (a climate-risk picker
+whose failure must not cost the disclosure matrix); and that all four ask the API for reporting year
+**2025** — a tab querying the wrong year looks correct on screen while disclosing the wrong period.
+
+⚙ **The size ratchet's own tripwire fired, as its message asked it to** — *"if it is no longer
+oversized the split happened and this test should be updated deliberately, not left asserting a stale
+shape"*. The bound now tracks the work and is **two-sided**: a tranche that GREW the page fails too,
+which a one-sided "still oversized" assertion would have waved through.
+
+⚠ **`MEASURED_BASELINE`'s *Frontend pages* 341 → 345 is a BUMP, not a narrowing, and the distinction
+is the point.** Tranche 1 excluded `*.test.tsx` because a test file can never be rendered as a screen
+— that corrected the measurement. A tab module under `pages/` is the same kind of thing this metric
+has always counted (S5c's split of `ChangesPage` is recorded as "+7 files"), so excluding tab modules
+would flatter F2-16 and break comparability with every earlier split. 🔑 **What I did instead was
+warn about the reading**: the pages-vs-routes delta is 345 − 329 = 16 and will pass 40 as F2-16 and
+F2-12 proceed, without one new screen becoming unreachable. It is a count of files under `pages/`, not
+of unreachable screens — and fixing that is F2-07's to define, not this row's to fake.
+
+⚠ **Not a bundle win, and the slice should not be read as one.** The tabs are statically imported, so
+`EsgPage-*.js` stays **212.98 kB**. `React.lazy` would change behaviour (loading states) and is not
+part of a pure move.
+
+➡ **Remaining tranches, with the coupling measured rather than guessed** (post-split line ranges):
+`CapaTab` 599–1139, `SgiTab` 2246–2775, `GhgInventoryTab` 1909–2230, `ClimateTab` 281–586,
+`EvidenceTab` 1271–1535, `AnnexTab` 1560–1869, `SettingsTab` 2783–2987 — **seven tabs that use none
+of the page's shared primitives**, so each is as cheap as the four just moved. ⚠ **Exactly two are
+not**: `CalculatorTab` (`<Field` ×4, `inputStyle` ×4) and `SurveyTab` (`<Stat` ×3, `inputStyle` ×3).
+Whichever tranche takes one of those must move `Field` / `Stat` / `inputStyle` into a shared module
+**in the same commit** — importing them back from `EsgPage` would make the page and its own tabs
+mutually dependent, and `inputStyle` is a `const`, so a circular import there is a TDZ hazard rather
+than a style question. ⚙ I first wrote this paragraph as *"the remaining tabs are not the easy case"*
+on the strength of a page-wide count (8/4/3); per-function measurement says **7 of 9 are** exactly
+that easy. **A count over the whole file cannot tell you which function carries the coupling.**
 
 ✔ **2026-08-08 — [[F2-16]] TRANCHE 1: the executive ESG dashboard leaves the monolith, and the
 reason this page was scheduled first turns out to be false.** `EsgPage.tsx` **5,583 → 4,994**; the
