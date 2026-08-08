@@ -370,7 +370,7 @@ it as evidence. Close F2-28 first — it is 3–5 days and already sequenced ahe
 | **F2-11** | — | ⬆ **Partly pulled into Wave 1 by the council** — it was silently moved from Wave 1 to Wave 4 with no stated reason. Wave 1 takes the ESLint ratchet + the pages on the five persona journeys; the rest stays here. **i18n convergence** — ESLint baseline first (**`eslint_configured: false` today**), then no-bare-Latin-JSX and no-`lang === 'ar'`-in-`pages/**` as **ratchets**; migrate the 439 hardcoded strings; fix the 49 zero-Arabic pages; per-module Arabic-coverage CI report | S→L | ⬜ |
 | **F2-A11Y** | Part 5 §7 | Fix the **68 `color-contrast` (WCAG 1.4.3, serious)** instances **at the design-token level**, not per component; re-run the existing axe harness; wire `@axe-core/playwright` into CI as a ratchet; then extend to focus/keyboard/screen-reader (genuinely unmeasured) | M | ⬜ |
 | **F2-12** | — | `ndi` containment — characterisation tests over its **82 writes** *first*, then split `NdiPage.tsx` (4,969 lines) along tab boundaries | L | ⬜ |
-| F2-16 | — | Split `EsgPage.tsx` (5,582) — **before** `ndi` ~~since `sust` has 200 tests to catch mistakes~~ *(⚠ false — those are backend tests; the page had **zero**. It goes first because it is larger and `ndi` needs F2-12's characterisation tests)*; page-size ratchet (no new file > 800 lines, existing may only shrink) | M | 🔶 **ratchet DONE 2026-08-06 · tranches 1–2 DONE 2026-08-08** — **5,583 → 3,201** (43% of the original). T1: the 586-line executive dashboard → `EsgOverviewTab.tsx` (639) with a textual-identity proof and the page's **first 9 tests**. T2: the four regulatory tabs → a file each (513/501/471/461) with **18 mutation-proven tests**; page diff +4 / −1797 |
+| F2-16 | — | Split `EsgPage.tsx` (5,582) — **before** `ndi` ~~since `sust` has 200 tests to catch mistakes~~ *(⚠ false — those are backend tests; the page had **zero**. It goes first because it is larger and `ndi` needs F2-12's characterisation tests)*; page-size ratchet (no new file > 800 lines, existing may only shrink) | M | 🔶 **ratchet DONE · `EsgPage` DONE 2026-08-08 in 3 tranches; `NdiPage` awaits F2-12** — **5,583 → 564**, a tenth of the original and **out of `OVERSIZE`**. T1: executive dashboard → `EsgOverviewTab` (639) + the page's **first 9 tests**. T2: four regulatory tabs → a file each + **18 mutation-proven tests**. T3: seven operational tabs → a file each + **23 tests**; four textual proofs, one of which exists because T2's boundary rule would have orphaned three tabs' documentation on the page |
 | **F2-17** | — | **Extend** the existing k6 harness: realistic seed volumes (10k risks / 50k controls / 200k evidence / 1M audit rows — this is also F2-02's demo tenant), 20 highest-traffic endpoints **including writes/exports/search**, raise dev Hikari above 10 so a ceiling can be found, publish p95 targets, top-5 in CI | L | ⬜ |
 | W3-1 | — | The 84 user stories as a CI probe suite | M | ⬜ |
 | W3-2 | — | Module scorecard **generated from the registry** — with *Assurance* and *Operating-evidence* columns | S | ⬜ |
@@ -827,6 +827,61 @@ from closed to open, every one genuinely half-done.
 **F2-22b** DTO conversion · **F2-12** (`ndi`) · **F2-11** (i18n) · **F2-A11Y**. Owner-blocked and not
 engineering: O-1 deploy (**29 migrations behind**), the three destructive drops, F2-150/151/152,
 F2-135, F2-147 slice 2, O-7.
+
+✔ **2026-08-08 — [[F2-16]] TRANCHE 3: `EsgPage.tsx` 3,201 → 564 and OUT of the size ratchet — the
+`EsgPage` half of this row is DONE.** The seven operational tabs are a file each: `EsgClimateTab` 359,
+`EsgCapaTab` 607, `EsgEvidenceTab` 319, `EsgAnnexTab` 411, `EsgGhgInventoryTab` 377, `EsgSgiTab` 588,
+`EsgSettingsTab` 248. Page diff **+12 / −2649**, every added line an import. Across three tranches the
+largest file in the frontend went **5,583 → 564 — a tenth** — and gained **50 tests** where it had none.
+What is left is the shell, the tab switch, `CalculatorTab` (120), `SurveyTab` (186) and the
+`Field`/`Stat`/`inputStyle` primitives those two share; the ceiling is met, so that last move is
+optional rather than owed. `NdiPage.tsx` (4,969) is the remaining half and is gated on [[F2-12]].
+
+⚠⚠ **TRANCHE 2's BOUNDARY RULE WOULD HAVE SHIPPED A DEFECT HERE, AND IT IS THE MOST REUSABLE THING
+IN THIS SLICE.** That tranche derived each range by walking up from the declaration over adjacent `//`
+lines — correct for four regulatory tabs that each had one contiguous banner directly above. Three of
+these seven have a different shape: `ClimateTab` is documented with a `/** … */` block, so there are
+**no `//` lines to absorb and the walk-up took nothing**; `CapaTab` and `AnnexTab` have
+**multi-paragraph** banners split by blank lines, so it would have taken the last paragraph and left
+the section header. Either way the documentation stays on the page, **orphaned above an unrelated
+declaration, compiling cleanly and describing the wrong function.** 🔑 **A rule that is right for the
+cases you tested it on is not a rule** — and the failure mode here is invisible to `tsc`, to the tests,
+and to the diff of the new file. The rule is now the file's own convention: everything between the
+previous top-level declaration and this one belongs to this one. ➕ That rule also collected
+`AnnexTab`'s four inseparable companions — `RY_FORWARD`, `RY_STATUS_LABEL`, `RyForm` and `ryFields`,
+spread on **both sides** of the tab — with no special case, which is the argument for it.
+
+⚙ **So the proof set grew from two to four, and the two new ones are the interesting ones.** **P3**: no
+`function`/`const`/`interface` and **no banner line** of a moved tab survives on the page — the check
+that catches the orphaning above. **P4**: line conservation, 2,588 moved + 613 retained == 3,201. 🔑 A
+proof only exists once you know what can go wrong; P3 is a defect from this slice turned into an
+assertion.
+
+➕ **23 tests, pinning something a reader of the page could not have known: these seven do not degrade
+alike.** `CapaTab`, `EvidenceTab`, `GhgInventoryTab`, `SgiTab` use per-call `.catch` and say
+**nothing** — an empty table is indistinguishable from *no records*. `ClimateTab`, `AnnexTab`,
+`SettingsTab` use `try/catch` + `toast.danger` and **tell** the user. Both are deliberate and opposite,
+and an extraction is exactly the kind of change that swaps one for the other silently.
+
+⚠ **One observation found by testing, and pinned rather than fixed: `SettingsTab` has no recovery
+path.** Its guard is `if (loading || !settings)`, so a failed read leaves the user on *“Loading…”*
+**for ever** — toast, then nothing, no retry. I expected an empty state, the test failed, and the
+honest response was to assert what exists with a comment saying so. ⚙ **Changing what a tab does in
+the middle of a move is how a refactor loses its proof**, and a test that describes a wart keeps it
+visible where a test rewritten to pass hides it. Filed on the row.
+
+🔑🔑 **AND THE FIXTURE LESSON REPEATED BY A NEW ROUTE, WHICH IS WHY IT IS WORTH STATING AS A RULE.**
+I typed six fixtures against their interfaces; the seventh I left as a bare object literal, because the
+interface lookup had come back *not found* (it is `OrganisationSettings`, not `SustainabilitySettings`)
+and I moved on without it. **The untyped one was the wrong one** —
+`ghgScope3CoverageThreshold` and `sustainabilityReportingYear` do not exist, and six required fields
+were missing. Annotating it then caught **three more** wrong values in fixtures I *had* typed:
+`CapaSourceType` has no `GHG_COVERAGE`, `GhgScope` is `1|2|3` and not `'SCOPE_3'`, and `SgiTier`'s five
+members do not include my invented `OFF_TRACK`. ⚙ **A fixture's type annotation is the cheapest
+field-name check there is, and skipping it exactly once was enough** — same defect as tranche 1's
+`esgWarnThreshold`, reached differently. ⚠ **And `as X['y']` casts throw that check away**: they are
+now gone from this file and from tranche 2's, where removing them proved those Records were already
+correct — the check is live from here on rather than merely present.
 
 ✔ **2026-08-08 — [[F2-16]] TRANCHE 2: the four regulatory tabs, and two instrument bugs that
 each caught themselves.** `EsgPage.tsx` **4,994 → 3,201** — 43% of the 5,583 it started at. CMA
