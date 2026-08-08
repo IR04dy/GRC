@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Filter, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, RotateCcw, X as XIcon, GitBranch, Download } from 'lucide-react';
+import { AlertTriangle, Filter, Plus, Flame, ShieldCheck, ClipboardCheck, Target, Activity, ArrowRight, Send, CheckCheck, ShieldOff, Archive, Pencil, RotateCcw, X as XIcon, GitBranch, Download } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
 import { ModuleSubmissionsPanel } from '../../components/workflows/ModuleSubmissionsPanel';
 import { Tabs } from '../../components/ui/Tabs';
+import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { Card } from '../../components/ui/Card';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -21,7 +22,7 @@ import { FilterModal, distinctValues, type FilterField } from '../../components/
 import { SavedViewSelector } from '../../components/ui/SavedViewSelector';
 import { defaultViewForPage, type SavedView } from '../../lib/savedViews';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
-import { riskApi, ermAdvancedApi, reportingApi, ApiError, type RiskResponse, type KriDefinitionDto, type RiskAppetiteStatementDto, type AppetiteBreachEventDto } from '../../lib/api';
+import { riskApi, ermAdvancedApi, reportingApi, ApiError, type RiskResponse, type KriDefinitionDto, type RiskAppetiteStatementDto, type AppetiteBreachEventDto, type RiskCategoryDto } from '../../lib/api';
 import { kriApi } from '../../lib/kriEngine';
 import { usePromoted } from '../../lib/promotedRecords';
 import { toRiskResponse, usePromotedProvenance } from '../../lib/promotedAdapters';
@@ -716,11 +717,14 @@ const SEVERITY_TONE_APP: Record<string, BadgeTone> = {
 };
 
 function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [items, setItems] = useState<RiskAppetiteStatementDto[]>([]);
   const [breaches, setBreaches] = useState<Record<number, AppetiteBreachEventDto[]>>({});
   const [stats, setStats] = useState<{ total: number; withinTolerance: number; exceeded: number; critical: number; noExposure: number } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<RiskCategoryDto[]>([]);
+  /** F2-166 — create/edit form state. `null` = closed. */
+  const [editing, setEditing] = useState<{ of: RiskAppetiteStatementDto | null } | null>(null);
   const toast = useToast();
 
   // F2-98: reactive, as KriDashboard.
@@ -754,8 +758,16 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
         ermAdvancedApi.appetites(0, 100),
         ermAdvancedApi.appetiteDashboard(),
       ]);
+      void riskApi.categories().then(setCategories).catch(() => setCategories([]));
       const list = page.content ?? [];
-      if (list.length === 0) { applyMock(); return; }
+      // ⚠ F2-166 — this branch used to be `if (list.length === 0) { applyMock(); return; }`, and
+      // that single line is why nobody noticed the tab could not create a statement. A tenant with
+      // none saw the demo library instead of an empty register, complete with Approve / Retire /
+      // Update-exposure buttons on rows whose ids (5101–5107, 6101–6108) exist nowhere. So the
+      // honest empty state below — the one that says "no statements, here is how to add one" — was
+      // unreachable code, and the gap it would have exposed stayed invisible.
+      // Fourth time a client-side fallback has hidden the truth about a screen (F2-42, F2-38,
+      // F2-158). A signed-in tenant with zero rows now sees zero rows.
       setItems(list);
       setStats(dash);
       const bm: Record<number, AppetiteBreachEventDto[]> = {};
@@ -802,6 +814,62 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
     catch (e) { toast.danger(e instanceof ApiError ? e.message : 'Action failed'); }
   }
 
+  /**
+   * F2-166 — the fields for creating / editing a statement.
+   *
+   * ⚠ `categoryId` and `toleranceUpper` are REQUIRED, and that is deliberate rather than strict for
+   * its own sake: `RiskService.isOverAppetite` — the over-appetite arm of F2-164's mandatory-treatment
+   * close gate — matches an APPROVED statement on `categoryId` and compares residual to
+   * `toleranceUpper`. A statement missing either is invisible to it. Four of the nine statements
+   * seeded in dev have a null category and so gate nothing, which is precisely the outcome a form
+   * with optional fields produces. The board narrative belongs in `statementEn/Ar`; the two columns
+   * the engine reads are not optional.
+   */
+  const appetiteFields: FieldDef[] = [
+    { kind: 'text',     key: 'titleEn',      label: lang === 'ar' ? 'العنوان (إنجليزي)' : 'Title (EN)', required: true, maxLength: 500, span: 6 },
+    { kind: 'text',     key: 'titleAr',      label: lang === 'ar' ? 'العنوان (عربي)' : 'Title (AR)',    required: true, maxLength: 500, span: 6 },
+    { kind: 'select',   key: 'riskDimension', label: lang === 'ar' ? 'البُعد' : 'Risk dimension', required: true, span: 4,
+      options: ['STRATEGIC', 'OPERATIONAL', 'FINANCIAL', 'COMPLIANCE', 'CYBER', 'REPUTATIONAL'].map(v => ({ value: v, label: v })) },
+    { kind: 'select',   key: 'appetiteLevel', label: lang === 'ar' ? 'مستوى الشهية' : 'Appetite level', required: true, span: 4,
+      // Exactly the keys APPETITE_TONE maps — a level outside them renders a neutral badge, which is
+      // the vocabulary-drift shape F2-164 found on the risk detail page.
+      options: Object.keys(APPETITE_TONE).map(v => ({ value: v, label: v })) },
+    { kind: 'select',   key: 'categoryId',   label: lang === 'ar' ? 'فئة الخطر (يقرأها بوابة الإغلاق)' : 'Risk category (read by the close gate)', required: true, span: 4,
+      options: categories.filter(c => c.isActive !== false)
+        .map(c => ({ value: String(c.id), label: lang === 'ar' ? (c.nameAr ?? c.nameEn) : c.nameEn })) },
+    { kind: 'number',   key: 'toleranceLower', label: lang === 'ar' ? 'الحد الأدنى للتحمل' : 'Tolerance lower', span: 3 },
+    { kind: 'number',   key: 'toleranceUpper', label: lang === 'ar' ? 'سقف التحمل (يقرأه المحرك)' : 'Tolerance upper (engine reads this)', required: true, span: 3 },
+    { kind: 'text',     key: 'unit',         label: lang === 'ar' ? 'الوحدة' : 'Unit', maxLength: 40, span: 3 },
+    { kind: 'date',     key: 'nextReviewDate', label: lang === 'ar' ? 'المراجعة التالية' : 'Next review', span: 3 },
+    { kind: 'textarea', key: 'statementEn',  label: lang === 'ar' ? 'نص البيان (إنجليزي)' : 'Statement (EN)', rows: 3, span: 12 },
+    { kind: 'textarea', key: 'statementAr',  label: lang === 'ar' ? 'نص البيان (عربي)' : 'Statement (AR)', rows: 3, span: 12 },
+  ];
+
+  async function saveAppetite(v: Record<string, unknown>) {
+    const num = (k: string) => (v[k] === '' || v[k] == null ? undefined : Number(v[k]));
+    const body = {
+      titleEn: String(v.titleEn ?? ''), titleAr: String(v.titleAr ?? ''),
+      statementEn: (v.statementEn as string) || undefined,
+      statementAr: (v.statementAr as string) || undefined,
+      riskDimension: String(v.riskDimension ?? ''),
+      appetiteLevel: String(v.appetiteLevel ?? ''),
+      categoryId: num('categoryId'),
+      toleranceLower: num('toleranceLower'), toleranceUpper: num('toleranceUpper'),
+      unit: (v.unit as string) || undefined,
+      nextReviewDate: (v.nextReviewDate as string) || undefined,
+    };
+    // The server forces status to DRAFT on create and refuses `status`/`approvedBy` on either verb
+    // (SEC-RISK-002), so sign-off still has to go through Approve — a statement cannot self-attest.
+    const existing = editing?.of;
+    if (existing) await ermAdvancedApi.updateAppetite(existing.id, body);
+    else await ermAdvancedApi.createAppetite(body);
+    toast.success(existing
+      ? (lang === 'ar' ? 'تم تحديث البيان' : 'Statement updated')
+      : (lang === 'ar' ? 'تم إنشاء البيان كمسودة — يحتاج موافقة' : 'Statement created as DRAFT — it needs approval to bind'));
+    setEditing(null);
+    void loadAll();
+  }
+
   return (
     <>
       {showingDemo && <DemoDataNotice signedIn={isAuthenticated()} detailKey="demoNoticeAppetite" />}
@@ -818,10 +886,25 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
         <Kpi Icon={Flame}          label={t('appKpiCritical')}   value={stats?.critical ?? 0}        tone="danger"  to="/risk?tab=appetite" />
         <Kpi Icon={ClipboardCheck} label={t('appKpiNoData')}     value={stats?.noExposure ?? 0}      tone="info"    to="/risk?tab=appetite" />
       </div>
+      {/* F2-166 — the statement register had no create affordance at all, so this button is the
+          only way `createAppetite` is reachable. Hidden on the demo library: those rows are not
+          the tenant's, and a write against them 404s. */}
+      {!showingDemo && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <Button variant="primary" Icon={Plus} onClick={() => setEditing({ of: null })}>
+            {lang === 'ar' ? 'بيان شهية جديد' : 'New appetite statement'}
+          </Button>
+        </div>
+      )}
       {loading
         ? <InlineEmpty>Loading…</InlineEmpty>
         : items.length === 0
-          ? <Card><InlineEmpty>No appetite statements yet.</InlineEmpty></Card>
+          ? <Card><InlineEmpty>
+              {lang === 'ar'
+                ? 'لا توجد بيانات شهية مخاطر. أنشئ بياناً وأقرّه لكي يعمل فحص تجاوز الشهية عند إغلاق المخاطر.'
+                : 'No risk appetite statements. Create one and approve it — until then the '
+                  + 'over-appetite arm of the mandatory-treatment gate has nothing to compare against.'}
+            </InlineEmpty></Card>
           : (
             <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}>
               {items.map(s => {
@@ -841,6 +924,10 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
                       {sev && <Badge tone={sevTone}>{sev.replace(/_/g, ' ')}</Badge>}
                       {ob > 0 && <Badge tone="danger">{ob} open breach{ob > 1 ? 'es' : ''}</Badge>}
                       <Button variant="secondary" Icon={ArrowRight} onClick={() => updateExposure(s)}>Update exposure</Button>
+                      {!showingDemo && s.status !== 'RETIRED' &&
+                        <Button variant="secondary" Icon={Pencil} onClick={() => setEditing({ of: s })}>
+                          {lang === 'ar' ? 'تعديل' : 'Edit'}
+                        </Button>}
                       {s.status !== 'APPROVED' && s.status !== 'RETIRED' &&
                         <Button variant="secondary" Icon={CheckCheck} onClick={() => approveAppetite(s)}>Approve</Button>}
                       {s.status !== 'RETIRED' &&
@@ -852,6 +939,30 @@ function AppetiteDashboard({ demoMode }: { demoMode: boolean; risks: RiskRespons
             </div>
           )
       }
+      {editing && (
+        <FormModal
+          open
+          title={editing.of
+            ? (lang === 'ar' ? 'تعديل بيان الشهية' : 'Edit appetite statement')
+            : (lang === 'ar' ? 'بيان شهية جديد' : 'New appetite statement')}
+          fields={appetiteFields}
+          size="lg"
+          initial={{
+            titleEn: editing.of?.titleEn ?? '', titleAr: editing.of?.titleAr ?? '',
+            statementEn: editing.of?.statementEn ?? '', statementAr: editing.of?.statementAr ?? '',
+            riskDimension: editing.of?.riskDimension ?? 'OPERATIONAL',
+            appetiteLevel: editing.of?.appetiteLevel ?? 'CAUTIOUS',
+            categoryId: editing.of?.categoryId != null ? String(editing.of.categoryId) : '',
+            toleranceLower: editing.of?.toleranceLower ?? '',
+            toleranceUpper: editing.of?.toleranceUpper ?? '',
+            unit: editing.of?.unit ?? '',
+            nextReviewDate: editing.of?.nextReviewDate ?? '',
+          }}
+          submitLabel={editing.of ? (lang === 'ar' ? 'حفظ' : 'Save') : (lang === 'ar' ? 'إنشاء' : 'Create')}
+          onClose={() => setEditing(null)}
+          onSubmit={saveAppetite}
+        />
+      )}
     </>
   );
 }

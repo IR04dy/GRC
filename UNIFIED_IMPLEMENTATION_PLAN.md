@@ -1002,6 +1002,86 @@ today… needs the owner's word"*. Also measured: **all four APPROVED acceptance
 belong to soft-deleted probe risks**, so no acceptance has ever been recorded through the UI — which is
 what an unreachable approval step looks like from the data side.
 
+✔ **2026-08-08 — [[F2-165]] CLOSED, and building the instrument it asked for produced a P2 on its
+first run: [[F2-166]].** F2-165 said F2-68(c)'s unused-export scan resolves per exported *object*, so
+`riskAcceptanceApi` counted as reached while four of its five methods were dead. Its own
+recommendation was **measure the population before changing the gate**, and that instruction was
+right — the figure is large enough that a cold per-method rule would have produced a list nobody
+adjudicates. Measured: **91 grouped clients · 1,070 methods · 191 with no caller (17.8%)**.
+
+⚠ **The recommendation's second step was wrong, and reading one entry is what showed it.** It said to
+sort the population into *governance-critical* and *not yet wired*. The first candidate refuted the
+sort: `evidenceApi.approve` has no caller and looks maximally governance-critical, but
+`lib/evidenceItems.ts#approveEvidenceItem` POSTs the **same** `/api/v1/evidence/items/{id}/approve`
+and a screen calls it. Filed by name shape that reads *"no screen can approve evidence"* — false. So
+the partition that carries meaning is by **endpoint**, not by verb name, and it is mechanical:
+**5 dead duplicates** (exact `(verb, path)` has a reached sibling → deletable dead code, all five
+deleted), **148 `HOLE`** (the endpoint *family* is reached, so a live workflow has a gap — the F2-164
+shape), **41 whole-capability dark** (no screen touches the family at all — F2-68(c)'s original
+population). Two independently-built passes agreed on that last figure, 41 against 42, which is the
+only reason it is worth publishing. ⚙ **A classification rule you can only apply by intuition will
+manufacture a P1 on its first use.**
+
+Only the duplicate half is a hard zero, and it can be one *because the remedy is unambiguous*.
+The other 189 are a reported figure with a two-way ratchet and no ceiling, each annotated with what
+the **user** cannot do — the `BARE_EXPORT_CEILING` lesson honoured rather than quoted.
+
+⚠⚠ **The instrument contained the defect it measures, twice.** (1) My first stripper was hand-rolled;
+a **regex literal** in `lib/api.ts` (`/filename="?([^";]+)"?/i`) put it into double-quote state at
+line 212, every comment after that survived, and prose words came out as object keys — the count was
+wrong by 14. The repo's own `stripComments` **documents that exact limitation** in its docstring and
+bounds its string patterns to one line so it degrades safely. 🔑 **The helper existed, it named the
+precise failure, and re-implementing it reproduced the bug it was written to avoid** — second
+occurrence of F2-07a's *"grep for an instrument before building one"*. (2) My duplicate detector's
+"plain export" pass also matched `export const someApi = {…}`, so referencing a group marked **all**
+its endpoints reached and 196 dark methods came back as **192 "dead duplicates"** — object
+granularity, reintroduced inside the invariant written to catch object granularity. Plus a depth-1
+key match that read `api.get<PageResponse<Risk>>` as a method called `PageResponse`, an anti-phantom
+check written against raw source that failed on ~30 real methods (comments sit between keys) and
+would have had me "fix" an extractor that was right, and a family rule that truncated
+`/api/v1/risk/appetite{}` to `/api/v1/risk` so the appetite gap did not flag on the first pass. Four
+pattern mistakes in one slice, same family as the six phantoms F2-164's `.status ===` scan invented.
+
+🔴 **[[F2-166]] — P2 High, and it chains straight into the gate the previous slice restored.**
+`ermAdvancedApi` has 9 appetite methods. `appetites`, `appetiteDashboard`, `appetiteBreaches`,
+`updateExposure`, `approveAppetite` and `retireAppetite` were all wired; `createAppetite`,
+`updateAppetite`, `getAppetite` and `deleteAppetite` had **no caller in `src/`**. Read aloud: *a
+statement can be approved, retired and have its exposure updated — and cannot be brought into
+existence.* `RiskService.isOverAppetite` matches an **APPROVED** statement on the risk's `categoryId`
+and compares residual to `toleranceUpper`; it is the over-appetite arm of F2-164's mandatory-treatment
+close gate. So that arm could only fire for a tenant whose rows arrived by seed script. Dev:
+organisation 1 has 9 statements (8 APPROVED, **3 risks currently over a ceiling**), organisations 2
+and 3 have **zero**, and **4 of the 9 carry a null `category_id`** and gate nothing.
+
+⚠⚠ **Why nobody noticed — the fallback was load-bearing, for the fourth time.** `loadAll` ended
+`if (list.length === 0) { applyMock(); return; }`, so a **signed-in** tenant with no statements saw
+the demo library (ids 5101–5107 / 6101–6108) with Approve / Retire / Update-exposure live on rows
+that exist in no database. The tab always looked complete, the honest `No appetite statements yet`
+branch was **unreachable code**, and the missing create path had nothing to draw attention to it.
+After F2-42, F2-38 and F2-158 — 🔑 **when a screen has a client-side fallback, hit its endpoints
+before believing the screen.**
+
+Fixed here: a `FormModal` create/edit form on the Appetite tab, with `categoryId` and
+`toleranceUpper` **required** because the two columns the engine reads are not optional; the
+appetite-level options derived from `APPETITE_TONE`'s keys rather than retyped (F2-164's
+`?? 'neutral'` lesson); the zero-rows fabrication removed and the empty state now naming the control
+left inert; write affordances hidden while demo rows are on screen, since a write against id 5101 can
+only 404. Live probe on :8084 (`[REVIEW-TEST]`, residue 0): create as `so_officer` **403** (RISK_READ
+only, guard holds) · as `rmanager` **201 DRAFT** (server forces DRAFT, `approvedBy` unbindable) · edit
+200 · a LOW risk over a ceiling of 3, walked OPEN → UNDER_REVIEW → MITIGATING, close **200 while the
+statement is DRAFT** (correct — an unapproved appetite must not bind) · approve → APPROVED · close
+**409 "a treatment plan is required before closing a risk over its appetite ceiling"**. ⚙ **That last
+leg was unreachable before this slice** — not failing, unreachable.
+
+🔑 **Three findings now share one shape**: F2-164 (approve/reject/revoke dead, create live), F2-166
+(create/edit dead, approve live), F2-163 (a console with no entry point). ⚙ **Read a workflow end to
+end in both directions** — creation to final decision, and back. A gap at either end makes everything
+between it and the gap decorative, and the screen looks finished from every angle except that one.
+
+FE **423/423** in 45 files (+18: 10 for the instrument, 8 for the appetite wiring), `tsc` +
+`vite build` clean, mutation **7/7** caught, backend untouched. Two guards added:
+`apiClientMethodReachability.test.ts` and `appetiteStatementWiring.test.ts`.
+
 ✔ **2026-08-08 — [[F2-16]] TRANCHE 3: `EsgPage.tsx` 3,201 → 564 and OUT of the size ratchet — the
 `EsgPage` half of this row is DONE.** The seven operational tabs are a file each: `EsgClimateTab` 359,
 `EsgCapaTab` 607, `EsgEvidenceTab` 319, `EsgAnnexTab` 411, `EsgGhgInventoryTab` 377, `EsgSgiTab` 588,

@@ -2318,9 +2318,10 @@ export const cyberApi = {
   deletePolicy:       (id: number) => api.delete<void>(`/api/v1/cyber/policies/${id}`),
 
   // Catalog
-  controlsAll:        () => api.get<CyberControlDto[]>('/api/v1/cyber/controls/all'),
-  // dashboard:        moved up (typed as CyberDashboardDto)
-  frameworks:         () => api.get<unknown>('/api/v1/cyber/frameworks'),
+  // F2-165 — `controlsAll` and `frameworks` deleted here: same GETs as
+  // `lib/frameworkControls.ts#listAllControls` / `#listFrameworks`, which
+  // `FrameworkControlsPage` calls. Neither of these had a caller.
+  // dashboard: moved up (typed as CyberDashboardDto)
 };
 
 // ─── Privacy ────────────────────────────────────────────────────────────────
@@ -2867,9 +2868,13 @@ export const evidenceApi = {
   createItem:   (body: EvidenceItemRequest) => api.post<EvidenceItemDto>('/api/v1/evidence/items', body),
   updateItem:   (id: number, body: EvidenceItemRequest) => api.put<EvidenceItemDto>(`/api/v1/evidence/items/${id}`, body),
   deleteItem:   (id: number) => api.delete<void>(`/api/v1/evidence/items/${id}`),
-  approve:      (id: number) => api.post<EvidenceItemDto>(`/api/v1/evidence/items/${id}/approve`),
-  reject:       (id: number) => api.post<EvidenceItemDto>(`/api/v1/evidence/items/${id}/reject`),
-  submit:       (id: number) => api.post<EvidenceItemDto>(`/api/v1/evidence/items/${id}/submit`),
+  // F2-165 — `approve` / `reject` / `submit` deleted here. They POSTed the same
+  // `/api/v1/evidence/items/{id}/…` routes as `lib/evidenceItems.ts`, whose
+  // `approveEvidenceItem` / `rejectEvidenceItem` / `submitEvidenceItem` the screens
+  // actually call; these three had no caller and were a second client for a live
+  // endpoint. Read by name shape they looked like the four-eyes evidence control going
+  // unreachable; read by ENDPOINT they were dead code. Pinned by
+  // `apiClientMethodReachability.test.ts` — that invariant is a hard zero.
   uploadFile:   (id: number, file: File) => uploadFile<EvidenceItemDto>(`/api/v1/evidence/items/${id}/file`, file),
   stats:        () => api.get<unknown>('/api/v1/evidence/items/stats'),
   expired:      () => api.get<PageResponse<EvidenceItemDto>>('/api/v1/evidence/items/expired'),
