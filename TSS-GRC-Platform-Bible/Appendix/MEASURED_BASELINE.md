@@ -647,7 +647,7 @@ central tokens (§5.3), so the fix is likely a small number of token changes rat
 
 | Metric | Value | Note |
 |---|---:|---|
-| Backend tests then | 1,858 | **now 3,346** (`mvn -o clean package`, 2026-08-01, 0 failures) |
+| Backend tests then | 1,858 | **now 3,457** (`mvn -o clean package`, 2026-08-08, 0 failures) — ⚠ this cell read **3,346** for a week; no test can gate a suite's own total, so treat it as dated rather than maintained ([[F2-162]]) |
 | **Instruction coverage** | **37.1%** | JaCoCo, 1,324 classes — **not re-measured since; the suite has since grown 51%** |
 | **Branch coverage** | **26.0%** | |
 | **Line coverage** | **38.5%** | |

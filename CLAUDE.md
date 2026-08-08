@@ -56,8 +56,12 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,354; ~1 min hot, 3–5 min cold)
+mvn -o clean package        # full build + all UNIT tests (3,457 @ 2026-08-08; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
+# ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
+# and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
+# own total). Read it as "roughly this many, and growing" — the authority is the run's own
+# `Tests run:` line. Same class as F2-162: an ungateable number stated precisely goes stale.
 
 # Integration tests (*IT.java) — real HTTP + the real dev SQL Server. W1-5/F2-18.
 JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn -o verify -Pit
