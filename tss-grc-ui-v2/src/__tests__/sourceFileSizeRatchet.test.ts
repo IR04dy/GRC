@@ -19,8 +19,16 @@ import { join } from 'node:path';
  * coverage of the page that calls it</b>. Tranche 1 (2026-08-08) took it 5,583 → 4,994 and gave it
  * its first 9 tests, in `pages/esg/EsgOverviewTab.test.tsx`; tranche 2 took it <b>4,994 → 3,201</b>
  * by moving the four regulatory tabs (CMA / TCFD / materiality / metrics) into a file each, with 18
- * more tests in `pages/esg/EsgRegulatoryTabs.test.tsx`. The page is now 43% of its original size and
- * still the fourth-largest file in the frontend, so it stays pinned below.
+ * more tests in `pages/esg/EsgRegulatoryTabs.test.tsx`; tranche 3 took it <b>3,201 → 564</b> with the
+ * seven operational tabs (climate, CAPA, evidence, annex, GHG, SGI, settings).
+ *
+ * <b>So `EsgPage.tsx` is GONE from `OVERSIZE` below — 5,583 → 564, a tenth of where it started.</b>
+ * What remains in it is the shell, the tab switch, `CalculatorTab` (120) and `SurveyTab` (186), and
+ * the shared `Field` / `Stat` / `inputStyle` primitives those two use. Those two tabs were left
+ * deliberately: moving either one means moving the primitives into a shared module in the same
+ * commit — the page and its own tabs must not import from each other, and `inputStyle` is a `const`,
+ * so a cycle there is a TDZ hazard rather than a style question. At 564 lines the ceiling this
+ * ratchet exists to enforce is met, so that move is now optional rather than owed.
  *
  * <b>Why a pinned SET and not a count.</b> A count ceiling lets a new 900-line page appear as long as
  * something else shrinks — which is precisely the trade the row is trying to prevent. Pinning the
@@ -73,7 +81,10 @@ describe('F2-16 — source files over 800 lines may only shrink in number, and n
     'pages/cyber/CyberPage.tsx',
     'pages/dashboard/ExecutiveDashboard.tsx',
     'pages/dataOfficer/OtherPages.tsx',
-    'pages/esg/EsgPage.tsx',
+    // ✔ `pages/esg/EsgPage.tsx` LEFT THIS LIST on 2026-08-08 — F2-16 tranche 3 took it to 564 lines,
+    // from the 5,583 that made it the largest file in the frontend. It is not commented out here as a
+    // placeholder: the stale-entry check below fails on any entry that is no longer oversized, which
+    // is what forced this deletion rather than leaving the list overstating the debt.
     'pages/esg/GreenFinancePage.tsx',
     'pages/ethics/EthicsPage.tsx',
     'pages/fraud/FraudCaseDetailPage.tsx',
@@ -164,17 +175,20 @@ describe('F2-16 — source files over 800 lines may only shrink in number, and n
 
     expect(all).toContain('pages/esg/EsgPage.tsx');
 
-    // ⚠ This asserted `> 4000` and fired on tranche 2, exactly as its own message asked it to: the
-    // split happened, so the shape is updated deliberately rather than left stale. The bound tracks
-    // the work — it is `> 800` once F2-16 is finished, at which point EsgPage leaves OVERSIZE and the
-    // stale-entry check above becomes the guard. Keeping a bound at all is what makes the ratchet
-    // notice a REGRESSION: a tranche that grew the page instead of shrinking it would pass a
-    // one-sided "still oversized" assertion.
-    expect(measure().get('pages/esg/EsgPage.tsx'),
-      'EsgPage.tsx is F2-16\'s headline file. Tranche 1 took it 5,583 → 4,994 and tranche 2 → 3,201; '
-      + 'if it has grown past 3,300 a tranche went backwards, and if it is under 800 the split is '
-      + 'finished and this test plus OVERSIZE should be updated deliberately.')
-      .toBeGreaterThan(800);
-    expect(measure().get('pages/esg/EsgPage.tsx')).toBeLessThan(3300);
+    // ⚠ This assertion has now fired TWICE, both times correctly, and it is worth understanding why
+    // rather than just reading its current form. It began as `> 4000` with the message "if it is no
+    // longer oversized the split happened and this test should be updated deliberately, not left
+    // asserting a stale shape". Tranche 2 (→ 3,201) fired it, so it became a two-sided 800 < n < 3,300
+    // — two-sided on purpose, because a one-sided "still oversized" check would wave through a tranche
+    // that GREW the page. Tranche 3 (→ 564) fired it again, and this is the terminal state: the file
+    // is out of OVERSIZE, so `measure()` no longer contains it at all and the bound has to invert.
+    expect(measure().has('pages/esg/EsgPage.tsx'),
+      'EsgPage.tsx was F2-16\'s headline file, 5,583 lines and the largest in the frontend; tranches '
+      + '1–3 took it to 564. If it is oversized again, a change put page-level code back into the '
+      + 'shell instead of into a tab module — the whole point of the split.').toBe(false);
+    expect(lineCount(join(SRC, 'pages/esg/EsgPage.tsx')),
+      'anti-vacuity for the assertion above: `measure()` also omits a file that was renamed or '
+      + 'deleted, which would make "not oversized" true for the wrong reason.')
+      .toBeGreaterThan(200);
   });
 });

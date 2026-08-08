@@ -105,7 +105,7 @@ const CMA_ROW: CmaDisclosure = {
 const CMA_READINESS: CmaReadiness = {
   year: 2025, total: 24, applicable: 22,
   byStatus: { DISCLOSED: 11, PARTIAL: 4, NOT_DISCLOSED: 3, NOT_APPLICABLE: 2,
-              EVIDENCE_REQUIRED: 5, UNDER_REVIEW: 1 } as CmaReadiness['byStatus'],
+              EVIDENCE_REQUIRED: 5, UNDER_REVIEW: 1 },
   withEvidence: 16, withGap: 7, readinessPct: 73,
 };
 
@@ -119,7 +119,7 @@ const TCFD_ROW: TcfdItem = {
 const TCFD_READINESS: TcfdReadiness = {
   year: 2025, total: 11, applicable: 11,
   byStatus: { DISCLOSED: 3, PARTIAL: 2, NOT_DISCLOSED: 1, NOT_APPLICABLE: 0,
-              EVIDENCE_REQUIRED: 4, UNDER_REVIEW: 1 } as TcfdReadiness['byStatus'],
+              EVIDENCE_REQUIRED: 4, UNDER_REVIEW: 1 },
   byPillar: { GOVERNANCE: 2, STRATEGY: 3, RISK_MGMT: 3, METRICS_TARGETS: 3 },
   disclosedByPillar: { GOVERNANCE: 1, STRATEGY: 0, RISK_MGMT: 1, METRICS_TARGETS: 1 },
   withEvidence: 6, withGap: 3, alignmentPct: 41,
