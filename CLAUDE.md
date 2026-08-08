@@ -255,8 +255,16 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   risks?" — **and a test asserted that as correct** (`the_targetId_overload_delegates_to_the_module_
   level_check`). Four register rows recorded this mechanism as "does not exist" without opening the
   file. 🔑 **A test can lock in a defect; it is hardest to spot when it describes the code accurately.**
+  Registered types today: **`ML_MODEL`** (F2-159) and **`EXERCISE_RUN`** (F2-161) — the second cost
+  one class, which is what the registry is for.
   ⚠ Adding a resolver? **Unit-test the resolver itself**, not just the registry — mutation proved a
   fake resolver hides a missing tenant filter and an ownership check reduced to mere existence.
+  ⚠⚠ **Check whether the route actually names the record before binding, and convert PER LINE.** The
+  identical guard string sat on `GET /{id}` and on `GET /` + `by-exercise/{exerciseId}` in the same
+  controller; a textual replace puts `#id` into a method that has no such parameter, SpEL then throws,
+  and the endpoint answers **500, not 403**. Also mind the parameter NAME: it is `#id` on
+  `ExerciseRuntimeController` and `#runId` on `ExerciseObserverController`, so a copied constant fails
+  silently. Both traps are pinned by `ExerciseRunOwnershipGuardTest`.
   ⚠ And do **not** bind an id just because the route has one: `transition`/`decommission`/audit-record/
   drift-verdict are judgements *about* the record and the owner is their subject (V367's defect).
   `MlModelOwnershipGuardTest` pins that boundary in both directions.

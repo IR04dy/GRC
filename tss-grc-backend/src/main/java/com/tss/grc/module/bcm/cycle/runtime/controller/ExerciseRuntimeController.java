@@ -27,7 +27,7 @@ import java.util.List;
  *
  * <pre>
  *   POST   /api/v1/bcm/exercise-runs
- *      Start a new run. BCM_MANAGER / FACILITATOR / PLATFORM_ADMIN.
+ *      Start a new run. BCM_MANAGER / PLATFORM_ADMIN (no run exists yet, so nobody facilitates it).
  *
  *   GET    /api/v1/bcm/exercise-runs/{id}
  *      Full detail (header + inject queue).
@@ -39,7 +39,7 @@ import java.util.List;
  *      Chronological after-action timeline.
  *
  *   POST   /api/v1/bcm/exercise-runs/{id}/injects/{injectId}/dispatch
- *      Dispatch a specific inject. FACILITATOR / BCM_MANAGER / PLATFORM_ADMIN.
+ *      Dispatch a specific inject. BCM_MANAGER / PLATFORM_ADMIN, or THIS RUN's facilitator.
  *
  *   POST   /api/v1/bcm/exercise-runs/{id}/injects/{injectId}/responses
  *      Record a participant response. Any authenticated user.
@@ -48,15 +48,28 @@ import java.util.List;
  *      List responses for an inject.
  *
  *   POST   /api/v1/bcm/exercise-runs/{id}/custom-inject
- *      Add an on-the-fly inject. FACILITATOR / BCM_MANAGER / PLATFORM_ADMIN.
+ *      Add an on-the-fly inject. BCM_MANAGER / PLATFORM_ADMIN, or THIS RUN's facilitator.
  *
  *   POST   /api/v1/bcm/exercise-runs/{id}/transition?action=PAUSE|RESUME|END|ABORT
- *      State machine. FACILITATOR / BCM_MANAGER / PLATFORM_ADMIN.
+ *      State machine. BCM_MANAGER / PLATFORM_ADMIN, or THIS RUN's facilitator.
  * </pre>
  *
- * <p>Same {@code hasAnyRole(…)} pattern as Slice 10-A's
- * {@code ExerciseScenarioLibraryController} — Spring Security normalises
- * authorities with the {@code ROLE_} prefix at user-detail load time.
+ * <p><b>F2-161 — this is no longer a pure {@code hasAnyRole(…)} surface.</b> Every route that
+ * names a single run now also admits <em>that run's</em> facilitator, via
+ * {@code hasPermission(#id, 'EXERCISE_RUN', 'OWNER')} against
+ * {@code exercise_run.facilitator_user_id} (populated 4/4).
+ *
+ * <p>⚠ The guards used to recite {@code FACILITATOR}, which matches no row in {@code iam.roles},
+ * alongside {@code BCM_MANAGER}, which has <b>0 users</b> — so dispatching an inject, adding a
+ * custom inject and transitioning the run were reachable by the <b>platform administrator and nobody
+ * else</b>, while the person actually facilitating could only read. For a business-continuity tool
+ * that is the live-exercise path: the screen someone is on while the clock runs.
+ *
+ * <p>⚠ Three routes stay role-only and <em>cannot</em> be bound: {@code POST /} (the run does not
+ * exist yet), {@code GET /} (a collection) and {@code by-exercise/{exerciseId}} (one exercise has
+ * many runs, possibly with different facilitators, so the exercise id cannot answer the question).
+ * Spring Security still normalises role authorities with the {@code ROLE_} prefix at user-detail
+ * load time; the ownership leg goes through {@code ModulePermissionEvaluator} instead.
  */
 @RestController
 @RequestMapping("/api/v1/bcm/exercise-runs")
@@ -70,38 +83,47 @@ public class ExerciseRuntimeController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','PLATFORM_ADMIN')")
+    // F2-161: names no single run, so there is no facilitator to be — role-only, with the
+    // ghost FACILITATOR removed (it matched no row in iam.roles and admitted nobody).
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN')")
     public RunSummary start(@RequestBody @Valid StartRunRequest req) {
         return service.startRun(req);
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    // F2-161: names no single run, so there is no facilitator to be — role-only, with the
+    // ghost FACILITATOR removed (it matched no row in iam.roles and admitted nobody).
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
     @Operation(summary = "List all exercise runs for the org (optional status filter)")
     public List<RunSummary> list(@RequestParam(required = false) String status) {
         return service.listAll(status);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN',"
+                + "'RISK_MANAGER') or hasPermission(#id, 'EXERCISE_RUN', 'OWNER')")
     public RunDetail get(@PathVariable Long id) {
         return service.get(id);
     }
 
     @GetMapping("/by-exercise/{exerciseId}")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    // F2-161: scoped by EXERCISE, not run. One exercise has many runs and they may have
+    // different facilitators, so #exerciseId cannot answer "do you facilitate this run".
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
     public List<RunSummary> listForExercise(@PathVariable Long exerciseId) {
         return service.listForExercise(exerciseId);
     }
 
     @GetMapping("/{id}/timeline")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN',"
+                + "'RISK_MANAGER') or hasPermission(#id, 'EXERCISE_RUN', 'OWNER')")
     public RunTimeline timeline(@PathVariable Long id) {
         return service.getRunTimeline(id);
     }
 
     @PostMapping("/{id}/injects/{injectId}/dispatch")
-    @PreAuthorize("hasAnyRole('FACILITATOR','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') "
+                + "or hasPermission(#id, 'EXERCISE_RUN', 'OWNER')")
     public InjectView dispatch(@PathVariable Long id, @PathVariable Long injectId) {
         return service.dispatchInject(id, injectId);
     }
@@ -117,14 +139,16 @@ public class ExerciseRuntimeController {
     }
 
     @GetMapping("/{id}/injects/{injectId}/responses")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR','PLATFORM_ADMIN',"
+                + "'RISK_MANAGER') or hasPermission(#id, 'EXERCISE_RUN', 'OWNER')")
     public List<ResponseView> listResponses(@PathVariable Long id, @PathVariable Long injectId) {
         return service.listResponses(id, injectId);
     }
 
     @PostMapping("/{id}/custom-inject")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('FACILITATOR','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') "
+                + "or hasPermission(#id, 'EXERCISE_RUN', 'OWNER')")
     public InjectView customInject(
         @PathVariable Long id,
         @RequestBody @Valid CustomInjectRequest req) {
@@ -132,7 +156,8 @@ public class ExerciseRuntimeController {
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("hasAnyRole('FACILITATOR','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') "
+                + "or hasPermission(#id, 'EXERCISE_RUN', 'OWNER')")
     public RunSummary transition(
         @PathVariable Long id,
         @RequestParam("action") String action,

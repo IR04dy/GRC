@@ -344,8 +344,19 @@ class RoleGuardConversionRatchetTest {
      * always knew should be admitted. The number falling is real progress on <em>this</em> metric while
      * the role list it counts is untouched — which is the same ambiguity
      * {@link #BASELINE_GHOST_ROLE_NAMES} carries, in the sibling statistic.
+     *
+     * <p><b>425 → 410 (F2-161):</b> fifteen more {@code bcm} runtime sites gained an
+     * {@code EXERCISE_RUN} ownership leg — six on {@code ExerciseRuntimeController} ({@code #id}) and
+     * nine on {@code ExerciseObserverController} ({@code #runId}, where every route names a run).
+     * ⚠ Three could not be bound and stay role-only: {@code POST /} (no run exists yet), {@code GET /}
+     * (a collection) and {@code by-exercise/{exerciseId}} — one exercise has many runs, possibly with
+     * different facilitators, so the exercise id cannot answer the question. That last one is the reason
+     * the conversion had to be done <b>per line rather than per guard string</b>: the identical wide
+     * guard text sat on both bindable and unbindable routes, and a textual replace would have put
+     * {@code #id} into the expression of a method with no such parameter — a SpEL evaluation error,
+     * i.e. a <b>500 on the run list</b> rather than a 403.
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 425;
+    private static final int BASELINE_PURE_ROLE_SITES = 410;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"
@@ -686,8 +697,27 @@ class RoleGuardConversionRatchetTest {
      * {@code bcm.exercise_run.facilitator_user_id} is populated 4/4 and only needs a second
      * {@code EntityOwnershipResolver}. The three {@code AUDIT_*} committee-seat names still need a
      * different question — seat membership, not record ownership — so they remain out.
+     *
+     * <p><b>4 → 3 (F2-161): {@code FACILITATOR} follows by the same route, and the mechanism cost one
+     * new class instead of a slice.</b> {@code bcm.exercise_run.facilitator_user_id} is populated 4/4, so
+     * {@code ExerciseRunOwnershipResolver} was the whole of the work — which is the point of having built
+     * the registry: the second consumer is cheap. ⚠ The measured consequence was worse here than for
+     * {@code MODEL_OWNER}: the runtime's write guards were
+     * {@code hasAnyRole('FACILITATOR','BCM_MANAGER','PLATFORM_ADMIN')} where {@code FACILITATOR} matches
+     * nothing and {@code BCM_MANAGER} has <b>0 users</b>, so dispatching an inject, adding a custom
+     * inject and transitioning a run were <b>platform-administrator-only</b> — the live-exercise path of
+     * a business-continuity tool. All four dev runs are facilitated by {@code rmanager}, who could read
+     * them and not drive them.
+     *
+     * <p>The three remaining names are all committee <b>seats</b> ({@code AUDIT_COMMITTEE_CHAIR},
+     * {@code AUDIT_COMMITTEE_MEMBER}, {@code AUDIT_DIRECTOR}) and need a different question than
+     * ownership: <em>is the caller a seated member of this committee?</em> F2-26 shipped the roster
+     * linkage, so the data exists; a {@code CommitteeSeatResolver} is not an
+     * {@link com.tss.grc.security.EntityOwnershipResolver} because the record being guarded is not the
+     * committee — it is a finding or a pivot the committee <em>reviews</em>. That is why they did not
+     * come along for free.
      */
-    private static final int BASELINE_GHOST_ROLE_NAMES = 4;
+    private static final int BASELINE_GHOST_ROLE_NAMES = 3;
 
     // ── extraction ────────────────────────────────────────────────────────────────────────────
 

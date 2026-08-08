@@ -765,6 +765,34 @@ today fits**: loosening `>= 6` to `>= 5` was one character and would have destro
 between a business-day and a calendar-day SLA. Fixed instant for the scheduler, business-day distance
 (plus the original ≥ +7 claim, conditioned on a working-day start) for the service.
 
+✔ **2026-08-08 — [[F2-161]] SHIPPED: the second ownership resolver, and the mechanism paid for
+itself.** One new class (`ExerciseRunOwnershipResolver`) plus 15 guard conversions took the ghost list
+**4 → 3** and pure role sites **425 → 410**. ⚠ **The defect it fixed is the sharpest reachability finding
+of the programme so far**: `ExerciseRuntimeController`'s write guards were
+`hasAnyRole('FACILITATOR','BCM_MANAGER','PLATFORM_ADMIN')` where `FACILITATOR` matches nothing and
+**`BCM_MANAGER` has 0 users** — so dispatching an inject, adding an on-the-fly inject, transitioning a
+run and assigning an observer were **platform-administrator-only**, on the screen a BCM team is using
+*while the exercise clock runs*. All four dev runs are facilitated by `rmanager`, who could read them and
+not drive them.
+
+🔑 **The converse had to be proved per RECORD rather than per user**, because there is no run `rmanager`
+does not facilitate: the same endpoint and the same token returned **403** once
+`facilitator_user_id` pointed elsewhere, then 201 again when restored. That is exactly the property
+seating a `FACILITATOR` role could never have given — with a role, the facilitator of run 1 could drive
+run 4.
+
+⚠ **Three routes cannot be bound and the failure mode is a 500, not a 403**: `POST /` (no run yet),
+`GET /` (a collection) and `by-exercise/{exerciseId}` (one exercise, many runs, possibly different
+facilitators). The identical wide guard text sat on bindable and unbindable routes, so the conversion was
+done **per line, not per guard string** — a textual replace would have put `#id` into a method that has
+none, and SpEL throws.
+
+➡ **F2-52's last three ghosts will NOT fall to this mechanism, and that is a design statement rather than
+a backlog item**: `AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER` and `AUDIT_DIRECTOR` need *"is the
+caller a seated member of this committee?"*, and the record being guarded is not the committee — it is a
+finding or a pivot the committee **reviews**. A `CommitteeSeatResolver` is a different abstraction.
+⚠ Prod remains **29 migrations behind** (V345–V373); this slice adds no migration.
+
 ➡ **Next unblocked candidates**: F2-147 slice 2 (owner: commission the SMS/WhatsApp/SMTP gateways) ·
 F2-150/F2-151/F2-152 (need owner decisions) · F2-11/F2-12/F2-16/F2-17/F2-14 (unblocked but
 multi-session). ⚠ **Prod is now 29 migrations behind** (V345–V373).

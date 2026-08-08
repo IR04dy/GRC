@@ -75,7 +75,8 @@ public class ExerciseObserverController {
 
     @PostMapping("/{runId}/observers")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('FACILITATOR','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') "
+                + "or hasPermission(#runId, 'EXERCISE_RUN', 'OWNER')")
     public AssignmentView assignObserver(
         @PathVariable Long runId,
         @RequestBody @Valid AssignObserverRequest req) {
@@ -83,7 +84,8 @@ public class ExerciseObserverController {
     }
 
     @DeleteMapping("/{runId}/observers/{assignmentId}")
-    @PreAuthorize("hasAnyRole('FACILITATOR','BCM_MANAGER','PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','PLATFORM_ADMIN') "
+                + "or hasPermission(#runId, 'EXERCISE_RUN', 'OWNER')")
     public ResponseEntity<Void> removeObserver(
         @PathVariable Long runId,
         @PathVariable Long assignmentId) {
@@ -92,8 +94,9 @@ public class ExerciseObserverController {
     }
 
     @GetMapping("/{runId}/observers")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR',"
-                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR',"
+                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER') "
+                + "or hasPermission(#runId, 'EXERCISE_RUN', 'OWNER')")
     public List<AssignmentView> listObservers(@PathVariable Long runId) {
         return service.listObservers(runId);
     }
@@ -101,8 +104,9 @@ public class ExerciseObserverController {
     // ─── Observer dashboard (read-only mirror) ──────────────────────────
 
     @GetMapping("/{runId}/observer-dashboard")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR',"
-                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR',"
+                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER') "
+                + "or hasPermission(#runId, 'EXERCISE_RUN', 'OWNER')")
     public ObserverDashboard getObserverDashboard(
         @PathVariable Long runId,
         @RequestParam(value = "observerUserId", required = false) Long observerUserId) {
@@ -118,8 +122,9 @@ public class ExerciseObserverController {
 
     @PostMapping("/{runId}/observations")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR',"
-                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR',"
+                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER') "
+                + "or hasPermission(#runId, 'EXERCISE_RUN', 'OWNER')")
     public ObservationView recordObservation(
         @PathVariable Long runId,
         @RequestBody @Valid ObservationRequest req) {
@@ -127,8 +132,9 @@ public class ExerciseObserverController {
     }
 
     @PutMapping("/{runId}/observations/{obsId}/flag")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR',"
-                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR',"
+                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER') "
+                + "or hasPermission(#runId, 'EXERCISE_RUN', 'OWNER')")
     public ObservationView flagObservation(
         @PathVariable Long runId,
         @PathVariable Long obsId,
@@ -138,23 +144,26 @@ public class ExerciseObserverController {
 
     @PostMapping("/{runId}/observations/{obsId}/promote-to-gap")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR',"
-                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR',"
+                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER') "
+                + "or hasPermission(#runId, 'EXERCISE_RUN', 'OWNER')")
     @Operation(summary = "Promote an exercise observation to a tracked BCM gap (B-E)")
     public BcmGap promoteObservationToGap(@PathVariable Long runId, @PathVariable Long obsId) {
         return service.promoteObservationToGap(runId, obsId);
     }
 
     @GetMapping("/{runId}/observations")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR',"
-                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR',"
+                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER') "
+                + "or hasPermission(#runId, 'EXERCISE_RUN', 'OWNER')")
     public List<ObservationView> listObservations(@PathVariable Long runId) {
         return service.listObservations(runId);
     }
 
     @GetMapping("/{runId}/observations/by-type")
-    @PreAuthorize("hasAnyRole('BCM_MANAGER','FACILITATOR','CISO','AUDITOR',"
-                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER')")
+    @PreAuthorize("hasAnyRole('BCM_MANAGER','CISO','AUDITOR',"
+                + "'INTERNAL_AUDITOR','PLATFORM_ADMIN','RISK_MANAGER') "
+                + "or hasPermission(#runId, 'EXERCISE_RUN', 'OWNER')")
     public ObservationsByType observationsByType(@PathVariable Long runId) {
         return service.getObservationsByType(runId);
     }
