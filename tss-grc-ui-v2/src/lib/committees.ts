@@ -420,6 +420,10 @@ export interface SeatLinkageSeat {
   username: string | null;
   fullNameEn: string | null;
   basisEn: string | null;
+  /** F2-178 — does this seat's term window contain today, and has it not been ended? A flag beside
+   *  `state` rather than a fourth `SeatLinkState`: currency and linkage are independent axes, and a
+   *  `LAPSED` value would force a lapsed-and-unlinked seat to report only one of its two problems. */
+  currentlySeated: boolean;
 }
 
 export interface SeatLinkageReport {
@@ -431,10 +435,67 @@ export interface SeatLinkageReport {
   votingSeats: number;
   votingLinked: number;
   votingUnlinked: number;
+  /** F2-178 — ACTIVE seats whose term window contains today and which have not been ended:
+   *  the seats F2-177's `COMMITTEE:SEAT` guard is willing to consider at all. */
+  currentSeats: number;
+  /** F2-178 — of those, how many name a platform user. **This is the number that says whether
+   *  the seat guard admits anybody on this committee.** Lower than `linked` means a linked seat
+   *  has lapsed: `renewal_status` still reads ACTIVE (nothing ever expires a term) but the term
+   *  window has closed, so the roster looks maintained and confers nothing. */
+  currentLinked: number;
   /** linked / (activeSeats − declaredExternal): declared-external seats leave the
    *  denominator, or a committee that seats an external auditor could never reach 100%. */
   coveragePct: number;
   seats: SeatLinkageSeat[];
+}
+
+/**
+ * F2-178 — tenant-wide roster coverage: every live committee's seat linkage in one call.
+ *
+ * F2-26's per-committee report has been on the member-registry screen since it shipped, which
+ * makes a gap fixable once you are already looking at the committee that has it. This answers the
+ * prior question — *do we have a gap* — which nobody was in a position to ask: production has 0 of
+ * 31 seats linked and 11 of 17 committees with no roster at all, and finding that out meant
+ * opening seventeen registry screens in turn.
+ */
+export interface RosterCoverageRow {
+  committeeId: number;
+  code: string;
+  nameEn: string;
+  nameAr: string | null;
+  /** Also the first argument of a `hasPermission(type,'COMMITTEE','SEAT')` guard, so this row is
+   *  readable as the explanation for which guarded screens are closed. */
+  committeeType: CommitteeType;
+  status: CommitteeStatus;
+  /** `false` is a worse state than 0% linked: a committee with no roster can never be quorate. */
+  hasRoster: boolean;
+  seats: number;
+  linked: number;
+  declaredExternal: number;
+  unlinked: number;
+  votingSeats: number;
+  votingLinked: number;
+  currentSeats: number;
+  currentLinked: number;
+  coveragePct: number;
+}
+
+export interface RosterCoverageReport {
+  committees: RosterCoverageRow[];
+  totalCommittees: number;
+  committeesWithRoster: number;
+  committeesFullyLinked: number;
+  /** Live committees where the seat guard admits **no** platform user — includes the
+   *  empty-roster ones, because an empty body admits nobody for a different reason and the
+   *  consequence is identical. */
+  committeesAdmittingNobody: number;
+  totalSeats: number;
+  totalLinked: number;
+  totalDeclaredExternal: number;
+  totalUnlinked: number;
+  totalCurrentLinked: number;
+  /** DISSOLVED committees left out of every figure above — a dissolved body confers no seat. */
+  dissolvedExcluded: number;
 }
 
 export interface LinkUserBody {
@@ -519,6 +580,19 @@ export function listLinkableUsers(committeeId?: number, q?: string): Promise<Lin
 /** F2-26 — roster-linkage coverage: how many seats can cast their own vote. */
 export function getSeatLinkage(committeeId: number): Promise<SeatLinkageReport> {
   return api.get(`${REG_BASE}/committees/${committeeId}/linkage`);
+}
+
+/**
+ * F2-178 — roster coverage for every live committee in the tenant, in one call.
+ *
+ * One request, not one per committee: the committees list needs the shape of the whole tenant, and
+ * looping `getSeatLinkage` over the list would issue a term query and a user look-up per committee
+ * for a screen that shows neither the per-seat rows nor the resolved usernames. It also could not
+ * answer the question the report exists for — `getSeatLinkage` takes an id, so a committee with no
+ * roster at all is indistinguishable from one that is 0% linked.
+ */
+export function getRosterCoverage(): Promise<RosterCoverageReport> {
+  return api.get(`${REG_BASE}/linkage-coverage`);
 }
 
 export function listSkills(committeeId: number): Promise<CommitteeMemberSkill[]> {

@@ -75,19 +75,31 @@ PUBLISHED = {
     "module_loc": 205_767,
     "entities_strict": 419,             # FILES declaring an entity (the doc published 417: a substring
     "entity_decls": 432,                # count). Entity CLASSES — 13 more, all in data_officer.
-    "endpoints": 2_213,
-    "writes": 1_239,
-    "main_preauthorize": 2_201,
-    "perm_modules": 37,
-    # F2-177: 12 -> 11. `governance` left this column WITHOUT a role guard being converted — its two
-    # controllers gained a committee-SEAT leg (`hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')`)
-    # while all 15 role names beside it stayed. So a package leaving here means "some authority in it
-    # is data-driven", not "this package is converted". ⚠ This pairing is also what caught the drift:
-    # MEASURED_BASELINE.md was edited and this dict was not, and MeasuredBaselineFreshnessTest failed
-    # the build for it — which is the mechanism working, not friction.
+    "endpoints": 2_215,        # +1 F2-178 (GET .../registry/linkage-coverage); +1 pre-existing drift
+    "writes": 1_238,
+    "main_preauthorize": 2_203,
+    "perm_modules": 37,        # 2-arg module form only — see HASPERM vs HASPERM_ANY above
+    # ⚠⚠ 11, and the three attempts it took to establish that are the lesson. This figure was measured
+    # by TWO extractors that silently disagreed: the build gate
+    # (`MeasuredBaselineFreshnessTest.HAS_PERMISSION_BARE`) matches `hasPermission(` at any arity and
+    # said 11; THIS script demanded two arguments and said 12, because F2-177's committee-SEAT leg in
+    # `governance` is a three-argument call. F2-177 published 11 by argument; F2-178 "corrected" it to 12
+    # on the strength of `--check`; the full suite then failed and settled it at 11.
+    #
+    # 11 is right, and not by majority vote — by the metric's own stated meaning, which the gate's
+    # assertion message spells out: *"a tenant cannot delegate access to these packages at all, because
+    # the code compares role NAMES."* That is false of `governance` the moment one endpoint there
+    # consults a roster a tenant administrator can edit. The script now counts with HASPERM_ANY, so the
+    # two authorities ask the same question.
+    #
+    # 🔑 Two things to carry away. (1) `MeasuredBaselineFreshnessTest` compares this dict against the
+    # doc's cell — edit both and the pairing agrees while both are wrong, which is what F2-178 did for
+    # one commit. **A pairing test proves two artefacts agree, not that either is true.** (2) When two
+    # measurements of one published number disagree, the tie-break is **what the number is for**, not
+    # whichever extractor you happen to be holding.
     "packages_no_haspermission": 11,
     "module_tests": 3_284,
-    "suite_tests": 3_479,
+    "suite_tests": 3_563,      # census counts @Test declarations; surefire ran 3,555 executions
     # F2-03 floored all seven Tier-1 regulator-facing modules (2026-08-05/06), so this
     # fell 15 -> 8. The --check mode caught the drift the moment it was first run in
     # anger, which is F2-19b in one line: the guard existed and nothing ran it.
@@ -155,6 +167,25 @@ CLASS_RM = re.compile(r'@RequestMapping\s*\(\s*"')
 WRITE = re.compile(r"@(?:Post|Put|Patch|Delete)Mapping")
 PREAUTH = re.compile(r"@PreAuthorize")
 HASPERM = re.compile(r"hasPermission\(\s*'([A-Z_]+)'\s*,\s*'([A-Z_]+)'\s*\)")
+# ⚠⚠ F2-178. HASPERM above is the MODULE-permission form and deliberately matches exactly two
+# arguments, because its captures feed `perm_modules` — and the first argument of the three-argument
+# relation forms is NOT a permission module (`hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')` names
+# a committee type; `hasPermission(#id,'ML_MODEL','OWNER')` names a record). Counting those would inflate
+# `perm_modules` with values no catalogue contains.
+#
+# But `packages_no_haspermission` is a DIFFERENT question — "can a tenant delegate any access here at
+# all, or does this package only compare role names?" — and a seat leg or an ownership leg answers yes.
+# So that figure is counted with the arity-agnostic pattern below, which is also what the build gate
+# (`MeasuredBaselineFreshnessTest.HAS_PERMISSION_BARE`) has always used.
+#
+# 🔑 This split exists because the two patterns silently disagreed and the disagreement outlived three
+# separate attempts to reason about the number. F2-177 published 11 (the gate's answer, reached by
+# argument); F2-178 "corrected" it to 12 on the strength of THIS script; the full suite then failed and
+# settled it at 11, because the metric's own stated meaning — *a tenant cannot delegate access to these
+# packages at all* — is false of `governance` the moment one endpoint there consults a roster.
+# **Two extractors for one published figure is the defect; agreeing on which question each answers is
+# the fix.**
+HASPERM_ANY = re.compile(r"hasPermission\(")
 TESTM = re.compile(r"@(?:Test|ParameterizedTest|RepeatedTest)\b")
 IMPORT = re.compile(r"^import\s+(?:static\s+)?com\.tss\.grc\.([A-Za-z0-9_.]+);", re.M)
 SCHEMA = re.compile(r'schema\s*=\s*"([^"]+)"')
@@ -176,7 +207,7 @@ def walk(root, *exts):
 def backend():
     mods = sorted(d for d in os.listdir(MODJ) if os.path.isdir(os.path.join(MODJ, d)))
     stat = {m: dict(loc=0, files=0, entities=0, entities_loose=0, entity_decls=0, endpoints=0,
-                    writes=0, preauth=0, schemas=set(), perms=set(), out=collections.Counter(),
+                    writes=0, preauth=0, schemas=set(), perms=set(), any_perm=False, out=collections.Counter(),
                     tests=0, phantom=[]) for m in mods}
     for m in mods:
         for path in walk(os.path.join(MODJ, m), ".java"):
@@ -202,6 +233,10 @@ def backend():
                 s["schemas"].update(SCHEMA.findall(tbl))
             for mod_, _act in HASPERM.findall(code):
                 s["perms"].add(mod_)
+            # Arity-agnostic: a relation leg (COMMITTEE/SEAT, ML_MODEL/OWNER) is data-driven authority
+            # even though its first argument is not a permission module. See HASPERM_ANY.
+            if HASPERM_ANY.search(code):
+                s["any_perm"] = True
             for path_ in IMPORT.findall(code):
                 if path_.startswith("module."):
                     other = path_.split(".")[1]
@@ -373,7 +408,7 @@ def main():
         "writes": sum(s["writes"] for s in stat.values()),
         "preauthorize": sum(s["preauth"] for s in stat.values()),
         "perm_modules": len(be["all_perms"]),
-        "packages_no_haspermission": sum(1 for s in stat.values() if not s["perms"]),
+        "packages_no_haspermission": sum(1 for s in stat.values() if not s["any_perm"]),
         "module_tests": sum(s["tests"] for s in stat.values()),
         "suite_tests": be["suite_tests"],
         "zero_test_packages": sum(1 for s in stat.values() if s["tests"] == 0),

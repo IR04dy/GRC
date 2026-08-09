@@ -4,7 +4,9 @@ import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.admin.committee.dto.LinkUserRequest;
 import com.tss.grc.module.admin.committee.dto.LinkableUser;
 import com.tss.grc.module.admin.committee.dto.MemberTermRequest;
+import com.tss.grc.module.admin.committee.dto.RosterCoverageReport;
 import com.tss.grc.module.admin.committee.dto.SeatLinkageReport;
+import com.tss.grc.module.admin.committee.entity.Committee;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberSkill;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
 import com.tss.grc.module.admin.committee.repository.CommitteeMemberSkillRepository;
@@ -21,8 +23,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -57,6 +61,16 @@ public class CommitteeMemberRegistryService {
     private final UserRepository                 users;
     private final AuditLogService                audit;
     private final ApplicationEventPublisher      publisher;
+
+    /**
+     * F2-178 — the date the coverage reports judge term windows against, injectable for the same reason
+     * {@code CommitteeSeatAuthority} carries one: F2-160 cost a suite that failed on Saturdays because
+     * nothing said the clock was an input. Not a constructor parameter, so Lombok's
+     * {@code @RequiredArgsConstructor} and every existing caller are untouched.
+     */
+    private Clock clock = Clock.system(ZoneId.of("UTC"));
+
+    void setClock(Clock clock) { this.clock = clock; }
 
     // ── Member terms ─────────────────────────────────────────────────
 
@@ -359,6 +373,8 @@ public class CommitteeMemberRegistryService {
         List<SeatLinkageReport.Seat> seats = new java.util.ArrayList<>();
         long linked = 0, external = 0, unlinked = 0;
         long votingSeats = 0, votingLinked = 0;
+        long currentSeats = 0, currentLinked = 0;
+        LocalDate today = LocalDate.now(clock);
 
         for (CommitteeMemberTerm t : active) {
             SeatLinkageReport.State state = t.getMemberUserId() != null
@@ -367,6 +383,9 @@ public class CommitteeMemberRegistryService {
                     ? SeatLinkageReport.State.EXTERNAL
                     : SeatLinkageReport.State.UNLINKED;
             boolean voting = t.getIsVotingMember() != null && t.getIsVotingMember() == 1;
+            // F2-178 — the authorisation rule, not the roster rule. Same expression the seat guard's
+            // query applies; see CommitteeMemberTerm#isCurrentOn.
+            boolean current = t.isCurrentOn(today);
 
             switch (state) {
                 case LINKED   -> linked++;
@@ -377,6 +396,10 @@ public class CommitteeMemberRegistryService {
                 votingSeats++;
                 if (state == SeatLinkageReport.State.LINKED) votingLinked++;
             }
+            if (current) {
+                currentSeats++;
+                if (state == SeatLinkageReport.State.LINKED) currentLinked++;
+            }
 
             User u = t.getMemberUserId() == null ? null : byId.get(t.getMemberUserId());
             seats.add(new SeatLinkageReport.Seat(
@@ -384,7 +407,8 @@ public class CommitteeMemberRegistryService {
                 t.getMemberUserId(),
                 u == null ? null : u.getUsername(),
                 u == null ? null : u.getFullNameEn(),
-                state == SeatLinkageReport.State.EXTERNAL ? t.getNoPlatformUserBasisEn() : null));
+                state == SeatLinkageReport.State.EXTERNAL ? t.getNoPlatformUserBasisEn() : null,
+                current));
         }
 
         // Declared-external seats leave the denominator: a report that can never reach 100%
@@ -393,8 +417,78 @@ public class CommitteeMemberRegistryService {
         int pct = linkable <= 0 ? 0 : (int) Math.round(100.0 * linked / linkable);
 
         return new SeatLinkageReport(committeeId, active.size(), linked, external, unlinked,
-            votingSeats, votingLinked, votingSeats - votingLinked, pct, seats);
+            votingSeats, votingLinked, votingSeats - votingLinked,
+            currentSeats, currentLinked, pct, seats);
     }
+
+    /**
+     * F2-178 — tenant-wide roster coverage: every live committee's linkage in one call.
+     *
+     * <p><b>Why this is a separate method and not {@code linkage()} in a loop.</b> Seventeen calls to
+     * {@link #linkage(Long)} would issue seventeen term queries and seventeen user look-ups to compute a
+     * screen that needs neither the per-seat rows nor the resolved usernames. The aggregate is one query;
+     * the committee list is a second. More importantly the loop cannot answer the question this report
+     * exists for: {@code linkage()} takes a committee id, so a committee with an empty roster is
+     * indistinguishable from one that is 0% linked, and 9 of 17 dev committees are in exactly that state.
+     *
+     * <p>Rows are ordered worst-first — committees the seat guard admits nobody on, then by how many seats
+     * are unlinked — because a coverage report sorted alphabetically is a list, not a work queue.
+     */
+    @Transactional(readOnly = true)
+    public RosterCoverageReport rosterCoverage() {
+        Long org = TenantContext.getCurrentTenant();
+        LocalDate today = LocalDate.now(clock);
+
+        List<Committee> all = committees.findByOrganisationId(org);
+        // DISSOLVED bodies confer no seat (CommitteeSeatAuthority), so they are excluded rather than
+        // listed as permanently red rows nobody may act on. The count is reported, not inferred.
+        List<Committee> live = all.stream()
+            .filter(c -> !"DISSOLVED".equalsIgnoreCase(String.valueOf(c.getStatus())))
+            .toList();
+        long dissolved = all.size() - live.size();
+
+        Map<Long, long[]> agg = new HashMap<>();
+        for (Object[] r : terms.rosterCoverageByCommittee(org, today))
+            agg.put(((Number) r[0]).longValue(), new long[] {
+                num(r[1]), num(r[2]), num(r[3]), num(r[4]), num(r[5]), num(r[6]), num(r[7]) });
+
+        List<RosterCoverageReport.Row> rows = new java.util.ArrayList<>();
+        long tSeats = 0, tLinked = 0, tExternal = 0, tUnlinked = 0, tCurrentLinked = 0;
+        long withRoster = 0, fullyLinked = 0, admitsNobody = 0;
+
+        for (Committee c : live) {
+            long[] a = agg.getOrDefault(c.getId(), new long[7]);
+            long seats = a[0], linked = a[1], external = a[2];
+            long votingSeats = a[3], votingLinked = a[4], currentSeats = a[5], currentLinked = a[6];
+            long unlinked = seats - linked - external;
+            long linkable = seats - external;
+            int pct = linkable <= 0 ? 0 : (int) Math.round(100.0 * linked / linkable);
+
+            rows.add(new RosterCoverageReport.Row(
+                c.getId(), c.getCode(), c.getNameEn(), c.getNameAr(),
+                c.getCommitteeType(), String.valueOf(c.getStatus()),
+                seats > 0, seats, linked, external, unlinked,
+                votingSeats, votingLinked, currentSeats, currentLinked, pct));
+
+            tSeats += seats; tLinked += linked; tExternal += external;
+            tUnlinked += unlinked; tCurrentLinked += currentLinked;
+            if (seats > 0) withRoster++;
+            if (linkable > 0 && linked == linkable) fullyLinked++;
+            if (currentLinked == 0) admitsNobody++;
+        }
+
+        rows.sort(Comparator
+            .comparing((RosterCoverageReport.Row r) -> !r.admitsNobody())   // admits nobody first
+            .thenComparing(r -> r.hasRoster())                              // no roster at all before 0%
+            .thenComparing(Comparator.comparingLong(RosterCoverageReport.Row::unlinked).reversed())
+            .thenComparing(r -> String.valueOf(r.code())));
+
+        return new RosterCoverageReport(rows, live.size(), withRoster, fullyLinked, admitsNobody,
+            tSeats, tLinked, tExternal, tUnlinked, tCurrentLinked, dissolved);
+    }
+
+    /** SUM over an empty group is NULL in SQL Server, not 0 — see the query's javadoc. */
+    private static long num(Object o) { return o == null ? 0L : ((Number) o).longValue(); }
 
     /** Independence stats for a committee: numerator + denominator. */
     @Transactional(readOnly = true)

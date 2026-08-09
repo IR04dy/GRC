@@ -118,4 +118,35 @@ public class CommitteeMemberTerm {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    /**
+     * F2-178 — does this seat confer anything <b>today</b>? The Java twin of
+     * {@code CommitteeMemberTermRepository.CURRENT_SEAT_WINDOW}.
+     *
+     * <p><b>Why it exists.</b> {@code renewal_status = 'ACTIVE'} is not the same question as "may this
+     * seat authorise something", and the platform now asks both: F2-26's coverage report asks the first,
+     * F2-177's seat guard asks the second. Nothing ever transitions an ACTIVE term to EXPIRED — the sweep
+     * only sends 90/60/30-day reminders and {@code endTerm} is a manual act — so a term keeps reading
+     * ACTIVE for ever once its window closes. This method is what lets the report show the two numbers
+     * side by side instead of showing one and meaning the other.
+     *
+     * <p>⚠ <b>It must match the JPQL constant's three-valued logic exactly, including on NULL.</b>
+     * {@code t.termStartsAt <= :on} is UNKNOWN — and therefore excluding — when the column is NULL, so a
+     * NULL start returns {@code false} here rather than being treated as "started long ago". The column
+     * is {@code nullable = false} and 0 rows in dev or production are NULL, so the branch is unreachable
+     * today; it is written and tested anyway, because the alternative is a Java/SQL disagreement that
+     * only appears once someone relaxes the column. {@code renewal_status} is deliberately <b>not</b>
+     * tested here: it is the caller's half of the predicate, applied in the query's {@code WHERE} and by
+     * {@code findActiveByCommittee}, and folding it in would make this method silently answer a different
+     * question from the one its name asks.
+     *
+     * @param on the date to judge the window against — a parameter, not {@code LocalDate.now()}, for the
+     *           same reason the repository query takes one (F2-160: the clock is an input)
+     */
+    public boolean isCurrentOn(LocalDate on) {
+        if (on == null) return false;
+        if (endedAt != null) return false;
+        if (termStartsAt == null || termStartsAt.isAfter(on)) return false;
+        return termEndsAt == null || !termEndsAt.isBefore(on);
+    }
 }

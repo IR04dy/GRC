@@ -16,6 +16,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { MeetingPapersPanel } from '../../components/committees/MeetingPapersPanel';
 import { ChangeAuthorityPanel } from '../../components/committees/ChangeAuthorityPanel';
+import { RosterCoveragePanel } from '../../components/committees/RosterCoveragePanel';
 import { useI18n } from '../../lib/i18n';
 import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
@@ -630,6 +631,12 @@ export function CommitteesPage() {
           personas without ADMIN:READ, and above the register because an unconfigured
           gate blocks approvals platform-wide, not just on this page. */}
       {tab === 'committees' && <ChangeAuthorityPanel />}
+
+      {/* F2-178 — tenant-wide roster linkage. F2-26's per-committee report has been on the
+          member-registry screen since it shipped, which makes a gap fixable once you are
+          already on the committee that has it; this is where you find out that you have one.
+          Also self-hiding without ADMIN:READ, and collapsed to a single line when clean. */}
+      {tab === 'committees' && <RosterCoveragePanel />}
 
       {tab === 'committees' && (
         <Card title={t('comTabCommittees')} Icon={Landmark}

@@ -3,6 +3,7 @@ package com.tss.grc.module.admin.committee.controller;
 import com.tss.grc.module.admin.committee.dto.LinkUserRequest;
 import com.tss.grc.module.admin.committee.dto.LinkableUser;
 import com.tss.grc.module.admin.committee.dto.MemberTermRequest;
+import com.tss.grc.module.admin.committee.dto.RosterCoverageReport;
 import com.tss.grc.module.admin.committee.dto.SeatLinkageReport;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberSkill;
 import com.tss.grc.module.admin.committee.entity.CommitteeMemberTerm;
@@ -121,6 +122,27 @@ public class CommitteeMemberRegistryController {
     @PreAuthorize("hasPermission('ADMIN','READ')")
     public SeatLinkageReport linkage(@PathVariable Long committeeId) {
         return service.linkage(committeeId);
+    }
+
+    /**
+     * Roster-linkage coverage across <b>every</b> live committee in the tenant — F2-178.
+     *
+     * <p>The per-committee report above has existed since F2-26 and answers the question only once you
+     * are already on the committee that has the problem. This one answers "do we have a problem", which
+     * is the question nobody was in a position to ask: production has <b>0 of 31 seats linked</b> and
+     * <b>11 of 17 committees with no roster at all</b>, and finding that out required opening seventeen
+     * registry screens in turn. F2-177 raised the stakes by making a seat an authorisation subject, so an
+     * unlinked roster is now the reason an assurance view is closed rather than only the reason a vote has
+     * to be entered on someone's behalf.
+     *
+     * <p>{@code ADMIN:READ}, matching the per-committee report: it aggregates exactly what that endpoint
+     * already discloses, minus the resolved usernames, so guarding it more tightly would protect nothing
+     * and guarding it more loosely would widen what F2-26 decided.
+     */
+    @GetMapping("/linkage-coverage")
+    @PreAuthorize("hasPermission('ADMIN','READ')")
+    public RosterCoverageReport rosterCoverage() {
+        return service.rosterCoverage();
     }
 
     @PostMapping("/terms/{id}/end")

@@ -201,7 +201,9 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
 
 Backend modules under `module/` — **59 packages** (58 with code; `datagov` is an empty
-placeholder), 204 kLoC, 432 entities, 2,212 endpoints. Each follows
+placeholder), 205 kLoC, 432 entities, **2,215 endpoints** (measured 2026-08-09; only the
+**59** is enforced — the rest drift on almost every commit, so re-run
+`baseline_census.py --check` rather than trusting them). Each follows
 `controller / dto / entity / repository / service`.
 
 ⚠ **Do not edit that count by hand — it is enforced.** `module-registry.yaml`
@@ -318,7 +320,23 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   it from the roster screen instead of needing a jar. Say this when reporting the guard as working.
   ⚙ Three prerequisites had already shipped for other reasons (F2-26 linkage, F2-28 roster
   denominator, S6c `CommitteeSeatOffice` for the free-text `role`) — **re-measure a recorded
-  blocker before believing its estimate.**
+  blocker before believing its estimate.** ⚠⚠ And F2-178's own *recommendation* then broke that
+  rule the same day: it asked for a per-committee linkage report **that F2-26 had already shipped**
+  (`GET /committees/registry/committees/{id}/linkage`, rendered on the registry screen). 🔑 **A
+  recommendation is the least-verified claim on the register — nothing executes it.** What was
+  actually missing was the *tenant-wide* view (`GET …/registry/linkage-coverage`, F2-178), because a
+  report keyed by committee id cannot show a committee with **no roster at all** — 9 of 18 live dev
+  committees and 11 of 17 in prod.
+  ⚠⚠ **`renewal_status = 'ACTIVE'` is NOT "this seat may authorise".** The guard also needs
+  `ended_at IS NULL` and today inside the term window, and **nothing in the platform ever moves an
+  ACTIVE term to EXPIRED** (`CommitteeScheduledSweep` only sends 90/60/30-day reminders; `endTerm`
+  is manual). So a roster can read **100% covered and admit nobody** — 0 rows today, and the
+  earliest prod term ends **2027-03-01**, so it arrives by calendar arithmetic. Both queries are
+  built from one constant, `CommitteeMemberTermRepository.CURRENT_SEAT_WINDOW`;
+  `SeatWindowPredicateSharingTest` fails the build if that clause is written **twice** in the file.
+  ⚠ Two traps in that constant: it must **lead with a newline** (Java strips *trailing* whitespace
+  in text blocks → `WHENt.endedAt` → a malformed `@Query` kills the app **at context startup**, not
+  one endpoint), and `SUM` over an empty group is **NULL, not 0** in SQL Server.
   ⚠ **A catalogued permission is inert until a guard consults it**, and a catalogue
   *derived* from guards is not *faithful* to them: V362 classified actions by method
   shape and so promoted whole WRITE tiers to APPROVE in 4 of the 6 modules it touched

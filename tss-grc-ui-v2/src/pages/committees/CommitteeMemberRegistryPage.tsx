@@ -475,6 +475,24 @@ export function CommitteeMemberRegistryPage() {
         </Card>
       )}
 
+      {/* F2-178 — the divergence between "linked" and "confers access".
+          `linked` counts by renewal_status alone, which is what F2-26's question needed. F2-177's
+          seat guard also requires the term window to contain today, and NOTHING in this platform
+          ever moves an ACTIVE term to EXPIRED — the sweep only sends reminders. So a roster can
+          read fully linked while every one of its seats has lapsed and authorises nothing. This
+          card fires only when the two numbers actually disagree, so it stays silent until it has
+          something to say. */}
+      {linkage && linkage.currentLinked < linkage.linked && (
+        <Card title={isAr ? 'مقاعد مرتبطة منتهية المدة' : 'Linked seats that have lapsed'}
+              Icon={AlertCircle}>
+          <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.7 }}>
+            {isAr
+              ? `${linkage.linked - linkage.currentLinked} من ${linkage.linked} مقعد مرتبط خارج مدّته اليوم، ومع ذلك ما زال سجلّه يقرأ «نشط» — لا شيء في المنصة ينقل الفترة إلى «منتهية» تلقائياً. هذه المقاعد لا تمنح صلاحية: حَرَس المقعد يرفض حاملها. جدّد الفترة أو أنهِها بشكل صريح.`
+              : `${linkage.linked - linkage.currentLinked} of ${linkage.linked} linked seats are outside their term window today and still read ACTIVE — nothing moves a term to EXPIRED on its own. Those seats confer no access: the seat guard refuses whoever holds them. Renew the term, or end it explicitly.`}
+          </div>
+        </Card>
+      )}
+
       {/* Active members panel */}
       <Card title={isAr ? 'الأعضاء النشطون' : 'Active members'} Icon={Users}
         action={

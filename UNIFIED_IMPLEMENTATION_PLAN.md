@@ -1189,6 +1189,49 @@ no schema touched. ⚠ RC-C's *cause* is untouched — 404 endpoints still autho
 *existing* is not *held*: several surviving names resolve to roles with 0 active users, which fails
 identically and nothing counts it.
 
+🔶 **F2-178 — the visibility half CLOSED 2026-08-09, and the slice's own register row is the lesson.**
+F2-177 filed F2-178 three hours earlier recommending "a linkage-coverage report on the committee
+screen — per committee, seats linked / declared external / neither". **That report shipped with
+[[F2-26]]**: `GET /committees/registry/committees/{id}/linkage` has returned exactly those three
+states, with a voting split and per-seat detail, and `CommitteeMemberRegistryPage` has rendered a KPI
+and a warning card from it ever since. 🔑 **So the mistake F2-177 recorded as its own headline —
+*re-measure a recorded blocker before believing its estimate* — was repeated by F2-177's own
+recommendation, on the same day, by the session that wrote the lesson.** Writing a lesson down does
+not transfer it; **a recommendation is the least-verified claim on the register**, because nothing
+executes it.
+
+⚙ What was genuinely missing was narrower and sharper: the report could only be read **one committee at
+a time**. Production is **0 of 31 seats linked** and finding that out meant opening seventeen registry
+screens in turn, so nobody did. `GET /api/v1/committees/registry/linkage-coverage` + `RosterCoveragePanel`
+now answer it in one call, worst-first. And a **state a per-committee report structurally cannot show**:
+`linkage(committeeId)` takes an id, so "empty roster" and "0% linked" arrive as the same screen —
+**9 of 18** live dev committees and **11 of 17** production committees have *no term rows at all*, which
+means they can never be quorate and is what `ChangeGovernanceHealthService.ROSTER_EMPTY` already refuses
+CAB approvals for.
+
+⚠⚠ **Measuring it found a second defect with a date on it.** F2-26's report counts a seat by
+`renewal_status = 'ACTIVE'`; F2-177's guard *also* requires `ended_at IS NULL` and today inside the term
+window — **two consumers of one column deciding "this seat counts" by different rules**, so a roster can
+read **100% covered and admit nobody**. The rule this breaks was already in the tree, written for a
+different pair: `ChangeGovernanceHealthService` says *"a report describing access must share its
+predicate with the enforcement point"*, after [[F2-62]] cost exactly that. The divergence is **0 rows
+today** — and **nothing in this platform ever moves an ACTIVE term to EXPIRED** (the sweep only sends
+reminders; `endTerm` is manual), so it arrives by calendar arithmetic: **the earliest production term
+ends 2027-03-01.** Both queries are now built by concatenation from one `CURRENT_SEAT_WINDOW` constant,
+and `SeatWindowPredicateSharingTest` fails the build if the clause appears **twice** in the repository
+source — a copy reads as correct on the day it is written, which is why it needs a build failure rather
+than a review comment.
+
+➕ Two smaller ones. Java strips **trailing** whitespace inside text blocks, so the first draft emitted
+`WHENt.endedAt` and a malformed `@Query` **fails at context startup** — the whole application, not one
+endpoint; both constants now lead with their own newline so no caller can lose the separator. And the
+probe's org-2 fixture tagged `[REVIEW-TEST]` in `name_en` while its `DELETE` matched on `code`, orphaning
+a committee and two seats in another tenant **while the tag-check leg passed** — caught only by printing
+the before/after count. 🔑 *The `CHARINDEX` convention holds only if the tag is in the column the cleanup
+matches on*; the leak is now a failing leg. 13 + 9 + 10 new tests, live probe **30/30** including the
+divergence forced on real rows and cross-tenant isolation against a second-tenant committee created for
+it. No migration. ⚠ **Still open and not an engineering act:** somebody has to do the linking.
+
 ✔ **F2-172 CLOSED 2026-08-09 — the intake front door became real, and measuring the rewire before
 writing it is what turned a chore into two defects.** F2-171's follow-up said "call
 `POST /api/v1/intake` on submit and `PUT …/triage` on triage". Measuring what that would hit found

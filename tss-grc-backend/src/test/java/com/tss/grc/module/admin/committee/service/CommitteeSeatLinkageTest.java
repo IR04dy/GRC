@@ -486,6 +486,68 @@ class CommitteeSeatLinkageTest {
         assertThat(service.linkableUsers(COMMITTEE, null).get(0).heldSeats()).isEqualTo(1);
     }
 
+    // ── 4. F2-178 — the report says which seats actually confer access ──────
+
+    /**
+     * A linked seat whose term window has closed still counts on the roster and no longer counts for
+     * authorisation, and the report says both.
+     *
+     * <p><b>F2-178.</b> This report was written when {@code member_user_id} had one consumer —
+     * {@code recordVote}'s roster match, which is content with {@code renewal_status = 'ACTIVE'}. F2-177
+     * added a second that also requires the term window to be open. Nothing in the platform ever moves
+     * an ACTIVE term to EXPIRED (the sweep sends reminders; {@code endTerm} is manual), so a roster
+     * drifts into "fully linked, admits nobody" on its own. Reporting only {@code linked} would state,
+     * truthfully and uselessly, that the roster is complete.
+     */
+    @Test
+    void a_linked_seat_outside_its_term_window_counts_on_the_roster_and_not_for_authorisation() {
+        CommitteeMemberTerm lapsed = linked(1L, "CCO", "Chair", (short) 1, CISO);
+        lapsed.setTermEndsAt(LocalDate.now().minusDays(1));
+        rosterOf(lapsed, linked(2L, "DPO", "Member", (short) 1, SECRETARY));
+
+        SeatLinkageReport r = service.linkage(COMMITTEE);
+
+        assertThat(r.linked()).isEqualTo(2);
+        assertThat(r.coveragePct()).isEqualTo(100);      // the roster reads complete…
+        assertThat(r.currentSeats()).isEqualTo(1);
+        assertThat(r.currentLinked()).isEqualTo(1);      // …and admits one of the two
+        assertThat(r.seats()).extracting(SeatLinkageReport.Seat::currentlySeated)
+            .containsExactly(false, true);
+        // The lapsed seat is still LINKED: currency and linkage are independent axes, and collapsing
+        // them into one enum would make a lapsed-and-unlinked seat report only one of its problems.
+        assertThat(r.seats().get(0).state()).isEqualTo(SeatLinkageReport.State.LINKED);
+    }
+
+    @Test
+    void an_ended_term_stops_conferring_access_immediately_rather_than_at_its_end_date() {
+        CommitteeMemberTerm resigned = linked(1L, "CCO", "Chair", (short) 1, CISO);
+        resigned.setTermEndsAt(LocalDate.now().plusYears(2));
+        resigned.setEndedAt(java.time.LocalDateTime.now().minusDays(3));
+        rosterOf(resigned);
+
+        SeatLinkageReport r = service.linkage(COMMITTEE);
+
+        // Ending a term mid-window is a distinct act (resignation, removal) recorded in end_reason, and
+        // it revokes the seat now — not when term_ends_at arrives two years later.
+        assertThat(r.linked()).isEqualTo(1);
+        assertThat(r.currentLinked()).isZero();
+        assertThat(r.seats().get(0).currentlySeated()).isFalse();
+    }
+
+    @Test
+    void an_unlinked_seat_inside_its_window_is_current_but_confers_nothing() {
+        rosterOf(term(1L, "DPO", "Member", (short) 1));
+
+        SeatLinkageReport r = service.linkage(COMMITTEE);
+
+        // currentSeats counts seats the guard would consider; currentLinked counts the ones it can
+        // actually match a user to. An unlinked seat is in the first and not the second, and conflating
+        // them would report an empty roster's worth of access.
+        assertThat(r.currentSeats()).isEqualTo(1);
+        assertThat(r.currentLinked()).isZero();
+        assertThat(r.seats().get(0).currentlySeated()).isTrue();
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private static LinkUserRequest link(Long userId) {
