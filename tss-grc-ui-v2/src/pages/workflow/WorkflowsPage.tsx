@@ -9,7 +9,7 @@ import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
-import { workflowApi, type WorkflowDefinitionDto, type WorkflowDefinitionGraph } from '../../lib/api';
+import { workflowApi, ApiError, type WorkflowDefinitionDto, type WorkflowDefinitionGraph } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { WORKFLOW_DEFINITIONS, WORKFLOW_GRAPHS_BY_ID } from './mockWorkflowDefs';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
@@ -19,6 +19,7 @@ import { ALL_WORKFLOWS } from '../../lib/mockWorkflows';
 import { ChainCatalog } from '../../components/workflows/ChainCatalog';
 import { WorkflowDesigner } from '../../components/workflows/WorkflowDesigner';
 import { Pencil, Eye } from 'lucide-react';
+import { isDemoId } from '../../lib/demoIds';
 
 /**
  * Workflows admin page — assessment §6.1 strategic flagship.
@@ -45,15 +46,16 @@ export function WorkflowsPage() {
     }
     setLoading(true);
     workflowApi.definitions()
+      // F2-169 — `d.length > 0 ? d : WORKFLOW_DEFINITIONS` made the honest empty state unreachable:
+      // a tenant with no workflow definitions saw six fabricated ones, and `isDemo` here is the
+      // static `!isAuthenticated()`, so nothing said they were fake. A signed-in empty tenant is a
+      // real answer. Same shape as F2-166.
       .then(d => {
-        const list = d && d.length > 0 ? d : WORKFLOW_DEFINITIONS;
+        const list = d ?? [];
         setDefinitions(list);
         if (list.length > 0 && activeId == null) setActiveId(list[0].id);
       })
-      .catch(() => {
-        setDefinitions(WORKFLOW_DEFINITIONS);
-        if (activeId == null) setActiveId(WORKFLOW_DEFINITIONS[0]?.id ?? null);
-      })
+      .catch(e => toast.danger(e instanceof ApiError ? e.message : t('loadFailed')))
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -65,8 +67,10 @@ export function WorkflowsPage() {
     }
     setGraphLoading(true);
     workflowApi.graph(activeId)
-      .then(g => setGraph(g ?? WORKFLOW_GRAPHS_BY_ID[activeId] ?? null))
-      .catch(() => setGraph(WORKFLOW_GRAPHS_BY_ID[activeId] ?? null))
+      // A fabricated graph only for a fabricated definition — otherwise the designer would render
+      // someone else's invented steps over a real workflow the server just failed to describe.
+      .then(g => setGraph(g ?? (isDemoId(activeId) ? WORKFLOW_GRAPHS_BY_ID[activeId] ?? null : null)))
+      .catch(() => setGraph(isDemoId(activeId) ? WORKFLOW_GRAPHS_BY_ID[activeId] ?? null : null))
       .finally(() => setGraphLoading(false));
   }, [activeId]);
 

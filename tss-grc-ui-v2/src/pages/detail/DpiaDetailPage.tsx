@@ -19,6 +19,7 @@ import { EntityActivityTimeline } from '../../components/audit/EntityActivityTim
 import { dpiaApi, type DpiaDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { isDemoId } from '../../lib/demoIds';
 import {
   DPIAS, DPIA_QUESTIONS_BY_ID, DPIA_MITIGATIONS_BY_ID, DPIA_REVIEWS_BY_ID,
 } from '../privacy/mockPrivacy';
@@ -45,7 +46,13 @@ export function DpiaDetailPage() {
     setLoading(true);
     dpiaApi.get(Number(id))
       .then(r => { setItem(r.dpia); })
-      .catch(() => setItem(DPIAS.find(d => d.id === Number(id)) as DpiaDto ?? null))
+      // F2-169 — a fabricated record only for a fabricated id. `isDemoId` is true exactly when the
+      // URL id came from the demo corpus, so an unauthenticated walk-through still resolves while a
+      // real record whose fetch FAILED now says so instead of quietly becoming an invented one.
+      .catch(() => {
+        if (isDemoId(Number(id))) { setItem(DPIAS.find(d => d.id === Number(id)) as DpiaDto ?? null); return; }
+        setItem(null); toast.danger(t('loadFailed'));
+      })
       .finally(() => setLoading(false));
   }, [id]);
 

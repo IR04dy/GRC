@@ -651,7 +651,7 @@ central tokens (§5.3), so the fix is likely a small number of token changes rat
 | **Instruction coverage** | **37.1%** | JaCoCo, 1,324 classes — **not re-measured since; the suite has since grown 51%** |
 | **Branch coverage** | **26.0%** | |
 | **Line coverage** | **38.5%** | |
-| Frontend tests then | **0** (`runner: none`) | **now 455** via vitest (`npx vitest run`, 48 files, 2026-08-09) — 49 at the 07-25 baseline |
+| Frontend tests then | **0** (`runner: none`) | **now 459** via vitest (`npx vitest run`, 48 files, 2026-08-09) — 49 at the 07-25 baseline. ⚠ Run it from `tss-grc-ui-v2/`: a bare `npx vitest` at the repo root finds a different 4-file suite and prints a green *25 passed* (F2-169) |
 | Code duplication | **5.41%** — 1,666 clones, 21,062 lines | jscpd over 389,021 lines |
 | **ESLint configured** | **`false`** | ⚠ a precondition for F2-11's lint ratchets — they cannot be added until ESLint exists |
 | trivy dependency vulns | 36 | not triaged by severity in `metrics.json` |

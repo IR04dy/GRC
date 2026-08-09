@@ -860,6 +860,8 @@ export const en = {
   comingSoon: 'Coming next',
   comingSoonSub: 'This view will follow once we agree on the design language.',
   demoMode: 'Demo mode · using sample data',
+  // F2-169 — a failed load must say so. It used to be answered with fabricated rows.
+  loadFailed: 'Could not load this list — the request failed. Nothing here is sample data.',
   // F2-98: the substitution a SIGNED-IN user can hit — an empty register, or the API failing.
   // Deliberately does not say "sign in": the reader already has a session.
   demoDataSubstituted:'Sample data — your own records could not be loaded',

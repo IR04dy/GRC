@@ -59,6 +59,8 @@ import { usePromoted } from '../../lib/promotedRecords';
 import { toFindingDto, toEngagementDto } from '../../lib/promotedAdapters';
 import { NitaqatPanel } from '../../components/compliance/NitaqatPanel';
 import { COMPLIANCE_ANCHORS } from '../../lib/moduleAnchors';
+import { isAuthenticated } from '../../lib/auth';
+import { isDemoId } from '../../lib/demoIds';
 
 type TabId = 'overview' | 'controls' | 'internal' | 'external' | 'findings' | 'scorecard' | 'changes' | 'engagements' | 'frameworks' | 'nitaqat' | 'workflows';
 
@@ -1007,14 +1009,25 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
 
   useEffect(() => {
     (async () => {
-      // Per-call .catch() — coverage may be unavailable in dev DBs while the
-      // catalogue is fine (and vice versa). Each call falls back to its own
-      // demo slice independently so we keep partial real data on screen.
-      const [fs, cov] = await Promise.all([
-        frameworkApi.list().catch(() => FRAMEWORKS),
-        frameworkApi.coverage().catch(() => FRAMEWORK_COVERAGE),
-      ]);
-      const finalFs = fs.length ? fs : FRAMEWORKS;
+      /**
+       * F2-169 — the demo substitution happens once, here, and only with no session.
+       *
+       * The three lines this replaces read `frameworkApi.list().catch(() => FRAMEWORKS)`,
+       * `coverage().catch(() => FRAMEWORK_COVERAGE)` and `fs.length ? fs : FRAMEWORKS`, with a
+       * comment explaining that per-call fallbacks "keep partial real data on screen". The cost was
+       * not visible from that sentence: this page's badge is `controls.isDemo || …`, four hook flags
+       * that none of these paths touch — so a signed-in user whose framework catalogue failed, or
+       * whose tenant simply has no frameworks yet, was shown a **fabricated regulatory catalogue**
+       * with no badge and no way to tell. An empty catalogue is a real answer and must render as one.
+       */
+      const demo = !isAuthenticated();
+      const [fs, cov] = demo
+        ? [FRAMEWORKS, FRAMEWORK_COVERAGE]
+        : await Promise.all([
+            frameworkApi.list().catch(e => { toast.danger(e instanceof ApiError ? e.message : t('loadFailed')); return [] as FrameworkDto[]; }),
+            frameworkApi.coverage().catch(() => [] as FrameworkCoverageDto[]),
+          ]);
+      const finalFs = fs;
       setFrameworks(finalFs);
       setCoverage(Object.fromEntries(cov.map(c => [c.frameworkId, c])));
       if (finalFs.length > 0 && activeId == null) setActiveId(finalFs[0].id);
@@ -1025,13 +1038,18 @@ function FrameworkAnchorView({ t, toast }: { t: (k: string) => string; toast: Re
   useEffect(() => {
     if (activeId == null) return;
     setLoading(true);
+    // F2-169 — a fabricated child may only hang off a fabricated parent. `isDemoId` is true exactly
+    // when the selected framework came out of `FRAMEWORKS`, so the demo screens keep their tabs and
+    // a real framework's failed tab shows nothing rather than another tenant's invented policies.
+    // (Before F2-168 these maps were keyed 1..3 and collided with real framework ids.)
+    const demoParent = isDemoId(activeId);
     Promise.all([
-      frameworkApi.policiesFor(activeId).catch(() => FRAMEWORK_POLICIES_BY_ID[activeId] ?? [] as FrameworkPolicyRowDto[]),
-      frameworkApi.findingsFor(activeId).catch(() => FRAMEWORK_FINDINGS_BY_ID[activeId] ?? [] as FrameworkFindingRowDto[]),
-      frameworkApi.controlsFor(activeId).catch(() => FRAMEWORK_CONTROLS_BY_ID[activeId] ?? [] as FrameworkControlRowDto[]),
-      frameworkApi.dpiasFor(activeId).catch(() => FRAMEWORK_DPIAS_BY_ID[activeId] ?? [] as FrameworkDpiaRowDto[]),
-      frameworkApi.krisFor(activeId).catch(() => FRAMEWORK_KRIS_BY_ID[activeId] ?? [] as FrameworkKriRowDto[]),
-      frameworkApi.risksFor(activeId).catch(() => FRAMEWORK_RISKS_BY_ID[activeId] ?? [] as FrameworkRiskRowDto[]),
+      frameworkApi.policiesFor(activeId).catch(() => demoParent ? FRAMEWORK_POLICIES_BY_ID[activeId] ?? [] : [] as FrameworkPolicyRowDto[]),
+      frameworkApi.findingsFor(activeId).catch(() => demoParent ? FRAMEWORK_FINDINGS_BY_ID[activeId] ?? [] : [] as FrameworkFindingRowDto[]),
+      frameworkApi.controlsFor(activeId).catch(() => demoParent ? FRAMEWORK_CONTROLS_BY_ID[activeId] ?? [] : [] as FrameworkControlRowDto[]),
+      frameworkApi.dpiasFor(activeId).catch(() => demoParent ? FRAMEWORK_DPIAS_BY_ID[activeId] ?? [] : [] as FrameworkDpiaRowDto[]),
+      frameworkApi.krisFor(activeId).catch(() => demoParent ? FRAMEWORK_KRIS_BY_ID[activeId] ?? [] : [] as FrameworkKriRowDto[]),
+      frameworkApi.risksFor(activeId).catch(() => demoParent ? FRAMEWORK_RISKS_BY_ID[activeId] ?? [] : [] as FrameworkRiskRowDto[]),
     ]).then(([p, f, c, d, k, r]) => { setPolicies(p); setFindings(f); setControls(c); setDpias(d); setKris(k); setRisks(r); }).finally(() => setLoading(false));
   }, [activeId]);
 

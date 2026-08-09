@@ -21,6 +21,7 @@ import { tprmApi, type TprmVendorDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { VENDORS, VENDOR_ASSESSMENTS_BY_ID, VENDOR_CONTRACTS_BY_ID } from '../tprm/mockTprm';
+import { isDemoId } from '../../lib/demoIds';
 
 type TabId = 'overview' | 'assessments' | 'contracts' | 'docs' | 'signoff' | 'links' | 'activity';
 
@@ -41,7 +42,13 @@ export function VendorDetailPage() {
     setLoading(true);
     tprmApi.vendors(0, 200)
       .then(p => setItem(p.content?.find(v => v.id === Number(id)) ?? null))
-      .catch(() => setItem(VENDORS.find(v => v.id === Number(id)) ?? null))
+      // F2-169 — a fabricated record only for a fabricated id. `isDemoId` is true exactly when the
+      // URL id came from the demo corpus, so an unauthenticated walk-through still resolves while a
+      // real record whose fetch FAILED now says so instead of quietly becoming an invented one.
+      .catch(() => {
+        if (isDemoId(Number(id))) { setItem(VENDORS.find(v => v.id === Number(id)) ?? null); return; }
+        setItem(null); toast.danger(t('loadFailed'));
+      })
       .finally(() => setLoading(false));
   }, [id]);
 

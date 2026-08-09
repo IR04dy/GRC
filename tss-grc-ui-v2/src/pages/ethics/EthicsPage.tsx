@@ -1211,12 +1211,16 @@ function DisclosuresTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   const [busy, setBusy] = useState(false);
 
   async function load() {
+    // F2-169 — the demo gate is HERE, and it is the only one. `demoMode` is what raises the badge
+    // and disables the row actions, so a substitution made anywhere else in this function is
+    // fabricated data the page presents as real. Two used to be: an empty tenant was shown
+    // `DISCLOSURES` (F2-166's shape — the honest empty state was unreachable code), and a failed
+    // fetch was too, which turned an outage into a plausible ethics register.
     if (demoMode) { setItems(DISCLOSURES); return; }
     setLoading(true);
     try {
-      const list = (await disclosureApi.list({ size: 200 })).content ?? [];
-      setItems(list.length === 0 ? DISCLOSURES : list);
-    } catch { setItems(DISCLOSURES); }
+      setItems((await disclosureApi.list({ size: 200 })).content ?? []);
+    } catch (e) { toast.danger(e instanceof ApiError ? e.message : t('loadFailed')); }
     finally { setLoading(false); }
   }
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);

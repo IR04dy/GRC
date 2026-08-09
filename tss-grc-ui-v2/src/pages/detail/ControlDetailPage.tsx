@@ -21,6 +21,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { EntityAnchorsPanel } from '../../components/authority/EntityAnchorsPanel';
 import { CONTROL_ANCHORS_BY_ID } from '../../lib/entityAnchors';
+import { isDemoId } from '../../lib/demoIds';
 import {
   COMPLIANCE_CONTROLS, CONTROL_SUBCONTROLS_BY_ID, CONTROL_EVIDENCE_BY_ID, CONTROL_TESTS_BY_ID,
 } from '../compliance/mockCompliance';
@@ -45,7 +46,13 @@ export function ControlDetailPage() {
     setLoading(true);
     complianceApi.controls(0, 200)
       .then(p => setItem(p.content?.find(c => c.id === Number(id)) ?? null))
-      .catch(() => setItem(COMPLIANCE_CONTROLS.find(c => c.id === Number(id)) ?? null))
+      // F2-169 — a fabricated record only for a fabricated id. `isDemoId` is true exactly when the
+      // URL id came from the demo corpus, so an unauthenticated walk-through still resolves while a
+      // real record whose fetch FAILED now says so instead of quietly becoming an invented one.
+      .catch(() => {
+        if (isDemoId(Number(id))) { setItem(COMPLIANCE_CONTROLS.find(c => c.id === Number(id)) ?? null); return; }
+        setItem(null); toast.danger(t('loadFailed'));
+      })
       .finally(() => setLoading(false));
   }, [id]);
 

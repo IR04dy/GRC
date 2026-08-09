@@ -466,11 +466,14 @@ function DpiaTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnTy
   const items = [...promoted, ...apiItems];
 
   function reload() {
+    // F2-169 — the demo substitution is the line above and nowhere else. The `.catch` used to
+    // answer a failed DPIA fetch with `DPIAS`, and the page's badge reads `dsrs.isDemo` — a
+    // different data set — so the fabricated DPIAs arrived with no badge at all.
     if (!isAuthenticated()) { setItems(DPIAS); return; }
     setLoading(true);
     dpiaApi.list(0, 100)
       .then(p => setItems(p.content))
-      .catch(() => setItems(DPIAS))
+      .catch(e => toast.danger(e instanceof ApiError ? e.message : t('loadFailed')))
       .finally(() => setLoading(false));
   }
   useEffect(() => { reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps

@@ -270,3 +270,124 @@ describe('W2-1b — a demo substitution is never silent', () => {
     expect(body).toMatch(/isDemo/);
   });
 });
+
+/**
+ * F2-169 — a substitution in a *fallback position* must be gated on a fabricated parent.
+ *
+ * The two guards above certify one mechanism: `useApiResource`/`applyMock` raises `isDemo`, and every
+ * consumer renders the badge. ⚙ **A contract that inspects one mechanism certifies only that
+ * mechanism.** Measured 2026-08-09: **19 substitutions** written a different way — a bare
+ * `.catch(() => FRAMEWORKS)`, a `d.length > 0 ? d : WORKFLOW_DEFINITIONS`, a
+ * `?? COMPLIANCE_FINDINGS.find(…)` — were never in this file's population, so they raised no flag and
+ * rendered no badge. Worst of them: `frameworkApi.list().catch(() => FRAMEWORKS)` showed a signed-in
+ * user a **fabricated regulatory catalogue** on any failure, and three sites turned a genuinely empty
+ * tenant into fabricated rows, which is [[F2-166]]'s defect in three more places.
+ *
+ * The rule this pins is the one [[F2-168]] made expressible: **fabricated data may substitute only
+ * for a fabricated parent.** `isDemoId(parentId)` is true exactly when the record the children hang
+ * off came out of the corpus, so demo walk-throughs keep working and a real record's failed fetch
+ * surfaces as an error instead of as somebody's invented policies.
+ *
+ * A top-of-loader `if (!isAuthenticated()) { setItems(MOCK); return; }` is *not* a fallback position
+ * and is deliberately outside this population — that is the disclosed demo path.
+ */
+describe('F2-169 — fabricated data only substitutes for a fabricated parent', () => {
+  /** `.catch(() => X)`, `?? X`, `a.length ? a : X` — the three shapes measured in the tree. */
+  const FALLBACK = /\.catch\(\s*(?:\([^)]*\)|\w+)\s*=>[^\n]*|\?\?[^\n]*|\.length\s*(?:>\s*0|===\s*0|\?)[^\n]*/;
+
+  /**
+   * ⚠ Reviewed exception, with the reason recorded — not an allow-list to grow.
+   * `AdminPage`'s Roles tab is a read-only display, and F2-52's comment in that file explains why the
+   * fallback stays: the role *picker* reads `rolesAreReal ? roles : []`, so the ghost roles the
+   * fallback contains can never be granted. If that decoupling ever goes, this entry must go too.
+   */
+  const REVIEWED = new Set(['pages/admin/AdminPage.tsx#ADMIN_ROLES']);
+
+  it('no ungated fabricated fallback survives outside the reviewed exception', () => {
+    const violations: string[] = [];
+    let population = 0;
+    for (const { path, body } of ALL) {
+      if (IS_TEST(path)) continue;
+      const src = stripBlockAndLineComments(body);
+      const names = corpusNamesImportedBy(src);
+      if (names.length === 0) continue;
+      // a local `const x = isDemoId(...)` counts as the gate, because that is how the six framework
+      // tabs read — the predicate is hoisted out of the six identical .catch arms
+      const gates = ['isDemoId', ...[...src.matchAll(/const\s+(\w+)\s*=\s*isDemoId\(/g)].map(m => m[1])];
+      for (const line of src.split('\n')) {
+        const m = FALLBACK.exec(line);
+        if (!m) continue;
+        const hit = names.filter(n => m[0].includes(n));
+        if (hit.length === 0) continue;
+        population += 1;
+        if (gates.some(g => m[0].includes(g))) continue;
+        const key = `${path}#${hit[0]}`;
+        if (REVIEWED.has(key)) continue;
+        violations.push(`${key}  ${line.trim().slice(0, 100)}`);
+      }
+    }
+    expect(violations).toEqual([]);
+    // anti-vacuity: the scan must still be finding the gated survivors it is meant to police
+    expect(population).toBeGreaterThanOrEqual(10);
+  });
+
+  it('the three empty-tenant substitutions are gone — an empty tenant is a real answer', () => {
+    // F2-166's shape, found three more times: `list.length === 0 ? MOCK : list` makes the honest
+    // empty state unreachable code for a signed-in tenant that simply has nothing yet.
+    for (const rel of ['pages/ethics/EthicsPage.tsx', 'pages/workflow/WorkflowsPage.tsx',
+                       'pages/compliance/CompliancePage.tsx']) {
+      const src = stripBlockAndLineComments(readFileSync(join(SRC, rel), 'utf8'));
+      const names = corpusNamesImportedBy(src);
+      // WARNING, and the reason this reads the way it does: the first draft built the pattern with
+      // `new RegExp` from a template literal and was **vacuous** — it passed with the defect
+      // re-inserted, and only the general scan above caught the mutation. A `.not.toMatch` whose
+      // regex can never match is the quietest way to own a guarantee you do not have.
+      const offenders = src.split(/\r?\n/)
+        .filter(l => /\.length\s*(?:>\s*0|===\s*0)/.test(l))
+        .filter(l => names.some(n => l.includes(n)))
+        .map(l => rel + ': ' + l.trim().slice(0, 90));
+      expect(offenders).toEqual([]);
+    }
+  });
+
+  it('a failed load says so', () => {
+    // Removing a fabrication is only half the fix: an error rendered as an empty screen is the same
+    // lie in a quieter voice. Every loader this slice touched surfaces the failure.
+    for (const rel of ['pages/ethics/EthicsPage.tsx', 'pages/privacy/PrivacyPage.tsx',
+                       'pages/workflow/WorkflowsPage.tsx', 'pages/compliance/CompliancePage.tsx',
+                       'pages/detail/ControlDetailPage.tsx', 'pages/detail/DpiaDetailPage.tsx',
+                       'pages/detail/FindingDetailPage.tsx', 'pages/detail/VendorDetailPage.tsx']) {
+      expect(readFileSync(join(SRC, rel), 'utf8'), `${rel} swallows its load error`)
+        .toMatch(/toast\.danger\([^\n]*loadFailed/);
+    }
+  });
+
+  it('loadFailed is bilingual, like everything a user reads', () => {
+    for (const lang of ['en', 'ar']) {
+      expect(readFileSync(join(SRC, `translations/${lang}.ts`), 'utf8')).toMatch(/^\s+loadFailed: '/m);
+    }
+  });
+});
+
+/** Corpus identifiers a file imports — the only names that can be a fabricated substitution. */
+function corpusNamesImportedBy(src: string): string[] {
+  const out = new Set<string>();
+  for (const m of src.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+'[^']*(?:mock\w+|entityAnchors|policyLifecycle)'/g)) {
+    for (const part of m[1].split(',')) {
+      const n = part.trim().split(' as ').pop()!.trim();
+      if (n && /^[A-Z]/.test(n)) out.add(n);
+    }
+  }
+  return [...out];
+}
+
+/**
+ * ⚠ Comments must come out first. The measurement that produced this test read them and reported
+ * three "violations" that were the prose describing the fix — the same mistake F2-165 made with a
+ * hand-rolled stripper. This one is deliberately conservative: it does not try to parse regex
+ * literals, it only removes `//`-to-end-of-line and `/* … *\/` runs, which is enough here because a
+ * corpus identifier is upper-case and never appears inside one.
+ */
+function stripBlockAndLineComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(?<!:)\/\/[^\n]*/g, '');
+}

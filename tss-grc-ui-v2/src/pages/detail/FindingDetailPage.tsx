@@ -25,6 +25,7 @@ import { COMPLIANCE_FINDINGS, FINDING_EVIDENCE_BY_ID, FINDING_HISTORY_BY_ID } fr
 import { CommsPanel } from '../../components/comms/CommsPanel';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { EntityAutomationRuns } from '../../components/audit/EntityAutomationRuns';
+import { isDemoId } from '../../lib/demoIds';
 
 type TabId = 'overview' | 'capa' | 'evidence' | 'docs' | 'signoff' | 'links' | 'history' | 'comms';
 
@@ -45,8 +46,14 @@ export function FindingDetailPage() {
     if (!id) return;
     setLoading(true);
     complianceApi.findings(0, 200)
-      .then(p => setItem(p.content?.find(f => f.id === Number(id)) ?? COMPLIANCE_FINDINGS.find(f => f.id === Number(id)) ?? null))
-      .catch(() => setItem(COMPLIANCE_FINDINGS.find(f => f.id === Number(id)) ?? null))
+      // F2-169 — the SUCCESS path substituted too: a real finding list that did not contain the
+      // id fell through to a fabricated finding. Both paths now require a fabricated id.
+      .then(p => setItem(p.content?.find(f => f.id === Number(id))
+        ?? (isDemoId(Number(id)) ? COMPLIANCE_FINDINGS.find(f => f.id === Number(id)) ?? null : null)))
+      .catch(() => {
+        if (isDemoId(Number(id))) { setItem(COMPLIANCE_FINDINGS.find(f => f.id === Number(id)) ?? null); return; }
+        setItem(null); toast.danger(t('loadFailed'));
+      })
       .finally(() => setLoading(false));
   }, [id]);
 

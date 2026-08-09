@@ -1002,6 +1002,50 @@ today… needs the owner's word"*. Also measured: **all four APPROVED acceptance
 belong to soft-deleted probe risks**, so no acceptance has ever been recorded through the UI — which is
 what an unreachable approval step looks like from the data side.
 
+✔ **2026-08-09 — [[F2-169]] CLOSED (P2): 19 undisclosed substitutions, written outside the one
+mechanism the disclosure contract inspects.** Filed the same day as [[F2-168]]'s residue, on a count
+of *"8 sites in 2 files"* taken from that slice's scan. Re-measuring the class before touching it
+found **20 sites in 9 files** — 15 `.catch(() => MOCK)`, 3 empty-list substitutions, 2 `?? MOCK` — of
+which 19 raise no flag and render no badge. 🔑 **A residue noted in passing is a guess about a
+population, not a measurement of one.**
+
+The worst case was not in the filing at all: `frameworkApi.list().catch(() => FRAMEWORKS)` showed a
+signed-in user a **fabricated regulatory catalogue** on any failure, because this page's `isDemo` is
+four hook flags that path never touches. `FindingDetailPage` substituted on the **success** path too.
+
+And three of them are [[F2-166]]'s defect a fifth time: `list.length === 0 ? DISCLOSURES : list`,
+`d.length > 0 ? d : WORKFLOW_DEFINITIONS`, `fs.length ? fs : FRAMEWORKS`. Measured per tenant in dev,
+`workflow.definitions` and `ethics.disclosures` hold rows for **organisation 1 only** — so **2 of the
+3 dev tenants** were being shown 6 fabricated workflow definitions and 6 fabricated conflict-of-
+interest disclosures each, with the honest empty state unreachable. ⚙ The seed script populates one
+tenant, which makes every `length === 0` substitution live for the others. (`compliance.frameworks` is
+global, 24 rows, so its arm needs a failure — recorded because a per-tenant count clears that one.)
+
+Fixed with one rule that [[F2-168]] made expressible: **fabricated data may substitute only for a
+fabricated parent, or when there is no session.** `isDemoId(parentId)` gates the six framework tabs,
+the workflow graph and the four detail pages; the demo path stays at the top of each loader as
+`if (!isAuthenticated()) { … return; }`. Plus the other half — eight loaders now surface the failure
+through a new **bilingual** `loadFailed` string, because an error rendered as an empty screen is the
+same lie in a quieter voice. One reviewed exception, annotated with F2-52's reason: `AdminPage`'s
+Roles tab is a read-only display whose picker reads `rolesAreReal ? roles : []`.
+
+⚠⚠ **One of the new assertions shipped vacuous in its first draft.**
+`expect(src).not.toMatch(new RegExp(...))` built from a template literal never matched anything — the
+defect re-inserted left it green, and only the general scan caught the mutation. Rewritten with plain
+substring filters and re-mutated to prove it fires. 🔑 **A `.not.toMatch` whose regex cannot match is
+the quietest way to own a guarantee you do not have**; a passing negative assertion looks identical
+whether the property holds or the pattern is broken. Mutation-test negative assertions specifically.
+
+⚠ The instrument also mis-classified twice: its "does this file have a badge mechanism?" column looked
+for `applyMock`/`useApiList` and so reported **False** for `EthicsPage`, which has a hand-rolled
+`demoMode` — the exact flag the substitution bypasses; and after the fix, 3 of 13 remaining hits were
+**comment prose describing the fix**, because the scan did not strip comments ([[F2-165]]'s mistake
+with a different scanner). ⚠ Fifth working-directory drift too, and this one was worse than a "no test
+files" error: a bare `npx vitest` from the repo root ran a **different 4-file suite** and printed *25
+passed*. **A green run from the wrong directory is indistinguishable from a green run.**
+
+FE **459/459** in 48 files, `tsc` + `vite build` clean, mutation 4/4, backend untouched.
+
 ✔ **2026-08-09 — [[F2-168]] CLOSED (P1): fabricated children were attaching themselves to REAL
 records by id collision — on the success path, with no badge and no demo flag.** Found by doing what
 [[F2-167]] said to do next: re-measure [[F2-15]]'s `Current State` before renumbering the mock ids.
