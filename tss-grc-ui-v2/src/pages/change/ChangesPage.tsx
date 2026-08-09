@@ -44,7 +44,7 @@ import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { CHANGE_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 import { GovernancePanel } from './GovernancePanel';
-import { usePromoted } from '../../lib/promotedRecords';
+import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
 import { toChangeRequestDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import {
@@ -230,7 +230,8 @@ export function ChangesPage() {
     { header: t('colStatus'),       cell: c => <Badge tone={STATUS_TONE[c.status] ?? 'neutral'} dot>{c.status.replace(/_/g, ' ')}</Badge>, width: '170px' },
     { header: t('changeFldScheduledStart'), cell: c => c.scheduledStart ? new Date(c.scheduledStart).toLocaleDateString() : '—', mono: true, width: '120px' },
     { header: '', align: 'end', width: '160px',
-      cell: c => <RowActions disabled={demoMode} onEdit={() => { setEditing(c); setModalOpen(true); }}
+      // F2-171: promoted-intake changes are merged in above and exist only in this browser.
+      cell: c => <RowActions disabled={demoMode || isUnsyncedId(c.id)} onEdit={() => { setEditing(c); setModalOpen(true); }}
                               onDelete={() => setConfirmDel(c)}
                               extras={[
                                 { Icon: FolderOpen, onClick: () => setDocsTarget(c), title: lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls' },

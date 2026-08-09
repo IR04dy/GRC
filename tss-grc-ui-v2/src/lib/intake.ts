@@ -39,7 +39,7 @@
 //   NIST 800-61 §3.2   — Incident reporting
 
 import { useCallback, useEffect, useState } from 'react';
-import { addPromoted, type PromotedRecord } from './promotedRecords';
+import { addPromoted, mintPromotedId, type PromotedRecord } from './promotedRecords';
 
 // ── Domain types ────────────────────────────────────────────────────────
 
@@ -674,7 +674,10 @@ export function useIntake() {
     if (decision === 'PROMOTE') {
       const catalog = INTAKE_CATALOG[current.kind];
       const entityType = catalog.defaultTarget;
-      const recordId = Date.now() % 1_000_000;
+      // F2-171: was `Date.now() % 1_000_000` — a POSITIVE id in 0…999,999, which is the
+      // range real IDENTITY values live in. `mintPromotedId()` is negative by
+      // construction, so this placeholder can never name a real record. See its javadoc.
+      const recordId = mintPromotedId();
       const promoted: PromotedRecord = {
         id: recordId,
         sourceIntakeId: current.id,

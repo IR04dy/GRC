@@ -93,7 +93,45 @@ function redirectToLogin(): void {
   }
 }
 
+/**
+ * A path segment that is a negative integer — the id scheme `promotedRecords.mintPromotedId()`
+ * uses for a record that exists only in this browser. Anchored to a whole segment so a query
+ * value never matches; the query string is stripped before the test regardless.
+ */
+const PLACEHOLDER_ID_SEGMENT = /\/-\d+(?=\/|$)/;
+
+/**
+ * F2-171 — never hand a placeholder id to a real endpoint.
+ *
+ * <b>Why here and not at the button.</b> Intake promotion merges a client-only row into
+ * eleven registers, and those rows render the same live governance actions as server rows —
+ * Approve, Submit, Delete, and a detail-page link. Disabling each of those is UX work spread
+ * across eleven files, and a missed one is silent. This is the single choke point every call
+ * in the app passes through, so the safety property is total here and total the moment it
+ * lands: whatever a page forgets, the request cannot leave.
+ *
+ * That matters because of what the old id scheme was. `Date.now() % 1_000_000` is a positive
+ * integer in the range real IDENTITY values occupy; measured in dev, 0.056% of promotions
+ * would have named *some* existing record across the eleven registers, and the share grows
+ * with every row a tenant adds. On such a promotion `dpiaApi.approve(d.id)` approved a real,
+ * unrelated DPIA while the screen showed the promoted row's title — F2-167's wrong-record
+ * shape, from a source of fabricated rows F2-167 never measured.
+ *
+ * Thrown, not swallowed: pages already funnel `ApiError` into `problemMessage()` toasts, so
+ * the user gets a sentence naming the cause instead of a silent no-op. Status 0 marks it as
+ * client-side — no HTTP request was made.
+ */
+function assertNotPlaceholder(path: string): void {
+  if (PLACEHOLDER_ID_SEGMENT.test(path.split('?')[0])) {
+    throw new ApiError(0,
+      'This record has not been saved to the server yet, so no action can be taken on it. '
+      + 'It was created by promoting an intake submission, which currently only records the '
+      + 'result in this browser (F2-171).');
+  }
+}
+
 async function request<T>(path: string, opts: FetchOpts = {}): Promise<T> {
+  assertNotPlaceholder(path);
   const { body, anonymous, headers, _retried, ...rest } = opts;
   const token = getAccessToken();
 
@@ -173,6 +211,9 @@ export async function downloadFile(
 ): Promise<void> {
   // Wrap in the same refresh-on-401 path as request(). We can't call
   // request() directly because we need the raw Response (blob + headers).
+  // …which is exactly why the F2-171 check has to be repeated: this is a second
+  // network entry point, not a caller of the first.
+  assertNotPlaceholder(path);
   const hasBody = opts?.jsonBody !== undefined;
   const attempt = async (token: string | null): Promise<Response> => {
     return fetch(`${API_BASE}${path}`, {
@@ -225,6 +266,7 @@ export async function downloadFile(
  * so we must NOT set Content-Type ourselves. Mirrors downloadFile's 401-refresh.
  */
 export async function uploadFile<T>(path: string, file: File, field = 'file'): Promise<T> {
+  assertNotPlaceholder(path);   // third network entry point — see request()
   const attempt = async (token: string | null): Promise<Response> => {
     const fd = new FormData();
     fd.append(field, file);

@@ -34,7 +34,7 @@ import { incidentApi, ApiError, type IncidentDto, type IncidentRequest, type Reg
 import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../lib/toast';
 import { INCIDENTS } from './mockIncidents';
-import { usePromoted } from '../../lib/promotedRecords';
+import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
 import { toIncidentDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { INCIDENT_LIFECYCLES } from '../../lib/moduleLifecycles';
@@ -334,7 +334,8 @@ export function IncidentsPage() {
         if (r.status !== 'CLOSED' && phase !== 'POST_INCIDENT') extras.push({ Icon: ArrowRight, onClick: () => advancePhase(r), title: t('incidentsActAdvancePhase'), tone: 'primary' });
         if (r.status !== 'CLOSED')                              extras.push({ Icon: Scroll,     onClick: () => openTemplates(r),  title: t('incidentsActSaudiTemplates'), tone: 'accent' });
         if (r.status !== 'CLOSED')                              extras.push({ Icon: Archive,    onClick: () => closeIncidentAction(r), title: t('incidentsActClose'),    tone: 'success' });
-        return <RowActions disabled={isDemo} extras={extras} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} />;
+        // F2-171: promoted-intake rows are merged in above and exist only in this browser.
+        return <RowActions disabled={isDemo || isUnsyncedId(r.id)} extras={extras} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} />;
       } },
   ];
 

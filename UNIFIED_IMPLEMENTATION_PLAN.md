@@ -1002,6 +1002,57 @@ today… needs the owner's word"*. Also measured: **all four APPROVED acceptance
 belong to soft-deleted probe risks**, so no acceptance has ever been recorded through the UI — which is
 what an unreachable approval step looks like from the data side.
 
+✔ **2026-08-09 — [[F2-171]] CLOSED (P2): pressing "Promote" on an intake writes the register
+row to `localStorage` and to nothing else — with a POSITIVE id, on eleven registers that render
+live governance buttons.** Opened out of [[F2-170]]'s residue, which listed `dpiaApi.create` among
+16 entities "no screen can create". That framing was wrong in a way only reading the page could
+show: `PrivacyPage.tsx:323` says *"DD-76: route DSR / breach / DPIA creation through Services
+Center"* — creation is **deliberately** routed to intake, and the client method is dark **because
+that other path exists.** Following it is the whole finding. The other path does not reach the
+server: `triage(…, 'PROMOTE', …)` calls `addPromoted()`, which writes browser storage, and the
+intake record's permanent history note then reads *"Promoted to DPIA #482913"* — an id belonging
+to no record. Live-probed: `GET /api/v1/intake` answers **200 with totalElements 0**, and
+`intake.intake_records` holds **0 rows**, because `IntakeController` + `IntakeService` were built
+(DD-82), are reachable, and **no product code has ever called them**. The service's own javadoc
+says it implements the lifecycle "the React `useIntake()` hook drives"; nothing drives it.
+
+🔑 **Three files gave three accounts of one value, and the live one was the unsafe one.**
+`promotedAdapters.ts` opened by promising *negative* ids "so they never collide with
+backend-assigned ids"; `PromotedRecord.id` promised "highest existing + 1"; `intake.ts` minted
+`Date.now() % 1_000_000`, positive, in exactly the range IDENTITY values occupy — and all twelve
+numeric adapters passed it straight through. **The file documenting the hazard was the file
+letting it through**, [[F2-168]]'s shape exactly. Precisely one of thirteen adapters honoured the
+contract. Harms in order of certainty: nothing persists (every promotion); the row's Approve /
+Submit / Reject / Expire buttons address a nonexistent id, so the governance chain cannot proceed
+(every promotion); the title linked to `/dpias/<synthetic>`; and — measured at **0.056% of
+promotions in dev, growing linearly with tenant size** — the id names a *real, unrelated* record
+and approves it while the screen shows the promoted row's title.
+
+⚠ **Five fabrication guards were green, each having measured a different property of the same
+defect class.** [[F2-137]] scopes to `/portal/` and `/public/` routes; this path is authenticated
+throughout, so its premise test ("`lib/intake` really does make zero network calls") had measured
+the fact while its scope excluded the consequence. [[F2-167]] disables actions on fabricated rows
+but resolves on the **demo** flag, and a promoted row is not demo. `demoFallbackContract` matches
+`/mock/i` in the import path, and this store is named after the domain it fakes.
+[[F2-168]]/[[F2-169]] swept the mock corpus, which this is not in. **A fourth source of fabricated
+rows that no fabrication guard measured.** The reusable question is not "is there a guard?" but
+"which existing guard's *scope* excludes this?"
+
+Fixed in two layers, and only one is the control: `assertNotPlaceholder()` at **all three**
+network entry points in `lib/api.ts` refuses a negative-id path before `fetch` and throws an
+error that names the cause — total, so whatever a page misses cannot leave the browser; plus
+`mintPromotedId()` negative by construction, `promotedId()` coercing on read (localStorage has no
+migration step, so pre-fix overlays are repaired rather than trusted), and 15 row-action sites +
+the DPIA tab made inert and labelled. Browser-verified with a seeded promotion: both PDPL buttons
+`disabled`, no link, an Arabic "غير محفوظ" badge — while all **six real DPIAs on the same screen**
+kept their links and live buttons, which is the negative control that makes the first half mean
+anything. ⚠ Two of my own assertions shipped **vacuous** and only mutation found them (a
+query-string case that passed whether or not the query was stripped — twice, with two different
+values), and **my mutation harness misreported 11 of 12 results** because vitest's `Tests N
+failed` line is ANSI-coloured. Follow-up **F2-172** filed to make promotion persist; note the
+server's `triage()` takes `promotedToRecordId` from the client and creates nothing, so the target
+row is created on **neither** side.
+
 ✔ **2026-08-09 — [[F2-170]] CLOSED (P3): nothing asked whether the endpoint the frontend calls
 EXISTS — and this time the answer was "all of them".** Opened out of [[F2-165]]'s dark-method triage,
 sorted **by endpoint** as that finding's own correction demands. Three reachability instruments were

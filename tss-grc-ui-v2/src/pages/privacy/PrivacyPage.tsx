@@ -34,7 +34,7 @@ import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { PRIVACY_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
-import { usePromoted } from '../../lib/promotedRecords';
+import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
 import { toDsrDto, toBreachDto, toDpiaDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PdplBreachConsole } from '../../components/privacy/PdplBreachConsole';
 import { ConsentTab } from '../../components/privacy/ConsentTab';
@@ -171,7 +171,8 @@ export function PrivacyPage() {
         if (!terminal)                          extras.push({ Icon: CheckCheck, onClick: () => fulfilDsrAction(r), title: t('privacyActFulfilDsr'), tone: 'success' });
         if (!terminal)                          extras.push({ Icon: Clock,      onClick: () => extendDsrAction(r), title: t('privacyActExtendDsr'), tone: 'accent' });
         if (!terminal)                          extras.push({ Icon: XIcon,      onClick: () => rejectDsrAction(r), title: t('privacyActRejectDsr') });
-        return <RowActions disabled={isDemo} extras={extras} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} />;
+        // F2-171: promoted-intake DSRs are merged in above and exist only in this browser.
+        return <RowActions disabled={isDemo || isUnsyncedId(r.id)} extras={extras} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} />;
       } },
   ];
 
@@ -201,7 +202,8 @@ export function PrivacyPage() {
         if (r.status === 'OPEN')          extras.push({ Icon: ShieldCheck, onClick: () => containBreachAction(r),    title: t('privacyActContainBreach'), tone: 'primary' });
         if (r.status !== 'CLOSED')        extras.push({ Icon: Send,        onClick: () => notifyDataOfficeAction(r), title: t('privacyActNotifyDataOffice'), tone: 'accent' });
         if (r.status !== 'CLOSED')        extras.push({ Icon: Archive,     onClick: () => closeBreachAction(r),      title: t('privacyActCloseBreach'),   tone: 'success' });
-        return <RowActions disabled={isDemo} extras={extras} />;
+        // F2-171: promoted-intake breaches are merged in above and exist only in this browser.
+        return <RowActions disabled={isDemo || isUnsyncedId(r.id)} extras={extras} />;
       } },
   ];
 
@@ -459,6 +461,7 @@ const DPIA_RISK_TONE: Record<string, 'danger' | 'warning' | 'info' | 'success' |
  * lifecycle workflow (submit-for-review / approve / reject / expire).
  */
 function DpiaTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnType<typeof useI18n>['t'] }) {
+  const { lang } = useI18n();
   const [apiItems, setItems] = useState<DpiaDto[]>([]);
   const [loading, setLoading] = useState(false);
   // DD-75: merge intake-promoted DPIAs into the visible register.
@@ -495,13 +498,32 @@ function DpiaTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnTy
 
   return (
     <Card padded={false}>
-      {items.map(d => (
+      {items.map(d => {
+      /**
+       * F2-171 — a DPIA that came from intake promotion has no server row behind it.
+       *
+       * The register merges promoted rows above, and this tab renders the PDPL workflow
+       * buttons — Submit for review, Approve, Reject, Expire. Every one of them takes
+       * `d.id`, so on a promoted row they addressed a record that does not exist (and,
+       * under the old positive-id scheme, occasionally a real and unrelated one). The
+       * title was a `<Link to={/dpias/:id}>` for the same reason.
+       *
+       * `isUnsyncedId` is total — no server id is negative — so this needs no page flag
+       * and cannot disagree with whatever the list call did.
+       */
+      const unsynced = isUnsyncedId(d.id);
+      const whyInert = lang === 'ar'
+        ? 'لم يُحفظ هذا التقييم على الخادم بعد — لا يمكن تنفيذ إجراء عليه'
+        : 'Not saved to the server yet — no action can be taken on it';
+      return (
         <div key={d.id} style={{
           display: 'grid', gridTemplateColumns: '1fr auto auto auto auto',
           gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)', alignItems: 'center',
         }}>
           <div>
-            <Link to={`/dpias/${d.id}`} style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink-1)', textDecoration: 'none' }}>{d.titleEn}</Link>
+            {unsynced
+              ? <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink-1)' }} title={whyInert}>{d.titleEn}</span>
+              : <Link to={`/dpias/${d.id}`} style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink-1)', textDecoration: 'none' }}>{d.titleEn}</Link>}
             {d.titleAr && <div style={{ fontSize: 11, color: 'var(--ink-3)' }} dir="rtl">{d.titleAr}</div>}
             <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <Badge tone="primary">{d.triggerReason.replace(/_/g, ' ')}</Badge>
@@ -516,15 +538,23 @@ function DpiaTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnTy
             <Shield size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} />
             {d.overallResidualRisk ?? '—'}
           </Badge>
+          {/* The reason goes on each BUTTON, not just this wrapper: a live check showed
+              `title: null` on the buttons themselves, and RowActions' own note is that a
+              greyed button with no explanation reads as a broken page. */}
           <div style={{ display: 'flex', gap: 6 }}>
-            {d.status === 'DRAFT'     && <Button size="sm" variant="ghost" Icon={Send}       onClick={() => submit(d)}>{t('privacyDpiaActSubmit')}</Button>}
-            {d.status === 'IN_REVIEW' && <Button size="sm" variant="primary" Icon={CheckCheck} onClick={() => approve(d)}>{t('privacyDpiaActApprove')}</Button>}
-            {(d.status === 'IN_REVIEW' || d.status === 'DRAFT') && <Button size="sm" variant="ghost" Icon={XIcon} onClick={() => reject(d)}>{t('privacyDpiaActReject')}</Button>}
-            {d.status === 'APPROVED'  && <Button size="sm" variant="ghost" Icon={Clock}      onClick={() => expire(d)}>{t('privacyDpiaActExpire')}</Button>}
+            {d.status === 'DRAFT'     && <Button size="sm" variant="ghost" Icon={Send}       disabled={unsynced} title={unsynced ? whyInert : undefined} onClick={() => submit(d)}>{t('privacyDpiaActSubmit')}</Button>}
+            {d.status === 'IN_REVIEW' && <Button size="sm" variant="primary" Icon={CheckCheck} disabled={unsynced} title={unsynced ? whyInert : undefined} onClick={() => approve(d)}>{t('privacyDpiaActApprove')}</Button>}
+            {(d.status === 'IN_REVIEW' || d.status === 'DRAFT') && <Button size="sm" variant="ghost" Icon={XIcon} disabled={unsynced} title={unsynced ? whyInert : undefined} onClick={() => reject(d)}>{t('privacyDpiaActReject')}</Button>}
+            {d.status === 'APPROVED'  && <Button size="sm" variant="ghost" Icon={Clock}      disabled={unsynced} title={unsynced ? whyInert : undefined} onClick={() => expire(d)}>{t('privacyDpiaActExpire')}</Button>}
           </div>
-          <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>#{d.id}</span>
+          {/* An id the server never issued is noise at best and misleading at worst — say
+              what the row actually is instead. */}
+          {unsynced
+            ? <Badge tone="warning">{lang === 'ar' ? 'غير محفوظ' : 'Not saved'}</Badge>
+            : <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>#{d.id}</span>}
         </div>
-      ))}
+      );
+      })}
     </Card>
   );
 }

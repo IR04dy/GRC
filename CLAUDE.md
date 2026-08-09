@@ -78,6 +78,11 @@ Stop the running backend before `mvn clean` (jar lock) — kill by port
 (`netstat -ano | findstr :8084`; DevTools = 2 java PIDs). When launching in a
 background wrapper, **grep the log for `BUILD SUCCESS` / `Tests run:`** — wrapper
 exit codes can lie.
+⚠ **That landmine has a second, quieter mode: `mvn clean` KILLS a running dev backend and
+still reports `BUILD SUCCESS`** (measured 2026-08-09). Under `spring-boot:run` the app runs
+from `target/classes`, so `clean` deletes the code out from under it — no jar lock, no build
+error, just a dead listener. The failure surfaces later as `ConnectionRefused` from the next
+live probe, which reads like the probe's bug. **Check the port before probing, not after.**
 ⚠ **For `spring-boot:run`, `BUILD SUCCESS` is not a start signal** (measured 2026-08-07).
 DevTools' `RestartLauncher` swallows the app's failure, so Maven printed `BUILD SUCCESS` in
 5.059 s over an application that never bound a port. **Grep `Started GrcApplication in`**
@@ -357,3 +362,14 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   trades a 500 for an unbounded join on every read.
 - `seed_real_data.py` batches must start `SET NOCOUNT ON;`.
 - Don't "seed" an empty table before checking it's wired (`privacy_lc` is orphaned).
+- **The intake substrate is CLIENT-ONLY, and the server half was built and never called** (F2-171,
+  measured 2026-08-09). `module/intake` ships `IntakeController` + `IntakeService` (submit / list /
+  triage / public-tracker) and `intake.intake_records.promoted_to_record_id`; **no product code
+  calls `/api/v1/intake`** — live-probed **200 with totalElements 0, and 0 rows in the table**.
+  `lib/intake.ts` drives submit → triage → promote in `localStorage`, and `addPromoted()` merges
+  the "created" row into 11 registers. So a promoted DPIA/risk/incident/vendor **has no server
+  row**, is invisible to every other user, and dies with the browser's site data. Placeholder ids
+  are **negative** now (`mintPromotedId`) and `lib/api.ts` refuses a negative-id path at all three
+  network entry points — do not "fix" a 404 on such a row by relaxing that guard; the row is the
+  problem. ⚠ Note the server's `triage()` takes `promotedToRecordId` **from the client** and
+  creates nothing, so the target row is created on **neither** side (F2-172).

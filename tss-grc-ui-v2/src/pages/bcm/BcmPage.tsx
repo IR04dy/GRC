@@ -42,7 +42,7 @@ import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngi
 import { BCM_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { BCM_ANCHORS } from '../../lib/moduleAnchors';
-import { usePromoted } from '../../lib/promotedRecords';
+import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
 import { toBiaDto } from '../../lib/promotedAdapters';
 import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
 
@@ -318,7 +318,8 @@ export function BcmPage() {
     { header: t('colImpact'),         cell: r => <Badge tone={IMPACT_TONE[r.overallImpact ?? ''] ?? 'neutral'}>{r.overallImpact ?? '—'}</Badge> },
     { header: t('bcmStatusCol'),      cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
     { header: '', align: 'end', width: '90px',
-      cell: r => <RowActions disabled={isDemo} onEdit={() => biaS.startEdit(r)} onDelete={() => biaS.askDelete(r)} /> },
+      // F2-171: promoted-intake BIAs are merged in above and exist only in this browser.
+      cell: r => <RowActions disabled={isDemo || isUnsyncedId(r.id)} onEdit={() => biaS.startEdit(r)} onDelete={() => biaS.askDelete(r)} /> },
   ];
 
   // ── Submit handlers ──

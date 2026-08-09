@@ -55,7 +55,7 @@ import {
 import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { COMPLIANCE_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
-import { usePromoted } from '../../lib/promotedRecords';
+import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
 import { toFindingDto, toEngagementDto } from '../../lib/promotedAdapters';
 import { NitaqatPanel } from '../../components/compliance/NitaqatPanel';
 import { COMPLIANCE_ANCHORS } from '../../lib/moduleAnchors';
@@ -598,7 +598,8 @@ export function CompliancePage() {
           if (nx) extras.push({ Icon: ChevronRight, onClick: () => advanceEngagement(r), title: `${t('engagementActAdvance')} → ${nx}`, tone: 'primary' });
         }
         if (r.status === 'CLOSED') extras.push({ Icon: RotateCcw, onClick: () => scheduleFollowUp(r), title: t('engagementActScheduleFollowup'), tone: 'accent' });
-        return <RowActions disabled={isDemo} extras={extras} onEdit={() => engageS.startEdit(r)} onDelete={() => engageS.askDelete(r)} />;
+        // F2-171: promoted-intake engagements are merged in above and exist only in this browser.
+        return <RowActions disabled={isDemo || isUnsyncedId(r.id)} extras={extras} onEdit={() => engageS.startEdit(r)} onDelete={() => engageS.askDelete(r)} />;
       } },
   ];
 
@@ -620,7 +621,8 @@ export function CompliancePage() {
         if (stage === 'OWNER_TESTED')       extras.push({ Icon: Briefcase,   onClick: () => capaIndepTest(r),    title: t('capaActIndepTest'),  tone: 'accent' });
         if (stage === 'INDEPENDENT_TESTED') extras.push({ Icon: Stamp,       onClick: () => capaSignoff(r),      title: t('capaActSignoff'),    tone: 'accent' });
         if (stage === 'AUDIT_SIGNED_OFF')   extras.push({ Icon: Lock,        onClick: () => capaCloseFinding(r), title: t('capaActClose'),      tone: 'success' });
-        return <RowActions disabled={isDemo} extras={extras} />;
+        // F2-171: promoted-intake findings are merged in above and exist only in this browser.
+        return <RowActions disabled={isDemo || isUnsyncedId(r.id)} extras={extras} />;
       } },
   ];
 

@@ -38,7 +38,7 @@ import {
 import { ETHICS_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { ETHICS_ANCHORS as ETHICS_REG_ANCHORS } from '../../lib/moduleAnchors';
-import { usePromoted } from '../../lib/promotedRecords';
+import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
 import { toEthicsCaseDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import '../../styles/pages/ethics.css';
@@ -240,7 +240,8 @@ export function EthicsPage() {
     { header: t('colStatus'),         cell: c => <Badge tone={STATUS_TONE[c.status] ?? 'neutral'} dot>{c.status.replace(/_/g, ' ')}</Badge>, width: '160px' },
     { header: t('ethicsFldChannel'),  cell: c => c.intakeChannel.replace(/_/g, ' '), width: '110px' },
     { header: '', align: 'end', width: '160px',
-      cell: c => <RowActions disabled={demoMode}
+      // F2-171: promoted-intake cases are merged in above and exist only in this browser.
+      cell: c => <RowActions disabled={demoMode || isUnsyncedId(c.id)}
         onEdit={() => { setEditing(c); setModalOpen(true); }}
         onDelete={() => setConfirmDel(c)}
         extras={[

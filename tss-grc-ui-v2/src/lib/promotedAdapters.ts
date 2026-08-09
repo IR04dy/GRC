@@ -17,6 +17,16 @@
 //
 // Promoted records use *negative* synthesized ids (or a clearly distinct
 // scheme) so they never collide with backend-assigned ids.
+//
+// ⚠ F2-171 — that sentence was true as an intention and false as a description for
+// as long as it had been written. `intake.ts` minted `Date.now() % 1_000_000`, a
+// POSITIVE id, and every adapter below passed it straight through with
+// `typeof p.id === 'number' ? p.id : Number(p.id)` — so the file that documented the
+// hazard was the file that let it through, the same way `entityAnchors.ts` opened with
+// the mock-id range in F2-168. Exactly one of the thirteen adapters actually honoured
+// the contract: `toCapaFromObservation`, which mints a string. Now the rule is enforced
+// rather than described — every numeric adapter goes through `promotedId()` below, and
+// `promotedRecords.mintPromotedId()` is the only producer.
 
 import type {
   IncidentDto,
@@ -48,6 +58,24 @@ function pickStr(p: PromotedRecord, key: string, fallback = ''): string {
   return typeof v === 'string' ? v : fallback;
 }
 
+/**
+ * The single numeric-id path for every adapter — F2-171.
+ *
+ * Coerces rather than trusts, for one concrete reason: overlays minted before this fix
+ * are already sitting in users' `localStorage` with positive ids, and there is no
+ * migration step for browser storage. `-Math.abs(n)` repairs those on read, so the
+ * invariant "a promoted row's id is negative" holds for old and new records alike
+ * without anyone having to clear site data.
+ *
+ * A non-numeric id (the CAPA scheme) never reaches here — those adapters build their
+ * own string id and are not routed through this helper.
+ */
+function promotedId(p: PromotedRecord): number {
+  const n = typeof p.id === 'number' ? p.id : Number(p.id);
+  if (!Number.isFinite(n) || n === 0) return -1;
+  return -Math.abs(n);
+}
+
 function severityOf(p: PromotedRecord): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
   const s = p.payload.severitySelfAssessed;
   return s === 'LOW' || s === 'MEDIUM' || s === 'HIGH' || s === 'CRITICAL' ? s : 'MEDIUM';
@@ -60,7 +88,7 @@ export function toIncidentDto(p: PromotedRecord): IncidentDto {
   const summary = pickStr(p, 'summary');
   const category = pickStr(p, 'category', 'CYBER');
   return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
+    id: promotedId(p),
     title: summary.slice(0, 80) || `Promoted from ${p.sourceReferenceCode}`,
     severity: severityOf(p),
     category: category.includes('PRIVACY') ? 'PRIVACY' : 'CYBER',
@@ -74,7 +102,7 @@ export function toIncidentDto(p: PromotedRecord): IncidentDto {
 /** DSR_REQUEST → PrivacyDsrDto */
 export function toDsrDto(p: PromotedRecord): PrivacyDsrDto {
   return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
+    id: promotedId(p),
     requestType: pickStr(p, 'requestType', 'ACCESS'),
     requesterName: pickStr(p, '_submitter') || 'Anonymous',
     requesterEmail: pickStr(p, 'requesterEmail'),
@@ -87,7 +115,7 @@ export function toDsrDto(p: PromotedRecord): PrivacyDsrDto {
 export function toBreachDto(p: PromotedRecord): PrivacyBreachDto {
   const summary = pickStr(p, 'summary') || pickStr(p, 'description');
   return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
+    id: promotedId(p),
     titleEn: summary.slice(0, 80) || `Promoted from ${p.sourceReferenceCode}`,
     descriptionEn: summary,
     breachType: pickStr(p, 'category', 'CONFIDENTIALITY'),
@@ -107,7 +135,7 @@ export function toRiskResponse(p: PromotedRecord): RiskResponse {
   const lik = sev === 'LOW' ? 2 : sev === 'MEDIUM' ? 3 : 4;
   const imp = sev === 'LOW' ? 2 : sev === 'MEDIUM' ? 3 : sev === 'HIGH' ? 4 : 5;
   return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
+    id: promotedId(p),
     riskCode: `R-${p.sourceReferenceCode}`,
     titleEn: summary.slice(0, 80) || `Promoted from ${p.sourceReferenceCode}`,
     descriptionEn: summary,
@@ -126,7 +154,7 @@ export function toRiskResponse(p: PromotedRecord): RiskResponse {
 export function toVendorDto(p: PromotedRecord): TprmVendorDto {
   const name = pickStr(p, 'vendorName') || pickStr(p, 'name') || `Vendor from ${p.sourceReferenceCode}`;
   return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
+    id: promotedId(p),
     vendorName: name,
     vendorNameAr: pickStr(p, 'vendorNameAr'),
     vendorType: pickStr(p, 'vendorType', 'SERVICE'),
@@ -141,7 +169,7 @@ export function toVendorDto(p: PromotedRecord): TprmVendorDto {
 export function toEthicsCaseDto(p: PromotedRecord): EthicsCaseDto {
   const summary = pickStr(p, 'summary') || pickStr(p, 'description');
   return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
+    id: promotedId(p),
     caseCode: `EC-${p.sourceReferenceCode}`,
     titleEn: summary.slice(0, 80) || `Promoted from ${p.sourceReferenceCode}`,
     category: pickStr(p, 'category') || pickStr(p, 'disclosureType', 'OTHER'),
@@ -165,8 +193,10 @@ export function usePromotedProvenance(target: RegisterTarget): Map<number, strin
   return useMemo(() => {
     const m = new Map<number, string>();
     for (const r of records) {
-      const id = typeof r.id === 'number' ? r.id : Number(r.id);
-      if (!Number.isNaN(id)) m.set(id, r.sourceReferenceCode);
+      // F2-171 — keyed with the SAME coercion the adapters apply, or the badge silently
+      // stops resolving: the row would carry -483 and the map +483. F2-168's lesson,
+      // which was that keys and record ids have to move together or the lookup misses.
+      m.set(promotedId(r), r.sourceReferenceCode);
     }
     return m;
   }, [records]);
@@ -176,7 +206,7 @@ export function usePromotedProvenance(target: RegisterTarget): Map<number, strin
 export function toDpiaDto(p: PromotedRecord): DpiaDto {
   const summary = pickStr(p, 'description') || pickStr(p, 'projectName');
   return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
+    id: promotedId(p),
     titleEn: pickStr(p, 'projectName') || summary.slice(0, 80) || `Promoted from ${p.sourceReferenceCode}`,
     triggerReason: pickStr(p, 'trigger', 'NEW_PROCESSING_ACTIVITY'),
     status: 'DRAFT',
@@ -190,7 +220,7 @@ export function toBiaDto(p: PromotedRecord): BcmBiaDto {
   const rto = Number(pickStr(p, 'rtoHours'));
   const rpo = Number(pickStr(p, 'rpoHours'));
   return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
+    id: promotedId(p),
     assessmentDate: p.promotedAt.slice(0, 10),
     rtoHours: Number.isFinite(rto) ? rto : undefined,
     rpoHours: Number.isFinite(rpo) ? rpo : undefined,
@@ -203,7 +233,7 @@ export function toBiaDto(p: PromotedRecord): BcmBiaDto {
 export function toEngagementDto(p: PromotedRecord): AuditEngagementDto {
   const summary = pickStr(p, 'scope') || pickStr(p, 'description');
   return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
+    id: promotedId(p),
     engagementCode: `ENG-${p.sourceReferenceCode}`,
     titleEn: pickStr(p, 'titleEn') || summary.slice(0, 80) || `Promoted from ${p.sourceReferenceCode}`,
     auditType: pickStr(p, 'auditType', 'INTERNAL'),
@@ -218,7 +248,7 @@ export function toEngagementDto(p: PromotedRecord): AuditEngagementDto {
 export function toFindingDto(p: PromotedRecord): ComplianceFindingDto {
   const summary = pickStr(p, 'observation') || pickStr(p, 'summary');
   return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
+    id: promotedId(p),
     title: summary.slice(0, 80) || `Promoted from ${p.sourceReferenceCode}`,
     severity: severityOf(p),
     owner: submitterOf(p),
@@ -230,7 +260,7 @@ export function toFindingDto(p: PromotedRecord): ComplianceFindingDto {
 /** POLICY_EXCEPTION → CyberExceptionDto (used by /compliance exceptions view) */
 export function toExceptionDto(p: PromotedRecord): CyberExceptionDto {
   return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
+    id: promotedId(p),
     titleEn: pickStr(p, 'policyTitle') || pickStr(p, 'policyCode') || `Promoted from ${p.sourceReferenceCode}`,
     exceptionReason: pickStr(p, 'businessJustification'),
     workflowStatus: 'PENDING_REVIEW',
@@ -268,7 +298,7 @@ export function toCapaFromObservation(p: PromotedRecord): Capa {
 /** CHANGE_REQUEST → ChangeRequestDto */
 export function toChangeRequestDto(p: PromotedRecord): ChangeRequestDto {
   return {
-    id: typeof p.id === 'number' ? p.id : Number(p.id),
+    id: promotedId(p),
     changeCode: `CR-${p.sourceReferenceCode}`,
     titleEn: pickStr(p, 'titleEn') || pickStr(p, 'description', '').slice(0, 80) || `Promoted from ${p.sourceReferenceCode}`,
     titleAr: pickStr(p, 'titleAr'),

@@ -31,7 +31,7 @@ import { TPRM_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { TPRM_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
-import { usePromoted } from '../../lib/promotedRecords';
+import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
 import { toVendorDto, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { TprmOnboardingPipeline, TprmReassessmentDashboard } from './TprmOnboardingPanel';
@@ -148,7 +148,8 @@ export function TprmPage() {
     { header: t('tprmReviewCol'), cell: r => r.contractEndDate ?? '—', mono: true },
     { header: t('colStatus'),     cell: r => <Badge tone={STATUS_TONE[r.status] ?? 'neutral'} dot>{statusLabel(t, r.status)}</Badge> },
     { header: '',                 align: 'end', width: '90px',
-      cell: r => <RowActions disabled={isDemo} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
+      // F2-171: promoted-intake vendors are merged in above and exist only in this browser.
+      cell: r => <RowActions disabled={isDemo || isUnsyncedId(r.id)} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
   ];
 
   async function onSubmit(values: TprmVendorRequest) {

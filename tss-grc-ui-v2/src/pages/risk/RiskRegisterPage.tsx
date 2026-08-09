@@ -24,7 +24,7 @@ import { defaultViewForPage, type SavedView } from '../../lib/savedViews';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { riskApi, ermAdvancedApi, reportingApi, ApiError, type RiskResponse, type KriDefinitionDto, type RiskAppetiteStatementDto, type AppetiteBreachEventDto, type RiskCategoryDto } from '../../lib/api';
 import { kriApi } from '../../lib/kriEngine';
-import { usePromoted } from '../../lib/promotedRecords';
+import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
 import { toRiskResponse, usePromotedProvenance } from '../../lib/promotedAdapters';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { isAuthenticated } from '../../lib/auth';
@@ -400,7 +400,8 @@ export function RiskRegisterPage() {
         if (r.status === 'MITIGATING' || r.status === 'ACCEPTED')   // F2-164: 'TREATED' was a dead branch
                                          extras.push({ Icon: Archive,    onClick: () => closeRisk(r),       title: t('riskActClose'),        tone: 'primary' });
         if (r.status === 'CLOSED')       extras.push({ Icon: RotateCcw,  onClick: () => reopenRisk(r),      title: t('riskActReopen'),       tone: 'accent' });
-        return <RowActions disabled={demoMode} extras={extras} onEdit={() => startEdit(r)} onDelete={() => startDelete(r)} />;
+        // F2-171: promoted-intake rows are merged in above and exist only in this browser.
+        return <RowActions disabled={demoMode || isUnsyncedId(r.id)} extras={extras} onEdit={() => startEdit(r)} onDelete={() => startDelete(r)} />;
       } },
   ];
 
