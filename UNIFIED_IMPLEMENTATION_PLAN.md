@@ -1002,6 +1002,51 @@ today… needs the owner's word"*. Also measured: **all four APPROVED acceptance
 belong to soft-deleted probe risks**, so no acceptance has ever been recorded through the UI — which is
 what an unreachable approval step looks like from the data side.
 
+✔ **2026-08-09 — [[F2-170]] CLOSED (P3): nothing asked whether the endpoint the frontend calls
+EXISTS — and this time the answer was "all of them".** Opened out of [[F2-165]]'s dark-method triage,
+sorted **by endpoint** as that finding's own correction demands. Three reachability instruments were
+already in the tree and none of them can cross the wire: F2-68(c) asks whether a screen imports a
+client export, F2-165 asks it per method, [[F2-163]] asks whether the user can navigate to a screen.
+So the failure none of them can see is a client that is imported, called from a live screen,
+reachable by navigation — **and pointed at a path no controller serves.** That is precisely
+[[F2-158]], where `RoleController#list` answered **500 to every caller since it was written** and
+nobody noticed because `AdminPage.tsx` wired mock roles into all three failure paths: the mock
+fallback was load-bearing. [[F2-169]] deleted 19 of those fallbacks last slice, which is what makes
+this gate worth having now — a broken path renders a failure toast instead of plausible rows.
+
+Result: **0 of 1,782 frontend endpoints lack a handler**, shipped as a hard zero with **no
+allow-list**, which is only honest while the population really is zero. The five apparent misses were
+dynamic dispatch over a closed set of literals (`${key}` over four integration adapters, `${action}`
+over `/approve`/`/reject`), so a `{}` now matches a `{}` *or a literal segment* — a relaxation that
+removes the allow-list entirely, and an allow-list avoided is worth more than a tighter match.
+
+⚠⚠ **The scan invented 1,763 defects before it found 0, and the only reason none were filed is that
+I asked the running backend instead of my own instrument.** First draft as a regex over controller
+source: 1,763 of 1,809 endpoints "missing" because the class-keyword search cut the header before the
+annotations, so no base path was ever read. Fixed, 160 remained — **48 of them the whole of
+`/api/v1/cyber`** — because `CyberController`'s javadoc contains *"the former CyberService god-class
+was split"* and `\bclass\s+\w+` matched the prose **"class was"**. A live probe answered **200 for
+every one of the 48**. 🔑 **An extractor that finds nothing looks exactly like a catastrophic
+defect.** The remedy is structural rather than diligence: the backend half is now **reflection** over
+merged annotations, where javadoc is invisible and neither bug is expressible. This is the **third**
+scanner in the programme to read prose as code (F2-165 a regex literal, F2-169 comment text
+describing its own fix), and the **fourth** over-wide pattern in four slices — a bare `'([A-Z_]+)'`
+over each guard scraped the *module* argument out of `hasPermission('AUDIT','DELETE')` and invented
+**21 ghost roles and 126 "PLATFORM_ADMIN-only" endpoints**; scoped to `hasAnyRole` the truth is 0
+and 0.
+
+The figure that came out of it corrects the register: **421 backend endpoints have no frontend client,
+208 of them guarded writes** — **2.2× the 189 dark *methods* F2-165 publishes**, because one method
+serves several endpoints and a clientless controller has no method to be dark. ⚙ F2-165's own lesson
+turned on F2-165. Both are decrease-only ceilings that also fail when they drop, so neither can rot;
+per-endpoint adjudication stays in `KNOWN_DARK`. The triage also read the list for the F2-164/F2-166
+shape and found **16 entities no screen can create** (PDPL consents and DPIAs, compliance findings,
+ASM assets, IA plans, sub-processors, COI campaigns…), existing for **organisation 1 only** in dev.
+Filed as capability backlog and **not** as an F2-166 repeat, on the strength of reading
+`ConsentRecordService` end to end: nothing else gates on consents, so no server-side rule goes inert.
+That distinction is the whole difference between a P2 and a backlog item, and only the service says
+which it is.
+
 ✔ **2026-08-09 — [[F2-169]] CLOSED (P2): 19 undisclosed substitutions, written outside the one
 mechanism the disclosure contract inspects.** Filed the same day as [[F2-168]]'s residue, on a count
 of *"8 sites in 2 files"* taken from that slice's scan. Re-measuring the class before touching it

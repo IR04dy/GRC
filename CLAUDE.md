@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,468 @ 2026-08-08; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,471 @ 2026-08-09; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -202,6 +202,18 @@ placeholder), 204 kLoC, 432 entities, 2,212 endpoints. Each follows
 `ModuleRegistryContractTest` fails the build if the registry, the directory listing,
 `SkuRegistry`'s ADR-018 homing or *this sentence* disagree. Adding a package means an entry
 there, a homing in `SkuRegistry`, and a workspace decision — or the build refuses it.
+
+**The wire between the two codebases is gated** (F2-170, `FrontendEndpointContractTest`):
+every endpoint an FE client calls must have a controller — a **hard zero, no allow-list**,
+measured 0/1,782. It exists because F2-158's `RoleController#list` answered **500 to every
+caller since it was written** and a mock fallback made that invisible; F2-169 removed those
+fallbacks, so a wrong path now surfaces. Two decrease-only ceilings ride with it:
+**421 endpoints have no FE client, 208 of them guarded writes** — 2.2× F2-165's 189 dark
+*methods*, because one method serves several endpoints and a clientless controller has no
+method to be dark. ⚠ Its backend half is **reflection, never a source regex**: as a regex it
+reported 1,763 of 1,809 endpoints missing, then 48 of `/api/v1/cyber` alone, because
+`CyberController`'s javadoc says *"god-class was split"* and `\bclass\s+\w+` matched the prose.
+A live probe answered 200 for all 48.
 
 - **Largest:** `bcm` 25k · `sust` 16.7k (+`finance`/`ghg`/`capa`/`vendor`) ·
   `platform` 10k · `risk` 9k · `ndi` 7.7k · `integrations` 7.6k · `cyber` 7.3k ·
