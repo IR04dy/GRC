@@ -14,6 +14,7 @@ import com.tss.grc.module.intake.entity.IntakeRecord;
 import com.tss.grc.module.intake.repository.IntakeRecordRepository;
 import com.tss.grc.module.intake.spi.IntakePromotionContext;
 import com.tss.grc.module.intake.spi.PromotionRegistry;
+import com.tss.grc.module.intake.spi.SystemIntakePort;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -81,10 +82,26 @@ import java.util.Optional;
  * <p>The create and the stamp share this transaction on purpose. A promoted status with no record —
  * or a record with no promoted status — is the inconsistency the whole finding is about, and
  * rolling both back together is the only way the intake row cannot outlive its own claim.
+ *
+ * <h3>F2-175 — one construction site, and why that is the whole fix</h3>
+ *
+ * <p>Everything above describes properties of {@code submit()}. A CRITICAL model-drift observation
+ * opened a {@code RISK_ISSUE} intake by building the entity in {@code MlModelDriftService} and calling
+ * the repository directly, so it had <b>none</b> of them: wrong assignee, its own reference-code
+ * format, its own SLA arithmetic, no history events, and a hand-rolled JSON escaper that emitted
+ * invalid JSON for a tab — which made the record unpromotable, blocking the escalation the mechanism
+ * exists to perform. See {@link SystemIntakePort} for the measurements.
+ *
+ * <p>The lesson is in the shape rather than the list: <b>a rule enforced at one writer is not
+ * enforced.</b> So {@link #fileDraft} is now the only place in the platform where an
+ * {@code IntakeRecord} is constructed — {@code submit()} and {@link #fileSystemSubmission} each decide
+ * only the questions that are genuinely theirs (who filed it, and whether an anonymity claim is
+ * honoured) and hand the rest over. {@code IntakeSingleWriterInvariantTest} pins the count at one, and
+ * pins that no peer module imports anything of this module but its {@code spi}.
  */
 @Service
 @RequiredArgsConstructor
-public class IntakeService {
+public class IntakeService implements SystemIntakePort {
 
     private final IntakeRecordRepository repo;
     private final PromotionRegistry promotions;
@@ -111,36 +128,139 @@ public class IntakeService {
         String actorLabel = anonymous ? "anonymous"
             : Optional.ofNullable(CurrentActor.username()).orElse("unknown");
 
+        return IntakeRecordDto.from(fileDraft(new Draft(
+            orgId, req.getKind(), req.getChannel(), req.getSeverity(), req.getLocale(),
+            req.getPayload(), anonymous, submitterUserId, req.getSubmitterRole(),
+            // For an honoured anonymous submission nothing identifying is persisted, whatever the
+            // body carried. Dropping these is the point of the channel, not an oversight.
+            anonymous ? null : req.getSubmitterName(),
+            anonymous ? null : req.getSubmitterEmail(),
+            anonymous ? null : req.getSubmitterPhone(),
+            actorLabel, "Submitted via " + req.getChannel())));
+    }
+
+    /**
+     * F2-175 — file a submission on behalf of a platform mechanism. See {@link SystemIntakePort} for
+     * the five ways the writer this replaces disagreed with the paragraph above it.
+     *
+     * <p>Two arguments are validated here rather than trusted, and both are the kind of thing a
+     * caller gets wrong once:
+     *
+     * <ul>
+     *   <li><b>the organisation</b>, because a system caller may have no {@code TenantContext} at all
+     *       and a signature that quietly falls back to the ambient tenant files another customer's
+     *       record the first time it runs on a scheduler thread;</li>
+     *   <li><b>the actor label</b>, because it is the only provenance a system-filed record has. The
+     *       submitter columns are empty by design — there is no user — so a blank label produces a
+     *       record with a completely anonymous origin that was never <em>asked</em> to be anonymous.
+     *       That is indistinguishable, in the inbox and in the history, from an honoured
+     *       whistleblower submission, and the two must not be confusable.</li>
+     * </ul>
+     */
+    @Override
+    @Transactional
+    public Receipt fileSystemSubmission(SystemSubmission s) {
+        if (s == null) throw new IllegalArgumentException("submission is required");
+        if (s.organisationId() == null) {
+            throw new IllegalArgumentException(
+                "A system intake submission must name its organisation explicitly: schedulers and "
+                + "async listeners have no TenantContext, so there is no ambient tenant to fall back "
+                + "to — and falling back is how a background job files one customer's finding into "
+                + "another customer's register.");
+        }
+        if (s.systemActor() == null || s.systemActor().isBlank()) {
+            throw new IllegalArgumentException(
+                "A system intake submission must name the mechanism that filed it — it is the "
+                + "record's only provenance, and without it the submission is indistinguishable "
+                + "from an anonymous human report.");
+        }
+
+        IntakeRecord saved = fileDraft(new Draft(
+            s.organisationId(), s.kind(), s.channel(), s.severity(),
+            // No locale: a machine has no display language, and inventing "en" on an Arabic-primary
+            // platform is a claim about a reader who does not exist. No adapter reads it.
+            null, writePayload(s.payload(), s.kind()),
+            false, null, null, s.systemActor(), null, null,
+            "system", "Filed automatically by " + s.systemActor()));
+
+        return new Receipt(saved.getId(), saved.getReferenceCode(),
+            saved.getAssignedTo(), saved.getSlaDueAt());
+    }
+
+    /**
+     * Everything a submission is, once the questions only its own entry point can answer have been
+     * answered. Internal on purpose — it is not a second request DTO, it is the argument list of the
+     * one construction site, named so a fourteen-parameter call is readable.
+     */
+    private record Draft(
+        Long orgId, String kind, String channel, String severity, String locale, String payload,
+        boolean anonymous, Long submitterUserId, String submitterRole,
+        String submitterName, String submitterEmail, String submitterPhone,
+        String actorLabel, String submissionNote
+    ) {
+    }
+
+    /**
+     * <b>The only place in the platform an {@code IntakeRecord} is constructed</b> (F2-175, pinned by
+     * {@code IntakeSingleWriterInvariantTest}). Reference code, SLA and assignee all come from the
+     * catalogue here, so no caller can supply or derive its own — which is exactly what the second
+     * writer did with all three.
+     */
+    private IntakeRecord fileDraft(Draft d) {
+        // Re-resolved rather than passed in: this is the validity gate, and a kind that reached here
+        // uncatalogued must fail here even if some future caller forgot to ask.
+        IntakeKindRouting.Routing routing = IntakeKindRouting.require(d.kind());
+
         IntakeRecord r = new IntakeRecord();
-        r.setOrganisationId(orgId);
+        r.setOrganisationId(d.orgId());
         r.setReferenceCode(generateReferenceCode(routing));
-        r.setKind(req.getKind());
+        r.setKind(d.kind());
         r.setStatus("TRIAGING");                   // auto-acknowledge → triaging
-        r.setChannel(req.getChannel());
-        r.setSubmitterIsAnonymous(anonymous);
-        r.setSubmitterUserId(submitterUserId);
-        r.setSubmitterRole(req.getSubmitterRole());
-        // For an honoured anonymous submission nothing identifying is persisted, whatever the body
-        // carried. Dropping these is the point of the channel, not an oversight.
-        r.setSubmitterName(anonymous ? null : req.getSubmitterName());
-        r.setSubmitterEmail(anonymous ? null : req.getSubmitterEmail());
-        r.setSubmitterPhone(anonymous ? null : req.getSubmitterPhone());
-        r.setPayload(req.getPayload());
-        r.setSeverity(Optional.ofNullable(req.getSeverity()).orElse("MEDIUM"));
-        r.setLocale(req.getLocale());
+        r.setChannel(d.channel());
+        r.setSubmitterIsAnonymous(d.anonymous());
+        r.setSubmitterUserId(d.submitterUserId());
+        r.setSubmitterRole(d.submitterRole());
+        r.setSubmitterName(d.submitterName());
+        r.setSubmitterEmail(d.submitterEmail());
+        r.setSubmitterPhone(d.submitterPhone());
+        r.setPayload(d.payload());
+        r.setSeverity(Optional.ofNullable(d.severity()).orElse("MEDIUM"));
+        r.setLocale(d.locale());
 
         LocalDateTime now = LocalDateTime.now();
         r.setAcknowledgedAt(now);
         r.setAssignedTo(routing.defaultAssignee());
         r.setSlaDueAt(now.plusHours(routing.slaHours()));
 
-        // Auto-acknowledgement event + triage-routing event.
-        r.getHistory().add(buildEvent(r, now, "SUBMITTED", actorLabel,
-            "Submitted via " + req.getChannel()));
+        // Auto-acknowledgement event + triage-routing event. These two lines are an intake record's
+        // whole audit trail, and the writer F2-175 retired produced neither.
+        r.getHistory().add(buildEvent(r, now, "SUBMITTED", d.actorLabel(), d.submissionNote()));
         r.getHistory().add(buildEvent(r, now, "TRIAGING", "system",
             "Auto-acknowledged. Routed to " + r.getAssignedTo()));
 
-        return IntakeRecordDto.from(repo.save(r));
+        return repo.save(r);
+    }
+
+    /**
+     * Serialise a system caller's facts with the mapper, never by hand.
+     *
+     * <p>This is the half of F2-175 that had a live consequence. The retired writer concatenated JSON
+     * with its own {@code esc()} covering backslash, quote, {@code \n} and {@code \r} — and JSON
+     * requires <em>every</em> C0 control character escaped. A model title carrying a tab produced a
+     * payload Jackson rejects, which {@link #contextFor} reports as
+     * <em>"has an unreadable payload and cannot be promoted"</em>: the submission files, and then can
+     * never be escalated into the register it was raised for. Round-tripping through the mapper makes
+     * that unrepresentable rather than unlikely.
+     */
+    private String writePayload(Map<String, Object> payload, String kind) {
+        if (payload == null || payload.isEmpty()) return null;
+        try {
+            return json.writeValueAsString(payload);
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                "System submission of kind " + kind + " has a payload that cannot be serialised: "
+                + e.getMessage(), e);
+        }
     }
 
     @Transactional(readOnly = true)

@@ -1232,6 +1232,123 @@ matches on*; the leak is now a failing leg. 13 + 9 + 10 new tests, live probe **
 divergence forced on real rows and cross-tenant isolation against a second-tenant committee created for
 it. No migration. ⚠ **Still open and not an engineering act:** somebody has to do the linking.
 
+⚠⚠ **Correction 2026-08-10 — two of that slice's own tests were wrong for three hours of every day.**
+`CommitteeSeatLinkageTest` built its seat-currency fixtures with `LocalDate.now()`, which resolves in the
+JVM's default zone (Riyadh, **UTC+3**), while the service reads `LocalDate.now(clock)` on
+`Clock.system(ZoneId.of("UTC"))`. Between local midnight and 03:00 they differ by a day, so a term ending
+"yesterday" was still current and `currentSeats()` came back **2 where 1 was asserted**. It merged **green**
+and failed a day later, during F2-175's suite run at 00:4x local — inside the only window that could
+reveal it. 🔑 **Same lesson as F2-178's own, from the other side:** that slice recorded *a fixed-clock test
+whose fixed date equals the real date proves nothing about the injection*; this adds *a test that reads the
+wall clock at all is asserting against a "now" the code does not share.* One remedy covers both — inject
+the clock, pin the date. ✔ Checked in production code and clean: the guard (`CommitteeSeatAuthority`) and
+the report both use `Clock.system(UTC)`, so they share the **zone** as well as the predicate and the F2-62
+divergence has not reopened through the clock. ⚙ Mutation could not have caught it — the harness ran six
+named classes and this was not one of them: **a harness scoped to a slice's own tests cannot notice one of
+those tests being wrong about the world.**
+
+✔ **F2-175 CLOSED 2026-08-10 — `intake.intake_records` had two writers, and the second one's JSON was
+invalid.** A CRITICAL model-drift observation opened a `RISK_ISSUE` intake by building the entity in
+`MlModelDriftService` and calling `intakeRepo.save()`, so it consulted **none** of what F2-172 installed:
+it hard-coded the assignee (`RISK_MANAGER`, a *role name* lifted from its own controller's `hasAnyRole`
+guard, where the catalogue routes to `RISK_OFFICER`), minted its own `ISS-…` reference codes, did its own
+`plusDays(14)` SLA arithmetic, wrote **no history events at all**, and hand-concatenated its payload with
+a private `esc()`.
+
+⚠⚠ **That last one was not cosmetic.** `esc()` escaped backslash, quote, `\n` and `\r`; JSON requires
+**every** C0 control character escaped, and `IntakeService#contextFor` parses the payload before promotion.
+So a CRITICAL drift on a model whose title carried a **tab** — the character a title acquires by being
+pasted out of a spreadsheet — filed an issue that could **never be escalated into the risk register**,
+reported as *"has an unreadable payload"* from `intake` while the fault sat in `ai/governance`. Verified
+against Jackson before writing the fix, then live: a real tab in a real title, promoted end to end, with a
+**negative control** proving the old payload is still refused.
+
+⚠ **The filing said the bypass was "currently benign". The supportable claim was "unexercised".** Dev holds
+26 drift observations, 2 CRITICAL, `triggered_issue_id` NULL on all 26, `IDENT_CURRENT` 27 over 26 rows —
+seeded, never executed; `intake.intake_records` was at 0. 🔑 **A path that has never run cannot be observed
+to be harmless, only to be untested** — and one of its five divergences was a break waiting for the first
+real input.
+
+⚠⚠ **The existing test asserted the defect as correct** — `startsWith("ISS-")`, `isEqualTo("SUBMITTED")`,
+and a payload assertion (`contains("MODEL-2026-001")`) that a hand-built string satisfies whether or not it
+parses. Second instance after [[F2-159]]. 🔑 **A test written by reading the implementation can only agree
+with it**; the question it must answer is *should* the code do this, not *does* it.
+
+⚙ **The fix is one construction site, not one call site.** The filing prescribed exposing
+`submitSystemIntake(…)` and repointing the caller — necessary, not sufficient, because a second
+`new IntakeRecord()` inside `IntakeService` is the same defect one file further in. `fileDraft(Draft)` is
+now the only place in the platform an `IntakeRecord` is born, and the seam is an interface —
+`intake.spi.SystemIntakePort`, the inbound counterpart to `RegisterPromotionPort`. `IntakeSingleWriterInvariantTest`
+pins **one** construction site across 1,869 main sources, **one** repository user, and **no peer importing
+anything of `module/intake` but its `spi`** — invariants, not ratchets, because the population is one and a
+count to raise would make a tolerated writer indistinguishable from a reviewed one.
+
+⚠ **Two of the filing's three architectural claims were false, and reading the guard cost five minutes.**
+It said the edge crosses ADR-012 and that `ModuleGraphRatchetTest` should see it. ADR-018 homes `intake` in
+**Base** and `ai/governance` is a sold SKU, so `ai → intake` is **SKU → Base, the legal direction**; and
+that test's `KERNEL_ISH` set is `{platform, integrations, dashboard}`, so the edge is neither a kernel
+inversion nor half of a cycle. What was violated is **encapsulation**, which nothing in this tree measured.
+
+⚠⚠ **And "fixing" the assignee made it resolve to nobody — said plainly rather than dressed up.**
+`RISK_MANAGER` exists in `iam.roles` and `rmanager` holds it; the catalogued `RISK_OFFICER` does not exist.
+It is still the right change, for a reason that has to be *given*: `assigned_to` is a stakeholder-code
+column, **10 of the catalogue's 14 codes are not role names**, and **nothing in `module/intake` resolves the
+column at all** — it renders as a label. Nobody was notified before and nobody is now. What changed is that
+the value agrees with the one catalogue [[F2-174]] can fix in a single place, and `IntakeCatalogueParityTest`
+pins it field-by-field, so keeping `RISK_MANAGER` meant diverging from the pinned source of truth.
+
+⚠⚠ **The live probe found a regression that 3,577 green tests and 17/17 mutations could not: a ROWVERSION
+stale-update 500.** The old code did `save → open the issue → mutate → save AGAIN`, and it survived for as
+long as it existed **only because nothing between the two saves forced a flush** — the issue was inserted
+in the same persistence context, so Hibernate batched the observation's INSERT and UPDATE. Routing that
+insert through the `@Transactional` port put a real boundary there, the flush happened, and the second
+save's `UPDATE … WHERE row_version = <what this session last saw>` matched **zero rows**:
+`StaleObjectStateException` → HTTP 500 on a governance escalation. Fixed by filing the issue **before** the
+single `save()`; nothing in the payload ever needed the observation's id, so the second save was never
+necessary. 🔑 **A latent double-save is not a style problem — it is a defect waiting for somebody to add a
+transactional call between the two writes**, and CLAUDE.md's rule ("native first, mutate + save once") had
+named only the loudest trigger for months. ⚠ **No unit test could see it: a mocked repository has no
+`row_version`.** House rule 4 — *live-probe every slice* — paid for itself in one measurement, and the pin
+is now `verify(driftRepo, times(1)).save(...)` plus an `InOrder` check.
+
+⚙ **Writing a mutation exposed a test that could not fail:** `RISK_ISSUE`'s SLA is `24 * 14` hours, which
+`plusDays(14)` equals exactly, so restoring the retired arithmetic survived. Fixed with a second case on
+`WORKPLACE_INJURY` — the **24-hour** GOSI notification — where the two answers differ. The coincidence is
+also why this never diverged visibly. ➕ Two unfiled defects fixed in passing: the payload **dropped
+`notesAr`** (Arabic is mandatory, and it is the field carrying the analyst's own words), and the audit line
+named the observation but **never the issue**, so a CRITICAL drift left no trace of the escalation.
+`safeRole(String role) { return role; }` — a method named as if it validates, returning its argument —
+deleted with the rest. 17 mutations, live probe **42/42**, 4 test classes, no migration, no frontend change.
+
+⚠⚠ **And with the ROWVERSION fix in, the probe got one step further and found a SECOND defect: promoting a
+`RISK_ISSUE` had never once worked.** `PUT …/triage` → **409**, and the backend log named it: *"The INSERT
+statement conflicted with the CHECK constraint `CK_risks_status`… column 'status'"*. `RiskPromotionAdapter`
+passed **`"IDENTIFIED"`**; the constraint allows `OPEN|UNDER_REVIEW|MITIGATING|ACCEPTED|CLOSED|ARCHIVED|
+TRANSFERRED`. Its javadoc *argued* for `IDENTIFIED` — "raised, not assessed" — **right about the intent and
+never a value the column accepts**. Fixed to `OPEN`; pinned by `RiskPromotionStatusTest`, which reads the
+vocabulary out of the **migration SQL** so the unit suite stays database-free, and asserts the vocabulary is
+non-empty first (its own first draft stripped every `N` from the literals and turned `OPEN` into `OPE` —
+caught only by that anti-vacuity leg). ⚙ **Two independent reasons nobody had seen it:** F2-172 live-probed
+promotion into `privacy.dpia` and reasoned about the other twelve adapters from their source; and the only
+kind routed to `RISK` is `RISK_ISSUE`, whose sole producer was the drift monitor — the path this very slice
+measured as never having run. 🔑 **A defect behind two blind spots is not found by probing either end.**
+⬜ Generalised and filed as **F2-180**: 1 of 13 adapters verified working, 1 found broken, **11 unmeasured**
+— and a first attempt at a static sweep reported the broken one as clean because it compared literals
+against *every* table's CHECKs rather than the target's. ⚠ **An unscoped cross-check is worse than none.**
+
+⬜ **F2-179 filed, measured, and deliberately not bundled.** Repointing a caller means reading what it
+*says*, and `severity` was the one field passed straight through — so: the escalation trigger is
+`"CRITICAL".equals(req.severity())`, a case-**sensitive** Java comparison, while the column's CHECK
+(`CK_ml_drift_sev`) runs under collation `Latin1_General_100_CI_AS_SC_UTF8`, which is case-**insensitive**.
+Reproduced live: `severity: "critical"` → **201**, stored verbatim in lower case, `triggered_issue_id`
+NULL, no intake row, and the model **still `IN_PRODUCTION`**. The controller's own javadoc says these
+observations come from "automated monitoring jobs", which is precisely where casing conventions differ and
+nobody reads the payload — and the failure is *silent*, so the first symptom is a critically drifted model
+left in production. The [[F2-94]] class in a third disguise: **two artefacts that must agree, where one of
+them cannot enforce the agreement.** Not bundled because the honest fix (normalise on write, so the CHECK,
+the trigger and the frontend's label map all agree) sits next to a governance question — *should `MAJOR`
+escalate too?* — and answering that while fixing a casing bug would smuggle a policy change in under a typo.
+
 ✔ **F2-172 CLOSED 2026-08-09 — the intake front door became real, and measuring the rewire before
 writing it is what turned a chore into two defects.** F2-171's follow-up said "call
 `POST /api/v1/intake` on submit and `PUT …/triage` on triage". Measuring what that would hit found

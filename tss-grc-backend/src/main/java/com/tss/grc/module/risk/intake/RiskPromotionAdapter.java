@@ -16,12 +16,39 @@ import org.springframework.stereotype.Component;
  * adapter this replaces did the latter — mapping {@code MEDIUM} to likelihood 3 / impact 3 — which
  * threw away two answers the submitter had actually given.
  *
- * <p>Status is {@code IDENTIFIED}: a promoted risk has been raised, not assessed. Anything further
- * along would let it skip the register's own assessment step.
+ * <p>Status is {@code OPEN}: a promoted risk has been raised, not assessed. Anything further along
+ * would let it skip the register's own assessment step.
+ *
+ * <p>⚠⚠ <b>It said {@code IDENTIFIED} until F2-175, and {@code CK_risks_status} does not allow that
+ * value — so promoting a {@code RISK_ISSUE} had never once worked.</b> The insert failed with
+ * <em>"The INSERT statement conflicted with the CHECK constraint CK_risks_status"</em>, surfacing to the
+ * caller as a 409 whose message says <em>"either something it refers to does not exist, or the record is
+ * still referenced elsewhere"</em> — a description of a foreign key, on a failure that is nothing of the
+ * kind. The javadoc even argued for {@code IDENTIFIED} on governance grounds, which is exactly right
+ * about the intent and was never a value this column accepts. {@code OPEN} is the member of the
+ * constrained vocabulary that carries that meaning (V29/V244:
+ * {@code OPEN|UNDER_REVIEW|MITIGATING|ACCEPTED|CLOSED|ARCHIVED|TRANSFERRED}).
+ *
+ * <p>⚙ Why nobody noticed: F2-172 live-probed promotion into {@code privacy.dpia} and reasoned about the
+ * other twelve adapters from the code. And the only intake kind targeting {@code RISK} is
+ * {@code RISK_ISSUE}, whose sole producer was the drift monitor — a path F2-175 then measured as never
+ * having run. Two independent reasons for the same blind spot, which is why it took a probe of the
+ * <em>chain</em> rather than of the adapter.
+ *
+ * @see com.tss.grc.module.risk.intake.RiskPromotionStatusTest the pin, read from the migration so the
+ *      unit suite stays database-free
  */
 @Component
 @RequiredArgsConstructor
 public class RiskPromotionAdapter implements RegisterPromotionPort {
+
+    /**
+     * The status a promoted risk is created with. A named constant rather than an inline literal so the
+     * pin has something to read: {@code RiskPromotionStatusTest} checks it against the vocabulary
+     * {@code CK_risks_status} declares in the migrations, which is the only copy of that list inside
+     * the repository.
+     */
+    static final String PROMOTED_STATUS = "OPEN";
 
     private final RiskService risks;
 
@@ -41,7 +68,7 @@ public class RiskPromotionAdapter implements RegisterPromotionPort {
             null, null,                 // categoryId / ownerId — free-text on the form, not ids
             likelihood, impact,
             null, null,                 // residual: unknown until the risk is assessed
-            "IDENTIFIED",
+            PROMOTED_STATUS,
             null);
         return String.valueOf(risks.create(req).id());
     }

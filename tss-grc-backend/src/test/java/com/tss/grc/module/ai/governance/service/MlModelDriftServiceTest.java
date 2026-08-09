@@ -6,8 +6,7 @@ import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.DriftObservationRes
 import com.tss.grc.module.ai.governance.entity.MlModel;
 import com.tss.grc.module.ai.governance.entity.MlModelDriftObservation;
 import com.tss.grc.module.ai.governance.repository.MlModelDriftObservationRepository;
-import com.tss.grc.module.intake.entity.IntakeRecord;
-import com.tss.grc.module.intake.repository.IntakeRecordRepository;
+import com.tss.grc.module.intake.spi.SystemIntakePort;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import org.junit.jupiter.api.AfterEach;
@@ -39,12 +38,27 @@ import static org.mockito.Mockito.when;
  *
  * Locks the post-market monitoring contract:
  *  - every record emits F8 MODEL_DRIFT_OBSERVED with severity
- *  - CRITICAL severity auto-opens an IntakeRecord (kind RISK_ISSUE)
+ *  - CRITICAL severity files a RISK_ISSUE intake through SystemIntakePort
  *    and flips the parent model to REVISION
- *  - non-CRITICAL severity does not auto-open Issue or flip stage
+ *  - non-CRITICAL severity does not file an intake or flip stage
  *  - acknowledge() stamps acknowledged_at + by
  *  - threshold breach detection (metric vs threshold) is captured
  *  - reads are org-scoped
+ *
+ * <p>⚠⚠ <b>F2-175 — this class used to assert the defect as correct, and that is the reusable part.</b>
+ * {@code recordCriticalDrift_autoOpensIssueAndFlipsModel} asserted
+ * {@code getReferenceCode()).startsWith("ISS-")} and {@code getStatus()).isEqualTo("SUBMITTED")} — both
+ * true of the code, both wrong about the platform: {@code ISS-} is a prefix no catalogue entry uses, and
+ * every other submission lands in {@code TRIAGING}. It also asserted the payload merely
+ * {@code contains("MODEL-2026-001")}, which a string built by concatenation satisfies whether or not it
+ * is valid JSON — and it was not, for any title containing a tab.
+ *
+ * <p>Nothing here was careless. The assertions were written by reading the implementation, and a test
+ * written that way can only ever agree with it. CLAUDE.md records the identical trap from F2-159, where
+ * a test asserted that a {@code targetId} overload correctly discarded its {@code targetId}. 🔑 <b>The
+ * question a test has to answer is not "does the code do this" but "should it" — and only the second one
+ * can be got wrong in a way worth catching.</b> What the drift path owes intake is now asserted in
+ * {@code IntakeSystemSubmissionTest}, against the catalogue rather than against the caller.
  */
 @ExtendWith(MockitoExtension.class)
 class MlModelDriftServiceTest {
@@ -57,7 +71,7 @@ class MlModelDriftServiceTest {
 
     @Mock private MlModelDriftObservationRepository driftRepo;
     @Mock private MlModelService modelService;
-    @Mock private IntakeRecordRepository intakeRepo;
+    @Mock private SystemIntakePort intake;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher eventPublisher;
 
@@ -118,7 +132,7 @@ class MlModelDriftServiceTest {
 
         assertThat(out.severity()).isEqualTo("MODERATE");
         assertThat(out.triggeredIssueId()).isNull();
-        verify(intakeRepo, never()).save(any(IntakeRecord.class));
+        verify(intake, never()).fileSystemSubmission(any());
         // Model stage NOT flipped.
         verify(modelService, never()).flipToRevisionDueToCriticalDrift(any(), anyString());
     }
@@ -160,30 +174,72 @@ class MlModelDriftServiceTest {
     // ─── Record (CRITICAL) — auto-open Issue + flip to REVISION ──
 
     @Test
-    void recordCriticalDrift_autoOpensIssueAndFlipsModel() {
+    void recordCriticalDrift_filesIssueThroughThePortAndFlipsModel() {
         MlModel m = model("IN_PRODUCTION");
         when(modelService.mustGet(MODEL_EX)).thenReturn(m);
         AtomicLong driftSeq = new AtomicLong(100);
         when(driftRepo.save(any(MlModelDriftObservation.class))).thenAnswer(assignId(driftSeq));
-        AtomicLong intakeSeq = new AtomicLong(500);
-        when(intakeRepo.save(any(IntakeRecord.class))).thenAnswer(assignId(intakeSeq));
+        when(intake.fileSystemSubmission(any())).thenReturn(
+                new SystemIntakePort.Receipt(501L, "RI-K7MP-3QXZ", "RISK_OFFICER",
+                        LocalDateTime.of(2026, 5, 15, 9, 0)));
 
         DriftObservationResponse out = service.record(MODEL_EX, req("CRITICAL", "PERFORMANCE_DEGRADATION"));
 
-        // Issue created with id from intake save.
-        assertThat(out.triggeredIssueId()).isNotNull();
-        ArgumentCaptor<IntakeRecord> intakeCap = ArgumentCaptor.forClass(IntakeRecord.class);
-        verify(intakeRepo).save(intakeCap.capture());
-        IntakeRecord issue = intakeCap.getValue();
-        assertThat(issue.getOrganisationId()).isEqualTo(ORG_ID);
-        assertThat(issue.getKind()).isEqualTo("RISK_ISSUE");
-        assertThat(issue.getStatus()).isEqualTo("SUBMITTED");
-        assertThat(issue.getReferenceCode()).startsWith("ISS-");
-        assertThat(issue.getPayload()).contains("MODEL-2026-001");
-        assertThat(issue.getPayload()).contains("AI_MODEL_CRITICAL_DRIFT");
+        // The drift row is stamped with the id the PORT reported — not one this module chose.
+        assertThat(out.triggeredIssueId()).isEqualTo(501L);
+
+        ArgumentCaptor<SystemIntakePort.SystemSubmission> cap =
+                ArgumentCaptor.forClass(SystemIntakePort.SystemSubmission.class);
+        verify(intake).fileSystemSubmission(cap.capture());
+        SystemIntakePort.SystemSubmission s = cap.getValue();
+
+        // ⚠ What this test asserts now is only what the drift monitor is entitled to decide: the
+        // tenant, the kind, the channel, the severity, who is speaking, and the facts. The reference
+        // code, the SLA, the assignee, the status and the history are the catalogue's — asserting them
+        // here is what let ISS-/SUBMITTED/RISK_MANAGER look correct for as long as they did.
+        assertThat(s.organisationId()).isEqualTo(ORG_ID);
+        assertThat(s.kind()).isEqualTo("RISK_ISSUE");
+        assertThat(s.channel()).isEqualTo("API_INGESTION");
+        assertThat(s.severity()).isEqualTo("HIGH");
+        assertThat(s.systemActor()).contains("drift monitor");
+
+        // The payload is a Map now, so the facts are assertable as values rather than as substrings of
+        // hand-built JSON — which is also why they can no longer be malformed.
+        assertThat(s.payload())
+                .containsEntry("trigger", "AI_MODEL_CRITICAL_DRIFT")
+                .containsEntry("modelCode", "MODEL-2026-001")
+                .containsEntry("observationType", "PERFORMANCE_DEGRADATION")
+                .containsEntry("metricName", "auc_rolling_30d")
+                .containsEntry("metricValue", new BigDecimal("0.831"));
+        // The Arabic notes reached the register. The retired writer serialised notesEn and dropped
+        // notesAr on the floor — on a platform whose bilingual rule makes Arabic mandatory.
+        assertThat(s.payload()).containsEntry("notesAr", "ملاحظات");
+
+        // ⚠⚠ The observation is saved EXACTLY ONCE, and this is the assertion the live probe bought.
+        // The shape before F2-175 was save → open issue → mutate → save again, which worked only while
+        // the issue was inserted in the same persistence context with no flush in between. Routing the
+        // issue through the @Transactional port put a real boundary there, the intermediate flush
+        // happened, and the second save's `UPDATE … WHERE row_version = <stale>` matched zero rows:
+        // StaleObjectStateException, HTTP 500, on a governance escalation. CLAUDE.md has recorded the
+        // ROWVERSION double-flush landmine for months; a mocked repository has no row_version, so the
+        // suite was green over it and only a real database said otherwise.
+        verify(driftRepo, org.mockito.Mockito.times(1)).save(any(MlModelDriftObservation.class));
+
+        // …and the issue is filed BEFORE that save, which is what makes one save sufficient: the id is
+        // on the entity when it is first written, rather than needing a second UPDATE to carry it.
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(intake, driftRepo);
+        order.verify(intake).fileSystemSubmission(any());
+        order.verify(driftRepo).save(any(MlModelDriftObservation.class));
 
         // Model flipped via the service hook.
         verify(modelService).flipToRevisionDueToCriticalDrift(eqMl(m), anyString());
+
+        // The audit line names the issue it raised. It named nothing before, so a CRITICAL drift left
+        // no audit trace of the escalation at all.
+        verify(audit).log(org.mockito.ArgumentMatchers.eq("CREATE"),
+                org.mockito.ArgumentMatchers.eq("MlModelDriftObservation"),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.contains("RI-K7MP-3QXZ"));
 
         // Event payload should reflect triggeredIssue=true.
         ArgumentCaptor<DomainEvent> evCap = ArgumentCaptor.forClass(DomainEvent.class);

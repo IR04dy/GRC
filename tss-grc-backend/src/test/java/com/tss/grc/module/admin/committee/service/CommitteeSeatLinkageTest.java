@@ -27,7 +27,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -85,11 +87,32 @@ class CommitteeSeatLinkageTest {
 
     @InjectMocks CommitteeMemberRegistryService service;
 
+    /**
+     * A fixed "today", deliberately not the real one.
+     *
+     * <p>⚠⚠ <b>This constant exists because the seat-currency tests below were WRONG for three hours of
+     * every day, and the suite caught it at 00:4x local on 2026-08-10 — a day after they were written and
+     * merged green.</b> They built fixtures with {@code LocalDate.now()}, which resolves in the JVM's
+     * default zone (Riyadh, UTC+3), while {@code CommitteeMemberRegistryService} reads
+     * {@code LocalDate.now(clock)} with {@code Clock.system(ZoneId.of("UTC"))}. Between local midnight
+     * and 03:00 the two disagree by a day, so a term ending "yesterday" was still current to the service
+     * and {@code currentSeats()} came back 2 instead of 1.
+     *
+     * <p>🔑 The F2-178 slice already recorded that <em>a fixed-clock test whose fixed date equals the real
+     * date proves nothing about clock injection</em>. This is the same lesson from the other side: a test
+     * that reads the wall clock at all is asserting against a "now" the code does not share. The remedy is
+     * the same either way — <b>inject the clock and pin the date</b>, so the assertion depends on the
+     * fixture and nothing else. {@code CommitteeRosterCoverageTest} did this from the start; this class
+     * did not, and the difference was invisible for 21 hours out of 24.
+     */
+    private static final LocalDate TODAY = LocalDate.of(2027, 6, 15);
+
     private CommitteeMemberTerm seat;
 
     @BeforeEach
     void setUp() {
         TenantContext.setCurrentTenant(ORG);
+        service.setClock(Clock.fixed(TODAY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
 
         seat = term(TERM, "CCO", "Chair", (short) 1);
         when(terms.findByIdAndOrganisationId(TERM, ORG)).thenReturn(Optional.of(seat));
@@ -502,7 +525,7 @@ class CommitteeSeatLinkageTest {
     @Test
     void a_linked_seat_outside_its_term_window_counts_on_the_roster_and_not_for_authorisation() {
         CommitteeMemberTerm lapsed = linked(1L, "CCO", "Chair", (short) 1, CISO);
-        lapsed.setTermEndsAt(LocalDate.now().minusDays(1));
+        lapsed.setTermEndsAt(TODAY.minusDays(1));
         rosterOf(lapsed, linked(2L, "DPO", "Member", (short) 1, SECRETARY));
 
         SeatLinkageReport r = service.linkage(COMMITTEE);
@@ -521,8 +544,8 @@ class CommitteeSeatLinkageTest {
     @Test
     void an_ended_term_stops_conferring_access_immediately_rather_than_at_its_end_date() {
         CommitteeMemberTerm resigned = linked(1L, "CCO", "Chair", (short) 1, CISO);
-        resigned.setTermEndsAt(LocalDate.now().plusYears(2));
-        resigned.setEndedAt(java.time.LocalDateTime.now().minusDays(3));
+        resigned.setTermEndsAt(TODAY.plusYears(2));
+        resigned.setEndedAt(TODAY.minusDays(3).atStartOfDay());
         rosterOf(resigned);
 
         SeatLinkageReport r = service.linkage(COMMITTEE);

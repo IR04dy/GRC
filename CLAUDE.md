@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,471 @ 2026-08-09; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,577 @ 2026-08-10; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -369,6 +369,21 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
 - `JAVA_HOME` → JDK 17, always (fresh shells default to 11).
 - ROWVERSION double-flush: never save an entity twice around a native
   `@Modifying` on the same table — native first, mutate + save once.
+  ⚠⚠ **A native `@Modifying` is only the loudest trigger. ANY flush between the two saves does it** —
+  measured 2026-08-10 (F2-175). `MlModelDriftService.record` did `save → file the issue → mutate →
+  save again` and worked for as long as it existed, because the issue was inserted in the *same*
+  persistence context and Hibernate batched the INSERT and UPDATE together. Routing that insert
+  through a `@Transactional` port put a real boundary between them, the intermediate flush happened,
+  and the second save's `UPDATE … WHERE row_version = <what this session last saw>` matched **zero
+  rows** → `StaleObjectStateException` → **HTTP 500 on a governance escalation**.
+  🔑 **A latent double-save is not a style issue — it is a defect waiting for someone to add a
+  transactional call between the two writes**, and that someone will be reading neither. Do the other
+  work FIRST, then save once: nothing in the issue payload needed the observation's id, so the second
+  save was never necessary.
+  ⚠ **No unit test can see this.** Mocked repositories have no `row_version`, so the suite was green
+  over it and only the live probe against real SQL Server disagreed — house rule 4 earning its place.
+  Pin it with `verify(repo, times(1)).save(...)` plus an `InOrder` check that the other work precedes
+  the save.
 - Engine-wiring TX rules: `afterCommit` + per-call `REQUIRES_NEW`
   `TransactionTemplate` + native stamp updates (joined-TX failures poison commits).
 - `@Valid` fires **before** `@PreAuthorize` — permission probes need a valid body.
@@ -408,6 +423,25 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   **When a page has a client-side fallback, hit its endpoint directly before believing the page** —
   third occurrence after F2-42 and F2-38. And do **not** fix such a refusal with `EAGER`: that
   trades a 500 for an unbounded join on every read.
+- **The database is CASE-INSENSITIVE and Java is not, so a CHECK constraint is no guard for a
+  `.equals()`** (F2-179, measured 2026-08-10). Columns are `Latin1_General_100_CI_AS_SC_UTF8`
+  (DB `SQL_Latin1_General_CP1_CI_AS`), so `CK_ml_drift_sev` — `severity IN ('CRITICAL','MAJOR',…)` —
+  **accepts `'critical'`**, stores it verbatim, and `if ("CRITICAL".equals(req.severity()))` is then
+  false. Probed live: a lowercase CRITICAL drift returns **201**, files no issue, and leaves the model
+  `IN_PRODUCTION` — no error anywhere. Any Java literal compared against a CHECK-constrained token has
+  this shape; `ExerciseObserverService` holds the same five-token `Set.of(...)` against the same
+  collation. **Normalise on write** (so the CHECK, the comparison and the FE label map agree) rather
+  than reaching for `equalsIgnoreCase`, which leaves the odd casing in the column and misses the
+  frontend's label lookup.
+- **`LocalDate.now()` in a test is UTC+3 here; the services it tests are UTC** — so a date-relative
+  fixture is wrong for three hours of every day (F2-178 correction, caught 2026-08-10 at 00:4x local).
+  `CommitteeSeatLinkageTest` set `termEndsAt = LocalDate.now().minusDays(1)` while
+  `CommitteeMemberRegistryService`/`CommitteeSeatAuthority` read `LocalDate.now(Clock.system(ZoneId.of("UTC")))`;
+  between local midnight and 03:00 the two disagree by a day and a lapsed seat reads as current. It had
+  merged **green** the day before. **Inject the clock and pin the date** (`Clock.fixed` on a `TODAY`
+  constant that is deliberately *not* today — a fixed date equal to the real one proves nothing about the
+  injection). ⚠ A mutation harness scoped to a slice's own tests cannot catch this: the failing class was
+  not in its list.
 - `seed_real_data.py` batches must start `SET NOCOUNT ON;`.
 - Don't "seed" an empty table before checking it's wired (`privacy_lc` is orphaned).
 - **The intake substrate is the platform front door, and until F2-172 it filed every submission
@@ -455,5 +489,27 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   catalogue, so the obvious guess compiles and 403s.
   ⚠ **Six `CONTROL_TEST` kinds have no register and now 409 by design** (F2-176). A promotion that
   cannot create the record must refuse, not flip the status and write nothing.
-  ⚠ **`MlModelDriftService` is a SECOND writer to `intake.intake_records`** that bypasses
-  `IntakeService` entirely — none of the above governs it (F2-175).
+  ⚠ **There is exactly ONE writer to `intake.intake_records`, and that is now enforced** (F2-175).
+  `MlModelDriftService` used to build the entity itself and call `intakeRepo.save()`, so none of the above
+  governed the CRITICAL-drift path: hard-coded assignee, its own `ISS-…` code minter, its own
+  `plusDays(14)`, no history events, and hand-concatenated JSON whose `esc()` covered only
+  `\`/`"`/`\n`/`\r` — **so a model title containing a TAB produced a record that could never be promoted**,
+  failing as *"unreadable payload"* from `intake` while the fault sat in `ai/governance`.
+  **A peer module files a submission through `intake.spi.SystemIntakePort`** (the inbound counterpart to
+  `RegisterPromotionPort`), which takes a `Map` payload the mapper serialises — so promotability is
+  structural, not lucky. `IntakeSingleWriterInvariantTest` pins three hard zeros/ones: `new IntakeRecord(`
+  appears **once** in main sources, `IntakeRecordRepository` has **one** user, and **no peer imports
+  anything of `module/intake` but its `spi`**. ⚠ Invariants, not ratchets — the population is one, so a
+  raisable count would make a tolerated writer look reviewed.
+  🔑 Three reusable lessons from it: **(a)** the register's own filing called the bypass *"currently
+  benign"* when the supportable claim was *"unexercised"* — 26 seeded drift rows, `triggered_issue_id`
+  NULL on all of them, so the path had **never run**; **(b)** two of the filing's three architectural
+  claims were false (`ai → intake` is SKU → Base, the *legal* direction, and `ModuleGraphRatchetTest`'s
+  `KERNEL_ISH` is only `{platform, integrations, dashboard}` so it could not fire) — **read the guard
+  before believing a finding's claim about it**; **(c)** the existing test asserted the defect as
+  correct (`startsWith("ISS-")`, `isEqualTo("SUBMITTED")`), the second instance after F2-159 —
+  **a test written by reading the implementation can only agree with it.**
+  ⚠⚠ And the honest half: the catalogued assignee `RISK_OFFICER` **does not exist in `iam.roles`** while
+  the hard-coded `RISK_MANAGER` does. It is still the right change — `assigned_to` is a stakeholder-code
+  column, **10 of 14 catalogue codes are not role names**, and **nothing resolves the column at all** (it
+  renders as a label) — but do not read it as "the assignee now works." That is F2-174.
