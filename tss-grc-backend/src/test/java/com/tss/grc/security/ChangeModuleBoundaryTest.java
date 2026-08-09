@@ -174,9 +174,20 @@ class ChangeModuleBoundaryTest {
                 the adapters exist to reach exactly the peers the change module gave up: \
                 admin (the committee engine), capa (S7d/CE-7's PIR follow-up tracker), evidence \
                 (S8a/CE-9's change evidence), incident (CH-13's rollback hook) and workflow \
-                (S8h/CE-10's WorkflowPort — the 15th adopting module). Reaching a sixth \
+                (S8h/CE-10's WorkflowPort — the 15th adopting module) — plus intake, which is \
+                the one entry here that points the OTHER way. Reaching a seventh \
                 arrived without a port decision — widen this list only together with a new \
                 port and the reason it exists, never to make a red build green.
+
+                ⚠ intake is INBOUND and that distinction is the reason it was allowed. The five \
+                above implement change_mgmt.spi ports so change can reach a peer without importing \
+                it. ChangePromotionAdapter (F2-172) implements com.tss.grc.module.intake.spi\
+                .RegisterPromotionPort so INTAKE can create a change request without importing \
+                change — the arrow still ends at an interface, and change_mgmt still imports \
+                nothing new. It could not live in module/change_mgmt/intake, because \
+                theChangeModuleImportsNoPeerModule above forbids exactly that, and it could not \
+                live in module/intake, because ADR-018 homes intake in Base and Base must not \
+                depend on a sold SKU. This package is the only place both halves are legal.
 
                 ⚠ S8h is the worked example of that rule paying off. Its first draft also reached \
                 iam, to compute recipient reachability inside WorkflowAdapter from RoleRepository and \
@@ -185,7 +196,7 @@ class ChangeModuleBoundaryTest {
                 implementation of notifyStep's four resolution rules, kept honest only by a unit test \
                 asserting the two agreed. It moved to WorkflowRequestService.reachOf, beside the \
                 fan-out it predicts, and the adapter went from 387 lines to a translation layer.""")
-            .containsExactly("admin", "capa", "evidence", "incident", "workflow");
+            .containsExactly("admin", "capa", "evidence", "incident", "intake", "workflow");
     }
 
     @Test

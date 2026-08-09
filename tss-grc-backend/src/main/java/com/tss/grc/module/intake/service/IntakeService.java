@@ -1,6 +1,10 @@
 package com.tss.grc.module.intake.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tss.grc.common.exception.DomainAccessDeniedException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.intake.IntakeCatalog;
 import com.tss.grc.module.intake.dto.IntakePublicStatusDto;
 import com.tss.grc.module.intake.dto.IntakeRecordDto;
 import com.tss.grc.module.intake.dto.IntakeSubmissionRequest;
@@ -8,10 +12,15 @@ import com.tss.grc.module.intake.dto.TriageDecisionRequest;
 import com.tss.grc.module.intake.entity.IntakeEvent;
 import com.tss.grc.module.intake.entity.IntakeRecord;
 import com.tss.grc.module.intake.repository.IntakeRecordRepository;
+import com.tss.grc.module.intake.spi.IntakePromotionContext;
+import com.tss.grc.module.intake.spi.PromotionRegistry;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.PermissionEvaluator;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,72 +30,42 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * IntakeService — DD-82.
+ * IntakeService — DD-82, rebuilt for F2-172.
  *
- * Implements the same submit / triage / case-track lifecycle the React
- * useIntake() hook drives. Routing metadata (default assignee, SLA hours,
- * code prefix, target register) is mirrored from frontend INTAKE_CATALOG
- * so the two stay in sync. When the backend grows further, this catalog
- * should move to a shared module.
+ * <p>Implements the same submit / triage / case-track lifecycle the React {@code useIntake()} hook
+ * drives. Routing metadata lives in {@link IntakeCatalog}, generated from the frontend catalogue
+ * and pinned to it — it used to be three private maps here covering 16 of the 26 kinds, and the ten
+ * missing ones would each have been refused as "unknown" the moment a client actually posted.
+ *
+ * <h3>What F2-172 changed, and why it is more than a wiring fix</h3>
+ * {@code triage(PROMOTE)} used to take {@code promotedToEntityType} and {@code promotedToRecordId}
+ * <b>from the request body</b> and create nothing. So the row it marked "Promoted to DPIA #482913"
+ * pointed at a record that had never been written — on the server as well as in the browser
+ * (F2-171). Promotion now:
+ *
+ * <ol>
+ *   <li>reads the <b>target from the kind</b>, so a client cannot promote a DSR into the risk
+ *       register;</li>
+ *   <li>requires the target module's own write permission on top of {@code INTAKE:TRIAGE}, so
+ *       promotion is not a side door into fourteen modules;</li>
+ *   <li>creates the record through that module's service, in this transaction;</li>
+ *   <li>stamps {@code promoted_to_record_id} from <b>the row that was created</b>, and</li>
+ *   <li>refuses when no register can take it, rather than recording a promotion that did nothing.</li>
+ * </ol>
+ *
+ * <p>Points 3 and 4 share a transaction on purpose. A promoted status with no record — or a record
+ * with no promoted status — is the inconsistency the whole finding is about, and rolling both back
+ * together is the only way the intake row cannot outlive its own claim.
  */
 @Service
 @RequiredArgsConstructor
 public class IntakeService {
 
     private final IntakeRecordRepository repo;
+    private final PromotionRegistry promotions;
+    private final PermissionEvaluator permissions;
+    private final ObjectMapper json;
     private static final SecureRandom RNG = new SecureRandom();
-
-    /** SLA hours per intake kind — mirrors frontend INTAKE_CATALOG. */
-    private static final Map<String, Integer> SLA_HOURS = Map.ofEntries(
-        Map.entry("DSR_REQUEST",         30 * 24),
-        Map.entry("BREACH_REPORT",       72),
-        Map.entry("VRP_DISCLOSURE",      24 * 5),
-        Map.entry("SPEAKUP",             24 * 7),
-        Map.entry("SECURITY_INCIDENT",   72),
-        Map.entry("PRIVACY_BREACH",      72),
-        Map.entry("RISK_ISSUE",          24 * 14),
-        Map.entry("CONTROL_OBSERVATION", 24 * 14),
-        Map.entry("POLICY_EXCEPTION",    24 * 7),
-        Map.entry("VENDOR_ONBOARDING",   24 * 14),
-        Map.entry("DPIA_INITIATION",     24 * 14),
-        Map.entry("BIA_SUBMISSION",      24 * 30),
-        Map.entry("AUDIT_REQUEST",       24 * 14),
-        Map.entry("CHANGE_REQUEST",      48),
-        Map.entry("ETHICS_DISCLOSURE",   24 * 14),
-        Map.entry("CONTROL_ATTESTATION", 24 * 14)
-    );
-
-    /** Default assignee per intake kind. */
-    private static final Map<String, String> DEFAULT_ASSIGNEE = Map.ofEntries(
-        Map.entry("DSR_REQUEST",         "DPO"),
-        Map.entry("BREACH_REPORT",       "DPO"),
-        Map.entry("VRP_DISCLOSURE",      "CISO_OFFICE"),
-        Map.entry("SPEAKUP",             "ETHICS_CTE"),
-        Map.entry("SECURITY_INCIDENT",   "CSIRT"),
-        Map.entry("PRIVACY_BREACH",      "DPO"),
-        Map.entry("RISK_ISSUE",          "RISK_OFFICER"),
-        Map.entry("CONTROL_OBSERVATION", "COMPLIANCE_LEAD"),
-        Map.entry("POLICY_EXCEPTION",    "POLICY_OFFICER"),
-        Map.entry("VENDOR_ONBOARDING",   "TPRM_LEAD"),
-        Map.entry("DPIA_INITIATION",     "DPO"),
-        Map.entry("BIA_SUBMISSION",      "BCM_LEAD"),
-        Map.entry("AUDIT_REQUEST",       "AUDIT_LEAD"),
-        Map.entry("CHANGE_REQUEST",      "CAB"),
-        Map.entry("ETHICS_DISCLOSURE",   "ETHICS_OFFICER"),
-        Map.entry("CONTROL_ATTESTATION", "COMPLIANCE_LEAD")
-    );
-
-    /** Two-letter code prefix per intake kind for human-friendly tracking codes. */
-    private static final Map<String, String> CODE_PREFIX = Map.ofEntries(
-        Map.entry("DSR_REQUEST", "DS"),         Map.entry("BREACH_REPORT", "BR"),
-        Map.entry("VRP_DISCLOSURE", "VR"),      Map.entry("SPEAKUP", "SU"),
-        Map.entry("SECURITY_INCIDENT", "SI"),   Map.entry("PRIVACY_BREACH", "PB"),
-        Map.entry("RISK_ISSUE", "RI"),          Map.entry("CONTROL_OBSERVATION", "CO"),
-        Map.entry("POLICY_EXCEPTION", "PE"),    Map.entry("VENDOR_ONBOARDING", "VO"),
-        Map.entry("DPIA_INITIATION", "DI"),     Map.entry("BIA_SUBMISSION", "BI"),
-        Map.entry("AUDIT_REQUEST", "AR"),       Map.entry("CHANGE_REQUEST", "CR"),
-        Map.entry("ETHICS_DISCLOSURE", "ED"),   Map.entry("CONTROL_ATTESTATION", "CA")
-    );
 
     @Transactional
     public IntakeRecordDto submit(IntakeSubmissionRequest req) {
@@ -94,13 +73,11 @@ public class IntakeService {
         if (orgId == null) {
             throw new IllegalStateException("No tenant context — public intake submission requires an org-resolver");
         }
-        if (!SLA_HOURS.containsKey(req.getKind())) {
-            throw new IllegalArgumentException("Unknown intake kind: " + req.getKind());
-        }
+        IntakeCatalog.Entry catalog = IntakeCatalog.require(req.getKind());
 
         IntakeRecord r = new IntakeRecord();
         r.setOrganisationId(orgId);
-        r.setReferenceCode(generateReferenceCode(req.getKind()));
+        r.setReferenceCode(generateReferenceCode(catalog.codePrefix()));
         r.setKind(req.getKind());
         r.setStatus("TRIAGING");                   // auto-acknowledge → triaging
         r.setChannel(req.getChannel());
@@ -115,8 +92,8 @@ public class IntakeService {
 
         LocalDateTime now = LocalDateTime.now();
         r.setAcknowledgedAt(now);
-        r.setAssignedTo(DEFAULT_ASSIGNEE.get(req.getKind()));
-        r.setSlaDueAt(now.plusHours(SLA_HOURS.get(req.getKind())));
+        r.setAssignedTo(catalog.defaultAssignee());
+        r.setSlaDueAt(now.plusHours(catalog.slaHours()));
 
         // Auto-acknowledgement event + triage-routing event.
         r.getHistory().add(buildEvent(r, now, "SUBMITTED",
@@ -161,24 +138,83 @@ public class IntakeService {
             case "CLOSE"   -> "CLOSED";
             default -> throw new IllegalArgumentException("decision must be PROMOTE | REJECT | CLOSE");
         };
-        r.setStatus(newStatus);
 
+        String promotionNote = null;
         if ("PROMOTED".equals(newStatus)) {
-            r.setPromotedToEntityType(req.getPromotedToEntityType());
-            r.setPromotedToRecordId(req.getPromotedToRecordId());
+            // Not idempotent by nature: promoting twice creates two register records, and the
+            // second one silently overwrites the pointer to the first, orphaning it. Cheap to
+            // notice here; impossible to notice afterwards.
+            if ("PROMOTED".equals(r.getStatus())) {
+                throw new IllegalStateException(r.getReferenceCode() + " was already promoted to "
+                    + r.getPromotedToEntityType() + " #" + r.getPromotedToRecordId()
+                    + " on " + r.getPromotedAt() + ". Promoting again would create a second record.");
+            }
+            String target = IntakeCatalog.require(r.getKind()).defaultTarget();
+            requireTargetPermission(target, r.getReferenceCode());
+            String recordId = promotions.promote(target, contextFor(r, req, actor));
+
+            r.setPromotedToEntityType(target);
+            r.setPromotedToRecordId(recordId);
             r.setPromotedAt(LocalDateTime.now());
+            promotionNote = "Promoted to " + target + " #" + recordId;
         } else if ("REJECTED".equals(newStatus)) {
             r.setRejectionReason(req.getNote());
         }
+        r.setStatus(newStatus);
 
-        String note = Optional.ofNullable(req.getNote()).orElse(switch (req.getDecision()) {
-            case "PROMOTE" -> "Promoted to " + req.getPromotedToEntityType() + " #" + req.getPromotedToRecordId();
-            case "REJECT"  -> "Rejected";
-            default        -> "Closed without promotion";
-        });
+        // The promotion note names the record that was actually created, so a triager's own note
+        // cannot replace it: the history line "Promoted to DPIA #482913" pointing at nothing is the
+        // artefact F2-171 was found by, and the id in it has to come from the write.
+        String note = "PROMOTE".equals(req.getDecision())
+            ? promotionNote + (req.getNote() == null || req.getNote().isBlank() ? "" : " — " + req.getNote())
+            : Optional.ofNullable(req.getNote()).orElse(
+                "REJECT".equals(req.getDecision()) ? "Rejected" : "Closed without promotion");
         r.getHistory().add(buildEvent(r, LocalDateTime.now(), newStatus, actor, note));
 
         return IntakeRecordDto.from(repo.save(r));
+    }
+
+    /**
+     * Build the read-only view an adapter gets. The payload is parsed here, once, so fourteen
+     * adapters do not each hand-roll a JSON parse — and so a malformed payload fails with a message
+     * naming the intake rather than as a {@code JsonParseException} from inside some other module.
+     */
+    private IntakePromotionContext contextFor(IntakeRecord r, TriageDecisionRequest req, String actor) {
+        IntakeCatalog.Entry catalog = IntakeCatalog.require(r.getKind());
+        Map<String, Object> payload;
+        try {
+            payload = (r.getPayload() == null || r.getPayload().isBlank())
+                ? Map.of()
+                : json.readValue(r.getPayload(), new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                "Intake " + r.getReferenceCode() + " has an unreadable payload and cannot be "
+                + "promoted: " + e.getMessage());
+        }
+        return new IntakePromotionContext(
+            r.getId(), r.getReferenceCode(), r.getKind(), r.getSeverity(),
+            r.getSubmitterName(), r.getSubmitterEmail(),
+            Boolean.TRUE.equals(r.getSubmitterIsAnonymous()),
+            r.getLocale(), r.getAcknowledgedAt(), req.getNote(), actor,
+            payload, catalog.titleEn(), catalog.titleAr());
+    }
+
+    /**
+     * {@code INTAKE:TRIAGE} lets you decide a submission; it does not let you create a record in
+     * somebody else's register. See {@code RegisterPromotionPort#requiredPermission} for the
+     * measurement behind that.
+     */
+    private void requireTargetPermission(String target, String referenceCode) {
+        String required = promotions.requiredPermissionFor(target);
+        if (required == null) return;          // no port — PromotionRegistry raises the real error
+        String[] parts = required.split(":", 2);
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !permissions.hasPermission(auth, parts[0], parts[1])) {
+            throw new DomainAccessDeniedException(
+                "Promoting " + referenceCode + " creates a " + target + " record, which requires "
+                + required + " in addition to INTAKE:TRIAGE. Reassign the submission to someone who "
+                + "holds it, or reject it.");
+        }
     }
 
     private IntakeEvent buildEvent(IntakeRecord r, LocalDateTime at, String status, String actor, String note) {
@@ -192,9 +228,8 @@ public class IntakeService {
     }
 
     /** Generate the public reference code — format "XX-XXXX-YYYY". */
-    private String generateReferenceCode(String kind) {
-        String prefix = CODE_PREFIX.getOrDefault(kind, "II");
-        return prefix + "-" + segment() + "-" + segment();
+    private String generateReferenceCode(String codePrefix) {
+        return codePrefix + "-" + segment() + "-" + segment();
     }
 
     private String segment() {
