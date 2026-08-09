@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { CheckCircle2, FileText, Send, Copy, ArrowRight } from 'lucide-react';
+import { CheckCircle2, FileText, Send, Copy, ArrowRight, AlertCircle } from 'lucide-react';
 import { PublicShell } from '../../components/layout/PublicShell';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
-import { useIntake } from '../../lib/intake';
+import { ApiError, intakeApi } from '../../lib/api';
 
 /**
  * Public DSR portal — DD-55.
@@ -23,14 +23,32 @@ import { useIntake } from '../../lib/intake';
  *   - Identity verification step (optional, configurable)
  *   - Timestamps + 30-day SLA clock starts on submission
  *
- * The submission flows through useIntake.submit() into the same intake
- * registry the triager inbox reads from.
+ * ⚠ F2-172 — WHAT THIS PAGE COULD NOT DO, and now says so.
+ *
+ * The submission used to flow through `useIntake().submit()`, which wrote to the data
+ * subject's own browser (`localStorage`). So a person exercising a PDPL Art. 4 right was
+ * shown a reference code, told the 30-day statutory clock had started, and **no privacy
+ * officer ever received the request**. This is F2-137's defect exactly — that finding
+ * retired `/portal/speakup` for writing whistleblower reports to the reporter's browser —
+ * and this page is its twin, which F2-137 did not reach.
+ *
+ * It now posts to the real endpoint. That endpoint is `isAuthenticated()`, so an
+ * unauthenticated data subject is refused, and **the refusal is what the page shows**:
+ * F2-138 records that no anonymous intake endpoint exists at all, and it is owner-blocked.
+ * A visible "not available online yet" is strictly better than an invisible failure dressed
+ * as a reference code, and the page starts working by itself the moment the endpoint does.
+ *
+ * The form, the validation and the acknowledgement copy are all kept: this is a disclosure
+ * change, not a removal. Nothing here fabricates a reference code any more.
  */
 export function DsrPortalPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { submit } = useIntake();
+  // Deliberately NOT useIntake(): that hook loads the authenticated triager inbox, which on
+  // this public page would 401 on mount and bounce a data subject to a staff login screen.
   const [submitted, setSubmitted] = useState<{ refCode: string; slaDueAt: string } | null>(null);
+  const [refused, setRefused] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     requesterName: '',
     requesterEmail: '',
@@ -57,26 +75,44 @@ export function DsrPortalPage() {
       toast.danger(t('portalDsrErrorConsent'));
       return;
     }
-    // F2-138 keeps this page client-only: there is no anonymous DSR submit endpoint to
-    // point at, so `submit()` takes its no-session branch and the record lives in this
-    // browser. `useIntake().submit` is async now regardless of which branch it takes.
-    const rec = await submit({
-      kind: 'DSR_REQUEST',
-      channel: 'WEB_FORM',
-      submitterIsAnonymous: false,
-      submitterRole: 'CUSTOMER',
-      submitterName: form.requesterName.trim(),
-      submitterEmail: form.requesterEmail.trim(),
-      payload: {
-        requestType: form.requestType,
-        scope: form.scope.trim(),
-        verificationMethod: form.verificationMethod,
-        idLast4: form.idLast4.trim() ? form.idLast4.trim().slice(-4) : undefined,
-      },
-      severity: 'MEDIUM',
-      locale: lang,
-    });
-    setSubmitted({ refCode: rec.referenceCode, slaDueAt: rec.slaDueAt ?? '' });
+    void fileRequest();
+  }
+
+  async function fileRequest() {
+    setBusy(true);
+    setRefused(null);
+    try {
+      const rec = await intakeApi.submitPublic({
+        kind: 'DSR_REQUEST',
+        channel: 'WEB_FORM',
+        submitterIsAnonymous: false,
+        submitterRole: 'CUSTOMER',
+        submitterName: form.requesterName.trim(),
+        submitterEmail: form.requesterEmail.trim(),
+        payload: JSON.stringify({
+          requestType: form.requestType,
+          scope: form.scope.trim(),
+          verificationMethod: form.verificationMethod,
+          ...(form.idLast4.trim() ? { idLast4: form.idLast4.trim().slice(-4) } : {}),
+        }),
+        severity: 'MEDIUM',
+        locale: lang,
+      });
+      // Only reached when the server really accepted it — the reference code is the
+      // server's, never minted here.
+      setSubmitted({ refCode: rec.referenceCode, slaDueAt: rec.slaDueAt ?? '' });
+    } catch (e) {
+      const unauthorised = e instanceof ApiError && (e.status === 401 || e.status === 403);
+      setRefused(unauthorised
+        ? (lang === 'ar'
+            ? 'لا يمكن تقديم الطلب عبر هذه الصفحة حالياً. حقّك في الوصول أو التصحيح أو المحو قائم بموجب نظام حماية البيانات الشخصية — يُرجى التواصل مع مسؤول حماية البيانات في المنشأة لتقديم الطلب، وسيبدأ احتساب المدة النظامية من تاريخ استلامه.'
+            : 'This request cannot be filed through this page yet. Your right of access, rectification or erasure under the PDPL still stands — please contact the organisation\u2019s data protection officer to file it, and the statutory period runs from the date they receive it.')
+        : (e instanceof ApiError ? e.message
+            : (lang === 'ar' ? 'تعذّر إرسال الطلب. يُرجى المحاولة لاحقاً.' : 'The request could not be sent. Please try again shortly.')));
+      toast.danger(lang === 'ar' ? 'لم يتم تقديم الطلب' : 'The request was not filed');
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (submitted) {
@@ -211,8 +247,34 @@ export function DsrPortalPage() {
             <span style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>{t('portalDsrConsent')}</span>
           </label>
 
+          {/* F2-172 — the server's refusal, stated to the person it affects. This is the
+              only outcome besides a real server-issued reference code; nothing in between
+              is rendered any more. */}
+          {refused && (
+            <div style={{
+              display: 'flex', gap: 10, alignItems: 'flex-start', padding: 14,
+              background: 'var(--warning-bg)', border: '1px solid var(--warning-fg)',
+              borderRadius: 'var(--r-sm)',
+            }}>
+              <AlertCircle size={18} color="var(--warning-fg)" style={{ flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 13, color: 'var(--ink-1)', lineHeight: 1.65 }}>{refused}</div>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="primary" Icon={Send} onClick={() => {/* form onSubmit handles it */}}>
+            {/* ⚠ `type="submit"` is load-bearing and its absence was a live defect, found by
+                clicking this button during F2-172's browser pass. The shared `Button` defaults to
+                `type="button"` **on purpose** — its own comment says a Button inside a form must not
+                auto-submit and that pages needing it "pass type=submit explicitly" — and this one
+                did not, while its `onClick` was an empty function commented
+                "form onSubmit handles it". A `type="button"` click never reaches the form's
+                `onSubmit`, so **pressing Submit on the public PDPL rights form did nothing at all**;
+                only pressing Enter in a field ever worked. Measured across the codebase: 19 files
+                render a `<form onSubmit>`, 16 pass `type="submit"`, and of the three that do not,
+                the other two (`CaseTrackerPage`, `VendorPortalPage`) call their handler from
+                `onClick` — so this was the only dead one. Pinned by
+                `publicPortalBackedByServer.test.ts`. */}
+            <Button variant="primary" type="submit" Icon={Send} disabled={busy}>
               {t('portalDsrSubmit')}
             </Button>
           </div>

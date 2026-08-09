@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, posix, sep } from 'node:path';
+import { stripComments } from './support/sourceScan';
 
 /**
  * F2-137 — a public portal must talk to the server, not to the visitor's own browser.
@@ -27,21 +28,16 @@ describe('F2-137 — public portal routes are backed by the server, not by local
   const APP = readFileSync(join(SRC, 'App.tsx'), 'utf8');
 
   /**
-   * Modules that hold a submission in the browser when there is no session.
+   * Modules that hold submissions in the browser and never call the network.
    *
-   * ⚠ **F2-172 changed what membership means here, and the change had to be made explicitly
-   * rather than absorbed.** `lib/intake` now calls `POST /api/v1/intake` — but only when the
-   * visitor is signed in. The public routes below have no session by definition, so they still
-   * take the `localStorage` branch, and the two exemptions still describe the code.
-   *
-   * The premise test underneath used to assert *"lib/intake really does make zero network
-   * calls"* by grepping for `fetch(` / `api.get` / `axios`. That assertion is now **false and
-   * still green**: the calls go through `intakeApi.*`, which none of those patterns match. A
-   * guard that keeps passing after its premise stops holding is worse than one that fails —
-   * it is the shape this whole finding family keeps producing — so it has been rewritten to
-   * measure what is actually true.
+   * ⚠ **Empty since F2-172, and that is this guard's own success condition firing.** The list
+   * held `lib/intake`, and the comment below already said membership was *measured* so that a
+   * store growing a real fetch would leave it. `lib/intake` now calls `POST /api/v1/intake`,
+   * `GET /api/v1/intake` and `PUT /api/v1/intake/{id}/triage`, so it left. Because an empty list
+   * would make the route scan below vacuous — the failure mode this file is otherwise careful
+   * about — that scan was replaced by two properties that stay decidable with no members.
    */
-  const CLIENT_ONLY_STORES = ['lib/intake'];
+  const CLIENT_ONLY_STORES: string[] = [];
 
   /** Route prefixes served without a login. */
   const PUBLIC_PREFIXES = ['/portal/', '/public/'];
@@ -57,10 +53,25 @@ describe('F2-137 — public portal routes are backed by the server, not by local
    * these pages at a server means building that endpoint first, with tenancy, rate limiting and the
    * Article 10 clock, which is a decision rather than a rewire.
    */
-  const BLOCKED_ON_MISSING_ENDPOINT: Record<string, string> = {
-    '/portal/dsr': 'F2-138 — no anonymous DSR submit endpoint exists to point at',
-    '/portal/track': 'F2-138 — tracks any intake kind by reference code; the public submit side does not exist',
-  };
+  const BLOCKED_ON_MISSING_ENDPOINT: Record<string, string> = {};
+
+  /**
+   * F2-172 — what replaced those two exemptions, and why it is not the same claim.
+   *
+   * `/portal/track` is fixed outright: it calls `GET /api/v1/intake/track/{code}`, which is
+   * `permitAll`, and renders the server's PII-free projection.
+   *
+   * `/portal/dsr` is **still blocked by F2-138** — no anonymous submit endpoint exists, so
+   * `POST /api/v1/intake` refuses a data subject. What changed is that the page now *shows* that
+   * refusal instead of writing to `localStorage` and handing out a reference code. So the property
+   * worth enforcing is no longer "which store does it import" but the one that actually harmed
+   * people: **a public page must not mint an acknowledgement the server did not issue.** Unlike an
+   * exemption list, that cannot be satisfied by moving the fabrication into a new file.
+   */
+  const REFERENCE_CODE_MINTING = [
+    /generateReferenceCode\s*\(/,
+    /\bMath\s*\.\s*random\s*\(\)[\s\S]{0,120}toString\s*\(\s*36\s*\)/,
+  ];
 
   function lazyImports(): Record<string, string> {
     const out: Record<string, string> = {};
@@ -117,38 +128,138 @@ describe('F2-137 — public portal routes are backed by the server, not by local
   }
 
   /**
-   * The premise, re-measured for F2-172. Two facts have to hold together for the exemptions
-   * below to mean anything:
+   * The premise, INVERTED by F2-172. It used to assert that `lib/intake` makes zero network calls
+   * — true when written, and the sentence that made every exemption here defensible. The store is
+   * now server-backed, so the same fact is asserted the other way round: it must reach the server,
+   * and it must no longer hold submissions in the browser. Keeping the assertion rather than
+   * deleting it with the list it justified is the point: reintroduce a local overlay for intake
+   * and this fails.
    *
-   *   1. `lib/intake` still has a `localStorage` branch — otherwise the public pages are
-   *      already server-backed and both exemptions are spent;
-   *   2. that branch is reached **only when there is no session** — otherwise a signed-in
-   *      user's submission is still going nowhere, which is F2-171 unfixed.
-   *
-   * ⚠ The old version of this test asserted "zero network calls" by grepping for `fetch(`,
-   * `api.get` and `axios`. After the rewire it kept passing while being false, because the
-   * calls go through the `intakeApi` client. **A premise test that cannot notice its premise
-   * changing is the same defect class as the code it guards**, and the fix is the same one:
-   * measure the property, not one spelling of it.
+   * ⚠ `stripComments`, and not as a nicety. The first version of this scanned the raw file and
+   * failed on the JAVADOC — the block explaining that the localStorage overlay was *removed*
+   * contains the word twice. Fourth time on this programme that a matcher has read prose as code
+   * (F2-137's newline, F2-165's regex literal, F2-170's javadoc-as-class), and the remedy is the
+   * repo helper that already exists rather than a more careful regex.
    */
-  it('lib/intake keeps a browser branch, and reaches it only without a session', () => {
-    const src = readFileSync(join(SRC, 'lib', 'intake.ts'), 'utf8').replace(/\r\n/g, '\n');
+  it('lib/intake is server-backed, and holds no submission store of its own', () => {
+    const src = stripComments(readFileSync(join(SRC, 'lib', 'intake.ts'), 'utf8'));
+    expect(src, 'lib/intake no longer reaches the server — the F2-172 rewire was reverted, and '
+      + 'every submission is going back into the submitter\'s own browser')
+      .toMatch(/intakeApi\.(submit|list|triage|track|get)/);
+    expect(src.match(/localStorage/g),
+      'lib/intake persists to localStorage again. The intake substrate is the platform front '
+      + 'door: a local overlay there means submissions no triager can see (F2-171/F2-172).')
+      .toBeNull();
+    expect(CLIENT_ONLY_STORES,
+      'lib/intake is back on CLIENT_ONLY_STORES — if that is deliberate, the two assertions above '
+      + 'must be re-inverted with it').not.toContain('lib/intake');
+  });
 
-    expect(src, 'lib/intake no longer persists to localStorage — if the public portals are '
-      + 'server-backed now, delete both exemptions below; that is the win being recorded')
-      .toMatch(/localStorage/);
+  /**
+   * The replacement for the client-store route scan, decidable with zero CLIENT_ONLY_STORES
+   * because it inspects the pages rather than their imports.
+   *
+   * A reference code is what a submitter keeps, quotes and trusts; the only body entitled to issue
+   * one is the one that also stored the submission. `/portal/dsr` minted its own and showed a
+   * 30-day PDPL clock over a record that existed in nobody's database.
+   */
+  it('no public page mints its own reference code', () => {
+    const offenders: string[] = [];
+    for (const { path, component } of publicRoutes()) {
+      const src = pageSource(component);
+      if (src === null) continue;
+      for (const pattern of REFERENCE_CODE_MINTING) {
+        if (pattern.test(src)) offenders.push(`${path} -> ${component} matches ${pattern}`);
+      }
+    }
+    expect(offenders, 'a public page is generating its own reference code. Only the server may '
+      + 'issue one, because only the server has the row it identifies — otherwise the submitter is '
+      + 'handed a tracking code for a submission nobody received.\n  ' + offenders.join('\n  '))
+      .toEqual([]);
+  });
 
-    // It DOES call the network now. Stated positively so the day it stops is a failure too.
-    expect(src, 'lib/intake no longer calls the intake API — has the F2-172 wiring been reverted?')
-      .toMatch(/intakeApi\.(submit|triage|list)\(/);
+  /** Anti-vacuity for the rule above: the matcher must reject the shape that was there. */
+  it('the reference-code matcher recognises the shape it was written against', () => {
+    const fabricating = 'const code = generateReferenceCode(kind);';
+    const alsoFabricating = 'const seg = () => Math.random().toString(36).toUpperCase();';
+    const honest = 'const rec = await intakeApi.submitPublic(body); setCode(rec.referenceCode);';
+    expect(REFERENCE_CODE_MINTING.some(r => r.test(fabricating))).toBe(true);
+    expect(REFERENCE_CODE_MINTING.some(r => r.test(alsoFabricating))).toBe(true);
+    expect(REFERENCE_CODE_MINTING.some(r => r.test(honest))).toBe(false);
+  });
 
-    // And the branch is the session, not a flag, a mock import or an environment check.
-    const submitBranch = /const submit = useCallback\(([\s\S]*?)\n  \}, \[signedIn\]\);/.exec(src);
-    expect(submitBranch, 'submit() moved — repoint this assertion').toBeTruthy();
-    expect(submitBranch![1], 'submit must post to the server when there IS a session')
-      .toMatch(/if \(signedIn\)[\s\S]{0,400}intakeApi\.submit\(/);
-    expect(submitBranch![1], 'and fall back to the browser only when there is not')
-      .toMatch(/setOverlay\(/);
+  /**
+   * A public form whose action button cannot submit it — found by *clicking* the DSR portal's
+   * Submit during F2-172's browser pass, and dead since the page was written.
+   *
+   * The shared `Button` defaults to `type="button"` deliberately (its own comment: a Button inside
+   * a form must not auto-submit, so pages needing it "pass type=submit explicitly").
+   * `DsrPortalPage` did not, and its `onClick` was an empty function annotated "form onSubmit
+   * handles it". A `type="button"` click never reaches `onSubmit`, so pressing Submit on the
+   * public PDPL rights form did nothing at all; only Enter in a field ever worked.
+   *
+   * ⚙ Why nothing caught it: every guard on this page asked what the submit path *does*, and none
+   * asked whether it can be *entered*. Route reachability was measured (F2-07b); a screen's own
+   * primary action was not. Measured across the tree: 19 files render a `<form onSubmit>`, 16 pass
+   * `type="submit"`, and of the three that do not the other two call their handler from `onClick`.
+   */
+  it('every public form can actually be submitted by its action button', () => {
+    /** An action button with a do-nothing handler: it can only work via form submission. */
+    const EMPTY_HANDLER = /onClick=\{\(\)\s*=>\s*\{\s*(?:\/\*[\s\S]*?\*\/)?\s*\}\}/;
+    const offenders: string[] = [];
+    let buttonsScanned = 0;
+    for (const { path, component } of publicRoutes()) {
+      const src = pageSource(component);
+      if (src === null || !/<form\s+onSubmit/.test(src)) continue;
+      // ⚠⚠ Judge each <Button …> element on its OWN attributes, never on the file. The first
+      // version of this asked whether the FILE contained `type="submit"` and passed with the dead
+      // button re-inserted — because the javadoc explaining why this button needs `type="submit"`
+      // says so three times, and `stripComments` does not remove a JSX `{/* … */}` block either.
+      // Fifth instance of a matcher reading prose as code on this programme, and the third remedy
+      // tried for it: not a better regex and not a stripper, but a matcher scoped to the element
+      // it is judging, where surrounding prose cannot reach.
+      // ⚠ `[^>]*?` cannot capture JSX attributes: the `>` in `=>` truncates them, so an
+      // inline arrow handler was invisible and every button read as alive. The alternation admits
+      // `=>` as a unit and the lookbehind refuses a cut inside one.
+      for (const m of src.matchAll(/<Button((?:[^>]|=>)*?)>(?<!=>)/g)) {
+        const attrs = m[1];
+        buttonsScanned++;
+        if (EMPTY_HANDLER.test(attrs) && !/type="submit"/.test(attrs)) {
+          offenders.push(`${path} -> ${component}: <Button${attrs.replace(/\s+/g, ' ').trimEnd()}> `
+            + 'has a do-nothing onClick and no type="submit", so clicking it does nothing');
+        }
+      }
+    }
+    expect(buttonsScanned, 'no <Button> inside a public <form onSubmit> was found — the scan broke, '
+      + 'so this assertion is vacuous').toBeGreaterThanOrEqual(3);
+    expect(offenders, 'a public form has an action button that cannot submit it. Either pass '
+      + 'type="submit" or call the handler from onClick — the shared Button defaults to '
+      + 'type="button", so an empty onClick beside a form onSubmit is a dead button.\n  '
+      + offenders.join('\n  ')).toEqual([]);
+  });
+
+  /** Anti-vacuity: the element-local matcher must recognise the exact shape that was live, must
+   *  clear both legitimate alternatives, and must NOT be rescued by prose on a neighbouring line —
+   *  that last case is the regression the file-wide version shipped with. */
+  it('the dead-button matcher recognises the shape DsrPortalPage had', () => {
+    const EMPTY_HANDLER = /onClick=\{\(\)\s*=>\s*\{\s*(?:\/\*[\s\S]*?\*\/)?\s*\}\}/;
+    const judge = (el: string): 'dead' | 'alive' | 'unparsed' => {
+      const m = /<Button((?:[^>]|=>)*?)>(?<!=>)/.exec(el);
+      if (!m) return 'unparsed';
+      return EMPTY_HANDLER.test(m[1]) && !/type="submit"/.test(m[1]) ? 'dead' : 'alive';
+    };
+    expect(judge('<Button variant="primary" Icon={Send} onClick={() => {/* form onSubmit handles it */}}>'),
+      'the exact shape DsrPortalPage shipped must read dead').toBe('dead');
+    expect(judge('<Button onClick={() => { }}>')).toBe('dead');
+    expect(judge('<Button variant="primary" type="submit" Icon={Send} disabled={busy}>')).toBe('alive');
+    expect(judge('<Button variant="primary" onClick={() => lookup()}>'),
+      'a button that calls its handler directly is fine — CaseTrackerPage and VendorPortalPage do')
+      .toBe('alive');
+    // The regression the file-wide check shipped with: prose nearby must not rescue the element.
+    const proseThenDeadButton = '{/* pass type="submit" here */}'
+      + '<Button variant="primary" onClick={() => {/* form onSubmit handles it */}}>';
+    expect(judge(proseThenDeadButton.slice(proseThenDeadButton.indexOf('<Button'))),
+      'the element must be judged alone, not with its documentation').toBe('dead');
   });
 
   it('the import matcher sees a multi-line import, which the first version of it did not', () => {

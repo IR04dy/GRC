@@ -1,6 +1,6 @@
 package com.tss.grc.module.intake.spi;
 
-import com.tss.grc.module.intake.IntakeCatalog;
+import com.tss.grc.module.intake.service.IntakeKindRouting;
 import com.tss.grc.module.intake.dto.TriageDecisionRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
@@ -81,10 +81,10 @@ class IntakePromotionContractTest {
      * and every one is a periodic regulatory submission. The nearest server-side thing is
      * {@code ccm.ControlTestRun}, which is an <em>automated</em> continuous-monitoring run executed
      * by a {@code ControlTestRunner}; filing a human's Nitaqat headcount return as one would be a
-     * fabrication of a different shape, so it is refused with a message instead. F2-173.
+     * fabrication of a different shape, so it is refused with a message instead. F2-176.
      */
     private static final Map<String, String> TARGETS_WITHOUT_A_REGISTER = Map.of(
-        "CONTROL_TEST", "F2-173 — six periodic-regulatory-submission kinds (HRSD/MOC, DD-88/DD-94) "
+        "CONTROL_TEST", "F2-176 — six periodic-regulatory-submission kinds (HRSD/MOC, DD-88/DD-94) "
             + "route here and the platform has no register for one. ccm.ControlTestRun is an "
             + "automated monitoring run, not a filing.");
 
@@ -129,7 +129,7 @@ class IntakePromotionContractTest {
         for (RegisterPromotionPort p : ports()) served.add(p.target());
 
         Map<String, List<String>> unserved = new LinkedHashMap<>();
-        for (var e : IntakeCatalog.all().entrySet()) {
+        for (var e : IntakeKindRouting.all().entrySet()) {
             String target = e.getValue().defaultTarget();
             if (served.contains(target) || TARGETS_WITHOUT_A_REGISTER.containsKey(target)) continue;
             unserved.computeIfAbsent(target, k -> new ArrayList<>()).add(e.getKey());

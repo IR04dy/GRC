@@ -110,10 +110,18 @@ class FrontendEndpointContractTest {
      * lives in F2-165's {@code KNOWN_DARK}, annotated. This number exists so the population cannot
      * grow silently, and so it cannot go stale unnoticed the way an ungateable figure in prose does
      * (F2-162).
+     *
+     * <p><b>421 -> 417 on 2026-08-09 (F2-172).</b> The intake substrate was the largest single
+     * clientless block with a real workflow behind it: {@code POST /api/v1/intake},
+     * {@code GET /api/v1/intake}, {@code GET /api/v1/intake/'{'}id{'}'} and
+     * {@code PUT /api/v1/intake/'{'}id{'}'}/triage} had existed since DD-82 and no product code
+     * called any of them, because the frontend filed every submission into {@code localStorage}.
+     * ⚙ Note which direction this test fired in: it <em>refused the commit</em> that added
+     * {@code GET /'{'}id{'}'} with no caller, which is what made the client rewire part of the same
+     * slice rather than a follow-up. A ceiling that only ever complains upward would have let a
+     * fifth dark endpoint land beside the four it was replacing.
      */
-    private static final int BASELINE_CLIENTLESS_ENDPOINTS = 417;   // 421 → 417: F2-172 wired the
-    // four intake endpoints. Lowered because the ratchet fails on a DROP too — a ceiling that only
-    // fails upward stops describing the population the moment the population improves.
+    private static final int BASELINE_CLIENTLESS_ENDPOINTS = 417;
 
     /**
      * Of those, the ones that are guarded WRITES — a governed capability with no caller at all.
@@ -132,9 +140,13 @@ class FrontendEndpointContractTest {
      * invented 21 ghost roles and 126 admin-only endpoints before being scoped to
      * {@code hasAnyRole}/{@code hasRole} arguments. The module vocabulary and the role vocabulary are
      * different namespaces that look identical.
+     *
+     * <p><b>208 -> 206 on 2026-08-09 (F2-172):</b> intake submit and intake triage. Both were
+     * governed writes with no caller, and submit was governed by a permission held by 3 of 69
+     * roles — so the pair is a worked example of what this number is for: not unbuilt UI here, but
+     * a built workflow whose front door nobody could reach.
      */
-    private static final int BASELINE_CLIENTLESS_GUARDED_WRITES = 206;   // 208 → 206: F2-172 wired
-    // POST /api/v1/intake and PUT /api/v1/intake/{id}/triage, the two guarded writes among them.
+    private static final int BASELINE_CLIENTLESS_GUARDED_WRITES = 206;
 
     // ── the two populations ────────────────────────────────────────────────────────────────────
 

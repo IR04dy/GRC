@@ -114,36 +114,46 @@ describe('F2-172 — lib/intake reaches the server, and does not fabricate when 
   /**
    * ⚠ The anchor is the `catch` arm of the load, not the file. F2-171's own source scan
    * tested `/isUnsyncedId/.test(src)` and the *import line* satisfied it, so the regression a
-   * reviewer would actually make passed clean. The regression here is "restore the seed on a
-   * failed load", and it lives inside that arm.
+   * reviewer would actually make passed clean. The regression here is "put something in the
+   * list when the load fails", and it lives inside that arm.
    */
-  it('a failed load for a signed-in user shows nothing, not the seed records', () => {
+  it('a failed load shows nothing, and says that it failed', () => {
     const src = code(INTAKE);
-    const catchArm = /\}\s*catch\s*\{([\s\S]*?)\}\s*finally/.exec(src);
-    expect(catchArm, 'the refresh() catch arm moved — repoint this assertion').toBeTruthy();
+    const catchArm = /\}\s*catch\s*\(e\)\s*\{([\s\S]*?)\}\s*finally/.exec(src);
+    expect(catchArm, 'the reload() catch arm moved — repoint this assertion').toBeTruthy();
     expect(catchArm![1], 'the failed-load path must not substitute fabricated submissions')
-      .not.toMatch(/SEED_INTAKE|setServer\(\s*\[/);
-    expect(catchArm![1], 'a failed load must say so').toMatch(/setLoadFailed\(true\)/);
+      .not.toMatch(/SEED_INTAKE|setItems\(\s*\[\s*\{/);
+    expect(catchArm![1], 'an empty list must be distinguishable from a failed load — the '
+      + 'ambiguity four earlier findings on this programme turned out to be')
+      .toMatch(/setError\(/);
+    expect(catchArm![1]).toMatch(/setItems\(\[\]\)/);
   });
 
-  it('the seed records are reachable only without a session', () => {
+  /**
+   * Stronger than the assertion this replaces. An earlier draft of this slice kept the five
+   * fabricated `SEED_INTAKE` submissions for the no-session portal path and asserted only that
+   * a signed-in triager could not see them. Deleting them outright is better and it is what
+   * shipped: the portal's honest answer is that anonymous submission is blocked (F2-138), not
+   * five invented cases with invented submitter names.
+   */
+  it('there is no fabricated inbox left to fall back to', () => {
     const src = code(INTAKE);
-    // SEED_INTAKE may be defined and exported; what matters is that the branch consuming it
-    // is the `signedIn ? … : …` false arm.
-    const items = /const items: IntakeRecord\[\] = ([\s\S]*?);\n\n/.exec(src);
-    expect(items, 'the items expression moved — repoint this assertion').toBeTruthy();
-    expect(items![1]).toMatch(/signedIn\s*\n?\s*\?/);
-    const [signedInArm, signedOutArm] = items![1].split(/:\s*\[/);
-    expect(signedInArm, 'a signed-in user must not be shown seed submissions')
-      .not.toMatch(/SEED_INTAKE/);
-    expect(signedOutArm, 'the no-session portal path still needs its seed (F2-138)')
-      .toMatch(/SEED_INTAKE/);
+    expect(src, 'the seed fixture is back — an empty inbox is a fact, five invented '
+      + 'submissions are not (F2-166, F2-169)').not.toMatch(/SEED_INTAKE/);
+    expect(existsSync(join(SRC, 'lib', 'intakeSeed.ts')),
+      'lib/intakeSeed.ts is back — it existed only to hold the fixture').toBe(false);
   });
 
-  it('promotion cannot happen without a session', () => {
-    // The triager inbox is behind a login, so the no-session branch has no legitimate
-    // promotion to perform — and a fallback there is the defect verbatim.
-    expect(code(INTAKE)).toMatch(/if \(!signedIn\)[\s\S]{0,200}throw new Error/);
+  /**
+   * The whole substrate ran on `localStorage` (F2-171), so the single most useful thing to
+   * assert about this file is the absence of that word. It also closes the loophole an earlier
+   * draft left open: a "fallback only when signed out" branch is still a branch that writes a
+   * reference code the server never issued, and for a DSR that code represents a statutory
+   * clock the platform has not started.
+   */
+  it('the intake substrate no longer touches browser storage at all', () => {
+    expect(code(INTAKE), 'lib/intake.ts must not read or write localStorage on any path')
+      .not.toMatch(/localStorage/);
   });
 });
 
@@ -151,11 +161,14 @@ describe('F2-172 — the client cannot name the record the server created', () =
   const API = code(readFileSync(join(SRC, 'lib', 'api.ts'), 'utf8'));
 
   it('the triage call sends a decision and a note, and nothing else', () => {
-    const triage = /triage: \(id: number, decision:[\s\S]*?\),\n/.exec(code(API));
+    const triage = /triage: \(id: number, body: \{([\s\S]*?)\}\)/.exec(API);
     expect(triage, 'intakeApi.triage moved — repoint this assertion').toBeTruthy();
-    expect(triage![0], 'a caller-supplied record id is the defect F2-172 removed')
-      .not.toMatch(/promotedTo/);
-    expect(triage![0]).toMatch(/\{ decision, note \}/);
+    expect(triage![1], 'a caller-supplied target register or record id is the defect F2-172 '
+      + 'removed. Jackson drops unknown properties silently, so re-adding one here would be '
+      + 'obeyed by no server and rejected by none either — it would simply be a lie in a type.')
+      .not.toMatch(/promoted/i);
+    expect(triage![1]).toMatch(/decision:/);
+    expect(triage![1]).toMatch(/note\?:/);
   });
 
   it('the submission body carries no promotion fields either', () => {
@@ -186,6 +199,16 @@ describe('F2-172 — a negative id still cannot leave the browser', () => {
       uploadFile('/api/v1/evidence/-9/file', new File(['x'], 'x.txt')),
     ].map(p => expect(p).rejects.toBeInstanceOf(ApiError)));
     expect(spy, 'a request left the browser for an id no server issues').not.toHaveBeenCalled();
+  });
+
+  /** Carried over from `promotedIntakeSafety.test.ts` when that file was retired: a guard that
+   *  refuses silently is indistinguishable from a dead button, which is the class of defect
+   *  this programme keeps finding. Status 0 marks it client-side — no HTTP exchange happened,
+   *  so any real status code would be a fabrication of its own. */
+  it('names the cause, because a silent no-op reads as a broken page', async () => {
+    stubFetch();
+    await expect(api.post(NEGATIVE, {})).rejects.toThrow(/no server ever issues/i);
+    await api.post(NEGATIVE, {}).catch((e: ApiError) => expect(e.status).toBe(0));
   });
 
   /**

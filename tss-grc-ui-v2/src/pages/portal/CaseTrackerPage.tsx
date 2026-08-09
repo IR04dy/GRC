@@ -7,8 +7,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
 import {
-  useIntake, INTAKE_CATALOG, INTAKE_STATUS_TONE, INTAKE_STATUS_LABEL,
-  type IntakeRecord,
+  trackByReferenceCode, INTAKE_CATALOG, INTAKE_STATUS_TONE, INTAKE_STATUS_LABEL,
+  type IntakePublicStatus,
 } from '../../lib/intake';
 
 /**
@@ -22,24 +22,48 @@ import {
  *  - industry-standard tooling DSR self-service tracker
  *  - NAVEX EthicsPoint case-status portal
  *
- * Privacy guardrails:
- *  - We never reveal anything beyond status + public events.
- *  - For anonymous SpeakUp cases the triager's name isn't disclosed —
- *    only their role.
+ * Privacy guardrails — F2-172 made these structural rather than editorial.
+ *
+ * This page used to read `useIntake()`, i.e. the browser's own localStorage store, so it
+ * could only ever find a code the same browser had submitted and it rendered a full event
+ * timeline that no server had produced. It now calls
+ * `GET /api/v1/intake/track/{code}`, which is `permitAll` and answers with a deliberately
+ * minimal projection: reference code, kind, status, acknowledgement and SLA date. No
+ * submitter identity, no payload, no assignee, and **no event history** (SEC-FIN-001 — a
+ * reference code is a weak, often-enumerable bearer, so the server treats it as authorising
+ * a status check and nothing more).
+ *
+ * ⚠ So this page deliberately shows LESS than it used to. The timeline is gone because the
+ * server does not send one to an unauthenticated caller, and reconstructing one on the client
+ * is exactly the fabrication F2-171 removed. Widening the projection is a security decision
+ * about SEC-FIN-001, not a rendering change.
  */
 export function CaseTrackerPage() {
   const { t, lang } = useI18n();
-  const { findByReferenceCode } = useIntake();
   const [searchParams, setSearchParams] = useSearchParams();
   const [code, setCode] = useState(searchParams.get('code') ?? '');
-  const [result, setResult] = useState<IntakeRecord | null | 'not-found'>(null);
+  const [result, setResult] = useState<IntakePublicStatus | null | 'not-found' | 'error'>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function run(raw: string) {
+    setBusy(true);
+    try {
+      const found = await trackByReferenceCode(raw);
+      setResult(found ?? 'not-found');
+    } catch {
+      // A transport failure is not "no such code". Telling a data subject their case does
+      // not exist because the server was unreachable is the worse of the two wrong answers.
+      setResult('error');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     const initial = searchParams.get('code');
     if (initial) {
       setCode(initial);
-      const found = findByReferenceCode(initial);
-      setResult(found ?? 'not-found');
+      void run(initial);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -49,8 +73,7 @@ export function CaseTrackerPage() {
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) return;
     setSearchParams({ code: trimmed }, { replace: true });
-    const found = findByReferenceCode(trimmed);
-    setResult(found ?? 'not-found');
+    void run(trimmed);
   }
 
   return (
@@ -68,9 +91,22 @@ export function CaseTrackerPage() {
               background: 'var(--surface-2)', color: 'var(--ink-1)',
             }}
           />
-          <Button variant="primary" Icon={Search} onClick={() => lookup()}>{t('portalTrackLookup')}</Button>
+          <Button variant="primary" Icon={Search} disabled={busy} onClick={() => lookup()}>{t('portalTrackLookup')}</Button>
         </form>
       </Card>
+
+      {result === 'error' && (
+        <Card>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: 16 }}>
+            <AlertCircle size={20} color="var(--warning-fg)" style={{ flexShrink: 0, marginTop: 2 }} />
+            <div style={{ fontSize: 13, color: 'var(--ink-1)', lineHeight: 1.6 }}>
+              {lang === 'ar'
+                ? 'تعذّر التحقق من حالة البلاغ الآن. هذا لا يعني أن الرقم المرجعي غير صحيح — يُرجى المحاولة لاحقاً.'
+                : 'We could not check this case right now. That does not mean the reference code is wrong — please try again shortly.'}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {result === 'not-found' && (
         <Card>
@@ -88,21 +124,19 @@ export function CaseTrackerPage() {
         </Card>
       )}
 
-      {result && result !== 'not-found' && (
+      {result && result !== 'not-found' && result !== 'error' && (
         <CaseStatusCard rec={result} t={t} lang={lang} />
       )}
     </PublicShell>
   );
 }
 
-function CaseStatusCard({ rec, t, lang }: { rec: IntakeRecord; t: (k: string) => string; lang: 'en' | 'ar' }) {
+function CaseStatusCard({ rec, t, lang }: { rec: IntakePublicStatus; t: (k: string) => string; lang: 'en' | 'ar' }) {
   const catalog = INTAKE_CATALOG[rec.kind];
   const slaDays = rec.slaDueAt
     ? Math.round((new Date(rec.slaDueAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
     : null;
   const overdue = slaDays !== null && slaDays < 0 && rec.status !== 'PROMOTED' && rec.status !== 'CLOSED';
-  // For anonymous cases hide the actor name — show role only.
-  const showActor = (actor: string) => rec.submitterIsAnonymous ? actor.replace(/@.+/, '@***') : actor;
 
   return (
     <Card title={(lang === 'ar' ? catalog.titleAr : catalog.titleEn)}
@@ -120,28 +154,19 @@ function CaseStatusCard({ rec, t, lang }: { rec: IntakeRecord; t: (k: string) =>
         <Stat label={t('portalTrackReference')} value={catalog.reference} />
       </div>
 
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-        {t('portalTrackHistory')}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {rec.history.map((ev, i) => (
-          <div key={i} style={{
-            display: 'grid', gridTemplateColumns: '120px 130px 1fr', gap: 12,
-            padding: '8px 0', borderBottom: i < rec.history.length - 1 ? '1px dashed var(--border)' : 'none',
-            alignItems: 'flex-start',
-          }}>
-            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-              {ev.at.slice(0, 16).replace('T', ' ')}
-            </span>
-            <Badge tone={INTAKE_STATUS_TONE[ev.status]}>
-              {INTAKE_STATUS_LABEL[ev.status][lang]}
-            </Badge>
-            <div>
-              {ev.note && <div style={{ fontSize: 13, color: 'var(--ink-1)', lineHeight: 1.5 }}>{ev.note}</div>}
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{showActor(ev.actor)}</div>
-            </div>
-          </div>
-        ))}
+      {/* F2-172 — no timeline here, deliberately. The server's public projection carries no
+          event history (SEC-FIN-001), and the list this replaced was rendered from the
+          reporter's own browser store: it could only ever show events the same browser had
+          written, and it looked identical to a real audit trail. Status + SLA is what a
+          reference code authorises. */}
+      <div style={{
+        fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.6, padding: '10px 12px',
+        background: 'var(--surface-2)', border: '1px dashed var(--border)',
+        borderRadius: 'var(--r-sm)', marginBottom: 4,
+      }}>
+        {lang === 'ar'
+          ? 'لأسباب تتعلق بالخصوصية، يُظهر هذا التتبّع العام الحالة والموعد النظامي فقط. للحصول على تفاصيل إضافية، استخدم قناة الاتصال المذكورة في إشعار الاستلام.'
+          : 'For privacy reasons this public tracker shows the status and the regulatory deadline only. For anything further, use the contact route in your acknowledgement.'}
       </div>
 
       {rec.status === 'PROMOTED' && (

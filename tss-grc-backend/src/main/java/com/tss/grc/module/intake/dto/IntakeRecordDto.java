@@ -25,6 +25,8 @@ public class IntakeRecordDto {
     private String channel;
 
     private Boolean submitterIsAnonymous;
+    /** F2-172 — server-bound submitter. NULL on an honoured anonymous submission, by design. */
+    private Long    submitterUserId;
     private String  submitterRole;
     private String  submitterName;
     private String  submitterEmail;
@@ -63,6 +65,13 @@ public class IntakeRecordDto {
             .status(r.getStatus())
             .channel(r.getChannel())
             .submitterIsAnonymous(r.getSubmitterIsAnonymous())
+            // ⚠ F2-172 — this line was MISSING in the first draft, and neither the unit test nor
+            // the live probe could see it: the test asserts on the entity captured at repo.save,
+            // and the probe read the column with pyodbc. So both were green over a DTO that
+            // reported submitterUserId as null on every response, identified or not — a field
+            // that always answers "nobody", which is the F2-159 decoy shape. A browser call,
+            // which is the only consumer that actually goes through this mapper, caught it.
+            .submitterUserId(r.getSubmitterUserId())
             .submitterRole(r.getSubmitterRole())
             .submitterName(r.getSubmitterName())
             .submitterEmail(r.getSubmitterEmail())

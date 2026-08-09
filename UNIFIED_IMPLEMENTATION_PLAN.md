@@ -1002,41 +1002,85 @@ today… needs the owner's word"*. Also measured: **all four APPROVED acceptance
 belong to soft-deleted probe risks**, so no acceptance has ever been recorded through the UI — which is
 what an unreachable approval step looks like from the data side.
 
-✔ **2026-08-09 — [[F2-172]] CLOSED (P2): "promotion creates the target row" was implemented on
-NEITHER side, and the fix is a boundary decision rather than a rewire.** [[F2-171]] made the client
-honest — a promoted row's id could not name a real record, and eleven registers rendered it inert —
-but the row still existed in one browser. The server half was no better: `IntakeService.triage()`
-read `promotedToEntityType`/`promotedToRecordId` **out of the request body** and created nothing,
-under a DTO comment saying they were *"echoed back so the frontend can deeplink to the new register
-row"* — a sentence that assumes a row. So the platform had two implementations of promotion and
-neither wrote the record.
+✔ **2026-08-09 — [[F2-172]] CLOSED (P2): the intake front door became real — and it was broken at
+both ends at once, which is why it took two slices and a merge.** F2-171's follow-up said the fix was
+to "call `POST /api/v1/intake` on submit and `PUT …/triage` on triage". **Measuring what that rewire
+would actually hit, before writing it, is what turned a chore into the finding.** Three defects would
+have shipped as regressions from a mechanical repointing:
 
-The seam is `intake.spi.RegisterPromotionPort`, declared in **Base**, implemented by **13 adapters
-living in the module that owns the record**. That placement is the finding's real content: ADR-018
-homes `intake` in Base, twelve of the fourteen targets are sold SKUs, and importing them from intake
-would make the mandatory kernel depend on commercial modules. The `CHANGE` adapter sits in
-`change_adapters` because `ChangeModuleBoundaryTest` **refused** the obvious placement — an existing
-guard catching a real design question, and its peer list went 5 → 6 with the reason recorded,
-including that this entry is the one pointing the *other* way. Four properties bought: the target
-comes from the kind's catalogue entry; the id comes from the row that was written; promotion demands
-the **target module's** write permission on top of `INTAKE:TRIAGE` (measured first — the one
-non-admin dev triager already holds all eight); and a target with no adapter is a **409 that names
-it**, never a promotion that flips the status and writes nothing.
+**(a)** the server accepted **16** of the frontend's **26** intake kinds — the ten it rejected are the
+DD-88 HRSD and DD-94 MOC workflows, including the **24-hour GOSI workplace-injury notification** and
+the **WPS payroll confirmation**, both statutory — while `IntakeService`'s javadoc claimed the two
+catalogues were mirrored (they were, once, at DD-82). ⚙ *Two copies of a routing table where only one
+side is exercised do not drift slowly; they drift completely and silently.* `IntakeKindRouting` is
+pinned to `intake.ts` field-by-field in both directions now.
 
-➕ Found on the way: the server catalogue held **16 of the frontend's 26 kinds**, so all ten HRSD/MOC
-kinds would have 400'd on submit — invisible for exactly F2-171's reason, that nothing called the
-endpoint. It is generated from `intake.ts` and pinned now. ⚙ *Two copies of a routing table where
-only one side is exercised do not drift slowly; they drift completely and silently.*
+**(b)** `POST /api/v1/intake` was guarded by `INTAKE:WRITE`, **held by 3 of 69 roles, all
+administrators**, so repointing the client would have 403'd every employee reporting a security event
+(NCA ECC 6.1) or a privacy breach (PDPL Art. 27). Opened to `isAuthenticated()` under **ADR-010
+§Sanctioned exceptions** — it *subsumes* `CoiController#submitDeclaration`, admitted for the same
+reason at F2-144(b), so the argument did not have to be constructed, only noticed — with V374's
+`submitter_user_id` landing **first**, for F2-144's reason. The sharper half has no COI counterpart:
+`submitterIsAnonymous` also arrived from the body, and obeying it unconditionally would let any caller
+make any submission unattributable through the field that exists to protect whistleblowers, so it is
+honoured only where the catalogue allows it and nothing identifying is stored when it is.
 
-⚠ And the half worth carrying forward: when the cause was removed, a guard written for it went
-**vacuous rather than red**. F2-137's premise test asserts *"lib/intake makes zero network calls"* by
-grepping for `fetch(` / `api.get` / `axios`, and the new calls go through the `intakeApi` client — so
-it kept passing while being false. Rewritten to measure the property. ⚠ Two of my own new assertions
-failed against source they should have matched, because `core.autocrlf` gives this checkout `\r\n`
-while the Python probe I wrote them against translates them — the loud version of F2-169's silent
-`.not.toMatch`. Backend **3,495/0/0**, FE **472/472**, mutation **12/12 + 13/13**, 16 live probes,
-browser-verified through to `POST /dpias/12/submit-for-review → 200`. **F2-173** filed: six
-`CONTROL_TEST` kinds have no register at all, and now refuse rather than fabricate.
+**(c)** *"Promotion creates the target row"* was implemented on **neither side**. `IntakeService.triage()`
+read `promotedToEntityType`/`promotedToRecordId` **out of the request body** and created nothing, under
+a DTO comment saying they were *"echoed back so the frontend can deeplink to the new register row"* — a
+sentence that assumes a row. 🔑 **The fix is a boundary decision, not a rewire.** Seam =
+`intake.spi.RegisterPromotionPort` declared in **Base**, implemented by **13 adapters living in the
+module that OWNS the record** (`privacy/intake/`, `risk/intake/`…). ADR-018 homes `intake` in Base and
+12 of the 14 targets are sold SKUs, so importing them from intake would make the mandatory kernel
+depend on commercial modules. The `CHANGE` adapter sits in `change_adapters` because
+**`ChangeModuleBoundaryTest` refused the obvious placement** — an existing guard catching a real design
+question. Four properties bought: target from the **kind's catalogue entry**; id from **the row that
+was written**; the **target module's own write permission** on top of `INTAKE:TRIAGE`; and a target
+with no adapter is a **409 naming it**. ⚠ Guessing the permission from the target name is the trap —
+the ethics register and the whole `policy` module are guarded by **`COMPLIANCE:WRITE`**, and `ETHICS`
+*does* exist in the catalogue, so the obvious guess compiles and 403s.
+
+⚙ **The slice boundary was set by a test, not by me.** The server half was scoped server-only, planning
+the client rewire as a follow-up; `FrontendEndpointContractTest` refused the commit because `GET /{id}`
+had no caller — a ceiling firing in the direction a ceiling normally cannot, and a better scoping
+decision than my own.
+
+⚠ Errors caught by mutation or the browser, none by reading. The mutation harness left the running
+backend executing a **mutant** (`copy2` preserves mtime, so Maven skipped the recompile — F2-80's
+trap), and 26 of 27 probe legs had been measured against code that differed from the tree.
+`IntakeRecordDto.from()` never copied `submitterUserId`, so every response said "nobody" while both the
+unit test (entity at `repo.save`) and the pyodbc probe (the column) stayed green — neither goes through
+the mapper. The new dead-button guard shipped vacuous **twice**: once reading its own documentation,
+once because `[^>]*?` cannot cross the `>` in `=>`. The browser also found a **second live defect**:
+the public DSR form's Submit was `type="button"` beside an empty `onClick`, so clicking it had never
+done anything — 19 files render a `<form onSubmit>`, 16 pass `type="submit"`, and this was the only
+dead one. And when the cause was removed, a guard written for it went **vacuous rather than red**:
+F2-137's premise test asserted *"lib/intake makes zero network calls"* by grepping `fetch(` / `api.get`
+/ `axios`, and the new calls go through the `intakeApi` client — it kept passing while being false.
+
+⚠⚠ **The two halves met in a merge, and the merge is the last lesson.** Git found **10 conflicting
+files**; the ones that mattered were not textual. Two independently generated catalogues
+(`IntakeKindRouting` and `IntakeCatalog`) that git would have kept **both** of, being different files.
+Two tests whose *premise* the other half falsified — `thePromotionNoteSaysTheTargetDoesNotExistYet`
+asserted the honest thing to say while nothing created the row, and became false the moment something
+did. And a `KNOWN_DARK` entry for `intakeApi.track`, correct when written and wrong once the other half
+wired the case tracker, caught only because that ratchet fails on a **decrease** too. ⚙ *When two
+slices close the same finding from different ends, the conflicts are the least of it: what needs
+re-deciding is every claim each side made about what was still missing.*
+
+Backend **3,513/0/0**, FE **477/477** in 49 files, `tsc` + `vite build` clean, mutation
+**16/16 + 12/12 + 13/13**, live probes **27/27 + 16/16**, browser-verified across 5 screens through to
+`POST /dpias/12/submit-for-review → 200` and **IN REVIEW** — the governance chain F2-171 said could not
+proceed — with all six pre-existing DPIAs as the negative control. ⚠ Not proven live, and stated rather
+than faked: **cross-tenant isolation** (all 7 dev users sit in org 1) and the **target-permission gate**
+(no dev persona holds `INTAKE:TRIAGE` without all eight target permissions, so a live 403 would mean
+revoking a grant from the shared dev database). Filed **F2-173** (shared `CR` reference-code prefix),
+**F2-174** (`assigned_to` stakeholder codes that resolve to nobody), **F2-175**
+(`MlModelDriftService` is a second writer to `intake.intake_records` that bypasses `IntakeService`) and
+**F2-176** (six `CONTROL_TEST` kinds — HRSD/MOC periodic regulatory submissions — have no register to
+be promoted into and now refuse with a 409 naming the gap, a functional regression against the
+fabricated behaviour they had, taken deliberately). `/portal/dsr` stays blocked by **F2-138**, but now
+*says so* bilingually instead of issuing a reference code.
 
 ✔ **2026-08-09 — [[F2-171]] CLOSED (P2): pressing "Promote" on an intake writes the register
 row to `localStorage` and to nothing else — with a POSITIVE id, on eleven registers that render

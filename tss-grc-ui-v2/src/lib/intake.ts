@@ -39,9 +39,7 @@
 //   NIST 800-61 §3.2   — Incident reporting
 
 import { useCallback, useEffect, useState } from 'react';
-import { intakeApi, type IntakeRecordDto } from './api';
-import { isAuthenticated } from './auth';
-import { SEED_INTAKE } from './intakeSeed';
+import { ApiError, intakeApi, type IntakeRecordWire } from './api';
 
 // ── Domain types ────────────────────────────────────────────────────────
 
@@ -116,8 +114,9 @@ export interface IntakeEvent {
 }
 
 export interface IntakeRecord {
-  /** Stable unique id (used internally). */
-  id: string;
+  /** The server-assigned id (intake.intake_records.id) — F2-172. Was a client-minted
+   *  string ('intake-001') while the substrate lived in localStorage. */
+  id: number;
   /** Human-friendly reference code shown to the submitter, used for
    *  case-tracking by anonymous users. Format: "{KIND-PREFIX}-XXXX-YYYY". */
   referenceCode: string;
@@ -145,7 +144,9 @@ export interface IntakeRecord {
   acknowledgedAt: string;
 
   /** Promotion outcome (when triager promotes intake to a register record). */
-  promotedTo?: { entityType: RegisterTarget; recordId: number | string; promotedAt: string };
+  /** Promotion outcome. `recordId` is NULL until F2-172s second half creates the target
+   *  row — the server refuses a client-supplied id, so there is nothing to fall back to. */
+  promotedTo?: { entityType: RegisterTarget; recordId: number | string | null; promotedAt: string };
   /** Rejection reason (when triager rejects). */
   rejectionReason?: string;
 
@@ -426,18 +427,19 @@ export const INTAKE_STATUS_LABEL: Record<IntakeStatus, { en: string; ar: string 
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-/** Build a human-friendly reference code: "DS-A4F2-9XYZ". The user
- *  bookmarks this to track their submission anonymously. */
-export function generateReferenceCode(kind: IntakeKind): string {
-  const prefix = INTAKE_CATALOG[kind].codePrefix;
-  const seg = () => Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4).padEnd(4, 'X');
-  return `${prefix}-${seg()}-${seg()}`;
-}
-
-export function slaDeadline(kind: IntakeKind, submittedAt: Date = new Date()): string {
-  const ms = INTAKE_CATALOG[kind].slaHours * 60 * 60 * 1000;
-  return new Date(submittedAt.getTime() + ms).toISOString();
-}
+// F2-172 — `generateReferenceCode()` and `slaDeadline()` were DELETED here, not moved.
+//
+// Both minted, on the client, a value that only the server can legitimately produce: the
+// tracking code a submitter is told to keep, and the date a statutory clock expires. While
+// the substrate was client-only they were load-bearing; now `IntakeService` mints the code
+// (`IntakeKindRouting.codePrefix` + a `SecureRandom` segment) and computes the deadline from
+// the same catalogue, and a second implementation on the client could only ever disagree
+// with it. A client-side reference-code generator is also precisely the tool needed to
+// fabricate an acknowledgement for a submission that was never filed, which is the defect
+// this slice removes from `/portal/dsr` — so leaving it exported would leave the mechanism
+// available with nothing pointing at it.
+//
+// `hoursUntilSla` stays: it reads the server's `slaDueAt` rather than deciding it.
 
 /** Hours remaining before SLA deadline (negative = overdue). */
 export function hoursUntilSla(rec: IntakeRecord, now: Date = new Date()): number {
@@ -445,241 +447,243 @@ export function hoursUntilSla(rec: IntakeRecord, now: Date = new Date()): number
   return Math.round((new Date(rec.slaDueAt).getTime() - now.getTime()) / (60 * 60 * 1000));
 }
 
-// ── Seed data ──────────────────────────────────────────────────────────
-// Moved to ./intakeSeed — F2-172. Re-exported so existing importers keep working,
-// and consumed by useIntake() only when there is no session.
-export { SEED_INTAKE } from './intakeSeed';
-
-
-// ── Persistence — F2-172 ────────────────────────────────────────────────
+// ── The server-backed hook ──────────────────────────────────────────────
 //
-// Everything below used to be `localStorage` and nothing else, for the whole lifecycle:
-// submit, triage, promote, case-track. A signed-in DPO pressed New → DPIA, a triager
-// pressed Promote, and the only trace was in one browser's site data (F2-171/F2-172).
+// F2-172. What this replaced, and why none of it survives:
 //
-// The rule now, and it is F2-169's rule rather than a new one — *fabricated data may
-// substitute only for a fabricated parent, or when there is no session*:
+//   * a `SEED_INTAKE` array of 5 fabricated records, merged into the inbox for every
+//     caller. Under the rule F2-169 settled, fabricated rows may substitute only for a
+//     fabricated parent or with no session at all — an authenticated triager looking at
+//     a real (possibly empty) tenant is neither. An empty inbox is a fact; five invented
+//     submissions with invented submitter names are not, and they made the honest empty
+//     state unreachable (F2-166's shape).
 //
-//   • signed in  → the server is the ONLY source. A failed load is reported, never
-//                  replaced. The seed records above are fabricated, so a signed-in user
-//                  must not see them either — they used to render unconditionally.
-//   • no session → the seed + the browser overlay, which is the public-portal path.
-//                  That path is blocked on F2-138 (there is no anonymous submit endpoint
-//                  to point at), and `publicPortalBackedByServer.test.ts` holds its two
-//                  exemptions open with that reason recorded.
+//   * a `localStorage` overlay (`grc.intake`) holding `added` and `patches`. Every
+//     submission the platform's front door ever received lived in the submitter's own
+//     browser: invisible to the triager it was routed to, invisible to every other user,
+//     and gone with the site data. `IntakeController` had been built at DD-82, was
+//     reachable, and had never once been called — probed live on 2026-08-09 the inbox
+//     answered 200 with totalElements 0 against 0 rows in `intake.intake_records`.
 //
-// ⚠ Promotion is authenticated by construction — the triager inbox is behind a login — so
-// the no-session branch cannot promote. It throws rather than falling back, because a
-// fallback there is precisely the defect: a promotion recorded in a browser.
+//   * a client-authored triage `actor` ('demo.triager@tss.sa', hardcoded at the call
+//     site). The server takes the actor from the security context, so the parameter is
+//     gone rather than ignored — a parameter nothing reads is an invitation to believe
+//     it matters.
+//
+// ⚠ The public case-tracker deliberately does NOT use this hook. It is an unauthenticated
+// page, so mounting an authenticated inbox load there would 401 on every visit. See
+// trackByReferenceCode below.
 
-const STORAGE_KEY = 'grc.intake';
-
-interface IntakeOverlay {
-  added: IntakeRecord[];
-  patches: Record<string, Partial<IntakeRecord>>;
-}
-
-function load(): IntakeOverlay {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { added: [], patches: {} };
-    const parsed = JSON.parse(raw);
-    return { added: parsed.added ?? [], patches: parsed.patches ?? {} };
-  } catch { return { added: [], patches: {} }; }
-}
-function save(o: IntakeOverlay) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(o)); } catch { /* ignore */ }
-}
-
-/** Server DTO → the shape every page in this app already renders. */
-function fromDto(d: IntakeRecordDto): IntakeRecord {
+/** Wire → domain. `payload` crosses as a JSON string because the column is NVARCHAR(MAX). */
+function fromWire(w: IntakeRecordWire): IntakeRecord {
   let payload: Record<string, unknown> = {};
-  if (d.payload) {
+  if (w.payload) {
     try {
-      const parsed = JSON.parse(d.payload);
+      const parsed: unknown = JSON.parse(w.payload);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         payload = parsed as Record<string, unknown>;
       }
-    } catch { /* a payload we cannot parse renders as empty, not as an error page */ }
+    } catch {
+      // A payload the server cannot round-trip is a data problem, not a render problem.
+      // Surface it as a field rather than dropping the record — the triager still needs
+      // to see that something arrived.
+      payload = { _unparseablePayload: w.payload };
+    }
   }
   return {
-    // The server keys on a bigint and this interface on a string. Kept as the plain
-    // decimal so `Number(rec.id)` round-trips for the triage call below.
-    id: String(d.id),
-    referenceCode: d.referenceCode,
-    kind: d.kind as IntakeKind,
-    status: d.status as IntakeStatus,
-    channel: d.channel as IntakeChannel,
-    submitterIsAnonymous: d.submitterIsAnonymous,
-    submitterRole: (d.submitterRole ?? 'EMPLOYEE') as SubmitterRole,
-    submitterName: d.submitterName ?? undefined,
-    submitterEmail: d.submitterEmail ?? undefined,
-    submitterPhone: d.submitterPhone ?? undefined,
+    id: w.id,
+    referenceCode: w.referenceCode,
+    kind: w.kind as IntakeKind,
+    status: w.status as IntakeStatus,
+    channel: w.channel as IntakeChannel,
+    submitterIsAnonymous: w.submitterIsAnonymous,
+    submitterRole: (w.submitterRole ?? 'EMPLOYEE') as SubmitterRole,
+    ...(w.submitterName ? { submitterName: w.submitterName } : {}),
+    ...(w.submitterEmail ? { submitterEmail: w.submitterEmail } : {}),
+    ...(w.submitterPhone ? { submitterPhone: w.submitterPhone } : {}),
     payload,
-    assignedTo: d.assignedTo ?? undefined,
-    slaDueAt: d.slaDueAt ?? undefined,
-    severity: (d.severity ?? undefined) as IntakeRecord['severity'],
-    acknowledgedAt: d.acknowledgedAt,
-    promotedTo: d.promotedToEntityType && d.promotedToRecordId
+    ...(w.assignedTo ? { assignedTo: w.assignedTo } : {}),
+    ...(w.slaDueAt ? { slaDueAt: w.slaDueAt } : {}),
+    ...(w.severity ? { severity: w.severity as IntakeRecord['severity'] } : {}),
+    acknowledgedAt: w.acknowledgedAt,
+    ...(w.promotedToEntityType
       ? {
-          entityType: d.promotedToEntityType as RegisterTarget,
-          recordId: d.promotedToRecordId,
-          promotedAt: d.promotedAt ?? d.acknowledgedAt,
+          promotedTo: {
+            entityType: w.promotedToEntityType as RegisterTarget,
+            // The primary key of the register row the server wrote, stamped from the write
+            // itself. Still typed nullable: rows promoted before F2-172's second half landed
+            // carry a NULL here, and a UI that assumes an id would render "#undefined" on
+            // them. There is nothing to fall back to — an id the server did not issue is the
+            // defect, not the gap.
+            recordId: w.promotedToRecordId,
+            promotedAt: w.promotedAt ?? w.acknowledgedAt,
+          },
         }
-      : undefined,
-    rejectionReason: d.rejectionReason ?? undefined,
-    history: (d.history ?? []).map(h => ({
-      at: h.at, status: h.status as IntakeStatus, actor: h.actor,
-      ...(h.note ? { note: h.note } : {}),
+      : {}),
+    ...(w.rejectionReason ? { rejectionReason: w.rejectionReason } : {}),
+    history: (w.history ?? []).map(e => ({
+      at: e.at,
+      status: e.status as IntakeStatus,
+      actor: e.actor,
+      ...(e.note ? { note: e.note } : {}),
     })),
-    locale: (d.locale ?? undefined) as IntakeRecord['locale'],
+    ...(w.locale ? { locale: w.locale as 'en' | 'ar' } : {}),
   };
 }
 
-export interface PromotionOutcome {
-  entityType: RegisterTarget;
-  /** The id of the record the SERVER created. Never minted here. */
-  recordId: string;
-}
+export type IntakeSubmitInit =
+  Omit<IntakeRecord,
+    'id' | 'referenceCode' | 'acknowledgedAt' | 'slaDueAt' | 'history' | 'status' | 'assignedTo'>
+  & { severity?: IntakeRecord['severity'] };
 
 /**
- * React hook over the intake substrate.
+ * The triager inbox and the submit/triage actions, backed by `/api/v1/intake`.
  *
- * `submit` and `triage` are **async** — they were synchronous while everything happened in
- * memory, and every caller has to await them now. That is the visible cost of the record
- * being real, and it is the point: a synchronous "promoted" was only ever possible because
- * nothing was written.
+ * `error` is a first-class return value rather than a swallowed catch: an inbox that renders
+ * empty because the request failed is indistinguishable from a tenant with no submissions,
+ * and that ambiguity is what four earlier findings on this programme turned out to be.
  */
-export function useIntake() {
-  const signedIn = isAuthenticated();
-  const [overlay, setOverlay] = useState<IntakeOverlay>(() => load());
-  const [server, setServer] = useState<IntakeRecord[] | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [loading, setLoading] = useState(signedIn);
+export function useIntake(options?: { skip?: boolean }) {
+  const skip = options?.skip ?? false;
+  const [items, setItems] = useState<IntakeRecord[]>([]);
+  const [loading, setLoading] = useState(!skip);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { if (!signedIn) save(overlay); }, [overlay, signedIn]);
-
-  const refresh = useCallback(async () => {
-    if (!signedIn) return;
+  const reload = useCallback(async () => {
+    if (skip) return;
     setLoading(true);
+    setError(null);
     try {
-      const page = await intakeApi.list();
-      setServer(page.content.map(fromDto));
-      setLoadFailed(false);
-    } catch {
-      // ⚠ Deliberately NOT `setServer(SEED_INTAKE)`. A signed-in user whose inbox failed to
-      // load must see that it failed; showing five fabricated submissions instead is
-      // F2-169's defect, and on a triage queue it is worse than on a register — it invites
-      // a decision on a case that does not exist.
-      setServer(null);
-      setLoadFailed(true);
+      const page = await intakeApi.list({ size: 200 });
+      setItems((page.content ?? []).map(fromWire));
+    } catch (e) {
+      setItems([]);
+      setError(e instanceof Error ? e.message : 'Could not load the intake inbox');
     } finally {
       setLoading(false);
     }
-  }, [signedIn]);
+  }, [skip]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { void reload(); }, [reload]);
 
-  const items: IntakeRecord[] = signedIn
-    ? (server ?? [])
-    : [
-        ...SEED_INTAKE.map(r => overlay.patches[r.id] ? { ...r, ...overlay.patches[r.id] } : r),
-        ...overlay.added,
-      ];
-
-  const submit = useCallback(async (init: Omit<IntakeRecord, 'id' | 'referenceCode' | 'acknowledgedAt' | 'slaDueAt' | 'history' | 'status' | 'assignedTo'> & {
-    severity?: IntakeRecord['severity'];
-  }): Promise<IntakeRecord> => {
-    if (signedIn) {
-      const dto = await intakeApi.submit({
-        kind: init.kind,
-        channel: init.channel,
-        submitterIsAnonymous: init.submitterIsAnonymous,
-        submitterRole: init.submitterRole,
-        submitterName: init.submitterName,
-        submitterEmail: init.submitterEmail,
-        submitterPhone: init.submitterPhone,
-        payload: JSON.stringify(init.payload ?? {}),
-        severity: init.severity,
-        locale: init.locale,
-      });
-      const rec = fromDto(dto);
-      setServer(prev => [...(prev ?? []), rec]);
-      return rec;
-    }
-
-    // No session: the public-portal path, still client-only pending F2-138.
-    const id = `intake-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    const referenceCode = generateReferenceCode(init.kind);
-    const now = new Date();
-    const acknowledgedAt = now.toISOString();
-    const slaDueAt = slaDeadline(init.kind, now);
-    const catalog = INTAKE_CATALOG[init.kind];
-    const next: IntakeRecord = {
-      ...init,
-      id,
-      referenceCode,
-      status: 'TRIAGING',            // auto-ack moves it straight to triaging
-      acknowledgedAt,
-      slaDueAt,
-      assignedTo: catalog.defaultAssignee,
-      history: [
-        { at: acknowledgedAt, status: 'SUBMITTED', actor: init.submitterIsAnonymous ? 'anonymous' : (init.submitterEmail ?? init.submitterName ?? 'unknown'), note: `Submitted via ${init.channel}` },
-        { at: acknowledgedAt, status: 'TRIAGING', actor: 'system', note: `Auto-acknowledged. Routed to ${catalog.defaultAssignee}. SLA due ${new Date(slaDueAt).toISOString().slice(0, 10)}.` },
-      ],
-    };
-    setOverlay(prev => ({ ...prev, added: [...prev.added, next] }));
-    return next;
-  }, [signedIn]);
+  /** Files a submission. Throws on failure — callers already funnel ApiError into a toast,
+   *  and a swallowed failure here would show a reference code for a report nobody received,
+   *  which is the defect this whole slice exists to remove. */
+  const submit = useCallback(async (init: IntakeSubmitInit): Promise<IntakeRecord> => {
+    const wire = await intakeApi.submit({
+      kind: init.kind,
+      channel: init.channel,
+      submitterIsAnonymous: init.submitterIsAnonymous,
+      ...(init.submitterRole ? { submitterRole: init.submitterRole } : {}),
+      ...(init.submitterName ? { submitterName: init.submitterName } : {}),
+      ...(init.submitterEmail ? { submitterEmail: init.submitterEmail } : {}),
+      ...(init.submitterPhone ? { submitterPhone: init.submitterPhone } : {}),
+      payload: JSON.stringify(init.payload ?? {}),
+      ...(init.severity ? { severity: init.severity } : {}),
+      ...(init.locale ? { locale: init.locale } : {}),
+    });
+    const rec = fromWire(wire);
+    setItems(prev => [...prev, rec]);
+    return rec;
+  }, []);
 
   /**
-   * Apply a triage decision.
+   * Applies a triage decision. No `actor` parameter: the server stamps it from the
+   * authenticated principal.
    *
-   * On PROMOTE the returned {@link PromotionOutcome} carries the id of a record the
-   * **server** created — `IntakeService` resolves the target from the kind's catalogue
-   * entry and stamps the id from the row it wrote. Nothing is minted here, and there is no
-   * request field for either value.
+   * On PROMOTE the server creates the register record inside the same transaction that flips
+   * the status, so what comes back names a row that exists. This function's job is therefore
+   * only to *report* it — everything it used to do is gone:
    *
-   * Errors propagate. A promotion can legitimately fail — the caller lacks the target
-   * module's write permission (403), the submission was already promoted (409), the target
-   * has no register (409), or a BIA names a business process this tenant does not have
-   * (409). Each of those is a sentence the triager needs; swallowing it and flipping the
-   * row to "Promoted" is exactly what F2-171 was.
+   *   * `mintPromotedId()` + `addPromoted()`, which wrote the "promoted record" into
+   *     `localStorage`. F2-171 made that placeholder inert (a negative id, refused by the
+   *     api client, with disabled actions); F2-172's server half made it unnecessary.
+   *     Keeping an inert placeholder beside a real row would be worse than either alone —
+   *     two answers to "was this promoted?", one of them per-browser.
+   *   * deriving the target from `INTAKE_CATALOG` here. The client's catalogue and the
+   *     server's agreed at the time, but the authoritative copy is the one that wrote the
+   *     row, and it is on the response.
+   *
+   * Returns null for a non-promote decision, and null if the server somehow reports a
+   * promotion with no record — that would be a server defect, and inventing an id to paper
+   * over it is the exact move this finding removed.
    */
   const triage = useCallback(async (
-    id: string,
+    id: number,
     decision: 'PROMOTE' | 'REJECT' | 'CLOSE',
-    _actor: string,
-    extra?: Partial<IntakeRecord>,
-  ): Promise<PromotionOutcome | null> => {
-    if (!signedIn) {
-      throw new Error('Triage requires a signed-in session — the decision is recorded on the '
-        + 'server, and the promoted record is created there.');
-    }
-    const numericId = Number(id);
-    if (!Number.isFinite(numericId)) {
-      // A `intake-<base36>` id belongs to an overlay row from before this wiring. There is
-      // no server record to triage, and inventing one is the defect.
-      throw new Error(`Intake ${id} exists only in this browser and cannot be triaged — it was `
-        + 'submitted before intake was wired to the server (F2-172).');
-    }
-    const dto = await intakeApi.triage(numericId, decision, extra?.rejectionReason ?? undefined);
-    const updated = fromDto(dto);
-    setServer(prev => (prev ?? []).map(r => (r.id === updated.id ? updated : r)));
+    note?: string,
+  ) => {
+    const wire = await intakeApi.triage(id, { decision, ...(note ? { note } : {}) });
+    const rec = fromWire(wire);
+    setItems(prev => prev.map(r => (r.id === id ? rec : r)));
 
-    if (decision !== 'PROMOTE' || !updated.promotedTo) return null;
+    if (decision !== 'PROMOTE') return null;
+    const promoted = rec.promotedTo;
+    if (!promoted?.recordId) return null;
+    return { entityType: promoted.entityType, recordId: promoted.recordId };
+  }, []);
+
+  /**
+   * Re-reads one record from `GET /api/v1/intake/{id}` and refreshes it in place.
+   *
+   * Called when a triager opens the decision modal, and the reason is not freshness for its own
+   * sake: the list is a snapshot taken when the page loaded, and two triagers looking at the
+   * same queue would otherwise both decide on it. Deciding from stale state is how one
+   * submission gets promoted twice. Returns null and leaves the list untouched on failure —
+   * the modal still opens on the row the triager clicked, which is the safe degradation.
+   */
+  const refreshOne = useCallback(async (id: number): Promise<IntakeRecord | null> => {
+    try {
+      const rec = fromWire(await intakeApi.get(id));
+      setItems(prev => prev.map(r => (r.id === id ? rec : r)));
+      return rec;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  return { items, loading, error, submit, triage, reload, refreshOne };
+}
+
+/**
+ * The PUBLIC case-tracker's projection — deliberately smaller than an IntakeRecord.
+ *
+ * The server sends no submitter identity, no payload, no assignee and **no event history**
+ * to an unauthenticated caller (SEC-FIN-001 — a reference code is a weak, enumerable
+ * bearer). A page rendering this must show less rather than fill the gaps: the timeline the
+ * old fabricated store displayed here had no server counterpart and cannot honestly be
+ * reconstructed.
+ */
+export interface IntakePublicStatus {
+  referenceCode: string;
+  kind: IntakeKind;
+  status: IntakeStatus;
+  acknowledgedAt: string;
+  slaDueAt?: string;
+}
+
+/**
+ * Looks a submission up by reference code against `GET /api/v1/intake/track/{code}`, no token.
+ *
+ * A plain function, not a hook, and deliberately separate from useIntake: the tracker is an
+ * unauthenticated page, so loading the triager inbox there would 401 on every visit and
+ * bounce a member of the public to a login screen.
+ */
+export async function trackByReferenceCode(code: string): Promise<IntakePublicStatus | null> {
+  const trimmed = code.trim().toUpperCase();
+  if (!trimmed) return null;
+  try {
+    const w = await intakeApi.track(trimmed);
     return {
-      entityType: updated.promotedTo.entityType,
-      recordId: String(updated.promotedTo.recordId),
+      referenceCode: w.referenceCode,
+      kind: w.kind as IntakeKind,
+      status: w.status as IntakeStatus,
+      acknowledgedAt: w.acknowledgedAt,
+      ...(w.slaDueAt ? { slaDueAt: w.slaDueAt } : {}),
     };
-  }, [signedIn]);
-
-  const findByReferenceCode = useCallback((code: string): IntakeRecord | null => {
-    const trimmed = code.trim().toUpperCase();
-    return items.find(r => r.referenceCode.toUpperCase() === trimmed) ?? null;
-  }, [items]);
-
-  const reset = useCallback(() => setOverlay({ added: [], patches: {} }), []);
-
-  return { items, submit, triage, findByReferenceCode, reset, refresh, loading, loadFailed, signedIn };
+  } catch (e) {
+    // 404 is the normal "no such code" answer and must read as not-found, not as an outage.
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
 }

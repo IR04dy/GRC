@@ -124,7 +124,7 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V373 packaged; next free V374** (361 files; ⚠ this line said "V1→V295 / next free
+— **V1→V374 packaged; next free V375** (362 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
@@ -137,8 +137,8 @@ short of dev (`ORG_ADMIN` −30, unable to read seven modules), and re-running t
 *snapshot*, not a rule; `RoleGrantDerivationRatchetTest` pins the 6 legacy sites and fails a 7th.
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V373 are pending** the
-next jar — 29 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V374 are pending** the
+next jar — 30 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -193,7 +193,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 |---|---|
 | Backend | Spring Boot 3.5.x, **Java 17 (pinned — Lombok breaks on newer)**, Spring Security 6 |
 | Auth | JJWT — Bearer access token + HttpOnly refresh cookie; FE auto-refreshes on 401 |
-| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V373 (OFF in dev) |
+| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V374 (OFF in dev) |
 | ORM | Hibernate 6 / Spring Data JPA, `ddl-auto=none` |
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
@@ -213,7 +213,8 @@ every endpoint an FE client calls must have a controller — a **hard zero, no a
 measured 0/1,782. It exists because F2-158's `RoleController#list` answered **500 to every
 caller since it was written** and a mock fallback made that invisible; F2-169 removed those
 fallbacks, so a wrong path now surfaces. Two decrease-only ceilings ride with it:
-**421 endpoints have no FE client, 208 of them guarded writes** — 2.2× F2-165's 189 dark
+**417 endpoints have no FE client, 206 of them guarded writes** (was 421/208 until F2-172 wired
+the intake substrate) — 2.2× F2-165's 189 dark
 *methods*, because one method serves several endpoints and a clientless controller has no
 method to be dark. ⚠ Its backend half is **reflection, never a source regex**: as a regex it
 reported 1,763 of 1,809 endpoints missing, then 48 of `/api/v1/cyber` alone, because
@@ -362,13 +363,40 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   trades a 500 for an unbounded join on every read.
 - `seed_real_data.py` batches must start `SET NOCOUNT ON;`.
 - Don't "seed" an empty table before checking it's wired (`privacy_lc` is orphaned).
-- **Intake promotion creates the register record SERVER-side, and the client cannot name it**
-  (F2-172, 2026-08-09 — this entry said the opposite until then, and both halves were true:
-  `lib/intake.ts` drove the lifecycle in `localStorage`, and `IntakeService.triage()` took
-  `promotedToRecordId` **from the request body** and created nothing). Now: `PUT /api/v1/intake/{id}/triage`
-  resolves the **target from the kind's catalogue entry**, calls a `intake.spi.RegisterPromotionPort`,
-  and stamps `promoted_to_record_id` **from the row it wrote**. The request DTO has no field for
-  either — do not re-add one.
+- **The intake substrate is the platform front door, and until F2-172 it filed every submission
+  into the submitter's own browser.** Now server-backed end to end: `useIntake()` calls
+  `POST/GET/PUT /api/v1/intake`, `SEED_INTAKE`'s 5 fabricated records and the `grc.intake`
+  localStorage overlay are deleted, and the client-side `generateReferenceCode()`/`slaDeadline()`
+  minters are **deleted rather than moved** — only the server may issue a tracking code or a
+  statutory deadline. `lib/intake.ts` no longer touches `localStorage` on **any** path; a signed-in
+  failure surfaces as an error and the public portal *says* it is blocked (F2-138) rather than
+  issuing a code.
+  ⚠ **Four things about this module a reader will otherwise get wrong:**
+  **(a) `POST /api/v1/intake` is `isAuthenticated()`, not permission-guarded**, and that is an
+  ADR-010 §Sanctioned exception, pinned in `ControllerAuthorizationRatchetTest`'s `SELF_SCOPED`
+  floor with `IntakeSubmitGuardTest` holding the expression. It was `INTAKE:WRITE`, measured as
+  **3 of 69 roles, all administrators** — so an ordinary employee could not report a security
+  event (NCA ECC 6.1), a privacy breach (PDPL Art. 27) or a workplace injury (GOSI 24 h). Do not
+  "restore consistency" by converting it. READ and TRIAGE stay permissioned: filing is a duty,
+  reading other people's whistleblowing reports and DSRs is a privilege.
+  **(b) `submitterIsAnonymous` is a REQUEST, not an instruction.** The server honours it only for
+  the kinds whose `IntakeKindRouting` entry sets `allowsAnonymous` (SPEAKUP, BREACH_REPORT,
+  VRP_DISCLOSURE) — obeying it unconditionally would let any caller make any submission
+  unattributable and defeat the `submitter_user_id` binding through the field that exists to
+  protect whistleblowers. Where it IS honoured, **nothing identifying is stored** and
+  `submitter_user_id` is NULL by design (V374 self-checks THROW if the column is made NOT NULL).
+  **(c) The kind catalogue exists TWICE** — `IntakeKindRouting` (Java, in `intake/service/`) and
+  `INTAKE_CATALOG` (`lib/intake.ts`) — pinned field-by-field, in both directions, by
+  `IntakeCatalogueParityTest`. The server held **16** of the frontend's **26** for months while its
+  javadoc claimed they were mirrored; the ten it rejected included the 24-hour GOSI injury
+  notification. Add a kind to both. `titleAr` is part of the pin and is **not** decoration — a
+  promoted record's mandatory `title_ar` is composed from it.
+  **(d) Promotion creates the register record SERVER-side, and the client cannot name it.**
+  `PUT /api/v1/intake/{id}/triage` resolves the **target from the kind's catalogue entry**, calls an
+  `intake.spi.RegisterPromotionPort`, and stamps `promoted_to_record_id` **from the row it wrote**,
+  in one transaction. The request DTO has no field for either — do not re-add one. (Both halves used
+  to be broken at once: `lib/intake.ts` drove the lifecycle in `localStorage`, *and*
+  `IntakeService.triage()` took `promotedToRecordId` from the request body and created nothing.)
   ⚠ **The 13 adapters live in the module that OWNS the record** (`privacy/intake/`, `risk/intake/`…),
   never in `module/intake`: ADR-018 homes intake in **Base**, and twelve of the fourteen targets are
   sold SKUs. `IntakePromotionContractTest` fails the build if `module/intake` imports a peer. The
@@ -376,11 +404,9 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   `module/change_mgmt` importing a peer — that guard refused the obvious placement and was right to.
   ⚠ Promotion also requires the **target module's own write permission** on top of `INTAKE:TRIAGE`,
   and guessing it from the target name is the trap: the ethics register and the whole policy module
-  are guarded by **`COMPLIANCE:WRITE`**, not `ETHICS:WRITE`.
-  ⚠ `IntakeCatalog.java` is **generated from `tss-grc-ui-v2/src/lib/intake.ts`** and pinned by
-  `IntakeCatalogParityTest` — it held 16 of 26 kinds for as long as nobody called the endpoint.
-  Regenerate, never hand-edit.
-  ⚠ **Six `CONTROL_TEST` kinds have no register and now 409 by design** (F2-173). A promotion that
+  are guarded by **`COMPLIANCE:WRITE`**, not `ETHICS:WRITE` — and `ETHICS` *does* exist in the
+  catalogue, so the obvious guess compiles and 403s.
+  ⚠ **Six `CONTROL_TEST` kinds have no register and now 409 by design** (F2-176). A promotion that
   cannot create the record must refuse, not flip the status and write nothing.
-  ⚠ `lib/intake.ts` still has a `localStorage` branch, reached **only with no session** — the public
-  portal, blocked on F2-138. A signed-in failure surfaces as an error; it must never fall back.
+  ⚠ **`MlModelDriftService` is a SECOND writer to `intake.intake_records`** that bypasses
+  `IntakeService` entirely — none of the above governs it (F2-175).
