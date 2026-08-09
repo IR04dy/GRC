@@ -34,8 +34,7 @@ import { incidentApi, ApiError, type IncidentDto, type IncidentRequest, type Reg
 import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../lib/toast';
 import { INCIDENTS } from './mockIncidents';
-import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
-import { toIncidentDto, usePromotedProvenance } from '../../lib/promotedAdapters';
+import { usePromotedProvenance } from '../../lib/intakeProvenance';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { INCIDENT_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
@@ -137,8 +136,7 @@ export function IncidentsPage() {
   // triager who hits "Promote" on a security-event intake actually sees
   // their new incident appear here. Promoted rows are display-only —
   // edit / delete still operate on incidents.data.
-  const promotedRows = usePromoted('INCIDENT').map(toIncidentDto);
-  const allIncidents = useMemo(() => [...promotedRows, ...incidents.data], [promotedRows, incidents.data]);
+  const allIncidents = incidents.data;
   const provenance = usePromotedProvenance('INCIDENT');
 
   // ── DD-47: filter modal state + predicate ─────────────────────────
@@ -318,7 +316,7 @@ export function IncidentsPage() {
   ];
 
   const cols: Column<IncidentDto>[] = [
-    { header: t('incidentsTitleCol'),    cell: r => <span style={{ fontWeight: 600 }}>{r.title}{provenance.has(r.id) && <PromotedBadge sourceReferenceCode={provenance.get(r.id)!} />}</span> },
+    { header: t('incidentsTitleCol'),    cell: r => <span style={{ fontWeight: 600 }}>{r.title}{provenance.has(String(r.id)) && <PromotedBadge sourceReferenceCode={provenance.get(String(r.id))!} />}</span> },
     { header: t('incidentsCategoryCol'), cell: r => <Badge tone="info">{r.category ?? '—'}</Badge> },
     { header: t('incidentsSeverityCol'), cell: r => <Badge tone={SEVERITY_TONE[r.severity] ?? 'neutral'} dot>{severityLabel(t, r.severity)}</Badge> },
     // NIST 800-61 phase column
@@ -335,7 +333,7 @@ export function IncidentsPage() {
         if (r.status !== 'CLOSED')                              extras.push({ Icon: Scroll,     onClick: () => openTemplates(r),  title: t('incidentsActSaudiTemplates'), tone: 'accent' });
         if (r.status !== 'CLOSED')                              extras.push({ Icon: Archive,    onClick: () => closeIncidentAction(r), title: t('incidentsActClose'),    tone: 'success' });
         // F2-171: promoted-intake rows are merged in above and exist only in this browser.
-        return <RowActions disabled={isDemo || isUnsyncedId(r.id)} extras={extras} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} />;
+        return <RowActions disabled={isDemo} extras={extras} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} />;
       } },
   ];
 

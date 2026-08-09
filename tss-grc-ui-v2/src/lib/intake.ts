@@ -39,7 +39,9 @@
 //   NIST 800-61 §3.2   — Incident reporting
 
 import { useCallback, useEffect, useState } from 'react';
-import { addPromoted, mintPromotedId, type PromotedRecord } from './promotedRecords';
+import { intakeApi, type IntakeRecordDto } from './api';
+import { isAuthenticated } from './auth';
+import { SEED_INTAKE } from './intakeSeed';
 
 // ── Domain types ────────────────────────────────────────────────────────
 
@@ -443,156 +445,32 @@ export function hoursUntilSla(rec: IntakeRecord, now: Date = new Date()): number
   return Math.round((new Date(rec.slaDueAt).getTime() - now.getTime()) / (60 * 60 * 1000));
 }
 
-// ── Seed data ───────────────────────────────────────────────────────────
-// A handful of pre-seeded intake records so the inbox view isn't empty
-// in demo mode and the case-tracker has something to look up.
+// ── Seed data ──────────────────────────────────────────────────────────
+// Moved to ./intakeSeed — F2-172. Re-exported so existing importers keep working,
+// and consumed by useIntake() only when there is no session.
+export { SEED_INTAKE } from './intakeSeed';
 
-function ev(at: string, status: IntakeStatus, actor: string, note?: string): IntakeEvent {
-  return { at, status, actor, ...(note ? { note } : {}) };
-}
 
-export const SEED_INTAKE: IntakeRecord[] = [
-  {
-    id: 'intake-001',
-    referenceCode: 'DS-K7L9-Z4M2',
-    kind: 'DSR_REQUEST',
-    status: 'TRIAGING',
-    channel: 'WEB_FORM',
-    submitterIsAnonymous: false,
-    submitterRole: 'CUSTOMER',
-    submitterName: 'Mariam Al-Otaibi',
-    submitterEmail: 'm.alotaibi@example.sa',
-    payload: {
-      requestType: 'ACCESS',
-      scope: 'All personal data the company holds about me, including marketing profiles and call recordings.',
-      verificationMethod: 'NATIONAL_ID',
-      idLast4: '1234',
-    },
-    assignedTo: 'DPO',
-    slaDueAt: '2026-06-03T09:30:00',
-    severity: 'MEDIUM',
-    acknowledgedAt: '2026-05-04T09:30:00',
-    history: [
-      ev('2026-05-04T09:30:00', 'SUBMITTED', 'anonymous', 'Submitted via /portal/dsr'),
-      ev('2026-05-04T09:30:00', 'TRIAGING', 'system', 'Auto-acknowledged. Assigned to DPO.'),
-    ],
-    locale: 'en',
-  },
-  {
-    id: 'intake-002',
-    referenceCode: 'SU-X9P3-T2W7',
-    kind: 'SPEAKUP',
-    status: 'TRIAGING',
-    channel: 'WEB_FORM',
-    submitterIsAnonymous: true,
-    submitterRole: 'PUBLIC',
-    payload: {
-      category: 'PROCUREMENT_FRAUD',
-      summary: 'Suspicious sole-source contract awarded to a vendor where a procurement-team relative is on the board.',
-      involvedParties: 'Procurement team (department-level — names withheld for now)',
-      evidenceAvailable: true,
-      evidenceDescription: 'Email exchanges and the bid-evaluation matrix.',
-    },
-    assignedTo: 'ETHICS_CTE',
-    slaDueAt: '2026-05-11T14:15:00',
-    severity: 'HIGH',
-    acknowledgedAt: '2026-05-04T14:15:00',
-    history: [
-      ev('2026-05-04T14:15:00', 'SUBMITTED', 'anonymous', 'Submitted via /portal/speakup'),
-      ev('2026-05-04T14:15:00', 'TRIAGING', 'system', 'Auto-acknowledged. Assigned to Ethics Committee.'),
-    ],
-    locale: 'en',
-  },
-  {
-    id: 'intake-003',
-    referenceCode: 'SI-B5D8-N3J1',
-    kind: 'SECURITY_INCIDENT',
-    status: 'PROMOTED',
-    channel: 'WEB_FORM',
-    submitterIsAnonymous: false,
-    submitterRole: 'EMPLOYEE',
-    submitterName: 'Hassan Al-Saud',
-    submitterEmail: 'iam.team@tss.sa',
-    payload: {
-      category: 'PHISHING',
-      summary: 'Targeted phishing email referencing internal project codenames received by 4 finance team members.',
-      observedAt: '2026-04-22T08:15:00',
-      systemsAffected: 'Email gateway only — no clicks reported',
-      severitySelfAssessed: 'MEDIUM',
-    },
-    assignedTo: 'CSIRT',
-    slaDueAt: '2026-04-25T08:30:00',
-    severity: 'MEDIUM',
-    acknowledgedAt: '2026-04-22T08:30:00',
-    promotedTo: { entityType: 'INCIDENT', recordId: 14, promotedAt: '2026-04-22T11:00:00' },
-    history: [
-      ev('2026-04-22T08:30:00', 'SUBMITTED', 'iam.team@tss.sa'),
-      ev('2026-04-22T08:30:00', 'TRIAGING', 'system', 'Routed to CSIRT.'),
-      ev('2026-04-22T11:00:00', 'PROMOTED', 'csirt.lead@tss.sa', 'Promoted to incident #14 — VPN credential-stuffing campaign'),
-    ],
-    locale: 'en',
-  },
-  {
-    id: 'intake-004',
-    referenceCode: 'PE-F2H6-K8R4',
-    kind: 'POLICY_EXCEPTION',
-    status: 'TRIAGING',
-    channel: 'WEB_FORM',
-    submitterIsAnonymous: false,
-    submitterRole: 'EMPLOYEE',
-    submitterName: 'Layla Al-Saud',
-    submitterEmail: 'sre.lead@tss.sa',
-    payload: {
-      policyCode: 'POL-LEG-002',
-      policyTitle: 'Legacy Crypto Sunset',
-      exceptionScope: 'TLS 1.0 listener on legacy ATM gateway until vendor patch lands.',
-      compensatingControls: 'Network ACL restricts to two known CIDR ranges; CyberArk session recording enforced; daily log review.',
-      requestedDuration: '90 days',
-      sunsetDate: '2026-08-04',
-      businessJustification: 'Vendor patch ETA Q3; replacement infrastructure procurement in flight.',
-    },
-    assignedTo: 'POLICY_OFFICER',
-    slaDueAt: '2026-05-11T11:00:00',
-    severity: 'HIGH',
-    acknowledgedAt: '2026-05-04T11:00:00',
-    history: [
-      ev('2026-05-04T11:00:00', 'SUBMITTED', 'sre.lead@tss.sa'),
-      ev('2026-05-04T11:00:00', 'TRIAGING', 'system', 'Routed to Policy Officer + CISO peer review.'),
-    ],
-    locale: 'en',
-  },
-  {
-    id: 'intake-005',
-    referenceCode: 'VR-Q4N2-Y8X3',
-    kind: 'VRP_DISCLOSURE',
-    status: 'CLOSED',
-    channel: 'WEB_FORM',
-    submitterIsAnonymous: true,
-    submitterRole: 'PUBLIC',
-    payload: {
-      category: 'XSS',
-      affectedUrl: 'https://tss.sa/marketing/feedback?q=<script>',
-      reproductionSteps: '1. Open the feedback form. 2. Enter <script>alert(1)</script> as the query parameter. 3. Reflected XSS triggers.',
-      severitySelfAssessed: 'MEDIUM',
-      cve: '',
-      researcherHandle: 'r3dteam',
-      contactEmail: 'r3dteam@protonmail.example',
-    },
-    assignedTo: 'CISO_OFFICE',
-    slaDueAt: '2026-04-22T16:45:00',
-    severity: 'MEDIUM',
-    acknowledgedAt: '2026-04-15T16:45:00',
-    history: [
-      ev('2026-04-15T16:45:00', 'SUBMITTED', 'anonymous'),
-      ev('2026-04-15T16:45:00', 'TRIAGING', 'system'),
-      ev('2026-04-18T10:00:00', 'PROMOTED', 'soc.lead@tss.sa', 'Reproduced — patched in marketing-microsite v2.4.1'),
-      ev('2026-04-22T15:00:00', 'CLOSED', 'soc.lead@tss.sa', 'Researcher confirmed fix. Bounty paid.'),
-    ],
-    locale: 'en',
-  },
-];
-
-// ── Local mutation overlay (demo mode) ─────────────────────────────────
+// ── Persistence — F2-172 ────────────────────────────────────────────────
+//
+// Everything below used to be `localStorage` and nothing else, for the whole lifecycle:
+// submit, triage, promote, case-track. A signed-in DPO pressed New → DPIA, a triager
+// pressed Promote, and the only trace was in one browser's site data (F2-171/F2-172).
+//
+// The rule now, and it is F2-169's rule rather than a new one — *fabricated data may
+// substitute only for a fabricated parent, or when there is no session*:
+//
+//   • signed in  → the server is the ONLY source. A failed load is reported, never
+//                  replaced. The seed records above are fabricated, so a signed-in user
+//                  must not see them either — they used to render unconditionally.
+//   • no session → the seed + the browser overlay, which is the public-portal path.
+//                  That path is blocked on F2-138 (there is no anonymous submit endpoint
+//                  to point at), and `publicPortalBackedByServer.test.ts` holds its two
+//                  exemptions open with that reason recorded.
+//
+// ⚠ Promotion is authenticated by construction — the triager inbox is behind a login — so
+// the no-session branch cannot promote. It throws rather than falling back, because a
+// fallback there is precisely the defect: a promotion recorded in a browser.
 
 const STORAGE_KEY = 'grc.intake';
 
@@ -613,21 +491,124 @@ function save(o: IntakeOverlay) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(o)); } catch { /* ignore */ }
 }
 
-/** React hook: merged seed + localStorage overlay. Public portals (DSR,
- *  SpeakUp, VRP) all flow through here so the triager inbox can see them
- *  without a backend round-trip. */
+/** Server DTO → the shape every page in this app already renders. */
+function fromDto(d: IntakeRecordDto): IntakeRecord {
+  let payload: Record<string, unknown> = {};
+  if (d.payload) {
+    try {
+      const parsed = JSON.parse(d.payload);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        payload = parsed as Record<string, unknown>;
+      }
+    } catch { /* a payload we cannot parse renders as empty, not as an error page */ }
+  }
+  return {
+    // The server keys on a bigint and this interface on a string. Kept as the plain
+    // decimal so `Number(rec.id)` round-trips for the triage call below.
+    id: String(d.id),
+    referenceCode: d.referenceCode,
+    kind: d.kind as IntakeKind,
+    status: d.status as IntakeStatus,
+    channel: d.channel as IntakeChannel,
+    submitterIsAnonymous: d.submitterIsAnonymous,
+    submitterRole: (d.submitterRole ?? 'EMPLOYEE') as SubmitterRole,
+    submitterName: d.submitterName ?? undefined,
+    submitterEmail: d.submitterEmail ?? undefined,
+    submitterPhone: d.submitterPhone ?? undefined,
+    payload,
+    assignedTo: d.assignedTo ?? undefined,
+    slaDueAt: d.slaDueAt ?? undefined,
+    severity: (d.severity ?? undefined) as IntakeRecord['severity'],
+    acknowledgedAt: d.acknowledgedAt,
+    promotedTo: d.promotedToEntityType && d.promotedToRecordId
+      ? {
+          entityType: d.promotedToEntityType as RegisterTarget,
+          recordId: d.promotedToRecordId,
+          promotedAt: d.promotedAt ?? d.acknowledgedAt,
+        }
+      : undefined,
+    rejectionReason: d.rejectionReason ?? undefined,
+    history: (d.history ?? []).map(h => ({
+      at: h.at, status: h.status as IntakeStatus, actor: h.actor,
+      ...(h.note ? { note: h.note } : {}),
+    })),
+    locale: (d.locale ?? undefined) as IntakeRecord['locale'],
+  };
+}
+
+export interface PromotionOutcome {
+  entityType: RegisterTarget;
+  /** The id of the record the SERVER created. Never minted here. */
+  recordId: string;
+}
+
+/**
+ * React hook over the intake substrate.
+ *
+ * `submit` and `triage` are **async** — they were synchronous while everything happened in
+ * memory, and every caller has to await them now. That is the visible cost of the record
+ * being real, and it is the point: a synchronous "promoted" was only ever possible because
+ * nothing was written.
+ */
 export function useIntake() {
+  const signedIn = isAuthenticated();
   const [overlay, setOverlay] = useState<IntakeOverlay>(() => load());
-  useEffect(() => save(overlay), [overlay]);
+  const [server, setServer] = useState<IntakeRecord[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loading, setLoading] = useState(signedIn);
 
-  const items: IntakeRecord[] = (() => {
-    const seeded = SEED_INTAKE.map(r => overlay.patches[r.id] ? { ...r, ...overlay.patches[r.id] } : r);
-    return [...seeded, ...overlay.added];
-  })();
+  useEffect(() => { if (!signedIn) save(overlay); }, [overlay, signedIn]);
 
-  const submit = useCallback((init: Omit<IntakeRecord, 'id' | 'referenceCode' | 'acknowledgedAt' | 'slaDueAt' | 'history' | 'status' | 'assignedTo'> & {
+  const refresh = useCallback(async () => {
+    if (!signedIn) return;
+    setLoading(true);
+    try {
+      const page = await intakeApi.list();
+      setServer(page.content.map(fromDto));
+      setLoadFailed(false);
+    } catch {
+      // ⚠ Deliberately NOT `setServer(SEED_INTAKE)`. A signed-in user whose inbox failed to
+      // load must see that it failed; showing five fabricated submissions instead is
+      // F2-169's defect, and on a triage queue it is worse than on a register — it invites
+      // a decision on a case that does not exist.
+      setServer(null);
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [signedIn]);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  const items: IntakeRecord[] = signedIn
+    ? (server ?? [])
+    : [
+        ...SEED_INTAKE.map(r => overlay.patches[r.id] ? { ...r, ...overlay.patches[r.id] } : r),
+        ...overlay.added,
+      ];
+
+  const submit = useCallback(async (init: Omit<IntakeRecord, 'id' | 'referenceCode' | 'acknowledgedAt' | 'slaDueAt' | 'history' | 'status' | 'assignedTo'> & {
     severity?: IntakeRecord['severity'];
-  }) => {
+  }): Promise<IntakeRecord> => {
+    if (signedIn) {
+      const dto = await intakeApi.submit({
+        kind: init.kind,
+        channel: init.channel,
+        submitterIsAnonymous: init.submitterIsAnonymous,
+        submitterRole: init.submitterRole,
+        submitterName: init.submitterName,
+        submitterEmail: init.submitterEmail,
+        submitterPhone: init.submitterPhone,
+        payload: JSON.stringify(init.payload ?? {}),
+        severity: init.severity,
+        locale: init.locale,
+      });
+      const rec = fromDto(dto);
+      setServer(prev => [...(prev ?? []), rec]);
+      return rec;
+    }
+
+    // No session: the public-portal path, still client-only pending F2-138.
     const id = `intake-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     const referenceCode = generateReferenceCode(init.kind);
     const now = new Date();
@@ -638,7 +619,7 @@ export function useIntake() {
       ...init,
       id,
       referenceCode,
-      status: 'SUBMITTED',
+      status: 'TRIAGING',            // auto-ack moves it straight to triaging
       acknowledgedAt,
       slaDueAt,
       assignedTo: catalog.defaultAssignee,
@@ -647,70 +628,51 @@ export function useIntake() {
         { at: acknowledgedAt, status: 'TRIAGING', actor: 'system', note: `Auto-acknowledged. Routed to ${catalog.defaultAssignee}. SLA due ${new Date(slaDueAt).toISOString().slice(0, 10)}.` },
       ],
     };
-    // Move to TRIAGING immediately (auto-ack)
-    next.status = 'TRIAGING';
     setOverlay(prev => ({ ...prev, added: [...prev.added, next] }));
     return next;
-  }, []);
+  }, [signedIn]);
 
-  const triage = useCallback((id: string, decision: 'PROMOTE' | 'REJECT' | 'CLOSE', actor: string, extra?: Partial<IntakeRecord>) => {
-    // Resolve the current record up-front so we can compute the promotion
-    // outcome before invoking setOverlay — avoids TS control-flow narrowing
-    // issues when reading state set inside the setOverlay callback.
-    const seed = SEED_INTAKE.find(r => r.id === id);
-    const inAdded = overlay.added.find(r => r.id === id);
-    const current = inAdded ?? (seed ? { ...seed, ...overlay.patches[id] } : null);
-    if (!current) return null;
-
-    const at = new Date().toISOString();
-    const status: IntakeStatus = decision === 'PROMOTE' ? 'PROMOTED' : decision === 'REJECT' ? 'REJECTED' : 'CLOSED';
-
-    // ── DD-69: when promoting, also create the downstream register
-    // record so the triager's action actually shows up in /incidents,
-    // /privacy, /risk etc. Synthesised record-id, payload mirrored
-    // from the intake submission, source-intake reference preserved.
-    let promotedTo: IntakeRecord['promotedTo'] | undefined = current.promotedTo;
-    let promotionResult: { entityType: RegisterTarget; recordId: string | number } | null = null;
-    if (decision === 'PROMOTE') {
-      const catalog = INTAKE_CATALOG[current.kind];
-      const entityType = catalog.defaultTarget;
-      // F2-171: was `Date.now() % 1_000_000` — a POSITIVE id in 0…999,999, which is the
-      // range real IDENTITY values live in. `mintPromotedId()` is negative by
-      // construction, so this placeholder can never name a real record. See its javadoc.
-      const recordId = mintPromotedId();
-      const promoted: PromotedRecord = {
-        id: recordId,
-        sourceIntakeId: current.id,
-        sourceReferenceCode: current.referenceCode,
-        promotedAt: at,
-        payload: { ...current.payload, _intakeKind: current.kind, _submitter: current.submitterName ?? current.submitterEmail ?? 'anonymous' },
-      };
-      addPromoted(entityType, promoted);
-      promotedTo = { entityType, recordId, promotedAt: at };
-      promotionResult = { entityType, recordId };
+  /**
+   * Apply a triage decision.
+   *
+   * On PROMOTE the returned {@link PromotionOutcome} carries the id of a record the
+   * **server** created — `IntakeService` resolves the target from the kind's catalogue
+   * entry and stamps the id from the row it wrote. Nothing is minted here, and there is no
+   * request field for either value.
+   *
+   * Errors propagate. A promotion can legitimately fail — the caller lacks the target
+   * module's write permission (403), the submission was already promoted (409), the target
+   * has no register (409), or a BIA names a business process this tenant does not have
+   * (409). Each of those is a sentence the triager needs; swallowing it and flipping the
+   * row to "Promoted" is exactly what F2-171 was.
+   */
+  const triage = useCallback(async (
+    id: string,
+    decision: 'PROMOTE' | 'REJECT' | 'CLOSE',
+    _actor: string,
+    extra?: Partial<IntakeRecord>,
+  ): Promise<PromotionOutcome | null> => {
+    if (!signedIn) {
+      throw new Error('Triage requires a signed-in session — the decision is recorded on the '
+        + 'server, and the promoted record is created there.');
     }
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId)) {
+      // A `intake-<base36>` id belongs to an overlay row from before this wiring. There is
+      // no server record to triage, and inventing one is the defect.
+      throw new Error(`Intake ${id} exists only in this browser and cannot be triaged — it was `
+        + 'submitted before intake was wired to the server (F2-172).');
+    }
+    const dto = await intakeApi.triage(numericId, decision, extra?.rejectionReason ?? undefined);
+    const updated = fromDto(dto);
+    setServer(prev => (prev ?? []).map(r => (r.id === updated.id ? updated : r)));
 
-    const note = extra?.rejectionReason ?? (
-      decision === 'PROMOTE' ? `Promoted to ${promotionResult?.entityType ?? current.kind} #${promotionResult?.recordId ?? '?'}` :
-      decision === 'REJECT' ? 'Rejected' :
-      'Closed without promotion'
-    );
-    const newPatch: Partial<IntakeRecord> = {
-      ...(overlay.patches[id] ?? {}),
-      ...(extra ?? {}),
-      status,
-      promotedTo,
-      history: [...current.history, { at, status, actor, note }],
+    if (decision !== 'PROMOTE' || !updated.promotedTo) return null;
+    return {
+      entityType: updated.promotedTo.entityType,
+      recordId: String(updated.promotedTo.recordId),
     };
-
-    setOverlay(prev => {
-      if (inAdded) {
-        return { ...prev, added: prev.added.map(r => r.id === id ? { ...r, ...newPatch } : r) };
-      }
-      return { ...prev, patches: { ...prev.patches, [id]: newPatch } };
-    });
-    return promotionResult;
-  }, [overlay]);
+  }, [signedIn]);
 
   const findByReferenceCode = useCallback((code: string): IntakeRecord | null => {
     const trimmed = code.trim().toUpperCase();
@@ -719,5 +681,5 @@ export function useIntake() {
 
   const reset = useCallback(() => setOverlay({ added: [], patches: {} }), []);
 
-  return { items, submit, triage, findByReferenceCode, reset };
+  return { items, submit, triage, findByReferenceCode, reset, refresh, loading, loadFailed, signedIn };
 }

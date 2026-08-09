@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ListChecks, ArrowLeft, AlertTriangle, Network, Send,
@@ -25,8 +25,6 @@ import {
   CAPA_FORWARD_TRANSITIONS, daysUntilDue,
   type CapaStatus,
 } from '../../lib/capa';
-import { usePromoted } from '../../lib/promotedRecords';
-import { toCapaFromObservation } from '../../lib/promotedAdapters';
 
 type TabId = 'overview' | 'rca' | 'lifecycle' | 'history';
 
@@ -51,8 +49,7 @@ export function CapaDetailPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { items: apiItems, advance } = useCapas();
-  const promotedCapas = usePromoted('CAPA').map(toCapaFromObservation);
-  const items = useMemo(() => [...promotedCapas, ...apiItems], [promotedCapas, apiItems]);
+  const items = apiItems;
   const [tab, setTab] = useState<TabId>('overview');
 
   const c = items.find(x => x.id === id);

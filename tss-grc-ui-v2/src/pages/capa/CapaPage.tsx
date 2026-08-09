@@ -28,8 +28,6 @@ import {
 import { scanPaTriggers, type PaTrigger } from '../../lib/paTriggers';
 import { deriveCapaNotifs, audCommitteeDigest, type CapaNotif } from '../../lib/capaNotifications';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
-import { usePromoted } from '../../lib/promotedRecords';
-import { toCapaFromObservation } from '../../lib/promotedAdapters';
 import '../../styles/pages/capa.css';
 
 type TabId = 'register' | 'aging' | 'pareto' | 'workflow' | 'triggers' | 'committee';
@@ -53,8 +51,7 @@ export function CapaPage() {
   // DD-75: surface CAPAs that originated from a promoted CONTROL_OBSERVATION
   // intake. Promoted CAPAs are display-only — the lifecycle still operates
   // on the underlying source intake until a real backend lands.
-  const promotedCapas = usePromoted('CAPA').map(toCapaFromObservation);
-  const items = useMemo(() => [...promotedCapas, ...apiItems], [promotedCapas, apiItems]);
+  const items = apiItems;
   const [tab, setTab] = useState<TabId>('register');
   const [q, setQ] = useState('');
   const [filterStatus, setFilterStatus] = useState<CapaStatus | 'ALL'>('ALL');

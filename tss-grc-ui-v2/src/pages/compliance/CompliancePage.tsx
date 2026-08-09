@@ -55,8 +55,6 @@ import {
 import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngineRequestsPanel';
 import { COMPLIANCE_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
-import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
-import { toFindingDto, toEngagementDto } from '../../lib/promotedAdapters';
 import { NitaqatPanel } from '../../components/compliance/NitaqatPanel';
 import { COMPLIANCE_ANCHORS } from '../../lib/moduleAnchors';
 import { isAuthenticated } from '../../lib/auth';
@@ -287,10 +285,8 @@ export function CompliancePage() {
   const engagements = useApiList<AuditEngagementDto>(()      => complianceApi.auditEngagements(0, 100), AUDIT_ENGAGEMENTS);
 
   // DD-75: merge intake-promoted rows into findings and engagements.
-  const promotedFindings    = usePromoted('FINDING').map(toFindingDto);
-  const promotedEngagements = usePromoted('ENGAGEMENT').map(toEngagementDto);
-  const allFindings    = useMemo(() => [...promotedFindings, ...findings.data],       [promotedFindings, findings.data]);
-  const allEngagements = useMemo(() => [...promotedEngagements, ...engagements.data], [promotedEngagements, engagements.data]);
+  const allFindings    = findings.data;
+  const allEngagements = engagements.data;
 
   // Per-framework coverage for the ring cluster (playbook framework-ring hero).
   // Coverage% = implemented + half-credit for partial, over the framework's
@@ -599,7 +595,7 @@ export function CompliancePage() {
         }
         if (r.status === 'CLOSED') extras.push({ Icon: RotateCcw, onClick: () => scheduleFollowUp(r), title: t('engagementActScheduleFollowup'), tone: 'accent' });
         // F2-171: promoted-intake engagements are merged in above and exist only in this browser.
-        return <RowActions disabled={isDemo || isUnsyncedId(r.id)} extras={extras} onEdit={() => engageS.startEdit(r)} onDelete={() => engageS.askDelete(r)} />;
+        return <RowActions disabled={isDemo} extras={extras} onEdit={() => engageS.startEdit(r)} onDelete={() => engageS.askDelete(r)} />;
       } },
   ];
 
@@ -622,7 +618,7 @@ export function CompliancePage() {
         if (stage === 'INDEPENDENT_TESTED') extras.push({ Icon: Stamp,       onClick: () => capaSignoff(r),      title: t('capaActSignoff'),    tone: 'accent' });
         if (stage === 'AUDIT_SIGNED_OFF')   extras.push({ Icon: Lock,        onClick: () => capaCloseFinding(r), title: t('capaActClose'),      tone: 'success' });
         // F2-171: promoted-intake findings are merged in above and exist only in this browser.
-        return <RowActions disabled={isDemo || isUnsyncedId(r.id)} extras={extras} />;
+        return <RowActions disabled={isDemo} extras={extras} />;
       } },
   ];
 

@@ -94,28 +94,29 @@ function redirectToLogin(): void {
 }
 
 /**
- * A path segment that is a negative integer — the id scheme `promotedRecords.mintPromotedId()`
- * uses for a record that exists only in this browser. Anchored to a whole segment so a query
- * value never matches; the query string is stripped before the test regardless.
+ * A path segment that is a negative integer. No id this platform issues can look like this —
+ * every one is a SQL Server IDENTITY or a UUID. Anchored to a whole segment so a query value
+ * never matches; the query string is stripped before the test regardless.
  */
 const PLACEHOLDER_ID_SEGMENT = /\/-\d+(?=\/|$)/;
 
 /**
- * F2-171 — never hand a placeholder id to a real endpoint.
+ * F2-171/F2-172 — no endpoint in this platform keys on a negative id, so a negative id in a
+ * request path is a client-side bug, not a record.
  *
- * <b>Why here and not at the button.</b> Intake promotion merges a client-only row into
- * eleven registers, and those rows render the same live governance actions as server rows —
- * Approve, Submit, Delete, and a detail-page link. Disabling each of those is UX work spread
- * across eleven files, and a missed one is silent. This is the single choke point every call
- * in the app passes through, so the safety property is total here and total the moment it
- * lands: whatever a page forgets, the request cannot leave.
+ * <b>What this was for, and why it is still here after the cause was removed.</b> F2-171
+ * added it because intake promotion merged client-only rows into eleven registers and those
+ * rows rendered the same live governance actions as server rows. F2-172 removed that
+ * merge — promotion writes a real record now, and nothing in the app mints a synthetic id
+ * any more, so the population this guard was written for is empty.
  *
- * That matters because of what the old id scheme was. `Date.now() % 1_000_000` is a positive
- * integer in the range real IDENTITY values occupy; measured in dev, 0.056% of promotions
- * would have named *some* existing record across the eleven registers, and the share grows
- * with every row a tenant adds. On such a promotion `dpiaApi.approve(d.id)` approved a real,
- * unrelated DPIA while the screen showed the promoted row's title — F2-167's wrong-record
- * shape, from a source of fabricated rows F2-167 never measured.
+ * It stays because it is an invariant rather than a ceiling. Every id this platform issues
+ * is a SQL Server IDENTITY (starts at 1, counts up) or a UUID, so "a path segment that is a
+ * negative integer" is unreachable by construction and free to assert. A ceiling tolerating
+ * a population would have had to go with the population; a total assertion at the single
+ * choke point every call passes through costs one regex and turns the next accidental
+ * placeholder scheme into a named error instead of a 404 nobody can explain — which is
+ * precisely how F2-171's harms presented.
  *
  * Thrown, not swallowed: pages already funnel `ApiError` into `problemMessage()` toasts, so
  * the user gets a sentence naming the cause instead of a silent no-op. Status 0 marks it as
@@ -124,9 +125,9 @@ const PLACEHOLDER_ID_SEGMENT = /\/-\d+(?=\/|$)/;
 function assertNotPlaceholder(path: string): void {
   if (PLACEHOLDER_ID_SEGMENT.test(path.split('?')[0])) {
     throw new ApiError(0,
-      'This record has not been saved to the server yet, so no action can be taken on it. '
-      + 'It was created by promoting an intake submission, which currently only records the '
-      + 'result in this browser (F2-171).');
+      'This action addressed a record id that no server ever issues (a negative number), so '
+      + 'no request was sent. That is a bug in the screen that produced it, not something '
+      + 'you can retry.');
   }
 }
 
@@ -4209,4 +4210,79 @@ export const notificationApi = {
   /** Mark every notification owned by the current user as read. */
   markAllRead: () =>
     api.patch<void>('/api/v1/notifications/read-all', {}),
+};
+
+// ─── Intake (Services Center front door) — F2-172 ──────────────────────────
+//
+// `POST /api/v1/intake` and `PUT /api/v1/intake/{id}/triage` shipped with DD-82 and were
+// called by nothing until F2-172. `lib/intake.ts` drove the whole lifecycle in
+// `localStorage`, so a submitted DSR and a promoted DPIA existed in exactly one browser
+// (F2-171). This is the client that makes them real.
+//
+// ⚠ There is deliberately no field here for the promoted record's id. The server derives
+// the target from the intake kind and the id from the row it writes; a caller-supplied
+// value for either is the defect F2-172 removed, not a convenience it dropped.
+
+/** Wire shape of `IntakeRecordDto`. `payload` is a JSON *string*; `id` is numeric. */
+export interface IntakeRecordDto {
+  id: number;
+  referenceCode: string;
+  kind: string;
+  status: string;
+  channel: string;
+  submitterIsAnonymous: boolean;
+  submitterRole: string | null;
+  submitterName: string | null;
+  submitterEmail: string | null;
+  submitterPhone: string | null;
+  payload: string | null;
+  assignedTo: string | null;
+  slaDueAt: string | null;
+  severity: string | null;
+  acknowledgedAt: string;
+  promotedToEntityType: string | null;
+  promotedToRecordId: string | null;
+  promotedAt: string | null;
+  rejectionReason: string | null;
+  locale: string | null;
+  history: { at: string; status: string; actor: string; note: string | null }[];
+}
+
+export interface IntakeSubmissionBody {
+  kind: string;
+  channel: string;
+  submitterIsAnonymous: boolean;
+  submitterRole?: string;
+  submitterName?: string;
+  submitterEmail?: string;
+  submitterPhone?: string;
+  /** JSON string — the server stores it as written and parses it at promotion time. */
+  payload: string;
+  severity?: string;
+  locale?: string;
+}
+
+/** PII-free projection the public case-tracker returns (SEC-FIN-001). */
+export interface IntakePublicStatusDto {
+  referenceCode: string;
+  kind: string;
+  status: string;
+  acknowledgedAt: string;
+  slaDueAt: string | null;
+}
+
+export const intakeApi = {
+  list:   (page = 0, size = 100) =>
+    api.get<PageResponse<IntakeRecordDto>>(`/api/v1/intake${pageQ(page, size)}`),
+  submit: (body: IntakeSubmissionBody) => api.post<IntakeRecordDto>('/api/v1/intake', body),
+  /**
+   * Apply a triage decision. On PROMOTE the response carries `promotedToEntityType` and
+   * `promotedToRecordId` — read them, never send them.
+   */
+  triage: (id: number, decision: 'PROMOTE' | 'REJECT' | 'CLOSE', note?: string) =>
+    api.put<IntakeRecordDto>(`/api/v1/intake/${id}/triage`, { decision, note }),
+  /** Public tracker — no auth, and the server returns nothing identifying. */
+  track:  (referenceCode: string) =>
+    api.get<IntakePublicStatusDto>(
+      `/api/v1/intake/track/${encodeURIComponent(referenceCode)}`, { anonymous: true }),
 };

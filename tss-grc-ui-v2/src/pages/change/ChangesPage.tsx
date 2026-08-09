@@ -44,8 +44,7 @@ import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { CHANGE_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 import { GovernancePanel } from './GovernancePanel';
-import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
-import { toChangeRequestDto, usePromotedProvenance } from '../../lib/promotedAdapters';
+import { usePromotedProvenance } from '../../lib/intakeProvenance';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import {
   TAB_IDS, REVIEW_STATUSES, STATUS_TONE, TYPE_TONE, RISK_TONE,
@@ -110,8 +109,7 @@ export function ChangesPage() {
   };
   const [apiItems, setItems] = useState<ChangeRequestDto[]>([]);
   // DD-71: include intake-promoted change requests in the visible register.
-  const promotedChanges = usePromoted('CHANGE').map(toChangeRequestDto);
-  const items = useMemo(() => [...promotedChanges, ...apiItems], [promotedChanges, apiItems]);
+  const items = apiItems;
   const changeProv = usePromotedProvenance('CHANGE');
   // Register rows honour the process-bar deep-link filters (review queue / type).
   const registerFiltered = reviewMode || !!typeParam;
@@ -224,14 +222,14 @@ export function ChangesPage() {
   // Columns for register
   const cols: Column<ChangeRequestDto>[] = [
     { header: t('changeFldCode'),   cell: c => <span className="mono changes-cell-mono-bold">{c.changeCode ?? '—'}</span>, width: '130px' },
-    { header: t('colTitle'),        cell: c => <div className="changes-cell-title">{lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}{changeProv.has(c.id) && <PromotedBadge sourceReferenceCode={changeProv.get(c.id)!} />}</div> },
+    { header: t('colTitle'),        cell: c => <div className="changes-cell-title">{lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}{changeProv.has(String(c.id)) && <PromotedBadge sourceReferenceCode={changeProv.get(String(c.id))!} />}</div> },
     { header: t('changeFldType'),   cell: c => <Badge tone={TYPE_TONE[c.changeType] ?? 'neutral'}>{c.changeType}</Badge>, width: '120px' },
     { header: t('changeFldRisk'),   cell: c => c.riskLevel ? <Badge tone={RISK_TONE[c.riskLevel] ?? 'neutral'} dot>{c.riskLevel}</Badge> : '—', width: '110px' },
     { header: t('colStatus'),       cell: c => <Badge tone={STATUS_TONE[c.status] ?? 'neutral'} dot>{c.status.replace(/_/g, ' ')}</Badge>, width: '170px' },
     { header: t('changeFldScheduledStart'), cell: c => c.scheduledStart ? new Date(c.scheduledStart).toLocaleDateString() : '—', mono: true, width: '120px' },
     { header: '', align: 'end', width: '160px',
       // F2-171: promoted-intake changes are merged in above and exist only in this browser.
-      cell: c => <RowActions disabled={demoMode || isUnsyncedId(c.id)} onEdit={() => { setEditing(c); setModalOpen(true); }}
+      cell: c => <RowActions disabled={demoMode} onEdit={() => { setEditing(c); setModalOpen(true); }}
                               onDelete={() => setConfirmDel(c)}
                               extras={[
                                 { Icon: FolderOpen, onClick: () => setDocsTarget(c), title: lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls' },

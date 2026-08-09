@@ -43,7 +43,7 @@ export function DsrPortalPage() {
 
   const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm(prev => ({ ...prev, [k]: v }));
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.requesterName.trim() || !form.requesterEmail.trim()) {
       toast.danger(t('portalDsrErrorIdentity'));
@@ -57,7 +57,10 @@ export function DsrPortalPage() {
       toast.danger(t('portalDsrErrorConsent'));
       return;
     }
-    const rec = submit({
+    // F2-138 keeps this page client-only: there is no anonymous DSR submit endpoint to
+    // point at, so `submit()` takes its no-session branch and the record lives in this
+    // browser. `useIntake().submit` is async now regardless of which branch it takes.
+    const rec = await submit({
       kind: 'DSR_REQUEST',
       channel: 'WEB_FORM',
       submitterIsAnonymous: false,

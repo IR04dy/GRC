@@ -31,8 +31,7 @@ import { TPRM_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { TPRM_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
-import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
-import { toVendorDto, usePromotedProvenance } from '../../lib/promotedAdapters';
+import { usePromotedProvenance } from '../../lib/intakeProvenance';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { TprmOnboardingPipeline, TprmReassessmentDashboard } from './TprmOnboardingPanel';
 import { TprmConsolidatedOverview } from '../../components/tprm/TprmConsolidatedOverview';
@@ -90,8 +89,7 @@ export function TprmPage() {
 
   const vendors = useApiList<TprmVendorDto>(() => tprmApi.vendors(0, 100), VENDORS);
   // DD-71: include intake-promoted vendors in the visible register.
-  const promotedVendors = usePromoted('VENDOR').map(toVendorDto);
-  const allVendors = useMemo(() => [...promotedVendors, ...vendors.data], [promotedVendors, vendors.data]);
+  const allVendors = vendors.data;
   const provenance = usePromotedProvenance('VENDOR');
 
   // ── DD-47: filter modal ──────────────────────────────────────
@@ -141,7 +139,7 @@ export function TprmPage() {
   ];
 
   const cols: Column<TprmVendorDto>[] = [
-    { header: t('colVendor'),     cell: r => <span style={{ fontWeight: 600 }}>{r.vendorName}{provenance.has(r.id) && <PromotedBadge sourceReferenceCode={provenance.get(r.id)!} />}</span> },
+    { header: t('colVendor'),     cell: r => <span style={{ fontWeight: 600 }}>{r.vendorName}{provenance.has(String(r.id)) && <PromotedBadge sourceReferenceCode={provenance.get(String(r.id))!} />}</span> },
     { header: t('colType'),       cell: r => <span style={{ color: 'var(--ink-2)' }}>{r.vendorType ?? '—'}</span> },
     { header: t('colCountry'),    cell: r => r.country ?? '—' },
     { header: t('colRisk'),       cell: r => <Badge tone={RISK_TONE[r.riskRating] ?? 'neutral'}>{r.riskRating}</Badge> },
@@ -149,7 +147,7 @@ export function TprmPage() {
     { header: t('colStatus'),     cell: r => <Badge tone={STATUS_TONE[r.status] ?? 'neutral'} dot>{statusLabel(t, r.status)}</Badge> },
     { header: '',                 align: 'end', width: '90px',
       // F2-171: promoted-intake vendors are merged in above and exist only in this browser.
-      cell: r => <RowActions disabled={isDemo || isUnsyncedId(r.id)} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
+      cell: r => <RowActions disabled={isDemo} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
   ];
 
   async function onSubmit(values: TprmVendorRequest) {

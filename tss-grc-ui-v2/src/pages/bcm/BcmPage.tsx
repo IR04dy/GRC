@@ -42,8 +42,6 @@ import { ModuleEngineRequestsPanel } from '../../components/workflows/ModuleEngi
 import { BCM_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { BCM_ANCHORS } from '../../lib/moduleAnchors';
-import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
-import { toBiaDto } from '../../lib/promotedAdapters';
 import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
 
 type TabId = 'overview' | 'plans' | 'processes' | 'bia' | 'graph' | 'exercises' | 'comms' | 'workflows' | 'alignment';
@@ -173,8 +171,7 @@ export function BcmPage() {
   // /bia returns a plain array — adapt to the Page<T> shape useApiList expects.
   const bia   = useApiList<BcmBiaDto>(() => bcmApi.bia().then(arr => ({ content: arr })), BCM_BIA);
   // DD-75: merge intake-promoted BIA submissions into the visible register.
-  const promotedBia = usePromoted('BIA').map(toBiaDto);
-  const allBia = useMemo(() => [...promotedBia, ...bia.data], [promotedBia, bia.data]);
+  const allBia = bia.data;
   const exercises = useApiList<BcmExerciseDto>(() => bcmApi.exercises(0, 200), BCM_EXERCISES);
 
   // ── DD-47: filter modal — tab-aware ──────────────────────────────
@@ -319,7 +316,7 @@ export function BcmPage() {
     { header: t('bcmStatusCol'),      cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
     { header: '', align: 'end', width: '90px',
       // F2-171: promoted-intake BIAs are merged in above and exist only in this browser.
-      cell: r => <RowActions disabled={isDemo || isUnsyncedId(r.id)} onEdit={() => biaS.startEdit(r)} onDelete={() => biaS.askDelete(r)} /> },
+      cell: r => <RowActions disabled={isDemo} onEdit={() => biaS.startEdit(r)} onDelete={() => biaS.askDelete(r)} /> },
   ];
 
   // ── Submit handlers ──

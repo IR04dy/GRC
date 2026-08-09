@@ -24,8 +24,7 @@ import { defaultViewForPage, type SavedView } from '../../lib/savedViews';
 import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { riskApi, ermAdvancedApi, reportingApi, ApiError, type RiskResponse, type KriDefinitionDto, type RiskAppetiteStatementDto, type AppetiteBreachEventDto, type RiskCategoryDto } from '../../lib/api';
 import { kriApi } from '../../lib/kriEngine';
-import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
-import { toRiskResponse, usePromotedProvenance } from '../../lib/promotedAdapters';
+import { usePromotedProvenance } from '../../lib/intakeProvenance';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import { isAuthenticated } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n';
@@ -192,8 +191,7 @@ export function RiskRegisterPage() {
   }, []);
   const [apiRisks, setRisks] = useState<RiskResponse[]>([]);
   // DD-71: include intake-promoted risks in the visible register.
-  const promotedRisks = usePromoted('RISK').map(toRiskResponse);
-  const risks = useMemo(() => [...promotedRisks, ...apiRisks], [promotedRisks, apiRisks]);
+  const risks = apiRisks;
   const provenance = usePromotedProvenance('RISK');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -370,7 +368,7 @@ export function RiskRegisterPage() {
   // Columns for the Register table — DataTable, with Inherent → Residual + actions
   const cols: Column<RiskResponse>[] = [
     { header: t('riskColId'),    cell: r => r.riskCode, mono: true, width: '110px' },
-    { header: t('riskColName'),  cell: r => <div style={{ fontWeight: 600, color: 'var(--ink-1)' }}>{lang === 'ar' && r.titleAr ? r.titleAr : r.titleEn}{provenance.has(r.id) && <PromotedBadge sourceReferenceCode={provenance.get(r.id)!} />}</div> },
+    { header: t('riskColName'),  cell: r => <div style={{ fontWeight: 600, color: 'var(--ink-1)' }}>{lang === 'ar' && r.titleAr ? r.titleAr : r.titleEn}{provenance.has(String(r.id)) && <PromotedBadge sourceReferenceCode={provenance.get(String(r.id))!} />}</div> },
     { header: t('riskColCategory'), cell: r => <Badge tone="info">{(lang === 'ar' && r.categoryNameAr) ? r.categoryNameAr : (r.categoryNameEn ?? r.categoryName ?? '—')}</Badge> },
     { header: t('riskColOwner'), cell: r => <span style={{ color: 'var(--ink-2)' }}>{r.ownerFullNameEn ?? r.ownerName ?? '—'}</span> },
     { header: t('riskColInherent'), cell: r => <ScorePill score={r.inherentScore} />, align: 'center', width: '90px' },
@@ -401,7 +399,7 @@ export function RiskRegisterPage() {
                                          extras.push({ Icon: Archive,    onClick: () => closeRisk(r),       title: t('riskActClose'),        tone: 'primary' });
         if (r.status === 'CLOSED')       extras.push({ Icon: RotateCcw,  onClick: () => reopenRisk(r),      title: t('riskActReopen'),       tone: 'accent' });
         // F2-171: promoted-intake rows are merged in above and exist only in this browser.
-        return <RowActions disabled={demoMode || isUnsyncedId(r.id)} extras={extras} onEdit={() => startEdit(r)} onDelete={() => startDelete(r)} />;
+        return <RowActions disabled={demoMode} extras={extras} onEdit={() => startEdit(r)} onDelete={() => startDelete(r)} />;
       } },
   ];
 

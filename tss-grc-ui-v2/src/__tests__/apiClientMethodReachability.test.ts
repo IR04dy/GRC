@@ -20,7 +20,9 @@ import { isTestFile, relPosix, stripComments, walkSources } from './support/sour
  * `rowHref` navigation surface.
  *
  * <h3>What this measures, and the two buckets that carry meaning</h3>
- * <b>91 grouped clients, 1,070 methods, 189 with no caller</b> (measured 2026-08-08, after the 5
+ * <b>91 grouped clients, 1,070 methods, 190 with no caller</b> (measured 2026-08-08; 189 then,
+ * +1 for `intakeApi.track` when F2-172 added the intake client — see its entry for why that one
+ * arrives dark while its three siblings went live in the same commit. Measured after the 5
  * dead duplicates below were deleted). The finding's own recommendation was to sort those into
  * *governance-critical* and *not yet wired* — but reading the first one showed that sort is a
  * judgement call that invents defects. `evidenceApi.approve` had no caller and looked maximally
@@ -35,7 +37,7 @@ import { isTestFile, relPosix, stripComments, walkSources } from './support/sour
  *       lost by deleting it and nothing is excused by keeping it, so this one can be an invariant
  *       today. It measured 5: the evidence trio, plus `cyberApi.controlsAll` / `cyberApi.frameworks`
  *       against `lib/frameworkControls.ts`. All five deleted, so the invariant starts at zero.</li>
- *   <li><b>{@link KNOWN_DARK} — a reported figure with a decrease-only ratchet.</b> 189 methods
+ *   <li><b>{@link KNOWN_DARK} — a reported figure with a decrease-only ratchet.</b> 190 methods
  *       with no live twin, of which <b>148 carry `HOLE`</b>: the endpoint family a screen
  *       <em>does</em> reach, so the workflow has a gap (can approve, cannot create). That is the
  *       F2-164 shape and the dangerous one, because the screen looks complete. The other 41 are
@@ -46,7 +48,7 @@ import { isTestFile, relPosix, stripComments, walkSources } from './support/sour
  * dropped) and are <em>annotation, not assertion</em> — nothing here recomputes them, so they can
  * describe the day they were measured without being able to rot into a false gate.
  *
- * <p>⚠ Why the second bucket is not an invariant: 189 cannot be wired in one slice, and an
+ * <p>⚠ Why the second bucket is not an invariant: 190 cannot be wired in one slice, and an
  * unadjudicated red list becomes an allow-list — which is how a ceiling stops distinguishing
  * *tolerated* from *reviewed* (the `BARE_EXPORT_CEILING` precedent, F2-61(c)). It ratchets in both
  * directions so it cannot rot, and the annotations say what the user cannot do, because "which
@@ -282,6 +284,15 @@ const KNOWN_DARK: readonly string[] = [
   'lib/api.ts#changeApi.routeTaskThroughEngine',                                // HOLE
   'lib/api.ts#changeApi.schedulePublications',                                  // HOLE
   'lib/api.ts#changeApi.updateModel',                                           // HOLE
+  // ── intake (F2-172) ─────────────────────────────────────────────────────────────────────────────
+  // The other three (`list`, `submit`, `triage`) went live in the same commit that added this
+  // client, so this is the only one arriving dark. HOLE, and a precise one: a submitter can be
+  // GIVEN a reference code but cannot LOOK ONE UP against the server. `/portal/track` still
+  // resolves codes out of `lib/intake`'s browser overlay, which is deliberate and blocked on
+  // F2-138 — there is no anonymous submit endpoint, so a public tracker pointed at the server
+  // would answer "not found" for every code a member of the public actually holds. Wiring this
+  // is the second half of F2-138, not a loose end of F2-172.
+  'lib/api.ts#intakeApi.track',                                                 // HOLE
 ];
 
 // ── the scan ───────────────────────────────────────────────────────────────────────────────────

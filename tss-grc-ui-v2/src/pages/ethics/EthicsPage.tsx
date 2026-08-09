@@ -38,8 +38,7 @@ import {
 import { ETHICS_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { ETHICS_ANCHORS as ETHICS_REG_ANCHORS } from '../../lib/moduleAnchors';
-import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
-import { toEthicsCaseDto, usePromotedProvenance } from '../../lib/promotedAdapters';
+import { usePromotedProvenance } from '../../lib/intakeProvenance';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import '../../styles/pages/ethics.css';
 
@@ -119,8 +118,7 @@ export function EthicsPage() {
   const [tab, setTab] = useState<TabId>('register');
   const [apiItems, setItems] = useState<EthicsCaseDto[]>([]);
   // DD-71: include intake-promoted speakup / ethics-disclosure cases.
-  const promotedCases = usePromoted('ETHICS_CASE').map(toEthicsCaseDto);
-  const items = useMemo(() => [...promotedCases, ...apiItems], [promotedCases, apiItems]);
+  const items = apiItems;
   const ethicsProv = usePromotedProvenance('ETHICS_CASE');
   const [analytics, setAnalytics] = useState<EthicsAnalyticsDto | null>(null);
   const [frameworks, setFrameworks] = useState<FrameworkDto[]>([]);
@@ -231,7 +229,7 @@ export function EthicsPage() {
     { header: t('ethicsFldCode'),     cell: c => <span className="mono ethics-mono-bold">{c.caseCode ?? '—'}</span>, width: '130px' },
     { header: t('colTitle'),          cell: c => (
       <div>
-        <div className="ethics-cell-title">{lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}{ethicsProv.has(c.id) && <PromotedBadge sourceReferenceCode={ethicsProv.get(c.id)!} />}</div>
+        <div className="ethics-cell-title">{lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}{ethicsProv.has(String(c.id)) && <PromotedBadge sourceReferenceCode={ethicsProv.get(String(c.id))!} />}</div>
         {c.isAnonymous && <span className="ethics-cell-anonymous"><EyeOff size={10} /> {t('ethicsAnonymous')}</span>}
       </div>
     ) },
@@ -241,7 +239,7 @@ export function EthicsPage() {
     { header: t('ethicsFldChannel'),  cell: c => c.intakeChannel.replace(/_/g, ' '), width: '110px' },
     { header: '', align: 'end', width: '160px',
       // F2-171: promoted-intake cases are merged in above and exist only in this browser.
-      cell: c => <RowActions disabled={demoMode || isUnsyncedId(c.id)}
+      cell: c => <RowActions disabled={demoMode}
         onEdit={() => { setEditing(c); setModalOpen(true); }}
         onDelete={() => setConfirmDel(c)}
         extras={[

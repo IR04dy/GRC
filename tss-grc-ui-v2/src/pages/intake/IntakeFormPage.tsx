@@ -8,6 +8,8 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { getUser } from '../../lib/auth';
+import { getErrorDisplayMessage } from '../../lib/apiError';
 import {
   useIntake, INTAKE_CATALOG, type IntakeKind,
 } from '../../lib/intake';
@@ -65,27 +67,35 @@ export function IntakeFormPage() {
     );
   }
 
-  function onSubmit(payload: Record<string, string>) {
-    // Demo stub for the logged-in user. Real auth would pull from JWT.
-    const submitterEmail = 'employee@tss.sa';
-    const submitterName  = 'Demo Employee';
+  async function onSubmit(payload: Record<string, string>) {
+    // F2-172 — this used to be `'Demo Employee' / 'employee@tss.sa'` under the comment
+    // "Demo stub for the logged-in user. Real auth would pull from JWT." It was harmless
+    // while the submission never left the browser. It is not harmless now: the name goes
+    // into a server row, onto the triager's queue, and into the promoted record's owner
+    // field. The session already knows who this is.
+    const user = getUser();
     const severityCandidate = payload.severitySelfAssessed as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | undefined;
-    const rec = submit({
-      kind,
-      channel: 'WEB_FORM',
-      submitterIsAnonymous: false,
-      submitterRole: 'EMPLOYEE',
-      submitterName,
-      submitterEmail,
-      payload,
-      severity: severityCandidate ?? 'MEDIUM',
-      locale: lang as 'en' | 'ar',
-    });
-    // DD-70: for CHANGE_REQUEST, compute the risk score and CAB gate so
-    // the submitter sees the classification immediately on the ack screen.
-    const risk = kind === 'CHANGE_REQUEST' ? computeChangeRisk(payload) : undefined;
-    setSubmitted({ refCode: rec.referenceCode, slaDueAt: rec.slaDueAt ?? '', risk });
-    toast.success(t('intakeFormToastSubmitted'));
+    try {
+      const rec = await submit({
+        kind,
+        channel: 'WEB_FORM',
+        submitterIsAnonymous: false,
+        submitterRole: 'EMPLOYEE',
+        submitterName: user?.username,
+        payload,
+        severity: severityCandidate ?? 'MEDIUM',
+        locale: lang as 'en' | 'ar',
+      });
+      // DD-70: for CHANGE_REQUEST, compute the risk score and CAB gate so
+      // the submitter sees the classification immediately on the ack screen.
+      const risk = kind === 'CHANGE_REQUEST' ? computeChangeRisk(payload) : undefined;
+      setSubmitted({ refCode: rec.referenceCode, slaDueAt: rec.slaDueAt ?? '', risk });
+      toast.success(t('intakeFormToastSubmitted'));
+    } catch (e) {
+      // No acknowledgement screen on failure. A reference code for a submission that was
+      // never stored is the artefact F2-137 and F2-171 were both found by.
+      toast.danger(getErrorDisplayMessage(e));
+    }
   }
 
   if (submitted) {

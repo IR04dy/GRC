@@ -27,9 +27,19 @@ describe('F2-137 — public portal routes are backed by the server, not by local
   const APP = readFileSync(join(SRC, 'App.tsx'), 'utf8');
 
   /**
-   * Modules that hold submissions in the browser and never call the network. Membership is
-   * *measured* below, not asserted — a store that grows a real fetch should leave this list, and a
-   * store on this list that turns out to call the network would make every exemption below bogus.
+   * Modules that hold a submission in the browser when there is no session.
+   *
+   * ⚠ **F2-172 changed what membership means here, and the change had to be made explicitly
+   * rather than absorbed.** `lib/intake` now calls `POST /api/v1/intake` — but only when the
+   * visitor is signed in. The public routes below have no session by definition, so they still
+   * take the `localStorage` branch, and the two exemptions still describe the code.
+   *
+   * The premise test underneath used to assert *"lib/intake really does make zero network
+   * calls"* by grepping for `fetch(` / `api.get` / `axios`. That assertion is now **false and
+   * still green**: the calls go through `intakeApi.*`, which none of those patterns match. A
+   * guard that keeps passing after its premise stops holding is worse than one that fails —
+   * it is the shape this whole finding family keeps producing — so it has been rewritten to
+   * measure what is actually true.
    */
   const CLIENT_ONLY_STORES = ['lib/intake'];
 
@@ -106,14 +116,39 @@ describe('F2-137 — public portal routes are backed by the server, not by local
     return file ? readFileSync(file, 'utf8') : null;
   }
 
-  it('lib/intake really does make zero network calls, so the premise here is measured', () => {
-    const src = readFileSync(join(SRC, 'lib', 'intake.ts'), 'utf8');
-    const network = src.match(/\bfetch\s*\(|\bapi\.(get|post|put|patch|delete)\b|XMLHttpRequest|axios/g);
-    expect(network, 'lib/intake now calls the network — remove it from CLIENT_ONLY_STORES and '
-      + 're-examine every exemption below, which only made sense while it could not reach a server')
-      .toBeNull();
-    expect(src, 'lib/intake no longer persists to localStorage — has it been rewired?')
+  /**
+   * The premise, re-measured for F2-172. Two facts have to hold together for the exemptions
+   * below to mean anything:
+   *
+   *   1. `lib/intake` still has a `localStorage` branch — otherwise the public pages are
+   *      already server-backed and both exemptions are spent;
+   *   2. that branch is reached **only when there is no session** — otherwise a signed-in
+   *      user's submission is still going nowhere, which is F2-171 unfixed.
+   *
+   * ⚠ The old version of this test asserted "zero network calls" by grepping for `fetch(`,
+   * `api.get` and `axios`. After the rewire it kept passing while being false, because the
+   * calls go through the `intakeApi` client. **A premise test that cannot notice its premise
+   * changing is the same defect class as the code it guards**, and the fix is the same one:
+   * measure the property, not one spelling of it.
+   */
+  it('lib/intake keeps a browser branch, and reaches it only without a session', () => {
+    const src = readFileSync(join(SRC, 'lib', 'intake.ts'), 'utf8').replace(/\r\n/g, '\n');
+
+    expect(src, 'lib/intake no longer persists to localStorage — if the public portals are '
+      + 'server-backed now, delete both exemptions below; that is the win being recorded')
       .toMatch(/localStorage/);
+
+    // It DOES call the network now. Stated positively so the day it stops is a failure too.
+    expect(src, 'lib/intake no longer calls the intake API — has the F2-172 wiring been reverted?')
+      .toMatch(/intakeApi\.(submit|triage|list)\(/);
+
+    // And the branch is the session, not a flag, a mock import or an environment check.
+    const submitBranch = /const submit = useCallback\(([\s\S]*?)\n  \}, \[signedIn\]\);/.exec(src);
+    expect(submitBranch, 'submit() moved — repoint this assertion').toBeTruthy();
+    expect(submitBranch![1], 'submit must post to the server when there IS a session')
+      .toMatch(/if \(signedIn\)[\s\S]{0,400}intakeApi\.submit\(/);
+    expect(submitBranch![1], 'and fall back to the browser only when there is not')
+      .toMatch(/setOverlay\(/);
   });
 
   it('the import matcher sees a multi-line import, which the first version of it did not', () => {

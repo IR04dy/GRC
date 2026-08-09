@@ -15,6 +15,8 @@ import { Modal } from '../../components/ui/Modal';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { getUser } from '../../lib/auth';
+import { getErrorDisplayMessage } from '../../lib/apiError';
 import {
   useIntake, INTAKE_CATALOG, INTAKE_STATUS_TONE, INTAKE_STATUS_LABEL,
   hoursUntilSla,
@@ -47,7 +49,7 @@ const KIND_TONE: Record<string, 'info' | 'warning' | 'danger' | 'accent' | 'prim
 export function IntakeInboxPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { items, triage } = useIntake();
+  const { items, triage, loading, loadFailed } = useIntake();
   const [tab, setTab] = useState<TabId>('open');
   const [filterKind, setFilterKind] = useState<IntakeKind | 'ALL'>('ALL');
   const [triageTarget, setTriageTarget] = useState<IntakeRecord | null>(null);
@@ -117,11 +119,19 @@ export function IntakeInboxPage() {
           </select>
           <Badge tone="primary">{visible.length}</Badge>
         </div>}>
-        {visible.length === 0
-          ? <EmptyState Icon={Inbox} title={t('inboxEmpty')} sub={t('inboxEmptyBody')} />
-          : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {visible.map(r => <InboxRow key={r.id} rec={r} onTriage={() => setTriageTarget(r)} t={t} lang={lang} />)}
-            </div>
+        {/* F2-172 — three states, not two. The inbox used to render the seed records
+            unconditionally, so a signed-in triager with an empty or unreachable queue saw
+            five fabricated submissions and could act on them. An empty queue and a broken
+            one now say which they are. */}
+        {loadFailed
+          ? <EmptyState Icon={AlertTriangle} title={t('loadFailed')} sub={t('inboxLoadFailedBody')} />
+          : loading
+            ? <EmptyState Icon={Inbox} title={t('inboxLoading')} sub="" />
+            : visible.length === 0
+              ? <EmptyState Icon={Inbox} title={t('inboxEmpty')} sub={t('inboxEmptyBody')} />
+              : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {visible.map(r => <InboxRow key={r.id} rec={r} onTriage={() => setTriageTarget(r)} t={t} lang={lang} />)}
+                </div>
         }
       </Card>
 
@@ -129,14 +139,27 @@ export function IntakeInboxPage() {
         <TriageModal
           rec={triageTarget}
           onClose={() => setTriageTarget(null)}
-          onDecide={(decision, extra) => {
-            const result = triage(triageTarget.id, decision, 'demo.triager@tss.sa', extra);
-            if (decision === 'PROMOTE' && result) {
-              toast.success(`${t('inboxToastPromoted')} → ${result.entityType} #${result.recordId}`);
-            } else {
-              toast.success(t(decision === 'REJECT' ? 'inboxToastRejected' : decision === 'CLOSE' ? 'inboxToastClosed' : 'inboxToastPromoted'));
+          onDecide={async (decision, extra) => {
+            // F2-172 — the actor used to be the literal 'demo.triager@tss.sa'. It is now
+            // whoever is authenticated: the server reads it from the token and writes it
+            // into the intake's permanent history, so a fabricated name here would be a
+            // fabricated name in an audit trail.
+            try {
+              const result = await triage(triageTarget.id, decision, getUser()?.username ?? '', extra);
+              if (decision === 'PROMOTE' && result) {
+                toast.success(`${t('inboxToastPromoted')} → ${result.entityType} #${result.recordId}`);
+              } else {
+                toast.success(t(decision === 'REJECT' ? 'inboxToastRejected' : 'inboxToastClosed'));
+              }
+              setTriageTarget(null);
+            } catch (e) {
+              // The modal stays open. A promotion can fail for reasons the triager can act
+              // on — no write permission on the target module, the submission was already
+              // promoted, the platform has no register for this kind, or a BIA names a
+              // business process this tenant has not registered. Closing the dialog on a
+              // failure would read as success, which is the whole shape of F2-171.
+              toast.danger(getErrorDisplayMessage(e));
             }
-            setTriageTarget(null);
           }}
         />
       )}
@@ -260,7 +283,7 @@ function PromotedDeeplink({ target }: { target: NonNullable<IntakeRecord['promot
 function TriageModal({ rec, onClose, onDecide }: {
   rec: IntakeRecord;
   onClose: () => void;
-  onDecide: (decision: 'PROMOTE' | 'REJECT' | 'CLOSE', extra?: Partial<IntakeRecord>) => void;
+  onDecide: (decision: 'PROMOTE' | 'REJECT' | 'CLOSE', extra?: Partial<IntakeRecord>) => void | Promise<void>;
 }) {
   const { t, lang } = useI18n();
   const [reason, setReason] = useState('');

@@ -34,8 +34,7 @@ import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { PRIVACY_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 import { RegulatoryAlignmentTab } from '../../components/regulatory/RegulatoryAlignmentTab';
-import { usePromoted, isUnsyncedId } from '../../lib/promotedRecords';
-import { toDsrDto, toBreachDto, toDpiaDto, usePromotedProvenance } from '../../lib/promotedAdapters';
+import { usePromotedProvenance } from '../../lib/intakeProvenance';
 import { PdplBreachConsole } from '../../components/privacy/PdplBreachConsole';
 import { ConsentTab } from '../../components/privacy/ConsentTab';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
@@ -93,10 +92,8 @@ export function PrivacyPage() {
   const ropa     = useApiList<PrivacyRopaDto>(()   => privacyApi.ropa(0, 100),     ROPA);
 
   // DD-71: merge intake-promoted rows into DSRs and Breaches.
-  const promotedDsrs     = usePromoted('DSR').map(toDsrDto);
-  const promotedBreaches = usePromoted('BREACH').map(toBreachDto);
-  const allDsrs     = useMemo(() => [...promotedDsrs, ...dsrs.data], [promotedDsrs, dsrs.data]);
-  const allBreaches = useMemo(() => [...promotedBreaches, ...breaches.data], [promotedBreaches, breaches.data]);
+  const allDsrs     = dsrs.data;
+  const allBreaches = breaches.data;
   const dsrProv    = usePromotedProvenance('DSR');
   const breachProv = usePromotedProvenance('BREACH');
 
@@ -148,7 +145,7 @@ export function PrivacyPage() {
   ];
 
   const dsrCols: Column<PrivacyDsrDto>[] = [
-    { header: t('privacyDsrSubject'),  cell: r => <div><div style={{ fontWeight: 600 }}>{r.requesterName}{dsrProv.has(r.id) && <PromotedBadge sourceReferenceCode={dsrProv.get(r.id)!} />}</div><div className="mono" style={{ fontSize: 11 }}>{r.requesterEmail}</div></div> },
+    { header: t('privacyDsrSubject'),  cell: r => <div><div style={{ fontWeight: 600 }}>{r.requesterName}{dsrProv.has(String(r.id)) && <PromotedBadge sourceReferenceCode={dsrProv.get(String(r.id))!} />}</div><div className="mono" style={{ fontSize: 11 }}>{r.requesterEmail}</div></div> },
     { header: t('privacyDsrType'),     cell: r => <Badge tone="info">{r.requestType}</Badge> },
     { header: t('privacyDsrReceived'), cell: r => fmtDate(r.receivedAt), mono: true },
     { header: t('privacyDsrDue'),      cell: r => fmtDate(r.dueDate), mono: true },
@@ -172,12 +169,12 @@ export function PrivacyPage() {
         if (!terminal)                          extras.push({ Icon: Clock,      onClick: () => extendDsrAction(r), title: t('privacyActExtendDsr'), tone: 'accent' });
         if (!terminal)                          extras.push({ Icon: XIcon,      onClick: () => rejectDsrAction(r), title: t('privacyActRejectDsr') });
         // F2-171: promoted-intake DSRs are merged in above and exist only in this browser.
-        return <RowActions disabled={isDemo || isUnsyncedId(r.id)} extras={extras} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} />;
+        return <RowActions disabled={isDemo} extras={extras} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} />;
       } },
   ];
 
   const breachCols: Column<PrivacyBreachDto>[] = [
-    { header: t('colTitle'),    cell: r => <div><div style={{ fontWeight: 600 }}>{r.titleEn}{breachProv.has(r.id) && <PromotedBadge sourceReferenceCode={breachProv.get(r.id)!} />}</div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{(r.descriptionEn ?? '').slice(0, 80)}</div></div> },
+    { header: t('colTitle'),    cell: r => <div><div style={{ fontWeight: 600 }}>{r.titleEn}{breachProv.has(String(r.id)) && <PromotedBadge sourceReferenceCode={breachProv.get(String(r.id))!} />}</div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{(r.descriptionEn ?? '').slice(0, 80)}</div></div> },
     { header: t('colType'),     cell: r => <Badge tone="info">{r.breachType ?? '—'}</Badge> },
     { header: t('colSeverity'), cell: r => <Badge tone={SEVERITY_TONE[r.severity ?? ''] ?? 'neutral'} dot>{severityLabel(t, r.severity ?? '—')}</Badge> },
     { header: t('colRecords'),  cell: r => r.affectedRecords?.toLocaleString() ?? '—', mono: true },
@@ -203,7 +200,7 @@ export function PrivacyPage() {
         if (r.status !== 'CLOSED')        extras.push({ Icon: Send,        onClick: () => notifyDataOfficeAction(r), title: t('privacyActNotifyDataOffice'), tone: 'accent' });
         if (r.status !== 'CLOSED')        extras.push({ Icon: Archive,     onClick: () => closeBreachAction(r),      title: t('privacyActCloseBreach'),   tone: 'success' });
         // F2-171: promoted-intake breaches are merged in above and exist only in this browser.
-        return <RowActions disabled={isDemo || isUnsyncedId(r.id)} extras={extras} />;
+        return <RowActions disabled={isDemo} extras={extras} />;
       } },
   ];
 
@@ -461,12 +458,11 @@ const DPIA_RISK_TONE: Record<string, 'danger' | 'warning' | 'info' | 'success' |
  * lifecycle workflow (submit-for-review / approve / reject / expire).
  */
 function DpiaTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnType<typeof useI18n>['t'] }) {
-  const { lang } = useI18n();
   const [apiItems, setItems] = useState<DpiaDto[]>([]);
   const [loading, setLoading] = useState(false);
-  // DD-75: merge intake-promoted DPIAs into the visible register.
-  const promoted = usePromoted('DPIA').map(toDpiaDto);
-  const items = [...promoted, ...apiItems];
+  // DD-75/F2-172: intake-promoted DPIAs are real privacy.dpia rows now, so they come
+  // back from the list call below like any other. There is no overlay to merge.
+  const items = apiItems;
 
   function reload() {
     // F2-169 — the demo substitution is the line above and nowhere else. The `.catch` used to
@@ -499,31 +495,18 @@ function DpiaTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnTy
   return (
     <Card padded={false}>
       {items.map(d => {
-      /**
-       * F2-171 — a DPIA that came from intake promotion has no server row behind it.
-       *
-       * The register merges promoted rows above, and this tab renders the PDPL workflow
-       * buttons — Submit for review, Approve, Reject, Expire. Every one of them takes
-       * `d.id`, so on a promoted row they addressed a record that does not exist (and,
-       * under the old positive-id scheme, occasionally a real and unrelated one). The
-       * title was a `<Link to={/dpias/:id}>` for the same reason.
-       *
-       * `isUnsyncedId` is total — no server id is negative — so this needs no page flag
-       * and cannot disagree with whatever the list call did.
-       */
-      const unsynced = isUnsyncedId(d.id);
-      const whyInert = lang === 'ar'
-        ? 'لم يُحفظ هذا التقييم على الخادم بعد — لا يمكن تنفيذ إجراء عليه'
-        : 'Not saved to the server yet — no action can be taken on it';
+      // F2-171 disabled every button here and dropped the title link, because a
+      // promoted DPIA had no server row and its id addressed nothing — occasionally, under
+      // the old positive-id scheme, a real and unrelated DPIA. F2-172 removed the cause
+      // rather than the symptom: promotion writes privacy.dpia, so every row on this tab
+      // is a record the PDPL workflow can actually advance.
       return (
         <div key={d.id} style={{
           display: 'grid', gridTemplateColumns: '1fr auto auto auto auto',
           gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)', alignItems: 'center',
         }}>
           <div>
-            {unsynced
-              ? <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink-1)' }} title={whyInert}>{d.titleEn}</span>
-              : <Link to={`/dpias/${d.id}`} style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink-1)', textDecoration: 'none' }}>{d.titleEn}</Link>}
+            <Link to={`/dpias/${d.id}`} style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink-1)', textDecoration: 'none' }}>{d.titleEn}</Link>
             {d.titleAr && <div style={{ fontSize: 11, color: 'var(--ink-3)' }} dir="rtl">{d.titleAr}</div>}
             <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <Badge tone="primary">{d.triggerReason.replace(/_/g, ' ')}</Badge>
@@ -538,20 +521,13 @@ function DpiaTab({ toast, t }: { toast: ReturnType<typeof useToast>; t: ReturnTy
             <Shield size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} />
             {d.overallResidualRisk ?? '—'}
           </Badge>
-          {/* The reason goes on each BUTTON, not just this wrapper: a live check showed
-              `title: null` on the buttons themselves, and RowActions' own note is that a
-              greyed button with no explanation reads as a broken page. */}
           <div style={{ display: 'flex', gap: 6 }}>
-            {d.status === 'DRAFT'     && <Button size="sm" variant="ghost" Icon={Send}       disabled={unsynced} title={unsynced ? whyInert : undefined} onClick={() => submit(d)}>{t('privacyDpiaActSubmit')}</Button>}
-            {d.status === 'IN_REVIEW' && <Button size="sm" variant="primary" Icon={CheckCheck} disabled={unsynced} title={unsynced ? whyInert : undefined} onClick={() => approve(d)}>{t('privacyDpiaActApprove')}</Button>}
-            {(d.status === 'IN_REVIEW' || d.status === 'DRAFT') && <Button size="sm" variant="ghost" Icon={XIcon} disabled={unsynced} title={unsynced ? whyInert : undefined} onClick={() => reject(d)}>{t('privacyDpiaActReject')}</Button>}
-            {d.status === 'APPROVED'  && <Button size="sm" variant="ghost" Icon={Clock}      disabled={unsynced} title={unsynced ? whyInert : undefined} onClick={() => expire(d)}>{t('privacyDpiaActExpire')}</Button>}
+            {d.status === 'DRAFT'     && <Button size="sm" variant="ghost" Icon={Send}       onClick={() => submit(d)}>{t('privacyDpiaActSubmit')}</Button>}
+            {d.status === 'IN_REVIEW' && <Button size="sm" variant="primary" Icon={CheckCheck} onClick={() => approve(d)}>{t('privacyDpiaActApprove')}</Button>}
+            {(d.status === 'IN_REVIEW' || d.status === 'DRAFT') && <Button size="sm" variant="ghost" Icon={XIcon} onClick={() => reject(d)}>{t('privacyDpiaActReject')}</Button>}
+            {d.status === 'APPROVED'  && <Button size="sm" variant="ghost" Icon={Clock}      onClick={() => expire(d)}>{t('privacyDpiaActExpire')}</Button>}
           </div>
-          {/* An id the server never issued is noise at best and misleading at worst — say
-              what the row actually is instead. */}
-          {unsynced
-            ? <Badge tone="warning">{lang === 'ar' ? 'غير محفوظ' : 'Not saved'}</Badge>
-            : <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>#{d.id}</span>}
+          <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>#{d.id}</span>
         </div>
       );
       })}

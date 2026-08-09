@@ -5224,6 +5224,8 @@ export const en = {
   inboxAnonymous:              'Anonymous reporter',
   inboxEmpty:                  'Nothing to triage',
   inboxEmptyBody:              'New submissions appear here as soon as they hit the public portals or employee intake forms.',
+  inboxLoadFailedBody:         'The triage queue could not be loaded. Nothing is shown rather than sample submissions, because a decision on a case that does not exist cannot be undone.',
+  inboxLoading:                'Loading the triage queue…',
   inboxTriage:                 'Triage',
   inboxPromote:                'Promote',
   inboxReject:                 'Reject',
