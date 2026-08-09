@@ -1002,6 +1002,42 @@ today… needs the owner's word"*. Also measured: **all four APPROVED acceptance
 belong to soft-deleted probe risks**, so no acceptance has ever been recorded through the UI — which is
 what an unreachable approval step looks like from the data side.
 
+✔ **2026-08-09 — [[F2-172]] CLOSED (P2): "promotion creates the target row" was implemented on
+NEITHER side, and the fix is a boundary decision rather than a rewire.** [[F2-171]] made the client
+honest — a promoted row's id could not name a real record, and eleven registers rendered it inert —
+but the row still existed in one browser. The server half was no better: `IntakeService.triage()`
+read `promotedToEntityType`/`promotedToRecordId` **out of the request body** and created nothing,
+under a DTO comment saying they were *"echoed back so the frontend can deeplink to the new register
+row"* — a sentence that assumes a row. So the platform had two implementations of promotion and
+neither wrote the record.
+
+The seam is `intake.spi.RegisterPromotionPort`, declared in **Base**, implemented by **13 adapters
+living in the module that owns the record**. That placement is the finding's real content: ADR-018
+homes `intake` in Base, twelve of the fourteen targets are sold SKUs, and importing them from intake
+would make the mandatory kernel depend on commercial modules. The `CHANGE` adapter sits in
+`change_adapters` because `ChangeModuleBoundaryTest` **refused** the obvious placement — an existing
+guard catching a real design question, and its peer list went 5 → 6 with the reason recorded,
+including that this entry is the one pointing the *other* way. Four properties bought: the target
+comes from the kind's catalogue entry; the id comes from the row that was written; promotion demands
+the **target module's** write permission on top of `INTAKE:TRIAGE` (measured first — the one
+non-admin dev triager already holds all eight); and a target with no adapter is a **409 that names
+it**, never a promotion that flips the status and writes nothing.
+
+➕ Found on the way: the server catalogue held **16 of the frontend's 26 kinds**, so all ten HRSD/MOC
+kinds would have 400'd on submit — invisible for exactly F2-171's reason, that nothing called the
+endpoint. It is generated from `intake.ts` and pinned now. ⚙ *Two copies of a routing table where
+only one side is exercised do not drift slowly; they drift completely and silently.*
+
+⚠ And the half worth carrying forward: when the cause was removed, a guard written for it went
+**vacuous rather than red**. F2-137's premise test asserts *"lib/intake makes zero network calls"* by
+grepping for `fetch(` / `api.get` / `axios`, and the new calls go through the `intakeApi` client — so
+it kept passing while being false. Rewritten to measure the property. ⚠ Two of my own new assertions
+failed against source they should have matched, because `core.autocrlf` gives this checkout `\r\n`
+while the Python probe I wrote them against translates them — the loud version of F2-169's silent
+`.not.toMatch`. Backend **3,495/0/0**, FE **472/472**, mutation **12/12 + 13/13**, 16 live probes,
+browser-verified through to `POST /dpias/12/submit-for-review → 200`. **F2-173** filed: six
+`CONTROL_TEST` kinds have no register at all, and now refuse rather than fabricate.
+
 ✔ **2026-08-09 — [[F2-171]] CLOSED (P2): pressing "Promote" on an intake writes the register
 row to `localStorage` and to nothing else — with a POSITIVE id, on eleven registers that render
 live governance buttons.** Opened out of [[F2-170]]'s residue, which listed `dpiaApi.create` among

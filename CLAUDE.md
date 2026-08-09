@@ -362,14 +362,25 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   trades a 500 for an unbounded join on every read.
 - `seed_real_data.py` batches must start `SET NOCOUNT ON;`.
 - Don't "seed" an empty table before checking it's wired (`privacy_lc` is orphaned).
-- **The intake substrate is CLIENT-ONLY, and the server half was built and never called** (F2-171,
-  measured 2026-08-09). `module/intake` ships `IntakeController` + `IntakeService` (submit / list /
-  triage / public-tracker) and `intake.intake_records.promoted_to_record_id`; **no product code
-  calls `/api/v1/intake`** — live-probed **200 with totalElements 0, and 0 rows in the table**.
-  `lib/intake.ts` drives submit → triage → promote in `localStorage`, and `addPromoted()` merges
-  the "created" row into 11 registers. So a promoted DPIA/risk/incident/vendor **has no server
-  row**, is invisible to every other user, and dies with the browser's site data. Placeholder ids
-  are **negative** now (`mintPromotedId`) and `lib/api.ts` refuses a negative-id path at all three
-  network entry points — do not "fix" a 404 on such a row by relaxing that guard; the row is the
-  problem. ⚠ Note the server's `triage()` takes `promotedToRecordId` **from the client** and
-  creates nothing, so the target row is created on **neither** side (F2-172).
+- **Intake promotion creates the register record SERVER-side, and the client cannot name it**
+  (F2-172, 2026-08-09 — this entry said the opposite until then, and both halves were true:
+  `lib/intake.ts` drove the lifecycle in `localStorage`, and `IntakeService.triage()` took
+  `promotedToRecordId` **from the request body** and created nothing). Now: `PUT /api/v1/intake/{id}/triage`
+  resolves the **target from the kind's catalogue entry**, calls a `intake.spi.RegisterPromotionPort`,
+  and stamps `promoted_to_record_id` **from the row it wrote**. The request DTO has no field for
+  either — do not re-add one.
+  ⚠ **The 13 adapters live in the module that OWNS the record** (`privacy/intake/`, `risk/intake/`…),
+  never in `module/intake`: ADR-018 homes intake in **Base**, and twelve of the fourteen targets are
+  sold SKUs. `IntakePromotionContractTest` fails the build if `module/intake` imports a peer. The
+  `CHANGE` adapter is the exception and sits in `change_adapters`, because ADR-012 forbids
+  `module/change_mgmt` importing a peer — that guard refused the obvious placement and was right to.
+  ⚠ Promotion also requires the **target module's own write permission** on top of `INTAKE:TRIAGE`,
+  and guessing it from the target name is the trap: the ethics register and the whole policy module
+  are guarded by **`COMPLIANCE:WRITE`**, not `ETHICS:WRITE`.
+  ⚠ `IntakeCatalog.java` is **generated from `tss-grc-ui-v2/src/lib/intake.ts`** and pinned by
+  `IntakeCatalogParityTest` — it held 16 of 26 kinds for as long as nobody called the endpoint.
+  Regenerate, never hand-edit.
+  ⚠ **Six `CONTROL_TEST` kinds have no register and now 409 by design** (F2-173). A promotion that
+  cannot create the record must refuse, not flip the status and write nothing.
+  ⚠ `lib/intake.ts` still has a `localStorage` branch, reached **only with no session** — the public
+  portal, blocked on F2-138. A signed-in failure surfaces as an error; it must never fall back.

@@ -111,7 +111,9 @@ class FrontendEndpointContractTest {
      * grow silently, and so it cannot go stale unnoticed the way an ungateable figure in prose does
      * (F2-162).
      */
-    private static final int BASELINE_CLIENTLESS_ENDPOINTS = 421;
+    private static final int BASELINE_CLIENTLESS_ENDPOINTS = 417;   // 421 → 417: F2-172 wired the
+    // four intake endpoints. Lowered because the ratchet fails on a DROP too — a ceiling that only
+    // fails upward stops describing the population the moment the population improves.
 
     /**
      * Of those, the ones that are guarded WRITES — a governed capability with no caller at all.
@@ -131,7 +133,8 @@ class FrontendEndpointContractTest {
      * {@code hasAnyRole}/{@code hasRole} arguments. The module vocabulary and the role vocabulary are
      * different namespaces that look identical.
      */
-    private static final int BASELINE_CLIENTLESS_GUARDED_WRITES = 208;
+    private static final int BASELINE_CLIENTLESS_GUARDED_WRITES = 206;   // 208 → 206: F2-172 wired
+    // POST /api/v1/intake and PUT /api/v1/intake/{id}/triage, the two guarded writes among them.
 
     // ── the two populations ────────────────────────────────────────────────────────────────────
 
