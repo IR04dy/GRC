@@ -171,7 +171,7 @@ export function PrivacyPage() {
         if (!terminal)                          extras.push({ Icon: CheckCheck, onClick: () => fulfilDsrAction(r), title: t('privacyActFulfilDsr'), tone: 'success' });
         if (!terminal)                          extras.push({ Icon: Clock,      onClick: () => extendDsrAction(r), title: t('privacyActExtendDsr'), tone: 'accent' });
         if (!terminal)                          extras.push({ Icon: XIcon,      onClick: () => rejectDsrAction(r), title: t('privacyActRejectDsr') });
-        return <RowActions extras={extras} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} />;
+        return <RowActions disabled={isDemo} extras={extras} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} />;
       } },
   ];
 
@@ -201,7 +201,7 @@ export function PrivacyPage() {
         if (r.status === 'OPEN')          extras.push({ Icon: ShieldCheck, onClick: () => containBreachAction(r),    title: t('privacyActContainBreach'), tone: 'primary' });
         if (r.status !== 'CLOSED')        extras.push({ Icon: Send,        onClick: () => notifyDataOfficeAction(r), title: t('privacyActNotifyDataOffice'), tone: 'accent' });
         if (r.status !== 'CLOSED')        extras.push({ Icon: Archive,     onClick: () => closeBreachAction(r),      title: t('privacyActCloseBreach'),   tone: 'success' });
-        return <RowActions extras={extras} />;
+        return <RowActions disabled={isDemo} extras={extras} />;
       } },
   ];
 

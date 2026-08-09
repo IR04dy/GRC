@@ -1002,6 +1002,60 @@ today… needs the owner's word"*. Also measured: **all four APPROVED acceptance
 belong to soft-deleted probe risks**, so no acceptance has ever been recorded through the UI — which is
 what an unreachable approval step looks like from the data side.
 
+✔ **2026-08-09 — [[F2-167]] CLOSED: a demo row's buttons were live, and the fabricated ids
+collide with real ones.** Filed by asking a single question about the previous slice — *why did the
+shipped demo-fallback contract pass [[F2-166]]?* `demoFallbackContract.test.ts` has five tests and
+they all enforce **disclosure**: the applier raises a flag, the flag is not `!isAuthenticated()`
+(F2-98), every hook consumer names `isDemo`. F2-166 satisfied all five and was still a P2. ⚙
+**Disclosure is the wrong property.** A badge reading *"demo data"* beside a live **Approve** button
+does not warn the user, it invites them, and the contract had no opinion about buttons at all.
+
+⚠⚠ **What makes it P2 rather than cosmetic: the ids are not distinct.** Every mock file numbers its
+records from 1, and so does every identity column. Measured in dev — `iam.users` **7 rows at ids
+1–8** against `mockAdmin`'s 1–15; `tprm.vendors` **28 at 1–28** against `mockTprm`'s 1–501;
+`compliance.controls` **35 at 1–35**; `evidence.evidence_items` 57 rows inside `mockEvidence`'s band;
+`bcm.bcp_plans` 10 at 7–16. Substitution fires on two paths — the list call **threw**, or it returned
+**zero rows** — and on the *throw* path the tenant's real rows are present. So Delete on "demo user
+#3" called `adminApi.deleteUser(3)` against **real user 3**, and the `ConfirmDialog` showed the
+*fabricated* name, so the user confirmed the deletion of a record they were never shown.
+
+Population: **13 pages** substitute fabricated rows and carry row-scoped writes (`cyber` 19,
+`scm` 13, `ethics` 13, `bcm` 12, `privacy` 11, `compliance` 10, `incidents` 5, `evidence` 4,
+`risk` 3, `reporting` 3, `admin` 2, `change` 2, `tprm` 2). **Exactly one** gated anything on the demo
+flag beforehand — `RiskRegisterPage`, and only because F2-166 had just fixed it.
+
+Fixed at the choke point: `RowActions` renders edit, delete **and** the workflow `extras`
+(approve / escalate / complete) platform-wide, so one `disabled` prop covers all **35** sites.
+Disabled buttons carry `disabled` + `aria-disabled` and a bilingual title naming the reason, because
+a greyed button with no explanation reads as a broken page. The invariant is a **hard zero with no
+allow-list** (every site fixed in the same commit) with a 30-site anti-vacuity floor.
+
+⚠ **Two instrument corrections, the same mistake as the last three slices.** My first "is it gated?"
+test looked for any `!isDemo` in the file and declared **8 of 13 pages safe** — but every hook
+consumer carries `enabled: !isDemo` (live refresh) and `{!isDemo && <LivePulse/>}` (the pulse dot),
+and **neither gates a button**; the true count was 1. Then my flag resolver searched *backwards* from
+each site and reported **24 of 35** as having no flag in scope: a `columns` array is routinely
+declared above `const isDemo = …` and its `cell` arrow only *runs* during the table's render, so the
+flag is in scope and the resolver was wrong, not the code. 🔑 **Look at what a match sits next to,
+and remember that JS scope is not textual order.** `tsc` is what made a 35-site textual sweep safe —
+an out-of-scope identifier is a compile error, so a wrong flag name could not ship silently.
+
+⚠ **A missed mutation, kept and labelled.** `RowActions` also wraps each handler in `guard()`.
+Replacing `guard` with the identity function left all six tests green — jsdom, like a browser, will
+not dispatch a click from a disabled button, so the wrapper is not independently observable. It stays
+as a second line for a future branch rendered without `disabled`, but the comment now says so,
+because the first draft claimed the callback was the asserted boundary. ⚙ **A missed mutation on
+redundant code is fine; a comment claiming it was covered is not** — F2-159's decoy in miniature.
+
+⚠ **Deliberately still open:** this makes the buttons inert, it does **not** make the ids safe. The
+durable fix is to renumber every mock record above any plausible identity value so a write from a
+fabricated row can only 404 — 14 files, ~600 id literals **including object keys**
+(`APPETITE_BREACHES` is keyed by appetite id), where a miss is silent. That belongs in its own slice
+with its own verification, filed under [[F2-15]] (whose `Current State` also needs re-measuring).
+
+FE **430/430** in 46 files (+7), `tsc` + `vite build` clean, mutation **3/4** (the 4th is the
+redundant wrapper above), census drift 0, backend untouched.
+
 ✔ **2026-08-08 — [[F2-165]] CLOSED, and building the instrument it asked for produced a P2 on its
 first run: [[F2-166]].** F2-165 said F2-68(c)'s unused-export scan resolves per exported *object*, so
 `riskAcceptanceApi` counted as reached while four of its five methods were dead. Its own

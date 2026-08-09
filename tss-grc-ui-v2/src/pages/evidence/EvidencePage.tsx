@@ -287,7 +287,7 @@ export function EvidencePage() {
     { header: t('colStatus'),    cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
     { header: '', align: 'end', width: '120px',
       cell: r => (
-        <RowActions
+        <RowActions disabled={isDemo}
           extras={[
             { Icon: Sparkles, onClick: () => runAiCheck(r), title: ar ? 'تقييم جودة الدليل (ذكاء اصطناعي)' : 'AI quality check', tone: 'primary' },
             { Icon: Paperclip, onClick: () => pickFileFor(r), title: t('evidenceAttachFile'), tone: 'primary' },

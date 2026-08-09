@@ -393,7 +393,7 @@ export function CompliancePage() {
         if (r.status === 'APPLICABILITY_ASSESSED')  extras.push({ Icon: Flag,   onClick: () => assessImpact(r),         title: t('complianceActAssessImpact'),         tone: 'accent' });
         if (r.status === 'IMPACT_ASSESSED')         extras.push({ Icon: Wrench, onClick: () => markControlsUpdated(r),  title: t('complianceActMarkControlsUpdated'),  tone: 'primary' });
         if (r.status === 'CONTROLS_UPDATED')        extras.push({ Icon: Archive, onClick: () => closeChangeAction(r),   title: t('complianceActCloseChange'),          tone: 'success' });
-        return <RowActions extras={extras} onEdit={() => changeS.startEdit(r)} onDelete={() => changeS.askDelete(r)} />;
+        return <RowActions disabled={isDemo} extras={extras} onEdit={() => changeS.startEdit(r)} onDelete={() => changeS.askDelete(r)} />;
       } },
   ];
 
@@ -596,7 +596,7 @@ export function CompliancePage() {
           if (nx) extras.push({ Icon: ChevronRight, onClick: () => advanceEngagement(r), title: `${t('engagementActAdvance')} → ${nx}`, tone: 'primary' });
         }
         if (r.status === 'CLOSED') extras.push({ Icon: RotateCcw, onClick: () => scheduleFollowUp(r), title: t('engagementActScheduleFollowup'), tone: 'accent' });
-        return <RowActions extras={extras} onEdit={() => engageS.startEdit(r)} onDelete={() => engageS.askDelete(r)} />;
+        return <RowActions disabled={isDemo} extras={extras} onEdit={() => engageS.startEdit(r)} onDelete={() => engageS.askDelete(r)} />;
       } },
   ];
 
@@ -618,7 +618,7 @@ export function CompliancePage() {
         if (stage === 'OWNER_TESTED')       extras.push({ Icon: Briefcase,   onClick: () => capaIndepTest(r),    title: t('capaActIndepTest'),  tone: 'accent' });
         if (stage === 'INDEPENDENT_TESTED') extras.push({ Icon: Stamp,       onClick: () => capaSignoff(r),      title: t('capaActSignoff'),    tone: 'accent' });
         if (stage === 'AUDIT_SIGNED_OFF')   extras.push({ Icon: Lock,        onClick: () => capaCloseFinding(r), title: t('capaActClose'),      tone: 'success' });
-        return <RowActions extras={extras} />;
+        return <RowActions disabled={isDemo} extras={extras} />;
       } },
   ];
 
@@ -629,7 +629,7 @@ export function CompliancePage() {
     { header: t('colOwner'),      cell: r => r.owner ?? '—' },
     { header: t('colStatus'),     cell: r => <Badge tone={STATUS_TONE_MAP[r.status] ?? 'neutral'} dot>{(r.status ?? '').replace(/_/g, ' ')}</Badge> },
     { header: '',                 align: 'end', width: '160px',
-      cell: r => <RowActions
+      cell: r => <RowActions disabled={isDemo}
         extras={[
           { Icon: Paperclip, onClick: () => setDocsTarget({ entityType: 'ComplianceControl', entityId: r.id, label: lang === 'ar' ? 'أدلة الضابط والمرفقات' : 'Control evidence & attachments' }), title: lang === 'ar' ? 'الأدلة' : 'Evidence' },
           { Icon: Send, onClick: () => setReqFor(r), title: lang === 'ar' ? 'طلب دليل من إدارة' : 'Request evidence from a department' },

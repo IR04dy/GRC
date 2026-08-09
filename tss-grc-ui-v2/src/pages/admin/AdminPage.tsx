@@ -151,7 +151,7 @@ export function AdminPage() {
     { header: t('colCreated'),        cell: r => fmtDate(r.createdAt), mono: true },
     { header: t('colStatus'),         cell: r => <Badge tone={r.isLocked ? 'danger' : r.isActive ? 'success' : 'neutral'} dot>{r.isLocked ? t('badgeLocked') : r.isActive ? t('statusActive') : t('badgeInactive')}</Badge> },
     { header: '',                     align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
+      cell: r => <RowActions disabled={isDemo} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
   ];
 
   const roleCols: Column<AdminRoleDto>[] = [

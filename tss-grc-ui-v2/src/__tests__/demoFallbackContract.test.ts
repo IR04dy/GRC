@@ -206,6 +206,57 @@ describe('W2-1b — a demo substitution is never silent', () => {
       .toEqual([]);
   });
 
+  /**
+   * F2-167 — **disclosure is not enough when the fabricated row carries a button.**
+   *
+   * Every assertion above this one is about *telling the user* the rows are fake. F2-166 satisfied
+   * all of them and was still a P2: the badge said "demo" while Approve / Retire / Update-exposure
+   * rendered live on the fabricated rows. And the ids are not safely distinct — **every mock file
+   * numbers its records from 1, and so does every identity column.** Measured in dev: `iam.users`
+   * holds 7 rows at ids 1–8 against `mockAdmin`'s 1–15, `tprm.vendors` 28 rows at 1–28 against
+   * `mockTprm`'s 1–501, `compliance.controls` 35 at 1–35, `evidence.evidence_items` 57 inside
+   * `mockEvidence`'s band. Substitution also fires when the list call **threw**, and on that path the
+   * tenant's real records exist — so `onDelete` on "demo user #3" sent a real, tenant-scoped delete
+   * for **real user 3**, while the confirmation dialog displayed the fabricated name.
+   *
+   * ⚙ So the shape to distrust is not "undisclosed mock data" but **"a real mutation reachable from
+   * a row the product itself knows is not real"**. `RowActions` is the choke point — it renders
+   * edit, delete *and* the workflow `extras` (approve / escalate / complete) for the whole platform —
+   * so one `disabled` prop covers all 35 sites, and `RowActions.test.tsx` proves the callbacks do not
+   * fire. This is a hard zero with no allow-list, because every site was fixed in the same commit.
+   */
+  it('every RowActions on a substituting page is disabled while the rows are fabricated', () => {
+    const offenders: string[] = [];
+    let scanned = 0;
+    for (const { path, body } of ALL) {
+      if (IS_TEST(path)) continue;
+      const src = code(body);
+      // In scope: a file that can put fabricated rows on screen, by either mechanism.
+      const substitutes =
+        (/import[\s\S]{0,400}?from\s+['"][^'"]*mock[^'"]*['"]/i.test(body)
+          && (/catch\s*(\([^)]*\))?\s*\{\s*(apply|set)[A-Za-z]*\(/.test(src)
+              || /\.length === 0\)\s*\{?\s*(apply|set)[A-Za-z]*\(/.test(src)))
+        || /useApi(List|Resource)\s*[<(]/.test(src);
+      if (!substitutes) continue;
+      for (const m of src.matchAll(/<RowActions\b([^>]*)/g)) {
+        scanned++;
+        if (!/\bdisabled=\{/.test(m[1])) {
+          offenders.push(`${path} (offset ${m.index})`);
+        }
+      }
+    }
+    // Anti-vacuity: 35 sites were measured across 13 pages. A scan that finds none would make this
+    // green for the wrong reason — the failure mode that let four backend regex scans under-count.
+    expect(scanned, 'the RowActions scan found nothing — it has stopped working')
+      .toBeGreaterThanOrEqual(30);
+    expect(offenders,
+      'These row-action clusters sit on a page that can substitute fabricated rows, and nothing '
+      + 'makes them inert. Pass the page\'s demo flag: `<RowActions disabled={isDemo} …>`. The ids '
+      + 'in the mock files overlap real ids, so a delete from a demo row can hit a real record '
+      + '(F2-167):\n  ' + offenders.join('\n  '))
+      .toEqual([]);
+  });
+
   it('the hook still documents both substitution paths', () => {
     const hook = ALL.find(f => f.path === 'lib/useApiResource.ts');
     expect(hook, 'useApiResource.ts moved — this contract test needs repointing').toBeDefined();

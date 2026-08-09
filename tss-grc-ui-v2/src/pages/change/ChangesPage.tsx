@@ -230,7 +230,7 @@ export function ChangesPage() {
     { header: t('colStatus'),       cell: c => <Badge tone={STATUS_TONE[c.status] ?? 'neutral'} dot>{c.status.replace(/_/g, ' ')}</Badge>, width: '170px' },
     { header: t('changeFldScheduledStart'), cell: c => c.scheduledStart ? new Date(c.scheduledStart).toLocaleDateString() : '—', mono: true, width: '120px' },
     { header: '', align: 'end', width: '160px',
-      cell: c => <RowActions onEdit={() => { setEditing(c); setModalOpen(true); }}
+      cell: c => <RowActions disabled={demoMode} onEdit={() => { setEditing(c); setModalOpen(true); }}
                               onDelete={() => setConfirmDel(c)}
                               extras={[
                                 { Icon: FolderOpen, onClick: () => setDocsTarget(c), title: lang === 'ar' ? 'المستندات والضوابط' : 'Docs & controls' },

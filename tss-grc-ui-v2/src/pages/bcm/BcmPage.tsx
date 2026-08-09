@@ -297,7 +297,7 @@ export function BcmPage() {
         if (r.status === 'INVOKED') {
           extras.push({ Icon: RotateCcw, onClick: () => restorePlan(r), title: t('bcmActRestorePlan'), tone: 'primary' });
         }
-        return <RowActions extras={extras} onEdit={() => planS.startEdit(r)} onDelete={() => planS.askDelete(r)} />;
+        return <RowActions disabled={isDemo} extras={extras} onEdit={() => planS.startEdit(r)} onDelete={() => planS.askDelete(r)} />;
       } },
   ];
 
@@ -306,7 +306,7 @@ export function BcmPage() {
     { header: t('colArabic'),         cell: r => <span style={{ color: 'var(--ink-2)' }}>{r.processNameAr ?? '—'}</span> },
     { header: t('bcmCriticalityCol'), cell: r => <Badge tone={IMPACT_TONE[r.criticality ?? ''] ?? 'neutral'}>{r.criticality ?? '—'}</Badge> },
     { header: '', align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => procS.startEdit(r)} onDelete={() => procS.askDelete(r)} /> },
+      cell: r => <RowActions disabled={isDemo} onEdit={() => procS.startEdit(r)} onDelete={() => procS.askDelete(r)} /> },
   ];
 
   const biaCols: Column<BcmBiaDto>[] = [
@@ -318,7 +318,7 @@ export function BcmPage() {
     { header: t('colImpact'),         cell: r => <Badge tone={IMPACT_TONE[r.overallImpact ?? ''] ?? 'neutral'}>{r.overallImpact ?? '—'}</Badge> },
     { header: t('bcmStatusCol'),      cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
     { header: '', align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => biaS.startEdit(r)} onDelete={() => biaS.askDelete(r)} /> },
+      cell: r => <RowActions disabled={isDemo} onEdit={() => biaS.startEdit(r)} onDelete={() => biaS.askDelete(r)} /> },
   ];
 
   // ── Submit handlers ──
@@ -585,7 +585,7 @@ export function BcmPage() {
                       {e.status !== 'COMPLETED' && e.status !== 'CANCELLED'
                         ? <Button variant="ghost" size="sm" Icon={FileCheck2} onClick={() => completeExercise(e)}>{t('bcmActCompleteExercise')}</Button>
                         : <span />}
-                      <RowActions onEdit={() => exerS.startEdit(e)} onDelete={() => exerS.askDelete(e)} />
+                      <RowActions disabled={isDemo} onEdit={() => exerS.startEdit(e)} onDelete={() => exerS.askDelete(e)} />
                     </div>
                   );
                 })}

@@ -240,7 +240,7 @@ export function EthicsPage() {
     { header: t('colStatus'),         cell: c => <Badge tone={STATUS_TONE[c.status] ?? 'neutral'} dot>{c.status.replace(/_/g, ' ')}</Badge>, width: '160px' },
     { header: t('ethicsFldChannel'),  cell: c => c.intakeChannel.replace(/_/g, ' '), width: '110px' },
     { header: '', align: 'end', width: '160px',
-      cell: c => <RowActions
+      cell: c => <RowActions disabled={demoMode}
         onEdit={() => { setEditing(c); setModalOpen(true); }}
         onDelete={() => setConfirmDel(c)}
         extras={[
@@ -781,7 +781,7 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
         }
         if (['CLEARED','ESCALATED','STR_FILED'].includes(a.status))
           extras.push({ Icon: Lock, onClick: () => transition(a, 'CLOSED'), title: t('amlClose') });
-        return <RowActions extras={extras} onEdit={() => { setEditing(a); setModalOpen(true); }} onDelete={() => setConfirmDel(a)} />;
+        return <RowActions disabled={showingDemo} extras={extras} onEdit={() => { setEditing(a); setModalOpen(true); }} onDelete={() => setConfirmDel(a)} />;
       }
     },
   ];
@@ -1054,7 +1054,7 @@ function KycTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
           }, title: t('kycReject') });
         }
         extras.push({ Icon: ChevronRight, onClick: () => { setExpandedId(prev => prev === s.id ? null : s.id); void loadHits(s.id); }, title: t('kycViewHits'), tone: 'accent' });
-        return <RowActions extras={extras} onEdit={() => { setEditing(s); setModalOpen(true); }} onDelete={() => setConfirmDel(s)} />;
+        return <RowActions disabled={showingDemo} extras={extras} onEdit={() => { setEditing(s); setModalOpen(true); }} onDelete={() => setConfirmDel(s)} />;
       } },
   ];
 
@@ -1290,7 +1290,7 @@ function DisclosuresTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
         const extras: Array<{ Icon: typeof ArrowRight; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
         if (next) extras.push({ Icon: ArrowRight, onClick: () => transition(d, next), title: `${t('changeAdvanceTo')} ${next}`, tone: 'primary' });
         if (d.status === 'REVIEW') extras.push({ Icon: XIcon, onClick: () => transition(d, 'RECUSED'), title: t('discActionRecuse'), tone: 'accent' });
-        return <RowActions extras={extras} onEdit={() => { setEditing(d); setModalOpen(true); }} onDelete={() => setConfirmDel(d)} />;
+        return <RowActions disabled={demoMode} extras={extras} onEdit={() => { setEditing(d); setModalOpen(true); }} onDelete={() => setConfirmDel(d)} />;
       }
     },
   ];

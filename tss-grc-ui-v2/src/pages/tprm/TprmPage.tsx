@@ -148,7 +148,7 @@ export function TprmPage() {
     { header: t('tprmReviewCol'), cell: r => r.contractEndDate ?? '—', mono: true },
     { header: t('colStatus'),     cell: r => <Badge tone={STATUS_TONE[r.status] ?? 'neutral'} dot>{statusLabel(t, r.status)}</Badge> },
     { header: '',                 align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
+      cell: r => <RowActions disabled={isDemo} onEdit={() => { setEditing(r); setOpen(true); }} onDelete={() => setConfirmDel(r)} /> },
   ];
 
   async function onSubmit(values: TprmVendorRequest) {

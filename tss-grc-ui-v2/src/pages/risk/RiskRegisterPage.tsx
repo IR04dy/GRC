@@ -400,7 +400,7 @@ export function RiskRegisterPage() {
         if (r.status === 'MITIGATING' || r.status === 'ACCEPTED')   // F2-164: 'TREATED' was a dead branch
                                          extras.push({ Icon: Archive,    onClick: () => closeRisk(r),       title: t('riskActClose'),        tone: 'primary' });
         if (r.status === 'CLOSED')       extras.push({ Icon: RotateCcw,  onClick: () => reopenRisk(r),      title: t('riskActReopen'),       tone: 'accent' });
-        return <RowActions extras={extras} onEdit={() => startEdit(r)} onDelete={() => startDelete(r)} />;
+        return <RowActions disabled={demoMode} extras={extras} onEdit={() => startEdit(r)} onDelete={() => startDelete(r)} />;
       } },
   ];
 

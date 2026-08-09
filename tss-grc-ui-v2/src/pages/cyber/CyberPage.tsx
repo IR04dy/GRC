@@ -744,7 +744,7 @@ export function CyberPage() {
     { header: t('colMaturity'),   cell: r => r.maturityLevel ?? '—', mono: true },
     { header: t('colStatus'),     cell: r => <Badge tone={STATUS_TONE[r.implementationStatus ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.implementationStatus ?? '—')}</Badge> },
     { header: '', align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => ctrlS.startEdit(r)} onDelete={() => ctrlS.askDelete(r)} /> },
+      cell: r => <RowActions disabled={isDemo} onEdit={() => ctrlS.startEdit(r)} onDelete={() => ctrlS.askDelete(r)} /> },
   ];
   const subCtrlCols: Column<CyberSubControlDto>[] = [
     { header: t('colSubControl'), cell: r => <span style={{ fontWeight: 600 }}>{r.subControlNumber} · {r.titleEn}</span> },
@@ -754,7 +754,7 @@ export function CyberPage() {
     { header: t('colStatus'),     cell: r => <Badge tone={STATUS_TONE[r.implementationStatus ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.implementationStatus ?? '—')}</Badge> },
     { header: t('colEvidence'),   cell: r => r.evidenceRequired ? <Badge tone="warning">{t('badgeRequired')}</Badge> : <Badge tone="neutral">{t('badgeOptional')}</Badge> },
     { header: '', align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => subS.startEdit(r)} onDelete={() => subS.askDelete(r)} /> },
+      cell: r => <RowActions disabled={isDemo} onEdit={() => subS.startEdit(r)} onDelete={() => subS.askDelete(r)} /> },
   ];
   const assessCols: Column<CyberAssessmentDto>[] = [
     { header: t('colDate'),     cell: r => r.assessmentDate ?? '—', mono: true },
@@ -775,7 +775,7 @@ export function CyberPage() {
           extras.push({ Icon: GitBranchPlus, onClick: () => convertGap(r), title: t('cyberActConvertGap'), tone: 'accent' });
         }
         return (
-          <RowActions extras={extras}
+          <RowActions disabled={isDemo} extras={extras}
             onEdit={() => assessS.startEdit(r)}
             onDelete={() => assessS.askDelete(r)} />
         );
@@ -792,7 +792,7 @@ export function CyberPage() {
     { header: t('colStage'),    cell: r => <Badge tone={STATUS_TONE[r.workflowStatus ?? ''] ?? 'neutral'} dot>{(r.workflowStatus ?? '').replace(/_/g, ' ') || '—'}</Badge> },
     { header: '', align: 'end', width: '120px',
       cell: r => (
-        <RowActions
+        <RowActions disabled={isDemo}
           extras={r.workflowStatus !== 'CLOSED' ? [{ Icon: TrendingUp, onClick: () => escalateVuln(r), title: t('actionAdvance'), tone: 'accent' }] : []}
           onEdit={() => vulnS.startEdit(r)}
           onDelete={() => vulnS.askDelete(r)}
@@ -807,7 +807,7 @@ export function CyberPage() {
     { header: t('colStage'),    cell: r => <Badge tone={STATUS_TONE[r.workflowStatus ?? ''] ?? 'neutral'} dot>{(r.workflowStatus ?? '').replace(/_/g, ' ') || '—'}</Badge> },
     { header: '', align: 'end', width: '120px',
       cell: r => (
-        <RowActions
+        <RowActions disabled={isDemo}
           extras={r.workflowStatus !== 'APPROVED' && r.workflowStatus !== 'EXPIRED' ? [{ Icon: CheckCheck, onClick: () => approveExc(r), title: t('actionApprove'), tone: 'success' }] : []}
           onEdit={() => excS.startEdit(r)}
           onDelete={() => excS.askDelete(r)}
@@ -824,7 +824,7 @@ export function CyberPage() {
     { header: t('colStage'),    cell: r => <Badge tone={STATUS_TONE[r.workflowStatus ?? r.status ?? ''] ?? 'neutral'} dot>{((r.workflowStatus ?? r.status ?? '')).replace(/_/g, ' ') || '—'}</Badge> },
     { header: '', align: 'end', width: '120px',
       cell: r => (
-        <RowActions
+        <RowActions disabled={isDemo}
           extras={r.workflowStatus === 'DETECTION' || r.workflowStatus === 'LOGGING' ? [{ Icon: PlayCircle, onClick: () => startResponse(r), title: t('actionAdvance'), tone: 'success' }] : []}
           onEdit={() => incS.startEdit(r)}
           onDelete={() => incS.askDelete(r)}
@@ -840,7 +840,7 @@ export function CyberPage() {
     { header: t('colCriticality'),    cell: r => <Badge tone={r.criticality === 'CRITICAL' ? 'danger' : r.criticality === 'HIGH' ? 'warning' : 'info'}>{r.criticality ?? '—'}</Badge> },
     { header: t('colStatus'),         cell: r => <Badge tone={r.status === 'ACTIVE' ? 'success' : 'neutral'} dot>{r.status ?? '—'}</Badge> },
     { header: '', align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => assetS.startEdit(r)} onDelete={() => assetS.askDelete(r)} /> },
+      cell: r => <RowActions disabled={isDemo} onEdit={() => assetS.startEdit(r)} onDelete={() => assetS.askDelete(r)} /> },
   ];
   // CY-A: raise an evidence request against another department, with a due date +
   // priority. The EvidenceRequestSlaScheduler then chases overdue requests. Anchored
@@ -890,7 +890,7 @@ export function CyberPage() {
       </span>
     ) },
     { header: '', align: 'end', width: '150px',
-      cell: r => <RowActions
+      cell: r => <RowActions disabled={isDemo}
         extras={[
           { Icon: Paperclip, onClick: () => setEvAttach(r), title: lang === 'ar' ? 'الملفات / المرفقات' : 'Files / attachments' },
           { Icon: Send,      onClick: () => setReqFor(r),   title: lang === 'ar' ? 'طلب دليل من إدارة' : 'Request evidence' },
@@ -919,7 +919,7 @@ export function CyberPage() {
     { header: t('colStatus'),     cell: r => <Badge tone={STATUS_TONE[r.workflowStatus ?? ''] ?? 'neutral'} dot>{(r.workflowStatus ?? '').replace(/_/g, ' ') || '—'}</Badge> },
     { header: '', align: 'end', width: '120px',
       cell: r => (
-        <RowActions
+        <RowActions disabled={isDemo}
           extras={r.workflowStatus !== 'COMPLETED' && r.workflowStatus !== 'CANCELLED' ? [{ Icon: Check, onClick: () => completePlan(r), title: t('actionApprove'), tone: 'success' }] : []}
           onEdit={() => apS.startEdit(r)}
           onDelete={() => apS.askDelete(r)}

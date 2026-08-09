@@ -182,7 +182,7 @@ export function ReportSchedulesPage() {
           { Icon: Play, onClick: () => runNow(s), title: t('rsRunNow'), tone: 'primary' },
           { Icon: s.isActive ? ToggleRight : ToggleLeft, onClick: () => togglePause(s), title: s.isActive ? t('rsPause') : t('rsResume'), tone: 'accent' },
         ];
-        return <RowActions extras={extras}
+        return <RowActions disabled={demoMode} extras={extras}
                   onEdit={() => { setEditing(s); setModalOpen(true); }}
                   onDelete={() => setConfirmDel(s)} />;
       }

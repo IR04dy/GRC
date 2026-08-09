@@ -495,7 +495,7 @@ export function ScmPage() {
     { header: t('colRisk'),        cell: r => <Badge tone={RISK_TONE[r.riskLevel ?? ''] ?? 'neutral'}>{r.riskLevel ?? '—'}</Badge> },
     { header: t('colStatus'),      cell: r => <Badge tone={STATUS_TONE[r.status] ?? 'neutral'} dot>{statusLabel(t, r.status)}</Badge> },
     { header: '', align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => supS.startEdit(r)} onDelete={() => supS.askDelete(r)} /> },
+      cell: r => <RowActions disabled={isDemo} onEdit={() => supS.startEdit(r)} onDelete={() => supS.askDelete(r)} /> },
   ];
 
   const onbCols: Column<ScmOnboardingDto>[] = [
@@ -517,7 +517,7 @@ export function ScmPage() {
               <Button variant="ghost" size="sm" Icon={XIcon}       onClick={() => rejectOnb(r)}>{t('scmActReject')}</Button>
             </>
           )}
-          <RowActions onEdit={() => onbS.startEdit(r)} />
+          <RowActions disabled={isDemo} onEdit={() => onbS.startEdit(r)} />
         </div>
       ) },
   ];
@@ -536,7 +536,7 @@ export function ScmPage() {
           {!r.escalatedToRisk && (
             <Button variant="ghost" size="sm" Icon={Flag} onClick={() => escalateAsm(r)}>{t('scmActEscalate')}</Button>
           )}
-          <RowActions onEdit={() => asmS.startEdit(r)} />
+          <RowActions disabled={isDemo} onEdit={() => asmS.startEdit(r)} />
         </div>
       ) },
   ];
@@ -556,7 +556,7 @@ export function ScmPage() {
       : <span style={{ color: 'var(--danger)' }}>—</span> },
     { header: t('colStatus'),        cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
     { header: '', align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => depS.startEdit(r)} onDelete={() => depS.askDelete(r)} /> },
+      cell: r => <RowActions disabled={isDemo} onEdit={() => depS.startEdit(r)} onDelete={() => depS.askDelete(r)} /> },
   ];
 
   const contractCols: Column<ScmContractDto>[] = [
@@ -574,7 +574,7 @@ export function ScmPage() {
       ? `${r.contractValue.toLocaleString()} ${r.currency ?? ''}` : '—', mono: true },
     { header: t('colStatus'),       cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
     { header: '', align: 'end', width: '90px',
-      cell: r => <RowActions onEdit={() => conS.startEdit(r)} /> },
+      cell: r => <RowActions disabled={isDemo} onEdit={() => conS.startEdit(r)} /> },
   ];
 
   const incidentCols: Column<ScmIncidentDto>[] = [
