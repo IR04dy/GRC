@@ -1053,6 +1053,47 @@ failed` line is ANSI-coloured. Follow-up **F2-172** filed to make promotion pers
 server's `triage()` takes `promotedToRecordId` from the client and creates nothing, so the target
 row is created on **neither** side.
 
+✔ **F2-172 CLOSED 2026-08-09 — the intake front door became real, and measuring the rewire before
+writing it is what turned a chore into two defects.** F2-171's follow-up said "call
+`POST /api/v1/intake` on submit and `PUT …/triage` on triage". Measuring what that would hit found
+**(a)** the server accepted **16** of the frontend's **26** intake kinds — the ten it rejected are the
+DD-88 HRSD and DD-94 MOC workflows, including the **24-hour GOSI workplace-injury notification** and
+the **WPS payroll confirmation**, both statutory — while `IntakeService`'s javadoc claimed the two
+catalogues were mirrored (they were, once, at DD-82); and **(b)** `POST /api/v1/intake` was guarded by
+`INTAKE:WRITE`, **held by 3 of 69 roles, all administrators**, so repointing the client would have
+403'd every employee reporting a security event (NCA ECC 6.1) or a privacy breach (PDPL Art. 27).
+Opened to `isAuthenticated()` under **ADR-010 §Sanctioned exceptions** — it *subsumes*
+`CoiController#submitDeclaration`, admitted for the same reason at F2-144(b), so the argument did not
+have to be constructed, only noticed — with V374's `submitter_user_id` landing **first**, for
+F2-144's reason. The sharper half has no COI counterpart: `submitterIsAnonymous` also arrived from
+the body, and obeying it unconditionally would let any caller make any submission unattributable
+through the field that exists to protect whistleblowers, so it is honoured only where the catalogue
+allows it and nothing identifying is stored when it is. `triage()` now derives the target register
+from the kind and **refuses** a client-supplied record id.
+
+⚙ **The slice boundary was set by a test, not by me.** I had scoped this server-only, planning the
+client rewire as a follow-up; `FrontendEndpointContractTest` refused the commit because
+`GET /{id}` had no caller — a ceiling firing in the direction a ceiling normally cannot, and a better
+scoping decision than my own.
+
+⚠ Four of my own errors, every one caught by mutation or by the browser rather than by reading. The
+mutation harness left the running backend executing a **mutant** (`copy2` preserves mtime, so Maven
+skipped the recompile — F2-80's trap), and 26 of 27 probe legs had been measured against code that
+differed from the tree. `IntakeRecordDto.from()` never copied `submitterUserId`, so every response
+said "nobody" while both the unit test (entity at `repo.save`) and the pyodbc probe (the column)
+stayed green — neither goes through the mapper. And the new dead-button guard shipped vacuous
+**twice**: once reading its own documentation, once because `[^>]*?` cannot cross the `>` in `=>`.
+
+The browser also found a **second live defect**: the public DSR form's Submit was `type="button"`
+beside an empty `onClick`, so clicking it had never done anything — 19 files render a
+`<form onSubmit>`, 16 pass `type="submit"`, and this was the only dead one. Filed **F2-173** (shared
+`CR` reference-code prefix), **F2-174** (`assigned_to` stakeholder codes that resolve to nobody) and
+**F2-175** (`MlModelDriftService` is a second writer to `intake.intake_records` that bypasses
+`IntakeService`). Still open and unchanged: **nothing creates the promoted register record on either
+side** — that wants a port with one adapter per target module per ADR-012, so F2-171's placeholder
+machinery stays load-bearing — and `/portal/dsr` stays blocked by **F2-138**, but now *says so*
+instead of issuing a reference code.
+
 ✔ **2026-08-09 — [[F2-170]] CLOSED (P3): nothing asked whether the endpoint the frontend calls
 EXISTS — and this time the answer was "all of them".** Opened out of [[F2-165]]'s dark-method triage,
 sorted **by endpoint** as that finding's own correction demands. Three reachability instruments were

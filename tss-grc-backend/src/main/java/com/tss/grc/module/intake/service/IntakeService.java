@@ -1,5 +1,6 @@
 package com.tss.grc.module.intake.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.intake.dto.IntakePublicStatusDto;
 import com.tss.grc.module.intake.dto.IntakeRecordDto;
@@ -17,17 +18,56 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.Optional;
 
 /**
- * IntakeService — DD-82.
+ * IntakeService — DD-82, reworked by F2-172.
  *
- * Implements the same submit / triage / case-track lifecycle the React
- * useIntake() hook drives. Routing metadata (default assignee, SLA hours,
- * code prefix, target register) is mirrored from frontend INTAKE_CATALOG
- * so the two stay in sync. When the backend grows further, this catalog
- * should move to a shared module.
+ * <p>Implements the submit / triage / case-track lifecycle the React {@code useIntake()} hook
+ * drives. Routing metadata lives in {@link IntakeKindRouting}, which is parity-checked against the
+ * frontend catalogue by {@code IntakeCatalogueParityTest} — see that class for what the three
+ * parallel maps this replaced were getting wrong.
+ *
+ * <h3>What F2-172 changed, and why each change is a security property rather than a tidy-up</h3>
+ *
+ * <ol>
+ *   <li><b>The submitter is bound by the server.</b> {@code submit()} read
+ *       {@code submitterName}/{@code Email}/{@code Phone}/{@code Role} out of the request body and
+ *       stored them verbatim, and the table had no column naming a platform user at all. That is
+ *       RC-E in the platform's front door. It was latent only because the endpoint's guard admitted
+ *       3 of 69 roles, all administrators — the same shape as F2-144, where a lockout was the only
+ *       thing preventing an unbound write. V374 adds {@code submitter_user_id} and this class fills
+ *       it from {@link CurrentActor}; the body's identity fields are <b>ignored, not validated</b>,
+ *       following {@code CoiService#declarantFor}'s reasoning that rejecting them would leak
+ *       whether another identity exists.</li>
+ *
+ *   <li><b>An anonymity claim is honoured only where the catalogue allows it.</b> This is the
+ *       non-obvious half. {@code submitterIsAnonymous} arrives from the client, and if the server
+ *       simply obeyed it, then <em>every</em> submission could be made unattributable on request —
+ *       which would defeat the binding above completely, using the field intended to protect
+ *       whistleblowers. So the claim is honoured for the kinds whose catalogue entry sets
+ *       {@code allowsAnonymous} (SPEAKUP, BREACH_REPORT, VRP_DISCLOSURE) and refused everywhere
+ *       else. Where it IS honoured, nothing identifying is stored — not the user id, and not the
+ *       name, email or phone the body may still carry — because ISO 37001 §8.3 and Nazaha expect
+ *       real anonymity, and a record that quietly retains the reporter's identity is worse than one
+ *       that never claimed to hide it.</li>
+ *
+ *   <li><b>The promotion target is server truth.</b> {@code triage()} took
+ *       {@code promotedToEntityType} and {@code promotedToRecordId} from the request body and
+ *       created nothing, so "promotion creates the register row" was implemented on neither side
+ *       (F2-171 found the client half minting {@code Date.now() % 1_000_000} — a positive integer
+ *       in exactly the range real IDENTITY values occupy). The type is now derived from the
+ *       catalogue and the id is <b>refused</b>: whoever creates the downstream row is the only
+ *       party that can know its id, and until an adapter exists to create it the honest value is
+ *       NULL with an event note saying so. Accepting the client's number would have made a
+ *       placeholder durable and visible to every user in the tenant, which is strictly worse than
+ *       the browser-local one it replaced.</li>
+ * </ol>
+ *
+ * <p>⚠ Still open, and deliberately not papered over: nothing creates the promoted register record.
+ * That is F2-172's second half — a port declared here with one adapter per target module, per
+ * ADR-012's boundary rules — and it is why {@code promotedToRecordId} stays NULL rather than
+ * receiving a synthesised value.
  */
 @Service
 @RequiredArgsConstructor
@@ -36,57 +76,15 @@ public class IntakeService {
     private final IntakeRecordRepository repo;
     private static final SecureRandom RNG = new SecureRandom();
 
-    /** SLA hours per intake kind — mirrors frontend INTAKE_CATALOG. */
-    private static final Map<String, Integer> SLA_HOURS = Map.ofEntries(
-        Map.entry("DSR_REQUEST",         30 * 24),
-        Map.entry("BREACH_REPORT",       72),
-        Map.entry("VRP_DISCLOSURE",      24 * 5),
-        Map.entry("SPEAKUP",             24 * 7),
-        Map.entry("SECURITY_INCIDENT",   72),
-        Map.entry("PRIVACY_BREACH",      72),
-        Map.entry("RISK_ISSUE",          24 * 14),
-        Map.entry("CONTROL_OBSERVATION", 24 * 14),
-        Map.entry("POLICY_EXCEPTION",    24 * 7),
-        Map.entry("VENDOR_ONBOARDING",   24 * 14),
-        Map.entry("DPIA_INITIATION",     24 * 14),
-        Map.entry("BIA_SUBMISSION",      24 * 30),
-        Map.entry("AUDIT_REQUEST",       24 * 14),
-        Map.entry("CHANGE_REQUEST",      48),
-        Map.entry("ETHICS_DISCLOSURE",   24 * 14),
-        Map.entry("CONTROL_ATTESTATION", 24 * 14)
-    );
-
-    /** Default assignee per intake kind. */
-    private static final Map<String, String> DEFAULT_ASSIGNEE = Map.ofEntries(
-        Map.entry("DSR_REQUEST",         "DPO"),
-        Map.entry("BREACH_REPORT",       "DPO"),
-        Map.entry("VRP_DISCLOSURE",      "CISO_OFFICE"),
-        Map.entry("SPEAKUP",             "ETHICS_CTE"),
-        Map.entry("SECURITY_INCIDENT",   "CSIRT"),
-        Map.entry("PRIVACY_BREACH",      "DPO"),
-        Map.entry("RISK_ISSUE",          "RISK_OFFICER"),
-        Map.entry("CONTROL_OBSERVATION", "COMPLIANCE_LEAD"),
-        Map.entry("POLICY_EXCEPTION",    "POLICY_OFFICER"),
-        Map.entry("VENDOR_ONBOARDING",   "TPRM_LEAD"),
-        Map.entry("DPIA_INITIATION",     "DPO"),
-        Map.entry("BIA_SUBMISSION",      "BCM_LEAD"),
-        Map.entry("AUDIT_REQUEST",       "AUDIT_LEAD"),
-        Map.entry("CHANGE_REQUEST",      "CAB"),
-        Map.entry("ETHICS_DISCLOSURE",   "ETHICS_OFFICER"),
-        Map.entry("CONTROL_ATTESTATION", "COMPLIANCE_LEAD")
-    );
-
-    /** Two-letter code prefix per intake kind for human-friendly tracking codes. */
-    private static final Map<String, String> CODE_PREFIX = Map.ofEntries(
-        Map.entry("DSR_REQUEST", "DS"),         Map.entry("BREACH_REPORT", "BR"),
-        Map.entry("VRP_DISCLOSURE", "VR"),      Map.entry("SPEAKUP", "SU"),
-        Map.entry("SECURITY_INCIDENT", "SI"),   Map.entry("PRIVACY_BREACH", "PB"),
-        Map.entry("RISK_ISSUE", "RI"),          Map.entry("CONTROL_OBSERVATION", "CO"),
-        Map.entry("POLICY_EXCEPTION", "PE"),    Map.entry("VENDOR_ONBOARDING", "VO"),
-        Map.entry("DPIA_INITIATION", "DI"),     Map.entry("BIA_SUBMISSION", "BI"),
-        Map.entry("AUDIT_REQUEST", "AR"),       Map.entry("CHANGE_REQUEST", "CR"),
-        Map.entry("ETHICS_DISCLOSURE", "ED"),   Map.entry("CONTROL_ATTESTATION", "CA")
-    );
+    /**
+     * Event note written when a triager promotes an intake. It names the absence rather than
+     * implying a record: the old note read {@code "Promoted to DPIA #482913"}, naming an id that
+     * belonged to nothing on the server and, at a measured 0.056% of promotions in dev, to a real
+     * unrelated record.
+     */
+    static final String PROMOTION_TARGET_PENDING =
+        "Promoted. The %s record has not been created yet — intake promotion does not yet write to "
+        + "the target register (F2-172), so this intake is the only record of the decision.";
 
     @Transactional
     public IntakeRecordDto submit(IntakeSubmissionRequest req) {
@@ -94,34 +92,47 @@ public class IntakeService {
         if (orgId == null) {
             throw new IllegalStateException("No tenant context — public intake submission requires an org-resolver");
         }
-        if (!SLA_HOURS.containsKey(req.getKind())) {
+        IntakeKindRouting.Routing routing = IntakeKindRouting.get(req.getKind());
+        if (routing == null) {
             throw new IllegalArgumentException("Unknown intake kind: " + req.getKind());
         }
 
+        // ── The two identity decisions, in this order. ──────────────────────────────────────────
+        // (1) Is the submission anonymous? A claim is a request, not an instruction: it is honoured
+        //     only for the kinds whose catalogue entry allows it. Otherwise every intake could be
+        //     filed unattributably on demand.
+        boolean anonymous = Boolean.TRUE.equals(req.getSubmitterIsAnonymous()) && routing.allowsAnonymous();
+        // (2) Who filed it? From the security context, never from the body. NULL for an honoured
+        //     anonymous submission — there the absence IS the feature.
+        Long submitterUserId = anonymous ? null : CurrentActor.userId();
+        String actorLabel = anonymous ? "anonymous"
+            : Optional.ofNullable(CurrentActor.username()).orElse("unknown");
+
         IntakeRecord r = new IntakeRecord();
         r.setOrganisationId(orgId);
-        r.setReferenceCode(generateReferenceCode(req.getKind()));
+        r.setReferenceCode(generateReferenceCode(routing));
         r.setKind(req.getKind());
         r.setStatus("TRIAGING");                   // auto-acknowledge → triaging
         r.setChannel(req.getChannel());
-        r.setSubmitterIsAnonymous(req.getSubmitterIsAnonymous());
+        r.setSubmitterIsAnonymous(anonymous);
+        r.setSubmitterUserId(submitterUserId);
         r.setSubmitterRole(req.getSubmitterRole());
-        r.setSubmitterName(req.getSubmitterName());
-        r.setSubmitterEmail(req.getSubmitterEmail());
-        r.setSubmitterPhone(req.getSubmitterPhone());
+        // For an honoured anonymous submission nothing identifying is persisted, whatever the body
+        // carried. Dropping these is the point of the channel, not an oversight.
+        r.setSubmitterName(anonymous ? null : req.getSubmitterName());
+        r.setSubmitterEmail(anonymous ? null : req.getSubmitterEmail());
+        r.setSubmitterPhone(anonymous ? null : req.getSubmitterPhone());
         r.setPayload(req.getPayload());
         r.setSeverity(Optional.ofNullable(req.getSeverity()).orElse("MEDIUM"));
         r.setLocale(req.getLocale());
 
         LocalDateTime now = LocalDateTime.now();
         r.setAcknowledgedAt(now);
-        r.setAssignedTo(DEFAULT_ASSIGNEE.get(req.getKind()));
-        r.setSlaDueAt(now.plusHours(SLA_HOURS.get(req.getKind())));
+        r.setAssignedTo(routing.defaultAssignee());
+        r.setSlaDueAt(now.plusHours(routing.slaHours()));
 
         // Auto-acknowledgement event + triage-routing event.
-        r.getHistory().add(buildEvent(r, now, "SUBMITTED",
-            req.getSubmitterIsAnonymous() ? "anonymous"
-                : Optional.ofNullable(req.getSubmitterEmail()).orElse(Optional.ofNullable(req.getSubmitterName()).orElse("unknown")),
+        r.getHistory().add(buildEvent(r, now, "SUBMITTED", actorLabel,
             "Submitted via " + req.getChannel()));
         r.getHistory().add(buildEvent(r, now, "TRIAGING", "system",
             "Auto-acknowledged. Routed to " + r.getAssignedTo()));
@@ -137,6 +148,26 @@ public class IntakeService {
         else if (kind != null) page = repo.findByOrganisationIdAndKind(orgId, kind, pageable);
         else page = repo.findByOrganisationId(orgId, pageable);
         return page.map(IntakeRecordDto::from);
+    }
+
+    /**
+     * One record with its full event history — the read {@code IntakeController}'s javadoc has
+     * advertised since DD-82 and which was never written. Org-scoped like {@link #triage}: a record
+     * belonging to another tenant is reported as absent rather than forbidden, so the response does
+     * not disclose that the id exists.
+     *
+     * <p>Returns a DTO, not the entity. {@code IntakeRecord.history} is a LAZY {@code @OneToMany},
+     * so a handler returning the entity would 500 outside the session — the landmine F2-158 found
+     * live in {@code RoleController#list}, and which {@code LazyEntitySerialisationInvariantTest}
+     * now refuses outright.
+     */
+    @Transactional(readOnly = true)
+    public IntakeRecordDto findOne(Long id) {
+        Long orgId = TenantContext.getCurrentTenant();
+        return repo.findById(id)
+            .filter(x -> orgId == null || orgId.equals(x.getOrganisationId()))
+            .map(IntakeRecordDto::from)
+            .orElseThrow(() -> new EntityNotFoundException("IntakeRecord " + id));
     }
 
     /** Public case-tracker lookup — anonymous submitters use this from
@@ -163,16 +194,24 @@ public class IntakeService {
         };
         r.setStatus(newStatus);
 
+        String targetType = null;
         if ("PROMOTED".equals(newStatus)) {
-            r.setPromotedToEntityType(req.getPromotedToEntityType());
-            r.setPromotedToRecordId(req.getPromotedToRecordId());
+            // The target register is a property of the kind, not a caller's claim. A routing is
+            // guaranteed present: submit() refuses an uncatalogued kind, so a stored record always
+            // has one.
+            IntakeKindRouting.Routing routing = IntakeKindRouting.get(r.getKind());
+            targetType = routing != null ? routing.defaultTarget() : null;
+            r.setPromotedToEntityType(targetType);
+            // Deliberately NOT req.getPromotedToRecordId(). See the class javadoc: no code creates
+            // the downstream row yet, so the only id a client could supply is invented.
+            r.setPromotedToRecordId(null);
             r.setPromotedAt(LocalDateTime.now());
         } else if ("REJECTED".equals(newStatus)) {
             r.setRejectionReason(req.getNote());
         }
 
         String note = Optional.ofNullable(req.getNote()).orElse(switch (req.getDecision()) {
-            case "PROMOTE" -> "Promoted to " + req.getPromotedToEntityType() + " #" + req.getPromotedToRecordId();
+            case "PROMOTE" -> PROMOTION_TARGET_PENDING.formatted(targetType);
             case "REJECT"  -> "Rejected";
             default        -> "Closed without promotion";
         });
@@ -192,9 +231,8 @@ public class IntakeService {
     }
 
     /** Generate the public reference code — format "XX-XXXX-YYYY". */
-    private String generateReferenceCode(String kind) {
-        String prefix = CODE_PREFIX.getOrDefault(kind, "II");
-        return prefix + "-" + segment() + "-" + segment();
+    private String generateReferenceCode(IntakeKindRouting.Routing routing) {
+        return routing.codePrefix() + "-" + segment() + "-" + segment();
     }
 
     private String segment() {

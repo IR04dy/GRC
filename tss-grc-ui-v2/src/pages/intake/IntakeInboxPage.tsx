@@ -20,6 +20,7 @@ import {
   hoursUntilSla,
   type IntakeRecord, type IntakeKind,
 } from '../../lib/intake';
+import { ApiError } from '../../lib/api';
 import { computeChangeRisk } from '../../lib/changeRisk';
 import { ChangeRiskPanel } from '../../components/intake/ChangeRiskPanel';
 
@@ -47,7 +48,7 @@ const KIND_TONE: Record<string, 'info' | 'warning' | 'danger' | 'accent' | 'prim
 export function IntakeInboxPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { items, triage } = useIntake();
+  const { items, loading, error, triage, refreshOne } = useIntake();
   const [tab, setTab] = useState<TabId>('open');
   const [filterKind, setFilterKind] = useState<IntakeKind | 'ALL'>('ALL');
   const [triageTarget, setTriageTarget] = useState<IntakeRecord | null>(null);
@@ -117,10 +118,23 @@ export function IntakeInboxPage() {
           </select>
           <Badge tone="primary">{visible.length}</Badge>
         </div>}>
-        {visible.length === 0
+        {/* F2-172 — three states where there used to be two. The old store merged five
+            fabricated submissions into every tenant's inbox, so "empty" was unreachable and a
+            failed load was indistinguishable from a quiet queue. Both now say which they are. */}
+        {error
+          ? <EmptyState Icon={Inbox} title={lang === 'ar' ? 'تعذّر تحميل صندوق الفرز' : 'Could not load the intake inbox'} sub={error} />
+          : loading
+          ? <EmptyState Icon={Inbox} title={lang === 'ar' ? 'جارٍ التحميل…' : 'Loading…'} />
+          : visible.length === 0
           ? <EmptyState Icon={Inbox} title={t('inboxEmpty')} sub={t('inboxEmptyBody')} />
           : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {visible.map(r => <InboxRow key={r.id} rec={r} onTriage={() => setTriageTarget(r)} t={t} lang={lang} />)}
+              {visible.map(r => <InboxRow key={r.id} rec={r} onTriage={() => {
+                setTriageTarget(r);
+                // F2-172 — re-read the record before the triager decides on it. The list is a
+                // snapshot from page load; two triagers on the same queue would otherwise both
+                // act on it, and a submission promoted twice is not recoverable from the events.
+                void refreshOne(r.id).then(fresh => { if (fresh) setTriageTarget(fresh); });
+              }} t={t} lang={lang} />)}
             </div>
         }
       </Card>
@@ -129,14 +143,24 @@ export function IntakeInboxPage() {
         <TriageModal
           rec={triageTarget}
           onClose={() => setTriageTarget(null)}
-          onDecide={(decision, extra) => {
-            const result = triage(triageTarget.id, decision, 'demo.triager@tss.sa', extra);
-            if (decision === 'PROMOTE' && result) {
-              toast.success(`${t('inboxToastPromoted')} → ${result.entityType} #${result.recordId}`);
-            } else {
-              toast.success(t(decision === 'REJECT' ? 'inboxToastRejected' : decision === 'CLOSE' ? 'inboxToastClosed' : 'inboxToastPromoted'));
+          onDecide={async (decision, extra) => {
+            // F2-172 — the decision now goes to PUT /api/v1/intake/{id}/triage. The `actor`
+            // argument is gone: it used to be the literal 'demo.triager@tss.sa', and the
+            // server stamps the actor from the authenticated principal.
+            try {
+              const result = await triage(triageTarget.id, decision, extra?.rejectionReason);
+              if (decision === 'PROMOTE' && result) {
+                // Deliberately does NOT name an id. The target register row does not exist
+                // yet on either side (F2-172's second half), and the old toast interpolated
+                // a fabricated one — F2-171's defect, in a message the triager trusts.
+                toast.success(`${t('inboxToastPromoted')} → ${result.entityType}`);
+              } else {
+                toast.success(t(decision === 'REJECT' ? 'inboxToastRejected' : decision === 'CLOSE' ? 'inboxToastClosed' : 'inboxToastPromoted'));
+              }
+              setTriageTarget(null);
+            } catch (e) {
+              toast.danger(e instanceof ApiError ? e.message : 'Could not record the triage decision');
             }
-            setTriageTarget(null);
           }}
         />
       )}
@@ -165,15 +189,33 @@ function InboxRow({ rec, onTriage, t, lang }: {
         <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{rec.submitterEmail ?? rec.submitterPhone ?? '—'}</div>
       </div>;
 
-  // Pull a one-line "headline" from the payload
+  // Pull a one-line "headline" from the payload.
+  //
+  // ⚠ F2-172 — this handled 5 kinds and dumped raw JSON for the other 21, and the 5 are exactly
+  // the kinds the deleted `SEED_INTAKE` fixture contained (DSR, SpeakUp, security incident,
+  // policy exception, VRP). It had been written to make the fabricated rows read well, and
+  // nothing else could reach this list, so the fallback was unreachable in practice. With the
+  // inbox server-backed all 26 kinds arrive — and the first one filed in the browser, a GOSI
+  // workplace-injury notification, rendered as `{"summary":"…","category":"PHISHING","obser`.
+  // ⚙ A fixture-shaped code path is invisible while the fixture is the only input.
   const headline = (() => {
     const p = rec.payload as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
     if (rec.kind === 'DSR_REQUEST') return `${p.requestType} — ${p.scope}`;
     if (rec.kind === 'SPEAKUP') return `${p.category} — ${p.summary}`;
     if (rec.kind === 'SECURITY_INCIDENT') return `${p.category} — ${p.summary}`;
     if (rec.kind === 'POLICY_EXCEPTION') return `${p.policyTitle ?? p.policyCode} — ${p.exceptionScope}`;
     if (rec.kind === 'VRP_DISCLOSURE') return `${p.category} on ${p.affectedUrl ?? '—'}`;
-    return JSON.stringify(p).slice(0, 100);
+    // Generic: prefer the fields the form schemas actually use for a one-liner, in the order a
+    // reader would want them, then fall back to the first non-trivial string in the payload.
+    const lead = str(p.summary) ?? str(p.description) ?? str(p.scope) ?? str(p.title)
+      ?? str(p.justification) ?? str(p.businessJustification) ?? str(p.projectName)
+      ?? str(p.vendorName) ?? str(p.employeeName) ?? str(p.observation)
+      ?? Object.values(p).map(str).find(v => v && v.length > 3) ?? null;
+    const qualifier = str(p.category) ?? str(p.requestType) ?? str(p.changeType) ?? str(p.severitySelfAssessed);
+    if (lead) return qualifier ? `${qualifier} — ${lead}` : lead;
+    // Nothing readable in the payload — say so rather than printing braces at a triager.
+    return lang === 'ar' ? 'لا يوجد ملخّص في النموذج' : 'No summary in the submitted form';
   })();
 
   return (

@@ -88,8 +88,8 @@ PUBLISHED = {
     "zero_test_packages": 7,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 361,
-    "migration_head": 373,
+    "migration_files": 362,          # +V374 (F2-172, intake submitter binding)
+    "migration_head": 374,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
     "fe_pages": 353,          # F2-142 retired 3; F2-16 tranche 1 +1, tranche 2 +4, tranche 3 +7
                              # regulatory tabs). A BUMP, not a narrowing — see MEASURED_BASELINE:

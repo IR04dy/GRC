@@ -50,6 +50,20 @@ public class IntakeRecord extends BaseEntity {
     @Column(name = "submitter_is_anonymous", nullable = false)
     private Boolean submitterIsAnonymous = false;
 
+    /**
+     * The platform user who filed this submission — F2-172, V374.
+     *
+     * <p>Set from the security context by {@code IntakeService#submit}, never from the request
+     * body. {@code NULL} is a meaningful value and not a gap: an anonymous submission of an
+     * anonymity-allowing kind (SPEAKUP / BREACH_REPORT / VRP_DISCLOSURE) stores no identity at all,
+     * because ISO 37001 §8.3 and Nazaha expect a whistleblowing channel to be genuinely anonymous.
+     *
+     * <p>No {@code @ManyToOne} to a user entity, deliberately: a submission is an immutable record
+     * of an event and must survive the account being deleted, exactly as an audit-log row does.
+     */
+    @Column(name = "submitter_user_id")
+    private Long submitterUserId;
+
     @Column(name = "submitter_role", length = 20)
     private String submitterRole;
 

@@ -106,20 +106,51 @@ describe('F2-171 — the placeholder id can never name a real record', () => {
    * ⚠ The defect was at the *producer*, and every assertion above tests the helper instead.
    * Mutation caught that: reverting `intake.ts` to `Date.now() % 1_000_000` left all of them
    * green, because none of them go through the code that was wrong. This one does — it drives
-   * the real hook, promotes a real seeded intake, and reads what landed in the overlay.
+   * the real hook and reads what landed in the overlay.
+   *
+   * <p>Rewritten by F2-172. It used to promote one of five fabricated `SEED_INTAKE` records
+   * through a synchronous hook; the seed is deleted and `triage()` now awaits
+   * `PUT /api/v1/intake/{id}/triage`, so the server is stubbed and the hook is driven for
+   * real. The property under test is unchanged and still the one that matters: whatever the
+   * server answers, the placeholder the overlay receives must be negative.
+   *
+   * <p>Note what the stub deliberately returns — `promotedToRecordId: null`. That is the
+   * server's real behaviour after F2-172: it refuses a client-supplied target id and creates
+   * no downstream row, so the register overlay is the only thing holding a local id and it
+   * must never be mistakable for a record.
    */
   it('promoting a real intake through the hook lands a negative id in the overlay', async () => {
     localStorage.clear();
     const { renderHook, act, waitFor } = await import('@testing-library/react');
+    const apiMod = await import('../lib/api');
     const { useIntake } = await import('../lib/intake');
     const { usePromoted } = await import('../lib/promotedRecords');
 
+    const wire = (status: string, promotedTo: string | null) => ({
+      id: 4321, referenceCode: 'DI-K7L9-Z4M2', kind: 'DPIA_INITIATION', status,
+      channel: 'WEB_FORM', submitterIsAnonymous: false, submitterUserId: 5,
+      submitterRole: 'EMPLOYEE', submitterName: null, submitterEmail: null, submitterPhone: null,
+      payload: '{"projectName":"Falcon"}', assignedTo: 'DPO', slaDueAt: null, severity: 'MEDIUM',
+      acknowledgedAt: '2026-08-09T10:00:00', promotedToEntityType: promotedTo,
+      promotedToRecordId: null, promotedAt: promotedTo ? '2026-08-09T11:00:00' : null,
+      rejectionReason: null, locale: 'en', history: [],
+    });
+
+    vi.spyOn(apiMod.intakeApi, 'list').mockResolvedValue(
+      { content: [wire('TRIAGING', null)], totalElements: 1 } as never);
+    const triageSpy = vi.spyOn(apiMod.intakeApi, 'triage')
+      .mockResolvedValue(wire('PROMOTED', 'DPIA') as never);
+
     const intake = renderHook(() => useIntake());
-    const target = intake.result.current.items.find(r => r.status === 'TRIAGING' || r.status === 'SUBMITTED');
-    expect(target, 'no triageable intake in the seed — the fixture moved').toBeTruthy();
+    await waitFor(() => expect(intake.result.current.loading).toBe(false));
+    const target = intake.result.current.items[0];
+    expect(target, 'the stubbed inbox produced no record — the hook no longer reads it').toBeTruthy();
+    expect(typeof target.id, 'the record id is the server id now, not a client string').toBe('number');
 
     let outcome: { entityType: string; recordId: string | number } | null = null;
-    act(() => { outcome = intake.result.current.triage(target!.id, 'PROMOTE', 'tester'); });
+    await act(async () => { outcome = await intake.result.current.triage(target.id, 'PROMOTE'); });
+    expect(triageSpy, 'triage did not reach the server — it is a local mutation again')
+      .toHaveBeenCalledWith(4321, { decision: 'PROMOTE' });
     expect(outcome, 'triage returned no promotion result').toBeTruthy();
 
     const recordId = outcome!.recordId;

@@ -4210,3 +4210,115 @@ export const notificationApi = {
   markAllRead: () =>
     api.patch<void>('/api/v1/notifications/read-all', {}),
 };
+
+// ── Intake (the front door) — F2-172 ──────────────────────────────────────
+/**
+ * The intake substrate's server client.
+ *
+ * <p>Until F2-172 nothing in the product called `/api/v1/intake`. `IntakeController` and
+ * `IntakeService` were built at DD-82, were reachable, and had never been invoked: probed
+ * live on 2026-08-09 the inbox answered 200 with `totalElements: 0` and
+ * `intake.intake_records` held 0 rows, while `lib/intake.ts` drove the whole
+ * submit → triage → promote lifecycle in `localStorage` (F2-171). So a submission was
+ * invisible to every other user and died with the browser's site data.
+ *
+ * Two things had to be true on the server before this client could exist, and neither was:
+ * the server accepted 16 of the frontend's 26 intake kinds, and `POST` was guarded by
+ * `INTAKE:WRITE` — held by 3 of 69 roles, all administrators. See `IntakeKindRouting` and
+ * `IntakeSubmitGuardTest`.
+ *
+ * `payload` crosses the wire as a JSON *string* (the column is NVARCHAR(MAX)); the mapping
+ * in `lib/intake.ts` owns the parse so no page has to know.
+ */
+export interface IntakeRecordWire {
+  id: number;
+  referenceCode: string;
+  kind: string;
+  status: string;
+  channel: string;
+  submitterIsAnonymous: boolean;
+  submitterUserId: number | null;
+  submitterRole: string | null;
+  submitterName: string | null;
+  submitterEmail: string | null;
+  submitterPhone: string | null;
+  payload: string | null;
+  assignedTo: string | null;
+  slaDueAt: string | null;
+  severity: string | null;
+  acknowledgedAt: string;
+  promotedToEntityType: string | null;
+  promotedToRecordId: string | null;
+  promotedAt: string | null;
+  rejectionReason: string | null;
+  locale: string | null;
+  history: { at: string; status: string; actor: string; note: string | null }[];
+}
+
+/** The PII-free projection the PUBLIC tracker returns — deliberately not IntakeRecordWire.
+ *  A reference code is a weak, enumerable bearer, so the server never sends submitter
+ *  identity, the payload, the assignee or the event history to an unauthenticated caller
+ *  (SEC-FIN-001). A page rendering this must show less, not fill the gaps. */
+export interface IntakePublicStatusWire {
+  referenceCode: string;
+  kind: string;
+  status: string;
+  acknowledgedAt: string;
+  slaDueAt: string | null;
+}
+
+export interface IntakeSubmissionBody {
+  kind: string;
+  channel: string;
+  submitterIsAnonymous: boolean;
+  submitterRole?: string;
+  submitterName?: string;
+  submitterEmail?: string;
+  submitterPhone?: string;
+  payload: string;
+  severity?: string;
+  locale?: string;
+}
+
+export const intakeApi = {
+  /** Guarded by `isAuthenticated()`, not a permission — filing is a duty every employee is
+   *  under (ADR-010 §Sanctioned exceptions). The submitter is bound server-side from the
+   *  token, so the identity fields here are descriptive and never decide attribution. */
+  submit: (body: IntakeSubmissionBody) =>
+    api.post<IntakeRecordWire>('/api/v1/intake', body),
+  /** Triager inbox. `INTAKE:READ` — reading other people's submissions is a privilege even
+   *  though filing is not: this inbox holds whistleblowing reports and DSRs. */
+  list: (params?: { status?: string; kind?: string; page?: number; size?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.set('status', params.status);
+    if (params?.kind) q.set('kind', params.kind);
+    q.set('page', String(params?.page ?? 0));
+    q.set('size', String(params?.size ?? 100));
+    return api.get<PageResponse<IntakeRecordWire>>(`/api/v1/intake?${q.toString()}`);
+  },
+  get: (id: number) => api.get<IntakeRecordWire>(`/api/v1/intake/${id}`),
+  triage: (id: number, body: { decision: 'PROMOTE' | 'REJECT' | 'CLOSE'; note?: string }) =>
+    api.put<IntakeRecordWire>(`/api/v1/intake/${id}/triage`, body),
+  /**
+   * The submit path for a genuinely public surface (`/portal/dsr` — a data subject
+   * exercising PDPL Art. 4-7, who has no account).
+   *
+   * ⚠ **This is expected to be refused today, and calling it anyway is the point.**
+   * F2-138 records that no anonymous intake endpoint exists: `POST /api/v1/intake` is
+   * `isAuthenticated()`, so a member of the public gets a 401. The page shows that refusal.
+   * The alternative — not calling, and printing a notice — would leave the portal unable to
+   * start working when the anonymous endpoint lands, and it is a memory-based control.
+   * What must never come back is the third option, which is what this replaced: mint a
+   * reference code client-side and tell the data subject their statutory clock has started.
+   *
+   * `anonymous: true` is load-bearing. Without it a 401 sends `redirectToLogin()`, so a
+   * data subject filing a DSR would be bounced to a staff login screen.
+   */
+  submitPublic: (body: IntakeSubmissionBody) =>
+    api.post<IntakeRecordWire>('/api/v1/intake', body, { anonymous: true }),
+  /** Public — no token. `anonymous: true` keeps the Authorization header off so a stale
+   *  session cannot turn a public lookup into a 401 redirect. */
+  track: (referenceCode: string) =>
+    api.get<IntakePublicStatusWire>(
+      `/api/v1/intake/track/${encodeURIComponent(referenceCode)}`, { anonymous: true }),
+};

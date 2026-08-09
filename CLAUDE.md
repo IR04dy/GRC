@@ -124,7 +124,7 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V373 packaged; next free V374** (361 files; ⚠ this line said "V1→V295 / next free
+— **V1→V374 packaged; next free V375** (362 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
@@ -137,8 +137,8 @@ short of dev (`ORG_ADMIN` −30, unable to read seven modules), and re-running t
 *snapshot*, not a rule; `RoleGrantDerivationRatchetTest` pins the 6 legacy sites and fails a 7th.
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V373 are pending** the
-next jar — 29 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V374 are pending** the
+next jar — 30 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -193,7 +193,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 |---|---|
 | Backend | Spring Boot 3.5.x, **Java 17 (pinned — Lombok breaks on newer)**, Spring Security 6 |
 | Auth | JJWT — Bearer access token + HttpOnly refresh cookie; FE auto-refreshes on 401 |
-| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V373 (OFF in dev) |
+| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V374 (OFF in dev) |
 | ORM | Hibernate 6 / Spring Data JPA, `ddl-auto=none` |
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
@@ -213,7 +213,8 @@ every endpoint an FE client calls must have a controller — a **hard zero, no a
 measured 0/1,782. It exists because F2-158's `RoleController#list` answered **500 to every
 caller since it was written** and a mock fallback made that invisible; F2-169 removed those
 fallbacks, so a wrong path now surfaces. Two decrease-only ceilings ride with it:
-**421 endpoints have no FE client, 208 of them guarded writes** — 2.2× F2-165's 189 dark
+**417 endpoints have no FE client, 206 of them guarded writes** (was 421/208 until F2-172 wired
+the intake substrate) — 2.2× F2-165's 189 dark
 *methods*, because one method serves several endpoints and a clientless controller has no
 method to be dark. ⚠ Its backend half is **reflection, never a source regex**: as a regex it
 reported 1,763 of 1,809 endpoints missing, then 48 of `/api/v1/cyber` alone, because
@@ -362,14 +363,34 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   trades a 500 for an unbounded join on every read.
 - `seed_real_data.py` batches must start `SET NOCOUNT ON;`.
 - Don't "seed" an empty table before checking it's wired (`privacy_lc` is orphaned).
-- **The intake substrate is CLIENT-ONLY, and the server half was built and never called** (F2-171,
-  measured 2026-08-09). `module/intake` ships `IntakeController` + `IntakeService` (submit / list /
-  triage / public-tracker) and `intake.intake_records.promoted_to_record_id`; **no product code
-  calls `/api/v1/intake`** — live-probed **200 with totalElements 0, and 0 rows in the table**.
-  `lib/intake.ts` drives submit → triage → promote in `localStorage`, and `addPromoted()` merges
-  the "created" row into 11 registers. So a promoted DPIA/risk/incident/vendor **has no server
-  row**, is invisible to every other user, and dies with the browser's site data. Placeholder ids
-  are **negative** now (`mintPromotedId`) and `lib/api.ts` refuses a negative-id path at all three
-  network entry points — do not "fix" a 404 on such a row by relaxing that guard; the row is the
-  problem. ⚠ Note the server's `triage()` takes `promotedToRecordId` **from the client** and
-  creates nothing, so the target row is created on **neither** side (F2-172).
+- **The intake substrate is the platform front door, and until F2-172 it filed every submission
+  into the submitter's own browser.** Now server-backed: `useIntake()` calls `POST/GET/PUT
+  /api/v1/intake`, `SEED_INTAKE`'s 5 fabricated records and the `grc.intake` localStorage overlay
+  are deleted, and the client-side `generateReferenceCode()`/`slaDeadline()` minters are **deleted
+  rather than moved** — only the server may issue a tracking code or a statutory deadline.
+  ⚠ **Three things about this endpoint that a reader will otherwise get wrong:**
+  **(a) `POST /api/v1/intake` is `isAuthenticated()`, not permission-guarded**, and that is an
+  ADR-010 §Sanctioned exception, pinned in `ControllerAuthorizationRatchetTest`'s `SELF_SCOPED`
+  floor with `IntakeSubmitGuardTest` holding the expression. It was `INTAKE:WRITE`, measured as
+  **3 of 69 roles, all administrators** — so an ordinary employee could not report a security
+  event (NCA ECC 6.1), a privacy breach (PDPL Art. 27) or a workplace injury (GOSI 24 h). Do not
+  "restore consistency" by converting it. READ and TRIAGE stay permissioned: filing is a duty,
+  reading other people's whistleblowing reports and DSRs is a privilege.
+  **(b) `submitterIsAnonymous` is a REQUEST, not an instruction.** The server honours it only for
+  the kinds whose `IntakeKindRouting` entry sets `allowsAnonymous` (SPEAKUP, BREACH_REPORT,
+  VRP_DISCLOSURE) — obeying it unconditionally would let any caller make any submission
+  unattributable and defeat the `submitter_user_id` binding through the field that exists to
+  protect whistleblowers. Where it IS honoured, **nothing identifying is stored** and
+  `submitter_user_id` is NULL by design (V374 self-checks THROW if the column is made NOT NULL).
+  **(c) The kind catalogue exists TWICE** — `IntakeKindRouting` (Java) and `INTAKE_CATALOG`
+  (`lib/intake.ts`) — and they are pinned field-by-field by `IntakeCatalogueParityTest`. The
+  server held **16** of the frontend's **26** for months while its javadoc claimed they were
+  mirrored; the ten it rejected included the 24-hour GOSI injury notification. Add a kind to both.
+  ⚠ **What is still NOT true: promotion creates no register record, on either side.** `triage()`
+  now derives the target register from the kind and **refuses** a client-supplied
+  `promotedToRecordId` (F2-171 found the client minting `Date.now() % 1_000_000`, a positive id in
+  the real IDENTITY range), so the column is NULL and the audit note says so in words. F2-171's
+  placeholder machinery — negative ids, `isUnsyncedId` guards, `assertNotPlaceholder` in
+  `lib/api.ts` — is still load-bearing scaffolding; do not remove it until an adapter per target
+  module exists. And `/portal/dsr` still cannot file: **F2-138** — no anonymous intake endpoint
+  exists — but the page now *shows* the refusal instead of issuing a reference code.

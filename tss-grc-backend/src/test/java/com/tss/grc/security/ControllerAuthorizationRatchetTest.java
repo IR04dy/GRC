@@ -197,9 +197,29 @@ class ControllerAuthorizationRatchetTest {
      * only ever wrongly exclude someone, and an employee who cannot file their declaration is a
      * compliance failure that looks like the employee's fault. ADR-010's amended §Sanctioned exceptions
      * states the rule; {@code CoiSubmitGuardTest} pins the expression.
+     *
+     * <p><b>{@code IntakeController#submit} — admitted 2026-08-09 (F2-172), and it is
+     * {@code CoiController#submitDeclaration}'s superset rather than its analogue.</b> The intake
+     * front door carries 26 kinds, and {@code ETHICS_DISCLOSURE} is the very duty the COI endpoint
+     * was admitted for — so the two could not defensibly be gated differently. The others include
+     * reporting a security event (NCA ECC 6.1), a privacy breach (PDPL Art. 27), a workplace injury
+     * (GOSI, 24 hours) and wrongdoing anonymously (Nazaha, ISO 37001 §8.3). The old guard was
+     * {@code hasPermission('INTAKE','WRITE')}, held by <b>3 of 69 roles, all administrators</b>
+     * (COMPLIANCE_OFFICER, GRC_ADMINISTRATOR, ORG_ADMIN) — measured, not assumed.
+     *
+     * <p>The same ordering trap as F2-144, and avoided the same way: {@code submit()} read the
+     * submitter's name, email and phone from the request body and the table had no column naming a
+     * platform user, so widening the guard first would have bought an impersonation path. V374 adds
+     * {@code submitter_user_id} and the service fills it from {@code CurrentActor}. There is a
+     * second half with no COI counterpart — {@code submitterIsAnonymous} also arrived from the body,
+     * and a server that simply obeyed it would let any caller make any submission unattributable on
+     * request, using the field that exists to protect whistleblowers. The claim is honoured only for
+     * the three kinds whose catalogue entry allows it. {@code IntakeSubmitGuardTest} pins the
+     * expression, {@code IntakeSubmitterBindingTest} pins both identity properties.
      */
     private static final Set<String> SELF_SCOPED = Set.of(
             "CoiController#submitDeclaration",
+            "IntakeController#submit",
             "HelpController#trackView",
             "NotificationController#markAllRead",
             "NotificationController#markRead",

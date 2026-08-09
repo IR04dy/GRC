@@ -12,6 +12,8 @@ import {
   useIntake, INTAKE_CATALOG, type IntakeKind,
 } from '../../lib/intake';
 import { INTAKE_FORM_FIELDS } from '../../lib/intakeForms';
+import { getUser } from '../../lib/auth';
+import { ApiError } from '../../lib/api';
 import { IntakeFormRenderer } from '../../components/intake/IntakeFormRenderer';
 import { computeChangeRisk, type ChangeRiskBreakdown } from '../../lib/changeRisk';
 import { ChangeRiskPanel } from '../../components/intake/ChangeRiskPanel';
@@ -21,9 +23,10 @@ import { ChangeRiskPanel } from '../../components/intake/ChangeRiskPanel';
  *
  * Authenticated employee-side intake. Walks any IntakeKind that has a
  * registered form schema. Mounts inside the Shell (full sidebar +
- * header), pre-fills submitter from the logged-in user (here, demo
- * stub), submits via useIntake().submit() into the same registry the
- * triager Inbox + public Tracker read from.
+ * header), pre-fills submitter from the signed-in user, and submits via
+ * useIntake().submit() -> POST /api/v1/intake (F2-172; it wrote to
+ * localStorage until then, so the triager Inbox and the public Tracker
+ * were reading the submitter's own browser).
  *
  * Routes: /intake/:kind  where :kind is the lowercase IntakeKind.
  */
@@ -65,27 +68,41 @@ export function IntakeFormPage() {
     );
   }
 
-  function onSubmit(payload: Record<string, string>) {
-    // Demo stub for the logged-in user. Real auth would pull from JWT.
-    const submitterEmail = 'employee@tss.sa';
-    const submitterName  = 'Demo Employee';
+  /**
+   * F2-172 — this now files a real server row and awaits it.
+   *
+   * Two changes worth naming. The submitter fields were `'Demo Employee'` /
+   * `'employee@tss.sa'` under a comment saying "Real auth would pull from JWT"; they are now
+   * the signed-in user's, and the *attribution* no longer depends on them at all — the server
+   * binds `submitter_user_id` from the token and ignores whatever the body claims.
+   *
+   * And the acknowledgement screen is shown only **after** the server confirms. It used to
+   * render a reference code from a record that had been written to `localStorage`, so a
+   * submitter was handed a tracking code for a report nobody had received. A failure now
+   * surfaces as a toast and the form stays open with the answers intact.
+   */
+  async function onSubmit(payload: Record<string, string>) {
+    const me = getUser();
     const severityCandidate = payload.severitySelfAssessed as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | undefined;
-    const rec = submit({
-      kind,
-      channel: 'WEB_FORM',
-      submitterIsAnonymous: false,
-      submitterRole: 'EMPLOYEE',
-      submitterName,
-      submitterEmail,
-      payload,
-      severity: severityCandidate ?? 'MEDIUM',
-      locale: lang as 'en' | 'ar',
-    });
-    // DD-70: for CHANGE_REQUEST, compute the risk score and CAB gate so
-    // the submitter sees the classification immediately on the ack screen.
-    const risk = kind === 'CHANGE_REQUEST' ? computeChangeRisk(payload) : undefined;
-    setSubmitted({ refCode: rec.referenceCode, slaDueAt: rec.slaDueAt ?? '', risk });
-    toast.success(t('intakeFormToastSubmitted'));
+    try {
+      const rec = await submit({
+        kind,
+        channel: 'WEB_FORM',
+        submitterIsAnonymous: false,
+        submitterRole: 'EMPLOYEE',
+        ...(me?.username ? { submitterName: me.username } : {}),
+        payload,
+        severity: severityCandidate ?? 'MEDIUM',
+        locale: lang as 'en' | 'ar',
+      });
+      // DD-70: for CHANGE_REQUEST, compute the risk score and CAB gate so
+      // the submitter sees the classification immediately on the ack screen.
+      const risk = kind === 'CHANGE_REQUEST' ? computeChangeRisk(payload) : undefined;
+      setSubmitted({ refCode: rec.referenceCode, slaDueAt: rec.slaDueAt ?? '', risk });
+      toast.success(t('intakeFormToastSubmitted'));
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : 'Could not file the submission');
+    }
   }
 
   if (submitted) {
