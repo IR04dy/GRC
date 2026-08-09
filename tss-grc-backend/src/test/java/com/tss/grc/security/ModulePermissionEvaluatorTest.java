@@ -30,8 +30,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class ModulePermissionEvaluatorTest {
 
+    private final RecordingSeatDirectory seats = new RecordingSeatDirectory();
+
     private final ModulePermissionEvaluator evaluator =
-        new ModulePermissionEvaluator(new EntityOwnershipRegistry(List.of(ML_MODEL)));
+        new ModulePermissionEvaluator(new EntityOwnershipRegistry(List.of(ML_MODEL)), seats);
 
     private Authentication authWith(String... authorities) {
         List<SimpleGrantedAuthority> granted = Arrays.stream(authorities)
@@ -233,6 +235,83 @@ class ModulePermissionEvaluatorTest {
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("ML_MODEL")
             .hasMessageContaining("may not depend on bean ordering");
+    }
+
+    // ── F2-177: the second relation on the 4-argument overload — a COMMITTEE SEAT ──────────
+
+    /**
+     * F2-177 — {@code hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')}.
+     *
+     * <p>The three guards that used to recite {@code AUDIT_COMMITTEE_CHAIR} /
+     * {@code AUDIT_COMMITTEE_MEMBER} / {@code AUDIT_DIRECTOR} ask this instead. What these tests pin is
+     * the <b>dispatch</b>: the same overload now answers two different questions, and the failure mode
+     * worth guarding is one branch quietly answering for the other — which is F2-159's defect exactly,
+     * one level up.
+     */
+    @Test
+    void a_committee_seat_is_answered_by_the_seat_directory() {
+        Authentication auth = principal(7L, 1L, "VIEWER_READ");
+        assertThat(evaluator.hasPermission(auth, "AUDIT_COMMITTEE", "COMMITTEE", "SEAT")).isTrue();
+        assertThat(evaluator.hasPermission(auth, "BOARD", "COMMITTEE", "SEAT")).isFalse();
+        assertThat(seats.calls).contains("AUDIT_COMMITTEE/7/1", "BOARD/7/1");
+    }
+
+    @Test
+    void the_seat_leg_takes_the_tenant_from_the_token_not_from_the_guard_literal() {
+        // The guard's literal names a committee TYPE, so it cannot point the lookup at another tenant's
+        // body — but only if the organisation id comes from the principal. This is the assertion that
+        // says so: same type, same user id, different tenant, refused.
+        assertThat(evaluator.hasPermission(principal(7L, 2L), "AUDIT_COMMITTEE", "COMMITTEE", "SEAT"))
+            .isFalse();
+    }
+
+    @Test
+    void a_committee_relation_other_than_SEAT_is_refused_rather_than_degraded() {
+        // There is deliberately no CHAIR relation yet (CommitteeSeatDirectory says why). A guard asking
+        // for one must NOT silently get "holds any seat" — that is how a stricter rule becomes a looser
+        // one with a green suite.
+        Authentication auth = principal(7L, 1L);
+        assertThat(evaluator.hasPermission(auth, "AUDIT_COMMITTEE", "COMMITTEE", "CHAIR")).isFalse();
+        assertThat(evaluator.hasPermission(auth, "AUDIT_COMMITTEE", "COMMITTEE", "OWNER")).isFalse();
+        assertThat(seats.calls).as("the directory must not be consulted for an unknown relation")
+            .isEmpty();
+    }
+
+    @Test
+    void the_seat_branch_and_the_ownership_branch_do_not_answer_for_each_other() {
+        Authentication auth = principal(7L, 1L, "AI_READ");
+        // A seat request against a registered entity type is not a seat question.
+        assertThat(evaluator.hasPermission(auth, OWNED, "ML_MODEL", "SEAT")).isFalse();
+        // And an ownership request against COMMITTEE is refused above, never routed to the registry.
+        assertThat(evaluator.hasPermission(auth, "AUDIT_COMMITTEE", "COMMITTEE", "OWNER")).isFalse();
+    }
+
+    @Test
+    void the_seat_leg_still_honours_the_platform_admin_bypass_without_consulting_the_roster() {
+        assertThat(evaluator.hasPermission(adminPrincipal(), "AUDIT_COMMITTEE", "COMMITTEE", "SEAT"))
+            .isTrue();
+        assertThat(seats.calls).as("the administrator bypass must short-circuit before any query")
+            .isEmpty();
+    }
+
+    @Test
+    void a_non_GrcUserDetails_principal_holds_no_seat() {
+        // Schedulers and machine callers have no user id, so there is nobody to be seated.
+        assertThat(evaluator.hasPermission(authWith("AUDIT_READ"), "AUDIT_COMMITTEE", "COMMITTEE", "SEAT"))
+            .isFalse();
+        assertThat(seats.calls).isEmpty();
+    }
+
+    /** Seated: user 7 in organisation 1, on the AUDIT_COMMITTEE and nothing else. */
+    private static final class RecordingSeatDirectory implements CommitteeSeatDirectory {
+        private final List<String> calls = new java.util.ArrayList<>();
+
+        @Override
+        public boolean holdsActiveSeat(String committeeType, Long userId, Long organisationId) {
+            calls.add(committeeType + "/" + userId + "/" + organisationId);
+            return "AUDIT_COMMITTEE".equals(committeeType)
+                && Long.valueOf(7L).equals(userId) && Long.valueOf(1L).equals(organisationId);
+        }
     }
 
     // ── fixtures for the ownership overload ─────────────────────────────────────

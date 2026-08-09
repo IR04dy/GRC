@@ -45,13 +45,30 @@ public enum CommitteeSeatOffice {
     UNCLASSIFIED;
 
     /**
-     * Every distinct active seat title measured in dev and production on 2026-08-03. Kept here so
+     * Every distinct active seat title measured in dev and production. Kept here so
      * {@code CommitteeSeatOfficeTest} can assert the classifier reads the real corpus rather than an
      * invented one — the anti-vacuity habit that four under-counting scans earned this month.
+     *
+     * <p>⚠ <b>Re-measured 2026-08-09 (F2-177) and it had gone stale by six titles.</b> The first ten were
+     * measured 2026-08-03; two days later S6/CE-3's CAB and ECAB rosters seeded six more, and nothing
+     * noticed — <b>a corpus constant is only "measured" on the day it is written</b>, and its own test
+     * cannot tell, because a title missing from the list simply is not asserted about. That is the same
+     * shape as {@code IntakeService}'s "stays in sync" javadoc (F2-172): a claim about the database that
+     * only a query can keep true.
+     *
+     * <p>All six classify correctly — {@code CAB Chair}/{@code ECAB Chair} to {@link #CHAIR}, the four
+     * {@code … Member — X} titles to {@link #MEMBER} — so nothing was broken by the drift. That is luck
+     * rather than design: a title like {@code "CAB Convenor"} would have been {@link #UNCLASSIFIED} and
+     * silently absent from a chair-required quorum. Dev now carries 16 distinct ACTIVE titles over 43 seats,
+     * production 10 over 31.
      */
     public static final List<String> MEASURED_TITLES = List.of(
+        // ── measured 2026-08-03, dev + production ────────────────────────────────────────────────
         "Member", "Standing Invitee", "Chair", "Independent Director", "Member (Independent)",
-        "Secretary", "Vice-Chair", "Chair (Independent)", "Chairman", "Executive Director");
+        "Secretary", "Vice-Chair", "Chair (Independent)", "Chairman", "Executive Director",
+        // ── added by the CAB/ECAB rosters 2026-08-05, measured 2026-08-09; dev only so far ───────
+        "CAB Chair", "CAB Member — Compliance", "CAB Member — Security",
+        "ECAB Chair", "ECAB Member — Risk", "ECAB Member — Compliance");
 
     /**
      * Classify a free-text seat title.

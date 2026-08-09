@@ -33,10 +33,11 @@ import java.io.Serializable;
 @RequiredArgsConstructor
 public class ModulePermissionEvaluator implements PermissionEvaluator {
 
-    /** The only entity relation modelled today; see the four-argument overload for why it is closed. */
+    /** The entity relation: <em>is the caller the owner of this record?</em> */
     static final String OWNER_RELATION = "OWNER";
 
     private final EntityOwnershipRegistry ownership;
+    private final CommitteeSeatDirectory seats;
 
     @Override
     public boolean hasPermission(Authentication authentication,
@@ -77,6 +78,21 @@ public class ModulePermissionEvaluator implements PermissionEvaluator {
      *
      * <p>{@code PLATFORM_ADMIN} still bypasses, matching the other overload — the platform administrator
      * is not expected to own every record in order to administer it.
+     *
+     * <h3>F2-177 — the second question this overload answers: <em>are you seated on this body?</em></h3>
+     * <pre>
+     * &#64;PreAuthorize("hasAnyRole('AUDITOR') or hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')")
+     * </pre>
+     * <p>Dispatch is on {@code targetType}, and the two branches are genuinely different questions rather
+     * than two flavours of one: ownership resolves a <b>record id</b> to a person, while a seat resolves a
+     * <b>committee type</b> to a roster. See {@link CommitteeSeatDirectory} for why a seat could not be
+     * modelled as an {@link EntityOwnershipResolver}.
+     *
+     * <p>⚠ <b>The vocabulary stays closed in both branches.</b> An unknown {@code targetType} falls through
+     * to the ownership registry, which refuses an unregistered type and logs; an unknown relation on a
+     * known type refuses here. Nothing falls back to the module-level check — that fallback <em>was</em>
+     * F2-159's defect, and it is the reason this method is worth being pedantic about: a mistake must cost
+     * a 403, never silent breadth.
      */
     @Override
     public boolean hasPermission(Authentication authentication,
@@ -87,16 +103,31 @@ public class ModulePermissionEvaluator implements PermissionEvaluator {
             return false;
         }
         if (hasPlatformAdminRole(authentication)) return true;
-
-        String relation = permission.toString().toUpperCase();
-        if (!OWNER_RELATION.equals(relation)) {
-            // Only ownership is modelled today. Anything else is a guard bug, and answering the
-            // module-level question in its place is precisely the defect this overload used to have.
-            log.warn("[F2-159] unsupported entity relation '{}' for targetType '{}' — refusing. "
-                + "The only relation implemented is '{}'.", relation, targetType, OWNER_RELATION);
+        if (!(authentication.getPrincipal() instanceof GrcUserDetails me)) {
             return false;
         }
-        if (!(authentication.getPrincipal() instanceof GrcUserDetails me)) {
+
+        String relation = permission.toString().toUpperCase();
+        String type = targetType.toUpperCase();
+
+        if (CommitteeSeatDirectory.TARGET_TYPE.equals(type)) {
+            if (!CommitteeSeatDirectory.SEAT_RELATION.equals(relation)) {
+                // No CHAIR relation exists yet, on purpose — CommitteeSeatDirectory says why. A guard
+                // asking for one must not silently degrade to "any seat".
+                log.warn("[F2-177] unsupported committee relation '{}' — refusing. The only relation "
+                    + "implemented is '{}'.", relation, CommitteeSeatDirectory.SEAT_RELATION);
+                return false;
+            }
+            return seats.holdsActiveSeat(targetId.toString(), me.getUserId(), me.getOrganisationId());
+        }
+
+        if (!OWNER_RELATION.equals(relation)) {
+            // Anything else is a guard bug, and answering the module-level question in its place is
+            // precisely the defect this overload used to have.
+            log.warn("[F2-159] unsupported entity relation '{}' for targetType '{}' — refusing. "
+                + "The relations implemented are '{}' and '{}' (on targetType '{}').",
+                relation, targetType, OWNER_RELATION, CommitteeSeatDirectory.SEAT_RELATION,
+                CommitteeSeatDirectory.TARGET_TYPE);
             return false;
         }
         return ownership.isOwnedBy(targetType, targetId, me.getUserId(), me.getOrganisationId());

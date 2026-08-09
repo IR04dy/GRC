@@ -170,8 +170,10 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
    ⚠ **This line said "≤ 62" for months** — three times the enforced ceiling, so it
    invited waving through 41 unguarded endpoints the build in fact rejects. No ratchet
    in the suite has ever been 62 (F2-69). The other enforced ceilings, for reference:
-   `BASELINE_ENTITY_BOUND_WRITES` 214, `BASELINE_PURE_ROLE_SITES` 430 — read the
-   constant, never a prose summary of it. ⚠ **`BARE_EXPORT_CEILING` 32 is GONE** — F2-61(c)
+   `BASELINE_ENTITY_BOUND_WRITES` 214, `BASELINE_PURE_ROLE_SITES` 404 — read the
+   constant, never a prose summary of it. ⚠ **`BASELINE_GHOST_ROLE_NAMES` is now 0** (F2-177) —
+   another ceiling that became an invariant, and the same rule applies: it may not be raised.
+   ⚠ **`BARE_EXPORT_CEILING` 32 is GONE** — F2-61(c)
    swept it to zero and replaced it with an invariant
    (`ExportAuthorizationRatchetTest.everyExportHandlerAlsoDemandsARead`): every
    file-returning handler guarded by `MODULE:EXPORT` must AND a `READ` permission, with
@@ -252,12 +254,15 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   prod — this line said "94 / 24" for months; **PLATFORM_ADMIN bypasses in code**,
   so `admin` proves nothing about authorization: probe with a real persona.
   ⚠ **`hasAnyRole(...)` is a second, independent gate that gets NO admin bypass**
-  and validates nothing — **430 endpoints still authorise by role name** (F2-05/F2-52).
-  Measured 2026-08-07: **43 distinct names recited, 5 absent from `iam.roles`** (67→**69**
-  active after V373). ⚠ This line said "~50% miss rate" and that is now 12% — but do **not**
-  read the improvement as safety: 3 of the 5 survivors are on 27 sites, and a name that is
-  absent makes the guard *tighter* than it reads, which never looks like a bug from the
-  outside. Before trusting or writing one, check the names exist.
+  and validates nothing — **404 endpoints still authorise by role name** (F2-05/F2-52).
+  Measured 2026-08-09: **38 distinct names recited, 0 absent from `iam.roles`** (69 active
+  after V373) — F2-177 closed the ghost half, so `BASELINE_GHOST_ROLE_NAMES` is a **hard zero**
+  and no longer a ratchet. ⚠ **Do not read that as "role guards are fine now."** 404 endpoints
+  still cannot be re-granted without a jar, and the miss rate reaching 0 says only that every
+  name *can* match — not that anybody holds it. Several still resolve to roles with **0 active
+  users**, which fails identically and is what F2-161 found (`BCM_MANAGER`) and F2-52 slice 5
+  found (`AML_OFFICER`/`KYC_OFFICER`/`ONBOARDING_AGENT`). Before trusting one, check the name
+  exists **and** that somebody holds it.
   ⚠⚠ **There are TWO role-name surfaces and only one used to be measured.**
   `attachment/AttachmentAccessPolicy` mirrors each parent record's read guard so an attachment
   is as confidential as its parent — where the parent authorises by role, it holds a **Java role
@@ -266,7 +271,12 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   four dev personas could open a vendor BCP campaign and 403 on its files. The class's own
   comment already said *"It has to move WITH the parent, not later"* — an instruction with no
   enforcement, ignored by two converting slices. **`RoleNameSurfaceRatchetTest` enforces it now:
-  change a guard's roles and change that registry in the same commit.**
+  change a guard's roles and change that registry in the same commit.** F2-177 found the **third**
+  instance (`SANCTIONS_CHECK`, drifted since the AML conversion) and it cost **nothing** — the 7
+  roles holding `AML:READ` were exactly the 7 real names listed. 🔑 **Close a harmless drift
+  anyway: what made it harmless was two independent lists agreeing, and nobody was maintaining
+  that.** Surface ghosts are now **2, both extractor artefacts** (`TPRM`/`BCM` are the first
+  argument of `permOrRoles`), so neither surface holds a real ghost name.
   ⚠ **There is a THIRD authorisation shape now: entity ownership** (F2-159/D-14).
   `@PreAuthorize("hasAnyRole(...) or hasPermission(#externalId,'ML_MODEL','OWNER')")` resolves the
   record's owner via `EntityOwnershipRegistry` + an `EntityOwnershipResolver` per type. Use it where a
@@ -290,6 +300,25 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   ⚠ And do **not** bind an id just because the route has one: `transition`/`decommission`/audit-record/
   drift-verdict are judgements *about* the record and the owner is their subject (V367's defect).
   `MlModelOwnershipGuardTest` pins that boundary in both directions.
+  ⚠ **And a FOURTH shape: a committee seat** (F2-177) —
+  `hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')`, a **second relation** on the same 4-arg
+  overload, dispatched on `targetType` and answered by `CommitteeSeatAuthority` from
+  `admin.committee_member_terms`. Use it where the guard names a **body**, not a job family: the
+  three names it retired (`AUDIT_COMMITTEE_CHAIR`/`_MEMBER`, `AUDIT_DIRECTOR`) survived six F2-52
+  slices because seating them as roles is looser than the roster, dropping them discards the
+  intent, and a module permission admits every reader. `targetId` is the committee **type** (not an
+  id — a guard ships in a jar and every tenant's audit committee has its own PK).
+  ⚠ **Its own ghost trap is one letter away**: `'AUDIT_COMMITTE'` fails exactly like a ghost role
+  name. `CommitteeSeatGuardTest` pins the 17-value `committee_type` vocabulary at a **hard zero**
+  and pins `SEAT` as the only relation (there is deliberately no `CHAIR` — add relations in the
+  commit that first guards on one; an unconsulted relation is how F2-159's decoy formed).
+  ⚠⚠ **The mechanism works and the DATA does not exist yet** (F2-178): of 43 dev seats **13** name
+  a user, 1 is declared external, **29 neither** — `AUDIT_COMMITTEE` is **0/5**, and **prod is 0 of
+  31**. So the leg answers `false` for everyone today; what changed is that a tenant admin can fix
+  it from the roster screen instead of needing a jar. Say this when reporting the guard as working.
+  ⚙ Three prerequisites had already shipped for other reasons (F2-26 linkage, F2-28 roster
+  denominator, S6c `CommitteeSeatOffice` for the free-text `role`) — **re-measure a recorded
+  blocker before believing its estimate.**
   ⚠ **A catalogued permission is inert until a guard consults it**, and a catalogue
   *derived* from guards is not *faithful* to them: V362 classified actions by method
   shape and so promoted whole WRITE tiers to APPROVE in 4 of the 6 modules it touched

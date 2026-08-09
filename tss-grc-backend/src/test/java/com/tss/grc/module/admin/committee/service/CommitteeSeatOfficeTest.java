@@ -35,10 +35,33 @@ class CommitteeSeatOfficeTest {
             Map.entry("Vice-Chair",           CommitteeSeatOffice.DEPUTY_CHAIR),
             Map.entry("Chair (Independent)",  CommitteeSeatOffice.CHAIR),
             Map.entry("Chairman",             CommitteeSeatOffice.CHAIR),
-            Map.entry("Executive Director",   CommitteeSeatOffice.MEMBER)));
+            Map.entry("Executive Director",   CommitteeSeatOffice.MEMBER),
+            // F2-177 — the six the CAB/ECAB rosters added on 2026-08-05, unnoticed for four days. This
+            // test could not have caught the drift: a title absent from MEASURED_TITLES is simply not
+            // asserted about, so the corpus growing is invisible to the corpus test. Only re-querying
+            // the column finds it, which is why the constant's javadoc now carries two dates.
+            Map.entry("CAB Chair",                CommitteeSeatOffice.CHAIR),
+            Map.entry("CAB Member — Compliance",  CommitteeSeatOffice.MEMBER),
+            Map.entry("CAB Member — Security",    CommitteeSeatOffice.MEMBER),
+            Map.entry("ECAB Chair",               CommitteeSeatOffice.CHAIR),
+            Map.entry("ECAB Member — Risk",       CommitteeSeatOffice.MEMBER),
+            Map.entry("ECAB Member — Compliance", CommitteeSeatOffice.MEMBER)));
 
         // Anti-vacuity: an empty or shrunken corpus would make the assertion above trivially true.
-        assertThat(CommitteeSeatOffice.MEASURED_TITLES).hasSize(10);
+        assertThat(CommitteeSeatOffice.MEASURED_TITLES).hasSize(16);
+    }
+
+    @Test
+    @DisplayName("F2-177 — an unreadable title is UNCLASSIFIED, and that is what the drift risked")
+    void anUnreadableTitleIsNotQuietlyAMember() {
+        // All six titles the drift introduced happen to classify correctly, which is luck, not design.
+        // `CAB Convenor` is the counter-example: a plausible tenant title that this classifier cannot
+        // read. It must land in UNCLASSIFIED — reported — rather than defaulting to MEMBER, because a
+        // chair-required quorum for a committee whose chair reads as an ordinary member is quietly
+        // unsatisfiable. Asserted here so the *consequence* of a stale corpus is pinned, not just its size.
+        assertThat(CommitteeSeatOffice.classify("CAB Convenor"))
+            .isEqualTo(CommitteeSeatOffice.UNCLASSIFIED);
+        assertThat(CommitteeSeatOffice.UNCLASSIFIED.presides()).isFalse();
     }
 
     @Test

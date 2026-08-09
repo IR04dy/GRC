@@ -355,8 +355,15 @@ class RoleGuardConversionRatchetTest {
      * guard text sat on both bindable and unbindable routes, and a textual replace would have put
      * {@code #id} into the expression of a method with no such parameter — a SpEL evaluation error,
      * i.e. a <b>500 on the run list</b> rather than a 403.
+     *
+     * <p><b>410 → 404 (F2-177):</b> the six {@code module.governance} assurance reads gained a
+     * committee-seat leg ({@code hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')}). ⚠ Same caveat as
+     * the two entries above, and this is the third slice to drain the number without converting anything:
+     * <b>composed is not converted.</b> All 15 real role names on those six guards are untouched and still
+     * authoritative. Read this figure falling as "fewer guards are role-<em>only</em>", never as "fewer
+     * guards are role-based".
      */
-    private static final int BASELINE_PURE_ROLE_SITES = 410;
+    private static final int BASELINE_PURE_ROLE_SITES = 404;
 
     /**
      * Anti-vacuity floor. A scan that resolves no controllers passes every "may only decrease"
@@ -478,11 +485,19 @@ class RoleGuardConversionRatchetTest {
             + " ; not in the catalogue = " + ghosts.size() + " -> " + ghosts);
 
         // The instrument must be able to speak: a scan that finds no names would report zero ghosts.
+        //
+        // ⚠ F2-177 lowered this floor from 40 to 30, and that is a real hazard worth naming rather than a
+        // tidy-up. The floor is anti-vacuity — it exists so a broken scan cannot report a clean surface —
+        // but it was calibrated at 40 when 44 names were recited, and the surface has legitimately shrunk
+        // to 38 (three retired here, plus MODEL_OWNER and FACILITATOR bound to records by F2-159/F2-161).
+        // A floor that sits 2 below the measurement fails on the next honest conversion, which trains the
+        // reader to lower it without looking — the exact habit that let ROLE_GUARD_CENSUS.md drift 19
+        // ghosts. Lowered once, with margin, and the number it protects is stated in the message.
         assertThat(census.roleNames.size())
-            .as("the guard scan found %d role names; the codebase recites dozens across 537 pure role "
+            .as("the guard scan found %d role names; the codebase recites dozens across %d pure role "
                 + "sites. A collapsed scan reports zero ghosts, which is the reassuring direction.",
-                census.roleNames.size())
-            .isGreaterThanOrEqualTo(40);
+                census.roleNames.size(), census.pureUnderModule)
+            .isGreaterThanOrEqualTo(30);
 
         assertThat(ghosts.size())
             .as("%d role names recited by @PreAuthorize match no row in iam.roles, against a baseline "
@@ -716,8 +731,32 @@ class RoleGuardConversionRatchetTest {
      * {@link com.tss.grc.security.EntityOwnershipResolver} because the record being guarded is not the
      * committee — it is a finding or a pivot the committee <em>reviews</em>. That is why they did not
      * come along for free.
+     *
+     * <p><b>3 → 0 (F2-177, 2026-08-09): the fourth route, and this ratchet becomes an invariant.</b> The
+     * three survivors left together, because they were all asking one question no expression could ask.
+     * {@code hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')} is a second relation on the
+     * four-argument overload, resolved against the roster F2-26 linked and the term window F2-28 relies
+     * on: six sites, all reads, both controllers in {@code module.governance}. {@code AUDIT_DIRECTOR}
+     * needed its intent recovered rather than its name fixed — it is the head of internal audit, whom this
+     * platform models as {@code INTERNAL_AUDITOR}, <em>already named in the same guard</em>, so it was a
+     * duplicate rather than an authority.
+     *
+     * <p>⚠ <b>A ceiling of 0 is a different test from a ceiling of 3, and the change of kind is the point.</b>
+     * {@code CLAUDE.md} records this from F2-61(c): <i>a ceiling tolerates the population it measures, so
+     * once a sweep lands, leaving the ceiling in place makes a tolerated guard indistinguishable from a
+     * reviewed one.</i> There is no population left to tolerate — all 38 names recited by all guards in the
+     * platform exist in {@link #ROLE_CATALOGUE}. And {@link CommitteeSeatGuardTest} forbids the replacement
+     * mechanism from acquiring the same defect: {@code hasPermission('AUDIT_COMMITTE',…)} — one letter
+     * short — would be a permanently false leg in exactly the way a ghost role name was, so the
+     * committee-type vocabulary is pinned there at a hard zero too.
+     *
+     * <p>⚠⚠ <b>What 0 does NOT mean.</b> {@link #BASELINE_PURE_ROLE_SITES} is 404: that many endpoints still
+     * authorise by role name with no permission leg, so F2-05's conversion backlog is untouched. This
+     * number counts names that <em>cannot match</em>, not guards that should be permissions. Two names also
+     * remain on the attachment surface ({@link RoleNameSurfaceRatchetTest}), both measured as extractor
+     * artefacts rather than ghosts. Zero here closes F2-52 and says nothing about the rest of F2-05.
      */
-    private static final int BASELINE_GHOST_ROLE_NAMES = 3;
+    private static final int BASELINE_GHOST_ROLE_NAMES = 0;
 
     // ── extraction ────────────────────────────────────────────────────────────────────────────
 

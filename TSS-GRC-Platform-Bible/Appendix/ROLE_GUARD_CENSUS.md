@@ -24,29 +24,22 @@ do not open up. Read section B and B2 together before choosing a conversion targ
 | Measure | Count |
 |---|---|
 | Guard sites with a role leg | 503 |
-| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **410** |
-| … composed (role leg ANDed onto a permission — already tight) | 93 |
+| … **pure** (no `hasPermission` leg) — F2-05 conversion scope | **404** |
+| … composed (role leg ANDed onto a permission — already tight) | 99 |
 | Module packages holding pure role guards | 29 |
-| Distinct role names recited by any role guard | 41 |
-| … **that do not exist in `iam.roles`** | **3** |
+| Distinct role names recited by any role guard | 38 |
+| … **that do not exist in `iam.roles`** | **0** |
 | Pure guards **closed to everyone** (no named role exists, no live authority leg) | **0** |
 | Pure guards **wide despite dead role names** — a live `hasAuthority` leg carries them (⚠ camouflage) | **0** |
 | Pure guards left admitting **PLATFORM_ADMIN alone, by attrition** | **0** |
 | … versus guards that name PLATFORM_ADMIN and nothing else (deliberate) | 28 |
 | Pure guards whose surviving roles are held by no user | 0 |
-| Pure guards reachable by at least one seeded user | 410 |
+| Pure guards reachable by at least one seeded user | 404 |
 | `hasAuthority('MODULE_ACTION')` sites (permission spelled longhand) | 2 |
 
 ## A. Role names no role table contains
 
-Each of these is a permanently false OR leg. Where it is the *only* leg, section B
-shows what that closes.
-
-| Role name recited in a guard | Guard sites naming it |
-|---|---|
-| `AUDIT_COMMITTEE_CHAIR` | 6 |
-| `AUDIT_COMMITTEE_MEMBER` | 3 |
-| `AUDIT_DIRECTOR` | 3 |
+None — every recited role name exists.
 
 ## B. Pure role guards closed to everyone
 
@@ -115,7 +108,6 @@ closed guards is a correctness fix, not only a modelling one.
 | `module.reginspect` | 10 |  |
 | `module.opres` | 9 |  |
 | `module.audit_committee` | 7 |  |
-| `module.governance` | 7 |  |
 | `module.integrations` | 5 |  |
 | `module.iam` | 4 |  |
 | `module.platform` | 4 |  |
@@ -123,6 +115,7 @@ closed guards is a correctness fix, not only a modelling one.
 | `module.auth` | 1 |  |
 | `module.board_pack` | 1 |  |
 | `module.capa` | 1 |  |
+| `module.governance` | 1 |  |
 | `module.incident` | 1 |  |
 | `module.knowledge` | 1 |  |
 | `module.nca_ecc` | 1 |  |

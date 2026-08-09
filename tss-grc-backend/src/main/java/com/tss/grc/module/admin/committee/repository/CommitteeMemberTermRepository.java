@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -71,6 +72,42 @@ public interface CommitteeMemberTermRepository extends JpaRepository<CommitteeMe
     """)
     long countActiveSeatsForUser(Long organisationId, Long committeeId, Long userId,
                                 Long excludeTermId);
+
+    /**
+     * F2-177 — does this user hold a <b>current</b> seat on any of these committees?
+     *
+     * <p>⚠ <b>Why this is not {@link #countActiveSeatsForUser}.</b> That query answers "does this user
+     * already <em>occupy</em> a seat here", which F2-26 needs to stop one person holding two seats on one
+     * committee, and it deliberately ignores dates — a future-dated appointment still occupies the seat it
+     * was made to. Authorisation is the opposite question, and the two differ on exactly the rows that
+     * matter: a term that has not started yet, and a term whose {@code term_ends_at} has passed while
+     * {@code renewal_status} still reads {@code ACTIVE} because the renewal sweep has not run. Neither may
+     * authorise anything, and both would have passed the other query.
+     *
+     * <p>{@code endedAt} is checked as well as the dates: ending a term mid-window is a distinct act
+     * (resignation, removal) recorded in {@code end_reason}, and it revokes the seat immediately rather
+     * than at {@code term_ends_at}.
+     *
+     * <p>{@code on} is a parameter rather than {@code CURRENT_DATE} so a test can stand on either side of
+     * a term boundary — F2-160's lesson, where a suite failed on Saturdays and nothing in the repository
+     * said the clock was an input.
+     *
+     * <p>{@code memberUserId} is only ever non-null for a seat that has been linked to a platform user,
+     * so external directors and unlinked seats can never match: no {@code no_platform_user} clause is
+     * needed, and adding one would read as though it were load-bearing.
+     */
+    @Query("""
+        SELECT COUNT(t) FROM CommitteeMemberTerm t
+        WHERE t.organisationId = :organisationId
+          AND t.committeeId IN :committeeIds
+          AND t.memberUserId = :userId
+          AND t.renewalStatus = 'ACTIVE'
+          AND t.endedAt IS NULL
+          AND t.termStartsAt <= :on
+          AND (t.termEndsAt IS NULL OR t.termEndsAt >= :on)
+    """)
+    long countCurrentSeatsForUser(Long organisationId, Collection<Long> committeeIds,
+                                 Long userId, LocalDate on);
 
     /** Independence ratio numerator — count of independent active members. */
     @Query("""

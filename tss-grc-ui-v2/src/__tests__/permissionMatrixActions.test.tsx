@@ -44,7 +44,18 @@ import {
 
 const BACKEND_JAVA = join(__dirname, '..', '..', '..', 'tss-grc-backend', 'src', 'main', 'java');
 
-/** Both spacings. The missing `\s*` is what made the first draft of this scan agree with the bug. */
+/**
+ * Both spacings. The missing `\s*` is what made the first draft of this scan agree with the bug.
+ *
+ * ⚠ F2-177 — the trailing `\)` is load-bearing and must stay. Two THREE-argument shapes now exist
+ * and neither is a module/action pair: `hasPermission(#id,'ML_MODEL','OWNER')` asks whether the
+ * caller owns a record (F2-159) and `hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')` asks
+ * whether they hold a committee seat (F2-177). Relaxing this pattern to tolerate extra arguments —
+ * which looks like a harmless generalisation — would mint `COMMITTEE`/`SEAT` and `ML_MODEL`/`OWNER`
+ * as phantom permission actions, and this file would then demand matrix columns for them and fail
+ * on a correct platform. The permission catalogue and the entity/seat relations are different
+ * namespaces that read identically, exactly as F2-170 found for module codes vs role names.
+ */
 const GUARD_RE = /hasPermission\(\s*'[A-Z_]+'\s*,\s*'([A-Z_]+)'\s*\)/g;
 
 function walkJava(dir: string, out: string[] = []): string[] {

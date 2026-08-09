@@ -79,7 +79,13 @@ PUBLISHED = {
     "writes": 1_239,
     "main_preauthorize": 2_201,
     "perm_modules": 37,
-    "packages_no_haspermission": 12,
+    # F2-177: 12 -> 11. `governance` left this column WITHOUT a role guard being converted — its two
+    # controllers gained a committee-SEAT leg (`hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')`)
+    # while all 15 role names beside it stayed. So a package leaving here means "some authority in it
+    # is data-driven", not "this package is converted". ⚠ This pairing is also what caught the drift:
+    # MEASURED_BASELINE.md was edited and this dict was not, and MeasuredBaselineFreshnessTest failed
+    # the build for it — which is the mechanism working, not friction.
+    "packages_no_haspermission": 11,
     "module_tests": 3_284,
     "suite_tests": 3_479,
     # F2-03 floored all seven Tier-1 regulator-facing modules (2026-08-05/06), so this

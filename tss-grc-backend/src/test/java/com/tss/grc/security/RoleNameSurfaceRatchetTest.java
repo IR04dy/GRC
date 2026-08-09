@@ -98,8 +98,31 @@ class RoleNameSurfaceRatchetTest {
      * owner opens their model and is still refused its attachments. Recorded at the site and filed, not
      * papered over: inventing an entity-bound {@code ParentGuard} kind for a single entry is how
      * F2-156's drift began.
+     *
+     * <p><b>3 → 2 (F2-177): {@code AUDIT_COMMITTEE_MEMBER} is gone, and the two survivors are both the
+     * extractor artefacts — so this surface holds no ghost names at all.</b> Its entry
+     * ({@code SANCTIONS_CHECK}) was the <b>third instance of F2-156's drift</b>:
+     * {@code SanctionsScreeningController}'s reads have been {@code hasPermission('AML','READ')} since
+     * F2-05 slice 5, and this registry kept the nine-name list from before that. Now
+     * {@code ParentGuard.perm("AML")}, mirroring the parent.
+     *
+     * <p>🔑 <b>And this instance cost nothing, which is the useful half of the finding.</b> Measured against
+     * {@code iam.role_permissions} on 2026-08-09: the 7 roles holding {@code AML:READ} are <em>exactly</em>
+     * the 7 real names the list carried, so {@code holders \ registry} was <b>empty</b> — nobody could open
+     * a sanctions check and 403 on its files, which is the failure the first two instances caused. The other
+     * direction was {@code {AUDIT_COMMITTEE_MEMBER, PLATFORM_ADMIN}}: absent from {@code iam.roles}, and
+     * covered by the bypass. ⚠ <b>A drift that happens to be harmless is still worth closing, because what
+     * made it harmless — two independently maintained lists agreeing — is a coincidence nobody was
+     * maintaining.</b> Reporting it as a third breach would have been wrong; reporting nothing would have
+     * left the coincidence load-bearing.
+     *
+     * <p>⚠ The entity-bound gap named above is unchanged and now has a <em>second</em> shape: a parent whose
+     * guard admits a committee <b>seat</b> (F2-177) is as inexpressible here as one that admits a record's
+     * owner. Neither of F2-177's two parents has attachments, so nothing is wrong today — but a
+     * seat-guarded record that acquires an attachment surface needs a {@code ParentGuard} kind, not a
+     * copied role list.
      */
-    private static final int BASELINE_SURFACE_GHOSTS = 3;
+    private static final int BASELINE_SURFACE_GHOSTS = 2;
 
     /**
      * Role collections in the class, so a collapsed extractor cannot report a clean surface.
@@ -110,9 +133,19 @@ class RoleNameSurfaceRatchetTest {
      * extractor is not a floor, it is a guess</b> — and had it been guessed 5 low instead of 2 high the
      * test would have passed while measuring almost nothing, which is the failure that does not announce
      * itself.
+     *
+     * <p>⚠ <b>F2-177: the name floor was sitting exactly ON the measurement and had to move.</b> Aligning
+     * {@code SANCTIONS_CHECK} to its parent removed five names from this surface (25 collections, <b>18</b>
+     * distinct), so {@code MIN_DISTINCT_NAMES = 18} passed by zero margin — one more honest alignment and a
+     * <em>correct</em> change would have failed the build, which teaches the next reader to lower the floor
+     * without checking whether the extractor still works. Lowered to 12 once, deliberately, with the
+     * measurement recorded here so the margin is visible rather than inferred. The same edit was needed in
+     * {@link RoleGuardConversionRatchetTest}'s name floor for the same reason, in the same slice: <b>an
+     * anti-vacuity floor is a lower bound on the instrument, not a target for the population</b>, and a
+     * shrinking population will collide with it.
      */
     private static final int MIN_ROLE_COLLECTIONS = 15;
-    private static final int MIN_DISTINCT_NAMES = 18;
+    private static final int MIN_DISTINCT_NAMES = 12;
 
     private static final Pattern BLOCK_COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
     private static final Pattern LINE_COMMENT = Pattern.compile("(?m)^\\s*//.*$");

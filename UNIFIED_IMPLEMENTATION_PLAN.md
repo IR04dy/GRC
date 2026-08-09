@@ -230,7 +230,7 @@ this table is why the ordering principle changed.
 |---|---|---|---|---|
 | **RC-A** | **Two schema authorities that never reconcile.** Dev is Python-bootstrapped with Flyway **off**; prod runs Flyway **on**, baselined at 292 over a restored dev dump. So **any migration numbered ≤ 292 can never execute in either environment**, and anything the Python bootstrap creates exists nowhere else | **F2-49** (2 migrations Flyway never applies) · **F2-64** (crisis-comms: 3 pages over absent tables) · **F2-65** (V247's drop can never run) · **F2-70** (**67 mapped tables no migration creates**) · **F2-71** (4 more, incl. Nafath SSO, with live controllers) · **F2-72** (column drift) — **six** | `schema_drift.py` (intent vs schema) + `SchemaContractRatchetTest` (DB-free, in CI) | 🔶 **THE CONSEQUENCE IS CLOSED; THE CAUSE IS NOT — corrected 2026-08-07, and the distinction is why this is a root-cause row rather than a finding.** ✔ `flyway:migrate` **does** build this platform now: **360 files run V1 → V373 on an empty database**, and F2-70, F2-75, F2-77, F2-143, F2-153 and F2-154 are all closed. The two authorities reconcile on every measured axis (F2-153's closing measurement: CHECK dev 417 / built 414, FK 185 / 178, UNIQUE-by-property 271 / 268, **extra 0** — every remaining difference a deliberate exclusion). So the sentence this cell carried for weeks, *"no customer can be deployed who was not cloned from this laptop"*, is **no longer true**. ⚠ **What is still true is the cause**: dev remains Python-bootstrapped with Flyway off and prod remains baselined, so the two schemas are still maintained by different mechanisms and can still diverge — which is precisely what `schema_convergence.py` now measures, and what caught F2-146 and F2-153. ⚠ And the *deployed* gap is a separate item: prod is **29 migrations behind (V345–V373)**, which is **O-1**, not RC-A. 🔑 A root cause whose worst consequence has been fixed must not be recorded as closed — the mechanism that produced six findings is still in place, and the instrument is what changed |
 | **RC-B** | **Merge treated as done; deployment invisible.** Prod served 8-day-old code while fixes sat merged, and this plan asserted what a restart would deliver — wrongly, twice, in opposite directions | prod's grant surface 22 migrations stale, so **F2-43 and V333 were "closed" but open in production** | `deployment_identity.py` + W0-7's `/actuator/info`; DoD says **deployed**, not merged | 🔁 **INSTRUMENTED, NOT CLOSED — corrected 2026-07-31 by the review, and it was right.** The deploy happened (prod `packagedHead=V336`, Flyway head V336 applied 16:47:23, 0 failed rows, verified 15/15 against the running process) — but **V337 and V338 were packaged-and-unapplied within the hour**, so the cause had two fresh instances before the row declaring it closed was written. Measured, not argued: the four V338 tables (`platform.persistence_row`, `file_metadata`, `sso_provider_config`, `nafath_transaction`) exist in dev and **in none of prod's schemas** right now. Batching them behind one restart is a defensible call — **marking F2-71 ✅ DONE while it is dev-only is not, because it breaks the very DoD this row states.** A cause with a detector is *permanent*; it can be instrumented and it cannot be finished. ➕ **And on 2026-08-01 the detector itself turned out to be blind — `F2-73`:** `/actuator/info` could not read `platform.flyway_schema_history` (unqualified table name → empty `dbo`), so `pending` was structurally always empty and `deployment_identity.py`'s "packaged but NOT applied" check **could never fire in the only environment RC-B is about**. Fixed same day. **A cause is not instrumented because an instrument exists; it is instrumented when the instrument has been shown to fire.** |
-| **RC-C** | **Authorisation written as identity, not capability.** A `hasAnyRole` guard gets **no** `PLATFORM_ADMIN` bypass, so a role name that does not exist 403s silently and permanently | **F2-52** (647 guards reciting 74 roles, **40 non-existent**) · **F2-05** (the conversion programme) · F2-64's second half (`CRISIS_COMMANDER`, `COMMS_LEAD`) | `RoleGuardConversionRatchetTest` — **561 → 552** today, ceiling-only | 🔁 in progress, gated, decreasing |
+| **RC-C** | **Authorisation written as identity, not capability.** A `hasAnyRole` guard gets **no** `PLATFORM_ADMIN` bypass, so a role name that does not exist 403s silently and permanently | **F2-52** (647 guards reciting 74 roles, **40 non-existent**) · **F2-05** (the conversion programme) · F2-64's second half (`CRISIS_COMMANDER`, `COMMS_LEAD`) · F2-156 + F2-177 (the *second* surface, `AttachmentAccessPolicy`) | `RoleGuardConversionRatchetTest` — **647 → 404** pure sites (ceiling) and **ghost names 40 → 0** (now an **invariant**, F2-177); `RoleNameSurfaceRatchetTest` for the attachment registry, **2 artefacts, no real ghost** | 🔶 **THE SILENT-FAILURE HALF IS CLOSED; THE CAUSE IS NOT — 2026-08-09.** Every one of the 38 role names any guard recites now exists in `iam.roles`, so no guard is permanently-false any more, and the last three (`AUDIT_COMMITTEE_CHAIR`/`_MEMBER`, `AUDIT_DIRECTOR`) left by a **fourth** route this row did not anticipate: they were **committee seats**, and `hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')` asks the question they were spelling. ⚠ **The cause is untouched**: 404 endpoints still authorise by identity, still cannot be re-granted without a jar, and still sit outside every tightness measurement. ⚠⚠ And *existing* is not *held* — several surviving names resolve to roles with **0 active users** (F2-161's `BCM_MANAGER`, F2-52 slice 5's three AML front-line roles), which fails identically and is not counted by anything. 🔑 A ghost-name count of zero is the end of one failure mode, not of the class |
 | **RC-D** | **Enforcement switched on without re-reading the grants.** F2-27 made 24 `*:EXPORT` permissions actually enforce; nobody then asked who held them | **A17-D10a** (board pack 24 roles) · **F2-59** (regulator's 11 registers) · **F2-60** (37 roles → 13) · **F2-61** (`VIEWER` holds 16) | `grant_tightness.py`, both directions, now with `--database` so it can finally see prod — **plus `export_grant_policy.py` (2026-08-01), which compares two actions of the SAME module to each other, the axis a tier rule is actually about and the one neither instrument had** | ✅ **CAUSE CLOSED 2026-08-01**: ADR-017 **D-10c** states the rule as a containment and enforces it in the guard, and **F2-61(c) finished the sweep the same day** — all 32 remaining export handlers now AND a `READ` permission, so **36 of the 38** `EXPORT`-guarded file handlers are composed with exactly **two** named exceptions, and `BARE_EXPORT_CEILING` is retired in favour of an invariant. ⚠ **RC-D's own instruments could not see this class** — `grant_tightness.py` compares guards to grants, so `EXPORT` wider than `READ` was invisible to it, and the defect it hid was live. ➕ **The root cause is now unreachable rather than merely repaired**: RC-D was *“enforcement switched on without re-reading the grants”*, and a composed guard does not depend on the grant table being re-read — which is the difference between fixing four symptoms (A17-D10a, F2-59, F2-60, F2-61's BCM instance) and closing the class |
 | **RC-E** | **Server truth recorded from the caller.** A DTO carries a field the server alone may decide — actor, role, outcome, timestamp, status — and the service binds it instead of deriving it. The record then says whatever the client said | DF-3 · DF-4 · **F2-22b(i)–(vii)** · F2-28/DF-5 · F2-40 · F2-46 · **F2-54** | per-slice DTO + probe; no standing scanner yet, which is why this keeps recurring | 🔁 **open — added 2026-07-31 by the review, and the omission was glaring:** this is the programme's most productive defect class, and **the queue's own item #1 (F2-54) belonged to no row of the table that justifies the queue's order** |
 | **RC-F** | **A control declared, then enforced at one writer or none.** The flag exists, a report reads it, and the enforcement point never consults it — or only one of several writers does | **F2-62** (`is_active` a dead control, while the SAMA/NCA pack told the auditor it enforced) · **F2-67** (delete guarded, deactivate not) · historically F2-23, F2-43, F2-50, F2-51, F2-53 | F2-62's **biconditional** test — the report's cell and the authorities actually minted must agree, asserted over real generated bytes | 🔁 **open — added 2026-07-31.** It produced more of today's findings than RC-B and RC-C combined. The 🔑 line below named this pattern and then declined to make it a row, which is how a cause stays invisible while being described |
@@ -1132,6 +1132,103 @@ values), and **my mutation harness misreported 11 of 12 results** because vitest
 failed` line is ANSI-coloured. Follow-up **F2-172** filed to make promotion persist; note the
 server's `triage()` takes `promotedToRecordId` from the client and creates nothing, so the target
 row is created on **neither** side.
+
+✔ **F2-177 CLOSED 2026-08-09 — the last three ghost role names were committee seats, and three of
+the four things needed to ask that question had already shipped for other reasons.** [[F2-52]] drained
+the ghost-role population from 40 to 3 over six slices and stopped, because the survivors
+(`AUDIT_COMMITTEE_CHAIR`, `AUDIT_COMMITTEE_MEMBER`, `AUDIT_DIRECTOR`) resist all three of its routes:
+seating them as roles admits every holder to every committee's business, dropping the legs discards the
+only record of who the endpoint is for, and converting to a module permission hands the access to
+every reader of the module. [[F2-159]]'s entity ownership does not fit either — the guarded record is
+not the committee, it is a pivot or an overview the committee *reviews*, so there is no owner column.
+
+The fourth route is `hasPermission('AUDIT_COMMITTEE','COMMITTEE','SEAT')`: a **second relation** on the
+four-argument overload, dispatched on `targetType`, answered from `admin.committee_member_terms`. Six
+sites, both controllers in `module.governance`, all reads — and `RiskControlFindingPivotController`'s
+own javadoc had said for months that the view exists for *"audit-committee preparation"*, which was
+true of the intent and false of the guard.
+
+🔑 **The register recorded "no SpEL function asks the question yet" and that sentence became the size
+of the job.** Measured: [[F2-26]] had linked roster seats to platform users, [[F2-28]] had made the
+roster the quorum denominator, and S6c had already normalised the free-text seat title (16 distinct
+spellings over 43 seats, three meaning *chair*). None was authorisation work; together they were
+everything this needed, and the remaining cost was one interface, one component and two queries —
+about what [[F2-161]]'s second ownership resolver cost, for the same reason. **Re-measure a recorded
+blocker before believing its estimate.**
+
+⚠ **And the number that matters is the one the guard cannot fix.** Of 43 seats in dev, **13** name a
+platform user, 1 is declared external and **29 do neither**; `AUDIT_COMMITTEE` is **0 of 5**, and
+production is **0 of 31 — no committee seat is linked to any platform user at all.** So the leg answers
+`false` for every caller today, exactly as unreachable as the ghost it replaced. What changed is that a
+tenant administrator can now fix it from the roster screen instead of needing a jar. Filed as
+**F2-178** rather than left as a caveat, because a fix whose value depends on data nobody has entered
+needs saying out loud.
+
+⚠ **The remedy could have rebuilt the defect inside itself**: `'AUDIT_COMMITTE'` — one letter short —
+is a permanently false leg in exactly the way a ghost role name is. `CommitteeSeatGuardTest` pins the
+17-value `committee_type` vocabulary at a hard zero and pins `SEAT` as the only relation, because
+**replacing an unvalidated string with a different unvalidated string is not a fix.** `AUDIT_DIRECTOR`
+also had to have its *intent* recovered rather than its name fixed: it is the head of internal audit,
+whom this platform models as `INTERNAL_AUDITOR` — already named in the same guard — so deleting it
+removed a duplicate, not an authority.
+
+➕ Two by-products. The **third** instance of [[F2-156]]'s attachment-registry drift (`SANCTIONS_CHECK`,
+still a nine-name role list after the AML conversion) and the **only one measured to have cost
+nothing**: the 7 roles holding `AML:READ` were exactly the 7 real names listed. 🔑 *Close a harmless
+drift anyway — what made it harmless was two independent lists agreeing, and nobody was maintaining
+that.* And `CommitteeSeatOffice.MEASURED_TITLES`, a corpus constant stamped "measured 2026-08-03", had
+been six titles stale since the CAB/ECAB rosters landed two days later; **its own test could not have
+caught that**, because a title absent from the list is simply not asserted about.
+
+Ghost role names in `@PreAuthorize` **3 → 0** (now an invariant, not a ratchet) and on the attachment
+surface **3 → 2**, both survivors measured as extractor artefacts — so **no real ghost role name
+remains on either authorisation surface**. Pure role sites 410 → **404**. 21 new tests, mutation
+**14/14**, live probe **28/28**, including cross-tenant isolation proven with a real second-tenant
+committee — the leg [[F2-172]] could not run. No migration: nothing catalogued, nothing granted,
+no schema touched. ⚠ RC-C's *cause* is untouched — 404 endpoints still authorise by identity, and
+*existing* is not *held*: several surviving names resolve to roles with 0 active users, which fails
+identically and nothing counts it.
+
+✔ **F2-172 CLOSED 2026-08-09 — the intake front door became real, and measuring the rewire before
+writing it is what turned a chore into two defects.** F2-171's follow-up said "call
+`POST /api/v1/intake` on submit and `PUT …/triage` on triage". Measuring what that would hit found
+**(a)** the server accepted **16** of the frontend's **26** intake kinds — the ten it rejected are the
+DD-88 HRSD and DD-94 MOC workflows, including the **24-hour GOSI workplace-injury notification** and
+the **WPS payroll confirmation**, both statutory — while `IntakeService`'s javadoc claimed the two
+catalogues were mirrored (they were, once, at DD-82); and **(b)** `POST /api/v1/intake` was guarded by
+`INTAKE:WRITE`, **held by 3 of 69 roles, all administrators**, so repointing the client would have
+403'd every employee reporting a security event (NCA ECC 6.1) or a privacy breach (PDPL Art. 27).
+Opened to `isAuthenticated()` under **ADR-010 §Sanctioned exceptions** — it *subsumes*
+`CoiController#submitDeclaration`, admitted for the same reason at F2-144(b), so the argument did not
+have to be constructed, only noticed — with V374's `submitter_user_id` landing **first**, for
+F2-144's reason. The sharper half has no COI counterpart: `submitterIsAnonymous` also arrived from
+the body, and obeying it unconditionally would let any caller make any submission unattributable
+through the field that exists to protect whistleblowers, so it is honoured only where the catalogue
+allows it and nothing identifying is stored when it is. `triage()` now derives the target register
+from the kind and **refuses** a client-supplied record id.
+
+⚙ **The slice boundary was set by a test, not by me.** I had scoped this server-only, planning the
+client rewire as a follow-up; `FrontendEndpointContractTest` refused the commit because
+`GET /{id}` had no caller — a ceiling firing in the direction a ceiling normally cannot, and a better
+scoping decision than my own.
+
+⚠ Four of my own errors, every one caught by mutation or by the browser rather than by reading. The
+mutation harness left the running backend executing a **mutant** (`copy2` preserves mtime, so Maven
+skipped the recompile — F2-80's trap), and 26 of 27 probe legs had been measured against code that
+differed from the tree. `IntakeRecordDto.from()` never copied `submitterUserId`, so every response
+said "nobody" while both the unit test (entity at `repo.save`) and the pyodbc probe (the column)
+stayed green — neither goes through the mapper. And the new dead-button guard shipped vacuous
+**twice**: once reading its own documentation, once because `[^>]*?` cannot cross the `>` in `=>`.
+
+The browser also found a **second live defect**: the public DSR form's Submit was `type="button"`
+beside an empty `onClick`, so clicking it had never done anything — 19 files render a
+`<form onSubmit>`, 16 pass `type="submit"`, and this was the only dead one. Filed **F2-173** (shared
+`CR` reference-code prefix), **F2-174** (`assigned_to` stakeholder codes that resolve to nobody) and
+**F2-175** (`MlModelDriftService` is a second writer to `intake.intake_records` that bypasses
+`IntakeService`). Still open and unchanged: **nothing creates the promoted register record on either
+side** — that wants a port with one adapter per target module per ADR-012, so F2-171's placeholder
+machinery stays load-bearing — and `/portal/dsr` stays blocked by **F2-138**, but now *says so*
+instead of issuing a reference code.
 
 ✔ **2026-08-09 — [[F2-170]] CLOSED (P3): nothing asked whether the endpoint the frontend calls
 EXISTS — and this time the answer was "all of them".** Opened out of [[F2-165]]'s dark-method triage,

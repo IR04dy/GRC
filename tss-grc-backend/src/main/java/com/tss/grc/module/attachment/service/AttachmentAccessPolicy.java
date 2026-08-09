@@ -281,9 +281,22 @@ public class AttachmentAccessPolicy {
         // FRAUD_INVESTIGATOR, are absent from iam.roles, and PLATFORM_ADMIN keeps access via the
         // bypass above rather than via the list.
         DECLARED.put("FRAUD_CASE", ParentGuard.perm("FRAUD"));
-        DECLARED.put("SANCTIONS_CHECK", ParentGuard.roles(
-            "PLATFORM_ADMIN", "AML_OFFICER", "COMPLIANCE_OFFICER", "CISO", "INTERNAL_AUDITOR",
-            "AUDIT_COMMITTEE_MEMBER", "KYC_OFFICER", "ONBOARDING_AGENT", "AUDITOR"));
+        // F2-177: the THIRD instance of F2-156's drift, and the only one measured to have cost nothing.
+        // SanctionsScreeningController's reads have been hasPermission('AML','READ') since F2-05 slice 5
+        // (V370); this entry kept the nine-name list from before it. Measured 2026-08-09 against
+        // iam.role_permissions: the 7 roles holding AML:READ are *exactly* the 7 real names listed here,
+        // so `holders \ registry` is EMPTY — nobody could open a sanctions check and 403 on its files,
+        // which is the failure the other two instances caused. `registry \ holders` is
+        // {AUDIT_COMMITTEE_MEMBER, PLATFORM_ADMIN}: the first is absent from iam.roles and admitted
+        // nobody, the second keeps access through the bypass above. Aligning to the parent is therefore
+        // provably access-preserving in both directions, and the useful part of the finding is the
+        // negative: a drift that happens to be harmless is still worth closing, because what made it
+        // harmless (two independent lists agreeing) is a coincidence nobody was maintaining.
+        // ⚠ The AML read tier is deliberately wide — V370 split READ_ENTRIES / READ_HITS precisely so
+        // front-line onboarding and KYC staff can see lists and checks but NOT the hit queue (FATF R.21
+        // tipping-off). A *check*'s attachments belong to the wide tier; if a HIT ever becomes an
+        // attachment parent it must mirror AML_READ_HITS, not this.
+        DECLARED.put("SANCTIONS_CHECK", ParentGuard.perm("AML"));
 
         // ── Saudi financial-sector registers (role-guarded parents) ───────────
         DECLARED.put("COUNTERPARTY", ParentGuard.roles(CPTY_READ));
