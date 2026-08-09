@@ -3,10 +3,11 @@
 // evidenceAnchors but keyed by entity-id. industry-standard GRC tooling "Issue" + "Policy"
 // + "Control" cite-table pattern.
 import type { RegulatorAnchor } from './evidenceAnchors';
+import { demoKeyed } from './demoIds';
 
 // ── Findings ──────────────────────────────────────────────────────────────
 // Keyed by COMPLIANCE_FINDINGS.id (mock ids 31-38 from mockCompliance.ts).
-export const FINDING_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
+export const FINDING_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = demoKeyed({
   31: [
     { authorityCode: 'SDAIA', frameworkCode: 'PDPL',      controlRef: 'Article 29', citationText: 'Cross-border transfer safeguards.', controlStatus: 'NOT_IMPLEMENTED' },
     { authorityCode: 'ISO',   frameworkCode: 'ISO_27701', controlRef: 'A.7.5',      controlStatus: 'NOT_IMPLEMENTED' },
@@ -43,11 +44,11 @@ export const FINDING_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
     { authorityCode: 'SDAIA', frameworkCode: 'PDPL',      controlRef: 'Article 18', citationText: 'Retention limitation.', controlStatus: 'PARTIAL' },
     { authorityCode: 'ISO',   frameworkCode: 'ISO_27701', controlRef: 'A.7.4',      controlStatus: 'PARTIAL' },
   ],
-};
+});
 
 // ── Controls (compliance) ─────────────────────────────────────────────────
 // Keyed by COMPLIANCE_CONTROLS.id (mock ids 1-10).
-export const CONTROL_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
+export const CONTROL_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = demoKeyed({
   1: [
     { authorityCode: 'ISO',   frameworkCode: 'ISO_27001', controlRef: 'A.5.1',   citationText: 'Information security policies.', controlStatus: 'IMPLEMENTED' },
     { authorityCode: 'NCA',   frameworkCode: 'NCA_ECC',   controlRef: 'PR-1.1',  controlStatus: 'IMPLEMENTED' },
@@ -94,11 +95,11 @@ export const CONTROL_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
     { authorityCode: 'AICPA', frameworkCode: 'SOC_2',     controlRef: 'CC3.1', citationText: 'Information communicated externally.', controlStatus: 'IMPLEMENTED' },
     { authorityCode: 'ISO',   frameworkCode: 'ISO_27001', controlRef: 'A.5.5', controlStatus: 'IMPLEMENTED' },
   ],
-};
+});
 
 // ── Policies ──────────────────────────────────────────────────────────────
 // Keyed by POLICIES.id (mock ids 51-58).
-export const POLICY_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
+export const POLICY_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = demoKeyed({
   51: [
     { authorityCode: 'ISO',   frameworkCode: 'ISO_27001', controlRef: 'A.5.1',   citationText: 'ISMS policy.', controlStatus: 'IMPLEMENTED' },
     { authorityCode: 'NCA',   frameworkCode: 'NCA_ECC',   controlRef: 'PR-1.1',  controlStatus: 'IMPLEMENTED' },
@@ -132,11 +133,11 @@ export const POLICY_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
     { authorityCode: 'ISO', frameworkCode: 'ISO_27001', controlRef: 'A.8.24', citationText: 'Sunset of legacy crypto.', controlStatus: 'PARTIAL' },
     { authorityCode: 'PCI', frameworkCode: 'PCI_DSS',   controlRef: '4.1',    controlStatus: 'PARTIAL' },
   ],
-};
+});
 
 // ── Risks ──────────────────────────────────────────────────────────────────
 // Keyed by MOCK_RISKS.id.
-export const RISK_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
+export const RISK_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = demoKeyed({
   1:  [ // Sensitive data breach
     { authorityCode: 'ISO',   frameworkCode: 'ISO_27001', controlRef: 'A.5.34', citationText: 'Privacy + protection of PII.', controlStatus: 'IMPLEMENTED' },
     { authorityCode: 'SDAIA', frameworkCode: 'PDPL',      controlRef: 'Article 20', controlStatus: 'IMPLEMENTED' },
@@ -185,4 +186,4 @@ export const RISK_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
     { authorityCode: 'CMA',  frameworkCode: 'CMA_ESG', controlRef: '§3', citationText: 'Sustainability disclosure.', controlStatus: 'PARTIAL' },
     { authorityCode: 'COSO', frameworkCode: 'COSO_ERM', controlRef: 'Strategy #2', controlStatus: 'PARTIAL' },
   ],
-};
+});

@@ -1,3 +1,5 @@
+import { demoRows } from '../../lib/demoIds';
+
 // Demo-mode fallback data for the Cybersecurity module. Shapes match the
 // backend DTOs in lib/api.ts so coverage charts, vulnerability lifecycle
 // stepper and incident counters render with realistic data offline.
@@ -8,7 +10,7 @@ import type {
 } from '../../lib/api';
 
 // ─── Controls ──────────────────────────────────────────────────────────────
-export const CONTROLS: CyberControlDto[] = [
+export const CONTROLS: CyberControlDto[] = demoRows([
   { id: 1, controlNumber: 'AC-2.1.1', titleEn: 'User account lifecycle management',
     frameworkName: 'NCA ECC',   domain: 'Identity & Access',
     controlType: 'PREVENTIVE',  controlOwner: 'iam.team@tss.sa',
@@ -50,10 +52,10 @@ export const CONTROLS: CyberControlDto[] = [
     controlType: 'PREVENTIVE',  controlOwner: 'security.officer@tss.sa',
     maturityLevel: '3 - Defined', implementationStatus: 'IMPLEMENTED',
     reviewFrequency: 'ANNUAL' },
-];
+]);
 
 // ─── Sub-controls ──────────────────────────────────────────────────────────
-export const SUB_CONTROLS: CyberSubControlDto[] = [
+export const SUB_CONTROLS: CyberSubControlDto[] = demoRows([
   { id: 101, controlId: 1, subControlNumber: 'AC-2.1.1.a', titleEn: 'Automated joiner workflow',
     descriptionEn: 'New hires receive baseline access within 1 hour of HR feed.',
     controlOwner: 'iam.team@tss.sa', maturityLevel: '4 - Managed', implementationStatus: 'IMPLEMENTED', evidenceRequired: true },
@@ -78,10 +80,10 @@ export const SUB_CONTROLS: CyberSubControlDto[] = [
   { id: 108, controlId: 5, subControlNumber: 'CYB-1.4.3.a', titleEn: 'HSM-backed key generation',
     descriptionEn: 'Production keys generated and held in FIPS 140-2 L3 HSMs.',
     controlOwner: 'pki.team@tss.sa', maturityLevel: '4 - Managed', implementationStatus: 'IMPLEMENTED', evidenceRequired: true },
-];
+]);
 
 // ─── Assessments ───────────────────────────────────────────────────────────
-export const ASSESSMENTS: CyberAssessmentDto[] = [
+export const ASSESSMENTS: CyberAssessmentDto[] = demoRows([
   { id: 201, controlId: 1, assessmentDate: '2026-03-08', assessorName: 'Rana Al-Mutairi',
     reviewerName: 'Hassan Al-Saud',  result: 'PASS',    maturityScore: 4,
     gapIdentified: false, riskLevel: 'LOW',    status: 'COMPLETED',
@@ -108,10 +110,10 @@ export const ASSESSMENTS: CyberAssessmentDto[] = [
   { id: 206, controlId: 7, assessmentDate: '2026-01-15', assessorName: 'Saud Al-Faraj',
     reviewerName: 'Hassan Al-Saud',  result: 'PASS',    maturityScore: 4,
     gapIdentified: false, riskLevel: 'LOW',    status: 'COMPLETED' },
-];
+]);
 
 // ─── Vulnerabilities ───────────────────────────────────────────────────────
-export const VULNS: CyberVulnDto[] = [
+export const VULNS: CyberVulnDto[] = demoRows([
   { id: 301, titleEn: 'RCE in web frontend (Spring Web)', cveId: 'CVE-2025-3041', vulnerabilityType: 'RCE',
     assetId: 11, assetName: 'web-app-prod-01',
     cvssScore: 9.8, severity: 'CRITICAL', slaDays: 7, dueDate: '2026-04-29',
@@ -144,10 +146,10 @@ export const VULNS: CyberVulnDto[] = [
     assetId: 11, assetName: 'web-app-prod-01',
     cvssScore: 7.5, severity: 'HIGH', slaDays: 14, dueDate: '2026-05-08',
     discoveryDate: '2026-04-24', workflowStatus: 'VERIFICATION', status: 'IN_PROGRESS' },
-];
+]);
 
 // ─── Exceptions ────────────────────────────────────────────────────────────
-export const EXCEPTIONS: CyberExceptionDto[] = [
+export const EXCEPTIONS: CyberExceptionDto[] = demoRows([
   { id: 401, vulnerabilityId: 305, titleEn: 'Internal-only XSS in corp-wiki',
     exceptionReason: 'Asset is intranet-only; no inbound internet exposure.',
     workflowStatus: 'APPROVED', ownerName: 'wiki.admin@tss.sa', approverName: 'CISO',
@@ -166,10 +168,10 @@ export const EXCEPTIONS: CyberExceptionDto[] = [
     compensatingControls: 'Mutual TLS over private link; payload-level encryption.',
     impactAssessment: 'Residual risk: MEDIUM. Sunset by 2026-09-30.',
     expiryDate: '2026-09-30', approvedAt: '2026-02-15T09:00:00' },
-];
+]);
 
 // ─── Cyber incidents ───────────────────────────────────────────────────────
-export const INCIDENTS: CyberIncidentDto[] = [
+export const INCIDENTS: CyberIncidentDto[] = demoRows([
   { id: 501, incidentNumber: 'CYB-INC-2026-019', titleEn: 'Phishing campaign targeting finance team',
     incidentType: 'PHISHING',          affectedAssetId: 21, affectedAssetName: 'M365 mailboxes',
     severity: 'HIGH', impact: 'MEDIUM',
@@ -207,10 +209,10 @@ export const INCIDENTS: CyberIncidentDto[] = [
     incidentLead: 'noc.duty@tss.sa',
     lessonsLearned: 'WAF rate-limit + Cloudflare under attack mode mitigated within 15 min.',
     linkedVulnerabilitiesCount: 0, linkedEvidenceCount: 3 },
-];
+]);
 
 // ─── Assets ────────────────────────────────────────────────────────────────
-export const ASSETS: CyberAssetDto[] = [
+export const ASSETS: CyberAssetDto[] = demoRows([
   { id: 11, assetName: 'web-app-prod-01',  assetType: 'APPLICATION',
     businessOwner: 'product.lead@tss.sa', technicalOwner: 'eng.lead@tss.sa',
     classification: 'CONFIDENTIAL', criticality: 'CRITICAL',
@@ -251,10 +253,10 @@ export const ASSETS: CyberAssetDto[] = [
     classification: 'CONFIDENTIAL', criticality: 'HIGH',
     ipAddress: '10.10.0.23', hostname: 'vpn-gw-01.tss.sa', operatingSystem: 'PAN-OS 11',
     linkedVulnerabilitiesCount: 0, linkedIncidentsCount: 1, linkedControlsCount: 9, status: 'ACTIVE' },
-];
+]);
 
 // ─── Cyber evidence ────────────────────────────────────────────────────────
-export const EVIDENCE: CyberEvidenceDto[] = [
+export const EVIDENCE: CyberEvidenceDto[] = demoRows([
   { id: 601, titleEn: 'Q1 Privileged-access recertification report', evidenceType: 'REPORT',
     controlId: 2, frameworkRequirement: 'NCA ECC AC-2.1.2', ownerName: 'iam.team@tss.sa',
     version: '1.0', collectedDate: '2026-03-31', reviewDate: '2026-04-04', expiryDate: '2026-06-30',
@@ -279,10 +281,10 @@ export const EVIDENCE: CyberEvidenceDto[] = [
     controlId: 7, frameworkRequirement: 'NCA ECC IR-3.1.1', ownerName: 'csirt.lead@tss.sa',
     version: '1.0', collectedDate: '2026-04-22', reviewDate: '2026-04-25', expiryDate: '2026-10-22',
     fileName: 'IR-tabletop-2026-04.pdf', status: 'APPROVED' },
-];
+]);
 
 // ─── Action plans (CAPA) ───────────────────────────────────────────────────
-export const ACTION_PLANS: CyberActionPlanDto[] = [
+export const ACTION_PLANS: CyberActionPlanDto[] = demoRows([
   { id: 701, titleEn: 'Roll out JIT elevation to remaining Tier-0 systems',
     descriptionEn: 'Extend Just-in-Time access elevation across the remaining 40% of Tier-0.',
     sourceType: 'ASSESSMENT', sourceId: 202, sourceRef: 'CYB-ASSESS-202',
@@ -323,4 +325,4 @@ export const ACTION_PLANS: CyberActionPlanDto[] = [
     priority: 'LOW', ownerName: 'appsec.team@tss.sa',
     dueDate: '2026-09-30', startDate: '2026-04-01',
     workflowStatus: 'IN_PROGRESS', status: 'OPEN', progressPct: 50 },
-];
+]);

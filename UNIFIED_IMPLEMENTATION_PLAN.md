@@ -1002,6 +1002,71 @@ today… needs the owner's word"*. Also measured: **all four APPROVED acceptance
 belong to soft-deleted probe risks**, so no acceptance has ever been recorded through the UI — which is
 what an unreachable approval step looks like from the data side.
 
+✔ **2026-08-09 — [[F2-168]] CLOSED (P1): fabricated children were attaching themselves to REAL
+records by id collision — on the success path, with no badge and no demo flag.** Found by doing what
+[[F2-167]] said to do next: re-measure [[F2-15]]'s `Current State` before renumbering the mock ids.
+Two things fell out of that measurement before any code changed.
+
+First, **F2-15's "3,650 lines" is an arithmetic error, not a stale figure** — its own itemised list
+sums to **3,550** and every per-file number is unchanged from the day it was written. ⚠ And it had
+**already been found**: `MEASURED_BASELINE.md` §0.1 files it under *"Never reproducible"* and
+`baseline_census.py` publishes 3,550, so the census had been reporting a **−100 drift against the
+register row, ungated**, for weeks. The measurement existed and the register was never reconciled with
+it — [[F2-162]]'s shape again. Second, and the reason the P1 survived: **"15 mock files" is a boundary drawn by filename.** Seven more modules
+define fabricated records with numeric ids — `entityAnchors.ts` (38 keyed regulator citations),
+`policyLifecycle.ts`, `approvalChains.ts`, `auditPlan.ts`, `riskAppetiteSaudi.ts`,
+`auditCommittee.ts`, `auditAppointments.ts` — **22 modules, ~968 id-ish literals**. ⚙ **A boundary
+drawn by filename is not a boundary**, and the file it omitted is the one holding the fabricated
+compliance citations.
+
+The defect: six detail pages fetch a **genuine** record from the server and then decorate it out of
+a fabricated map **keyed by that record's id**, unconditionally, with `isDemo`/`showingDemo`/
+`demoMode` absent from all six files. `CONTROL_TESTS_BY_ID[control.id]` rendered fabricated
+**control-test results** — tester, sample count, findings, PASS — on a real control.
+`FINDING_HISTORY_BY_ID[finding.id]` rendered a fabricated **audit trail** on a real finding. Vendor
+assessments and contracts, DPIA reviews, risk history and the four `*_ANCHORS_BY_ID` citation maps
+did the same: **17 fabricated datasets, 37 expressions, 7 pages**, all of them artefacts an auditor
+samples. Live-probed on `:8084`: **38 real records** were affected — 5 of 35 controls, 8 of 40
+findings, 16 of 28 vendors, 9 of 51 risks. DPIA and policy keys do not collide *yet*; latent, not
+absent.
+
+🔑 **The hazard was documented, in the file, by its author, and it still shipped.**
+`entityAnchors.ts` opens with *"Keyed by COMPLIANCE_FINDINGS.id (mock ids 31-38 from
+mockCompliance.ts)"*. The sentence lived next to the data; the bug lived at the call site.
+
+Fixed with one constant. `lib/demoIds.ts` — `demoRows` / `demoKeyed` / `demoRecord` recursively
+shift every `id` and every camelCase `*Id` **numeric** field, plus a keyed map's keys, above
+`DEMO_ID_BASE` (900,000,000). 85 exports wrapped across 17 modules. Because keys and record ids move
+by the same amount, `MAP[fabricatedId]` still resolves — the demo experience is untouched — while
+`MAP[realId]` misses and each page falls through to the honest empty state it already had. **Zero
+page edits were needed**, and the same shift closes what F2-167 deliberately left open: a write
+raised from a fabricated row can only 404.
+
+⚠ **A wrapper, not a rewrite, and that was the whole engineering call.** ~968 literals including
+object keys, where a miss is *silent* — no compile error, just a lookup that stops resolving. A
+textual sweep puts the slice's correctness in a regex; the wrapper puts it in one function with 16
+unit tests, including the two ways it could corrupt data while appearing to work: shifting a number
+that is not an id (`KRI_TRENDS_BY_ID` values are weekly readings), and shifting the same record
+twice.
+
+⚠ **Fifth over-wide scan in five slices.** The site scan called all 42 candidates unconditional;
+reading them, 2 were correctly guarded (`RiskDetailPage` chooses `live` over `mockRows` via
+`useLive`) and 8 were mock-on-mock. Then the *ratchet's own first draft* sampled 6,000 characters
+after each export and accused six exports holding no ids at all. 🔑 **Caught only because the
+failure list was short enough to read** — a wrong ratchet that fires is fixable, one that passes is
+not.
+
+Guards: `demoIdSpaceContract.test.ts` (9) — every id ≥ base, every key ≥ base, **no id in 1..2000
+reaches any fabricated map**, **every key still resolves to a corpus record** (measured true *before*
+the shift, so it is a real invariant), non-id numbers unmoved, a hard-zero ratchet on unwrapped
+exports, the six pages keep their `?? []` branch, six vacuity floors. Mutation **6/6**. Live: the
+**154** ids the running server actually serves reach none of the 13 fabricated maps.
+
+Residue filed: [[F2-169]] (P3) — eight inline `.catch(() => MAP[realId])` fallbacks bypass
+`applyMock`, so no badge is raised and the disclosure contract cannot see them; after this slice they
+resolve to `[]`, which turns a 500 into an empty tab. FE **455/455** in 48 files (+25), `tsc` +
+`vite build` clean, backend untouched.
+
 ✔ **2026-08-09 — [[F2-167]] CLOSED: a demo row's buttons were live, and the fabricated ids
 collide with real ones.** Filed by asking a single question about the previous slice — *why did the
 shipped demo-fallback contract pass [[F2-166]]?* `demoFallbackContract.test.ts` has five tests and

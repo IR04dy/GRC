@@ -1,3 +1,5 @@
+import { demoKeyed, demoRows } from '../../lib/demoIds';
+
 // Sample risk data — used when no JWT is present (demo mode). Aligned with
 // backend DTOs in lib/api.ts so heat map, KRI dashboard and appetite charts
 // all populate without authentication.
@@ -6,7 +8,7 @@ import type {
   RiskAppetiteStatementDto, AppetiteBreachEventDto,
 } from '../../lib/api';
 
-export const MOCK_RISKS: RiskResponse[] = [
+export const MOCK_RISKS: RiskResponse[] = demoRows([
   { id: 1,  riskCode: 'R-0042', titleEn: 'Sensitive Data Breach',     titleAr: 'تسريب بيانات حساسة',
     descriptionEn: 'Unauthorised disclosure of customer-identifying or special-category personal data through web, API, or mailbox compromise. Top NCA ECC + PDPL exposure for the entity.',
     categoryNameEn: 'Cyber',       categoryNameAr: 'سيبراني',
@@ -104,10 +106,10 @@ export const MOCK_RISKS: RiskResponse[] = [
     inherentLikelihood: 3, inherentImpact: 3, inherentScore: 9,
     residualLikelihood: 3, residualImpact: 3, residualScore: 9,
     identifiedDate: '2025-07-10', reviewDate: '2026-07-10' },
-];
+]);
 
 // ── KRIs (Key Risk Indicators) ──────────────────────────────────────────────
-export const KRIS: KriDefinitionDto[] = [
+export const KRIS: KriDefinitionDto[] = demoRows([
   { id: 1001, code: 'KRI-CYB-01', nameEn: 'Failed login attempts (24h)',
     descriptionEn: 'Aggregated failed-login events across all auth systems in the last 24 hours.',
     riskId: 1, unit: 'events', direction: 'HIGHER_IS_WORSE',
@@ -156,10 +158,10 @@ export const KRIS: KriDefinitionDto[] = [
     greenMax: 90, amberMax: 75, targetValue: 95,
     frequency: 'WEEKLY', owner: 'aml.team@tss.sa', dataSource: 'AML engine',
     framework: 'SAMA_AML', isActive: true },
-];
+]);
 
 // 12-week trend per KRI — feeds the TimeSeries sparkline on each KRI card.
-export const KRI_TRENDS_BY_ID: Record<number, number[]> = {
+export const KRI_TRENDS_BY_ID: Record<number, number[]> = demoKeyed({
   1001: [ 320, 380, 410, 540, 720, 980, 880, 760, 920, 1100, 1180, 1240 ], // Failed logins (24h) — climbing into amber
   1002: [   0,   0,   1,   0,   2,   0,   1,   0,   0,   0,    0,    0 ], // Critical CVEs open beyond SLA
   1003: [  18,  22,  19,  25,  28,  30,  21,  19,  23,  24,   22,   22 ], // Critical service downtime (mins)
@@ -168,10 +170,10 @@ export const KRI_TRENDS_BY_ID: Record<number, number[]> = {
   1006: [   3,   2,   2,   2,   1,   1,   2,   2,   1,   1,    1,    1 ], // Open audit findings beyond due date
   1007: [   1,   1,   0,   0,   0,   0,   0,   0,   0,   0,    0,    0 ], // DSR responses past PDPL SLA
   1008: [  88,  85,  82,  79,  76,  74,  78,  77,  76,  78,   79,   78 ], // AML alerts cleared within 5d (%)
-};
+});
 
 // Latest band per KRI (used by KriDashboard.latest map)
-export const KRI_LATEST_BANDS: Record<number, string> = {
+export const KRI_LATEST_BANDS: Record<number, string> = demoKeyed({
   1001: 'AMBER',
   1002: 'GREEN',
   1003: 'GREEN',
@@ -180,10 +182,10 @@ export const KRI_LATEST_BANDS: Record<number, string> = {
   1006: 'GREEN',
   1007: 'GREEN',
   1008: 'AMBER',
-};
+});
 
 // Open breaches per KRI (only RED bands typically have any)
-export const KRI_BREACHES: Record<number, KriBreachEventDto[]> = {
+export const KRI_BREACHES: Record<number, KriBreachEventDto[]> = demoKeyed({
   1005: [
     { id: 9001, kriId: 1005, readingId: 88001, breachBand: 'RED', readingValue: 4, thresholdCrossed: 3,
       breachedAt: '2026-04-22T08:30:00', status: 'OPEN' },
@@ -192,14 +194,14 @@ export const KRI_BREACHES: Record<number, KriBreachEventDto[]> = {
     { id: 9002, kriId: 1001, readingId: 88002, breachBand: 'AMBER', readingValue: 1240, thresholdCrossed: 500,
       breachedAt: '2026-04-19T07:00:00', status: 'ACKNOWLEDGED', acknowledgedAt: '2026-04-19T08:30:00' },
   ],
-};
+});
 
 export const KRI_DASHBOARD_STATS = {
   totalKris: 8, green: 4, amber: 3, red: 1, noData: 0, openBreaches: 1,
 };
 
 // ── Risk Appetite ───────────────────────────────────────────────────────────
-export const APPETITES: RiskAppetiteStatementDto[] = [
+export const APPETITES: RiskAppetiteStatementDto[] = demoRows([
   { id: 5101, titleEn: 'Cybersecurity – Critical Vulnerabilities', titleAr: 'الأمن السيبراني — ثغرات حرجة',
     statementEn: 'We have a MINIMAL appetite for unpatched critical vulnerabilities in production.',
     riskDimension: 'CYBER', appetiteLevel: 'MINIMAL',
@@ -243,16 +245,16 @@ export const APPETITES: RiskAppetiteStatementDto[] = [
     toleranceLower: 0, toleranceUpper: 1, unit: 'events/yr', currentExposure: 1,
     approvedBy: 'CISO', approvedAt: '2026-02-22T10:30:00', nextReviewDate: '2026-08-22',
     status: 'APPROVED' },
-];
+]);
 
 // Open breaches per appetite statement (only those exceeding tolerance)
-export const APPETITE_BREACHES: Record<number, AppetiteBreachEventDto[]> = {
+export const APPETITE_BREACHES: Record<number, AppetiteBreachEventDto[]> = demoKeyed({
   5104: [
     { id: 8001, appetiteId: 5104, observedValue: 32, breachSeverity: 'EXCEEDED',
       breachedAt: '2026-04-15T12:00:00',
       notes: 'AWS spend share rose to 32% after the regional expansion.', status: 'OPEN' },
   ],
-};
+});
 
 export const APPETITE_DASHBOARD_STATS = {
   total: 7, withinTolerance: 5, exceeded: 1, critical: 1, noExposure: 0,
@@ -269,7 +271,7 @@ export interface RiskAssessmentRow {
   residualScore: number | null;
   notes: string;
 }
-export const RISK_ASSESSMENTS_BY_ID: Record<number, RiskAssessmentRow[]> = {
+export const RISK_ASSESSMENTS_BY_ID: Record<number, RiskAssessmentRow[]> = demoKeyed({
   1: [
     { id: 1011, date: '2026-04-12', assessor: 'Ahmed Al-Qahtani', inherentScore: 20, residualScore: 9,  notes: 'Quarterly re-assessment after DLP rollout. Compensating controls recognised.' },
     { id: 1012, date: '2026-01-14', assessor: 'Hassan Al-Saud',   inherentScore: 20, residualScore: 12, notes: 'Initial assessment post-incident. Treatment plan approved.' },
@@ -295,7 +297,7 @@ export const RISK_ASSESSMENTS_BY_ID: Record<number, RiskAssessmentRow[]> = {
   10: [
     { id: 1101, date: '2026-04-19', assessor: 'Mona Al-Bishi',    inherentScore: 20, residualScore: 12, notes: 'Awaiting SDAIA cross-border permit; safeguards documented.' },
   ],
-};
+});
 
 export interface RiskTreatmentRow {
   id: number;
@@ -306,7 +308,7 @@ export interface RiskTreatmentRow {
   dueDate: string;
   progressPct: number;
 }
-export const RISK_TREATMENTS_BY_ID: Record<number, RiskTreatmentRow[]> = {
+export const RISK_TREATMENTS_BY_ID: Record<number, RiskTreatmentRow[]> = demoKeyed({
   1: [
     { id: 2011, type: 'MITIGATE', action: 'Roll out DLP-tagging on all customer-data sources', owner: 'data.security@tss.sa', status: 'IN_PROGRESS', dueDate: '2026-06-30', progressPct: 60 },
     { id: 2012, type: 'MITIGATE', action: 'Quarterly access recertification on all sensitive stores',  owner: 'iam.team@tss.sa',     status: 'IMPLEMENTED', dueDate: '2026-03-31', progressPct: 100 },
@@ -328,7 +330,7 @@ export const RISK_TREATMENTS_BY_ID: Record<number, RiskTreatmentRow[]> = {
     { id: 2101, type: 'MITIGATE', action: 'Adopt SDAIA Standard Contractual Clauses with all foreign processors', owner: 'dpo@tss.sa', status: 'IN_PROGRESS', dueDate: '2026-06-30', progressPct: 35 },
     { id: 2102, type: 'AVOID',    action: 'Migrate PDPL Tier-2 data to in-Kingdom STC sovereign cloud',          owner: 'cio.office@tss.sa', status: 'IN_PROGRESS', dueDate: '2026-12-31', progressPct: 25 },
   ],
-};
+});
 
 export interface RiskKriRow {
   id: number;
@@ -340,7 +342,7 @@ export interface RiskKriRow {
   greenMax: number;
   amberMax: number;
 }
-export const RISK_KRIS_BY_ID: Record<number, RiskKriRow[]> = {
+export const RISK_KRIS_BY_ID: Record<number, RiskKriRow[]> = demoKeyed({
   1: [
     { id: 1001, code: 'KRI-CYB-01', nameEn: 'Failed login attempts (24h)',          band: 'AMBER', current: 1240, unit: 'events',  greenMax: 500, amberMax: 1500 },
     { id: 1002, code: 'KRI-CYB-02', nameEn: 'Critical vulnerabilities open beyond SLA', band: 'GREEN', current: 0,    unit: 'CVEs',    greenMax: 0,   amberMax: 3 },
@@ -361,7 +363,7 @@ export const RISK_KRIS_BY_ID: Record<number, RiskKriRow[]> = {
   7: [
     { id: 1008, code: 'KRI-AML-01', nameEn: 'AML alerts cleared within 5 days (%)',    band: 'AMBER', current: 78,   unit: '%',       greenMax: 90,  amberMax: 75 },
   ],
-};
+});
 
 export interface RiskHistoryEvent {
   id: number;
@@ -370,7 +372,7 @@ export interface RiskHistoryEvent {
   type: 'CREATED' | 'STATUS_CHANGE' | 'SCORE_CHANGE' | 'TREATMENT_ADDED' | 'COMMENT' | 'ATTACHMENT' | 'REVIEW';
   message: string;
 }
-export const RISK_HISTORY_BY_ID: Record<number, RiskHistoryEvent[]> = {
+export const RISK_HISTORY_BY_ID: Record<number, RiskHistoryEvent[]> = demoKeyed({
   1: [
     { id: 5011, at: '2026-04-12T10:30:00', actor: 'Ahmed Al-Qahtani', type: 'REVIEW',          message: 'Quarterly re-assessment completed. Residual recalibrated 12 → 9.' },
     { id: 5012, at: '2026-04-08T14:00:00', actor: 'Mona Al-Bishi',     type: 'COMMENT',         message: 'DLP coverage now 92% — recommend closing residual review.' },
@@ -388,7 +390,7 @@ export const RISK_HISTORY_BY_ID: Record<number, RiskHistoryEvent[]> = {
     { id: 5082, at: '2026-04-15T15:00:00', actor: 'pam.team@tss.sa',   type: 'TREATMENT_ADDED', message: 'Session recording on DBA bastion hosts.' },
     { id: 5083, at: '2025-11-08T10:00:00', actor: 'Hassan Al-Saud',    type: 'CREATED',         message: 'Risk registered after CSIRT review.' },
   ],
-};
+});
 
 export interface RiskLinkRow {
   id: number;
@@ -398,7 +400,7 @@ export interface RiskLinkRow {
   href: string;
   status?: string;
 }
-export const RISK_LINKS_BY_ID: Record<number, RiskLinkRow[]> = {
+export const RISK_LINKS_BY_ID: Record<number, RiskLinkRow[]> = demoKeyed({
   1: [
     { id: 7011, type: 'CONTROL', ref: 'A.5.34',     title: 'Privacy + protection of PII',          href: '/controls/1', status: 'IMPLEMENTED' },
     { id: 7012, type: 'CONTROL', ref: 'AC-2.1.2',   title: 'Privileged access review',             href: '/controls/3', status: 'PARTIAL' },
@@ -414,4 +416,4 @@ export const RISK_LINKS_BY_ID: Record<number, RiskLinkRow[]> = {
     { id: 7082, type: 'FINDING', ref: 'AUD-F-032',  title: 'PAM session recording not extended',    href: '/findings/32' },
     { id: 7083, type: 'CHANGE',  ref: 'CHG-2026-012', title: 'Roll out MFA for all VPN users',     href: '/changes' },
   ],
-};
+});

@@ -1,7 +1,8 @@
 // Demo-mode fallback for the Scheduled Reports admin page.
 import type { ReportScheduleDto, ReportRunDto } from '../../lib/api';
+import { demoRows } from '../../lib/demoIds';
 
-export const REPORT_SCHEDULES: ReportScheduleDto[] = [
+export const REPORT_SCHEDULES: ReportScheduleDto[] = demoRows([
   { id: 1, name: 'Weekly Risk Register (Exec)', description: 'Top-risk register snapshot for the executive committee.',
     reportType: 'RISK_REGISTER', format: 'PDF', language: 'en', cadence: 'WEEKLY',
     cadenceAnchor: 'MONDAY', timeOfDay: '07:00',
@@ -59,9 +60,9 @@ export const REPORT_SCHEDULES: ReportScheduleDto[] = [
     lastRunAt: '2026-05-02T07:00:00', nextRunAt: '2026-05-03T07:00:00',
     lastRunStatus: 'FAILED', lastRunMessage: 'SMTP gateway timeout — retry queued.',
     createdAt: '2026-02-15T09:30:00' },
-];
+]);
 
-export const REPORT_RUNS: ReportRunDto[] = [
+export const REPORT_RUNS: ReportRunDto[] = demoRows([
   { id: 9001, scheduleId: 1, triggeredAt: '2026-04-28T07:00:00', triggeredBy: 'CRON',  status: 'SUCCESS', durationMs: 11420, bytes: 524_288, recipients: 'ceo@tss.sa,cro@tss.sa,ciso@tss.sa,pmo@tss.sa' },
   { id: 9002, scheduleId: 3, triggeredAt: '2026-05-02T07:30:00', triggeredBy: 'CRON',  status: 'SUCCESS', durationMs: 4180,  bytes: 184_320, recipients: 'cro@tss.sa,risk.team@tss.sa' },
   { id: 9003, scheduleId: 5, triggeredAt: '2026-05-02T08:00:00', triggeredBy: 'CRON',  status: 'SUCCESS', durationMs: 6720,  bytes: 92_160,  recipients: 'dpo@tss.sa,privacy.team@tss.sa' },
@@ -72,4 +73,4 @@ export const REPORT_RUNS: ReportRunDto[] = [
   { id: 9008, scheduleId: 1, triggeredAt: '2026-04-21T07:00:00', triggeredBy: 'CRON',  status: 'SUCCESS', durationMs: 12180, bytes: 540_672, recipients: 'ceo@tss.sa,cro@tss.sa,ciso@tss.sa,pmo@tss.sa' },
   { id: 9009, scheduleId: 3, triggeredAt: '2026-05-01T07:30:00', triggeredBy: 'CRON',  status: 'SUCCESS', durationMs: 4310,  bytes: 184_960, recipients: 'cro@tss.sa,risk.team@tss.sa' },
   { id: 9010, scheduleId: 1, triggeredAt: '2026-04-22T15:30:00', triggeredBy: 'MANUAL',status: 'SUCCESS', durationMs: 11580, bytes: 532_480, recipients: 'ceo@tss.sa' },
-];
+]);

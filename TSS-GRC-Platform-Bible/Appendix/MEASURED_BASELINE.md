@@ -51,7 +51,7 @@ that will be read as current forever.
 | Routes registered in `App.tsx` | **330** | 329 | ⬆ **330 with F2-163** — `/bcm/exercises/:exerciseId/runs`, the run list that gave the three exercise-runtime consoles (1,862 lines) their first entry point. ⚠ It is the first route this row has gained since CE-13, and it moves the pages-vs-routes delta by **0** (+1 page, +1 route): that is what a genuinely new SCREEN looks like, as against the componentisation that took the delta to 23. CE-13 added `/changes/cab` — the CAB workspace, and the route CE-0 withheld its sidebar row for |
 | Sidebar navigation entries | **194** | 184 | CE-13 added the CAB-queue row |
 | Mock-data import statements | **30** in **26** files | 44 / 29 | W2-1 removed 14 |
-| Mock data files still shipped | **15**, **3,550 lines** | 15 / *pub. 3,650* | ⚠ see §0.1 |
+| Mock data files still shipped | **15**, **3,569 lines** | 15 / *pub. 3,650* | ⚠ see §0.1. +19 on 2026-08-09: [[F2-168]] wrapped every fabricated export in `demoIds`, one import line per module. The corpus is **22 modules** once `entityAnchors`, `policyLifecycle`, `approvalChains`, `auditPlan`, `riskAppetiteSaudi`, `auditCommittee` and `auditAppointments` are counted — "15" is a filename boundary |
 | Unguarded write endpoints (enforced ratchet) | **≤ 21** (`ControllerAuthorizationRatchetTest`) | 21 | ⚠ `CLAUDE.md` house rule says "**≤ 62**" — the enforced constant is **21** |
 
 **Corrections to numbers this project has previously published, including by me:**
@@ -651,7 +651,7 @@ central tokens (§5.3), so the fix is likely a small number of token changes rat
 | **Instruction coverage** | **37.1%** | JaCoCo, 1,324 classes — **not re-measured since; the suite has since grown 51%** |
 | **Branch coverage** | **26.0%** | |
 | **Line coverage** | **38.5%** | |
-| Frontend tests then | **0** (`runner: none`) | **now 430** via vitest (`npx vitest run`, 46 files, 2026-08-09) — 49 at the 07-25 baseline |
+| Frontend tests then | **0** (`runner: none`) | **now 455** via vitest (`npx vitest run`, 48 files, 2026-08-09) — 49 at the 07-25 baseline |
 | Code duplication | **5.41%** — 1,666 clones, 21,062 lines | jscpd over 389,021 lines |
 | **ESLint configured** | **`false`** | ⚠ a precondition for F2-11's lint ratchets — they cannot be added until ESLint exists |
 | trivy dependency vulns | 36 | not triaged by severity in `metrics.json` |

@@ -3,13 +3,14 @@
 // without authentication.
 import type { EvidenceItemDto, EvidenceRequestDto, EvidenceReviewDto } from '../../lib/api';
 import { ANCHOR_PACKS, type RegulatorAnchor } from '../../lib/evidenceAnchors';
+import { demoKeyed, demoRows } from '../../lib/demoIds';
 
 /**
  * Multi-authority anchor map: each evidence id is bound to one or more
  * authority + framework + control citations, tracking the control-status
  * each authority sees. industry-standard GRC tooling "Citation" pattern.
  */
-export const EVIDENCE_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
+export const EVIDENCE_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = demoKeyed({
   1: ANCHOR_PACKS.ISMS_POLICY,
   2: ANCHOR_PACKS.VULN_SCAN,
   3: ANCHOR_PACKS.FIREWALL_RULES,
@@ -19,10 +20,10 @@ export const EVIDENCE_ANCHORS_BY_ID: Record<number, RegulatorAnchor[]> = {
   7: ANCHOR_PACKS.PAM_RECERT,
   8: ANCHOR_PACKS.AUDIT_PLAN,
   9: ANCHOR_PACKS.AWARENESS,
-};
+});
 
 // ── Catalog (evidence items) ────────────────────────────────────────────────
-export const EVIDENCE: EvidenceItemDto[] = [
+export const EVIDENCE: EvidenceItemDto[] = demoRows([
   { id: 1, evidenceCode: 'EV-1083', titleEn: 'Information Security Policy v3.2',           titleAr: 'سياسة أمن المعلومات الإصدار 3.2',
     descriptionEn: 'Authoritative ISMS policy approved by the executive board.',
     evidenceType: 'POLICY',        status: 'APPROVED',
@@ -68,10 +69,10 @@ export const EVIDENCE: EvidenceItemDto[] = [
     evidenceType: 'REPORT',        status: 'APPROVED',
     subControlCode: 'A.6.3.1', controlCode: 'A.6.3', frameworkCode: 'ISO_27001',
     collectedDate: '2026-04-05', expiryDate: '2026-07-05' },
-];
+]);
 
 // ── Requests ──────────────────────────────────────────────────────────────
-export const EVIDENCE_REQUESTS: EvidenceRequestDto[] = [
+export const EVIDENCE_REQUESTS: EvidenceRequestDto[] = demoRows([
   { id: 101, requestCode: 'REQ-2026-042', titleEn: 'Provide H1 2026 firewall change log',  titleAr: 'سجل تغييرات الجدار الناري للنصف الأول',
     subControlCode: 'A.8.20.1', frameworkCode: 'ISO_27001',
     status: 'OPEN', requestedAt: '2026-04-22', dueDate: '2026-05-06', ownerName: 'network.team@tss.sa' },
@@ -90,10 +91,10 @@ export const EVIDENCE_REQUESTS: EvidenceRequestDto[] = [
   { id: 106, requestCode: 'REQ-2026-037', titleEn: 'SAMA CSF re-attestation evidence',      titleAr: 'دليل إعادة اعتماد إطار البنك المركزي',
     subControlCode: 'CSF-1.1.1', frameworkCode: 'SAMA_CSF',
     status: 'OPEN', requestedAt: '2026-04-25', dueDate: '2026-05-25', ownerName: 'compliance.lead@tss.sa' },
-];
+]);
 
 // ── Reviews ──────────────────────────────────────────────────────────────
-export const EVIDENCE_REVIEWS: EvidenceReviewDto[] = [
+export const EVIDENCE_REVIEWS: EvidenceReviewDto[] = demoRows([
   { id: 201, evidenceId: 1, evidenceTitleEn: 'Information Security Policy v3.2',
     reviewerName: 'CISO', reviewDate: '2026-04-16', result: 'APPROVED',
     notesEn: 'Policy aligned with ISO 27001:2022; board-approved minutes attached.' },
@@ -112,4 +113,4 @@ export const EVIDENCE_REVIEWS: EvidenceReviewDto[] = [
   { id: 206, evidenceId: 9, evidenceTitleEn: 'Phishing Awareness Campaign Results',
     reviewerName: 'Awareness Lead', reviewDate: '2026-04-08', result: 'APPROVED',
     notesEn: 'Click-rate 4.2% — below 5% target. Repeat-offenders enrolled in remedial training.' },
-];
+]);

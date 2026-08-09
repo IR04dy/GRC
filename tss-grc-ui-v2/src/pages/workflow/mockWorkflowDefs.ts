@@ -1,7 +1,8 @@
 // Demo-mode fallback for the Workflows admin page (state-machine library).
 import type { WorkflowDefinitionDto, WorkflowDefinitionGraph } from '../../lib/api';
+import { demoKeyed, demoRows } from '../../lib/demoIds';
 
-export const WORKFLOW_DEFINITIONS: WorkflowDefinitionDto[] = [
+export const WORKFLOW_DEFINITIONS: WorkflowDefinitionDto[] = demoRows([
   { id: 1, code: 'RISK_LIFECYCLE', nameEn: 'Risk Lifecycle', nameAr: 'دورة حياة المخاطر',
     targetModule: 'RISK', targetEntity: 'Risk', version: '1.0',
     descriptionEn: 'ISO 31000 / COSO ERM-aligned risk lifecycle: identify → assess → treat → monitor → close.',
@@ -62,9 +63,9 @@ export const WORKFLOW_DEFINITIONS: WorkflowDefinitionDto[] = [
     targetModule: 'ETHICS', targetEntity: 'KycSubject', version: '1.0',
     descriptionEn: 'CDD → EDD → screening → approved → periodic review.',
     isActive: true },
-];
+]);
 
-export const WORKFLOW_GRAPHS_BY_ID: Record<number, WorkflowDefinitionGraph> = {
+export const WORKFLOW_GRAPHS_BY_ID: Record<number, WorkflowDefinitionGraph> = demoKeyed({
   1: {
     definition: WORKFLOW_DEFINITIONS[0],
     states: [
@@ -122,4 +123,4 @@ export const WORKFLOW_GRAPHS_BY_ID: Record<number, WorkflowDefinitionGraph> = {
       { id: 3106, fromStateCode: 'RECOVERY',      toStateCode: 'CLOSURE',        actionCode: 'CLOSE',      actionNameEn: 'Close + lessons',        slaHours: 168 },
     ],
   },
-};
+});

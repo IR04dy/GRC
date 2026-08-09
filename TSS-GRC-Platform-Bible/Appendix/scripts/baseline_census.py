@@ -104,7 +104,7 @@ PUBLISHED = {
     "mock_import_statements": 30,
     "mock_import_files": 26,
     "mock_files": 15,
-    "mock_file_lines": 3_550,
+    "mock_file_lines": 3_569,   # F2-168 added one import line per wrapped module
 }
 # Figures that must match exactly for --check, mirrored by MeasuredBaselineFreshnessTest in the backend
 # suite. The rest are reported but NOT gated: LoC, test counts and coupling edges move on almost every

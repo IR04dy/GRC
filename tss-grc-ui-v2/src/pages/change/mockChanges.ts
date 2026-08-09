@@ -1,8 +1,9 @@
 // Demo-mode fallback data for the Change Management module.
 // Aligned with the backend DTOs in lib/api.ts.
 import type { ChangeRequestDto, ChangeAnalyticsDto } from '../../lib/api';
+import { demoRows } from '../../lib/demoIds';
 
-export const CHANGE_REQUESTS: ChangeRequestDto[] = [
+export const CHANGE_REQUESTS: ChangeRequestDto[] = demoRows([
   { id: 1, changeCode: 'CHG-2026-014',
     titleEn: 'Migrate primary database to PostgreSQL 16',
     titleAr: 'ترقية قاعدة البيانات الأساسية إلى PostgreSQL 16',
@@ -121,7 +122,7 @@ export const CHANGE_REQUESTS: ChangeRequestDto[] = [
     implementationStarted: '2026-04-30T22:00:00', implementationEnded: '2026-04-30T23:30:00',
     status: 'CLOSED', closureDate: '2026-05-04', outcome: 'SUCCESSFUL',
     createdAt: '2026-02-04T09:00:00' },
-];
+]);
 
 export const CHANGE_ANALYTICS: ChangeAnalyticsDto = {
   total: 10,

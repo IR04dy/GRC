@@ -2,9 +2,10 @@
 // backend DTOs in lib/api.ts so the dependency graph, BIA aggregates and
 // exercise scorecards render with realistic numbers without authentication.
 import type { BcmPlanDto, BcmProcessDto, BcmBiaDto, BcmExerciseDto } from '../../lib/api';
+import { demoRows } from '../../lib/demoIds';
 
 // ── BCM plans ──────────────────────────────────────────────────────────────
-export const BCM_PLANS: BcmPlanDto[] = [
+export const BCM_PLANS: BcmPlanDto[] = demoRows([
   { id: 1, planNameEn: 'Core Banking System Recovery', planNameAr: 'استعادة النظام المصرفي الأساسي',
     planType: 'BCP', version: '2.4', status: 'APPROVED',     nextReviewDate: '2026-09-15', createdAt: '2024-01-15' },
   { id: 2, planNameEn: 'Payment Gateway Recovery',     planNameAr: 'استعادة بوابة المدفوعات',
@@ -19,10 +20,10 @@ export const BCM_PLANS: BcmPlanDto[] = [
     planType: 'BCP', version: '2.0', status: 'DRAFT',        nextReviewDate: '2026-07-18', createdAt: '2025-10-01' },
   { id: 7, planNameEn: 'Crisis Management Plan',       planNameAr: 'خطة إدارة الأزمات',
     planType: 'CMP', version: '5.2', status: 'APPROVED',     nextReviewDate: '2026-09-30', createdAt: '2023-09-12' },
-];
+]);
 
 // ── Critical processes ─────────────────────────────────────────────────────
-export const BCM_PROCESSES: BcmProcessDto[] = [
+export const BCM_PROCESSES: BcmProcessDto[] = demoRows([
   { id: 11, processNameEn: 'Online Banking Authentication',  processNameAr: 'مصادقة الخدمات المصرفية الإلكترونية',
     ownerId: 1001, criticality: 'CRITICAL', status: 'ACTIVE' },
   { id: 12, processNameEn: 'Card Payment Authorization',     processNameAr: 'تفويض مدفوعات البطاقات',
@@ -45,10 +46,10 @@ export const BCM_PROCESSES: BcmProcessDto[] = [
     ownerId: 1010, criticality: 'MEDIUM',   status: 'ACTIVE' },
   { id: 21, processNameEn: 'Marketing Campaigns',            processNameAr: 'الحملات التسويقية',
     ownerId: 1011, criticality: 'LOW',      status: 'ACTIVE' },
-];
+]);
 
 // ── BIA records ────────────────────────────────────────────────────────────
-export const BCM_BIA: BcmBiaDto[] = [
+export const BCM_BIA: BcmBiaDto[] = demoRows([
   { id: 31, processId: 11, assessmentDate: '2026-03-10', rtoHours: 1,    rpoHours: 0,    mtpdHours: 4,   overallImpact: 'CRITICAL', status: 'APPROVED', linkedRiskId: 5012 },
   { id: 32, processId: 12, assessmentDate: '2026-03-12', rtoHours: 0.5,  rpoHours: 0,    mtpdHours: 2,   overallImpact: 'CRITICAL', status: 'APPROVED', linkedRiskId: 5013 },
   { id: 33, processId: 13, assessmentDate: '2026-02-22', rtoHours: 24,   rpoHours: 6,    mtpdHours: 72,  overallImpact: 'HIGH',     status: 'APPROVED' },
@@ -59,10 +60,10 @@ export const BCM_BIA: BcmBiaDto[] = [
   { id: 38, processId: 18, assessmentDate: '2026-04-15', rtoHours: 1,    rpoHours: 0.25, mtpdHours: 4,   overallImpact: 'CRITICAL', status: 'APPROVED', linkedRiskId: 5018 },
   { id: 39, processId: 19, assessmentDate: '2026-03-25', rtoHours: 4,    rpoHours: 0.5,  mtpdHours: 12,  overallImpact: 'HIGH',     status: 'APPROVED' },
   { id: 40, processId: 20, assessmentDate: '2026-02-04', rtoHours: 24,   rpoHours: 8,    mtpdHours: 72,  overallImpact: 'MEDIUM',   status: 'APPROVED' },
-];
+]);
 
 // ── Exercises ──────────────────────────────────────────────────────────────
-export const BCM_EXERCISES: BcmExerciseDto[] = [
+export const BCM_EXERCISES: BcmExerciseDto[] = demoRows([
   { id: 51, planId: 5, exerciseNameEn: 'Datacenter Failover Drill (Q1)', exerciseNameAr: 'تمرين تحويل مركز البيانات',
     exerciseType: 'FAILOVER',    scenario: 'Loss of primary site cooling — full failover to DR.',
     scheduledDate: '2026-02-08', executedDate: '2026-02-08', score: 92, status: 'COMPLETED',
@@ -96,4 +97,4 @@ export const BCM_EXERCISES: BcmExerciseDto[] = [
     exerciseType: 'SIMULATION',  scenario: 'Full HQ evacuation; 2,400 staff working remotely for 48h.',
     scheduledDate: '2026-06-04', status: 'PLANNED',
     facilitator: 'Noura Al-Harbi' },
-];
+]);

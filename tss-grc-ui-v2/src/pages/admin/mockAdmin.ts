@@ -1,8 +1,9 @@
 // Aligned with AdminUserDto in lib/api.ts so AdminPage's user table renders
 // fullNameEn / roles[] / isActive / isLocked / lastLoginAt without nulls.
 import type { AdminUserDto } from '../../lib/api';
+import { demoRows } from '../../lib/demoIds';
 
-export const ADMIN_USERS: AdminUserDto[] = [
+export const ADMIN_USERS: AdminUserDto[] = demoRows([
   { id: 1, username: 'admin',
     email: 'admin@tss-grc.local',
     fullNameEn: 'Ahmed Al-Qahtani',  fullNameAr: 'أحمد القحطاني',
@@ -75,12 +76,12 @@ export const ADMIN_USERS: AdminUserDto[] = [
     isActive: true, isLocked: false,
     roles: ['EXTERNAL_AUDITOR'],
     createdAt: '2026-01-12T08:00:00', lastLoginAt: '2026-04-26T14:00:00' },
-];
+]);
 
 // ── Roles & permissions (RBAC) — shape matches AdminRoleDto ─────────────
 import type { AdminRoleDto } from '../../lib/api';
 
-export const ADMIN_ROLES: AdminRoleDto[] = [
+export const ADMIN_ROLES: AdminRoleDto[] = demoRows([
   { id: 1, roleName: 'PLATFORM_ADMIN',  displayNameEn: 'Platform Administrator', displayNameAr: 'مسؤول النظام',           isSystemRole: true,  isActive: true },
   { id: 2, roleName: 'RISK_MANAGER',    displayNameEn: 'Risk Manager',           displayNameAr: 'مدير المخاطر',            isSystemRole: true,  isActive: true },
   { id: 3, roleName: 'CYBER_ANALYST',   displayNameEn: 'Cybersecurity Analyst',  displayNameAr: 'محلل الأمن السيبراني',  isSystemRole: true,  isActive: true },
@@ -91,13 +92,13 @@ export const ADMIN_ROLES: AdminRoleDto[] = [
   { id: 8, roleName: 'BCM_COORDINATOR', displayNameEn: 'BCM Coordinator',        displayNameAr: 'منسق استمرارية الأعمال',  isSystemRole: true,  isActive: true },
   { id: 9, roleName: 'TPRM_LEAD',       displayNameEn: 'TPRM Lead',              displayNameAr: 'مسؤول إدارة مخاطر الأطراف الثالثة', isSystemRole: true, isActive: true },
   { id:10, roleName: 'AML_ANALYST',     displayNameEn: 'AML Analyst',            displayNameAr: 'محلل مكافحة غسل الأموال', isSystemRole: true,  isActive: true },
-];
+]);
 
 // ── Audit log events (admin tab) ────────────────────────────────────────
 export interface AdminAuditEvent {
   id: number; at: string; actor: string; action: string; entity: string; ip: string; outcome: 'SUCCESS' | 'DENIED' | 'ERROR';
 }
-export const ADMIN_AUDIT_EVENTS: AdminAuditEvent[] = [
+export const ADMIN_AUDIT_EVENTS: AdminAuditEvent[] = demoRows([
   { id: 1,  at: '2026-04-30 09:14:32', actor: 'admin',         action: 'USER_LOGIN',         entity: 'admin@tss-grc.local',          ip: '10.20.40.12',  outcome: 'SUCCESS' },
   { id: 2,  at: '2026-04-30 09:42:11', actor: 'admin',         action: 'CREATE_USER',        entity: 'noura.h@tss-grc.local',        ip: '10.20.40.12',  outcome: 'SUCCESS' },
   { id: 3,  at: '2026-04-30 10:15:08', actor: 'admin',         action: 'GRANT_ROLE',         entity: 'noura.h → BCM_COORDINATOR',    ip: '10.20.40.12',  outcome: 'SUCCESS' },
@@ -113,4 +114,4 @@ export const ADMIN_AUDIT_EVENTS: AdminAuditEvent[] = [
   { id:13,  at: '2026-04-25 16:10:09', actor: 'omar.d',        action: 'CLOSE_VULN',         entity: 'CVE-2024-5641',                ip: '10.20.40.50',  outcome: 'SUCCESS' },
   { id:14,  at: '2026-04-25 11:22:01', actor: 'admin',         action: 'CHANGE_PASSWORD',    entity: 'self',                         ip: '10.20.40.12',  outcome: 'SUCCESS' },
   { id:15,  at: '2026-04-24 22:11:40', actor: 'csirt.duty',    action: 'TRIGGER_RUNBOOK',    entity: 'BCP-002 invocation',           ip: '10.20.40.55',  outcome: 'SUCCESS' },
-];
+]);

@@ -1,3 +1,5 @@
+import { demoKeyed, demoRows } from '../../lib/demoIds';
+
 // Demo-mode fallback data for the Compliance module. Aligned with backend
 // DTOs in lib/api.ts so framework scorecards, findings aging and audit
 // engagement timelines render with realistic data offline.
@@ -10,7 +12,7 @@ import type {
 } from '../../lib/api';
 
 // ── Controls ──────────────────────────────────────────────────────────────
-export const COMPLIANCE_CONTROLS: ComplianceControlDto[] = [
+export const COMPLIANCE_CONTROLS: ComplianceControlDto[] = demoRows([
   { id: 1, code: 'A.5.1',   nameEn: 'Information security policies',          framework: 'ISO_27001', domain: 'Organizational', maturityLevel: 5, status: 'IMPLEMENTED',     owner: 'CISO' },
   { id: 2, code: 'A.5.7',   nameEn: 'Threat intelligence',                    framework: 'ISO_27001', domain: 'Operations',     maturityLevel: 3, status: 'PARTIAL',         owner: 'soc.lead@tss.sa' },
   { id: 3, code: 'AC-2',    nameEn: 'Account management lifecycle',           framework: 'NCA_ECC',   domain: 'Identity',       maturityLevel: 4, status: 'IMPLEMENTED',     owner: 'iam.team@tss.sa' },
@@ -21,10 +23,10 @@ export const COMPLIANCE_CONTROLS: ComplianceControlDto[] = [
   { id: 8, code: '8.4',     nameEn: 'Business continuity strategies',         framework: 'ISO_22301', domain: 'Strategy',       maturityLevel: 2, status: 'PLANNED',         owner: 'bcm.team@tss.sa' },
   { id: 9, code: 'A.8.16',  nameEn: 'Monitoring activities',                  framework: 'ISO_27001', domain: 'Operations',     maturityLevel: 3, status: 'PARTIAL',         owner: 'soc.lead@tss.sa' },
   { id: 10, code: 'CC-3.1', nameEn: 'Information communicated to external',   framework: 'SOC_2',     domain: 'Communication',  maturityLevel: 4, status: 'IMPLEMENTED',     owner: 'audit.lead@tss.sa' },
-];
+]);
 
 // ── Assessments ───────────────────────────────────────────────────────────
-export const COMPLIANCE_ASSESSMENTS: ComplianceAssessmentDto[] = [
+export const COMPLIANCE_ASSESSMENTS: ComplianceAssessmentDto[] = demoRows([
   { id: 21, framework: 'ISO_27001',  period: '2026-Q1', auditor: 'KPMG ME',         score: 92, status: 'COMPLETED',
     assessmentDate: '2026-03-28', notes: 'Annual surveillance audit; two minor non-conformities raised.' },
   { id: 22, framework: 'NCA_ECC',    period: '2026-Q1', auditor: 'Internal Audit',  score: 85, status: 'COMPLETED',
@@ -39,10 +41,10 @@ export const COMPLIANCE_ASSESSMENTS: ComplianceAssessmentDto[] = [
     assessmentDate: '2026-03-10', notes: 'SOC 2 Type II refresh — qualified opinion.' },
   { id: 27, framework: 'PCI_DSS',    period: '2026-Q1', auditor: 'AT&T QSA',        score: 90, status: 'COMPLETED',
     assessmentDate: '2026-01-30', notes: 'Annual PCI re-assessment; AOC issued.' },
-];
+]);
 
 // ── Findings ──────────────────────────────────────────────────────────────
-export const COMPLIANCE_FINDINGS: ComplianceFindingDto[] = [
+export const COMPLIANCE_FINDINGS: ComplianceFindingDto[] = demoRows([
   { id: 31, title: 'Cross-border data transfer mechanism not formalised',
     severity: 'HIGH', owner: 'dpo@tss.sa',
     capa: 'Negotiate SDAIA Standard Contractual Clauses with vendor; ratify by June.',
@@ -93,10 +95,10 @@ export const COMPLIANCE_FINDINGS: ComplianceFindingDto[] = [
     independentTestAt: '2026-04-15', independentTestResult: 'PASS',
     auditSignoffAt: '2026-04-26',
     frameworkId: 2, clauseRef: 'PDPL-15' },
-];
+]);
 
 // ── Regulatory changes ────────────────────────────────────────────────────
-export const REGULATORY_CHANGES: RegulatoryChangeDto[] = [
+export const REGULATORY_CHANGES: RegulatoryChangeDto[] = demoRows([
   { id: 41, sourceAuthority: 'SDAIA',
     titleEn: 'PDPL Implementing Regulations — 2026 amendments',
     titleAr: 'اللائحة التنفيذية لنظام حماية البيانات — تعديلات 2026',
@@ -151,10 +153,10 @@ export const REGULATORY_CHANGES: RegulatoryChangeDto[] = [
     applicability: 'IN_SCOPE',  impactLevel: 'HIGH',     status: 'IMPACT_ASSESSED',
     impactSummary: 'Workloads classified; sovereign migration plan in flight.',
     controlsUpdatedCount: 2 },
-];
+]);
 
 // ── Policies ──────────────────────────────────────────────────────────────
-export const POLICIES: PolicyDto[] = [
+export const POLICIES: PolicyDto[] = demoRows([
   { id: 51, code: 'POL-ISMS-001', titleEn: 'Information Security Policy', titleAr: 'سياسة أمن المعلومات',
     version: '3.2', category: 'SECURITY', status: 'PUBLISHED',
     effectiveFrom: '2026-04-01', nextReviewDate: '2027-04-01',
@@ -185,10 +187,10 @@ export const POLICIES: PolicyDto[] = [
   { id: 58, code: 'POL-LEG-002', titleEn: 'Legacy Crypto Sunset Policy', titleAr: 'سياسة إنهاء التشفير القديم',
     version: '1.0', category: 'SECURITY', status: 'REVIEW_DUE',
     effectiveFrom: '2025-09-30', nextReviewDate: '2026-04-30' },
-];
+]);
 
 // ── Audit engagements ─────────────────────────────────────────────────────
-export const AUDIT_ENGAGEMENTS: AuditEngagementDto[] = [
+export const AUDIT_ENGAGEMENTS: AuditEngagementDto[] = demoRows([
   { id: 61, engagementCode: 'AUD-2026-001', titleEn: 'ISO 27001 Annual Surveillance',
     auditType: 'CERTIFICATION_AUDIT', framework: 'ISO_27001',
     auditorFirm: 'KPMG ME', leadAuditor: 'David Frost',
@@ -235,10 +237,10 @@ export const AUDIT_ENGAGEMENTS: AuditEngagementDto[] = [
     engagementLetterDate: '2026-04-15',
     scopeSummary: 'Half-year internal review of cyber operations effectiveness.',
     status: 'PLANNED', findingsCount: 0 },
-];
+]);
 
 // ── Frameworks catalogue ──────────────────────────────────────────────────
-export const FRAMEWORKS: FrameworkDto[] = [
+export const FRAMEWORKS: FrameworkDto[] = demoRows([
   { id: 1, code: 'ISO_27001',  nameEn: 'ISO/IEC 27001',  nameAr: 'الآيزو 27001',  version: '2022', issuer: 'ISO',     family: 'INFOSEC',     isActive: true },
   { id: 2, code: 'NCA_ECC',    nameEn: 'NCA ECC',        nameAr: 'الضوابط الأساسية للأمن السيبراني', version: '1.0',  issuer: 'NCA',     family: 'CYBER_REG',   isActive: true },
   { id: 3, code: 'PDPL',       nameEn: 'Saudi PDPL',     nameAr: 'نظام حماية البيانات', version: '1.1', issuer: 'SDAIA',  family: 'PRIVACY',     isActive: true },
@@ -288,10 +290,10 @@ export const FRAMEWORKS: FrameworkDto[] = [
   { id: 17, code: 'MOC_TASATTUR',           nameEn: 'Anti-Concealment Law (Tasattur)', nameAr: 'نظام مكافحة التستر',  version: '2020',          issuer: 'MOC', family: 'COMPLIANCE', isActive: true },
   { id: 18, code: 'MOC_CONSUMER_PROTECTION', nameEn: 'Consumer Protection Law',          nameAr: 'نظام حماية المستهلك', version: '2014 (e-Comm 2019)', issuer: 'MOC', family: 'COMPLIANCE', isActive: true },
   { id: 19, code: 'MOC_COMMERCIAL_REGISTRY', nameEn: 'Commercial Registry obligations',  nameAr: 'التزامات السجل التجاري', version: '2024',         issuer: 'MOC', family: 'COMPLIANCE', isActive: true },
-];
+]);
 
 // ── Coverage stats per framework ──────────────────────────────────────────
-export const FRAMEWORK_COVERAGE: FrameworkCoverageDto[] = [
+export const FRAMEWORK_COVERAGE: FrameworkCoverageDto[] = demoRows([
   { frameworkId: 1, code: 'ISO_27001',  nameEn: 'ISO/IEC 27001', family: 'INFOSEC',
     policyCount: 6, full: 4, partial: 2, outOfScope: 0, notApplicable: 0,
     openFindings: 3, closedFindings: 11,
@@ -391,10 +393,10 @@ export const FRAMEWORK_COVERAGE: FrameworkCoverageDto[] = [
     openFindings: 0, closedFindings: 1,
     controlCount: 5, implementedControls: 5, avgMaturity: 4.0,
     dpiaCount: 0, kriCount: 0, riskCount: 1, riskAsRiskFw: 0, riskAsCompFw: 1 },
-];
+]);
 
 // ── Per-framework drill-down rows (sample for ISO_27001 = 1) ───────────────
-export const FRAMEWORK_POLICIES_BY_ID: Record<number, FrameworkPolicyRowDto[]> = {
+export const FRAMEWORK_POLICIES_BY_ID: Record<number, FrameworkPolicyRowDto[]> = demoKeyed({
   1: [
     { mappingId: 9001, policyId: 51, code: 'POL-ISMS-001', titleEn: 'Information Security Policy',
       version: '3.2', category: 'SECURITY', status: 'PUBLISHED', nextReviewDate: '2027-04-01',
@@ -413,9 +415,9 @@ export const FRAMEWORK_POLICIES_BY_ID: Record<number, FrameworkPolicyRowDto[]> =
       version: '2.1', category: 'PRIVACY', status: 'PUBLISHED', nextReviewDate: '2027-02-15',
       clauseRef: 'PDPL-7', satisfaction: 'FULL' },
   ],
-};
+});
 
-export const FRAMEWORK_FINDINGS_BY_ID: Record<number, FrameworkFindingRowDto[]> = {
+export const FRAMEWORK_FINDINGS_BY_ID: Record<number, FrameworkFindingRowDto[]> = demoKeyed({
   1: [
     { id: 33, title: 'SIEM tuning false-positive rate above threshold',
       severity: 'MEDIUM', owner: 'soc.lead@tss.sa', dueDate: '2026-06-30',
@@ -432,9 +434,9 @@ export const FRAMEWORK_FINDINGS_BY_ID: Record<number, FrameworkFindingRowDto[]> 
       severity: 'HIGH', owner: 'dpo@tss.sa', dueDate: '2026-06-30',
       status: 'OPEN', capaStage: 'IMPLEMENTING', clauseRef: 'PDPL-29', createdAt: '2026-04-15' },
   ],
-};
+});
 
-export const FRAMEWORK_CONTROLS_BY_ID: Record<number, FrameworkControlRowDto[]> = {
+export const FRAMEWORK_CONTROLS_BY_ID: Record<number, FrameworkControlRowDto[]> = demoKeyed({
   1: [
     { id: 1,  code: 'A.5.1',  nameEn: 'Information security policies', domain: 'Organizational', maturityLevel: 5, status: 'IMPLEMENTED',  owner: 'CISO' },
     { id: 9,  code: 'A.8.16', nameEn: 'Monitoring activities',          domain: 'Operations',     maturityLevel: 3, status: 'PARTIAL',      owner: 'soc.lead@tss.sa' },
@@ -443,9 +445,9 @@ export const FRAMEWORK_CONTROLS_BY_ID: Record<number, FrameworkControlRowDto[]> 
     { id: 3,  code: 'AC-2',   nameEn: 'Account management lifecycle', domain: 'Identity',  maturityLevel: 4, status: 'IMPLEMENTED', owner: 'iam.team@tss.sa' },
     { id: 4,  code: 'IR-3',   nameEn: 'Incident response plan',       domain: 'Incident',  maturityLevel: 4, status: 'IMPLEMENTED', owner: 'csirt.lead@tss.sa' },
   ],
-};
+});
 
-export const FRAMEWORK_DPIAS_BY_ID: Record<number, FrameworkDpiaRowDto[]> = {
+export const FRAMEWORK_DPIAS_BY_ID: Record<number, FrameworkDpiaRowDto[]> = demoKeyed({
   3: [
     { id: 41, titleEn: 'AI-based credit scoring',          triggerReason: 'AUTOMATED_DECISION_MAKING', status: 'APPROVED',
       overallResidualRisk: 'MEDIUM', assessmentDate: '2026-02-10', nextReviewDate: '2026-08-10', clauseRef: 'PDPL-22' },
@@ -454,9 +456,9 @@ export const FRAMEWORK_DPIAS_BY_ID: Record<number, FrameworkDpiaRowDto[]> = {
     { id: 45, titleEn: 'Employee wellness programme',     triggerReason: 'SPECIAL_CATEGORY', status: 'DRAFT',
       overallResidualRisk: 'MEDIUM', assessmentDate: '2026-04-25', clauseRef: 'PDPL-6' },
   ],
-};
+});
 
-export const FRAMEWORK_KRIS_BY_ID: Record<number, FrameworkKriRowDto[]> = {
+export const FRAMEWORK_KRIS_BY_ID: Record<number, FrameworkKriRowDto[]> = demoKeyed({
   1: [
     { id: 1002, code: 'KRI-CYB-02', nameEn: 'Critical vulnerabilities open beyond SLA',
       unit: 'CVEs', direction: 'HIGHER_IS_WORSE', greenMax: 0, amberMax: 3,
@@ -475,9 +477,9 @@ export const FRAMEWORK_KRIS_BY_ID: Record<number, FrameworkKriRowDto[]> = {
       unit: 'DSRs', direction: 'HIGHER_IS_WORSE', greenMax: 0, amberMax: 2,
       frequency: 'WEEKLY', owner: 'dpo@tss.sa', clauseRef: 'PDPL-23' },
   ],
-};
+});
 
-export const FRAMEWORK_RISKS_BY_ID: Record<number, FrameworkRiskRowDto[]> = {
+export const FRAMEWORK_RISKS_BY_ID: Record<number, FrameworkRiskRowDto[]> = demoKeyed({
   1: [
     { id: 1, titleEn: 'Sensitive Data Breach',  status: 'OPEN', inherentScore: 20, residualScore: 9,
       riskLevel: 'CRITICAL', matchedAsComplianceFramework: true, complianceFrameworkClause: 'A.5.34' },
@@ -494,13 +496,13 @@ export const FRAMEWORK_RISKS_BY_ID: Record<number, FrameworkRiskRowDto[]> = {
     { id: 8, titleEn: 'Insider Misuse of Privileged Access', status: 'TREATMENT_IN_PROGRESS', inherentScore: 15, residualScore: 8,
       riskLevel: 'HIGH', matchedAsRiskFramework: true, riskFrameworkClause: '6.4.3' },
   ],
-};
+});
 
 // ── Per-control detail-tab mocks ──────────────────────────────────────────
 export interface ControlSubControlRow {
   id: number; code: string; nameEn: string; status: string; maturityLevel: number; owner: string;
 }
-export const CONTROL_SUBCONTROLS_BY_ID: Record<number, ControlSubControlRow[]> = {
+export const CONTROL_SUBCONTROLS_BY_ID: Record<number, ControlSubControlRow[]> = demoKeyed({
   1: [
     { id: 101, code: 'A.5.1.1',  nameEn: 'Senior leadership endorsement of ISMS policy', status: 'IMPLEMENTED', maturityLevel: 5, owner: 'CISO' },
     { id: 102, code: 'A.5.1.2',  nameEn: 'Review of policies for information security', status: 'IMPLEMENTED', maturityLevel: 4, owner: 'security.officer@tss.sa' },
@@ -522,12 +524,12 @@ export const CONTROL_SUBCONTROLS_BY_ID: Record<number, ControlSubControlRow[]> =
     { id: 902, code: 'A.8.16.2', nameEn: 'Alert tuning + false-positive rate <5%',    status: 'PARTIAL',     maturityLevel: 3, owner: 'soc.lead@tss.sa' },
     { id: 903, code: 'A.8.16.3', nameEn: '24/7 monitoring + SOC handover',            status: 'IMPLEMENTED', maturityLevel: 4, owner: 'soc.duty@tss.sa' },
   ],
-};
+});
 
 export interface ControlEvidenceRow {
   id: number; code: string; titleEn: string; type: string; collectedDate: string; expiryDate: string; status: string;
 }
-export const CONTROL_EVIDENCE_BY_ID: Record<number, ControlEvidenceRow[]> = {
+export const CONTROL_EVIDENCE_BY_ID: Record<number, ControlEvidenceRow[]> = demoKeyed({
   1: [
     { id: 1, code: 'EV-1083', titleEn: 'Information Security Policy v3.2',             type: 'POLICY',        collectedDate: '2026-04-15', expiryDate: '2027-04-15', status: 'APPROVED' },
     { id: 8, code: 'EV-1076', titleEn: 'Annual ISMS Internal Audit Plan',              type: 'DOCUMENT',      collectedDate: '2026-01-15', expiryDate: '2026-12-31', status: 'APPROVED' },
@@ -541,12 +543,12 @@ export const CONTROL_EVIDENCE_BY_ID: Record<number, ControlEvidenceRow[]> = {
   9: [
     { id: 3, code: 'EV-1081', titleEn: 'Firewall Rules Configuration Snapshot',         type: 'CONFIGURATION', collectedDate: '2026-04-12', expiryDate: '2026-05-12', status: 'PENDING_REVIEW' },
   ],
-};
+});
 
 export interface ControlTestRow {
   id: number; date: string; tester: string; result: 'PASS' | 'FAIL' | 'PARTIAL'; samples: number; findings: number; notes: string;
 }
-export const CONTROL_TESTS_BY_ID: Record<number, ControlTestRow[]> = {
+export const CONTROL_TESTS_BY_ID: Record<number, ControlTestRow[]> = demoKeyed({
   1: [
     { id: 1, date: '2026-03-28', tester: 'KPMG ME',          result: 'PASS',    samples: 25, findings: 0, notes: 'No exceptions found.' },
     { id: 2, date: '2025-11-04', tester: 'Internal Audit',   result: 'PASS',    samples: 20, findings: 1, notes: 'Minor gap closed pre-audit.' },
@@ -561,13 +563,13 @@ export const CONTROL_TESTS_BY_ID: Record<number, ControlTestRow[]> = {
   9: [
     { id: 6, date: '2026-04-04', tester: 'Yousef Al-Harbi',   result: 'PARTIAL', samples: 50, findings: 3, notes: 'Three Tier-1 systems below SIEM coverage threshold.' },
   ],
-};
+});
 
 // ── Per-finding detail-tab mocks ─────────────────────────────────────────
 export interface FindingHistoryEvent {
   id: number; at: string; actor: string; type: 'CREATED' | 'CAPA_PROGRESS' | 'COMMENT' | 'TEST_RESULT' | 'STATUS_CHANGE' | 'SIGNOFF'; message: string;
 }
-export const FINDING_HISTORY_BY_ID: Record<number, FindingHistoryEvent[]> = {
+export const FINDING_HISTORY_BY_ID: Record<number, FindingHistoryEvent[]> = demoKeyed({
   31: [
     { id: 11, at: '2026-04-22T14:00:00', actor: 'DPO + Legal',      type: 'CAPA_PROGRESS', message: 'Standard Contractual Clauses drafted; vendor review in progress.' },
     { id: 12, at: '2026-04-15T10:00:00', actor: 'Mona Al-Bishi',    type: 'STATUS_CHANGE', message: 'Status: IDENTIFIED → IMPLEMENTING.' },
@@ -587,9 +589,9 @@ export const FINDING_HISTORY_BY_ID: Record<number, FindingHistoryEvent[]> = {
     { id: 42, at: '2026-04-02T14:00:00', actor: 'PKI Team',         type: 'TEST_RESULT',  message: 'Owner test PASS.' },
     { id: 43, at: '2026-02-28T09:00:00', actor: 'KPMG ME',          type: 'CREATED',       message: 'Finding raised post-surveillance audit.' },
   ],
-};
+});
 
-export const FINDING_EVIDENCE_BY_ID: Record<number, ControlEvidenceRow[]> = {
+export const FINDING_EVIDENCE_BY_ID: Record<number, ControlEvidenceRow[]> = demoKeyed({
   31: [
     { id: 4, code: 'EV-1080', titleEn: 'PDPL Data Inventory Report Q4 2025',   type: 'REPORT',      collectedDate: '2026-04-08', expiryDate: '2026-05-08', status: 'PENDING_REVIEW' },
   ],
@@ -599,13 +601,13 @@ export const FINDING_EVIDENCE_BY_ID: Record<number, ControlEvidenceRow[]> = {
   33: [
     { id: 9, code: 'EV-1075', titleEn: 'Phishing Awareness Campaign Results',   type: 'REPORT',      collectedDate: '2026-04-05', expiryDate: '2026-07-05', status: 'APPROVED' },
   ],
-};
+});
 
 // ── Per-policy detail-tab mocks ──────────────────────────────────────────
 export interface PolicyLifecycleEvent {
   id: number; at: string; actor: string; stage: 'DRAFT' | 'LEGAL_REVIEW' | 'EXEC_APPROVAL' | 'PUBLISHED' | 'REVIEW_DUE' | 'RETIRED'; message: string;
 }
-export const POLICY_LIFECYCLE_EVENTS_BY_ID: Record<number, PolicyLifecycleEvent[]> = {
+export const POLICY_LIFECYCLE_EVENTS_BY_ID: Record<number, PolicyLifecycleEvent[]> = demoKeyed({
   51: [
     { id: 1, at: '2026-04-01T09:00:00', actor: 'CEO',           stage: 'PUBLISHED',     message: 'Policy v3.2 published; effective 2026-04-01.' },
     { id: 2, at: '2026-03-22T15:30:00', actor: 'Exec Committee',stage: 'EXEC_APPROVAL', message: 'Approved by executive committee.' },
@@ -625,4 +627,4 @@ export const POLICY_LIFECYCLE_EVENTS_BY_ID: Record<number, PolicyLifecycleEvent[
     { id: 10, at: '2026-04-15T10:00:00', actor: 'System',         stage: 'REVIEW_DUE',    message: 'Annual review due — flagged.' },
     { id: 11, at: '2025-09-30T11:00:00', actor: 'CEO',            stage: 'PUBLISHED',     message: 'Policy v1.0 published.' },
   ],
-};
+});

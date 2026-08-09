@@ -4,12 +4,13 @@
 // realistic data offline. No fields left blank.
 import type { TprmVendorDto } from '../../lib/api';
 import type { VendorTier, OnboardingStage } from '../../lib/vendorOnboarding';
+import { demoKeyed, demoRows } from '../../lib/demoIds';
 
 // ── Per-vendor detail-tab mocks ────────────────────────────────────────
 export interface VendorAssessmentRow {
   id: number; date: string; type: 'INITIAL' | 'PERIODIC' | 'TRIGGERED'; assessor: string; score: number; risk: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; status: 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED'; findings: string;
 }
-export const VENDOR_ASSESSMENTS_BY_ID: Record<number, VendorAssessmentRow[]> = {
+export const VENDOR_ASSESSMENTS_BY_ID: Record<number, VendorAssessmentRow[]> = demoKeyed({
   1: [
     { id: 11, date: '2026-03-15', type: 'PERIODIC',  assessor: 'KPMG ME',         score: 92, risk: 'LOW',    status: 'COMPLETED', findings: 'Annual SOC2 review — clean opinion.' },
     { id: 12, date: '2025-10-08', type: 'TRIGGERED', assessor: 'Internal TPRM',   score: 88, risk: 'LOW',    status: 'COMPLETED', findings: 'Triggered by Saudi sovereign-cloud transition; no issues.' },
@@ -27,12 +28,12 @@ export const VENDOR_ASSESSMENTS_BY_ID: Record<number, VendorAssessmentRow[]> = {
   5: [
     { id: 51, date: '2026-04-02', type: 'TRIGGERED', assessor: 'Internal TPRM',   score: 70, risk: 'MEDIUM', status: 'COMPLETED', findings: 'Two outages in Q1 above 4h MTPD; escalated to Risk.' },
   ],
-};
+});
 
 export interface VendorContractRow {
   id: number; contractNumber: string; titleEn: string; type: string; startDate: string; endDate: string; value: number; currency: string; status: string;
 }
-export const VENDOR_CONTRACTS_BY_ID: Record<number, VendorContractRow[]> = {
+export const VENDOR_CONTRACTS_BY_ID: Record<number, VendorContractRow[]> = demoKeyed({
   1: [
     { id: 101, contractNumber: 'AWS-EA-2025-001', titleEn: 'Enterprise Agreement (Cloud)',  type: 'MSA',     startDate: '2025-01-01', endDate: '2027-12-31', value: 18_500_000, currency: 'SAR', status: 'ACTIVE' },
     { id: 102, contractNumber: 'AWS-PSO-2024-088', titleEn: 'Professional Services Order',  type: 'SOW',     startDate: '2024-09-01', endDate: '2025-09-01', value: 1_800_000,  currency: 'SAR', status: 'CLOSED' },
@@ -49,9 +50,9 @@ export const VENDOR_CONTRACTS_BY_ID: Record<number, VendorContractRow[]> = {
   5: [
     { id: 501, contractNumber: 'MBL-WAN-2025-031', titleEn: 'WAN + SIP Master Services',     type: 'MSA',     startDate: '2025-03-01', endDate: '2026-08-31', value: 6_750_000,  currency: 'SAR', status: 'EXPIRING_SOON' },
   ],
-};
+});
 
-export const VENDORS: TprmVendorDto[] = [
+export const VENDORS: TprmVendorDto[] = demoRows([
   { id: 1,
     vendorName:    'Microsoft Saudi Arabia',
     vendorNameAr:  'مايكروسوفت العربية السعودية',
@@ -183,7 +184,7 @@ export const VENDORS: TprmVendorDto[] = [
     riskRating:    'HIGH',     status: 'ONBOARDING',
     contractEndDate: '',
     description:   'Edge WAF + DDoS protection for customer-facing properties. Awaiting CISO Office sign-off on SOC 2 + DPA review.' },
-];
+]);
 
 // ── DD-74: TPRM metadata layer ─────────────────────────────────────────
 // Frontend-only augmentation of the vendor record with the data the
@@ -202,7 +203,7 @@ export interface VendorTprmMeta {
   lastAssessedAt: string;
 }
 
-export const VENDOR_TPRM_META: Record<number, VendorTprmMeta> = {
+export const VENDOR_TPRM_META: Record<number, VendorTprmMeta> = demoKeyed({
   // ── Active (already through onboarding) ─────────────
   1:  { tier: 'TIER_1', onboardingStage: 'ACTIVE', lastAssessedAt: '2025-03-15' }, // 14 mo → OVERDUE for T1
   2:  { tier: 'TIER_1', onboardingStage: 'ACTIVE', lastAssessedAt: '2025-04-12' }, // 13 mo → OVERDUE
@@ -222,4 +223,4 @@ export const VENDOR_TPRM_META: Record<number, VendorTprmMeta> = {
   14: { tier: 'TIER_3', onboardingStage: 'TIER_ASSESSMENT', lastAssessedAt: '2026-04-25' },
   15: { tier: 'TIER_3', onboardingStage: 'DUE_DILIGENCE',   lastAssessedAt: '2026-04-15' },
   16: { tier: 'TIER_1', onboardingStage: 'SECURITY_REVIEW', lastAssessedAt: '2026-04-10' },
-};
+});

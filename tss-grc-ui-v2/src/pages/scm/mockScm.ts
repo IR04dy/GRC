@@ -1,3 +1,5 @@
+import { demoRows } from '../../lib/demoIds';
+
 // Mock data used as the demo-mode fallback for the SCM module.
 // Shapes are aligned with the live backend DTOs in lib/api.ts so list
 // rendering, filtering and chart aggregation work without authentication.
@@ -7,7 +9,7 @@ import type {
 } from '../../lib/api';
 
 // ── Suppliers / vendors ─────────────────────────────────────────────────────
-export const SUPPLIERS: ScmVendorDto[] = [
+export const SUPPLIERS: ScmVendorDto[] = demoRows([
   { id: 1,  nameEn: 'Aramco IT Procurement',           nameAr: 'شركة أرامكو لتقنية المعلومات',
     category: 'IT_SERVICES',   criticality: 'CRITICAL', country: 'KSA', serviceType: 'SaaS',
     riskLevel: 'LOW',  status: 'ACTIVE',  onboardingStatus: 'COMPLETED',
@@ -68,10 +70,10 @@ export const SUPPLIERS: ScmVendorDto[] = [
     riskLevel: 'MEDIUM', status: 'ACTIVE',  onboardingStatus: 'COMPLETED',
     contactName: 'Hessa Al-Dosari', contactEmail: 'hdosari@mobily-biz.example.sa',   registrationNumber: 'CR-1010251922',
     description: 'Primary internet, MPLS and SIP trunks.' },
-];
+]);
 
 // ── Onboarding pipeline ─────────────────────────────────────────────────────
-export const ONBOARDING: ScmOnboardingDto[] = [
+export const ONBOARDING: ScmOnboardingDto[] = demoRows([
   { id: 101, vendorId: 4,  vendorNameEn: 'Tabuk Logistics Group',  vendorNameAr: 'مجموعة تبوك للخدمات اللوجستية',
     currentStage: 'OPERATIONAL_REVIEW', status: 'IN_PROGRESS',
     completedStages: 'REGISTRATION,CRITICALITY_CLASSIFICATION,SECURITY_REVIEW',
@@ -107,10 +109,10 @@ export const ONBOARDING: ScmOnboardingDto[] = [
     completedStages: 'REGISTRATION,CRITICALITY_CLASSIFICATION,SECURITY_REVIEW',
     dueDate: '2026-06-01', assignee: 'procurement.lead@tss.sa',
     notes: 'Hold pending alternative-vendor negotiation.' },
-];
+]);
 
 // ── Assessments ─────────────────────────────────────────────────────────────
-export const ASSESSMENTS: ScmAssessmentDto[] = [
+export const ASSESSMENTS: ScmAssessmentDto[] = demoRows([
   { id: 201, vendorId: 1,  vendorNameEn: 'Aramco IT Procurement',
     assessmentType: 'PERIODIC',  assessmentDate: '2026-02-15', nextAssessmentDate: '2026-08-15',
     overallScore: 9.2, riskRating: 'LOW',  status: 'COMPLETED',
@@ -161,10 +163,10 @@ export const ASSESSMENTS: ScmAssessmentDto[] = [
     overallScore: 7.0, riskRating: 'MEDIUM', status: 'ESCALATED',
     findings: 'Two outages in Q1 exceeded the 4-hour MTPD threshold.',
     recommendations: 'Add diverse-path SD-WAN with secondary carrier.', escalatedToRisk: true },
-];
+]);
 
 // ── Dependencies ────────────────────────────────────────────────────────────
-export const DEPENDENCIES: ScmDependencyDto[] = [
+export const DEPENDENCIES: ScmDependencyDto[] = demoRows([
   { id: 301, serviceNameEn: 'Public cloud workloads (production)', serviceNameAr: 'أحمال العمل السحابية',
     assetName: 'AWS Riyadh region', vendorId: 9,  vendorNameEn: 'AWS Middle East',
     dependencyType: 'CRITICAL', dependencyLevel: 'HIGH', hasAlternative: true,
@@ -206,10 +208,10 @@ export const DEPENDENCIES: ScmDependencyDto[] = [
     dependencyType: 'NON_CRITICAL', dependencyLevel: 'LOW', hasAlternative: false,
     status: 'INACTIVE',
     impactAnalysis: 'Alternative supplier under qualification; not active.' },
-];
+]);
 
 // ── Contracts ───────────────────────────────────────────────────────────────
-export const CONTRACTS: ScmContractDto[] = [
+export const CONTRACTS: ScmContractDto[] = demoRows([
   { id: 401, vendorId: 9,  vendorNameEn: 'AWS Middle East',  contractNumber: 'AWS-EA-2025-001',
     titleEn: 'Enterprise Agreement (Cloud)', titleAr: 'اتفاقية المؤسسة السحابية',
     contractType: 'MSA', startDate: '2025-01-01', endDate: '2027-12-31',
@@ -250,10 +252,10 @@ export const CONTRACTS: ScmContractDto[] = [
     contractType: 'MSA', startDate: '2024-12-01', endDate: '2025-11-30',
     autoRenewal: false, contractValue: 3_150_000, currency: 'SAR', status: 'EXPIRING_SOON',
     notes: 'On hold pending Q1 SLA improvement.' },
-];
+]);
 
 // ── Disruptions / supplier incidents ───────────────────────────────────────
-export const DISRUPTIONS: ScmIncidentDto[] = [
+export const DISRUPTIONS: ScmIncidentDto[] = demoRows([
   { id: 501, incidentCode: 'SC-INC-2026-014', vendorId: 12, vendorNameEn: 'Mobily Business',
     incidentType: 'OUTAGE', impact: 'HIGH', description: '6-hour MPLS outage on HQ-DR circuit; SD-WAN failover engaged.',
     slaBreached: true, status: 'INVESTIGATING',
@@ -293,4 +295,4 @@ export const DISRUPTIONS: ScmIncidentDto[] = [
     backupPlanActivated: false, capaCreated: true, escalatedToManagement: true,
     reportedAt: '2026-01-29T14:33:00', resolvedAt: '2026-02-05T10:00:00',
     resolutionNotes: 'Vendor rotated all team credentials; security training mandated.' },
-];
+]);

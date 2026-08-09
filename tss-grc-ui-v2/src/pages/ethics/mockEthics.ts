@@ -1,3 +1,5 @@
+import { demoKeyed, demoRows } from '../../lib/demoIds';
+
 // Demo-mode fallback data for the Ethics & Compliance module
 // (cases, disclosures, KYC subjects, AML alerts, analytics).
 // Aligned with the backend DTOs in lib/api.ts.
@@ -9,7 +11,7 @@ import type {
 } from '../../lib/api';
 
 // ── Ethics cases (whistleblower hotline + investigations) ────────────────
-export const ETHICS_CASES: EthicsCaseDto[] = [
+export const ETHICS_CASES: EthicsCaseDto[] = demoRows([
   { id: 1, caseCode: 'CASE-2026-019',
     titleEn: 'Alleged kickback from regional supplier',
     titleAr: 'ادعاء استلام عمولة من مورد إقليمي',
@@ -98,7 +100,7 @@ export const ETHICS_CASES: EthicsCaseDto[] = [
     status: 'CLOSED', outcome: 'SUBSTANTIATED', outcomeSummary: 'Counselled and required to reimburse vendor 18,500 SAR.',
     closureDate: '2026-03-04',
     createdAt: '2026-02-04T13:30:00' },
-];
+]);
 
 export const ETHICS_ANALYTICS: EthicsAnalyticsDto = {
   total: 9,
@@ -111,7 +113,7 @@ export const ETHICS_ANALYTICS: EthicsAnalyticsDto = {
 };
 
 // ── Disclosures (CoI / Gifts / Hospitality / Outside Business) ───────────
-export const DISCLOSURES: DisclosureDto[] = [
+export const DISCLOSURES: DisclosureDto[] = demoRows([
   { id: 51, disclosureCode: 'DIS-2026-088', disclosureType: 'CONFLICT_OF_INTEREST',
     titleEn: 'Board director — vendor ownership stake', titleAr: 'عضو المجلس — حصة في مورد',
     description: 'Board director discloses 12% ownership in a vendor up for re-tender.',
@@ -177,10 +179,10 @@ export const DISCLOSURES: DisclosureDto[] = [
     occurredOn: '2025-12-01', status: 'APPROVED', decision: 'NOTED',
     decidedByName: 'CFO',
     createdAt: '2025-11-22T14:00:00' },
-];
+]);
 
 // ── KYC subjects (Sanctions / PEP / CDD / EDD) ───────────────────────────
-export const KYC_SUBJECTS: KycSubjectDto[] = [
+export const KYC_SUBJECTS: KycSubjectDto[] = demoRows([
   { id: 71, subjectCode: 'KYC-2026-2204', subjectType: 'CUSTOMER',
     fullName: 'Khalid bin Salman Al-Faisal', fullNameAr: 'خالد بن سلمان الفيصل',
     nationality: 'KSA', countryOfResidence: 'KSA', nationalId: '1090455678',
@@ -249,10 +251,10 @@ export const KYC_SUBJECTS: KycSubjectDto[] = [
     lastScreenedAt: '2026-03-08T09:00:00', nextReviewDate: '2027-03-08',
     status: 'APPROVED',
     createdAt: '2024-06-12T09:00:00' },
-];
+]);
 
 // Screening hits (PEP / sanctions matches that need disposition)
-export const KYC_HITS_BY_SUBJECT: Record<number, ScreeningHitDto[]> = {
+export const KYC_HITS_BY_SUBJECT: Record<number, ScreeningHitDto[]> = demoKeyed({
   71: [
     { id: 9101, subjectId: 71, listSource: 'World-Check', listEntryRef: 'WC-22411',
       matchScore: 92, matchSummary: 'Strong match — PEP (Saudi public official)',
@@ -274,10 +276,10 @@ export const KYC_HITS_BY_SUBJECT: Record<number, ScreeningHitDto[]> = {
       dispositionNotes: 'Manual review confirmed false positive (different entity).',
       decidedByName: 'AML Analyst', decidedAt: '2026-04-04T16:30:00' },
   ],
-};
+});
 
 // ── AML transaction-monitoring alerts ────────────────────────────────────
-export const AML_ALERTS: AmlAlertDto[] = [
+export const AML_ALERTS: AmlAlertDto[] = demoRows([
   { id: 91, alertCode: 'AML-2026-441', alertType: 'STRUCTURING', severity: 'CRITICAL',
     ruleId: 'STR-001', ruleName: 'Structuring (sub-threshold cash deposits)',
     titleEn: 'Structuring pattern across 12 deposits',
@@ -350,7 +352,7 @@ export const AML_ALERTS: AmlAlertDto[] = [
     status: 'STR_FILED', disposition: 'CONFIRMED',
     decidedAt: '2026-04-12T16:00:00', decidedByName: 'Compliance Officer',
     strFiled: true, strReference: 'STR-2026-013', strFiledAt: '2026-04-13T10:00:00' },
-];
+]);
 
 export const AML_ANALYTICS: AmlAnalyticsDto = {
   total: 7,

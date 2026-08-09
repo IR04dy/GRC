@@ -1,3 +1,5 @@
+import { demoKeyed } from './demoIds';
+
 // Policy lifecycle + bilingual versioning — Sprint 6.
 //
 // Existing PolicyDto already has a `status` enum (DRAFT → LEGAL_REVIEW
@@ -71,7 +73,7 @@ const _now = Date.now();
 const _daysAgo = (n: number) => new Date(_now - n * 86_400_000).toISOString().slice(0, 10);
 const _daysAhead = (n: number) => new Date(_now + n * 86_400_000).toISOString().slice(0, 10);
 
-export const POLICY_VERSIONS_BY_ID: Record<number, PolicyVersion[]> = {
+export const POLICY_VERSIONS_BY_ID: Record<number, PolicyVersion[]> = demoKeyed({
   // POL-AI-001 — Acceptable AI Use Policy (in EXEC_APPROVAL today per AP-001)
   55: [
     {
@@ -173,7 +175,7 @@ export const POLICY_VERSIONS_BY_ID: Record<number, PolicyVersion[]> = {
       excerptAr: 'يجب على المسؤولين والمدراء والإدارة العليا الإفصاح عن أي مصالح مالية في موردين أو عملاء أو منافسين — بما في ذلك تلك المملوكة لأقارب الدرجات الأولى والثانية والثالثة.',
     },
   ],
-};
+});
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

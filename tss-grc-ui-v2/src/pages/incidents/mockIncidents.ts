@@ -1,8 +1,9 @@
 // Demo-mode fallback for the unified Incidents register. Aligned with the
 // IncidentDto shape in lib/api.ts.
 import type { IncidentDto } from '../../lib/api';
+import { demoRows } from '../../lib/demoIds';
 
-export const INCIDENTS: IncidentDto[] = [
+export const INCIDENTS: IncidentDto[] = demoRows([
   { id: 1, title: 'Ransomware on file-share server',          titleAr: 'برنامج فدية على خادم الملفات',
     severity: 'CRITICAL', category: 'CYBER',          status: 'CONTAINED',
     assignee: 'csirt.lead@tss.sa', discoveryDate: '2026-04-29',
@@ -35,4 +36,4 @@ export const INCIDENTS: IncidentDto[] = [
     severity: 'LOW',      category: 'CYBER',          status: 'CLOSED',
     assignee: 'noc.duty@tss.sa',  discoveryDate: '2026-03-28',
     description: 'Volumetric attack peaked at 12 Gbps; mitigated by Cloudflare under-attack mode.' },
-];
+]);

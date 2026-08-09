@@ -687,7 +687,7 @@ function KriDashboard({ demoMode }: { demoMode: boolean; risks: RiskResponse[] }
                           width={300} height={60}
                           color={band === 'RED' ? 'var(--danger)' : band === 'AMBER' ? 'var(--accent-700)' : 'var(--success)'}
                           threshold={k.amberMax != null ? { value: k.amberMax, color: 'var(--accent-700)', label: `Amber ≤ ${k.amberMax}` } : undefined}
-                          series={KRI_TRENDS_BY_ID[k.id].map((v, i) => ({ label: `W${i - 11 + 12}`, value: v }))} />
+                          series={(KRI_TRENDS_BY_ID[k.id] ?? []).map((v, i) => ({ label: `W${i - 11 + 12}`, value: v }))} />
                       </div>
                     )}
                     <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', justifyContent: 'space-between' }}>

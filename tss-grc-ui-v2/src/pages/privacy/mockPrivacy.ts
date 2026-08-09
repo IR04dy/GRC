@@ -2,9 +2,10 @@
 // in lib/api.ts so DSR aging, breach 72-hour clock and RoPA charts render
 // without authentication.
 import type { PrivacyDsrDto, PrivacyBreachDto, PrivacyRopaDto, DpiaDto } from '../../lib/api';
+import { demoKeyed, demoRows } from '../../lib/demoIds';
 
 // ── DSRs ────────────────────────────────────────────────────────────────────
-export const DSRS: PrivacyDsrDto[] = [
+export const DSRS: PrivacyDsrDto[] = demoRows([
   { id: 1, requestType: 'ACCESS',        requesterName: 'Ahmed Al-Mutairi',
     requesterEmail: 'a.almutairi@example.sa',  receivedAt: '2026-04-25', dueDate: '2026-05-25', status: 'IN_PROGRESS' },
   { id: 2, requestType: 'ERASURE',       requesterName: 'Layla Al-Saud',
@@ -19,7 +20,7 @@ export const DSRS: PrivacyDsrDto[] = [
     requesterEmail: 'n.alharbi@example.sa',    receivedAt: '2026-04-03', dueDate: '2026-04-10', status: 'APPROVED' },
   { id: 7, requestType: 'WITHDRAW_CONSENT', requesterName: 'Faisal Al-Maliki',
     requesterEmail: 'f.almaliki@example.sa',   receivedAt: '2026-04-29', dueDate: '2026-05-29', status: 'OPEN' },
-];
+]);
 
 // ── Data breaches ──────────────────────────────────────────────────────────
 // Sprint 4 — synthesise a "still in 72h window" breach at module load so
@@ -30,7 +31,7 @@ const _now = new Date();
 const _thirtyHoursAgo = new Date(_now.getTime() - 30 * 3_600_000).toISOString();
 const _thirtyOneHoursAgo = new Date(_now.getTime() - 31 * 3_600_000).toISOString();
 
-export const BREACHES: PrivacyBreachDto[] = [
+export const BREACHES: PrivacyBreachDto[] = demoRows([
   { id: 10, titleEn: 'Customer database export downloaded by terminated employee',
     descriptionEn: 'Departing analyst downloaded a 47k-row customer export 18 hours before access revocation. Dataset contains name, mobile, IBAN-suffix.',
     breachType: 'CONFIDENTIALITY', severity: 'HIGH', status: 'INVESTIGATING',
@@ -66,10 +67,10 @@ export const BREACHES: PrivacyBreachDto[] = [
     breachType: 'CONFIDENTIALITY', severity: 'LOW', status: 'CLOSED',
     occurredAt: '2026-03-15T11:00:00', reportedAt: '2026-03-15T13:00:00',
     affectedRecords: 4_120 },
-];
+]);
 
 // ── RoPA (Records of Processing Activity) ──────────────────────────────────
-export const ROPA: PrivacyRopaDto[] = [
+export const ROPA: PrivacyRopaDto[] = demoRows([
   { id: 21, activityNameEn: 'Customer onboarding (KYC)',           activityNameAr: 'استقطاب العملاء',
     purposeEn: 'Identity verification + AML screening per SAMA AML.',
     legalBasis: 'LEGAL_OBLIGATION', retentionPeriod: '10 years post-relationship',
@@ -110,10 +111,10 @@ export const ROPA: PrivacyRopaDto[] = [
     purposeEn: 'Voluntary wellness programme (special-category data).',
     legalBasis: 'CONSENT',          retentionPeriod: 'Duration of programme',
     status: 'UNDER_REVIEW' },
-];
+]);
 
 // ── DPIAs ───────────────────────────────────────────────────────────────────
-export const DPIAS: DpiaDto[] = [
+export const DPIAS: DpiaDto[] = demoRows([
   { id: 41, titleEn: 'AI-based credit scoring',           titleAr: 'تقييم الائتمان بالذكاء الاصطناعي',
     triggerReason: 'AUTOMATED_DECISION_MAKING', status: 'APPROVED',
     overallResidualRisk: 'MEDIUM', processingActivityId: 27,
@@ -149,13 +150,13 @@ export const DPIAS: DpiaDto[] = [
     overallResidualRisk: 'LOW', processingActivityId: 23,
     assessmentDate: '2024-09-10', nextReviewDate: '2025-09-10',
     conclusion: 'Re-assessment due — original assessment expired.' },
-];
+]);
 
 // ── Per-DPIA detail-tab mocks ───────────────────────────────────────────
 export interface DpiaQuestionRow {
   id: number; section: string; question: string; answer: string; risk: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 }
-export const DPIA_QUESTIONS_BY_ID: Record<number, DpiaQuestionRow[]> = {
+export const DPIA_QUESTIONS_BY_ID: Record<number, DpiaQuestionRow[]> = demoKeyed({
   41: [
     { id: 1, section: 'Lawful basis',     question: 'What lawful basis covers this AI-driven decision?',                        answer: 'Contract performance + legitimate interest balanced against subject impact.', risk: 'MEDIUM' },
     { id: 2, section: 'Automated decisions', question: 'Does the model produce decisions with legal or significant effect?',     answer: 'Yes — credit-scoring drives loan approvals.',                                  risk: 'HIGH' },
@@ -172,12 +173,12 @@ export const DPIA_QUESTIONS_BY_ID: Record<number, DpiaQuestionRow[]> = {
     { id: 21, section: 'Special category', question: 'Is health data processed?',                                                answer: 'Yes — opt-in BMI, blood pressure, exercise tracking.',                          risk: 'HIGH' },
     { id: 22, section: 'Consent',          question: 'How is consent captured + revocable?',                                     answer: 'In-app onboarding flow; revocation removes data within 30 days.',                risk: 'MEDIUM' },
   ],
-};
+});
 
 export interface DpiaMitigationRow {
   id: number; risk: string; mitigation: string; owner: string; due: string; status: 'PLANNED' | 'IN_PROGRESS' | 'IMPLEMENTED';
 }
-export const DPIA_MITIGATIONS_BY_ID: Record<number, DpiaMitigationRow[]> = {
+export const DPIA_MITIGATIONS_BY_ID: Record<number, DpiaMitigationRow[]> = demoKeyed({
   41: [
     { id: 1, risk: 'Algorithmic bias on protected attributes', mitigation: 'Quarterly bias audit + threshold-based alerting',           owner: 'AI Ethics Board', due: '2026-08-31', status: 'IN_PROGRESS' },
     { id: 2, risk: 'Lack of explainability for adverse decisions', mitigation: 'SHAP-based explainer surfaced in adverse-action notice', owner: 'Data Science',     due: '2026-06-15', status: 'IMPLEMENTED' },
@@ -189,12 +190,12 @@ export const DPIA_MITIGATIONS_BY_ID: Record<number, DpiaMitigationRow[]> = {
   45: [
     { id: 21, risk: 'Special-category data without explicit consent', mitigation: 'In-app opt-in flow with granular categories',         owner: 'Product + DPO', due: '2026-07-01', status: 'PLANNED' },
   ],
-};
+});
 
 export interface DpiaReviewRow {
   id: number; date: string; reviewer: string; role: string; outcome: 'APPROVED' | 'CHANGES_REQUESTED' | 'REJECTED'; comments: string;
 }
-export const DPIA_REVIEWS_BY_ID: Record<number, DpiaReviewRow[]> = {
+export const DPIA_REVIEWS_BY_ID: Record<number, DpiaReviewRow[]> = demoKeyed({
   41: [
     { id: 1, date: '2026-02-14', reviewer: 'DPO',                   role: 'Data Protection Officer', outcome: 'APPROVED',          comments: 'Approved subject to quarterly bias audit.' },
     { id: 2, date: '2026-02-12', reviewer: 'AI Ethics Board',       role: 'Ethics Board',            outcome: 'CHANGES_REQUESTED', comments: 'Request explainability mitigation.' },
@@ -207,4 +208,4 @@ export const DPIA_REVIEWS_BY_ID: Record<number, DpiaReviewRow[]> = {
     { id: 21, date: '2026-03-12', reviewer: 'DPO',                  role: 'Data Protection Officer', outcome: 'REJECTED',          comments: 'Use-case did not justify biometric processing.' },
     { id: 22, date: '2026-03-08', reviewer: 'External Counsel',     role: 'External Legal',          outcome: 'CHANGES_REQUESTED', comments: 'Recommend rejection or alternative people-counter.' },
   ],
-};
+});
