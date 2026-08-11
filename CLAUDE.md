@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,761 @ 2026-08-11; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,770 @ 2026-08-12; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -638,6 +638,41 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   confirms no other class writes it — **empty today, which is the finding.** ⚠ Its first draft matched bare
   `is NEVER`/`nothing routes` and flagged three reasons that were already correct and already *method*-level:
   a scan not scoped to the **shape of the claim** invents findings, the fifth instance of that here.
+  ⚠⚠ **And that gate then verified only the claim shape it was written for** (F2-192, measured 2026-08-11).
+  `UNREACHABILITY_CLAIM` is scoped to state-transition verbs — correctly, since that was the shape F2-188 had
+  just found false five times — so the map's **larger** bucket, the *capability* claims (*"no endpoint does X"*,
+  *"only the list is wired"*, *"cannot be resolved by any route"*), was never scrutinised. Measured against each
+  owner class's live **cross-class** surface (ASM, callers other than the class itself): **all 18 owner classes
+  have one**, **7 claims were outright false**, 4 overstated, 5 stand. Every false one had a **routed sibling on
+  the same class** already doing the thing the reason called impossible — and one (`ChangeModelService#usageFor`)
+  had the method's own **parameter** wrong. 🔑 **A gate that verifies claims verifies the claim shape it was
+  written for** — F2-187's headline one level up, at the gate built to answer it; assume a third shape exists.
+  `everyReasonIsWrittenAgainstItsOwnerClassLiveSurface` now requires each reason to cite a live method of its
+  owner class **in method notation** (`#name`), because half the siblings are called `list`/`get` and *"no
+  endpoint **lists** unacknowledged drift"* satisfies a substring check for `list` **while asserting its
+  opposite**. ⚠ **It fired on its first run against a shape I had not counted:**
+  `SanctionsScreeningSchedulerService#setClock` was recorded as a *"DECLARED TEST SEAM … reached by tests only"*
+  and **nothing called it** — the sibling class's identically-named setter is the tested one. It had been
+  classified a seam **by its name**, three lines under F2-187's own warning that *"a `setClock`-shaped exemption
+  would let any dark method be hidden by renaming it"*. 🔑 **Naming a trap does not exempt you from it, and a
+  warning you wrote yourself is the one you are least likely to re-read.** ⚙ That was the real gap:
+  `#runSlaSweep` flips `sla_breach` and fires `SANCTIONS_HIT_SLA_BREACHED` **across tenants** off a
+  `LocalDateTime.now(clock)` cutoff and had **no test at all** — the seam was built for tests nobody wrote.
+  `SanctionsSchedulerSweepTest` drives both ticks through it (cutoff arithmetic, one call per *distinct* tenant
+  under that tenant's `TenantContext`, no leak, skip-and-log per F2-191, the `equalsIgnoreCase` DAILY filter,
+  the NULL-org→1 fallback, the `scheduler-enabled` gate).
+  ⚠⚠ **`admin` is the wrong persona for a role-DERIVED value, and it fails toward agreeing with you.** Probing
+  `/three-lines/user/{id}/role-band` as `admin` returns `allBands: []` and `lod_band: []` — PLATFORM_ADMIN maps
+  to no line of defence — which is indistinguishable from the false claim *"never displayed per user"*. As
+  `rmanager` it returns `effectiveBand: "LINE_2"` with `lod_band: ["LINE_2"]` in the JWT. CLAUDE.md's
+  "admin proves nothing about authorization" has this second edge.
+  ⚠ **And a negative assertion naming something that was never in the population passes for an unrelated
+  reason**: 4 of F2-192's 17 mutations survived and **all four were the mutation's fault** — one stripped 1 of 2
+  citations in the same reason, one replaced 1 of 6 concatenated literals, one expected a *relaxed* check to
+  fail (it cannot, on a corpus that already satisfies the strict one), and one asserted the cross-class
+  narrowing against two methods it never touched (one private, one an entry point nothing calls). Pin a
+  narrowing by **measurement** — 34 public `@Service` methods are reached only from inside their own class, and
+  that count goes to 0 if the narrowing is deleted.
   ⚠ **The audit did find one real defect, and it was far narrower than the claim**: `CommitteeScheduledSweep`
   flipped action items to OVERDUE **in place** instead of calling `markOverdue` (whose javadoc said *"Called by
   the scheduled sweep"*). Since the sweep is the only producer in production, **no `ACTION_OVERDUE` audit row

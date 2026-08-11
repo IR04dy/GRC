@@ -88,6 +88,23 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * swapped in for a deleted one and still pass, and a tolerated entry becomes indistinguishable
  * from a reviewed one. Both directions are enforced, so a method that gains a caller — or is
  * deleted — must lose its entry in the same commit.
+ *
+ * <h3>⚠⚠ And the reasons in that map have now been audited twice, from two angles</h3>
+ * <ul>
+ *   <li><b>F2-188</b> took the five entries claiming <i>"a row can never leave this state"</i> and
+ *       found <b>all five false</b>. It added
+ *       {@link #noReasonAssertsUnreachabilityWithoutAScanThatVerifiesIt()}, scoped by
+ *       {@link #UNREACHABILITY_CLAIM} to state-transition verbs.</li>
+ *   <li><b>F2-192</b> took the <em>larger</em> bucket — the capability claims (<i>"no endpoint does
+ *       X", "only the list is wired", "cannot be resolved by any route"</i>) — which a state-verb
+ *       pattern cannot see, and found <b>seven false and four overstated</b>. Every one had been
+ *       written from the dark method alone while a routed sibling on the same class already did the
+ *       thing the reason called impossible. It added
+ *       {@link #everyReasonIsWrittenAgainstItsOwnerClassLiveSurface()}.</li>
+ * </ul>
+ * <p>🔑 <b>A gate that verifies claims verifies the claim shape it was written for.</b> That is
+ * F2-187's own headline — <i>a reachability gate certifies the granularity it resolves</i> — arriving
+ * one level up, at the gate built to answer it. Assume the next reader finds a third shape.
  */
 class DarkServiceMethodTest {
 
@@ -124,46 +141,61 @@ class DarkServiceMethodTest {
         // the CALLER, not by the methods, which is why no scan of the service could find it.
         Map.entry("com.tss.grc.module.compliance.service.PolicyService#submitForLegalReview",
             "RETIRED BY DESIGN. CH-6/PM-C1 retired the legacy compliance.policies write lifecycle; "
-            + "authoring lives on the canonical register (PolicyManagementService#transition). "
-            + "RegChangePolicyController says so in a comment and names CH-9 as when the whole "
-            + "service goes. Nothing is lost: the effect has a live twin."),
+            + "authoring lives on the canonical register (PolicyManagementService#transition). The "
+            + "READS on this very class are still live — RegChangePolicyController keeps #list, #get "
+            + "and #stats — which is why the class survives at all, and its comment names CH-9 as "
+            + "when the whole service goes. Nothing is lost: the effect has a live twin."),
         Map.entry("com.tss.grc.module.compliance.service.PolicyService#legalApprove",
-            "RETIRED BY DESIGN — see #submitForLegalReview."),
+            "RETIRED BY DESIGN — see #submitForLegalReview. Live surface: #list, #get, #stats."),
         Map.entry("com.tss.grc.module.compliance.service.PolicyService#executiveApprove",
-            "RETIRED BY DESIGN — see #submitForLegalReview."),
+            "RETIRED BY DESIGN — see #submitForLegalReview. Live surface: #list, #get, #stats."),
         Map.entry("com.tss.grc.module.compliance.service.PolicyService#markReviewDue",
-            "RETIRED BY DESIGN — see #submitForLegalReview."),
+            "RETIRED BY DESIGN — see #submitForLegalReview. Live surface: #list, #get, #stats."),
         Map.entry("com.tss.grc.module.compliance.service.PolicyService#create",
-            "RETIRED BY DESIGN — see #submitForLegalReview. Its mass-assignment defence is still "
-            + "worth reading: RegulatoryChangeService cites it by name."),
+            "RETIRED BY DESIGN — see #submitForLegalReview. Live surface: #list, #get, #stats. Its "
+            + "mass-assignment defence is still worth reading: RegulatoryChangeService cites it by "
+            + "name."),
         Map.entry("com.tss.grc.module.compliance.service.PolicyService#update",
-            "RETIRED BY DESIGN — see #submitForLegalReview."),
+            "RETIRED BY DESIGN — see #submitForLegalReview. Live surface: #list, #get, #stats."),
         Map.entry("com.tss.grc.module.compliance.service.PolicyService#delete",
-            "RETIRED BY DESIGN — see #submitForLegalReview."),
+            "RETIRED BY DESIGN — see #submitForLegalReview. Live surface: #list, #get, #stats."),
         Map.entry("com.tss.grc.module.compliance.service.PolicyService#reject",
-            "RETIRED BY DESIGN — see #submitForLegalReview."),
+            "RETIRED BY DESIGN — see #submitForLegalReview. Live surface: #list, #get, #stats."),
         Map.entry("com.tss.grc.module.compliance.service.PolicyService#retire",
-            "RETIRED BY DESIGN — see #submitForLegalReview."),
+            "RETIRED BY DESIGN — see #submitForLegalReview. Live surface: #list, #get, #stats."),
 
         // ── Declared test seams: reached only by tests, on purpose ───────────────────────────
         // Listed rather than subtracted by a name rule. A `setClock`-shaped exemption would let any
         // dark method be hidden by renaming it, which is the "classification rule you can only apply
         // by intuition" F2-165 warns manufactures a finding on first use.
         Map.entry("com.tss.grc.module.aml.sanctions.service.SanctionsHitService#setClock",
-            "DECLARED TEST SEAM — injects a fixed Clock so date-relative assertions are stable. "
-            + "CLAUDE.md records why this seam matters here specifically: LocalDate.now() in a test "
-            + "is UTC+3 on this machine while the services are UTC, so a date-relative fixture is "
-            + "wrong for three hours of every day (the F2-178 correction). Reached by tests only, "
-            + "which is the point."),
+            "DECLARED TEST SEAM — injects a fixed Clock so date-relative assertions are stable. What "
+            + "it exists to make testable is live: #detectSlaBreachesForOrg is called by the "
+            + "screening scheduler, and #reviewHit / #escalate are routed. CLAUDE.md records why this "
+            + "seam matters here specifically: LocalDate.now() in a test is UTC+3 on this machine "
+            + "while the services are UTC, so a date-relative fixture is wrong for three hours of "
+            + "every day (the F2-178 correction). Reached by tests only, which is the point."),
         Map.entry("com.tss.grc.module.aml.sanctions.service.SanctionsScreeningSchedulerService#setClock",
-            "DECLARED TEST SEAM — see SanctionsHitService#setClock."),
+            "TEST SEAM — and ⚠⚠ IT WAS NOT ONE UNTIL F2-192. This entry read \"DECLARED TEST SEAM — "
+            + "reached by tests only, which is the point\", and the new scan found NO caller at all: "
+            + "not in main sources, not in any test. SanctionsHitServiceTest calls the identically "
+            + "named setter on the sibling class. So it had been classified a seam BECAUSE it is "
+            + "called setClock — the exact error the comment above this block warns about. What that "
+            + "exposed is the real gap: #runSlaSweep flips sla_breach and fires "
+            + "SANCTIONS_HIT_SLA_BREACHED across tenants off a LocalDateTime.now(clock) cutoff and had "
+            + "no test of any kind. SanctionsSchedulerSweepTest now drives both ticks through this "
+            + "seam, so the claim is true and the scan proves it. ⚠ This is also the one entry with no "
+            + "live sibling to cite — every method here is @Scheduled (#refreshTick, #slaSweepTick: "
+            + "the container calls them, so no call site exists in the bytecode) or package-private — "
+            + "which is why SEAM_VERIFIED_BY_TESTS exists and why it is checked, not trusted."),
 
         // ── Outbound integrations with no production trigger (filed: F2-187) ──────────────────
         Map.entry("com.tss.grc.module.integrations.servicenow.service.ServiceNowOutboundService#pushCyberIncident",
-            "NO PRODUCTION TRIGGER. ServiceNowController exposes /health, /config and /test-push "
-            + "only, so a real cyber incident is never pushed to ServiceNow — the integration reads "
-            + "as working (health green, config present, test-push succeeds) while no domain event "
-            + "reaches it. The service's own javadoc states the v1 intent (\"modules whose DTOs "
+            "NO PRODUCTION TRIGGER. The class's entire live surface is #push, reached from "
+            + "ServiceNowController's /test-push; the controller otherwise exposes /health and "
+            + "/config only. So a real cyber incident is never pushed to ServiceNow — the integration "
+            + "reads as working (health green, config present, test-push succeeds) while no domain "
+            + "event reaches it. The service's own javadoc states the v1 intent (\"modules whose DTOs "
             + "haven't stabilised\"), so this is a posture rather than a bug, but the posture is "
             + "invisible to a buyer. F2-187."),
         Map.entry("com.tss.grc.module.integrations.servicenow.service.ServiceNowOutboundService#pushFinding",
@@ -174,13 +206,14 @@ class DarkServiceMethodTest {
             "NO PRODUCTION TRIGGER — see #pushCyberIncident. F2-187."),
         Map.entry("com.tss.grc.module.integrations.splunk.service.SplunkOutboundService#pushGenericEvent",
             "NO PRODUCTION TRIGGER for the free-form variant. Splunk differs from ServiceNow: "
-            + "SplunkController also exposes POST /security-event/{id}, so that module has one real "
-            + "trigger and only the generic overload is dark. F2-187."),
+            + "#pushSecurityEvent is live from SplunkController's POST /security-event/{id}, so that "
+            + "module has one real trigger and only the generic overload is dark. F2-187."),
         Map.entry("com.tss.grc.module.integrations.crowdstrike.service.CrowdStrikeOutboundService#hideHost",
-            "DEAD DUPLICATE-ish: CrowdStrikeController exposes /contain/{hostId} and /lift/{hostId}, "
-            + "so host containment IS reachable; #hideHost is a second containment verb nothing "
-            + "routes to. Listed rather than deleted because CrowdStrikeClient#hideHost is the "
-            + "vendor API call the contain path may need to switch to. F2-187."),
+            "DEAD DUPLICATE-ish: #containHost and #liftContainment are live from CrowdStrikeController "
+            + "(/contain/{hostId} and /lift/{hostId}), so host containment IS reachable; #hideHost is "
+            + "a second containment verb nothing routes to. Listed rather than deleted because "
+            + "CrowdStrikeClient#hideHost is the vendor API call the contain path may need to switch "
+            + "to. F2-187."),
 
         // ── ⚠⚠ F2-188: this used to be "a state nothing can ever move to — the sharpest bucket". ──
         // All FIVE reasons were false, and every one of them was written from the method alone. Each
@@ -198,81 +231,141 @@ class DarkServiceMethodTest {
         Map.entry("com.tss.grc.module.ccm.service.CcmService#recordRun",
             "A THIRD entry point to recordRunInternal, for a result computed outside the platform. "
             + "The ladder is not dark: CcmSchedulerService#tick is @Scheduled(fixedDelay=60s) and "
-            + "calls runDefinitionInternal, and POST /ccm/tests/{externalId}/run-now reaches "
-            + "runTestNow — both land in recordRunInternal, which owns the consecutive-failure Issue "
-            + "ladder and the last_run_* stamps. Kept as the ingestion seam for an external runner. "
-            + "F2-187/F2-188."),
+            + "calls #runDefinitionInternal, and POST /ccm/tests/{externalId}/run-now reaches "
+            + "#runTestNow — both land in recordRunInternal, which owns the consecutive-failure Issue "
+            + "ladder and the last_run_* stamps (#listLatestRuns and #getRunsForTest read them back). "
+            + "Kept as the ingestion seam for an external runner. F2-187/F2-188."),
         Map.entry("com.tss.grc.module.socops.service.IrPlaybookService#recordInvocation",
             "SUPERSEDED by IrPlaybookRunService, whose own comment says it preserves 'the legacy "
             + "invocation semantics the dashboard + F8 rules rely on' and emits invocationCount "
-            + "itself. Invocations ARE recorded, as trackable runs with snapshotted tasks. Kept "
-            + "because the counter-only path is cheaper for a bulk import. F2-187/F2-188."),
+            + "itself. Invocations ARE recorded, as trackable runs with snapshotted tasks; the "
+            + "playbook itself is fully live on this class (#save, #cloneFromTemplate, #stepsOf, "
+            + "#templates). Kept because the counter-only path is cheaper for a bulk import. "
+            + "F2-187/F2-188."),
         Map.entry("com.tss.grc.module.socops.service.ThreatIntelService#markActioned",
             "A LEGACY SHIM, and its own javadoc says so one line above the signature: 'the old "
             + "\"mark done\" path (no concrete target) now records a REVIEWED action'. It delegates "
-            + "to actionIoc, which is live and writes the action history plus the denormalised "
-            + "actioned/pending queue. F2-187/F2-188."),
+            + "to #actionIoc, which is live from ThreatIntelController and writes the action history "
+            + "plus the denormalised actioned/pending queue (#listActions reads it). F2-187/F2-188."),
 
-        // ── Built and unwired: the capability exists in code and no route reaches it ──────────
+        // ── ⚠⚠ F2-192: "built and unwired" — the bucket F2-188's gate could not see. ─────────
+        // These reasons claim a CAPABILITY is absent ("no endpoint does X", "only the list is
+        // wired"). UNREACHABILITY_CLAIM is scoped to state-transition verbs, so none of them ever
+        // came under scrutiny. Measured against the owner classes' live surfaces, four of the five
+        // were wrong or overstated — and each was written from the dark method alone, exactly as the
+        // five F2-188 audited were. The corrections are kept in place rather than rewritten away.
         Map.entry("com.tss.grc.module.ai.governance.service.MlModelDriftService#listUnacknowledged",
-            "No endpoint lists unacknowledged drift observations, so the CRITICAL-drift escalation "
-            + "F2-175 fixed can be filed and never reviewed — the intake record is created and the "
-            + "queue that would surface it is unreachable. F2-187."),
+            "F2-192 CORRECTION — this said \"the CRITICAL-drift escalation F2-175 fixed can be filed "
+            + "and never reviewed\", and that was false twice over. #list is live from "
+            + "MlModelDriftController and its response carries isAcknowledged, so drift observations "
+            + "ARE readable; and the escalation F2-175 wired files an INTAKE RECORD, whose queue "
+            + "(GET /api/v1/intake, server-backed end to end since F2-172) is the review surface. "
+            + "What is genuinely absent is narrower: no tenant-wide, cross-model unacknowledged feed, "
+            + "so a reviewer must already know which model drifted. F2-187."),
         Map.entry("com.tss.grc.module.bcm.cycle.runtime.observer.service.ExerciseObserverService#buildAarSection",
-            "The observer's after-action-report section is built by nothing, so observer findings "
-            + "from a BCM exercise never reach the AAR that NCEMA evidence is drawn from. F2-187."),
+            "F2-192 CORRECTION — \"observer findings never reach the AAR\" overstated it. "
+            + "#flagObservationForAar and #promoteObservationToGap are both live from "
+            + "ExerciseObserverController, so a flagged observation does reach the BCM gap register, "
+            + "which is where NCEMA evidence is actually drawn from, and #listObservations / "
+            + "#getObservationsByType read them. The narrow truth: nothing composes this markdown "
+            + "section, and CrisisAar is keyed to crisis_event_id rather than to an exercise run, so "
+            + "there is no exercise-run AAR for it to be composed into. F2-187."),
         Map.entry("com.tss.grc.module.platform.push.service.WebPushService#dispatchToUserIds",
-            "Targeted web-push fan-out with no caller: a notification cannot be pushed to specific "
-            + "users. The delivery half of what F2-38(d) left open as an owner decision. F2-187."),
+            "⚠ DECLARED v1 STUB — and this entry used to read \"a notification cannot be pushed to "
+            + "specific users\", which invites the wrong remedy. The method's own javadoc, four lines "
+            + "above the signature, says \"v1 stub for the actual Web Push dispatch … the real "
+            + "VAPID-signed POST to the browser push service is wired in Sprint 12\": it resolves "
+            + "subscriptions, writes an audit row and emits WEB_PUSH_DISPATCHED, and delivers "
+            + "nothing. So giving it a caller would produce a dispatch trail for pushes that never "
+            + "left the server. Registration IS live (#register, #unregister, #listForCurrentUser), "
+            + "so browsers subscribe and nothing is ever sent — the delivery half of what F2-38(d) "
+            + "left open as an owner decision. F2-187/F2-192."),
         Map.entry("com.tss.grc.platform.realtime.RealtimeBroadcaster#sendToUser",
-            "Per-user realtime send with no caller; only BroadcastHelper's tenant-wide path is live. "
-            + "Pairs with WebPushService#dispatchToUserIds — targeted delivery is built and unwired "
-            + "on BOTH transports, which is why neither looks like the odd one out. F2-187."),
+            "F2-192 CORRECTION — \"only BroadcastHelper's tenant-wide path is live\" named the wrong "
+            + "caller: #broadcastEntityUpdate is called directly by 14 services and #broadcastOrgEvent "
+            + "by 2. The per-user channel is documented in THREE artefacts and implemented in none — "
+            + "WebSocketConfig's javadoc lists /user/queue/notifications, lib/realtime.ts repeats it "
+            + "in its topic conventions, and this method publishes to it — while no frontend "
+            + "subscription targets it (every subscribe() call builds /topic/org.{orgId}.…). It is "
+            + "dark on BOTH ends, so wiring the publisher alone would deliver to nobody. Pairs with "
+            + "WebPushService#dispatchToUserIds. F2-187/F2-192."),
         Map.entry("com.tss.grc.module.privacy.subprocessor.service.SubprocessorEventService#listAll",
-            "The tenant-wide subprocessor-event feed is unreachable; only the per-subprocessor list "
-            + "is wired. So a DPO cannot review every sub-processor change in one place, which is the "
-            + "view PDPL sub-processor oversight actually needs. F2-187."),
+            "SURVIVED the F2-192 audit, because the live sibling answers a different question: "
+            + "#listForSubprocessor is routed per subprocessor (and #recordEvent writes the events), "
+            + "while the tenant-wide feed this method returns has no route at all. So a DPO cannot "
+            + "review every sub-processor change in one place, which is the view PDPL sub-processor "
+            + "oversight actually needs. F2-187."),
 
         // ── Predicates and readers nothing consults: low blast radius, but say why they matter ──
+        // ⚠ F2-192 rewrote six of these. Each had described a capability as missing when a routed
+        // sibling on the same class already provided it — and in one case (#usageFor) the reason had
+        // the method's own parameter wrong, which reading the signature would have shown.
         Map.entry("com.tss.grc.module.platform.controls.service.ControlLibraryService#hasRecentApprovedAssessment",
-            "A control-assessment freshness predicate nothing asks. Worth a second look before "
-            + "deletion rather than after: a freshness check that is never consulted is exactly how "
-            + "a stale control passes for current. F2-187."),
-        Map.entry("com.tss.grc.module.change_mgmt.service.ChangeManagementService#isConditional",
-            "Derived, never stored, and never asked: nothing distinguishes a change approved SUBJECT "
-            + "TO CONDITIONS from an unconditional approval, so the conditions attached at CAB are "
-            + "invisible downstream. F2-187."),
-        Map.entry("com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService#isGateConfigured",
-            "Public gate-configuration probe with no caller; the class's @EventListener sibling is "
-            + "the live path and warns on the same condition, so this is the query form of an answer "
-            + "the platform only ever logs. F2-187."),
-        Map.entry("com.tss.grc.module.admin.committee.service.CommitteeCatalogService#countStandingItems",
-            "Standing-item count nothing reads; the committee registry screen derives its own. A "
-            + "second, unconsulted counter is how two numbers for one thing start disagreeing. "
+            "A control-assessment freshness predicate nothing asks. #listAssessmentsForControl is live "
+            + "from ControlLibraryController, so the assessments are visible — what no code does is "
+            + "JUDGE them, and a freshness check that is never consulted is exactly how a stale "
+            + "control passes for current. Worth a second look before deletion rather than after. "
             + "F2-187."),
+        Map.entry("com.tss.grc.module.change_mgmt.service.ChangeManagementService#isConditional",
+            "F2-192 CORRECTION — \"the conditions attached at CAB are invisible downstream\" was "
+            + "false: #conditions and #openConditions are both live from ChangeManagementController, "
+            + "and #addCondition writes them. What is dark is only the derived boolean over "
+            + "conditionRepo.count, not the conditions themselves. F2-187."),
+        Map.entry("com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService#isGateConfigured",
+            "F2-192 CORRECTION — this claimed \"the query form of an answer the platform only ever "
+            + "logs\", and both halves were wrong. The method is a one-line delegate to "
+            + "#gateConfigurationFault, which is live and consulted twice: ChangeManagementService "
+            + "turns a non-null fault into ChangeAuthorityNotConfiguredException, so an unconfigured "
+            + "CAB/ECAB gate REFUSES the approval (A17-D2, fail closed), and CommitteeGateMapService "
+            + "renders configured/fault per gate. #currentTenantHealth is routed too. So this is a "
+            + "redundant boolean over a live, load-bearing method — not an unasked question. F2-187."),
+        Map.entry("com.tss.grc.module.admin.committee.service.CommitteeCatalogService#countStandingItems",
+            "Standing-item count nothing reads; #getStandingItems is live from "
+            + "CommitteeCatalogController and the committee registry screen derives its own count from "
+            + "that list. A second, unconsulted counter is how two numbers for one thing start "
+            + "disagreeing. F2-187."),
         Map.entry("com.tss.grc.module.admin.committee.service.CommitteeCatalogService#findTemplate",
-            "Committee-template lookup with no caller: templates are catalogued and cannot be "
-            + "resolved by any route, so a tenant cannot instantiate a committee from one. F2-187."),
+            "F2-192 CORRECTION — \"templates cannot be resolved by any route, so a tenant cannot "
+            + "instantiate a committee from one\" was false: #getTemplate, #listAllTemplates and "
+            + "#listTemplatesByDomain are all live from CommitteeCatalogController. This is the "
+            + "tolerant Optional twin of #getTemplate — it swallows a missing-object error where the "
+            + "throwing variant propagates it. F2-187."),
         Map.entry("com.tss.grc.module.change_mgmt.service.ChangeModelService#usageFor",
-            "Per-change-model usage count nothing reads, so a tenant cannot see whether a change "
-            + "model is in use before editing or retiring it. F2-187."),
+            "F2-192 CORRECTION — this called the method a \"per-change-model usage count\" and it "
+            + "takes a changeId, not a model id; reading the signature would have shown that. "
+            + "#backingFor runs the identical usageRepo.findByOrganisationIdAndChangeRequestId lookup "
+            + "and is live from ChangeManagementController, with #models and #liveModelFor live too — "
+            + "so whether a model backs a change IS answerable. F2-187."),
         Map.entry("com.tss.grc.module.governance.threelines.service.ThreeLinesService#bandForUser",
-            "Resolves which of the three lines of defence a user sits in — and nothing asks, so the "
-            + "independence model is recorded and never enforced or displayed per user. F2-187."),
+            "F2-192 CORRECTION — \"the independence model is recorded and never enforced or displayed "
+            + "per user\" was false on both counts. #userBandFor is live from ThreeLinesController and "
+            + "returns this exact effective band inside UserBandDto, and #bandsForUser is live from "
+            + "JwtTokenProvider, which puts lod_band into the token — so the model is available to "
+            + "authorisation on every request. This is the third variant of one computation (scalar / "
+            + "list / DTO) and the only dark one. Deleting it is an owner call rather than a fix: four "
+            + "ThreeLinesServiceTest cases assert the band ranking through it. F2-187."),
         Map.entry("com.tss.grc.module.ndi.settings.service.NdiSettingService#stringValue",
-            "Typed accessor for NDI settings with no caller; callers read the raw setting instead, "
-            + "which is how a default declared in one place stops being applied. F2-187."),
+            "Typed accessor with a fallback that no caller uses; #getByKey is live from "
+            + "NdiSettingController and callers read the raw setting through it, which is how a "
+            + "default declared in one place stops being applied. #list, #listGrouped, #setValue and "
+            + "#resetToDefault are all routed. F2-187."),
         Map.entry("com.tss.grc.module.platform.regulatory.service.AuthorityDocumentService#citationCount",
-            "Citation count per authority document is computed by nothing, so a regulatory-library "
-            + "screen cannot show how heavily a document is relied upon. F2-187."),
+            "F2-192 CORRECTION — \"a regulatory-library screen cannot show how heavily a document is "
+            + "relied upon\" was false: #listCitations is live from AuthorityDocumentController, so a "
+            + "screen counts the list, and #rollupByFamily is live for the aggregate view. This is the "
+            + "count-only variant of a routed read. F2-187."),
         Map.entry("com.tss.grc.module.sust.ghg.service.EmissionFactorService#resolveActive",
-            "Active-emission-factor resolver with no caller: GHG calculations pick factors by another "
-            + "path, so the 'which factor was active on this date' question this method answers is "
-            + "not the one the numbers were produced with. Check before deleting — ISAE 3410 "
-            + "assurance lineage depends on that answer. F2-187."),
+            "SURVIVED the F2-192 audit, and it is the sharpest survivor: #list and #get are live from "
+            + "EmissionFactorController, but GhgEmissionRecordService resolves a record's factor by "
+            + "stored FK (factorRepo.findByIdAndOrganisationId(r.getEmissionFactorId(), …)) and never "
+            + "by code + isActive. So the 'which factor is active for this code' question this method "
+            + "answers is not the one the numbers were produced with. Check before deleting — ISAE "
+            + "3410 assurance lineage depends on that answer. F2-187."),
         Map.entry("com.tss.grc.module.sust.climate.service.FinancedEmissionsService#getTarget",
-            "Single-PCAF-target read is unreachable; only the list is wired, so a financed-emissions "
-            + "target has no detail view. F2-187.")
+            "F2-192 CORRECTION — \"unreachable\" overstated it: #listTargets is live from "
+            + "FinancedEmissionsController and carries the same fields, and #computeReductionAgainstTarget "
+            + "is live and consulted by TcfdReportService. What is missing is only a single-target "
+            + "detail ROUTE. F2-187.")
     ));
 
     // ── the scan ─────────────────────────────────────────────────────────────────────────────
@@ -314,16 +407,118 @@ class DarkServiceMethodTest {
     }
 
     private static List<Resource> mainClasses() throws IOException {
+        return classesUnder("/target/classes/");
+    }
+
+    /**
+     * Test classes — used for exactly one purpose: verifying a "reached by tests only" claim.
+     *
+     * <p>They are still not callers for {@link #measureDark()}. The difference matters: a seam's
+     * whole claim is that a test reaches it, and that claim is checkable rather than assertable.
+     */
+    private static List<Resource> testClasses() throws IOException {
+        return classesUnder("/target/test-classes/");
+    }
+
+    private static List<Resource> classesUnder(String segment) throws IOException {
         List<Resource> out = new ArrayList<>();
         for (Resource r : new PathMatchingResourcePatternResolver()
                 .getResources("classpath*:com/tss/grc/**/*.class")) {
             String url = r.getURL().toString().replace('\\', '/');
-            // Deliberate: test classes are NOT callers. See the class javadoc.
-            if (url.contains("/target/classes/")) {
+            // Deliberate: test classes are NOT callers for the dark measurement. See class javadoc.
+            if (url.contains(segment)) {
                 out.add(r);
             }
         }
         return out;
+    }
+
+    private static String internalNameOf(Resource r, String segment) throws IOException {
+        String url = r.getURL().toString().replace('\\', '/');
+        int i = url.indexOf(segment);
+        return url.substring(i + segment.length()).replace(".class", "");
+    }
+
+    /**
+     * F2-192 — {@code owner#method} for every call site whose <b>calling class is not the owner</b>.
+     *
+     * <p>Deliberately narrower than {@link #callSites()}, and the narrowing is the point: this set
+     * answers <i>"what does something OUTSIDE this service use"</i>, which is the question a
+     * capability claim is actually about. A method reached only from inside its own class is not
+     * dark (so {@code measureDark} is right to use the wider set) and is also not part of the
+     * class's live surface (so this one is right to exclude it).
+     *
+     * <p>⚠ A nested class counts as a different caller. That errs toward reporting a live surface,
+     * which makes the citation requirement below fire more often, not less — the safe direction for
+     * an instrument whose failure mode is letting an unexamined reason through.
+     */
+    private static Set<String> crossClassCallSites(Iterable<Resource> from, String segment)
+            throws IOException {
+        Set<String> calls = new LinkedHashSet<>();
+        for (Resource r : from) {
+            String self = internalNameOf(r, segment);
+            try (InputStream in = r.getInputStream()) {
+                new ClassReader(in).accept(new ClassVisitor(Opcodes.ASM9) {
+                    @Override
+                    public MethodVisitor visitMethod(int access, String name, String descriptor,
+                                                     String signature, String[] exceptions) {
+                        return new MethodVisitor(Opcodes.ASM9) {
+                            @Override
+                            public void visitMethodInsn(int opcode, String owner, String mName,
+                                                        String desc, boolean isInterface) {
+                                if (!owner.equals(self)) {
+                                    calls.add(owner + "#" + mName);
+                                }
+                            }
+
+                            @Override
+                            public void visitInvokeDynamicInsn(String iName, String desc,
+                                                               Handle bsm, Object... bsmArgs) {
+                                for (Object a : bsmArgs) {
+                                    if (a instanceof Handle h && !h.getOwner().equals(self)) {
+                                        calls.add(h.getOwner() + "#" + h.getName());
+                                    }
+                                }
+                            }
+                        };
+                    }
+                }, ClassReader.SKIP_FRAMES);
+            }
+        }
+        return calls;
+    }
+
+    /**
+     * The public methods of {@code fqcn} that some other main class calls — its <b>live surface</b>.
+     *
+     * <p>This is the list a capability claim has to be written against, and the list every one of
+     * F2-192's seven false reasons was written without.
+     */
+    static Set<String> liveSiblings(String fqcn, Set<String> crossClassCalls) {
+        Class<?> c;
+        try {
+            c = Class.forName(fqcn, false, DarkServiceMethodTest.class.getClassLoader());
+        } catch (ClassNotFoundException e) {
+            return Set.of();
+        }
+        Set<String> internalNames = new LinkedHashSet<>();
+        for (Class<?> t : supertypes(c)) {
+            internalNames.add(t.getName().replace('.', '/'));
+        }
+        Set<String> live = new TreeSet<>();
+        for (Method m : c.getDeclaredMethods()) {
+            if (!Modifier.isPublic(m.getModifiers()) || m.isSynthetic() || m.isBridge()
+                    || FRAMEWORK_NAMES.contains(m.getName())) {
+                continue;
+            }
+            for (String n : internalNames) {
+                if (crossClassCalls.contains(n + "#" + m.getName())) {
+                    live.add(m.getName());
+                    break;
+                }
+            }
+        }
+        return live;
     }
 
     private static List<Class<?>> serviceClasses() throws IOException {
@@ -591,6 +786,180 @@ class DarkServiceMethodTest {
             }
         }
         return hits;
+    }
+
+    /**
+     * Entries whose owner class has <b>no live cross-class surface at all</b>, so there is no sibling
+     * to cite and the claim has to be verified another way.
+     *
+     * <p>Today there is exactly one, and its claim — "reached by tests only" — is the one claim this
+     * instrument can check directly, by finding the call site in {@code target/test-classes}. That is
+     * why the exemption is safe where a name-based one would not be: {@code setClock} does not get in
+     * by being called {@code setClock}, it gets in by a scan proving what its reason says.
+     */
+    private static final Set<String> SEAM_VERIFIED_BY_TESTS = Set.of(
+        "com.tss.grc.module.aml.sanctions.service.SanctionsScreeningSchedulerService#setClock");
+
+    /**
+     * F2-192 — the assertion F2-188 needed and could not have written, for the bucket it did not audit.
+     *
+     * <h3>What went wrong</h3>
+     * <p>F2-188 proved that a named-map gate cannot prove a reason is <em>true</em>, and built
+     * {@link #noReasonAssertsUnreachabilityWithoutAScanThatVerifiesIt()} to catch the claim shape it
+     * had just found false: <i>"a row can never leave this state"</i>. {@link #UNREACHABILITY_CLAIM}
+     * is scoped to state-transition verbs, deliberately and correctly.
+     *
+     * <p>But the <b>larger</b> bucket of this map makes a different claim — <i>"no endpoint does X",
+     * "only the list is wired", "cannot be resolved by any route"</i> — and that shape is invisible to
+     * a state-verb pattern. So it was never audited. Measured for F2-192 against the bytecode:
+     * <b>every one of the 18 owner classes has a live cross-class surface</b>, and of the reasons
+     * resting on one of those capability claims, <b>seven were outright false</b> and four more
+     * overstated. In every case a routed sibling on the <em>same class</em> already did, or nearly
+     * did, the thing the reason said a user could not do.
+     *
+     * <p>🔑 <b>A gate that verifies claims verifies the claim shape it was written for</b> — the same
+     * lesson as F2-187's own headline (a reachability gate certifies the granularity it resolves),
+     * arriving one level up: at the gate that was built to answer it.
+     *
+     * <h3>The rule</h3>
+     * <p>A reason must <b>cite, in method notation, at least one live method of its own owner class</b>.
+     * Notation (<code>#name</code> or <code>name(</code>) rather than a bare word because half these
+     * siblings are called {@code list} or {@code get}, and "no endpoint lists unacknowledged drift"
+     * would otherwise satisfy a check for {@code list} while asserting its opposite.
+     *
+     * <p>This is F2-185(a)'s <i>"one file short is the whole error"</i> turned into a build failure:
+     * you cannot write the entry without having read what the class already exposes.
+     */
+    @Test
+    void everyReasonIsWrittenAgainstItsOwnerClassLiveSurface() throws IOException {
+        Set<String> cross = crossClassCallSites(mainClasses(), "/target/classes/");
+        Set<String> testCalls = crossClassCallSites(testClasses(), "/target/test-classes/");
+
+        List<String> uncited = new ArrayList<>();
+        List<String> noSurfaceAndUndeclared = new ArrayList<>();
+        Map<String, Integer> surfaceSizes = new TreeMap<>();
+
+        for (Map.Entry<String, String> e : TOLERATED.entrySet()) {
+            String key = e.getKey();
+            String owner = key.substring(0, key.indexOf('#'));
+            String dark = key.substring(key.indexOf('#') + 1);
+            Set<String> siblings = new TreeSet<>(liveSiblings(owner, cross));
+            siblings.remove(dark);          // it is dark; it cannot be its own evidence
+            surfaceSizes.put(key, siblings.size());
+
+            if (siblings.isEmpty()) {
+                if (!SEAM_VERIFIED_BY_TESTS.contains(key)) {
+                    noSurfaceAndUndeclared.add(key);
+                }
+                continue;
+            }
+            String reason = e.getValue();
+            boolean cited = siblings.stream()
+                .anyMatch(s -> reason.contains("#" + s) || reason.contains(s + "("));
+            if (!cited) {
+                uncited.add(key + "  (live surface: " + siblings + ")");
+            }
+        }
+
+        System.out.println("[F2-192] entries = " + TOLERATED.size()
+            + " ; owners with no live surface = " + surfaceSizes.values().stream()
+                .filter(n -> n == 0).count()
+            + " ; seam-verified = " + SEAM_VERIFIED_BY_TESTS.size());
+
+        assertThat(uncited)
+            .as("""
+                These reasons say what a user cannot do without naming what the same class already \
+                exposes. Cite a live sibling in method notation (#name) and say what it does and \
+                does not cover. F2-192 measured this bucket and SEVEN reasons were false because \
+                they were written from the dark method alone — a routed sibling on the same class \
+                already did the thing the reason called impossible.""")
+            .isEmpty();
+
+        assertThat(noSurfaceAndUndeclared)
+            .as("""
+                This entry's owner class has no live cross-class surface at all, so there is no \
+                sibling to cite and nothing here corroborates the reason. If the claim is "reached \
+                by tests only", add it to SEAM_VERIFIED_BY_TESTS and this test will verify that \
+                against target/test-classes. Otherwise the honest entry says the whole class is \
+                dark — which is a bigger finding than one method.""")
+            .isEmpty();
+
+        // The other direction, and the part that makes the exemption a measurement: a declared seam
+        // must actually be reached by a test, and must still have no live surface of its own.
+        for (String key : SEAM_VERIFIED_BY_TESTS) {
+            assertThat(TOLERATED).containsKey(key);
+            String owner = key.substring(0, key.indexOf('#'));
+            String method = key.substring(key.indexOf('#') + 1);
+            assertThat(testCalls)
+                .as("%s is declared a test seam, and no test calls it — so it is not a seam, it is "
+                    + "dead code", key)
+                .contains(owner.replace('.', '/') + "#" + method);
+            Set<String> siblings = new TreeSet<>(liveSiblings(owner, cross));
+            siblings.remove(method);
+            assertThat(siblings)
+                .as("%s no longer needs the exemption: its class has a live surface now, so the "
+                    + "reason must cite it like every other entry. Delete the declaration.", key)
+                .isEmpty();
+        }
+    }
+
+    @Test
+    void theLiveSurfaceScanIsNotVacuous() throws IOException {
+        Set<String> all = callSites();
+        Set<String> cross = crossClassCallSites(mainClasses(), "/target/classes/");
+        assertThat(cross)
+            .as("the cross-class scan found call sites at all")
+            .hasSizeGreaterThan(4_000);
+
+        // A known-live method must be in the surface, and a known-dark one must not — without both
+        // legs, an empty or an all-inclusive scan would satisfy the citation rule silently.
+        Set<String> threeLines = liveSiblings(
+            "com.tss.grc.module.governance.threelines.service.ThreeLinesService", cross);
+        assertThat(threeLines)
+            .as("userBandFor is routed by ThreeLinesController and bandsForUser is called by "
+                + "JwtTokenProvider — the two facts that made F2-187's reason false")
+            .contains("userBandFor", "bandsForUser")
+            .doesNotContain("bandForUser");
+
+        // ⚠ And the narrowing itself. The first version of this leg hand-picked two method names it
+        // ASSUMED the narrowing would exclude (CcmService#recordRunInternal, #recordRun) — and the
+        // mutation that deletes the narrowing survived, because one is private (so liveSiblings skips
+        // it on visibility) and the other is an entry point nothing calls at all. Neither was ever
+        // affected by the rule being tested. 🔑 A negative assertion naming a method that was never
+        // in the population passes for a reason unrelated to the property. So measure the difference
+        // instead: how many public @Service methods does the narrowing actually remove? 34 on the
+        // tree as measured — a real population, and it drops to 0 if the narrowing is deleted.
+        Set<String> onlySelfCalled = new TreeSet<>();
+        for (Class<?> svc : serviceClasses()) {
+            Set<String> names = new LinkedHashSet<>();
+            for (Class<?> t : supertypes(svc)) {
+                names.add(t.getName().replace('.', '/'));
+            }
+            for (Method m : svc.getDeclaredMethods()) {
+                if (!Modifier.isPublic(m.getModifiers()) || m.isSynthetic() || m.isBridge()
+                        || FRAMEWORK_NAMES.contains(m.getName())) {
+                    continue;
+                }
+                boolean anywhere = names.stream().anyMatch(n -> all.contains(n + "#" + m.getName()));
+                boolean outside = names.stream().anyMatch(n -> cross.contains(n + "#" + m.getName()));
+                if (anywhere && !outside) {
+                    onlySelfCalled.add(svc.getSimpleName() + "#" + m.getName());
+                }
+            }
+        }
+        System.out.println("[F2-192] public @Service methods called only from inside their own "
+            + "class = " + onlySelfCalled.size());
+        assertThat(onlySelfCalled)
+            .as("""
+                The narrowing must actually remove something, or "does anything OUTSIDE this class \
+                use it" has degraded to "does this class compile". These are public service methods \
+                whose only caller is their own class: they count as reached (so measureDark is right \
+                to leave them alone) and they are NOT live surface, so a reason may not cite them as \
+                evidence that a capability is routed.""")
+            .isNotEmpty();
+        assertThat(cross.size())
+            .as("and the cross-class set must be strictly smaller than the all-callers set")
+            .isLessThan(all.size());
     }
 
     @Test

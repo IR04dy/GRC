@@ -1717,6 +1717,37 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-192 CLOSED 2026-08-12 (measured 2026-08-11) — the gate F2-188 built to verify reasons verified only
+the claim shape F2-188 had already audited.** F2-188 proved a named-map gate cannot prove a reason *true* and
+added a check scoped, correctly, to **state-transition verbs** — the shape it had just found false five times.
+The map's **larger** bucket makes a different claim (*"no endpoint does X"*, *"only the list is wired"*,
+*"cannot be resolved by any route"*), which that pattern cannot see, so it was never scrutinised. Measured
+against each owner class's live cross-class surface from the constant pool: **all 18 owner classes have one**,
+and **7 capability claims were outright false**, 4 overstated, 5 stand. In every false case a **routed sibling
+on the same class** already did the thing the reason called impossible — `#userBandFor` is routed *and*
+`#bandsForUser` feeds the JWT's `lod_band`, `#getTemplate` is routed, `#conditions`/`#openConditions` are
+routed, `#listCitations` is routed, `#gateConfigurationFault` is not merely logged but **fails the approval
+closed** (A17-D2), and `#usageFor`'s reason had the method's own **parameter** wrong. 🔑 **A gate that verifies
+claims verifies the claim shape it was written for** — F2-187's own headline arriving one level up, at the gate
+built to answer it. New gate: `everyReasonIsWrittenAgainstItsOwnerClassLiveSurface` requires every reason to
+cite a live method of its owner class **in method notation**, because half the siblings are called `list` or
+`get` and *"no endpoint **lists** unacknowledged drift"* would satisfy a substring check for `list` while
+asserting its opposite. ⚠ **It fired on its first run against a claim shape I had not even counted:**
+`SanctionsScreeningSchedulerService#setClock` was listed as a *"DECLARED TEST SEAM … reached by tests only"*
+and **no test called it** — the sibling class's identically-named setter is the one under test. It had been
+classified a seam **because of its name**, three lines below F2-187's own warning that *"a setClock-shaped
+exemption would let any dark method be hidden by renaming it"*. 🔑 **Naming a trap does not exempt you from it.**
+⚙ That was the slice's one real gap: `#runSlaSweep` flips `sla_breach` and fires `SANCTIONS_HIT_SLA_BREACHED`
+across tenants off a `now(clock)` cutoff and had **no test at all** — `SanctionsSchedulerSweepTest` (7 tests)
+now drives it through the seam, so the claim is true and the scan proves it. ⚠⚠ **4 of 17 mutations survived
+and all four were the mutation's fault**, incl. one that asserted the cross-class narrowing against two method
+names it never touched: 🔑 **a negative assertion naming something never in the population passes for a reason
+unrelated to the property.** Rebuilt around a measured count (34 public `@Service` methods are reached only
+from inside their own class) → **17/17**. ⚠ **A probe with `admin` alone would have CONFIRMED the false claim**:
+PLATFORM_ADMIN maps to no line of defence, so `/role-band` returns `allBands: []` — indistinguishable from
+"never displayed"; `rmanager` returns `effectiveBand: "LINE_2"` with `lod_band: ["LINE_2"]` in the token.
+Verified: suite **3,770/0/0**, mutation **17/17**, probe **18/18**, **0 migrations, 0 production lines, 0 FE**.
+
 ✔ **F2-191 CLOSED 2026-08-11 — the fifth instance of one shape, and the first found by asking the question
 on purpose.** F2-190 ended on *"how many things write this status, and how many of them ask?"*, so I asked it
 per module. In `compliance/obligation`: `guardAttest` was a `switch` whose arms allowed **none** of `DUE`,
