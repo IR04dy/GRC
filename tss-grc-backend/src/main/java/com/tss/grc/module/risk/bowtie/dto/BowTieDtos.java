@@ -234,5 +234,11 @@ public final class BowTieDtos {
     ) {}
 
     // ─── Approval payload ────────────────────────────────────────
+    /**
+     * F2-185(b): cap enabled — 255 == {@code risk.bow_tie_analysis.approved_by_name}, the column
+     * {@code BowTieAnalysisService#approve} copies it into. F2-184 recorded the target as
+     * "unconfirmed (no bowtie approver_name found)" — because it searched for the DTO's field name
+     * rather than following the setter, and the column is {@code approvedByName}.
+     */
     public record ApproveRequest(@Size(max = 255) String approverName) {}
 }

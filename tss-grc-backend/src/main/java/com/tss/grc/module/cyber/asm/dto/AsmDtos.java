@@ -220,6 +220,16 @@ public final class AsmDtos {
             @Size(max = 500) String note
     ) {}
 
+    /**
+     * F2-185(b): cap enabled, and this is the site where the decision was easiest once it was looked
+     * for in the right place. {@code note} has no column — {@code ShadowItService#block} puts it in
+     * the F7 audit message, which is {@code NVARCHAR(MAX)} — so the F2-184 rule ("compare the cap to
+     * its column") has nothing to compare and would have argued for deleting it. But the identical
+     * field on {@code ShadowItSanctionRequest} eight lines above is bound {@code @Valid} on the
+     * adjacent {@code /sanction} route, so the platform already enforces exactly this cap on exactly
+     * this field: 500 here is consistency, not a new limit. 🔑 Before asking "what column does this
+     * guard", ask whether a sibling route already enforces the same field.
+     */
     public record ShadowItBlockRequest(
             @Size(max = 500) String note
     ) {}

@@ -183,9 +183,18 @@ public final class ObligationDtos {
         @Positive Integer reminderCadenceDays
     ) {}
 
+    /**
+     * F2-185(b): both caps were {@code @Size(max = 8000)} and neither had ever run — the binding
+     * parameter carries no {@code @Valid}. They are DELETED rather than switched on, because
+     * {@code obligation_attestation_campaign.closing_summary_en/_ar} are {@code NVARCHAR(MAX)}
+     * (V184 lines 186-187, and the entity says so too): the schema deliberately leaves a closing
+     * summary unbounded, so enabling an 8,000-character limit would impose one nobody chose on the
+     * narrative that closes a regulatory attestation campaign. Same call as {@code coiNote} in
+     * F2-184 — a dormant number is a decision to make, not a repair to apply.
+     */
     public record CampaignCloseRequest(
-        @Size(max = 8000) String closingSummaryEn,
-        @Size(max = 8000) String closingSummaryAr
+        String closingSummaryEn,
+        String closingSummaryAr
     ) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

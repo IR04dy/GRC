@@ -226,7 +226,13 @@ public class SodService {
             v.setUsername(username);
             v.setDetailEn(ruleDetail(rule) + " — granted with override");
             v.setDetectionSource("OVERRIDE");
-            v.setDispositionNote("Override justification: " + justification);
+            // F2-185(b): store the justification VERBATIM. The 24-character "Override
+            // justification: " prefix that used to sit here made the effective budget 976 against a
+            // NVARCHAR(1000) column, so a justification the DTO's @Size(max = 1000) accepts
+            // overflowed by 24 → SQL Server 8152 → HTTP 500 on an SoD override, rolling back the
+            // grant it was authorising. Nothing is lost by dropping it: this same row carries
+            // detection_source = 'OVERRIDE' and a detail_en ending "granted with override".
+            v.setDispositionNote(justification);
             violations.save(v);
         }
         audit.recordEvent(new AuditEventBuilder()

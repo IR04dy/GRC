@@ -135,41 +135,35 @@ class InertValidationConstraintTest {
             + "@NotBlank would hide that; the fix is to wire the endpoint or delete the dead path, "
             + "and both are scope decisions."),
         Map.entry("com.tss.grc.module.tprm.bcp_attestation.dto.VendorBcpAttestationDtos$EscalateRequest",
-            "F2-185(a): no usage anywhere in main sources — dead DTO. Same call as above."),
+            "F2-185(a): no usage anywhere in main sources — dead DTO. Same call as above.")
 
-        // ── Bound as a @RequestBody, but the parameter lacks @Valid. Every one is a @Size cap on a
-        //    narrative field, and the fix is NOT simply to add @Valid: the cap has never been
-        //    compared against its column, so enabling it blindly either imposes a limit nobody
-        //    chose (column is NVARCHAR(MAX)) or still fails to protect it (cap looser than the
-        //    column). Measured 2026-08-11: closing_summary_* and coi_note are MAX; exception_note,
-        //    reviewer_comment_* and action_taken_* are exactly 1000, matching their caps. ──
-        Map.entry("com.tss.grc.module.compliance.obligation.dto.ObligationDtos$CampaignCloseRequest",
-            "F2-185(b): @Size(1000) vs compliance.obligation_attestation_campaign.closing_summary_* "
-            + "NVARCHAR(MAX) — enabling would cap a closing summary the schema leaves unbounded."),
-        Map.entry("com.tss.grc.module.tprm.bcp_attestation.dto.VendorBcpAttestationDtos$CampaignCloseRequest",
-            "F2-185(b): same shape against tprm.vendor_bcp_campaign.closing_summary_* NVARCHAR(MAX)."),
-        Map.entry("com.tss.grc.module.iam.governance.dto.GovernanceDtos$CloseCampaignRequest",
-            "F2-185(b): @Size(1000) == iam.access_review_campaigns.exception_note 1000, so enabling "
-            + "is safe and converts a truncation 500 into a 400. Grouped with its siblings rather "
-            + "than fixed alone, so one probe covers the whole shape."),
-        Map.entry("com.tss.grc.module.iam.governance.dto.GovernanceDtos$ApproveAccessRequest",
-            "F2-185(b): @Size(1000) on overrideJustification. ⚠ Note for whoever picks this up: it "
-            + "is @Size, NOT @NotBlank — an unenforced length cap, not a missing justification. No "
-            + "column of that name exists, so the target is unconfirmed."),
-        Map.entry("com.tss.grc.module.tprm.bcp_attestation.dto.VendorBcpAttestationDtos$AttestationReviewRequest",
-            "F2-185(b): reviewer_comment_* are 1000 == the cap; reviewed_by_name 255 needs checking."),
-        Map.entry("com.tss.grc.module.tprm.outsourcing.dto.OutsourcingDtos$MonitoringEventResolveRequest",
-            "F2-185(b): action_taken_* are 1000 == the cap."),
-        Map.entry("com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos$NoticeArchiveRequest",
-            "F2-185(b): privacy.privacy_notices.archive_reason_en is 500 — if the cap is 1000 the "
-            + "annotation is LOOSER than the column and enabling it protects nothing."),
-        Map.entry("com.tss.grc.module.risk.bowtie.dto.BowTieDtos$ApproveRequest",
-            "F2-185(b): approverName cap vs its column unconfirmed (no bowtie approver_name found)."),
-        Map.entry("com.tss.grc.module.cyber.asm.dto.AsmDtos$ShadowItBlockRequest",
-            "F2-185(b): `note` — column not located by name; needs the entity read."),
-        Map.entry("com.tss.grc.module.cyber.vuln_sla.dto.VulnSlaDtos$RemediatedRequest",
-            "F2-185(b): `note` — same as above.")
+        // ── F2-185b CLOSED 2026-08-11: the ten BOUND_WITHOUT_VALID entries that used to sit here
+        //    are gone, resolved per site rather than as a batch, because the ten did not share an
+        //    answer. Two caps DELETED (closing_summary_* are NVARCHAR(MAX) — and both were @Size
+        //    (8000), not the 1000 recorded here, so the filing's own numbers were wrong); seven
+        //    ENABLED against columns they match exactly, now held by RequestSizeCapMirrorTest; one
+        //    needed a service change first (the SoD override prefix made cap == column a lie — see
+        //    SodOverrideNoteTest); and one, VulnSlaDtos$RemediatedRequest, turned out not to be a
+        //    cap problem at all: the controller bound the note and threw it away.
+        //    🔑 The reason each entry carried a reason is that the reasons disagreed. A count of
+        //    "ten dormant caps" would have been closed with one @Valid sweep and would have left
+        //    two new limits nobody chose, one 500 still live, and one silently discarded field.
     );
+
+    /**
+     * F2-185b — the hole its own mutation harness found, and the reason it is a separate assertion.
+     *
+     * <p>The test below is per-TYPE: it subtracts everything the cascade validates, so a DTO that is
+     * {@code @Valid} at one binding site drops out of the population <b>at every</b> binding site.
+     * That is correct for "is this constraint ever enforced" and wrong for "is it enforced where I am
+     * about to send a request". Measured by removing {@code @Valid} from one of the three routes that
+     * bind {@code AttestationReviewRequest}: the suite stayed green, because the other two still had
+     * it. 🔑 <b>A per-type gate over a per-site defect reports the population it can see, and one
+     * unvalidated site out of three looks exactly like none.</b>
+     *
+     * <p>Entries are types where that is deliberate, with the reason. Empty is the goal.
+     */
+    private static final Map<String, String> PARTIALLY_VALIDATED = Map.of();
 
     private record Inert(Shape shape, String type, String members, String reachedFrom) {
         @Override public String toString() {
@@ -321,6 +315,79 @@ class InertValidationConstraintTest {
             as a ceiling.
 
             %s""".formatted(stale)).isEmpty();
+    }
+
+    /**
+     * F2-185b — per SITE, not per type. See {@link #PARTIALLY_VALIDATED} for why this cannot be folded
+     * into the test above: that one asks whether a constraint is <i>ever</i> enforced, and answers
+     * "yes" for a DTO validated on one route and bound bare on another. This asks the question a
+     * caller actually cares about — will my request to <b>this</b> endpoint be checked.
+     */
+    @Test
+    void aConstrainedRequestTypeIsValidatedAtEverySiteThatBindsIt() throws Exception {
+        Set<Class<?>> all = allTypesUnder(BASE);
+
+        Map<String, Set<String>> bareSites = new TreeMap<>();
+        Set<Class<?>> constrainedBound = new LinkedHashSet<>();
+        int controllers = 0;
+        int bindings = 0;
+
+        for (Class<?> c : all) {
+            if (!isController(c)) continue;
+            controllers++;
+            for (Method m : declaredMethodsOf(c)) {
+                if (MAPPINGS.stream().noneMatch(m::isAnnotationPresent)) continue;
+                for (Parameter p : m.getParameters()) {
+                    if (BODY_BINDINGS.stream().noneMatch(p::isAnnotationPresent)) continue;
+                    bindings++;
+                    if (marksForValidation(p)) continue;
+                    for (Class<?> bound : unwrap(p.getParameterizedType())) {
+                        // Only a type that DECLARES a constraint can lose one here. A bare body of a
+                        // constraint-free DTO is a design choice, not a defect — and the cascade
+                        // closure is included so a wrapper whose @Valid children carry the
+                        // constraints still counts.
+                        boolean carries = cascadeClosure(Set.of(bound)).stream()
+                                .anyMatch(t -> !isExcludedFromInertness(t)
+                                        && !constrainedMembersOf(t).isEmpty());
+                        if (!carries) continue;
+                        constrainedBound.add(bound);
+                        bareSites.computeIfAbsent(bound.getName(), k -> new TreeSet<>())
+                                .add(c.getSimpleName() + "#" + m.getName());
+                    }
+                }
+            }
+        }
+
+        // Anti-vacuity: this walk must actually reach the controller surface. If reflection silently
+        // returned nothing, every assertion below would pass on an empty population.
+        assertThat(controllers).as("controllers scanned").isGreaterThanOrEqualTo(MIN_CONTROLLERS);
+        assertThat(bindings).as("body-bound parameters scanned").isGreaterThanOrEqualTo(100);
+
+        List<String> unexpected = bareSites.entrySet().stream()
+                .filter(e -> !PARTIALLY_VALIDATED.containsKey(e.getKey()))
+                .filter(e -> !TOLERATED.containsKey(e.getKey()))   // already named by the test above
+                .map(e -> "  %s   bare at: %s".formatted(e.getKey(), String.join(", ", e.getValue())))
+                .toList();
+
+        assertThat(unexpected).as("""
+            These request types declare a validation constraint and are bound as a body WITHOUT \
+            @Valid at the sites listed. The constraint does not run for a caller hitting those \
+            routes, even if a sibling route validates the same type — which is precisely how one of \
+            three review routes on VendorBcpAttestationController could have lost its @Valid without \
+            failing the build (F2-185b's own surviving mutation).
+
+            Add @Valid at the named site, or add the type to PARTIALLY_VALIDATED with the reason. \
+            ⚠ Before adding @Valid, check each @Size cap against its column — RequestSizeCapMirrorTest \
+            explains why the number itself is a decision.
+
+            %s""".formatted(String.join("\n", unexpected))).isEmpty();
+
+        // Reverse direction, same rule as everywhere else in this file.
+        List<String> stale = PARTIALLY_VALIDATED.keySet().stream()
+                .filter(t -> !bareSites.containsKey(t)).sorted().toList();
+        assertThat(stale).as(
+            "PARTIALLY_VALIDATED entries that are now validated everywhere — delete them: %s", stale)
+                .isEmpty();
     }
 
     // ------------------------------------------------------------------ the two detectors

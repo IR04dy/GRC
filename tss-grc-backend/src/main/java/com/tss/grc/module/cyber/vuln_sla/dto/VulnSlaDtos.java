@@ -146,6 +146,19 @@ public final class VulnSlaDtos {
         }
     }
 
+    /**
+     * F2-185(b): the worst of the ten, and not because of the annotation. {@code note} was bound and
+     * then <b>discarded</b> — the controller called {@code markRemediated(externalId, userId)} and
+     * never passed {@code req} — directly under a comment asserting the note "is captured by the F7
+     * audit_log via the service-layer message". It was not captured anywhere. {@code vulnSla.ts}
+     * already accepts a note and posts it, so the wire carried a value the server dropped in silence.
+     * Now threaded to the service and appended to the audit message, mirroring
+     * {@code ShadowItService#block}, with the cap enabled at 500 to match its ASM sibling.
+     *
+     * <p>🔑 The inert {@code @Size} was the fingerprint, not the defect: nobody validates a value
+     * they never read. Deleting the annotation — the obvious "fix" for an unenforced cap — would have
+     * removed the only clue that the field went nowhere.
+     */
     public record RemediatedRequest(
             @Size(max = 500) String note
     ) {}

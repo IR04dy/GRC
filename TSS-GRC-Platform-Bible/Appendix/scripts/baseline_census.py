@@ -103,8 +103,8 @@ PUBLISHED = {
     # its own published figure. Both are ungated, which is exactly why. 🔑 The same number written in
     # two places will disagree unless something compares them; re-run this script rather than
     # trusting either cell (F2-179).
-    "module_tests": 3_467,
-    "suite_tests": 3_695,      # census counts @Test declarations; surefire ran 3,687 executions (F2-184)
+    "module_tests": 3_477,
+    "suite_tests": 3_706,      # census counts @Test declarations; surefire ran 3,698 executions (F2-185b)
     # F2-03 floored all seven Tier-1 regulator-facing modules (2026-08-05/06), so this
     # fell 15 -> 8. The --check mode caught the drift the moment it was first run in
     # anger, which is F2-19b in one line: the guard existed and nothing ran it.

@@ -213,7 +213,7 @@ public class OutsourcingController {
     @PostMapping("/monitoring-events/{eventId}/resolve")
     @PreAuthorize("hasPermission('TPRM','WRITE')")
     public MonitoringEventResponse resolveEvent(@PathVariable Long eventId,
-                                                  @RequestBody(required = false) MonitoringEventResolveRequest req) {
+                                                  @Valid @RequestBody(required = false) MonitoringEventResolveRequest req) {
         return monitoring.resolve(eventId, req);
     }
 

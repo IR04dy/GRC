@@ -125,7 +125,8 @@ public class AccessGovernanceController {
     @PostMapping("/requests/{id}/approve")
     @PreAuthorize(APPROVE_GUARD)
     public AccessRequest approveRequest(@PathVariable Long id,
-            @RequestBody(required = false) com.tss.grc.module.iam.governance.dto.GovernanceDtos.ApproveAccessRequest r) {
+            @Valid @RequestBody(required = false)
+            com.tss.grc.module.iam.governance.dto.GovernanceDtos.ApproveAccessRequest r) {
         return requestService.approve(id,
             r != null && Boolean.TRUE.equals(r.override()),
             r == null ? null : r.overrideJustification());

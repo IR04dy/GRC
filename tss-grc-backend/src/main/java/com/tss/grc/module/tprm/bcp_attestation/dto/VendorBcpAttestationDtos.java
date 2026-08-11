@@ -40,9 +40,15 @@ public final class VendorBcpAttestationDtos {
         @Size(max = 500) String regulatorReference
     ) {}
 
+    /**
+     * F2-185(b): the caps are DELETED, not enabled. {@code vendor_bcp_campaign.closing_summary_en/
+     * _ar} are {@code NVARCHAR(MAX)} (V177 lines 94-95), so an 8,000-character limit that had never
+     * run would be a new restriction on a campaign's closing narrative rather than a repair. The
+     * identical shape sits on {@code ObligationDtos.CampaignCloseRequest}.
+     */
     public record CampaignCloseRequest(
-        @Size(max = 8000) String closingSummaryEn,
-        @Size(max = 8000) String closingSummaryAr
+        String closingSummaryEn,
+        String closingSummaryAr
     ) {}
 
     // ─── Campaign response ──────────────────────────────────────────
@@ -148,6 +154,16 @@ public final class VendorBcpAttestationDtos {
     ) {}
 
     // ─── Reviewer outcome ───────────────────────────────────────────
+    /**
+     * F2-185(b): these three caps ARE enabled — {@code @Valid} added at all three binding sites in
+     * {@code VendorBcpAttestationController} (accept / reject / out-of-scope). Every number matches
+     * its column exactly: {@code reviewer_comment_en} 1000, {@code reviewer_comment_ar} 1000,
+     * {@code reviewed_by_name} 255 on {@code tprm.vendor_bcp_attestation}. That equality is what
+     * makes switching them on safe — SQL Server already refuses more, so the only behaviour change
+     * is a 400 naming the field instead of a truncation 500, and no request that works today can
+     * start failing. {@code RequestSizeCapMirrorTest} holds the equality so the number cannot drift
+     * away from the column later.
+     */
     public record AttestationReviewRequest(
         @Size(max = 1000) String reviewerCommentEn,
         @Size(max = 1000) String reviewerCommentAr,

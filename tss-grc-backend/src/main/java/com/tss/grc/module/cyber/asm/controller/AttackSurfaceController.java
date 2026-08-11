@@ -180,7 +180,7 @@ public class AttackSurfaceController {
     @PreAuthorize(WRITE_GUARD)
     @Operation(summary = "Block the discovery (terminal).")
     public ShadowItResponse blockShadowIt(@PathVariable UUID externalId,
-                                          @RequestBody(required = false) ShadowItBlockRequest req) {
+                                          @Valid @RequestBody(required = false) ShadowItBlockRequest req) {
         return shadowItService.block(externalId, req);
     }
 

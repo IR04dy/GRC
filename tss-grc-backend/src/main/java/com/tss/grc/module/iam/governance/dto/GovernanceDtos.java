@@ -76,7 +76,20 @@ public final class GovernanceDtos {
 
     // ── P2: SoD + recertification (plan §6.4/§6.5) ───────────────────────
 
-    /** Optional approval body — only needed to override a preventive SoD block. */
+    /**
+     * Optional approval body — only needed to override a preventive SoD block.
+     *
+     * <p>F2-185(b): the cap is enabled ({@code @Valid} at {@code AccessGovernanceController
+     * #approveRequest}) and it is the one site in the ten where enabling ALONE would not have been
+     * enough. The justification lands in {@code iam.sod_violation.disposition_note}, which is
+     * {@code NVARCHAR(1000)} — the same number — but {@code SodService#recordOverride} used to
+     * prepend {@code "Override justification: "}, 24 characters, so the effective budget was 976 and
+     * a justification the cap accepted overflowed the column by 24: error 8152, a 500 on an SoD
+     * override, with the whole approval rolled back. The prefix is deleted there rather than the cap
+     * lowered here, because the same row already says {@code detection_source = 'OVERRIDE'} and
+     * {@code detail_en} ends "granted with override" — it was redundant three times over, and it was
+     * the only reason cap and column disagreed.
+     */
     public record ApproveAccessRequest(Boolean override, @Size(max = 1000) String overrideJustification) {}
 
     public record SodDispositionRequest(
@@ -101,7 +114,12 @@ public final class GovernanceDtos {
         @Size(max = 500) String note
     ) {}
 
-    /** Optional closure body — exceptionNote only needed when items are still pending. */
+    /**
+     * Optional closure body — exceptionNote only needed when items are still pending.
+     *
+     * <p>F2-185(b): cap enabled — 1000 == {@code iam.access_review_campaigns.exception_note}, so the
+     * database already refuses more and the only change is which status code says so.
+     */
     public record CloseCampaignRequest(@Size(max = 1000) String exceptionNote) {}
 
     // ── P3: break-glass (plan §6.6) ──────────────────────────────────────

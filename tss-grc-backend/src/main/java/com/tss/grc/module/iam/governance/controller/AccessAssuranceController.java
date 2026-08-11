@@ -113,7 +113,7 @@ public class AccessAssuranceController {
     @PostMapping("/campaigns/{id}/close")
     @PreAuthorize(APPROVE_GUARD)
     public CampaignView closeCampaign(@PathVariable Long id,
-                                      @RequestBody(required = false) CloseCampaignRequest r) {
+                                      @Valid @RequestBody(required = false) CloseCampaignRequest r) {
         return recertService.close(id, r == null ? null : r.exceptionNote(), currentUserId());
     }
 

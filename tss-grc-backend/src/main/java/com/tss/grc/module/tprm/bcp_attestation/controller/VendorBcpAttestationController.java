@@ -89,21 +89,21 @@ public class VendorBcpAttestationController {
     @PostMapping("/{id}/accept")
     @PreAuthorize("hasPermission('TPRM','WRITE')")
     public AttestationResponse accept(@PathVariable Long id,
-                                       @RequestBody(required = false) AttestationReviewRequest req) {
+                                       @Valid @RequestBody(required = false) AttestationReviewRequest req) {
         return service.acceptAttestation(id, req);
     }
 
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasPermission('TPRM','WRITE')")
     public AttestationResponse reject(@PathVariable Long id,
-                                       @RequestBody(required = false) AttestationReviewRequest req) {
+                                       @Valid @RequestBody(required = false) AttestationReviewRequest req) {
         return service.rejectAttestation(id, req);
     }
 
     @PostMapping("/{id}/mark-out-of-scope")
     @PreAuthorize("hasPermission('TPRM','WRITE')")
     public AttestationResponse markOutOfScope(@PathVariable Long id,
-                                                @RequestBody(required = false) AttestationReviewRequest req) {
+                                                @Valid @RequestBody(required = false) AttestationReviewRequest req) {
         return service.markOutOfScope(id, req);
     }
 }

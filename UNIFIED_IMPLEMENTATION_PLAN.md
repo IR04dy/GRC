@@ -1586,17 +1586,55 @@ mutations attack the instrument itself, including **the phantom-75 bug** (attrib
 to its container), so the defect that made this a filing rather than a sweep cannot come back silently.
 Suite **3,687/0/0**, mutation **16/16**, live probe **37/37** as `compliance`, 0 migrations, 0 FE change.
 
-⬜ **F2-185 filed** — the twelve F2-184 tolerated, in two groups. **(a) P2, two dark request types:**
+⬜ **F2-185 filed, scope now (a) only** — **P2, two dark request types:**
 `WhistleblowerRetaliationService#transitionTo` has **no caller**, so the retaliation terminal transition
 (`VALIDATED`/`UPHELD`/`DISMISSED`) has no endpoint and a retaliation complaint cannot be closed through the API;
 `VendorBcpAttestationDtos.EscalateRequest` has no usage at all. ⚠ Do **not** close these by deleting the inert
 `@NotBlank` — that removes the fingerprint and leaves the defect. 🔑 **An inert constraint on a `*Request` type is
-a fingerprint of a dark endpoint** — the [[F2-165]] family, found from a different angle. **(b) P3, ten `@Size`
-caps** on types bound without `@Valid`; the column measurements are already recorded (4 are MAX → delete the cap,
-5 match exactly → enable, 5 need the entity read), so the next slice starts from data. ⚠ One correction carried
-forward: `ApproveAccessRequest.overrideJustification` is `@Size(max = 1000)`, **not** `@NotBlank` — I was one
-step from recording "an override can be approved with no justification" before reading the DTO. **The severity of
-an inert constraint is the severity of the constraint, not of the field it sits on.**
+a fingerprint of a dark endpoint** — the [[F2-165]] family, found from a different angle. Each site is a scope
+decision (wire the endpoint vs delete the dead path), which is why it did not ship with F2-185b. ⚠ One correction
+carried forward: `ApproveAccessRequest.overrideJustification` is `@Size(max = 1000)`, **not** `@NotBlank` — I was
+one step from recording "an override can be approved with no justification" before reading the DTO. **The severity
+of an inert constraint is the severity of the constraint, not of the field it sits on.**
+
+✔ **F2-185b CLOSED 2026-08-11 — the ten `@Size` caps, and the ten did not share an answer.** Split out of F2-185
+and shipped the same day. **2 caps DELETED** (`closing_summary_*` on the obligation and vendor-BCP campaign close
+requests are `NVARCHAR(MAX)` in entity *and* migration — enabling an 8,000-char cap that had never run would
+impose a limit the schema declined to impose on a regulatory attestation's closing narrative); **7 sites ENABLED**
+where the cap equals its column exactly (`exception_note` 1000, `reviewer_comment_en/ar` 1000, `reviewed_by_name`
+255, `action_taken_en/ar` 1000, `archive_reason_en` 500, `approved_by_name` 255) — equality is what makes it safe,
+since the DB already refuses more and the only change is a 400 naming the field instead of a truncation 500;
+**1 needed the service fixed first**; **1 was not a cap problem at all**. ⚠⚠ **`cap == column` was TRUE and the
+write still failed:** `SodService#recordOverride` prepended `"Override justification: "` — 24 chars against a
+1000-char `disposition_note` — so a justification the boundary accepts overflowed by exactly the prefix →
+SQL Server 8152 → **500 on an SoD override, rolling back the grant it was authorising**. Prefix deleted (the row
+already carries `detection_source='OVERRIDE'` and a `detail_en` ending "granted with override"), not the cap
+lowered to 976. 🔑 **A length check that stops at the boundary misses everything the code adds after it** — not an
+annotation, not a vocabulary, not a column, so invisible to every scan in this family. ⚠⚠ **The P2 inside the P3:**
+`VulnerabilitySlaController#markRemediated` bound `RemediatedRequest req` and never passed it — under a comment
+claiming the audit log captured the note. `vulnSla.ts` already posts one. Now threaded to the service and appended
+to the audit message; latent rather than active, because the sole FE caller sends no note today. 🔑 **The inert
+`@Size` was the fingerprint, not the defect** — deleting it, the obvious tidy-up, would have removed the only clue
+the field went nowhere. ⚙ **The two `note` fields have no column at all** (both land in the `NVARCHAR(MAX)` audit
+message), so F2-184's rule had nothing to compare; the answer was that the *identical* field on
+`ShadowItSanctionRequest` is already `@Valid` on the adjacent route. 🔑 **Before asking what column a cap guards,
+ask whether a sibling route already enforces the same field.** ⚠⚠ **Three of F2-184's ten recorded measurements
+were wrong** — two caps were 8000 not 1000, `archive_reason_en` was an exact match rather than the predicted
+looser-than-column case, and the two "unconfirmed" columns exist under names a field-name search missed. 🔑 **The
+measurements in a filing are the least-verified thing in it, and all three were wrong in the direction of looking
+already-solved.** Gates: `RequestSizeCapMirrorTest` (declared request-component → entity-field map, verified by
+reflection, four directions incl. "column is MAX → delete the cap, do not mirror it" and a re-introduction guard
+the inertness test structurally cannot see) + `SodOverrideNoteTest` (arithmetic, because a structural mirror cannot
+see a prefix). ⚠ Instrument trap: `jakarta.validation.constraints.Size` has **no `RECORD_COMPONENT` target**, so
+`RecordComponent#getAnnotation(Size.class)` always answers null — a component-only sweep reads every cap as absent.
+⚠⚠ **Mutation 19/20 → 20/20, and the survivor was the best result in the slice:** removing `@Valid` from *one* of
+the three routes binding `AttestationReviewRequest` left the suite green, because F2-184's instrument is per-TYPE
+and subtracts everything the cascade validates. 🔑 **A per-type gate over a per-site defect reports the population
+it can see, and one unvalidated site out of three looks exactly like none.** Closed rather than filed:
+`aConstrainedRequestTypeIsValidatedAtEverySiteThatBindsIt` walks 254 controllers and 186 bare-bound bodies, demands
+a **hard zero**, and re-catches mutation 3. Verified: suite **3,698/0/0**, FE **487/487** + `tsc` clean (0 FE files),
+mutation **20/20**, live probe **25/25** (nothing mutated — `@Valid` fires before `@PreAuthorize`, so a ghost id is
+sufficient), schema **14/14** vs `sys.columns`. **0 migrations, 0 frontend changes.**
 
 ⬜ **F2-183 filed** — `consumer.complaint` has **no CHECK constraints at all**, so its `channel` and
 `severity` vocabularies live only in a case-sensitive Java `switch` that **substitutes** rather than refuses:

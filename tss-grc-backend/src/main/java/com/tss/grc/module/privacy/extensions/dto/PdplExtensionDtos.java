@@ -206,5 +206,11 @@ public final class PdplExtensionDtos {
             LocalDateTime effectiveFrom, LocalDateTime effectiveTo
     ) { }
 
+    /**
+     * F2-185(b): cap enabled — 500 == {@code privacy.privacy_notices.archive_reason_en}. ⚠ F2-184's
+     * filing guessed this column was 500 against a 1000 cap and flagged it as the one case where the
+     * annotation would be LOOSER than the column; measured, cap and column agree exactly. A recorded
+     * guess is not a measurement, however carefully it is hedged.
+     */
     public record NoticeArchiveRequest(@Size(max = 500) String archiveReasonEn) { }
 }

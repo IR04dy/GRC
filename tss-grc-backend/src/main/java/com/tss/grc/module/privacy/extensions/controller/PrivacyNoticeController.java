@@ -69,7 +69,9 @@ public class PrivacyNoticeController {
 
     @PostMapping("/{id}/archive")
     @PreAuthorize("hasPermission('PRIVACY','WRITE')")
-    public NoticeResponse archive(@PathVariable Long id, @RequestBody(required = false) NoticeArchiveRequest body, Authentication auth) {
+    public NoticeResponse archive(@PathVariable Long id,
+                                  @Valid @RequestBody(required = false) NoticeArchiveRequest body,
+                                  Authentication auth) {
         return NoticeResponse.from(service.archive(id, body, userId(auth)));
     }
 

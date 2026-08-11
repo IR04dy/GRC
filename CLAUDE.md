@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,687 @ 2026-08-11; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,698 @ 2026-08-11; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -522,6 +522,40 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   before enabling a `@Pattern` over a CHECK-less column — F2-184's five all held in-vocabulary data, which is
   what made it latent-defect closure rather than a behaviour change. Third variant of one question: F2-179 asked
   it per field, F2-182 answered *does a coercion exist upstream*, F2-184 *does anything already refuse this*.
+  ⚠⚠ **That rule is right and it is not sufficient — `cap == column` can be TRUE while the write still fails**
+  (F2-185b, measured 2026-08-11). `ApproveAccessRequest.overrideJustification` is `@Size(max = 1000)` and
+  `iam.sod_violations.disposition_note` is `NVARCHAR(1000)`, so the mirror was satisfied — but
+  `SodService#recordOverride` prepended `"Override justification: "`, **24 characters**, making the effective
+  budget 976. A justification the boundary accepts overflowed by exactly the prefix → SQL Server **8152** → **500
+  on an SoD override**, and since the violation is written in the same transaction as the grant it authorises, the
+  whole override rolls back. 🔑 **A length check that stops at the boundary misses everything the code adds after
+  it** — the prefix is not an annotation, not a vocabulary and not a column, so no scan in this family can see it.
+  Fix by dropping the decoration (the row already said `detection_source='OVERRIDE'`), not by lowering the cap to a
+  number that leaks a storage detail into the API. `SodOverrideNoteTest` asserts the **arithmetic**: the longest
+  value the boundary accepts must fit the column *after* the service has touched it.
+  ⚠ **And where the field has no column at all, the rule has nothing to compare.** Both `note` fields F2-185b
+  enabled land only in the `NVARCHAR(MAX)` audit message, so the MAX branch argues for deleting them — wrongly:
+  the *identical* field on `ShadowItSanctionRequest` is already `@Valid` at 500 on the adjacent `/sanction` route
+  of the same controller. 🔑 **Before asking what column a cap guards, ask whether a sibling route already
+  enforces the same field.** `RequestSizeCapMirrorTest` holds the nine mirrored caps against their
+  `@Column(length)` and requires every other cap on those types to be *explained by name*.
+  ⚠⚠ **`jakarta.validation.constraints.Size` has no `RECORD_COMPONENT` target**, so javac propagates it to the
+  backing field and the accessor and `RecordComponent#getAnnotation(Size.class)` **always answers null**. A
+  reflection sweep that asks only the component reports every cap on every record DTO as absent — and "absent"
+  reads identically to "nothing to check here."
+  ⚠⚠ **`InertValidationConstraintTest` is per-TYPE and that was blind to a per-SITE defect** (F2-185b): it
+  subtracts everything the cascade validates, so a DTO that is `@Valid` on one route drops out of the population
+  on **every** route — removing `@Valid` from one of the three routes binding `AttestationReviewRequest` left the
+  suite green. 🔑 **A per-type gate over a per-site defect reports the population it can see, and one
+  unvalidated site out of three looks exactly like none.** A second assertion,
+  `aConstrainedRequestTypeIsValidatedAtEverySiteThatBindsIt`, now walks 254 controllers and **186** bare-bound
+  body parameters and demands a hard zero (`PARTIALLY_VALIDATED` empty, enforced both ways). It is also the only
+  guard that sees a deleted MAX cap being re-added *without* `@Valid`.
+  ⚠ **Re-check a filing's measurements before building on them**: of the ten F2-184 recorded for the next slice,
+  **three were wrong** — two caps were 8000 not 1000, one predicted looser-than-column case was an exact match,
+  and two columns called "unconfirmed" exist under names a field-name search missed (`approverName` →
+  `approved_by_name`). 🔑 **The measurements in a filing are the least-verified thing in it**, and all three were
+  wrong in the direction of looking already-solved.
   ⚠ **A constraint on a `@Entity` field is NOT inert** — `spring-boot-starter-validation` + JPA validation mode
   `AUTO` means Hibernate's `BeanValidationEventListener` enforces it on pre-insert/pre-update. It fires as a
   `ConstraintViolationException` → **500** rather than a 400, so it is a weaker defect worth knowing about;

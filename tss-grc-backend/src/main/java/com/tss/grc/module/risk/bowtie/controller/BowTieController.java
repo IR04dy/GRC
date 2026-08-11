@@ -130,7 +130,7 @@ public class BowTieController {
     @PreAuthorize(ROLES_GUARD)
     @Operation(summary = "Approve an IN_REVIEW bow-tie — recomputes effectiveness + residual rating.")
     public BowTieAnalysisResponse approve(@PathVariable UUID externalId,
-                                          @RequestBody(required = false) ApproveRequest request) {
+                                          @Valid @RequestBody(required = false) ApproveRequest request) {
         return service.approve(externalId, request);
     }
 

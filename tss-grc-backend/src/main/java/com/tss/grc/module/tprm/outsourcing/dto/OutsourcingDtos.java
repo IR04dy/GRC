@@ -190,6 +190,11 @@ public final class OutsourcingDtos {
         Boolean resolved
     ) {}
 
+    /**
+     * F2-185(b): caps enabled — both 1000 == {@code tprm.outsourcing_monitoring_event.action_taken_en
+     * /_ar}. SAMA outsourcing monitoring, so the field is a remediation record: a truncation 500 on
+     * closing a monitoring event is worse than a 400 that names which of the two is too long.
+     */
     public record MonitoringEventResolveRequest(
         @Size(max = 1000) String actionTakenEn,
         @Size(max = 1000) String actionTakenAr
