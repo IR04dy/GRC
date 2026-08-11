@@ -54,6 +54,9 @@ public class CommitteeScheduledSweep {
     static final String AUDIT_PREFIX = "COM_FIRE:";
 
     private final CommitteeActionItemRepository actions;
+    /** F2-188 — the owner of the OVERDUE transition. The sweep decides *which* rows are late; it
+     *  does not get its own copy of what "late" does to a row. */
+    private final CommitteeActionItemService    actionItems;
     private final CommitteeResolutionRepository resolutions;
     private final CommitteeRepository           committees;
     private final AuditLogRepository            auditRepo;
@@ -84,26 +87,38 @@ public class CommitteeScheduledSweep {
 
     // ── Overdue action items ──────────────────────────────────────────
 
+    /**
+     * ⚠ F2-188 — this used to flip the row and emit the event itself, duplicating a transition
+     * {@link CommitteeActionItemService#markOverdue(Long)} already owned. Two consequences, both
+     * invisible because the sweep is the <em>only</em> producer of OVERDUE in production:
+     *
+     * <ul>
+     *   <li><b>No transition ever reached the audit ledger.</b> {@code markOverdue} writes
+     *       {@code ACTION_OVERDUE · "Status OPEN → OVERDUE · was due <date>"}. The only row written
+     *       here is the dedup marker {@code COM_FIRE:COMMITTEE_ACTION_OVERDUE · "Sweep fired …"},
+     *       which records that a <em>trigger</em> fired, not that a status changed and from what — so
+     *       an examiner filtering the action register's history for {@code ACTION_OVERDUE} found
+     *       nothing for any tenant. SAMA treats this register as primary follow-through evidence
+     *       (V158's own rule description says so).</li>
+     *   <li><b>The two payloads disagreed on a key.</b> Same trigger name, {@code ownerName} here
+     *       against {@code owner} there, and no {@code fromStatus}/{@code toStatus}. Latent rather
+     *       than live — today's AR-148 carries {@code condition_json = '{}'} so it matches
+     *       unconditionally — but a rule keyed on {@code owner} would match nothing, which is the
+     *       failure {@code AutomationRuleEngine}'s javadoc already records once.</li>
+     * </ul>
+     *
+     * <p>The service now owns the transition and emits the <b>union</b> of the two payloads, so this
+     * loop keeps its dedup bookkeeping and gives up its second copy of the state machine. The
+     * guard is unchanged in effect: {@code findShouldBeOverdue} filters {@code OPEN|IN_PROGRESS} and
+     * {@code markOverdue} refuses {@code COMPLETED|CANCELLED|OVERDUE} — two answers that agree
+     * today, and now only one of them decides.
+     */
     private int sweepOverdueActions(Long org, LocalDate today) {
         List<CommitteeActionItem> rows = actions.findShouldBeOverdue(org, today);
         int fired = 0;
         for (CommitteeActionItem a : rows) {
             if (alreadyFired(org, "CommitteeActionItem", a.getId(), "COMMITTEE_ACTION_OVERDUE")) continue;
-            // Flip status to OVERDUE in-place so the action's own state
-            // tracks the sweep result.
-            a.setStatus("OVERDUE");
-            actions.save(a);
-
-            publisher.publishEvent(DomainEvent.of(
-                org, "COMMITTEE_ACTION_OVERDUE", "CommitteeActionItem", a.getId(),
-                Map.of("actionCode",   a.getActionCode(),
-                       "committeeId",  a.getCommitteeId(),
-                       "meetingId",    a.getMeetingId(),
-                       "ownerName",    a.getOwnerName() == null ? "" : a.getOwnerName(),
-                       "dueDate",      a.getDueDate() == null ? "" : a.getDueDate().toString(),
-                       "priority",     a.getPriority(),
-                       "linkedModule", a.getLinkedModule() == null ? "" : a.getLinkedModule(),
-                       "linkedEntityCode", a.getLinkedEntityCode() == null ? "" : a.getLinkedEntityCode())));
+            actionItems.markOverdue(a.getId());
             markFired(org, "CommitteeActionItem", a.getId(), "COMMITTEE_ACTION_OVERDUE");
             fired++;
         }

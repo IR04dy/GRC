@@ -1717,6 +1717,42 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-188 CLOSED 2026-08-11 — F2-187's named map proved its reasons EXISTED, not that they were true, and
+all five of the strongest were false.** That row grouped five dark methods under *"A state nothing can ever
+move to: the sharpest bucket, because the row just sits"*, which is the claim that set its severity. Working
+them, one day later: `CcmService#recordRun` is a **third** entry point to the private `recordRunInternal`
+(`CcmSchedulerService#tick` is `@Scheduled(fixedDelay = 60_000)` **and** `POST /ccm/tests/{id}/run-now`
+exists), so the consecutive-failure → Issue ladder was never dark; `markOverdueForCampaign` was **superseded**
+by `sweepOverdueForOrg` and `ComplianceDeadlineScheduler`'s javadoc *names the method it replaced*;
+`IrPlaybookService#recordInvocation` was superseded by `IrPlaybookRunService`, whose comment says it preserves
+the legacy semantics; `ThreatIntelService#markActioned` says *"Legacy shim"* **one line above the signature I
+read**. 🔑 **A named-map gate proves a reason exists; it cannot prove the reason is true — so the reasons are
+the least-verified part of the most authoritative-looking artefact.** And `everyToleratedEntryCarriesARealReason`
+made it worse rather than better: it rejected six bare labels, so I rewrote them as fluent consequence-naming
+prose, and **fluency reads as verification**. ⚠ Four of the five truths sat in a neighbouring comment — the
+**fourth consecutive** instance of *one file short is the whole error* (F2-179, F2-185(a), F2-174, this).
+
+⚠ **The audit found one real defect and it is far narrower than the claim.** `CommitteeScheduledSweep` flipped
+an action item to OVERDUE **in place** while `CommitteeActionItemService#markOverdue` existed and said *"Called
+by the scheduled sweep."* Since the sweep is the only producer in production: **no `ACTION_OVERDUE` audit row
+had ever been written for any tenant** — the only trace is the dedup marker `COM_FIRE:… "Sweep fired"`, which
+records a trigger firing rather than a status change and from what, on the register V158 calls the primary
+follow-through evidence — and **the two emitters disagreed on a payload key** (`ownerName` vs `owner`, no
+`fromStatus`/`toStatus`), so the service's shape never occurred and a rule keyed on `owner` would match
+nothing (latent: AR-148's `condition_json` is `{}`; `AutomationRuleEngine` has already paid for one condition
+that could never match). 🔑 **A duplicated transition agrees with the original on the part that is easy to
+check and differs on the parts nothing asserts.** Fixed by routing the sweep through the service with the
+**union** payload — both keys kept deliberately, since retiring either is a behaviour change to a notification
+path dressed as a refactor. Gates: the new `noReasonAssertsUnreachabilityWithoutAScanThatVerifiesIt` (a reason
+may claim a state is unreachable only if it declares the (entity, state) and a scan confirms no other writer —
+**empty today, which is the finding**) + `CommitteeOverdueTransitionTest` (6), including *exactly one* event,
+because the obvious wrong fix double-escalates to the owner's line manager, and a structural leg that the
+sweep holds no `setStatus(`. ⚠ The new gate's own first draft matched bare `is NEVER`/`nothing routes` and
+invented three findings from reasons that were already correct and already **method**-level — *a scan not
+scoped to the shape of the claim invents findings*, fifth instance here. ⚙ Side effect: the transition is now
+**tenant-scoped** where the in-place flip trusted the query. Suite **3,738/0/0**, 0 migrations, 0 FE change.
+F2-187's population is now **37** and its severity claim corrected in place rather than quietly dropped.
+
 ✔ **F2-174 CLOSED 2026-08-11 — and the measurement refuted the row's urgency, both of its candidate
 fixes, and a test I had written myself.** The row said the codes were now *"written on every submission,
 including the ones carrying a 24-hour GOSI deadline"*. Measured first: **`intake.intake_records` held 0

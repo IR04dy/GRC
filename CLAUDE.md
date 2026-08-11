@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,731 @ 2026-08-11; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,738 @ 2026-08-11; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -622,10 +622,33 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   `PolicyManagementService#transition` as the live twin and names CH-9 as the exit. A hard zero would have
   manufactured four false P2s on its first run. 🔑 **The difference between dead code and a decision is a recorded
   reason, and it is rarely recorded where you are looking.**
-  ⚠ **The sharpest members are "a row can never leave this state"** — `CommitteeActionItemService#markOverdue` and
-  `ObligationAttestationService#markOverdueForCampaign` have **no caller and no scheduler**, and
-  `CcmService#recordRun` owns the consecutive-failure → Issue ladder, so a CCM control that keeps failing raises
-  nothing and reads as never having run. Same family as the ACTIVE-term sweep and F2-175's never-run drift ladder.
+  ⚠⚠ **That filing had a "sharpest bucket" of five members graded *"a row can never leave this state"*, and
+  F2-188 measured all five: EVERY ONE WAS FALSE.** `CcmService#recordRun` is a *third* entry point —
+  `CcmSchedulerService#tick` is `@Scheduled(fixedDelay=60s)` and `POST /ccm/tests/{id}/run-now` exists, both
+  reaching the private `recordRunInternal` that owns the ladder. `markOverdueForCampaign` was **superseded** by
+  `sweepOverdueForOrg`, and `ComplianceDeadlineScheduler`'s javadoc names the method it replaced.
+  `IrPlaybookService#recordInvocation` was superseded by `IrPlaybookRunService`, whose comment says it preserves
+  the legacy semantics. `ThreatIntelService#markActioned` says *"Legacy shim"* one line above its own signature.
+  **Four of the five truths sat in a comment I had not opened.**
+  🔑 **A named-map gate proves a reason EXISTS and is substantial; nothing proves it is TRUE — so the reasons are
+  the least-verified part of the most authoritative-looking artefact.** And the substantiality check made it
+  worse: it rejected six bare labels, so I rewrote them as fluent consequence-naming prose, and **fluency reads
+  as verification.** `DarkServiceMethodTest.noReasonAssertsUnreachabilityWithoutAScanThatVerifiesIt` now refuses
+  an unreachability claim unless the entry declares the (entity, state) in `CLAIMS_NO_OTHER_WRITER` and a scan
+  confirms no other class writes it — **empty today, which is the finding.** ⚠ Its first draft matched bare
+  `is NEVER`/`nothing routes` and flagged three reasons that were already correct and already *method*-level:
+  a scan not scoped to the **shape of the claim** invents findings, the fifth instance of that here.
+  ⚠ **The audit did find one real defect, and it was far narrower than the claim**: `CommitteeScheduledSweep`
+  flipped action items to OVERDUE **in place** instead of calling `markOverdue` (whose javadoc said *"Called by
+  the scheduled sweep"*). Since the sweep is the only producer in production, **no `ACTION_OVERDUE` audit row
+  had ever been written for any tenant** — only the dedup marker `COM_FIRE:…` ("Sweep fired"), which records a
+  trigger firing, not a status change and from what — and the two emitters disagreed on a payload key
+  (`ownerName` vs `owner`, no `fromStatus`/`toStatus`), latent only because AR-148's `condition_json` is `{}`.
+  🔑 **A duplicated transition agrees with the original on the part that is easy to check and differs on the
+  parts nothing asserts.** Fixed by routing the sweep through the service with the **union** payload; pinned by
+  `CommitteeOverdueTransitionTest`, including a structural leg that the sweep holds no `setStatus(`. ⚙ Side
+  effect worth knowing: the transition is now **tenant-scoped** (`findByIdAndOrganisationId`) where the in-place
+  flip trusted the query alone.
 - **`LocalDate.now()` in a test is UTC+3 here; the services it tests are UTC** — so a date-relative
   fixture is wrong for three hours of every day (F2-178 correction, caught 2026-08-10 at 00:4x local).
   `CommitteeSeatLinkageTest` set `termEndsAt = LocalDate.now().minusDays(1)` while

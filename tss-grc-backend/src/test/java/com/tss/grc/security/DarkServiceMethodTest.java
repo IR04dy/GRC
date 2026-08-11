@@ -8,6 +8,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -17,6 +20,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.springframework.asm.ClassReader;
 import org.springframework.asm.ClassVisitor;
@@ -177,29 +182,37 @@ class DarkServiceMethodTest {
             + "routes to. Listed rather than deleted because CrowdStrikeClient#hideHost is the "
             + "vendor API call the contain path may need to switch to. F2-187."),
 
-        // ── A state nothing can ever move to: the sharpest bucket, because the row just sits ──
-        // Each of these is the shape CLAUDE.md already records twice — committee terms that nothing
-        // moves out of ACTIVE, and the drift ladder that had never run. The method exists, the state
-        // exists, and no path reaches it, so a register reads "current" forever.
-        Map.entry("com.tss.grc.module.admin.committee.service.CommitteeActionItemService#markOverdue",
-            "No caller and no scheduler: a committee action item is NEVER marked overdue, so an "
-            + "action-item register shows nothing outstanding no matter how late it is. Same shape "
-            + "as the ACTIVE-term sweep CLAUDE.md records for committee seats. F2-187."),
+        // ── ⚠⚠ F2-188: this used to be "a state nothing can ever move to — the sharpest bucket". ──
+        // All FIVE reasons were false, and every one of them was written from the method alone. Each
+        // has a live twin, and in four cases the evidence was in a comment I did not open: the
+        // scheduler's, the replacing service's, or the method's own javadoc one line above the
+        // signature. See theSharpestBucketWasEmpty() for the audit and what it cost.
+        //
+        // markOverdue is NOT in this map any more: CommitteeScheduledSweep now calls it, which is the
+        // one real defect the audit found. It had been flipping the row itself.
         Map.entry("com.tss.grc.module.compliance.obligation.service.ObligationAttestationService#markOverdueForCampaign",
-            "No caller and no scheduler: a regulatory-obligation attestation is NEVER marked "
-            + "overdue, so a compliance owner cannot see who has missed an attestation campaign. "
-            + "F2-187."),
+            "SUPERSEDED, and the evidence is in the replacement's javadoc: "
+            + "ComplianceDeadlineScheduler says it sweeps org-wide '(previously markOverdueForCampaign "
+            + "only ran when a campaign...)' and calls sweepOverdueForOrg instead, which is scheduled "
+            + "daily. Attestations ARE marked overdue. Kept only because a per-campaign variant is a "
+            + "plausible admin action; the two must not diverge. F2-187/F2-188."),
         Map.entry("com.tss.grc.module.ccm.service.CcmService#recordRun",
-            "Nothing records a continuous-control-monitoring test run — and this method owns the "
-            + "consecutive-failure -> Issue ladder and the parent definition's last_run_* stamps. So "
-            + "a CCM control that fails repeatedly raises no Issue and reads as never having run. "
-            + "The F2-175 drift-ladder shape in a second module. F2-187."),
+            "A THIRD entry point to recordRunInternal, for a result computed outside the platform. "
+            + "The ladder is not dark: CcmSchedulerService#tick is @Scheduled(fixedDelay=60s) and "
+            + "calls runDefinitionInternal, and POST /ccm/tests/{externalId}/run-now reaches "
+            + "runTestNow — both land in recordRunInternal, which owns the consecutive-failure Issue "
+            + "ladder and the last_run_* stamps. Kept as the ingestion seam for an external runner. "
+            + "F2-187/F2-188."),
         Map.entry("com.tss.grc.module.socops.service.IrPlaybookService#recordInvocation",
-            "Playbook invocations are never recorded, so an incident review cannot evidence that the "
-            + "IR playbook was followed — the artefact an auditor asks for. F2-187."),
+            "SUPERSEDED by IrPlaybookRunService, whose own comment says it preserves 'the legacy "
+            + "invocation semantics the dashboard + F8 rules rely on' and emits invocationCount "
+            + "itself. Invocations ARE recorded, as trackable runs with snapshotted tasks. Kept "
+            + "because the counter-only path is cheaper for a bulk import. F2-187/F2-188."),
         Map.entry("com.tss.grc.module.socops.service.ThreatIntelService#markActioned",
-            "A threat-intel item cannot be marked actioned, so the queue never drains and there is "
-            + "no record of which indicators were dealt with. F2-187."),
+            "A LEGACY SHIM, and its own javadoc says so one line above the signature: 'the old "
+            + "\"mark done\" path (no concrete target) now records a REVIEWED action'. It delegates "
+            + "to actionIoc, which is live and writes the action history plus the denormalised "
+            + "actioned/pending queue. F2-187/F2-188."),
 
         // ── Built and unwired: the capability exists in code and no route reaches it ──────────
         Map.entry("com.tss.grc.module.ai.governance.service.MlModelDriftService#listUnacknowledged",
@@ -440,6 +453,145 @@ class DarkServiceMethodTest {
         assertThat(thin)
             .as("A tolerated entry needs a reason a reader can act on, not a label")
             .isEmpty();
+    }
+
+    /**
+     * Language that turns a reason into a claim about the whole system rather than about this method.
+     *
+     * <p>Deliberately narrow, and it took two drafts to get there. "never called", "nothing routes to
+     * it", "never consulted" are claims about <b>the method</b> — exactly what the bytecode measurement
+     * establishes, so a reason saying so is reporting the finding, not extending it. "is never marked
+     * overdue" is a claim that <b>no path anywhere</b> moves a row into a state, which is a different
+     * and much stronger assertion, and the one that sets a finding's severity because it means a row
+     * sits in a register forever.
+     *
+     * <p>⚠ The first draft matched bare {@code is NEVER} / {@code nothing routes} and flagged three
+     * entries whose reasons were already correct and already method-level ({@code hideHost} —
+     * <i>"containment IS reachable; #hideHost is a second containment verb nothing routes to"</i>,
+     * {@code pushCyberIncident}, {@code hasRecentApprovedAssessment}). That is the same mistake this
+     * repository has now made four times in the other direction: <b>a scan not scoped to the shape of
+     * the claim invents findings</b>. The verbs below are all state-transition verbs.
+     */
+    private static final Pattern UNREACHABILITY_CLAIM = Pattern.compile(
+        "(?i)\\bnever (?:marked|flipped|moved|transitions|leaves|recorded|run)\\b"
+        + "|\\bnothing (?:marks|flips|moves|records|advances)\\b"
+        + "|\\bno caller and no scheduler\\b|\\bcannot be marked\\b");
+
+    /**
+     * F2-188 — the assertion that would have caught five false reasons, and the reason it exists.
+     *
+     * <p>{@link #everyToleratedEntryCarriesARealReason()} enforces that a reason is <b>substantial</b>.
+     * Nothing enforced that it was <b>true</b>. Five entries — filed as "a state nothing can ever move
+     * to: the sharpest bucket" — claimed a register sits stale forever, and <b>every one of the five was
+     * wrong</b>:
+     *
+     * <ul>
+     *   <li>{@code CcmService#recordRun} — "nothing records a CCM test run … a control that fails
+     *       repeatedly raises no Issue". {@code CcmSchedulerService#tick} is
+     *       {@code @Scheduled(fixedDelay = 60_000)} and {@code POST /tests/{id}/run-now} exists; both
+     *       reach the same private {@code recordRunInternal} that owns the ladder.</li>
+     *   <li>{@code CommitteeActionItemService#markOverdue} — "no caller and no scheduler: an action item
+     *       is NEVER marked overdue". {@code CommitteeScheduledSweep} was flipping the row itself. That
+     *       IS a defect, and a much narrower one than claimed — it is now fixed and the entry is gone.</li>
+     *   <li>{@code ObligationAttestationService#markOverdueForCampaign} — superseded by
+     *       {@code sweepOverdueForOrg}, and {@code ComplianceDeadlineScheduler}'s javadoc names the
+     *       method it replaced.</li>
+     *   <li>{@code IrPlaybookService#recordInvocation} — superseded by {@code IrPlaybookRunService},
+     *       whose comment says it preserves the legacy semantics.</li>
+     *   <li>{@code ThreatIntelService#markActioned} — a shim whose own javadoc says "the old 'mark done'
+     *       path … now records a REVIEWED action", one line above the signature.</li>
+     * </ul>
+     *
+     * <p>🔑 <b>A named-map gate proves a reason exists; it cannot prove the reason is true — so the
+     * reasons are the least-verified part of the most authoritative-looking artefact.</b> And the
+     * substantiality check made it worse rather than better: it rejected six of my first-draft labels,
+     * so I rewrote them as fluent prose naming a consequence, and <b>fluency reads as verification</b>.
+     * Four of the five truths were sitting in a comment I had not opened — the fourth consecutive
+     * instance of <i>one file short is the whole error</i>.
+     *
+     * <p>So the rule now: a reason may make an unreachability claim only if the entry appears in
+     * {@link #CLAIMS_NO_OTHER_WRITER} declaring the (entity, state) it is about, and this test then
+     * <b>verifies</b> that no main-source class other than the method's own writes that state. Enforced
+     * both ways, so a declaration cannot outlive the claim it supports.
+     *
+     * <p>The map is empty today, and that is the finding rather than a gap: after the audit, no
+     * surviving entry makes such a claim. The scan still runs over all {@value #REASON_SCAN_NOTE}
+     * reasons, so it is not vacuous — it is the population that is zero, not the instrument.
+     */
+    private static final String REASON_SCAN_NOTE = "TOLERATED";
+
+    /** entry key → (simple entity name, state literal) the reason claims nothing else can write. */
+    private static final Map<String, String[]> CLAIMS_NO_OTHER_WRITER = Map.of();
+
+    @Test
+    void noReasonAssertsUnreachabilityWithoutAScanThatVerifiesIt() throws IOException {
+        List<String> unbacked = new ArrayList<>();
+        for (Map.Entry<String, String> e : TOLERATED.entrySet()) {
+            if (UNREACHABILITY_CLAIM.matcher(e.getValue()).find()
+                    && !CLAIMS_NO_OTHER_WRITER.containsKey(e.getKey())) {
+                unbacked.add(e.getKey());
+            }
+        }
+        System.out.println("[F2-188] reasons scanned = " + TOLERATED.size()
+            + " ; unreachability claims = " + unbacked.size()
+            + " ; declared+verified = " + CLAIMS_NO_OTHER_WRITER.size());
+
+        assertThat(unbacked)
+            .as("""
+                These reasons claim a state is unreachable — the claim that sets a finding's severity, \
+                because it means a row sits in a register forever. F2-188 measured five such claims and \
+                ALL FIVE were false; four of the truths were in a comment beside the method. If the \
+                claim is real, declare the (entity, state) in CLAIMS_NO_OTHER_WRITER so this test can \
+                check it. If it is not, say what the method actually is: a redundant path, a superseded \
+                variant or a legacy shim — and name the live twin.""")
+            .isEmpty();
+
+        // The other direction: a declaration must still be backed by a claim, and the claim must hold.
+        for (Map.Entry<String, String[]> d : CLAIMS_NO_OTHER_WRITER.entrySet()) {
+            assertThat(TOLERATED).containsKey(d.getKey());
+            assertThat(UNREACHABILITY_CLAIM.matcher(TOLERATED.get(d.getKey())).find())
+                .as("%s is declared in CLAIMS_NO_OTHER_WRITER but its reason no longer makes the "
+                    + "claim — delete the declaration in the same commit", d.getKey())
+                .isTrue();
+            String owner = d.getKey().substring(0, d.getKey().indexOf('#'));
+            List<String> otherWriters = classesWriting(d.getValue()[1]).stream()
+                .filter(c -> !c.equals(owner))
+                .toList();
+            assertThat(otherWriters)
+                .as("%s claims nothing else moves a %s to %s, and these classes do",
+                    d.getKey(), d.getValue()[0], d.getValue()[1])
+                .isEmpty();
+        }
+    }
+
+    /**
+     * Fully-qualified names of main-source classes containing {@code setStatus("<state>")} or
+     * {@code set*Status("<state>")}.
+     *
+     * <p>Source text, not bytecode, and that is a deliberate weakening: a string constant survives into
+     * the constant pool but attributing it to the class that <em>writes</em> it needs the setter call,
+     * and a source scan is honest about being a locator. It is only ever used to <b>refute</b> a claim
+     * of exclusivity — a scan that misses a writer leaves the claim standing, so the failure direction
+     * is the same one the register already carries.
+     */
+    private static List<String> classesWriting(String state) throws IOException {
+        Path root = Path.of("src/main/java");
+        if (!Files.isDirectory(root)) {
+            return List.of();
+        }
+        Pattern write = Pattern.compile("set\\w*Status\\(\\s*\"" + Pattern.quote(state) + "\"");
+        List<String> hits = new ArrayList<>();
+        try (Stream<Path> files = Files.walk(root)) {
+            for (Path p : files.filter(f -> f.toString().endsWith(".java")).toList()) {
+                String src = new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
+                if (write.matcher(src).find()) {
+                    String rel = root.relativize(p).toString()
+                        .replace('\\', '/').replace('/', '.');
+                    hits.add(rel.substring(0, rel.length() - ".java".length()));
+                }
+            }
+        }
+        return hits;
     }
 
     @Test

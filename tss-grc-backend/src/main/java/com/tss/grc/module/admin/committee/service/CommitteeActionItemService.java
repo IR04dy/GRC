@@ -220,17 +220,41 @@ public class CommitteeActionItemService {
         return saved;
     }
 
+    /**
+     * The only emitter of {@code COMMITTEE_ACTION_*}.
+     *
+     * <p>⚠ F2-188: {@code CommitteeScheduledSweep} used to flip a row to OVERDUE in place and emit
+     * its own {@code COMMITTEE_ACTION_OVERDUE} with a <b>different payload</b> — {@code ownerName}
+     * where this method sends {@code owner}, no {@code fromStatus}/{@code toStatus}, plus
+     * {@code dueDate}/{@code linkedModule}/{@code linkedEntityCode} which this one lacked. Since the
+     * sweep is the only thing that ever fires OVERDUE in production, the shape below was the one that
+     * never occurred, and a rule keyed on {@code owner} would have matched nothing —
+     * {@code AutomationRuleEngine} has already paid for that exact bug once (its javadoc records a
+     * condition that compared {@code "" == "HIGH"} and so could never match, for any payload).
+     *
+     * <p>The payload is now the <b>union</b> of the two, so routing the sweep through here removes a
+     * duplicate transition without dropping a key any consumer might have been written against. Both
+     * {@code owner} and {@code ownerName} are emitted deliberately: four triggers have only ever sent
+     * the first and one has only ever sent the second, and silently retiring either would be a
+     * behaviour change to a notification path dressed as a refactor.
+     */
     private void publishTransition(CommitteeActionItem a, String fromStatus, String toStatus) {
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("actionCode",       a.getActionCode());
+        payload.put("committeeId",      a.getCommitteeId());
+        payload.put("meetingId",        a.getMeetingId());
+        payload.put("owner",            a.getOwnerName() == null ? "" : a.getOwnerName());
+        payload.put("ownerName",        a.getOwnerName() == null ? "" : a.getOwnerName());
+        payload.put("fromStatus",       fromStatus);
+        payload.put("toStatus",         toStatus);
+        payload.put("priority",         a.getPriority());
+        payload.put("dueDate",          a.getDueDate() == null ? "" : a.getDueDate().toString());
+        payload.put("linkedModule",     a.getLinkedModule() == null ? "" : a.getLinkedModule());
+        payload.put("linkedEntityCode", a.getLinkedEntityCode() == null ? "" : a.getLinkedEntityCode());
         publisher.publishEvent(DomainEvent.of(
             a.getOrganisationId(),
             "COMMITTEE_ACTION_" + toStatus,
             "CommitteeActionItem", a.getId(),
-            Map.of("actionCode",  a.getActionCode(),
-                   "committeeId", a.getCommitteeId(),
-                   "meetingId",   a.getMeetingId(),
-                   "owner",       a.getOwnerName() == null ? "" : a.getOwnerName(),
-                   "fromStatus",  fromStatus,
-                   "toStatus",    toStatus,
-                   "priority",    a.getPriority())));
+            payload));
     }
 }
