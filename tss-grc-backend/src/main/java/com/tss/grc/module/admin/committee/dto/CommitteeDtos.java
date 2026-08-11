@@ -152,7 +152,14 @@ public final class CommitteeDtos {
             @Size(max = 120) String guestRole,
             Boolean present,
             Boolean coiDeclared,
-            @Size(max = 1000) String coiNote
+            // F2-184 — @Size(max = 1000) deleted rather than enabled. It had never run (the
+            // AttendanceRequest#marks cascade was missing), and admin.committee_meeting_attendee
+            // .coi_note is NVARCHAR(MAX): the schema deliberately leaves a conflict-of-interest
+            // declaration unbounded, so switching the cap on would impose a limit nobody chose on
+            // a governance note. guestName/guestRole keep theirs — those equal their columns
+            // (member_name 255, member_role 120) exactly, so enforcing them only converts a
+            // truncation 500 into a 400 naming the field.
+            String coiNote
     ) {}
 
     /**
@@ -172,14 +179,19 @@ public final class CommitteeDtos {
      * denominator. So the distinction that matters is <b>absent field</b> (probably a mistake, now a
      * 400 naming {@code marks}) versus <b>empty list</b> (an assertion the caller meant to make).
      */
-    public record AttendanceRequest(@NotNull java.util.List<AttendanceMark> marks) {}
+    public record AttendanceRequest(@NotNull @Valid java.util.List<AttendanceMark> marks) {}
 
     /** <b>Output only.</b> {@code votingMember} is resolved from the seat, never echoed from a
      *  request — the field's presence here is what made the old shape ambiguous. */
+    // F2-184 — the @NotBlank/@Size that used to sit on memberName/memberRole are gone. This record
+    // is output-only (see above), built by CommitteeService from persisted rows, so bean validation
+    // never ran on it: an inert constraint here is worse than none, because it reads exactly like
+    // the guard a reviewer is looking for. They are leftovers from when this type WAS the input
+    // shape — the javadoc above says so — and the constraints outlived the demotion.
     public record AttendeeRow(
             Long memberTermId,
-            @NotBlank @Size(max = 255) String memberName,
-            @Size(max = 120) String memberRole,
+            String memberName,
+            String memberRole,
             Boolean votingMember, Boolean present,
             Boolean coiDeclared, String coiNote,
             /** TRUE = a non-member who attended; never counts toward quorum. */

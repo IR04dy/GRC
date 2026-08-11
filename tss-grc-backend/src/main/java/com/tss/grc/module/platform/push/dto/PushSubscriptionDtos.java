@@ -38,12 +38,22 @@ public final class PushSubscriptionDtos {
         LocalDateTime updatedAt
     ) {}
 
-    /** Outbound payload passed to {@code dispatchToUserIds(...)} — kept tiny on purpose. */
+    /**
+     * Outbound payload passed to {@code dispatchToUserIds(...)} — kept tiny on purpose.
+     *
+     * <p>F2-184 — its {@code @NotBlank}/{@code @Size} annotations are deleted. Nothing binds this
+     * type from the wire; every instance is constructed in Java by a peer service, and bean
+     * validation runs only against a {@code @Valid} parameter, so the annotations enforced nothing.
+     * Contrast {@code SubscribeRequest} above, whose identical-looking annotations are real because
+     * a controller binds it. <b>If these limits matter, they belong in {@code WebPushService} as a
+     * check on the way out</b> — a push provider truncating a 300-character title is a runtime
+     * concern, not a request-validation one.
+     */
     public record DispatchPayload(
-        @NotBlank @Size(max = 80)   String code,
-        @NotBlank @Size(max = 200)  String titleAr,
-        @NotBlank @Size(max = 200)  String titleEn,
-        @Size(max = 60)             String severity,
-        @Size(max = 500)            String deepLink
+        String code,
+        String titleAr,
+        String titleEn,
+        String severity,
+        String deepLink
     ) {}
 }

@@ -1,6 +1,7 @@
 package com.tss.grc.module.aml.sanctions.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -91,9 +92,26 @@ public final class SanctionsDtos {
         @Pattern(regexp = SEVERITY_REGEX) String severity
     ) {}
 
+    /**
+     * F2-184 — {@code @Valid} on {@code entries} is load-bearing and was missing.
+     *
+     * <p>{@code EntryCreateRequest} is bound <b>only</b> through this bulk path — there is no
+     * single-entry create endpoint — so without the cascade <b>none</b> of its per-entry constraints
+     * ran on the only route that creates sanctions entries. {@code SanctionsListService
+     * .bulkImportEntries} is a straight setter copy guarded solely by {@code assertWritable}, and
+     * {@code aml.sanctions_list_entry} carries <b>zero</b> CHECK constraints, so
+     * {@code @Pattern} on {@code entityType}/{@code severity} was the only thing narrowing those
+     * columns and it never ran. An entry with an empty {@code primaryNameEn} passes NOT NULL and
+     * never matches a screening query — a sanctioned party that is not flagged.
+     *
+     * <p>⚠ Enabling this refuses nothing that exists today: measured 2026-08-11, every cap equals
+     * its column's length exactly ({@code entry_external_id} 64, {@code primary_name_*} 500,
+     * {@code country} 100, {@code listed_by} 255, {@code listing_reason_*} 1000) and all 15 stored
+     * rows hold in-vocabulary {@code entity_type} and {@code severity} values.
+     */
     public record EntryBulkImportRequest(
         @NotNull @Positive Long listId,
-        @NotNull List<EntryCreateRequest> entries
+        @NotNull @Valid List<EntryCreateRequest> entries
     ) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

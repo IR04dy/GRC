@@ -1,5 +1,6 @@
 package com.tss.grc.module.platform.export;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
@@ -24,8 +25,17 @@ public record TabularExportRequest(
     @NotBlank @Size(max = 60) String exportType,
     /** "ar" or "en" — controls RTL sheet direction + the LANG filename segment. */
     @Size(max = 5) String lang,
-    /** One or more sheets. */
-    @NotEmpty @Size(max = 20) List<Sheet> sheets
+    /**
+     * One or more sheets.
+     *
+     * <p>F2-184 — {@code @Valid} was missing, and here that disabled a <b>DoS control</b>, not a
+     * cosmetic check. The 20-sheet cap on this field ran; {@code Sheet}'s own
+     * {@code @Size(max = 50_000)} on {@code rows} did not, so a caller could post 20 sheets of
+     * unbounded rows and the server would try to build the whole workbook in memory (Apache POI,
+     * no streaming). The cap is a number somebody deliberately wrote down and nothing has ever
+     * enforced; enabling it turns an OOM into a 400 that names the field.
+     */
+    @NotEmpty @Size(max = 20) @Valid List<Sheet> sheets
 ) {
     /** A single worksheet: a name, a header row, and data rows. */
     public record Sheet(

@@ -1547,14 +1547,56 @@ caught by `git status`, not by the harness. And a wrong assertion of mine left t
 reported an SGI mutation as *"caught by a calendar test"*: **a mutation harness run against a red suite reports
 every mutation as caught.** It now checks the baseline first and aborts if it is not green.
 
-⬜ **F2-184 filed** — an inert bean-validation constraint: `@Pattern` on `CalendarEventDto.recurrence`, a class
-**no endpoint binds**, while the `CreateRequest` the endpoints do bind had none. Validation runs only on a
-`@Valid` parameter, so it enforced nothing and read like the guard a reviewer was hunting. One confirmed
-instance, fixed. ⚠ **The population is deliberately unmeasured**: my sweep reported 75 types and the first one
-checked was a false positive (it attributed nested records' annotations to their container class), so the number
-is not recorded anywhere. Do it by **reflection over controller parameters**, treating a type as bound if it is
-a `@RequestBody` type *or reachable from one through a `@Valid` field* — exactness matters, because a false
-positive here invites deleting a live guard. Third phantom number from a regex over Java in three findings.
+✔ **F2-184 CLOSED 2026-08-11 — filed as "plausibly P3" from one fail-closed instance; the measured population
+was P2, and it indicted the slice that filed it.** Reflection over **2,941** types (254 controllers, 2,210
+handlers — matching `LazyEntitySerialisationInvariantTest` exactly) found **405** types declaring a validation
+constraint and **20 that nothing validates**. Against the **75** the abandoned regex claimed. Two false-positive
+classes were excluded *with the reason stated*: test fixtures reached through `classpath*:`, and **JPA entities**,
+whose constraints Hibernate's `BeanValidationEventListener` really does enforce at flush (a 500 rather than a
+400, so worth knowing but not a bypass) — conflating those would have overstated the finding by six sites.
+
+⚠⚠ **The worst instance was the only route that creates a sanctions entry.** `EntryBulkImportRequest.entries`
+was `@NotNull` but not `@Valid`, and `EntryCreateRequest` is bound **only** there — no single-entry endpoint
+exists. So `@NotBlank primaryNameEn`, `@NotBlank entryExternalId` and the `@Pattern`s on `entityType`/`severity`
+never ran; the service is a setter copy guarded only by `assertWritable`; and `aml.sanctions_list_entry` has
+**zero CHECKs**, so those patterns were the *only* narrowing. **A sanctions entry with a blank name is stored and
+never matches a screening query.** It also closed a second defect for free: the duplicate check is
+`existsBy…EntryExternalId(null)` → `= NULL` → never true, so null-id entries were **created, not skipped, on
+every re-import**. Fixing the boundary made that query unreachable.
+
+🔑 **The rule, and it is not "add `@Valid` everywhere":** a dormant `@Size` number has never been tested against
+its column, so enabling it is a decision. Cap **==** column → enable (converts a truncation 500 into a named 400
+and cannot break a working request). Column **NVARCHAR(MAX)** → the schema deliberately leaves it unbounded, so
+**delete the cap** — `AttendanceMark.coiNote`'s was deleted for exactly this reason, because capping a
+conflict-of-interest declaration is a product change. Cap **looser** than the column → the annotation is what is
+wrong. Third variant of one question: F2-179 asked it per field, F2-182 answered it with *does a coercion exist
+upstream*, F2-184 with *does anything already refuse this*. Every enabled constraint was checked against stored
+data first (15 sanctions rows, 40 loss lines, 0 negatives), so this is latent-defect closure, not a behaviour
+change.
+
+⚠ **And it found four more inert constraints on `CalendarEventDto` — the class F2-182 had already fixed**,
+sitting above the comment F2-182 wrote about deleting the fifth. 🔑 **Fixing the instance you noticed is not
+closing the shape, and a class you have already edited reads as one you have already checked.** That is the whole
+case for the instrument over the read.
+
+Gate: `InertValidationConstraintTest` holds the 12 survivors as a **named map with a reason each, enforced in
+both directions** — a new one fails the build, and a fixed one must have its entry removed. A decrease-only "12"
+would let one be swapped for another, the failure CLAUDE.md records for `BARE_EXPORT_CEILING`. Six of the 16
+mutations attack the instrument itself, including **the phantom-75 bug** (attributing a nested type's constraints
+to its container), so the defect that made this a filing rather than a sweep cannot come back silently.
+Suite **3,687/0/0**, mutation **16/16**, live probe **37/37** as `compliance`, 0 migrations, 0 FE change.
+
+⬜ **F2-185 filed** — the twelve F2-184 tolerated, in two groups. **(a) P2, two dark request types:**
+`WhistleblowerRetaliationService#transitionTo` has **no caller**, so the retaliation terminal transition
+(`VALIDATED`/`UPHELD`/`DISMISSED`) has no endpoint and a retaliation complaint cannot be closed through the API;
+`VendorBcpAttestationDtos.EscalateRequest` has no usage at all. ⚠ Do **not** close these by deleting the inert
+`@NotBlank` — that removes the fingerprint and leaves the defect. 🔑 **An inert constraint on a `*Request` type is
+a fingerprint of a dark endpoint** — the [[F2-165]] family, found from a different angle. **(b) P3, ten `@Size`
+caps** on types bound without `@Valid`; the column measurements are already recorded (4 are MAX → delete the cap,
+5 match exactly → enable, 5 need the entity read), so the next slice starts from data. ⚠ One correction carried
+forward: `ApproveAccessRequest.overrideJustification` is `@Size(max = 1000)`, **not** `@NotBlank` — I was one
+step from recording "an override can be approved with no justification" before reading the DTO. **The severity of
+an inert constraint is the severity of the constraint, not of the field it sits on.**
 
 ⬜ **F2-183 filed** — `consumer.complaint` has **no CHECK constraints at all**, so its `channel` and
 `severity` vocabularies live only in a case-sensitive Java `switch` that **substitutes** rather than refuses:

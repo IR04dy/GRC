@@ -1,6 +1,7 @@
 package com.tss.grc.module.bcm.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -48,7 +49,12 @@ public final class BiaQuantitativeDtos {
         @PositiveOrZero BigDecimal maxTolerableLossSar,
         @Size(max = 255) String preparedByName,
         Long preparedByUserId,
-        List<BiaQuantitativeLossLineDto> lossLines
+        // F2-184 — without @Valid, none of the loss line's own constraints ran: the
+        // @Pattern vocabularies on timeBand/confidence and the @PositiveOrZero on amountSar.
+        // bcm.bia_quantitative_loss_line has zero CHECKs, so those patterns were the only
+        // thing narrowing time_band and confidence. Safe to enable: all 40 stored rows hold
+        // in-vocabulary values and none has a negative amount (min 0.00).
+        @Valid List<BiaQuantitativeLossLineDto> lossLines
     ) {}
 
     // ─── Response ────────────────────────────────────────────────────

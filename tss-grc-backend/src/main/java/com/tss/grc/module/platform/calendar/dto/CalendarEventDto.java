@@ -38,17 +38,22 @@ public class CalendarEventDto {
      *  a deterministic synthetic UUID from {@code entityType+entityId}. */
     private UUID externalId;
 
+    // F2-184 — @NotBlank/@NotNull on source, titleEn, eventType and startsAt are gone for the same
+    // reason F2-182 deleted the @Pattern below, and finding them is why F2-184 exists as its own
+    // instrument: F2-182 fixed ONE field on this class by reading it, and left four. Only reflection
+    // over controller parameters saw the rest. 🔑 Fixing the instance you noticed is not the same as
+    // closing the shape, and a class you have already edited reads as one you have already checked.
     /** USER (persisted) | AGGREGATED (synthesised from a GRC entity). */
-    @NotBlank private String source;
+    private String source;
 
-    @NotBlank private String titleEn;
+    private String titleEn;
     private String titleAr;
     private String descriptionEn;
     private String descriptionAr;
 
-    @NotBlank private String eventType;
+    private String eventType;
 
-    @NotNull   private LocalDateTime startsAt;
+    private LocalDateTime startsAt;
     private LocalDateTime endsAt;
     private Boolean allDay;
 

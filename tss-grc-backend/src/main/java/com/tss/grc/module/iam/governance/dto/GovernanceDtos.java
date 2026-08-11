@@ -1,5 +1,6 @@
 package com.tss.grc.module.iam.governance.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -31,7 +32,17 @@ public final class GovernanceDtos {
         @NotBlank @Size(max = 50) String action
     ) {}
 
-    public record MatrixUpdateRequest(@NotNull List<GrantPair> grants) {}
+    /**
+     * F2-184 — {@code @Valid} was missing, so {@code GrantPair}'s own constraints never ran.
+     *
+     * <p>⚠ State this one accurately: it is <b>not</b> an authorisation bypass.
+     * {@code AccessGovernanceService.putMatrix} already rejects a pair that resolves to no
+     * permission ({@code orElseThrow} → 400 "Unknown permission"), so a blank module was refused —
+     * the guard sits in the service, which is exactly what F2-182 found six times. What the missing
+     * cascade cost is the <b>diagnostic</b>: a {@code null} module reaches
+     * {@code g.module().toUpperCase()} and answers <b>500 NPE</b> instead of a 400 naming the field.
+     */
+    public record MatrixUpdateRequest(@NotNull @Valid List<GrantPair> grants) {}
 
     /** One catalogue cell of the role × module × action grid. */
     public record MatrixCell(String module, String action, String permissionName, boolean granted) {}

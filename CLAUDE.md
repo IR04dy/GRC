@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,671 @ 2026-08-11; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,687 @ 2026-08-11; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -498,9 +498,42 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   verbatim and `IcsBuilder.rruleFor`'s `default -> null` emitted **no RRULE at all**, exporting a quarterly DR
   test as a single event. 🔑 **A constraint on a response DTO is worse than none, because it answers the
   question a reader was about to ask.** Same family as the `safeRole` decoy, but the tell is **structural**:
-  the class is never a `@RequestBody`. ⚠ The population is **unmeasured on purpose** — a source-regex sweep
-  reported 75 types and the first one checked was a false positive (nested records attributed to their
-  container class). Measure it by **reflection over controller parameters** or not at all.
+  the class is never a `@RequestBody`. ⚠ A source-regex sweep for it reported **75** types and the first one
+  checked was a false positive (nested records attributed to their container class); done properly by
+  **reflection** the answer is **20**, now **12** and gated — `InertValidationConstraintTest` walks 2,941 types
+  (254 controllers, 2,210 handlers) and holds the survivors as a **named map with a reason each, enforced in
+  both directions**, so a fixed one must have its entry deleted. Six of its 16 mutations attack the instrument,
+  including the phantom-75 bug itself.
+  ⚠⚠ **The load-bearing half is `@Valid` on a nested collection, and its absence is invisible at the field.**
+  `EntryBulkImportRequest.entries` was `@NotNull` without `@Valid`, and `EntryCreateRequest` is bound **only**
+  there — no single-entry endpoint — so on **the only route that creates a sanctions entry** none of
+  `@NotBlank primaryNameEn`, `@NotBlank entryExternalId` or the `@Pattern`s on `entityType`/`severity` ran.
+  `aml.sanctions_list_entry` has **zero CHECKs**, so those patterns were the only narrowing, and a blank-named
+  entry is stored and **never matches a screening query**. It also fixed a second defect for free: the duplicate
+  check is `existsBy…EntryExternalId(null)` → `= NULL` → never true, so null-id entries were **created, not
+  skipped, on every re-import**. 🔑 **A defect reachable only through input the boundary should have refused is
+  fixed at the boundary** — a null check in the service would have left the unnamed row.
+  ⚠⚠ **Do NOT just add `@Valid` — a dormant `@Size` number has never been tested against its column.** Cap
+  **==** column length → enable (the DB already refuses more, so this only converts a truncation 500 into a 400
+  naming the field, and **cannot break a working request**). Column **NVARCHAR(MAX)** → the schema deliberately
+  leaves the field unbounded, so **delete the cap**: `AttendanceMark.coiNote`'s `@Size(1000)` was deleted rather
+  than enabled because capping a conflict-of-interest declaration is a product change, not a fix. Cap **looser**
+  than the column → enabling protects nothing; the annotation is the thing that is wrong. Check stored values
+  before enabling a `@Pattern` over a CHECK-less column — F2-184's five all held in-vocabulary data, which is
+  what made it latent-defect closure rather than a behaviour change. Third variant of one question: F2-179 asked
+  it per field, F2-182 answered *does a coercion exist upstream*, F2-184 *does anything already refuse this*.
+  ⚠ **A constraint on a `@Entity` field is NOT inert** — `spring-boot-starter-validation` + JPA validation mode
+  `AUTO` means Hibernate's `BeanValidationEventListener` enforces it on pre-insert/pre-update. It fires as a
+  `ConstraintViolationException` → **500** rather than a 400, so it is a weaker defect worth knowing about;
+  counting entities as inert would have overstated F2-184 by six sites.
+  ⚠⚠ **And the finding indicted the slice that filed it**: `CalendarEventDto` still carried four more inert
+  constraints (`source`, `titleEn`, `eventType`, `startsAt`) directly above the comment F2-182 wrote explaining
+  why it deleted the fifth. 🔑 **Fixing the instance you noticed is not closing the shape, and a class you have
+  already edited reads as one you have already checked.**
+  ⚙ An inert constraint on a `*Request` type is also a **dark-code detector**: two of the twelve survivors are
+  types nothing reaches, one of them because `WhistleblowerRetaliationService#transitionTo` has no caller — the
+  retaliation terminal transition has **no endpoint** (F2-185). Do not close those by deleting the annotation;
+  that removes the fingerprint and leaves the defect.
 - **`LocalDate.now()` in a test is UTC+3 here; the services it tests are UTC** — so a date-relative
   fixture is wrong for three hours of every day (F2-178 correction, caught 2026-08-10 at 00:4x local).
   `CommitteeSeatLinkageTest` set `termEndsAt = LocalDate.now().minusDays(1)` while
