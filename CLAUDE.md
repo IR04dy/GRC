@@ -590,6 +590,42 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   types nothing reaches, one of them because `WhistleblowerRetaliationService#transitionTo` has no caller — the
   retaliation terminal transition has **no endpoint** (F2-185). Do not close those by deleting the annotation;
   that removes the fingerprint and leaves the defect.
+- ⚠⚠ **A reachability gate certifies the granularity it resolves, and this platform had two that between them
+  could not see a backend method** (F2-187, measured 2026-08-11). `apiClientMethodReachability.test.ts` resolves
+  **TypeScript API-client methods**; `FrontendEndpointContractTest` resolves **endpoints** — and a service method
+  with no controller *has no endpoint*, so it sat in neither population. **38 public methods on shipped `@Service`
+  classes have no `invoke*` site anywhere in `target/classes`.** `DarkServiceMethodTest` now holds them as a **named
+  map with a reason each, enforced in both directions** (a new one fails the build; one that gains a caller must
+  lose its entry in the same commit) — and it rejects a reason that is a bare label, which fired on six of my own
+  first-draft entries. 🔑 **Before trusting a green reachability gate, say what unit it resolves out loud and ask
+  what sits between that unit and the code that runs.**
+  ⚠ **Measure this from BYTECODE, never a source regex** — `org.springframework.asm.ClassReader` is already on the
+  classpath. The register records four pattern mistakes in one slice from doing it with regexes, and three phantom
+  counts over Java in three consecutive findings (1,763 endpoints from a javadoc sentence; 0-of-389; 75 types).
+  ⚠⚠ **The raw number is roughly a third false positives and the subtraction is structural, not a name rule.**
+  51 → 38: **16** are `@Scheduled`/`@EventListener` (the container calls them), **5** implement a framework
+  interface. Reflection/SpEL/scheduler-by-name are invisible in bytecode *by nature*, which is exactly why the
+  survivors are a named list and **not** an assertion of zero. Test classes are deliberately **not** counted as
+  callers: a method whose only caller is its own unit test is reached by nothing that ships.
+  ⚠⚠ **A method-NAME fallback silently clears the methods most likely to be duplicated elsewhere.** A first pass
+  cleared any name invoked on any type, hiding `PolicyService#create`/`update`/`delete` — i.e. reporting four dark
+  methods where the whole legacy write lifecycle (nine) was dark. Resolve per **owner type**, walking supertypes so
+  interface dispatch still counts.
+  ⚠ **A dark method is not automatically a missing capability — sort by EFFECT, not by verb name.** F2-185(a) was
+  graded **P2** on *"a retaliation complaint cannot be closed through the API"*; probed live 20/20, it can —
+  `/retaliation/{id}/validate|uphold|dismiss` are all wired and the FE renders each. `transitionTo` was a redundant
+  **fourth** path, so the filed choice ("wire it or delete it") had a third answer. 🔑 **The claim came from reading
+  the service and not the controller beside it: one file short is the whole error** (second instance, after F2-179's
+  "`ExerciseObserverService` is open" — both mine).
+  ⚠ **9 of the 38 are dark ON PURPOSE and the evidence sits by the CALLER, not the method.**
+  `RegChangePolicyController` carries the comment that retires the legacy lifecycle, names
+  `PolicyManagementService#transition` as the live twin and names CH-9 as the exit. A hard zero would have
+  manufactured four false P2s on its first run. 🔑 **The difference between dead code and a decision is a recorded
+  reason, and it is rarely recorded where you are looking.**
+  ⚠ **The sharpest members are "a row can never leave this state"** — `CommitteeActionItemService#markOverdue` and
+  `ObligationAttestationService#markOverdueForCampaign` have **no caller and no scheduler**, and
+  `CcmService#recordRun` owns the consecutive-failure → Issue ladder, so a CCM control that keeps failing raises
+  nothing and reads as never having run. Same family as the ACTIVE-term sweep and F2-175's never-run drift ladder.
 - **`LocalDate.now()` in a test is UTC+3 here; the services it tests are UTC** — so a date-relative
   fixture is wrong for three hours of every day (F2-178 correction, caught 2026-08-10 at 00:4x local).
   `CommitteeSeatLinkageTest` set `termEndsAt = LocalDate.now().minusDays(1)` while

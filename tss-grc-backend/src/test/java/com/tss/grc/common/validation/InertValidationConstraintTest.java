@@ -128,14 +128,33 @@ class InertValidationConstraintTest {
      */
     private static final Map<String, String> TOLERATED = Map.ofEntries(
         // ── Dark types. The defect is not the annotation; it is that nothing reaches the type. ──
-        Map.entry("com.tss.grc.module.ethics.whistleblower.dto.WhistleblowerDtos$RetaliationTransitionRequest",
-            "F2-185(a): the only consumer, WhistleblowerRetaliationService#transitionTo, has NO "
-            + "caller — the retaliation terminal transition (VALIDATED/UPHELD/DISMISSED) has no "
-            + "endpoint, so the complaint lifecycle cannot be closed through the API. Deleting the "
-            + "@NotBlank would hide that; the fix is to wire the endpoint or delete the dead path, "
-            + "and both are scope decisions."),
+        //
+        // F2-185's retaliation half was resolved 2026-08-11 and its entry here is GONE. The FINDING
+        // stays open on the vendor-BCP half below, so this comment deliberately does not claim the
+        // row is closed — `FindingsRegisterConsistencyTest.closureClaimedByATestIsHonoured` failed
+        // when an earlier draft did, and on this occasion the REGISTER was right and my javadoc was
+        // premature. (F2-185b hit the same check from the opposite direction: there the test's claim
+        // was true and the register cell was stale, and the fix was to split the row. 🔑 The check
+        // does not tell you which side is wrong — it tells you to go and decide.)
+        //
+        // What the removed entry used to say is worth keeping, as a warning about this list: it read
+        // "the retaliation terminal transition has no endpoint, so the complaint lifecycle cannot be
+        // closed through the API", and that was **false** — /retaliation/{id}/validate|uphold|dismiss
+        // are all wired, guarded ETHICS:PROTECT, and rendered as buttons. `transitionTo` was a
+        // redundant FOURTH path, so the answer was neither of the two options that entry offered.
+        // 🔑 A reason recorded next to a tolerated entry is still only a claim. Mine was written by
+        // reading the service and not the controller beside it, which is the same one-file-short
+        // mistake as F2-179's "ExerciseObserverService is open" — and both were mine.
         Map.entry("com.tss.grc.module.tprm.bcp_attestation.dto.VendorBcpAttestationDtos$EscalateRequest",
-            "F2-185(a): no usage anywhere in main sources — dead DTO. Same call as above.")
+            "F2-185(a): STILL OPEN, and re-measured 2026-08-11 rather than carried over. No usage "
+            + "anywhere in main sources — but unlike its retired sibling this one has no live twin. "
+            + "Campaign-level POST /bcp-campaigns/{id}/escalate is a BULK sweep over everything past "
+            + "the threshold, with no reason and no named recipient; there is no way to escalate one "
+            + "vendor's attestation to a person. Corroborated by the schema: "
+            + "vendor_bcp_attestation.escalated_to_user_id is declared in V177, mapped on the entity, "
+            + "and written by NOTHING, while aml's ScreeningHit writes its identically-named column "
+            + "from HitEscalateRequest. So the DTO, the column and a working precedent all exist and "
+            + "the endpoint does not. Adding a write surface is the owner's call, not a repair.")
 
         // ── F2-185b CLOSED 2026-08-11: the ten BOUND_WITHOUT_VALID entries that used to sit here
         //    are gone, resolved per site rather than as a batch, because the ten did not share an

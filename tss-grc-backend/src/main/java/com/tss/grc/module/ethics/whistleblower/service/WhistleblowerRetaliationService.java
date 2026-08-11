@@ -4,7 +4,6 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ethics.whistleblower.dto.WhistleblowerDtos.RetaliationComplaintRequest;
 import com.tss.grc.module.ethics.whistleblower.dto.WhistleblowerDtos.RetaliationComplaintResponse;
-import com.tss.grc.module.ethics.whistleblower.dto.WhistleblowerDtos.RetaliationTransitionRequest;
 import com.tss.grc.module.ethics.whistleblower.entity.WhistleblowerRetaliationComplaint;
 import com.tss.grc.module.ethics.whistleblower.repository.WhistleblowerCaseRepository;
 import com.tss.grc.module.ethics.whistleblower.repository.WhistleblowerRetaliationComplaintRepository;
@@ -125,12 +124,32 @@ public class WhistleblowerRetaliationService {
                 "Retaliation claim dismissed — could not be substantiated");
     }
 
-    @Transactional
-    public RetaliationComplaintResponse transitionTo(Long id, RetaliationTransitionRequest req) {
-        return transition(id, req.terminalStatus(), req.assignedProtectorUserId(),
-                "WHISTLEBLOWER_RETALIATION_" + req.terminalStatus(),
-                "Retaliation claim transitioned to " + req.terminalStatus());
-    }
+    // ── F2-185(a): a fourth, generic transition path used to sit here, and it was deleted ──────
+    // `transitionTo(id, RetaliationTransitionRequest)` took the terminal state as a request FIELD.
+    // Nothing called it — no controller, no peer service, no test — and F2-184 noticed it only by
+    // the accident of its DTO carrying an inert @NotBlank.
+    //
+    // ⚠ The register filed this as P2 "a retaliation complaint cannot be closed through the API at
+    // all". That claim was FALSE, and measuring it is what settled the fix. The three endpoints
+    // above are wired, guarded `ETHICS:PROTECT`, and `WhistleblowerRetaliationPage.tsx` renders a
+    // button for each. The lifecycle was always finishable; what existed was a redundant FOURTH
+    // way to finish it.
+    //
+    // So "wire it or delete it" was not the 50/50 the filing implied. Wiring it would have been
+    // strictly worse than the three it duplicated:
+    //   · its DTO added nothing — `terminalStatus` is what the path segment already encodes and
+    //     `assignedProtectorUserId` is the `protectorUserId` query parameter they already accept;
+    //   · it built the F8 trigger by concatenation, `"WHISTLEBLOWER_RETALIATION_" + terminalStatus`,
+    //     correct only because ALLOWED happens to gate `to` down to the three legal upper-case
+    //     tokens — one widened state machine away from emitting an event no rule subscribes to;
+    //   · its audit line read "Retaliation claim transitioned to UPHELD" where `uphold()` writes
+    //     "upheld — disciplinary action triggered". That sentence is the record a labour regulator
+    //     reads, and the generic path degraded it for an identical state change.
+    //
+    // 🔑 A dark method is not automatically a missing capability. Sort by EFFECT, not by verb name
+    // (F2-165's own correction): a dark method whose effect a live sibling already achieves is dead
+    // code, and only one with no live sibling is lost capability. `DarkServiceMethodTest` holds the
+    // rest of that population so the next one is adjudicated rather than discovered by accident.
 
     private RetaliationComplaintResponse transition(Long id, String to, Long protectorUserId,
                                                      String trigger, String message) {

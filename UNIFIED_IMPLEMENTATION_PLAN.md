@@ -1586,16 +1586,44 @@ mutations attack the instrument itself, including **the phantom-75 bug** (attrib
 to its container), so the defect that made this a filing rather than a sweep cannot come back silently.
 Suite **3,687/0/0**, mutation **16/16**, live probe **37/37** as `compliance`, 0 migrations, 0 FE change.
 
-⬜ **F2-185 filed, scope now (a) only** — **P2, two dark request types:**
-`WhistleblowerRetaliationService#transitionTo` has **no caller**, so the retaliation terminal transition
-(`VALIDATED`/`UPHELD`/`DISMISSED`) has no endpoint and a retaliation complaint cannot be closed through the API;
-`VendorBcpAttestationDtos.EscalateRequest` has no usage at all. ⚠ Do **not** close these by deleting the inert
-`@NotBlank` — that removes the fingerprint and leaves the defect. 🔑 **An inert constraint on a `*Request` type is
-a fingerprint of a dark endpoint** — the [[F2-165]] family, found from a different angle. Each site is a scope
-decision (wire the endpoint vs delete the dead path), which is why it did not ship with F2-185b. ⚠ One correction
-carried forward: `ApproveAccessRequest.overrideJustification` is `@Size(max = 1000)`, **not** `@NotBlank` — I was
-one step from recording "an override can be approved with no justification" before reading the DTO. **The severity
-of an inert constraint is the severity of the constraint, not of the field it sits on.**
+⬜ **F2-185 — retaliation half RESOLVED 2026-08-11, vendor-BCP half still OPEN.** ⚠⚠ **The P2 this row carried
+was based on a false claim, and a live probe settled it 20/20.** It said *"a retaliation complaint cannot be closed
+through the API"* — it can: `POST /retaliation/{id}/validate|uphold|dismiss` are all wired, guarded
+`hasPermission('ETHICS','PROTECT')`, and `WhistleblowerRetaliationPage.tsx` renders a button for each. `RECEIVED →
+VALIDATED → UPHELD` and `RECEIVED → DISMISSED` both complete against the running stack; an illegal jump still 409s;
+`ranalyst` gets 403. So `transitionTo` was a redundant **fourth** path and was **deleted**, not wired — its DTO added
+nothing (`terminalStatus` is what the path encodes, `assignedProtectorUserId` is the query param the three already
+take) and its audit line read *"transitioned to UPHELD"* where `uphold()` writes *"upheld — disciplinary action
+triggered"*, the sentence a labour regulator reads. 🔑 **A dark method is not automatically a missing capability;
+sort by EFFECT, not by verb name** (F2-165's own correction). 🔑 **The wrong claim came from reading the service and
+not the controller beside it** — one file short is the whole error, the same shape as F2-179's "`ExerciseObserverService`
+is open", and both were mine. **Still open:** `VendorBcpAttestationDtos.EscalateRequest`, which unlike its sibling has
+**no live twin** — the campaign-level `/escalate` is a bulk sweep with no reason and no named recipient, and
+`vendor_bcp_attestation.escalated_to_user_id` (V177, mapped, **written by nothing**) plus `aml`'s working
+`HitEscalateRequest` precedent say the per-attestation escalation was intended. Adding a write surface is the owner's
+call. ⚠ Do **not** close it by deleting the inert `@Size`. ⚠ One correction carried forward:
+`ApproveAccessRequest.overrideJustification` is `@Size(max = 1000)`, **not** `@NotBlank` — I was one step from
+recording "an override can be approved with no justification" before reading the DTO. **The severity of an inert
+constraint is the severity of the constraint, not of the field it sits on.**
+
+⬜ **F2-187 filed 2026-08-11 — 38 public service methods nothing invokes, and two green reachability gates that
+could not see any of them.** Measured from the compiled constant pool (ASM) while resolving F2-185(a), because the
+annotation fingerprint that found `transitionTo` **only exists where a dark method happens to take a constrained
+DTO**. `apiClientMethodReachability.test.ts` (F2-165) resolves **TS client methods**; `FrontendEndpointContractTest`
+(F2-170) resolves **endpoints**, and a service method with no controller has none — so the gap was the intersection.
+Adjudicated, not counted: **9** are a documented expand-contract residue (`PolicyService`'s legacy lifecycle: CH-6/PM-C1
+retired it, `PolicyManagementService#transition` is the live twin, CH-9 is the exit), **6** outbound-integration pushes
+with no production trigger, **2** declared test seams, **21** unreachable capability/helpers. Sharpest members:
+`CcmService#recordRun` (owns the consecutive-failure → Issue ladder, so a CCM control that keeps failing raises
+nothing), `CommitteeActionItemService#markOverdue` + `ObligationAttestationService#markOverdueForCampaign` (no caller
+**and no scheduler** — nothing is ever marked overdue), `WebPushService#dispatchToUserIds` + `RealtimeBroadcaster#sendToUser`
+(targeted delivery built and unwired on **both** transports, which is why neither looks odd). ⚠ **The raw number was
+51; publishing it would have been publishing false positives** — 16 `@Scheduled`/`@EventListener` and 5 framework-interface
+impls are container-invoked and invisible in bytecode by nature. ⚠⚠ **And the ASM pass found MORE than the javap pass:**
+a class-agnostic method-*name* fallback had cleared `create`/`update`/`delete`, hiding five more `PolicyService` methods.
+Gated by `DarkServiceMethodTest` (7 tests, mutation 10 caught / 0 undeclared survivors) as a **named map with a reason
+each, both directions** — plus an assertion that rejects a bare label, which fired on six of my own first-draft entries.
+🔑 **A green reachability gate certifies the granularity it resolves and nothing coarser or finer.**
 
 ✔ **F2-185b CLOSED 2026-08-11 — the ten `@Size` caps, and the ten did not share an answer.** Split out of F2-185
 and shipped the same day. **2 caps DELETED** (`closing_summary_*` on the obligation and vendor-BCP campaign close

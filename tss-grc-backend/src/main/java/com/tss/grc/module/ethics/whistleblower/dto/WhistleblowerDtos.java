@@ -227,10 +227,11 @@ public final class WhistleblowerDtos {
             LocalDate claimedAtPeriodStart
     ) {}
 
-    public record RetaliationTransitionRequest(
-            @NotBlank String terminalStatus,        // VALIDATED / UPHELD / DISMISSED
-            Long assignedProtectorUserId
-    ) {}
+    // F2-185(a): `RetaliationTransitionRequest(terminalStatus, assignedProtectorUserId)` was deleted
+    // here along with its only consumer. The three wired endpoints encode the terminal state in the
+    // path and already accept `protectorUserId` as a query parameter, so this record described a
+    // capability that existed three times over. See WhistleblowerRetaliationService for why the
+    // register's "the lifecycle cannot be closed through the API" grading was false.
 
     public record RetaliationComplaintResponse(
             Long id,

@@ -1,0 +1,527 @@
+package com.tss.grc.security;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import org.junit.jupiter.api.Test;
+import org.springframework.asm.ClassReader;
+import org.springframework.asm.ClassVisitor;
+import org.springframework.asm.Handle;
+import org.springframework.asm.MethodVisitor;
+import org.springframework.asm.Opcodes;
+import org.springframework.context.event.EventListener;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+/**
+ * F2-185(a) — a <b>public method on a shipped {@code @Service} that nothing invokes</b>.
+ *
+ * <h3>Why this instrument did not exist, and what found the gap</h3>
+ * <p>Two reachability instruments already guard this platform and <b>neither can see this</b>:
+ * <ul>
+ *   <li>{@code apiClientMethodReachability.test.ts} (F2-165) resolves <b>TypeScript API-client
+ *       methods</b> — it answers "does a screen call this client method", and it lives in the
+ *       frontend. A Java service method is not in its universe.</li>
+ *   <li>{@code FrontendEndpointContractTest} (F2-170) resolves <b>endpoints</b> — every endpoint an
+ *       FE client calls must have a controller, plus a decrease-only count of endpoints with no FE
+ *       client. A service method with no controller <b>has no endpoint</b>, so it is not in that
+ *       population either.</li>
+ * </ul>
+ * <p>F2-184 found {@code WhistleblowerRetaliationService#transitionTo} only by accident: its
+ * request DTO carried an inert {@code @NotBlank}, and an inert constraint on a {@code *Request}
+ * type is a fingerprint of a dark path. 🔑 <b>That fingerprint only exists where the dark method
+ * happens to take a constrained DTO.</b> A dark method taking primitives leaves none — so the
+ * fingerprint could never have measured the population, only stumbled on members of it.
+ *
+ * <h3>Bytecode, not a source regex — and this time the reason is arithmetic</h3>
+ * <p>Call sites come from the compiled constant pool via ASM. The register records four pattern
+ * mistakes from one slice of doing this with regexes (F2-165), three phantom counts over Java in
+ * three consecutive findings (F2-170's 1,763 endpoints from a javadoc sentence, F2-179's 0-of-389,
+ * F2-184's 75 types), and F2-182's setter-site scan whose 10 "open" writers were 6 already closed.
+ * A constant pool has no comments, no prose and no strings that look like calls.
+ *
+ * <h3>⚠ What this instrument deliberately does not count as a caller</h3>
+ * <ul>
+ *   <li><b>Tests.</b> Only {@code target/classes} is scanned for call sites. A method whose only
+ *       caller is its own unit test is reached by nothing that ships — the F2-159 decoy shape,
+ *       where a test asserted a defect as correct.</li>
+ *   <li><b>Reflection, SpEL and scheduler-by-name.</b> Invisible in bytecode, so they are
+ *       subtracted structurally below (container annotations, interface contracts) rather than
+ *       guessed at. This is the honest limit of the instrument and it is why the survivors are a
+ *       named list and not an assertion of zero.</li>
+ * </ul>
+ *
+ * <h3>🔑 Why the survivors are a named map with a reason each</h3>
+ * <p>Because the first run proved the population is not homogeneous. Its raw answer was <b>51</b>;
+ * 16 are {@code @Scheduled}/{@code @EventListener} (the container calls them), 5 implement a
+ * framework interface, 2 are declared test seams — and of the 28 that remained, <b>four are a
+ * documented expand-contract residue</b>: {@code PolicyService}'s legacy lifecycle, retired from
+ * HTTP by CH-6/PM-C1 with {@code PolicyManagementService#transition} as the live twin and CH-9
+ * named as the exit. A hard zero would have manufactured four false P2s on its first run —
+ * F2-165's own warning that <i>"a classification rule you can only apply by intuition will
+ * manufacture a P1 on its first use"</i>, arriving again one instrument later.
+ *
+ * <p>So this is the {@code InertValidationConstraintTest.TOLERATED} shape, for the same reason
+ * CLAUDE.md gives for retiring {@code BARE_EXPORT_CEILING}: a bare count lets a new dark method be
+ * swapped in for a deleted one and still pass, and a tolerated entry becomes indistinguishable
+ * from a reviewed one. Both directions are enforced, so a method that gains a caller — or is
+ * deleted — must lose its entry in the same commit.
+ */
+class DarkServiceMethodTest {
+
+    /** Names the JDK, Spring or Jackson invokes, which no call site of ours will show. */
+    private static final Set<String> FRAMEWORK_NAMES = Set.of(
+        "equals", "hashCode", "toString", "clone", "finalize", "compareTo", "run", "call", "get",
+        "apply", "accept", "test", "close", "afterPropertiesSet", "destroy", "onApplicationEvent",
+        "getOrder", "afterCommit", "afterCompletion", "beforeCommit", "supports", "convert",
+        "matches", "resolveArgument", "handle", "initialize", "isValid", "compare");
+
+    /** Annotations that mean "the container calls this, not us". */
+    private static final List<Class<? extends java.lang.annotation.Annotation>> CONTAINER_ANN =
+        List.of(Scheduled.class, EventListener.class, TransactionalEventListener.class,
+                PostConstruct.class, PreDestroy.class);
+
+    /**
+     * The dark public service methods this slice deliberately left, each with the reason and — the
+     * part that matters — <b>what a user cannot do because of it</b>.
+     *
+     * <p>F2-165's rule for sorting this population is by <b>effect, not verb name</b>: a dark method
+     * whose effect a live sibling already achieves is dead code; one with no live sibling is lost
+     * capability. That rule is applied per entry below, because applying it in the aggregate is what
+     * produced its "no screen can approve evidence" false alarm.
+     */
+    private static final Map<String, String> TOLERATED = new TreeMap<>(Map.ofEntries(
+
+        // ── Deliberate expand-contract residue: retired from HTTP, live twin named, exit named ──
+        // ⚠ NINE methods, not the four the first (Python, name-fallback) pass reported. The whole
+        // legacy write lifecycle is here, which is what RegChangePolicyController's comment already
+        // said out loud: "Legacy policy writes RETIRED (CH-6/PM-C1) … only the read endpoints
+        // (list/get/stats) remain … PolicyService keeps the now HTTP-unexposed lifecycle methods
+        // (+ their tests) through this expand-contract window; the whole legacy service goes with
+        // CH-9." 🔑 The comment is the difference between dead code and a decision — and it sits by
+        // the CALLER, not by the methods, which is why no scan of the service could find it.
+        Map.entry("com.tss.grc.module.compliance.service.PolicyService#submitForLegalReview",
+            "RETIRED BY DESIGN. CH-6/PM-C1 retired the legacy compliance.policies write lifecycle; "
+            + "authoring lives on the canonical register (PolicyManagementService#transition). "
+            + "RegChangePolicyController says so in a comment and names CH-9 as when the whole "
+            + "service goes. Nothing is lost: the effect has a live twin."),
+        Map.entry("com.tss.grc.module.compliance.service.PolicyService#legalApprove",
+            "RETIRED BY DESIGN — see #submitForLegalReview."),
+        Map.entry("com.tss.grc.module.compliance.service.PolicyService#executiveApprove",
+            "RETIRED BY DESIGN — see #submitForLegalReview."),
+        Map.entry("com.tss.grc.module.compliance.service.PolicyService#markReviewDue",
+            "RETIRED BY DESIGN — see #submitForLegalReview."),
+        Map.entry("com.tss.grc.module.compliance.service.PolicyService#create",
+            "RETIRED BY DESIGN — see #submitForLegalReview. Its mass-assignment defence is still "
+            + "worth reading: RegulatoryChangeService cites it by name."),
+        Map.entry("com.tss.grc.module.compliance.service.PolicyService#update",
+            "RETIRED BY DESIGN — see #submitForLegalReview."),
+        Map.entry("com.tss.grc.module.compliance.service.PolicyService#delete",
+            "RETIRED BY DESIGN — see #submitForLegalReview."),
+        Map.entry("com.tss.grc.module.compliance.service.PolicyService#reject",
+            "RETIRED BY DESIGN — see #submitForLegalReview."),
+        Map.entry("com.tss.grc.module.compliance.service.PolicyService#retire",
+            "RETIRED BY DESIGN — see #submitForLegalReview."),
+
+        // ── Declared test seams: reached only by tests, on purpose ───────────────────────────
+        // Listed rather than subtracted by a name rule. A `setClock`-shaped exemption would let any
+        // dark method be hidden by renaming it, which is the "classification rule you can only apply
+        // by intuition" F2-165 warns manufactures a finding on first use.
+        Map.entry("com.tss.grc.module.aml.sanctions.service.SanctionsHitService#setClock",
+            "DECLARED TEST SEAM — injects a fixed Clock so date-relative assertions are stable. "
+            + "CLAUDE.md records why this seam matters here specifically: LocalDate.now() in a test "
+            + "is UTC+3 on this machine while the services are UTC, so a date-relative fixture is "
+            + "wrong for three hours of every day (the F2-178 correction). Reached by tests only, "
+            + "which is the point."),
+        Map.entry("com.tss.grc.module.aml.sanctions.service.SanctionsScreeningSchedulerService#setClock",
+            "DECLARED TEST SEAM — see SanctionsHitService#setClock."),
+
+        // ── Outbound integrations with no production trigger (filed: F2-187) ──────────────────
+        Map.entry("com.tss.grc.module.integrations.servicenow.service.ServiceNowOutboundService#pushCyberIncident",
+            "NO PRODUCTION TRIGGER. ServiceNowController exposes /health, /config and /test-push "
+            + "only, so a real cyber incident is never pushed to ServiceNow — the integration reads "
+            + "as working (health green, config present, test-push succeeds) while no domain event "
+            + "reaches it. The service's own javadoc states the v1 intent (\"modules whose DTOs "
+            + "haven't stabilised\"), so this is a posture rather than a bug, but the posture is "
+            + "invisible to a buyer. F2-187."),
+        Map.entry("com.tss.grc.module.integrations.servicenow.service.ServiceNowOutboundService#pushFinding",
+            "NO PRODUCTION TRIGGER — see #pushCyberIncident. F2-187."),
+        Map.entry("com.tss.grc.module.integrations.servicenow.service.ServiceNowOutboundService#pushCapaTask",
+            "NO PRODUCTION TRIGGER — see #pushCyberIncident. F2-187."),
+        Map.entry("com.tss.grc.module.integrations.servicenow.service.ServiceNowOutboundService#pushComplianceGap",
+            "NO PRODUCTION TRIGGER — see #pushCyberIncident. F2-187."),
+        Map.entry("com.tss.grc.module.integrations.splunk.service.SplunkOutboundService#pushGenericEvent",
+            "NO PRODUCTION TRIGGER for the free-form variant. Splunk differs from ServiceNow: "
+            + "SplunkController also exposes POST /security-event/{id}, so that module has one real "
+            + "trigger and only the generic overload is dark. F2-187."),
+        Map.entry("com.tss.grc.module.integrations.crowdstrike.service.CrowdStrikeOutboundService#hideHost",
+            "DEAD DUPLICATE-ish: CrowdStrikeController exposes /contain/{hostId} and /lift/{hostId}, "
+            + "so host containment IS reachable; #hideHost is a second containment verb nothing "
+            + "routes to. Listed rather than deleted because CrowdStrikeClient#hideHost is the "
+            + "vendor API call the contain path may need to switch to. F2-187."),
+
+        // ── A state nothing can ever move to: the sharpest bucket, because the row just sits ──
+        // Each of these is the shape CLAUDE.md already records twice — committee terms that nothing
+        // moves out of ACTIVE, and the drift ladder that had never run. The method exists, the state
+        // exists, and no path reaches it, so a register reads "current" forever.
+        Map.entry("com.tss.grc.module.admin.committee.service.CommitteeActionItemService#markOverdue",
+            "No caller and no scheduler: a committee action item is NEVER marked overdue, so an "
+            + "action-item register shows nothing outstanding no matter how late it is. Same shape "
+            + "as the ACTIVE-term sweep CLAUDE.md records for committee seats. F2-187."),
+        Map.entry("com.tss.grc.module.compliance.obligation.service.ObligationAttestationService#markOverdueForCampaign",
+            "No caller and no scheduler: a regulatory-obligation attestation is NEVER marked "
+            + "overdue, so a compliance owner cannot see who has missed an attestation campaign. "
+            + "F2-187."),
+        Map.entry("com.tss.grc.module.ccm.service.CcmService#recordRun",
+            "Nothing records a continuous-control-monitoring test run — and this method owns the "
+            + "consecutive-failure -> Issue ladder and the parent definition's last_run_* stamps. So "
+            + "a CCM control that fails repeatedly raises no Issue and reads as never having run. "
+            + "The F2-175 drift-ladder shape in a second module. F2-187."),
+        Map.entry("com.tss.grc.module.socops.service.IrPlaybookService#recordInvocation",
+            "Playbook invocations are never recorded, so an incident review cannot evidence that the "
+            + "IR playbook was followed — the artefact an auditor asks for. F2-187."),
+        Map.entry("com.tss.grc.module.socops.service.ThreatIntelService#markActioned",
+            "A threat-intel item cannot be marked actioned, so the queue never drains and there is "
+            + "no record of which indicators were dealt with. F2-187."),
+
+        // ── Built and unwired: the capability exists in code and no route reaches it ──────────
+        Map.entry("com.tss.grc.module.ai.governance.service.MlModelDriftService#listUnacknowledged",
+            "No endpoint lists unacknowledged drift observations, so the CRITICAL-drift escalation "
+            + "F2-175 fixed can be filed and never reviewed — the intake record is created and the "
+            + "queue that would surface it is unreachable. F2-187."),
+        Map.entry("com.tss.grc.module.bcm.cycle.runtime.observer.service.ExerciseObserverService#buildAarSection",
+            "The observer's after-action-report section is built by nothing, so observer findings "
+            + "from a BCM exercise never reach the AAR that NCEMA evidence is drawn from. F2-187."),
+        Map.entry("com.tss.grc.module.platform.push.service.WebPushService#dispatchToUserIds",
+            "Targeted web-push fan-out with no caller: a notification cannot be pushed to specific "
+            + "users. The delivery half of what F2-38(d) left open as an owner decision. F2-187."),
+        Map.entry("com.tss.grc.platform.realtime.RealtimeBroadcaster#sendToUser",
+            "Per-user realtime send with no caller; only BroadcastHelper's tenant-wide path is live. "
+            + "Pairs with WebPushService#dispatchToUserIds — targeted delivery is built and unwired "
+            + "on BOTH transports, which is why neither looks like the odd one out. F2-187."),
+        Map.entry("com.tss.grc.module.privacy.subprocessor.service.SubprocessorEventService#listAll",
+            "The tenant-wide subprocessor-event feed is unreachable; only the per-subprocessor list "
+            + "is wired. So a DPO cannot review every sub-processor change in one place, which is the "
+            + "view PDPL sub-processor oversight actually needs. F2-187."),
+
+        // ── Predicates and readers nothing consults: low blast radius, but say why they matter ──
+        Map.entry("com.tss.grc.module.platform.controls.service.ControlLibraryService#hasRecentApprovedAssessment",
+            "A control-assessment freshness predicate nothing asks. Worth a second look before "
+            + "deletion rather than after: a freshness check that is never consulted is exactly how "
+            + "a stale control passes for current. F2-187."),
+        Map.entry("com.tss.grc.module.change_mgmt.service.ChangeManagementService#isConditional",
+            "Derived, never stored, and never asked: nothing distinguishes a change approved SUBJECT "
+            + "TO CONDITIONS from an unconditional approval, so the conditions attached at CAB are "
+            + "invisible downstream. F2-187."),
+        Map.entry("com.tss.grc.module.change_mgmt.service.ChangeGovernanceHealthService#isGateConfigured",
+            "Public gate-configuration probe with no caller; the class's @EventListener sibling is "
+            + "the live path and warns on the same condition, so this is the query form of an answer "
+            + "the platform only ever logs. F2-187."),
+        Map.entry("com.tss.grc.module.admin.committee.service.CommitteeCatalogService#countStandingItems",
+            "Standing-item count nothing reads; the committee registry screen derives its own. A "
+            + "second, unconsulted counter is how two numbers for one thing start disagreeing. "
+            + "F2-187."),
+        Map.entry("com.tss.grc.module.admin.committee.service.CommitteeCatalogService#findTemplate",
+            "Committee-template lookup with no caller: templates are catalogued and cannot be "
+            + "resolved by any route, so a tenant cannot instantiate a committee from one. F2-187."),
+        Map.entry("com.tss.grc.module.change_mgmt.service.ChangeModelService#usageFor",
+            "Per-change-model usage count nothing reads, so a tenant cannot see whether a change "
+            + "model is in use before editing or retiring it. F2-187."),
+        Map.entry("com.tss.grc.module.governance.threelines.service.ThreeLinesService#bandForUser",
+            "Resolves which of the three lines of defence a user sits in — and nothing asks, so the "
+            + "independence model is recorded and never enforced or displayed per user. F2-187."),
+        Map.entry("com.tss.grc.module.ndi.settings.service.NdiSettingService#stringValue",
+            "Typed accessor for NDI settings with no caller; callers read the raw setting instead, "
+            + "which is how a default declared in one place stops being applied. F2-187."),
+        Map.entry("com.tss.grc.module.platform.regulatory.service.AuthorityDocumentService#citationCount",
+            "Citation count per authority document is computed by nothing, so a regulatory-library "
+            + "screen cannot show how heavily a document is relied upon. F2-187."),
+        Map.entry("com.tss.grc.module.sust.ghg.service.EmissionFactorService#resolveActive",
+            "Active-emission-factor resolver with no caller: GHG calculations pick factors by another "
+            + "path, so the 'which factor was active on this date' question this method answers is "
+            + "not the one the numbers were produced with. Check before deleting — ISAE 3410 "
+            + "assurance lineage depends on that answer. F2-187."),
+        Map.entry("com.tss.grc.module.sust.climate.service.FinancedEmissionsService#getTarget",
+            "Single-PCAF-target read is unreachable; only the list is wired, so a financed-emissions "
+            + "target has no detail view. F2-187.")
+    ));
+
+    // ── the scan ─────────────────────────────────────────────────────────────────────────────
+
+    /** (ownerInternalName, methodName) of every call site in main classes. */
+    private static Set<String> callSites() throws IOException {
+        Set<String> calls = new LinkedHashSet<>();
+        for (Resource r : mainClasses()) {
+            try (InputStream in = r.getInputStream()) {
+                new ClassReader(in).accept(new ClassVisitor(Opcodes.ASM9) {
+                    @Override
+                    public MethodVisitor visitMethod(int access, String name, String descriptor,
+                                                     String signature, String[] exceptions) {
+                        return new MethodVisitor(Opcodes.ASM9) {
+                            @Override
+                            public void visitMethodInsn(int opcode, String owner, String mName,
+                                                        String desc, boolean isInterface) {
+                                calls.add(owner + "#" + mName);
+                            }
+
+                            @Override
+                            public void visitInvokeDynamicInsn(String iName, String desc,
+                                                               Handle bsm, Object... bsmArgs) {
+                                // Method references (Foo::bar) and lambdas land here; the referenced
+                                // method is a Handle among the bootstrap arguments. Missing these
+                                // would report every ::-referenced method as dark.
+                                for (Object a : bsmArgs) {
+                                    if (a instanceof Handle h) {
+                                        calls.add(h.getOwner() + "#" + h.getName());
+                                    }
+                                }
+                            }
+                        };
+                    }
+                }, ClassReader.SKIP_FRAMES);
+            }
+        }
+        return calls;
+    }
+
+    private static List<Resource> mainClasses() throws IOException {
+        List<Resource> out = new ArrayList<>();
+        for (Resource r : new PathMatchingResourcePatternResolver()
+                .getResources("classpath*:com/tss/grc/**/*.class")) {
+            String url = r.getURL().toString().replace('\\', '/');
+            // Deliberate: test classes are NOT callers. See the class javadoc.
+            if (url.contains("/target/classes/")) {
+                out.add(r);
+            }
+        }
+        return out;
+    }
+
+    private static List<Class<?>> serviceClasses() throws IOException {
+        List<Class<?>> out = new ArrayList<>();
+        for (Resource r : mainClasses()) {
+            String url = r.getURL().toString().replace('\\', '/');
+            int i = url.indexOf("/target/classes/");
+            String fqcn = url.substring(i + "/target/classes/".length())
+                    .replace(".class", "").replace('/', '.');
+            if (fqcn.contains("$")) {
+                continue;
+            }
+            try {
+                Class<?> c = Class.forName(fqcn, false, DarkServiceMethodTest.class.getClassLoader());
+                if (c.isAnnotationPresent(Service.class)) {
+                    out.add(c);
+                }
+            } catch (Throwable ignored) {
+                // A class we cannot load is not a class we can adjudicate.
+            }
+        }
+        return out;
+    }
+
+    /** Every supertype, so a call dispatched through an interface or superclass counts. */
+    private static Set<Class<?>> supertypes(Class<?> c) {
+        Set<Class<?>> seen = new LinkedHashSet<>();
+        Deque<Class<?>> q = new ArrayDeque<>(List.of(c));
+        while (!q.isEmpty()) {
+            Class<?> cur = q.poll();
+            if (cur == null || !seen.add(cur)) {
+                continue;
+            }
+            if (cur.getSuperclass() != null) {
+                q.add(cur.getSuperclass());
+            }
+            q.addAll(List.of(cur.getInterfaces()));
+        }
+        return seen;
+    }
+
+    private static boolean declaredByASupertype(Class<?> owner, Method m) {
+        for (Class<?> t : supertypes(owner)) {
+            if (t == owner) {
+                continue;
+            }
+            try {
+                t.getDeclaredMethod(m.getName(), m.getParameterTypes());
+                return true;
+            } catch (NoSuchMethodException ignored) {
+                // not declared there
+            }
+        }
+        return false;
+    }
+
+    static Set<String> measureDark() throws IOException {
+        Set<String> calls = callSites();
+        Set<String> dark = new TreeSet<>();
+        for (Class<?> svc : serviceClasses()) {
+            Set<String> internalNames = new LinkedHashSet<>();
+            for (Class<?> t : supertypes(svc)) {
+                internalNames.add(t.getName().replace('.', '/'));
+            }
+            for (Method m : svc.getDeclaredMethods()) {
+                if (!Modifier.isPublic(m.getModifiers()) || m.isSynthetic() || m.isBridge()) {
+                    continue;
+                }
+                if (FRAMEWORK_NAMES.contains(m.getName())) {
+                    continue;
+                }
+                if (CONTAINER_ANN.stream().anyMatch(m::isAnnotationPresent)) {
+                    continue;
+                }
+                if (m.isAnnotationPresent(Override.class) || declaredByASupertype(svc, m)) {
+                    continue;
+                }
+                boolean reached = internalNames.stream()
+                        .anyMatch(n -> calls.contains(n + "#" + m.getName()));
+                if (!reached) {
+                    dark.add(svc.getName() + "#" + m.getName());
+                }
+            }
+        }
+        return dark;
+    }
+
+    // ── the assertions ───────────────────────────────────────────────────────────────────────
+
+    @Test
+    void everyDarkServiceMethodIsAdjudicated() throws IOException {
+        Set<String> dark = measureDark();
+        Set<String> unexplained = new TreeSet<>(dark);
+        unexplained.removeAll(TOLERATED.keySet());
+        assertThat(unexplained)
+            .as("""
+                A public method on a shipped @Service that nothing invokes. Either wire it, delete \
+                it, or add it to TOLERATED with what a USER cannot do because of it — a bare \
+                "unused" is the annotation that makes a tolerated entry look reviewed. Note the \
+                instrument's blind spots first (class javadoc): if the only caller is reflection, \
+                SpEL or a scheduler-by-name, the honest entry says so.""")
+            .isEmpty();
+    }
+
+    @Test
+    void aToleratedEntryThatGainedACallerMustLoseItsEntry() throws IOException {
+        Set<String> dark = measureDark();
+        Set<String> fixed = new TreeSet<>(TOLERATED.keySet());
+        fixed.removeAll(dark);
+        assertThat(fixed)
+            .as("""
+                These are listed as dark but now have a caller (or were deleted). Remove the entry \
+                in the same commit. This direction is the whole reason TOLERATED is a named map \
+                rather than a count: without it a new dark method can be swapped in for a fixed one \
+                and the gate stays green — CLAUDE.md's BARE_EXPORT_CEILING lesson.""")
+            .isEmpty();
+    }
+
+    @Test
+    void everyToleratedEntryCarriesARealReason() {
+        List<String> thin = TOLERATED.entrySet().stream()
+                .filter(e -> e.getValue().length() < 40
+                        || e.getValue().toLowerCase().matches("^(unused|dead|n/?a|todo)\\.?$"))
+                .map(Map.Entry::getKey)
+                .toList();
+        assertThat(thin)
+            .as("A tolerated entry needs a reason a reader can act on, not a label")
+            .isEmpty();
+    }
+
+    @Test
+    void theRetaliationTransitionIsGoneAndItsThreeReplacementsAreNot() throws IOException {
+        Set<String> dark = measureDark();
+        // F2-185(a): the method the register graded P2 for "the lifecycle cannot be closed". It was
+        // deleted, so it must not be dark — it must not exist.
+        assertThat(dark).noneMatch(d -> d.endsWith("WhistleblowerRetaliationService#transitionTo"));
+        Class<?> svc;
+        try {
+            svc = Class.forName(
+                "com.tss.grc.module.ethics.whistleblower.service.WhistleblowerRetaliationService");
+        } catch (ClassNotFoundException e) {
+            throw new AssertionError(e);
+        }
+        List<String> names = List.of(svc.getDeclaredMethods()).stream().map(Method::getName).toList();
+        assertThat(names)
+            .as("the three real disposition paths must survive the deletion of the generic one")
+            .contains("validate", "uphold", "dismiss")
+            .doesNotContain("transitionTo");
+    }
+
+    @Test
+    void aMethodReferenceTargetIsNotReportedDark() throws IOException {
+        // What this proves: a method reached ONLY through `::` (CommitteeReferralService::states, a
+        // private static used as a Predicate) is in the call set. Without that, the first public
+        // service method reached only by a `::` reference would be reported dark and its reader
+        // would go hunting for an endpoint that already exists.
+        //
+        // ⚠ What it does NOT prove, and I first claimed it did: that the visitInvokeDynamicInsn
+        // handler is load-bearing. Mutation 6 deletes that handler and this assertion still passes,
+        // because javac desugars a method reference to a private static into a synthetic bridge that
+        // calls it with an ordinary invokestatic — which visitMethodInsn already sees. So the
+        // bootstrap-handle collection is redundant on THIS tree. It is kept because the desugaring is
+        // a compiler implementation detail, not a language guarantee, and a reference to a method on
+        // another class can compile to a direct handle.
+        //
+        // 🔑 I wrote the first version of this test by reasoning about my own code rather than
+        // measuring it, and named it after the mechanism I assumed was doing the work. That is the
+        // F2-159 shape — a test that agrees with the implementation because it was derived from it —
+        // and the mutation harness is the only reason it did not ship under a name that lied.
+        assertThat(callSites())
+            .as("a ::-referenced target must be collected, or ::-reached methods read as dark")
+            .contains("com/tss/grc/module/admin/committee/service/CommitteeReferralService#states");
+    }
+
+    @Test
+    void theInstrumentIsNotVacuous() throws IOException {
+        // If the call-site scan silently returned nothing, every service method would read as dark
+        // and the TOLERATED map would be swamped — but if it returned everything, the population
+        // would be empty and both assertions above would pass over any defect.
+        Set<String> calls = callSites();
+        assertThat(calls).as("the ASM scan found call sites at all").hasSizeGreaterThan(5_000);
+        assertThat(serviceClasses()).as("@Service classes were discovered").hasSizeGreaterThan(200);
+        Set<String> dark = measureDark();
+        assertThat(dark)
+            .as("a dark population of 0 would mean the subtraction is clearing everything")
+            .isNotEmpty();
+        assertThat(dark.size())
+            .as("""
+                and a population in the hundreds would mean the reachability logic is broken rather \
+                than the code being dark — the first raw run measured 51 before the container/ \
+                interface/seam subtraction, so this ceiling is a sanity bound on the INSTRUMENT.""")
+            .isLessThan(60);
+    }
+
+    @Test
+    void theSubtractionRulesActuallyFire() throws IOException {
+        // Each subtraction below removed real members on the measured tree. If a rule stops firing,
+        // either the codebase changed or the rule broke — both worth knowing, because a subtraction
+        // that silently matches nothing is how a false population looks correct.
+        Set<String> dark = measureDark();
+        assertThat(dark)
+            .as("@Scheduled methods must be subtracted (16 on the measured tree)")
+            .noneMatch(d -> d.endsWith("SodService#nightlyScan")
+                    || d.endsWith("KriSchedulerService#tick")
+                    || d.endsWith("AuditChainService#sealAllTenants"));
+        assertThat(dark)
+            .as("@EventListener methods must be subtracted")
+            .noneMatch(d -> d.endsWith("AutomationRuleEngine#onDomainEvent"));
+        assertThat(dark)
+            .as("framework-interface implementations must be subtracted")
+            .noneMatch(d -> d.endsWith("CustomUserDetailsService#loadUserByUsername"));
+    }
+}
