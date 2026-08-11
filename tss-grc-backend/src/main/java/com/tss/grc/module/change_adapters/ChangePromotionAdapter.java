@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * {@code CHANGE_REQUEST} → {@code change.change_request} — F2-172.
@@ -34,6 +36,33 @@ import java.time.format.DateTimeParseException;
 @RequiredArgsConstructor
 public class ChangePromotionAdapter implements RegisterPromotionPort {
 
+    /**
+     * The status a promoted change is created with — {@code ck_change_status}, a 16-value vocabulary of
+     * which this is deliberately the first.
+     */
+    static final String PROMOTED_STATUS = "DRAFT";
+
+    /**
+     * Every value this adapter can write to {@code change_requests.change_type} — {@code ck_change_type}.
+     *
+     * <p>⚠ This used to be {@code ctx.firstText("changeType").orElse("NORMAL")}: whatever the payload
+     * said, straight into a CHECK-constrained column. It happens to work today because
+     * {@code CHANGE_REQUEST}'s form offers exactly {@code STANDARD | NORMAL | EMERGENCY} — so this was
+     * not a defect, it was the {@link com.tss.grc.module.incident.intake.IncidentPromotionAdapter} defect
+     * with a form that happened to agree. F2-180 clamps it because "the caller is currently sending legal
+     * values" is a fact about today's frontend, not a property of the server, and the payload does not
+     * have to come from that form.
+     *
+     * <p>⚙ Nearly a real collision: {@code CAPITAL_CHANGE_NOTIFICATION}'s form also has a
+     * {@code changeType} field, whose values are {@code INCREASE | DECREASE}. Only the catalogue's
+     * routing keeps them apart — that kind promotes to {@code POLICY}, not here — so one re-routing
+     * would have turned a near-miss into the same failure.
+     */
+    static final Set<String> CHANGE_TYPES = Set.of("STANDARD", "NORMAL", "EMERGENCY");
+
+    /** The type an unrecognised or absent {@code changeType} becomes. */
+    static final String CHANGE_TYPE_DEFAULT = "NORMAL";
+
     private final ChangeManagementService changes;
 
     @Override public String target() { return "CHANGE"; }
@@ -47,7 +76,7 @@ public class ChangePromotionAdapter implements RegisterPromotionPort {
         c.setTitleEn(ctx.titleEn(255, "titleEn", "description"));
         c.setTitleAr(ctx.firstText("titleAr").orElseGet(() -> ctx.titleAr(255)));
         c.setDescriptionEn(ctx.description());
-        c.setChangeType(ctx.firstText("changeType").orElse("NORMAL"));
+        c.setChangeType(changeType(ctx));
         c.setRiskLevel(ctx.severityOrMedium());
         c.setRollbackPlan(ctx.firstText("rollbackPlan").orElse(null));
         c.setRequestedByName(ctx.ownerName());
@@ -55,8 +84,15 @@ public class ChangePromotionAdapter implements RegisterPromotionPort {
         c.setScheduledStart(dateTime(ctx));
         // DRAFT, not SUBMITTED: the CAB gate is a transition the change module owns, and entering
         // its queue from a side door is the F2-04 shape in workflow form.
-        c.setStatus("DRAFT");
+        c.setStatus(PROMOTED_STATUS);
         return String.valueOf(changes.create(c).getId());
+    }
+
+    private String changeType(IntakePromotionContext ctx) {
+        return ctx.firstText("changeType")
+            .map(s -> s.trim().toUpperCase(Locale.ROOT))
+            .filter(CHANGE_TYPES::contains)
+            .orElse(CHANGE_TYPE_DEFAULT);
     }
 
     private java.time.LocalDateTime dateTime(IntakePromotionContext ctx) {

@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,577 @ 2026-08-10; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,602 @ 2026-08-11; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -433,6 +433,13 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   collation. **Normalise on write** (so the CHECK, the comparison and the FE label map agree) rather
   than reaching for `equalsIgnoreCase`, which leaves the odd casing in the column and misses the
   frontend's label lookup.
+  ⚠⚠ **And the mirror of that landmine: a CHECK constraint the Java side never mentions is still enforced.**
+  F2-180 found **19 of the 22** incident categories the platform's own screen offers being refused by
+  `CK_incidents_category`, and three promotion adapters writing status/category words their columns had
+  never accepted. **Before writing a vocabulary literal, read the column's CHECK** — from
+  `sys.check_constraints` or the migration, scoped to *that* table. ⚠ **A cross-check not scoped to the
+  target table is worse than none**: the first sweep compared literals against every CHECK in the database
+  and cleared the one adapter already known to be broken, because its value is legal on some other table.
 - **`LocalDate.now()` in a test is UTC+3 here; the services it tests are UTC** — so a date-relative
   fixture is wrong for three hours of every day (F2-178 correction, caught 2026-08-10 at 00:4x local).
   `CommitteeSeatLinkageTest` set `termEndsAt = LocalDate.now().minusDays(1)` while
@@ -478,6 +485,25 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   in one transaction. The request DTO has no field for either — do not re-add one. (Both halves used
   to be broken at once: `lib/intake.ts` drove the lifecycle in `localStorage`, *and*
   `IntakeService.triage()` took `promotedToRecordId` from the request body and created nothing.)
+  ⚠⚠ **A promoted record's status/category words are governed by a `CHECK` the Java side never mentions,
+  and three of the thirteen adapters were writing values their columns had never accepted** (F2-180 +
+  F2-175): `RiskPromotionAdapter` `IDENTIFIED`, `VendorPromotionAdapter` `ONBOARDING`, and
+  `IncidentPromotionAdapter` passing the submitter's own category straight through — so `SECURITY_INCIDENT`
+  (**0 of its form's 4 categories legal**), `WORKPLACE_INJURY` and `CONSUMER_COMPLAINT_RESPONSE` could
+  never promote, and only `VRP_DISCLOSURE` — which has no category field — ever worked. All three words
+  were right about what the state *means*. 🔑 **Being right about what a state means is not evidence about
+  what the column stores it in.** Now pinned by `PromotionVocabularyTest`: 13 adapters → 13 target tables →
+  18 CHECK vocabularies, read from the **migrations** so `mvn package` stays hermetic, with every
+  constrained column either bound to a named constant or listed in `unwritten` with a reason. All 13 are
+  live-probed (50/50) as of 2026-08-11.
+  ⚠ **The reason it was three and not eight is one accessor**: `IntakePromotionContext#severityOrMedium()`
+  clamps to the four bands all five severity-ish columns declare. **A closed column needs a closed writer** —
+  add a clamp, do not trust the caller, and do not widen the CHECK to admit whatever the caller sent.
+  ⚠ **Error 547 is BOTH `FOREIGN KEY` and `CHECK`**, and `GlobalExceptionHandler` reported every one as a
+  reference problem — costing three investigations, including one on `risk.risks`, a table with no foreign
+  keys at all. It now answers `conflictKind: VALUE_NOT_ALLOWED` and names the column (the 547 CHECK message
+  carries the column but not the value, so SEC-CFG-001 holds). If you see the old wording, you are on an
+  old jar. 🔑 **A wrong-but-specific diagnostic does not slow the reader down, it sends them somewhere.**
   ⚠ **The 13 adapters live in the module that OWNS the record** (`privacy/intake/`, `risk/intake/`…),
   never in `module/intake`: ADR-018 homes intake in **Base**, and twelve of the fourteen targets are
   sold SKUs. `IntakePromotionContractTest` fails the build if `module/intake` imports a peer. The

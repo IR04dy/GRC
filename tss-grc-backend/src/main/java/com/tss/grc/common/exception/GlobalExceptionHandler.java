@@ -527,12 +527,36 @@ public class GlobalExceptionHandler {
                 detail = "A record with these values already exists. One of the fields you supplied "
                        + "must be unique within your organisation — change it and try again.";
             }
-            case 547 -> {                            // FOREIGN KEY / CHECK constraint
-                kind = "REFERENCE";
+            case 547 -> {
+                // ⚠⚠ F2-180 — SQL Server error 547 is BOTH "FOREIGN KEY" and "CHECK", and this arm
+                // used to answer with the foreign-key wording for both. The comment here even said
+                // "FOREIGN KEY / CHECK constraint", so the ambiguity was known and the message was
+                // written for one of the two.
+                //
+                // What that cost, measured: F2-175 spent a probe iteration on a promotion that failed
+                // CK_risks_status while being told "either something it refers to does not exist, or the
+                // record is still referenced elsewhere" — a description of a foreign key, on a table
+                // (risk.risks) that has no foreign keys at all. F2-180 then hit it again on
+                // CK_vendors_status, and again 19 times over while measuring the incident register's
+                // category vocabulary. Three investigations, each starting from a sentence about
+                // references that was never true of any of them.
+                //
+                // 🔑 A diagnostic that is wrong in a specific, plausible direction is worse than a
+                // vague one: it does not slow the reader down, it sends them somewhere.
+                //
+                // The two are told apart from the driver's own text, which says which kind of
+                // constraint it was. It also names the table and column but NOT the offending value —
+                // so naming the column is safe under SEC-CFG-001 and is exactly what the caller needs.
+                boolean checkConstraint = isCheckConstraintViolation(ex);
+                kind = checkConstraint ? "VALUE_NOT_ALLOWED" : "REFERENCE";
                 status = HttpStatus.CONFLICT;
-                detail = "This operation conflicts with a related record: either something it "
-                       + "refers to does not exist, or the record is still referenced elsewhere "
-                       + "and cannot be removed.";
+                detail = checkConstraint
+                    ? "One of the values supplied is not one this field accepts. The field is "
+                      + "restricted to a fixed set of values" + column(ex) + " — correct the value "
+                      + "rather than retrying."
+                    : "This operation conflicts with a related record: either something it "
+                      + "refers to does not exist, or the record is still referenced elsewhere "
+                      + "and cannot be removed.";
             }
             case 515 -> {                            // cannot insert NULL
                 kind = "REQUIRED_FIELD";
@@ -563,6 +587,49 @@ public class GlobalExceptionHandler {
         }
         pd.setProperty("timestamp", Instant.now());
         return pd;
+    }
+
+    /**
+     * Whether an error-547 violation was a {@code CHECK} rather than a {@code FOREIGN KEY} — F2-180.
+     *
+     * <p>SQL Server shares 547 between the two and the driver's message is the only thing that
+     * distinguishes them: <em>"The INSERT statement conflicted with the CHECK constraint
+     * "CK_risks_status""</em> against <em>"…with the FOREIGN KEY constraint…"</em>. Matching on
+     * {@code CHECK constraint} rather than on the absence of {@code FOREIGN KEY} is deliberate: an
+     * unrecognised 547 keeps the old, broader wording instead of being asserted as a value problem.
+     */
+    private static boolean isCheckConstraintViolation(Throwable ex) {
+        return chainText(ex).toUpperCase(java.util.Locale.ROOT).contains("CHECK CONSTRAINT");
+    }
+
+    /**
+     * Every message in the cause chain, joined.
+     *
+     * <p>Scanning the chain rather than only {@link #rootMessage} because the layer carrying the
+     * driver's text is not reliably the deepest one: Hibernate and Spring each wrap, and which link
+     * ends up last depends on the operation. Reading only the root is how this kind of check comes to
+     * work for inserts and quietly stop working for updates.
+     */
+    private static String chainText(Throwable ex) {
+        StringBuilder sb = new StringBuilder();
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (t.getMessage() != null) sb.append(t.getMessage()).append('\n');
+            if (t.getCause() == t) break;
+        }
+        return sb.toString();
+    }
+
+    /**
+     * {@code " (column 'status')"} when the driver named the column, otherwise empty.
+     *
+     * <p>The 547 CHECK message carries the table and the column but not the offending value, so this
+     * adds the one piece of information a caller cannot infer without leaking row data — the reason
+     * prod hardening (SEC-CFG-001) strips root messages in the first place.
+     */
+    private static String column(Throwable ex) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile("column\\s+'([A-Za-z0-9_]+)'").matcher(chainText(ex));
+        return m.find() ? " (column '" + m.group(1) + "')" : "";
     }
 
     /** Vendor error number from anywhere in the cause chain, or 0 when there is no SQLException. */

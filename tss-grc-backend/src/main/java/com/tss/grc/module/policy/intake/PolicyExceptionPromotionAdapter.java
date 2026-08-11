@@ -34,6 +34,12 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class PolicyExceptionPromotionAdapter implements RegisterPromotionPort {
 
+    /**
+     * The status a promoted exception is created with — {@code ck_policy_exc_status}. Named for the pin;
+     * see {@code PromotionVocabularyTest}.
+     */
+    static final String PROMOTED_STATUS = "REQUESTED";
+
     private final PolicyManagementService policies;
     private final PolicyDocumentRepository documents;
 
@@ -56,7 +62,7 @@ public class PolicyExceptionPromotionAdapter implements RegisterPromotionPort {
         e.setRiskLevel(ctx.severityOrMedium());
         e.setRequestedAt(ctx.acknowledgedAt());
         e.setExpiryDate(sunset(ctx));
-        e.setStatus("REQUESTED");
+        e.setStatus(PROMOTED_STATUS);
         return String.valueOf(policies.createException(e).getId());
     }
 

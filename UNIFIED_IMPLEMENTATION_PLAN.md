@@ -1332,9 +1332,83 @@ caught only by that anti-vacuity leg). ⚙ **Two independent reasons nobody had 
 promotion into `privacy.dpia` and reasoned about the other twelve adapters from their source; and the only
 kind routed to `RISK` is `RISK_ISSUE`, whose sole producer was the drift monitor — the path this very slice
 measured as never having run. 🔑 **A defect behind two blind spots is not found by probing either end.**
-⬜ Generalised and filed as **F2-180**: 1 of 13 adapters verified working, 1 found broken, **11 unmeasured**
-— and a first attempt at a static sweep reported the broken one as clean because it compared literals
-against *every* table's CHECKs rather than the target's. ⚠ **An unscoped cross-check is worse than none.**
+✅ Generalised and filed as **F2-180**, then **closed 2026-08-11** (see below): 1 of 13 adapters verified
+working, 1 found broken, **11 unmeasured** — and a first attempt at a static sweep reported the broken one
+as clean because it compared literals against *every* table's CHECKs rather than the target's.
+⚠ **An unscoped cross-check is worse than none.**
+
+---
+
+### F2-180 — the other twelve adapters, measured instead of reasoned about ✅ CLOSED 2026-08-11
+
+**13 of 13 adapters now verified live** (was 1 of 13), and the two that had never worked are fixed.
+
+**What the scoped measurement found.** 13 adapters → 13 target tables → **18 single-column CHECK
+vocabularies**, each literal compared against *its own* table's constraint:
+
+- ⚠⚠ **`VendorPromotionAdapter` wrote `status = "ONBOARDING"`, which `CK_vendors_status` has never
+  allowed** (`ACTIVE|INACTIVE|PENDING_REVIEW|TERMINATED`). Promoting a `VENDOR_ONBOARDING` submission had
+  **never once worked**; all 28 vendors in dev are `ACTIVE`, which is what a register looks like when
+  nothing has ever entered it through the front door. Fixed to `PENDING_REVIEW` — the vocabulary already
+  had a word for "registered, reviews not yet done", so widening the CHECK would have taught every
+  status-grouped query a new value to mean what an existing one already means.
+- ⚠⚠ **`IncidentPromotionAdapter` passed the submitter's own category through untouched.** Measured against
+  the forms its four kinds render: `SECURITY_INCIDENT` offers `PHISHING|MALWARE|LOST_DEVICE|
+  UNAUTHORISED_ACCESS` — **0 of 4 legal**, so the flagship NCA ECC 6.1 employee-reporting path failed for
+  every submission that answered the question. `WORKPLACE_INJURY`: 0 legal, fallback `"HSE"` not legal.
+  `CONSUMER_COMPLAINT_RESPONSE`: **1 of 5** legal, fallback `"CONSUMER"` not legal. `VRP_DISCLOSURE` has no
+  category field, fell through to `CYBER`, and was **the only one of the four that could ever promote.**
+  Fixed by mapping the four vocabularies onto the column's five with per-kind fallbacks, and keeping the
+  reporter's own word on the record — the **V261 precedent**, whose comment is the clearest statement of the
+  rule in the tree: *"category → 'CYBER' (CK_incidents_category is strict; type kept in description)"*.
+
+🔑 **Why it was three adapters and not eight.** Five constrained columns are fed by one accessor,
+`IntakePromotionContext#severityOrMedium()`, which **clamps** to the four bands all five declare — written
+by somebody who had checked. Category, status and change-type had no such accessor. So the lesson is not
+"be careful with literals": **a closed column needs a closed writer, and the clamp is the only place that
+can be.** `ck_change_type` was clamped here too although it was never failing — the form happens to offer
+exactly the legal three, which is a fact about today's frontend, not a property of the server.
+
+**⑤ The diagnostic that hid all of it.** **SQL Server error 547 is BOTH `FOREIGN KEY` and `CHECK`**, and
+`GlobalExceptionHandler` answered with the foreign-key wording for both. Its own comment said
+`// FOREIGN KEY / CHECK constraint`, so the ambiguity was known. Cost: F2-175 spent a probe iteration being
+told a promotion failed on a **reference** in `risk.risks` — a table with **no foreign keys at all**;
+F2-180 hit the same sentence on `CK_vendors_status`; then **19 more times** measuring F2-181. Now
+`conflictKind: VALUE_NOT_ALLOWED` and *"One of the values supplied is not one this field accepts …
+(column 'category')"*. The column is safe to name: the 547 CHECK message carries it **without** the
+offending value, so SEC-CFG-001 still holds. 🔑 **A diagnostic that is wrong in a specific, plausible
+direction is worse than a vague one: it does not slow the reader down, it sends them somewhere.**
+
+**What shipped as the durable artefact.** `PromotionVocabularyTest` — hermetic (reads the migrations, so
+`mvn -o clean package` stays database-free), keyed per **constraint** with a leg that proves from the
+migration text that the constraint really is on that adapter's target table. Each constrained column is
+**either** bound to the constant holding the value **or** listed in `unwritten` with a reason, which turns
+the six targets whose tables carry no CHECK today into a pin rather than an omission: add one to
+`privacy.dpia` and the build fails until somebody has looked at `DpiaPromotionAdapter`.
+
+**⚠⚠ The unscoped-cross-check mistake recurred twice inside the slice that exists to fix it.** A heuristic
+pairing UI option-lists to columns by value overlap produced 30+ "findings" including `VALID_NDI_TABS`
+against `ck_change_risk` (both contain `CRITICAL/HIGH/MEDIUM/LOW`) — discarded, with only the two
+same-register pairings surviving into F2-181, each proven by a live POST. And the pin's own parser
+extracted a column named **`PEND`** from `ratification_state <> N'PENDING'`, because `PENDING` contains
+`IN`. Its `noUndeclaredConstrainedColumn` leg failed on the **first run** and named the phantom.
+🔑 **A regex over SQL that has not had its string literals removed is parsing two languages at once.**
+
+**Verification.** Suite **3,602/0/0** · mutation **15/15** (including binding an adapter to *another*
+table's constraint whose vocabulary does contain the value, so only the scoping leg can catch it) · live
+probe **50/50**, all 13 adapters submitting → promoting → reading the created row back by the id the server
+stamped. The one leg that read as a failure was **the probe's own**: `ENGAGEMENT` returns the `external_id`,
+not a bigint, exactly as `RegisterPromotionPort`'s javadoc allows. Corrected rather than explained away —
+*a false negative in a verification artefact is worse than no leg, because it gets quoted.*
+
+⬜ **F2-181 filed.** Asking who *else* writes the column F2-180's adapter was breaking found the register's
+own create screen doing worse: `IncidentsPage.tsx` offers **22** categories and the column accepts **3**
+(19 refused, live), plus **3 of 6** statuses — `CONTAINED`, `ERADICATED`, `RECOVERED`, the middle of the
+NIST 800-61 lifecycle the screen is modelled on. Not bundled: the adapter's values were chosen by a
+developer, so mapping them has one right answer; these are *offered to a user by the product*, and the fix
+is either a migration widening a regulated register's taxonomy or the deletion of a deliberately-designed
+one. ⚙ **A finding scoped to one producer should ask what the other producers of the same column do — the
+scoping that makes an investigation tractable is also what hides its neighbour.**
 
 ⬜ **F2-179 filed, measured, and deliberately not bundled.** Repointing a caller means reading what it
 *says*, and `severity` was the one field passed straight through — so: the escalation trigger is

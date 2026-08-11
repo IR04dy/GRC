@@ -131,4 +131,91 @@ class DataIntegrityErrorContractTest {
             .hasEntrySatisfying("errors", v ->
                 assertThat(v.toString()).contains("code"));
     }
+
+    // ─────────────────────────────────────────────────────────────────────────────────
+    // F2-180 — error 547 is BOTH kinds, and saying "foreign key" for a CHECK sends the
+    // reader somewhere specific and wrong.
+    // ─────────────────────────────────────────────────────────────────────────────────
+
+    /** The driver's real wording for a CHECK violation — table and column, never the value. */
+    private static DataIntegrityViolationException checkViolation(String constraint, String col) {
+        SQLException sql = new SQLException(
+            "The INSERT statement conflicted with the CHECK constraint \"" + constraint + "\". The "
+            + "conflict occurred in database \"TSS_GRC\", table \"risk.risks\", column '" + col + "'.",
+            "23000", 547);
+        return new DataIntegrityViolationException(
+            "could not execute statement [...]; constraint [" + constraint + "]", sql);
+    }
+
+    /** And the real wording for a foreign key, which must keep the reference message. */
+    private static DataIntegrityViolationException foreignKeyViolation(String constraint) {
+        SQLException sql = new SQLException(
+            "The INSERT statement conflicted with the FOREIGN KEY constraint \"" + constraint
+            + "\". The conflict occurred in database \"TSS_GRC\", table \"policy.documents\", "
+            + "column 'id'.", "23000", 547);
+        return new DataIntegrityViolationException(
+            "could not execute statement [...]; constraint [" + constraint + "]", sql);
+    }
+
+    @Test
+    void aCheckViolationIsNotReportedAsAReferenceProblem() {
+        ProblemDetail pd = handler.handleDataIntegrityViolation(
+            checkViolation("CK_risks_status", "status"));
+
+        assertThat(pd.getProperties())
+            .as("⚠ This said REFERENCE for every 547. F2-175 was told a promotion had failed because "
+              + "'something it refers to does not exist' on risk.risks — a table with no foreign keys "
+              + "at all — and F2-180 hit the same sentence on CK_vendors_status and then 19 more times "
+              + "on CK_incidents_category. Three investigations started from one wrong noun.")
+            .containsEntry("conflictKind", "VALUE_NOT_ALLOWED");
+        assertThat(pd.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(pd.getDetail())
+            .contains("not one this field accepts")
+            .doesNotContain("refers to does not exist")
+            .doesNotContain("referenced elsewhere");
+    }
+
+    @Test
+    void aCheckViolationNamesTheColumnButNeverTheValueOrTheTable() {
+        ProblemDetail pd = handler.handleDataIntegrityViolation(
+            checkViolation("CK_risks_status", "status"));
+
+        assertThat(pd.getDetail())
+            .as("the column is the one thing the caller cannot infer, and the 547 CHECK message "
+              + "carries it without carrying the offending value")
+            .contains("column 'status'");
+        assertThat(pd.getDetail())
+            .as("SEC-CFG-001: no schema, no driver text")
+            .doesNotContain("TSS_GRC")
+            .doesNotContain("risk.risks")
+            .doesNotContain("INSERT statement");
+        assertThat(pd.getProperties()).containsEntry("constraint", "CK_risks_status");
+    }
+
+    @Test
+    void aRealForeignKeyViolationKeepsTheReferenceMessage() {
+        ProblemDetail pd = handler.handleDataIntegrityViolation(
+            foreignKeyViolation("FK_policy_exceptions_policy"));
+
+        assertThat(pd.getProperties())
+            .as("the fix must not overshoot: a genuine FK failure is still a reference problem, and "
+              + "the match is on 'CHECK constraint' rather than on the absence of 'FOREIGN KEY' so an "
+              + "unrecognised 547 keeps the broader wording rather than being asserted as a value bug")
+            .containsEntry("conflictKind", "REFERENCE");
+        assertThat(pd.getDetail()).contains("refers to does not exist");
+    }
+
+    @Test
+    void theColumnIsOmittedRatherThanGuessedWhenTheDriverDidNotNameIt() {
+        SQLException sql = new SQLException(
+            "The UPDATE statement conflicted with the CHECK constraint \"CK_x\".", "23000", 547);
+        ProblemDetail pd = handler.handleDataIntegrityViolation(
+            new DataIntegrityViolationException("could not execute statement", sql));
+
+        assertThat(pd.getProperties()).containsEntry("conflictKind", "VALUE_NOT_ALLOWED");
+        assertThat(pd.getDetail())
+            .as("an absent column must produce a clean sentence, not '(column 'null')'")
+            .doesNotContain("column")
+            .contains("fixed set of values");
+    }
 }

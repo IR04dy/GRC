@@ -19,6 +19,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class FindingPromotionAdapter implements RegisterPromotionPort {
 
+    /**
+     * The status a promoted finding is created with — {@code CK_findings_status}. Named so
+     * {@code PromotionVocabularyTest} can read it: F2-180 found two adapters whose status word was one
+     * the column had never accepted, and an inline literal gives a pin nothing to compare.
+     */
+    static final String PROMOTED_STATUS = "OPEN";
+
     private final ComplianceService compliance;
 
     @Override public String target() { return "FINDING"; }
@@ -34,7 +41,7 @@ public class FindingPromotionAdapter implements RegisterPromotionPort {
             ctx.ownerName(),
             null,                                    // capa — opened by the finding's own workflow
             null,                                    // dueDate — set when the finding is accepted
-            "OPEN",
+            PROMOTED_STATUS,
             null,
             ctx.firstText("controlReference").map(s -> s.length() > 100 ? s.substring(0, 100) : s)
                .orElse(null));

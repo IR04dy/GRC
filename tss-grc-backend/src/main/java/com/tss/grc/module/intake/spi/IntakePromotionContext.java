@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Everything a {@link RegisterPromotionPort} is given about the submission it is turning into a
@@ -127,11 +128,28 @@ public record IntakePromotionContext(
         return (acknowledgedAt != null ? acknowledgedAt : LocalDateTime.now()).toLocalDate();
     }
 
+    /**
+     * Every value {@link #severityOrMedium()} can return.
+     *
+     * <p>Five CHECK-constrained columns are fed from that one accessor — {@code tprm.vendors.risk_rating},
+     * {@code cyber.incidents.severity}, {@code compliance.findings.severity},
+     * {@code policy.exceptions.risk_level} and {@code change_mgmt.change_requests.risk_level} — and all
+     * five declare exactly this vocabulary. Exposing it as a constant is what lets
+     * {@code PromotionVocabularyTest} check one clamp against five migrations instead of trusting a
+     * switch statement to have been written by somebody who looked.
+     *
+     * <p>⚙ F2-180 found two adapters writing values their columns had never accepted, and this accessor
+     * is the reason it was not four: severity was clamped from the start. <b>The clamp is the pattern;
+     * the defects were the columns that had no clamp.</b>
+     */
+    public static final Set<String> SEVERITY_BANDS = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
+
+    /** The band an unrecognised or absent severity becomes. */
+    public static final String SEVERITY_DEFAULT = "MEDIUM";
+
     /** Severity normalised to the {@code LOW|MEDIUM|HIGH|CRITICAL} vocabulary every register uses. */
     public String severityOrMedium() {
-        return switch (severity == null ? "" : severity.toUpperCase()) {
-            case "LOW", "MEDIUM", "HIGH", "CRITICAL" -> severity.toUpperCase();
-            default -> "MEDIUM";
-        };
+        String upper = severity == null ? "" : severity.toUpperCase(java.util.Locale.ROOT);
+        return SEVERITY_BANDS.contains(upper) ? upper : SEVERITY_DEFAULT;
     }
 }
