@@ -1717,6 +1717,31 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-189 CLOSED 2026-08-11 — the workflow engine's SLA sweep performed a transition its own lifecycle
+table forbids.** Generalising F2-188's shape found it: `WorkflowRequestService.TRANSITIONS` declared
+`REOPENED → {IN_PROGRESS, SUBMITTED, ESCALATED, CLOSED}` with **no OVERDUE**, and `transition()` answers 409
+outside the table — while `WorkflowRequestSlaScheduler`'s own `OVERDUE_SCAN_STATUSES` **includes REOPENED**
+and wrote `setStatus("OVERDUE")` directly. So a reopened past-due request would be flipped **on a schedule**
+into a state the table says is unreachable, in the engine adopted by **14 modules**. Second, quieter half: a
+WF-10 tier climb on an already-OVERDUE row re-set OVERDUE, a self-transition the table also does not declare —
+⚠ **unobservable in the data by construction** (it writes the same value), so that half is not claimed as
+observed. ⚠ **Latent, measured before grading**: 0 `REOPENED → OVERDUE` events in dev, 0 in prod, 0 candidate
+rows. ⚠ **The sweep was right and the table was wrong** — a reopened request past its due date *is* overdue,
+and "fixing" the sweep to skip REOPENED would silently stop escalating a class of overdue request. So one
+edge was added and the sweep now asks `mayTransition`, F2-178's one-predicate shape. 🔑 **A declared state
+machine is only a control if the code that changes state consults it** — `TRANSITIONS` looked complete, 409s
+on violation, and one of its two writers had never read it. Gate: `WorkflowSlaTransitionLegalityTest` (8),
+load-bearing leg = the two lists compared; the now-unreachable skip branch exercised directly with `APPROVED`
+per F2-183's rule. ⚠ **Two measurement mistakes, both caught by looking**: grouping status writes by *setter
+name* put `setStatus("DRAFT")` with **52 writers** at the top of the work list (52 unrelated entity types with
+a creation default — sixth instance of a grouping key that was not the thing measured), and the DB probe first
+read **1** `OVERDUE → OVERDUE` event as the self-write having fired when the row is an **`ESCALATED`** event
+whose from/to are equal *because the status correctly did not change* — 🔑 *an event whose from and to are
+equal is not evidence of a write.* ⚙ Also: **a shape that produced one real defect does not imply a
+population** — 8 of 31 schedulers write a state literal and most *are* the owning service. Suite
+**3,746/0/0**, 0 migrations, 0 FE change. Noted not fixed: `WorkflowEvidenceBridge` holds a **third** copy of
+a status vocabulary in the same module, answering a different question, compared to neither.
+
 ✔ **F2-188 CLOSED 2026-08-11 — F2-187's named map proved its reasons EXISTED, not that they were true, and
 all five of the strongest were false.** That row grouped five dark methods under *"A state nothing can ever
 move to: the sharpest bucket, because the row just sits"*, which is the claim that set its severity. Working

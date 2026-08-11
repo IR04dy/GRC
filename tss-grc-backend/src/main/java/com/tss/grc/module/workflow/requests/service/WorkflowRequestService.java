@@ -102,9 +102,31 @@ public class WorkflowRequestService {
         Map.entry("ESCALATED",    Set.of("IN_PROGRESS", "SUBMITTED", "CLOSED")),
         Map.entry("OVERDUE",      Set.of("IN_PROGRESS", "SUBMITTED", "ESCALATED", "CLOSED")),
         Map.entry("CLOSED",       Set.of("REOPENED", "ARCHIVED")),
-        Map.entry("REOPENED",     Set.of("IN_PROGRESS", "SUBMITTED", "ESCALATED", "CLOSED")),
+        // F2-189: OVERDUE was missing here while WorkflowRequestSlaScheduler had REOPENED in its
+        // overdue scan list and wrote the status directly — so a reopened request past its due date
+        // was flipped on a schedule to a state this table said it could not reach, and the same move
+        // through transition() answered 409. The sweep was right (a reopened request with a past due
+        // date IS overdue); the table was incomplete. See mayTransition below for the other half.
+        Map.entry("REOPENED",     Set.of("IN_PROGRESS", "SUBMITTED", "ESCALATED", "OVERDUE", "CLOSED")),
         Map.entry("ARCHIVED",     Set.of())
     );
+
+    /**
+     * The legality half of {@link #transition(WorkflowRequest, String)}, without the write — so a
+     * caller outside the interactive path can ask the <b>same</b> table instead of keeping its own
+     * idea of the lifecycle.
+     *
+     * <p>F2-189 exists because {@code WorkflowRequestSlaScheduler} kept its own: two status lists that
+     * had to agree with {@link #TRANSITIONS} and nothing compared them. This is the F2-178 shape —
+     * one predicate, read by both — and {@code WorkflowSlaTransitionLegalityTest} fails the build if
+     * the scan list and the table disagree again.
+     *
+     * <p>Package-private on purpose: this is the engine's own seam, not API surface. A caller that
+     * wants the guarded write should use the endpoint.
+     */
+    static boolean mayTransition(String from, String to) {
+        return TRANSITIONS.getOrDefault(from, Set.of()).contains(to);
+    }
 
     private final WorkflowRequestRepository          requestRepo;
     private final WorkflowRequestRecipientRepository recipientRepo;
@@ -1417,7 +1439,7 @@ public class WorkflowRequestService {
         Set<String> allowed = TRANSITIONS.getOrDefault(r.getStatus(), Set.of());
         if (!TRANSITIONS.containsKey(to))
             throw new IllegalArgumentException("Unknown status: " + to);
-        if (!allowed.contains(to))
+        if (!mayTransition(r.getStatus(), to))
             throw new IllegalTransitionException(r.getStatus(), to, allowed);
         r.setStatus(to);
     }

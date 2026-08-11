@@ -156,7 +156,29 @@ public class WorkflowRequestSlaScheduler {
         if (alreadyOverdue && !newTier) return false;
 
         String from = r.getStatus();
-        r.setStatus("OVERDUE");
+
+        // F2-189 — ask the engine's own transition table instead of writing the literal.
+        //
+        // What was wrong: OVERDUE_SCAN_STATUSES included REOPENED, and TRANSITIONS did not allow
+        // REOPENED -> OVERDUE, so a reopened request past its due date was flipped here on a schedule
+        // to a state the table said it could not reach — while the identical move through the API
+        // answered 409. Two lists that had to agree, with nothing comparing them; the table has been
+        // completed (the sweep was right about the product) and this is now the only writer that asks.
+        //
+        // The `alreadyOverdue` guard is the second half: re-setting OVERDUE on a row that is already
+        // OVERDUE is a self-transition the table does not declare either, and it was happening every
+        // time a multi-tier ladder climbed a rung. Advancing the tier does not need a status write.
+        if (!alreadyOverdue) {
+            if (!WorkflowRequestService.mayTransition(from, "OVERDUE")) {
+                // Not silent: a skipped escalation is exactly the kind of omission that reads as
+                // "nothing was overdue". Reachable only if the scan list and the table diverge
+                // again, which WorkflowSlaTransitionLegalityTest fails the build for.
+                log.warn("Workflow-request SLA sweep: request {} is past due in status {}, which the "
+                        + "lifecycle does not allow to become OVERDUE — not escalated", r.getId(), from);
+                return false;
+            }
+            r.setStatus("OVERDUE");
+        }
         if (firstEscalation) r.setEscalatedAt(now);
         r.setLastReminderAt(now);
         r.setReminderCount(r.getReminderCount() == null ? 1 : r.getReminderCount() + 1);

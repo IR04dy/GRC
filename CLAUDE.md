@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,738 @ 2026-08-11; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,746 @ 2026-08-11; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -649,6 +649,26 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   `CommitteeOverdueTransitionTest`, including a structural leg that the sweep holds no `setStatus(`. ⚙ Side
   effect worth knowing: the transition is now **tenant-scoped** (`findByIdAndOrganisationId`) where the in-place
   flip trusted the query alone.
+- ⚠⚠ **A declared state machine is only a control if the code that changes state consults it** (F2-189,
+  measured 2026-08-11). `WorkflowRequestService.TRANSITIONS` is the workflow engine's lifecycle — `transition()`
+  answers **409** outside it, and the FE and `WorkflowEvidenceBridge` read it to know what is reachable. It
+  declared `REOPENED → {IN_PROGRESS, SUBMITTED, ESCALATED, CLOSED}` with **no OVERDUE**, while
+  `WorkflowRequestSlaScheduler` held its own `OVERDUE_SCAN_STATUSES` **containing REOPENED** and wrote
+  `setStatus("OVERDUE")` directly — so a reopened past-due request would be flipped **on a schedule** to a state
+  the table calls unreachable, in the engine **14 modules** adopt. Latent (0 such events in dev or prod). The
+  sweep was **right** and the table incomplete: a reopened request past its due date *is* overdue, and "fixing"
+  the sweep to skip REOPENED would silently stop escalating a class of overdue request. Fixed by one table edge
+  + `WorkflowRequestService.mayTransition` read by both (F2-178's one-predicate shape);
+  `WorkflowSlaTransitionLegalityTest` compares the scan list against the table, which is the comparison nobody
+  was making. **When you add a scheduler that changes state, make it ask the table — do not copy the states.**
+  ⚠ **Two measurement traps from that slice.** (a) Grouping `set*Status("X")` by **setter name** across the tree
+  put `setStatus("DRAFT")` at the top with **52 writers** — 52 unrelated entity types each with a creation
+  default. Sixth instance here of a grouping key that is not the thing being measured; re-scoped to *"does a
+  `@Scheduled` class write a state a service owns?"* the answer is a readable **8 of 31**, and most of those
+  **are** the owning service. 🔑 **A shape that produced one real defect does not imply a population.**
+  (b) 🔑 **An event row whose `from_status` equals its `to_status` is not evidence of a write** — the one
+  `OVERDUE → OVERDUE` row in dev is an `ESCALATED` event whose states match *because the status correctly did
+  not change*, and reading it is what stopped a false claim.
 - **`LocalDate.now()` in a test is UTC+3 here; the services it tests are UTC** — so a date-relative
   fixture is wrong for three hours of every day (F2-178 correction, caught 2026-08-10 at 00:4x local).
   `CommitteeSeatLinkageTest` set `termEndsAt = LocalDate.now().minusDays(1)` while
