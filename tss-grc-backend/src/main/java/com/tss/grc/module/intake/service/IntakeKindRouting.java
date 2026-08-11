@@ -51,7 +51,19 @@ public final class IntakeKindRouting {
      * @param slaHours         hours from submission to a mandatory triage decision
      * @param defaultTarget    the register a promotion lands in. <b>Server-derived, never taken
      *                         from the request body</b> — see {@code IntakeService#triage}
-     * @param defaultAssignee  stakeholder code the submission is routed to
+     * @param defaultAssignee  who the submission is routed to, as a <b>role name from
+     *                         {@code iam.roles}</b> — the value written to
+     *                         {@code intake.intake_records.assigned_to}. F2-174: ten of the
+     *                         original fourteen codes matched no row in the platform's own role
+     *                         catalogue ({@code CISO_OFFICE}, {@code ETHICS_CTE}, {@code CSIRT},
+     *                         {@code RISK_OFFICER}, {@code COMPLIANCE_LEAD},
+     *                         {@code POLICY_OFFICER}, {@code TPRM_LEAD}, {@code BCM_LEAD},
+     *                         {@code AUDIT_LEAD}, {@code CAB}), so <em>no tenant administrator
+     *                         could make them reach anybody</em> — a free-text label dressed as
+     *                         routing. Pinned against the catalogue by
+     *                         {@code IntakeAssigneeRoleResolutionTest}. ⚠ Naming a real role is
+     *                         not the same as reaching a person: nothing resolves this column yet,
+     *                         and several of these roles have no active holder in dev or prod
      * @param allowsAnonymous  whether an anonymity claim on this kind is <b>honoured</b>. Load
      *                         bearing: a claim on a kind that does not allow it is refused rather
      *                         than obeyed, otherwise any caller could make every submission
@@ -86,52 +98,52 @@ public final class IntakeKindRouting {
 
     static {
         // ── The original 16 (DD-54). Unchanged — all sixteen already agreed with the frontend. ──
-        put("DSR_REQUEST",         "DS", 30 * 24, "DSR",          "DPO",             false,
+        put("DSR_REQUEST",         "DS", 30 * 24, "DSR",          "DPO",                false,
             "Data subject request", "طلب صاحب البيانات");
-        put("BREACH_REPORT",       "BR", 72,      "BREACH",       "DPO",             true,
+        put("BREACH_REPORT",       "BR", 72,      "BREACH",       "DPO",                true,
             "Report a privacy breach", "الإبلاغ عن خرق خصوصية");
-        put("VRP_DISCLOSURE",      "VR", 24 * 5,  "INCIDENT",     "CISO_OFFICE",     true,
+        put("VRP_DISCLOSURE",      "VR", 24 * 5,  "INCIDENT",     "CISO",               true,
             "Vulnerability disclosure", "إفصاح عن ثغرة");
-        put("SPEAKUP",             "SU", 24 * 7,  "ETHICS_CASE",  "ETHICS_CTE",      true,
+        put("SPEAKUP",             "SU", 24 * 7,  "ETHICS_CASE",  "ETHICS_OFFICER",     true,
             "SpeakUp — anonymous report", "تحدّث — بلاغ مجهول");
-        put("SECURITY_INCIDENT",   "SI", 72,      "INCIDENT",     "CSIRT",           false,
+        put("SECURITY_INCIDENT",   "SI", 72,      "INCIDENT",     "IR_LEAD",            false,
             "Report a security event", "الإبلاغ عن حدث أمني");
-        put("PRIVACY_BREACH",      "PB", 72,      "BREACH",       "DPO",             false,
+        put("PRIVACY_BREACH",      "PB", 72,      "BREACH",       "DPO",                false,
             "Report a privacy breach (internal)", "الإبلاغ عن خرق خصوصية (داخلي)");
-        put("RISK_ISSUE",          "RI", 24 * 14, "RISK",         "RISK_OFFICER",    false,
+        put("RISK_ISSUE",          "RI", 24 * 14, "RISK",         "RISK_MANAGER",       false,
             "Raise a risk issue", "الإبلاغ عن مخاطرة");
-        put("CONTROL_OBSERVATION", "CO", 24 * 14, "FINDING",      "COMPLIANCE_LEAD", false,
+        put("CONTROL_OBSERVATION", "CO", 24 * 14, "FINDING",      "COMPLIANCE_OFFICER", false,
             "Report a control failure / observation", "الإبلاغ عن خلل في ضابط رقابي");
-        put("POLICY_EXCEPTION",    "PE", 24 * 7,  "EXCEPTION",    "POLICY_OFFICER",  false,
+        put("POLICY_EXCEPTION",    "PE", 24 * 7,  "EXCEPTION",    "COMPLIANCE_OFFICER", false,
             "Request a policy exception", "طلب استثناء من سياسة");
-        put("VENDOR_ONBOARDING",   "VO", 24 * 14, "VENDOR",       "TPRM_LEAD",       false,
+        put("VENDOR_ONBOARDING",   "VO", 24 * 14, "VENDOR",       "SUPPLIER_MANAGER",   false,
             "Onboard a new vendor", "إدراج مورد جديد");
-        put("DPIA_INITIATION",     "DI", 24 * 14, "DPIA",         "DPO",             false,
+        put("DPIA_INITIATION",     "DI", 24 * 14, "DPIA",         "DPO",                false,
             "Initiate a DPIA", "بدء تقييم أثر حماية البيانات");
-        put("BIA_SUBMISSION",      "BI", 24 * 30, "BIA",          "BCM_LEAD",        false,
+        put("BIA_SUBMISSION",      "BI", 24 * 30, "BIA",          "BCM_MANAGER",        false,
             "Submit BIA for my business unit", "تقديم تقييم الأثر للوحدة");
-        put("AUDIT_REQUEST",       "AR", 24 * 14, "ENGAGEMENT",   "AUDIT_LEAD",      false,
+        put("AUDIT_REQUEST",       "AR", 24 * 14, "ENGAGEMENT",   "INTERNAL_AUDITOR",   false,
             "Request an internal audit", "طلب مراجعة داخلية");
-        put("CHANGE_REQUEST",      "CR", 48,      "CHANGE",       "CAB",             false,
+        put("CHANGE_REQUEST",      "CR", 48,      "CHANGE",       "CHANGE_MANAGER",     false,
             "Submit a change request", "تقديم طلب تغيير");
-        put("ETHICS_DISCLOSURE",   "ED", 24 * 14, "ETHICS_CASE",  "ETHICS_OFFICER",  false,
+        put("ETHICS_DISCLOSURE",   "ED", 24 * 14, "ETHICS_CASE",  "ETHICS_OFFICER",     false,
             "Submit a disclosure (COI / gift / outside employment)",
             "تقديم إفصاح (تضارب مصالح / هدية / عمل خارجي)");
-        put("CONTROL_ATTESTATION", "CA", 24 * 14, "CONTROL_TEST", "COMPLIANCE_LEAD", false,
+        put("CONTROL_ATTESTATION", "CA", 24 * 14, "CONTROL_TEST", "COMPLIANCE_OFFICER", false,
             "Attest to a control / policy", "إقرار بضابط/سياسة");
 
         // ── DD-88: HRSD (Saudi Ministry of Human Resources) workflows. ──
         // Added by F2-172. Every one of these was rejected by the server before it.
-        put("SAUDIZATION_REPORT",     "SR", 24 * 5,  "CONTROL_TEST", "HR_LEAD", false,
+        put("SAUDIZATION_REPORT",     "SR", 24 * 5,  "CONTROL_TEST", "HR_LEAD",            false,
             "Submit monthly Saudization report", "تقديم تقرير السعودة الشهري");
-        put("WORKPLACE_INJURY",       "WI", 24,      "INCIDENT",     "HR_LEAD", false,
+        put("WORKPLACE_INJURY",       "WI", 24,      "INCIDENT",     "HR_LEAD",            false,
             "Report a workplace injury / occupational illness",
             "الإبلاغ عن إصابة عمل أو مرض مهني");
-        put("GOSI_EMPLOYEE_REGISTER", "GR", 24 * 5,  "CONTROL_TEST", "HR_LEAD", false,
+        put("GOSI_EMPLOYEE_REGISTER", "GR", 24 * 5,  "CONTROL_TEST", "HR_LEAD",            false,
             "Register a new employee with GOSI", "تسجيل موظف جديد في التأمينات الاجتماعية");
-        put("EMPLOYMENT_CONTRACT",    "EC", 24 * 7,  "POLICY",       "HR_LEAD", false,
+        put("EMPLOYMENT_CONTRACT",    "EC", 24 * 7,  "POLICY",       "HR_LEAD",            false,
             "Draft / renew employment contract", "إعداد / تجديد عقد عمل");
-        put("WPS_PAYROLL_RUN",        "WP", 24 * 11, "CONTROL_TEST", "HR_LEAD", false,
+        put("WPS_PAYROLL_RUN",        "WP", 24 * 11, "CONTROL_TEST", "HR_LEAD",            false,
             "Confirm monthly WPS payroll run", "تأكيد تشغيل نظام حماية الأجور الشهري");
 
         // ── DD-94: MOC (Ministry of Commerce) workflows. Added by F2-172. ──

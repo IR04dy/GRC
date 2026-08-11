@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,698 @ 2026-08-11; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,731 @ 2026-08-11; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -721,7 +721,23 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   before believing a finding's claim about it**; **(c)** the existing test asserted the defect as
   correct (`startsWith("ISS-")`, `isEqualTo("SUBMITTED")`), the second instance after F2-159 —
   **a test written by reading the implementation can only agree with it.**
-  ⚠⚠ And the honest half: the catalogued assignee `RISK_OFFICER` **does not exist in `iam.roles`** while
-  the hard-coded `RISK_MANAGER` does. It is still the right change — `assigned_to` is a stakeholder-code
-  column, **10 of 14 catalogue codes are not role names**, and **nothing resolves the column at all** (it
-  renders as a label) — but do not read it as "the assignee now works." That is F2-174.
+  ⚠⚠ And the honest half: the catalogued assignee `RISK_OFFICER` **did not exist in `iam.roles`** while
+  the hard-coded `RISK_MANAGER` did. It was still the right change — one catalogue, consulted — but the
+  value it consulted was wrong: **10 of 14 catalogue codes matched no role**, carrying **22 of 26 kinds**.
+  🔑 **The hard-code F2-175 deleted was right about the name and wrong about the mechanism.**
+  ⚠⚠ **`defaultAssignee` is a ROLE NAME from `iam.roles`, not a free-text stakeholder label** (F2-174,
+  closed 2026-08-11). All 14 codes had a real counterpart already seated, so the ten that named nothing
+  (`CISO_OFFICE`, `ETHICS_CTE`, `CSIRT`, `RISK_OFFICER`, `COMPLIANCE_LEAD`, `POLICY_OFFICER`, `TPRM_LEAD`,
+  `BCM_LEAD`, `AUDIT_LEAD`, `CAB`) were renamed, and `IntakeAssigneeRoleResolutionTest` holds a **hard
+  zero** against the one pinned catalogue (`RoleGuardConversionRatchetTest.ROLE_CATALOGUE` — its **third
+  reader, not a third copy**). Do **not** read it as "the assignee now works": only **4 of 11** names have
+  an active holder in dev or prod, nothing resolves the column (it renders as a label in the ack text and
+  the audit note), and `assigned_to` **collates differently** from `iam.roles.role_name`
+  (`Latin1_General_100_CI_AS_SC_UTF8` vs `SQL_Latin1_General_CP1_CI_AS`) — so a resolver's bare join raises
+  *"Cannot resolve the collation conflict"* 468/8180 and must `COLLATE` explicitly.
+  ⚠ **Both fixes the filing proposed were non-viable, and only measurement showed it**: failing closed at
+  runtime would refuse the 24-hour GOSI injury notification over a label (contradicting the ADR-010
+  exception above), `0 of 14` codes matched any committee so the seat machinery was not reusable, and
+  `workflow.recipient_list_members` is **empty in both databases**. 🔑 **A filing's candidate fixes are
+  the least-verified thing in it after its recommendations.** ⚠ And its urgency was false:
+  `intake.intake_records` held **0 rows in dev and prod**, so the field had never once been written.

@@ -1717,6 +1717,58 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-174 CLOSED 2026-08-11 — and the measurement refuted the row's urgency, both of its candidate
+fixes, and a test I had written myself.** The row said the codes were now *"written on every submission,
+including the ones carrying a 24-hour GOSI deadline"*. Measured first: **`intake.intake_records` held 0
+rows in dev and 0 in prod** — nothing had ever been submitted through the rewired substrate, so the field
+had never once been written. The defect was **latent**, which is the same error [[F2-175]]'s filing made in
+the other direction by calling a bypass "currently benign" when the honest word was "unexercised". 🔑
+**"It is written on every submission" and "a row exists" are different claims, and only the second is a
+measurement** — and it is what made this a rename with no back-fill rather than a data migration.
+
+⚠⚠ **Both filed options were non-viable as written.** **(a) "resolve to a role or a committee and fail
+closed"**: 10 of 14 codes resolved to nothing and they carried **22 of 26 kinds**, so failing closed at
+runtime would refuse a security-event report, a privacy breach and the 24-hour GOSI injury notification —
+over a *routing label*, and in direct contradiction of the ADR-010 exception F2-172 had just argued on the
+same endpoint (*filing is a duty*). The *"or a committee"* half had nothing to resolve to either: **0 of
+14 codes match any `admin.committees` row** by type, code or name, in either database, so F2-177's seat
+machinery was not reusable here. **(b) "drop the column and route through the workflow engine"**:
+`workflow.recipient_list_members` is **empty in both databases**, so it swaps a label that resolves to
+nobody for a lookup that returns nobody. 🔑 **A filing's two "candidate fixes" are the least-verified
+thing in it after its recommendations — nothing has executed either.** The third option is the one
+measurement handed over and neither option mentions: **all 14 codes already had a real counterpart seated
+in `iam.roles`**, so 14 codes → **11 real role names** in both catalogues, and the fail-closed half moves
+from runtime to **build time**, where a hard zero over a 14-value catalogue that ships in a jar means the
+state cannot arise in production at all.
+
+⚠⚠ **A test of mine asserted the defect as correct and its comment argued for it.**
+`IntakeSystemSubmissionTest.assigneeIsTheCataloguedStakeholder` pinned `RISK_OFFICER` under *"assigned_to
+holds stakeholder codes; a role name in it routes to nobody, and there was never any reason for the two
+vocabularies to agree"* — every clause backwards, since it is the stakeholder code that routes to nobody
+and a role name is the only value people can be attached to. A second site pinned the same string inside
+the history note. **Third instance** after F2-159's decoy and F2-175's own `startsWith("ISS-")`: 🔑 *a
+test written by reading the implementation can only agree with it.* ⚙ The closure is neat in the other
+direction too — **the hard-code F2-175 deleted (`RISK_MANAGER`) was right about the name and wrong about
+the mechanism**, and its row had honestly recorded that replacing it made resolvability worse.
+
+⚠ **`ETHICS_OFFICER` is absent from prod (58 roles vs dev's 69) because V362 is among the 31 pending
+migrations** — O-1, not a catalogue defect. Recorded rather than worked around: re-routing ethics
+disclosures to `COMPLIANCE_OFFICER` would have made the number look clean on an un-migrated database by
+changing *who triages a whistleblowing report*. Measuring prod at all is F2-183's rule applied to a Java
+constant instead of an `ADD CONSTRAINT`. ⚠ **Stated limits:** only **4 of 11** names have an active holder
+in either database (F2-178's *the mechanism works and the data does not exist yet*, now answerable from
+the Roles screen); nothing resolves the column yet — it renders as a label in the acknowledgement text and
+the audit note; and the probe found that `assigned_to` and `iam.roles.role_name` **collate differently**
+(`Latin1_General_100_CI_AS_SC_UTF8` vs `SQL_Latin1_General_CP1_CI_AS`), so a bare join raises *"Cannot
+resolve the collation conflict"* 468/8180 and any future resolver must `COLLATE` explicitly. A per-tenant
+stakeholder→role/committee mapping stays an owner decision. Gate: `IntakeAssigneeRoleResolutionTest` (4)
+reading the **one** pinned role catalogue as its **third reader, not a third copy**, plus a deliberately
+weaker second source — each name must appear in the migration corpus, because two edits by one author in
+one commit are not two sources. Mutation **11/11** (0 undeclared survivors; the first draft of mutation 6
+survived because it renamed a role the intake catalogue never uses — *a mutation has to touch what the
+test actually reads*), live probe **55/55** over 11 kinds, suite **3,731/0/0**, FE `tsc` clean +
+**487/487**, **0 migrations**.
+
 ✔ **F2-172 CLOSED 2026-08-09 — the intake front door became real, and measuring the rewire before
 writing it is what turned a chore into two defects.** F2-171's follow-up said "call
 `POST /api/v1/intake` on submit and `PUT …/triage` on triage". Measuring what that would hit found

@@ -135,7 +135,7 @@ export interface IntakeRecord {
   payload: Record<string, unknown>;
 
   /** Triage routing — populated on submission via routeFor(). */
-  assignedTo?: string;       // stakeholder code (e.g. 'DPO', 'CISO_OFFICE')
+  assignedTo?: string;       // role name from iam.roles (e.g. 'DPO', 'CISO') — see defaultAssignee
   slaDueAt?: string;         // ISO date — promotion or rejection deadline
   /** Severity self-asserted by submitter, may be re-classified at triage. */
   severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -171,7 +171,14 @@ export interface IntakeCatalogEntry {
   slaHours: number;
   /** Where promoted record lands. */
   defaultTarget: RegisterTarget;
-  /** Stakeholder code who triages by default. */
+  /** Who triages by default, as a **role name from `iam.roles`** — not a free-text
+   *  stakeholder label (F2-174). Ten of the original fourteen codes matched no role in
+   *  the platform's own catalogue (`CISO_OFFICE`, `ETHICS_CTE`, `CSIRT`, `RISK_OFFICER`,
+   *  `COMPLIANCE_LEAD`, `POLICY_OFFICER`, `TPRM_LEAD`, `BCM_LEAD`, `AUDIT_LEAD`, `CAB`),
+   *  so no tenant administrator could make them reach anybody. Server-side this string is
+   *  what lands in `intake.intake_records.assigned_to`, and it is pinned against the role
+   *  catalogue by `IntakeAssigneeRoleResolutionTest`. ⚠ Still only a label on this screen —
+   *  it names a role that exists, which is not the same as reaching a person. */
   defaultAssignee: string;
   /** Standard / regulator citation. */
   reference: string;
@@ -206,7 +213,7 @@ export const INTAKE_CATALOG: Record<IntakeKind, IntakeCatalogEntry> = {
   },
   VRP_DISCLOSURE: {
     kind: 'VRP_DISCLOSURE', codePrefix: 'VR', slaHours: 24 * 5, defaultTarget: 'INCIDENT',
-    defaultAssignee: 'CISO_OFFICE', reference: 'NCA ECC 6.1, ISO 29147',
+    defaultAssignee: 'CISO', reference: 'NCA ECC 6.1, ISO 29147',
     publicSurface: true, allowsAnonymous: true,
     titleEn: 'Vulnerability disclosure', titleAr: 'إفصاح عن ثغرة',
     blurbEn: 'Responsible disclosure for security researchers — we triage within 5 working days.',
@@ -214,7 +221,7 @@ export const INTAKE_CATALOG: Record<IntakeKind, IntakeCatalogEntry> = {
   },
   SPEAKUP: {
     kind: 'SPEAKUP', codePrefix: 'SU', slaHours: 24 * 7, defaultTarget: 'ETHICS_CASE',
-    defaultAssignee: 'ETHICS_CTE', reference: 'Nazaha, ISO 37001 §8.3',
+    defaultAssignee: 'ETHICS_OFFICER', reference: 'Nazaha, ISO 37001 §8.3',
     publicSurface: true, allowsAnonymous: true,
     titleEn: 'SpeakUp — anonymous report', titleAr: 'تحدّث — بلاغ مجهول',
     blurbEn: 'Confidential channel for ethics, fraud, harassment or governance concerns.',
@@ -222,7 +229,7 @@ export const INTAKE_CATALOG: Record<IntakeKind, IntakeCatalogEntry> = {
   },
   SECURITY_INCIDENT: {
     kind: 'SECURITY_INCIDENT', codePrefix: 'SI', slaHours: 72, defaultTarget: 'INCIDENT',
-    defaultAssignee: 'CSIRT', reference: 'NCA ECC 6.1, ISO 27001 §6.8, NIST 800-61',
+    defaultAssignee: 'IR_LEAD', reference: 'NCA ECC 6.1, ISO 27001 §6.8, NIST 800-61',
     publicSurface: false, allowsAnonymous: false,
     titleEn: 'Report a security event', titleAr: 'الإبلاغ عن حدث أمني',
     blurbEn: 'Phishing email, suspected malware, lost device, suspicious activity.',
@@ -238,7 +245,7 @@ export const INTAKE_CATALOG: Record<IntakeKind, IntakeCatalogEntry> = {
   },
   RISK_ISSUE: {
     kind: 'RISK_ISSUE', codePrefix: 'RI', slaHours: 24 * 14, defaultTarget: 'RISK',
-    defaultAssignee: 'RISK_OFFICER', reference: 'ISO 31000 §5.4.2, COSO ERM C4',
+    defaultAssignee: 'RISK_MANAGER', reference: 'ISO 31000 §5.4.2, COSO ERM C4',
     publicSurface: false, allowsAnonymous: false,
     titleEn: 'Raise a risk issue', titleAr: 'الإبلاغ عن مخاطرة',
     blurbEn: 'Identify an emerging risk — we triage within 2 weeks and add to the register.',
@@ -246,7 +253,7 @@ export const INTAKE_CATALOG: Record<IntakeKind, IntakeCatalogEntry> = {
   },
   CONTROL_OBSERVATION: {
     kind: 'CONTROL_OBSERVATION', codePrefix: 'CO', slaHours: 24 * 14, defaultTarget: 'FINDING',
-    defaultAssignee: 'COMPLIANCE_LEAD', reference: 'ISO 27001 §10.2, IIA IPPF 2410',
+    defaultAssignee: 'COMPLIANCE_OFFICER', reference: 'ISO 27001 §10.2, IIA IPPF 2410',
     publicSurface: false, allowsAnonymous: false,
     titleEn: 'Report a control failure / observation', titleAr: 'الإبلاغ عن خلل في ضابط رقابي',
     blurbEn: 'Spotted a control not working as designed? Log it for triage.',
@@ -254,7 +261,7 @@ export const INTAKE_CATALOG: Record<IntakeKind, IntakeCatalogEntry> = {
   },
   POLICY_EXCEPTION: {
     kind: 'POLICY_EXCEPTION', codePrefix: 'PE', slaHours: 24 * 7, defaultTarget: 'EXCEPTION',
-    defaultAssignee: 'POLICY_OFFICER', reference: 'ISO 27001 §A.5.36',
+    defaultAssignee: 'COMPLIANCE_OFFICER', reference: 'ISO 27001 §A.5.36',
     publicSurface: false, allowsAnonymous: false,
     titleEn: 'Request a policy exception', titleAr: 'طلب استثناء من سياسة',
     blurbEn: 'Time-bound exception with justification, owner sign-off, and sunset date.',
@@ -262,7 +269,7 @@ export const INTAKE_CATALOG: Record<IntakeKind, IntakeCatalogEntry> = {
   },
   VENDOR_ONBOARDING: {
     kind: 'VENDOR_ONBOARDING', codePrefix: 'VO', slaHours: 24 * 14, defaultTarget: 'VENDOR',
-    defaultAssignee: 'TPRM_LEAD', reference: 'SAMA Outsourcing §5.1, NRC, ISO 27036',
+    defaultAssignee: 'SUPPLIER_MANAGER', reference: 'SAMA Outsourcing §5.1, NRC, ISO 27036',
     publicSurface: false, allowsAnonymous: false,
     titleEn: 'Onboard a new vendor', titleAr: 'إدراج مورد جديد',
     blurbEn: 'Tier classification → IT, security, legal and finance reviews → activation.',
@@ -278,7 +285,7 @@ export const INTAKE_CATALOG: Record<IntakeKind, IntakeCatalogEntry> = {
   },
   BIA_SUBMISSION: {
     kind: 'BIA_SUBMISSION', codePrefix: 'BI', slaHours: 24 * 30, defaultTarget: 'BIA',
-    defaultAssignee: 'BCM_LEAD', reference: 'ISO 22301 §8.2.2',
+    defaultAssignee: 'BCM_MANAGER', reference: 'ISO 22301 §8.2.2',
     publicSurface: false, allowsAnonymous: false,
     titleEn: 'Submit BIA for my business unit', titleAr: 'تقديم تقييم الأثر للوحدة',
     blurbEn: 'Annual Business Impact Assessment for your business unit.',
@@ -286,7 +293,7 @@ export const INTAKE_CATALOG: Record<IntakeKind, IntakeCatalogEntry> = {
   },
   AUDIT_REQUEST: {
     kind: 'AUDIT_REQUEST', codePrefix: 'AR', slaHours: 24 * 14, defaultTarget: 'ENGAGEMENT',
-    defaultAssignee: 'AUDIT_LEAD', reference: 'IIA IPPF 2010',
+    defaultAssignee: 'INTERNAL_AUDITOR', reference: 'IIA IPPF 2010',
     publicSurface: false, allowsAnonymous: false,
     titleEn: 'Request an internal audit', titleAr: 'طلب مراجعة داخلية',
     blurbEn: 'Business unit-driven request for an internal audit on a specific topic.',
@@ -294,7 +301,7 @@ export const INTAKE_CATALOG: Record<IntakeKind, IntakeCatalogEntry> = {
   },
   CHANGE_REQUEST: {
     kind: 'CHANGE_REQUEST', codePrefix: 'CR', slaHours: 48, defaultTarget: 'CHANGE',
-    defaultAssignee: 'CAB', reference: 'ITIL v4, ISO 20000-1 §8.2.6',
+    defaultAssignee: 'CHANGE_MANAGER', reference: 'ITIL v4, ISO 20000-1 §8.2.6',
     publicSurface: false, allowsAnonymous: false,
     titleEn: 'Submit a change request', titleAr: 'تقديم طلب تغيير',
     blurbEn: 'Standard / Normal / Emergency change request routed to the Change Advisory Board.',
@@ -311,7 +318,7 @@ export const INTAKE_CATALOG: Record<IntakeKind, IntakeCatalogEntry> = {
   },
   CONTROL_ATTESTATION: {
     kind: 'CONTROL_ATTESTATION', codePrefix: 'CA', slaHours: 24 * 14, defaultTarget: 'CONTROL_TEST',
-    defaultAssignee: 'COMPLIANCE_LEAD', reference: 'ISO 27001 §9.2',
+    defaultAssignee: 'COMPLIANCE_OFFICER', reference: 'ISO 27001 §9.2',
     publicSurface: false, allowsAnonymous: false,
     titleEn: 'Attest to a control / policy', titleAr: 'إقرار بضابط/سياسة',
     blurbEn: 'Confirm operating effectiveness for the controls assigned to you.',

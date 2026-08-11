@@ -520,6 +520,14 @@ class RoleGuardConversionRatchetTest {
      * authorisation surface — the Java role lists in {@code AttachmentAccessPolicy} — against this same
      * set. One copy, read by both, because a duplicated catalogue is how the census document drifted
      * nineteen ghosts behind the build (see {@code CENSUS_ROLE_SITES} below).
+     *
+     * <p><b>Three readers now</b> (F2-174). {@link IntakeAssigneeRoleResolutionTest} checks the intake
+     * catalogue's {@code defaultAssignee} against this set — and it is worth naming what makes it
+     * different, because "surface" would overstate it: intake's use is a <b>reference</b>, not an
+     * authorisation decision. Nothing consults {@code assigned_to} to admit or refuse anybody. The
+     * failure mode is nevertheless identical — a name absent from {@code iam.roles} can never resolve
+     * to a person, whether it is being asked to authorise or to route — which is why one catalogue
+     * answers all three questions.
      */
     static final Set<String> ROLE_CATALOGUE = Set.of(
         "APPSEC_INGEST", "APPSEC_LEAD", "ASSET_OWNER", "AUDITOR",

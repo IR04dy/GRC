@@ -110,16 +110,29 @@ class IntakeSystemSubmissionTest {
     }
 
     @Test
-    @DisplayName("the assignee comes from the catalogue — RISK_OFFICER, not the guard's role name")
+    @DisplayName("the assignee comes from the catalogue — one source, and it names a real role")
     void assigneeIsTheCataloguedStakeholder() {
         captureSave();
         SystemIntakePort.Receipt r = service.fileSystemSubmission(drift(payload("Credit scoring")));
 
         // The retired writer hard-coded RISK_MANAGER, lifted from MlModelDriftController's own
-        // hasAnyRole guard. assigned_to holds stakeholder codes; a role name in it routes to nobody,
-        // and there was never any reason for the two vocabularies to agree.
-        assertThat(saved().getAssignedTo()).isEqualTo("RISK_OFFICER");
-        assertThat(r.assignedTo()).isEqualTo("RISK_OFFICER");
+        // hasAnyRole guard. What matters is that the value is DERIVED — one catalogue, consulted —
+        // rather than which literal it happens to equal.
+        //
+        // ⚠ This assertion read RISK_OFFICER until F2-174, and the comment above it argued the
+        // point backwards: "assigned_to holds stakeholder codes; a role name in it routes to
+        // nobody, and there was never any reason for the two vocabularies to agree." Measured
+        // against both real databases, the reverse is true — RISK_OFFICER matched no row in
+        // iam.roles, so it was the stakeholder code that routed to nobody, and a role name is the
+        // only value a tenant administrator can attach people to. F2-175's own register entry had
+        // already recorded the honest half ("do not read it as 'the assignee now works'"); this
+        // test was written from the implementation and so could only agree with it.
+        //
+        // The closure worth noticing: the hard-code F2-175 deleted was RIGHT about the name and
+        // wrong about the mechanism. F2-174 makes the catalogue say the same thing, so the value
+        // is now both derived and resolvable.
+        assertThat(saved().getAssignedTo()).isEqualTo("RISK_MANAGER");
+        assertThat(r.assignedTo()).isEqualTo("RISK_MANAGER");
     }
 
     @Test
@@ -182,7 +195,10 @@ class IntakeSystemSubmissionTest {
         assertThat(h.get(0).getStatus()).isEqualTo("SUBMITTED");
         assertThat(h.get(0).getNote()).contains("AI Governance — drift monitor");
         assertThat(h.get(1).getStatus()).isEqualTo("TRIAGING");
-        assertThat(h.get(1).getNote()).contains("RISK_OFFICER");
+        // F2-174: this is the second place the assignee reaches a human — the audit trail, alongside
+        // the acknowledgement text IntakeFormPage renders. Both said RISK_OFFICER, a name matching no
+        // row in iam.roles, so the record's own history told a reader it had been routed somewhere.
+        assertThat(h.get(1).getNote()).contains("RISK_MANAGER");
     }
 
     // ─── The one with a live consequence ─────────────────────────────────────────────────────────
