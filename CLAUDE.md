@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,755 @ 2026-08-11; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,761 @ 2026-08-11; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -684,6 +684,21 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   lifecycle. 🔑 **When a module has a declared state machine, ask not "is it correct?" but "how many things
   write this status, and how many of them ask?"** — F2-175, F2-188, F2-189 and F2-190 are four writers found
   from four different angles, and no earlier fix would have caught a later one.
+  ⚠⚠ **Asked on purpose, that question yielded a fifth: `compliance/obligation`** (F2-191). `guardAttest` was a
+  `switch` allowing **none** of `DUE`/`OVERDUE`/`IN_PROGRESS` to become `OVERDUE`, while **three** writers set it
+  directly and none called the guard — and the artefact that was **right** was the class javadoc's state machine.
+  The two harms were both in the trail, not the row: the sweeps passed the literal `"DUE"` as previous status
+  although their query selects `DUE` *or* `IN_PROGRESS`, and the campaign path emitted **no row-level event at
+  all**. 🔑 **Each duplicate agreed with the original on the part that is easy to check and differed on the audit
+  trail** — the row always ends up in the right state; what differs is the event, the from-status, or nothing
+  being emitted, and none of that is visible from the row. Fixed with `ATTEST_TRANSITIONS` + `mayAttest` + one
+  shared `flipToOverdue` (skip-and-log, never abort a daily batch), and `AttestationOverdueGuardTest` **parses the
+  javadoc** and compares it edge-for-edge with the table, so the prose is the specification.
+  ⚠ **Cost of asking, stated: 13 candidate groups, 12 false positives.** A same-package proxy is not same-entity —
+  `[bcm] setStatus("DRAFT")` lists nine services creating nine different entities. The scan locates; the reading
+  is the measurement. ⚠ **Entity creation is not a transition**: a structural assertion banning
+  `setAttestationStatus(` outright fails on the campaign's legitimate `"DUE"` at materialisation. Scope such
+  assertions to the *state literal*, not the setter.
 - **`LocalDate.now()` in a test is UTC+3 here; the services it tests are UTC** — so a date-relative
   fixture is wrong for three hours of every day (F2-178 correction, caught 2026-08-10 at 00:4x local).
   `CommitteeSeatLinkageTest` set `termEndsAt = LocalDate.now().minusDays(1)` while

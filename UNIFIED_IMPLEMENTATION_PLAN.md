@@ -1717,6 +1717,34 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-191 CLOSED 2026-08-11 — the fifth instance of one shape, and the first found by asking the question
+on purpose.** F2-190 ended on *"how many things write this status, and how many of them ask?"*, so I asked it
+per module. In `compliance/obligation`: `guardAttest` was a `switch` whose arms allowed **none** of `DUE`,
+`OVERDUE` or `IN_PROGRESS` to become `OVERDUE`, while **three** writers set it directly and none called the
+guard — `markOverdueForCampaign`, `sweepOverdueForOrg` (daily) and `ObligationCampaignService#escalateOverdue`.
+Three artefacts, three answers, and the correct one was the **class javadoc**. Two consequences no single file
+showed: both sweeps passed the literal `"DUE"` as the previous status while their own query selects
+`DUE` *or* `IN_PROGRESS` — so a cycle an officer had started was reported to the rule engine as never begun —
+and the campaign path emitted **no row-level event at all**, only the campaign-level one, so an F8 rule keyed
+on `OBLIGATION_OVERDUE` saw nothing for campaign-driven escalation. Fixed with `ATTEST_TRANSITIONS` +
+`mayAttest` + one shared `flipToOverdue` that skips-and-logs rather than aborting a batch, and the campaign
+calling the owning service. ⚙ **The dark-method map noticed the fix was incomplete for the second time**:
+`markOverdueForCampaign`'s reason said *"the two must not diverge"* — they had — and giving it a caller made
+`aToleratedEntryThatGainedACallerMustLoseItsEntry` fail. ⚠ **The prose is now the specification and the build
+enforces it**: `theProseAndTheTableAgree` parses the javadoc's arrow lines and compares them edge for edge,
+because F2-190 found a lifecycle described in a comment and implemented as something else, and here the comment
+was the only artefact that was right. ⚠ **Two of my own errors, both caught by a test**: I wrote that the
+campaign could flip a `NOT_APPLICABLE` cycle to OVERDUE (it cannot — I read a filter from a *different method*;
+the wrong claim is left in the file as a correction, since F2-188's lesson is that fluent prose reads as
+verification *including when it is mine*), and my structural assertion first banned `setAttestationStatus(`
+outright, which fails on the campaign's legitimate `"DUE"` at materialisation — **entity creation is not a
+transition**, the same distinction behind F2-189's 52-writer false positive. ⚠ And an existing test had pinned
+the campaign's unguarded, event-less loop as correct — **fifth** instance of a test agreeing with the
+implementation it was written from. ⚙ **The measurement's honest limit: 13 candidate groups, 12 false
+positives** — a same-package proxy is not same-entity (`[bcm] setStatus("DRAFT")` lists nine services creating
+nine different entities), so the scan is a locator and the reading is the measurement. Suite **3,761/0/0**,
+0 migrations, 0 FE change.
+
 ✔ **F2-190 CLOSED 2026-08-11 — the third writer of workflow status, found by following the lead F2-189
 recorded and deferred.** `WorkflowEvidenceBridge`'s comment said *"Drive through the WF-1 machine: pre-submit
 states hop via SUBMITTED first"* and it wrote `setStatus` directly. Its two hard-coded sets covered **11 of

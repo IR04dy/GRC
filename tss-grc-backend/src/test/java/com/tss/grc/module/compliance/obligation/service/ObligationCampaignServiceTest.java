@@ -64,6 +64,8 @@ class ObligationCampaignServiceTest {
 
     @Mock private ObligationAttestationCampaignRepository campaignRepo;
     @Mock private ObligationAttestationRepository attestationRepo;
+    /** F2-191 — the campaign no longer flips attestation status itself; it asks the owning service. */
+    @Mock private ObligationAttestationService attestationService;
     @Mock private ObligationRepository obligationRepo;
     @Mock private AuditLogService audit;
     @Mock private ApplicationEventPublisher publisher;
@@ -72,7 +74,8 @@ class ObligationCampaignServiceTest {
 
     @BeforeEach void setUp() {
         TenantContext.setCurrentTenant(ORG_ID);
-        service = new ObligationCampaignService(campaignRepo, attestationRepo, obligationRepo, audit, publisher);
+        service = new ObligationCampaignService(campaignRepo, attestationRepo, attestationService,
+            obligationRepo, audit, publisher);
     }
 
     @AfterEach void tearDown() { TenantContext.clear(); }
@@ -300,23 +303,28 @@ class ObligationCampaignServiceTest {
             a.setDueDate(LocalDate.now().minusDays(5));
             stale.add(a);
         }
-        when(attestationRepo.findByOrganisationIdAndCampaignIdAndAttestationStatusInAndDueDateBeforeAndIsDeletedFalse(
-                eq(ORG_ID), eq(201L), eq(List.of("DUE", "IN_PROGRESS")), any()))
-            .thenReturn(stale);
-        when(attestationRepo.save(any(ObligationAttestation.class))).thenAnswer(inv -> inv.getArgument(0));
+        // F2-191 — the campaign no longer selects and flips the rows itself. It asks the service that
+        // owns the attestation lifecycle, which is the only place that consults the guard, knows each
+        // row's real previous status and emits the per-row OBLIGATION_OVERDUE event. The old version of
+        // this test stubbed the repository and counted saves, i.e. it asserted the campaign's own copy
+        // of the loop as correct — and that copy emitted no row-level event at all.
+        when(attestationService.markOverdueForCampaign(eq(201L), any())).thenReturn(stale.size());
         when(campaignRepo.save(any(ObligationAttestationCampaign.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CampaignResponse out = service.escalateOverdue(201L);
 
         assertThat(out.status()).isEqualTo("ESCALATED");
-        assertThat(out.totalOverdue()).isEqualTo(2);
+        assertThat(out.totalOverdue())
+            .as("the roll-up must come from what the owning service actually flipped, not from the "
+                + "size of a candidate list the campaign selected for itself")
+            .isEqualTo(2);
+        verify(attestationService).markOverdueForCampaign(eq(201L), any());
+        verify(attestationRepo, never()).save(any(ObligationAttestation.class));
     }
 
     @Test void escalateOverdue_emitsAuditCommitteeTrigger() {
         ObligationAttestationCampaign c = existing("IN_PROGRESS", 3);
         when(campaignRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, 201L)).thenReturn(Optional.of(c));
-        when(attestationRepo.findByOrganisationIdAndCampaignIdAndAttestationStatusInAndDueDateBeforeAndIsDeletedFalse(
-                anyLong(), anyLong(), anyList(), any())).thenReturn(List.of());
         when(campaignRepo.save(any(ObligationAttestationCampaign.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.escalateOverdue(201L);

@@ -190,12 +190,11 @@ class DarkServiceMethodTest {
         //
         // markOverdue is NOT in this map any more: CommitteeScheduledSweep now calls it, which is the
         // one real defect the audit found. It had been flipping the row itself.
-        Map.entry("com.tss.grc.module.compliance.obligation.service.ObligationAttestationService#markOverdueForCampaign",
-            "SUPERSEDED, and the evidence is in the replacement's javadoc: "
-            + "ComplianceDeadlineScheduler says it sweeps org-wide '(previously markOverdueForCampaign "
-            + "only ran when a campaign...)' and calls sweepOverdueForOrg instead, which is scheduled "
-            + "daily. Attestations ARE marked overdue. Kept only because a per-campaign variant is a "
-            + "plausible admin action; the two must not diverge. F2-187/F2-188."),
+        // markOverdueForCampaign is NOT in this map any more (F2-191). Its reason said the two variants
+        // "must not diverge" — they had: the campaign service held a third copy of the loop, unguarded
+        // and silent. ObligationCampaignService#escalateOverdue now calls it, so it has a caller and the
+        // both-directions assertion required this entry's deletion. That is twice this gate has been the
+        // thing that noticed a fix was incomplete (markOverdue was the first).
         Map.entry("com.tss.grc.module.ccm.service.CcmService#recordRun",
             "A THIRD entry point to recordRunInternal, for a result computed outside the platform. "
             + "The ladder is not dark: CcmSchedulerService#tick is @Scheduled(fixedDelay=60s) and "

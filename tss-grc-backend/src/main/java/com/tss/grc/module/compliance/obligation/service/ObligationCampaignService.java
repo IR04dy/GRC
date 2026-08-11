@@ -64,6 +64,9 @@ public class ObligationCampaignService {
 
     private final ObligationAttestationCampaignRepository campaignRepo;
     private final ObligationAttestationRepository attestationRepo;
+    /** F2-191 — the owner of the attestation lifecycle. The campaign decides WHEN to escalate; it
+     *  does not keep its own copy of what OVERDUE does to a cycle. */
+    private final ObligationAttestationService attestationService;
     private final ObligationRepository obligationRepo;
     private final AuditLogService audit;
     private final ApplicationEventPublisher publisher;
@@ -233,29 +236,24 @@ public class ObligationCampaignService {
         ObligationAttestationCampaign c = loadOrThrow(campaignId);
         guardTransition(c.getStatus(), "ESCALATED");
 
-        List<ObligationAttestation> stale = attestationRepo
-            .findByOrganisationIdAndCampaignIdAndAttestationStatusInAndDueDateBeforeAndIsDeletedFalse(
-                c.getOrganisationId(), c.getId(),
-                List.of("DUE", "IN_PROGRESS"),
-                LocalDate.now());
-
+        // F2-191 — the third copy of this loop, and the one that was silent. It wrote the status with
+        // no guard and, unlike the two sweeps, emitted no per-attestation OBLIGATION_OVERDUE event at
+        // all: only the campaign-level event fired, so an F8 rule keyed on the row-level trigger saw
+        // nothing for campaign-driven escalation. Routing through the attestation service gives each
+        // row its guard, its event and the correct previous status.
         LocalDateTime now = LocalDateTime.now();
-        for (ObligationAttestation a : stale) {
-            a.setAttestationStatus("OVERDUE");
-            a.setUpdatedAt(now);
-            attestationRepo.save(a);
-        }
+        int overdue = attestationService.markOverdueForCampaign(c.getId(), LocalDate.now());
 
         c.setStatus("ESCALATED");
-        c.setTotalOverdue(stale.size());
+        c.setTotalOverdue(overdue);
         c.setUpdatedAt(now);
         ObligationAttestationCampaign saved = campaignRepo.save(c);
 
         audit.log("TRANSITION", "ObligationAttestationCampaign", saved.getId(),
-            "Obligation campaign escalated to Audit Committee: " + stale.size()
+            "Obligation campaign escalated to Audit Committee: " + overdue
                 + " overdue (" + saved.getCampaignCode() + ")");
         emit("OBLIGATION_CAMPAIGN_ESCALATED", saved, null,
-            Map.of("overdueCount", String.valueOf(stale.size())));
+            Map.of("overdueCount", String.valueOf(overdue)));
         return toResponse(saved);
     }
 

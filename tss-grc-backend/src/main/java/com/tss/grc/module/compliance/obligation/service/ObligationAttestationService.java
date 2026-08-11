@@ -208,14 +208,7 @@ public class ObligationAttestationService {
         List<ObligationAttestation> due = repo
             .findByOrganisationIdAndCampaignIdAndAttestationStatusInAndDueDateBeforeAndIsDeletedFalse(
                 org(), campaignId, List.of("DUE", "IN_PROGRESS"), cutoff);
-        LocalDateTime now = LocalDateTime.now();
-        for (ObligationAttestation a : due) {
-            a.setAttestationStatus("OVERDUE");
-            a.setUpdatedAt(now);
-            repo.save(a);
-            emit("OBLIGATION_OVERDUE", a, "DUE");
-        }
-        return due.size();
+        return flipToOverdue(due);
     }
 
     /**
@@ -229,35 +222,89 @@ public class ObligationAttestationService {
         List<ObligationAttestation> due = repo
             .findByOrganisationIdAndAttestationStatusInAndDueDateBeforeAndIsDeletedFalse(
                 org(), List.of("DUE", "IN_PROGRESS"), cutoff);
+        return flipToOverdue(due);
+    }
+
+    /**
+     * The single OVERDUE writer for this entity — F2-191.
+     *
+     * <p>Both sweeps had their own copy of this loop, and neither consulted {@link #guardAttest}. Two
+     * consequences: the guard's own table did not permit OVERDUE at all (so the lifecycle a reader
+     * consults said this could not happen, while it happened daily), and {@code emit} was passed the
+     * literal {@code "DUE"} as the previous status for rows that may have been {@code IN_PROGRESS} —
+     * so the F8 event told a compliance owner the cycle had never been started when it had.
+     *
+     * <p>A row the table forbids is <b>skipped and logged</b>, not thrown on: a batch that aborts
+     * half-way through a daily sweep leaves an arbitrary subset escalated, which is worse than one
+     * unescalated row and much harder to notice.
+     */
+    private int flipToOverdue(List<ObligationAttestation> candidates) {
         LocalDateTime now = LocalDateTime.now();
-        for (ObligationAttestation a : due) {
+        int flipped = 0;
+        for (ObligationAttestation a : candidates) {
+            String from = a.getAttestationStatus();
+            if (!mayAttest(from, "OVERDUE")) {
+                log.warn("Obligation attestation {} is past due in status {}, which the lifecycle does "
+                        + "not allow to become OVERDUE — not escalated", a.getId(), from);
+                continue;
+            }
             a.setAttestationStatus("OVERDUE");
             a.setUpdatedAt(now);
             repo.save(a);
-            emit("OBLIGATION_OVERDUE", a, "DUE");
+            emit("OBLIGATION_OVERDUE", a, from);
+            flipped++;
         }
-        return due.size();
+        return flipped;
     }
 
     // ─── Guards ─────────────────────────────────────────────────────
+
+    /**
+     * The per-cycle lifecycle, as one table read by every writer.
+     *
+     * <p>F2-191 — this was a {@code switch} whose arms lumped {@code DUE}, {@code OVERDUE} and
+     * {@code IN_PROGRESS} together and allowed none of them to become <b>OVERDUE</b>, while the class
+     * javadoc above says {@code DUE → … | OVERDUE} and {@code IN_PROGRESS → … | OVERDUE}, and
+     * <b>three</b> writers wrote OVERDUE without ever calling the guard
+     * ({@link #markOverdueForCampaign}, {@link #sweepOverdueForOrg} and
+     * {@code ObligationCampaignService}'s escalation step). Three artefacts, three answers.
+     *
+     * <p>The javadoc was right — an attestation past its due date is overdue — so the table now says
+     * exactly what the prose says, and {@link #mayAttest} is the one predicate all four callers use.
+     * {@code OVERDUE → OVERDUE} stays absent deliberately: re-flipping a row that is already overdue
+     * is not a state change, and the sweeps skip it rather than declaring a self-loop.
+     */
+    static final Map<String, Set<String>> ATTEST_TRANSITIONS = Map.of(
+        "DUE",         Set.of("IN_PROGRESS", "ATTESTED", "ATTESTED_WITH_EXCEPTIONS", "NOT_APPLICABLE", "OVERDUE"),
+        "IN_PROGRESS", Set.of("ATTESTED", "ATTESTED_WITH_EXCEPTIONS", "NOT_APPLICABLE", "OVERDUE"),
+        "OVERDUE",     Set.of("IN_PROGRESS", "ATTESTED", "ATTESTED_WITH_EXCEPTIONS", "NOT_APPLICABLE"),
+        // Re-attesting an already-attested cycle is allowed (e.g. reviewer requested changes), so the
+        // owner can flip ATTESTED → ATTESTED_WITH_EXCEPTIONS or back during the review window.
+        "ATTESTED",    Set.of("IN_PROGRESS", "ATTESTED", "ATTESTED_WITH_EXCEPTIONS", "NOT_APPLICABLE"),
+        "ATTESTED_WITH_EXCEPTIONS",
+                       Set.of("IN_PROGRESS", "ATTESTED", "ATTESTED_WITH_EXCEPTIONS", "NOT_APPLICABLE"),
+        // Terminal by design.
+        //
+        // ⚠ A first draft of this comment claimed the campaign escalation could flip a NOT_APPLICABLE
+        // cycle to OVERDUE. It cannot: escalateOverdue's candidate query filters to DUE/IN_PROGRESS.
+        // The claim came from reading a status filter in a DIFFERENT method of that class. Left here
+        // as a correction rather than deleted, because F2-188's lesson is that fluent prose in an
+        // authoritative-looking place reads as verification — including when it is mine and wrong.
+        "NOT_APPLICABLE", Set.of());
+
+    /** Legality without the throw, so a sweep can skip a row instead of aborting the batch. */
+    static boolean mayAttest(String from, String to) {
+        return ATTEST_TRANSITIONS.getOrDefault(Objects.requireNonNullElse(from, ""), Set.of())
+            .contains(to);
+    }
 
     static void guardAttest(String from, String to) {
         if (!ATTEST_STATES.contains(to)) {
             throw new IllegalArgumentException("Unknown attestation status: " + to);
         }
-        Set<String> allowed = switch (Objects.requireNonNullElse(from, "")) {
-            case "DUE", "OVERDUE", "IN_PROGRESS" ->
-                Set.of("IN_PROGRESS", "ATTESTED", "ATTESTED_WITH_EXCEPTIONS", "NOT_APPLICABLE");
-            // Re-attesting an already-attested cycle is allowed (e.g.
-            // reviewer requested changes); we accept the same set so the
-            // owner can flip ATTESTED → ATTESTED_WITH_EXCEPTIONS or vice
-            // versa during the review window.
-            case "ATTESTED", "ATTESTED_WITH_EXCEPTIONS" ->
-                Set.of("IN_PROGRESS", "ATTESTED", "ATTESTED_WITH_EXCEPTIONS", "NOT_APPLICABLE");
-            default -> Set.of();
-        };
-        if (!allowed.contains(to)) {
-            throw new IllegalTransitionException(from, to, allowed);
+        if (!mayAttest(from, to)) {
+            throw new IllegalTransitionException(from, to,
+                ATTEST_TRANSITIONS.getOrDefault(Objects.requireNonNullElse(from, ""), Set.of()));
         }
     }
 
