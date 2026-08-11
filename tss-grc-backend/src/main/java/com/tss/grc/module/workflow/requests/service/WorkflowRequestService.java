@@ -128,6 +128,51 @@ public class WorkflowRequestService {
         return TRANSITIONS.getOrDefault(from, Set.of()).contains(to);
     }
 
+    /**
+     * The one intermediate state that makes {@code from → to} legal in two hops, if there is one.
+     *
+     * <p>F2-190 — {@code WorkflowEvidenceBridge}'s comment said <i>"Drive through the WF-1 machine:
+     * pre-submit states hop via SUBMITTED first"</i>, and it hard-coded the set of states it believed
+     * needed the hop. Two problems with a hard-coded hop list: it omitted {@code RETURNED} (whose only
+     * legal continuations are {@code RESUBMITTED} and {@code CLOSED}, so no SUBMITTED hop exists) and
+     * it omitted {@code DRAFT} (which must not reach APPROVED at all). Asking the table removes both
+     * kinds of mistake, and it means a future edge added to {@link #TRANSITIONS} is picked up rather
+     * than needing a second edit somewhere else.
+     *
+     * <p><b>Deliberately depth 2, not a shortest-path search.</b> A longer walk would let an automated
+     * outcome carry a request across steps a person is supposed to take — {@code DRAFT → SENT →
+     * SUBMITTED → APPROVED} would have an evidence approval <em>send</em> the request on the
+     * requester's behalf and then approve it. Refusing is the right answer there, so the cap is a
+     * product decision rather than an optimisation.
+     *
+     * <p><b>The candidate order is declared, not incidental.</b> F2-186 is a live finding about a
+     * report whose answer depended on {@code HashMap} iteration order; a hop chosen by whichever state
+     * a set happened to yield first would be the same defect. {@code SUBMITTED} is preferred because it
+     * is what the bridge's own comment intended, then {@code RESUBMITTED}, then the remainder in
+     * alphabetical order.
+     *
+     * <p>⚠ This does <b>not</b> special-case a legal direct move: ask {@link #mayTransition} first.
+     * Returning empty for both "no hop needed" and "no hop exists" would collapse the two answers a
+     * caller has to tell apart, which is how a bypass gets written by accident.
+     */
+    static java.util.Optional<String> hopVia(String from, String to) {
+        List<String> candidates = new java.util.ArrayList<>(
+            new java.util.TreeSet<>(TRANSITIONS.getOrDefault(from, Set.of())));
+        candidates.sort(java.util.Comparator
+            .comparingInt((String s) -> switch (s) {
+                case "SUBMITTED" -> 0;
+                case "RESUBMITTED" -> 1;
+                default -> 2;
+            })
+            .thenComparing(java.util.Comparator.naturalOrder()));
+        for (String m : candidates) {
+            if (mayTransition(m, to)) {
+                return java.util.Optional.of(m);
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
     private final WorkflowRequestRepository          requestRepo;
     private final WorkflowRequestRecipientRepository recipientRepo;
     private final WorkflowRequestEventRepository     eventRepo;

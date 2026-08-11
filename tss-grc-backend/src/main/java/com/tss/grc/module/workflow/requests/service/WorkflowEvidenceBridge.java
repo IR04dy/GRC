@@ -41,10 +41,14 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class WorkflowEvidenceBridge {
 
+    /**
+     * Statuses where an evidence outcome is moot because the request is already decided.
+     *
+     * <p>A product decision, not derivable from the lifecycle table: {@code APPROVED} and
+     * {@code REJECTED} are not graph-terminal (both can be reopened), but a request that has already
+     * been decided must not be re-decided by a late evidence event.
+     */
     private static final Set<String> TERMINAL = Set.of("CLOSED", "ARCHIVED", "APPROVED", "REJECTED");
-    /** Open statuses that must hop through SUBMITTED before a review outcome applies. */
-    private static final Set<String> PRE_SUBMIT =
-        Set.of("SENT", "ASSIGNED", "IN_PROGRESS", "WAITING_RESPONSE", "REOPENED", "ESCALATED", "OVERDUE");
 
     private final WorkflowRequestRepository      requestRepo;
     private final WorkflowRequestEventRepository eventRepo;
@@ -78,14 +82,48 @@ public class WorkflowEvidenceBridge {
 
         String from = r.getStatus();
         String requestCode = String.valueOf(event.payload().get("requestCode"));
-        // Drive through the WF-1 machine: pre-submit states hop via SUBMITTED first.
-        if (PRE_SUBMIT.contains(r.getStatus())) r.setStatus("SUBMITTED");
-        r.setStatus(approved ? "APPROVED" : "RETURNED");
+        String target = approved ? "APPROVED" : "RETURNED";
+
+        // F2-190 — ask the lifecycle table instead of a hard-coded hop list.
+        //
+        // What was wrong: this said "Drive through the WF-1 machine: pre-submit states hop via
+        // SUBMITTED first" and then drove around it. PRE_SUBMIT held 7 states and TERMINAL 4, of the
+        // table's 16 — so for the five in neither (DRAFT, SUBMITTED, UNDER_REVIEW, RETURNED,
+        // RESUBMITTED) the target was written directly, and two of those moves the table forbids:
+        // DRAFT -> APPROVED (a request nobody ever sent, marked approved) and RETURNED -> APPROVED
+        // (whose only legal continuations are RESUBMITTED and CLOSED). The hop itself was also
+        // decorative: two consecutive setStatus calls collapse, so the row never rested in SUBMITTED
+        // and no event recorded it — a control the comment described that did not run.
+        //
+        // Now: direct if legal; otherwise one declared intermediate, recorded as its own event so the
+        // trail matches the machine; otherwise refuse and leave the row alone. DRAFT refuses on
+        // purpose — reaching APPROVED from there needs SENT, and an evidence approval must not send a
+        // request on the requester's behalf.
+        String hop = null;
+        if (!WorkflowRequestService.mayTransition(from, target)) {
+            hop = WorkflowRequestService.hopVia(from, target).orElse(null);
+            if (hop == null) {
+                log.warn("[wf-evidence-bridge] request {} is {} and the lifecycle offers no route to {}"
+                        + " — evidence {} recorded against the evidence request, workflow left alone",
+                    requestId, from, target, trigger);
+                return;
+            }
+        }
+        if (hop != null) {
+            r.setStatus(hop);
+            requestRepo.save(r);
+            appendEvent(r, hop, from, hop, "Evidence outcome for " + requestCode
+                + " requires the lifecycle step " + from + " → " + hop + " before " + target);
+        }
+        r.setStatus(target);
         requestRepo.save(r);
 
         String note = (approved ? "Evidence request " : "Evidence request ")
             + requestCode + (approved ? " APPROVED in the evidence subsystem" : " REJECTED in the evidence subsystem — returned for changes");
-        appendEvent(r, approved ? "APPROVED" : "RETURNED", from, r.getStatus(), note);
+        // from-status of the DECIDING event is the hop when there was one, so the two events read as a
+        // walk of the machine rather than two competing accounts of the same change.
+        appendEvent(r, approved ? "APPROVED" : "RETURNED",
+            hop == null ? from : hop, r.getStatus(), note);
         withTenant(r.getOrganisationId(), () ->
             audit.log(approved ? "WORKFLOW_REQUEST_APPROVED" : "WORKFLOW_REQUEST_RETURNED",
                 "WorkflowRequest", r.getId(), code(r) + " · via evidence bridge · " + note));

@@ -70,7 +70,13 @@ class WorkflowEvidenceBridgeTest {
         bridge.onEvidenceOutcome(evt("EVIDENCE_REQUEST_APPROVED", 5L));
 
         assertThat(r.getStatus()).isEqualTo("APPROVED");
-        verify(eventRepo).save(any());
+        // F2-190: TWO events now, and the change is the point. IN_PROGRESS -> APPROVED is not in
+        // WorkflowRequestService.TRANSITIONS, so the machine requires a hop via SUBMITTED. The bridge
+        // always intended that ("pre-submit states hop via SUBMITTED first") but implemented it as two
+        // consecutive setStatus calls, which collapse — so the row never rested in SUBMITTED and no
+        // event recorded it. This assertion read `save(any())` (Mockito's exactly-once) and so pinned
+        // the collapsed behaviour as correct.
+        verify(eventRepo, org.mockito.Mockito.times(2)).save(any());
         verify(notifications).notifyUser(any(), any(), any(), any(), any(), any(), any(), any());
         verify(audit).log(any(), any(), any(), any());
     }

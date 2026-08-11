@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,746 @ 2026-08-11; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,755 @ 2026-08-11; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -669,6 +669,21 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   (b) 🔑 **An event row whose `from_status` equals its `to_status` is not evidence of a write** — the one
   `OVERDUE → OVERDUE` row in dev is an `ESCALATED` event whose states match *because the status correctly did
   not change*, and reading it is what stopped a false claim.
+  ⚠⚠ **The engine had a THIRD status writer and it also drove around the table** (F2-190).
+  `WorkflowEvidenceBridge` said *"Drive through the WF-1 machine: pre-submit states hop via SUBMITTED first"*
+  and wrote `setStatus` directly; its two hard-coded sets covered **11 of the table's 16** states, and of the
+  five in neither, `DRAFT → APPROVED` (a request nobody ever sent, marked approved) and `RETURNED → APPROVED`
+  are both forbidden. 🔑 **And the hop was decorative — `setStatus("SUBMITTED")` immediately followed by
+  `setStatus(target)` collapses**, so the row never rested there and no event recorded it: *a control described
+  in a comment and implemented as two consecutive writes runs as neither.* Fixed with
+  `WorkflowRequestService.hopVia`, **capped at depth 2 on purpose** (`DRAFT → SENT → SUBMITTED → APPROVED`
+  exists, and walking it would have an evidence approval *send* the request for the requester), the hop
+  recorded as its own event, and `PRE_SUBMIT` **deleted** — an unread second opinion is how the next reader
+  decides it is the authority. ⚠ Its candidate order is **declared** (SUBMITTED, then RESUBMITTED, then
+  alphabetical): a hop picked by whichever state a `Set` yields first is F2-186's `HashMap`-order defect in a
+  lifecycle. 🔑 **When a module has a declared state machine, ask not "is it correct?" but "how many things
+  write this status, and how many of them ask?"** — F2-175, F2-188, F2-189 and F2-190 are four writers found
+  from four different angles, and no earlier fix would have caught a later one.
 - **`LocalDate.now()` in a test is UTC+3 here; the services it tests are UTC** — so a date-relative
   fixture is wrong for three hours of every day (F2-178 correction, caught 2026-08-10 at 00:4x local).
   `CommitteeSeatLinkageTest` set `termEndsAt = LocalDate.now().minusDays(1)` while

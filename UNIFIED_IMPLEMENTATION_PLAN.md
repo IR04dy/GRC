@@ -1717,6 +1717,31 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-190 CLOSED 2026-08-11 — the third writer of workflow status, found by following the lead F2-189
+recorded and deferred.** `WorkflowEvidenceBridge`'s comment said *"Drive through the WF-1 machine: pre-submit
+states hop via SUBMITTED first"* and it wrote `setStatus` directly. Its two hard-coded sets covered **11 of
+the table's 16** states; for the five in neither it wrote the outcome straight in, and two of those moves the
+table forbids — **`DRAFT → APPROVED`** (a request nobody ever sent, marked approved by an evidence event) and
+**`RETURNED → APPROVED`** (which must pass through RESUBMITTED, because that is what "returned for changes"
+means), plus a `RETURNED → RETURNED` self-loop on a rejection. 🔑 **And the hop was decorative**:
+`setStatus("SUBMITTED")` followed immediately by `setStatus(target)` collapses, so the row never rested in
+SUBMITTED and no event recorded it — *a control described in a comment and implemented as two consecutive
+writes runs as neither.* ⚠ Latent: **0** evidence requests anchored to `WORKFLOW_REQUEST` in dev or prod,
+**0** `evidence-bridge` events. Fixed with `hopVia` beside F2-189's `mayTransition`, **capped at depth 2 on
+purpose** (`DRAFT → SENT → SUBMITTED → APPROVED` exists, and walking it would have an evidence approval *send*
+the request on the requester's behalf), the hop recorded as its own event, and `PRE_SUBMIT` **deleted** rather
+than left unread. Candidate order declared, not incidental — F2-186 is a live finding about an answer that
+depended on `HashMap` order. ⚠⚠ **An existing test had pinned the collapsed behaviour as correct**
+(`verify(eventRepo).save(any())` — Mockito's *exactly once*, true only while the hop is invisible): fourth
+instance of a test agreeing with the implementation it was written from. ⚠ And my own new test first asserted
+an API I expected rather than the one I wrote — 🔑 *a test written from a method's name instead of its contract
+asserts the API you expected*, and it failed safe only by luck. Gate:
+`WorkflowEvidenceBridgeLegalityTest` (9), including an invariant whose expected-refusal set is
+`containsExactly("DRAFT -> APPROVED", "DRAFT -> RETURNED")` so a state joining or leaving it fails the build.
+Suite **3,755/0/0**, 0 migrations, 0 FE change. 🔑 **Three writers, three slices, one shape** (F2-175, F2-188,
+F2-189, this): *when a module has a declared state machine, the question is not "is it correct?" but "how many
+things write this status, and how many of them ask?"*
+
 ✔ **F2-189 CLOSED 2026-08-11 — the workflow engine's SLA sweep performed a transition its own lifecycle
 table forbids.** Generalising F2-188's shape found it: `WorkflowRequestService.TRANSITIONS` declared
 `REOPENED → {IN_PROGRESS, SUBMITTED, ESCALATED, CLOSED}` with **no OVERDUE**, and `transition()` answers 409
