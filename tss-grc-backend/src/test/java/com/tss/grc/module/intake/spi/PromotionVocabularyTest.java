@@ -13,6 +13,8 @@ import com.tss.grc.module.privacy.intake.DpiaPromotionAdapter;
 import com.tss.grc.module.privacy.intake.DsrPromotionAdapter;
 import com.tss.grc.module.risk.intake.RiskPromotionAdapter;
 import com.tss.grc.module.tprm.intake.VendorPromotionAdapter;
+import com.tss.grc.support.MigrationVocabularies;
+import com.tss.grc.support.MigrationVocabularies.Vocabulary;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -169,13 +171,13 @@ class PromotionVocabularyTest {
     @Test
     @DisplayName("every value an adapter writes is in its own column's CHECK vocabulary")
     void everyBoundValueIsInItsColumnsVocabulary() throws Exception {
-        Map<String, Constraint> constraints = parseConstraints();
+        Map<String, Vocabulary> constraints = parseConstraints();
         List<String> violations = new ArrayList<>();
         int checked = 0;
 
         for (Map.Entry<Class<?>, Target> e : REGISTRY.entrySet()) {
             for (Binding b : e.getValue().bindings()) {
-                Constraint c = constraints.get(b.constraint().toLowerCase());
+                Vocabulary c = constraints.get(b.constraint().toLowerCase());
                 assertThat(c).as(
                     "%s declares a binding to %s, which no migration declares. Either the constraint was "
                     + "renamed (update this binding) or it never existed (the binding is a typo, and a typo "
@@ -211,11 +213,11 @@ class PromotionVocabularyTest {
     @Test
     @DisplayName("every declared constraint really is on that adapter's target table")
     void everyDeclaredConstraintIsOnItsDeclaredTable() throws Exception {
-        Map<String, Constraint> constraints = parseConstraints();
+        Map<String, Vocabulary> constraints = parseConstraints();
         List<String> misScoped = new ArrayList<>();
         for (Map.Entry<Class<?>, Target> e : REGISTRY.entrySet()) {
             for (Binding b : e.getValue().bindings()) {
-                Constraint c = constraints.get(b.constraint().toLowerCase());
+                Vocabulary c = constraints.get(b.constraint().toLowerCase());
                 if (c != null && !c.table().equalsIgnoreCase(e.getValue().table())) {
                     misScoped.add(String.format("%s targets %s but binds %s, declared on %s",
                         e.getKey().getSimpleName(), e.getValue().table(), b.constraint(), c.table()));
@@ -233,17 +235,17 @@ class PromotionVocabularyTest {
     @Test
     @DisplayName("no constrained column on a target table is written without being declared")
     void noUndeclaredConstrainedColumn() throws Exception {
-        Map<String, Constraint> constraints = parseConstraints();
+        Map<String, Vocabulary> constraints = parseConstraints();
         List<String> undeclared = new ArrayList<>();
 
         for (Map.Entry<Class<?>, Target> e : REGISTRY.entrySet()) {
             Target t = e.getValue();
             Set<String> declared = new LinkedHashSet<>();
             for (Binding b : t.bindings()) {
-                Constraint c = constraints.get(b.constraint().toLowerCase());
+                Vocabulary c = constraints.get(b.constraint().toLowerCase());
                 if (c != null) declared.add(c.column().toLowerCase());
             }
-            for (Constraint c : constraints.values()) {
+            for (Vocabulary c : constraints.values()) {
                 if (!c.table().equalsIgnoreCase(t.table())) continue;
                 String col = c.column().toLowerCase();
                 if (declared.contains(col) || t.unwritten().containsKey(col)) continue;
@@ -292,12 +294,12 @@ class PromotionVocabularyTest {
     @Test
     @DisplayName("the shared severity clamp satisfies all five columns that consume it")
     void sharedSeverityClampMatchesEveryColumnItFeeds() throws Exception {
-        Map<String, Constraint> constraints = parseConstraints();
+        Map<String, Vocabulary> constraints = parseConstraints();
         List<String> feeds = List.of("CK_vendors_risk_rating", "CK_incidents_severity",
             "CK_findings_severity", "ck_policy_exc_risk", "ck_change_risk");
 
         for (String name : feeds) {
-            Constraint c = constraints.get(name.toLowerCase());
+            Vocabulary c = constraints.get(name.toLowerCase());
             assertThat(c).as("%s must be readable from the migrations", name).isNotNull();
             assertThat(c.values()).as(
                 "%s (%s) must admit every band severityOrMedium() can return. If a column narrows its "
@@ -313,95 +315,17 @@ class PromotionVocabularyTest {
     // Migration parsing — verified against sys.check_constraints before being trusted
     // ─────────────────────────────────────────────────────────────────────────────
 
-    private record Constraint(String constraint, String table, String column, Set<String> values) {}
-
-    private static final Pattern TABLE_REF =
-        Pattern.compile("(?:ALTER|CREATE)\\s+TABLE\\s+(?:\\[?(\\w+)\\]?\\.)?\\[?(\\w+)\\]?",
-            Pattern.CASE_INSENSITIVE);
     /**
-     * A column reference inside a CHECK body: an identifier followed by a comparison.
+     * The migration parse now lives in {@link MigrationVocabularies}.
      *
-     * <p>⚠ Run against the CHECK body <b>with the quoted literals removed</b>, and both halves of that
-     * matter. This pattern's first draft was applied to the raw body and pulled the column name
-     * {@code PEND} out of {@code ratification_state<>N'PENDING'} — because {@code PENDING} contains
-     * {@code IN}, and {@code IN} was one of the operators. The {@link #noUndeclaredConstrainedColumn()}
-     * leg failed on the first run and named the phantom column, which is the anti-vacuity habit paying
-     * for itself twice: F2-175's {@code RiskPromotionStatusTest} caught {@code .replace("N","")} turning
-     * {@code OPEN} into {@code OPE} the same way. 🔑 <b>A regex over SQL that has not had its string
-     * literals removed is parsing two languages at once.</b>
+     * <p>⚙ It was extracted by F2-179, which needed the same walk for a third purpose and found that
+     * three test classes had each grown their own copy — of which only this one knew that a CHECK
+     * body must have its string literals stripped before a column name is looked for, and that a
+     * multi-column predicate is not a vocabulary. Both facts were learned here at a cost, and a copy
+     * that predates the discovery cannot know them. The traps are documented on that class.
      */
-    private static final Pattern COLUMN_REF = Pattern.compile(
-        "\\[?([a-z_][a-z0-9_]*)\\]?\\s*(?:<>|!=|=|\\bIN\\b|\\bIS\\b)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern LITERAL = Pattern.compile("N?'([A-Z][A-Z0-9_]*)'");
-    private static final Pattern ANY_LITERAL = Pattern.compile("N?'[^']*'");
-
-    /**
-     * Every single-column CHECK vocabulary in the migration set, keyed by lower-cased constraint name.
-     * Later migration versions overwrite earlier ones, so a widened or narrowed constraint is read as it
-     * will exist after the whole chain has run — the state a deployed server is actually in.
-     */
-    private static Map<String, Constraint> parseConstraints() throws IOException {
-        List<Path> files;
-        try (Stream<Path> walk = Files.list(MIGRATIONS)) {
-            files = walk.filter(p -> p.getFileName().toString().endsWith(".sql"))
-                .sorted(Comparator.comparingInt(PromotionVocabularyTest::version))
-                .toList();
-        }
-        Map<String, Constraint> out = new LinkedHashMap<>();
-        for (Path f : files) {
-            String src = Files.readString(f).replace("\r\n", "\n");
-            Matcher m = Pattern.compile("(?:CONSTRAINT\\s+)?\\[?(\\w+)\\]?\\s+CHECK\\s*\\(",
-                Pattern.CASE_INSENSITIVE).matcher(src);
-            while (m.find()) {
-                String name = m.group(1);
-                String body = balanced(src, m.end() - 1);
-                if (body == null) continue;
-                Set<String> values = new LinkedHashSet<>();
-                Matcher lit = LITERAL.matcher(body);
-                while (lit.find()) values.add(lit.group(1));
-                if (values.isEmpty()) continue;              // a range or null-check, not a vocabulary
-
-                // Which column(s) does the predicate constrain? Answered with the string literals
-                // removed, so a value never masquerades as a column name.
-                Set<String> columns = new LinkedHashSet<>();
-                Matcher col = COLUMN_REF.matcher(ANY_LITERAL.matcher(body).replaceAll("''"));
-                while (col.find()) columns.add(col.group(1).toLowerCase());
-                // More than one column means a cross-column rule, not a vocabulary — which is exactly
-                // what sys.check_constraints says about them too (parent_column_id is NULL for
-                // ck_change_pso and ck_change_ratification_clock). Reading those as vocabularies is how
-                // the first run of this test invented a column called PEND.
-                if (columns.size() != 1) continue;
-                out.put(name.toLowerCase(), new Constraint(
-                    name, tableOf(src, m.start()), columns.iterator().next(), values));
-            }
-        }
-        assertThat(out).as("the migration parse must find the platform's CHECK vocabularies")
-            .hasSizeGreaterThanOrEqualTo(40);
-        return out;
-    }
-
-    /** The nearest {@code CREATE TABLE} / {@code ALTER TABLE} above this point owns the constraint. */
-    private static String tableOf(String src, int at) {
-        Matcher m = TABLE_REF.matcher(src.substring(0, at));
-        String last = "?";
-        while (m.find()) {
-            last = m.group(1) == null ? m.group(2) : m.group(1) + "." + m.group(2);
-        }
-        return last;
-    }
-
-    private static String balanced(String src, int open) {
-        int depth = 0;
-        for (int i = open; i < src.length(); i++) {
-            if (src.charAt(i) == '(') depth++;
-            else if (src.charAt(i) == ')' && --depth == 0) return src.substring(open, i + 1);
-        }
-        return null;
-    }
-
-    private static int version(Path p) {
-        Matcher m = Pattern.compile("^V(\\d+)__").matcher(p.getFileName().toString());
-        return m.find() ? Integer.parseInt(m.group(1)) : Integer.MAX_VALUE;
+    private static Map<String, Vocabulary> parseConstraints() {
+        return MigrationVocabularies.byConstraint();
     }
 
     @SuppressWarnings("unchecked")

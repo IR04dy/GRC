@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,602 @ 2026-08-11; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,633 @ 2026-08-11; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -433,6 +433,35 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   collation. **Normalise on write** (so the CHECK, the comparison and the FE label map agree) rather
   than reaching for `equalsIgnoreCase`, which leaves the odd casing in the column and misses the
   frontend's label lookup.
+  ⚠ **`ExerciseObserverService` is already CLOSED and that sentence was wrong for a day** (F2-179):
+  `normaliseRole`/`normaliseType`/`normaliseSeverity` all `trim().toUpperCase(Locale.ROOT)` *before*
+  testing the `Set`. It is the pattern to copy. 🔑 **Read the code before believing a doc's claim
+  about it — including one you wrote.** The real second instance was somewhere nobody had named.
+  ⚠⚠ **Use `common/validation/ClosedVocabulary` for this — do not hand-roll another one.** Measured
+  2026-08-11: **347** closed upper-case CHECK vocabularies (389 single-column CHECKs), every text
+  column case-insensitive, **79 with an open writer** (a caller's casing reaches the column) and
+  **25** of those also read back by a case-sensitive Java comparison. **0** non-canonical values are
+  stored today, so it is latent — reachable only through the API, which is where machine callers live.
+  The primitive is `require` / `orDefault` / `coerce` / `is`, and a vocabulary **names the CHECK it
+  mirrors** so `ClosedVocabularyPinTest` checks all of them against the migration SQL by reflection,
+  with no registry to forget. ⚙ It is not new code — `module/cyber`'s `CyberInputValidation#checkEnum`
+  got this right at CY-H and was used **6 times, all inside `module/cyber`**, which ADR-012/018 forbid
+  a peer importing; that is the whole reason every other module hand-rolled something weaker.
+  ⚠ **`require` vs `coerce` is a per-field product decision, not a house style.** Refusing an
+  unrecognised token with a 400 is right for a governance escalation and **wrong** for the public
+  whistleblower portal, where `safeSeverity` already accepted it as `MEDIUM` and *the report arrived* —
+  a lost report is worse than a mis-graded one, and `CyberInputValidation`'s own javadoc draws that
+  line ("no request that succeeds today can start failing").
+  ⚠⚠ **The worst instance of this family found so far was on the PUBLIC portal** (F2-179):
+  `WhistleblowerCaseService.isAnonymousReporterType` asked `"ANONYMOUS".equals(<the raw request
+  value>)`, so `reporterType: "anonymous"` was stored `is_anonymous = FALSE` and the next branch
+  **persisted the reporter's name, email, phone and employee id.** Its sibling `safeSeverity` returned
+  `MEDIUM` for `'critical'`. 🔑 **`safeChannel`/`safeReporterType` returned their argument unchanged —
+  the `safeRole(String role) { return role; }` decoy F2-175 deleted, in a different module. The name
+  is the tell, not the module: grep `safe*`.** (It found a third, `ComplaintService`, filed as F2-183.)
+  ⚠ And the reason the green suite missed the identity bug: the existing test's fixture set **both**
+  `reporterType = "ANONYMOUS"` *and* `isAnonymous = true`. 🔑 **A fixture that satisfies a condition
+  twice cannot tell you which half is load-bearing** — supply one at a time.
   ⚠⚠ **And the mirror of that landmine: a CHECK constraint the Java side never mentions is still enforced.**
   F2-180 found **19 of the 22** incident categories the platform's own screen offers being refused by
   `CK_incidents_category`, and three promotion adapters writing status/category words their columns had

@@ -1423,6 +1423,100 @@ them cannot enforce the agreement.** Not bundled because the honest fix (normali
 the trigger and the frontend's label map all agree) sits next to a governance question — *should `MAJOR`
 escalate too?* — and answering that while fixing a casing bug would smuggle a policy change in under a typo.
 
+### F2-179 — the casing the constraint could not see, and the public portal it was hiding on ✅ CLOSED 2026-08-11
+
+**The finding's own "look here next" pointer was wrong, and checking it is what found the real defect.**
+The register row said to look at `ExerciseObserverService`, which holds the same five-token set against the
+same collation. It is **already closed** — `normaliseRole`/`normaliseType`/`normaliseSeverity` each
+`trim().toUpperCase(Locale.ROOT)` *before* testing the set, on every write path. It is the pattern to copy.
+Third instance in this programme of a filing asserting something about existing code without opening it,
+after F2-175's two false architectural claims and F2-178's recommendation for a report that had already
+shipped. ⚙ **Read the code before believing a register row's claim about it — including one you wrote.**
+
+**So the population was measured instead of guessed, and scoped deliberately.** 347 closed upper-case CHECK
+vocabularies (of 389 single-column CHECKs), every text column case-insensitive → 207 reachable through an
+entity field → **79 with an open writer** (a caller's casing reaches the column) → **25** also read back by
+a case-sensitive Java comparison. **0** non-canonical values are stored in dev, so this is a latent trap
+rather than damaged data — reachable only through the API, which is exactly where machine-to-machine callers
+live. The join is `module(entity) == module(file) AND accessor-name == column-name`, narrow on purpose after
+F2-180's unscoped-cross-check lesson; its one known imprecision produced exactly one false pairing
+(`bcm.exercise_observation.severity`) and that is reported as such, not as a finding. ⚠ The scan reported
+**0 of 389** on its first run, because `\b(IN|=)\b` can never match `=` — `=` is not a word character. The
+anti-vacuity print is the only reason that surfaced as a bug instead of as "there is no population."
+
+**⚠⚠ The severe instance was found by the sweep, not by the finding — and it is on the public portal.**
+`WhistleblowerCaseService.submitCase` is unauthenticated, the widest caller surface in the product.
+`isAnonymousReporterType` asked `"ANONYMOUS".equals(<the RAW request value>)`, so a reporter declaring
+anonymity as `reporterType: "anonymous"` with the `isAnonymous` flag absent was recorded
+`is_anonymous = FALSE` — and the next branch **persisted their name, email, phone and employee id.** Keeping
+the reporter's identity out of the record is the one thing that module exists to do. Its sibling
+`safeSeverity` switched case-sensitively and returned **`MEDIUM`** for `'critical'`, silently downgrading a
+fraud or corruption allegation's triage band. And `safeChannel`/`safeReporterType` returned their argument
+unchanged — the `safeRole(String role) { return role; }` decoy F2-175 deleted, **second instance, different
+module. The name is the tell, not the module: grepping `safe*` immediately found a third** (`ComplaintService`,
+filed as F2-183).
+
+**Why the green suite missed the identity bug.** `submit_anonymousRequest_persistsTokenAndStripsContactFields`
+asserts exactly the right thing and passes — because its fixture sets **both** `reporterType = "ANONYMOUS"`
+*and* `isAnonymous = true`. The belt and the braces; the defect was in the braces alone. 🔑 **A fixture that
+satisfies a condition twice cannot tell you which half is load-bearing.**
+
+**What shipped.** `common/validation/ClosedVocabulary` — `require`/`orDefault`/`coerce`/`is`, refusing at
+construction a set with no constraint name, lower-case tokens or no tokens, and at use a fallback outside its
+own vocabulary. ⚙ **Not new code so much as code in the wrong package**: `CyberInputValidation#checkEnum` has
+done this since CY-H, used 6 times, all inside `module/cyber`, which ADR-012/018 forbid a peer importing —
+which is the whole reason every other module hand-rolled something weaker or nothing. The one addition that
+matters: a vocabulary **names the CHECK it mirrors**, so `ClosedVocabularyPinTest` checks every one against
+the migration SQL **by reflection** (never a source regex — F2-170's regex half matched a javadoc sentence
+and reported 1,763 phantom failures), with no registry to forget to update.
+
+**⚠ `require` vs `coerce` is a per-field product decision, not a house style.** Drift severity uses
+`require`: a 400 beats a silently-defaulted governance signal. Whistleblower severity uses **`coerce`**,
+because an unrecognised token was already accepted as `MEDIUM` and *the report arrived* — converting that to
+a 400 would make submissions that succeed today start failing, which is the line `CyberInputValidation`'s own
+javadoc draws. A lost whistleblower report is worse than a mis-graded one; for a governance escalation the
+opposite holds. **The `MAJOR` question stays the owner's**, localised to one named constant.
+
+**⚙ The migration parser was extracted, and the mutation harness earned its keep there.** Three test classes
+had each grown a copy of the walk, so it became `support/MigrationVocabularies` (F2-178's predicate-sharing
+lesson). The harness then found that **two of its safety rules mask each other**: drop the literal-stripping
+and `ratification_state <> N'PENDING'` yields the phantom column `PEND`, but that makes the column count
+*two*, so the multi-column rule discards the whole constraint instead of admitting the phantom — and every
+downstream assertion stayed green. 🔑 **Two guards that each hide the other's failure are, between them, one
+guard that nothing tests.** ⚠⚠ And it **corrected F2-180's own record**: that row credits the literal-stripping
+with killing the `PEND` phantom, but the load-bearing half is the **word boundary** — `N'PENDING'` cannot
+yield `PEND` while `\bIN\b` is required. Both parser mutations survive because the code is over-defended, not
+under-tested; reported as **21/23 with both survivors explained** rather than 23/23 with a contrived test.
+🔑 **When two changes ship together, only a mutation tells you which one was doing the work.**
+
+**Verification.** Suite **3,633/0/0** · FE **487/487** in 50 files + `tsc` clean · mutation **21/23** ·
+**live probe 31/31** on a jar-run backend (prod :8090 untouched): a `severity: "critical"` drift → 201 with
+`triggeredIssueId` set (**NULL before**), the column byte-exact under `Latin1_General_100_BIN2` rather than
+merely CI-equal, and the model flipped `IN_PRODUCTION → REVISION`; out-of-vocabulary values now **400 naming
+the field and the offending value** where the CHECK answered 409; and 18 legs against the public portal with
+**no `Authorization` header**, including the negative control that an identified reporter is still identified.
+Cleanup by captured id plus a `CHARINDEX` belt, with an anti-vacuity leg that **failed on the first run**
+because no whistleblower rows had been created — which is what makes "back to baseline" mean anything.
+⚙ Two probe bugs cost one run each, and the platform's own diagnostics named both: `@Valid` firing before
+`@PreAuthorize` on two required owner ids, and F2-83's 404 *"must carry a valid 'org' short code"* — the
+counter-example to F2-180's foreign-key message. **0 migrations, 0 frontend change.**
+
+⬜ **F2-182 filed** — the residual 10 of those 25, across 8 modules, each with its consequence read from the
+code rather than guessed. Two deserve reading first: `ndi.compliance_assessment.compliance_status`, where a
+lower-case `evidence_required` **bypasses an approval gate**, and `risk.kri_definition.value_direction`,
+where a two-value vocabulary means a lower-case token **inverts KRI breach detection** — the indicator reads
+healthy exactly when it has breached. Not bundled: eight modules of write paths in one sweep is the shape of
+change this programme has repeatedly got wrong, and two of them want a live probe of the gate they control.
+`upperOr` already closes three workflow columns, and seven of the 25 are `if (x == null) setDefault(…)`
+shapes where no behaviour turns on the casing — stated so the 25 is not mistaken for 25 defects.
+
+⬜ **F2-183 filed** — `consumer.complaint` has **no CHECK constraints at all**, so its `channel` and
+`severity` vocabularies live only in a case-sensitive Java `switch` that **substitutes** rather than refuses:
+`channel: "email"` is stored as `WEB`, `severity: "critical"` as `MEDIUM`. Two defects, not one — the casing
+bug and the absent constraint that would have made it detectable. It needs a migration, which is why it is
+not in F2-179's zero-migration slice. ⚠ The decision in it is what to do about existing rows: the original
+value was never stored, so adding the constraint is safe but asserting the history is accurate is not.
+
 ✔ **F2-172 CLOSED 2026-08-09 — the intake front door became real, and measuring the rewire before
 writing it is what turned a chore into two defects.** F2-171's follow-up said "call
 `POST /api/v1/intake` on submit and `PUT …/triage` on triage". Measuring what that would hit found

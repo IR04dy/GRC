@@ -3,6 +3,7 @@ package com.tss.grc.module.tprm.intake;
 import com.tss.grc.module.intake.spi.IntakePromotionContext;
 import com.tss.grc.module.tprm.entity.Vendor;
 import com.tss.grc.module.tprm.service.TprmService;
+import com.tss.grc.support.MigrationVocabularies;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,15 +13,9 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDateTime;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -47,8 +42,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class VendorPromotionStatusTest {
 
-    private static final Path MIGRATIONS = Path.of("src/main/resources/db/migration/sqlserver");
-
     @Mock TprmService tprm;
     @Captor ArgumentCaptor<Vendor> captor;
 
@@ -61,7 +54,7 @@ class VendorPromotionStatusTest {
 
     @Test
     @DisplayName("the promoted status is one CK_vendors_status actually allows")
-    void promotedStatusIsInTheConstrainedVocabulary() throws IOException {
+    void promotedStatusIsInTheConstrainedVocabulary() {
         Set<String> allowed = vocabularyOf("CK_vendors_status");
 
         assertThat(allowed).as(
@@ -111,42 +104,17 @@ class VendorPromotionStatusTest {
         return v;
     }
 
-    /** The last definition of {@code name} in migration-version order — the state a server ends in. */
-    private static Set<String> vocabularyOf(String name) throws IOException {
-        Set<String> latest = new LinkedHashSet<>();
-        try (var walk = Files.list(MIGRATIONS)) {
-            for (Path f : walk.filter(p -> p.getFileName().toString().endsWith(".sql"))
-                    .sorted(java.util.Comparator.comparingInt(VendorPromotionStatusTest::version))
-                    .toList()) {
-                String src = Files.readString(f).replace("\r\n", "\n");
-                Matcher m = Pattern.compile(Pattern.quote(name) + "\\s+CHECK\\s*\\(",
-                    Pattern.CASE_INSENSITIVE).matcher(src);
-                while (m.find()) {
-                    Set<String> found = new LinkedHashSet<>();
-                    Matcher lit = Pattern.compile("N?'([A-Z][A-Z0-9_]*)'")
-                        .matcher(balanced(src, m.end() - 1));
-                    while (lit.find()) found.add(lit.group(1));
-                    if (!found.isEmpty()) {
-                        latest.clear();
-                        latest.addAll(found);
-                    }
-                }
-            }
-        }
-        return latest;
-    }
-
-    private static String balanced(String src, int open) {
-        int depth = 0;
-        for (int i = open; i < src.length(); i++) {
-            if (src.charAt(i) == '(') depth++;
-            else if (src.charAt(i) == ')' && --depth == 0) return src.substring(open, i + 1);
-        }
-        return src.substring(open);
-    }
-
-    private static int version(Path p) {
-        Matcher m = Pattern.compile("^V(\\d+)__").matcher(p.getFileName().toString());
-        return m.find() ? Integer.parseInt(m.group(1)) : Integer.MAX_VALUE;
+    /**
+     * The last definition of {@code name} in migration-version order — the state a server ends in.
+     *
+     * <p>⚙ This walk used to live here, and in {@code PromotionVocabularyTest}, and in
+     * {@code AutomationRecipientKeyRatchetTest}: three copies, of which only one knew about the
+     * {@code PEND}-from-{@code N'PENDING'} trap. F2-179 extracted it to
+     * {@link MigrationVocabularies} for the reason {@code SeatWindowPredicateSharingTest} enforces
+     * elsewhere — a predicate written twice drifts, and the copy that predates the discovery does
+     * not know what the other one learned.
+     */
+    private static Set<String> vocabularyOf(String name) {
+        return MigrationVocabularies.valuesOf(name);
     }
 }

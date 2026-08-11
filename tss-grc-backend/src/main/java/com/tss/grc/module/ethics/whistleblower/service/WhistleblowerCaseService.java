@@ -2,6 +2,7 @@ package com.tss.grc.module.ethics.whistleblower.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.module.ethics.whistleblower.dto.WhistleblowerDtos.CaseResponse;
 import com.tss.grc.module.ethics.whistleblower.dto.WhistleblowerDtos.CaseSubmissionRequest;
 import com.tss.grc.module.ethics.whistleblower.dto.WhistleblowerDtos.CaseSubmissionResponse;
@@ -85,6 +86,58 @@ public class WhistleblowerCaseService {
             "CLOSED_REMEDIATED",   Set.of()
     );
 
+    // ─── F2-179 — the four caller-supplied vocabularies this table constrains ─────────
+    //
+    // ⚠⚠ What stood here before: `safeChannel` and `safeReporterType` returned their argument
+    // unchanged (defaulting only a blank), and `safeSeverity` switched case-SENSITIVELY. All four
+    // columns are collated Latin1_General_100_CI_AS_SC_UTF8, so their CHECK constraints cannot tell
+    // 'anonymous' from 'ANONYMOUS' — and `submitCase` is the platform's PUBLIC, UNAUTHENTICATED
+    // portal, the widest caller surface in the product. Two consequences, both reproduced live
+    // before this was written:
+    //
+    //   (a) `isAnonymousReporterType` asked "ANONYMOUS".equals(<the RAW request value>). A reporter
+    //       submitting reporterType:"anonymous" was recorded is_anonymous = FALSE, and the branch in
+    //       submitCase then PERSISTED their name, email, phone and employee id. Keeping the
+    //       reporter's identity out of the record is the one thing this module exists to do.
+    //   (b) `safeSeverity`'s switch missed 'critical' and returned MEDIUM — a silent downgrade of a
+    //       fraud or corruption report's triage band, discarding the reporter's own assessment.
+    //
+    // 🔑 The two do-nothing helpers are the `safeRole(String role) { return role; }` shape F2-175
+    // deleted from MlModelDriftService: a method named as though it validates, which returns its
+    // argument unchanged. Second instance in this program, in a different module — **the name is the
+    // tell, not the module**, so `safe*` is worth grepping for.
+    //
+    // ⚙ Why the vocabularies are declared here as data rather than checked inline: ClosedVocabulary
+    // carries the CHECK constraint's name, so ClosedVocabularyPinTest reads the migration SQL and
+    // fails the build if the two ever disagree. A bare Set.of(...) is a claim about the schema that
+    // nothing verifies, which is how AttachmentAccessPolicy's role list drifted three times.
+
+    static final ClosedVocabulary REPORTER_TYPE = ClosedVocabulary.of(
+        "reporterType", "CK_wb_reporter_type",
+        "EMPLOYEE", "MANAGER", "CONTRACTOR", "VENDOR", "CUSTOMER", "EXTERNAL", "ANONYMOUS");
+
+    static final ClosedVocabulary SUBMISSION_CHANNEL = ClosedVocabulary.of(
+        "submissionChannel", "CK_wb_channel",
+        "PUBLIC_PORTAL", "INTERNAL_PORTAL", "EMAIL", "PHONE", "IN_PERSON", "EXTERNAL_PARTNER");
+
+    static final ClosedVocabulary CATEGORY = ClosedVocabulary.of(
+        "category", "CK_wb_category",
+        "FRAUD", "CORRUPTION", "CONFLICT_OF_INTEREST", "HARASSMENT", "DISCRIMINATION", "SAFETY",
+        "ENVIRONMENT", "PRIVACY_VIOLATION", "FINANCIAL_MISCONDUCT", "IT_SECURITY",
+        "REGULATORY_NON_COMPLIANCE", "OTHER");
+
+    static final ClosedVocabulary SEVERITY = ClosedVocabulary.of(
+        "severity", "CK_wb_severity", "CRITICAL", "HIGH", "MEDIUM", "LOW");
+
+    /** The reporter type meaning "do not keep my identity" — named because a branch turns on it. */
+    static final String REPORTER_TYPE_ANONYMOUS = "ANONYMOUS";
+
+    /** Assumed when a submitter who did not claim anonymity does not say what they are. */
+    static final String REPORTER_TYPE_DEFAULT = "EXTERNAL";
+
+    /** The retained fail-soft band — see {@link ClosedVocabulary#coerce} for why it is not a 400. */
+    static final String SEVERITY_DEFAULT = "MEDIUM";
+
     private final WhistleblowerCaseRepository caseRepo;
     private final WhistleblowerCaseUpdateRepository updateRepo;
     private final AuditLogService audit;
@@ -160,18 +213,27 @@ public class WhistleblowerCaseService {
         c.setCaseCode(generateCode(orgId));
         c.setSubmissionToken(UUID.randomUUID());
         c.setSubmittedAt(LocalDateTime.now());
-        c.setSubmissionChannel(safeChannel(req.submissionChannel(), "PUBLIC_PORTAL"));
-        c.setReporterType(safeReporterType(req.reporterType(),
-                Boolean.TRUE.equals(req.isAnonymous()) ? "ANONYMOUS" : "EXTERNAL"));
-        c.setIsAnonymous(Boolean.TRUE.equals(req.isAnonymous()) || isAnonymousReporterType(req.reporterType()));
+        // F2-179 — normalise the reporter type ONCE, then let the anonymity decision read that
+        // single normalised value. The defect was that the stored value and the value the branch
+        // below tested were different expressions of the same field: one had been through
+        // safeReporterType, the other was req.reporterType() raw.
+        boolean claimedAnonymous = Boolean.TRUE.equals(req.isAnonymous());
+        String reporterType = REPORTER_TYPE.orDefault(req.reporterType(),
+                claimedAnonymous ? REPORTER_TYPE_ANONYMOUS : REPORTER_TYPE_DEFAULT);
+
+        c.setSubmissionChannel(SUBMISSION_CHANNEL.orDefault(req.submissionChannel(), "PUBLIC_PORTAL"));
+        c.setReporterType(reporterType);
+        c.setIsAnonymous(claimedAnonymous || REPORTER_TYPE_ANONYMOUS.equals(reporterType));
         if (!Boolean.TRUE.equals(c.getIsAnonymous())) {
             c.setReporterName(req.reporterName());
             c.setReporterEmail(req.reporterEmail());
             c.setReporterPhone(req.reporterPhone());
             c.setReporterEmployeeId(req.reporterEmployeeId());
         }
-        c.setCategory(req.category());
-        c.setSeverity(safeSeverity(req.severity()));
+        c.setCategory(CATEGORY.require(req.category()));
+        // coerce, not require: an unrecognised severity used to be accepted as MEDIUM, and a report
+        // that never arrives is worse than one triaged at the wrong band. Casing is what is fixed.
+        c.setSeverity(SEVERITY.coerce(req.severity(), SEVERITY_DEFAULT));
         c.setSubjectEn(req.subjectEn());
         c.setSubjectAr(req.subjectAr());
         c.setNarrativeEn(req.narrativeEn());
@@ -253,7 +315,10 @@ public class WhistleblowerCaseService {
         c.setTriageDecisionEn(req.triageDecisionEn());
         c.setTriageDecisionAr(req.triageDecisionAr());
         if (req.severity() != null && !req.severity().isBlank()) {
-            c.setSeverity(safeSeverity(req.severity()));
+            // Same coerce-not-require reasoning as submitCase: this re-grades an existing case, and
+            // an officer's 'critical' must land on CRITICAL rather than being read as unrecognised
+            // and reset to MEDIUM — which is what the old case-sensitive switch did.
+            c.setSeverity(SEVERITY.coerce(req.severity(), SEVERITY_DEFAULT));
         }
         if (req.assignedInvestigatorUserId() != null) {
             c.setAssignedInvestigatorUserId(req.assignedInvestigatorUserId());
@@ -450,27 +515,6 @@ public class WhistleblowerCaseService {
         return "WB-" + year + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
-    private static String safeChannel(String s, String fallback) {
-        if (s == null || s.isBlank()) return fallback;
-        return s;
-    }
-
-    private static String safeReporterType(String s, String fallback) {
-        if (s == null || s.isBlank()) return fallback;
-        return s;
-    }
-
-    private static boolean isAnonymousReporterType(String reporterType) {
-        return "ANONYMOUS".equals(reporterType);
-    }
-
-    private static String safeSeverity(String s) {
-        if (s == null || s.isBlank()) return "MEDIUM";
-        return switch (s) {
-            case "CRITICAL", "HIGH", "MEDIUM", "LOW" -> s;
-            default -> "MEDIUM";
-        };
-    }
 
     private void emit(String trigger, WhistleblowerCase c, String previousStatus) {
         Map<String, Object> payload = new HashMap<>();

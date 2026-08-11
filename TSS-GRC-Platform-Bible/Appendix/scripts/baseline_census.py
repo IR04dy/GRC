@@ -98,8 +98,13 @@ PUBLISHED = {
     # measurements of one published number disagree, the tie-break is **what the number is for**, not
     # whichever extractor you happen to be holding.
     "packages_no_haspermission": 11,
-    "module_tests": 3_284,
-    "suite_tests": 3_610,      # census counts @Test declarations; surefire ran 3,602 executions (F2-180)
+    # ⚠ These two drifted apart from MEASURED_BASELINE.md's own cell: F2-180 refreshed the doc to
+    # 3,402 / 3,610 and updated only `suite_tests` here, leaving `module_tests` at 3,284 — 118 behind
+    # its own published figure. Both are ungated, which is exactly why. 🔑 The same number written in
+    # two places will disagree unless something compares them; re-run this script rather than
+    # trusting either cell (F2-179).
+    "module_tests": 3_416,
+    "suite_tests": 3_641,      # census counts @Test declarations; surefire ran 3,633 executions (F2-179)
     # F2-03 floored all seven Tier-1 regulator-facing modules (2026-08-05/06), so this
     # fell 15 -> 8. The --check mode caught the drift the moment it was first run in
     # anger, which is F2-19b in one line: the guard existed and nothing ran it.

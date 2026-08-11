@@ -1,6 +1,7 @@
 package com.tss.grc.module.ai.governance.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.DriftObservationRequest;
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.DriftObservationResponse;
 import com.tss.grc.module.ai.governance.entity.MlModel;
@@ -50,6 +51,35 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MlModelDriftService {
 
+    /**
+     * F2-179 — {@code CK_ml_drift_sev}, mirrored so the escalation trigger below can be asked as a
+     * case-sensitive Java question of a value that has been normalised first.
+     *
+     * <p>The column's collation is case-<b>insensitive</b>, so it accepted {@code 'critical'},
+     * stored it verbatim, and {@code "CRITICAL".equals(req.severity())} was then false: the
+     * observation was recorded, looked entirely valid, filed no issue, and left the model
+     * {@code IN_PRODUCTION}. Nothing anywhere reported a problem. Reproduced live (201, {@code
+     * triggered_issue_id} NULL, model unchanged) before this was written.
+     */
+    static final ClosedVocabulary SEVERITY = ClosedVocabulary.of(
+        "severity", "CK_ml_drift_sev", "INFO", "MINOR", "MODERATE", "MAJOR", "CRITICAL");
+
+    /** {@code CK_ml_drift_type} — same shape, same column, no trigger hanging off it today. */
+    static final ClosedVocabulary OBSERVATION_TYPE = ClosedVocabulary.of(
+        "observationType", "CK_ml_drift_type",
+        "DATA_DRIFT", "CONCEPT_DRIFT", "PERFORMANCE_DEGRADATION", "FAIRNESS_REGRESSION");
+
+    /**
+     * The single band that escalates.
+     *
+     * <p>⚙ Named rather than inlined because <b>whether {@code MAJOR} should escalate too</b> is the
+     * one genuine decision in F2-179, and it is a governance call about AI post-market monitoring
+     * (EU AI Act Art. 72 / SDAIA) rather than a casing bug. Deliberately left as the owner's: fixing
+     * the casing must not smuggle a policy change in under a typo fix. If the answer is yes, this
+     * constant becomes a set and {@code MlModelDriftServiceTest} says so in one place.
+     */
+    static final String ESCALATING_SEVERITY = "CRITICAL";
+
     private final MlModelDriftObservationRepository driftRepo;
     private final MlModelService modelService;
     private final SystemIntakePort intake;
@@ -86,12 +116,18 @@ public class MlModelDriftService {
         Long orgId = TenantContext.getCurrentTenant();
         MlModel m = modelService.mustGet(modelExternalId);
 
+        // F2-179 — normalise BEFORE anything reads these back. The DTO constrains severity only by
+        // @Size(max = 20) and the CHECK cannot tell 'critical' from 'CRITICAL', so the boundary is
+        // the only place the two artefacts can be made to agree.
+        String observationType = OBSERVATION_TYPE.require(req.observationType());
+        String severity = SEVERITY.require(req.severity());
+
         MlModelDriftObservation d = new MlModelDriftObservation();
         d.setOrganisationId(orgId);
         d.setModelId(m.getId());
         d.setObservedAt(req.observedAt() == null ? LocalDateTime.now() : req.observedAt());
-        d.setObservationType(req.observationType());
-        d.setSeverity(req.severity());
+        d.setObservationType(observationType);
+        d.setSeverity(severity);
         d.setMetricName(req.metricName());
         d.setMetricValue(req.metricValue());
         d.setBaselineValue(req.baselineValue());
@@ -119,7 +155,7 @@ public class MlModelDriftService {
         // ROWVERSION — `verify(driftRepo, times(1)).save(...)` in MlModelDriftServiceTest is the pin,
         // and it exists because the live probe found what the green suite could not.
         String issueNote = "";
-        if ("CRITICAL".equals(req.severity())) {
+        if (ESCALATING_SEVERITY.equals(severity)) {
             SystemIntakePort.Receipt issue = openCriticalDriftIssue(orgId, m, d);
             d.setTriggeredIssueId(issue.id());
             // The receipt exists so the audit line can name the issue. The old path logged only the
@@ -134,8 +170,10 @@ public class MlModelDriftService {
                     "Critical drift on " + d.getMetricName() + " (" + d.getObservationType() + ")");
         }
 
+        // ⚠ The normalised values, not req.*(): an audit line reading "Drift DATA_DRIFT/critical"
+        // over a row storing CRITICAL is a ledger that disagrees with the record it describes.
         audit.log("CREATE", "MlModelDriftObservation", d.getId(),
-                "Drift " + req.observationType() + "/" + req.severity()
+                "Drift " + observationType + "/" + severity
                         + " on " + m.getModelCode() + " · " + req.metricName() + "=" + req.metricValue()
                         + issueNote);
         eventPublisher.publishEvent(new DomainEvent(

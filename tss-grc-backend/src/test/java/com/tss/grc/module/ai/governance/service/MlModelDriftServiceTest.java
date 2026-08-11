@@ -9,8 +9,10 @@ import com.tss.grc.module.ai.governance.repository.MlModelDriftObservationReposi
 import com.tss.grc.module.intake.spi.SystemIntakePort;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
+import com.tss.grc.support.MigrationVocabularies;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -27,6 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -246,6 +249,88 @@ class MlModelDriftServiceTest {
         verify(eventPublisher).publishEvent(evCap.capture());
         assertThat(evCap.getValue().payload()).containsEntry("triggeredIssue", true);
         assertThat(evCap.getValue().payload()).containsEntry("severity", "CRITICAL");
+    }
+
+    // ─── F2-179 — the casing the CHECK constraint could not see ───
+    //
+    // The column's collation is case-INSENSITIVE, so CK_ml_drift_sev accepted 'critical', stored it
+    // verbatim, and `"CRITICAL".equals(req.severity())` was then false. Reproduced live before the
+    // fix: 201, row stored with severity = 'critical', triggered_issue_id NULL, and the parent model
+    // still IN_PRODUCTION. Nothing anywhere reported a problem — the observation looked entirely
+    // valid, which is the whole difficulty of the class.
+
+    @Test
+    @DisplayName("F2-179: a lower-case CRITICAL still escalates, and is stored canonically")
+    void lowerCaseCriticalSeverityStillFilesTheIssueAndFlipsTheModel() {
+        MlModel m = model("IN_PRODUCTION");
+        when(modelService.mustGet(MODEL_EX)).thenReturn(m);
+        when(driftRepo.save(any(MlModelDriftObservation.class))).thenAnswer(assignId(new AtomicLong(200)));
+        when(intake.fileSystemSubmission(any())).thenReturn(
+                new SystemIntakePort.Receipt(777L, "RI-AAAA-BBBB", "RISK_OFFICER",
+                        LocalDateTime.of(2026, 5, 15, 9, 0)));
+
+        DriftObservationResponse out = service.record(
+                MODEL_EX, req("critical", "performance_degradation"));
+
+        verify(intake).fileSystemSubmission(any());
+        verify(modelService).flipToRevisionDueToCriticalDrift(eqMl(m), anyString());
+        assertThat(out.triggeredIssueId()).isEqualTo(777L);
+
+        ArgumentCaptor<MlModelDriftObservation> cap =
+                ArgumentCaptor.forClass(MlModelDriftObservation.class);
+        verify(driftRepo).save(cap.capture());
+        assertThat(cap.getValue().getSeverity()).as(
+                "⚠ Normalised on WRITE, not compared with equalsIgnoreCase. The rejected alternative "
+                + "fires the escalation but leaves 'critical' in the column, where the frontend's "
+                + "Record<MlDriftSeverity, Label> lookup misses and the register renders a drift row "
+                + "with no severity label.")
+                .isEqualTo("CRITICAL");
+        assertThat(cap.getValue().getObservationType()).isEqualTo("PERFORMANCE_DEGRADATION");
+    }
+
+    @Test
+    @DisplayName("F2-179: the audit line records the stored value, not the caller's casing")
+    void theAuditLineAgreesWithTheRowItDescribes() {
+        MlModel m = model("MONITORING");
+        when(modelService.mustGet(MODEL_EX)).thenReturn(m);
+        when(driftRepo.save(any(MlModelDriftObservation.class))).thenAnswer(assignId(new AtomicLong(300)));
+
+        service.record(MODEL_EX, req("moderate", "data_drift"));
+
+        verify(audit).log(org.mockito.ArgumentMatchers.eq("CREATE"),
+                org.mockito.ArgumentMatchers.eq("MlModelDriftObservation"),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.contains("Drift DATA_DRIFT/MODERATE"));
+    }
+
+    @Test
+    @DisplayName("F2-179: a severity outside the vocabulary is a 400 naming it, not a 409 from the CHECK")
+    void anUnknownSeverityIsRefusedAtTheBoundary() {
+        when(modelService.mustGet(MODEL_EX)).thenReturn(model("MONITORING"));
+
+        assertThatThrownBy(() -> service.record(MODEL_EX, req("SEV1", "DATA_DRIFT")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("severity")
+                .hasMessageContaining("SEV1");
+        assertThatThrownBy(() -> service.record(MODEL_EX, req("CRITICAL", "MODEL_ROT")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("observationType");
+        // Nothing was written, and — the leg that matters on a refusal path — nothing was escalated.
+        verify(driftRepo, org.mockito.Mockito.never()).save(any(MlModelDriftObservation.class));
+        verify(intake, org.mockito.Mockito.never()).fileSystemSubmission(any());
+    }
+
+    @Test
+    @DisplayName("F2-179: the declared vocabularies match the CHECK constraints they name")
+    void theDriftVocabulariesMatchTheSchema() {
+        assertThat(MlModelDriftService.SEVERITY.tokens())
+                .isEqualTo(MigrationVocabularies.valuesOf("CK_ml_drift_sev"));
+        assertThat(MlModelDriftService.OBSERVATION_TYPE.tokens())
+                .isEqualTo(MigrationVocabularies.valuesOf("CK_ml_drift_type"));
+        assertThat(MlModelDriftService.SEVERITY.tokens())
+                .as("anti-vacuity, and the band the escalation turns on must be one the column holds")
+                .contains(MlModelDriftService.ESCALATING_SEVERITY)
+                .hasSize(5);
     }
 
     /** Mockito helper — we want exact identity match on the MlModel arg. */
