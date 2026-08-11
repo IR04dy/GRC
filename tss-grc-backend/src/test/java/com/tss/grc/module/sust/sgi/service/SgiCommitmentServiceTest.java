@@ -410,4 +410,94 @@ class SgiCommitmentServiceTest {
         c.setStatus("ACTIVE");
         return c;
     }
+
+    // ── F2-182: value_source, the lineage switch, was open on update only ────────────
+
+    /** A commitment complete enough to survive {@code validate()}, so the test exercises the writer. */
+    private SgiCommitment sourced(String valueSource) {
+        SgiCommitment c = commitment(
+            new BigDecimal("8"), new BigDecimal("22"), new BigDecimal("50"));
+        c.setId(7L);
+        c.setCommitmentCode("SGI-2026-014");
+        c.setTitleEn("Renewable share of grid supply");
+        c.setTitleAr("نسبة الطاقة المتجددة من إمداد الشبكة");
+        c.setSector("ENERGY");
+        c.setUnit("PERCENTAGE");
+        c.setValueSource(valueSource);
+        return c;
+    }
+
+    /**
+     * The asymmetry that made this reachable: {@code POST} binds {@code SgiCreateRequest}, which
+     * carried a {@code @Pattern}; {@code PUT /{id}} binds the <b>entity</b> with no {@code @Valid} at
+     * all, so nothing ran. Two artefacts claiming one vocabulary where only one of them was ever
+     * consulted on a given path — and the DTO's regex could not be checked against
+     * {@code ck_sgi_value_source} the way a named vocabulary can.
+     */
+    @Test
+    void update_normalisesTheValueSourceCasingThePutPathUsedToLetThrough() {
+        authAs("esg_officer", false);
+        stubAtRiskFactor("0.70");   // update ends in the behind-plan CAPA check, which reads settings
+        SgiCommitment cur = sourced("ESG_METRIC");
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(cur));
+        when(repo.save(any(SgiCommitment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SgiCommitment patch = new SgiCommitment();
+        patch.setValueSource("ghg_total");
+        SgiCommitment saved = service.update(7L, patch);
+
+        assertThat(saved.getValueSource()).isEqualTo("GHG_TOTAL");
+    }
+
+    @Test
+    void update_refusesAValueSourceTheColumnCouldNeverHold() {
+        authAs("esg_officer", false);
+        when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(sourced("MANUAL")));
+
+        SgiCommitment patch = new SgiCommitment();
+        patch.setValueSource("SPREADSHEET");
+        assertThatThrownBy(() -> service.update(7L, patch))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("valueSource")
+            .hasMessageContaining("SPREADSHEET");
+    }
+
+    /**
+     * ⚠ The honest half, and the reason this site is P3 rather than P2 — recorded as a test so the
+     * claim is checkable rather than asserted in a register row.
+     *
+     * <p>{@code computeSourcedValue} switches on the <em>same</em> string, also case-sensitively, and
+     * returns empty for {@code 'manual'}. So even with the writer open, the background sweep could not
+     * overwrite a hand-maintained number: the second comparison failed for the same reason the first
+     * one did. 🔑 <b>A second case-sensitive comparison downstream had accidentally neutralised the
+     * first one's defect.</b> That is luck, not design — it would evaporate the moment anyone gave
+     * that switch a {@code default} branch — and the guard reading {@code is()} rather than
+     * {@code equals} is what makes it no longer depend on luck.
+     */
+    @Test
+    void aLegacyLowerCaseManualRowIsStillTreatedAsHandMaintained() {
+        SgiCommitment legacy = sourced("manual");
+
+        assertThatThrownBy(() -> {
+            when(repo.findByIdAndOrganisationId(7L, ORG_ID)).thenReturn(Optional.of(legacy));
+            service.refreshValue(7L);
+        })
+            .as("refreshValue must name the real reason — 'has no linked source' — rather than falling "
+              + "through to the misleading 'no source data available' the open writer produced")
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("no linked source");
+
+        service.refreshSourcedValueQuietly(legacy);
+        verify(repo, org.mockito.Mockito.never()).save(any(SgiCommitment.class));
+        assertThat(legacy.getCurrentValue()).as(
+            "the background sweep must not touch a commitment whose numbers a human owns")
+            .isEqualByComparingTo(new BigDecimal("22"));
+    }
+
+    @Test
+    void theManualConstantIsATokenTheColumnCanHold() {
+        assertThat(SgiCommitmentService.VALUE_SOURCE.tokens())
+            .contains(SgiCommitmentService.VALUE_SOURCE_MANUAL)
+            .containsExactlyInAnyOrder("MANUAL", "ESG_METRIC", "GHG_TOTAL");
+    }
 }

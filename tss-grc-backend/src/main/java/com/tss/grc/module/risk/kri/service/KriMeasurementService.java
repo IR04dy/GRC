@@ -178,7 +178,10 @@ public class KriMeasurementService {
                 .findByOrganisationIdAndIsActiveTrueAndIsDeletedFalse(orgId);
         int skipped = 0;
         for (KriDefinition d : active) {
-            if ("MANUAL".equals(d.getSourceQueryType())) continue;
+            // F2-182 — a stored-value read: a MANUAL KRI whose casing differed would have been handed
+            // to the auto-collector, which then logs an unsupported-source warning per sweep.
+            if (KriDefinitionService.SOURCE_QUERY_TYPE.is(
+                    d.getSourceQueryType(), KriDefinitionService.SOURCE_MANUAL)) continue;
             // Sprint-13 ships the orchestration shell; auto-fetchers
             // are a future slice. Each non-MANUAL KRI is skipped for now
             // (no fetcher bound), so the count reflects skips — not
@@ -216,7 +219,12 @@ public class KriMeasurementService {
     public static String evaluateStatus(BigDecimal value, KriDefinition d) {
         if (value == null || d == null) return "NA";
         if (d.getGreenThreshold() == null || d.getAmberThreshold() == null) return "NA";
-        boolean higherBetter = "HIGHER_IS_BETTER".equals(d.getValueDirection());
+        // F2-182 — ClosedVocabulary#is because this reads a stored value, and because the failure mode
+        // here is not a missed match but an INVERSION: the column holds exactly two tokens, so a value
+        // that does not equal HIGHER_IS_BETTER silently selects the other branch. The indicator then
+        // reads GREEN precisely when it has breached, which is the one outcome a KRI must never have.
+        boolean higherBetter = KriDefinitionService.VALUE_DIRECTION.is(
+                d.getValueDirection(), KriDefinitionService.HIGHER_IS_BETTER);
         BigDecimal green = d.getGreenThreshold();
         BigDecimal amber = d.getAmberThreshold();
         if (higherBetter) {

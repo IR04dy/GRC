@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,633 @ 2026-08-11; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,671 @ 2026-08-11; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -469,6 +469,38 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   `sys.check_constraints` or the migration, scoped to *that* table. ⚠ **A cross-check not scoped to the
   target table is worse than none**: the first sweep compared literals against every CHECK in the database
   and cleared the one adapter already known to be broken, because its value is legal on some other table.
+  ⚠⚠ **`require` vs `coerce` has a mechanical answer, and F2-182 found it: ask whether a coercion already
+  exists upstream.** Where one does — the whistleblower portal's `safeSeverity` returned `MEDIUM` and *the
+  report arrived* — out-of-vocabulary values succeed today and `coerce` is mandatory. Where none does, the
+  **CHECK is already refusing** everything outside the vocabulary, so **every value that succeeds today is a
+  case-variant of a legal token** and `require` cannot break a working request; it only turns a CHECK
+  violation into a 400 that names the field, and normalises the casing that slipped through. That retires the
+  per-field argument for this whole family. Use `orDefault` where the "absent" token is a real member
+  (`chk_calendar_recurrence`'s `NONE`), not a null stand-in.
+  ⚠⚠ **Do NOT decide "is this writer closed?" from a scan of setter call sites** — F2-182's filing did, and
+  **6 of the 10 sites it reported as open were already closed**, including both it called control bypasses. A
+  guard sits in at least four places a setter-site regex cannot see: a conjunction in the **same `if`**
+  (`NdiComplianceAssessmentService.update`), a **shared `validate()`** called by every mutation path
+  (`KriDefinitionService`, `CmaDisclosureService`, `TcfdItemService`), an **`if` block** wrapping the setter
+  (`BcmRiskService`), or a **DTO annotation** (`SgiCreateRequest`). 🔑 **Reachability is a dataflow question;
+  a regex can only tell you where to go and read.** What *is* reliably measurable is whether the Java
+  vocabulary agrees with the column's CHECK — `HandRolledVocabularyMirrorTest` does that for the six mirrors
+  still hand-rolled, and `ClosedVocabularyPinTest` for every `ClosedVocabulary`.
+  ⚠ **And close a refuted site anyway when it gates a control**: `ndi.compliance_assessment.compliance_status`
+  and `risk.kri_definition.value_direction` had no reachable defect, but both *read* the column
+  case-sensitively, so a row from a data fix or a restore would have walked through an NCA/NDI approval gate
+  or inverted a KRI's bands. **Reachability is a fact about today, not a property of a control.** The KRI
+  shape is the sharper one: a two-token vocabulary means a mismatch does not degrade to a default, it selects
+  the **opposite** branch — probed live, an LCR of 95 against a 130/120 ladder reads GREEN inverted.
+  ⚠⚠ **A bean-validation annotation on a class no endpoint binds enforces nothing** (F2-182 → F2-184).
+  `CalendarEventDto` carried `@Pattern(NONE|DAILY|…)` on `recurrence`; that type is the **outbound** payload
+  and both endpoints bind the nested `CreateRequest`, which had none — so a lower-case `monthly` was stored
+  verbatim and `IcsBuilder.rruleFor`'s `default -> null` emitted **no RRULE at all**, exporting a quarterly DR
+  test as a single event. 🔑 **A constraint on a response DTO is worse than none, because it answers the
+  question a reader was about to ask.** Same family as the `safeRole` decoy, but the tell is **structural**:
+  the class is never a `@RequestBody`. ⚠ The population is **unmeasured on purpose** — a source-regex sweep
+  reported 75 types and the first one checked was a false positive (nested records attributed to their
+  container class). Measure it by **reflection over controller parameters** or not at all.
 - **`LocalDate.now()` in a test is UTC+3 here; the services it tests are UTC** — so a date-relative
   fixture is wrong for three hours of every day (F2-178 correction, caught 2026-08-10 at 00:4x local).
   `CommitteeSeatLinkageTest` set `termEndsAt = LocalDate.now().minusDays(1)` while

@@ -1,6 +1,7 @@
 package com.tss.grc.module.ai.governance.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.MlModelAuditRequest;
 import com.tss.grc.module.ai.governance.dto.AiGovernanceDtos.MlModelAuditResponse;
 import com.tss.grc.module.ai.governance.entity.MlModel;
@@ -18,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -42,10 +44,52 @@ import java.util.UUID;
  *       CAPA / Issue automatically — caller may also pass
  *       {@code capaTaskId} explicitly if a CAPA is already queued.</li>
  * </ul>
+ *
+ * <p><b>F2-182 — both side-effect conditions were case-sensitive comparisons against a
+ * case-insensitive column.</b> {@code audit_type} and {@code status} are constrained by
+ * {@code CK_ml_audit_type} / {@code CK_ml_audit_status}, on a
+ * {@code Latin1_General_100_CI_AS_SC_UTF8} collation — so {@code auditType: "fairness"} with
+ * {@code status: "passed"} satisfied the bean validation ({@code @NotBlank @Size} only),
+ * satisfied both CHECKs, was stored verbatim in lower case, and then matched neither
+ * {@code "FAIRNESS".equals(…)} nor {@code positiveStatus}. The audit row looked entirely valid
+ * and <b>{@code has_fairness_audit} stayed false</b> — an EU AI Act Art. 9/15 and SDAIA
+ * post-market attribute recorded as absent for an audit that had happened. The same casing also
+ * hid the row from {@link #getLatestByType}, which queries the column directly.
+ *
+ * <p>Both vocabularies are now declared against the constraints they mirror, so
+ * {@code ClosedVocabularyPinTest} checks them against the migration SQL by reflection, and the
+ * side effects read the <b>normalised</b> values rather than the request's.
  */
 @Service
 @RequiredArgsConstructor
 public class MlModelAuditService {
+
+    /**
+     * The audit disciplines. {@code AIA} is the Saudi AI-impact assessment added by V224 — which
+     * dropped and re-added the constraint, so the vocabulary is read from the last definition in
+     * version order, not the first.
+     */
+    static final ClosedVocabulary AUDIT_TYPE = ClosedVocabulary.of(
+            "auditType", "CK_ml_audit_type",
+            "PERFORMANCE", "SECURITY", "PRIVACY", "ROBUSTNESS", "EXPLAINABILITY",
+            "BIAS", "FAIRNESS", "AIA");
+
+    static final ClosedVocabulary AUDIT_STATUS = ClosedVocabulary.of(
+            "status", "CK_ml_audit_status",
+            "PASSED", "PASSED_WITH_CONDITIONS", "FAILED", "REMEDIATED");
+
+    /** The two disciplines that satisfy a compliance attribute on the parent model. */
+    static final String AUDIT_TYPE_FAIRNESS = "FAIRNESS";
+    static final String AUDIT_TYPE_EXPLAINABILITY = "EXPLAINABILITY";
+
+    /**
+     * The outcomes that let an audit satisfy a compliance attribute. Named because it is a
+     * governance judgement, not a casing detail: {@code REMEDIATED} counts because the finding was
+     * closed, and whether that should still require a re-test is the owner's call — the F2-179
+     * {@code ESCALATING_SEVERITY} pattern.
+     */
+    static final Set<String> SATISFYING_STATUSES =
+            Set.of("PASSED", "PASSED_WITH_CONDITIONS", "REMEDIATED");
 
     private final MlModelAuditRepository auditRepo;
     private final MlModelService modelService;
@@ -82,10 +126,15 @@ public class MlModelAuditService {
         Long orgId = TenantContext.getCurrentTenant();
         MlModel m = modelService.mustGet(modelExternalId);
 
+        // F2-182 — normalise before anything reads the value back, so the column, the two side-effect
+        // conditions below and the frontend's label map all agree on one spelling.
+        String auditType = AUDIT_TYPE.require(req.auditType());
+        String status = AUDIT_STATUS.require(req.status());
+
         MlModelAudit a = new MlModelAudit();
         a.setOrganisationId(orgId);
         a.setModelId(m.getId());
-        a.setAuditType(req.auditType());
+        a.setAuditType(auditType);
         a.setAuditDate(req.auditDate() == null ? LocalDate.now() : req.auditDate());
         a.setAuditorUserId(req.auditorUserId());
         a.setAuditorExternalParty(req.auditorExternalParty());
@@ -93,25 +142,28 @@ public class MlModelAuditService {
         a.setMethodologyAr(req.methodologyAr());
         a.setFindingsEn(req.findingsEn());
         a.setFindingsAr(req.findingsAr());
-        a.setStatus(req.status());
+        a.setStatus(status);
         a.setMetricsJson(req.metricsJson());
         a.setCapaTaskId(req.capaTaskId());
         a = auditRepo.save(a);
 
-        // Side effects on parent compliance flags.
-        boolean positiveStatus = "PASSED".equals(req.status())
-                || "PASSED_WITH_CONDITIONS".equals(req.status())
-                || "REMEDIATED".equals(req.status());
-        if ("FAIRNESS".equals(req.auditType()) && positiveStatus) {
+        // Side effects on parent compliance flags — compare the NORMALISED values, never req.*().
+        // Plain equals, not ClosedVocabulary#is: is() exists for reading back a row that predates the
+        // writer being closed, and its javadoc says so. These values were normalised three statements
+        // ago, so needing is() here would mean the write above had not closed anything. What guards
+        // the literals instead is that they are named constants, asserted against AUDIT_TYPE's tokens
+        // by MlModelAuditVocabularyTest — a token the column cannot hold is always false (F2-177).
+        boolean satisfying = SATISFYING_STATUSES.contains(status);
+        if (AUDIT_TYPE_FAIRNESS.equals(auditType) && satisfying) {
             m.setHasFairnessAudit(true);
             m.setLastFairnessAuditDate(a.getAuditDate());
         }
-        if ("EXPLAINABILITY".equals(req.auditType()) && positiveStatus) {
+        if (AUDIT_TYPE_EXPLAINABILITY.equals(auditType) && satisfying) {
             m.setHasExplainabilityDoc(true);
         }
 
         audit.log("CREATE", "MlModelAudit", a.getId(),
-                "Audit " + req.auditType() + " · " + req.status()
+                "Audit " + auditType + " · " + status
                         + " · model=" + m.getModelCode());
         eventPublisher.publishEvent(new DomainEvent(
                 orgId, "MODEL_AUDIT_RECORDED",

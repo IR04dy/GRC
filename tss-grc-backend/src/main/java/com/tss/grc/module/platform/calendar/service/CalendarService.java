@@ -1,6 +1,7 @@
 package com.tss.grc.module.platform.calendar.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.module.audit_lc.entity.Finding;
 import com.tss.grc.module.audit_lc.repository.FindingRepository;
 import com.tss.grc.module.capa.entity.CapaTask;
@@ -47,10 +48,36 @@ import java.util.UUID;
  * flag the frontend uses to render a 'Falls on weekend' chip — the
  * server is the source of truth on Saudi workday math because the
  * F8 reminder scheduler depends on the same answer.
+ *
+ * <p><b>F2-182 — {@code recurrence} was validated on the wrong class.</b>
+ * {@code CalendarEventDto} carried {@code @Pattern(regexp = "NONE|DAILY|…")}, but that type is the
+ * <b>outbound</b> DTO built by {@code from(entity)}; both endpoints bind the nested
+ * {@code CalendarEventDto.CreateRequest}, whose {@code recurrence} had no annotation at all.
+ * Bean validation only runs on a parameter marked {@code @Valid}, so the annotation protected
+ * nothing while reading exactly like protection. 🔑 <b>A constraint on a response DTO is
+ * decoration, and worse than none, because it answers the question a reader was about to ask.</b>
+ *
+ * <p>The consequence was quiet: {@code IcsBuilder.rruleFor} switches on the value with
+ * {@code default -> null} and the caller emits an RRULE only when non-null, so
+ * {@code recurrence: "monthly"} produced an {@code .ics} event with <b>no recurrence rule at all</b>
+ * — a quarterly audit day or DR test subscribed once and then never again. It fails closed, which
+ * is why nothing complained.
  */
 @Service
 @RequiredArgsConstructor
 public class CalendarService {
+
+    /**
+     * Mirrors {@code chk_calendar_recurrence}. {@code NONE} is a real member rather than a null
+     * stand-in, which is why {@code orDefault} is right here and {@code require} is not: an event
+     * that says nothing about recurrence is not recurring, and that has always been accepted.
+     */
+    static final ClosedVocabulary RECURRENCE = ClosedVocabulary.of(
+            "recurrence", "chk_calendar_recurrence",
+            "NONE", "DAILY", "WEEKLY", "MONTHLY", "QUARTERLY", "ANNUAL");
+
+    /** The member of the vocabulary that means "does not repeat" — the default on silence. */
+    static final String RECURRENCE_NONE = "NONE";
 
     private final CalendarEventRepository       repo;
     private final CapaTaskRepository            capas;
@@ -315,7 +342,16 @@ public class CalendarService {
         return dto;
     }
 
-    private void applyCreate(CalendarEvent e, CalendarEventDto.CreateRequest req) {
+    /**
+     * Bind the inbound payload onto the entity. Package-private and static — visible for testing, and
+     * it touches no instance state.
+     *
+     * <p>⚙ It was private, and a mutation restoring the F2-182 defect here <b>survived</b>: the test
+     * covering the recurrence vocabulary was calling {@code RECURRENCE.orDefault(...)} directly rather
+     * than the writer that uses it, so it asserted the primitive and not the site. 🔑 <b>A test that
+     * reaches around the code under test proves the library works, which was never in doubt.</b>
+     */
+    static void applyCreate(CalendarEvent e, CalendarEventDto.CreateRequest req) {
         e.setTitleEn(req.getTitleEn());
         e.setTitleAr(req.getTitleAr());
         e.setDescriptionEn(req.getDescriptionEn());
@@ -330,7 +366,7 @@ public class CalendarService {
         e.setEntityType(req.getEntityType());
         e.setEntityId(req.getEntityId());
         e.setReminderDays(req.getReminderDays() == null ? "7,1" : req.getReminderDays());
-        e.setRecurrence(req.getRecurrence() == null ? "NONE" : req.getRecurrence());
+        e.setRecurrence(RECURRENCE.orDefault(req.getRecurrence(), RECURRENCE_NONE));
         e.setRecurrenceUntil(req.getRecurrenceUntil());
     }
 

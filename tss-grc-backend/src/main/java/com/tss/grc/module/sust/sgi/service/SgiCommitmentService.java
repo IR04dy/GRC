@@ -3,6 +3,7 @@ package com.tss.grc.module.sust.sgi.service;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.sust.capa.service.CorrectiveActionService;
 import com.tss.grc.module.sust.ghg.entity.GhgEmissionRecord;
@@ -57,6 +58,32 @@ public class SgiCommitmentService {
     private static final Set<String> SECTORS = Set.of(
         "ENERGY", "INDUSTRY", "TRANSPORT", "WASTE", "FORESTRY", "WATER", "LAND", "OTHER");
 
+    /**
+     * F2-182 — {@code value_source} is the lineage switch: {@code MANUAL} means a human owns the
+     * number, and {@link #refreshValue}/{@link #refreshSourcedValueQuietly} both gate on
+     * {@code "MANUAL".equals(…)}. Create was closed by a {@code @Pattern} on {@code SgiCreateRequest};
+     * <b>update was not</b> — {@code PUT /{id}} binds the entity with no {@code @Valid} at all, so
+     * {@code valueSource: "manual"} reached the column (which {@code ck_sgi_value_source} accepts,
+     * being case-insensitive) and both guards then read it as sourced rather than manual.
+     *
+     * <p>⚙ Honest note on the harm, because it is smaller than it looks and the reason is reusable:
+     * {@code computeSourcedValue} switches on the <em>same</em> string, case-sensitively, and returns
+     * empty for {@code 'manual'} — so the quiet sweep no-ops and the endpoint still refuses, just with
+     * the wrong message ("no source data available" instead of "has no linked source"). <b>A second
+     * case-sensitive comparison downstream accidentally neutralised the first one's defect.</b> That
+     * is luck, not a design, and it evaporates the moment anyone adds a {@code default} branch.
+     *
+     * <p>The vocabulary now lives here rather than on the DTO, so it is the single authority for both
+     * paths and {@code ClosedVocabularyPinTest} can check it against the migration — which a
+     * {@code @Pattern} regex never was. The DTO's annotation is removed with this change: keeping both
+     * would leave create refusing a casing that update accepts.
+     */
+    static final ClosedVocabulary VALUE_SOURCE = ClosedVocabulary.of(
+        "valueSource", "ck_sgi_value_source", "MANUAL", "ESG_METRIC", "GHG_TOTAL");
+
+    /** The lineage value that means "a human maintains this number" — the guard both refreshes read. */
+    static final String VALUE_SOURCE_MANUAL = "MANUAL";
+
     private final SgiCommitmentRepository repo;
     private final OrganisationSettingsService settingsService;
     private final AuditLogService audit;
@@ -105,6 +132,8 @@ public class SgiCommitmentService {
         // seeds the Rule-C SoD comparison (last-editor ≠ achiever).
         req.setCreatedBy(CurrentActor.username());
         req.setUpdatedBy(null);
+        // F2-182 — normalise here rather than on the DTO, so the entity-bound path is closed too.
+        req.setValueSource(VALUE_SOURCE.orDefault(req.getValueSource(), VALUE_SOURCE_MANUAL));
         validate(req);
         SgiCommitment saved = repo.save(req);
         audit.log("CREATE", "SgiCommitment", saved.getId(), "Created SGI commitment: " + saved.getCommitmentCode());
@@ -142,7 +171,9 @@ public class SgiCommitmentService {
         if (req.getNotesAr() != null)            cur.setNotesAr(req.getNotesAr());
         if (req.getEvidenceRef() != null)        cur.setEvidenceRef(req.getEvidenceRef());
         // SGI-C — source lineage (a MANUAL commitment stays fully hand-edited).
-        if (req.getValueSource() != null)        cur.setValueSource(req.getValueSource());
+        // F2-182 — this was the open writer: PUT binds the entity with no @Valid, so the DTO's
+        // @Pattern never ran on this path and 'manual' reached a case-insensitive column.
+        if (req.getValueSource() != null)        cur.setValueSource(VALUE_SOURCE.require(req.getValueSource()));
         if (req.getSourceMetricId() != null)     cur.setSourceMetricId(req.getSourceMetricId());
         if (req.getSourceScope() != null)        cur.setSourceScope(req.getSourceScope());
         // SGI-A — stamp the last editor from the principal so Rule C can block a
@@ -304,7 +335,9 @@ public class SgiCommitmentService {
             throw new IllegalStateException(
                 "Commitment is " + c.getStatus() + " and cannot be refreshed.");
         }
-        if (c.getValueSource() == null || "MANUAL".equals(c.getValueSource())) {
+        // ClosedVocabulary#is, not equals, and deliberately: this reads a row that may have been
+        // written before the writer above was closed, which is the one use its javadoc sanctions.
+        if (c.getValueSource() == null || VALUE_SOURCE.is(c.getValueSource(), VALUE_SOURCE_MANUAL)) {
             throw new IllegalArgumentException(
                 "Commitment " + c.getCommitmentCode() + " has no linked source (value_source=MANUAL).");
         }
@@ -333,7 +366,9 @@ public class SgiCommitmentService {
      */
     @Transactional
     public void refreshSourcedValueQuietly(SgiCommitment c) {
-        if (c.getValueSource() == null || "MANUAL".equals(c.getValueSource())) return;
+        // Same reasoning as refreshValue: a legacy row's casing must not turn a hand-maintained
+        // commitment into one this background sweep believes it may overwrite.
+        if (c.getValueSource() == null || VALUE_SOURCE.is(c.getValueSource(), VALUE_SOURCE_MANUAL)) return;
         computeSourcedValue(c).ifPresent(sv -> {
             boolean changed = sv.value().compareTo(nz(c.getCurrentValue())) != 0
                 || !Objects.equals(sv.asOf(), c.getCurrentValueAsOf());

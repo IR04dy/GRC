@@ -444,4 +444,79 @@ class KriMeasurementServiceTest {
         assertThat(skipped).isEqualTo(1);
         verify(audit).log(eq("KRI_EVALUATION_SKIPPED"), eq("KriDefinition"), anyLong(), anyString());
     }
+
+    // ─── F2-182: value_direction, where a casing mismatch inverts rather than degrades ──────
+
+    /**
+     * ⚠ <b>The failure mode here is worse than a missed match, and that is the whole point.</b>
+     *
+     * <p>{@code CK_kri_def_direction} holds exactly <b>two</b> tokens. So a value that fails to equal
+     * {@code HIGHER_IS_BETTER} does not fall through to a default or produce an error — it silently
+     * selects the opposite branch. An LCR of 95% against a 130/120 green/amber ladder is a serious
+     * liquidity breach; read in the inverted direction it is comfortably GREEN. The indicator reports
+     * healthy exactly when it has breached, which is the one outcome a KRI must never have.
+     *
+     * <p>⚙ <b>Correcting F2-182's own row while pinning it.</b> That row called this an <em>open
+     * writer</em>. It is not, and never was: {@code KriDefinitionService.validateEnums} ran on both
+     * {@code create} and {@code update}, so no caller could store this casing. The row's scan saw the
+     * setter in {@code applyFields} and never the validator up the call chain. What this test protects
+     * is therefore the <em>read</em>, against a row arriving from anywhere else — a data fix, a
+     * restore, an importer — because reachability is a fact about today, not a property of a control.
+     */
+    @Test
+    void aLowerCaseDirectionDoesNotInvertTheBands() {
+        KriDefinition legacy = higherBetter();
+        legacy.setValueDirection("higher_is_better");
+
+        assertThat(KriMeasurementService.evaluateStatus(new BigDecimal("95"), legacy)).as(
+            "95%% against green 130 / amber 120 is RED in the higher-is-better direction; read in the "
+            + "inverted direction it would be GREEN — the breach reported as health")
+            .isEqualTo("RED");
+        assertThat(KriMeasurementService.evaluateStatus(new BigDecimal("135"), legacy)).isEqualTo("GREEN");
+        assertThat(KriMeasurementService.evaluateStatus(new BigDecimal("125"), legacy)).isEqualTo("AMBER");
+    }
+
+    @Test
+    void theCanonicalDirectionsStillEvaluateAsTheyAlwaysDid() {
+        // Negative control: normalising the read must not collapse the two directions into one.
+        assertThat(KriMeasurementService.evaluateStatus(new BigDecimal("95"), higherBetter()))
+            .isEqualTo("RED");
+        assertThat(KriMeasurementService.evaluateStatus(new BigDecimal("30"), lowerBetter()))
+            .isEqualTo("GREEN");
+        assertThat(KriMeasurementService.evaluateStatus(new BigDecimal("30"), higherBetter())).as(
+            "the same value must read differently under the two directions, or the branch is dead")
+            .isEqualTo("RED");
+    }
+
+    /**
+     * The collection sweep must skip a MANUAL KRI whatever its casing. With the read case-sensitive, a
+     * {@code 'manual'} KRI was handed to the auto-collector, which has no fetcher bound for it — so it
+     * logged a {@code KRI_EVALUATION_SKIPPED} audit row every sweep for a KRI that is skipped by
+     * design. Noise in the audit ledger rather than a wrong number, but the audit ledger is a
+     * regulator-facing artefact and a human-input KRI is not an unbound fetcher.
+     */
+    @Test
+    void theSweepSkipsAManualKriInAnyCasing() {
+        KriDefinition manualLowerCase = lowerBetter();
+        manualLowerCase.setSourceQueryType("manual");
+        when(defRepo.findByOrganisationIdAndIsActiveTrueAndIsDeletedFalse(ORG_ID))
+                .thenReturn(List.of(manualLowerCase));
+
+        int skipped = service.evaluateAll(ORG_ID);
+
+        assertThat(skipped).as(
+            "a MANUAL KRI is not an unbound fetcher — it must not be counted as one")
+            .isZero();
+        verify(audit, never())
+                .log(eq("KRI_EVALUATION_SKIPPED"), eq("KriDefinition"), anyLong(), anyString());
+    }
+
+    @Test
+    void theBranchTokenIsOneTheColumnCanHold() {
+        assertThat(KriDefinitionService.VALUE_DIRECTION.tokens())
+            .contains(KriDefinitionService.HIGHER_IS_BETTER)
+            .containsExactlyInAnyOrder("LOWER_IS_BETTER", "HIGHER_IS_BETTER");
+        assertThat(KriDefinitionService.SOURCE_QUERY_TYPE.tokens())
+            .contains(KriDefinitionService.SOURCE_MANUAL);
+    }
 }

@@ -25,7 +25,9 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -229,5 +231,101 @@ class MlModelAuditServiceTest {
         service.listAudits(MODEL_EX);
         verify(auditRepo).findByOrganisationIdAndModelIdAndIsDeletedFalseOrderByAuditDateDesc(
                 OTHER_ORG, MODEL_ID);
+    }
+
+    // ─── F2-182: the casing the CHECK constraint could not see ───────────────────────
+
+    /**
+     * The defect, stated as behaviour: a lower-case FAIRNESS audit with a lower-case PASSED status
+     * satisfied {@code @NotBlank @Size(max = 40)}, satisfied {@code CK_ml_audit_type} and
+     * {@code CK_ml_audit_status} (both on a case-insensitive collation), was stored verbatim — and
+     * then matched neither side-effect condition. {@code has_fairness_audit} stayed false for an
+     * audit that had happened, which is an EU AI Act Art. 9/15 and SDAIA attribute recorded as absent.
+     */
+    @Test
+    void lowerCaseFairnessAudit_stillFlipsTheComplianceAttribute() {
+        MlModel m = model();
+        when(modelService.mustGet(MODEL_EX)).thenReturn(m);
+        when(auditRepo.save(any(MlModelAudit.class))).thenAnswer(assignId(new AtomicLong(100)));
+
+        MlModelAuditResponse out = service.recordAudit(MODEL_EX, req("fairness", "passed"));
+
+        assertThat(m.getHasFairnessAudit()).as(
+            "this is the whole finding: the side effect must not depend on the caller's casing, "
+            + "because the column cannot distinguish it and a machine caller decides it")
+            .isTrue();
+        assertThat(m.getLastFairnessAuditDate()).isNotNull();
+        assertThat(out.auditType()).as(
+            "and the value is NORMALISED, not merely matched — leaving 'fairness' in the column would "
+            + "hide the row from getLatestByType, which queries audit_type directly, and from the "
+            + "frontend's label map")
+            .isEqualTo("FAIRNESS");
+        assertThat(out.status()).isEqualTo("PASSED");
+    }
+
+    @Test
+    void lowerCaseExplainabilityAudit_stillFlipsTheDocumentationAttribute() {
+        MlModel m = model();
+        when(modelService.mustGet(MODEL_EX)).thenReturn(m);
+        when(auditRepo.save(any(MlModelAudit.class))).thenAnswer(assignId(new AtomicLong(100)));
+
+        service.recordAudit(MODEL_EX, req("  explainability  ", "remediated"));
+
+        assertThat(m.getHasExplainabilityDoc()).as("surrounding whitespace is trimmed too").isTrue();
+    }
+
+    /**
+     * ⚠ The negative control. Normalising must not make every audit satisfy the attribute — a FAILED
+     * fairness audit is the case the flag exists to distinguish, and a mutation that replaced the
+     * status check with {@code true} would pass every test above.
+     */
+    @Test
+    void lowerCaseFailedAudit_doesNotFlipAnything() {
+        MlModel m = model();
+        when(modelService.mustGet(MODEL_EX)).thenReturn(m);
+        when(auditRepo.save(any(MlModelAudit.class))).thenAnswer(assignId(new AtomicLong(100)));
+
+        service.recordAudit(MODEL_EX, req("fairness", "failed"));
+
+        assertThat(m.getHasFairnessAudit()).isFalse();
+        assertThat(m.getLastFairnessAuditDate()).isNull();
+    }
+
+    @Test
+    void aTokenOutsideTheVocabularyIs400NamingTheField_notA409FromTheConstraint() {
+        when(modelService.mustGet(MODEL_EX)).thenReturn(model());
+
+        assertThatThrownBy(() -> service.recordAudit(MODEL_EX, req("PENETRATION_TEST", "PASSED")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("auditType")
+            .hasMessageContaining("PENETRATION_TEST");
+
+        assertThatThrownBy(() -> service.recordAudit(MODEL_EX, req("FAIRNESS", "INCONCLUSIVE")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("status");
+
+        verify(auditRepo, never()).save(any());
+    }
+
+    /**
+     * The literals the side effects compare against must be members of the vocabulary. F2-177's
+     * {@code 'AUDIT_COMMITTE'} is one letter from a token that cannot ever match, and a comparison
+     * against a token the column cannot hold is silently always false — the same failure mode as a
+     * ghost role name.
+     */
+    @Test
+    void theSideEffectLiteralsAreTokensTheColumnCanActuallyHold() {
+        assertThat(MlModelAuditService.AUDIT_TYPE.tokens())
+            .contains(MlModelAuditService.AUDIT_TYPE_FAIRNESS,
+                      MlModelAuditService.AUDIT_TYPE_EXPLAINABILITY);
+        assertThat(MlModelAuditService.AUDIT_STATUS.tokens())
+            .containsAll(MlModelAuditService.SATISFYING_STATUSES);
+        assertThat(MlModelAuditService.SATISFYING_STATUSES).as(
+            "anti-vacuity: an empty set would make containsAll pass and the gate meaningless")
+            .isNotEmpty();
+        assertThat(MlModelAuditService.AUDIT_STATUS.tokens()).as(
+            "and FAILED must NOT be satisfying, or the attribute means nothing")
+            .contains("FAILED");
+        assertThat(MlModelAuditService.SATISFYING_STATUSES).doesNotContain("FAILED");
     }
 }

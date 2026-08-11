@@ -62,7 +62,12 @@ public class CalendarEventDto {
 
     private String reminderDays;
 
-    @Pattern(regexp = "NONE|DAILY|WEEKLY|MONTHLY|QUARTERLY|ANNUAL")
+    // F2-182 — a @Pattern(NONE|DAILY|…) used to sit here. This class is the OUTBOUND payload,
+    // assembled by from(entity) below; bean validation runs only on a @Valid parameter, and no
+    // endpoint binds this type. So the annotation validated nothing while reading like a guard, and
+    // the inbound CreateRequest's own `recurrence` had none. Deleted rather than moved: an @Pattern
+    // refuses 'monthly' where CalendarService.RECURRENCE normalises it, and a regex cannot be checked
+    // against chk_calendar_recurrence the way a named ClosedVocabulary can.
     private String recurrence;
 
     private LocalDate recurrenceUntil;

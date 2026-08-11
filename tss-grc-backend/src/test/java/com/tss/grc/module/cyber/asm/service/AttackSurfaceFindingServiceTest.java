@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -239,5 +240,83 @@ class AttackSurfaceFindingServiceTest {
         assertThatThrownBy(() -> service.linkCapaTask(FINDING_EX, 456L))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("already linked to CAPA");
+    }
+
+    // ─── F2-182: severity, the open writer with the worst arithmetic behind it ──────────
+
+    /**
+     * ⚠ <b>Read this test first — it states the consequence in numbers rather than in prose.</b>
+     *
+     * <p>Nothing in this assertion is mocked or contrived: it reads the real weight map the real
+     * asset-risk recompute uses, and shows that the case a caller could actually store scored the
+     * parent asset at the platform's <em>lowest</em> band. An internet-facing asset with an open
+     * critical finding read as 15/100. That is not a display bug and not an undercount in a KPI —
+     * it is the risk number going quiet exactly when it should be loudest.
+     */
+    @Test
+    void theArithmeticThatMadeThisWorthFixing() {
+        var weights = AttackSurfaceAssetService.SEVERITY_WEIGHT;
+        int low = weights.get("LOW");
+
+        assertThat(weights.getOrDefault("critical", low)).as(
+            "what a lower-case CRITICAL scored before the writer was closed — getOrDefault falls to "
+            + "LOW, and pickHighestOpenSeverity skips the row for the same reason")
+            .isEqualTo(low)
+            .isEqualTo(15);
+        assertThat(weights.getOrDefault("CRITICAL", low)).as("what it should score").isEqualTo(100);
+    }
+
+    @Test
+    void recordFinding_normalisesTheSeverityCasingTheColumnCannotDistinguish() {
+        when(assetService.mustGet(ASSET_EX)).thenReturn(asset());
+        when(findingRepo.save(any(AttackSurfaceFinding.class))).thenAnswer(assignId(new AtomicLong(900)));
+
+        FindingResponse out = service.recordFinding(new FindingRequest(
+                ASSET_EX, "WEAK_CIPHER", "  critical  ", "TENABLE", "plugin-26928",
+                "TLS 1.2 with CBC suite available", null, null, null));
+
+        ArgumentCaptor<AttackSurfaceFinding> captor = ArgumentCaptor.forClass(AttackSurfaceFinding.class);
+        verify(findingRepo).save(captor.capture());
+        assertThat(captor.getValue().getSeverity()).as(
+            "the STORED value, not just the response — leaving 'critical' in the column is what every "
+            + "downstream case-sensitive reader trips over, and equalsIgnoreCase at each reader would "
+            + "have left it there")
+            .isEqualTo("CRITICAL");
+        assertThat(out.severity()).isEqualTo("CRITICAL");
+    }
+
+    @Test
+    void recordFinding_refusesASeverityTheColumnCouldNeverHold() {
+        when(assetService.mustGet(ASSET_EX)).thenReturn(asset());
+
+        assertThatThrownBy(() -> service.recordFinding(new FindingRequest(
+                ASSET_EX, "WEAK_CIPHER", "SEV1", "TENABLE", null, "desc", null, null, null)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("severity")
+            .hasMessageContaining("SEV1");
+
+        verify(findingRepo, never()).save(any());
+    }
+
+    /**
+     * ⚙ Why {@code require} and not {@code coerce} here, pinned so the reasoning survives the commit.
+     *
+     * <p>F2-179 established that the choice is per-field. The decisive fact for this column is that
+     * {@code CK_asm_finding_severity} already refuses everything outside the vocabulary — so
+     * <b>every value that succeeds today is a case-variant of a legal token</b>, and normalising
+     * cannot break a request that currently works. It only converts a CHECK violation (which reached
+     * the caller as a 409 about a reference that does not exist, before F2-180 fixed the message) into
+     * a 400 naming the field. Coercing instead would have to pick a band, and the only defensible
+     * fallback for an unknown security severity is the one that caused the defect.
+     */
+    @Test
+    void everyVocabularyTokenIsWeightedAndOrdered() {
+        assertThat(AttackSurfaceFindingService.SEVERITY.tokens()).as(
+            "anti-vacuity before the comparison below")
+            .hasSize(5);
+        assertThat(AttackSurfaceAssetService.SEVERITY_WEIGHT.keySet()).as(
+            "a token the scorer has no weight for silently becomes LOW; the two artefacts must agree "
+            + "token for token, which is only checkable because the vocabulary is a real object")
+            .containsExactlyInAnyOrderElementsOf(AttackSurfaceFindingService.SEVERITY.tokens());
     }
 }

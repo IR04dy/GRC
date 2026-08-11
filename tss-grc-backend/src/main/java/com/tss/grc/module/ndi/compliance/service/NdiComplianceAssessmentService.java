@@ -2,6 +2,7 @@ package com.tss.grc.module.ndi.compliance.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.module.ndi.compliance.entity.NdiComplianceAssessment;
 import com.tss.grc.module.ndi.compliance.repository.NdiComplianceAssessmentRepository;
 import com.tss.grc.module.ndi.framework.entity.NdiFrameworkItem;
@@ -39,9 +40,34 @@ import java.util.*;
 @RequiredArgsConstructor
 public class NdiComplianceAssessmentService {
 
-    private static final Set<String> COMPLIANCE_STATUSES = Set.of(
+    /**
+     * F2-182 — was a bare {@code Set.of(...)}; now a vocabulary that names {@code ck_ndi_comp_status},
+     * so {@code ClosedVocabularyPinTest} checks the six tokens against the migration.
+     *
+     * <p><b>⚠ Read this before believing either the old or the new claim about it.</b> F2-182's
+     * register row said a lower-case {@code evidence_required} <em>bypasses the Rule 3 approval
+     * gate</em>. Measured by reading the code: <b>it does not, and never could through the API.</b>
+     * Every writer of this column is closed — {@link #setStatus} refused an unrecognised value with a
+     * 400, {@link #update} silently ignored one, and the other three writers pass literals. The
+     * finding's "open writer" classification came from a scan that saw
+     * {@code cur.setComplianceStatus(req.getComplianceStatus())} and could not see the
+     * {@code COMPLIANCE_STATUSES.contains(...) &&} guard in the same {@code if}. 🔑 <b>A static scan
+     * cannot answer "is this writer closed" — the guard may be a same-line conjunction, a shared
+     * validate() method, or a DTO annotation, and none of the three is visible at the setter.</b>
+     *
+     * <p>What <em>was</em> true is narrower and still worth closing: the gate's <b>read</b> was
+     * case-sensitive, so a row carrying that casing from any other origin — a data fix, a restore, a
+     * future importer — would have walked straight through an NCA/NDI approval gate. Reachability was
+     * the only thing protecting it, and reachability is not a guarantee. The vocabulary makes the
+     * question moot instead of unlikely.
+     */
+    private static final ClosedVocabulary COMPLIANCE_STATUS = ClosedVocabulary.of(
+        "status", "ck_ndi_comp_status",
         "COMPLIANT", "PARTIAL", "NON_COMPLIANT", "NOT_APPLICABLE",
         "EVIDENCE_REQUIRED", "UNDER_REVIEW");
+
+    /** The Rule 3 outcome that blocks approval — named because it is a control, not a label. */
+    static final String STATUS_EVIDENCE_REQUIRED = "EVIDENCE_REQUIRED";
     private static final Set<String> LIFECYCLE_STATUSES = Set.of(
         "DRAFT", "IN_PROGRESS", "SUBMITTED", "UNDER_REVIEW", "RETURNED", "APPROVED");
 
@@ -135,11 +161,11 @@ public class NdiComplianceAssessmentService {
         // F2-47 — an omitted status used to reach Set.of(...).contains(null), which THROWS, so a
         // request missing the field returned 500 instead of 400. Found while probing F2-46 with the
         // wrong body key: the controller reads body.get("status"), and any other key yields null.
-        if (newStatus == null || !COMPLIANCE_STATUSES.contains(newStatus)) {
-            throw new IllegalArgumentException(
-                "status is required and must be one of " + new java.util.TreeSet<>(COMPLIANCE_STATUSES)
-                + " (received: " + newStatus + ")");
-        }
+        // F2-182 — was a case-SENSITIVE Set.contains, so this already refused 'evidence_required'
+        // (which is why the gate was never bypassable). require() keeps the refusal for a token the
+        // column cannot hold and additionally NORMALISES a casing it can, so an integration sending
+        // 'compliant' now succeeds instead of receiving a 400 for a value the database accepts.
+        newStatus = COMPLIANCE_STATUS.require(newStatus);
         // Rule 5 — NOT_APPLICABLE requires justification.
         if ("NOT_APPLICABLE".equals(newStatus)) {
             String j = naJustification != null && !naJustification.isBlank()
@@ -177,9 +203,13 @@ public class NdiComplianceAssessmentService {
         // maker/checker SoD control — they are stamped server-side from the
         // authenticated principal at markUnderReview, never bound from the body.
         if (req.getNotes() != null)            cur.setNotes(req.getNotes());
-        if (req.getComplianceStatus() != null
-            && COMPLIANCE_STATUSES.contains(req.getComplianceStatus())) {
-            cur.setComplianceStatus(req.getComplianceStatus());
+        // F2-182 — this used to SILENTLY IGNORE an unrecognised status: the caller supplied a field,
+        // got 200, and the status had not moved. That is a deliberate behaviour change, stated rather
+        // than slipped in: an unrecognised token is now a 400 naming it, consistent with setStatus.
+        // No request the register screen can send is affected (the status is a fixed dropdown); the
+        // caller who benefits is the one whose casing differs, which now succeeds instead of no-oping.
+        if (req.getComplianceStatus() != null) {
+            cur.setComplianceStatus(COMPLIANCE_STATUS.require(req.getComplianceStatus()));
         }
         applyRules(cur);
         if ("DRAFT".equals(cur.getLifecycleStatus())
@@ -280,7 +310,13 @@ public class NdiComplianceAssessmentService {
         }
         // Rule 3 sanity check at approval — refuse COMPLIANT/PARTIAL without evidence.
         applyRules(cur);
-        if ("EVIDENCE_REQUIRED".equals(cur.getComplianceStatus())) {
+        // F2-182 — ClosedVocabulary#is, not equals, and this is the one place in this class where the
+        // distinction earns its keep: this reads a STORED value whose origin the method cannot know.
+        // Every API writer is closed, so no caller can produce 'evidence_required' — but a data fix, a
+        // restore or a future importer could, and a case-sensitive equals would then wave it straight
+        // through an NCA/NDI approval gate. Reachability was the only thing protecting this, and
+        // "nobody can currently reach it" is a fact about today, not a property of the control.
+        if (COMPLIANCE_STATUS.is(cur.getComplianceStatus(), STATUS_EVIDENCE_REQUIRED)) {
             throw new IllegalArgumentException(
                 "Cannot approve: item is flagged EVIDENCE_REQUIRED (Rule 3). Attach evidence first.");
         }
@@ -331,7 +367,7 @@ public class NdiComplianceAssessmentService {
         List<NdiComplianceAssessment> all = repo.findByOrganisationIdAndCycleId(org(), cycleId);
 
         Map<String, Integer> byCompliance = new LinkedHashMap<>();
-        for (String s : COMPLIANCE_STATUSES) byCompliance.put(s, 0);
+        for (String s : COMPLIANCE_STATUS.tokens()) byCompliance.put(s, 0);
         Map<String, Integer> byLifecycle = new LinkedHashMap<>();
         for (String s : LIFECYCLE_STATUSES) byLifecycle.put(s, 0);
         Map<String, BigDecimal[]> domainAccum = new LinkedHashMap<>();  // [score, weight]

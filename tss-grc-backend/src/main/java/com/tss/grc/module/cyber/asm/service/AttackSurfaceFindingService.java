@@ -1,6 +1,7 @@
 package com.tss.grc.module.cyber.asm.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.module.cyber.asm.dto.AsmDtos.FindingRequest;
 import com.tss.grc.module.cyber.asm.dto.AsmDtos.FindingResponse;
 import com.tss.grc.module.cyber.asm.dto.AsmDtos.FindingTransitionRequest;
@@ -37,11 +38,38 @@ import java.util.UUID;
  *   <li>F7 audit_log: FINDING_RECORDED, FINDING_TRANSITION, FINDING_CLOSED, FINDING_CAPA_LINKED</li>
  *   <li>F8 events: {@code ASM_FINDING_RECORDED}, {@code ASM_FINDING_CLOSED}</li>
  * </ul>
+ *
+ * <p><b>F2-182 — severity was the open writer with the worst arithmetic behind it.</b>
+ * {@code severity} arrived validated only by {@code @NotBlank @Size(max = 20)}, and
+ * {@code CK_asm_finding_severity} is enforced on a case-<b>insensitive</b> collation — so
+ * {@code severity: "critical"} was accepted and stored verbatim. Everything downstream then
+ * compares case-sensitively:
+ * {@code AttackSurfaceAssetService.SEVERITY_WEIGHT.getOrDefault(severity, …get("LOW"))} scored the
+ * parent asset <b>15 instead of 100</b>, {@code pickHighestOpenSeverity} skipped the row and
+ * returned {@code "LOW"}, and the critical-findings KPI
+ * ({@code "CRITICAL".equals(f.severity())}) omitted it. An internet-facing asset with an open
+ * critical finding therefore read as the platform's lowest risk band — the inverted-indicator
+ * shape, and it fails <b>open</b>: the number that exists to raise an alarm is the number that
+ * goes quiet.
+ *
+ * <p>⚙ {@code require} rather than {@code coerce} here, and the reason generalises: every value
+ * that succeeds today is a case-variant of a legal token, because {@code CK_asm_finding_severity}
+ * already rejects anything else. So normalising cannot break a request that currently works — it
+ * can only turn a CHECK violation into a 400 that names the field.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AttackSurfaceFindingService {
+
+    /**
+     * The severity bands, in the spelling {@code SEVERITY_WEIGHT}, {@code SEVERITY_ORDER} and the
+     * dashboard KPI all assume. Declared against the constraint it mirrors so
+     * {@code ClosedVocabularyPinTest} checks it against the migration rather than trusting this list.
+     */
+    static final ClosedVocabulary SEVERITY = ClosedVocabulary.of(
+            "severity", "CK_asm_finding_severity",
+            "INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL");
 
     /** Allowed transitions for findings. */
     static final Map<String, Set<String>> ALLOWED_TRANSITIONS = Map.of(
@@ -99,7 +127,8 @@ public class AttackSurfaceFindingService {
         f.setOrganisationId(orgId);
         f.setAssetId(asset.getId());
         f.setFindingType(req.findingType());
-        f.setSeverity(req.severity());
+        // F2-182 — normalise before the asset recompute below reads it back through SEVERITY_WEIGHT.
+        f.setSeverity(SEVERITY.require(req.severity()));
         f.setSource(req.source());
         f.setSourceRef(req.sourceRef());
         f.setDescriptionEn(req.descriptionEn());

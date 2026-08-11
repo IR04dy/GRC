@@ -1501,14 +1501,60 @@ because no whistleblower rows had been created — which is what makes "back to 
 `@PreAuthorize` on two required owner ids, and F2-83's 404 *"must carry a valid 'org' short code"* — the
 counter-example to F2-180's foreign-key message. **0 migrations, 0 frontend change.**
 
-⬜ **F2-182 filed** — the residual 10 of those 25, across 8 modules, each with its consequence read from the
-code rather than guessed. Two deserve reading first: `ndi.compliance_assessment.compliance_status`, where a
-lower-case `evidence_required` **bypasses an approval gate**, and `risk.kri_definition.value_direction`,
-where a two-value vocabulary means a lower-case token **inverts KRI breach detection** — the indicator reads
-healthy exactly when it has breached. Not bundled: eight modules of write paths in one sweep is the shape of
-change this programme has repeatedly got wrong, and two of them want a live probe of the gate they control.
-`upperOr` already closes three workflow columns, and seven of the 25 are `if (x == null) setDefault(…)`
-shapes where no behaviour turns on the casing — stated so the 25 is not mistaken for 25 defects.
+✔ **F2-182 CLOSED 2026-08-11 — and the first act of working it was refuting its own headline.** The row,
+written the previous day, listed **10** open writers and named two as control bypasses. Measured by reading
+the code: **6 of the 10 were already closed, and neither bypass was reachable.** The scan behind the filing
+called a writer *open* whenever the setter's argument came from the request, and a guard can sit in at least
+four places it cannot see — a conjunction in the **same `if`** (`ndi`), a **shared `validate()`** called by
+every mutation path (`kri`, `cma`, `tcfd`), an **`if` block** wrapping the setter (`bcm`), or a **DTO
+annotation** (`sgi` create). 🔑 **"Is this writer closed?" is a dataflow question and a regex over setter
+call sites cannot answer it** — it can only say where to go and read.
+
+⚠ **The worst real site was the one the row described as "a dashboard KPI undercounts."**
+`cyber.attack_surface_finding.severity`: `SEVERITY_WEIGHT.getOrDefault(severity, …get("LOW"))` scored an
+asset carrying a lower-case `critical` finding at **15 instead of 100**, `pickHighestOpenSeverity` skipped
+the row, and the critical-findings KPI omitted it — so an internet-facing asset with an open critical finding
+read as the platform's **lowest** risk band. Probed live on one asset: **15.00 → 100.00**. That is the
+inverted-indicator harm the row attributed to the KRI column, and unlike the KRI one it fails **open**.
+
+⚙ **Two consequences the row overstated, corrected rather than quietly dropped.** `sgi_commitment.value_source`
+could not actually trigger the refresh it "guards": `computeSourcedValue` switches on the same string, also
+case-sensitively, so **a second case-sensitive comparison had accidentally neutralised the first one's
+defect** — luck, not design. And `calendar_events.recurrence` did not pick the *wrong* RRULE; `rruleFor`'s
+`default -> null` meant the `.ics` carried **no RRULE at all**, so a quarterly DR test subscribed once and
+never again.
+
+🔑 **The reusable rule this slice produced, which retires F2-179's per-field agonising for the whole family:**
+ask whether a coercion **already exists upstream**. Where one does (the whistleblower portal's `safeSeverity`
+returned `MEDIUM` and *the report arrived*), out-of-vocabulary values succeed today and `coerce` is mandatory.
+Where none does, **the CHECK constraint is already refusing** everything outside the vocabulary — so every
+value that succeeds today is a case-variant of a legal token and `require` **cannot break a working request**.
+All five open sites were the second kind.
+
+The two refuted sites (`ndi`, `kri`) were **closed anyway**, because both gate a control and both *read* the
+column case-sensitively: a row arriving from a data fix, a restore or a future importer would have walked
+through an NCA/NDI approval gate or inverted a KRI's bands. **Reachability is a fact about today, not a
+property of a control.** Eight new `ClosedVocabulary` declarations, all agreeing with their migration CHECK on
+the first run; `SgiCreateRequest`'s `@Pattern` and `CalendarEventDto`'s misplaced one both **deleted** so each
+column has one authority. Durable half: **`HandRolledVocabularyMirrorTest`**, which reads the six hand-rolled
+`Set` mirrors this slice deliberately left alone and compares them against their constraints — directional
+(wider than the column fails, narrower is policy and is printed). Suite **3,671/0/0**, mutation **26/27** (the
+survivor genuinely unkillable), live probe **43/43**, **0 migrations, 0 frontend change**.
+
+⚠ **Two ways the mutation harness itself lied, both fixed.** It keyed backups per *edit*, so a mutation that
+edits one file twice wrote its backup from the already-mutated text and **left the first edit in the tree** —
+caught by `git status`, not by the harness. And a wrong assertion of mine left the baseline red, after which it
+reported an SGI mutation as *"caught by a calendar test"*: **a mutation harness run against a red suite reports
+every mutation as caught.** It now checks the baseline first and aborts if it is not green.
+
+⬜ **F2-184 filed** — an inert bean-validation constraint: `@Pattern` on `CalendarEventDto.recurrence`, a class
+**no endpoint binds**, while the `CreateRequest` the endpoints do bind had none. Validation runs only on a
+`@Valid` parameter, so it enforced nothing and read like the guard a reviewer was hunting. One confirmed
+instance, fixed. ⚠ **The population is deliberately unmeasured**: my sweep reported 75 types and the first one
+checked was a false positive (it attributed nested records' annotations to their container class), so the number
+is not recorded anywhere. Do it by **reflection over controller parameters**, treating a type as bound if it is
+a `@RequestBody` type *or reachable from one through a `@Valid` field* — exactness matters, because a false
+positive here invites deleting a live guard. Third phantom number from a regex over Java in three findings.
 
 ⬜ **F2-183 filed** — `consumer.complaint` has **no CHECK constraints at all**, so its `channel` and
 `severity` vocabularies live only in a case-sensitive Java `switch` that **substitutes** rather than refuses:

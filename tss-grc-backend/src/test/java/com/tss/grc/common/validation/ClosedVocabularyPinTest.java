@@ -53,8 +53,15 @@ class ClosedVocabularyPinTest {
      * elsewhere must not fail this test, or the guard becomes a reason not to use the primitive.
      */
     private static final Set<String> MUST_BE_FOUND = Set.of(
+        // F2-179 — the primitive's first two adopters.
         "CK_ml_drift_sev", "CK_ml_drift_type",
-        "CK_wb_reporter_type", "CK_wb_channel", "CK_wb_category", "CK_wb_severity");
+        "CK_wb_reporter_type", "CK_wb_channel", "CK_wb_category", "CK_wb_severity",
+        // F2-182 — the five genuinely-open writers, plus the two sites whose register row claimed a
+        // control bypass that measurement refuted (ndi, kri): closed anyway, because "no caller can
+        // currently reach it" is a fact about today rather than a property of the control.
+        "CK_ml_audit_type", "CK_ml_audit_status", "CK_asm_finding_severity",
+        "ck_sgi_value_source", "chk_calendar_recurrence",
+        "ck_ndi_comp_status", "CK_kri_def_direction", "CK_kri_def_source");
 
     @Test
     @DisplayName("every declared vocabulary matches the CHECK constraint it names")

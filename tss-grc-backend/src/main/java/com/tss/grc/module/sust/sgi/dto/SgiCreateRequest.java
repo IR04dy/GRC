@@ -5,7 +5,6 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -38,7 +37,14 @@ public record SgiCreateRequest(
         String notesAr,
         @Size(max = 255) String evidenceRef,
         // SGI-C — current_value provenance (all optional; default MANUAL).
-        @Pattern(regexp = "MANUAL|ESG_METRIC|GHG_TOTAL") String valueSource,
+        // F2-182 — the @Pattern that used to sit here is gone, not relocated. It closed THIS path
+        // and only this one: PUT /{id} binds the entity directly with no @Valid, so 'manual' reached
+        // the column there. Two artefacts claiming one vocabulary, where the DTO's regex could never
+        // be checked against ck_sgi_value_source, is the F2-94 shape. SgiCommitmentService.VALUE_SOURCE
+        // is now the single authority for both paths and ClosedVocabularyPinTest verifies it against
+        // the migration. It also NORMALISES, where the regex merely refused — so 'manual' from an
+        // integration now lands on MANUAL instead of 400-ing.
+        String valueSource,
         Long sourceMetricId,
         @Min(1) @Max(3) Short sourceScope
 ) {
