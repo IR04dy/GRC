@@ -61,7 +61,11 @@ class ClosedVocabularyPinTest {
         // currently reach it" is a fact about today rather than a property of the control.
         "CK_ml_audit_type", "CK_ml_audit_status", "CK_asm_finding_severity",
         "ck_sgi_value_source", "chk_calendar_recurrence",
-        "ck_ndi_comp_status", "CK_kri_def_direction", "CK_kri_def_source");
+        "ck_ndi_comp_status", "CK_kri_def_direction", "CK_kri_def_source",
+        // F2-183 — the `consumer` schema's first constraints of any kind. Listed here for the reason
+        // the javadoc above gives: without them this test passes over V375 whether it read it or not.
+        "CK_complaint_channel", "CK_complaint_category", "CK_complaint_severity",
+        "CK_complaint_status", "CK_complaint_id_type", "CK_cmpl_update_type");
 
     @Test
     @DisplayName("every declared vocabulary matches the CHECK constraint it names")

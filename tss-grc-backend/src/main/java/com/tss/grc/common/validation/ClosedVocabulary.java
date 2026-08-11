@@ -150,6 +150,35 @@ public final class ClosedVocabulary {
     }
 
     /**
+     * Normalise an <b>optional</b> value, answering {@code null} for blank <em>and</em> for anything
+     * outside the vocabulary.
+     *
+     * <p><b>Why this exists rather than {@link #coerce}.</b> {@code coerce} demands a fallback that is
+     * itself a member, because a mis-graded severity is still a severity. A <em>nullable</em> closed
+     * column has no such member — {@code consumer.complaint.customer_id_type} is
+     * {@code NATIONAL_ID | IQAMA | PASSPORT | CR} and nothing in that set means "not stated", so the
+     * absence has to be {@code NULL}. Picking one of the four as a stand-in would assert an identity
+     * document the customer never claimed.
+     *
+     * <p><b>Why not {@link #require}.</b> On the surface that first needed this — the anonymous,
+     * SAMA-mandated public complaint form — a 400 loses the complaint. The whistleblower precedent
+     * (F2-179) settles the direction: a report that never arrives is worse than one with a field the
+     * platform could not interpret.
+     *
+     * <p>⚠ <b>This discards a value the caller supplied</b>, so it is only right where the field is a
+     * classifier the record can do without. It is the wrong answer for anything a control reads —
+     * there, a null is not a smaller version of the value, it is an unanswered question. F2-183 uses
+     * it once, on an optional ID-type label that no branch in the platform tests.
+     */
+    public String coerceOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalised = value.trim().toUpperCase(Locale.ROOT);
+        return tokens.contains(normalised) ? normalised : null;
+    }
+
+    /**
      * Is {@code value} this token, ignoring the casing the column could not distinguish?
      *
      * <p>For reading back a value that may predate the writer being closed. New code should compare

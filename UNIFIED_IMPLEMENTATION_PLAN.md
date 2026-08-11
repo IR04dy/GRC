@@ -1636,12 +1636,58 @@ a **hard zero**, and re-catches mutation 3. Verified: suite **3,698/0/0**, FE **
 mutation **20/20**, live probe **25/25** (nothing mutated — `@Valid` fires before `@PreAuthorize`, so a ghost id is
 sufficient), schema **14/14** vs `sys.columns`. **0 migrations, 0 frontend changes.**
 
-⬜ **F2-183 filed** — `consumer.complaint` has **no CHECK constraints at all**, so its `channel` and
-`severity` vocabularies live only in a case-sensitive Java `switch` that **substitutes** rather than refuses:
-`channel: "email"` is stored as `WEB`, `severity: "critical"` as `MEDIUM`. Two defects, not one — the casing
-bug and the absent constraint that would have made it detectable. It needs a migration, which is why it is
-not in F2-179's zero-migration slice. ⚠ The decision in it is what to do about existing rows: the original
-value was never stored, so adding the constraint is safe but asserting the history is accurate is not.
+✔ **F2-183 CLOSED 2026-08-11 — and both of its own corrections ran against the filing, not with it.**
+The row said `channel` and `severity`, graded P3, and located the regulatory harm in the channel mix. All
+three needed correcting. **(1) `generateQuarterlyReport` does not aggregate by channel at all** — the
+report holds totals, SLA-breach percentages, compensation and `top_category`; there is no channel field on
+`ComplaintAggregateReport`. So the channel defect is real and its stated consequence was not. **(2) The
+column that *is* in the SAMA report — `category` — the filing never mentions**, and it was written straight
+from the request body with only `@NotBlank`, on the **anonymous public endpoint that is the only path that
+creates a complaint**, into a `NOT NULL NVARCHAR(64)` with no constraint. It is also the sharper defect,
+because `byCategory.merge(...)` is a case-**sensitive** `HashMap`: three complaints in one category
+submitted in three casings were **three buckets of 1**, so a rival category with 2 won and the regulator was
+told the wrong category was the most complained-about. 🔑 **A filing can be right that something is broken
+and wrong about why it matters — and the "why" is what sets the severity** (P3 → **P2**). The whole
+`consumer` schema had **zero** CHECK constraints, not a subset like F2-153's 32.
+⚠⚠ **The decision the row flagged was already answered by the data, and the decision that mattered was one
+it never raised.** Both real databases measured *before* any SQL: dev and prod each hold 12 complaints / 28
+timeline rows / 1 report, **0 out-of-vocabulary values, 0 non-canonical casings** — dev's 12 are V199 seed
+rows, never written through the substituting service — so there is nothing to backfill and nothing
+unrecoverable. What actually needed deciding: **a CHECK on a column whose writer is still open turns today's
+silently-stored junk into a constraint violation**, i.e. a lost complaint on a SAMA-mandated anonymous
+channel. 🔑 **Scope the migration to the writers you close in the same commit, not to the columns you can
+see.** V375 constrains 9 columns — the 4 whose writers this commit closed with `ClosedVocabulary`, the 4
+already closed by a literal plus `guardTransition`, and the report's derived `top_category` — and leaves
+`subcategory`/`root_cause_code` open **because no vocabulary is declared for them anywhere**, asserted as a
+decision by a test rather than left as an absence.
+⚠⚠ **And the CHECK cannot replace the writer: proved live, `severity = 'critical'` is ACCEPTED and stored
+verbatim** under `CK_complaint_severity`, because the collation is case-insensitive. A migration that adds
+the constraint and stops leaves F2-179's defect in place *while appearing to guard it*. V375 normalises
+casing first — and since that UPDATE touches **0 rows** in both real databases, the verification script
+seeds a deliberately lower-case `[REVIEW-TEST]` complaint so the branch is exercised rather than assumed.
+🔑 **A migration branch that is a no-op everywhere you can measure is untested code until you build it
+something to do.** ⚙ `coerce` throughout, never `require` — F2-182's rule: a coercion already existed
+upstream (the `switch`'s default arm), so out-of-vocabulary values succeed today and refusing them would
+break working submissions; `OTHER` is not a guess but the taxonomy's own unclassified code. The primitive
+grew **`coerceOrNull`** for the nullable `customer_id_type`, where no member means "not stated". Gates:
+`ClosedVocabularyPinTest` picks up all six vocabularies automatically (their names added to
+`MUST_BE_FOUND`, **without which the test passes over V375 whether it read it or not**) +
+`ComplaintVocabularyTest` (20), which pins the state machine to `CK_complaint_status` in both directions
+and the two status CHECKs the pin structurally cannot see. Suite **3,720/0/0**, live **19/19**,
+**1 migration (V375)**, **0 frontend change** — `lib/complaints.ts` already declared all five vocabularies
+correctly, which is exactly what made the three-way drift invisible. Filed on the way out: **F2-186**.
+
+⬜ **F2-186 filed** (P3, found by a test of mine failing non-deterministically) —
+`generateQuarterlyReport` picks the SAMA-facing `topCategory` with
+`byCategory.entrySet().stream().max(Comparator.comparingLong(Map.Entry::getValue))`, so **on equal counts
+the winner is whichever `HashMap` iteration happened to reach first**. Two categories tied at the top is
+not a rare state in a small quarter, and the consequence is that the same data can produce a different
+regulator-facing report on different runs — including across a restart, since `String.hashCode` is stable
+but bucket order depends on the map's insertion history. ⚠ Not fixed with F2-183 because the tie-break is
+a **product decision** (alphabetical? most recent? report both?) and any choice changes published output;
+what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a tie-break nobody chose is
+asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
+fixture as 3-versus-2 is what surfaced this.
 
 ✔ **F2-172 CLOSED 2026-08-09 — the intake front door became real, and measuring the rewire before
 writing it is what turned a chore into two defects.** F2-171's follow-up said "call

@@ -122,6 +122,32 @@ class ClosedVocabularyTest {
         assertThat(SEVERITY.coerce(null, "MODERATE")).isEqualTo("MODERATE");
     }
 
+    // ── coerceOrNull ─────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("coerceOrNull: normalises casing, and answers null where no member means 'not stated'")
+    void coerceOrNullIsForNullableColumnsWithNoInVocabularyFallback() {
+        // F2-183 added this for consumer.complaint.customer_id_type — NATIONAL_ID | IQAMA | PASSPORT |
+        // CR, where nothing in the set means "the customer did not say", so `coerce` has no legal
+        // fallback to take and `require` would 400 an anonymous complaint out of existence.
+        assertThat(SEVERITY.coerceOrNull("critical")).isEqualTo("CRITICAL");
+        assertThat(SEVERITY.coerceOrNull("  MAJOR  ")).isEqualTo("MAJOR");
+        assertThat(SEVERITY.coerceOrNull("SEV1")).isNull();
+        assertThat(SEVERITY.coerceOrNull("")).isNull();
+        assertThat(SEVERITY.coerceOrNull("   ")).isNull();
+        assertThat(SEVERITY.coerceOrNull(null)).isNull();
+    }
+
+    @Test
+    @DisplayName("coerceOrNull never invents a member — the one way it could quietly become coerce")
+    void coerceOrNullDoesNotFallBackOntoAToken() {
+        // If this ever returned a vocabulary member for unrecognised input it would be asserting a
+        // fact the caller never claimed — on the motivating column, an identity document.
+        for (String junk : new String[] {"drivers-licence", "national id", "NATIONALID", "0", "-"}) {
+            assertThat(SEVERITY.coerceOrNull(junk)).as("junk %s", junk).isNull();
+        }
+    }
+
     // ── is ───────────────────────────────────────────────────────────────────────────
 
     @Test

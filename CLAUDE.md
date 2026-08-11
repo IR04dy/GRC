@@ -124,7 +124,7 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V374 packaged; next free V375** (362 files; ⚠ this line said "V1→V295 / next free
+— **V1→V375 packaged; next free V376** (363 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
@@ -137,8 +137,8 @@ short of dev (`ORG_ADMIN` −30, unable to read seven modules), and re-running t
 *snapshot*, not a rule; `RoleGrantDerivationRatchetTest` pins the 6 legacy sites and fails a 7th.
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V374 are pending** the
-next jar — 30 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V375 are pending** the
+next jar — 31 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -195,7 +195,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 |---|---|
 | Backend | Spring Boot 3.5.x, **Java 17 (pinned — Lombok breaks on newer)**, Spring Security 6 |
 | Auth | JJWT — Bearer access token + HttpOnly refresh cookie; FE auto-refreshes on 401 |
-| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V374 (OFF in dev) |
+| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V375 (OFF in dev) |
 | ORM | Hibernate 6 / Spring Data JPA, `ddl-auto=none` |
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
@@ -477,6 +477,28 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   violation into a 400 that names the field, and normalises the casing that slipped through. That retires the
   per-field argument for this whole family. Use `orDefault` where the "absent" token is a real member
   (`chk_calendar_recurrence`'s `NONE`), not a null stand-in.
+  ⚠⚠ **A CHECK constraint and its writer must land in the SAME commit, and the migration's scope is
+  the WRITERS you close — not the columns you can see** (F2-183, measured 2026-08-11). Adding a CHECK to a
+  column whose writer is still open converts today's silently-stored junk into a **constraint violation**;
+  on `consumer.complaint` that is a lost complaint on the anonymous SAMA-mandated intake channel, strictly
+  worse than the defect being fixed. The whole `consumer` schema had **zero** CHECKs — not a subset like
+  F2-153's 32, all of them — so V375 constrains exactly the nine columns whose writers the same commit
+  closed, and leaves `subcategory`/`root_cause_code` open **because no vocabulary is declared for them
+  anywhere** (a test asserts that as a decision rather than leaving it an absence).
+  ⚠ **Measure PROD, not just dev, before shipping any `ADD CONSTRAINT`**: it verifies the rows already
+  present, so one unrecognised value fails Flyway and blocks the whole next jar. Both held 12/28/1 rows
+  with 0 violations here, so no `WITH NOCHECK` — which V364's self-checks correctly refuse.
+  ⚠⚠ **And the constraint cannot replace the normalising writer, because the collation is case-INSENSITIVE
+  — probed live: `severity = 'critical'` is ACCEPTED and stored verbatim** under `CK_complaint_severity`.
+  A migration that adds the CHECK and stops leaves the F2-179 defect intact *while appearing to guard it*,
+  which is worse than not having it. V375 therefore normalises casing first — and because that UPDATE
+  touches **0 rows** in both real databases, the verification script **seeds a deliberately lower-case
+  `[REVIEW-TEST]` row so the branch is exercised rather than assumed**. 🔑 **A migration branch that is a
+  no-op everywhere you can measure is untested code unless you build it something to do.**
+  ⚙ Two more from it: `ClosedVocabulary` grew **`coerceOrNull`** for nullable closed columns, where no
+  member means "not stated" so `coerce` has no legal fallback and `require` would 400 the record away; and
+  a **`ROWVERSION` column refuses an explicit INSERT value**, so a column list built from `sys.columns`
+  must exclude by TYPE (`timestamp`), never by name.
   ⚠⚠ **Do NOT decide "is this writer closed?" from a scan of setter call sites** — F2-182's filing did, and
   **6 of the 10 sites it reported as open were already closed**, including both it called control bypasses. A
   guard sits in at least four places a setter-site regex cannot see: a conjunction in the **same `if`**

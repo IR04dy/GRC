@@ -3,6 +3,7 @@ package com.tss.grc.module.consumer.complaints.service;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.common.util.SaudiWorkdayUtil;
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.module.consumer.complaints.dto.ComplaintDtos.AcknowledgeRequest;
 import com.tss.grc.module.consumer.complaints.dto.ComplaintDtos.AssignRequest;
 import com.tss.grc.module.consumer.complaints.dto.ComplaintDtos.ComplaintResponse;
@@ -99,8 +100,98 @@ public class ComplaintService {
     /** SAMA Banking Consumer Protection Principles — 20 working-day resolution. */
     public static final int RESOLUTION_SLA_BUSINESS_DAYS = 20;
 
-    /** Lifecycle state machine. */
-    private static final Map<String, Set<String>> ALLOWED = Map.ofEntries(
+    /*
+     * ─── Closed vocabularies (F2-183) ────────────────────────────────────────────────────────
+     *
+     * Until V375 the whole `consumer` schema carried ZERO check constraints, so every one of these
+     * columns was `NVARCHAR(n)` with its vocabulary living only in a javadoc comment — in three
+     * places (this class, the entity, and `lib/complaints.ts`) with nothing keeping them in step.
+     *
+     * ⚠ Each of these names a CHECK, so `ClosedVocabularyPinTest` reads V375 and fails the build if
+     * the two disagree. That is the point: the previous arrangement was the AttachmentAccessPolicy
+     * shape — independent lists that happened to agree, maintained by nobody.
+     */
+
+    /** {@code CK_complaint_channel} — how the complaint reached the bank. */
+    static final ClosedVocabulary CHANNEL = ClosedVocabulary.of(
+            "channel", "CK_complaint_channel",
+            "WEB", "EMAIL", "PHONE", "BRANCH", "SAMA_REFERRAL", "SOCIAL_MEDIA");
+
+    /**
+     * {@code CK_complaint_category} — the 13-code Saudi-bank taxonomy from the V199 header.
+     *
+     * <p>This was the worst of the four and the filing did not name it: {@code category} was written
+     * straight from the request body with only {@code @NotBlank} in front of it, on an <b>anonymous
+     * public endpoint</b>, into a column with no constraint. So it accepted arbitrary text — and
+     * {@code generateQuarterlyReport} groups by this column into a case-<b>sensitive</b>
+     * {@code HashMap} to pick the {@code topCategory} it reports to SAMA. Two spellings of one
+     * category therefore became two buckets, splitting the count and changing which category the
+     * regulator is told is the most complained-about.
+     */
+    static final ClosedVocabulary CATEGORY = ClosedVocabulary.of(
+            "category", "CK_complaint_category",
+            "ACCOUNT_ACCESS", "CARDS_DISPUTES", "ATM_ISSUES", "TRANSFER_DELAYS",
+            "FRAUD_UNAUTHORIZED_TXN", "FEES_CHARGES", "LOAN_FINANCING", "INSURANCE",
+            "INVESTMENT_PRODUCTS", "DIGITAL_BANKING", "BRANCH_SERVICE",
+            "MISLEADING_INFORMATION", "OTHER");
+
+    /** {@code CK_complaint_severity} — triage band. */
+    static final ClosedVocabulary SEVERITY = ClosedVocabulary.of(
+            "severity", "CK_complaint_severity", "LOW", "MEDIUM", "HIGH", "CRITICAL");
+
+    /**
+     * {@code CK_complaint_status} — the lifecycle states.
+     *
+     * <p>⚠ Unlike the four above, <b>no writer here was open</b>: the initial status is a literal and
+     * every later one goes through {@link #guardTransition}, which refuses anything the state machine
+     * does not list. So this vocabulary exists to pin {@link #ALLOWED} to the column rather than to
+     * normalise a caller's input — {@code ComplaintVocabularyTest} asserts the two agree in both
+     * directions. Deliberately <b>not</b> used to normalise {@code toStatus}: that would make
+     * {@code "resolved"} start succeeding where it is refused today, which is a widening of accepted
+     * input dressed as a casing fix.
+     */
+    static final ClosedVocabulary STATUS = ClosedVocabulary.of(
+            "status", "CK_complaint_status",
+            "RECEIVED", "ACKNOWLEDGED", "UNDER_INVESTIGATION", "AWAITING_CUSTOMER",
+            "RESOLVED", "CLOSED", "ESCALATED_TO_SAMA", "REOPENED", "REJECTED");
+
+    /** {@code CK_complaint_id_type} — nullable, so this one coerces to {@code null}, not to a member. */
+    static final ClosedVocabulary CUSTOMER_ID_TYPE = ClosedVocabulary.of(
+            "customerIdType", "CK_complaint_id_type",
+            "NATIONAL_ID", "IQAMA", "PASSPORT", "CR");
+
+    /** {@code CK_cmpl_update_type} — timeline entry kinds. Written only from the constants below. */
+    static final ClosedVocabulary UPDATE_TYPE = ClosedVocabulary.of(
+            "updateType", "CK_cmpl_update_type",
+            "STATUS_CHANGE", "CUSTOMER_CONTACT", "INTERNAL_NOTE",
+            "EVIDENCE_REQUEST", "SAMA_NOTIFICATION");
+
+    /** The channel assumed when an anonymous submitter names none — they used the web form. */
+    static final String CHANNEL_DEFAULT = "WEB";
+
+    /** The band an ungraded complaint enters at; also the column's own DEFAULT. */
+    static final String SEVERITY_DEFAULT = "MEDIUM";
+
+    /**
+     * The taxonomy's own "we could not classify this" member.
+     *
+     * <p>🔑 It is what makes {@code coerce} defensible for {@code category}: the fallback is not a
+     * guess at what the customer meant, it is the code the taxonomy provides for exactly this case.
+     */
+    static final String CATEGORY_UNCLASSIFIED = "OTHER";
+
+    static final String UPDATE_STATUS_CHANGE = "STATUS_CHANGE";
+    static final String UPDATE_SAMA_NOTIFICATION = "SAMA_NOTIFICATION";
+    static final String UPDATE_INTERNAL_NOTE = "INTERNAL_NOTE";
+
+    /**
+     * Lifecycle state machine.
+     *
+     * <p>Package-private rather than private so {@code ComplaintVocabularyTest} can assert it against
+     * {@link #STATUS} — the states this map names and the states the column accepts are two lists that
+     * must not drift, and reflection to read a private field would make the pin look optional.
+     */
+    static final Map<String, Set<String>> ALLOWED = Map.ofEntries(
             Map.entry("RECEIVED",            Set.of("ACKNOWLEDGED", "REJECTED")),
             Map.entry("ACKNOWLEDGED",        Set.of("UNDER_INVESTIGATION", "RESOLVED", "REJECTED")),
             Map.entry("UNDER_INVESTIGATION", Set.of("AWAITING_CUSTOMER", "RESOLVED", "ESCALATED_TO_SAMA")),
@@ -169,14 +260,19 @@ public class ComplaintService {
         c.setOrganisationId(orgId);
         c.setComplaintNo(generateNextComplaintNo());
         c.setSubmissionToken(UUID.randomUUID());
-        c.setChannel(safeChannel(req.channel()));
-        c.setCategory(req.category());
+        // F2-183: all four coerce rather than refuse. This is the anonymous SAMA-mandated intake
+        // surface, so a 400 on an unrecognised classifier would lose the complaint — the line
+        // F2-179 drew on the whistleblower portal, for the same reason. What changes is that a
+        // case-variant now lands on its own token instead of falling through to the fallback:
+        // `channel: "email"` was stored as WEB and `severity: "critical"` as MEDIUM.
+        c.setChannel(CHANNEL.coerce(req.channel(), CHANNEL_DEFAULT));
+        c.setCategory(CATEGORY.coerce(req.category(), CATEGORY_UNCLASSIFIED));
         c.setSubcategory(req.subcategory());
-        c.setSeverity(safeSeverity(req.severity()));
+        c.setSeverity(SEVERITY.coerce(req.severity(), SEVERITY_DEFAULT));
         c.setStatus("RECEIVED");
         c.setCustomerNameEn(req.customerNameEn());
         c.setCustomerNameAr(req.customerNameAr());
-        c.setCustomerIdType(req.customerIdType());
+        c.setCustomerIdType(CUSTOMER_ID_TYPE.coerceOrNull(req.customerIdType()));
         c.setCustomerIdLast4(req.customerIdLast4());
         c.setCustomerPhone(req.customerPhone());
         c.setCustomerEmail(req.customerEmail());
@@ -237,7 +333,7 @@ public class ComplaintService {
         c.setAcknowledgedBy(currentActor());
         Complaint saved = complaintRepo.save(c);
 
-        writeUpdate(saved, "STATUS_CHANGE", from, "ACKNOWLEDGED",
+        writeUpdate(saved, UPDATE_STATUS_CHANGE, from, "ACKNOWLEDGED",
                 noteOrDefault(req == null ? null : req.noteEn(),
                         "Complaint received and acknowledged. Investigation will start shortly."),
                 noteOrDefault(req == null ? null : req.noteAr(),
@@ -279,7 +375,7 @@ public class ComplaintService {
         // REOPENED — clear resolution fingerprints? Keep them as history; tests assert state only.
         Complaint saved = complaintRepo.save(c);
 
-        writeUpdate(saved, "STATUS_CHANGE", from, to,
+        writeUpdate(saved, UPDATE_STATUS_CHANGE, from, to,
                 req.noteEn(), req.noteAr(),
                 Boolean.TRUE.equals(req.customerVisible()));
 
@@ -303,7 +399,7 @@ public class ComplaintService {
         c.setSamaReferenceNo(req.samaReferenceNo());
         Complaint saved = complaintRepo.save(c);
 
-        writeUpdate(saved, "SAMA_NOTIFICATION", from, "ESCALATED_TO_SAMA",
+        writeUpdate(saved, UPDATE_SAMA_NOTIFICATION, from, "ESCALATED_TO_SAMA",
                 noteOrDefault(req.noteEn(),
                         "Complaint escalated to SAMA; SAMA reference: " + req.samaReferenceNo()),
                 noteOrDefault(req.noteAr(),
@@ -325,7 +421,7 @@ public class ComplaintService {
         c.setAssignedTo(req.assignedTo());
         Complaint saved = complaintRepo.save(c);
 
-        writeUpdate(saved, "INTERNAL_NOTE", saved.getStatus(), saved.getStatus(),
+        writeUpdate(saved, UPDATE_INTERNAL_NOTE, saved.getStatus(), saved.getStatus(),
                 "Assigned to " + req.assignedTo(),
                 "تمّ الإسناد إلى " + req.assignedTo(),
                 false);
@@ -511,21 +607,15 @@ public class ComplaintService {
         return auth.getName();
     }
 
-    private static String safeChannel(String s) {
-        if (s == null || s.isBlank()) return "WEB";
-        return switch (s) {
-            case "WEB", "EMAIL", "PHONE", "BRANCH", "SAMA_REFERRAL", "SOCIAL_MEDIA" -> s;
-            default -> "WEB";
-        };
-    }
-
-    private static String safeSeverity(String s) {
-        if (s == null || s.isBlank()) return "MEDIUM";
-        return switch (s) {
-            case "LOW", "MEDIUM", "HIGH", "CRITICAL" -> s;
-            default -> "MEDIUM";
-        };
-    }
+    /*
+     * F2-183: `safeChannel` and `safeSeverity` used to sit here as case-SENSITIVE switches over the
+     * same tokens the vocabularies now hold. They were the `safe*` shape CLAUDE.md tells you to grep
+     * for — third and fourth instances after WhistleblowerCaseService's pair — and their default arm
+     * made every unrecognised value, including a correct one in the wrong case, indistinguishable
+     * from silence. Deleted rather than repaired: a hand-rolled mirror of a CHECK is the thing
+     * ClosedVocabulary exists to stop, and nothing checked these two against the schema because
+     * there was no constraint in `consumer` to check them against.
+     */
 
     private static String noteOrDefault(String s, String fallback) {
         return (s == null || s.isBlank()) ? fallback : s;
