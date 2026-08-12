@@ -56,7 +56,7 @@ export function PrivacyLifecyclePage() {
       />
 
       <div className="kpi-grid mb-lg">
-        <Kpi Icon={Files}          label={t('prcKpiRopa')}          value={`${stats.ropaApproved} / ${stats.ropaTotal}`} tone="primary" to="/ropa" />
+        <Kpi Icon={Files}          label={t('prcKpiRopa')}          value={`${stats.ropaApproved} / ${stats.ropaTotal}`} tone="primary" to="/privacy?tab=ropa" />
         <Kpi Icon={ShieldAlert}    label={t('prcKpiDpiaHighRisk')}  value={String(stats.dpiaHighRisk)} tone={stats.dpiaHighRisk > 0 ? 'warning' : 'success'} to="/data-officer/dpia" />
         <Kpi Icon={Globe}          label={t('prcKpiCbt')}            value={`${stats.cbtAdequate} / ${stats.cbtTotal}`} tone="info" to="/privacy/data-flow" />
         <Kpi Icon={Globe}          label={t('prcKpiCbtBlocked')}     value={String(stats.cbtBlocked)} tone={stats.cbtBlocked > 0 ? 'danger' : 'success'} to="/privacy/data-flow" />

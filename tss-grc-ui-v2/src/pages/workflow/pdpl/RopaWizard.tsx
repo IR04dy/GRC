@@ -118,7 +118,7 @@ export function RopaWizard() {
       toast.success(isAr
         ? `تم نشر نشاط المعالجة في السجل (#${created.id})`
         : `Activity #${created.id} published to RoPA`);
-      navigate('/ropa');
+      navigate('/privacy?tab=ropa');
     } catch (e) {
       toast.danger((e as Error).message);
     } finally { setSubmitting(false); }
@@ -312,7 +312,7 @@ export function RopaWizard() {
         eyebrow={isAr ? 'الخصوصية / PDPL' : 'PDPL / Privacy'}
       />
       <WizardShell steps={steps} active={step} onChange={setStep} rtl={isAr}
-        submitting={submitting} onSubmit={submit} onCancel={() => navigate('/ropa')}
+        submitting={submitting} onSubmit={submit} onCancel={() => navigate('/privacy?tab=ropa')}
         submitLabel={isAr ? 'إضافة إلى السجل' : 'Add to RoPA'}/>
     </Shell>
   );

@@ -1717,6 +1717,117 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-199 CLOSED 2026-08-12 — the document a regulator receives was generated from a hard-coded
+corpus, and named the software vendor as the filing entity.** The first of the eleven pages F2-198 filed,
+chosen because its claim and its truth were furthest apart. Lineage F2-42 → F2-193 → F2-194 → F2-195 →
+F2-196 → F2-197 → F2-198 → this. Every earlier step asked what a screen **asserts**; this one asks what a
+screen **emits**, and the harm differs in kind rather than degree: a fabricated dashboard misleads whoever
+is looking at it, while a fabricated export produces an artefact that leaves the platform — downloaded,
+signed, filed with a regulator — where nothing downstream can tell the figures were invented and a
+signature line invites a human to vouch for them.
+
+`/nca-ecc-export` rendered an **"NCA ECC-1 Self-Assessment Submission"** for the National Cybersecurity
+Authority: a cover, six coverage KPIs, a 30-control matrix with statuses/maturities/evidence references,
+CISO **and CEO signature lines**, a CSV download and a print-to-PDF path — routed, sidebar-linked as the
+group header, and making **no server call of any kind**. All of it came from `lib/ncaEcc.ts`'s
+`ECC_DOMAINS`. ⚠⚠ **The cover named `brandName` — "TSS GRC Platform", the software product — as the
+filing entity, beside a hard-coded CR number `1010299292`**, so on a multi-tenant platform every tenant's
+return identified the vendor, identically. 🔑 **A tenant-specific fact appearing as a literal in a shipped
+bundle cannot be right for more than one tenant and is most likely right for none.**
+
+Real, probed live with two real personas and identical in dev and prod: `nca_ecc.filings` holds **4
+filings** (FY2023 ACKNOWLEDGED ref `NCA-ECC-2023-004812`, FY2024 SUBMITTED ref `NCA-ECC-2024-006139`,
+FY2025 CISO_APPROVAL, FY2026 PEER_REVIEW), each with five per-domain scores, an overall score, a CAPA
+count, a peer reviewer and a CISO approver. 🔑 **The fabrication was MORE GRANULAR than the platform's own
+filing model, which is why it looked more finished**: the ECC-2:2024 return is scored **per domain 1–5**
+— what the table models and what `lib/ncaEccFiling.ts`'s own header says — and the page invented a
+per-control matrix underneath it. That matrix could not have been rebuilt honestly either:
+**`responses_json` is NULL on all 4 filings in both databases**, so per-control responses have never once
+been captured, and reconstructing them would have been F2-196's defect.
+
+**Retired, not rewired** (ADR-017 §D-5, same call as F2-198): `NcaEccFilingsPage` already renders the
+filings, the five domain scores, the gap summary, the submission reference and the whole
+DRAFT→PEER_REVIEW→CISO_APPROVAL→SUBMITTED→ACKNOWLEDGED workflow, so a second real ECC screen would have made
+two surfaces for one statutory object. Redirect to `/nca-ecc/filings` (F2-137); sidebar group collapsed to
+its one real destination because the old `ncaSidebar` label read literally *"NCA ECC export"*; three files
+deleted (**1,013 lines**); **30 of 31 `nca*` translation keys** removed from both languages. **0 backend
+changes, 0 migrations.** ⚠ The export **capability** was filed rather than hand-rolled: there is no
+server-side ECC generator, and a client-side CSV of a regulator submission would bypass the export
+subsystem's RTL-Arabic handling and audit ledger — a product decision, not a fabrication fix.
+
+**New gate, keyed on EMISSION:** `exportProvenance.test.ts`. Seven instruments now guard fabricated data
+and each is keyed on a mechanism — a filename, a three-entry filename allow-list, an opt-in tag, a hook, a
+JSX tag, a prop, a routed component that calls nothing — and none asks whether the thing **producing a
+file** has server data behind it. Census: **21 files emit a document**; after the fix **zero routed pages**
+do so unbacked, so it ships as a **hard zero with an empty exemption map**.
+
+⚠⚠ **My own first draft did exactly what F2-188 warns about, and the REVERSE leg caught it.** I wrote two
+exemption entries with fluent multi-sentence reasons — `CsvImportPage` and `MfaSetupPage`, the latter a
+whole security narrative — and **both are Sprint 4 §3.3 CULLED pages**, routes removed, so neither was ever
+in the population. The forward assertion passed because the population was already zero; only *"every
+exemption names a page that is really in the population"* fired. 🔑 **A reason written for something that is
+not in the population reads exactly like a reason for something that is**, and the direction that catches
+it is the one nobody writes first.
+
+⚠⚠ **A shared detector hole:** `SERVER_CALL` was `\b\w*[Aa]pi\.\w+\s*\(`, and this codebase's idiom is a
+**typed** wrapper — `api.get<BoardPackAggregate>(…)` — where a generic sits between the method name and the
+paren. **118 files** use that form; it surfaced as `BoardPackPage` reading as unbacked when
+`lib/boardPackAggregate.ts:174` is a plain `api.get<T>(…)`. Fixed in **both** this gate and F2-198's. ⚙ The
+error direction is worth stating: it **over**-reports, so it inflates a population rather than hiding one
+— the opposite of F2-198's stripper bug — and re-measurement leaves F2-198's eleven findings unchanged.
+⚠ A one-hop rule must also exclude the **transport**: `lib/api.ts` contains `fetch(` by definition, so
+importing an `ApiError` type from it is not evidence of use.
+
+⚠⚠ **Second finding, in an existing gate:** `routeReachability`'s `INTENTIONALLY_OFF_NAV` header claimed
+*"if one of these ever becomes reachable … the test below says which."* The mutation harness disproved it,
+and measuring showed the claim could not simply be promoted to an assertion — **2 of 16 entries are
+legitimately linked** (`/login` from Topbar's sign-out, `/portal/trust-center` from PublicShell), because
+"off-nav" means *not a sidebar destination*. The comment was corrected and the enforceable half added as
+`RETIRED_MUST_STAY_UNLINKED`: five retired redirects with **zero** inbound links, plus a reverse leg that
+each is still declared so a bookmark cannot start 404ing. 🔑 **A comment describing a check that does not
+exist is worse than no comment, because it answers the question a reader was about to ask** — F2-184's
+shape, in a test's own documentation.
+
+⚠⚠ **And it showed F2-198's retirement was incomplete:** `/ropa` passed that test not by exemption but
+because **four in-app links still pointed at it** — two data-flow KPI tiles, a privacy-lifecycle tile, and
+`RopaWizard`'s post-publish `navigate('/ropa')`. All four now point at `/privacy?tab=ropa`. 🔑 **A
+retirement is not finished when the sidebar is repointed: a redirect keeps every stale link working, which
+is exactly what stops anyone noticing they are stale** — including the orphan test, for which being linked
+is the passing condition.
+
+⚠ **Three self-inflicted measurement errors, all caught by running things.** (a) Guessed column names on
+`cyber.cyber_frameworks` → *"Invalid column name"*, which reads like "the data isn't there"; resolve from
+`sys.columns`, not just `sys.tables`. (b) The probe asserted a deleted module 404s from Vite and reported
+**three false failures** — Vite's **SPA fallback** answers **200 with index.html**, so on an SPA dev server
+HTTP 200 is not evidence a file exists; the tell is `Content-Type`. (c) A structural check of the comment
+stripper counted declaration keywords and "lost" five — they were the words `export`/`type`/`return` inside
+**header comments**; anchored to line starts the honest answer is **0 anchored declarations lost across 773
+files** versus **612** by the wrong ordering, a stronger negative control than F2-198's single-file one.
+
+**Verified:** FE **577/577 across 59 files** (+13), tsc clean, `vite build` clean with the export chunk gone;
+mutation **14/14 as declared** (the `/ropa`-link revert flipped SURVIVES→CAUGHT once the new leg landed);
+live probe **16/16**; browser `/nca-ecc-export` → `/login?next=%2Fnca-ecc%2Ffilings`; backend doc-gated
+**21/21**; census clean after updating **both** homes of `fe_pages` (352 → **351**; folders hold at **110**,
+because `pages/nca-ecc/` still holds the real page — unlike `/ropa`, which took its folder with it).
+
+⬜ **Filed:** **(a)** the **10 remaining pages / 11 corpora, 6 sidebar** in F2-198's ratchets — `/approvals`,
+`/attestations`, `/audit-workspace`, `/control-crosswalk`, `/assets`, `/regulatory-change`, plus url-only
+`/workflows/chains` and `/bcm-dependency/legacy`. **(b)** ⚠⚠ **THREE disjoint real ECC control registers,
+three different answers**, identical dev and prod: `cyber.cyber_controls` **29, all NOT_IMPLEMENTED,
+maturity NULL** (the register F2-195 corrected "87%" to **0%** against); `compliance.controls` NCA_ECC
+**14 rows, 6 IMPLEMENTED / 7 PARTIAL / 1 PLANNED**; `evidence.controls` **34 with no status column**. That
+is F2-196's shape for the ECC self-assessment — **owner decision**, because picking a winner changes what
+the platform reports to a regulator, and it is why no control-level coverage figure went back on the
+submission surface. **(c)** No server-side ECC export generator exists. **(d)** The **8 Sprint 4 §3.3 culled
+page folders are still on disk** — `process-mining`, `ai-governance`, `production-readiness`, `mfa`,
+`monitoring`, `backup-dr`, `white-label`, `csv-import` — **2,244 lines**, unrouted since Sprint 4, kept "for
+one cycle" many cycles ago. **(e)** **F2-200 — MFA is browser-local**: `lib/mfa.ts` persists enrolment to
+`localStorage` (`grc.mfa.enrolment.v1`), `iam.users.mfa_enabled` exists server-side and is never written,
+and the `otpauth` URI carrying the shared secret is sent to **`api.qrserver.com`** in a query string.
+⚠ **Its urgency is LOW and saying so accurately matters**: `MfaSetupPage` is one of the culled folders in
+(d), so no route reaches any of it — confirm that before grading it (F2-174's lesson, where a filing's
+urgency was false because the field had never been written).
+
 ✔ **F2-198 CLOSED 2026-08-12 — a sidebar page invented the PDPL Article 31 register beside the real
 one, and every de-mocking gate was blind to it by construction.** The item F2-194 filed and F2-197 handed
 back; lineage F2-42 → F2-193 → F2-194 → F2-195 → F2-196 → F2-197 → this, asking the question one level

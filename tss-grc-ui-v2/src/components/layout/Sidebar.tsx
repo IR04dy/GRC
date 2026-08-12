@@ -399,12 +399,11 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'openbanking', to: '/openbanking/dashboard',   Icon: Banknote,   labelKey: 'ob.sidebar' },
       { id: 'hrsd',        to: '/authority/HRSD',          Icon: Users,      labelKey: 'modHrsd' },
       { id: 'moc',         to: '/authority/MOC',           Icon: Building2,  labelKey: 'modMoc' },
-      {
-        id: 'nca-ecc', to: '/nca-ecc-export', Icon: ShieldCheck, labelKey: 'ncaSidebar',
-        children: [
-          { id: 'nca-ecc-filings', to: '/nca-ecc/filings', Icon: FileText, labelKey: 'ncaFilingsSidebar' },
-        ],
-      },
+      // F2-199 — was a group whose header pointed at `/nca-ecc-export` (a fabricated
+      // regulator submission document, retired) with the real filings register as its only
+      // child. Collapsed to the one real destination; the old `ncaSidebar` label read
+      // "NCA ECC export", naming the thing that no longer exists.
+      { id: 'nca-ecc',     to: '/nca-ecc/filings',        Icon: ShieldCheck, labelKey: 'ncaFilingsSidebar' },
       { id: 'reginspect',   to: '/reginspect/dashboard',   Icon: ClipboardList, labelKey: 'reginspect.sidebar' },
       { id: 'regreporting', to: '/regreporting/dashboard', Icon: CalendarDays,  labelKey: 'regreporting.sidebar' },
     ],

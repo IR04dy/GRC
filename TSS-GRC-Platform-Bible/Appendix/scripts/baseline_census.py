@@ -114,7 +114,7 @@ PUBLISHED = {
     "migration_files": 363,          # +V375 (F2-183, the `consumer` schema's first CHECK constraints)
     "migration_head": 375,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
-    "fe_pages": 352,          # F2-142 retired 3; F2-16 tranche 1 +1, tranche 2 +4, tranche 3 +7
+    "fe_pages": 351,          # F2-142 -3; F2-16 +12; F2-163 +1; F2-198 -1 (/ropa); F2-199 -1 (/nca-ecc-export)
                              # -1 F2-198: RopaPage retired — 9 invented PDPL Art.31 activities against
                              # 11 real rows, and the real register was already on PrivacyPage's ROPA
                              # tab. `/ropa` still resolves (a Navigate), so fe_routes holds at 330.

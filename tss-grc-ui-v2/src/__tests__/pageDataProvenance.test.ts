@@ -91,8 +91,19 @@ function routedComponents(): Map<string, { module: string; routes: string[] }> {
   return out;
 }
 
-/** Any request to a server: an api-client call, the shared hooks, or a bare fetch. */
-const SERVER_CALL = /\b\w*[Aa]pi\.\w+\s*\(|\buseApi(?:List|Resource)\s*[<(]|\bfetch\s*\(/;
+/**
+ * Any request to a server: an api-client call, the shared hooks, or a bare fetch.
+ *
+ * ⚠ The optional `<…>` was missing until F2-199 and it is load-bearing. The house idiom is a
+ * TYPED wrapper — `api.get<BoardPackAggregate>('/api/v1/reporting/board-pack.json')` — so a
+ * generic argument sits between the method name and the paren and `\w+\s*\(` never matches it;
+ * **118 files** use that form. The error direction is over-reporting (a page that does call a
+ * server reads as one that never could), so it inflates a population rather than hiding one —
+ * unlike F2-198's comment-stripper bug, which shrank it. Re-measured after the fix: the eleven
+ * findings below are unchanged, because none of them uses the generic form.
+ */
+const SERVER_CALL =
+  /\b\w*[Aa]pi\.\w+\s*(?:<[^()\n]{0,200}>)?\s*\(|\buseApi(?:List|Resource)\s*[<(]|\bfetch\s*\(/;
 
 /**
  * Fields that assert live operational state rather than identity or definition. A page may
@@ -184,11 +195,12 @@ function report(fs: Finding[]): string {
 
 describe('F2-198 — a routed page that asserts operational state must ask a server', () => {
   /**
-   * Measured 2026-08-12 immediately after retiring `/ropa`. Decrease-only: each remaining member
-   * is a separate slice, and the number may never be raised. `/ropa` took it from 14 to 12.
+   * Measured 2026-08-12. Decrease-only: each remaining member is a separate slice, and the number
+   * may never be raised. `/ropa` took it from 14 to 12 (F2-198); `/nca-ecc-export` from 12 to 11
+   * and the sidebar half from 7 to 6 (F2-199).
    */
-  const BASELINE_STATE_CORPORA = 12;
-  const BASELINE_SIDEBAR_PAGES = 7;
+  const BASELINE_STATE_CORPORA = 11;
+  const BASELINE_SIDEBAR_PAGES = 6;
 
   it('does not grow the number of state-asserting corpora on server-less routed pages', () => {
     expect(CENSUS.findings.length,
@@ -339,6 +351,97 @@ describe('F2-198 — /ropa resolves to the register that reads the database', ()
       // `\s+` after the colon, not a single space: this file column-aligns its values, and the
       // first draft of this assertion failed on `ropaSidebar:             'ROPA',`.
       expect(body).toMatch(/^\s+ropaSidebar:\s+'/m);
+    }
+  });
+});
+
+describe('F2-199 — /nca-ecc-export resolves to the register that reads the database', () => {
+  /**
+   * `/nca-ecc-export` rendered an "NCA ECC-1 Self-Assessment Submission" — a document addressed
+   * to the National Cybersecurity Authority, with a cover, a 30-control matrix, CISO + CEO
+   * signature lines, a CSV download and a print-to-PDF path — and it made no server call at all.
+   *
+   * Two things made it worse than the dashboards this lineage has been retiring:
+   *   • it EXPORTS. A fabricated dashboard misleads whoever is looking at it; a fabricated export
+   *     produces a file that leaves the platform, gets signed, and is filed with a regulator.
+   *   • the cover named `brandName` — "TSS GRC Platform", the software product — as the filing
+   *     entity, beside a hard-coded CR number `1010299292`. In a multi-tenant platform that means
+   *     every tenant's ECC return identified the vendor rather than the filer, identically.
+   *
+   * The real register is `nca_ecc.filings`: 4 filings in dev and prod, scored per DOMAIN 1-5 as
+   * the ECC-2:2024 annual return actually requires, carrying peer review, CISO approval and an
+   * NCA submission reference — and `NcaEccFilingsPage` already renders all of it.
+   *
+   * 🔑 The fabrication was MORE GRANULAR than the platform's own filing model, which is part of
+   * why it looked more finished: the real return is five domain scores, and the page invented a
+   * 30-control matrix underneath them. `responses_json` is NULL on all 4 filings in both
+   * databases, so per-control responses have never been captured and the matrix could not have
+   * been rebuilt honestly — inventing them is F2-196's defect.
+   */
+  it('the fabricated submission document and its corpus are gone from the tree', () => {
+    for (const gone of ['pages/nca-ecc/NcaEccExportPage.tsx', 'lib/ncaEcc.ts',
+                        'pages/nca-ecc/ncaEcc.css']) {
+      expect(existsSync(join(SRC, gone)), `${gone} is back`).toBe(false);
+    }
+  });
+
+  it('nothing imports the retired corpus', () => {
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const full = join(dir, name);
+        if (statSync(full).isDirectory()) {
+          if (name === 'node_modules' || name === 'dist') continue;
+          walk(full);
+        } else if (/\.tsx?$/.test(name)) {
+          // the real client is `lib/ncaEccFiling` — the negative lookahead keeps it out
+          if (/from\s+'[^']*\/ncaEcc'|import\s+'[^']*ncaEcc\.css'/.test(
+            readFileSync(full, 'utf8'))) {
+            offenders.push(full.slice(SRC.length + 1));
+          }
+        }
+      }
+    };
+    walk(SRC);
+    expect(offenders).toEqual([]);
+  });
+
+  it('the route redirects rather than 404ing a bookmarked URL', () => {
+    // F2-137. Asserted on the whole Route element, not the bare word "Navigate", which appears
+    // in this file's prose and in a dozen other routes.
+    expect(APP).toMatch(
+      /<Route\s+path="\/nca-ecc-export"\s+element=\{<Navigate\s+to="\/nca-ecc\/filings"\s+replace\s*\/>\}/);
+  });
+
+  it('the sidebar entry points at the real register and no longer offers an export', () => {
+    expect(SIDEBAR).toMatch(/id:\s*'nca-ecc',\s*to:\s*'\/nca-ecc\/filings'/);
+    expect(SIDEBAR).not.toMatch(/to:\s*'\/nca-ecc-export'/);
+    // the old label literally read "NCA ECC export" — naming a page that no longer exists
+    expect(SIDEBAR).not.toMatch(/labelKey:\s*'ncaSidebar'/);
+  });
+
+  /**
+   * ⚠ Asserted as a CALL, not a mention — F2-194 lost two mutations to `toContain('name')`
+   * passing on an import statement and on a type name.
+   */
+  it('the surviving ECC surface reads the server', () => {
+    const page = stripComments(readFileSync(join(SRC, 'pages/nca-ecc/NcaEccFilingsPage.tsx'), 'utf8'));
+    expect(page).toMatch(/ncaEccFilingApi\.list\s*\(/);
+    expect(page).toMatch(/ncaEccFilingApi\.transition\s*\(/);
+    // and it renders the five real domain scores rather than a control matrix
+    expect(page).toMatch(/NCA_DOMAINS\.map/);
+  });
+
+  it('the 30 translation keys the retired page owned are gone from both languages', () => {
+    for (const lang of ['en', 'ar']) {
+      const body = readFileSync(join(SRC, `translations/${lang}.ts`), 'utf8');
+      for (const dead of ['ncaCoverCr', 'ncaCoverEntity', 'ncaKpiScore', 'ncaSignoffCeo',
+                          'ncaTblEvidence', 'ncaSubmissionTemplate', 'ncaSidebar']) {
+        expect(body, `${lang}.ts still declares ${dead}`).not.toMatch(
+          new RegExp(String.raw`^\s+${dead}:`, 'm'));
+      }
+      // The one that survives: the sidebar row's label, now naming the real register.
+      expect(body).toMatch(/^\s+ncaFilingsSidebar:\s+'/m);
     }
   });
 });

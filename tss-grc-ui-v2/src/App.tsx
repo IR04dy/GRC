@@ -306,7 +306,6 @@ const AssetRegisterPage      = lazy(() => import('./pages/assets/AssetRegisterPa
 const BoardPackPage          = lazy(() => import('./pages/board-pack/BoardPackPage').then(m => ({ default: m.BoardPackPage })));
 const RegulatoryChangePage   = lazy(() => import('./pages/regulatory-change/RegulatoryChangePage').then(m => ({ default: m.RegulatoryChangePage })));
 const VendorPortalPage       = lazy(() => import('./pages/portal/VendorPortalPage').then(m => ({ default: m.VendorPortalPage })));
-const NcaEccExportPage       = lazy(() => import('./pages/nca-ecc/NcaEccExportPage').then(m => ({ default: m.NcaEccExportPage })));
 const NcaEccFilingsPage      = lazy(() => import('./pages/nca-ecc/NcaEccFilingsPage').then(m => ({ default: m.NcaEccFilingsPage })));
 const ControlCrosswalkPage   = lazy(() => import('./pages/control-crosswalk/ControlCrosswalkPage').then(m => ({ default: m.ControlCrosswalkPage })));
 // ─── Sprint 4 §3.3 — Culled pages (imports removed; folders kept on disk
@@ -781,8 +780,23 @@ export function App() {
               {/* Vendor self-service portal (Sprint 5) — public */}
               <Route path="/portal/vendor"      element={<VendorPortalPage />} />
 
-              {/* NCA ECC self-assessment export (Sprint 6) */}
-              <Route path="/nca-ecc-export"     element={<NcaEccExportPage />} />
+              {/* F2-199 — retired. `/nca-ecc-export` rendered an "NCA ECC-1 Self-Assessment
+                  Submission" — a document for the National Cybersecurity Authority, with a
+                  cover, a 30-control matrix, and CISO + CEO signature lines, downloadable as
+                  CSV and printable to PDF — and it made NO server call of any kind. Every
+                  figure came from `lib/ncaEcc.ts`'s hard-coded ECC_DOMAINS, and the cover
+                  named `brandName` ("TSS GRC Platform", the software product) as the filing
+                  entity beside a hard-coded CR number, so every tenant's return identified
+                  the vendor rather than the filer.
+                  The real register is `nca_ecc.filings` — 4 filings in dev and prod, scored
+                  per DOMAIN 1-5 as the ECC-2:2024 annual return actually requires, with peer
+                  review and CISO approval — and `NcaEccFilingsPage` already renders all of
+                  it. Retired rather than rewired per ADR-017 §D-5: a second real ECC screen
+                  would repeat F2-196's disjoint-register defect. The per-control matrix could
+                  not be rebuilt honestly either — `responses_json` is NULL on all 4 filings
+                  in both databases, so per-control responses have never been captured.
+                  The redirect keeps a bookmark landing somewhere true (F2-137). */}
+              <Route path="/nca-ecc-export"     element={<Navigate to="/nca-ecc/filings" replace />} />
               <Route path="/nca-ecc/filings"    element={<NcaEccFilingsPage />} />
 
               {/* Notification dispatch console (Sprint 6) */}
