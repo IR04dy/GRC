@@ -205,9 +205,14 @@ class DarkServiceMethodTest {
         Map.entry("com.tss.grc.module.integrations.servicenow.service.ServiceNowOutboundService#pushComplianceGap",
             "NO PRODUCTION TRIGGER — see #pushCyberIncident. F2-187."),
         Map.entry("com.tss.grc.module.integrations.splunk.service.SplunkOutboundService#pushGenericEvent",
-            "NO PRODUCTION TRIGGER for the free-form variant. Splunk differs from ServiceNow: "
-            + "#pushSecurityEvent is live from SplunkController's POST /security-event/{id}, so that "
-            + "module has one real trigger and only the generic overload is dark. F2-187."),
+            "F2-193 CORRECTION — this said Splunk \"has one real trigger\" where ServiceNow has none, "
+            + "citing #pushSecurityEvent from SplunkController's POST /security-event/{id}. That route "
+            + "exists, and its own @Operation summary reads \"MANUALLY push a known SOC security event "
+            + "into Splunk\". A ROUTE IS NOT A TRIGGER. Measured across the whole module: no "
+            + "@Scheduled class and no event listener calls this service, so Splunk egress has no "
+            + "production trigger either — what it has that ServiceNow lacks is a typed manual route "
+            + "next to the smoke test. #push is live from POST /test-push, and the free-form overload "
+            + "on top of it is the dark one. F2-187/F2-193."),
         Map.entry("com.tss.grc.module.integrations.crowdstrike.service.CrowdStrikeOutboundService#hideHost",
             "DEAD DUPLICATE-ish: #containHost and #liftContainment are live from CrowdStrikeController "
             + "(/contain/{hostId} and /lift/{hostId}), so host containment IS reachable; #hideHost is "
@@ -486,6 +491,81 @@ class DarkServiceMethodTest {
             }
         }
         return calls;
+    }
+
+    /**
+     * Owner internal name → the internal names of the classes that call anything on it.
+     *
+     * <p>F2-193 needs the caller, not just the callee. {@link #crossClassCallSites} answers
+     * <i>"is this method used"</i>; a <b>trigger</b> claim asks a different question —
+     * <i>"what KIND of thing uses this class"</i>. A controller route and a {@code @Scheduled} loop
+     * are both call sites and are not both triggers, and that distinction is invisible in a set of
+     * {@code owner#method} strings.
+     */
+    private static Map<String, Set<String>> callersByOwner(Iterable<Resource> from, String segment)
+            throws IOException {
+        Map<String, Set<String>> out = new TreeMap<>();
+        for (Resource r : from) {
+            String self = internalNameOf(r, segment);
+            try (InputStream in = r.getInputStream()) {
+                new ClassReader(in).accept(new ClassVisitor(Opcodes.ASM9) {
+                    @Override
+                    public MethodVisitor visitMethod(int access, String name, String descriptor,
+                                                     String signature, String[] exceptions) {
+                        return new MethodVisitor(Opcodes.ASM9) {
+                            @Override
+                            public void visitMethodInsn(int opcode, String owner, String mName,
+                                                        String desc, boolean isInterface) {
+                                if (!owner.equals(self)) {
+                                    out.computeIfAbsent(owner, k -> new TreeSet<>()).add(self);
+                                }
+                            }
+
+                            @Override
+                            public void visitInvokeDynamicInsn(String iName, String desc,
+                                                               Handle bsm, Object... bsmArgs) {
+                                for (Object a : bsmArgs) {
+                                    if (a instanceof Handle h && !h.getOwner().equals(self)) {
+                                        out.computeIfAbsent(h.getOwner(), k -> new TreeSet<>())
+                                            .add(self);
+                                    }
+                                }
+                            }
+                        };
+                    }
+                }, ClassReader.SKIP_FRAMES);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * True when this class is something the CONTAINER drives rather than a person: it declares a
+     * {@code @Scheduled} tick or an event listener. That is what "automatic trigger" means.
+     *
+     * <p>A {@code @RestController} is deliberately not automatic even when the caller is another
+     * system — a webhook route still runs only when somebody sends the request, and the platform
+     * cannot claim it as a trigger of its own.
+     */
+    private static boolean containerDriven(String internalName) {
+        Class<?> c;
+        try {
+            c = Class.forName(internalName.replace('/', '.'), false,
+                DarkServiceMethodTest.class.getClassLoader());
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            return false;
+        }
+        for (Method m : c.getDeclaredMethods()) {
+            for (java.lang.annotation.Annotation a : m.getAnnotations()) {
+                String n = a.annotationType().getName();
+                if (n.equals("org.springframework.scheduling.annotation.Scheduled")
+                        || n.equals("org.springframework.context.event.EventListener")
+                        || n.equals("org.springframework.transaction.event.TransactionalEventListener")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -901,6 +981,156 @@ class DarkServiceMethodTest {
                     + "reason must cite it like every other entry. Delete the declaration.", key)
                 .isEmpty();
         }
+    }
+
+    // ── F2-193: the THIRD claim shape — an assertion about triggers ───────────────────────────
+    //
+    // F2-192 closed by predicting a third shape and this is it. Six entries in this map say a
+    // capability is unreachable not because no route exists but because nothing FIRES it: "NO
+    // PRODUCTION TRIGGER … no domain event reaches it". That is a claim about the kind of caller a
+    // class has, and nothing above measures kinds. The citation rule F2-192 added made it worse
+    // rather than better: it forced each of those reasons to name a live sibling, and a named routed
+    // sibling reads as evidence the integration is exercised.
+    //
+    // ⚠⚠ Measured, it caught the Splunk entry, which said Splunk "has one real trigger" and cited
+    // POST /security-event/{id} — a route whose own @Operation summary is "MANUALLY push a known SOC
+    // security event into Splunk". The handler said manual and the reason said trigger. Same error as
+    // F2-188's five: the truth was one line away, in a doc annotation nobody opened.
+
+    /** Reasons asserting that nothing fires this class. */
+    private static final Pattern NO_TRIGGER_CLAIM = Pattern.compile(
+        "NO PRODUCTION TRIGGER|no domain event reaches|nothing (?:ever )?(?:fires|triggers) it",
+        Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Reasons asserting that something DOES — the half that fired.
+     *
+     * <p>Narrow on purpose. F2-188's first draft matched bare {@code is NEVER} and manufactured three
+     * findings against reasons that were already correct, so the lesson recorded there is that a scan
+     * must be scoped to the shape of the claim. {@link #theTriggerClaimPatternsSeparateAPromiseFromItsDenial}
+     * pins these two patterns against the sentence that motivated them and against its correction.
+     */
+    private static final Pattern HAS_TRIGGER_CLAIM = Pattern.compile(
+        "\\b(?:one|a|its|the)\\s+real\\s+trigger\\b|\\btriggered\\s+(?:by|from)\\b"
+        + "|\\bhas\\s+(?:a|one)\\s+trigger\\b|\\bfires\\s+automatically\\b",
+        Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Drops double-quoted spans before matching a claim.
+     *
+     * <p>⚠ Not a nicety — the first run of this gate failed on its OWN correction. Every corrected
+     * reason in this map quotes the sentence it replaces, which is the register's convention and the
+     * reason the corrections are auditable at all; a detector that reads a quotation as an assertion
+     * forces each correction to paraphrase away its own evidence. A quoted claim is attribution, an
+     * unquoted one is a claim, and {@link #theTriggerClaimPatternsSeparateAPromiseFromItsDenial}
+     * pins both directions.
+     */
+    private static String unquoted(String reason) {
+        return reason.replaceAll("\"[^\"]*\"", " ");
+    }
+
+    @Test
+    void everyTriggerClaimMatchesItsOwnerClassCallerKinds() throws IOException {
+        Map<String, Set<String>> callers = callersByOwner(mainClasses(), "/target/classes/");
+
+        List<String> deniedButDriven = new ArrayList<>();
+        List<String> claimedButUndriven = new ArrayList<>();
+        Map<String, Set<String>> driven = new TreeMap<>();
+        int withAutomatic = 0;
+        int withoutAutomatic = 0;
+
+        for (Map.Entry<String, String> e : TOLERATED.entrySet()) {
+            String key = e.getKey();
+            String owner = key.substring(0, key.indexOf('#'));
+            Set<String> automatic = new TreeSet<>();
+            for (String caller : callers.getOrDefault(owner.replace('.', '/'), Set.of())) {
+                if (containerDriven(caller)) {
+                    automatic.add(caller.substring(caller.lastIndexOf('/') + 1));
+                }
+            }
+            if (automatic.isEmpty()) {
+                withoutAutomatic++;
+            } else {
+                withAutomatic++;
+                driven.put(key.substring(key.lastIndexOf('.') + 1), automatic);
+            }
+
+            String reason = unquoted(e.getValue());
+            if (NO_TRIGGER_CLAIM.matcher(reason).find() && !automatic.isEmpty()) {
+                deniedButDriven.add(key + "  (container-driven callers: " + automatic + ")");
+            }
+            if (HAS_TRIGGER_CLAIM.matcher(reason).find() && automatic.isEmpty()) {
+                claimedButUndriven.add(key);
+            }
+        }
+
+        System.out.println("[F2-193] trigger-claim census: owners with a container-driven caller = "
+            + withAutomatic + " ; without = " + withoutAutomatic + " ; driven = " + driven);
+
+        assertThat(deniedButDriven)
+            .as("""
+                This reason says nothing in production reaches the class, and a @Scheduled or \
+                @EventListener class calls it. Either the claim is false or the caller is inert — \
+                and "inert" is a second claim needing its own evidence.""")
+            .isEmpty();
+
+        assertThat(claimedButUndriven)
+            .as("""
+                This reason says a trigger exists and no container-driven class calls the owner. A \
+                ROUTE IS NOT A TRIGGER: the Splunk entry said "that module has one real trigger" and \
+                cited POST /security-event/{id}, whose own @Operation summary reads "Manually push". \
+                Say "routed" when you mean routed.""")
+            .isEmpty();
+
+        // Non-vacuity, measured rather than exemplified (F2-192's fourth surviving mutation was a
+        // negative assertion naming two methods that were never in the population). The classifier
+        // must separate: some owners here are reached by a scheduler and some are not.
+        assertThat(withAutomatic)
+            .as("no TOLERATED owner class has a container-driven caller — the classifier is not "
+                + "separating anything, so deniedButDriven cannot ever fire")
+            .isGreaterThan(0);
+        assertThat(withoutAutomatic)
+            .as("every TOLERATED owner class has a container-driven caller — implausible, and it "
+                + "would mean containerDriven() answers true unconditionally")
+            .isGreaterThan(0);
+    }
+
+    @Test
+    void theTriggerClaimPatternsSeparateAPromiseFromItsDenial() {
+        // The sentence F2-193 found, verbatim in shape, and the correction that replaced it. Without
+        // this pair the HAS_TRIGGER_CLAIM leg above is untested the moment the corpus is clean.
+        String wrong = "NO PRODUCTION TRIGGER for the free-form variant. Splunk differs from "
+            + "ServiceNow: #pushSecurityEvent is live from SplunkController's POST "
+            + "/security-event/{id}, so that module has one real trigger and only the generic "
+            + "overload is dark.";
+        String corrected = "NO PRODUCTION TRIGGER, and not one either: #pushSecurityEvent is ROUTED "
+            + "from SplunkController's POST /security-event/{id}, whose own @Operation summary says "
+            + "\"Manually push\".";
+
+        assertThat(HAS_TRIGGER_CLAIM.matcher(unquoted(wrong)).find())
+            .as("the pattern must catch the sentence it was written for").isTrue();
+        assertThat(HAS_TRIGGER_CLAIM.matcher(unquoted(corrected)).find())
+            .as("...and must not catch its correction, or the corpus can never be clean").isFalse();
+        assertThat(NO_TRIGGER_CLAIM.matcher(unquoted(corrected)).find())
+            .as("the correction still denies a trigger, so the other leg must still apply to it")
+            .isTrue();
+        // A denial must not read as an assertion: this is the F2-33 rule, that a detector which
+        // cannot tell a promise from its denial fails on the very sentence it exists to protect.
+        assertThat(HAS_TRIGGER_CLAIM.matcher("no domain event reaches it, so there is no trigger")
+            .find()).isFalse();
+
+        // Quoting vs asserting, both directions — the failure that this gate hit on its first run
+        // was on the correction it had just been given, because a correction quotes what it replaces.
+        String quotesTheOldClaim = "This said the module \"has one real trigger\" and it does not.";
+        assertThat(HAS_TRIGGER_CLAIM.matcher(quotesTheOldClaim).find())
+            .as("unstripped, the quotation reads as an assertion — which is the bug").isTrue();
+        assertThat(HAS_TRIGGER_CLAIM.matcher(unquoted(quotesTheOldClaim)).find())
+            .as("stripped, an attributed quotation is not the entry's own claim").isFalse();
+        assertThat(HAS_TRIGGER_CLAIM.matcher(unquoted("the module has one real trigger")).find())
+            .as("...and stripping must not swallow the unquoted claim itself").isTrue();
+        // Words are separated, not glued: a quoted span must not join its neighbours into a new one.
+        assertThat(unquoted("nothing \"real trigger\" here")).doesNotContain("real trigger");
+        assertThat(unquoted("a\"x\"b")).isEqualTo("a b");
     }
 
     @Test

@@ -56,7 +56,7 @@ SPRING_PROFILES_ACTIVE=dev JWT_SECRET=<secret> DB_PASSWORD=tss.123 mvn spring-bo
 # forked app JVM → boots "default" (Flyway ON, user grc_app) and hangs in Hikari retries
 # API http://localhost:8084 · Swagger /swagger-ui.html (dev only) · health /actuator/health
 
-mvn -o clean package        # full build + all UNIT tests (3,770 @ 2026-08-12; ~1 min hot, 3–5 cold)
+mvn -o clean package        # full build + all UNIT tests (3,779 @ 2026-08-12; ~1 min hot, 3–5 cold)
                             # hermetic: needs no database and no secrets — keep it that way
 # ⚠ That count is DATED, not maintained: it read 3,354 for weeks while the suite grew past 3,450,
 # and unlike the migration head or the ratchet ceilings NO test can gate it (a run cannot know its
@@ -673,6 +673,51 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   narrowing against two methods it never touched (one private, one an entry point nothing calls). Pin a
   narrowing by **measurement** — 34 public `@Service` methods are reached only from inside their own class, and
   that count goes to 0 if the narrowing is deleted.
+  ⚠⚠ **The third shape was the one that says nothing FIRES it, and asking about it found a live defect on a
+  screen** (F2-193, measured 2026-08-12). Six `TOLERATED` reasons say *"NO PRODUCTION TRIGGER … the integration
+  reads as working while no domain event reaches it"* — a claim about the **kind** of caller a class has, which
+  neither earlier gate measures. F2-192's citation rule made it worse: it forced each of them to name a live
+  sibling, and **a named routed sibling reads as evidence the integration is exercised.** The backend half found
+  one false claim: the Splunk entry said the module *"has one real trigger"*, citing `POST /security-event/{id}`
+  — whose own `@Operation` summary reads **"Manually push a known SOC security event into Splunk"**. 🔑 **A route
+  is not a trigger.** `everyTriggerClaimMatchesItsOwnerClassCallerKinds` now classifies every cross-class caller
+  as container-driven (`@Scheduled`/`@EventListener`) or not; census **2 of 36**, and those two are exactly the
+  entries whose reasons already claim a scheduler.
+  ⚠⚠ **The real defect was in the FRONTEND catalogue that says the same thing to an operator.**
+  `tss-grc-ui-v2/src/lib/connectors.ts` declared 12 connectors, **8 `ACTIVE`** with a cadence, a `lastRunAt` and
+  an `intake30d` count. Measured: **5 of the 8 have no backend of any kind** (SDAIA/NCA/SAMA regulator watch —
+  there is no RSS client anywhere; the vendor SOC 2 expiry watcher — `tprm` has no scheduler; the CAPA
+  effectiveness re-test, promising to flag `VERIFICATION_FAILED`, **a token that appears in no Java source**), a
+  6th is webhook-only rather than the 5-minute poll shown, and the **2 that are real had the wrong cadence in the
+  flattering direction** — 900 s shown as "Daily", `cron 0 0 6 * * *` shown as "Hourly" — **and both are off by
+  configuration in every profile in the repo** (`…tenable.polling-enabled: false`; `grc.kri.scheduler-enabled`
+  defaults false and is set nowhere). ⚠ **CrowdStrike, the one connector with a 60-second real poller, was not in
+  the list at all** — which is what proves the catalogue was never compared with the code. The counts summed to
+  **292** under *"Auto-intake (30 days)"*, linking to `/intake-inbox` where `intake.intake_records` has **0 rows in
+  dev and prod**; Tenable alone claimed **247 in 30 days** against a log table holding **5 rows ever, all manual**.
+  🔑 **F2-172 deleted the fabricated intake records and left the fabricated COUNT of them** — a de-mocking that
+  stops at the store and not at the aggregates over it. **When you de-mock a store, grep for every KPI that
+  summarised it.**
+  🔑 **The fabrication lived in the TYPE, not the data**: a `lastRunAt` on a catalogue no server feeds can only be
+  invented, and a `status` a human sets is a claim with no source. `status`/`lastRunAt`/`intake30d`/`owner` are
+  **deleted from the interface**; each entry declares `trigger` (`SCHEDULED_POLL`/`INBOUND_WEBHOOK`/
+  `OPERATOR_INITIATED`/`NOT_IMPLEMENTED`), the `backing` symbol providing it, and the `gate` property an operator
+  must set — because *"a poller exists"* and *"the poller runs"* are different facts and the old catalogue asserted
+  the second by never distinguishing them.
+  ⚠ **It takes TWO gates and neither is sufficient.** `ConnectorBackingContractTest` (backend, hermetic — it reads
+  the `.ts` file the way `FrontendEndpointContractTest` reads the API clients) resolves every `backing`: a claimed
+  poll must carry `@Scheduled` **on the named method** (naming `#pollFindings`, the manual entry point, is caught),
+  a claimed webhook must be a mapped route, an unimplemented connector must name **nothing**, every `gate` must be
+  a property the app binds. `connectorTriggerHonesty.test.ts` holds what only the catalogue knows: the retired
+  fields, `cadence` iff `SCHEDULED_POLL`, and the **planned voice in both languages** for anything unimplemented —
+  the badge is not what a reader reads. A fabricated poller with a perfect shape and a nonexistent class **passes
+  the frontend gate and fails the backend one**; that mutation is the pair's justification.
+  ⚠⚠ **The new gate failed on its own correction, and that is a general rule for this register's conventions.**
+  A correction quotes the sentence it replaces — that is what makes the corrections auditable — so a claim
+  detector matching raw text reads the quotation as an assertion. 🔑 **A detector that cannot tell a quotation
+  from a claim forces every correction to paraphrase away its own evidence.** `unquoted()` strips double-quoted
+  spans first, pinned in both directions, and a deliberate SURVIVES mutation records that the stripping is
+  load-bearing on the claim side **only** — no reason quotes a denial.
   ⚠ **The audit did find one real defect, and it was far narrower than the claim**: `CommitteeScheduledSweep`
   flipped action items to OVERDUE **in place** instead of calling `markOverdue` (whose javadoc said *"Called by
   the scheduled sweep"*). Since the sweep is the only producer in production, **no `ACTION_OVERDUE` audit row

@@ -5014,20 +5014,21 @@ export const en = {
   connectorsSub:               'Automated intake — vulnerability scanners, SIEM, regulator-watch feeds, attestation watchers',
   connectorsPageSub:           'These connectors auto-create register records or intake submissions without a human in the loop. Each is governed by a regulator anchor and a cadence; intake counts are 30-day rolling.',
   connectorsRegistryTitle:     'Connector registry',
-  connectorsBlurb:             'Active connectors push records into the platform on the cadence shown. Pause to disable; activate to enable. Configuration credentials are stored encrypted in the secrets vault.',
-  connectorsKpiActive:         'Active',
-  connectorsKpiConfigured:     'Configured (paused)',
+  // F2-193 — the old blurb read "Active connectors push records into the platform
+  // on the cadence shown. Pause to disable; activate to enable. Configuration
+  // credentials are stored encrypted in the secrets vault." Three claims, none of
+  // them true: five of the eight "active" connectors had no backend, the buttons
+  // only edited React state, and there is no secrets vault — credentials come from
+  // environment variables and external.properties.
+  connectorsBlurb:             'This is the catalogue of connector capabilities, not a live feed. Each row names the trigger that runs it and the backend that provides it; automated connectors are gated by the property shown, and the adapter panel above reports whether the server has it enabled. Rows marked not implemented have no backend yet.',
+  connectorsKpiAutomated:      'Automated (poll or webhook)',
+  connectorsKpiNotImplemented: 'Not implemented',
   connectorsKpiTotal:          'Total in registry',
-  connectorsKpiIntake30d:      'Auto-intake (30 days)',
   connectorsFilterAll:         'All connectors',
-  connectorsFilterActive:      'Active only',
-  connectorsFilterConfigured:  'Configured',
-  connectorsFilterAvailable:   'Available',
-  connectorsIntake30d:         '30d intake',
-  connectorsPause:             'Pause',
-  connectorsActivate:          'Activate',
-  connectorsPauseHint:         'Pausing a connector is governed by the change-management process. In demo mode the action surfaces here; production wiring requires CAB approval.',
-  connectorsActivated:         'Connector activated — first run scheduled within the next cadence window',
+  connectorsFilterAutomated:   'Automated only',
+  connectorsFilterNotImplemented: 'Not implemented',
+  connectorsGate:              'gate',
+  connectorsNoBacking:         'No backend yet',
 
   // DD-61: Trust Center public page
   portalTrustTitle:            'Trust Center',
@@ -6173,7 +6174,6 @@ export const en = {
   dashTprmSnapshotBadge: 'TPRM',
   dashTprmSnapshotSub:   'Live counters from the five new TPRM modules. Click any tile to drill in, or open the consolidated view.',
   dashTprmSnapshotCta:   'Open the full TPRM view',
-  connectorsPausedToast: 'Connector {name} paused',
 
   // Error state — bilingual, used by ErrorState component to surface
   // RFC-7807 ProblemDetail responses from the backend (incl. PR #117's

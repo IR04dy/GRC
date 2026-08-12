@@ -1717,6 +1717,49 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-193 CLOSED 2026-08-12 — the connector screen told an operator that five connectors with no backend
+were actively ingesting, and summed their invented counts into a KPI linking to an empty queue.** Found by
+following F2-192's closing instruction ("assume a third shape exists") into the one `TOLERATED` bucket it had
+left intact: the **trigger** claims — *"NO PRODUCTION TRIGGER … the integration reads as working while no
+domain event reaches it"*. That is a claim about the **kind** of caller a class has, which neither of the map's
+gates measures, and F2-192's citation rule had made it worse: it forced each of those reasons to name a live
+sibling, and **a named routed sibling reads as evidence the integration is exercised.** The backend audit found
+one false claim — the Splunk entry said the module *"has one real trigger"*, citing `POST /security-event/{id}`,
+whose own `@Operation` summary reads **"Manually push"**. 🔑 **A route is not a trigger.** ⚠⚠ **The same
+question asked of the frontend found the real defect.** `lib/connectors.ts` declared 12 connectors, **8 as
+`ACTIVE`** with a cadence, a `lastRunAt` and an `intake30d` count. Measured: **5 of the 8 have no
+implementation of any kind** (SDAIA/NCA/SAMA regulator watch — no RSS client anywhere; the vendor SOC 2 expiry
+watcher — `tprm` has no scheduler; the CAPA effectiveness re-test, promising to flag `VERIFICATION_FAILED`, **a
+token in no Java source**), a 6th is webhook-only not a 5-minute poll, and the **2 that are real had the wrong
+cadence in the flattering direction** (900 s shown as "Daily", 06:00-daily shown as "Hourly") **and are off by
+configuration in every profile in the repo**. ⚠ **CrowdStrike — the one connector with a 60-second real poller
+— was not in the catalogue at all**, which is what proves the list was never compared with the code. The
+`intake30d` values summed to **292** under *"Auto-intake (30 days)"*, linking to `/intake-inbox` where
+`intake.intake_records` holds **0 rows in dev and prod**; for Tenable the page claimed **247** in 30 days
+against a log table that has held **5 rows in total, all manual**. 🔑 **F2-172 deleted the fabricated intake
+records and left the fabricated COUNT of them** — a de-mocking that stops at the store and not at the
+aggregates that summarise it. Beside it, `Pause`/`Activate` wrote to a `useState` map and toasted *"first run
+scheduled within the next cadence window"*, and the blurb claimed a **secrets vault** that does not exist.
+🔑 **The fabrication lived in the TYPE, not the data** — a `lastRunAt` on a catalogue no server feeds can only
+be invented — so `status`/`lastRunAt`/`intake30d`/`owner` are **deleted from the interface** and each entry now
+declares its `trigger`, the `backing` symbol providing it and the `gate` property that must be set. Two gates,
+because neither half suffices: `ConnectorBackingContractTest` (backend, hermetic, 7 tests) resolves every
+`backing` against the code — a claimed poll must carry `@Scheduled` **on the named method**, a claimed webhook
+must be a mapped route, every `gate` must be a bound property — and `connectorTriggerHonesty.test.ts` (frontend,
+10 tests) holds what only the catalogue knows, including the **planned voice in both languages** for anything
+unimplemented. Mutation 3 is the proof: a fabricated Qualys poller with perfect shape and a nonexistent class
+**passes the frontend gate and fails the backend one**. ⚠ The new trigger-claim gate
+(`everyTriggerClaimMatchesItsOwnerClassCallerKinds`, classifying callers as container-driven or not) **failed on
+its own correction**, because a correction quotes the sentence it replaces: 🔑 **a detector that reads a
+quotation as an assertion forces every correction to paraphrase away its own evidence.** Census: **2 of 36**
+owner classes have a container-driven caller, and they are exactly the two whose reasons already claim a
+scheduler — corroboration, not coincidence. Verified: backend **3,779/0/0**, frontend **497/497 (51 files)**,
+`tsc` clean, mutation **14/14** (one deliberate SURVIVES: quote-stripping is load-bearing on the claim side
+only), probe **15/15**, **0 migrations, 0 production Java lines**. ⬜ Filed, not fixed: **four vendor connectors
+ship and none has a domain trigger** — wiring one transmits tenant data to a third party, so it needs a
+per-tenant configuration surface and an owner's call on which events qualify. Recording the absence is this
+slice; deciding what to build is not.
+
 ✔ **F2-192 CLOSED 2026-08-12 (measured 2026-08-11) — the gate F2-188 built to verify reasons verified only
 the claim shape F2-188 had already audited.** F2-188 proved a named-map gate cannot prove a reason *true* and
 added a check scoped, correctly, to **state-transition verbs** — the shape it had just found false five times.

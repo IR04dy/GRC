@@ -12,9 +12,9 @@ import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
-  CONNECTOR_REGISTRY, CADENCE_LABEL,
-  CONNECTOR_STATUS_TONE, CONNECTOR_STATUS_LABEL,
-  type ConnectorDefinition, type ConnectorStatus,
+  CONNECTOR_REGISTRY, CADENCE_LABEL, isAutomated,
+  CONNECTOR_TRIGGER_TONE, CONNECTOR_TRIGGER_LABEL,
+  type ConnectorDefinition, type ConnectorTrigger,
 } from '../../lib/connectors';
 import {
   listCcmTests, getCcmDashboard, enableCcmTest, disableCcmTest, runCcmTestNow,
@@ -32,45 +32,35 @@ import { ApiError } from '../../lib/api';
 import { CcmDashboard } from '../../components/compliance/CcmDashboard';
 
 /**
- * Connectors page — DD-62.
+ * Connectors page — DD-62, corrected by F2-193.
  *
- * Visualises the third intake channel — automated connectors pulling
- * from external monitoring + scanner + regulator-watch sources. Each
- * row shows source / what it auto-creates / cadence / status / 30-day
- * intake count.
+ * Visualises the third intake channel — connectors pulling from external
+ * monitoring, scanner and regulator-watch sources. Each row shows source,
+ * what it creates, and the TRIGGER that actually runs it plus the backend
+ * symbol providing it.
+ *
+ * ⚠ It used to show a cadence, a last-run timestamp, a 30-day ingestion count
+ * and Pause / Activate buttons — for connectors that in five cases had no
+ * backend at all. The buttons wrote to a `useState` map and toasted success,
+ * and the KPI summed the invented counts to 292 while linking to a queue with
+ * zero rows in it. Nothing here may render state the server did not supply:
+ * live enabled/healthy/last-poll comes from the adapter panel below, which
+ * reads /api/v1/integrations for real.
  *
  * industry-standard GRC tooling "Continuous Monitoring" + continuous-monitoring tooling "Integrations" pattern.
  */
 export function ConnectorsPage() {
   const { t, lang } = useI18n();
-  const toast = useToast();
-  const [filter, setFilter] = useState<'ALL' | ConnectorStatus>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'AUTOMATED' | ConnectorTrigger>('ALL');
 
-  // Connector statuses are mutable per-session so Pause / Activate produce
-  // a visible state change even though the backend connector module is not
-  // yet wired up. The overrides map keyed on connector id wins over the
-  // baked-in CONNECTOR_REGISTRY status.
-  const [overrides, setOverrides] = useState<Record<string, ConnectorStatus>>({});
+  const connectors = CONNECTOR_REGISTRY;
+  const automated = connectors.filter(isAutomated);
+  const planned = connectors.filter(c => c.trigger === 'NOT_IMPLEMENTED');
 
-  function effectiveStatus(c: ConnectorDefinition): ConnectorStatus {
-    return overrides[c.id] ?? c.status;
-  }
-  function pause(c: ConnectorDefinition) {
-    setOverrides(prev => ({ ...prev, [c.id]: 'DISABLED' }));
-    toast.success((t('connectorsPausedToast') ?? 'Connector paused').replace('{name}', c.id));
-  }
-  function activate(c: ConnectorDefinition) {
-    setOverrides(prev => ({ ...prev, [c.id]: 'ACTIVE' }));
-    toast.success(t('connectorsActivated'));
-  }
-
-  const withEffective = CONNECTOR_REGISTRY.map(c => ({ ...c, status: effectiveStatus(c) }));
-  const connectors = withEffective;
-  const active = connectors.filter(c => c.status === 'ACTIVE');
-  const configured = connectors.filter(c => c.status === 'CONFIGURED');
-  const intake30d = active.reduce((acc, c) => acc + (c.intake30d ?? 0), 0);
-
-  const visible = filter === 'ALL' ? connectors : connectors.filter(c => c.status === filter);
+  const visible =
+    filter === 'ALL' ? connectors
+    : filter === 'AUTOMATED' ? automated
+    : connectors.filter(c => c.trigger === filter);
 
   return (
     <Shell title={t('connectorsTitle')} sub={t('connectorsSub')}>
@@ -80,11 +70,13 @@ export function ConnectorsPage() {
         sub={t('connectorsPageSub')}
       />
 
+      {/* F2-193 — three counts, each one a fact about the backend. The fourth KPI
+          used to be "Auto-intake (30 days)", the sum of a hard-coded field on a
+          catalogue no server feeds, linking to an empty queue. */}
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={Activity} label={t('connectorsKpiActive')}     value={active.length}     tone="success" onClick={() => setFilter('ACTIVE')}     active={filter === 'ACTIVE'} />
-        <Kpi Icon={Plug}     label={t('connectorsKpiConfigured')} value={configured.length} tone="info"    onClick={() => setFilter('CONFIGURED')} active={filter === 'CONFIGURED'} />
-        <Kpi Icon={Database} label={t('connectorsKpiTotal')}      value={connectors.length} tone="primary" onClick={() => setFilter('ALL')}        active={filter === 'ALL'} />
-        <Kpi Icon={Zap}      label={t('connectorsKpiIntake30d')}  value={intake30d}         tone="accent" to="/intake-inbox" />
+        <Kpi Icon={Activity} label={t('connectorsKpiAutomated')}      value={automated.length}  tone="success" onClick={() => setFilter('AUTOMATED')}       active={filter === 'AUTOMATED'} />
+        <Kpi Icon={Plug}     label={t('connectorsKpiNotImplemented')} value={planned.length}    tone="neutral" onClick={() => setFilter('NOT_IMPLEMENTED')} active={filter === 'NOT_IMPLEMENTED'} />
+        <Kpi Icon={Database} label={t('connectorsKpiTotal')}          value={connectors.length} tone="primary" onClick={() => setFilter('ALL')}             active={filter === 'ALL'} />
       </div>
 
       {/* L3 — Live integration: the real CCM engine (/api/v1/ccm). Lists the
@@ -110,24 +102,24 @@ export function ConnectorsPage() {
       </div>
 
       <Card title={t('connectorsRegistryTitle')} Icon={Plug}
-        action={<select value={filter} onChange={e => setFilter(e.target.value as 'ALL' | ConnectorStatus)}
+        action={<select value={filter} onChange={e => setFilter(e.target.value as 'ALL' | 'AUTOMATED' | ConnectorTrigger)}
           style={{
             padding: '6px 8px', fontSize: 12,
             border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
             background: 'var(--surface-2)', color: 'var(--ink-1)',
           }}>
           <option value="ALL">{t('connectorsFilterAll')}</option>
-          <option value="ACTIVE">{t('connectorsFilterActive')}</option>
-          <option value="CONFIGURED">{t('connectorsFilterConfigured')}</option>
-          <option value="AVAILABLE">{t('connectorsFilterAvailable')}</option>
+          <option value="AUTOMATED">{t('connectorsFilterAutomated')}</option>
+          <option value="SCHEDULED_POLL">{CONNECTOR_TRIGGER_LABEL.SCHEDULED_POLL[lang === 'ar' ? 'ar' : 'en']}</option>
+          <option value="INBOUND_WEBHOOK">{CONNECTOR_TRIGGER_LABEL.INBOUND_WEBHOOK[lang === 'ar' ? 'ar' : 'en']}</option>
+          <option value="NOT_IMPLEMENTED">{t('connectorsFilterNotImplemented')}</option>
         </select>}>
         <p style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
           {t('connectorsBlurb')}
         </p>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {visible.map(c => (
-            <ConnectorRow key={c.id} c={c} t={t} lang={lang} toast={toast}
-              onPause={() => pause(c)} onActivate={() => activate(c)} />
+            <ConnectorRow key={c.id} c={c} t={t} lang={lang} />
           ))}
         </div>
       </Card>
@@ -473,21 +465,19 @@ function LiveControlTests() {
   );
 }
 
-function ConnectorRow({ c, t, lang, onPause, onActivate }: {
+function ConnectorRow({ c, t, lang }: {
   c: ConnectorDefinition;
   t: (k: string) => string;
   lang: 'en' | 'ar';
-  toast: { info: (m: string) => void; success: (m: string) => void };
-  onPause: () => void;
-  onActivate: () => void;
 }) {
-  const statusLabel = CONNECTOR_STATUS_LABEL[c.status][lang === 'ar' ? 'ar' : 'en'];
-  const cadenceLabel = CADENCE_LABEL[c.cadence][lang === 'ar' ? 'ar' : 'en'];
+  const isAr = lang === 'ar';
+  const triggerLabel = CONNECTOR_TRIGGER_LABEL[c.trigger][isAr ? 'ar' : 'en'];
+  const cadenceLabel = c.cadence ? CADENCE_LABEL[c.cadence][isAr ? 'ar' : 'en'] : null;
 
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: '38px 1fr 130px 110px 110px 90px 110px',
+      gridTemplateColumns: '38px 1fr 130px 150px 200px',
       gap: 10, padding: '12px 0',
       borderBottom: '1px dashed var(--border)',
       alignItems: 'center',
@@ -517,36 +507,30 @@ function ConnectorRow({ c, t, lang, onPause, onActivate }: {
       </div>
       <div>
         <div className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>{c.source}</div>
-        {c.owner && <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{c.owner}</div>}
       </div>
       <div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--ink-2)' }}>
-          <Clock size={12} /> {cadenceLabel}
-        </div>
+        <Badge tone={CONNECTOR_TRIGGER_TONE[c.trigger]} dot>{triggerLabel}</Badge>
+        {cadenceLabel && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--ink-2)', marginTop: 4 }}>
+            <Clock size={11} /> {cadenceLabel}
+          </div>
+        )}
       </div>
+      {/* The backend that provides the trigger, and the property that gates it.
+          ConnectorBackingContractTest fails the build if `backing` is not a real
+          @Scheduled method or a real mapped route — which is what stops this
+          column being the next place a capability is asserted without one. */}
       <div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-          {c.lastRunAt ? c.lastRunAt.slice(5, 16).replace('T', ' ') : '—'}
-        </div>
-      </div>
-      <div style={{ textAlign: 'center' }}>
-        <span className="mono" style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink-1)' }}>
-          {c.intake30d ?? 0}
-        </span>
-        <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>{t('connectorsIntake30d')}</div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-        <Badge tone={CONNECTOR_STATUS_TONE[c.status]} dot>{statusLabel}</Badge>
-        {c.status === 'ACTIVE' && (
-          <Button variant="ghost" size="sm" Icon={Pause} onClick={onPause}>
-            {t('connectorsPause')}
-          </Button>
-        )}
-        {(c.status === 'CONFIGURED' || c.status === 'AVAILABLE' || c.status === 'DISABLED') && (
-          <Button variant="primary" size="sm" Icon={Play} onClick={onActivate}>
-            {t('connectorsActivate')}
-          </Button>
-        )}
+        {c.backing
+          ? <>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--ink-2)', wordBreak: 'break-all' }}>{c.backing}</div>
+              {c.gate && (
+                <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2, wordBreak: 'break-all' }}>
+                  {t('connectorsGate')}: {c.gate}
+                </div>
+              )}
+            </>
+          : <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{t('connectorsNoBacking')}</span>}
       </div>
     </div>
   );

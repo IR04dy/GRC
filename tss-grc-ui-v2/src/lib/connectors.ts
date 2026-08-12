@@ -1,29 +1,67 @@
-// Connector-driven intake registry — DD-62.
+// Connector-driven intake registry — DD-62, rewritten by F2-193.
 //
-// Until now intake had two channels: web forms (DD-55..59) and API
-// pushes from the live system (KRI breaches → preventive CAPAs in
-// DD-43, effectiveness re-tests in DD-44). This file catalogues the
-// *third* class of intake — automated connectors pulling from
-// external monitoring + scanner + regulator-watch sources.
+// Intake has three channels: web forms (DD-55..59), API pushes from the live
+// system (KRI breaches → preventive CAPAs in DD-43, effectiveness re-tests in
+// DD-44), and this — automated connectors pulling from external monitoring,
+// scanner and regulator-watch sources.
+//
+// ⚠⚠ WHAT F2-193 FOUND, because it decides how this file is allowed to be written.
+// Until 2026-08-12 each entry carried a hand-set `status`, a `cadence`, a
+// `lastRunAt` timestamp and an `intake30d` count — "records auto-ingested in the
+// last 30 days". Eight of the twelve entries read ACTIVE. Measured against the
+// backend: five of those eight had no implementation of any kind (the three
+// regulator feeds, the vendor SOC 2 expiry watcher, and the CAPA effectiveness
+// re-test, whose description named a VERIFICATION_FAILED status that appears
+// nowhere in the Java sources). One was push-only, not the 5-minute poll it
+// claimed. The two with a real @Scheduled loop had the wrong cadence — and both
+// are off by configuration in every profile in the repo. The connector with the
+// most aggressive real trigger, CrowdStrike at 60 seconds, was not in the list
+// at all. The `intake30d` values summed to 292 in a KPI that linked to a queue
+// holding zero rows in dev and prod.
+//
+// 🔑 The fabrication did not live in the data, it lived in the TYPE: a field
+// called `lastRunAt` on a catalogue no server feeds can only ever be invented.
+// So the fix is structural. There is no `status` and no telemetry here. Each
+// entry declares the TRIGGER that actually runs it and NAMES the backend symbol
+// that provides it, and `ConnectorBackingContractTest` (backend, hermetic) reads
+// this file and fails the build if that symbol is not a real @Scheduled method
+// or a real mapped route. A connector cannot claim to be automated here without
+// a backend that automates it.
+//
+// Live state — enabled/healthy/last-poll — belongs to the four real adapters on
+// /api/v1/integrations and is read from the server by `integrationsApi.ts`. This
+// file is the catalogue: what exists, what runs it, what gates it.
 //
 // Modelled on:
 //   industry-standard GRC tooling Continuous Monitoring connectors
-//   continuous-monitoring tooling + continuous-monitoring tooling: AWS / Okta / GitHub / Jira evidence + finding feeds
+//   continuous-monitoring tooling: AWS / Okta / GitHub / Jira evidence + finding feeds
 //   the industry pattern GRC Threat-Intel TAXII feed
 //   industry-standard tooling Regulatory Research feed
-//
-// Each connector definition records:
-//   - source system (vendor, name)
-//   - what it auto-creates (target intake kind, target register)
-//   - cadence (every 5 min / hourly / nightly)
-//   - last successful run + next scheduled run
-//   - regulator anchor (why this connector matters)
 
 import type { IntakeKind } from './intake';
 
-export type ConnectorStatus = 'ACTIVE' | 'CONFIGURED' | 'AVAILABLE' | 'ERROR' | 'DISABLED';
+/**
+ * How a connector actually runs today — measured against the backend, not intended.
+ *
+ * - `SCHEDULED_POLL`     — a `@Scheduled` loop in the backend pulls on an interval.
+ * - `INBOUND_WEBHOOK`    — the vendor pushes; the platform exposes a mapped route.
+ * - `OPERATOR_INITIATED` — the mechanism exists but a person must press something.
+ *                          A route is not a trigger (F2-193): the endpoint that
+ *                          "pushes a known security event" is documented, by the
+ *                          handler itself, as a manual push.
+ * - `NOT_IMPLEMENTED`    — catalogued as a capability; no backend exists yet.
+ */
+export type ConnectorTrigger =
+  | 'SCHEDULED_POLL'
+  | 'INBOUND_WEBHOOK'
+  | 'OPERATOR_INITIATED'
+  | 'NOT_IMPLEMENTED';
 
-export type ConnectorCadence = 'STREAMING' | 'EVERY_5MIN' | 'HOURLY' | 'EVERY_4H' | 'DAILY' | 'WEEKLY';
+/**
+ * Real intervals only. Every member must be the measured cadence of a live
+ * `@Scheduled` loop — add a member in the commit that adds the loop, not before.
+ */
+export type ConnectorCadence = 'EVERY_MINUTE' | 'EVERY_15MIN' | 'DAILY_0600';
 
 export interface ConnectorDefinition {
   id: string;
@@ -31,21 +69,37 @@ export interface ConnectorDefinition {
   source: string;
   nameEn: string;
   nameAr: string;
+  /**
+   * What this connector does. For `NOT_IMPLEMENTED` entries this is written in
+   * the planned voice — a present-tense sentence about a connector that does not
+   * exist is the defect F2-193 closed, and the badge alone does not undo it.
+   */
   descriptionEn: string;
   descriptionAr: string;
-  /** What kind of intake record this connector auto-creates. */
+  /** What kind of intake record this connector creates. */
   intakeKind?: IntakeKind;
   /** Target register (when not via intake). */
   targetEntity?: 'RISK' | 'INCIDENT' | 'VULNERABILITY' | 'EVIDENCE' | 'REG_CHANGE' | 'CAPA' | 'FINDING';
-  cadence: ConnectorCadence;
-  status: ConnectorStatus;
+  /** Measured — see {@link ConnectorTrigger}. */
+  trigger: ConnectorTrigger;
+  /**
+   * The backend symbol that provides the trigger: `Class#method` for a scheduled
+   * poll, `VERB /path` for a webhook or an operator-initiated route. Required for
+   * everything except `NOT_IMPLEMENTED`, and checked against the Java sources by
+   * `ConnectorBackingContractTest`.
+   */
+  backing?: string;
+  /**
+   * The configuration property that must be true for the trigger to fire. Both
+   * scanner pollers and the KRI cycle ship OFF, so an operator reading "automated"
+   * needs to know what to set — omitting this is how "the poller exists" became
+   * "the poller runs".
+   */
+  gate?: string;
+  /** Present only for `SCHEDULED_POLL`, and only the loop's real interval. */
+  cadence?: ConnectorCadence;
   /** Standards anchor (e.g. NCA ECC 2.6, ISO 27001 §A.8.8). */
   reference: string;
-  lastRunAt?: string;
-  /** Records auto-ingested in last 30 days. */
-  intake30d?: number;
-  /** Demo-mode owner stakeholder code. */
-  owner?: string;
 }
 
 export const CONNECTOR_REGISTRY: ConnectorDefinition[] = [
@@ -55,23 +109,42 @@ export const CONNECTOR_REGISTRY: ConnectorDefinition[] = [
     source: 'Tenable.io',
     nameEn: 'Tenable Vulnerability Scanner',
     nameAr: 'فاحص الثغرات Tenable',
-    descriptionEn: 'Daily import of CVE-tagged findings; auto-creates a CyberVulnerability record per host/CVE pair.',
-    descriptionAr: 'استيراد يومي لثغرات CVE؛ يُنشئ سجل ثغرة سيبرانية لكل ثنائية مضيف/CVE.',
-    intakeKind: undefined, targetEntity: 'VULNERABILITY',
-    cadence: 'DAILY', status: 'ACTIVE',
+    descriptionEn: 'Polls CVE-tagged findings and creates a cyber vulnerability record per host/CVE pair, de-duplicated on (asset, plugin).',
+    descriptionAr: 'يستعلم عن ثغرات CVE ويُنشئ سجل ثغرة سيبرانية لكل ثنائية مضيف/CVE، مع استبعاد المكرَّر على (الأصل، الفاحص).',
+    targetEntity: 'VULNERABILITY',
+    trigger: 'SCHEDULED_POLL',
+    backing: 'TenableInboundService#scheduledPoll',
+    gate: 'grc.integrations.tenable.enabled + .polling-enabled',
+    cadence: 'EVERY_15MIN',
     reference: 'NCA ECC 2.6, ISO 27001 §A.8.8',
-    lastRunAt: '2026-05-05T03:00:00', intake30d: 247, owner: 'soc.lead@tss.sa',
   },
   {
     id: 'cn-qualys',
     source: 'Qualys VMDR',
     nameEn: 'Qualys VMDR',
     nameAr: 'Qualys VMDR',
-    descriptionEn: 'Continuous scanning + asset discovery; feeds vulnerabilities + asset register.',
-    descriptionAr: 'فحص مستمر واكتشاف أصول؛ يُغذّي سجل الثغرات والأصول.',
+    descriptionEn: 'Planned: continuous scanning + asset discovery feeding the vulnerability and asset registers.',
+    descriptionAr: 'مخطَّط: فحص مستمر واكتشاف أصول لتغذية سجلّي الثغرات والأصول.',
     targetEntity: 'VULNERABILITY',
-    cadence: 'STREAMING', status: 'CONFIGURED',
-    reference: 'NCA ECC 2.6', owner: 'soc.lead@tss.sa',
+    trigger: 'NOT_IMPLEMENTED',
+    reference: 'NCA ECC 2.6',
+  },
+  // ── EDR → socops.security_event ──
+  {
+    id: 'cn-crowdstrike',
+    source: 'CrowdStrike Falcon',
+    nameEn: 'CrowdStrike Falcon EDR',
+    nameAr: 'CrowdStrike Falcon EDR',
+    // Absent from this registry until F2-193, while five connectors with no code
+    // at all were listed as ACTIVE. It has the shortest real interval of any.
+    descriptionEn: 'Polls Falcon detections into the SOC security-event queue, de-duplicated on the vendor detection id.',
+    descriptionAr: 'يستعلم عن اكتشافات Falcon إلى قائمة أحداث الأمن في مركز العمليات، مع استبعاد المكرَّر بمعرّف الاكتشاف.',
+    targetEntity: 'INCIDENT',
+    trigger: 'SCHEDULED_POLL',
+    backing: 'CrowdStrikeInboundService#scheduledPoll',
+    gate: 'grc.integrations.crowdstrike.enabled + .polling-enabled',
+    cadence: 'EVERY_MINUTE',
+    reference: 'NCA ECC 2.5, NIST 800-61',
   },
   // ── SIEM → cyber.incidents ──
   {
@@ -79,70 +152,79 @@ export const CONNECTOR_REGISTRY: ConnectorDefinition[] = [
     source: 'Splunk Enterprise Security',
     nameEn: 'Splunk SIEM',
     nameAr: 'Splunk SIEM',
-    descriptionEn: 'Notable events from SIEM correlation; auto-create cyber-incident drafts at HIGH/CRITICAL severity.',
-    descriptionAr: 'الأحداث ذات الأهمية من ربط SIEM؛ تُنشئ مسودات حوادث سيبرانية بشدّة عالية/حرجة.',
+    // The old entry claimed a 5-minute poll. There is no Splunk poller: a saved
+    // search in Splunk posts to the webhook below. The egress route on the same
+    // module (POST /security-event/{id}) is documented "Manually push" by its own
+    // handler, so it is not a second trigger.
+    descriptionEn: 'Receives notable events posted by a Splunk saved search and drafts a cyber incident at HIGH/CRITICAL severity.',
+    descriptionAr: 'يستقبل الأحداث المهمّة المُرسَلة من بحث محفوظ في Splunk ويُنشئ مسودة حادثة سيبرانية بشدّة عالية/حرجة.',
     intakeKind: 'SECURITY_INCIDENT', targetEntity: 'INCIDENT',
-    cadence: 'EVERY_5MIN', status: 'ACTIVE',
-    reference: 'NCA ECC 6.1, NIST 800-61', lastRunAt: '2026-05-05T08:55:00', intake30d: 18, owner: 'csirt.lead@tss.sa',
+    trigger: 'INBOUND_WEBHOOK',
+    backing: 'POST /api/v1/integrations/splunk/webhook',
+    gate: 'grc.integrations.splunk.enabled + .webhook-shared-secret',
+    reference: 'NCA ECC 6.1, NIST 800-61',
   },
   // ── Regulator-watch → compliance.regulatory_changes ──
+  // All four shipped as ACTIVE/HOURLY with a last-run stamp and an intake count.
+  // There is no RSS client, no poller and no regulator-watch service anywhere in
+  // the backend; regulatory changes are entered by hand in the regchange module.
   {
     id: 'cn-sdaia-feed',
     source: 'SDAIA RSS',
     nameEn: 'SDAIA Regulator Watch',
     nameAr: 'مراقب جهة سدايا',
-    descriptionEn: 'Polls SDAIA publications; new circular → regulatory-change record + DPO impact-assessment task.',
-    descriptionAr: 'يستعلم من منشورات سدايا؛ التعميم الجديد → سجل تغيير تنظيمي + مهمّة تقييم أثر للـDPO.',
+    descriptionEn: 'Planned: poll SDAIA publications so a new circular opens a regulatory-change record and a DPO impact-assessment task.',
+    descriptionAr: 'مخطَّط: استعلام منشورات سدايا ليفتح التعميم الجديد سجل تغيير تنظيمي ومهمّة تقييم أثر للـDPO.',
     targetEntity: 'REG_CHANGE',
-    cadence: 'HOURLY', status: 'ACTIVE',
+    trigger: 'NOT_IMPLEMENTED',
     reference: 'PDPL Implementing Regulations',
-    lastRunAt: '2026-05-05T08:00:00', intake30d: 4, owner: 'dpo@tss.sa',
   },
   {
     id: 'cn-nca-feed',
     source: 'NCA RSS',
     nameEn: 'NCA Regulator Watch',
     nameAr: 'مراقب جهة الأمن السيبراني',
-    descriptionEn: 'Polls NCA circulars and ECC updates; new directive → regulatory-change record + CISO assignment.',
-    descriptionAr: 'يستعلم من تعاميم الجهة وتحديثات ECC؛ توجيه جديد → سجل تغيير تنظيمي + إسناد للـCISO.',
+    descriptionEn: 'Planned: poll NCA circulars and ECC updates so a new directive opens a regulatory-change record and a CISO assignment.',
+    descriptionAr: 'مخطَّط: استعلام تعاميم الجهة الوطنية وتحديثات ECC ليفتح التوجيه الجديد سجل تغيير تنظيمي وإسناداً للـCISO.',
     targetEntity: 'REG_CHANGE',
-    cadence: 'HOURLY', status: 'ACTIVE',
-    reference: 'NCA Circulars 2026', lastRunAt: '2026-05-05T08:00:00', intake30d: 2, owner: 'compliance.lead@tss.sa',
+    trigger: 'NOT_IMPLEMENTED',
+    reference: 'NCA Circulars 2026',
   },
   {
     id: 'cn-sama-feed',
     source: 'SAMA Circulars',
     nameEn: 'SAMA Circular Feed',
     nameAr: 'مراقب جهة ساما',
-    descriptionEn: 'Polls SAMA RH portal for new circulars (CSF, AML, Outsourcing, Open Banking).',
-    descriptionAr: 'يستعلم من بوابة ساما عن التعاميم الجديدة (CSF، مكافحة غسل الأموال، الإسناد، المصرفية المفتوحة).',
+    descriptionEn: 'Planned: poll the SAMA RH portal for new circulars (CSF, AML, Outsourcing, Open Banking).',
+    descriptionAr: 'مخطَّط: استعلام بوابة ساما عن التعاميم الجديدة (CSF، مكافحة غسل الأموال، الإسناد، المصرفية المفتوحة).',
     targetEntity: 'REG_CHANGE',
-    cadence: 'HOURLY', status: 'ACTIVE',
-    reference: 'SAMA Circulars + CSF', lastRunAt: '2026-05-05T08:00:00', intake30d: 6, owner: 'compliance.lead@tss.sa',
+    trigger: 'NOT_IMPLEMENTED',
+    reference: 'SAMA Circulars + CSF',
   },
   {
     id: 'cn-zatca-feed',
     source: 'ZATCA Decisions',
     nameEn: 'ZATCA Tax Watch',
     nameAr: 'مراقب جهة الزكاة والضريبة',
-    descriptionEn: 'Polls ZATCA for e-invoicing waves, new tax decisions, and FATOORA updates.',
-    descriptionAr: 'يستعلم من الزكاة والضريبة عن موجات الفوترة الإلكترونية والقرارات الضريبية وتحديثات FATOORA.',
+    descriptionEn: 'Planned: poll ZATCA for e-invoicing waves, new tax decisions and FATOORA updates.',
+    descriptionAr: 'مخطَّط: استعلام الزكاة والضريبة عن موجات الفوترة الإلكترونية والقرارات الضريبية وتحديثات FATOORA.',
     targetEntity: 'REG_CHANGE',
-    cadence: 'DAILY', status: 'CONFIGURED',
-    reference: 'ZATCA E-Invoicing', owner: 'finance.compliance@tss.sa',
+    trigger: 'NOT_IMPLEMENTED',
+    reference: 'ZATCA E-Invoicing',
   },
   // ── Vendor SOC 2 expiry watcher → TPRM ──
+  // Shipped ACTIVE/WEEKLY with three records ingested in 30 days. No attestation
+  // expiry watcher exists: the tprm module has no scheduler of any kind.
   {
     id: 'cn-vendor-attestation',
     source: 'Internal TPRM scheduler',
     nameEn: 'Vendor SOC 2 / ISO 27001 expiry watcher',
     nameAr: 'مراقب انتهاء SOC 2 / ISO 27001 للموردين',
-    descriptionEn: 'When a vendor attestation lapses, auto-create a periodic-review intake for TPRM.',
-    descriptionAr: 'عند انتهاء صلاحية إقرار مورد، يُنشئ تلقائياً استلام مراجعة دورية لـTPRM.',
+    descriptionEn: 'Planned: when a vendor attestation lapses, open a periodic-review intake for TPRM.',
+    descriptionAr: 'مخطَّط: عند انتهاء صلاحية إقرار مورد، يُفتح استلام مراجعة دورية لـTPRM.',
     intakeKind: 'VENDOR_ONBOARDING',
-    cadence: 'WEEKLY', status: 'ACTIVE',
+    trigger: 'NOT_IMPLEMENTED',
     reference: 'SAMA Outsourcing §5.4',
-    lastRunAt: '2026-05-04T00:00:00', intake30d: 3, owner: 'tprm.lead@tss.sa',
   },
   // ── Threat-intel TAXII ──
   {
@@ -150,73 +232,81 @@ export const CONNECTOR_REGISTRY: ConnectorDefinition[] = [
     source: 'STIX/TAXII feed',
     nameEn: 'Threat Intelligence (STIX/TAXII)',
     nameAr: 'الاستخبارات السيبرانية (STIX/TAXII)',
-    descriptionEn: 'Pulls IoC feeds (Saudi-CERT, MISP) for downstream SIEM tagging + threat-record creation.',
-    descriptionAr: 'يسحب موجزات مؤشرات الاختراق (Saudi-CERT، MISP) لوسم SIEM وإنشاء سجلات تهديدات.',
+    // The threat-intel register itself is live (IoCs are entered and actioned
+    // through ThreatIntelController); what does not exist is the TAXII pull.
+    descriptionEn: 'Planned: pull IoC feeds (Saudi-CERT, MISP) into the threat-intel register for downstream SIEM tagging.',
+    descriptionAr: 'مخطَّط: سحب موجزات مؤشرات الاختراق (Saudi-CERT، MISP) إلى سجل الاستخبارات لوسم SIEM.',
     targetEntity: 'INCIDENT',
-    cadence: 'EVERY_4H', status: 'CONFIGURED',
-    reference: 'NIST CSF ID.RA-2', owner: 'soc.lead@tss.sa',
+    trigger: 'NOT_IMPLEMENTED',
+    reference: 'NIST CSF ID.RA-2',
   },
-  // ── Effectiveness check (already shipped via DD-44 — registered for visibility) ──
+  // ── Effectiveness check ──
+  // Shipped ACTIVE/DAILY and described as auto-flagging VERIFICATION_FAILED — a
+  // status token that appears in no Java source, and there is no CAPA scheduler.
+  // The re-test is opened and closed by hand from the CAPA register.
   {
     id: 'cn-effectiveness',
     source: 'Internal CAPA scheduler',
     nameEn: 'CAPA effectiveness re-test',
     nameAr: 'إعادة اختبار فاعلية الإجراءات التصحيحية',
-    descriptionEn: 'Fires 90 days post-closure. Auto-flags VERIFICATION_FAILED if regression detected.',
-    descriptionAr: 'يُفعَّل بعد 90 يوماً من الإغلاق. يضع علامة VERIFICATION_FAILED تلقائياً عند رصد تراجع.',
+    descriptionEn: 'Planned: fire 90 days after closure and flag a corrective action whose regression re-test fails.',
+    descriptionAr: 'مخطَّط: يُفعَّل بعد 90 يوماً من الإغلاق ويضع علامة على الإجراء التصحيحي الذي يفشل اختبار تراجعه.',
     targetEntity: 'CAPA',
-    cadence: 'DAILY', status: 'ACTIVE',
+    trigger: 'NOT_IMPLEMENTED',
     reference: 'ISO 9001 §10.2.2, FDA 21 CFR §820.100',
-    lastRunAt: '2026-05-05T02:00:00', intake30d: 1, owner: 'audit.lead@tss.sa',
   },
-  // ── KRI breach (already in DD-43) ──
+  // ── KRI breach (DD-43) ──
   {
     id: 'cn-kri-monitor',
     source: 'Internal KRI scheduler',
     nameEn: 'KRI threshold monitor',
     nameAr: 'مراقب عتبات المؤشرات',
-    descriptionEn: 'Continuously evaluates KRI readings against thresholds. Amber/red breach → preventive-CAPA suggestion.',
-    descriptionAr: 'يقيّم باستمرار قراءات المؤشرات مقابل العتبات. تجاوز كهرماني/أحمر → اقتراح إجراء وقائي.',
+    // Real, and the cadence claim was wrong in the flattering direction: the cron
+    // is 06:00 daily, not hourly. It is also gated by a property set in no profile.
+    descriptionEn: 'Evaluates KRI readings against their thresholds; an amber/red breach raises a preventive-CAPA suggestion.',
+    descriptionAr: 'يقيّم قراءات المؤشرات مقابل عتباتها؛ التجاوز الكهرماني/الأحمر يرفع اقتراح إجراء وقائي.',
     targetEntity: 'CAPA',
-    cadence: 'HOURLY', status: 'ACTIVE',
+    trigger: 'SCHEDULED_POLL',
+    backing: 'KriSchedulerService#tick',
+    gate: 'grc.kri.scheduler-enabled',
+    cadence: 'DAILY_0600',
     reference: 'COSO ERM Component 5, ISO 31000 §6.5',
-    lastRunAt: '2026-05-05T08:00:00', intake30d: 11, owner: 'risk.officer@tss.sa',
   },
-  // ── Evidence connector (continuous-monitoring tooling-style) ──
+  // ── Evidence connector ──
   {
     id: 'cn-evidence-aws',
     source: 'AWS Config + IAM',
     nameEn: 'AWS Evidence Connector',
     nameAr: 'موصِّل أدلّة AWS',
-    descriptionEn: 'Pulls IAM policies, S3 bucket configs, RDS encryption, security-group rules to feed evidence.',
-    descriptionAr: 'يسحب سياسات IAM، إعدادات S3، تشفير RDS، قواعد المجموعات الأمنية لتغذية الأدلّة.',
+    descriptionEn: 'Planned: pull IAM policies, S3 bucket configs, RDS encryption and security-group rules to feed evidence.',
+    descriptionAr: 'مخطَّط: سحب سياسات IAM وإعدادات S3 وتشفير RDS وقواعد المجموعات الأمنية لتغذية الأدلّة.',
     targetEntity: 'EVIDENCE',
-    cadence: 'DAILY', status: 'AVAILABLE',
-    reference: 'SOC 2 CC-6.1, ISO 27001 §A.8.32', owner: 'cloud.platform@tss.sa',
+    trigger: 'NOT_IMPLEMENTED',
+    reference: 'SOC 2 CC-6.1, ISO 27001 §A.8.32',
   },
 ];
 
 export const CADENCE_LABEL: Record<ConnectorCadence, { en: string; ar: string }> = {
-  STREAMING:  { en: 'Real-time',     ar: 'حي' },
-  EVERY_5MIN: { en: 'Every 5 min',   ar: 'كل 5 دقائق' },
-  HOURLY:     { en: 'Hourly',        ar: 'كل ساعة' },
-  EVERY_4H:   { en: 'Every 4 hours', ar: 'كل 4 ساعات' },
-  DAILY:      { en: 'Daily',         ar: 'يومياً' },
-  WEEKLY:     { en: 'Weekly',        ar: 'أسبوعياً' },
+  EVERY_MINUTE: { en: 'Every minute',  ar: 'كل دقيقة' },
+  EVERY_15MIN:  { en: 'Every 15 min',  ar: 'كل 15 دقيقة' },
+  DAILY_0600:   { en: 'Daily 06:00',   ar: 'يومياً 06:00' },
 };
 
-export const CONNECTOR_STATUS_TONE: Record<ConnectorStatus, 'success' | 'info' | 'warning' | 'danger' | 'neutral'> = {
-  ACTIVE:     'success',
-  CONFIGURED: 'info',
-  AVAILABLE:  'neutral',
-  ERROR:      'danger',
-  DISABLED:   'neutral',
+export const CONNECTOR_TRIGGER_TONE: Record<ConnectorTrigger, 'success' | 'info' | 'warning' | 'neutral'> = {
+  SCHEDULED_POLL:     'success',
+  INBOUND_WEBHOOK:    'success',
+  OPERATOR_INITIATED: 'warning',
+  NOT_IMPLEMENTED:    'neutral',
 };
 
-export const CONNECTOR_STATUS_LABEL: Record<ConnectorStatus, { en: string; ar: string }> = {
-  ACTIVE:     { en: 'Active',     ar: 'نشط' },
-  CONFIGURED: { en: 'Configured', ar: 'مُهيَّأ' },
-  AVAILABLE:  { en: 'Available',  ar: 'متاح' },
-  ERROR:      { en: 'Error',      ar: 'خطأ' },
-  DISABLED:   { en: 'Disabled',   ar: 'مُعطَّل' },
+export const CONNECTOR_TRIGGER_LABEL: Record<ConnectorTrigger, { en: string; ar: string }> = {
+  SCHEDULED_POLL:     { en: 'Scheduled poll',   ar: 'استعلام مُجدول' },
+  INBOUND_WEBHOOK:    { en: 'Inbound webhook',  ar: 'ويب هوك وارد' },
+  OPERATOR_INITIATED: { en: 'Manual only',      ar: 'يدوي فقط' },
+  NOT_IMPLEMENTED:    { en: 'Not implemented',  ar: 'غير مُنفَّذ' },
 };
+
+/** A connector the platform runs by itself — a poll loop or a webhook route. */
+export function isAutomated(c: ConnectorDefinition): boolean {
+  return c.trigger === 'SCHEDULED_POLL' || c.trigger === 'INBOUND_WEBHOOK';
+}

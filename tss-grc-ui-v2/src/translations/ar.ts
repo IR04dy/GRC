@@ -5018,20 +5018,16 @@ export const ar = {
   connectorsSub:               'استلام آلي — فاحصات الثغرات، SIEM، تغذية مراقبي الجهات، مراقبي دورات الإقرار',
   connectorsPageSub:           'تُنشئ هذه التكاملات سجلات أو استلامات تلقائياً دون تدخل بشري. كل تكامل محكوم بمرجع تنظيمي ودوريّة؛ أعداد الاستلام مُتحرِّكة لـ 30 يوماً.',
   connectorsRegistryTitle:     'سجل التكاملات',
-  connectorsBlurb:             'التكاملات النشطة تدفع سجلات إلى المنصة بالدوريّة المُبيَّنة. أوقف للتعطيل؛ فعِّل للتشغيل. بيانات الاعتماد تُخزَّن مُشفَّرة في خزنة الأسرار.',
-  connectorsKpiActive:         'نشطة',
-  connectorsKpiConfigured:     'مُهيَّأة (موقوفة)',
+  // F2-193 — انظر التعليق في en.ts: النص السابق ادّعى ثلاث حقائق غير صحيحة.
+  connectorsBlurb:             'هذا سجل قدرات التكامل، وليس تغذية مباشرة. كل صف يذكر المُشغِّل الفعلي والخدمة الخلفية التي توفّره؛ التكاملات الآلية مُقيَّدة بالخصيصة المُبيَّنة، ولوحة الموصِّلات أعلاه تُظهر ما إذا كان الخادم قد فعّلها. الصفوف المُعلَّمة «غير مُنفَّذ» لا يوجد لها خدمة خلفية بعد.',
+  connectorsKpiAutomated:      'آلية (استعلام أو ويب هوك)',
+  connectorsKpiNotImplemented: 'غير مُنفَّذة',
   connectorsKpiTotal:          'إجمالي السجل',
-  connectorsKpiIntake30d:      'استلام آلي (30 يوماً)',
   connectorsFilterAll:         'جميع التكاملات',
-  connectorsFilterActive:      'النشطة فقط',
-  connectorsFilterConfigured:  'المُهيَّأة',
-  connectorsFilterAvailable:   'المتاحة',
-  connectorsIntake30d:         'استلام 30 يوماً',
-  connectorsPause:             'إيقاف',
-  connectorsActivate:          'تفعيل',
-  connectorsPauseHint:         'إيقاف التكامل يخضع لعملية إدارة التغيير. في الوضع التجريبي يظهر الإجراء هنا؛ ربط الإنتاج يتطلّب اعتماد لجنة CAB.',
-  connectorsActivated:         'تم تفعيل التكامل — جُدوِلت أول دورة ضمن نافذة التكرار التالية',
+  connectorsFilterAutomated:   'الآلية فقط',
+  connectorsFilterNotImplemented: 'غير المُنفَّذة',
+  connectorsGate:              'القيد',
+  connectorsNoBacking:         'لا توجد خدمة خلفية بعد',
 
   // DD-61
   portalTrustTitle:            'مركز الثقة',
@@ -6148,7 +6144,6 @@ export const ar = {
   dashTprmSnapshotBadge: 'TPRM',
   dashTprmSnapshotSub:   'عدّادات لحظية من وحدات TPRM الخمس. اضغط أي بطاقة للدخول، أو افتح العرض الموحّد.',
   dashTprmSnapshotCta:   'افتح عرض TPRM الكامل',
-  connectorsPausedToast: 'تم إيقاف الموصِّل {name}',
 
   // حالة الخطأ — يستخدمها مكون ErrorState لعرض ردود ProblemDetail من
   // الخادم (بما فيها 503 "الوحدة لم يتم تجهيز قاعدة بياناتها" التي يعيدها
