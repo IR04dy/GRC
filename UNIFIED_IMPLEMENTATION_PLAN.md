@@ -1764,7 +1764,7 @@ and **0** sidebar-reachable state-asserting instances instead of **8** — so `/
 `/control-crosswalk` and `/crisis-management`, all four already known, were silently absent. 🔑 **A corrupted
 source yields a SMALLER population, which reads exactly like "those pages are fine"** — the seventh instance
 here of a detector satisfied by something other than its claim. Fix: **one alternation, left-to-right**, pinned
-in both directions plus a leg asserting the real `App.tsx` keeps >75% of its bytes.
+in both directions plus a leg asserting the real `App.tsx` keeps >75% of its bytes. ⚠⚠ **This was a REPEAT: `Appendix/scripts/baseline_census.py` lines 139–142 already carry the correct alternation and a comment saying F2-68(c) found this same bug in the frontend scanner.** I wrote a second scanner over the same tree without reading the first. 🔑 **Before writing a scanner, read the scanner this repo already has.**
 **The population, measured properly:** over **310 routed components**, **73 pages make no server call** (47
 sidebar-reachable); narrowed by F2-193's rule that a catalogue may declare what a thing IS, never what is
 happening to it now → **14 corpora on 12 pages, 8 sidebar, 5 clock-minted**, which retiring `/ropa` took to

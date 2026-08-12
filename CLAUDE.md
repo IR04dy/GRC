@@ -881,7 +881,7 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   fabricated pages already known by name. 🔑 **A corrupted source yields a SMALLER population, which reads
   exactly like "those pages are fine"** — the quietest way for a scan to be wrong, and the 7th instance here of
   a detector satisfied by something other than its claim. Use `/(?<!:)\/\/[^\n]*|\/\*[\s\S]*?\*\//g`: at a `//`
-  an inner `/*` can never open a block, and at a `/*` a URL cannot truncate it. Pin **both** directions.
+  an inner `/*` can never open a block, and at a `/*` a URL cannot truncate it. Pin **both** directions. ⚠⚠ **This was a REPEAT: `Appendix/scripts/baseline_census.py` lines 139–142 already carry the correct alternation and a comment saying F2-68(c) found this same bug in the frontend scanner.** I wrote a second scanner over the same tree without reading the first. 🔑 **Before writing a scanner, read the scanner this repo already has.**
   ⚠ **Retire, do not rebuild, when a real surface already exists** — `PrivacyPage`'s ROPA tab already renders the
   register, so a second *real* ROPA screen would have made a fourth surface for one statutory object, which is
   F2-196's own defect. ADR-017 §D-5 ratified this in F2-42. `/ropa` redirects (F2-137: a bookmark must land

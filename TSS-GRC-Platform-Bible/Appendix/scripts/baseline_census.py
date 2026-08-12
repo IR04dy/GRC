@@ -114,11 +114,15 @@ PUBLISHED = {
     "migration_files": 363,          # +V375 (F2-183, the `consumer` schema's first CHECK constraints)
     "migration_head": 375,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
-    "fe_pages": 353,          # F2-142 retired 3; F2-16 tranche 1 +1, tranche 2 +4, tranche 3 +7
+    "fe_pages": 352,          # F2-142 retired 3; F2-16 tranche 1 +1, tranche 2 +4, tranche 3 +7
+                             # -1 F2-198: RopaPage retired — 9 invented PDPL Art.31 activities against
+                             # 11 real rows, and the real register was already on PrivacyPage's ROPA
+                             # tab. `/ropa` still resolves (a Navigate), so fe_routes holds at 330.
                              # regulatory tabs). A BUMP, not a narrowing — see MEASURED_BASELINE:
                              # tab modules are what this metric has always counted.
                              # +1 F2-163: ExerciseRunsPage, a real SCREEN with a route of its own.
-    "fe_page_folders": 111,   # each was the only file in its folder, so -3 folders too
+    "fe_page_folders": 110,   # each was the only file in its folder, so -3 folders too;
+                             # -1 again with F2-198 (RopaPage was the only file in pages/ropa/)
     # ⬆ 330 with F2-163. The FIRST route added since this row began tracking, and it moves the
     # pages-vs-routes delta by 0 (+1 page, +1 route) — which is what a genuinely new screen looks
     # like, as against the componentisation that made the delta 23.
