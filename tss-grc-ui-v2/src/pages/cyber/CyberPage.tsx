@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   ShieldCheck, Bug, Flame, ClipboardCheck, Filter, Download, Plus, Activity, BarChart3,
   Shield, Target, Cpu, FileCheck2, ListTodo, ShieldOff,
@@ -438,6 +438,29 @@ export function CyberPage() {
   const cyberIncidents = useApiList<CyberIncidentDto>(()   => cyberApi.incidents(0, 200),   INCIDENTS);
   const assets         = useApiList<CyberAssetDto>(()      => cyberApi.assets(0, 200),      ASSETS);
   const cyberEvidence  = useApiList<CyberEvidenceDto>(()   => cyberApi.evidence(0, 200),    EVIDENCE);
+
+  /**
+   * F2-195 — the real NCA ECC score: implemented ECC controls, half credit for any partial state,
+   * over the ECC controls in the register. `null` when the tenant has no ECC control at all, since
+   * a framework that is not in scope has no score — but a framework whose controls are all
+   * NOT_IMPLEMENTED scores a genuine **0%**, which is what dev holds (0 of 29) and what the
+   * hard-coded `"87%"` was covering.
+   *
+   * Scoped by `frameworkName` because the register carries four NCA frameworks (ECC 29, CCC 24,
+   * OTCC 13, CSCC 8) plus ISO 27001, and the tile names ECC specifically — an unscoped percentage
+   * would answer a different question with the same confidence.
+   */
+  const eccScorePct = useMemo(() => {
+    const ecc = controls.data.filter(c => (c.frameworkName ?? '').toUpperCase().includes('ECC'));
+    if (ecc.length === 0) return null;
+    const credit = ecc.reduce((sum, c) => {
+      const s = (c.implementationStatus ?? '').toUpperCase();
+      if (s === 'IMPLEMENTED') return sum + 1;
+      if (s.includes('PARTIAL')) return sum + 0.5;
+      return sum;
+    }, 0);
+    return Math.round((credit / ecc.length) * 100);
+  }, [controls.data]);
   const actionPlans    = useApiList<CyberActionPlanDto>(() => cyberApi.actionPlans(0, 200), ACTION_PLANS);
 
   const isDemo = controls.isDemo || vulns.isDemo;
@@ -1082,7 +1105,17 @@ export function CyberPage() {
         <Kpi Icon={ShieldCheck}    label={t('cyberKpiControls')}   value={controls.data.length} tone="primary" to="/controls/library" />
         <Kpi Icon={Bug}            label={t('cyberKpiVuln')}       value={vulns.data.filter(v => v.workflowStatus !== 'CLOSED').length} tone="warning" to="/cyber/vulns/v2" />
         <Kpi Icon={Flame}          label={t('cyberKpiIncidents')}  value={cyberIncidents.data.filter(i => i.severity === 'CRITICAL' || i.severity === 'HIGH').length} tone="danger" to="/incidents" />
-        <Kpi Icon={ClipboardCheck} label={t('cyberKpiCompliance')} value="87%" trend={{ dir: 'up', value: '+4%' }} tone="success" to="/compliance/posture" />
+        {/* F2-195 — was `"87%"` with a `+4%` trend, on a tile labelled "NCA ECC Score". Measured
+            live: all 29 NCA ECC controls in the register are NOT_IMPLEMENTED, so the real score is
+            **0%** — the platform's flagship Saudi regulatory metric was reading 87%, in green, over
+            a framework in which nothing had been implemented. (Assessments are not the denominator:
+            0 of the 21 assessments in dev are against an ECC control at all.) The tone is computed,
+            because a 0% score rendered in `success` green is a second claim of its own. */}
+        <Kpi Icon={ClipboardCheck} label={t('cyberKpiCompliance')}
+          value={eccScorePct === null ? null : `${eccScorePct}%`}
+          emptyHint={t('cyberKpiComplianceEmpty')}
+          tone={eccScorePct === null ? 'neutral' : eccScorePct >= 80 ? 'success' : eccScorePct >= 50 ? 'warning' : 'danger'}
+          to="/compliance/posture" />
       </div>
 
       <OverviewStrip

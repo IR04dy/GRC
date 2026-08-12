@@ -20,7 +20,7 @@ import { isTestFile, relPosix, stripComments, walkSources } from './support/sour
  * `rowHref` navigation surface.
  *
  * <h3>What this measures, and the two buckets that carry meaning</h3>
- * <b>91 grouped clients, 1,070 methods, 189 with no caller</b> (measured 2026-08-08, after the 5
+ * <b>91 grouped clients, 1,070 methods, 188 with no caller</b> (measured 2026-08-08, after the 5
  * dead duplicates below were deleted; unchanged by F2-172, which added a five-method intake client
  * with a caller for every one of them). The finding's own recommendation was to sort those into
  * *governance-critical* and *not yet wired* — but reading the first one showed that sort is a
@@ -36,8 +36,10 @@ import { isTestFile, relPosix, stripComments, walkSources } from './support/sour
  *       lost by deleting it and nothing is excused by keeping it, so this one can be an invariant
  *       today. It measured 5: the evidence trio, plus `cyberApi.controlsAll` / `cyberApi.frameworks`
  *       against `lib/frameworkControls.ts`. All five deleted, so the invariant starts at zero.</li>
- *   <li><b>{@link KNOWN_DARK} — a reported figure with a decrease-only ratchet.</b> 189 methods
- *       with no live twin, of which <b>148 carry `HOLE`</b>: the endpoint family a screen
+ *   <li><b>{@link KNOWN_DARK} — a reported figure with a decrease-only ratchet.</b> 188 methods
+ *       with no live twin (190 at F2-165, then 189; F2-195 wired `incidentApi.stats` so the tile
+ *       that had been showing a hard-coded "4.2h" MTTR reports the server's real `avgDays`), of
+ *       which <b>148 carry `HOLE`</b>: the endpoint family a screen
  *       <em>does</em> reach, so the workflow has a gap (can approve, cannot create). That is the
  *       F2-164 shape and the dangerous one, because the screen looks complete. The other 41 are
  *       capability no screen touches at all — F2-68(c)'s original population.</li>
@@ -47,7 +49,7 @@ import { isTestFile, relPosix, stripComments, walkSources } from './support/sour
  * dropped) and are <em>annotation, not assertion</em> — nothing here recomputes them, so they can
  * describe the day they were measured without being able to rot into a false gate.
  *
- * <p>⚠ Why the second bucket is not an invariant: 189 cannot be wired in one slice, and an
+ * <p>⚠ Why the second bucket is not an invariant: 188 cannot be wired in one slice, and an
  * unadjudicated red list becomes an allow-list — which is how a ceiling stops distinguishing
  * *tolerated* from *reviewed* (the `BARE_EXPORT_CEILING` precedent, F2-61(c)). It ratchets in both
  * directions so it cannot rot, and the annotations say what the user cannot do, because "which
@@ -235,7 +237,9 @@ const KNOWN_DARK: readonly string[] = [
   'lib/api.ts#governanceApi.updateRole',                       // HOLE: a governance role can be created, cloned and deleted — never edited
   'lib/api.ts#incidentApi.get',                                // HOLE
   'lib/api.ts#incidentApi.setPhase',
-  'lib/api.ts#incidentApi.stats',
+  // F2-195 wired `incidentApi.stats` — IncidentsPage renders `avgDays` as mean-time-to-resolve,
+  // where the tile used to read a hard-coded "4.2h". This gate is why the entry had to move in the
+  // same commit: the endpoint had been computing the real figure all along with no caller.
   'lib/api.ts#reportScheduleApi.get',                          // HOLE
   'lib/api.ts#reportScheduleApi.runs',                         // HOLE
   'lib/api.ts#workflowApi.executeTransition',                  // as startInstance below

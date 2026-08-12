@@ -935,6 +935,7 @@ export const ar = {
   cyberKpiVuln: 'الثغرات المفتوحة',
   cyberKpiIncidents: 'الحوادث الحرجة',
   cyberKpiCompliance: 'نسبة الامتثال لـ NCA',
+  cyberKpiComplianceEmpty: 'غير محتسب — لا توجد ضوابط ECC للهيئة الوطنية في سجل هذه المنشأة',
   cyberTabControls: 'الضوابط',
   cyberTabSubControls: 'الضوابط الفرعية',
   cyberTabAssessments: 'التقييمات',
@@ -958,8 +959,12 @@ export const ar = {
   bcmSub: 'تحليل الأثر، خطط الاستمرارية، خطط التعافي والتمارين وفق ISO 22301.',
   bcmKpiPlans: 'خطط الاستمرارية',
   bcmKpiProcesses: 'العمليات الحرجة',
-  bcmKpiExercises: 'نسبة نجاح التمارين',
+  // F2-195 — أُلغي المفتاح bcmKpiExercises («نسبة نجاح التمارين»): سجل التمارين يحفظ درجة لكل تمرين
+  // ولا يحفظ نتيجة نجاح/فشل، فلا يمكن حساب نسبة نجاح دون افتراض حدٍّ غير موجود في المخطط.
+  bcmKpiExerciseScore: 'متوسط درجة التمارين',
+  bcmKpiExerciseScoreEmpty: 'غير محتسب — لم تُقيَّم أي تمرين بدرجة بعد',
   bcmKpiRto: 'الالتزام بزمن الاستعادة',
+  bcmKpiRtoEmpty: 'غير محتسب — أزمنة الاستعادة الفعلية تُسجَّل على تفعيلات الخطط، وهذه الصفحة لا تقرأها بعد',
   bcmTabPlans: 'الخطط',
   bcmTabProcesses: 'العمليات',
   bcmTabBia: 'تحليل الأثر',
@@ -995,6 +1000,8 @@ export const ar = {
   privacyKpiActivities: 'أنشطة المعالجة',
   privacyKpiDsr: 'الطلبات المفتوحة',
   privacyKpiConsent: 'تغطية الموافقات',
+  // F2-195 — يُعرض بدلًا من رقم عند عدم وجود سجلات موافقة، حتى لا تُقرأ النسبة الغائبة كنسبة «98%».
+  privacyKpiConsentEmpty: 'غير محتسب — لا توجد سجلات موافقة لهذه المنشأة بعد',
   privacyKpiBreaches: 'الاختراقات المفتوحة',
   privacyTabDsr: 'طلبات أصحاب البيانات',
   privacyTabBreaches: 'الاختراقات',
@@ -1030,7 +1037,10 @@ export const ar = {
   complianceKpiFrameworks: 'الأطر الفعّالة',
   complianceKpiControls: 'الضوابط المختبَرة',
   complianceKpiEvidence: 'عناصر الأدلة',
+  complianceKpiEvidenceEmpty: 'غير متاح — تعذّرت قراءة مكتبة الأدلة',
   complianceKpiScore: 'نسبة الامتثال',
+  // F2-195 — المنشأة غير المُقيَّمة تُعرض بشُرطة، لا بنسبة. «0%» تعني فشلًا مقيسًا، والحقيقة أنه لا نسبة.
+  complianceKpiScoreEmpty: 'غير محتسب — لا ضوابط في السجل لاحتسابها',
   complianceTabControls: 'الضوابط',
   complianceTabInternal: 'تدقيق داخلي',
   complianceTabExternal: 'تدقيق خارجي',
@@ -3712,6 +3722,9 @@ export const ar = {
   incidentsKpiOpen: 'الحوادث المفتوحة',
   incidentsKpiCritical: 'الحرجة',
   incidentsKpiMttr: 'متوسط زمن المعالجة',
+  // F2-195 — الوحدة أيام، لا ساعات. الخادم يعيد avgDays والبطاقة كانت تعرض «4.2h».
+  incidentsKpiMttrDayUnit: ' ي',
+  incidentsKpiMttrEmpty: 'غير محتسب — لا يوجد حادث مُغلق يحمل تاريخ اكتشاف وتاريخ معالجة معًا',
   incidentsKpiClosed: 'المغلقة (٣٠ يوم)',
   incidentsTabRegister: 'السجل',
   incidentsTabTimeline: 'الجدول الزمني',

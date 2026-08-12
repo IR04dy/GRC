@@ -20,7 +20,7 @@ import { SEVERITY_TONE, severityLabel, STATUS_TONE, statusLabel } from '../../li
 import { useApiList } from '../../lib/useApiResource';
 import { useLiveRefresh } from '../../lib/useLiveRefresh';
 import { LivePulse } from '../../components/ui/LivePulse';
-import { privacyApi, dpiaApi, ApiError, type PrivacyDsrDto, type PrivacyDsrRequest, type PrivacyBreachDto, type PrivacyRopaDto, type DpiaDto } from '../../lib/api';
+import { privacyApi, dpiaApi, consentApi, ApiError, type PrivacyDsrDto, type PrivacyDsrRequest, type PrivacyBreachDto, type PrivacyRopaDto, type DpiaDto, type ConsentStatsDto } from '../../lib/api';
 import { isAuthenticated } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { DSRS, BREACHES, ROPA, DPIAS } from './mockPrivacy';
@@ -90,6 +90,25 @@ export function PrivacyPage() {
   const dsrs     = useApiList<PrivacyDsrDto>(()    => privacyApi.dsrs(0, 100),     DSRS);
   const breaches = useApiList<PrivacyBreachDto>(() => privacyApi.breaches(0, 100), BREACHES);
   const ropa     = useApiList<PrivacyRopaDto>(()   => privacyApi.ropa(0, 100),     ROPA);
+
+  // F2-195 — the real consent rate. The KPI below read a flat `"98%"`; `/privacy/consents/stats`
+  // already returns the four terminal states, so the rate is active over the whole population.
+  // A tenant with no consent records has no rate — that is `null` (an em-dash), not 0% and not 98%.
+  const [consentStats, setConsentStats] = useState<ConsentStatsDto | null>(null);
+  useEffect(() => {
+    let live = true;
+    consentApi.stats()
+      .then(s => { if (live) setConsentStats(s); })
+      .catch(() => { if (live) setConsentStats(null); });
+    return () => { live = false; };
+  }, []);
+  const consentRate = useMemo(() => {
+    if (!consentStats) return null;
+    const active = consentStats.active ?? 0;
+    const total = active + (consentStats.expired ?? 0)
+      + (consentStats.withdrawn ?? 0) + (consentStats.superseded ?? 0);
+    return total === 0 ? null : Math.round((active / total) * 100);
+  }, [consentStats]);
 
   // DD-71: merge intake-promoted rows into DSRs and Breaches.
   const allDsrs     = dsrs.data;
@@ -335,9 +354,16 @@ export function PrivacyPage() {
       <WorkflowQuickLaunch modules="PDPL" />
       <ModuleSubmissionsPanel module="PDPL" />
       <div className="kpi-grid">
-        <Kpi Icon={FileText}    label={t('privacyKpiActivities')} value={ropa.data.length || 142} tone="primary" to="/ropa" />
+        {/* F2-195 — was `ropa.data.length || 142`. `0 || 142` is 142, so the fallback fired on
+            exactly the tenant whose RoPA register is EMPTY: a PDPL Article 31 record of processing
+            activities showing 142 entries for an organisation that has recorded none. Same shape
+            F2-52 already fixed on the Admin page (`roles.length || 7`) and left here — its comment
+            states the rule this restores: "The real count is the real count, including 0." */}
+        <Kpi Icon={FileText}    label={t('privacyKpiActivities')} value={ropa.data.length} tone="primary" to="/ropa" />
         <Kpi Icon={Inbox}       label={t('privacyKpiDsr')}        value={openDsrs} tone="warning" to="/data-officer/dsr" />
-        <Kpi Icon={Users}       label={t('privacyKpiConsent')}    value="98%" tone="success" to="/data-officer/consents" />
+        <Kpi Icon={Users}       label={t('privacyKpiConsent')}
+          value={consentRate === null ? null : `${consentRate}%`}
+          emptyHint={t('privacyKpiConsentEmpty')} tone="success" to="/data-officer/consents" />
         <Kpi Icon={ShieldAlert} label={t('privacyKpiBreaches')}   value={allBreaches.filter(b => b.status !== 'CLOSED').length} tone="danger" to="/data-officer/breaches" />
       </div>
 

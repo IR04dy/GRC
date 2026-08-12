@@ -750,6 +750,43 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   ⚠ **And check the site count before believing a surviving mutation**: `getCcmDashboard()` has two call sites
   and the first mutation replaced one, which reads exactly like a hole in the gate. The harness now replaces
   every occurrence and prints how many it touched.
+  ⚠⚠ **Asking that question of the record FIELDS rather than the corpora found the strongest instance yet, in
+  the KPI strip** (F2-195, measured 2026-08-12). Ranking F2-194's 105 corpora by *"which fields assert live
+  operational state?"* (a `status`, a metric, a clock stamp) pointed at `moduleLifecycles`, and reading the 12
+  pages that render it found a sharper defect **directly above**: of **1,069 `<Kpi>` tags**, **9 on 5 module
+  pages** showed a figure nothing produced. `cyberKpiCompliance` **"NCA ECC Score" `"87%"` in `success` green
+  while all 29 NCA ECC controls are `NOT_IMPLEMENTED`** (real: **0%**); `incidentsKpiMttr` `"4.2h"` where
+  `/incidents/stats` already returned `avgDays: 4.5` — **the wrong unit**, not just 26× low;
+  `complianceKpiEvidence` `"1,283"` against 78; `complianceKpiScore` `"87%"` against 66%, **fifteen lines above
+  a real `RadialGauge` fed by `frameworkApi.coverage()`**; `bcmKpiExercises` `"92%"`, which is exercise #1's own
+  `score` presented as an aggregate. 🔑 **Every one erred in the flattering direction** — second instance after
+  F2-193's cadences. ⚠⚠ **The `|| N` shape is the sharp one, and F2-52 had already fixed it once with the rule
+  written down.** `0 || 142` is 142, so `ropa.data.length || 142` fires on **exactly** the tenant whose register
+  is empty — a PDPL Article 31 tile reading 142 activities for an organisation that has recorded none — and
+  `AdminPage.tsx` carries F2-52's comment three lines from the shape nobody swept: *"`roles.length || 7`
+  reported the hardcoded dropdown's length when the server returned nothing … **The real count is the real
+  count, including 0**"*. 🔑 **The codebase can hold the correct rule, in prose, beside the place it was not
+  applied.** ⚠ **A `trend` prop is a SECOND, independent claim** — it asserts a prior period, and nothing here
+  stores a KPI series, so wiring a value while keeping `trend={{dir:'up',value:'+4%'}}` leaves the half of the
+  fabrication that implies history exists *and looks finished*. ⚙ **Use `Kpi`'s `value={null}` + `emptyHint`
+  for a metric the platform cannot compute** — UX-008 built it (`value == null` → em-dash with the hint as
+  `title` **and** `aria-label`), so nothing needs inventing; fourth recorded blocker in this programme that was
+  already solved. And `isNoData` is `value == null`, not `!value`, which is why the real **0%** ECC score renders
+  as a number — pinned by `Kpi.test.tsx`, because `!value` would re-hide the finding inside the fix meant to
+  expose it. ⚠ **`kpiProvenance.test.ts` refuses all three shapes app-wide (survivors 1 of 1,069) and carries a
+  SYNTHETIC self-test**, because the corpus assertions pass both when the app is clean and when the regexes have
+  rotted; the scan was also run against the pre-fix tree as a control (10 there, 1 here). 🔑 **State out loud
+  which of those two a green scan is showing you.** ⚠⚠ **Two self-inflicted errors, both caught only by
+  running things:** the nullable-KPI assertion first matched `/\bnull\b/` anywhere and fired on **16 innocent**
+  tiles whose `null` is inside `x == null ? '—' : …` (**fifth** instance of a check satisfied by something other
+  than its claim), and I then set the follow-on ratchet to **16** — a number printed by the *broken* detector,
+  answering a different question; the real population is **71 across 32 files**. 🔑 **A baseline lifted from a
+  measurement of something else is worse than no baseline, because it looks measured.**
+  ⚠ **Still open and worth knowing**: `moduleLifecycles` holds **56** hard-coded `activeCount`/`overdueCount`
+  → **130 fabricated "active" items and 29 red `role="status"` "N items need attention" alerts** across 12
+  pages that all call the real API, and `rankLifecycles` sorts by them to pick the *"Recommended next action"*
+  chip. The trap in fixing it: the stripe is `overdue > 0 ? danger : active > 0 ? accent : success`, so deleting
+  the numbers turns 56 tiles **green** — asserting health rather than admitting ignorance.
   ⚠ **The audit did find one real defect, and it was far narrower than the claim**: `CommitteeScheduledSweep`
   flipped action items to OVERDUE **in place** instead of calling `markOverdue` (whose javadoc said *"Called by
   the scheduled sweep"*). Since the sweep is the only producer in production, **no `ACTION_OVERDUE` audit row

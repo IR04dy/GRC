@@ -1717,6 +1717,69 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-195 CLOSED 2026-08-12 — the module KPI strip asserted metrics no server computed, and every
+one was flattering.** Found by asking [[F2-194]]'s census question one level up: not *"which corpora
+are fabricated?"* but *"which record fields ASSERT live operational state?"*. Ranking all 105 corpora
+by that shape (a `status`, a metric, a clock stamp, a `configured` flag) put `moduleLifecycles`'
+`activeCount`/`overdueCount` at the top — and reading the 12 pages that render them found a sharper
+defect in the KPI strip **directly above**: of **1,069 `<Kpi>` tags**, **9 on 5 module pages** showed a
+figure nothing produced. Measured live, side by side with the real answer: **Cyber "NCA ECC Score"
+`"87%"` against a real 0%** — all **29** NCA ECC controls are `NOT_IMPLEMENTED`, so the platform's
+flagship Saudi regulatory metric read 87% **in `success` green** over a framework in which nothing had
+been implemented; **Incidents "Mean TTR" `"4.2h"`** where `/incidents/stats` already returned
+`avgDays: 4.5` — not 26× low but **the wrong unit**; **Compliance "Evidence Items" `"1,283"`** against
+78 (16×); **Compliance "Compliance Score" `"87%"`** against 66%, rendered **fifteen lines above** a real
+`RadialGauge` fed by `frameworkApi.coverage()`; **BCM "Exercise Pass Rate" `"92%"`**, which is exactly
+exercise #1's own `score` presented as an aggregate (real mean 84); **BCM "RTO Compliance" `"76%"`**;
+and two `|| N` fallbacks. 🔑 **Every one erred in the flattering direction** — second instance after
+F2-193's *"wrong cadence in the flattering direction"*. ⚠⚠ **The `|| N` shape is the sharp one and
+[[F2-52]] had already fixed it once, in this codebase, with the rule written down**: `AdminPage.tsx:249`
+carries the comment *"`roles.length || 7` reported the hardcoded dropdown's length when the server
+returned nothing … **The real count is the real count, including 0**"* — and its two siblings survived on
+the PDPL and BCM registers, where `0 || 142` fires on **exactly** the tenant whose register is empty (a
+PDPL Article 31 tile reading 142 activities for an organisation that has recorded none). 🔑 **Fixing the
+instance you noticed is not closing the shape, and the codebase can hold the correct rule, in prose,
+three lines from where nobody applied it.** ⚠ **A `trend` prop is a SECOND, independent claim** — four
+tiles carried `trend={{dir:'up',value:'+4%'}}`, which asserts a prior period no store holds; wiring a
+value while keeping its literal trend leaves the half of the fabrication that implies history exists,
+and it looks finished. **Fixed:** 8 of 9 wired to sources already fetched or already on the client —
+`incidentApi.stats().avgDays` (a method with **no caller**, which the F2-165 gate confirmed by demanding
+its removal from `KNOWN_DARK`: dark FE methods 189 → **188**), `evidenceApi.items().totalElements`,
+`consentApi.stats()`, the control registers' own status fields, `mean(exercise.score)`. The ECC score is
+**scoped by `frameworkName`** (the register holds four NCA frameworks + ISO 27001) and its tone is
+**computed**, because 0% in green is a claim of its own. ⚠ **My first draft called the 9th "no source
+exists" and that was false**: `bcm_lc.Invocation.actualRtoHours` is real and populated (2 of 3 dev
+invocations), joinable to the BIA target, served by `GET /api/bcm-lc/invocations` — which has **no
+api-client method**, so wiring it is a feature, not a de-fabrication. It renders `value={null}` with an
+`emptyHint` naming exactly that. 🔑 *One file short is the whole error* — third instance, avoided only
+by checking. ⚙ **The primitive already existed**: `Kpi` has had a first-class not-measured treatment
+since UX-008 (`value == null` → em-dash + `emptyHint` as `title` **and** `aria-label`), so nothing had to
+be built — fourth recorded blocker in this programme that was already solved. **Gate:**
+`kpiProvenance.test.ts` (8 tests) over all 1,069 tags refusing LITERAL / FALLBACK(`|| N`, N ≥ 2) /
+LITERAL_TREND, exceptions a named map with a reason each **enforced both ways**, survivors **1 of 1,069**
+(`rcKpiLanguages value={2}` — a property of the bundled font set). ⚠ **The scan was run against the
+pre-fix tree as a control** (10 there, 1 here, same 1,069 tags) and that control is now permanent:
+`theDetectorActuallyDetects` runs the predicates over **synthetic** tags plus a negative control on five
+honest shapes. 🔑 **Corpus assertions pass both when the app is clean and when the regexes have rotted;
+only a synthetic self-test tells those apart.** ⚠⚠ **Two self-inflicted errors, both caught by running
+things:** my nullable-KPI assertion first tested `/\bnull\b/` anywhere and fired on **16 innocent** tiles,
+matching the `null` inside `x == null ? '—' : …` (**fifth** instance in this lineage of a check satisfied
+by something other than its claim); and having fixed it I set the follow-on ratchet to **16** — a number
+printed by the *broken* detector, answering a different question. The real population is **71 across 32
+files**. 🔑 **A baseline lifted from a measurement of something else is worse than none, because it looks
+measured.** Also added `Kpi.test.tsx` pinning that a **genuine zero renders as `0`** — if `isNoData` were
+`!value` the real 0% ECC score would render as an em-dash and the finding would be re-hidden by the fix
+meant to expose it. Verified: FE **517/517 across 54 files** (+13), `tsc` clean, `vite build` clean,
+mutation **16/16 as declared** (two mismatches were my harness's fault, both repeats of warnings already
+in CLAUDE.md), probe **9/9 through the Vite proxy**. **0 backend changes, 0 migrations.**
+⬜ **Filed, not fixed:** (a) `moduleLifecycles`' **56** hard-coded counts — **130 fabricated "active"
+items and 29 red `role="status"` "N items need attention" alerts** on 12 pages that all call the real
+API, with `rankLifecycles` sorting by them to choose the *"Recommended next action"* chip, so the
+platform's recommendation is computed from invented numbers; ⚠ the stripe is
+`overdue > 0 ? danger : active > 0 ? accent : success`, so deleting the numbers turns 56 tiles **green** —
+the fix needs a neutral unmeasured state and a ranking that cannot promote an unmeasured tile.
+(b) The 71 hand-rolled em-dash tiles. (c) BCM RTO attainment. (d) F2-194's 105-corpus classification.
+
 ✔ **F2-194 CLOSED 2026-08-12 — a fabricated "Continuous Control Monitoring" panel sat six lines below the
 real monitoring engine on the same page, and the de-mocking boundary could not see it.** Found by asking
 F2-193's question of the page F2-193 had just edited. `ConnectorsPage` renders `LiveControlTests`, which drives

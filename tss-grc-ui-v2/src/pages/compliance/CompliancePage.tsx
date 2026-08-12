@@ -307,6 +307,36 @@ export function CompliancePage() {
       .slice(0, 6);
   }, [controls.data]);
 
+  /**
+   * F2-195 — the overall compliance score, on the same definition the per-framework rings above
+   * already use (implemented + half credit for partial, over the framework's controls). The KPI used
+   * to read a flat `"87%"` with a `+4%` trend while this page was already rendering real coverage
+   * gauges fifteen lines below it; measured live, the real figure is **66%** and the server's own
+   * `/dashboard/stats.complianceScore` says **70** — so the tile overstated by ~20 points.
+   *
+   * Deliberately computed over ALL controls, not `frameworkCoverage`, which is `.slice(0, 6)`d for
+   * the ring cluster: reusing that array would have scored the tenant on its six largest frameworks
+   * and silently excluded the rest.
+   */
+  const overallCoveragePct = useMemo(() => {
+    const rows = controls.data;
+    if (rows.length === 0) return null;
+    const impl = rows.filter(c => c.status === 'IMPLEMENTED').length;
+    const partial = rows.filter(c => c.status === 'PARTIAL').length;
+    return Math.round(((impl + partial * 0.5) / rows.length) * 100);
+  }, [controls.data]);
+
+  // F2-195 — the evidence-library size, replacing a hard-coded `"1,283"` (real answer: 78, so the
+  // tile was 16× high). `totalElements` off a size-1 page, because the count is the whole claim.
+  const [evidenceCount, setEvidenceCount] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    evidenceApi.items(0, 1)
+      .then(p => { if (live) setEvidenceCount(p.totalElements ?? null); })
+      .catch(() => { if (live) setEvidenceCount(null); });
+    return () => { live = false; };
+  }, []);
+
   const changeS = useEntityState<RegulatoryChangeDto>();
   const engageS = useEntityState<AuditEngagementDto>();
 
@@ -766,8 +796,12 @@ export function CompliancePage() {
       <div className="kpi-grid">
         <Kpi Icon={BookOpenCheck}  label={t('complianceKpiFrameworks')} value={new Set(controls.data.map(c => c.framework)).size} tone="primary" onClick={() => setTab('frameworks')} />
         <Kpi Icon={ClipboardCheck} label={t('complianceKpiControls')}   value={controls.data.length} tone="success" onClick={() => setTab('controls')} />
-        <Kpi Icon={FileCheck2}     label={t('complianceKpiEvidence')}   value="1,283" tone="info" onClick={() => setTab('findings')} />
-        <Kpi Icon={Award}          label={t('complianceKpiScore')}      value="87%" trend={{ dir: 'up', value: '+4%' }} tone="success" onClick={() => setTab('scorecard')} />
+        <Kpi Icon={FileCheck2}     label={t('complianceKpiEvidence')}
+          value={evidenceCount === null ? null : evidenceCount.toLocaleString()}
+          emptyHint={t('complianceKpiEvidenceEmpty')} tone="info" onClick={() => setTab('findings')} />
+        <Kpi Icon={Award}          label={t('complianceKpiScore')}
+          value={overallCoveragePct === null ? null : `${overallCoveragePct}%`}
+          emptyHint={t('complianceKpiScoreEmpty')} tone="success" onClick={() => setTab('scorecard')} />
       </div>
       <OverviewStrip
         storageKey="overview.compliance"

@@ -2802,13 +2802,28 @@ export interface RegulatoryTemplate {
   prefilledBody: string;
 }
 export type SaudiRegulator = 'NCA_HEY' | 'DATA_OFFICE' | 'CITC' | 'SAMA' | 'HRSD';
+/**
+ * Mirrors `module/incident/dto/IncidentStats`.
+ *
+ * F2-195 — `stats` was typed `unknown` and had no caller, so the Incidents KPI strip rendered
+ * `"4.2h"` for mean-time-to-resolve while this endpoint was already computing the real figure.
+ * `avgDays` is the mean of `ChronoUnit.DAYS.between(discoveryDate, resolutionDate)` over incidents
+ * that have both, taken from the 200 most recent — so it is **days**, and the fabricated value was
+ * not merely 26× low, it was in the wrong unit.
+ */
+export interface IncidentStatsDto {
+  total: number; open: number; investigating: number; resolved: number;
+  critical: number; high: number;
+  /** Mean days from discovery to resolution. Days, not hours. */
+  avgDays: number;
+}
 export const incidentApi = {
   list:    (page = 0, size = 50) => api.get<PageResponse<IncidentDto>>(`/api/v1/incidents${pageQ(page, size)}`),
   get:     (id: number) => api.get<IncidentDto>(`/api/v1/incidents/${id}`),
   create:  (body: IncidentRequest) => api.post<IncidentDto>('/api/v1/incidents', body),
   update:  (id: number, body: IncidentRequest) => api.put<IncidentDto>(`/api/v1/incidents/${id}`, body),
   remove:  (id: number) => api.delete<void>(`/api/v1/incidents/${id}`),
-  stats:   () => api.get<unknown>('/api/v1/incidents/stats'),
+  stats:   () => api.get<IncidentStatsDto>('/api/v1/incidents/stats'),
   // NIST 800-61 lifecycle
   advancePhase:    (id: number) => api.post<IncidentPhaseSnapshot>(`/api/v1/incidents/${id}/advance-phase`),
   setPhase:        (id: number, phase: string) => api.post<IncidentPhaseSnapshot>(`/api/v1/incidents/${id}/set-phase`, { phase }),

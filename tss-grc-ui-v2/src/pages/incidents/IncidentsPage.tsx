@@ -30,7 +30,7 @@ import { useLiveRefresh } from '../../lib/useLiveRefresh';
 import { LivePulse } from '../../components/ui/LivePulse';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
-import { incidentApi, ApiError, type IncidentDto, type IncidentRequest, type RegulatoryTemplate, type SaudiRegulator } from '../../lib/api';
+import { incidentApi, ApiError, type IncidentDto, type IncidentRequest, type IncidentStatsDto, type RegulatoryTemplate, type SaudiRegulator } from '../../lib/api';
 import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../lib/toast';
 import { INCIDENTS } from './mockIncidents';
@@ -131,6 +131,21 @@ export function IncidentsPage() {
   const [templatesOpen, setTemplatesOpen] = useState<{ incident: IncidentDto; templates: RegulatoryTemplate[] } | null>(null);
 
   const incidents = useApiList<IncidentDto>(() => incidentApi.list(0, 100), INCIDENTS);
+
+  // F2-195 — mean time to resolve, from the server. The KPI below used to read `"4.2h"` with a
+  // `−1.1h` trend, both invented: `/incidents/stats` already returned `avgDays` (mean days between
+  // discoveryDate and resolutionDate) and measured **4.5 days** in dev, so the tile understated
+  // incident response by 26× *and* in the wrong unit. Null while loading or on failure, which the
+  // Kpi tile renders as an em-dash rather than a zero (UX-008) — "not measured yet" is the truth
+  // during a fetch, and a "0h" MTTR would be a better-looking lie than the one being removed.
+  const [incidentStats, setIncidentStats] = useState<IncidentStatsDto | null>(null);
+  useEffect(() => {
+    let live = true;
+    incidentApi.stats()
+      .then(s => { if (live) setIncidentStats(s); })
+      .catch(() => { if (live) setIncidentStats(null); });
+    return () => { live = false; };
+  }, []);
 
   // DD-71: merge intake-promoted rows into the visible register so a
   // triager who hits "Promote" on a security-event intake actually sees
@@ -450,8 +465,14 @@ export function IncidentsPage() {
           onClick={() => setTab('register')} active={tab === 'register'} />
         <Kpi Icon={Flame}        label={t('incidentsKpiCritical')} value={critical}    tone="danger"
           onClick={() => setAdvFilters({ severity: 'CRITICAL' })} active={advFilters.severity === 'CRITICAL'} />
-        <Kpi Icon={Timer}        label={t('incidentsKpiMttr')}     value="4.2h" trend={{ dir: 'down', value: '−1.1h' }} tone="success"
+        <Kpi Icon={Timer}        label={t('incidentsKpiMttr')}
+          value={incidentStats ? `${incidentStats.avgDays.toFixed(1)}${t('incidentsKpiMttrDayUnit')}` : null}
+          emptyHint={t('incidentsKpiMttrEmpty')} tone="success"
           to="/incidents/rca" />
+        {/* F2-195 — no `trend` prop. The value is now real, but a trend is a SECOND claim: it
+            asserts a prior-period figure, and nothing in the platform stores an MTTR time series.
+            Wiring the value and keeping the trend would have left the half of the fabrication that
+            implies history exists. */}
         <Kpi Icon={CheckCircle2} label={t('incidentsKpiClosed')}   value={closed} tone="primary"
           onClick={() => setAdvFilters({ status: 'CLOSED' })} active={advFilters.status === 'CLOSED'} />
       </div>

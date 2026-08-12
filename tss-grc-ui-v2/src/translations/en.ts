@@ -944,6 +944,7 @@ export const en = {
   cyberKpiVuln: 'Open Vulnerabilities',
   cyberKpiIncidents: 'Critical Incidents',
   cyberKpiCompliance: 'NCA ECC Score',
+  cyberKpiComplianceEmpty: 'Not computed — no NCA ECC controls in the register for this organisation',
   cyberTabControls: 'Controls',
   cyberTabSubControls: 'Sub-Controls',
   cyberTabAssessments: 'Assessments',
@@ -967,8 +968,13 @@ export const en = {
   bcmSub: 'BIA, BCP, DRP and exercises aligned with ISO 22301.',
   bcmKpiPlans: 'BCM Plans',
   bcmKpiProcesses: 'Critical Processes',
-  bcmKpiExercises: 'Exercise Pass Rate',
+  // F2-195 — `bcmKpiExercises` ("Exercise Pass Rate") is retired: the exercise register stores a
+  // per-exercise score and no pass/fail outcome, so a pass rate cannot be computed from it without
+  // inventing a threshold. The tile now reports what the data supports.
+  bcmKpiExerciseScore: 'Mean Exercise Score',
+  bcmKpiExerciseScoreEmpty: 'Not computed — no exercise has been scored yet',
   bcmKpiRto: 'RTO Compliance',
+  bcmKpiRtoEmpty: 'Not computed — actual recovery times are recorded against plan invocations, which this page does not yet read',
   bcmTabPlans: 'BCM Plans',
   bcmTabProcesses: 'Critical Processes',
   bcmTabBia: 'BIA',
@@ -1004,6 +1010,9 @@ export const en = {
   privacyKpiActivities: 'Processing Activities',
   privacyKpiDsr: 'Open DSRs',
   privacyKpiConsent: 'Consent Coverage',
+  // F2-195 — shown instead of a number when no consent record exists, so an absent rate cannot
+  // read as the flat "98%" this tile used to assert regardless of the tenant's data.
+  privacyKpiConsentEmpty: 'Not computed — no consent records for this organisation yet',
   privacyKpiBreaches: 'Open Breaches',
   privacyTabDsr: 'Data Subject Requests',
   privacyTabBreaches: 'Data Breaches',
@@ -1039,7 +1048,11 @@ export const en = {
   complianceKpiFrameworks: 'Active Frameworks',
   complianceKpiControls: 'Controls Tested',
   complianceKpiEvidence: 'Evidence Items',
+  complianceKpiEvidenceEmpty: 'Not available — the evidence library could not be read',
   complianceKpiScore: 'Compliance Score',
+  // F2-195 — an unscored tenant gets an em-dash, never a percentage. "0%" would assert a measured
+  // total failure; the truth when no control has been assessed is that there is no score.
+  complianceKpiScoreEmpty: 'Not computed — no controls in the register to score',
   complianceTabControls: 'Controls',
   complianceTabInternal: 'Internal Audit',
   complianceTabExternal: 'External Audit',
@@ -3733,6 +3746,9 @@ export const en = {
   incidentsKpiOpen: 'Open Incidents',
   incidentsKpiCritical: 'Critical',
   incidentsKpiMttr: 'Mean TTR',
+  // F2-195 — the unit is DAYS. `/incidents/stats` returns `avgDays`; the tile used to say "4.2h".
+  incidentsKpiMttrDayUnit: 'd',
+  incidentsKpiMttrEmpty: 'Not computed — no resolved incident has both a discovery and a resolution date',
   incidentsKpiClosed: 'Closed (30d)',
   incidentsTabRegister: 'Register',
   incidentsTabTimeline: 'Timeline',

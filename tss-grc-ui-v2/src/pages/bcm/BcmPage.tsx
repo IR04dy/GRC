@@ -174,6 +174,15 @@ export function BcmPage() {
   const allBia = bia.data;
   const exercises = useApiList<BcmExerciseDto>(() => bcmApi.exercises(0, 200), BCM_EXERCISES);
 
+  // F2-195 — mean score over exercises that actually carry one. `null` (not 0) when none do, so an
+  // unexercised BCM programme renders an em-dash instead of a number: a "0" here would read as
+  // "we exercised and failed", which is a different and equally false claim.
+  const exerciseMeanScore = useMemo(() => {
+    const scored = exercises.data.filter(e => typeof e.score === 'number');
+    if (scored.length === 0) return null;
+    return Math.round(scored.reduce((sum, e) => sum + (e.score as number), 0) / scored.length);
+  }, [exercises.data]);
+
   // ── DD-47: filter modal — tab-aware ──────────────────────────────
   const [filterOpen, setFilterOpen] = useState(false);
   const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
@@ -502,9 +511,29 @@ export function BcmPage() {
       />
       <div className="kpi-grid">
         <Kpi Icon={RefreshCw}  label={t('bcmKpiPlans')}     value={plans.data.length} tone="primary" to="/bcm/plans" />
-        <Kpi Icon={Activity}   label={t('bcmKpiProcesses')} value={procs.data.length || 38} tone="info" onClick={() => setTab('processes')} active={tab === 'processes'} />
-        <Kpi Icon={Gauge}      label={t('bcmKpiExercises')} value="92%" trend={{ dir: 'up', value: '+5%' }} tone="success" onClick={() => setTab('exercises')} active={tab === 'exercises'} />
-        <Kpi Icon={TimerReset} label={t('bcmKpiRto')}       value="76%" trend={{ dir: 'down', value: '−2%' }} tone="warning" to="/bcm/bia" />
+        {/* F2-195 — was `procs.data.length || 38`: `0 || 38` is 38, so a tenant with no critical
+            processes recorded saw 38 of them. Same shape as the RoPA tile and as F2-52's
+            `roles.length || 7`. */}
+        <Kpi Icon={Activity}   label={t('bcmKpiProcesses')} value={procs.data.length} tone="info" onClick={() => setTab('processes')} active={tab === 'processes'} />
+        {/* F2-195 — was `"92%"` with a `+5%` trend. 92 is exactly exercise #1's `score`, presented
+            as an aggregate. The register stores a per-exercise `score` and no pass/fail outcome, so
+            the honest aggregate over this data is the MEAN SCORE, and the label now says so — a
+            "pass rate" would need a pass threshold that exists nowhere in the schema. (A real DR
+            *plan*-test pass rate does exist at GET /api/v1/bcm/dr-test-trend — 67% in dev — but DR
+            plan tests are not BCM exercises, so rendering it here would trade one wrong number for
+            another.) */}
+        <Kpi Icon={Gauge}      label={t('bcmKpiExerciseScore')}
+          value={exerciseMeanScore === null ? null : `${exerciseMeanScore}`}
+          emptyHint={t('bcmKpiExerciseScoreEmpty')} tone="success"
+          onClick={() => setTab('exercises')} active={tab === 'exercises'} />
+        {/* F2-195 — was `"76%"` with a `−2%` trend, and RTO attainment is not computed anywhere the
+            frontend can reach. The real ingredients DO exist: `bcm_lc.Invocation.actualRtoHours`
+            (populated on 2 of 3 dev invocations) against the BIA target via `affectedBiaIds`, served
+            by GET /api/bcm-lc/invocations — which has no api-client method, so wiring it is a
+            feature, not a de-fabrication. Rendered as not-measured until then: the em-dash is the
+            true state, and a number here is the one thing that cannot be. */}
+        <Kpi Icon={TimerReset} label={t('bcmKpiRto')} value={null}
+          emptyHint={t('bcmKpiRtoEmpty')} tone="warning" to="/bcm/bia" />
       </div>
 
       <OverviewStrip
