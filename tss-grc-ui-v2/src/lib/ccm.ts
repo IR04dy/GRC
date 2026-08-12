@@ -9,8 +9,32 @@
 //
 // This is the continuous-controls-monitoring pattern, scoped to the
 // Saudi-aligned controls our compliance module already lists.
+//
+// ⚠⚠ WHAT THIS FILE ACTUALLY IS (F2-194, measured 2026-08-12). `CCM_CHECKS` is a
+// hard-coded corpus, not a feed. The platform has a REAL continuous-control-
+// monitoring engine — `ccm.control_test_definition` + `ControlTestRunner` + a
+// 60-second `CcmSchedulerService` tick, read by `lib/ccmApi.ts` and rendered by
+// `pages/ccm/CcmDashboardPage` — and this catalogue is unrelated to it. Until
+// F2-194 a second panel computed a "% CCM health" badge, six KPIs, a ticking SLA
+// countdown over synthesised stale-evidence breaches and a coverage matrix citing
+// NCA ECC / ISO 27001 / SOC 2 / PDPL codes from these rows, and it was mounted on
+// the Connectors page directly beneath the real engine's panel. That panel is
+// gone; `connectorsProvenance.test.ts` keeps it gone.
+//
+// ⚠ The `_daysAgo` timestamps below are generated from `Date.now()` at module
+// load, with the stated intent that the demo "always shows realistic freshness
+// without hard-coded dates going stale". That is the sharpest thing about this
+// file: a fabrication anchored to the clock can never LOOK stale, so nothing
+// about it degrades into an obvious tell the way F2-193's frozen 2026-05-05
+// connector stamps eventually did.
+//
+// ⚠ Still rendered: `lib/assets.ts` (`ccmChecksForAsset`) puts these rows on the
+// Asset Register, and `lib/mockWorkflows.ts` feeds them into the cross-module
+// workflow list. Both of those hosts are themselves hard-coded corpora, so they
+// belong to F2-15's de-mocking queue rather than to this slice — and F2-194's
+// census is the reason the queue's boundary is now known to be wrong: it was
+// drawn by FILENAME, and nothing here is named `mock*`.
 
-import type { ConnectorDefinition } from './connectors';
 import { CONNECTOR_REGISTRY } from './connectors';
 import type { WorkflowInstance } from './workflows';
 
@@ -206,50 +230,14 @@ export const RESULT_TONE: Record<CcmCheck['lastResult'], 'success' | 'info' | 'w
 };
 
 // ─── Aggregation ────────────────────────────────────────────────────────────
-
-export interface CcmCoverage {
-  totalChecks: number;
-  fresh: number;
-  stale: number;
-  expired: number;
-  noData: number;
-  passing: number;
-  warning: number;
-  failing: number;
-  /** Distinct controls covered. */
-  controlsCovered: number;
-  /** Connectors actively contributing CCM checks. */
-  activeConnectors: number;
-}
-
-export function aggregateCoverage(checks: ReadonlyArray<CcmCheck> = CCM_CHECKS, now: Date = new Date()): CcmCoverage {
-  let fresh = 0, stale = 0, expired = 0, noData = 0;
-  let passing = 0, warning = 0, failing = 0;
-  const ctrlSet = new Set<string>();
-  const connSet = new Set<string>();
-
-  for (const c of checks) {
-    const f = classifyFreshness(c, now);
-    if (f === 'FRESH') fresh++;
-    else if (f === 'STALE') stale++;
-    else if (f === 'EXPIRED') expired++;
-    else noData++;
-
-    if (c.lastResult === 'PASS') passing++;
-    else if (c.lastResult === 'WARN') warning++;
-    else if (c.lastResult === 'FAIL') failing++;
-
-    connSet.add(c.connectorId);
-    for (const ctrl of c.controls) ctrlSet.add(`${ctrl.framework}:${ctrl.code}`);
-  }
-  return {
-    totalChecks: checks.length,
-    fresh, stale, expired, noData,
-    passing, warning, failing,
-    controlsCovered: ctrlSet.size,
-    activeConnectors: connSet.size,
-  };
-}
+//
+// F2-194 removed `aggregateCoverage` and the `CcmCoverage` shape with it. Its
+// only consumer was `components/compliance/CcmDashboard`, the fabricated panel
+// that rendered a "% CCM health" badge and a control-coverage count from this
+// hard-coded catalogue while the real engine's own dashboard sat on the same
+// page. Leaving the computation behind after retiring its only render path
+// would leave a decoy: the next reader would find a coverage aggregator and
+// assume something measures coverage.
 
 // ─── Workflow synthesis ─────────────────────────────────────────────────────
 //
@@ -309,11 +297,8 @@ export function synthesiseStaleEvidenceWorkflows(
   return out;
 }
 
-// ─── Helper for connector → checks ──────────────────────────────────────────
-export function checksForConnector(connectorId: string, checks: ReadonlyArray<CcmCheck> = CCM_CHECKS): CcmCheck[] {
-  return checks.filter(c => c.connectorId === connectorId);
-}
-
-export function connectorById(id: string): ConnectorDefinition | undefined {
-  return CONNECTOR_REGISTRY.find(c => c.id === id);
-}
+// ─── Helpers ────────────────────────────────────────────────────────────────
+//
+// `checksForConnector` and `connectorById` went with the same panel (F2-194).
+// The one surviving consumer of this module's catalogue is `lib/assets.ts`,
+// which is itself a hard-coded corpus — see the header note.

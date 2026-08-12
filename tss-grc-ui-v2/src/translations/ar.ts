@@ -1202,27 +1202,7 @@ export const ar = {
   engStatusUpcoming:       'قادم',
 
   // المراقبة المستمرّة للضوابط — السبرنت الرابع.
-  ccmTitle:                'المراقبة المستمرّة للضوابط',
-  ccmSub:                  'كل فحص للموصِّل يُقدّم دليلاً على ضابط أو أكثر. للدليل نافذة صلاحية؛ الفحوص المُتَقادمة تتحوّل إلى سير عمل يتابعه محرّك SLA.',
-  ccmHealthSuffix:         'حديث',
-  ccmKpiChecks:            'فحوص CCM',
-  ccmKpiFresh:             'حديث',
-  ccmKpiStale:             'متقادم',
-  ccmKpiExpired:           'منتهي',
-  ccmKpiControls:          'الضوابط المُغطّاة',
-  ccmKpiConnectors:        'الموصِّلات النشطة',
-  ccmStaleFeedTitle:       'الأدلّة المُوشكة على الانتهاء / المنتهية',
-  ccmStaleFeedSub:         'الفحوص المُتَقادمة تحتاج إلى سحب جديد من الموصِّل قبل أن تنتهي صلاحيتها وتُطلق ملاحظة CCM.',
-  ccmCoverageTitle:        'مصفوفة تغطية الموصِّلات',
-  ccmChecksLabel:          'فحوص',
-  ccmAutoRefresh:          'إعادة التصنيف كل دقيقة وفق آخر مزامنة للموصِّلات.',
-  ccmFreshnessFresh:       'حديث',
-  ccmFreshnessStale:       'متقادم',
-  ccmFreshnessExpired:     'منتهي',
   ccmFreshnessNo_data:     'لا توجد بيانات',
-  ccmAgoMin:               'أقل من ساعة',
-  ccmAgoHours:             'منذ {n} ساعة',
-  ccmAgoDays:              'منذ {n} يوم',
 
   // صندوق الموافقات عبر الوحدات — السبرنت الخامس.
   approvalsSidebar:        'الموافقات',

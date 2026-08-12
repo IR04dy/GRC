@@ -1211,27 +1211,7 @@ export const en = {
   engStatusUpcoming:       'Upcoming',
 
   // Continuous Control Monitoring (CCM) — Sprint 4.
-  ccmTitle:                'Continuous Control Monitoring',
-  ccmSub:                  'Each connector check provides evidence for one or more controls. Evidence has a freshness window; stale checks become workflow instances tracked by the SLA engine.',
-  ccmHealthSuffix:         'fresh',
-  ccmKpiChecks:            'CCM checks',
-  ccmKpiFresh:             'Fresh',
-  ccmKpiStale:             'Stale',
-  ccmKpiExpired:           'Expired',
-  ccmKpiControls:          'Controls covered',
-  ccmKpiConnectors:        'Active connectors',
-  ccmStaleFeedTitle:       'Evidence about to expire / already expired',
-  ccmStaleFeedSub:         'Stale checks need a fresh pull from the connector before they tip into expired and trigger a CCM finding.',
-  ccmCoverageTitle:        'Connector coverage matrix',
-  ccmChecksLabel:          'checks',
-  ccmAutoRefresh:          'Re-classifies every minute against connector last-sync timestamps.',
-  ccmFreshnessFresh:       'Fresh',
-  ccmFreshnessStale:       'Stale',
-  ccmFreshnessExpired:     'Expired',
   ccmFreshnessNo_data:     'No data',
-  ccmAgoMin:               '<1h ago',
-  ccmAgoHours:             '{n}h ago',
-  ccmAgoDays:              '{n}d ago',
 
   // Cross-module approval inbox — Sprint 5.
   approvalsSidebar:        'Approvals',

@@ -1717,6 +1717,50 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-194 CLOSED 2026-08-12 — a fabricated "Continuous Control Monitoring" panel sat six lines below the
+real monitoring engine on the same page, and the de-mocking boundary could not see it.** Found by asking
+F2-193's question of the page F2-193 had just edited. `ConnectorsPage` renders `LiveControlTests`, which drives
+the real engine (`/api/v1/ccm`: persisted `control_test_definition` rows, a real runner per test, a 60-second
+`CcmSchedulerService` tick) — and directly beneath it rendered `components/compliance/CcmDashboard`, which
+computed a *"% CCM health"* badge, six KPIs, a ticking `SlaCountdown` over **synthesised** stale-evidence
+breaches and a coverage matrix citing **NCA ECC 2-3-1/2-4/2-5/2-6, ISO 27001 A.8.24/A.8.32, SOC 2
+CC6.1/CC7.4, PDPL Art. 29 and SAMA CSF 3.1.5** — every figure from `lib/ccm.ts`'s 9 hard-coded `CCM_CHECKS`.
+🔑 **Why this one outlived F2-193's connector catalogue: its timestamps are generated from `Date.now()` at
+module load, so the fabrication can never LOOK stale** — where F2-193's frozen 2026-05-05 stamps were three
+months out of date and visibly so. ⚠⚠ **The measurement that makes it more than one component:** the
+de-mocking boundary is drawn by **filename**. F2-15 counts 15 files named `mock*`; its own row already
+corrected that ("the wrong boundary — it was drawn by filename") by adding 7 modules found with a **second**
+rule — modules with **numeric** ids — and `lib/ccm.ts` keys its rows `cn-tenable.s3-encryption`, so it is in
+**neither** count. 🔑 **A boundary correction made by a second rule inherits a second blind spot.** And
+W2-1b's `demoFallbackContract` ratchet matches **`/mock/i` imports**, so it cannot see a corpus living in a
+file called `ccm.ts` or `assets.ts` by construction. Census by **shape** instead of name (exported const array
+of ≥3 object literals, imported by another product file): **52 files declare 105 corpora, exactly 1 of those
+files is named `mock*`.** The population is genuinely mixed — `moduleAnchors`/`moduleLifecycles` are nav and
+lifecycle **configuration**, `AUTHORITIES` is the regulator catalogue W2-1a-i deliberately kept — so the
+fabricated-tenant-record members (`ASSETS` 19 across 5 importers, `APPROVAL_REQUESTS` 12, `CAPAS` 20,
+`AUDIT_UNIVERSE` 26, `AI_MODELS` 8 against a real `ml_model` table, `BACKUP_JOBS`, `SCENARIOS`, `SLOS`,
+`EMISSION_FACTORS`…) are **filed, not fixed**: classifying ~50 corpora quickly would produce fifty fluent
+unverified reasons, which is exactly the failure F2-188 recorded. **Fixed here:** ADR-017 §D-5 already
+ratified *"retire the fabricated page"* for this shape (F2-42), so the panel, its only mount, its 20 dead
+translation keys (×2 languages) and the `aggregateCoverage`/`CcmCoverage`/`connectorById`/`checksForConnector`
+computation behind it are gone — leaving a coverage aggregator would imply something measures coverage.
+`lib/ccm.ts` now carries a header naming the real engine, because `CCM_CHECKS` still reaches the Asset
+Register and the cross-module workflow list, whose hosts are themselves hard-coded corpora (F2-15's queue).
+Gate: `connectorsProvenance.test.ts` (7 tests) on `boardPackProvenance`'s model — comment-stripped source,
+and a **pairing** assertion, since a page that merely deleted its monitoring panel would satisfy the absence
+half alone. ⚠⚠ **Two of my own assertions were satisfied by something that was not the claim, and the
+mutation harness caught both**: the prose-retention check passed on the *type* `CcmDashboardSnapshot`, and the
+engine-present check passed on an **import** rather than a call (that mutation SURVIVED until fixed). 🔑
+**Third and fourth instances in one lineage of a substring check satisfied by something other than the
+claim** — F2-192's `list`, F2-193's quotation, now a type name and an import. ⚠ One mutation was also my own
+fault again (`getCcmDashboard()` has two call sites and I replaced one — F2-192's "1 of 6 literals" repeated);
+the harness now mutates **every** occurrence and prints the site count. Verified: FE **504/504 across 52
+files** (+7), `tsc` clean, `vite build` clean, mutation **6/6**, probe **6/6** — the surviving panel's three
+calls all answer, `run-now` executed a runner and recorded a run (`ccm.control_test_run` 3 → 4 with an
+evidence hash). ⚠ Stated honestly: only **1 of 10** definitions is enabled and `passRateLast24h` is **0.0**,
+so the real engine is real and barely exercised — which is the true state the fabricated badge was covering.
+**0 backend changes, 0 migrations.**
+
 ✔ **F2-193 CLOSED 2026-08-12 — the connector screen told an operator that five connectors with no backend
 were actively ingesting, and summed their invented counts into a KPI linking to an empty queue.** Found by
 following F2-192's closing instruction ("assume a third shape exists") into the one `TOLERATED` bucket it had

@@ -29,7 +29,6 @@ import {
 } from '../../lib/integrationsApi';
 import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { ApiError } from '../../lib/api';
-import { CcmDashboard } from '../../components/compliance/CcmDashboard';
 
 /**
  * Connectors page — DD-62, corrected by F2-193.
@@ -93,13 +92,16 @@ export function ConnectorsPage() {
         <LiveIntegrationAdapters />
       </div>
 
-      {/* Sprint 4 — Continuous Control Monitoring panel sits above the
-          connector registry. Every check the connectors run is graded by
-          freshness; stale or expired evidence becomes a workflow instance
-          fed into the cross-module SLA pulse. */}
-      <div style={{ marginBottom: 16 }}>
-        <CcmDashboard />
-      </div>
+      {/* F2-194 — components/compliance/CcmDashboard used to sit here, a second
+          "Continuous Control Monitoring" panel
+          directly beneath the real engine above. It computed a "% CCM health"
+          badge, six KPIs, a ticking SLA countdown over synthesised stale-evidence
+          breaches and a coverage matrix citing NCA ECC / ISO 27001 / SOC 2 / PDPL
+          codes — all from `lib/ccm.ts`'s hard-coded CCM_CHECKS, whose timestamps
+          are generated from Date.now() so the fabrication could never look stale.
+          A façade beside a working subsystem, on the same page: exactly the shape
+          ADR-017 D-5 ratified retiring in F2-42. The real engine's own dashboard
+          is at /ccm/dashboard, linked from the panel above. */}
 
       <Card title={t('connectorsRegistryTitle')} Icon={Plug}
         action={<select value={filter} onChange={e => setFilter(e.target.value as 'ALL' | 'AUTOMATED' | ConnectorTrigger)}

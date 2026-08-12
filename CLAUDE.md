@@ -718,6 +718,38 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   from a claim forces every correction to paraphrase away its own evidence.** `unquoted()` strips double-quoted
   spans first, pinned in both directions, and a deliberate SURVIVES mutation records that the stripping is
   load-bearing on the claim side **only** — no reason quotes a denial.
+  ⚠⚠ **Asking that question of the page I had just fixed found a second façade six lines below the first**
+  (F2-194, measured 2026-08-12). `ConnectorsPage` renders `LiveControlTests`, which drives the **real** CCM
+  engine (`/api/v1/ccm`, persisted `control_test_definition` rows, a real runner, a 60-second scheduler tick) —
+  and directly beneath it rendered `components/compliance/CcmDashboard`, a **fabricated** panel computing a
+  *"% CCM health"* badge, six KPIs, a ticking `SlaCountdown` over synthesised stale-evidence breaches and a
+  coverage matrix citing NCA ECC / ISO 27001 / SOC 2 / PDPL / SAMA CSF controls — all from `lib/ccm.ts`'s nine
+  hard-coded rows. 🔑 **Why it outlived F2-193's connector catalogue: its timestamps are generated from
+  `Date.now()` at module load, so the fabrication can never LOOK stale.** F2-193's were frozen at 2026-05-05 and
+  three months out of date, which is part of what gave it away. **A clock-anchored fabrication has no tell.**
+  ⚠⚠ **The de-mocking boundary is drawn by FILENAME, and that is now measured.** F2-15 counts 15 files named
+  `mock*` (3,550 lines); its own row corrected the boundary once by adding 7 modules found with a **second**
+  rule (modules with **numeric** ids) — and `lib/ccm.ts` keys its rows `cn-tenable.s3-encryption`, so it is in
+  **neither** count. 🔑 **A boundary correction made by a second rule inherits a second blind spot.**
+  `demoFallbackContract.test.ts` ratchets **`/mock/i` imports**, so a corpus in a file called `ccm.ts` or
+  `assets.ts` is invisible to the one enforced instrument here **by construction**. Census by shape (an exported
+  `const` array of ≥3 object literals that another product file imports): **52 files, 105 corpora, exactly 1 of
+  those files named `mock*`**. ⚠ The population is genuinely mixed — `moduleAnchors`/`moduleLifecycles` are nav
+  and lifecycle **configuration** and `AUTHORITIES` is the regulator catalogue W2-1a-i deliberately kept — so
+  classification needs reading, per corpus; **F2-194 fixed one member and filed the rest rather than
+  manufacturing ~50 unverified reasons** (F2-188's failure mode). Retiring the panel was the **ratified** answer,
+  not a new product call: ADR-017 §D-5 already chose *"retire the fabricated page"* for this shape in F2-42.
+  ⚠⚠ **Two assertions in my own new gate were satisfied by something that was not the claim, and only the
+  mutation harness saw it.** *"The prose explaining the removal is still there"* asserted the bare word
+  `CcmDashboard` and passed on the **type** `CcmDashboardSnapshot` imported from the real engine's client;
+  *"the page drives the real engine"* used `toContain('getCcmDashboard')` and passed on the **import statement**,
+  so a mutation replacing the call with `Promise.resolve(null)` SURVIVED. 🔑 **Third and fourth instances in one
+  lineage of a substring check satisfied by something other than the claim** — F2-192's reason citing `list`,
+  F2-193's reason quoting the sentence it corrected, then a type name and an import. **Assert the call shape
+  (`name\\s*\\(`), and assert a retained explanation by a string that appears nowhere else.**
+  ⚠ **And check the site count before believing a surviving mutation**: `getCcmDashboard()` has two call sites
+  and the first mutation replaced one, which reads exactly like a hole in the gate. The harness now replaces
+  every occurrence and prints how many it touched.
   ⚠ **The audit did find one real defect, and it was far narrower than the claim**: `CommitteeScheduledSweep`
   flipped action items to OVERDUE **in place** instead of calling `markOverdue` (whose javadoc said *"Called by
   the scheduled sweep"*). Since the sweep is the only producer in production, **no `ACTION_OVERDUE` audit row
