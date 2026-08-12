@@ -258,7 +258,9 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'pdpl-dash',  to: '/privacy/dashboard',     Icon: LayoutDashboard, labelKey: 'pdplDashSidebar' },
       { id: 'privacy',    to: '/privacy',               Icon: Fingerprint,     labelKey: 'modPdpl' },
-      { id: 'ropa',       to: '/ropa',                  Icon: Files,           labelKey: 'ropaSidebar' },
+      // F2-198 — points at the ROPA tab of the real register (privacy.processing_activities,
+      // 11 rows) instead of the retired /ropa page, which rendered 9 invented activities.
+      { id: 'ropa',       to: '/privacy?tab=ropa',      Icon: Files,           labelKey: 'ropaSidebar' },
       { id: 'data-flow',  to: '/privacy/data-flow',     Icon: Spline,          labelKey: 'dataFlowSidebar' },
       { id: 'subp',       to: '/privacy/subprocessors', Icon: Share2,          labelKey: 'subpSidebar' },
       { id: 'proc-dd',    to: '/processor-assessments', Icon: ClipboardCheck,  labelKey: 'procSidebar' },

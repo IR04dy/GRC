@@ -2411,6 +2411,13 @@ export interface PrivacyRopaDto {
   id: number; activityNameEn: string; activityNameAr?: string;
   purposeEn?: string; legalBasis?: string;
   retentionPeriod?: string; status?: string;
+  /**
+   * F2-198 — PDPL Article 29 cross-border transfer flag. `GET /api/v1/privacy/ropa` returns the
+   * `ProcessingActivity` entity, so this has always been on the wire (probed: present on all 11
+   * rows, 5 true) — this type simply never declared it, which is why the retired `/ropa` page
+   * invented its own cross-border count instead of reading the register.
+   */
+  crossBorderTransfer?: boolean;
 }
 export interface PrivacyBreachRequest {
   titleEn: string; titleAr?: string;

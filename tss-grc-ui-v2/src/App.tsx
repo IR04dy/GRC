@@ -315,7 +315,6 @@ const ControlCrosswalkPage   = lazy(() => import('./pages/control-crosswalk/Cont
 //    backup-dr · white-label · csv-import.
 const BcmDependencyPage      = lazy(() => import('./pages/bcm-dependency/BcmDependencyPage').then(m => ({ default: m.BcmDependencyPage })));
 const BcmDependencyGraphPage = lazy(() => import('./pages/bcm/BcmDependencyGraphPage').then(m => ({ default: m.BcmDependencyGraphPage })));
-const RopaPage               = lazy(() => import('./pages/ropa/RopaPage').then(m => ({ default: m.RopaPage })));
 const EsgPage                = lazy(() => import('./pages/esg/EsgPage').then(m => ({ default: m.EsgPage })));
 const TcfdScenariosPage      = lazy(() => import('./pages/esg/TcfdScenariosPage').then(m => ({ default: m.TcfdScenariosPage })));
 const FinancedEmissionsPage  = lazy(() => import('./pages/esg/FinancedEmissionsPage').then(m => ({ default: m.FinancedEmissionsPage })));
@@ -810,8 +809,18 @@ export function App() {
               <Route path="/bcm/dependency"     element={<BcmDependencyGraphPage />} />
               <Route path="/bcm-dependency/legacy" element={<BcmDependencyPage />} />
 
-              {/* ROPA + consent management — B2 */}
-              <Route path="/ropa"               element={<RopaPage />} />
+              {/* F2-198 — `/ropa` was a whole page whose every figure came from a hard-coded
+                  catalogue: 9 invented processing activities, five KPI tiles computed over them
+                  (one a red "needs review" badge), and a consent rollup claiming 142,310 active
+                  consents. The real PDPL Art. 31 register is `privacy.processing_activities` —
+                  11 rows, identical in dev and prod — and `PrivacyPage`'s ROPA tab already
+                  renders it from `privacyApi.ropa()` with a row link to the detail page.
+                  Building a second REAL ROPA screen here would have repeated F2-196's defect
+                  (three server-side DSR registers with disjoint vocabularies), so this redirects
+                  to the one that reads the database, per ADR-017 §D-5 and the F2-137 rule that a
+                  bookmark must land somewhere true. No query is preserved because the retired
+                  page took none — it selected rows from `useState`. */}
+              <Route path="/ropa"               element={<Navigate to="/privacy?tab=ropa" replace />} />
 
               {/* ESG / Saudi Green Initiative — C2 */}
               <Route path="/esg"                element={<EsgPage />} />

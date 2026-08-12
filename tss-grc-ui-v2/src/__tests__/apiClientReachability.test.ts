@@ -191,8 +191,6 @@ const KNOWN_UNREACHED: readonly string[] = [
   'lib/outsourcing.ts#listOverdueExitTests',
   'lib/outsourcing.ts#listOverdueReviews',
   'lib/tprmQuestionnaire.ts#getQtTemplate',
-  // Privacy / PDPL — 1
-  'lib/ropaWorkflows.ts#ropaWorkflowsBundle',
   // Platform services — 11
   'lib/api.ts#riskReportApi',
   'lib/digitalSignature.ts#listForEntity',

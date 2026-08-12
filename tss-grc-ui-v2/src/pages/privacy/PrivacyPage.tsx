@@ -370,7 +370,18 @@ export function PrivacyPage() {
             activities showing 142 entries for an organisation that has recorded none. Same shape
             F2-52 already fixed on the Admin page (`roles.length || 7`) and left here — its comment
             states the rule this restores: "The real count is the real count, including 0." */}
-        <Kpi Icon={FileText}    label={t('privacyKpiActivities')} value={ropa.data.length} tone="primary" to="/ropa" />
+        {/* F2-198 — `to` was `/ropa`, a page that rendered 9 invented activities from a
+            catalogue. It now points at this page's own ROPA tab, which lists the real register. */}
+        <Kpi Icon={FileText}    label={t('privacyKpiActivities')} value={ropa.data.length} tone="primary" to="/privacy?tab=ropa" />
+        {/* F2-198 — the one measurable figure the retired /ropa page surfaced that this screen did
+            not. `crossBorderTransfer` is already on the wire (5 of 11 activities in dev and prod),
+            and a PDPL Article 29 transfer out of the Kingdom is the fact a DPO is asked about, so
+            retiring the page must not silently drop it. Counted over the SAME `ropa.data` the
+            tile above counts, so the two can never disagree. */}
+        <Kpi Icon={Database}    label={t('privacyKpiCrossBorder')}
+          value={ropa.data.filter(r => r.crossBorderTransfer).length}
+          tone={ropa.data.some(r => r.crossBorderTransfer) ? 'warning' : 'success'}
+          to="/privacy?tab=ropa" />
         <Kpi Icon={Inbox}       label={t('privacyKpiDsr')}        value={openDsrs} tone="warning" to="/data-officer/dsr" />
         <Kpi Icon={Users}       label={t('privacyKpiConsent')}
           value={consentRate === null ? null : `${consentRate}%`}
