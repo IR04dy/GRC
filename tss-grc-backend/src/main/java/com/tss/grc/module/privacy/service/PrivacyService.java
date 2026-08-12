@@ -1,6 +1,7 @@
 package com.tss.grc.module.privacy.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.privacy.DsrRequestLifecycle;
 import com.tss.grc.module.privacy.entity.DataBreach;
 import com.tss.grc.module.privacy.entity.DataSubjectRequest;
 import com.tss.grc.module.privacy.entity.ProcessingActivity;
@@ -296,7 +297,7 @@ public class PrivacyService {
     @Transactional
     public DataSubjectRequest startDsr(Long id) {
         DataSubjectRequest r = getDsr(id);
-        if ("FULFILLED".equals(r.getStatus()) || "REJECTED".equals(r.getStatus())) {
+        if (DsrRequestLifecycle.isTerminal(r.getStatus())) {
             throw new IllegalArgumentException("DSR is already terminal (" + r.getStatus() + ")");
         }
         r.setStatus("IN_PROGRESS");
@@ -312,7 +313,7 @@ public class PrivacyService {
     @Transactional
     public DataSubjectRequest fulfilDsr(Long id) {
         DataSubjectRequest r = getDsr(id);
-        if ("FULFILLED".equals(r.getStatus()) || "REJECTED".equals(r.getStatus())) {
+        if (DsrRequestLifecycle.isTerminal(r.getStatus())) {
             throw new IllegalArgumentException("DSR is already terminal (" + r.getStatus() + ")");
         }
         r.setStatus("FULFILLED");
@@ -341,7 +342,7 @@ public class PrivacyService {
     @Transactional
     public DataSubjectRequest rejectDsr(Long id) {
         DataSubjectRequest r = getDsr(id);
-        if ("FULFILLED".equals(r.getStatus()) || "REJECTED".equals(r.getStatus())) {
+        if (DsrRequestLifecycle.isTerminal(r.getStatus())) {
             throw new IllegalArgumentException("DSR is already terminal (" + r.getStatus() + ")");
         }
         r.setStatus("REJECTED");
@@ -408,10 +409,12 @@ public class PrivacyService {
         long crossBorder   = ropaRepo.findByOrganisationIdAndCrossBorderTransferTrue(orgId).size();
         long highRiskRopa  = ropaRepo.findByOrganisationIdAndSpecialCategoryFlagTrue(orgId).size();
 
-        long dsrOpen = dsrRepo.countByOrganisationIdAndStatus(orgId, "PENDING")
-                     + dsrRepo.countByOrganisationIdAndStatus(orgId, "IN_PROGRESS")
-                     + dsrRepo.countByOrganisationIdAndStatus(orgId, "OPEN")
-                     + dsrRepo.countByOrganisationIdAndStatus(orgId, "NEW");
+        // F2-196: this was an inclusion list of four statuses and so answered 10 of 20 rows
+        // in dev and prod — it silently dropped ESCALATED, which is emphatically open. Open
+        // is now the complement of the declared terminal set, so a status nobody anticipated
+        // is counted and chased rather than excused. ESCALATED is also reported separately
+        // below as the at-risk bucket; being at risk does not stop it being open.
+        long dsrOpen = dsrRepo.countByOrganisationIdAndStatusNotIn(orgId, DsrRequestLifecycle.TERMINAL_LIST);
         long dsrSla  = dsrRepo.countByOrganisationIdAndStatus(orgId, "ESCALATED");
 
         long openBreaches = breachRepo.countByOrganisationIdAndStatus(orgId, "OPEN")

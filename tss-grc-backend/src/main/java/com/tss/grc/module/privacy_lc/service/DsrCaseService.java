@@ -4,6 +4,7 @@ import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
+import com.tss.grc.module.privacy_lc.DsrCaseLifecycle;
 import com.tss.grc.module.privacy_lc.dto.DsrCaseDto;
 import com.tss.grc.module.privacy_lc.entity.DsrCase;
 import com.tss.grc.module.privacy_lc.repository.DsrCaseRepository;
@@ -53,13 +54,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DsrCaseService {
 
-    private static final Map<String, Set<String>> ALLOWED = Map.of(
-        "INTAKE",             Set.of("VERIFYING_IDENTITY", "REJECTED", "EXTENDED"),
-        "VERIFYING_IDENTITY", Set.of("COLLECTING", "REJECTED", "EXTENDED"),
-        "COLLECTING",         Set.of("REDACTING", "REJECTED", "EXTENDED"),
-        "REDACTING",          Set.of("DELIVERED", "EXTENDED"),
-        "EXTENDED",           Set.of("VERIFYING_IDENTITY", "COLLECTING", "REDACTING", "DELIVERED", "REJECTED")
-    );
+    /**
+     * F2-196: the machine now lives in {@link DsrCaseLifecycle} because three other classes
+     * needed to know which of its states are terminal and each had invented its own answer —
+     * one of them wrongly, excluding EXTENDED from the statutory breach sweep. Read it there;
+     * do not restate it here or in a repository javadoc.
+     */
+    private static final Map<String, Set<String>> ALLOWED = DsrCaseLifecycle.ALLOWED;
 
     private final DsrCaseRepository repo;
     private final AuditLogService audit;
@@ -197,9 +198,7 @@ public class DsrCaseService {
 
     public List<DsrCaseDto> overdue() {
         Long orgId = TenantContext.requireOrganisationId();
-        return repo.findByOrganisationIdAndStatusNotInAndSlaDeadlineBefore(
-                orgId, List.of("DELIVERED", "REJECTED"), LocalDate.now()
-            ).stream()
+        return repo.findOverdueOpen(orgId, LocalDate.now()).stream()
             .map(DsrCaseDto::from).collect(Collectors.toList());
     }
 

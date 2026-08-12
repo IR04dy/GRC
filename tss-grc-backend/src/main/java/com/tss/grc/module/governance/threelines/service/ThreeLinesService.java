@@ -487,13 +487,13 @@ public class ThreeLinesService {
     }
 
     private long dsrOpenCount(Long orgId) {
-        // DsrCaseRepository has countByOrganisationIdAndStatus per-status;
-        // sum the "not closed" statuses. Cheap enough — there's a handful.
-        long total = 0;
-        for (String s : List.of("INTAKE", "VERIFYING_IDENTITY", "COLLECTING", "REDACTING", "EXTENDED")) {
-            total += dsrRepo.countByOrganisationIdAndStatus(orgId, s);
-        }
-        return total;
+        // F2-196: this summed an INCLUSION list of five open states. It happened to be
+        // complete for today's seven-token vocabulary, but an inclusion list over an open
+        // column silently drops any state nobody remembered to add — and the sibling sweep
+        // in platform/completion had made exactly that class of error in the other
+        // direction. Ask for the complement of the declared terminal set instead, so a new
+        // lifecycle state is counted as open (and chased) rather than quietly excused.
+        return dsrRepo.countOpen(orgId);
     }
 
     private static String slaStatus(LocalDate due, LocalDate today) {

@@ -798,6 +798,65 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   `CommitteeOverdueTransitionTest`, including a structural leg that the sweep holds no `setStatus(`. ⚙ Side
   effect worth knowing: the transition is now **tenant-scoped** (`findByIdAndOrganisationId`) where the in-place
   flip trusted the query alone.
+  ⚠⚠ **Asking the MIRROR question — how many things READ this status, and do they agree? — found a P1 on a
+  statutory control** (F2-196, measured 2026-08-12). The platform has **three** server-side DSR registers on
+  three tables with **disjoint** status vocabularies and **no CHECK constraint on any of the three status
+  columns** (`privacy.data_subject_requests` 20 rows · `privacy_lc.dsr_cases` 12 · `data_officer.dsr_request`
+  17, identical in dev and prod; only `IN_PROGRESS` and `REJECTED` common to any two). With no CHECK, **the
+  vocabulary lives only in the heads of its readers** — and seven readers had produced four vocabularies.
+  🔑 **`PrivacyGapService.dsrSlaSweep()` listed `EXTENDED` as closed.** It is not: the declared machine gives
+  it five outgoing edges and `DsrCaseService.transition` **pushes `slaDeadline` out 30 days** on entering it,
+  so the deadline already accounts for the PDPL Article 4 extension and a case past it is unambiguously in
+  breach. Excluding it meant **the extended deadline could never be enforced** — the requests most likely to
+  breach were the only ones exempt. **Not latent**: the sweep ran 2026-06-22 and stamped 7 of 12 cases; the 2
+  `EXTENDED` ones were already 4 and 11 days overdue and carry `sla_breached_at = NULL` — today 55 and 62 days
+  over, past the Article 4 ceiling, with no event and no audit row, in **both** databases.
+  🔑 **Five artefacts, and the two that were wrong were the two that fire the event** — the machine, the owning
+  service's own `overdue()` query and a frontend aggregate all said open; the sweep and **`DsrCaseRepository`'s
+  own javadoc** said closed. ⚠ The javadoc documented *the value the caller should pass*, which made the one
+  correct caller read as the deviation.
+  ⚠⚠ **The rule to copy: "open" must be the COMPLEMENT of a declared terminal set, never a second list.** An
+  inclusion list over an open vocabulary silently drops every token nobody remembered — that is how the PDPL
+  Article 23 tile answered **9** where 12 are open, dropping `ESCALATED` and **`OPEN`, the status
+  `DsrPromotionAdapter` writes**, so every DSR filed through the platform's own front door was invisible; and
+  how `stats.dsrOpen` answered **10** from a *different* inclusion list. With a complement, an unrecognised
+  status is chased rather than excused, which for a statutory clock is the safe direction.
+  ⚠ **And derive the terminal set, never type it**: `DsrCaseLifecycle.TERMINAL` is computed from `ALLOWED` as
+  *the states with no outgoing edges*, so the machine and the terminal set cannot drift.
+  🔑 **A vocabulary mismatch has no direction.** The count erred low (flattering) and the SLA column erred high
+  (7 finished rows each rendering a red "N days overdue" against the statutory deadline) from the same missing
+  tokens — `status === 'FULFILLED'` names a token this register holds in **0 of 20 rows**, because it lives in
+  a *different* table. F2-193 and F2-195 were uniformly flattering; do not assume that again.
+  ⚠⚠ **F2-195's `kpiProvenance` gate passed all of this**, because the tile's value genuinely does come from
+  the server. 🔑 **A provenance gate cannot see a wrong predicate** — the third shape in that lineage after
+  literals and `|| N` fallbacks.
+  ⚠⚠ **`ModuleGraphRatchetTest` will refuse the obvious placement, and it is right**: importing a business
+  module's lifecycle class into `platform/*` is an ADR-002 kernel inversion (55 → 56; the ratchet is
+  decrease-only and **may never be raised**). Put the predicate behind a **repository default method** the
+  out-of-module callers already import — better anyway, because the status vocabulary then never crosses a
+  module boundary and a caller that cannot name a status cannot invent its own idea of "open".
+  ⚠⚠ **A mocked repository will happily return rows for a predicate that is wrong.** `PrivacyGapServiceTest`
+  covered the sweep's dedup and audit behaviour thoroughly while stubbing the closed-status argument with
+  `any()`, so the wrong selection was invisible under a green test. Capture that argument, or assert the
+  accessor that binds the set and `verify(never())` on the raw finder.
+  ⚠ **And a gate you write after reading F2-192 will still have F2-192's defect.** My restatement scan detected
+  a collection literal and a `||`-chain — **the two shapes I had just fixed** — and a mutation restoring a
+  four-way `countByOrganisationIdAndStatus(...)` sum SURVIVED. There are at least **three** ways to restate a
+  vocabulary; the third is a per-status arithmetic sum. 🔑 **A gate verifies the claim shape it was written
+  for, including one written to answer that very finding.**
+  ⚠ Two instrument bugs caught only by running it: a `\[([^\]]*)\]` parse matched the TypeScript **type
+  annotation** `readonly string[]` and returned an empty set — reading exactly like *"the frontend declares
+  none"* (**sixth** instance here of a pattern satisfied by something other than its claim) — and the page scan
+  fired on **my own correction comment** quoting the code it replaced, three methods from the `stripComments`
+  helper written for that trap. **Strip comments from `.tsx` too, and anchor a parse on the assignment.**
+  ⚙ **No CHECK constraint was added, deliberately.** The vocabularies hold synonyms
+  (`FULFILLED`/`RESOLVED`/`COMPLETED` all mean finished; `NEW`/`OPEN`/`PENDING` all mean not started). A CHECK
+  admitting all of them **blesses the synonyms**; collapsing them rewrites live rows in two databases — an
+  owner decision, not a side effect of a display fix (F2-183's rule).
+  ⚠ **A frontend artefact that "agrees" may be a `localStorage` store.** `privacyLifecycle.ts` computes the
+  correct complement — over `SEED_DSR` in the browser, so it is evidence the correct rule was **written down**,
+  not that any screen showed a correct number. It is also a **fourth** DSR register shadowing a real API
+  (`/api/privacy-lc/dsr-cases`), still open. Checking `loadDsr()` is what stopped that being cited as proof.
 - ⚠⚠ **A declared state machine is only a control if the code that changes state consults it** (F2-189,
   measured 2026-08-11). `WorkflowRequestService.TRANSITIONS` is the workflow engine's lifecycle — `transition()`
   answers **409** outside it, and the FE and `WorkflowEvidenceBridge` read it to know what is reachable. It

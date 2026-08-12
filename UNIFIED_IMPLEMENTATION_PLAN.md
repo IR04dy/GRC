@@ -1717,6 +1717,75 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-196 CLOSED 2026-08-12 — the PDPL breach sweep excluded EXTENDED cases, so a DSR that used its
+statutory extension could never breach.** Found while wiring F2-195's filed `moduleLifecycles` item: the
+Privacy page's DSR status tests did not match what the database holds, and following that through three
+modules found a **P1** on a statutory control. The platform has **three** server-side DSR registers on
+three tables with **disjoint** status vocabularies and **no CHECK constraint on any of the three status
+columns** — 20 / 12 / 17 rows, identical in dev and the deployed database, only `IN_PROGRESS` and
+`REJECTED` common to any two — so every reader had to know its vocabulary by heart, and **seven readers
+produced four vocabularies**. ⚠⚠ **The P1:** `PrivacyGapService.dsrSlaSweep()` selected
+`NOT IN {DELIVERED, REJECTED, EXTENDED}`, but `EXTENDED` means *the controller invoked the PDPL Article 4
+one-time extension* and `DsrCaseService.transition` **pushes `slaDeadline` out 30 days** on entering it —
+so the deadline already accounts for the extension and a case past it is unambiguously in breach.
+Excluding it meant **the extended deadline could never be enforced at all**: the requests most likely to
+breach were the only ones exempt. 🔑 **Not latent — the omission is written in the data.** The sweep ran
+**2026-06-22** and stamped 7 of 12 cases; the **2 EXTENDED** ones were already 4 and 11 days past their
+extended deadlines and carry `sla_breached_at = NULL`. Today they are **55 and 62 days** over, beyond the
+Article 4 ceiling, with no `PDPL_DSR_SLA_BREACH` event and no audit row, in **both** databases. 🔑 **Five
+artefacts, and the two that were wrong were the two that fire the event** — the declared machine gives
+`EXTENDED` five outgoing edges, the owning service's own `overdue()` passes `{DELIVERED, REJECTED}`, and a
+frontend aggregate computes the complement; against them stood the sweep and **`DsrCaseRepository`'s own
+javadoc**. F2-191's sentence again: *each duplicate agreed with the original on the part that is easy to
+check and differed on the audit trail*. ⚠ The javadoc documented **the value the caller should pass**,
+which made the one correct caller read as the deviation. **The P2 half**, on `privacy.data_subject_requests`:
+the SLA column tested `status === 'FULFILLED' || 'REJECTED'` — and `FULFILLED` appears in **0 of the 20
+rows** (it lives in a *different* table) — so the **7** rows that really were finished (`RESOLVED`×6,
+`COMPLETED`×1) each rendered a red **"N days overdue"** against the statutory deadline and still offered
+Fulfil / Extend / Reject; the open count was an inclusion list answering **9** where **12** are open,
+dropping `ESCALATED` and **`OPEN`, the status `DsrPromotionAdapter` writes**, so every DSR filed through
+the platform's own front door was invisible to the tile; the server's `stats.dsrOpen` was a *different*
+inclusion list answering **10**; and the three service guards shared the page's test, so a finished
+request could be **re-fulfilled, overwriting `completedAt`**. 🔑 **A vocabulary mismatch has no
+direction** — the count erred low (flattering) and the SLA column high (7 fabricated breaches) from the
+same missing tokens; F2-193 and F2-195 were uniformly flattering and I expected that again. ⚠ **F2-195's
+provenance gate passed all of this**, because the tile's value *does* come from the server — the defect
+was the predicate. 🔑 **A provenance gate cannot see a wrong predicate.** **Fixed:** two lifecycle classes,
+one per register; `DsrCaseLifecycle.TERMINAL` is **derived** from the declared machine (no outgoing edges
+→ `{DELIVERED, REJECTED}`) so the two cannot drift, `DsrRequestLifecycle` declares the four finished
+tokens this register holds, both normalise case (CI collation, no CHECK), and **"open" is the COMPLEMENT
+of terminal, never a second list** — so an unrecognised status is chased rather than excused, which is the
+safe direction for a statutory clock. Six backend readers plus three frontend sites repointed. ⚠
+**`ModuleGraphRatchetTest` refused the obvious placement and was right**: importing the lifecycle into
+`platform/completion` took kernel inversions 55 → 56, so the predicate now sits behind two
+`DsrCaseRepository` default methods the out-of-module callers already import — better, because the
+vocabulary no longer crosses a module boundary at all. ⚠⚠ **The existing tests stubbed the wrong argument
+with `any()`**: `PrivacyGapServiceTest` covered the sweep's dedup and audit behaviour thoroughly over a
+selection nobody checked — *a mocked repository will happily return rows for a predicate that is wrong* —
+and `PrivacyServiceTest` asserted terminality for exactly the two tokens the implementation knew. ⚠⚠ **My
+own new gate had the F2-192 defect on its first run**: it detected a collection literal and an
+`||`-chain — the two shapes I had just fixed — and a mutation restoring the four-way
+`countByOrganisationIdAndStatus(...)` sum **SURVIVED**. A gate verifies the claim shape it was written for,
+*including one written after reading that finding*. ⚠ Two more caught only by running things: the FE-parity
+regex matched the **type annotation** `readonly string[]` and returned an empty set (**sixth** instance of
+a pattern satisfied by something other than its claim), and the page scan fired on **my own correction
+comment** — F2-193's quotation trap, three methods from the `stripComments` helper written for it.
+**Verified:** backend **3,790/0/0**, FE **522/522 / 55 files**, `tsc` clean, mutation **19/19 as declared**,
+live probe **11/11** — `POST /api/v1/privacy/dsr/sla/sweep` → **`{openOverdue: 9, firedEvents: 2}`** where
+the as-shipped predicate saw **7**, stamping exactly the two EXTENDED cases and writing 2 `SLA_BREACH`
+audit rows; `fulfil` on a `RESOLVED` request now **400 "already terminal"**, including lower-case
+`'resolved'`. `[REVIEW-TEST]` rows removed with `CHARINDEX`. **0 migrations** — the vocabularies contain
+synonyms, so a CHECK would bless them and collapsing them rewrites live rows in two databases: an owner
+decision, per F2-183's rule. ⬜ **Filed:** a **fourth**, browser-local DSR register (`privacyLifecycle.ts`'s
+`localStorage` + `SEED_DSR` store behind two pages, the F2-172 shape); consolidating the three server
+registers (owner); all four Privacy KPI tiles counting `module/privacy` rows while linking to
+`/data-officer/*` screens over different tables; `DsrCaseService.overdue()` having no route (an F2-187 dark
+method the named map lacks); and F2-195's `moduleLifecycles` item, whose filing needs two corrections —
+the red badges are **25 tiles** (29 is the sum of items they assert) and the pages are **11**, not 12.
+🔑 **When a column has no CHECK, its vocabulary lives only in the heads of its readers — so count the
+readers before trusting any one of them.** F2-189/190/191 asked how many things *write* a status and how
+many ask; this is the mirror question about readers.
+
 ✔ **F2-195 CLOSED 2026-08-12 — the module KPI strip asserted metrics no server computed, and every
 one was flattering.** Found by asking [[F2-194]]'s census question one level up: not *"which corpora
 are fabricated?"* but *"which record fields ASSERT live operational state?"*. Ranking all 105 corpora

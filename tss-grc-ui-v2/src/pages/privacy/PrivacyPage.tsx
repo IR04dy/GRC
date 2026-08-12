@@ -17,6 +17,7 @@ import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { SEVERITY_TONE, severityLabel, STATUS_TONE, statusLabel } from '../../lib/labels';
+import { isDsrOpen, isDsrTerminal } from '../../lib/dsrLifecycle';
 import { useApiList } from '../../lib/useApiResource';
 import { useLiveRefresh } from '../../lib/useLiveRefresh';
 import { LivePulse } from '../../components/ui/LivePulse';
@@ -171,7 +172,10 @@ export function PrivacyPage() {
     // PDPL 30-day countdown — green ≥ 7 days, amber 1-6 days, red ≤ 0 (overdue)
     { header: t('privacyDsrSlaLeft'),
       cell: r => {
-        if (r.status === 'FULFILLED' || r.status === 'REJECTED') return <span style={{ color: 'var(--ink-3)' }}>—</span>;
+        // F2-196: was `status === 'FULFILLED' || status === 'REJECTED'` — a token this
+        // register holds in 0 of 20 rows — so the 7 rows that really were finished
+        // (RESOLVED, COMPLETED) each rendered a red statutory-breach countdown.
+        if (isDsrTerminal(r.status)) return <span style={{ color: 'var(--ink-3)' }}>—</span>;
         if (!r.dueDate) return <span style={{ color: 'var(--ink-3)' }}>—</span>;
         const ms = new Date(r.dueDate).getTime() - Date.now();
         const days = Math.ceil(ms / 86400000);
@@ -182,7 +186,10 @@ export function PrivacyPage() {
     { header: '', align: 'end', width: '230px',
       cell: r => {
         const extras: Array<{ Icon: typeof PlayCircle; onClick: () => void; title: string; tone?: 'primary' | 'success' | 'accent' }> = [];
-        const terminal = r.status === 'FULFILLED' || r.status === 'REJECTED';
+        // F2-196: same whitelist as the SLA column above, so a finished request cannot be
+        // offered Fulfil / Extend / Reject. The server's guards agreed with the old test,
+        // so a RESOLVED request could be re-fulfilled and have its completedAt overwritten.
+        const terminal = isDsrTerminal(r.status);
         if (!terminal && r.status === 'OPEN') extras.push({ Icon: PlayCircle, onClick: () => startDsrAction(r),  title: t('privacyActStartDsr'),  tone: 'primary' });
         if (!terminal)                          extras.push({ Icon: CheckCheck, onClick: () => fulfilDsrAction(r), title: t('privacyActFulfilDsr'), tone: 'success' });
         if (!terminal)                          extras.push({ Icon: Clock,      onClick: () => extendDsrAction(r), title: t('privacyActExtendDsr'), tone: 'accent' });
@@ -305,7 +312,11 @@ export function PrivacyPage() {
   }
 
   const isDemo = dsrs.isDemo;
-  const openDsrs = allDsrs.filter(d => d.status === 'PENDING' || d.status === 'IN_PROGRESS' || d.status === 'NEW').length;
+  // F2-196: was an inclusion list `{PENDING, IN_PROGRESS, NEW}` and so answered 9 where 12
+  // are open — it dropped `OPEN`, the status the intake promotion adapter writes, so a DSR
+  // filed through the platform's own front door was invisible to the PDPL Article 23 tile.
+  // Open is the complement of finished; an unrecognised status counts as open.
+  const openDsrs = allDsrs.filter(d => isDsrOpen(d.status)).length;
 
   // Sprint 4 §2.7 — live privacy dashboard (DSR SLA, breach lifecycle)
   const { pulse } = useLiveRefresh({

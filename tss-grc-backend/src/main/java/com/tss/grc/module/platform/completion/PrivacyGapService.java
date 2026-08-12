@@ -104,9 +104,17 @@ public class PrivacyGapService {
     @Transactional
     public DsrSlaSweepResult dsrSlaSweep() {
         Long o = org();
-        List<String> closedStatuses = List.of("DELIVERED","REJECTED","EXTENDED");
-        List<DsrCase> overdue = dsrCases.findByOrganisationIdAndStatusNotInAndSlaDeadlineBefore(
-            o, closedStatuses, LocalDate.now());
+        // F2-196: this list was `{DELIVERED, REJECTED, EXTENDED}` — a hand-rolled copy of the
+        // owning service's identical query one module away, with EXTENDED added. EXTENDED is
+        // not terminal: the declared machine gives it five outgoing edges, and entering it
+        // pushes slaDeadline out by 30 days, so the deadline ALREADY accounts for the Article 4
+        // extension. Excluding it meant an extended case could never breach — measured
+        // 2026-08-12 in dev AND the deployed database: this sweep ran on 2026-06-22, stamped 7
+        // of 12 cases, and skipped the 2 EXTENDED ones that were already 4 and 11 days past
+        // their extended deadlines. Ask the repository for the open population; this module
+        // must not name DSR statuses at all (and ADR-002 forbids it importing privacy_lc's
+        // lifecycle class — ModuleGraphRatchetTest refused exactly that).
+        List<DsrCase> overdue = dsrCases.findOverdueOpen(o, LocalDate.now());
 
         long fired = 0;
         LocalDateTime now = LocalDateTime.now();

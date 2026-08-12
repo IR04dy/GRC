@@ -1,6 +1,7 @@
 package com.tss.grc.module.privacy.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.module.privacy.DsrRequestLifecycle;
 import com.tss.grc.module.privacy.entity.DataBreach;
 import com.tss.grc.module.privacy.entity.DataSubjectRequest;
 import com.tss.grc.module.privacy.repository.DataBreachRepository;
@@ -40,7 +41,10 @@ import static org.mockito.Mockito.when;
  *      OPEN/PENDING → IN_PROGRESS → FULFILLED | REJECTED
  *      startDsr() defaults dueDate = receivedAt + 30 days when blank.
  *      extendDsr() bumps the due date by N (default 30) days.
- *      Terminal states (FULFILLED, REJECTED) cannot be re-transitioned.
+ *      Terminal states cannot be re-transitioned. F2-196: that used to read
+ *      "(FULFILLED, REJECTED)" — the two the guards knew — while this register in fact
+ *      holds RESOLVED and COMPLETED, and holds FULFILLED in none of its 20 rows. The
+ *      authority is now {@link DsrRequestLifecycle#TERMINAL}; do not restate it here.
  *
  * 3. Tenant scope on every read/write — cross-org → 404.
  */
@@ -216,6 +220,53 @@ class PrivacyServiceTest {
         assertThatThrownBy(() -> service.startDsr(ID))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("already terminal");
+    }
+
+    /**
+     * F2-196 — RESOLVED and COMPLETED are terminal too, and this register holds 7 such rows.
+     *
+     * <p>The two tests above cover exactly the two tokens the implementation knew about —
+     * written by reading the guard, so they could only agree with it. Meanwhile
+     * {@code FULFILLED} appears in 0 of the 20 real rows in dev and prod, and RESOLVED (×6) /
+     * COMPLETED (×1) do. So the guard admitted every finished request in the database: a
+     * completed DSR could be re-started, re-fulfilled, and have its {@code completedAt}
+     * overwritten — losing the timestamp that evidences PDPL Article 23 compliance.
+     */
+    @Test
+    void dsrGuards_treat_every_finished_status_this_register_holds_as_terminal() {
+        for (String finished : DsrRequestLifecycle.TERMINAL) {
+            when(dsrRepo.findById(ID)).thenReturn(Optional.of(dsr(finished)));
+
+            assertThatThrownBy(() -> service.startDsr(ID))
+                .as("startDsr must refuse a %s request", finished)
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("already terminal");
+            assertThatThrownBy(() -> service.fulfilDsr(ID))
+                .as("fulfilDsr must refuse a %s request — re-fulfilling overwrites completedAt", finished)
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("already terminal");
+            assertThatThrownBy(() -> service.rejectDsr(ID))
+                .as("rejectDsr must refuse a %s request", finished)
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("already terminal");
+        }
+        // ...and the lower-case form too: the column is CI-collated with no CHECK, so a data
+        // fix or a machine caller can store 'resolved' and a bare .equals would miss it.
+        when(dsrRepo.findById(ID)).thenReturn(Optional.of(dsr("resolved")));
+        assertThatThrownBy(() -> service.fulfilDsr(ID))
+            .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("already terminal");
+    }
+
+    @Test
+    void dsrGuards_still_admit_every_live_status_including_the_intake_adapters_OPEN() {
+        // The complement direction: these must NOT be refused. ESCALATED and OPEN are the two
+        // the frontend's open count used to drop, and OPEN is what DsrPromotionAdapter writes.
+        for (String live : java.util.List.of("NEW", "PENDING", "OPEN", "IN_PROGRESS", "ESCALATED")) {
+            DataSubjectRequest r = dsr(live);
+            when(dsrRepo.findById(ID)).thenReturn(Optional.of(r));
+            when(dsrRepo.save(any(DataSubjectRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            assertThat(service.fulfilDsr(ID).getStatus())
+                .as("%s is a live status; fulfilling it must be allowed", live)
+                .isEqualTo("FULFILLED");
+        }
     }
 
     @Test

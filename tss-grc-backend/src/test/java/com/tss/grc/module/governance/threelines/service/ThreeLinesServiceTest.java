@@ -105,8 +105,10 @@ class ThreeLinesServiceTest {
             .thenReturn(List.of(policy("REVIEW")));
 
         // DSR — single INTAKE row.
-        when(dsrRepo.countByOrganisationIdAndStatus(eq(ORG), any(String.class))).thenReturn(0L);
-        when(dsrRepo.countByOrganisationIdAndStatus(ORG, "INTAKE")).thenReturn(1L);
+        // F2-196: the service now asks for the COMPLEMENT of the declared terminal set
+        // instead of summing an inclusion list of five open states, so that a lifecycle
+        // state nobody remembered to name is still counted as open.
+        when(dsrRepo.countOpen(ORG)).thenReturn(1L);
 
         ThreeLinesOverviewDto out = service.overview();
 
@@ -146,7 +148,7 @@ class ThreeLinesServiceTest {
         when(capaRepo.findByOrganisationIdOrderByCreatedAtDesc(ORG)).thenReturn(List.of());
         when(policyRepo.findByOrganisationIdAndStatusOrderByPolicyCodeAscVersionDesc(ORG, "REVIEW"))
             .thenReturn(List.of());
-        when(dsrRepo.countByOrganisationIdAndStatus(eq(ORG), any(String.class))).thenReturn(0L);
+        when(dsrRepo.countOpen(ORG)).thenReturn(0L);
 
         ThreeLinesOverviewDto out = service.overview();
 

@@ -6,12 +6,14 @@ import com.tss.grc.module.bcm.cycle.repository.CrisisEventRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.privacy.repository.ProcessingActivityRepository;
+import com.tss.grc.module.privacy_lc.DsrCaseLifecycle;
 import com.tss.grc.module.privacy_lc.entity.DsrCase;
 import com.tss.grc.module.privacy_lc.repository.DsrCaseRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -74,8 +76,7 @@ class PrivacyGapServiceTest {
 
     @Test void dsrSlaSweep_firesOnceForNullSlaBreachNotified() {
         DsrCase nullDedupCase = newDsrCase("DSR-001", null /* slaBreachNotified */);
-        when(dsrCases.findByOrganisationIdAndStatusNotInAndSlaDeadlineBefore(
-                eq(ORG_ID), any(), any())).thenReturn(List.of(nullDedupCase));
+        when(dsrCases.findOverdueOpen(eq(ORG_ID), any())).thenReturn(List.of(nullDedupCase));
 
         PrivacyGapService.DsrSlaSweepResult r1 = service.dsrSlaSweep();
 
@@ -86,11 +87,49 @@ class PrivacyGapServiceTest {
         verify(audit, times(1)).log(eq("SLA_BREACH"), eq("DsrCase"), anyLong(), any());
     }
 
+    /**
+     * F2-196 — the sweep must select on the DECLARED terminal set, and EXTENDED must not be
+     * in it.
+     *
+     * <p>The two tests either side of this one pass {@code any()} for the closed-status
+     * argument, so they asserted the dedup and audit behaviour over a selection that was
+     * wrong: the list read {@code {DELIVERED, REJECTED, EXTENDED}}, three artefacts away from
+     * the state machine, which gives EXTENDED five outgoing edges. Entering EXTENDED pushes
+     * {@code slaDeadline} out by 30 days (Article 4), so the deadline already accounts for the
+     * extension and a case past it is unambiguously in breach — yet none could ever be
+     * reported. Measured in dev and the deployed database: this sweep ran on 2026-06-22 and
+     * stamped 7 of 12 cases, skipping the 2 EXTENDED ones already 4 and 11 days overdue.
+     *
+     * <p>Captured as an argument rather than stubbed with {@code any()} — that is the whole
+     * point: a mocked repository will happily return rows for a predicate nobody checked.
+     */
+    @Test void dsrSlaSweep_asksTheRepositoryForTheOpenPopulation_andNamesNoStatusItself() {
+        when(dsrCases.findOverdueOpen(eq(ORG_ID), any())).thenReturn(List.of());
+
+        service.dsrSlaSweep();
+
+        // It must go through the accessor that binds DsrCaseLifecycle.TERMINAL_LIST...
+        verify(dsrCases).findOverdueOpen(eq(ORG_ID), any(LocalDate.class));
+        // ...and never through the raw status-based finder, which is where a caller gets to
+        // invent its own idea of "closed". That is exactly what happened: this sweep passed
+        // {DELIVERED, REJECTED, EXTENDED}. The two tests either side of this one stub that
+        // finder with any(), so they asserted dedup and audit behaviour over a wrong selection.
+        verify(dsrCases, never()).findByOrganisationIdAndStatusNotInAndSlaDeadlineBefore(
+            anyLong(), any(), any(LocalDate.class));
+
+        // The set the accessor binds — asserted here so the arithmetic is visible at the
+        // sweep, not only in the lifecycle's own unit test.
+        assertThat(DsrCaseLifecycle.TERMINAL_LIST)
+            .containsExactlyInAnyOrder("DELIVERED", "REJECTED")
+            .as("EXTENDED is an open state with a deadline already pushed out 30 days; "
+                + "treating it as closed means an extended PDPL case can never breach")
+            .doesNotContain("EXTENDED");
+    }
+
     @Test void dsrSlaSweep_secondCallIsNoOp_NoSpamAuditLog() {
         DsrCase alreadyNotified = newDsrCase("DSR-002", Boolean.TRUE);
         alreadyNotified.setSlaBreachedAt(LocalDateTime.now().minusDays(1));
-        when(dsrCases.findByOrganisationIdAndStatusNotInAndSlaDeadlineBefore(
-                eq(ORG_ID), any(), any())).thenReturn(List.of(alreadyNotified));
+        when(dsrCases.findOverdueOpen(eq(ORG_ID), any())).thenReturn(List.of(alreadyNotified));
 
         PrivacyGapService.DsrSlaSweepResult r = service.dsrSlaSweep();
 
