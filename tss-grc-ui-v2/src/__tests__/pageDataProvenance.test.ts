@@ -197,10 +197,12 @@ describe('F2-198 — a routed page that asserts operational state must ask a ser
   /**
    * Measured 2026-08-12. Decrease-only: each remaining member is a separate slice, and the number
    * may never be raised. `/ropa` took it from 14 to 12 (F2-198); `/nca-ecc-export` from 12 to 11
-   * and the sidebar half from 7 to 6 (F2-199).
+   * and the sidebar half from 7 to 6 (F2-199); `/approvals` from 11 to 10 and 6 to 5 (F2-201) —
+   * and that one is the first member of this population REWIRED rather than retired, because the
+   * server side was already complete and had no client at all.
    */
-  const BASELINE_STATE_CORPORA = 11;
-  const BASELINE_SIDEBAR_PAGES = 6;
+  const BASELINE_STATE_CORPORA = 10;
+  const BASELINE_SIDEBAR_PAGES = 5;
 
   it('does not grow the number of state-asserting corpora on server-less routed pages', () => {
     expect(CENSUS.findings.length,
@@ -442,6 +444,142 @@ describe('F2-199 — /nca-ecc-export resolves to the register that reads the dat
       }
       // The one that survives: the sidebar row's label, now naming the real register.
       expect(body).toMatch(/^\s+ncaFilingsSidebar:\s+'/m);
+    }
+  });
+});
+
+describe('F2-201 — the approval inbox decides against the server, not React state', () => {
+  /**
+   * `/approvals` was the first member of this population to be REWIRED rather than retired, and
+   * the reason is the inverse of F2-198 and F2-199: there was a complete, hardened server side
+   * with no client at all.
+   *
+   * `lib/approvals.ts` was a 407-line approval ENGINE in the browser — 12 hard-coded requests
+   * (`AP-001`…`AP-012`, clock-minted from `Date.now()` at module load), a 16-role registry naming
+   * invented individuals as the organisation's CISO / DPO / CFO / CEO, and a parallel/sequential
+   * routing machine. `ApprovalInboxPage` read that corpus and "decided" it with `setRequests`, so
+   * Approve produced a success toast plus a second toast claiming downstream chain rules had
+   * fired, and **nothing was persisted**: an approver believed they had discharged a governance
+   * duty, and a reload put the request back to PENDING.
+   *
+   * Measured live and identical in shape in both databases: `approvals.requests` holds **22 rows
+   * in dev (12 PENDING, 9 APPROVED, 1 DELEGATED)** and **21 in prod (11 PENDING)**, assigned to
+   * real dev personas across 17 real `entity_type` values — none of it visible on this page.
+   *
+   * 🔑 The server side was not merely present, it was HARDENED first: SEC-IAM-002 takes the
+   * deciding identity from the authenticated principal and never a body field, the service refuses
+   * a decision from anyone but the current assignee, and `?myInbox=true` is a real personal queue.
+   * The fabrication was not filling a gap — it was shadowing a finished control.
+   */
+  const PAGE = () => stripComments(
+    readFileSync(join(SRC, 'pages/approvals/ApprovalInboxPage.tsx'), 'utf8'));
+  const CLIENT = () => stripComments(readFileSync(join(SRC, 'lib/approvalsApi.ts'), 'utf8'));
+
+  it('the fabricated engine is gone from the tree', () => {
+    expect(existsSync(join(SRC, 'lib/approvals.ts')), 'lib/approvals.ts is back').toBe(false);
+  });
+
+  it('nothing imports the retired engine', () => {
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const full = join(dir, name);
+        if (statSync(full).isDirectory()) {
+          if (name === 'node_modules' || name === 'dist') continue;
+          walk(full);
+        } else if (/\.tsx?$/.test(name)) {
+          // the real client is `approvalsApi` — the `'` terminator keeps it out
+          if (/from\s+'[^']*\/approvals'/.test(readFileSync(full, 'utf8'))) {
+            offenders.push(full.slice(SRC.length + 1));
+          }
+        }
+      }
+    };
+    walk(SRC);
+    expect(offenders).toEqual([]);
+  });
+
+  /** Asserted as CALLS, not mentions — F2-194 lost two mutations to substring checks. */
+  it('the page reads the real register and decides through the real endpoint', () => {
+    const page = PAGE();
+    expect(page).toMatch(/approvalsApi\.list\s*\(/);
+    expect(page).toMatch(/approvalsApi\.myInbox\s*\(/);
+    expect(page).toMatch(/approvalsApi\.transition\s*\(/);
+  });
+
+  it('the client targets the real controller path', () => {
+    expect(CLIENT()).toMatch(/const BASE = '\/api\/approvals\/requests'/);
+    expect(CLIENT()).toMatch(/\$\{BASE\}\/\$\{id\}\/transition/);
+  });
+
+  /**
+   * The decisive behavioural leg. The old page's defect was not that the data was invented — it
+   * was that a decision never left the browser. A rewire that kept a local status write would
+   * look identical on screen and be the same defect.
+   */
+  it('no decision is written into local state — the row comes back from the server', () => {
+    const page = PAGE();
+    expect(page, 'a decision must not compute the new status locally')
+      .not.toMatch(/setRows\([^)]*status:\s*['"]APPROVED['"]/);
+    // the only setRows in the decision path replaces by id from the server's response
+    expect(page).toMatch(/setRows\(prev => prev\.map\(x => x\.id === updated\.id \? updated : x\)\)/);
+  });
+
+  /**
+   * The client may not re-create the machine the server does not run. F2-199's lesson: a
+   * fabrication that is MORE granular than the real model is what makes it look finished.
+   */
+  it('the client models no approver chain, mode or role registry', () => {
+    const client = CLIENT();
+    for (const gone of ['PARALLEL_ANY', 'PARALLEL_ALL', 'SEQUENTIAL',
+                        'APPROVER_REGISTRY', 'approverRoles']) {
+      expect(client, `approvalsApi re-introduced ${gone}, which the server has no column for`)
+        .not.toContain(gone);
+    }
+  });
+
+  it('the transition body carries no decidedBy — the server takes it from the principal', () => {
+    // SEC-IAM-002. A `decidedBy` field would be silently ignored, which is the F2-184 decoy shape.
+    expect(CLIENT()).not.toMatch(/decidedBy\??:\s*string;[\s\S]{0,400}ApprovalTransition/);
+    const iface = CLIENT().slice(CLIENT().indexOf('interface ApprovalTransition'));
+    expect(iface.slice(0, iface.indexOf('}'))).not.toContain('decidedBy');
+  });
+
+  it('the allowed-transition table mirrors the server, and terminal is derived from it', () => {
+    const client = CLIENT();
+    expect(client).toMatch(/PENDING:\s*\['APPROVED', 'REJECTED', 'DELEGATED', 'EXPIRED'\]/);
+    expect(client).toMatch(/DELEGATED:\s*\['PENDING'\]/);
+    // derived, never typed twice (F2-196)
+    expect(client).toMatch(/APPROVAL_TERMINAL[\s\S]{0,200}filter\(s => APPROVAL_ALLOWED\[s\]\.length === 0\)/);
+  });
+
+  it('an absent SLA deadline reads as unmeasured, not as on-track', () => {
+    // `sla_deadline` is NULL on 10 of 22 rows in dev, so this is a real state. F2-197's rule:
+    // a missing figure must not render as health.
+    expect(CLIENT()).toMatch(/if \(!r\.slaDeadline\) return 'NO_DEADLINE'/);
+    expect(PAGE()).toMatch(/tone="neutral"/);
+  });
+
+  it('the queue never falls back to a demo corpus on an empty or failed load', () => {
+    const page = PAGE();
+    expect(page, 'useApiList prefers a demo corpus when the server returns zero rows')
+      .not.toMatch(/useApiList/);
+    expect(page).toMatch(/setRows\(\[\]\)/);   // the failure path shows nothing, not something
+  });
+
+  it('the new labels are bilingual, like everything a user reads', () => {
+    for (const lang of ['en', 'ar']) {
+      const body = readFileSync(join(SRC, `translations/${lang}.ts`), 'utf8');
+      for (const k of ['approvalsKpiNoDeadline', 'approvalAssignedTo', 'approvalOverdueBy']) {
+        expect(body, `${lang}.ts is missing ${k}`).toMatch(
+          new RegExp(String.raw`^\s+${k}:\s+'`, 'm'));
+      }
+      // and the keys the fabricated page owned are gone
+      for (const dead of ['approvalToastChainFired', 'approvalDelegateNoCover',
+                          'approvalProgressLabel']) {
+        expect(body, `${lang}.ts still declares ${dead}`).not.toMatch(
+          new RegExp(String.raw`^\s+${dead}:`, 'm'));
+      }
     }
   });
 });

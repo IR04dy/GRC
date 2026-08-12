@@ -16,8 +16,6 @@
 //                      by a third-party (regulator inspection lookup)
 
 import { CCM_CHECKS } from './ccm';
-import type { ApprovalRequest } from './approvals';
-import { APPROVAL_REQUESTS } from './approvals';
 
 export type AssetType =
   | 'APPLICATION'
@@ -302,8 +300,10 @@ export interface AssetImpact {
   riskCount: number;
   /** CCM checks tied to controls covering this asset (via owner mapping). */
   ccmCheckCount: number;
-  /** Approval requests blocked on this asset's owner. */
-  approvalCount: number;
+  // F2-201 — `approvalCount` deleted rather than zeroed. It counted invented approval
+  // requests matched against invented assets, and nothing read it; a hard 0 would have
+  // asserted "no approvals waiting on this asset", which is an invented all-clear
+  // (F2-197's rule that a missing figure must not read as health).
   /** Other assets that depend on this one (downstream blast radius). */
   downstreamCount: number;
   /** Other assets this one depends on (upstream). */
@@ -347,12 +347,11 @@ export function ccmChecksForAsset(asset: Asset): typeof CCM_CHECKS {
   return CCM_CHECKS.filter(c => c.owner === asset.ownerEmail);
 }
 
-/** Approval requests whose source ref or owner matches this asset. */
-export function approvalsForAsset(asset: Asset): ApprovalRequest[] {
-  return APPROVAL_REQUESTS.filter(r =>
-    r.sourceRef.includes(asset.code) || (r.summaryEn ?? '').toLowerCase().includes(asset.nameEn.toLowerCase())
-  );
-}
+// F2-201 — `approvalsForAsset` deleted. It matched this file's invented assets against
+// `lib/approvals.ts`'s 12 invented approval requests, so the "pending approvals" it reported
+// for an asset were two fabrications agreeing with each other. The real register is
+// `approvals.requests`, keyed on `entity_type` + `entity_id`, and nothing in it references an
+// asset code — so this linkage cannot be rebuilt from server data and is not re-created here.
 
 /** Compose a single AssetImpact summary. Keep all the linkage logic in one
  *  place so the UI just reads counts. */
@@ -360,7 +359,6 @@ export function impactFor(asset: Asset, all: ReadonlyArray<Asset> = ASSETS): Ass
   return {
     riskCount: 0, // hooked up in production via Risk module — placeholder
     ccmCheckCount: ccmChecksForAsset(asset).length,
-    approvalCount: approvalsForAsset(asset).length,
     downstreamCount: downstreamOf(asset.code, all).length,
     upstreamCount: asset.dependencies.length,
   };

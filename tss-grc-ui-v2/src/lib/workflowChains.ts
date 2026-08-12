@@ -19,7 +19,6 @@
 // Saudi-aligned: every rule carries a regulator citation so an auditor
 // asking "why did this control re-test fire?" gets a one-line answer.
 
-import type { ApprovalRequest } from './approvals';
 
 // ─── Event taxonomy ─────────────────────────────────────────────────────────
 
@@ -348,38 +347,11 @@ function chainPrefix(t: ChainActionType): string {
 
 // ─── Convenience: derive ChainEvent from approval decision ──────────────────
 
-const CATEGORY_TO_EVENT: Partial<Record<ApprovalRequest['category'], ChainEventType>> = {
-  POLICY_PUBLICATION:    'POLICY_PUBLISHED',
-  RISK_ACCEPTANCE:       'RISK_ACCEPTED',
-  POLICY_EXCEPTION:      'WORKFLOW_CLOSED', // generic
-  VENDOR_ONBOARDING:     'VENDOR_ONBOARDED',
-  DSR_ERASURE:           'WORKFLOW_CLOSED',
-  BREACH_NOTIFICATION:   'BREACH_CONTAINED',
-  DPIA_SIGN_OFF:         'DPIA_APPROVED',
-  CHANGE_REQUEST:        'CHANGE_DEPLOYED',
-  AUDIT_FINDING_CLOSURE: 'AUDIT_FINDING_CLOSED',
-  CAPITAL_EXPENDITURE:   'WORKFLOW_CLOSED',
-  CONTROL_OVERRIDE:      'WORKFLOW_CLOSED',
-};
-
-/**
- * When an approval moves to APPROVED, derive a ChainEvent from the request
- * category and fire matching chain rules. Returns the resulting fires so
- * callers can show "spawned X" toasts.
- */
-export function fireFromApproval(req: ApprovalRequest): ChainFire[] {
-  const eventType = CATEGORY_TO_EVENT[req.category];
-  if (!eventType) return [];
-  const event: ChainEvent = {
-    type: eventType,
-    sourceRef: req.sourceRef,
-    module: req.module,
-    payload: { tier: 1 }, // demo default — production reads from source record
-    raisedAt: new Date().toISOString(),
-  };
-  return executeChain(event);
-}
-
+// F2-201 — `CATEGORY_TO_EVENT` and `fireFromApproval` deleted. Their only caller was the
+// approval inbox, which fired them client-side after a decision it never persisted; the
+// real decision path is `POST /api/approvals/requests/{id}/transition`, and the server
+// emits its own APPROVAL_DECIDED / APPROVAL_DELEGATED audit events. A browser-side chain
+// fired off an unpersisted decision was a second, quieter fabrication on top of the first.
 // ─── Statistics ─────────────────────────────────────────────────────────────
 
 export interface ChainStats {

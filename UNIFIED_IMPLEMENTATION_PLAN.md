@@ -1717,6 +1717,94 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-201 CLOSED 2026-08-12 — a governance control reported success without acting.** Second of
+the eleven pages F2-198 filed. Lineage F2-42 → F2-193 → … → F2-198 → F2-199 → this. Every earlier
+finding showed a false FIGURE; this one accepted an **ACTION**.
+
+`/approvals` was routed, sidebar-linked and made **no server call of any kind**. `lib/approvals.ts`
+was an approval ENGINE in the browser: **12 hard-coded requests** clock-minted from `Date.now()` at
+module load, a **16-role `APPROVER_REGISTRY` naming invented individuals as the organisation's CISO,
+DPO, CFO and CEO**, and a PARALLEL_ANY/PARALLEL_ALL/SEQUENTIAL routing machine. `decide()` mutated
+`setRequests` and returned — so an approver clicked Approve on a policy publication or a risk
+acceptance, saw a success toast plus a second toast claiming downstream chain rules had fired, and
+**nothing was written anywhere**; a reload put it back to PENDING. The file's own comment said
+*"Demo data — 12 pending approvals across the platform"*.
+
+Real, probed live: `approvals.requests` holds **22 rows in dev** (12 PENDING / 9 APPROVED / 1
+DELEGATED) and **21 in prod** (11 PENDING), assigned to real dev personas across **17 real
+`entity_type` values**, `sla_deadline` on 12 of 22. None of it appeared on the page.
+
+🔑 **This is the INVERSE of F2-198 and F2-199, and that is what made it worst.** Those were
+fabrications standing beside a real surface, so the fix was to retire. Here there was a **complete
+server side with no client at all** — and one that had been **hardened first**: the controller's own
+comment records S2 (F-1) closing a wide-open transition, SEC-IAM-002 takes the deciding identity
+from the authenticated principal and never a body field, the service refuses a decision from anyone
+but the current assignee, and `?myInbox=true` is a real personal queue. The browser copy used the
+same type name as the server entity. It was not filling a gap; it was **shadowing a finished
+control**.
+
+**Fixed by REWIRING** — the first member of this population to be wired rather than retired. New
+`lib/approvalsApi.ts`; the page loads the real register, has an "Only mine" toggle on
+`?myInbox=true`, and decides through `POST /{id}/transition` with the row replaced **from the
+server's response**. `lib/approvals.ts` deleted. **0 backend changes, 0 migrations** — everything
+needed had already shipped.
+
+⚠ **Deliberately SIMPLER than what it replaced.** The server carries one `assigned_to` plus
+`delegated_from`; there are no approver chains, no role registry, no multi-approver progress, so the
+page has none and a gate leg refuses them from returning. 🔑 **F2-199's lesson twice in two slices: a
+fabrication that is MORE granular than the platform's own model is exactly what makes it look more
+finished.**
+
+⚠⚠ **A ninth instrument, blind for a ninth reason.** F2-38c's fabricated-directory guard keys on the
+literal module name `'lib/userDirectory'`. `APPROVER_REGISTRY` was a **second** fabricated directory,
+sixteen invented officers deep, in a file called `approvals.ts` — invisible to it. Same shape as
+F2-198's finding about `demoFallbackContract`: **the invariant is real, its POPULATION is a
+filename.**
+
+⚠ **Three dependents detached, all inside the fabricated estate.** `assets.ts#approvalsForAsset`
+matched invented assets against invented approvals and is deleted with its card and KPI;
+`AssetImpact.approvalCount` is **deleted rather than zeroed** (nothing read it, and a hard 0 asserts
+"no approvals waiting" — F2-197's invented all-clear); `mockWorkflows.ts#APPROVAL_WORKFLOWS` is now
+`[]`; `workflowChains.ts#fireFromApproval` + `CATEGORY_TO_EVENT` are deleted — their only caller was
+the page, firing a chain off a decision that was never persisted.
+
+⚠⚠ **My worst error, caught before it shipped.** Reconciling translations I asked for `t('key')` and
+got **71 dead keys**, including ~57 `approvalChain*` and **`approvalsSidebar`**. Both false:
+`t('approvalChainKpiInflight', 'In-flight')` is a **two-argument** call a pattern ending in `'\)`
+cannot match, and `approvalsSidebar` is a `labelKey`, never a `t()`. Deleting them would have blanked
+five pages' labels and the sidebar row. Re-run with F2-199's rule — the quoted key appearing anywhere
+outside the translation files — the honest answer is **11 dead, 12 new**. 🔑 **A usage detector must
+match every call shape the codebase uses, and for a DELETE the safe direction is to over-approximate
+usage.** Ninth instance here of a check satisfied by something other than its claim.
+⚠ And **F2-165's gate caught a dark method I had just written**: `approvalsApi.get` wrapped an
+endpoint no screen opens. It is now **not wrapped at all**, with a note to add it in the commit that
+adds a detail view.
+
+**Gate:** 11 new legs. The load-bearing one is behavioural — *"no decision is written into local
+state"* — because a rewire that kept a local status write would look identical on screen and be the
+same defect. Ratchets **11 → 10** corpora and **6 → 5** sidebar pages.
+
+**Verified:** FE **590/590 across 59 files** (+11), tsc clean, build clean, census clean; mutation
+**12/12 as declared**; **live probe 17/17** — `auditor` (WORKFLOW:WRITE, no APPROVE) refused **403**, a
+**non-assignee holding APPROVE refused 403**, a `[REVIEW-TEST]` row created → server set PENDING →
+APPROVED with `decidedBy` from the principal → second decision refused **409** (terminal) → **still
+APPROVED on a fresh GET**, which is the persistence the old page never had. Browser via the Vite
+proxy: retired module fails to import, `approvalsApi.get` undefined, `APPROVAL_TERMINAL` derived,
+register **23 rows / 12 PENDING**.
+
+⚠ **One `[REVIEW-TEST]` row remains** (`APR-2026-19FF76EDDAD9F7A`) APPROVED in dev. Deleting it needs
+the owner's explicit OK (house rule 6).
+
+⬜ **Filed:** **(a)** the **9 remaining corpora / 5 sidebar pages** in F2-198's ratchets.
+**(b)** ⚠⚠ **`lib/platformPersistence.ts` — a global persistence-mode switch defaulting to `'demo'` =
+pure `localStorage`**, stored under `grc.persistence.mode.v1` and driving a topbar badge. It declares
+**11 adapters**, is imported by only **6** lib files, and all three `mirror*ToBackend` helpers
+`return` immediately in demo mode — so on the default setting the REST half is inert. Six adapters
+have no consumer beyond the `LIFECYCLE_ADAPTERS` map, and `APPROVAL_ADAPTER` named the very endpoint
+this finding wired while nothing ever called it. **Needs its own slice**; it is the mechanism behind
+F2-196's fourth DSR register. **(c)** `AssetImpact.riskCount` is a hard-coded `0` commented
+*"hooked up in production via Risk module — placeholder"*.
+
 ✔ **F2-199 CLOSED 2026-08-12 — the document a regulator receives was generated from a hard-coded
 corpus, and named the software vendor as the filing entity.** The first of the eleven pages F2-198 filed,
 chosen because its claim and its truth were furthest apart. Lineage F2-42 → F2-193 → F2-194 → F2-195 →

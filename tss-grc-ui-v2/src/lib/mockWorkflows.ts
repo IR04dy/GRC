@@ -7,7 +7,6 @@ import { SAUDI_APPETITES } from './riskAppetiteSaudi';
 import { synthesiseAllEngagementWorkflows } from './auditEngagement';
 import { AUDIT_ENGAGEMENTS } from '../pages/compliance/mockCompliance';
 import { synthesiseStaleEvidenceWorkflows } from './ccm';
-import { synthesiseApprovalWorkflows } from './approvals';
 
 // ─── Risk Lifecycle (ISO 31000 / COSO ERM) ──────────────────────────────────
 const RISK_STAGES = ['IDENTIFIED', 'ASSESSED', 'TREATMENT_PLANNED', 'IMPLEMENTING', 'MONITORING', 'CLOSED'];
@@ -346,11 +345,17 @@ export const AUDIT_ENGAGEMENT_WORKFLOWS: WorkflowInstance[] =
 export const CCM_EVIDENCE_WORKFLOWS: WorkflowInstance[] =
   synthesiseStaleEvidenceWorkflows();
 
-// Sprint 5 — every pending cross-module approval becomes a SLA-tracked
-// workflow row so the cross-module pulse sees them alongside everything
-// else and an approver who's running late surfaces in the escalation tier.
-export const APPROVAL_WORKFLOWS: WorkflowInstance[] =
-  synthesiseApprovalWorkflows();
+// F2-201 — was `synthesiseApprovalWorkflows()`, which turned `lib/approvals.ts`'s 12
+// invented approval requests into SLA-tracked workflow rows and fed them into ALL_WORKFLOWS,
+// so the cross-module pulse counted them alongside everything else. That corpus is gone: the
+// real queue is `approvals.requests`, rendered by `/approvals` from the server.
+//
+// ⚠ Left EMPTY rather than repointed at the API. Everything in this file is browser-side by
+// construction (it is the `mock*` estate F2-15 tracks) and ALL_WORKFLOWS is consumed
+// synchronously by `processMining`, `workflowVersioning` and `WorkflowsPage`; feeding one real
+// async source into a corpus of invented ones would make the pulse a mix of measured and
+// fabricated rows with no way for a reader to tell which is which.
+export const APPROVAL_WORKFLOWS: WorkflowInstance[] = [];
 
 // ─── Cross-module aggregator ────────────────────────────────────────────────
 // Sprint 4 SLA-engine consumers (LiveSlaPulse, escalation-runtime telemetry)

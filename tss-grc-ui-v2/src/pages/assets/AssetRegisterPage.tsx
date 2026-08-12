@@ -10,10 +10,9 @@ import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
-import { statusLabel } from '../../lib/statusLabels';
 import {
   ASSETS, downstreamOf, upstreamOf, transitiveBlastRadius,
-  ccmChecksForAsset, approvalsForAsset,
+  ccmChecksForAsset,
   CRITICALITY_TONE, TYPE_LABEL, RESIDENCY_TONE,
   type Asset, type AssetType, type AssetCriticality,
 } from '../../lib/assets';
@@ -148,7 +147,6 @@ function BlastRadiusPane({ asset, t, lang }: { asset: Asset; t: (k: string) => s
   const upstream   = useMemo(() => upstreamOf(asset.code), [asset.code]);
   const transitive = useMemo(() => transitiveBlastRadius(asset.code), [asset.code]);
   const ccm        = useMemo(() => ccmChecksForAsset(asset), [asset]);
-  const approvals  = useMemo(() => approvalsForAsset(asset), [asset]);
   const Icon = TYPE_ICON[asset.type];
 
   return (
@@ -194,7 +192,6 @@ function BlastRadiusPane({ asset, t, lang }: { asset: Asset; t: (k: string) => s
         <Kpi Icon={GitBranch}    label={t('assetsBlastDownstream')}  value={String(downstream.length)} tone={downstream.length > 0 ? 'warning' : 'success'} to="/assets" />
         <Kpi Icon={AlertOctagon} label={t('assetsBlastTransitive')}  value={String(transitive.size)}    tone={transitive.size > 0 ? 'danger' : 'success'} to="/assets" />
         <Kpi Icon={FileCheck2}   label={t('assetsBlastCcm')}         value={String(ccm.length)}         tone="primary" to="/ccm/dashboard" />
-        <Kpi Icon={Activity}     label={t('assetsBlastApprovals')}   value={String(approvals.length)}   tone={approvals.length > 0 ? 'warning' : 'success'} to="/approvals" />
       </div>
 
       {/* ── What depends on this (downstream) ─────────────── */}
@@ -287,25 +284,8 @@ function BlastRadiusPane({ asset, t, lang }: { asset: Asset; t: (k: string) => s
             </div>}
       </Card>
 
-      {/* ── Approvals waiting ──────────────────────────────── */}
-      {approvals.length > 0 && (
-        <Card title={t('assetsBlastApprovalsTitle')} Icon={Activity}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {approvals.map(a => (
-              <div key={a.id} style={{
-                padding: '8px 0', borderBottom: '1px dashed var(--border)',
-                display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center',
-              }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600 }}>{lang === 'ar' ? a.titleAr : a.titleEn}</div>
-                  <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{a.module} · {a.sourceRef}</div>
-                </div>
-                <Badge tone="info">{statusLabel(a.status, lang)}</Badge>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+      {/* F2-201 — the "Approvals waiting" card was removed with `approvalsForAsset`: it
+          listed invented approval requests matched against invented assets. */}
     </div>
   );
 }
