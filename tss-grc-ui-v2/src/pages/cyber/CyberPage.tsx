@@ -1122,7 +1122,33 @@ export function CyberPage() {
         storageKey="overview.cyber"
         processBarTitle={t('cyberProcessBarTitle')}
         processBarSubtitle={t('cyberProcessBarSubtitle')}
-        lifecycles={CYBER_LIFECYCLES}
+        lifecycles={[
+          // F2-197 — the catalogue asserted 32 active and 5 overdue cyber items for
+          // every tenant, including a red badge on Incident Response. Three tiles are
+          // measurable from lists this page already fetches; three are not.
+          //
+          // Incident Response, CSA and Asset Onboarding stay unmeasured on purpose:
+          // deciding which of INCIDENT_WORKFLOW_OPTIONS' nine stages are terminal
+          // (is CLOSURE finished, or the act of finishing?) is a judgement, and
+          // inventing a terminal set is how F2-196's wrong-predicate defect happened.
+          CYBER_LIFECYCLES[0],
+          // Exactly the "Open vulnerabilities" KPI above.
+          { ...CYBER_LIFECYCLES[1], activeCount: vulns.data.filter(v => v.workflowStatus !== 'CLOSED').length },
+          // EXPIRED is the declared terminal of EXCEPTION_STATUS_OPTIONS, so open is
+          // its complement; an exception whose own expiryDate has passed while it is
+          // still not EXPIRED is overdue by the record's own date.
+          { ...CYBER_LIFECYCLES[2],
+            activeCount:  exceptions.data.filter(e => e.workflowStatus !== 'EXPIRED').length,
+            overdueCount: exceptions.data.filter(e => e.workflowStatus !== 'EXPIRED'
+              && !!e.expiryDate && e.expiryDate < new Date().toISOString().slice(0, 10)).length },
+          CYBER_LIFECYCLES[3],
+          CYBER_LIFECYCLES[4],
+          // Both predicates are the ones the action-plan table's own Due column uses.
+          { ...CYBER_LIFECYCLES[5],
+            activeCount:  actionPlans.data.filter(p => p.workflowStatus !== 'COMPLETED' && p.workflowStatus !== 'CANCELLED').length,
+            overdueCount: actionPlans.data.filter(p => p.workflowStatus !== 'COMPLETED' && p.workflowStatus !== 'CANCELLED'
+              && !!p.dueDate && p.dueDate < new Date().toISOString().slice(0, 10)).length },
+        ]}
         postureTitle={t('cyberPostureTitle')}
         anchors={CYBER_ANCHORS}
         />

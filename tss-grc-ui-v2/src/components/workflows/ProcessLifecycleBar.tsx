@@ -45,10 +45,24 @@ export interface ProcessLifecycle {
   reference?: string;
   /** Icon. */
   Icon: LucideIcon;
-  /** Items currently active in this process. */
-  activeCount: number;
-  /** Items overdue / SLA-breached. */
-  overdueCount: number;
+  /**
+   * Items currently active in this process — **omit it when the platform does
+   * not compute one**, which is NOT the same as zero (F2-197).
+   *
+   * The catalogue in `lib/moduleLifecycles.ts` used to declare this for all 56
+   * processes as a hard-coded literal, so 11 module pages that all call the real
+   * API rendered 130 "active" items and 25 red "N items need attention" badges
+   * that no server had ever produced. A count belongs here only when the host
+   * page passes a figure it derived from a real response.
+   */
+  activeCount?: number;
+  /**
+   * Items overdue / SLA-breached — same rule, and harder to satisfy: `sla` is a
+   * free-text label ("30-day PDPL", "Quarterly", "CFO escalation" — 30 distinct
+   * strings), so no per-process due date is computable from this catalogue. Pass
+   * it only where the page has a real breach count from the server.
+   */
+  overdueCount?: number;
   /** Verb-first launcher — wired by the host page. */
   primary: ProcessAction;
   /** "View register" — usually a link to the filtered list. */
@@ -70,6 +84,51 @@ export interface ProcessLifecycle {
    * start one now."
    */
   intakeKind?: IntakeKind;
+}
+
+/**
+ * F2-197 — the health of one process tile, as ONE predicate that the compact
+ * chip, the expanded tile and the detail modal all read, so the three surfaces
+ * cannot disagree about what a missing count means.
+ *
+ *   overdue    — a real breach count arrived and it is > 0        (danger)
+ *   active     — a real in-flight count arrived and it is > 0     (accent)
+ *   clear      — BOTH counts arrived and both are zero            (success)
+ *   unmeasured — at least one count is absent                     (neutral)
+ *
+ * `clear` deliberately needs both numbers. A measured zero beside an unknown is
+ * not health, and green is an assurance: the trap in deleting the catalogue's
+ * fabricated numbers is that `overdue > 0 ? danger : active > 0 ? accent :
+ * success` turns every stripe `--success`, i.e. trades an invented figure for an
+ * invented all-clear. Test `typeof x === 'number'`, never `!x` — a genuine 0 must
+ * still render as 0 (the UX-008 / F2-195 `isNoData` rule).
+ */
+export type LifecycleHealth = 'overdue' | 'active' | 'clear' | 'unmeasured';
+
+export function lifecycleHealth(lc: ProcessLifecycle): LifecycleHealth {
+  const active = lc.activeCount;
+  const overdue = lc.overdueCount;
+  if (typeof overdue === 'number' && overdue > 0) return 'overdue';
+  if (typeof active === 'number' && active > 0) return 'active';
+  if (typeof active === 'number' && typeof overdue === 'number') return 'clear';
+  return 'unmeasured';
+}
+
+const HEALTH_STRIPE: Record<LifecycleHealth, string> = {
+  overdue:    'var(--danger)',
+  active:     'var(--accent-700)',
+  clear:      'var(--success)',
+  unmeasured: 'var(--border)',
+};
+
+/** The two states that give a user something to act on. */
+const ACTIONABLE: readonly LifecycleHealth[] = ['overdue', 'active'];
+
+/** Pre-translated "this figure is not computed" hint for the em-dash treatment. */
+function unmeasuredHint(lang: string): string {
+  return lang === 'ar'
+    ? 'لا تُحتسب أعداد هذه العملية بعد'
+    : 'This process has no counter yet — the platform does not compute one';
 }
 
 /**
@@ -95,10 +154,16 @@ export function ProcessLifecycleBar({
     // outline chips. Cap the rail to the active stage + a short next set with
     // a "+N" overflow rather than rendering 5–7 equal-weight pills that wrap.
     const ranked = rankLifecycles(lifecycles);
-    const VISIBLE_SECONDARY = 4; // primary + 4 secondary = 5 chips before overflow
-    const [primaryLc, ...rest] = ranked;
-    const shown = rest.slice(0, VISIBLE_SECONDARY);
-    const overflow = rest.length - shown.length;
+    const CHIP_BUDGET = 5; // 5 chips before overflow, promoted or not
+    // F2-197: exactly one chip used to render as the filled "Recommended next
+    // action" — unconditionally `ranked[0]`, so with the counts gone every module
+    // would still promote something. It is only a recommendation when a real count
+    // says there is work: no measured overdue/active anywhere → no promoted chip.
+    const promote = ranked.length > 0 && ACTIONABLE.includes(lifecycleHealth(ranked[0]));
+    const primaryLc = promote ? ranked[0] : undefined;
+    const quiet = promote ? ranked.slice(1) : ranked;
+    const shown = quiet.slice(0, CHIP_BUDGET - (promote ? 1 : 0));
+    const overflow = quiet.length - shown.length;
     return (
       <div style={{
         display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center',
@@ -108,7 +173,7 @@ export function ProcessLifecycleBar({
         borderRadius: 'var(--r-md)',
         marginBottom: 12,
       }}>
-        <ProcessChip lc={primaryLc} lang={lang} variant="primary" />
+        {primaryLc && <ProcessChip lc={primaryLc} lang={lang} variant="primary" />}
         {shown.map((lc, idx) => <ProcessChip key={idx} lc={lc} lang={lang} variant="secondary" />)}
         {overflow > 0 && (
           <span
@@ -147,14 +212,25 @@ export function ProcessLifecycleBar({
  * UX-006 urgency ranking for the compact rail. Overdue processes float to the
  * top (the recommended next action is whatever is breaching SLA), then by
  * active volume, so the promoted primary chip is the most pressing one.
+ *
+ * F2-197 — rank by `lifecycleHealth` first, so an UNMEASURED process can never
+ * outrank a measured one. Previously the comparator read the counts directly,
+ * which meant the fabricated catalogue decided every module's recommended next
+ * action; with the numbers gone, `??  0` alone would have left the order to
+ * `Array.prototype.sort` stability, i.e. to catalogue declaration order dressed
+ * up as urgency.
  */
-function rankLifecycles(lifecycles: ProcessLifecycle[]): ProcessLifecycle[] {
+const HEALTH_RANK: Record<LifecycleHealth, number> = {
+  overdue: 0, active: 1, clear: 2, unmeasured: 3,
+};
+
+export function rankLifecycles(lifecycles: ProcessLifecycle[]): ProcessLifecycle[] {
   return [...lifecycles].sort((a, b) => {
-    if ((b.overdueCount > 0 ? 1 : 0) !== (a.overdueCount > 0 ? 1 : 0)) {
-      return (b.overdueCount > 0 ? 1 : 0) - (a.overdueCount > 0 ? 1 : 0);
-    }
-    if (b.overdueCount !== a.overdueCount) return b.overdueCount - a.overdueCount;
-    return b.activeCount - a.activeCount;
+    const byHealth = HEALTH_RANK[lifecycleHealth(a)] - HEALTH_RANK[lifecycleHealth(b)];
+    if (byHealth !== 0) return byHealth;
+    const overdueDelta = (b.overdueCount ?? 0) - (a.overdueCount ?? 0);
+    if (overdueDelta !== 0) return overdueDelta;
+    return (b.activeCount ?? 0) - (a.activeCount ?? 0);
   });
 }
 
@@ -175,12 +251,11 @@ function ProcessChip({ lc, lang, variant }: {
 }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const { Icon } = lc;
+  const health = lifecycleHealth(lc);
+  const active = lc.activeCount;
   const overdue = lc.overdueCount;
   const isPrimary = variant === 'primary';
-  const stripe =
-    overdue > 0 ? 'var(--danger)' :
-    lc.activeCount > 0 ? 'var(--accent-700)' :
-    'var(--success)';
+  const stripe = HEALTH_STRIPE[health];
 
   const label = lang === 'ar' && lc.nameAr ? lc.nameAr : lc.name;
   const primaryLabel = lang === 'ar' && lc.primary.labelAr ? lc.primary.labelAr : lc.primary.label;
@@ -188,6 +263,16 @@ function ProcessChip({ lc, lang, variant }: {
     ? `${overdue} عنصر بحاجة إلى انتباه`
     : `${overdue} item${overdue === 1 ? '' : 's'} need${overdue === 1 ? 's' : ''} attention`;
   const nextActionHint = lang === 'ar' ? 'الإجراء التالي المقترح' : 'Recommended next action';
+  // A dense one-line rail has no room for an em-dash placeholder, so a chip with no
+  // in-flight count carries the disclosure in its tooltip — the neutral stripe is the
+  // visual signal, and the expanded tile + detail modal spell it out.
+  //
+  // ⚠ Keyed on `active` alone, NOT on `health === 'unmeasured'`. A tile with a real
+  // `activeCount: 0` and no overdue figure is `unmeasured` overall (the stripe must
+  // not go green), but it does have a counter — measured live: the risk-treatment
+  // tile is 0 for organisation 1 and 8 and 9 for the other two, and telling the first
+  // one "no counter yet" would be false in the direction of hiding a real zero.
+  const countHint = typeof active !== 'number' ? ` — ${unmeasuredHint(lang)}` : '';
 
   // Click opens the process-detail modal so the user sees the lifecycle
   // stages, regulatory anchor, steward, SLA and a primary "Start" button
@@ -205,7 +290,7 @@ function ProcessChip({ lc, lang, variant }: {
     <button type="button"
       onClick={trigger}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') trigger(e); }}
-      title={isPrimary ? `${nextActionHint}: ${label} — ${primaryLabel}` : `${label} — ${primaryLabel}`}
+      title={(isPrimary ? `${nextActionHint}: ${label} — ${primaryLabel}` : `${label} — ${primaryLabel}`) + countHint}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
         padding: isPrimary ? '6px 12px 6px 0' : '4px 10px 4px 0',
@@ -255,16 +340,16 @@ function ProcessChip({ lc, lang, variant }: {
         <Icon size={13} strokeWidth={2.1} />
       </span>
       <span style={{ fontWeight: isPrimary ? 700 : 600 }}>{label}</span>
-      {lc.activeCount > 0 && (
+      {typeof active === 'number' && active > 0 && (
         <span className="mono" style={{
           fontSize: 10, fontWeight: 700,
           padding: '0 6px',
           borderRadius: 'var(--r-pill)',
           background: isPrimary ? 'color-mix(in oklab, var(--on-primary) 22%, transparent)' : 'var(--surface-3)',
           color: isPrimary ? 'var(--on-primary)' : 'var(--ink-1)',
-        }}>{lc.activeCount}</span>
+        }}>{active}</span>
       )}
-      {overdue > 0 && (
+      {typeof overdue === 'number' && overdue > 0 && (
         <span className="mono"
           role="status"
           aria-label={attentionLabel}
@@ -289,23 +374,25 @@ function ProcessChip({ lc, lang, variant }: {
 function ProcessTile({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const { Icon } = lc;
+  const health  = lifecycleHealth(lc);
   const overdue = lc.overdueCount;
   const active  = lc.activeCount;
   const attentionLabel = lang === 'ar'
     ? `${overdue} عنصر بحاجة إلى انتباه`
     : `${overdue} item${overdue === 1 ? '' : 's'} need${overdue === 1 ? 's' : ''} attention`;
+  const noCountHint = unmeasuredHint(lang);
 
   // the industry pattern-style left-edge health stripe
-  const stripe =
-    overdue > 0 ? 'var(--danger)' :
-    active  > 0 ? 'var(--accent-700)' :
-    'var(--success)';
+  const stripe = HEALTH_STRIPE[health];
 
   const tooltip = [
     lang === 'ar' && lc.nameAr ? lc.nameAr : lc.name,
     lc.reference,
     lc.steward && `Owner: ${lc.steward}`,
     lc.sla && `SLA: ${lc.sla}`,
+    // Same rule as the chip: keyed on the in-flight count's own presence, because a
+    // real 0 with no overdue figure is `unmeasured` overall but does have a counter.
+    typeof active !== 'number' && noCountHint,
   ].filter(Boolean).join(' · ');
 
   return (
@@ -374,18 +461,33 @@ function ProcessTile({ lc, lang }: { lc: ProcessLifecycle; lang: string }) {
         </div>
       </div>
 
-      {/* Counter chip */}
+      {/* Counter chip — F2-197: this used to render `{active}` unconditionally, so
+        * an absent count would print a hard `0`. Not-measured takes the UX-008
+        * em-dash treatment (hint as both `title` and `aria-label`), which is what
+        * `Kpi` does for the same distinction; a genuine 0 still prints 0. */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-        <span style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11, fontWeight: 700,
-          padding: '1px 8px',
-          borderRadius: 'var(--r-pill)',
-          background: 'var(--surface-3)',
-          color: 'var(--ink-1)',
-          minWidth: 24, textAlign: 'center',
-        }}>{active}</span>
-        {overdue > 0 && (
+        {typeof active === 'number' ? (
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11, fontWeight: 700,
+            padding: '1px 8px',
+            borderRadius: 'var(--r-pill)',
+            background: 'var(--surface-3)',
+            color: 'var(--ink-1)',
+            minWidth: 24, textAlign: 'center',
+          }}>{active}</span>
+        ) : (
+          <span className="empty-inline-compact"
+            title={noCountHint} aria-label={noCountHint}
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11, fontWeight: 700,
+              padding: '1px 8px',
+              color: 'var(--ink-4)',
+              minWidth: 24, textAlign: 'center',
+            }}>—</span>
+        )}
+        {typeof overdue === 'number' && overdue > 0 && (
           <span
             role="status"
             aria-label={attentionLabel}

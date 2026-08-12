@@ -455,12 +455,19 @@ export function RiskRegisterPage() {
           // this comment said UNDER_ASSESSMENT → APPROVED_FOR_TREATMENT, neither of which exists)
           // Trigger: opens the New Risk modal so the user can register a
           // new risk that immediately enters the assessment workflow.
-          { ...RISK_LIFECYCLES[0],
+          // F2-197 — each count below is exactly the number of rows that tile's own
+          // register link opens, which is the strongest correspondence available: a
+          // tile whose figure disagrees with the list it navigates to is worse than a
+          // tile with no figure. The catalogue declared 4/1, 3/1, 1/0, 1/1 and 2/0 for
+          // every tenant. No overdue figure is given anywhere: `risk.risks` carries no
+          // per-status due date, so the red "N items need attention" badge these tiles
+          // used to show had nothing behind it at all.
+          { ...RISK_LIFECYCLES[0], activeCount: openCount,
             primary:   { label: 'Start',    labelAr: 'ابدأ',         onClick: startCreate },
             secondary: { label: 'Register', labelAr: 'السجل',        href: '/risk?status=OPEN' } },
 
           // ── 2. Risk Treatment Plan ──
-          { ...RISK_LIFECYCLES[1],
+          { ...RISK_LIFECYCLES[1], activeCount: risks.filter(r => r.status === 'MITIGATING').length,
             primary:   { label: 'Plan',       labelAr: 'خطة المعالجة', onClick: () => { setFilters(prev => ({ ...prev, status: 'UNDER_REVIEW' })); setTab('register'); } },
             // ⚠ F2-164 — this href read `status=TREATMENT_IN_PROGRESS`, a status the DB forbids.
             // The register passes it to `riskApi.list(status)`, so the tile always opened an
@@ -478,7 +485,9 @@ export function RiskRegisterPage() {
             secondary: { label: 'Statements', labelAr: 'بيانات الشهية', href: '/risk?tab=appetite' } },
 
           // ── 5. Risk Acceptance Approval ──
-          { ...RISK_LIFECYCLES[4],
+          // A time-bound acceptance stays in this process until it lapses, so the
+          // ACCEPTED rows ARE the population — and it is what `?status=ACCEPTED` opens.
+          { ...RISK_LIFECYCLES[4], activeCount: risks.filter(r => r.status === 'ACCEPTED').length,
             primary:   { label: 'Submit',   labelAr: 'تقديم للاعتماد', onClick: () => { setFilters(prev => ({ ...prev, status: 'OPEN' })); setTab('register'); } },
             secondary: { label: 'Accepted', labelAr: 'المُعتمدة',      href: '/risk?status=ACCEPTED' } },
         ]} />

@@ -382,7 +382,21 @@ export function PrivacyPage() {
         storageKey="overview.privacy"
         processBarTitle={t('privacyProcessBarTitle')}
         processBarSubtitle={t('privacyProcessBarSub')}
-        lifecycles={PRIVACY_LIFECYCLES}
+        lifecycles={[
+          // F2-197 — `openDsrs` is F2-196's corrected complement predicate (open =
+          // not terminal), so the tile and the PDPL Article 23 KPI above cannot give
+          // different answers about the same register.
+          { ...PRIVACY_LIFECYCLES[0], activeCount: openDsrs },
+          { ...PRIVACY_LIFECYCLES[1], activeCount: allBreaches.filter(b => b.status !== 'CLOSED').length },
+          // DPIA / RoPA / consent / cross-border stay unmeasured. `DPIAS` is a
+          // hard-coded corpus (F2-194's filed population) and a RoPA entry is a
+          // register record rather than work in flight, so neither has an honest
+          // "in flight" figure — the catalogue asserted 2/1 and 1/0 for both.
+          PRIVACY_LIFECYCLES[2],
+          PRIVACY_LIFECYCLES[3],
+          PRIVACY_LIFECYCLES[4],
+          PRIVACY_LIFECYCLES[5],
+        ]}
         postureTitle={t('privacyPostureTitle')}
         anchors={PRIVACY_ANCHORS}
         />

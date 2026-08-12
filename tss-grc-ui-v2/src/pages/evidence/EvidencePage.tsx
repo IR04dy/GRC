@@ -372,7 +372,19 @@ export function EvidencePage() {
         storageKey="overview.evidence"
         processBarTitle="Evidence Management — Processes & Lifecycles"
         processBarSubtitle="ISO 19011 + IIA Std 2330 + ISACA CCM — every named process active in this domain."
-        lifecycles={EVIDENCE_LIFECYCLES}
+        lifecycles={[
+          // F2-197 — three of the four are exactly the populations this page's own
+          // KPIs and tabs already show. The CCM tile stays unmeasured: connector
+          // health is F2-193/F2-194 territory and this page fetches none of it, so
+          // the catalogue's 0 / 0 claimed "no connectors, none failing" either way.
+          { ...EVIDENCE_LIFECYCLES[0], activeCount: requests.data.filter(r => r.status === 'PENDING' || r.status === 'IN_PROGRESS').length },
+          { ...EVIDENCE_LIFECYCLES[1], activeCount: items.data.filter(i => i.status === 'PENDING' || i.status === 'UNDER_REVIEW').length },
+          EVIDENCE_LIFECYCLES[2],
+          // Expiry is a real date on the row, so this is the one tile on the page
+          // that can honestly claim an overdue figure: every expired item is past
+          // the date its own record carries.
+          { ...EVIDENCE_LIFECYCLES[3], activeCount: expiredItems.length, overdueCount: expiredItems.length },
+        ]}
         postureTitle="Regulator Posture · Evidence Coverage"
         anchors={items.data.flatMap(i => EVIDENCE_ANCHORS_BY_ID[i.id] ?? [])}
         />

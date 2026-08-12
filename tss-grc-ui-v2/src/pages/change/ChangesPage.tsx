@@ -47,7 +47,7 @@ import { GovernancePanel } from './GovernancePanel';
 import { usePromotedProvenance } from '../../lib/intakeProvenance';
 import { PromotedBadge } from '../../components/intake/PromotedBadge';
 import {
-  TAB_IDS, REVIEW_STATUSES, STATUS_TONE, TYPE_TONE, RISK_TONE,
+  TAB_IDS, REVIEW_STATUSES, IN_FLIGHT_STATUSES, STATUS_TONE, TYPE_TONE, RISK_TONE,
   TYPE_OPTIONS, CATEGORY_OPTIONS, RISK_OPTIONS, EMPTY, type TabId,
 } from './changeVocabulary';
 import { KanbanBoard } from './ChangeBoardPanel';
@@ -158,9 +158,23 @@ export function ChangesPage() {
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
 
   const total       = items.length;
-  const inFlight    = items.filter(c => ['SUBMITTED','IMPACT_ASSESSED','CAB_PENDING','CAB_APPROVED','SCHEDULED','EMERGENCY_APPROVED','IMPLEMENTING'].includes(c.status)).length;
+  const inFlight    = items.filter(c => IN_FLIGHT_STATUSES.includes(c.status)).length;
   const overdue     = items.filter(c => c.scheduledStart && c.status !== 'CLOSED' && new Date(c.scheduledStart) < new Date()).length;
   const successPct  = analytics?.successRatePct ?? 0;
+
+  /**
+   * F2-197 — per-type counts for the process tiles. The catalogue used to declare
+   * these as literals (2 / 4 / 1 / 0 for every tenant); each is now exactly the
+   * number of rows that tile's OWN register link opens, using the same predicates
+   * `registerRows` applies to `?type=`/`?review=1`. A tile whose figure disagrees
+   * with the list it navigates to is worse than a tile with no figure.
+   */
+  const inFlightOfType = (changeType: string) => items.filter(c =>
+    (c.changeType ?? '').toUpperCase() === changeType && IN_FLIGHT_STATUSES.includes(c.status)).length;
+  const overdueOfType  = (changeType: string) => items.filter(c =>
+    (c.changeType ?? '').toUpperCase() === changeType
+    && c.scheduledStart && c.status !== 'CLOSED' && new Date(c.scheduledStart) < new Date()).length;
+  const awaitingReview = items.filter(c => REVIEW_STATUSES.includes(c.status)).length;
 
   const tabs: TabItem<TabId>[] = [
     { id: 'register',     label: t('changeTabRegister') },
@@ -283,7 +297,15 @@ export function ChangesPage() {
         storageKey="overview.changes"
         processBarTitle={t('changeProcessBarTitle')}
         processBarSubtitle={t('changeProcessBarSub')}
-        lifecycles={CHANGE_LIFECYCLES}
+        lifecycles={[
+          { ...CHANGE_LIFECYCLES[0], activeCount: inFlightOfType('STANDARD'),  overdueCount: overdueOfType('STANDARD') },
+          { ...CHANGE_LIFECYCLES[1], activeCount: inFlightOfType('NORMAL'),    overdueCount: overdueOfType('NORMAL') },
+          { ...CHANGE_LIFECYCLES[2], activeCount: inFlightOfType('EMERGENCY'), overdueCount: overdueOfType('EMERGENCY') },
+          // A PIR has no scheduled-start of its own, so there is no overdue figure to
+          // give: `awaitingReview` is the queue depth, and the tile says nothing about
+          // lateness rather than implying zero.
+          { ...CHANGE_LIFECYCLES[3], activeCount: awaitingReview },
+        ]}
         postureTitle={t('changePostureTitle')}
         anchors={CHANGE_ANCHORS}
         />

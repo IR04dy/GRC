@@ -180,6 +180,20 @@ export function TprmPage() {
     .sort((a, b) => a.days - b.days)
     .slice(0, 8);
 
+  /**
+   * F2-197 — contract-renewal counts, derived from the FULL vendor list.
+   *
+   * ⚠ `expiringContracts` above ends in `.slice(0, 8)` because it feeds a preview
+   * table, so `expiringContracts.filter(c => c.days <= 90).length` — which is what
+   * the "Reviews due" KPI computed — could never exceed 8 however many contracts
+   * were actually inside notice. A capped list is fine to render and wrong to count.
+   */
+  const contractDaysLeft = allVendors
+    .filter(v => v.contractEndDate)
+    .map(v => Math.round((new Date(v.contractEndDate!).getTime() - Date.now()) / 86400_000));
+  const renewalsInNotice = contractDaysLeft.filter(d => d <= 90).length;
+  const contractsExpired = contractDaysLeft.filter(d => d < 0).length;
+
   const critical = allVendors.filter(v => v.riskRating === 'CRITICAL').length;
   const isDemo = vendors.isDemo;
 
@@ -217,14 +231,23 @@ export function TprmPage() {
         <Kpi Icon={Building2}     label={t('tprmKpiVendors')}    value={vendors.data.length} tone="primary" onClick={() => setTab('vendors')} />
         <Kpi Icon={Workflow}      label={t('tprmKpiCritical')}   value={critical} tone="danger" onClick={() => setTab('vendors')} />
         <Kpi Icon={AlertTriangle} label={t('tprmKpiOpenRisks')}  value={vendors.data.filter(v => v.status === 'UNDER_REVIEW').length} tone="warning" onClick={() => setTab('vendors')} />
-        <Kpi Icon={CalendarClock} label={t('tprmKpiReviews')}    value={expiringContracts.filter(c => c.days <= 90).length} tone="info" onClick={() => setTab('contracts')} />
+        <Kpi Icon={CalendarClock} label={t('tprmKpiReviews')}    value={renewalsInNotice} tone="info" onClick={() => setTab('contracts')} />
       </div>
 
       <OverviewStrip
         storageKey="overview.tprm"
         processBarTitle={t('tprmProcessBarTitle')}
         processBarSubtitle={t('tprmProcessBarSub')}
-        lifecycles={TPRM_LIFECYCLES}
+        lifecycles={[
+          // F2-197 — onboarding, continuous monitoring, re-assessment and off-boarding
+          // all need an assessment or campaign list this page does not fetch, so they
+          // stay unmeasured rather than repeating the catalogue's 1 / 4 / 2 / 0.
+          TPRM_LIFECYCLES[0], TPRM_LIFECYCLES[1], TPRM_LIFECYCLES[2],
+          // Contract lifecycle is measurable: the tile's own SLA is "90-day notice",
+          // and an end date already past is unambiguously overdue.
+          { ...TPRM_LIFECYCLES[3], activeCount: renewalsInNotice, overdueCount: contractsExpired },
+          TPRM_LIFECYCLES[4],
+        ]}
         postureTitle={t('tprmPostureTitle')}
         anchors={TPRM_ANCHORS}
         />

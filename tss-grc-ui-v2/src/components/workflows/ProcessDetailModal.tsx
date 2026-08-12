@@ -14,8 +14,11 @@ import type { ProcessLifecycle } from './ProcessLifecycleBar';
  * page refresh. Now they open this modal which:
  *   - explains what the process is (name + standards anchor)
  *   - shows the canonical stages as a visual stepper
- *   - shows live counters (active / overdue) so the user knows
- *     where the work is in flight
+ *   - shows the active / overdue counters **when the host page passes real ones**
+ *     so the user knows where the work is in flight. F2-197: these read "live"
+ *     but every one of them came from 112 hard-coded literals in
+ *     `lib/moduleLifecycles.ts`. A process with no measured count now renders an
+ *     em-dash and says so, rather than a confident 0 under a green tick.
  *   - exposes two action buttons: "Open register" (navigates to
  *     the filtered list) and "Start new" (kicks off the workflow,
  *     wired to the lifecycle's onClick if present, otherwise a
@@ -187,19 +190,26 @@ export function ProcessDetailModal({ lc, onClose }: {
           </div>
         )}
 
-        {/* Live counters */}
+        {/* Counters — real when the page passes them, an explicit em-dash otherwise.
+          * The overdue counter is the sharp one: it used to fall to `success` + a
+          * green CheckCircle2 whenever the number was not > 0, so an absent count
+          * asserted "nothing is late" — the strongest claim on this modal, and the
+          * one nothing computed. `neutral` + a hint is the honest answer. */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
           <Counter
-            tone={lc.activeCount > 0 ? 'info' : 'neutral'}
+            tone={typeof lc.activeCount !== 'number' ? 'neutral' : lc.activeCount > 0 ? 'info' : 'neutral'}
             Icon={Workflow}
             label={t('processDetailActive')}
             value={lc.activeCount}
+            emptyHint={t('processCounterNotComputed')}
           />
           <Counter
-            tone={lc.overdueCount > 0 ? 'danger' : 'success'}
-            Icon={lc.overdueCount > 0 ? AlertTriangle : CheckCircle2}
+            tone={typeof lc.overdueCount !== 'number' ? 'neutral' : lc.overdueCount > 0 ? 'danger' : 'success'}
+            Icon={typeof lc.overdueCount === 'number' && lc.overdueCount > 0 ? AlertTriangle
+              : typeof lc.overdueCount === 'number' ? CheckCircle2 : Workflow}
             label={t('processDetailOverdue')}
             value={lc.overdueCount}
+            emptyHint={t('processCounterNotComputed')}
           />
         </div>
 
@@ -249,11 +259,13 @@ function Stat({ Icon, label, value }: { Icon: typeof Clock; label: string; value
   );
 }
 
-function Counter({ tone, Icon, label, value }: {
+function Counter({ tone, Icon, label, value, emptyHint }: {
   tone: 'info' | 'neutral' | 'danger' | 'success';
   Icon: typeof Workflow;
   label: string;
-  value: number;
+  /** `undefined` = the platform computes no count for this process (F2-197). */
+  value: number | undefined;
+  emptyHint: string;
 }) {
   const palette: Record<string, { bg: string; fg: string }> = {
     info:    { bg: 'var(--info-bg)',    fg: 'var(--info-fg)' },
@@ -269,7 +281,12 @@ function Counter({ tone, Icon, label, value }: {
     }}>
       <Icon size={20} color={fg} />
       <div>
-        <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: fg }}>{value}</div>
+        {typeof value === 'number' ? (
+          <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: fg }}>{value}</div>
+        ) : (
+          <div className="mono empty-inline-compact" title={emptyHint} aria-label={emptyHint}
+            style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink-4)' }}>—</div>
+        )}
         <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{label}</div>
       </div>
     </div>

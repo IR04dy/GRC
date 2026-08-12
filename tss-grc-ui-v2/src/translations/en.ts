@@ -5101,6 +5101,8 @@ export const en = {
   processDetailStages:         'Lifecycle stages',
   processDetailActive:         'In flight',
   processDetailOverdue:        'Overdue / SLA-breached',
+  // F2-197 — shown on the em-dash where a process has no server-computed count.
+  processCounterNotComputed:   'Not computed for this process — no server figure exists yet',
   processDetailOpenRegister:   'Open register',
   processDetailSubmitNew:      'Submit new',
   processDetailHowToUse:       'How to use this process',

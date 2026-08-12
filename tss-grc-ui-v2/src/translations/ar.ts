@@ -4947,6 +4947,8 @@ export const ar = {
   processDetailStages:         'مراحل دورة الحياة',
   processDetailActive:         'قيد التنفيذ',
   processDetailOverdue:        'متأخر / مخالف للموعد',
+  // F2-197 — shown on the em-dash where a process has no server-computed count.
+  processCounterNotComputed:   'لا يُحتسب لهذه العملية — لا يوجد رقم من الخدمة بعد',
   processDetailOpenRegister:   'فتح السجل',
   processDetailSubmitNew:      'تقديم جديد',
   processDetailHowToUse:       'كيفية استخدام هذه العملية',

@@ -17,6 +17,16 @@ export type TabId = 'register' | 'kanban' | 'workflow' | 'analytics' | 'integrat
 export const TAB_IDS: TabId[] = ['register', 'kanban', 'workflow', 'analytics', 'integrations', 'governance', 'comms'];
 // Changes eligible for a post-implementation review (the PIR process queue).
 export const REVIEW_STATUSES = ['IMPLEMENTED', 'ROLLED_BACK', 'POST_REVIEW'];
+/**
+ * Statuses that mean a change is still moving through the pipeline. F2-197 needed
+ * this named because the "In flight" KPI and the four process tiles must agree:
+ * two copies of a status list is how F2-189 and F2-191 got a scheduler and a guard
+ * disagreeing about the same column.
+ */
+export const IN_FLIGHT_STATUSES = [
+  'SUBMITTED', 'IMPACT_ASSESSED', 'CAB_PENDING', 'CAB_APPROVED',
+  'SCHEDULED', 'EMERGENCY_APPROVED', 'IMPLEMENTING',
+];
 
 export const STATUS_TONE: Record<string, BadgeTone> = {
   DRAFT: 'neutral', SUBMITTED: 'info', IMPACT_ASSESSED: 'info',

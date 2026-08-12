@@ -279,7 +279,16 @@ export function EthicsPage() {
         storageKey="overview.ethics"
         processBarTitle={t('ethicsProcessBarTitle')}
         processBarSubtitle={t('ethicsProcessBarSubtitle')}
-        lifecycles={ETHICS_LIFECYCLES}
+        lifecycles={[
+          // F2-197 — `open` is the same figure the "Open" KPI shows over the same
+          // whistleblower register this tile links to. The other five tiles cover
+          // disclosures, CDD/EDD, AML alerts, sanctions hits and the CoC campaign:
+          // every one of those lives behind a sub-tab that fetches its own data on
+          // demand, so nothing is in scope here to count at first render.
+          { ...ETHICS_LIFECYCLES[0], activeCount: open },
+          ETHICS_LIFECYCLES[1], ETHICS_LIFECYCLES[2],
+          ETHICS_LIFECYCLES[3], ETHICS_LIFECYCLES[4], ETHICS_LIFECYCLES[5],
+        ]}
         postureTitle={t('ethicsPostureTitle')}
         anchors={ETHICS_REG_ANCHORS}
         lang={lang} />

@@ -481,7 +481,16 @@ export function IncidentsPage() {
         storageKey="overview.incidents"
         processBarTitle={t('incidentsProcessBarTitle')}
         processBarSubtitle={t('incidentsProcessBarSub')}
-        lifecycles={INCIDENT_LIFECYCLES}
+        lifecycles={[
+          // F2-197 — `open_count` is the same figure the "Open" KPI above shows, and
+          // the register this tile links to. The other two tiles stay unmeasured: the
+          // regulator-notification queue and the lessons-learned archive are neither
+          // fetched on this page nor derivable from the incident list, and the
+          // catalogue's old 0 / 0 asserted "nothing outstanding" for both.
+          { ...INCIDENT_LIFECYCLES[0], activeCount: open_count },
+          INCIDENT_LIFECYCLES[1],
+          INCIDENT_LIFECYCLES[2],
+        ]}
         postureTitle={t('incidentsPostureTitle')}
         anchors={INCIDENT_ANCHORS}
         />

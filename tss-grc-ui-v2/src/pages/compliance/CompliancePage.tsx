@@ -807,7 +807,21 @@ export function CompliancePage() {
         storageKey="overview.compliance"
         processBarTitle={t('complianceProcessBarTitle')}
         processBarSubtitle={t('complianceProcessBarSub')}
-        lifecycles={COMPLIANCE_LIFECYCLES}
+        lifecycles={[
+          // F2-197 — CAP Closure and Issue Management are two views of the SAME
+          // register (both link to ?tab=findings), so they get the same open count:
+          // giving them different numbers is what the catalogue did, and it implied
+          // two independent backlogs.
+          { ...COMPLIANCE_LIFECYCLES[0], activeCount: findings.data.filter(f => f.status === 'OPEN').length },
+          { ...COMPLIANCE_LIFECYCLES[1], activeCount: engagements.data.length },
+          // Policy lifecycle and regulatory change stay unmeasured: this page no
+          // longer owns the policy register (it moved to /policy-management) and it
+          // fetches no reg-change list, so neither figure exists here.
+          COMPLIANCE_LIFECYCLES[2],
+          COMPLIANCE_LIFECYCLES[3],
+          { ...COMPLIANCE_LIFECYCLES[4], activeCount: controls.data.length },
+          { ...COMPLIANCE_LIFECYCLES[5], activeCount: findings.data.filter(f => f.status === 'OPEN').length },
+        ]}
         postureTitle={t('compliancePostureTitle')}
         anchors={COMPLIANCE_ANCHORS}
         />

@@ -782,11 +782,65 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   than its claim), and I then set the follow-on ratchet to **16** — a number printed by the *broken* detector,
   answering a different question; the real population is **71 across 32 files**. 🔑 **A baseline lifted from a
   measurement of something else is worse than no baseline, because it looks measured.**
-  ⚠ **Still open and worth knowing**: `moduleLifecycles` holds **56** hard-coded `activeCount`/`overdueCount`
-  → **130 fabricated "active" items and 29 red `role="status"` "N items need attention" alerts** across 12
-  pages that all call the real API, and `rankLifecycles` sorts by them to pick the *"Recommended next action"*
-  chip. The trap in fixing it: the stripe is `overdue > 0 ? danger : active > 0 ? accent : success`, so deleting
-  the numbers turns 56 tiles **green** — asserting health rather than admitting ignorance.
+  ⚠ **That filed item is now CLOSED as F2-197** — and two of its numbers needed correcting first: the red
+  `role="status"` badges are **25 tiles** (29 is the *sum of items* they assert) and the pages are **11**, not 12.
+  ⚠⚠ **Ask what a COMPONENT asserts, not just what its page fetches** (F2-197, measured 2026-08-12).
+  `lib/moduleLifecycles.ts` declared **56 processes across 11 exports** with `activeCount`/`overdueCount` as
+  integer literals — **112 literals**, **130 "active" items** and **29 overdue** — rendered on **11 module pages
+  that all fetch their real register from the server for the KPI strip immediately above**. 🔑 **F2-195's
+  `kpiProvenance` gate could not see it: that gate is keyed on the `<Kpi>` tag, and here the numbers arrive as
+  PROPS from a catalogue two files away, so there is no literal in the page's JSX to find.** Third depth of
+  F2-192's headline in one lineage — claim level, then predicate level (F2-196), now component level; assume a
+  fifth shape exists. Corollary that makes this findable: **a catalogue should declare what a thing IS, never
+  what is happening to it right now** — a `status`, a metric or a clock stamp in a static corpus can only have
+  been invented (F2-193's rule, applied to a corpus nobody had checked against it).
+  ⚠⚠ **The trap in fixing it is that deleting the numbers ASSERTS HEALTH.** The stripe is
+  `overdue > 0 ? danger : active > 0 ? accent : success` and `ProcessDetailModal`'s overdue tone falls to
+  `success` + a green `CheckCircle2` whenever the figure is not > 0 — so the naive fix turns all 56 tiles green
+  and starts claiming *"nothing is late"*. **An invented figure invites a question; an invented all-clear closes
+  one.** The shape to copy: one predicate (`lifecycleHealth`) read by all three surfaces — `overdue` / `active` /
+  `clear` / `unmeasured` (neutral `--border`, no counter, no badge, an em-dash with a bilingual hint as `title`
+  **and** `aria-label`). 🔑 **`clear` needs BOTH counts**: a measured zero beside an unknown is not health, and
+  green is an assurance. ⚙ The em-dash treatment is UX-008's `Kpi` convention — **fifth** recorded blocker in
+  this programme that was already solved. And test `typeof x === 'number'`, never `!x`.
+  ⚠⚠ **The ranking sorted by the fabrication to choose what the platform recommended.** `rankLifecycles`
+  compared the counts directly and the compact rail promoted **`ranked[0]` unconditionally** as the filled
+  *"Recommended next action"* chip. Now health-first (`unmeasured` can never outrank a measured tile) and
+  **nothing is promoted unless the top tile is genuinely `overdue` or `active`**. ⚠ With the counts gone, `?? 0`
+  alone would have left the order to `Array.prototype.sort` stability — i.e. catalogue declaration order dressed
+  up as urgency; the unit test therefore feeds the array in reverse.
+  ⚠ **24 of 56 tiles now carry a server-derived count** (31 expressions on 10 pages), each equal to *the number
+  of rows its own register link opens* — a tile whose figure disagrees with the list it navigates to is worse
+  than a tile with no figure. The **32 unmeasured** are commented decisions: the list is behind a lazy sub-tab
+  (a first render would report 0), or **the terminal set would have to be invented** — `INCIDENT_WORKFLOW_OPTIONS`
+  has nine stages and whether `CLOSURE` means finished or the act of finishing is a judgement. 🔑 **Inventing a
+  terminal set to make a tile look wired is exactly F2-196's defect.** `overdueCount` is unmeasurable from this
+  catalogue **by construction**: `sla` is free text — 41 declared, **30 distinct** (`"Quarterly"`, `"CFO
+  escalation"`, `"SDAIA permit"`) — so no per-process due date exists client-side.
+  ⚠⚠ **The one tile that COMPUTED its counts had both of them wrong**, which is why "it's computed" is not
+  reassurance. `ScmPage`'s inline tier-mapping tile counted rows carrying a **single point of failure** and the
+  chip rendered that as a red *"N items need attention"* — **a SPOF is a structural risk, not a missed
+  deadline** — and counted `SUPPLY_CHAIN_TIERS`, browser-bundled constants, so it reported the same **5** for
+  every tenant. 🔑 **A computed count is not a measured one.**
+  ⚙ **A real truncation defect found in passing:** TPRM's "Reviews due" KPI was
+  `expiringContracts.filter(c => c.days <= 90).length` and `expiringContracts` ends in **`.slice(0, 8)`** because
+  it feeds a preview table — so the number **could never exceed 8**. 🔑 **A capped list is fine to render and
+  wrong to count**, and F2-195's gate passes it because the value does come from the server.
+  ⚠⚠ **The mutation harness found two gaps and one was in my own gate:** the truthiness ban was keyed on the
+  **field** names, but the component aliases `lc.activeCount` to a local `active`, so `!!active` **SURVIVED** —
+  🔑 **a rule keyed on a field name cannot see the local alias**; and the "catalogue emptied" negative control
+  replaced `= [` with `= [] as ProcessLifecycle[]; const _unused = [`, leaving all 56 entries under a dead name
+  so the `name:` census still read 56. **The mutation was wrong, not the gate** — 🔑 **a negative control that
+  does not actually break the thing proves nothing, and reads as a hole in the instrument.**
+  ⚠ **All 12 gate assertions passed on the first run**, which is also what a rotted regex looks like, so every
+  detector was re-run against the pre-fix tree (`git show master:…`) as a control — **6 of 6 fire**. And the
+  decrease-only floor is **31**, the number its own detector returns; F2-195 set one to 16 by copying a figure
+  printed by a *broken* detector answering a different question.
+  ⚙ **One landmine walked into:** `mvn -o clean package` launched with the dev backend live on :8084. It survived
+  (the listener stayed bound and `package` rewrote `target/classes` before DevTools restarted into nothing), but
+  the port check run *before* the build gave false comfort. 🔑 **The rule is not "check the port before probing"
+  — it is "do not run `mvn clean` while you still need the dev backend."** ⚠ And `mvn -q` suppresses the
+  `Tests run:` line the house rule tells you to grep for, so a `-q` run cannot support a test-count claim.
   ⚠ **The audit did find one real defect, and it was far narrower than the claim**: `CommitteeScheduledSweep`
   flipped action items to OVERDUE **in place** instead of calling `markOverdue` (whose javadoc said *"Called by
   the scheduled sweep"*). Since the sweep is the only producer in production, **no `ACTION_OVERDUE` audit row

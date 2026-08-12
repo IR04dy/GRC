@@ -540,7 +540,17 @@ export function BcmPage() {
         storageKey="overview.bcm"
         processBarTitle={t('bcmProcessBarTitle')}
         processBarSubtitle={t('bcmProcessBarSub')}
-        lifecycles={BCM_LIFECYCLES}
+        lifecycles={[
+          // F2-197 — BIA and BCP are the two registers this page fetches, and each
+          // count is the length of the list its own tile links to. Recovery-strategy
+          // validation, exercises, crisis activation and dependency mapping have no
+          // list in scope at first render, so they stay unmeasured — the catalogue
+          // gave the last two 1/0 and 0/0, i.e. a green all-clear on a programme that
+          // may never have mapped a dependency.
+          { ...BCM_LIFECYCLES[0], activeCount: allBia.length },
+          { ...BCM_LIFECYCLES[1], activeCount: plans.data.length },
+          BCM_LIFECYCLES[2], BCM_LIFECYCLES[3], BCM_LIFECYCLES[4], BCM_LIFECYCLES[5],
+        ]}
         postureTitle={t('bcmPostureTitle')}
         anchors={BCM_ANCHORS}
         />

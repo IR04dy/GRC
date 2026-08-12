@@ -42,7 +42,6 @@ import { useToast } from '../../lib/toast';
 import { SUPPLIERS, ONBOARDING, ASSESSMENTS, DEPENDENCIES, CONTRACTS, DISRUPTIONS } from './mockScm';
 import { SCM_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { TierMapPanel } from './TierMapPanel';
-import { SUPPLY_CHAIN_TIERS } from './tierMap';
 import { Layers } from 'lucide-react';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { WorkflowQuickLaunch } from '../../components/workflows/WorkflowQuickLaunch';
@@ -825,8 +824,15 @@ export function ScmPage() {
             nameAr: 'تعيين طبقات سلسلة الإمداد',
             reference: 'Saudi NRC + NIST SP 800-161 + ISO 28001',
             Icon: Layers,
-            activeCount: SUPPLY_CHAIN_TIERS.length,
-            overdueCount: SUPPLY_CHAIN_TIERS.filter(s => !!s.spof).length,
+            // ⚠ F2-197 — this was the only tile in the platform that COMPUTED its
+            // counts, and both were wrong. `overdueCount` counted rows with a
+            // single point of failure, which the chip then rendered as a red
+            // role="status" "N items need attention": a SPOF is a structural risk,
+            // not a missed deadline. And `activeCount` counted `SUPPLY_CHAIN_TIERS`
+            // — browser-bundled constants in `pages/scm/tierMap.ts`, so it reported
+            // the same 5 for every tenant. A count of hard-coded rows is not a count
+            // of this organisation's work; both are omitted until the map is served.
+            // (The corpus itself is F2-194's filed population, an owner decision.)
             steward: 'Supply Chain Risk Office',
             sla: 'Annual review',
             primary:   { label: 'Map',      onClick: () => setTab('workflow') },

@@ -1717,6 +1717,52 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-197 CLOSED 2026-08-12 — the process-lifecycle bar asserted 130 in-flight items and 25 red
+SLA-breach badges from a hard-coded catalogue.** The item F2-195 filed and F2-196 handed back, and the
+widest instance in the F2-42 → F2-193 → F2-194 → F2-195 lineage by surface area.
+`lib/moduleLifecycles.ts` declared **56 processes across 11 exports**, each with `activeCount` and
+`overdueCount` as integer literals — **112 literals**, summing to **130 "active" items** and **29
+overdue**, rendered on **11 module pages** that all fetch their real register from the server for the KPI
+strip immediately above: **25 tiles** with a red `role="status"` badge reading *"N items need attention"*,
+**21** with an accent stripe and counter, **10** already green. Three render surfaces, and the loudest is
+`ProcessDetailModal`'s *"Live counters"* panel — 22px mono figures under a docstring claiming they show
+*"where the work is in flight"*. 🔑 **The most confident statement about these numbers was in a
+comment, written by someone who had not checked where they came from.**
+⚠⚠ **The trap: deleting the numbers asserts health.** The stripe is
+`overdue > 0 ? danger : active > 0 ? accent : success` and the modal's overdue tone falls to `success` +
+a green `CheckCircle2` whenever the number is not > 0 — so the naive fix turns all 56 tiles green and
+starts asserting *"nothing is late"*. **An invented figure invites a question; an invented all-clear
+closes one.** Fixed with one predicate, `lifecycleHealth`, read by all three surfaces: `overdue` /
+`active` / `clear` (**both** counts arrived and both zero) / `unmeasured` (neutral `--border`, no counter,
+no badge, an em-dash with a bilingual hint as `title` **and** `aria-label` — UX-008's `Kpi`
+convention, so nothing needed inventing, the **fifth** blocker in this programme that was already
+solved). 🔑 **`clear` needs both numbers**: a measured zero beside an unknown is not health.
+⚠⚠ **The ranking sorted by the fabrication to pick the "Recommended next action"** —
+`rankLifecycles` compared the counts directly and the compact rail promoted `ranked[0]`
+**unconditionally**, so the literals decided which process the platform told each user to work on. Now
+health-first (`unmeasured` last) with **nothing promoted unless the top tile is genuinely overdue or
+active**. **24 of 56 tiles** now carry a server-derived count (**31 expressions on 10 pages**), each
+equal to *the number of rows its own register link opens*; the **32 unmeasured** are commented decisions,
+mostly because the list is behind a lazy sub-tab or **the terminal set would have to be invented** —
+which is F2-196's defect, so an em-dash is the correct answer. `overdueCount` is unmeasurable from this
+catalogue by construction: `sla` is free text, 41 declared and **30 distinct**.
+⚠⚠ **The one tile that COMPUTED its counts had both wrong** — `ScmPage`'s inline tier-mapping
+tile counted rows with a **single point of failure** as *overdue* (a SPOF is not a missed deadline) and
+counted `SUPPLY_CHAIN_TIERS`, browser-bundled constants, so it reported the same **5** for every tenant.
+⚙ **A real truncation defect found in passing:** TPRM's "Reviews due" KPI counted
+`expiringContracts` — which ends in **`.slice(0, 8)`** — so it could never exceed 8. 🔑 **A
+capped list is fine to render and wrong to count.** ⚠⚠ **The mutation harness found two gaps,
+one in my own gate:** the truthiness ban was keyed on the **field** names, but the component aliases
+`lc.activeCount` to a local `active`, so `!!active` **SURVIVED**; and the "catalogue emptied" negative
+control left all 56 entries under a dead name, so it proved nothing. ⚠ All 12 gate assertions passed
+on the first run — which is also what a rotted regex looks like — so every detector was re-run
+against the pre-fix tree as a control: **6 of 6 fire**. Verified: FE **549/549 across 57 files** (+27),
+`tsc` clean, mutation **17/17 as declared**, backend **3,790/0/0** (no Java touched), live probe
+**18/18** through the Vite proxy, **0 migrations**. 🔑 **Lesson: ask what a COMPONENT asserts, not
+just what its page fetches** — a page can call the real API for everything on screen and still render
+a fabricated claim that arrives as a prop from a catalogue two files away. Corollary: **a catalogue should
+declare what a thing IS, never what is happening to it right now.**
+
 ✔ **F2-196 CLOSED 2026-08-12 — the PDPL breach sweep excluded EXTENDED cases, so a DSR that used its
 statutory extension could never breach.** Found while wiring F2-195's filed `moduleLifecycles` item: the
 Privacy page's DSR status tests did not match what the database holds, and following that through three
