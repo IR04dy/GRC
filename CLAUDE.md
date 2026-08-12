@@ -852,6 +852,50 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   `CommitteeOverdueTransitionTest`, including a structural leg that the sweep holds no `setStatus(`. ⚙ Side
   effect worth knowing: the transition is now **tenant-scoped** (`findByIdAndOrganisationId`) where the in-place
   flip trusted the query alone.
+- ⚠⚠ **A de-mocking gate keyed on a MECHANISM certifies only the pages that use that mechanism, and a page
+  that calls nothing sits outside all of them at once** (F2-198, measured 2026-08-12). `/ropa` was **routed,
+  sidebar-linked and made no server call of any kind** — 370 lines, zero `api.`/`useApiList`/`fetch` — rendering
+  9 invented PDPL Art. 31 processing activities, five `<Kpi>` tiles computed over them (one **`tone="danger"`**
+  "needs review"), and `CONSENT_SUMMARIES` claiming **142,310 active / 8,420 withdrawn** consents. Real, probed
+  live and identical in dev and prod: `privacy.processing_activities` **11 rows** (5 cross-border) and
+  `privacy.consents` **32 ACTIVE / 3 WITHDRAWN / 1 EXPIRED**. **Five instruments missed it:**
+  `demoFallbackContract`'s ratchet counts `/mock/i` **imports** (filename); that same file's F2-169 hard zero
+  builds its population from `corpusNamesImportedBy`, a **three-entry filename allow-list** — 🔑 **the invariant
+  is real, its POPULATION is a filename pattern**, so that zero still covers less than it looks like;
+  F2-168's `demoRows()` tagging only reaches corpora that opted in, so F2-167's `RowActions disabled={isDemo}`
+  cannot fire; the `isDemo` disclosure rule triggers on `useApiList`; and F2-195's `kpiProvenance` wants a
+  literal or `|| N` inside the `<Kpi>` tag. 🔑 **The cheapest question that finds this class: does the thing
+  rendering the figure ever ask a server anything?** `pageDataProvenance.test.ts` asks it — over **310 routed
+  components, 73 pages call nothing** (47 sidebar-reachable), narrowed by F2-193's rule to **12 corpora on 11
+  pages, 7 sidebar, 3 clock-minted** as decrease-only ratchets.
+  ⚠ **The new fabrication shape is a CORRECT predicate over an INVENTED corpus** — `aggregateRopa()` is honest
+  arithmetic, so it passes F2-195's gate (no literal) *and* F2-196's (which assumes the rows are real). Fourth
+  shape in that lineage. And it outlived the others because `ropaConsent.ts` minted every `lastReviewedAt` from
+  `Date.now()` at module load: **a clock-anchored fabrication has no tell** (F2-194).
+  ⚠⚠ **STRIP LINE COMMENTS AND BLOCK COMMENTS IN ONE LEFT-TO-RIGHT ALTERNATION — the order is load-bearing and
+  getting it wrong silently shrinks your population.** Written the obvious way (`s/\/\*[\s\S]*?\*\///` first,
+  then `//`), the census **deleted 40,247 of `App.tsx`'s 89,522 characters — 45% of the file** — because line 122
+  is a `//` prose comment whose text contains a literal `/*`, so the block pattern ran from there to the next
+  closing delimiter and took the `lazy()` declarations for the very pages being measured. It reported **24**
+  server-less pages instead of **74** and **0** sidebar instances instead of **8**, silently excluding all four
+  fabricated pages already known by name. 🔑 **A corrupted source yields a SMALLER population, which reads
+  exactly like "those pages are fine"** — the quietest way for a scan to be wrong, and the 7th instance here of
+  a detector satisfied by something other than its claim. Use `/(?<!:)\/\/[^\n]*|\/\*[\s\S]*?\*\//g`: at a `//`
+  an inner `/*` can never open a block, and at a `/*` a URL cannot truncate it. Pin **both** directions.
+  ⚠ **Retire, do not rebuild, when a real surface already exists** — `PrivacyPage`'s ROPA tab already renders the
+  register, so a second *real* ROPA screen would have made a fourth surface for one statutory object, which is
+  F2-196's own defect. ADR-017 §D-5 ratified this in F2-42. `/ropa` redirects (F2-137: a bookmark must land
+  somewhere true) and `siblingsUseQuery` — `group.items.some(s => s.to.includes('?'))` — turns query-aware
+  sidebar highlighting on automatically, the **6th** blocker in this programme that was already solved.
+  ⚠⚠ **But retiring must not silently drop a real signal the fabrication happened to display.** Cross-border
+  transfers (PDPL Art. 29, **5 of 11**) were preserved as a tile counted over the *same* `ropa.data` the activity
+  count uses. `crossBorderTransfer` was always on the wire — `GET /privacy/ropa` returns the **entity** — and
+  `PrivacyRopaDto` merely never declared it, which is *why* the page invented its own count. Conversely
+  `lastReviewedAt`/`nextReviewAt` exist on **no column and no wire**, so those two tiles were deleted rather than
+  reconstructed: inventing them is F2-196's defect.
+  ⚠ **Resolve table names from `sys.tables`, never guess them.** Measuring the backends behind the other ten
+  pages, a first pass guessed six table names and **five did not exist** — the same guessed-path error as
+  F2-197's probe, and it would have produced ten confident false "no backend" claims.
   ⚠⚠ **Asking the MIRROR question — how many things READ this status, and do they agree? — found a P1 on a
   statutory control** (F2-196, measured 2026-08-12). The platform has **three** server-side DSR registers on
   three tables with **disjoint** status vocabularies and **no CHECK constraint on any of the three status

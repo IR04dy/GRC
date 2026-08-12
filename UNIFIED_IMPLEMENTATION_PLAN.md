@@ -1717,6 +1717,80 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-198 CLOSED 2026-08-12 — a sidebar page invented the PDPL Article 31 register beside the real
+one, and every de-mocking gate was blind to it by construction.** The item F2-194 filed and F2-197 handed
+back; lineage F2-42 → F2-193 → F2-194 → F2-195 → F2-196 → F2-197 → this, asking the question one level
+further out each time — and the **page** turns out to be the level at which every instrument has a hole.
+`/ropa` was routed, sidebar-linked and made **no server call of any kind** (370 lines, zero
+`api.`/`useApiList`/`fetch`): 9 invented processing activities from `lib/ropaConsent.ts`, five `<Kpi>` tiles
+computed over them by `aggregateRopa()` — including **needs-review rendered `tone="danger"`** — and
+`CONSENT_SUMMARIES` asserting **142,310 active and 8,420 withdrawn consents**. The real register, probed
+live and **identical in dev and prod**: `privacy.processing_activities` **11 rows** (5 cross-border;
+`LEGAL_OBLIGATION` 4 / `LEGITIMATE_INTEREST` 3 / `CONSENT` 2 / `CONTRACT` 2) and `privacy.consents`
+**32 ACTIVE / 3 WITHDRAWN / 1 EXPIRED**.
+⚠⚠ **Five instruments guarded fabricated data and this page sat outside all of them at once, because each
+defines its population by a MECHANISM rather than by the claim:** `demoFallbackContract`'s ratchet counts
+`/mock/i` **imports** (a filename rule); the *same file's* F2-169 hard zero builds its population from
+`corpusNamesImportedBy`, a **three-entry filename allow-list** — 🔑 **the invariant is real, its POPULATION
+is a filename pattern**, which had not been noticed; F2-168's `demoRows()` tagging only reaches corpora that
+opted in, so F2-167's `RowActions disabled={isDemo}` cannot fire on an untagged one; the `isDemo` disclosure
+rule triggers on `useApiList`, and a page that calls nothing is not a consumer; and F2-195's `kpiProvenance`
+looks for a literal or a `|| N` fallback inside the `<Kpi>` tag.
+🔑 **The new shape is a CORRECT predicate over an INVENTED corpus.** `aggregateRopa` is honest arithmetic —
+so F2-195's gate passes it (no literal) and F2-196's would too (it assumes the rows are real). **Fourth shape
+in one lineage** after a literal, a `|| N`, a wrong predicate over real rows, and a prop from a catalogue.
+⚠ **Why it outlived the others: `ropaConsent.ts` line 77 is `const _now = Date.now()`**, with every
+`lastReviewedAt` derived from it at module load — F2-194's rule that **a clock-anchored fabrication has no
+tell**, where F2-193's frozen stamps were visibly three months stale. Three of the surviving pages do the same.
+**Retired, not rewired, and that was already ratified:** `PrivacyPage`'s ROPA tab renders the real register
+(`privacyApi.ropa()`, a five-column table, `rowHref` to the detail page), so a second *real* ROPA screen would
+have created a fourth surface for one statutory object — precisely F2-196's defect — and ADR-017 §D-5 already
+chose *"retire the fabricated page"* in F2-42. `/ropa` now redirects to `/privacy?tab=ropa` (F2-137: a bookmark
+must land somewhere true); `siblingsUseQuery` turns query-aware sidebar matching on automatically, the **sixth**
+blocker in this programme that was already solved. Deleted: the page, both corpora (**727 lines**) and **45 dead
+translation keys in each language**.
+⚠⚠ **Two tiles were deliberately NOT rebuilt** — probed live, there is **no `lastReviewedAt` and no
+`nextReviewAt`** on the table or the wire in either database, so a review-currency figure could only have been
+invented (F2-196's defect, F2-197's trap). The one real signal is preserved: **PDPL Article 29 cross-border
+transfers, 5 of 11**, counted over the *same* `ropa.data` the activity count uses so the two can never disagree.
+`crossBorderTransfer` was always on the wire — the endpoint returns the entity — and `PrivacyRopaDto` simply
+never declared it, which is *why* the page invented its own count. 🔑 **Retiring a fabrication must not silently
+drop a real signal it happened to display.**
+⚠⚠ **The measurement bug that nearly hid the population was in my own scan.** Stripping block comments before
+line comments deleted **40,247 of App.tsx's 89,522 characters (45%)**, because line 122 is a `//` prose comment
+containing a literal `/*`: the block pattern ran to the next closing delimiter and took the `lazy()`
+declarations for the very pages being measured. The census reported **24** server-less pages instead of **74**
+and **0** sidebar-reachable state-asserting instances instead of **8** — so `/ropa`, `/assets`,
+`/control-crosswalk` and `/crisis-management`, all four already known, were silently absent. 🔑 **A corrupted
+source yields a SMALLER population, which reads exactly like "those pages are fine"** — the seventh instance
+here of a detector satisfied by something other than its claim. Fix: **one alternation, left-to-right**, pinned
+in both directions plus a leg asserting the real `App.tsx` keeps >75% of its bytes.
+**The population, measured properly:** over **310 routed components**, **73 pages make no server call** (47
+sidebar-reachable); narrowed by F2-193's rule that a catalogue may declare what a thing IS, never what is
+happening to it now → **14 corpora on 12 pages, 8 sidebar, 5 clock-minted**, which retiring `/ropa` took to
+**12 / 11 / 7 / 3**. Gate: `pageDataProvenance.test.ts` (15 tests) — two decrease-only **ratchets**, not
+invariants, because eleven pages remain and each is a separate capability question; a three-part anti-vacuity
+leg, since both ratchets pass trivially if the scan resolves nothing, which is exactly what the broken stripper
+did. ⚠ **No per-page reasons are narrated** — F2-188's failure mode — and I did **not** establish whether each
+has a real backend: a first attempt guessed six table names and **five did not exist** (F2-197's guessed-path
+error again), so the next slice must resolve them from `sys.tables`, per page.
+**Verified:** FE **564/564 across 58 files** (+15), `tsc` clean, `vite build` clean (the `RopaPage` chunk is
+gone), mutation **11/11 as declared** (10 caught; 1 declared SURVIVES — a ratchet cannot see its own ceiling
+raised), live probe **11/11**, and in the running app `/ropa` resolves to
+**`/login?next=%2Fprivacy%3Ftab%3Dropa`** (the redirect fires before the auth gate and `next` preserves the real
+tab) while all three retired modules fail to import and `privacyApi.ropa` is still a function. Pre-fix control:
+the same detector reads **14 / 8** on master, both above the new baseline. **0 backend changes, 0 migrations.**
+⬜ **Filed:** **(a)** the 11 remaining pages — take `/nca-ecc-export` next (40 ECC domains with a status, while
+F2-195 measured the real register at **0% implemented**), then `/approvals`, `/attestations`,
+`/audit-workspace`, `/control-crosswalk`, `/assets`, `/regulatory-change`. **(b)** `demoFallbackContract`'s
+F2-169 population is still a filename allow-list, so that hard zero covers less than it appears to.
+**(c)** `privacy.consents.linked_ropa_id` is NULL on all 36 rows — mechanism without data, F2-178's shape.
+**(d)** The entity maps 14 of the table's 21 columns: `receiving_country`, `transfer_mechanism`,
+`adequacy_decision` and `data_office_reference` reach no wire, so the cross-border *detail* a DPO needs is
+unreachable although the columns hold it.
+🔑 **Lesson: a gate keyed on a mechanism certifies only pages that use that mechanism.** The question that
+found this is the cheapest available — **does the thing rendering this figure ever ask a server anything?**
+
 ✔ **F2-197 CLOSED 2026-08-12 — the process-lifecycle bar asserted 130 in-flight items and 25 red
 SLA-breach badges from a hard-coded catalogue.** The item F2-195 filed and F2-196 handed back, and the
 widest instance in the F2-42 → F2-193 → F2-194 → F2-195 lineage by surface area.
