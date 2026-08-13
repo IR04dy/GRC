@@ -67,7 +67,11 @@ public class AuditEngagementService {
     public AuditEngagementDto create(AuditEngagementDto req) {
         Long orgId = TenantContext.requireOrganisationId();
         AuditEngagement e = new AuditEngagement();
-        e.setExternalId(req.getId() != null ? req.getId() : generateExternalId());
+        // ⚠⚠ F2-206 — F2-172(d)'s SEVENTH instance. The server mints the engagement reference.
+        // An audit engagement's reference appears in the IIA working papers and findings that
+        // cite it (F2-203 measured five disjoint engagement code spaces already); letting a
+        // client name it adds a sixth by hand.
+        e.setExternalId(generateExternalId());
         e.setOrganisationId(orgId);
         e.setEngagementCode(req.getEngagementCode());
         e.setTitleEn(req.getTitleEn()); e.setTitleAr(req.getTitleAr());

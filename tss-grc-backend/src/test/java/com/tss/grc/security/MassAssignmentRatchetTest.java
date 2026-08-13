@@ -69,6 +69,31 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@link #serverOwnedFieldsAreStillSerialised()} pins that distinction so nobody "simplifies"
  * it back to {@code @JsonIgnore}.
  *
+ * <h2>⚠⚠ F2-206 — the SCOPE of everything above, corrected</h2>
+ *
+ * <p>The paragraphs above say the nine fields "can no longer arrive from a caller". That was
+ * true of <b>{@link BaseEntity} subclasses only</b>, and this class could not tell, because it
+ * proves the claim through {@code class Probe extends BaseEntity}. Measured 2026-08-13:
+ * <b>252 of 407 entities do not extend {@code BaseEntity}, none of them annotated its own
+ * {@code id}, and that is 177 of the 214 endpoints this ratchet counts.</b>
+ *
+ * <p>It was live, not theoretical. {@code POST /api/v1/privacy/ropa} carrying {@code {"id": n}}
+ * answered <b>201 Created</b> and overwrote processing activity {@code n} — a PDPL Article 31
+ * record — nulling every column the body omitted, moving the lawful basis from
+ * {@code LEGAL_OBLIGATION} to {@code CONSENT} and clearing the Article 25 special-category flag.
+ *
+ * <p>🔑 <b>An invariant enforced by a superclass covers exactly its subclasses, and a probe that
+ * extends that superclass can only ever measure the covered half.</b> {@link #riskProfileIsRecordedForF2_22b()}
+ * could not surface it either: it breaks its field walk at {@code BaseEntity} precisely because
+ * those fields are {@code READ_ONLY}, and {@code id} is in none of its risk vocabularies — so
+ * {@code id} was structurally unrankable by the very scan built to rank this defect.
+ *
+ * <p>{@code ServerOwnedIdentityModule} generalises the fix to every mapped type and
+ * {@link ServerOwnedIdentityInvariantTest} asserts it over the whole population with a negative
+ * control, so nothing here needs a per-entity change. <b>The three tests below are unchanged and
+ * still correct — read them as claims about {@code BaseEntity}, which is what they test.</b>
+ *
+ * @see ServerOwnedIdentityInvariantTest F2-206 — the same claims over all 407 entities
  * @see ControllerAuthorizationRatchetTest sibling ratchet — whether a write is guarded at all
  * @see ExportAuthorizationRatchetTest sibling ratchet — whether a file export requires EXPORT
  */
@@ -112,10 +137,16 @@ class MassAssignmentRatchetTest {
     /**
      * The server-owned fields on {@link BaseEntity} must not be settable from JSON.
      *
-     * <p>This is the platform-wide half of F2-22a: whatever any individual endpoint does with
-     * its body, these nine fields can no longer arrive from a caller. Asserted through a real
-     * {@link ObjectMapper} round-trip rather than by looking for the annotation, because what
-     * matters is Jackson's behaviour, not which annotation produced it.
+     * <p>Asserted through a real {@link ObjectMapper} round-trip rather than by looking for the
+     * annotation, because what matters is Jackson's behaviour, not which annotation produced it.
+     *
+     * <p>⚠ F2-206: this is the {@code BaseEntity} half of F2-22a, not a platform-wide half. The
+     * previous wording here — "whatever any individual endpoint does with its body, these nine
+     * fields can no longer arrive from a caller" — was the claim a reader would have relied on,
+     * and it did not hold for the 252 entities that do not extend {@code BaseEntity}. The probe
+     * below extends it, so this test can only ever speak for the types that do.
+     * {@link ServerOwnedIdentityInvariantTest} makes the platform-wide claim and proves it over
+     * every {@code @Entity}.
      */
     @Test
     void serverOwnedFieldsCannotBeSetFromJson() throws Exception {

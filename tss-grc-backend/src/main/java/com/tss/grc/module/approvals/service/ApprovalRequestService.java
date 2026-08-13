@@ -118,7 +118,18 @@ public class ApprovalRequestService {
     public ApprovalRequestDto create(ApprovalRequestDto req) {
         Long orgId = TenantContext.requireOrganisationId();
         ApprovalRequest r = new ApprovalRequest();
-        r.setExternalId(req.getId() != null ? req.getId() : generateExternalId());
+        // ⚠⚠ F2-206. The caller's `id` is IGNORED — the reference is minted here, always.
+        //
+        // This was `req.getId() != null ? req.getId() : generateExternalId()`: F2-172(d)'s
+        // defect for the SIXTH time, after the intake substrate, F2-202's DSR cases, F2-203's
+        // audit findings, F2-204's ERM treatment plans and F2-205's vulnerabilities. The
+        // external id is what an approver cites when they say which request they decided, so a
+        // client that chooses it can make two requests indistinguishable in an audit trail, or
+        // collide with a reference already issued.
+        //
+        // 🔑 Found by grepping `req.getId() != null ?` before assuming the family was closed —
+        // which CLAUDE.md instructs and which is now three slices for three finds.
+        r.setExternalId(generateExternalId());
         r.setOrganisationId(orgId);
         r.setEntityType(req.getEntityType());
         r.setEntityId(req.getEntityId());
