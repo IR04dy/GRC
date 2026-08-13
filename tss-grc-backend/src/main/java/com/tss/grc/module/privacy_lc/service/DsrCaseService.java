@@ -118,7 +118,18 @@ public class DsrCaseService {
     public DsrCaseDto create(DsrCaseDto req) {
         Long orgId = TenantContext.requireOrganisationId();
         DsrCase d = new DsrCase();
-        d.setExternalId(req.getId() != null ? req.getId() : generateExternalId());
+        // F2-202. The caller's `id` is IGNORED — the reference code is minted here, always.
+        //
+        // This used to be `req.getId() != null ? req.getId() : generateExternalId()`, which
+        // let a client name the tracking code for a statutory request. That is the defect
+        // F2-172(d) closed on the intake substrate ("only the server may issue a tracking
+        // code or a statutory deadline"), and the browser-local DSR copy this slice retired
+        // was minting exactly such a code — `DSR-<year>-<Math.random()*999>`, three digits of
+        // entropy, so two subjects filing on the same day could collide on one reference.
+        //
+        // Nothing supplied an id before this change: no frontend client existed, and no test
+        // sets one — so refusing it cannot break a working caller.
+        d.setExternalId(generateExternalId());
         d.setOrganisationId(orgId);
         d.setType(req.getType());
         d.setSubjectName(req.getSubjectName());
@@ -165,6 +176,14 @@ public class DsrCaseService {
         }
         if (req.getDataSummaryEn() != null) d.setDataSummaryEn(req.getDataSummaryEn());
         if (req.getDataSummaryAr() != null) d.setDataSummaryAr(req.getDataSummaryAr());
+        // F2-202. Only on REJECTED: PDPL Article 4 requires a refusal to be reasoned, and
+        // the columns have existed since V17 with nothing able to write them. Scoped to the
+        // rejecting transition on purpose — a reason attached to any other state would be a
+        // refusal reason on a case that was not refused.
+        if ("REJECTED".equals(req.getStatus())) {
+            if (req.getRejectionReasonEn() != null) d.setRejectionReasonEn(req.getRejectionReasonEn());
+            if (req.getRejectionReasonAr() != null) d.setRejectionReasonAr(req.getRejectionReasonAr());
+        }
         d = repo.save(d);
         audit.log("TRANSITION", "DsrCase", d.getId(),
             "DSR " + nullSafe(d.getExternalId())

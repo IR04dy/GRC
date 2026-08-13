@@ -13,7 +13,9 @@ import { useI18n } from '../../lib/i18n';
 import { LifecyclePipeline, type PipelineStage, type PipelineCard, dueLabel } from '../../components/lifecycle/LifecyclePipeline';
 import { loadTreatmentPlans, subscribeRiskLifecycle, aggregateRiskLifecycle } from '../../lib/riskLifecycle';
 import { loadFindings, subscribeAuditLifecycle, aggregateAuditLifecycle } from '../../lib/auditLifecycle';
-import { loadDsr, subscribePrivacy, aggregatePrivacy } from '../../lib/privacyLifecycle';
+import { subscribePrivacy } from '../../lib/privacyLifecycle';
+// F2-202 — the DSR lane is the one lane on this page fed by a real server register.
+import { dsrApi, aggregateDsr, isPastDeadline, isOpen as isOpenDsr, type DsrCase } from '../../lib/privacyLcApi';
 import { loadInvocations, subscribeBcm, aggregateBcm, pickPlanById } from '../../lib/bcmLifecycle';
 import { loadVulns, loadAssets, subscribeCyber, aggregateCyber } from '../../lib/cyberLifecycle';
 
@@ -41,14 +43,31 @@ export function LifecycleOverviewPage() {
 
   const riskStats = useMemo(() => aggregateRiskLifecycle(), [_t]);
   const auditStats = useMemo(() => aggregateAuditLifecycle(), [_t]);
-  const privacyStats = useMemo(() => aggregatePrivacy(), [_t]);
   const bcmStats = useMemo(() => aggregateBcm(), [_t]);
   const cyberStats = useMemo(() => aggregateCyber(), [_t]);
 
-  const totalAtRisk =
+  // F2-202 — DSR is the one lane here whose rows come from a server. It loads asynchronously,
+  // so it is `null` until the response lands and stays `null` if the request fails.
+  const [dsrs, setDsrs] = useState<DsrCase[] | null>(null);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    dsrApi.list().then(setDsrs).catch(() => setDsrs(null));
+    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const dsrStats = useMemo(() => dsrs && aggregateDsr(dsrs, now), [dsrs, now]);
+
+  /**
+   * ⚠ `null` until the DSR register has been read, because this is a SUM across lanes and one
+   * of its terms is now server-derived. Dropping the DSR term while keeping the other five
+   * would render a smaller number in `success` green — a composite that reads as measured and
+   * is quietly missing a statutory lane. F2-197's rule applies to totals, not just to tiles:
+   * an incomplete sum is not a smaller risk.
+   */
+  const totalAtRisk = dsrStats === null ? null :
     riskStats.risksWithOpenBreach +
     auditStats.findingsCritical +
-    privacyStats.dsrOverdue +
+    dsrStats.pastDeadline +
     bcmStats.tier1Count +
     cyberStats.vulnsOverdue +
     cyberStats.socOpenP1;
@@ -63,10 +82,16 @@ export function LifecycleOverviewPage() {
 
       {/* Top-level KPIs */}
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi Icon={AlertOctagon}     label={t('loKpiAtRisk')}        value={String(totalAtRisk)}                tone={totalAtRisk > 0 ? 'danger' : 'success'} to="/lifecycle" />
+        <Kpi Icon={AlertOctagon}     label={t('loKpiAtRisk')}
+          value={totalAtRisk === null ? null : String(totalAtRisk)}
+          emptyHint={t('loKpiAtRiskUnread')}
+          tone={totalAtRisk === null ? 'neutral' : totalAtRisk > 0 ? 'danger' : 'success'} to="/lifecycle" />
         <Kpi Icon={TrendingUp}        label={t('loKpiRiskBreach')}    value={String(riskStats.risksWithOpenBreach)} tone={riskStats.risksWithOpenBreach > 0 ? 'danger' : 'success'} to="/risk-lifecycle" />
         <Kpi Icon={Stamp}              label={t('loKpiAuditCritical')} value={String(auditStats.findingsCritical)} tone={auditStats.findingsCritical > 0 ? 'danger' : 'success'} to="/audit-lifecycle" />
-        <Kpi Icon={Fingerprint}        label={t('loKpiDsrOverdue')}    value={String(privacyStats.dsrOverdue)}     tone={privacyStats.dsrOverdue > 0 ? 'danger' : 'success'} to="/privacy-lifecycle" />
+        <Kpi Icon={Fingerprint}        label={t('loKpiDsrOverdue')}
+          value={dsrStats ? String(dsrStats.pastDeadline) : null}
+          emptyHint={t('loKpiDsrUnread')}
+          tone={dsrStats && dsrStats.pastDeadline > 0 ? 'danger' : 'neutral'} to="/privacy-lifecycle" />
         <Kpi Icon={Activity}            label={t('loKpiBcmActive')}     value={String(bcmStats.invocationsThisYear)} tone={bcmStats.activeInvocation ? 'danger' : 'success'} to="/bcm-lifecycle" />
         <Kpi Icon={AlertTriangle}      label={t('loKpiCyberCritical')} value={String(cyberStats.vulnsCritical)}    tone={cyberStats.vulnsCritical > 0 ? 'danger' : 'success'} to="/cyber-lifecycle" />
         <Kpi Icon={Clock}               label={t('loKpiBiaExpiring')}   value={String(bcmStats.biaExpiringSoon)}    tone={bcmStats.biaExpiringSoon > 0 ? 'warning' : 'success'} to="/bcm-lifecycle" />
@@ -133,13 +158,14 @@ export function LifecycleOverviewPage() {
           { code: 'REDACTING',           labelEn: 'Redacting',         labelAr: 'إخفاء',             tone: 'warning' },
           { code: 'DELIVERED',           labelEn: 'Delivered',        labelAr: 'مُسلَّم',            tone: 'success' },
         ]}
-        cards={loadDsr().map(d => {
+        cards={(dsrs ?? []).map(d => {
           const due = dueLabel(d.slaDeadline, () => '');
           return {
             id: d.id, status: d.status, refCode: d.id,
             titleEn: `${d.subjectName} · ${d.type}`,
             titleAr: `${d.subjectName} · ${d.type}`,
-            urgent: due?.urgent && d.status !== 'DELIVERED' && d.status !== 'REJECTED',
+            // Openness is the complement of the derived terminal set, not a `!==` chain.
+            urgent: isPastDeadline(d, now) || (due?.urgent === true && isOpenDsr(d.status)),
             dueLabel: due?.label,
           };
         })}

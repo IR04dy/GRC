@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Files, ShieldAlert, Globe, UserCheck, Clock,
   AlertTriangle, CheckCircle2, FileText, Activity,
@@ -13,16 +13,24 @@ import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
-  loadRopa, saveRopa, loadDpia, loadCbt, loadDsr, saveDsr, transitionDsr, subscribePrivacy,
-  detectHighRisk, dsrSlaRemaining, aggregatePrivacy,
+  loadRopa, saveRopa, loadDpia, loadCbt, subscribePrivacy,
+  detectHighRisk, aggregatePrivacy,
   ADEQUACY_BY_COUNTRY, ADEQUACY_TONE, ADEQUACY_LABEL, SAFEGUARD_LABEL,
   ROPA_STATUS_LABEL, ROPA_STATUS_TONE, LAWFUL_BASIS_LABEL,
-  DSR_TYPE_LABEL, DSR_STATUS_LABEL, DSR_STATUS_TONE,
-  transitionDpia, createDpia, transitionCbt, upgradeCbtSafeguard, createDsr,
-  type RopaActivity, type DsrCase, type DsrStatus,
+  transitionDpia, createDpia, transitionCbt, upgradeCbtSafeguard,
+  type RopaActivity,
   type DpiaAssessment, type DpiaStatus, type CrossBorderTransfer, type CbtStatus,
-  type SafeguardMechanism, type DsrType,
+  type SafeguardMechanism,
 } from '../../lib/privacyLifecycle';
+// F2-202 — the DSR half of this page reads the real register at /api/privacy-lc/dsr-cases.
+// Everything imported above is still browser-local; see `lib/lifecycleStores.ts`.
+import {
+  dsrApi, aggregateDsr, daysToDeadline, isPastDeadline, mayTransition,
+  isOpen as isOpenDsr, DSR_ALLOWED,
+  DSR_TYPE_LABEL, DSR_STATUS_LABEL, DSR_STATUS_TONE,
+  type DsrCase, type DsrStatus, type DsrType,
+} from '../../lib/privacyLcApi';
+import { ApiError } from '../../lib/api';
 import { useRealtimeOrgEvent } from '../../lib/useRealtimeEntity';
 import '../../styles/pages/privacy-lifecycle.css';
 
@@ -36,16 +44,63 @@ export function PrivacyLifecyclePage() {
   const [_tick, setTick] = useState(0);
   useEffect(() => subscribePrivacy(() => setTick(t => t + 1)), []);
 
-  // Sprint 4 §2.7 — backend `privacy_lc.DsrCaseService` broadcasts on every
-  // DSR transition (PDPL-30-day SLA pulse, fulfillment, rejection). Tick the
-  // same counter so memoised data re-derives for either local or remote events.
-  useRealtimeOrgEvent('changed.dsr_case', () => setTick(t => t + 1));
-
   const stats = useMemo(() => aggregatePrivacy(), [_tick]);
   const ropa = useMemo(() => loadRopa(), [_tick]);
   const dpias = useMemo(() => loadDpia(), [_tick]);
   const cbts = useMemo(() => loadCbt(), [_tick]);
-  const dsrs = useMemo(() => loadDsr(), [_tick]);
+
+  // ─── DSR: the real register ────────────────────────────────────────────────
+  //
+  // F2-202. `dsrs` is `null` until the first response lands and stays `null` if the request
+  // fails, because the tiles below distinguish "not yet known" from "zero" and a failed load
+  // must not render as an empty-but-healthy register.
+  const [dsrs, setDsrs] = useState<DsrCase[] | null>(null);
+  const [dsrError, setDsrError] = useState<string | null>(null);
+  const [busyDsr, setBusyDsr] = useState<string | null>(null);
+  // One clock for every deadline comparison on the page, refreshed each minute.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const loadDsrCases = useCallback(async () => {
+    setDsrError(null);
+    try {
+      // No fallback on any path. `useApiList` prefers a demo corpus when the server returns
+      // zero rows — the load-bearing fallback that hid F2-158's 500 for the whole Role API.
+      setDsrs(await dsrApi.list());
+    } catch (e) {
+      setDsrError(e instanceof ApiError ? e.message
+        : (lang === 'ar' ? 'تعذّر تحميل سجل طلبات أصحاب البيانات' : 'Could not load the data-subject request register'));
+      setDsrs(null);
+    }
+  }, [lang]);
+
+  useEffect(() => { void loadDsrCases(); }, [loadDsrCases]);
+
+  // Sprint 4 §2.7 — `privacy_lc.DsrCaseService` broadcasts on every DSR transition. Before
+  // F2-202 this handler ticked a counter that re-read localStorage, so the page listened for
+  // the server's own event and answered by re-reading the browser's copy of the data. Now it
+  // refetches the register the event is about.
+  useRealtimeOrgEvent('changed.dsr_case', () => { void loadDsrCases(); });
+
+  const dsrStats = useMemo(() => dsrs && aggregateDsr(dsrs, now), [dsrs, now]);
+
+  /** Decide through the server and replace the row from ITS response, never a local guess. */
+  const runTransition = useCallback(async (id: string, status: DsrStatus, okMsg: string) => {
+    setBusyDsr(id);
+    try {
+      const updated = await dsrApi.transition(id, { status });
+      setDsrs(prev => prev ? prev.map(x => x.id === updated.id ? updated : x) : prev);
+      toast.success(okMsg);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (lang === 'ar' ? 'فشل تحديث الطلب' : 'Could not update the request'));
+    } finally {
+      setBusyDsr(null);
+    }
+  }, [lang, toast]);
 
   return (
     <Shell title={t('prcTitle')} sub={t('prcSub')}>
@@ -60,10 +115,43 @@ export function PrivacyLifecyclePage() {
         <Kpi Icon={ShieldAlert}    label={t('prcKpiDpiaHighRisk')}  value={String(stats.dpiaHighRisk)} tone={stats.dpiaHighRisk > 0 ? 'warning' : 'success'} to="/data-officer/dpia" />
         <Kpi Icon={Globe}          label={t('prcKpiCbt')}            value={`${stats.cbtAdequate} / ${stats.cbtTotal}`} tone="info" to="/privacy/data-flow" />
         <Kpi Icon={Globe}          label={t('prcKpiCbtBlocked')}     value={String(stats.cbtBlocked)} tone={stats.cbtBlocked > 0 ? 'danger' : 'success'} to="/privacy/data-flow" />
-        <Kpi Icon={UserCheck}       label={t('prcKpiDsrOpen')}        value={String(stats.dsrOpen)} tone={stats.dsrOpen > 0 ? 'info' : 'success'} to="/data-officer/dsr" />
-        <Kpi Icon={AlertTriangle}  label={t('prcKpiDsrOverdue')}     value={String(stats.dsrOverdue)} tone={stats.dsrOverdue > 0 ? 'danger' : 'success'} to="/data-officer/dsr" />
-        <Kpi Icon={Clock}          label={t('prcKpiAvgDays')}        value={`${stats.dsrCloseAvgDays}d`} tone="info" to="/data-officer/dsr" />
+        {/*
+          F2-202 — these three now count over the rows fetched from /api/privacy-lc/dsr-cases,
+          and each links to the DSR tab on THIS page rather than to /data-officer/dsr. That
+          route serves `data_officer.dsr_request`, a different table with a different status
+          vocabulary (F2-196 measured three server-side DSR registers), so a figure counted
+          here and a list opened there could never be expected to agree.
+
+          `value={null}` while `dsrStats` is null renders UX-008's em-dash with `emptyHint` as
+          the title and aria-label. A 0 would assert "no open requests" on a register we have
+          not read yet, and an `AlertTriangle` tile falling to `success` would assert "nothing
+          is overdue" — F2-197's invented all-clear, on a statutory clock.
+        */}
+        <Kpi Icon={UserCheck} label={t('prcKpiDsrOpen')}
+          value={dsrStats ? String(dsrStats.open) : null}
+          emptyHint={t('prcKpiDsrUnread')}
+          tone={dsrStats && dsrStats.open > 0 ? 'info' : 'neutral'} to="?tab=dsr" />
+        <Kpi Icon={AlertTriangle} label={t('prcKpiDsrOverdue')}
+          value={dsrStats ? String(dsrStats.pastDeadline) : null}
+          emptyHint={t('prcKpiDsrUnread')}
+          tone={dsrStats && dsrStats.pastDeadline > 0 ? 'danger' : 'neutral'} to="?tab=dsr" />
+        {/*
+          Open, past the Article 4 deadline, and the platform has stamped no breach. F2-196
+          found the SLA sweep excluding EXTENDED cases, so the requests most likely to breach
+          were the only ones never escalated. This tile is the difference between the two
+          questions, and it is measured — in prod both EXTENDED cases still carry no stamp.
+        */}
+        <Kpi Icon={Clock} label={t('prcKpiDsrUnrecorded')}
+          value={dsrStats ? String(dsrStats.pastDeadlineUnrecorded) : null}
+          emptyHint={t('prcKpiDsrUnread')}
+          tone={dsrStats && dsrStats.pastDeadlineUnrecorded > 0 ? 'warning' : 'neutral'} to="?tab=dsr" />
       </div>
+
+      {dsrError && (
+        <Card title={t('prcDsrTitle')} Icon={UserCheck}>
+          <div role="status" className="prc-sub">{dsrError}</div>
+        </Card>
+      )}
 
       <div className="prc-tab-row">
         {([
@@ -81,7 +169,7 @@ export function PrivacyLifecyclePage() {
         ))}
       </div>
 
-      {tab === 'pipeline' && <DsrPipeline dsrs={dsrs}
+      {tab === 'pipeline' && <DsrPipeline dsrs={dsrs ?? []} now={now}
         onAdvance={(id, fromStatus) => {
           const next: Record<string, DsrStatus> = {
             INTAKE: 'VERIFYING_IDENTITY',
@@ -90,9 +178,10 @@ export function PrivacyLifecyclePage() {
             REDACTING: 'DELIVERED',
           };
           const target = next[fromStatus];
-          if (!target) return;
-          transitionDsr(id, target);
-          toast.success(t('lpcAdvancedToast'));
+          // The server answers 409 outside its own machine; asking first only avoids offering
+          // a button that will be refused. It is not a second opinion about what is legal.
+          if (!target || !mayTransition(fromStatus, target)) return;
+          void runTransition(id, target, t('lpcAdvancedToast'));
         }}
         onCardClick={() => setTab('dsr')} />}
 
@@ -136,18 +225,31 @@ export function PrivacyLifecyclePage() {
           upgradeCbtSafeguard(c.id, sg);
           toast.success(t('prcCbtUpgradedToast'));
         }} />}
-      {tab === 'dsr'  && <DsrTab  dsrs={dsrs}
-        onCreate={(type, name, idLast4, email) => { createDsr(type, name, idLast4, email); toast.success(t('prcDsrCreatedToast')); }}
-        onTransition={(d, status) => { transitionDsr(d.id, status); toast.info(`${t('prcDsrStatusUpdated')}: ${DSR_STATUS_LABEL[status][lang]}`); }}
-        onExtend={(d) => {
-          saveDsr({
-            ...d, status: 'EXTENDED', extended: true,
-            extensionReasonEn: 'Complex multi-system request — Article 4 60-day extension invoked.',
-            extensionReasonAr: 'طلب معقّد متعدّد الأنظمة — تمديد المادة 4 إلى 60 يوماً.',
-            slaDeadline: new Date(new Date(d.slaDeadline).getTime() + 30 * 86_400_000).toISOString().slice(0, 10),
-          });
-          toast.warning(t('prcDsrExtendedToast'));
-        }} />}
+      {tab === 'dsr'  && <DsrTab dsrs={dsrs} now={now} busyId={busyDsr}
+        onCreate={async (type, name, idLast4, email) => {
+          try {
+            // No id and no deadline in this payload. The server mints the reference code and
+            // the PDPL Article 4 deadline; F2-172 settled that only the server may issue
+            // either, and the browser copy minted both.
+            const created = await dsrApi.create({
+              type, subjectName: name, nationalIdLast4: idLast4, contactEmail: email,
+            });
+            setDsrs(prev => prev ? [created, ...prev] : [created]);
+            toast.success(`${t('prcDsrCreatedToast')} — ${created.id}`);
+          } catch (e) {
+            toast.danger(e instanceof ApiError ? e.message
+              : (lang === 'ar' ? 'تعذّر تسجيل الطلب' : 'Could not file the request'));
+          }
+        }}
+        onTransition={(d, status) =>
+          void runTransition(d.id, status,
+            `${t('prcDsrStatusUpdated')}: ${DSR_STATUS_LABEL[status][lang]}`)}
+        onExtend={(d) =>
+          // Just the transition. The server sets `extended` and adds the 30 days itself
+          // (DsrCaseService: "Article 4: extend to 60 days total"). The old handler recomputed
+          // that deadline in the browser and wrote its own extension justification — inventing
+          // a reason on the operator's behalf for a statutory extension.
+          void runTransition(d.id, 'EXTENDED', t('prcDsrExtendedToast'))} />}
     </Shell>
   );
 }
@@ -407,8 +509,11 @@ function CbtTab({ cbts, ropa, onTransition, onUpgradeSafeguard }: {
 
 // ─── DSR tab ────────────────────────────────────────────────────────────────
 
-function DsrTab({ dsrs, onCreate, onTransition, onExtend }: {
-  dsrs: DsrCase[];
+function DsrTab({ dsrs, now, busyId, onCreate, onTransition, onExtend }: {
+  /** `null` while the register has not been read — never conflated with an empty register. */
+  dsrs: DsrCase[] | null;
+  now: Date;
+  busyId: string | null;
   onCreate: (type: DsrType, name: string, idLast4: string, email: string) => void;
   onTransition: (d: DsrCase, status: DsrStatus) => void;
   onExtend: (d: DsrCase) => void;
@@ -443,8 +548,28 @@ function DsrTab({ dsrs, onCreate, onTransition, onExtend }: {
           <Button size="sm" variant="primary" onClick={submit}>{t('prcDsrFormSubmit')}</Button>
         </div>
       )}
-      {dsrs.map(d => {
-        const sla = dsrSlaRemaining(d);
+      {/*
+        Three distinct states, never collapsed: not read yet, read and empty, read with rows.
+        A "no requests yet" line over an unread register would be the same class of claim as
+        F2-197's green tile — an all-clear nothing measured.
+      */}
+      {dsrs === null && (
+        <div role="status" className="prc-card-sub">{t('prcDsrUnread')}</div>
+      )}
+      {dsrs !== null && dsrs.length === 0 && (
+        <div className="prc-card-sub">{t('prcDsrEmpty')}</div>
+      )}
+      {(dsrs ?? []).map(d => {
+        const days = daysToDeadline(d, now);
+        const late = isPastDeadline(d, now);
+        // Elapsed share of the window from filing to deadline, for the bar only.
+        const filed = new Date(d.filedAt).getTime();
+        const due = new Date(d.slaDeadline).getTime();
+        const pctElapsed = Number.isNaN(filed) || Number.isNaN(due) || due <= filed
+          ? 0
+          : Math.min(100, Math.max(0, ((now.getTime() - filed) / (due - filed)) * 100));
+        const nextStates = DSR_ALLOWED[d.status] ?? [];
+        const busy = busyId === d.id;
         return (
           <div key={d.id} className="prc-dsr-card">
             <div className="prc-item-head">
@@ -472,31 +597,63 @@ function DsrTab({ dsrs, onCreate, onTransition, onExtend }: {
                     {lang === 'ar' ? d.extensionReasonAr : d.extensionReasonEn}
                   </div>
                 )}
+                {/*
+                  The lawful basis for refusing the request. PDPL Article 4 requires a refusal
+                  to be reasoned; F2-202 put these columns on the wire and gave the transition
+                  endpoint a field to write them, so a REJECTED case can now say why.
+                */}
+                {(d.rejectionReasonEn || d.rejectionReasonAr) && (
+                  <div className="prc-dsr-extension">
+                    {(lang === 'ar' ? d.rejectionReasonAr : d.rejectionReasonEn) ?? ''}
+                  </div>
+                )}
               </div>
               <div className="prc-dsr-sla-col">
-                {/* SLA bar */}
+                {/* SLA bar — the deadline is the server's `sla_deadline` column, never computed here. */}
                 <div className="prc-dsr-sla-wrap">
-                  <div className={`prc-dsr-sla-time${sla.isOverdue ? ' prc-dsr-sla-time--late' : ''}`}>
-                    {sla.isOverdue ? t('prcDsrOverdue') : `${sla.hoursRemaining}h ${t('prcDsrRemaining')}`}
+                  <div className={`prc-dsr-sla-time${late ? ' prc-dsr-sla-time--late' : ''}`}>
+                    {late
+                      ? `${t('prcDsrOverdue')}${days == null ? '' : ` (${Math.abs(days)}d)`}`
+                      : days == null ? '—' : `${days}d ${t('prcDsrRemaining')}`}
                   </div>
                   <div className="prc-dsr-sla-bar">
                     <div className="prc-dsr-sla-fill"
-                      data-tone={sla.isOverdue ? 'danger' : sla.pctElapsed > 80 ? 'warning' : 'success'}
-                      style={{ width: `${sla.pctElapsed}%` }} />
+                      data-tone={late ? 'danger' : pctElapsed > 80 ? 'warning' : 'success'}
+                      style={{ width: `${pctElapsed}%` }} />
                   </div>
                   <div className="prc-dsr-sla-foot">
                     {t('prcDsrDeadline')}: <span className="mono">{d.slaDeadline}</span>
                   </div>
-                </div>
-                {/* Action buttons */}
-                <div className="prc-dsr-actions">
-                  {d.status === 'INTAKE' && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'VERIFYING_IDENTITY')}>{t('prcDsrVerify')}</Button>}
-                  {d.status === 'VERIFYING_IDENTITY' && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'COLLECTING')}>{t('prcDsrCollect')}</Button>}
-                  {d.status === 'COLLECTING' && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'REDACTING')}>{t('prcDsrRedact')}</Button>}
-                  {d.status === 'REDACTING' && <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => onTransition(d, 'DELIVERED')}>{t('prcDsrDeliver')}</Button>}
-                  {d.status !== 'DELIVERED' && d.status !== 'REJECTED' && d.status !== 'EXTENDED' && (
-                    <Button size="sm" variant="ghost" onClick={() => onExtend(d)}>{t('prcDsrExtend')}</Button>
+                  {/*
+                    Past the deadline with nothing recorded. F2-196 found the sweep skipping
+                    EXTENDED cases, so a case could sit weeks past its statutory deadline with
+                    no breach row, no event and no audit trail. That state is now visible on
+                    the case rather than only in the database — measured live in prod.
+                  */}
+                  {late && !d.slaBreachedAt && (
+                    <div className="prc-dsr-sla-foot" role="status">
+                      <Badge tone="warning">{t('prcDsrBreachUnrecorded')}</Badge>
+                    </div>
                   )}
+                  {d.slaBreachedAt && (
+                    <div className="prc-dsr-sla-foot">
+                      {t('prcDsrBreachRecorded')}: <span className="mono">{d.slaBreachedAt.slice(0, 10)}</span>
+                    </div>
+                  )}
+                </div>
+                {/*
+                  Action buttons come from `DSR_ALLOWED[d.status]`, the mirror of the server's
+                  own machine — so the UI cannot offer a step the server answers 409 to. The
+                  old block hard-coded four `status === '…'` tests plus a three-way `!==` chain
+                  for Extend, which is a second lifecycle written in JSX.
+                */}
+                <div className="prc-dsr-actions">
+                  {nextStates.includes('VERIFYING_IDENTITY') && <Button size="sm" variant="primary" disabled={busy} onClick={() => onTransition(d, 'VERIFYING_IDENTITY')}>{t('prcDsrVerify')}</Button>}
+                  {nextStates.includes('COLLECTING') && <Button size="sm" variant="primary" disabled={busy} onClick={() => onTransition(d, 'COLLECTING')}>{t('prcDsrCollect')}</Button>}
+                  {nextStates.includes('REDACTING') && <Button size="sm" variant="primary" disabled={busy} onClick={() => onTransition(d, 'REDACTING')}>{t('prcDsrRedact')}</Button>}
+                  {nextStates.includes('DELIVERED') && <Button size="sm" variant="primary" Icon={CheckCircle2} disabled={busy} onClick={() => onTransition(d, 'DELIVERED')}>{t('prcDsrDeliver')}</Button>}
+                  {nextStates.includes('EXTENDED') && <Button size="sm" variant="ghost" disabled={busy} onClick={() => onExtend(d)}>{t('prcDsrExtend')}</Button>}
+                  {nextStates.includes('REJECTED') && <Button size="sm" variant="ghost" disabled={busy} onClick={() => onTransition(d, 'REJECTED')}>{t('prcDsrReject')}</Button>}
                 </div>
               </div>
             </div>
@@ -548,8 +705,9 @@ function Stat({ label, value, tone }: { label: string; value: string; tone: 'pri
 
 // ─── DSR pipeline (interactive kanban) ─────────────────────────────────────
 
-function DsrPipeline({ dsrs, onAdvance, onCardClick }: {
+function DsrPipeline({ dsrs, now, onAdvance, onCardClick }: {
   dsrs: DsrCase[];
+  now: Date;
   onAdvance: (id: string, fromStatus: string, toStatus: string | null) => void;
   onCardClick: (id: string) => void;
 }) {
@@ -574,7 +732,11 @@ function DsrPipeline({ dsrs, onAdvance, onCardClick }: {
         { label: d.verificationMethod ?? '—', tone: 'primary' as const },
         ...(d.extended ? [{ label: 'EXT', tone: 'warning' as const }] : []),
       ],
-      urgent: due?.urgent && d.status !== 'DELIVERED' && d.status !== 'REJECTED',
+      // F2-202: `isPastDeadline` already tests openness as the COMPLEMENT of the derived
+      // terminal set. The old expression was `due?.urgent && status !== 'DELIVERED' &&
+      // status !== 'REJECTED'` — a hand-written closed-status list, the exact shape F2-196
+      // found in the SLA sweep, where a forgotten token meant a breach was never escalated.
+      urgent: isPastDeadline(d, now) || (due?.urgent === true && isOpenDsr(d.status)),
       dueLabel: due?.label,
     };
   });

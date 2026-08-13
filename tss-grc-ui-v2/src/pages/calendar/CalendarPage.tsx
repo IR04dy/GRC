@@ -224,7 +224,7 @@ export function CalendarPage() {
       const typesParam = activeTypes.length ? `&types=${encodeURIComponent(activeTypes.join(','))}` : '';
       // Token key is `grc.accessToken` — set by lib/auth.ts and used by
       // every other authenticated fetch (api.ts, kb.ts, ndiReports.ts,
-      // realtime.ts, platformPersistence.ts). The previous code looked
+      // realtime.ts). The previous code looked
       // up the unprefixed `accessToken` key which is never written by
       // auth.ts, so every iCal download was sent unauthenticated and
       // bounced to the login page.

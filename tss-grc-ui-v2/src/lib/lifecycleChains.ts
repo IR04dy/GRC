@@ -8,7 +8,6 @@
 import { createTreatmentPlan } from './riskLifecycle';
 import { createCapa, type Finding } from './auditLifecycle';
 import { createSocAlert, transitionVuln, type Vulnerability } from './cyberLifecycle';
-import { saveDsr, type DsrCase, type DsrType } from './privacyLifecycle';
 
 /**
  * Audit finding → Risk treatment plan + CAPA.
@@ -66,28 +65,26 @@ export function chainSocEscalationToVuln(socAlertAssetId: string | undefined, op
   return matching.id;
 }
 
-/**
- * PDPL breach → DSR auto-creation for affected subjects.
- * When a breach affecting personal data is confirmed, a DSR case is created
- * for the data subject for the access right (so they can request what was
- * exposed).
- */
-export function chainBreachToDsr(subjectName: string, nationalIdLast4: string, contactEmail: string, breachRef: string): string {
-  const id = `DSR-AUTO-${Date.now().toString(36).slice(-6).toUpperCase()}`;
-  const slaDeadline = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-  const dsr: DsrCase = {
-    id, type: 'ACCESS' as DsrType,
-    subjectName, nationalIdLast4, contactEmail,
-    status: 'INTAKE',
-    filedAt: new Date().toISOString(),
-    slaDeadline,
-    ropaIds: [],
-    dataSummaryEn: `Auto-created DSR following PDPL breach ${breachRef}. Subject was within affected data set.`,
-    dataSummaryAr: `طلب أُنشئ تلقائياً بعد خرق ${breachRef} وفق نظام حماية البيانات. صاحب البيانات ضمن البيانات المتأثّرة.`,
-  };
-  saveDsr(dsr);
-  return id;
-}
+// ⚠⚠ `chainBreachToDsr` was here and F2-202 DELETED it. Recording why, because the
+// capability it named is real and the gap is worth keeping visible.
+//
+// Intent: when a PDPL breach affecting personal data is confirmed, file an ACCESS request for
+// each affected subject so they can ask what was exposed.
+//
+// What it actually did: minted `DSR-AUTO-<Date.now() in base36>` as the tracking reference,
+// computed `Date.now() + 30 days` as the PDPL Article 4 statutory deadline, and wrote the case
+// into localStorage via `saveDsr`. That is the third client-side minter of that deadline this
+// slice found, after `createDsr` and the page's Extend handler, and F2-172 settled the rule:
+// only the server may issue a tracking code or a statutory deadline.
+//
+// It had NO CALLERS — nothing in the product invoked it, so nothing regressed by removing it.
+// Deleting rather than rewiring is deliberate: a breach-to-DSR chain needs the subjects of the
+// breach, and this function took them as parameters from a caller that does not exist. Filing
+// one case per named subject is a product decision about who is notified, not a plumbing job.
+//
+// If it is built, it files through `dsrApi.create()` in `lib/privacyLcApi.ts`, which sends no
+// id and no deadline — `POST /api/privacy-lc/dsr-cases` stamps both. See the filed item in
+// FINDINGS_REGISTER_V2.md under F2-202.
 
 /**
  * BCM invocation → Crisis activation hand-off.

@@ -22,6 +22,16 @@ import { isTestFile, relPosix, stripComments, walkSources } from './support/sour
  * {@code platform.persistence_row}, the table F2-71 found absent from the database for three months
  * while the client silently fell back to {@code localStorage}.
  *
+ * <p>⚠ <b>F2-202 deleted {@code lib/platformPersistence.ts} entirely, so those eight entries are
+ * gone from the list below.</b> They are worth remembering as the shape rather than the instance:
+ * this scan correctly reported all eight as unreached client exports and that was tolerated for
+ * months, because "an adapter nothing calls" reads as unfinished plumbing. What it could not say is
+ * that the <em>reached</em> parts of the same file were no-ops — the three {@code mirror*ToBackend}
+ * helpers had callers in five modules, so they never appeared here at all, and every one of them
+ * returned before sending anything because the mode switch they read had no setter anywhere in the
+ * product. <b>A reachability scan measures whether a symbol is called, never whether calling it
+ * does anything</b>, and the second question is where this file's real defect was.
+ *
  * <p>The precedent this generalises is F2-04b's: {@code moduleEnabled()} was exported, tested and
  * called by <b>nobody for four months</b> while the entitlement subsystem it belonged to never once
  * said no. Nothing in CI could see that. This scan can.
@@ -50,6 +60,36 @@ const LIB = join(SRC, 'lib');
 const DECL = /^export\s+(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm;
 /** The export talks to the backend — `api.get(...)` &c., or a raw `/api/...` path. */
 const CALLS_API = /api\.(?:get|post|put|patch|del|delete)\b|\/api\//;
+
+/**
+ * Declarative registries: files whose only `/api/...` occurrences are DATA, and which reference
+ * no symbol they could be calling. They are neither clients nor callers, and counting them as
+ * either makes this scan report things that are not true.
+ *
+ * <p>⚠ F2-202 added the first entry and it demonstrates both errors at once. `lib/lifecycleStores.ts`
+ * declares, per lifecycle workspace, whether its state is browser-local and which REST base serves
+ * the real register. The `|\/api\//` branch of {@code CALLS_API} matched those endpoint strings, so
+ * the file was reported as an API client with no importer — it wraps nothing. Worse, its notes name
+ * the functions they describe, and because "called" here is a deliberate over-approximation (a bare
+ * token match in any production file), the sentence explaining that
+ * `hydrateAuditLifecycle()` fetches four resources made a KNOWN_UNREACHED entry look reached.
+ *
+ * <p><b>Prose about code, stored as data, creates phantom callers in a token-matching scan.</b>
+ * That is a property of the over-approximating design F2-68(c) chose on purpose — it under-reports
+ * rather than inventing defects — so the fix is to exclude files that cannot call anything, not to
+ * weaken the match. `aRegistryExclusionMakesNoApiCall` below proves each exclusion earns it.
+ */
+const DECLARATIVE_REGISTRIES: Record<string, string> = {
+  'lib/lifecycleStores.ts':
+    'Declares which lifecycle workspaces are still browser-local, with the real endpoint and the '
+    + 'measured row count for each. Every /api/ string in it is a value, not a call, and its notes '
+    + 'name functions in other modules — so it is neither a client nor a caller. Enforced instead '
+    + 'by lifecycleStoreContract.test.ts and the backend LifecycleStoreBackingContractTest, which '
+    + 'resolves every endpoint it names to a live controller.',
+};
+
+/** An executable call to the shared api client. Used to prove a registry exclusion is honest. */
+const REAL_API_CALL = /\bapi\.(?:get|post|put|patch|del|delete)\s*(?:<[^()\n]{0,200}>)?\s*\(/;
 
 /**
  * Clients that are deliberately unimported. Empty, and that is the point: the one entry this scan
@@ -191,17 +231,9 @@ const KNOWN_UNREACHED: readonly string[] = [
   'lib/outsourcing.ts#listOverdueExitTests',
   'lib/outsourcing.ts#listOverdueReviews',
   'lib/tprmQuestionnaire.ts#getQtTemplate',
-  // Platform services — 11
+  // Platform services — 3 (was 11: F2-202 deleted lib/platformPersistence.ts and its 8 entries)
   'lib/api.ts#riskReportApi',
   'lib/digitalSignature.ts#listForEntity',
-  'lib/platformPersistence.ts#APPROVAL_ADAPTER',
-  'lib/platformPersistence.ts#AUDIT_ENG_ADAPTER',
-  'lib/platformPersistence.ts#BOARD_PACK_ADAPTER',
-  'lib/platformPersistence.ts#CAPA_ADAPTER',
-  'lib/platformPersistence.ts#NCA_ECC_ADAPTER',
-  'lib/platformPersistence.ts#REGCHANGE_ADAPTER',
-  'lib/platformPersistence.ts#adapterSave',
-  'lib/platformPersistence.ts#adapterTransition',
   'lib/savedViews.ts#syncSavedViewsFromBackend',
   // Other modules — 3
   'lib/cyberLifecycle.ts#ECC_DOMAINS_DEF',
@@ -220,8 +252,13 @@ const ALL = walkSources(SRC).map(path => ({
   body: stripComments(readFileSync(path, 'utf8')),
 }));
 
-/** Identifiers present in each production file — the "is it called anywhere" index. */
-const PRODUCTION = ALL.filter(f => !f.test);
+/**
+ * Identifiers present in each production file — the "is it called anywhere" index.
+ *
+ * Declarative registries are excluded: they reference no symbol they could call, so any token
+ * they contain is prose, and counting it as a call hides a genuinely dark export.
+ */
+const PRODUCTION = ALL.filter(f => !f.test && !(f.rel in DECLARATIVE_REGISTRIES));
 const TOKENS_BY_FILE = new Map(
   PRODUCTION.map(f => [f.path, new Set(f.body.match(/[A-Za-z_$][\w$]*/g) ?? [])] as const));
 
@@ -231,7 +268,8 @@ function declarationSpan(body: string, from: number): string {
   return body.slice(from, next === -1 ? body.length : next);
 }
 
-const libFiles = ALL.filter(f => f.path.startsWith(LIB) && !f.test);
+const libFiles = ALL.filter(
+  f => f.path.startsWith(LIB) && !f.test && !(f.rel in DECLARATIVE_REGISTRIES));
 
 function apiExports(): ApiExport[] {
   const out: ApiExport[] = [];
@@ -284,6 +322,24 @@ describe('F2-68(c) — no API client module is shipped with no importer', () => 
       'These modules wrap real backend endpoints and no production file imports them — a client '
       + 'shipped with no user. Either wire it, delete it, or add it to INTENTIONALLY_UNIMPORTED '
       + 'with the reason:\n  ' + orphans.join('\n  ')).toEqual([]);
+  });
+
+  it('a declarative-registry exclusion makes no API call and still exists', () => {
+    // Both directions. Forward: an exclusion may not hide a file that really does call the
+    // backend — otherwise this map becomes a way to ship a client with no user. Reverse: an
+    // entry for a file that is gone must be deleted, so the map cannot rot into a blanket
+    // suppression (F2-199: the reverse leg is the one nobody writes first).
+    const byRel = new Map(ALL.map(f => [f.rel, f] as const));
+    for (const [rel, reason] of Object.entries(DECLARATIVE_REGISTRIES)) {
+      const f = byRel.get(rel);
+      expect(f, `DECLARATIVE_REGISTRIES names ${rel}, which no longer exists`).toBeDefined();
+      expect(REAL_API_CALL.test(f!.body),
+        `${rel} is excluded as a declarative registry but contains a real api.* call — it is a `
+        + 'client, and excluding it would ship a client with no user').toBe(false);
+      expect(reason.length,
+        `${rel}'s exclusion reason must say what the file is and what enforces it instead`)
+        .toBeGreaterThan(80);
+    }
   });
 
   it('the unimported allow-list stays honest — no entry for a module that is gone or now used', () => {

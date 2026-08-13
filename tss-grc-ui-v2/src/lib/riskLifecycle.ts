@@ -20,12 +20,9 @@
 
 import { MOCK_RISKS } from '../pages/risk/mockRisks';
 import type { RiskResponse } from './api';
-import {
-  TREATMENT_PLAN_ADAPTER,
-  mirrorSaveToBackend,
-  mirrorTransitionToBackend,
-  mirrorDeleteToBackend,
-} from './platformPersistence';
+// F2-202: the `platformPersistence` import that used to sit here is gone with the file.
+// This store is BROWSER_LOCAL — declared, with its real endpoint and measured row count,
+// in `lib/lifecycleStores.ts`.
 
 export type TreatmentStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED';
 export type AcceptanceStatus = 'DRAFT' | 'CRO_REVIEW' | 'BOARD_APPROVAL' | 'APPROVED' | 'EXPIRED' | 'WITHDRAWN';
@@ -215,11 +212,13 @@ export function plansForRisk(riskId: number): TreatmentPlan[] {
 
 export function saveTreatmentPlan(plan: TreatmentPlan): TreatmentPlan {
   const existing = loadTreatmentPlans();
-  const isNew = !existing.some(p => p.id === plan.id);
   const next = [...existing.filter(p => p.id !== plan.id), plan];
   try { window.localStorage.setItem(TREATMENT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  // Best-effort REST sync; silent in demo mode.
-  mirrorSaveToBackend(TREATMENT_PLAN_ADAPTER, plan, isNew);
+  // F2-202: no REST mirror here. `mirrorSaveToBackend`/`mirrorTransitionToBackend`
+  // used to be called on this line; both returned before sending anything because the
+  // persistence-mode switch they read had no setter in the product. This store is
+  // declared BROWSER_LOCAL in `lib/lifecycleStores.ts` with its real endpoint and
+  // measured row count — that declaration is gated; a silent no-op was not.
   emit();
   return plan;
 }
@@ -227,7 +226,7 @@ export function saveTreatmentPlan(plan: TreatmentPlan): TreatmentPlan {
 export function deleteTreatmentPlan(id: string): void {
   const next = loadTreatmentPlans().filter(p => p.id !== id);
   try { window.localStorage.setItem(TREATMENT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  mirrorDeleteToBackend(TREATMENT_PLAN_ADAPTER, id);
+  // F2-202: no REST mirror here — see `lib/lifecycleStores.ts`.
   emit();
 }
 
@@ -263,10 +262,7 @@ export function transitionPlan(id: string, status: TreatmentStatus, by?: string,
   if (status === 'SUBMITTED') updated.submittedAt = now;
   if (status === 'APPROVED') { updated.approvedBy = by; updated.approvedAt = now; }
   if (status === 'REJECTED') { updated.rejectedReason = reason; }
-  // Mirror the state-machine transition through the backend's /transition endpoint
-  // before the local save — the backend has its own ALLOWED map and will reject
-  // illegal transitions. Fire-and-forget so demo path stays sync.
-  mirrorTransitionToBackend(TREATMENT_PLAN_ADAPTER, id, { status, approvedBy: by, rejectedReason: reason });
+  // F2-202: no REST mirror here — see `lib/lifecycleStores.ts`.
   return saveTreatmentPlan(updated);
 }
 

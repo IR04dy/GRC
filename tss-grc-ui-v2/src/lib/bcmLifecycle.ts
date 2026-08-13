@@ -28,11 +28,9 @@
 
 import { BCM_PLANS, BCM_PROCESSES } from '../pages/bcm/mockBcm';
 import type { BcmPlanDto, BcmProcessDto, BcmBiaDto } from './api';
-import {
-  BCM_INVOCATION_ADAPTER,
-  mirrorSaveToBackend,
-  mirrorTransitionToBackend,
-} from './platformPersistence';
+// F2-202: the `platformPersistence` import that used to sit here is gone with the file.
+// This store is BROWSER_LOCAL — declared, with its real endpoint and measured row count,
+// in `lib/lifecycleStores.ts`.
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -607,11 +605,13 @@ export function loadInvocations(): Invocation[] {
 
 export function saveInvocation(inv: Invocation): Invocation {
   const existing = loadInvocations();
-  const isNew = !existing.some(x => x.id === inv.id);
   const next = [...existing.filter(x => x.id !== inv.id), inv];
   try { window.localStorage.setItem(INVOCATION_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  // Best-effort REST sync; silent in demo mode.
-  mirrorSaveToBackend(BCM_INVOCATION_ADAPTER, inv, isNew);
+  // F2-202: no REST mirror here. `mirrorSaveToBackend`/`mirrorTransitionToBackend`
+  // used to be called on this line; both returned before sending anything because the
+  // persistence-mode switch they read had no setter in the product. This store is
+  // declared BROWSER_LOCAL in `lib/lifecycleStores.ts` with its real endpoint and
+  // measured row count — that declaration is gated; a silent no-op was not.
   emit();
   return inv;
 }
@@ -694,14 +694,7 @@ export function transitionInvocation(id: string, status: InvocationStatus, byRol
     updated.lessonsLearnedEn = narrativeEn ?? inv.lessonsLearnedEn;
     updated.lessonsLearnedAr = narrativeAr ?? inv.lessonsLearnedAr;
   }
-  // Mirror through backend's /transition endpoint — server enforces the
-  // NCEMA-aligned ALLOWED map (STANDBY → DECLARED → INVOKED → ...).
-  mirrorTransitionToBackend(BCM_INVOCATION_ADAPTER, id, {
-    status,
-    declaredBy: byRole,
-    pirFindingsEn: narrativeEn,
-    pirFindingsAr: narrativeAr,
-  });
+  // F2-202: no REST mirror here — see `lib/lifecycleStores.ts`.
   return saveInvocation(updated);
 }
 

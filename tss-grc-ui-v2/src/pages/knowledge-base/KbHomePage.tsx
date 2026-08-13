@@ -15,8 +15,19 @@ import { listArticles, filterArticles, type KbArticle } from '../../lib/kb';
 /**
  * Knowledge Base home — search + browse — Sprint 4 §2.9.
  *
- * Hits /api/kb/articles when in REST mode; falls back to localStorage seed
- * (empty until articles are published).
+ * Reads `GET /api/kb/articles` unconditionally. There is no mode branch and no localStorage
+ * fallback.
+ *
+ * ⚠ F2-202. The two sentences that used to be here read: "Hits /api/kb/articles when in REST
+ * mode; falls back to localStorage seed (empty until articles are published)." Both halves
+ * were wrong in a way that concealed a live defect.
+ *
+ * There was no reachable REST mode, so the first branch never ran. And the list was not empty
+ * because nothing had been published — measured 2026-08-13, `kb.articles` holds 22 rows of
+ * which 21 are PUBLISHED, and `GET /api/kb/articles` returns all 21. It was empty because
+ * F2-202-EMPTY-KEY: `listArticles()` resolved through a stuck persistence-mode switch to an
+ * empty localStorage key. A reader who wondered why the Knowledge Base had no articles found
+ * that parenthesis and stopped.
  */
 export function KbHomePage() {
   const { lang } = useI18n();

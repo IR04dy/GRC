@@ -1717,6 +1717,58 @@ what is not defensible is leaving it arbitrary. 🔑 **A test that depends on a 
 asserting the implementation rather than the requirement** — F2-183's first draft did, and rebuilding the
 fixture as 3-versus-2 is what surfaced this.
 
+✔ **F2-202 CLOSED 2026-08-13 — a persistence-mode switch with no setter, and the Knowledge Base
+list nobody could see.** The item F2-201 filed as needing its own slice. Lineage F2-42 → F2-193 → …
+→ F2-199 → F2-201 → this.
+
+`lib/platformPersistence.ts` declared a three-mode switch (`'demo' | 'rest' | 'mixed'`) and exported
+three `mirror*ToBackend` helpers that return immediately in `'demo'` mode. Measured:
+**`setPersistenceMode` had ZERO callers in the product, nothing wrote `grc.persistence.mode.v1`, and
+the switch took no Vite env input** — so `'demo'` was an *invariant*, not a default, and all three
+helpers were unconditional no-ops called from **11 sites across 5 modules**. The READ path never
+consulted the mode at all, so even a reachable switch could not have displayed what it wrote.
+🔑 **Writing to a store you never read from is not persistence, it is a one-way drain.**
+
+⚠⚠ **The topbar badge reads a DIFFERENT switch.** `lib/productionMode.ts` (key `grc.mode.v1`) does
+take `VITE_MODE`, so a deployment could set `VITE_MODE=production`, turn the badge green and label it
+"Production", while the switch gating every lifecycle write stayed `'demo'` and unreachable.
+`platformPersistence.ts`'s own header claimed it drove that badge. It did not, and never had.
+
+🔑 **The live defect: the Knowledge Base list was empty while 21 articles were published.** Every call
+in `kb.ts` went to the real server *except* `listArticles()`, which resolved through the stuck switch
+to an empty localStorage key and returned `[]`. `kb.articles` holds 22 rows / 21 PUBLISHED, and
+`GET /api/kb/articles` returns all 21 — so an author could create, publish and open an article by slug
+and never see it listed. `KbHomePage` carried a comment explaining the emptiness as "empty until
+articles are published", a cause that was not the cause (F2-184's shape).
+
+**Rewired: the DSR (PDPL Article 4) workspace** — F2-196's own named residue, statutory, and F2-201's
+inverse shape again (a hardened server with no client). New `lib/privacyLcApi.ts`; the page and the
+lifecycle overview read `/api/privacy-lc/dsr-cases` (12 rows dev and prod) and decide through
+`POST /{id}/transition`, taking the row back from the server. **Three client-side minters of the
+Article 4 statutory deadline deleted** (`createDsr`, the Extend handler, and the callerless
+`chainBreachToDsr`) — F2-172's rule that only the server may issue a tracking code or a statutory
+deadline. Backend: `create` no longer honours a client-supplied reference (F2-172(d)'s defect), and
+`TransitionRequest` gained the rejection-reason fields, so a lawful PDPL refusal can finally be
+recorded; `slaBreachedAt` + `rejectionReason*` went on the wire (columns since V17, never declared).
+
+**The fingerprint moved rather than vanishing.** `lib/lifecycleStores.ts` declares 8 stores with state,
+real endpoint, `schema.table`, measured dev/prod rows, localStorage key and a consequence-naming note.
+Two gates: `lifecycleStoreContract.test.ts` (28 legs) and hermetic `LifecycleStoreBackingContractTest`
+(6 legs, resolves every endpoint to a live controller). ⚠ **A third state existed that the first draft
+missed**: `auditLifecycle.ts` reads four real endpoints and drops every write, which is harder to notice
+than an honestly local store because the list looks right.
+
+⚠⚠ **Three of the eight endpoints were guessed from the schema name and all three were wrong**, each
+differently (`/api/v1/privacy/ropa`; `/api/v1/privacy/dpias` plural on its own class;
+`/api/privacy/cross-border-transfers` with no `v1`). 🔑 **A plausible endpoint string in a declared
+registry is worth nothing until something resolves it.** And **3 of 5 adapter `localKey` values
+disagreed with the modules' real keys** — independent proof the mechanism was never exercised.
+
+Ratchets: `BASELINE_BROWSER_LOCAL_STORES` **6**, `BASELINE_NOT_FULLY_SERVER_BACKED` **7 of 8**;
+clientless endpoints **417 → 413**, clientless guarded writes **206 → 203**. FE **619/619 across 60
+files**, backend **3,796**, mutation **19/19 as declared**, live probe **24/24**, browser flow verified
+(server-minted reference and deadline, 409 on an illegal edge, +30 days added server-side on EXTENDED).
+
 ✔ **F2-201 CLOSED 2026-08-12 — a governance control reported success without acting.** Second of
 the eleven pages F2-198 filed. Lineage F2-42 → F2-193 → … → F2-198 → F2-199 → this. Every earlier
 finding showed a false FIGURE; this one accepted an **ACTION**.

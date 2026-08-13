@@ -20,11 +20,9 @@
 //   6. Penetration test programme — quarterly red-team for Tier-1 entities
 //      per NCA ECC 2-5-1 + SAMA CSF 4.5 with finding integration.
 
-import {
-  CYBER_VULN_ADAPTER,
-  mirrorSaveToBackend,
-  mirrorTransitionToBackend,
-} from './platformPersistence';
+// F2-202: the `platformPersistence` import that used to sit here is gone with the file.
+// This store is BROWSER_LOCAL — declared, with its real endpoint and measured row count,
+// in `lib/lifecycleStores.ts`.
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -464,11 +462,13 @@ export function loadVulns(): Vulnerability[] {
 
 export function saveVuln(v: Vulnerability): Vulnerability {
   const existing = loadVulns();
-  const isNew = !existing.some(x => x.id === v.id);
   const next = [...existing.filter(x => x.id !== v.id), v];
   try { window.localStorage.setItem(VULN_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  // Best-effort REST sync; silent in demo mode.
-  mirrorSaveToBackend(CYBER_VULN_ADAPTER, v, isNew);
+  // F2-202: no REST mirror here. `mirrorSaveToBackend`/`mirrorTransitionToBackend`
+  // used to be called on this line; both returned before sending anything because the
+  // persistence-mode switch they read had no setter in the product. This store is
+  // declared BROWSER_LOCAL in `lib/lifecycleStores.ts` with its real endpoint and
+  // measured row count — that declaration is gated; a silent no-op was not.
   emit();
   return v;
 }
@@ -478,9 +478,7 @@ export function transitionVuln(id: string, status: VulnStatus): Vulnerability | 
   if (!v) return null;
   const updated: Vulnerability = { ...v, status };
   if (status === 'CLOSED') updated.closedAt = new Date().toISOString();
-  // Mirror through backend's /transition endpoint — server enforces NCA ECC
-  // ALLOWED map and computes SLA deadline from severity at TRIAGED.
-  mirrorTransitionToBackend(CYBER_VULN_ADAPTER, id, { status });
+  // F2-202: no REST mirror here — see `lib/lifecycleStores.ts`.
   return saveVuln(updated);
 }
 

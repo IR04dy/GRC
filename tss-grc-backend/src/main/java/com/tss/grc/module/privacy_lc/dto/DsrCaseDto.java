@@ -30,6 +30,24 @@ public class DsrCaseDto {
     private String extensionReasonAr;
     private String ropaIds;
 
+    // F2-202. These three columns have existed since V17 and the DTO did not declare them,
+    // so no client could ever see them — the F2-198 `crossBorderTransfer` shape, where a
+    // field is already in the table and the wire merely never mentions it.
+    //
+    //   • `slaBreachedAt` is the stamp `PrivacyGapService.dsrSlaSweep()` writes when a case
+    //     passes its PDPL Article 4 deadline. Without it a client can only compare the
+    //     deadline against its own clock, which answers "is it late?" but never "has this
+    //     platform RECORDED the breach?" — and those differ: F2-196 found two EXTENDED cases
+    //     that were 4 and 11 days overdue with `sla_breached_at = NULL` because the sweep
+    //     excluded them. A client-side comparison would have shown them as breached while
+    //     the platform had escalated nothing.
+    //   • `rejectionReason*` is the lawful basis for refusing a subject's request. PDPL
+    //     Article 4 requires a refusal to be reasoned; with no field on the wire a rejected
+    //     case arrived at the client with no reason at all.
+    private LocalDateTime slaBreachedAt;
+    private String rejectionReasonEn;
+    private String rejectionReasonAr;
+
     public static DsrCaseDto from(DsrCase e) {
         return DsrCaseDto.builder()
             .id(e.getExternalId()).type(e.getType())
@@ -43,6 +61,8 @@ public class DsrCaseDto {
             .slaDeadline(e.getSlaDeadline()).extended(e.getExtended())
             .extensionReasonEn(e.getExtensionReasonEn()).extensionReasonAr(e.getExtensionReasonAr())
             .ropaIds(e.getRopaIds())
+            .slaBreachedAt(e.getSlaBreachedAt())
+            .rejectionReasonEn(e.getRejectionReasonEn()).rejectionReasonAr(e.getRejectionReasonAr())
             .build();
     }
 
@@ -54,5 +74,12 @@ public class DsrCaseDto {
         private String deliveryMethod;
         private String dataSummaryEn;
         private String dataSummaryAr;
+        /**
+         * F2-202. Recorded only on REJECTED. PDPL Article 4 requires a refusal to be
+         * reasoned, and until this field existed the transition endpoint had no way to
+         * carry one — the columns were writable by nothing.
+         */
+        private String rejectionReasonEn;
+        private String rejectionReasonAr;
     }
 }

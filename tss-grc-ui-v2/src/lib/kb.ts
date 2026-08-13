@@ -13,7 +13,6 @@
 // taken" message.
 
 import { api, ApiError } from './api';
-import { adapterListAll, KB_ARTICLE_ADAPTER } from './platformPersistence';
 
 export type KbStatus     = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type KbVisibility = 'INTERNAL' | 'PUBLIC' | 'RESTRICTED';
@@ -46,8 +45,27 @@ export type KbArticleDraft = Omit<
   'id' | 'createdAt' | 'updatedAt' | 'publishedAt' | 'viewCount' | 'author'
 > & { slug?: string };
 
+/**
+ * The published article list. `GET /api/kb/articles` — `isAuthenticated()`, so any signed-in
+ * user may read it.
+ *
+ * ⚠ F2-202 fixed a live defect here, and it is the only read in this file that ever had it.
+ * This function used to call `adapterListAll(KB_ARTICLE_ADAPTER, [])` from
+ * `lib/platformPersistence.ts`. That helper branches on a persistence-mode switch, and the
+ * switch was `'demo'` in every build because nothing in the product could set it — so the
+ * call resolved to `loadLocal('grc.kb.articles.v1', [])`, read an empty localStorage key,
+ * and returned `[]`. Every OTHER call in this file — `getArticle`, `createArticle`,
+ * `updateArticle`, `transitionArticle`, `deleteArticle` — went straight to the real server.
+ *
+ * So the Knowledge Base list was permanently empty while `kb.articles` held 22 rows: an
+ * author could create an article, watch it persist, open it by slug, publish it — and never
+ * see it in the list. `KbHomePage` carried a comment reading "(empty until articles are
+ * published)", which explained the symptom away with a cause that was not the cause. That is
+ * the F2-184 shape: the most misleading comment is the one that answers the question the
+ * reader was about to ask.
+ */
 export async function listArticles(): Promise<KbArticle[]> {
-  return adapterListAll(KB_ARTICLE_ADAPTER as any, [] as KbArticle[]);
+  return api.get<KbArticle[]>('/api/kb/articles');
 }
 
 export async function getArticle(slug: string): Promise<KbArticle | null> {

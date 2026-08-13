@@ -1,27 +1,34 @@
 // Privacy / PDPL lifecycle — production hardening (Option 3).
 //
 // Saudi Personal Data Protection Law (PDPL) production lifecycle covering
-// the four lifecycle pieces the existing pdplBreach console doesn't:
+// three lifecycle pieces the existing pdplBreach console doesn't:
 //
 //   1. ROPA Article 22 wizard — guided creation walking through 9 fields
 //   2. DPIA workflow with PDPL-specific risk scoring (high-risk processing
 //      definitions per Implementing Regulations Article 25)
 //   3. Cross-border transfer adequacy assessment per Article 29 — country
 //      whitelist + safeguard mechanism picker (BCRs / SCCs / certification)
-//   4. DSR (Data Subject Request) full workflow — Article 4 rights with
-//      30-day SLA: identity verification → data collection → redaction →
-//      delivery / extension justification.
-
-import {
-  DSR_ADAPTER,
-  mirrorSaveToBackend,
-  mirrorTransitionToBackend,
-} from './platformPersistence';
+//
+// ⚠ F2-202 — the DSR (Article 4) workflow that used to be the fourth piece here has MOVED
+// to `lib/privacyLcApi.ts` and the real register at `/api/privacy-lc/dsr-cases` (12 rows in
+// dev, 12 in prod). It is not a fifth surface: `privacy_lc.dsr_cases` is the same table the
+// server-side machine, the SLA sweep and F2-196's derived terminal set already govern.
+//
+// Nothing DSR-shaped may come back into this file. The three cases that lived here as
+// `SEED_DSR` were clock-minted at module load, `createDsr()` issued the PDPL Article 4
+// statutory deadline and the tracking reference in the browser, and the "REST mirror" it
+// called could not send anything because the persistence-mode switch it read had no setter
+// anywhere in the product.
+//
+// ⚠⚠ The ROPA / DPIA / cross-border corpora BELOW are still browser-local, and that is a
+// filed finding, not a decision — see `BROWSER_LOCAL_LIFECYCLE_STORES` in
+// `lib/lifecycleStores.ts`, which names each one, its real endpoint and its measured row
+// count. Do not read the presence of a DSR rewire as evidence the rest of this file is
+// backed by anything.
 
 export type RopaStatus = 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'SUPERSEDED';
 export type DpiaStatus = 'DRAFT' | 'RISK_ASSESSMENT' | 'CONSULTATION' | 'APPROVED' | 'REJECTED';
 export type CbtStatus = 'DRAFT' | 'ASSESSING' | 'APPROVED' | 'BLOCKED' | 'PERIODIC_REVIEW';
-export type DsrStatus = 'INTAKE' | 'VERIFYING_IDENTITY' | 'COLLECTING' | 'REDACTING' | 'DELIVERED' | 'REJECTED' | 'EXTENDED';
 
 // ─── ROPA — Article 22 ──────────────────────────────────────────────────────
 
@@ -153,57 +160,11 @@ export const ADEQUACY_BY_COUNTRY: Record<string, AdequacyLevel> = {
   'Syria': 'PROHIBITED',
 };
 
-// ─── DSR — Article 4 rights ────────────────────────────────────────────────
-
-export type DsrType = 'ACCESS' | 'RECTIFICATION' | 'ERASURE' | 'OBJECTION' | 'RESTRICTION' | 'PORTABILITY' | 'WITHDRAW_CONSENT';
-
-export interface DsrCase {
-  id: string;
-  type: DsrType;
-  /** Subject's name (anonymised at completion). */
-  subjectName: string;
-  /** Last 4 digits of National ID for traceability. */
-  nationalIdLast4: string;
-  /** Subject's contact email. */
-  contactEmail: string;
-  status: DsrStatus;
-  /** Filed on. */
-  filedAt: string;
-  /** Identity verified at. */
-  identityVerifiedAt?: string;
-  /** Identity verification method. */
-  verificationMethod?: 'NAFATH' | 'ID_DOCUMENT' | 'IN_PERSON' | 'VIDEO_KYC';
-  /** Data collection completed at. */
-  dataCollectedAt?: string;
-  /** Bilingual data summary. */
-  dataSummaryEn?: string;
-  dataSummaryAr?: string;
-  /** Redaction completed at. */
-  redactionCompletedAt?: string;
-  /** Delivery method. */
-  deliveryMethod?: 'PORTAL' | 'EMAIL' | 'POSTAL' | 'IN_PERSON';
-  /** Delivered at. */
-  deliveredAt?: string;
-  /** SLA deadline (30 days from filing). */
-  slaDeadline: string;
-  /** Whether the SLA was extended (Article 4 allows 60 days for complex requests). */
-  extended?: boolean;
-  /** Bilingual extension reason. */
-  extensionReasonEn?: string;
-  extensionReasonAr?: string;
-  /** Bilingual rejection reason if rejected. */
-  rejectionReasonEn?: string;
-  rejectionReasonAr?: string;
-  /** Linked ROPA activity ids. */
-  ropaIds: string[];
-}
-
 // ─── Storage ────────────────────────────────────────────────────────────────
 
 const ROPA_KEY = 'grc.privacy.ropa.v1';
 const DPIA_KEY = 'grc.privacy.dpia.v1';
 const CBT_KEY = 'grc.privacy.cbt.v1';
-const DSR_KEY = 'grc.privacy.dsr.v1';
 const EVENT = 'grc.privacy.changed';
 
 const _now = Date.now();
@@ -319,55 +280,6 @@ const SEED_CBT: CrossBorderTransfer[] = [
   },
 ];
 
-const SEED_DSR: DsrCase[] = [
-  {
-    id: 'DSR-2026-042',
-    type: 'ACCESS',
-    subjectName: 'Mohammed A.',
-    nationalIdLast4: '4127',
-    contactEmail: 'm.****@example.sa',
-    status: 'COLLECTING',
-    filedAt: _daysAgo(5),
-    identityVerifiedAt: _daysAgo(4),
-    verificationMethod: 'NAFATH',
-    slaDeadline: _daysAhead(25),
-    ropaIds: ['ROPA-2026-001', 'ROPA-2026-002'],
-  },
-  {
-    id: 'DSR-2026-041',
-    type: 'ERASURE',
-    subjectName: 'Sara K.',
-    nationalIdLast4: '8841',
-    contactEmail: 's.****@example.sa',
-    status: 'DELIVERED',
-    filedAt: _daysAgo(28),
-    identityVerifiedAt: _daysAgo(27),
-    verificationMethod: 'NAFATH',
-    dataCollectedAt: _daysAgo(20),
-    dataSummaryEn: 'Marketing-only profile erased. Customer-onboarding data retained per SAMA AML 10-year mandate (Article 4 PDPL exception).',
-    dataSummaryAr: 'حُذف ملف التسويق فقط. احتُفظ ببيانات تسجيل العميل وفق ولاية ساما لمكافحة غسل الأموال 10 سنوات (استثناء المادة 4).',
-    deliveryMethod: 'EMAIL',
-    deliveredAt: _daysAgo(8),
-    slaDeadline: _daysAgo(2),
-    ropaIds: ['ROPA-2026-001', 'ROPA-2026-003'],
-  },
-  {
-    id: 'DSR-2026-040',
-    type: 'PORTABILITY',
-    subjectName: 'Khalid R.',
-    nationalIdLast4: '0921',
-    contactEmail: 'k.****@example.sa',
-    status: 'EXTENDED',
-    filedAt: _daysAgo(20),
-    identityVerifiedAt: _daysAgo(18),
-    verificationMethod: 'NAFATH',
-    extended: true,
-    extensionReasonEn: 'Complex request spanning 4 systems with custom data extraction; Article 4 60-day extension invoked. Subject notified.',
-    extensionReasonAr: 'طلب معقّد يشمل 4 أنظمة مع استخراج مخصّص؛ مُدِّدت المهلة وفق المادة 4 إلى 60 يوماً وأُبلغ صاحب البيانات.',
-    slaDeadline: _daysAhead(40),
-    ropaIds: ['ROPA-2026-001', 'ROPA-2026-002', 'ROPA-2026-003'],
-  },
-];
 
 // ─── Persistence ────────────────────────────────────────────────────────────
 
@@ -417,25 +329,6 @@ export function saveCbt(c: CrossBorderTransfer): CrossBorderTransfer {
   try { window.localStorage.setItem(CBT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
   emit();
   return c;
-}
-
-export function loadDsr(): DsrCase[] {
-  if (typeof window === 'undefined') return SEED_DSR;
-  try {
-    const raw = window.localStorage.getItem(DSR_KEY);
-    return raw ? JSON.parse(raw) as DsrCase[] : SEED_DSR;
-  } catch { return SEED_DSR; }
-}
-
-export function saveDsr(d: DsrCase): DsrCase {
-  const existing = loadDsr();
-  const isNew = !existing.some(x => x.id === d.id);
-  const next = [...existing.filter(x => x.id !== d.id), d];
-  try { window.localStorage.setItem(DSR_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  // Best-effort REST sync; silent in demo mode.
-  mirrorSaveToBackend(DSR_ADAPTER, d, isNew);
-  emit();
-  return d;
 }
 
 export function transitionDpia(id: string, status: DpiaStatus, dpoSignedBy?: string): DpiaAssessment | null {
@@ -495,40 +388,11 @@ export function upgradeCbtSafeguard(id: string, newSafeguard: SafeguardMechanism
   });
 }
 
-export function createDsr(type: DsrType, subjectName: string, nationalIdLast4: string, contactEmail: string): DsrCase {
-  const id = `DSR-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 999)).padStart(3, '0')}`;
-  const slaDeadline = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-  const dsr: DsrCase = {
-    id, type,
-    subjectName, nationalIdLast4, contactEmail,
-    status: 'INTAKE',
-    filedAt: new Date().toISOString(),
-    slaDeadline,
-    ropaIds: [],
-  };
-  return saveDsr(dsr);
-}
-
-export function transitionDsr(id: string, status: DsrStatus): DsrCase | null {
-  const d = loadDsr().find(x => x.id === id);
-  if (!d) return null;
-  const now = new Date().toISOString();
-  const updated: DsrCase = { ...d, status };
-  if (status === 'VERIFYING_IDENTITY' && !d.identityVerifiedAt) updated.identityVerifiedAt = now;
-  if (status === 'COLLECTING' && !d.dataCollectedAt) updated.dataCollectedAt = now;
-  if (status === 'REDACTING' && !d.redactionCompletedAt) updated.redactionCompletedAt = now;
-  if (status === 'DELIVERED' && !d.deliveredAt) updated.deliveredAt = now;
-  // Mirror through backend's /transition endpoint — server enforces ALLOWED map
-  // and PDPL Article 4 SLA-extension logic for EXTENDED state.
-  mirrorTransitionToBackend(DSR_ADAPTER, id, { status });
-  return saveDsr(updated);
-}
-
 export function subscribePrivacy(cb: () => void): () => void {
   const handler = () => cb();
   window.addEventListener(EVENT, handler);
   const storage = (e: StorageEvent) => {
-    if ([ROPA_KEY, DPIA_KEY, CBT_KEY, DSR_KEY].includes(e.key ?? '')) cb();
+    if ([ROPA_KEY, DPIA_KEY, CBT_KEY].includes(e.key ?? '')) cb();
   };
   window.addEventListener('storage', storage);
   return () => {
@@ -560,19 +424,6 @@ export function detectHighRisk(activity: RopaActivity): { isHigh: boolean; trigg
     triggers.push({ en: 'Large-scale processing', ar: 'معالجة واسعة النطاق' });
   }
   return { isHigh: triggers.length > 0, triggers };
-}
-
-export function dsrSlaRemaining(dsr: DsrCase): { hoursRemaining: number; isOverdue: boolean; pctElapsed: number } {
-  const start = new Date(dsr.filedAt).getTime();
-  const deadline = new Date(dsr.slaDeadline).getTime();
-  const total = deadline - start;
-  const elapsed = Date.now() - start;
-  const remaining = (deadline - Date.now()) / 3_600_000;
-  return {
-    hoursRemaining: Math.round(remaining),
-    isOverdue: Date.now() > deadline,
-    pctElapsed: Math.min(100, Math.max(0, (elapsed / total) * 100)),
-  };
 }
 
 // ─── Display helpers ───────────────────────────────────────────────────────
@@ -616,33 +467,24 @@ export const SAFEGUARD_LABEL: Record<SafeguardMechanism, { en: string; ar: strin
   EXPLICIT_CONSENT:        { en: 'Explicit consent',                ar: 'موافقة صريحة' },
 };
 
-export const DSR_TYPE_LABEL: Record<DsrType, { en: string; ar: string }> = {
-  ACCESS:           { en: 'Access',            ar: 'الوصول' },
-  RECTIFICATION:    { en: 'Rectification',     ar: 'التصحيح' },
-  ERASURE:          { en: 'Erasure',           ar: 'الحذف' },
-  OBJECTION:        { en: 'Objection',         ar: 'الاعتراض' },
-  RESTRICTION:      { en: 'Restriction',       ar: 'التقييد' },
-  PORTABILITY:      { en: 'Portability',       ar: 'النقل' },
-  WITHDRAW_CONSENT: { en: 'Withdraw consent',  ar: 'سحب الموافقة' },
-};
-
-export const DSR_STATUS_LABEL: Record<DsrStatus, { en: string; ar: string }> = {
-  INTAKE:              { en: 'Intake',                  ar: 'استلام' },
-  VERIFYING_IDENTITY:  { en: 'Verifying identity',      ar: 'التحقق من الهوية' },
-  COLLECTING:          { en: 'Collecting data',         ar: 'جمع البيانات' },
-  REDACTING:           { en: 'Redacting',                ar: 'إخفاء البيانات الحساسة' },
-  DELIVERED:           { en: 'Delivered',               ar: 'مُسلَّم' },
-  REJECTED:            { en: 'Rejected',                 ar: 'مرفوض' },
-  EXTENDED:            { en: 'Extended (60d)',           ar: 'مُمدَّد (60 يوم)' },
-};
-
-export const DSR_STATUS_TONE: Record<DsrStatus, 'info' | 'warning' | 'success' | 'danger' | 'neutral'> = {
-  INTAKE: 'neutral', VERIFYING_IDENTITY: 'info', COLLECTING: 'info',
-  REDACTING: 'warning', DELIVERED: 'success', REJECTED: 'danger', EXTENDED: 'warning',
-};
+// The DSR label/tone maps moved to `lib/privacyLcApi.ts` with the register they describe.
+// Duplicating them here would leave a second vocabulary for one statutory object, which is
+// the F2-196 defect this rewire exists to stop repeating.
 
 // ─── Aggregation ────────────────────────────────────────────────────────────
 
+/**
+ * ⚠ F2-202 removed `dsrOpen` / `dsrOverdue` / `dsrCloseAvgDays` from this type.
+ *
+ * They are not "gone" — they moved to `aggregateDsr()` in `lib/privacyLcApi.ts`, which
+ * computes them over rows fetched from `/api/privacy-lc/dsr-cases`. They could not stay
+ * here: this function is synchronous because ROPA/DPIA/CBT are read out of localStorage,
+ * and a synchronous accessor cannot answer a question whose data comes from a server.
+ *
+ * That asymmetry is the honest signal. Everything this function still returns is browser-
+ * local (see `BROWSER_LOCAL_LIFECYCLE_STORES`); the DSR figures had to leave for the same
+ * reason they are now trustworthy.
+ */
 export interface PrivacyLifecycleStats {
   ropaTotal: number;
   ropaApproved: number;
@@ -651,22 +493,12 @@ export interface PrivacyLifecycleStats {
   cbtTotal: number;
   cbtAdequate: number;
   cbtBlocked: number;
-  dsrOpen: number;
-  dsrOverdue: number;
-  dsrCloseAvgDays: number;
 }
 
 export function aggregatePrivacy(): PrivacyLifecycleStats {
   const ropa = loadRopa();
   const dpias = loadDpia();
   const cbts = loadCbt();
-  const dsrs = loadDsr();
-  const dsrOpen = dsrs.filter(d => d.status !== 'DELIVERED' && d.status !== 'REJECTED').length;
-  const dsrOverdue = dsrs.filter(d => d.status !== 'DELIVERED' && d.status !== 'REJECTED' && new Date(d.slaDeadline) < new Date()).length;
-  const closed = dsrs.filter(d => d.status === 'DELIVERED' && d.deliveredAt);
-  const avgClose = closed.length > 0
-    ? Math.round(closed.reduce((acc, d) => acc + (new Date(d.deliveredAt!).getTime() - new Date(d.filedAt).getTime()), 0) / (closed.length * 86_400_000))
-    : 0;
   return {
     ropaTotal: ropa.length,
     ropaApproved: ropa.filter(r => r.status === 'APPROVED').length,
@@ -675,8 +507,5 @@ export function aggregatePrivacy(): PrivacyLifecycleStats {
     cbtTotal: cbts.length,
     cbtAdequate: cbts.filter(c => c.adequacy === 'ADEQUATE').length,
     cbtBlocked: cbts.filter(c => c.status === 'BLOCKED' || c.adequacy === 'PROHIBITED').length,
-    dsrOpen,
-    dsrOverdue,
-    dsrCloseAvgDays: avgClose,
   };
 }

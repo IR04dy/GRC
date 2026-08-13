@@ -28,11 +28,9 @@
 import { api, ApiError } from './api';
 import { AUDIT_ENGAGEMENTS as MOCK_ENGAGEMENTS } from '../pages/compliance/mockCompliance';
 import type { AuditEngagementDto } from './api';
-import {
-  AUDIT_FINDING_ADAPTER,
-  mirrorSaveToBackend,
-  mirrorTransitionToBackend,
-} from './platformPersistence';
+// F2-202: the `platformPersistence` import that used to sit here is gone with the file.
+// This store is BROWSER_LOCAL — declared, with its real endpoint and measured row count,
+// in `lib/lifecycleStores.ts`.
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -666,12 +664,13 @@ export function findingsForEngagement(code: string): Finding[] {
 }
 
 export function saveFinding(f: Finding): Finding {
-  const isNew = !_findings.some(x => x.id === f.id);
   _findings = [..._findings.filter(x => x.id !== f.id), f];
   emit();
-  // Findings only have create/transition on the backend — full-field edits
-  // mirror through the existing AUDIT_FINDING_ADAPTER (best-effort POST).
-  mirrorSaveToBackend(AUDIT_FINDING_ADAPTER, f, isNew);
+  // F2-202: no REST mirror here. `mirrorSaveToBackend`/`mirrorTransitionToBackend`
+  // used to be called on this line; both returned before sending anything because the
+  // persistence-mode switch they read had no setter in the product. This store is
+  // declared BROWSER_LOCAL in `lib/lifecycleStores.ts` with its real endpoint and
+  // measured row count — that declaration is gated; a silent no-op was not.
   return f;
 }
 
@@ -701,7 +700,7 @@ export function transitionFinding(id: string, status: FindingStatus): Finding | 
   const updated = { ...f, status };
   _findings = _findings.map(x => x.id === id ? updated : x);
   emit();
-  mirrorTransitionToBackend(AUDIT_FINDING_ADAPTER, id, { status });
+  // F2-202: no REST mirror here — see `lib/lifecycleStores.ts`.
   return updated;
 }
 
