@@ -147,54 +147,26 @@ export const LIFECYCLE_STORES: readonly LifecycleStore[] = [
       + 'DSR reference code are minted server-side only — the browser copy minted both, the '
       + 'reference with three digits of Math.random().',
   },
-  {
-    id: 'privacy-ropa',
-    module: 'lib/privacyLifecycle.ts',
-    state: 'BROWSER_LOCAL',
-    endpoint: '/api/v1/privacy/ropa',
-    table: 'privacy.processing_activities',
-    rowsDev: 11,
-    rowsProd: 11,
-    localKey: 'grc.privacy.ropa.v1',
-    note:
-      'The real register is privacy.processing_activities and PrivacyPage\'s ROPA tab already '
-      + 'renders it — F2-198 retired the separate /ropa page onto that tab. This corpus is a '
-      + 'second, editable copy behind the privacy-lifecycle screen. Note the privacy_lc twin '
-      + 'table (privacy_lc.ropa_activities) holds 0 rows in both databases, so wiring this to '
-      + 'privacy_lc rather than privacy would show an empty register.',
-  },
-  {
-    id: 'privacy-dpia',
-    module: 'lib/privacyLifecycle.ts',
-    state: 'BROWSER_LOCAL',
-    endpoint: '/api/v1/privacy/dpias',
-    table: 'privacy.dpia',
-    rowsDev: 6,
-    // ⚠ Corrected by F2-204: this said 6. Prod holds 5. The two databases are not identical
-    // everywhere, and asserting they are is how a declared number stops being a measurement.
-    rowsProd: 5,
-    localKey: 'grc.privacy.dpia.v1',
-    note:
-      'privacy.dpia holds 6 assessments with their own question, mitigation and review tables. '
-      + 'The browser corpus carries its own PDPL Article 25 risk scoring, so a DPIA approved '
-      + 'here is invisible to the server register a DPO would be audited against. '
-      + 'privacy_lc.dpia_assessments holds 0 rows in both databases.',
-  },
-  {
-    id: 'privacy-cbt',
-    module: 'lib/privacyLifecycle.ts',
-    state: 'BROWSER_LOCAL',
-    endpoint: '/api/privacy/cross-border-transfers',
-    table: 'privacy.cross_border_transfers',
-    rowsDev: 9,
-    rowsProd: 9,
-    localKey: 'grc.privacy.cbt.v1',
-    note:
-      'PDPL Article 29 transfer assessments. privacy.cross_border_transfers holds 9 rows; '
-      + 'F2-198 already surfaced the cross-border COUNT on the privacy page from the real '
-      + 'register, so the number an operator sees there and the rows editable here come from '
-      + 'two different places. privacy_lc.cross_border_transfers holds 0 rows.',
-  },
+  /*
+   * ⚠⚠ F2-207 RETIRED three entries that stood here: `privacy-ropa`, `privacy-dpia` and
+   * `privacy-cbt`, the PDPL Article 31 / 25 / 29 registers. They are not wired — they are
+   * GONE, along with `lib/privacyLifecycle.ts` and the three `grc.privacy.*` keys, because
+   * all three already had a complete server-backed surface (`/privacy?tab=ropa`,
+   * `/privacy?tab=dpia`, `/pdpl-extensions?tab=cbt`) and a second real client would have
+   * been F2-196's own defect. ADR-017 §D-5.
+   *
+   * They are removed rather than kept as retired members on purpose: this registry's job is
+   * to name browser-local corpora that EXIST, and its coverage leg derives the population
+   * from the modules' own `grc.*.v1` literals. With the module deleted there is no corpus to
+   * declare, and a permanent "retired" row would be a claim no scan could check. The trace
+   * lives where it can be enforced instead — `privacyRegisterRetirement.test.ts` refuses the
+   * module's re-creation, the three keys, the five invented officers and the client-side DPIA
+   * reference minter, and `LifecycleStoreBackingContractTest` refuses the file server-side.
+   *
+   * Both decrease-only figures went DOWN by three, which is the honest direction and the
+   * opposite of F2-204's problem (there a ratchet's QUESTION was wrong, so it was re-scoped;
+   * here the question is right and the answer improved).
+   */
   {
     id: 'risk-treatment',
     module: 'lib/riskLifecycle.ts',

@@ -96,23 +96,36 @@ describe('F2-202 — the lifecycle-store registry', () => {
   // the number is indistinguishable from tolerating a regression.** So the figures are not
   // raised — they are re-scoped to questions that still only improve, and the total is asserted
   // exactly so the next omission fails rather than shrinks a count.
-  const BASELINE_BROWSER_LOCAL_STORES = 6;      // measured, after cyber-pentests was corrected
+  //
+  // ⚠⚠ F2-207 lowered both figures below to the count its own detector returns, and found
+  // that BOTH were already ONE ABOVE the truth before this slice touched them. F2-204 set them
+  // to 6 correctly; F2-205 then wired `cyber-vulnerabilities` (BROWSER_LOCAL -> SERVER_BACKED)
+  // and lowered neither, so each ceiling silently tolerated one store that no longer existed.
+  // 🔑 That is CLAUDE.md house rule 3's warning arriving from the inside: a ceiling left in
+  // place after a sweep makes a tolerated member indistinguishable from a reviewed one. **When
+  // you change a store's state, lower the ceiling in the same commit** — and when you edit one
+  // of these numbers, re-derive it rather than subtracting from the number written here.
+  const BASELINE_BROWSER_LOCAL_STORES = 2;      // measured: cyber-pentests, bcm-invocations
   /**
    * Stores that HAVE a real endpoint and still do not write to it. Decrease-only, and its scope
    * is now explicit: F2-202's version silently mixed in corpora that have no endpoint to write
    * to, so "not fully server-backed" conflated *unwired* with *unwireable* — two facts a slice
    * needs to tell apart before it can plan anything.
    */
-  // 7 before this slice (the 6 below plus risk-treatment); 6 after wiring it. ⚠ I first wrote 5
+  // 7 before F2-204 (the 6 then below plus risk-treatment); 6 after wiring it. ⚠ I first wrote 5
   // by counting before the backend gate corrected `cyber-pentests` from NO_SERVER_SURFACE to
   // BROWSER_LOCAL — a baseline taken from a measurement that was still wrong (F2-195's rule).
-  const BASELINE_ENDPOINT_BEARING_NOT_WIRED = 6;
+  // F2-207: 2, having retired the three PDPL stores. See the note above — this was also stale
+  // at 6 while the real answer had been 5 since F2-205.
+  const BASELINE_ENDPOINT_BEARING_NOT_WIRED = 2;
 
-  /** Every browser-local corpus the four lifecycle modules own. Exact, not a ceiling. */
+  /** Every browser-local corpus the lifecycle modules own. Exact, not a ceiling. */
   // 18, not 19: `risk-treatment-actions` was removed before shipping — it declared no
   // localStorage key, so it was never a browser-local corpus, and the gate's own coverage leg
   // is derived from those keys.
-  const DECLARED_CORPORA = 18;
+  // F2-207: 15. The three `privacy-*` entries are removed with `lib/privacyLifecycle.ts`; the
+  // exactness of this figure is what makes that a declared retirement rather than an omission.
+  const DECLARED_CORPORA = 15;
 
   /**
    * Registers that exist, are populated, and have NO controller, DTO or service anywhere —
@@ -164,7 +177,12 @@ describe('F2-202 — the lifecycle-store registry', () => {
     // F2-202 (prose about code, stored as data, inventing callers in a token scan). 🔑 In a
     // codebase whose convention is to explain a deletion by quoting what was deleted, every
     // token-matching instrument must strip comments or it will read the epitaph as the corpse.
-    const MODULES = ['privacyLifecycle', 'riskLifecycle', 'bcmLifecycle', 'cyberLifecycle'];
+    //
+    // ⚠ F2-207 removed `privacyLifecycle` from this list because the FILE is deleted, not
+    // because its corpora were wired. `readFileSync` on a retired module throws ENOENT, which
+    // fails as an unrelated error rather than as a finding — so the list must track the modules
+    // that exist. `privacyRegisterRetirement.test.ts` is what stops it coming back.
+    const MODULES = ['riskLifecycle', 'bcmLifecycle', 'cyberLifecycle'];
     const keys = new Set<string>();
     for (const m of MODULES) {
       const src = stripComments(readFileSync(join(__dirname, '..', 'lib', `${m}.ts`), 'utf8'));

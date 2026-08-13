@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Files, ShieldAlert, Globe, UserCheck, Clock,
-  AlertTriangle, CheckCircle2, FileText, Activity,
+  AlertTriangle, CheckCircle2, FileText, Activity, ArrowRight,
 } from 'lucide-react';
 import { LifecyclePipeline, type PipelineStage, type PipelineCard, dueLabel } from '../../components/lifecycle/LifecyclePipeline';
 import { Shell } from '../../components/layout/Shell';
@@ -13,18 +14,6 @@ import { Button } from '../../components/ui/Button';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
-  loadRopa, saveRopa, loadDpia, loadCbt, subscribePrivacy,
-  detectHighRisk, aggregatePrivacy,
-  ADEQUACY_BY_COUNTRY, ADEQUACY_TONE, ADEQUACY_LABEL, SAFEGUARD_LABEL,
-  ROPA_STATUS_LABEL, ROPA_STATUS_TONE, LAWFUL_BASIS_LABEL,
-  transitionDpia, createDpia, transitionCbt, upgradeCbtSafeguard,
-  type RopaActivity,
-  type DpiaAssessment, type DpiaStatus, type CrossBorderTransfer, type CbtStatus,
-  type SafeguardMechanism,
-} from '../../lib/privacyLifecycle';
-// F2-202 — the DSR half of this page reads the real register at /api/privacy-lc/dsr-cases.
-// Everything imported above is still browser-local; see `lib/lifecycleStores.ts`.
-import {
   dsrApi, aggregateDsr, daysToDeadline, isPastDeadline, mayTransition,
   isOpen as isOpenDsr, DSR_ALLOWED,
   DSR_TYPE_LABEL, DSR_STATUS_LABEL, DSR_STATUS_TONE,
@@ -34,20 +23,86 @@ import { ApiError } from '../../lib/api';
 import { useRealtimeOrgEvent } from '../../lib/useRealtimeEntity';
 import '../../styles/pages/privacy-lifecycle.css';
 
-type PrcTab = 'pipeline' | 'ropa' | 'dpia' | 'cbt' | 'dsr';
+/*
+ * ⚠⚠ F2-207 — THIS PAGE HAD FIVE TABS AND THREE OF THEM WERE STATUTORY REGISTERS KEPT IN
+ * `localStorage`. They are retired, not rewired, and the distinction is the whole finding.
+ *
+ * `lib/privacyLifecycle.ts` is DELETED. It held `SEED_ROPA` (PDPL Art. 31 processing
+ * activities), `SEED_DPIA` (Art. 25 impact assessments) and `SEED_CBT` (Art. 29 cross-border
+ * transfers) under `grc.privacy.ropa.v1` / `.dpia.v1` / `.cbt.v1`, and this page rendered and
+ * MUTATED them: approving a ROPA, signing off a DPIA and approving a transfer out of the
+ * Kingdom all wrote to the operator's own browser.
+ *
+ * All three real registers are populated AND already have a complete server-backed surface,
+ * measured 2026-08-13 in dev:
+ *
+ *   Art. 31 ROPA  → /privacy?tab=ropa          `privacy.processing_activities`      11 rows
+ *   Art. 25 DPIA  → /privacy?tab=dpia          `privacy.dpia`                        6 rows
+ *   Art. 29 CBT   → /data-lifecycle?tab=cbt   `privacy.cross_border_transfers`      9 rows
+ *
+ * So building a client here would have made a SECOND real surface for each — F2-196's own
+ * defect — and ADR-017 §D-5 already ratified "retire the fabricated page" for this shape in
+ * F2-42, F2-198 and F2-199.
+ *
+ * ⚠ Wiring the old handlers was not an option even in principle. `CbtStatus` declared
+ * DRAFT/ASSESSING/APPROVED/BLOCKED/PERIODIC_REVIEW and `CK_cbt_status` admits only
+ * REQUESTED/ASSESSED/APPROVED/REJECTED/EXPIRED, so 4 of the 5 tokens are refused by a CHECK
+ * constraint; `SafeguardMechanism` was refused 4 of 5 the same way, three of them being the
+ * same concept differently spelled (STANDARD_CLAUSES/SCC, BINDING_CORPORATE_RULES/BCR,
+ * NONE_NEEDED/ADEQUACY). A naive rewire converts today's silent local writes into constraint
+ * violations — F2-183's rule.
+ *
+ * ⚠⚠ And the retired handlers passed INVENTED OFFICERS as the author of statutory decisions:
+ * `'Layla Al-Ghamdi (DPO)'` as the Data Protection Officer signing an Article 25 DPIA and
+ * approving an Article 29 transfer, and the literal `'DPO + CRO'` as the ROPA approver. Those
+ * names must never reach a real endpoint; `privacyRegisterRetirement.test.ts` refuses them.
+ *
+ * ⚠ THE FOUR RETIRED KPI TILES. `prcKpiRopa` / `prcKpiDpiaHighRisk` / `prcKpiCbt` /
+ * `prcKpiCbtBlocked` counted over the three fabricated corpora — F2-198's shape, a CORRECT
+ * predicate over an INVENTED corpus, which is why F2-195's `kpiProvenance` gate passed them
+ * (the value came from a function, not a literal). They are deleted rather than rewired
+ * because each one's real equivalent was checked to exist on the surface this page now points
+ * at: `/privacy?tab=ropa` renders `privacyKpiActivities` (the register count) and
+ * `privacyKpiCrossBorder` (5 of 11) from `privacyApi.ropa()`; `/data-lifecycle?tab=cbt`
+ * renders four real status tiles over `listCrossBorderTransfers()`; and the DPIA tab shows
+ * `overallResidualRisk` per row. So no real signal is dropped by removing them — F2-198's
+ * other rule — and no fourth place computes a PDPL figure.
+ *
+ * ⚠ Three of them also LINKED somewhere other than the register they counted
+ * (`/data-officer/dpia` is a different table in a different module, `/privacy/data-flow` is
+ * not the transfer register at all), which is F2-197's "a tile whose figure disagrees with
+ * the list it navigates to is worse than a tile with no figure."
+ */
+
+type PrcTab = 'pipeline' | 'dsr';
+
+/**
+ * The tabs this page can actually open.
+ *
+ * ⚠⚠ F2-207 also fixed a defect that had nothing to do with the fabrication: the three DSR
+ * KPI tiles below link `to="?tab=dsr"`, and this page held its tab in `useState` and never
+ * read the query string — so every one of those tiles navigated, re-mounted the page on the
+ * PIPELINE tab, and looked like it had done nothing. A census across the app resolved all 22
+ * `?tab=` links to their target page: 5 landed on a page that ignores `?tab`, and the other
+ * two sites are fixed in this commit as well. `tabLinkTargets.test.ts` holds it at zero.
+ */
+const PRC_TABS: readonly PrcTab[] = ['pipeline', 'dsr'] as const;
 
 export function PrivacyLifecyclePage() {
   const { t, lang } = useI18n();
   const toast = useToast();
 
-  const [tab, setTab] = useState<PrcTab>('pipeline');
-  const [_tick, setTick] = useState(0);
-  useEffect(() => subscribePrivacy(() => setTick(t => t + 1)), []);
-
-  const stats = useMemo(() => aggregatePrivacy(), [_tick]);
-  const ropa = useMemo(() => loadRopa(), [_tick]);
-  const dpias = useMemo(() => loadDpia(), [_tick]);
-  const cbts = useMemo(() => loadCbt(), [_tick]);
+  // Derived from the URL, not synchronised with it — the idiom `PrivacyPage` already uses.
+  // Two sources of truth for one tab is how a tile link and the tab row come to disagree.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab') as PrcTab | null;
+  const tab: PrcTab = (urlTab && PRC_TABS.includes(urlTab)) ? urlTab : 'pipeline';
+  const selectTab = useCallback((next: PrcTab) => {
+    const updated = new URLSearchParams(searchParams);
+    if (next === 'pipeline') updated.delete('tab');
+    else updated.set('tab', next);
+    setSearchParams(updated, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // ─── DSR: the real register ────────────────────────────────────────────────
   //
@@ -82,7 +137,8 @@ export function PrivacyLifecyclePage() {
   // Sprint 4 §2.7 — `privacy_lc.DsrCaseService` broadcasts on every DSR transition. Before
   // F2-202 this handler ticked a counter that re-read localStorage, so the page listened for
   // the server's own event and answered by re-reading the browser's copy of the data. Now it
-  // refetches the register the event is about.
+  // refetches the register the event is about. (F2-205 found the same shape live in the cyber
+  // workspace: a real broadcast whose handler refreshed a browser constant.)
   useRealtimeOrgEvent('changed.dsr_case', () => { void loadDsrCases(); });
 
   const dsrStats = useMemo(() => dsrs && aggregateDsr(dsrs, now), [dsrs, now]);
@@ -111,16 +167,12 @@ export function PrivacyLifecyclePage() {
       />
 
       <div className="kpi-grid mb-lg">
-        <Kpi Icon={Files}          label={t('prcKpiRopa')}          value={`${stats.ropaApproved} / ${stats.ropaTotal}`} tone="primary" to="/privacy?tab=ropa" />
-        <Kpi Icon={ShieldAlert}    label={t('prcKpiDpiaHighRisk')}  value={String(stats.dpiaHighRisk)} tone={stats.dpiaHighRisk > 0 ? 'warning' : 'success'} to="/data-officer/dpia" />
-        <Kpi Icon={Globe}          label={t('prcKpiCbt')}            value={`${stats.cbtAdequate} / ${stats.cbtTotal}`} tone="info" to="/privacy/data-flow" />
-        <Kpi Icon={Globe}          label={t('prcKpiCbtBlocked')}     value={String(stats.cbtBlocked)} tone={stats.cbtBlocked > 0 ? 'danger' : 'success'} to="/privacy/data-flow" />
         {/*
-          F2-202 — these three now count over the rows fetched from /api/privacy-lc/dsr-cases,
-          and each links to the DSR tab on THIS page rather than to /data-officer/dsr. That
-          route serves `data_officer.dsr_request`, a different table with a different status
-          vocabulary (F2-196 measured three server-side DSR registers), so a figure counted
-          here and a list opened there could never be expected to agree.
+          F2-202 — these count over the rows fetched from /api/privacy-lc/dsr-cases, and each
+          links to the DSR tab on THIS page rather than to /data-officer/dsr. That route serves
+          `data_officer.dsr_request`, a different table with a different status vocabulary
+          (F2-196 measured three server-side DSR registers), so a figure counted here and a
+          list opened there could never be expected to agree.
 
           `value={null}` while `dsrStats` is null renders UX-008's em-dash with `emptyHint` as
           the title and aria-label. A 0 would assert "no open requests" on a register we have
@@ -149,19 +201,19 @@ export function PrivacyLifecyclePage() {
 
       {dsrError && (
         <Card title={t('prcDsrTitle')} Icon={UserCheck}>
-          <div role="status" className="prc-sub">{dsrError}</div>
+          {/* `prc-sub` was never a declared class — the load error rendered unstyled. */}
+          <div role="status" className="prc-card-sub">{dsrError}</div>
         </Card>
       )}
+
+      <PdplRegisterLinks />
 
       <div className="prc-tab-row">
         {([
           { id: 'pipeline', labelKey: 'lpcTabPipeline', Icon: Activity },
-          { id: 'ropa', labelKey: 'prcTabRopa', Icon: Files },
-          { id: 'dpia', labelKey: 'prcTabDpia', Icon: ShieldAlert },
-          { id: 'cbt',  labelKey: 'prcTabCbt',  Icon: Globe },
           { id: 'dsr',  labelKey: 'prcTabDsr',  Icon: UserCheck },
         ] as { id: PrcTab; labelKey: string; Icon: typeof Files }[]).map(tabDef => (
-          <button key={tabDef.id} onClick={() => setTab(tabDef.id)}
+          <button key={tabDef.id} onClick={() => selectTab(tabDef.id)}
             className={`prc-tab-btn${tab === tabDef.id ? ' prc-tab-btn--on' : ''}`}>
             <tabDef.Icon size={13} />
             {t(tabDef.labelKey)}
@@ -183,48 +235,8 @@ export function PrivacyLifecyclePage() {
           if (!target || !mayTransition(fromStatus, target)) return;
           void runTransition(id, target, t('lpcAdvancedToast'));
         }}
-        onCardClick={() => setTab('dsr')} />}
+        onCardClick={() => selectTab('dsr')} />}
 
-      {tab === 'ropa' && <RopaTab ropa={ropa}
-        onCreate={() => {
-          const id = `ROPA-${new Date().getFullYear()}-${String(ropa.length + 1).padStart(3, '0')}`;
-          saveRopa({
-            id,
-            nameEn: 'New processing activity', nameAr: 'نشاط معالجة جديد',
-            lawfulBasis: 'CONSENT',
-            purposesEn: '', purposesAr: '',
-            dataCategories: [], subjectCategories: [],
-            recipientsEn: '', recipientsAr: '',
-            storageLocation: 'Riyadh primary',
-            retentionPeriodEn: '', retentionPeriodAr: '',
-            securityMeasures: [],
-            owner: '',
-            status: 'DRAFT',
-            createdAt: new Date().toISOString(),
-          });
-          toast.info(t('prcRopaCreatedToast'));
-        }}
-        onApprove={(r) => {
-          saveRopa({ ...r, status: 'APPROVED', approvedBy: 'DPO + CRO', approvedAt: new Date().toISOString() });
-          toast.success(t('prcRopaApprovedToast'));
-        }} />}
-      {tab === 'dpia' && <DpiaTab dpias={dpias} ropa={ropa}
-        onCreate={(ropaId) => { createDpia(ropaId); toast.info(t('prcDpiaCreatedToast')); }}
-        onTransition={(d, status) => {
-          const by = status === 'APPROVED' ? 'Layla Al-Ghamdi (DPO)' : undefined;
-          transitionDpia(d.id, status, by);
-          toast.info(`DPIA ${status}`);
-        }} />}
-      {tab === 'cbt'  && <CbtTab  cbts={cbts}  ropa={ropa}
-        onTransition={(c, status) => {
-          const by = status === 'APPROVED' ? 'Layla Al-Ghamdi (DPO)' : undefined;
-          transitionCbt(c.id, status, by);
-          toast.info(`CBT ${status}`);
-        }}
-        onUpgradeSafeguard={(c, sg) => {
-          upgradeCbtSafeguard(c.id, sg);
-          toast.success(t('prcCbtUpgradedToast'));
-        }} />}
       {tab === 'dsr'  && <DsrTab dsrs={dsrs} now={now} busyId={busyDsr}
         onCreate={async (type, name, idLast4, email) => {
           try {
@@ -254,256 +266,42 @@ export function PrivacyLifecyclePage() {
   );
 }
 
-// ─── ROPA tab ───────────────────────────────────────────────────────────────
+// ─── Where the other three PDPL registers live ──────────────────────────────
 
-function RopaTab({ ropa, onCreate, onApprove }: {
-  ropa: RopaActivity[];
-  onCreate: () => void;
-  onApprove: (r: RopaActivity) => void;
-}) {
-  const { t, lang } = useI18n();
+/**
+ * F2-207. The ROPA, DPIA and cross-border tabs used to sit on this page over browser-local
+ * corpora. Retiring a surface must still leave a reader somewhere true — F2-137's rule for
+ * routes, applied here to a tab — so this names each real register and links to it.
+ *
+ * ⚠ Deliberately carries NO counts. This page does not fetch those three registers, and a
+ * number here would either have to be invented or make this a fourth surface for a statutory
+ * object. The linked pages each show their own real figures.
+ */
+function PdplRegisterLinks() {
+  const { t } = useI18n();
+  const targets = [
+    { to: '/privacy?tab=ropa',        Icon: Files,       label: t('prcOtherRopa'), sub: t('prcOtherRopaSub') },
+    { to: '/privacy?tab=dpia',        Icon: ShieldAlert, label: t('prcOtherDpia'), sub: t('prcOtherDpiaSub') },
+    { to: '/data-lifecycle?tab=cbt', Icon: Globe,       label: t('prcOtherCbt'),  sub: t('prcOtherCbtSub') },
+  ];
   return (
-    <Card title={t('prcRopaTitle')} Icon={Files}
-      action={<Button size="sm" variant="secondary" onClick={onCreate}>{t('prcRopaCreate')}</Button>}>
-      <div className="prc-card-sub">
-        {t('prcRopaSub')}
-      </div>
-      {ropa.map(r => {
-        const hr = detectHighRisk(r);
-        return (
-          <div key={r.id} className="prc-item">
-            <div className="prc-item-head">
-              <div className="prc-item-main">
-                <div className="prc-item-badges">
-                  <span className="mono prc-item-code">{r.id}</span>
-                  <Badge tone={ROPA_STATUS_TONE[r.status]}>{ROPA_STATUS_LABEL[r.status][lang]}</Badge>
-                  <Badge tone="info">{LAWFUL_BASIS_LABEL[r.lawfulBasis][lang]}</Badge>
-                  {hr.isHigh && <Badge tone="warning"><AlertTriangle size={11} /> {t('prcHighRisk')}</Badge>}
-                  {r.dpiaId && <Badge tone="primary">{r.dpiaId}</Badge>}
-                  {r.cbtId && <Badge tone="primary">{r.cbtId}</Badge>}
-                </div>
-                <div className="prc-item-title">{lang === 'ar' ? r.nameAr : r.nameEn}</div>
-                <div className="prc-item-owner">
-                  {t('prcRopaOwner')}: <b>{r.owner || '—'}</b>
-                </div>
+    <div className="prc-section-mb">
+      <Card title={t('prcOtherTitle')} Icon={FileText}>
+        <div className="prc-card-sub">{t('prcOtherSub')}</div>
+        <div className="prc-other-grid">
+          {targets.map(x => (
+            <Link key={x.to} to={x.to} className="prc-other-link">
+              <x.Icon size={14} />
+              <div className="prc-other-text">
+                <div className="prc-other-label">{x.label}</div>
+                <div className="prc-other-sub">{x.sub}</div>
               </div>
-              {r.status === 'IN_REVIEW' && <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => onApprove(r)}>{t('prcApprove')}</Button>}
-            </div>
-
-            {/* Article 22 9-field grid */}
-            <div className="prc-ropa-grid">
-              <FieldRow label={t('prcRopaPurposes')} value={lang === 'ar' ? r.purposesAr : r.purposesEn} />
-              <FieldRow label={t('prcRopaRecipients')} value={lang === 'ar' ? r.recipientsAr : r.recipientsEn} />
-              <FieldRow label={t('prcRopaDataCats')} value={r.dataCategories.join(', ') || '—'} />
-              <FieldRow label={t('prcRopaSubjectCats')} value={r.subjectCategories.join(', ') || '—'} />
-              <FieldRow label={t('prcRopaStorage')} value={r.storageLocation} />
-              <FieldRow label={t('prcRopaRetention')} value={lang === 'ar' ? r.retentionPeriodAr : r.retentionPeriodEn} />
-              <FieldRow label={t('prcRopaSecurity')} value={r.securityMeasures.join(' · ') || '—'} colspan={2} />
-            </div>
-
-            {hr.isHigh && (
-              <div className="prc-risk-banner">
-                <div className="prc-risk-banner-label">
-                  {t('prcArticle25')}
-                </div>
-                <div className="prc-risk-banner-chips">
-                  {hr.triggers.map((t_, i) => (
-                    <Badge key={i} tone="warning">{lang === 'ar' ? t_.ar : t_.en}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </Card>
-  );
-}
-
-function FieldRow({ label, value, colspan }: { label: string; value: string; colspan?: number }) {
-  return (
-    <div className={colspan === 2 ? 'prc-field--span2' : undefined}>
-      <div className="prc-field-label">
-        {label}
-      </div>
-      <div className="prc-field-value">{value}</div>
-    </div>
-  );
-}
-
-// ─── DPIA tab ───────────────────────────────────────────────────────────────
-
-function DpiaTab({ dpias, ropa, onCreate, onTransition }: {
-  dpias: DpiaAssessment[]; ropa: RopaActivity[];
-  onCreate: (ropaId: string) => void;
-  onTransition: (d: DpiaAssessment, status: DpiaStatus) => void;
-}) {
-  const { t, lang } = useI18n();
-  // Find ROPA activities flagged high-risk that have no DPIA yet.
-  const candidates = ropa.filter(r => detectHighRisk(r).isHigh && !dpias.some(d => d.ropaId === r.id));
-  return (
-    <Card title={t('prcDpiaTitle')} Icon={ShieldAlert}
-      action={candidates.length > 0
-        ? <Button size="sm" variant="primary" onClick={() => onCreate(candidates[0].id)}>{t('prcDpiaCreate')} ({candidates.length})</Button>
-        : null}>
-      <div className="prc-card-sub">
-        {t('prcDpiaSub')}
-      </div>
-      {dpias.length === 0
-        ? <div className="prc-empty">
-            {t('prcDpiaEmpty')}
-          </div>
-        : dpias.map(d => {
-            const r = ropa.find(x => x.id === d.ropaId);
-            return (
-              <div key={d.id} className="prc-item">
-                <div className="prc-item-head">
-                  <div className="prc-item-main">
-                    <div className="prc-item-badges">
-                      <span className="mono prc-item-code">{d.id}</span>
-                      <Badge tone={d.status === 'APPROVED' ? 'success' : d.status === 'CONSULTATION' ? 'warning' : 'info'}>
-                        {d.status}
-                      </Badge>
-                      {d.isHighRisk && <Badge tone="warning"><AlertTriangle size={11} /> {t('prcHighRisk')}</Badge>}
-                      {d.needsSdaiaConsultation && <Badge tone="danger">SDAIA consultation</Badge>}
-                    </div>
-                    <div className="prc-item-title--sm">
-                      {r ? (lang === 'ar' ? r.nameAr : r.nameEn) : d.ropaId}
-                    </div>
-                    {d.dpoSignedBy && (
-                      <div className="prc-dpo-sign">
-                        {t('prcDpoSign')}: {d.dpoSignedBy}
-                      </div>
-                    )}
-                  </div>
-                  <div className="prc-item-stats">
-                    <Stat label={t('prcDpiaInherent')} value={String(d.riskScore)} tone={d.riskScore > 12 ? 'danger' : 'warning'} />
-                    <Stat label={t('prcDpiaResidual')} value={String(d.residualScore)} tone={d.residualScore > 6 ? 'warning' : 'success'} />
-                  </div>
-                </div>
-                {/* Transition buttons */}
-                <div className="prc-dpia-trans-row">
-                  {d.status === 'DRAFT' && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'RISK_ASSESSMENT')}>{t('prcDpiaToRiskAssess')}</Button>}
-                  {d.status === 'RISK_ASSESSMENT' && d.needsSdaiaConsultation && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'CONSULTATION')}>{t('prcDpiaToSdaiaConsult')}</Button>}
-                  {(d.status === 'RISK_ASSESSMENT' || d.status === 'CONSULTATION') && <Button size="sm" variant="primary" onClick={() => onTransition(d, 'APPROVED')}>{t('prcDpiaDpoApprove')}</Button>}
-                  {d.status === 'APPROVED' && <Button size="sm" variant="ghost" onClick={() => onTransition(d, 'REJECTED')}>{t('prcDpiaReject')}</Button>}
-                </div>
-                <div className="prc-section-mb">
-                  <div className="prc-section-label">
-                    {t('prcDpiaTriggers')}
-                  </div>
-                  <div className="prc-section-chips">
-                    {(lang === 'ar' ? d.triggersAr : d.triggersEn).map((trg, i) => (
-                      <Badge key={i} tone="warning">{trg}</Badge>
-                    ))}
-                  </div>
-                </div>
-                <div className="prc-mitigations">
-                  <div className="prc-section-label">
-                    {t('prcDpiaMitigations')}
-                  </div>
-                  {lang === 'ar' ? d.mitigationsAr : d.mitigationsEn}
-                </div>
-              </div>
-            );
-          })
-      }
-    </Card>
-  );
-}
-
-// ─── Cross-border tab ───────────────────────────────────────────────────────
-
-function CbtTab({ cbts, ropa, onTransition, onUpgradeSafeguard }: {
-  cbts: CrossBorderTransfer[]; ropa: RopaActivity[];
-  onTransition: (c: CrossBorderTransfer, status: CbtStatus) => void;
-  onUpgradeSafeguard: (c: CrossBorderTransfer, sg: SafeguardMechanism) => void;
-}) {
-  const { t, lang } = useI18n();
-  return (
-    <>
-      <Card title={t('prcCbtTitle')} Icon={Globe}>
-        <div className="prc-card-sub">
-          {t('prcCbtSub')}
+              <ArrowRight size={13} className="prc-other-arrow" />
+            </Link>
+          ))}
         </div>
-        {cbts.map(c => {
-          const r = ropa.find(x => x.id === c.ropaId);
-          return (
-            <div key={c.id} className="prc-item">
-              <div className="prc-item-head">
-                <div className="prc-item-main">
-                  <div className="prc-item-badges">
-                    <span className="mono prc-item-code">{c.id}</span>
-                    <Badge tone={ADEQUACY_TONE[c.adequacy]}>{ADEQUACY_LABEL[c.adequacy][lang]}</Badge>
-                    <Badge tone="info">{SAFEGUARD_LABEL[c.safeguard][lang]}</Badge>
-                    <Badge tone="primary">{c.destinationCountry}</Badge>
-                  </div>
-                  <div className="prc-item-title--sm">
-                    {r ? (lang === 'ar' ? r.nameAr : r.nameEn) : c.ropaId}
-                  </div>
-                  <div className="prc-cbt-purpose">
-                    {lang === 'ar' ? c.purposeAr : c.purposeEn}
-                  </div>
-                  {c.nextReviewAt && (
-                    <div className="prc-cbt-review">
-                      {t('prcCbtNextReview')}: <span className="mono">{c.nextReviewAt}</span>
-                      {' · '} {t('prcCbtInterval')}: {c.reviewIntervalMonths}m
-                    </div>
-                  )}
-                </div>
-                <div className="prc-item-stats">
-                  <Stat label={t('prcCbtPreRisk')} value={String(c.preRiskScore)} tone="warning" />
-                  <Stat label={t('prcCbtPostRisk')} value={String(c.postRiskScore)} tone={c.postRiskScore <= 6 ? 'success' : 'warning'} />
-                </div>
-              </div>
-              {/* Action row */}
-              <div className="prc-cbt-actions">
-                {c.status === 'DRAFT' && <Button size="sm" variant="primary" onClick={() => onTransition(c, 'ASSESSING')}>{t('prcCbtStartAssess')}</Button>}
-                {c.status === 'ASSESSING' && c.adequacy !== 'PROHIBITED' && <Button size="sm" variant="primary" onClick={() => onTransition(c, 'APPROVED')}>{t('prcCbtApprove')}</Button>}
-                {c.status === 'ASSESSING' && c.adequacy === 'PROHIBITED' && <Button size="sm" variant="danger" onClick={() => onTransition(c, 'BLOCKED')}>{t('prcCbtBlock')}</Button>}
-                {c.status === 'APPROVED' && <Button size="sm" variant="secondary" onClick={() => onTransition(c, 'PERIODIC_REVIEW')}>{t('prcCbtTrigger Review')}</Button>}
-                {c.adequacy === 'NOT_ADEQUATE' && c.safeguard !== 'BINDING_CORPORATE_RULES' && (
-                  <select
-                    onChange={e => { if (e.target.value) onUpgradeSafeguard(c, e.target.value as SafeguardMechanism); }}
-                    defaultValue=""
-                    className="prc-cbt-select">
-                    <option value="">{t('prcCbtUpgradeSelect')}</option>
-                    {(['STANDARD_CLAUSES','BINDING_CORPORATE_RULES','CERTIFICATION','EXPLICIT_CONSENT'] as SafeguardMechanism[])
-                      .filter(s => s !== c.safeguard)
-                      .map(s => <option key={s} value={s}>{SAFEGUARD_LABEL[s][lang]}</option>)}
-                  </select>
-                )}
-                <Badge tone={c.status === 'APPROVED' ? 'success' : c.status === 'BLOCKED' ? 'danger' : c.status === 'PERIODIC_REVIEW' ? 'warning' : 'info'}>
-                  {c.status}
-                </Badge>
-              </div>
-            </div>
-          );
-        })}
       </Card>
-
-      <div className="prc-section-mt">
-        <Card title={t('prcAdequacyTitle')} Icon={Globe}>
-          <div className="prc-card-sub">
-            {t('prcAdequacySub')}
-          </div>
-          <div className="prc-adequacy-grid">
-            {(['ADEQUATE', 'CONDITIONAL', 'NOT_ADEQUATE', 'PROHIBITED'] as const).map(level => (
-              <div key={level} className="prc-adequacy-card">
-                <div className="prc-adequacy-card-head">
-                  <Badge tone={ADEQUACY_TONE[level]}>{ADEQUACY_LABEL[level][lang]}</Badge>
-                </div>
-                <ul className="prc-adequacy-list">
-                  {Object.entries(ADEQUACY_BY_COUNTRY)
-                    .filter(([, l]) => l === level)
-                    .map(([country]) => <li key={country}>{country}</li>)}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -689,17 +487,6 @@ function DsrTab({ dsrs, now, busyId, onCreate, onTransition, onExtend }: {
         );
       })}
     </Card>
-  );
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function Stat({ label, value, tone }: { label: string; value: string; tone: 'primary' | 'warning' | 'danger' | 'success' }) {
-  return (
-    <div className="prc-stat" data-tone={tone === 'primary' ? undefined : tone}>
-      <div className="prc-stat-label">{label}</div>
-      <div className="mono prc-stat-value">{value}</div>
-    </div>
   );
 }
 

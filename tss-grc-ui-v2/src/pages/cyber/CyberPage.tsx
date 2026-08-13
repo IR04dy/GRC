@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ShieldCheck, Bug, Flame, ClipboardCheck, Filter, Download, Plus, Activity, BarChart3,
   Shield, Target, Cpu, FileCheck2, ListTodo, ShieldOff,
@@ -407,10 +408,31 @@ function useEntityState<T>() {
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
+/**
+ * ⚠ F2-207 — every tab this page can open, so an inbound `?tab=` can be validated.
+ *
+ * `SocOpsEventsPage` has linked to `/cyber?tab=incidents` all along and this page held its
+ * tab in `useState`, ignoring the query string — so that link landed on the OVERVIEW tab and
+ * read as having done nothing. Derived from the URL (the same idiom `PrivacyPage` uses) rather
+ * than synchronised with it, because two sources of truth for one tab is how they drift.
+ */
+const CYBER_VALID_TABS: readonly TabId[] = [
+  'overview', 'controls', 'subcontrols', 'assessments', 'vuln', 'exceptions', 'incidents',
+  'assets', 'evidence', 'policies', 'actions', 'workflows', 'comms', 'alignment',
+] as const;
+
 export function CyberPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const [tab, setTab] = useState<TabId>('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab') as TabId | null;
+  const tab: TabId = (urlTab && CYBER_VALID_TABS.includes(urlTab)) ? urlTab : 'overview';
+  function setTab(next: TabId) {
+    const updated = new URLSearchParams(searchParams);
+    if (next === 'overview') updated.delete('tab');
+    else updated.set('tab', next);
+    setSearchParams(updated, { replace: true });
+  }
   const [busy, setBusy] = useState(false);
 
   const ctrlS    = useEntityState<CyberControlDto>();

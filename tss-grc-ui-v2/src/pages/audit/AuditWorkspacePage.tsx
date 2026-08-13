@@ -190,14 +190,22 @@ export function AuditWorkspacePage() {
             centerSub={t('audwsAgingCenterSub')} />
         </Card>
 
+        {/*
+          ⚠⚠ F2-207 removed a "View all (N) →" link to `/audit-workspace?tab=engagements`.
+          TWO things were wrong with it and neither is visible from the link: `WsTabId` is
+          `inbox | plan | auditors | appointments | committee` — there has never been an
+          `engagements` tab — and this page held its tab in `useState` and never read the
+          query string, so the link re-mounted the page on `inbox` and the reader still saw
+          the same five rows. A control that navigates and appears to do nothing is worse than
+          no control.
+          It is NOT replaced with a real destination, because `myEngagements` is
+          `AUDIT_ENGAGEMENTS` from `mockCompliance` — the fabricated corpus F2-203 measured and
+          filed (five disjoint engagement code spaces across two real tables). Building an
+          `engagements` tab over invented rows is the defect, not the fix. The count badge the
+          `else` branch already rendered now shows unconditionally.
+        */}
         <Card title={t('audwsEngagements')} Icon={Briefcase}
-          action={
-            myEngagements.length > 5
-              ? <Link to="/audit-workspace?tab=engagements" className="audws-viewall-link">
-                  {t('audwsEngagementsViewAll')} ({myEngagements.length}) →
-                </Link>
-              : <Badge tone="primary">{myEngagements.length}</Badge>
-          }>
+          action={<Badge tone="primary">{myEngagements.length}</Badge>}>
           {myEngagements.length === 0
             ? <EmptyState Icon={Briefcase} title={t('audwsEngagementsEmpty')} />
             : <div className="audws-row-list audws-row-list--gap-md">

@@ -3,6 +3,14 @@
  * Migrated from inline style={{...}} props (PR design-system-migration-batch-3).
  * Every value resolves to a design token so dark-mode + tenant theming
  * apply automatically. RTL-safe (uses logical properties).
+ *
+ * ⚠ F2-207 removed 28 rules that styled the retired ROPA / DPIA / cross-border tabs
+ * (the Article 31 field grid, the high-risk banner, the DPIA transition row and DPO
+ * sign-off line, the adequacy country grid, the CBT action row and safeguard picker,
+ * and the `.prc-stat` tile). Those three registers now live on their real server-backed
+ * surfaces; see the header of `PrivacyLifecyclePage.tsx`. Dead CSS is not harmless here
+ * — a rule for a retired fabrication is the kind of thing a later reader rebuilds a
+ * page around.
  */
 
 /* ─── Tab strip ────────────────────────────────────────────── */
@@ -37,13 +45,7 @@
   line-height: var(--leading-normal);
 }
 
-/* ─── Generic item card ────────────────────────────────────── */
-.prc-item {
-  padding: var(--sp-5);
-  margin-bottom: var(--sp-4);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-}
+/* ─── Generic item head (shared by the DSR case card) ──────── */
 .prc-item-head {
   display: flex;
   justify-content: space-between;
@@ -66,170 +68,58 @@
   font-size: var(--text-2xs);
   color: var(--primary);
 }
-.prc-item-title {
-  font-size: var(--text-md);
-  font-weight: 700;
-}
 .prc-item-title--sm {
   font-size: var(--text-sm);
   font-weight: 600;
 }
-.prc-item-owner {
-  font-size: var(--text-2xs);
-  color: var(--ink-3);
-  margin-top: 2px;
-}
-.prc-item-stats {
-  display: flex;
-  gap: var(--sp-4);
-  align-items: center;
-}
 
-/* ─── ROPA grid ────────────────────────────────────────────── */
-.prc-ropa-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-4);
-  font-size: var(--text-2xs);
-}
-.prc-field {
-  /* gridColumn span set inline by style attribute via data-attr? — but we
-   * make it a modifier below */
-}
-.prc-field--span2 {
-  grid-column: span 2;
-}
-.prc-field-label {
-  font-size: 9px;
-  color: var(--ink-3);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 2px;
-}
-.prc-field-value {
-  font-size: var(--text-2xs);
-  color: var(--ink-2);
-  line-height: var(--leading-normal);
-}
-
-/* ─── High-risk banner inside item ─────────────────────────── */
-.prc-risk-banner {
-  margin-top: var(--sp-4);
-  padding: var(--sp-4);
-  background: var(--warning-bg);
-  border-radius: var(--r-xs);
-  border-inline-start: 3px solid var(--warning);
-}
-.prc-risk-banner-label {
-  font-size: 10px;
-  color: var(--ink-3);
-  text-transform: uppercase;
-  margin-bottom: var(--sp-2);
-}
-.prc-risk-banner-chips {
-  display: flex;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
-
-/* ─── DPIA blocks ──────────────────────────────────────────── */
-.prc-dpia-trans-row {
-  display: flex;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-4);
-  flex-wrap: wrap;
-}
 .prc-section-mb {
   margin-bottom: var(--sp-4);
 }
-.prc-section-label {
-  font-size: 10px;
-  color: var(--ink-3);
-  text-transform: uppercase;
-  margin-bottom: var(--sp-2);
-}
-.prc-section-chips {
-  display: flex;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
-.prc-dpo-sign {
-  font-size: var(--text-2xs);
-  color: var(--success-fg);
-  margin-top: 2px;
-}
-.prc-mitigations {
-  font-size: var(--text-2xs);
-  color: var(--ink-2);
-  line-height: var(--leading-loose);
-  padding: var(--sp-4);
-  background: var(--surface-2);
-  border-radius: var(--r-xs);
-}
 
-/* ─── Empty state ──────────────────────────────────────────── */
-.prc-empty {
-  padding: var(--sp-7);
-  text-align: center;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-}
-
-/* ─── CBT card extras ──────────────────────────────────────── */
-.prc-cbt-purpose {
-  font-size: var(--text-2xs);
-  color: var(--ink-2);
-  margin-top: var(--sp-2);
-  line-height: var(--leading-loose);
-}
-.prc-cbt-review {
-  font-size: var(--text-2xs);
-  color: var(--ink-3);
-  margin-top: var(--sp-2);
-}
-.prc-cbt-actions {
-  display: flex;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
-  align-items: center;
-  padding-top: var(--sp-4);
-  border-top: 1px dashed var(--border);
-}
-.prc-cbt-select {
-  padding: var(--sp-2) var(--sp-4);
-  font-size: var(--text-2xs);
-  border: 1px solid var(--border);
-  border-radius: var(--r-xs);
-}
-
-/* ─── Adequacy grid ────────────────────────────────────────── */
-.prc-adequacy-grid {
+/* ─── Pointers to the three real PDPL registers (F2-207) ───── */
+.prc-other-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--sp-5);
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
 }
 @media (max-width: 900px) {
-  .prc-adequacy-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .prc-other-grid {
+    grid-template-columns: 1fr;
   }
 }
-.prc-adequacy-card {
-  padding: var(--sp-5);
+.prc-other-link {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-}
-.prc-adequacy-card-head {
-  margin-bottom: var(--sp-3);
-}
-.prc-adequacy-list {
-  margin: 0;
-  padding-inline-start: 14px;
-  font-size: var(--text-2xs);
+  background: var(--surface-1);
   color: var(--ink-2);
-  line-height: 1.7;
+  text-decoration: none;
 }
-.prc-section-mt {
-  margin-top: var(--sp-6);
+.prc-other-link:hover {
+  border-color: var(--primary);
+  background: var(--primary-50);
+}
+.prc-other-text {
+  flex: 1;
+  min-width: 0;
+}
+.prc-other-label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--ink-1);
+}
+.prc-other-sub {
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+  line-height: var(--leading-normal);
+}
+.prc-other-arrow {
+  color: var(--ink-3);
+  flex-shrink: 0;
 }
 
 /* ─── DSR — form ───────────────────────────────────────────── */
@@ -368,29 +258,3 @@
   height: 1px;
   background: var(--border);
 }
-
-/* ─── Stat tile ────────────────────────────────────────────── */
-.prc-stat {
-  padding: var(--sp-4);
-  border: 1px solid var(--primary);
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
-  min-width: 70px;
-  text-align: center;
-}
-.prc-stat[data-tone="warning"] { border-color: var(--warning-fg); }
-.prc-stat[data-tone="danger"]  { border-color: var(--danger-fg); }
-.prc-stat[data-tone="success"] { border-color: var(--success-fg); }
-.prc-stat-label {
-  font-size: 9px;
-  color: var(--ink-3);
-  text-transform: uppercase;
-}
-.prc-stat-value {
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: var(--primary);
-}
-.prc-stat[data-tone="warning"] .prc-stat-value { color: var(--warning-fg); }
-.prc-stat[data-tone="danger"]  .prc-stat-value { color: var(--danger-fg); }
-.prc-stat[data-tone="success"] .prc-stat-value { color: var(--success-fg); }

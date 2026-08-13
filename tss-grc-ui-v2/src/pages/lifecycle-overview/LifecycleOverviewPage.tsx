@@ -17,7 +17,11 @@ import {
 import {
   loadFindings, subscribeAuditLifecycle, aggregateAuditLifecycle, hydrateAuditLifecycle,
 } from '../../lib/auditLifecycle';
-import { subscribePrivacy } from '../../lib/privacyLifecycle';
+// F2-207 — `subscribePrivacy` is gone with `lib/privacyLifecycle.ts`. It existed to notify
+// this page when the browser-local ROPA/DPIA/CBT corpora were mutated; those three statutory
+// registers are retired onto their real server surfaces, so nothing dispatches that event and
+// nothing on this page reads those corpora. The privacy lane below has always been the real
+// DSR pipeline via `dsrApi`, which is why removing the subscription changes nothing it renders.
 // F2-202 — the DSR lane is the one lane on this page fed by a real server register.
 import { dsrApi, aggregateDsr, isPastDeadline, isOpen as isOpenDsr, type DsrCase } from '../../lib/privacyLcApi';
 import { loadInvocations, subscribeBcm, aggregateBcm, pickPlanById } from '../../lib/bcmLifecycle';
@@ -41,10 +45,9 @@ export function LifecycleOverviewPage() {
   useEffect(() => {
     const off1 = subscribeRiskLifecycle(() => setTick(x => x + 1));
     const off2 = subscribeAuditLifecycle(() => setTick(x => x + 1));
-    const off3 = subscribePrivacy(() => setTick(x => x + 1));
     const off4 = subscribeBcm(() => setTick(x => x + 1));
     const off5 = subscribeCyber(() => setTick(x => x + 1));
-    return () => { off1(); off2(); off3(); off4(); off5(); };
+    return () => { off1(); off2(); off4(); off5(); };
   }, []);
 
   // ⚠⚠ F2-205: THREE lanes on this page are server-backed and NONE of them was hydrated here.

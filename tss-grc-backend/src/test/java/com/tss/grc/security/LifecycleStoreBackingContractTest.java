@@ -340,4 +340,37 @@ class LifecycleStoreBackingContractTest {
                 reached the server could not have been displayed.""")
             .isFalse();
     }
+
+    @Test
+    @DisplayName("the retired browser-local PDPL registers have not come back")
+    void thePdplBrowserRegistersStayRetired() {
+        Path deleted = Path.of("..", "tss-grc-ui-v2", "src", "lib", "privacyLifecycle.ts");
+        assertThat(Files.exists(deleted))
+            .as("""
+                lib/privacyLifecycle.ts is back.
+
+                F2-207 retired it. It kept three SAUDI PDPL STATUTORY REGISTERS in localStorage —
+                the Article 31 record of processing activities, the Article 25 impact assessments
+                and the Article 29 cross-border transfers — and the privacy-lifecycle page
+                rendered and MUTATED all three, so approving a ROPA, signing off a DPIA and
+                approving a transfer of personal data out of the Kingdom each wrote to one
+                operator's browser and nowhere else.
+
+                All three registers are real, populated (11 / 6 / 9 rows in dev) and already had
+                a complete server-backed surface — /privacy?tab=ropa, /privacy?tab=dpia and
+                /data-lifecycle?tab=cbt — which is why this was a retirement under ADR-017 §D-5
+                rather than a rewire: a second real client for one statutory object is F2-196's
+                own defect.
+
+                Two things make re-creating it worse than it looks. Its CbtStatus and
+                SafeguardMechanism vocabularies were each refused 4-of-5 by CK_cbt_status and
+                CK_cbt_mechanism, so wiring it converts silent local writes into constraint
+                violations (F2-183's rule); and its handlers passed invented officer names as the
+                author of statutory decisions, which the real registers persist.
+
+                This assertion lives on the backend on purpose. The frontend half is
+                privacyRegisterRetirement.test.ts, and a frontend-only guard can be deleted in
+                the same commit that re-creates what it guards.""")
+            .isFalse();
+    }
 }
