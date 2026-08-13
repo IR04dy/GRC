@@ -87,8 +87,40 @@ describe('F2-202 — the lifecycle-store registry', () => {
    * lifted from a measurement of something else is worse than no baseline, because it looks
    * measured.
    */
-  const BASELINE_BROWSER_LOCAL_STORES = 6;
-  const BASELINE_NOT_FULLY_SERVER_BACKED = 6;   // F2-203 wired audit-findings (was 7)
+  // ⚠⚠ F2-204 re-scoped both figures below, and the reason matters more than the numbers.
+  //
+  // F2-202's registry declared 6 browser-local corpora. The four modules own **16** — it
+  // happened to list exactly the ones with a controller, a rule I never stated and therefore
+  // never checked, so ten were invisible and this ratchet read "6 stores remain" against a real
+  // 16. 🔑 **A decrease-only ratchet cannot express "the population was undercounted": raising
+  // the number is indistinguishable from tolerating a regression.** So the figures are not
+  // raised — they are re-scoped to questions that still only improve, and the total is asserted
+  // exactly so the next omission fails rather than shrinks a count.
+  const BASELINE_BROWSER_LOCAL_STORES = 6;      // measured, after cyber-pentests was corrected
+  /**
+   * Stores that HAVE a real endpoint and still do not write to it. Decrease-only, and its scope
+   * is now explicit: F2-202's version silently mixed in corpora that have no endpoint to write
+   * to, so "not fully server-backed" conflated *unwired* with *unwireable* — two facts a slice
+   * needs to tell apart before it can plan anything.
+   */
+  // 7 before this slice (the 6 below plus risk-treatment); 6 after wiring it. ⚠ I first wrote 5
+  // by counting before the backend gate corrected `cyber-pentests` from NO_SERVER_SURFACE to
+  // BROWSER_LOCAL — a baseline taken from a measurement that was still wrong (F2-195's rule).
+  const BASELINE_ENDPOINT_BEARING_NOT_WIRED = 6;
+
+  /** Every browser-local corpus the four lifecycle modules own. Exact, not a ceiling. */
+  // 18, not 19: `risk-treatment-actions` was removed before shipping — it declared no
+  // localStorage key, so it was never a browser-local corpus, and the gate's own coverage leg
+  // is derived from those keys.
+  const DECLARED_CORPORA = 18;
+
+  /**
+   * Registers that exist, are populated, and have NO controller, DTO or service anywhere —
+   * **69 rows in dev and prod that no endpoint can reach.** Decrease-only: the only way down is
+   * for someone to build the endpoint. Not wireable by a frontend slice, which is exactly why
+   * they are named rather than folded into "browser-local".
+   */
+  const BASELINE_NO_SERVER_SURFACE = 9;   // 11 claimed, 2 refuted by the backend gate
 
   it('no new browser-local lifecycle store appears', () => {
     expect(
@@ -99,17 +131,56 @@ describe('F2-202 — the lifecycle-store registry', () => {
     ).toBeLessThanOrEqual(BASELINE_BROWSER_LOCAL_STORES);
   });
 
-  it('the count of stores that cannot persist a write only decreases', () => {
-    // Tracked separately because a store that READS the server and drops its writes is not
-    // safer than an honestly local one — it is harder to notice, since the list it shows is
-    // real. Collapsing both into one figure would let a reclassification look like progress.
-    const notBacked = LIFECYCLE_STORES.filter(s => s.state !== 'SERVER_BACKED');
+  it('the count of ENDPOINT-BEARING stores that cannot persist a write only decreases', () => {
+    // ⚠⚠ F2-204 narrowed the population to stores that HAVE an endpoint. The old version
+    // counted every non-SERVER_BACKED store, which after this slice's honest expansion would
+    // have meant raising a decrease-only figure from 6 to 17 — indistinguishable from tolerating
+    // a regression. The eleven NO_SERVER_SURFACE stores are tracked by their own figure, because
+    // "nobody wired it" and "there is nothing to wire it to" are different facts and only the
+    // first is a frontend slice's to fix.
+    const unwired = LIFECYCLE_STORES.filter(
+      s => s.endpoint !== '' && s.state !== 'SERVER_BACKED' && s.state !== 'PARTIALLY_SERVER_BACKED');
     expect(
-      notBacked.length,
-      `${notBacked.length} of ${LIFECYCLE_STORES.length} lifecycle stores still cannot persist a `
-      + `write to the server; the baseline is ${BASELINE_NOT_FULLY_SERVER_BACKED} and may only go `
-      + 'down. Members: ' + notBacked.map(s => `${s.id} (${s.state})`).join(', '),
-    ).toBeLessThanOrEqual(BASELINE_NOT_FULLY_SERVER_BACKED);
+      unwired.length,
+      `${unwired.length} lifecycle stores have a real endpoint and still cannot persist a write; `
+      + `the baseline is ${BASELINE_ENDPOINT_BEARING_NOT_WIRED} and may only go down. Members: `
+      + unwired.map(s => `${s.id} (${s.state})`).join(', '),
+    ).toBeLessThanOrEqual(BASELINE_ENDPOINT_BEARING_NOT_WIRED);
+  });
+
+  it('the registry declares every browser-local corpus the modules own', () => {
+    // 🔑 THE LEG THAT WOULD HAVE CAUGHT F2-202's UNDERCOUNT. The population is DERIVED from the
+    // modules' own localStorage keys, so a corpus cannot be omitted by not being thought of —
+    // which is how ten of sixteen went undeclared in a reviewed file.
+    const MODULES = ['privacyLifecycle', 'riskLifecycle', 'bcmLifecycle', 'cyberLifecycle'];
+    const keys = new Set<string>();
+    for (const m of MODULES) {
+      const src = readFileSync(join(__dirname, '..', 'lib', `${m}.ts`), 'utf8');
+      for (const k of src.match(/'(grc\.[a-z0-9.]+\.v\d+)'/g) ?? []) keys.add(k.slice(1, -1));
+    }
+    const declared = new Set(LIFECYCLE_STORES.map(s => s.localKey).filter(Boolean));
+    const missing = [...keys].filter(k => !declared.has(k)).sort();
+    expect(missing,
+      'every localStorage key these modules write must be declared as a store — otherwise the '
+      + 'registry describes a smaller world than the one that exists, which is what it is for')
+      .toEqual([]);
+    expect(LIFECYCLE_STORES.length,
+      'exact, not a ceiling: a new corpus must be declared, and a retired one must be removed')
+      .toBe(DECLARED_CORPORA);
+  });
+
+  it('the unwireable population is named and only shrinks', () => {
+    const none = LIFECYCLE_STORES.filter(s => s.state === 'NO_SERVER_SURFACE');
+    expect(none.length).toBeLessThanOrEqual(BASELINE_NO_SERVER_SURFACE);
+    for (const st of none) {
+      expect(st.endpoint,
+        `${st.id}: a NO_SERVER_SURFACE store must name no endpoint — claiming one that does not `
+        + 'exist is the error this state was added to stop').toBe('');
+    }
+    // And the reverse: anything with an endpoint must NOT claim to be unserved.
+    for (const st of LIFECYCLE_STORES.filter(s => s.endpoint !== '')) {
+      expect(st.state).not.toBe('NO_SERVER_SURFACE');
+    }
   });
 
   it('exactly the DSR and audit-finding stores are server-backed today', () => {
@@ -120,6 +191,11 @@ describe('F2-202 — the lifecycle-store registry', () => {
     // reverse leg is the one nobody writes first, and the one that catches an entry that was
     // never in the population). It fired as designed when F2-203 wired audit-findings.
     expect(backed).toEqual(['privacy-dsr', 'audit-findings']);
+    // risk-treatment is PARTIALLY_SERVER_BACKED, not SERVER_BACKED: the plan is wired and
+    // `risk_lc.treatment_actions` (10 rows) has no sub-resource, so per-action progress cannot
+    // be persisted by any client. Recording that as "wired" would overstate it.
+    expect(LIFECYCLE_STORES.filter(s => s.state === 'PARTIALLY_SERVER_BACKED').map(s => s.id))
+      .toEqual(['risk-treatment']);
   });
 
   it('the SERVER_READ_LOCAL_WRITE state has no members', () => {
@@ -156,10 +232,22 @@ describe('F2-202 — the lifecycle-store registry', () => {
   it('a store that declares no key really keeps none', () => {
     // The reverse direction. Without it, blanking a key would silence the leg above rather
     // than fail it — F2-199's lesson that the reverse leg is the one nobody writes first.
+    //
+    // ⚠⚠ F2-204 re-scoped it from per-MODULE to per-CORPUS. It asserted that a `localKey: ''`
+    // store's module writes NO keys at all, which held only while every module hosted exactly
+    // one declared store. `riskLifecycle.ts` now hosts a wired store and two unwireable ones, so
+    // the module legitimately writes two keys and the old claim failed on a correct tree. 🔑 A
+    // per-module check over a per-corpus property is the same defect F2-203 had to fix in its
+    // disclosure leg — and it fails in the LOUD direction here, which is why it was cheap.
+    const claimed = new Set(LIFECYCLE_STORES.map(s => s.localKey).filter(Boolean));
     for (const store of LIFECYCLE_STORES.filter(s => s.localKey === '')) {
       const own = stripComments(read(store.module));
-      const keys = [...own.matchAll(/'(grc\.[a-z0-9.-]+\.v\d+)'/g)].map(m => m[1]);
-      expect(keys, `${store.id} declares no localStorage key but ${store.module} writes ${keys}`)
+      const orphans = [...own.matchAll(/'(grc\.[a-z0-9.-]+\.v\d+)'/g)]
+        .map(m => m[1]).filter(k => !claimed.has(k));
+      expect(orphans,
+        `${store.id} declares no localStorage key, and ${store.module} writes ${orphans} which no `
+        + 'store in the registry claims — so either this store still keeps state or another '
+        + 'corpus is undeclared')
         .toEqual([]);
     }
   });

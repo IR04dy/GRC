@@ -242,9 +242,12 @@ export function AuditLifecyclePage() {
         onCreate={(titleEn, titleAr, severity, conditionEn, conditionAr, ownerRole) =>
           void run(() => createFinding(engagementCode, titleEn, titleAr, severity, conditionEn, conditionAr, ownerRole),
                    t('alcFindingCreatedToast'))}
+        /* F2-204: the chain no longer creates a treatment plan. It used a hard-coded risk id,
+           and now that the treatment-plan store POSTs, that would PERSIST a plan against
+           whatever risk is id 1 in the tenant. Only the CAPA half is a real write. */
         onChainToRisk={(f) => {
-          const { planId, capaId } = chainFindingToRiskAndCapa(f);
-          toast.success(`${t('alcChainedToast')}: ${planId} + ${capaId}`);
+          const { capaId } = chainFindingToRiskAndCapa(f);
+          toast.success(`${t('alcChainedToast')}: ${capaId}`);
         }} />}
 
       {tab === 'capa' && <CapaTab findings={findings} allCapas={allCapas}

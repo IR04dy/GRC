@@ -1437,14 +1437,72 @@ export interface TreatmentPlanDto {
   costSarK: number; costBenefitEn?: string | null; costBenefitAr?: string | null;
   createdAt?: string; submittedAt?: string;
   approvedBy?: string | null; approvedAt?: string | null; rejectedReason?: string | null;
+  /**
+   * ⚠⚠ F2-204: this field was MISSING from this interface while the server has always sent it.
+   *
+   * `TreatmentPlanDto` in `module/risk_lc/dto` declares `List<TreatmentActionDto> actions` and
+   * maps them on every read. F2-198's `crossBorderTransfer` shape exactly — the value is on the
+   * wire and the client type simply never mentioned it, so no caller could see it.
+   *
+   * 🔑 It also refuted a claim I wrote earlier in this very slice. I read THIS interface, saw no
+   * `actions`, and concluded the server had none — then wrote that into a registry note and two
+   * code comments. The backend gate's new leg caught it by finding a `TreatmentAction` @Entity.
+   * One file short is the whole error, and this is its third instance in this lineage.
+   */
+  actions?: TreatmentActionOnWire[];
+}
+
+/** The action shape the server actually returns. Mirrors `TreatmentPlanDto.TreatmentActionDto`. */
+export interface TreatmentActionOnWire {
+  id: string;
+  titleEn: string;
+  titleAr: string;
+  ownerRole: string;
+  targetDate: string;
+  status: string;
+  expectedRiskReduction: number;
+  completedAt?: string | null;
+  evidenceRef?: string | null;
 }
 export const treatmentPlanApi = {
-  listForRisk: (riskId: number) =>
-    api.get<TreatmentPlanDto[]>(`/api/risk-lc/treatment-plans?riskId=${riskId}`),
+  /** Every plan for the tenant. Added by F2-204 — the risk-lifecycle workspace's list. */
+  listForOrg: () => api.get<TreatmentPlanDto[]>('/api/risk-lc/treatment-plans'),
+  // F2-204: `listForRisk` is DELETED. `listForOrg` reaches the same endpoint and
+  // `plansForRisk()` filters the cached register, so it was a second client for a live
+  // endpoint with no caller — the shape F2-165's gate refuses, and it fired on it. It had sat
+  // in that gate's hole list for months attributed to "the plan the F2-164 close gate reads
+  // has no register view", when in fact a whole workspace page was reading a browser copy.
   create: (body: {
     riskId: number; strategy: string; rationaleEn: string; rationaleAr: string;
     costSarK: number; costBenefitEn?: string; costBenefitAr?: string;
   }) => api.post<TreatmentPlanDto>('/api/risk-lc/treatment-plans', body),
+  /**
+   * Move a plan through the ERM approval machine, taking the row back from the server.
+   *
+   * F2-204: `rejectedReason` is the REJECTING OFFICER'S words and nothing else may fill it —
+   * `RiskLifecyclePage` used to pass the literal `'Insufficient cost-benefit justification'`,
+   * and since the server persists this field a naive wire would have written invented text
+   * into `risk_lc.treatment_plans.rejected_reason` as a Chief Risk Officer's stated rationale.
+   * There is deliberately no `approvedBy`: `TreatmentPlanService` stamps the authenticated
+   * principal (F2-22b(vi)).
+   */
+  transition: (id: string, body: { status: string; rejectedReason?: string }) =>
+    api.post<TreatmentPlanDto>(
+      `/api/risk-lc/treatment-plans/${encodeURIComponent(id)}/transition`, body),
+};
+
+/**
+ * The ERM treatment-plan machine, mirroring `TreatmentPlanService.ALLOWED` edge for edge.
+ * Pinned by `RiskTreatmentMachineParityTest`; read through the predicates below so there is
+ * one implementation of "what can this plan become?" (F2-203's shape).
+ */
+export const TREATMENT_ALLOWED: Record<string, readonly string[]> = {
+  DRAFT:       ['SUBMITTED'],
+  SUBMITTED:   ['APPROVED', 'REJECTED'],
+  APPROVED:    ['IN_PROGRESS'],
+  IN_PROGRESS: ['COMPLETED'],
+  REJECTED:    ['DRAFT'],
+  COMPLETED:   [],
 };
 
 // ─── Typed register linkage — ERM epic E-G ──────────────────────────────────

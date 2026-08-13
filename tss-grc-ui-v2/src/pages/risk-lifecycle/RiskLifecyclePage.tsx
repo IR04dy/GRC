@@ -1,37 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
-import {
-  AlertTriangle, ShieldCheck, TrendingUp, Calculator, GitBranch,
-  CheckCircle2, AlertOctagon, Activity, ArrowUpRight,
-  Send, ThumbsUp, ThumbsDown, RefreshCw, Sigma,
-} from 'lucide-react';
+import { AlertTriangle, ShieldCheck, TrendingUp, Calculator, CheckCircle2, AlertOctagon, Activity, ArrowUpRight, ThumbsUp, RefreshCw, Sigma } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useRealtimeOrgEvent } from '../../lib/useRealtimeEntity';
 import { useToast } from '../../lib/toast';
 import { MOCK_RISKS } from '../risk/mockRisks';
-import {
-  loadTreatmentPlans, plansForRisk, saveTreatmentPlan, transitionPlan, updateActionStatus,
-  breachesForRisk, fireBreach, escalateBreach, resolveBreach,
-  acceptancesForRisk, saveAcceptance, transitionAcceptance,
-  controlsForRisk, runMonteCarlo, aggregateRiskLifecycle,
-  subscribeRiskLifecycle,
-  TREATMENT_STATUS_LABEL, TREATMENT_STATUS_TONE, STRATEGY_LABEL,
-  ACCEPTANCE_STATUS_LABEL, ACCEPTANCE_STATUS_TONE,
-  BREACH_STATUS_LABEL, BREACH_STATUS_TONE,
-  type TreatmentPlan, type AcceptanceRequest, type KriBreachEvent,
-  type MonteCarloResult, type TreatmentStatus,
-} from '../../lib/riskLifecycle';
+import { loadTreatmentPlans, plansForRisk, transitionPlan, createTreatmentPlan, hydrateTreatmentPlans, treatmentPlansLoadFailed, nextTreatmentStatuses, treatmentStatusLabel, breachesForRisk, fireBreach, escalateBreach, resolveBreach, acceptancesForRisk, saveAcceptance, transitionAcceptance, controlsForRisk, runMonteCarlo, aggregateRiskLifecycle, subscribeRiskLifecycle, BREACH_STATUS_LABEL, BREACH_STATUS_TONE, type KriBreachEvent, type MonteCarloResult } from '../../lib/riskLifecycle';
 import { formatHijri } from '../../lib/sla';
-import { LifecyclePipeline, type PipelineStage, type PipelineCard } from '../../components/lifecycle/LifecyclePipeline';
-import { Activity as ActivityIcon, Send as SendIcon, ThumbsUp as ThumbsUpIcon, Play, CheckCircle2 as CheckCircle2Icon, ThumbsDown as ThumbsDownIcon, FileText as FileTextIcon } from 'lucide-react';
+import { Activity as ActivityIcon } from 'lucide-react';
 import { ActivityFeedDrawer } from '../../components/lifecycle/ActivityFeedDrawer';
 import { logTransition } from '../../lib/activityLog';
+import { TreatmentCard, AcceptanceCard, ControlLinkageCard, RiskTreatmentPipeline, Stat }
+  from './RiskLifecycleCards';
 import '../../styles/pages/risk-lifecycle.css';
 
 /**
@@ -52,6 +39,25 @@ export function RiskLifecyclePage() {
   const toast = useToast();
   const [riskId, setRiskId] = useState<number>(MOCK_RISKS[0]?.id ?? 1);
   const [historyFor, setHistoryFor] = useState<string | null>(null);
+
+  /**
+   * F2-204: every treatment-plan mutation was synchronous over a localStorage store and
+   * unconditionally followed by a success toast. A write that fails must say so, and must not
+   * leave the screen showing a state the server rejected — the cache is replaced from the
+   * server's response, so a refused transition cannot appear to have happened.
+   */
+  async function runPlan(work: () => Promise<unknown>, okMsg: string) {
+    try {
+      await work();
+      toast.success(okMsg);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message
+        : (lang === 'ar' ? 'تعذّر الحفظ' : 'Could not save'));
+    }
+  }
+
+  // Load the real register once; nothing seeds it, so an empty tenant reads as empty.
+  useEffect(() => { void hydrateTreatmentPlans(); }, []);
   const risk = useMemo(() => MOCK_RISKS.find(r => r.id === riskId), [riskId]);
 
   const [_tick, setTick] = useState(0);
@@ -73,6 +79,21 @@ export function RiskLifecyclePage() {
 
   return (
     <Shell title={t('rlcTitle')} sub={t('rlcSub')}>
+      {/* F2-204: an empty register and an unreachable one are different facts. Nothing seeds
+          the treatment-plan list any more, so a failed fetch must be reported rather than
+          rendered as "this risk has no treatment plans". */}
+      {treatmentPlansLoadFailed() && (
+        <Card title={lang === 'ar' ? 'تعذّر تحميل خطط المعالجة' : 'Treatment plans could not be loaded'}>
+          <div className="rlc-card-sub">
+            {lang === 'ar'
+              ? 'فشل تحميل سجلّ خطط المعالجة من الخادم. القائمة أدناه غير مكتملة — أعد المحاولة قبل الاعتماد عليها.'
+              : 'The treatment-plan register failed to load from the server. The list below is incomplete — retry before relying on it.'}
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => void hydrateTreatmentPlans(true)}>
+            {lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+          </Button>
+        </Card>
+      )}
       <PageHeader
         eyebrow={t('rlcEyebrow')}
         title={t('rlcTitle')}
@@ -93,17 +114,18 @@ export function RiskLifecyclePage() {
         <RiskTreatmentPipeline
           allPlans={loadTreatmentPlans()}
           onAdvance={(planId, fromStatus) => {
-            // DRAFT → SUBMITTED, SUBMITTED → APPROVED, APPROVED → IN_PROGRESS,
-            // IN_PROGRESS → COMPLETED, REJECTED → DRAFT.
-            const next: Record<string, TreatmentStatus> =
-              { DRAFT: 'SUBMITTED', SUBMITTED: 'APPROVED', APPROVED: 'IN_PROGRESS', IN_PROGRESS: 'COMPLETED', REJECTED: 'DRAFT' };
-            const target = next[fromStatus];
-            if (!target) return;
-            const by = target === 'APPROVED' ? 'Mohammed Al-Mahmoud (CRO)' : undefined;
-            // Capture prior state for undo.
-            const priorPlan = loadTreatmentPlans().find(p => p.id === planId);
-            const priorStatus = priorPlan?.status;
-            transitionPlan(planId, target, by);
+            // F2-204: this was a FOURTH copy of the machine, written as a lookup map, and it
+            // also chose the approver — `'Mohammed Al-Mahmoud (CRO)'`, an invented Chief Risk
+            // Officer. Ask the one table; the server stamps the approver (F2-22b(vi)).
+            const target = nextTreatmentStatuses(fromStatus)[0];
+            if (!target) {
+              toast.info(lang === 'ar'
+                ? `لا يوجد انتقال مُعلَن من الحالة ${fromStatus}`
+                : `No transition is declared out of ${fromStatus}`);
+              return;
+            }
+            void runPlan(() => transitionPlan(planId, target),
+                         `${t('lpcAdvancedToast')} → ${treatmentStatusLabel(target, lang)}`);
             logTransition('treatment-plan', planId, fromStatus, target);
             /* F2-142 — the CRO notification on submit/approve is removed, not repointed.
              *
@@ -114,31 +136,41 @@ export function RiskLifecyclePage() {
              * it at — `platform.notifications` rows are written server-side by the F8 engine, which is
              * the correct place for a transition-triggered notification and where CE-10 already puts
              * them. Making the risk lifecycle notify for real is server work, not a swapped import. */
-            // Undoable toast.
-            toast.undoable(`${t('lpcAdvancedToast')} → ${target}`, () => {
-              if (priorStatus) transitionPlan(planId, priorStatus as TreatmentStatus);
-              logTransition('treatment-plan', planId, target, priorStatus ?? fromStatus);
-              toast.info(t('undoneToast'));
-            });
+            /* ⚠⚠ F2-204: the undoable toast is REMOVED, and wiring the store is why.
+             *
+             * It called `transitionPlan(planId, priorStatus)` — a BACKWARDS transition. The
+             * server's machine allows exactly one reverse edge (`REJECTED → DRAFT`), so every
+             * other undo would answer 409: un-submitting, un-approving and un-completing are
+             * all forbidden, which is the point of an approval. While the store was
+             * browser-local the undo silently worked and the register drifted from what the
+             * machine would ever have permitted.
+             *
+             * 🔑 An undo affordance over a server-enforced state machine is a promise the
+             * machine forbids. If reversal is a real requirement it is a reverse EDGE plus an
+             * audit reason, decided on the server — not a client-side rewind. Filed. */
           }}
           onBulkAdvance={(planIds) => {
-            // Bulk advance all by one stage.
-            const next: Record<string, TreatmentStatus> =
-              { DRAFT: 'SUBMITTED', SUBMITTED: 'APPROVED', APPROVED: 'IN_PROGRESS', IN_PROGRESS: 'COMPLETED', REJECTED: 'DRAFT' };
-            const priorStates: { id: string; status: string }[] = [];
-            planIds.forEach(pid => {
-              const p = loadTreatmentPlans().find(x => x.id === pid);
-              if (!p) return;
-              const tgt = next[p.status];
-              if (!tgt) return;
-              priorStates.push({ id: pid, status: p.status });
-              transitionPlan(pid, tgt);
-              logTransition('treatment-plan', pid, p.status, tgt);
-            });
-            toast.undoable(`${planIds.length} ${t('bulkAdvancedToast')}`, () => {
-              priorStates.forEach(s => transitionPlan(s.id, s.status as TreatmentStatus));
-              toast.info(t('undoneToast'));
-            });
+            // F2-204: the FIFTH copy of the machine lived here, and its undo had the same
+            // problem as the single-card one above. Sequential on purpose — each transition is
+            // a server decision and a partial failure must be reported, not swallowed.
+            void (async () => {
+              let moved = 0;
+              for (const pid of planIds) {
+                const plan = loadTreatmentPlans().find(x => x.id === pid);
+                const tgt = plan && nextTreatmentStatuses(plan.status)[0];
+                if (!plan || !tgt) continue;
+                try {
+                  await transitionPlan(pid, tgt);
+                  logTransition('treatment-plan', pid, plan.status, tgt);
+                  moved += 1;
+                } catch (e) {
+                  toast.danger(e instanceof ApiError ? e.message
+                    : (lang === 'ar' ? 'تعذّر الحفظ' : 'Could not save'));
+                  break;
+                }
+              }
+              if (moved > 0) toast.success(`${moved} ${t('bulkAdvancedToast')}`);
+            })();
           }}
           onCardHistory={(planId) => setHistoryFor(planId)}
           onCardClick={(planId) => {
@@ -226,27 +258,24 @@ export function RiskLifecyclePage() {
           toast.success(t('rlcResolvedToast'));
         }} />
       <TreatmentCard riskId={riskId} plans={plans}
-        onCreate={() => {
-          const id = `TP-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-          saveTreatmentPlan({
-            id, riskId, strategy: 'MITIGATE',
-            rationaleEn: 'New treatment plan — fill in details before submission.',
-            rationaleAr: 'خطة معالجة جديدة — أكمل التفاصيل قبل التقديم.',
-            status: 'DRAFT', costSarK: 0,
-            costBenefitEn: '', costBenefitAr: '',
-            actions: [],
-            createdAt: new Date().toISOString(),
-          });
-          toast.info(t('rlcTreatmentCreatedToast'));
-        }}
-        onSubmit={(p) => { transitionPlan(p.id, 'SUBMITTED'); toast.info(t('rlcSubmittedToast')); }}
-        onApprove={(p) => { transitionPlan(p.id, 'APPROVED', 'Mohammed Al-Mahmoud (CRO)'); toast.success(t('rlcApprovedToast')); }}
-        onReject={(p) => { transitionPlan(p.id, 'REJECTED', undefined, 'Insufficient cost-benefit justification'); toast.danger(t('rlcRejectedToast')); }}
-        onProgress={(p) => { transitionPlan(p.id, 'IN_PROGRESS'); }}
-        onActionUpdate={(planId, actionId, status) => {
-          updateActionStatus(planId, actionId, status);
-          toast.success(t('rlcActionUpdatedToast'));
-        }} />
+        /* F2-204: the server mints the reference — this minted `TP-<year>-<4 chars>` itself. */
+        onCreate={() => void runPlan(
+          () => createTreatmentPlan(riskId, 'MITIGATE',
+            'New treatment plan — fill in details before submission.',
+            'خطة معالجة جديدة — أكمل التفاصيل قبل التقديم.', 0),
+          t('rlcTreatmentCreatedToast'))}
+        onSubmit={(p) => void runPlan(() => transitionPlan(p.id, 'SUBMITTED'), t('rlcSubmittedToast'))}
+        /* No approver argument: `TreatmentPlanService` stamps the authenticated principal. This
+           passed `'Mohammed Al-Mahmoud (CRO)'` and displayed it as the approving officer. */
+        onApprove={(p) => void runPlan(() => transitionPlan(p.id, 'APPROVED'), t('rlcApprovedToast'))}
+        /* ⚠⚠ And no reason literal. It passed `'Insufficient cost-benefit justification'` — the
+           page inventing the SUBSTANCE of a governance decision, not just its author — and the
+           server PERSISTS `rejectedReason`, so wiring this without removing it would have
+           written invented text into the column as a real officer's stated rationale. There is
+           no input for a reason on this card; filed rather than defaulted. */
+        onReject={(p) => void runPlan(() => transitionPlan(p.id, 'REJECTED'), t('rlcRejectedToast'))}
+        onProgress={(p) => void runPlan(() => transitionPlan(p.id, 'IN_PROGRESS'),
+                                        treatmentStatusLabel('IN_PROGRESS', lang))} />
       <AcceptanceCard riskId={riskId} risk={risk} accepts={accepts}
         onCreate={() => {
           const id = `ACC-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -460,295 +489,6 @@ function KriBreachCard({ riskId: _riskId, breaches, onFire, onEscalate, onResolv
             ))
         }
       </Card>
-    </div>
-  );
-}
-
-// ─── Treatment card ─────────────────────────────────────────────────────────
-
-function TreatmentCard({ riskId: _riskId, plans, onCreate, onSubmit, onApprove, onReject, onProgress, onActionUpdate }: {
-  riskId: number;
-  plans: TreatmentPlan[];
-  onCreate: () => void;
-  onSubmit: (p: TreatmentPlan) => void;
-  onApprove: (p: TreatmentPlan) => void;
-  onReject: (p: TreatmentPlan) => void;
-  onProgress: (p: TreatmentPlan) => void;
-  onActionUpdate: (planId: string, actionId: string, status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED') => void;
-}) {
-  const { t, lang } = useI18n();
-  return (
-    <div className="rlc-section">
-      <Card title={t('rlcTreatTitle')} Icon={ShieldCheck}
-        action={<Button size="sm" variant="secondary" onClick={onCreate}>{t('rlcCreatePlan')}</Button>}>
-        <div className="rlc-card-intro">
-          {t('rlcTreatSub')}
-        </div>
-        {plans.length === 0
-          ? <InlineEmpty>{t('rlcTreatEmpty')}</InlineEmpty>
-          : plans.map(p => {
-              const completedActions = p.actions.filter(a => a.status === 'COMPLETED').length;
-              const totalReduction = p.actions.filter(a => a.status === 'COMPLETED').reduce((acc, a) => acc + a.expectedRiskReduction, 0);
-              return (
-                <div key={p.id} className="rlc-plan-card">
-                  <div className="rlc-plan-card__head">
-                    <div className="rlc-plan-card__main">
-                      <div className="rlc-plan-card__chips">
-                        <span className="mono rlc-plan-card__id">{p.id}</span>
-                        <Badge tone={TREATMENT_STATUS_TONE[p.status]}>{TREATMENT_STATUS_LABEL[p.status][lang]}</Badge>
-                        <Badge tone="info">{STRATEGY_LABEL[p.strategy][lang]}</Badge>
-                        {p.costSarK > 0 && <Badge tone="primary">{p.costSarK.toLocaleString()}k SAR</Badge>}
-                      </div>
-                      <div className="rlc-plan-card__rationale">
-                        {lang === 'ar' ? p.rationaleAr : p.rationaleEn}
-                      </div>
-                      {p.costBenefitEn && (
-                        <div className="rlc-plan-card__cb">
-                          {lang === 'ar' ? p.costBenefitAr : p.costBenefitEn}
-                        </div>
-                      )}
-                      {p.approvedBy && (
-                        <div className="rlc-plan-card__approval">
-                          {t('rlcApprovedBy')}: {p.approvedBy}
-                        </div>
-                      )}
-                    </div>
-                    <div className="rlc-plan-card__actions">
-                      {p.status === 'DRAFT' && <Button size="sm" variant="primary" Icon={Send} onClick={() => onSubmit(p)}>{t('rlcSubmit')}</Button>}
-                      {p.status === 'SUBMITTED' && (
-                        <>
-                          <Button size="sm" variant="primary" Icon={ThumbsUp} onClick={() => onApprove(p)}>{t('rlcApprove')}</Button>
-                          <Button size="sm" variant="ghost" Icon={ThumbsDown} onClick={() => onReject(p)}>{t('rlcReject')}</Button>
-                        </>
-                      )}
-                      {p.status === 'APPROVED' && <Button size="sm" variant="primary" onClick={() => onProgress(p)}>{t('rlcStartWork')}</Button>}
-                    </div>
-                  </div>
-                  {/* Progress bar */}
-                  {p.actions.length > 0 && (
-                    <div className="rlc-progress-wrap">
-                      <div className="rlc-progress-head">
-                        <span>{t('rlcActions')} {completedActions}/{p.actions.length}</span>
-                        <span>{t('rlcExpectedReduction')}: {(totalReduction * 100).toFixed(0)}%</span>
-                      </div>
-                      <div className="rlc-progress-track">
-                        <div className="rlc-progress-fill" style={{ width: `${(completedActions / p.actions.length) * 100}%` }} />
-                      </div>
-                    </div>
-                  )}
-                  {/* Actions */}
-                  {p.actions.length > 0 && (
-                    <div className="rlc-action-list">
-                      {p.actions.map(a => (
-                        <div key={a.id} className="rlc-action-row">
-                          <div>
-                            <div className="rlc-action-title">{lang === 'ar' ? a.titleAr : a.titleEn}</div>
-                            <div className="rlc-action-meta">
-                              {a.ownerRole} · {t('rlcDue')} {a.targetDate} · −{(a.expectedRiskReduction * 100).toFixed(0)}%
-                            </div>
-                          </div>
-                          <Badge tone={a.status === 'COMPLETED' ? 'success' : a.status === 'IN_PROGRESS' ? 'info' : a.status === 'BLOCKED' ? 'danger' : 'neutral'}>
-                            {a.status}
-                          </Badge>
-                          {a.status !== 'COMPLETED' && (
-                            <Button size="sm" variant="ghost" onClick={() => onActionUpdate(p.id, a.id, 'COMPLETED')}>{t('rlcMarkDone')}</Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })
-        }
-      </Card>
-    </div>
-  );
-}
-
-// ─── Acceptance card ────────────────────────────────────────────────────────
-
-function AcceptanceCard({ riskId: _riskId, risk: _risk, accepts, onCreate, onSubmitToCro, onPromoteToBoard, onApprove }: {
-  riskId: number;
-  risk: any;
-  accepts: AcceptanceRequest[];
-  onCreate: () => void;
-  onSubmitToCro: (a: AcceptanceRequest) => void;
-  onPromoteToBoard: (a: AcceptanceRequest) => void;
-  onApprove: (a: AcceptanceRequest) => void;
-}) {
-  const { t, lang } = useI18n();
-  return (
-    <div className="rlc-section">
-      <Card title={t('rlcAcceptTitle')} Icon={GitBranch}
-        action={<Button size="sm" variant="secondary" onClick={onCreate}>{t('rlcCreateAcceptance')}</Button>}>
-        <div className="rlc-card-intro">
-          {t('rlcAcceptSub')}
-        </div>
-        {accepts.length === 0
-          ? <InlineEmpty>{t('rlcAcceptEmpty')}</InlineEmpty>
-          : accepts.map(a => (
-              <div key={a.id} className="rlc-accept-card">
-                <div className="rlc-accept-card__head">
-                  <div className="rlc-accept-card__main">
-                    <div className="rlc-accept-card__chips">
-                      <span className="mono rlc-plan-card__id">{a.id}</span>
-                      <Badge tone={ACCEPTANCE_STATUS_TONE[a.status]}>{ACCEPTANCE_STATUS_LABEL[a.status][lang]}</Badge>
-                      <Badge tone="warning">{t('rlcResidual')}: {a.residualScore}</Badge>
-                      <Badge tone="info">{t('rlcAppetite')}: ≤ {a.appetiteUpper}</Badge>
-                    </div>
-                    <div className="rlc-accept-card__rationale">
-                      {lang === 'ar' ? a.rationaleAr : a.rationaleEn}
-                    </div>
-                    <div className="rlc-accept-card__expiry">
-                      {t('rlcExpiresAt')}: <span className="mono">{a.expiresAt}</span>
-                      {a.expiresAtHijri && <> · <span className="mono">{a.expiresAtHijri}</span></>}
-                    </div>
-                  </div>
-                  <div className="rlc-accept-card__actions">
-                    {a.status === 'DRAFT' && <Button size="sm" variant="primary" Icon={Send} onClick={() => onSubmitToCro(a)}>{t('rlcSendToCro')}</Button>}
-                    {a.status === 'CRO_REVIEW' && <Button size="sm" variant="primary" onClick={() => onPromoteToBoard(a)}>{t('rlcPromoteBoard')}</Button>}
-                    {a.status === 'BOARD_APPROVAL' && <Button size="sm" variant="primary" Icon={ThumbsUp} onClick={() => onApprove(a)}>{t('rlcBoardSign')}</Button>}
-                  </div>
-                </div>
-                {/* Signatures */}
-                <div className="rlc-signatures">
-                  <div>
-                    <div className="rlc-signature-label">{t('rlcCroSignoff')}</div>
-                    {a.croSignedBy
-                      ? <div><b>{a.croSignedBy}</b><div className="mono rlc-signature-date">{a.croSignedAt?.slice(0, 10)}</div></div>
-                      : <span className="rlc-signature-pending">{t('rlcPending')}</span>}
-                  </div>
-                  <div>
-                    <div className="rlc-signature-label">{t('rlcBoardSignoff')}</div>
-                    {a.boardSignedBy
-                      ? <div><b>{a.boardSignedBy}</b><div className="mono rlc-signature-date">{a.boardSignedAt?.slice(0, 10)}</div></div>
-                      : <span className="rlc-signature-pending">{t('rlcPending')}</span>}
-                  </div>
-                </div>
-              </div>
-            ))
-        }
-      </Card>
-    </div>
-  );
-}
-
-// ─── Control linkage card ──────────────────────────────────────────────────
-
-function ControlLinkageCard({ controls }: { controls: ReturnType<typeof controlsForRisk> }) {
-  const { t, lang } = useI18n();
-  return (
-    <div className="rlc-section">
-      <Card title={t('rlcControlsTitle')} Icon={ShieldCheck}>
-        <div className="rlc-card-intro">
-          {t('rlcControlsSub')}
-        </div>
-        {controls.length === 0
-          ? <InlineEmpty>{t('rlcControlsEmpty')}</InlineEmpty>
-          : (
-            <table className="tbl rlc-table-full">
-              <thead>
-                <tr>
-                  <th>{t('rlcControlCode')}</th>
-                  <th>{t('rlcControlTitle')}</th>
-                  <th>{t('rlcControlFw')}</th>
-                  <th>{t('rlcControlMaturity')}</th>
-                  <th>{t('rlcControlCcm')}</th>
-                  <th>{t('rlcControlEvidence')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {controls.map(c => {
-                  const tone = c.ccmCoveragePct >= 80 ? 'success' : c.ccmCoveragePct >= 50 ? 'warning' : 'danger';
-                  return (
-                  <tr key={c.controlCode}>
-                    <td className="mono rlc-ccm-text">{c.controlCode}</td>
-                    <td>{lang === 'ar' ? c.controlTitleAr : c.controlTitleEn}</td>
-                    <td><Badge tone="info">{c.framework}</Badge></td>
-                    <td>
-                      <Badge tone={c.maturity >= 4 ? 'success' : c.maturity >= 3 ? 'info' : 'warning'}>
-                        {c.maturity}/5
-                      </Badge>
-                    </td>
-                    <td>
-                      <div className="rlc-ccm-row">
-                        <div className="rlc-ccm-track">
-                          <div className="rlc-ccm-fill" data-tone={tone} style={{ width: `${c.ccmCoveragePct}%` }} />
-                        </div>
-                        <span className="mono rlc-ccm-text">{c.ccmCoveragePct}%</span>
-                      </div>
-                    </td>
-                    <td className="mono rlc-ccm-text">{c.lastEvidenceAt ?? '—'}</td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-      </Card>
-    </div>
-  );
-}
-
-// ─── Treatment plan pipeline (interactive kanban) ──────────────────────────
-
-function RiskTreatmentPipeline({ allPlans, onAdvance, onBulkAdvance, onCardHistory, onCardClick }: {
-  allPlans: TreatmentPlan[];
-  onAdvance: (planId: string, fromStatus: string, toStatus: string | null) => void;
-  onBulkAdvance?: (planIds: string[]) => void;
-  onCardHistory?: (planId: string) => void;
-  onCardClick: (planId: string) => void;
-}) {
-  const { t } = useI18n();
-  const stages: PipelineStage[] = [
-    { code: 'DRAFT',       labelEn: 'Draft',         labelAr: 'مسوّدة',         tone: 'neutral', Icon: FileTextIcon },
-    { code: 'SUBMITTED',   labelEn: 'Submitted',     labelAr: 'مُقدَّمة',        tone: 'warning', Icon: SendIcon },
-    { code: 'APPROVED',    labelEn: 'Approved',      labelAr: 'مُعتمَدة',        tone: 'info',    Icon: ThumbsUpIcon },
-    { code: 'IN_PROGRESS', labelEn: 'In progress',    labelAr: 'قيد التنفيذ',    tone: 'primary', Icon: Play },
-    { code: 'COMPLETED',   labelEn: 'Completed',     labelAr: 'مُنجَزة',         tone: 'success', Icon: CheckCircle2Icon },
-    { code: 'REJECTED',    labelEn: 'Rejected',      labelAr: 'مرفوضة',          tone: 'danger',  Icon: ThumbsDownIcon },
-  ];
-  const cards: PipelineCard[] = allPlans.map(p => {
-    const completed = p.actions.filter(a => a.status === 'COMPLETED').length;
-    return {
-      id: p.id, status: p.status,
-      refCode: p.id,
-      titleEn: p.rationaleEn.slice(0, 80) + (p.rationaleEn.length > 80 ? '…' : ''),
-      titleAr: p.rationaleAr.slice(0, 80) + (p.rationaleAr.length > 80 ? '…' : ''),
-      subtitleEn: `Strategy: ${p.strategy} · ${p.costSarK.toLocaleString()}k SAR`,
-      subtitleAr: `الاستراتيجية: ${p.strategy} · ${p.costSarK.toLocaleString()} ألف ريال`,
-      badges: [
-        { label: `${completed}/${p.actions.length} ${t('rlcActions')}`, tone: completed === p.actions.length && p.actions.length > 0 ? 'success' : 'neutral' as const },
-      ],
-    };
-  });
-
-  return (
-    <LifecyclePipeline
-      stages={stages}
-      cards={cards}
-      introEn="Live treatment-plan pipeline across all risks. Click a card to jump to that risk; click the arrow to advance. Hold Shift+click for multi-select; click the clock icon for activity history."
-      introAr="مسار خطط المعالجة الحيّ عبر جميع المخاطر. انقر على بطاقة للانتقال إلى تلك المخاطرة، وانقر السهم لتقدّم الخطة. اضغط Shift+نقر للتحديد المتعدّد؛ انقر أيقونة الساعة للسجل."
-      onAdvance={onAdvance}
-      onCardClick={onCardClick}
-      onBulkAdvance={onBulkAdvance}
-      onCardHistory={onCardHistory}
-      emptyEn="No treatment plans yet."
-      emptyAr="لا خطط معالجة بعد."
-    />
-  );
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
-function Stat({ label, value, unit, tone }: { label: string; value: string; unit?: string; tone: 'primary' | 'warning' | 'danger' | 'info' }) {
-  return (
-    <div className="rlc-stat-tile" data-tone={tone}>
-      <div className="rlc-stat-tile__label">{label}</div>
-      <div className="mono rlc-stat-tile__value">
-        {value}{unit && <span className="rlc-stat-tile__unit">{unit}</span>}
-      </div>
     </div>
   );
 }

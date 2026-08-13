@@ -177,9 +177,27 @@ class LifecycleStoreBackingContractTest {
                 .as("unknown lifecycle-store state '%s' on %s — add it here in the same commit "
                     + "that adds it to LifecycleStoreState, or the vocabularies drift",
                     st.state(), st.id())
-                .isIn("SERVER_BACKED", "BROWSER_LOCAL", "SERVER_READ_LOCAL_WRITE");
-            assertThat(st.endpoint()).startsWith("/api/");
-            assertThat(st.table()).matches("[a-z_]+\\.[a-z_]+");
+                .isIn("SERVER_BACKED", "BROWSER_LOCAL", "SERVER_READ_LOCAL_WRITE",
+                      "NO_SERVER_SURFACE", "PARTIALLY_SERVER_BACKED");
+            // ⚠⚠ F2-204: a blank endpoint is now legal, and ONLY for NO_SERVER_SURFACE.
+            // That is not a loosening — it is the difference between "names a path nothing
+            // serves" (still a hard zero below) and "makes no claim, because nothing serves
+            // this table at all". Conflating them is what let F2-202's registry declare 6
+            // corpora when the modules own 16: every corpus without an endpoint was simply
+            // left out, and a registry that omits what it cannot resolve reads exactly like a
+            // complete one.
+            if (st.endpoint().isEmpty()) {
+                assertThat(st.state())
+                    .as("%s declares no endpoint, so it must declare NO_SERVER_SURFACE — a "
+                        + "blank path on any other state hides a wireable store", st.id())
+                    .isEqualTo("NO_SERVER_SURFACE");
+            } else {
+                assertThat(st.endpoint()).startsWith("/api/");
+            }
+            // One store legitimately has no table: `cyber-filings` has no register anywhere.
+            if (!st.table().isEmpty()) {
+                assertThat(st.table()).matches("[a-z_]+\\.[a-z_]+");
+            }
         });
     }
 
@@ -192,6 +210,10 @@ class LifecycleStoreBackingContractTest {
 
         Map<String, String> unresolved = new LinkedHashMap<>();
         for (Store st : parseStores()) {
+            // A NO_SERVER_SURFACE store makes no endpoint claim; the leg below checks the
+            // stronger property instead — that no entity even maps to its table, so no
+            // controller could serve it.
+            if (st.endpoint().isEmpty()) continue;
             if (!isServed(st.endpoint(), bases)) unresolved.put(st.id(), st.endpoint());
         }
         assertThat(unresolved)
@@ -206,6 +228,43 @@ class LifecycleStoreBackingContractTest {
                 Resolve the path from the controller's @RequestMapping, never from the schema the
                 table lives in — inferring it from the schema got three of eight wrong when this
                 registry was first written.""")
+            .isEmpty();
+    }
+
+    @Test
+    @DisplayName("a NO_SERVER_SURFACE store's table really has no entity mapped to it")
+    void noServerSurfaceStoresReallyHaveNone() throws IOException {
+        // 🔑 "Nothing serves this table" is the least-verified kind of statement a registry
+        // can carry — F2-188's lesson that a named-map gate proves a reason EXISTS and nothing
+        // proves it is TRUE. So it is verified structurally: a controller cannot serve a table
+        // that no @Entity maps to, and @Table(schema=…, name=…) is resolvable from source.
+        //
+        // It also fails in the useful direction. If somebody builds the entity, service and
+        // controller for `bcm_lc.drills`, this leg fires and says the store is now wireable —
+        // which is exactly the signal a slice planning that work needs.
+        Set<String> mapped = new LinkedHashSet<>();
+        try (Stream<Path> walk = Files.walk(Path.of("src", "main", "java"))) {
+            for (Path f : walk.filter(x -> x.toString().endsWith(".java")).toList()) {
+                Matcher m = Pattern.compile(
+                    "@Table\\(\\s*schema\\s*=\\s*\"([a-z_]+)\"\\s*,\\s*name\\s*=\\s*\"([a-z_]+)\"")
+                    .matcher(Files.readString(f));
+                while (m.find()) mapped.add(m.group(1) + "." + m.group(2));
+            }
+        }
+        assertThat(mapped).as("scanned no @Table mappings — the scan has rotted")
+            .hasSizeGreaterThan(100);
+
+        Map<String, String> nowMapped = new LinkedHashMap<>();
+        for (Store st : parseStores()) {
+            if (!"NO_SERVER_SURFACE".equals(st.state()) || st.table().isEmpty()) continue;
+            if (mapped.contains(st.table())) nowMapped.put(st.id(), st.table());
+        }
+        assertThat(nowMapped)
+            .as("A store declares NO_SERVER_SURFACE, but an @Entity maps to its table — so a "
+                + "controller could serve it, and the declaration understates what is possible. "
+                + "Either the entity is new (in which case this store is now wireable: change "
+                + "the state, name the endpoint, and everyDeclaredEndpointIsServed will resolve "
+                + "it), or the claim was wrong when it was written.")
             .isEmpty();
     }
 

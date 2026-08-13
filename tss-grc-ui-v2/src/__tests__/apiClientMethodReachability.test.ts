@@ -99,7 +99,10 @@ const KNOWN_DARK: readonly string[] = [
   'lib/api.ts#riskReportApi.topRisks',
   'lib/api.ts#riskReviewApi.overdue',
   'lib/api.ts#riskReviewApi.runSweep',
-  'lib/api.ts#treatmentPlanApi.listForRisk',     // HOLE: the plan the F2-164 close gate reads has no register view
+  // F2-204: `treatmentPlanApi.listForRisk` is deleted. Its recorded reason was wrong about
+  // WHY it was dark: the plan register did have a view — `RiskLifecyclePage` — which was
+  // reading a localStorage copy of the same 10 rows. Wiring that page made `listForOrg` the
+  // one live reader and this method a duplicate, which F2-165's sibling-endpoint leg refused.
   'lib/buyerGap.ts#ermGap.attest',               // HOLE: risk attestation cannot be recorded — yet its overdue SWEEP is wired
   'lib/buyerGap.ts#ermGap.linkRiskControl',      // HOLE: no screen links a control to a risk
   'lib/buyerGap.ts#ermGap.listAttestations',     // HOLE: as above

@@ -18,6 +18,7 @@
 //   5. Risk-control linkage — which controls mitigate this risk, what their
 //      CCM coverage is, and what evidence was last collected.
 
+import { ApiError, treatmentPlanApi, TREATMENT_ALLOWED, type TreatmentPlanDto } from './api';
 import { MOCK_RISKS } from '../pages/risk/mockRisks';
 import type { RiskResponse } from './api';
 // F2-202: the `platformPersistence` import that used to sit here is gone with the file.
@@ -56,7 +57,23 @@ export interface TreatmentPlan {
   /** Bilingual cost-benefit summary. */
   costBenefitEn: string;
   costBenefitAr: string;
-  actions: TreatmentAction[];
+  /**
+   * ⚠⚠ F2-204 CORRECTION. The server DOES send these — `TreatmentPlanDto` declares
+   * `List<TreatmentActionDto> actions` and maps all 10 `risk_lc.treatment_actions` rows on every
+   * read. An earlier draft of this comment said the opposite, because I read the FRONTEND
+   * `TreatmentPlanDto` interface in `lib/api.ts`, which had simply never declared the field
+   * (F2-198's `crossBorderTransfer` shape). The backend half of the lifecycle-store gate refuted
+   * it by finding the `TreatmentAction` @Entity. 🔑 One file short is the whole error.
+   *
+   * What is genuinely missing is the WRITE: `TreatmentPlanController` has no actions
+   * sub-resource, so no client can change an action's status. `addPlanAction` and
+   * `updateActionStatus` are deleted for that reason and the "Mark done" control is gone —
+   * an update that reports success and writes nothing is F2-201's defect. The list itself is
+   * real and read-only. Filed: build the sub-resource.
+   *
+   * Optional because a plan created in the same session has none until it is re-read.
+   */
+  actions?: TreatmentAction[];
   createdAt: string;
   submittedAt?: string;
   approvedBy?: string;
@@ -156,7 +173,6 @@ export interface ControlLinkage {
 
 // ─── Storage keys ───────────────────────────────────────────────────────────
 
-const TREATMENT_KEY = 'grc.risk.treatment.v1';
 const KRI_BREACH_KEY = 'grc.risk.kribreach.v1';
 const ACCEPT_KEY = 'grc.risk.accept.v1';
 const EVENT = 'grc.risk.lifecycle.changed';
@@ -195,92 +211,158 @@ export function controlsForRisk(riskId: number): ControlLinkage[] {
   return linkages;
 }
 
-// ─── Persistence: treatment plans ────────────────────────────────────────────
+// ─── Persistence: treatment plans — SERVER-BACKED (F2-204) ───────────────────
+//
+// This half of the module used to read `grc.risk.treatment.v1` and fall back to
+// `SEED_TREATMENT_PLANS`, while `risk_lc.treatment_plans` held **10 live rows in dev and
+// prod** behind a complete, hardened controller: GET, GET /{id}, POST, POST /{id}/transition
+// and DELETE, each guarded by `hasPermission('RISK', …)` under `@RequireModule("RISK")`, with
+// a `Map<String, Set<String>> ALLOWED` machine answering 409 outside it. Same inverse shape
+// as F2-201 and F2-203: a finished server-side control with no client.
+//
+// ⚠⚠ `transitionPlan` is an APPROVAL. `DRAFT → SUBMITTED → APPROVED/REJECTED → IN_PROGRESS
+// → COMPLETED` is the ERM sign-off on how a risk will be treated, and every decision taken on
+// that screen was written to localStorage and nowhere else.
+//
+// ⚠⚠ And the page invented the SUBSTANCE of the decision, not just the identity: it passed
+// `'Mohammed Al-Mahmoud (CRO)'` as the approving Chief Risk Officer **and**
+// `'Insufficient cost-benefit justification'` as the rejection reason. The server persists
+// `rejectedReason`, so wiring this naively would have written invented text into
+// `risk_lc.treatment_plans.rejected_reason` as a real officer's stated rationale. Both are
+// gone: the server stamps the approver from the authenticated principal (F2-22b(vi)), and a
+// rejection reason now comes from the rejecting officer or not at all.
+//
+// ⚙ `actions` is DELETED from `TreatmentPlan`. `TreatmentPlanDto` has no such field, there is
+// no actions sub-resource on the controller, and `risk_lc.treatment_actions` holds **10 rows
+// no endpoint serves**. Reconstructing them client-side would be F2-196's defect and keeping
+// the editor would be F2-201's — an update that reports success and writes nothing. The page
+// discloses that action tracking has no server surface; the 10 rows are filed.
+
+/** Server rows, cached. Empty until {@link hydrateTreatmentPlans} resolves. */
+let _plans: TreatmentPlan[] = [];
+let _plansHydrated = false;
+let _plansLoadFailed = false;
+let _plansPromise: Promise<void> | null = null;
+
+function fromDto(d: TreatmentPlanDto): TreatmentPlan {
+  return {
+    id: d.id,
+    riskId: d.riskId,
+    strategy: d.strategy as TreatmentStrategy,
+    rationaleEn: d.rationaleEn,
+    rationaleAr: d.rationaleAr,
+    status: d.status as TreatmentStatus,
+    costSarK: d.costSarK,
+    costBenefitEn: d.costBenefitEn ?? '',
+    costBenefitAr: d.costBenefitAr ?? '',
+    createdAt: d.createdAt ?? '',
+    submittedAt: d.submittedAt ?? undefined,
+    approvedBy: d.approvedBy ?? undefined,
+    approvedAt: d.approvedAt ?? undefined,
+    rejectedReason: d.rejectedReason ?? undefined,
+    // F2-204: real server rows, and the reason this mapping exists at all — see the note on
+    // TreatmentPlan.actions for the claim it corrects.
+    actions: (d.actions ?? []).map(a => ({
+      id: a.id,
+      titleEn: a.titleEn,
+      titleAr: a.titleAr,
+      ownerRole: a.ownerRole,
+      targetDate: a.targetDate,
+      status: a.status as TreatmentAction['status'],
+      expectedRiskReduction: a.expectedRiskReduction,
+      completedAt: a.completedAt ?? undefined,
+      evidenceRef: a.evidenceRef ?? undefined,
+    })),
+  };
+}
+
+/**
+ * Fetch the treatment-plan register. Safe to call repeatedly unless `force`.
+ *
+ * There is no seed fallback: an empty register reads as empty and an unreachable one reads as
+ * a failure. The old `catch → SEED_TREATMENT_PLANS` collapsed those two facts into one
+ * plausible screen, which is the F2-158 shape.
+ */
+export function hydrateTreatmentPlans(force = false): Promise<void> {
+  if (_plansPromise && !force) return _plansPromise;
+  _plansLoadFailed = false;
+  _plansPromise = treatmentPlanApi.listForOrg()
+    .then(rows => { _plans = rows.map(fromDto); _plansHydrated = true; emit(); })
+    .catch(e => {
+      if (!(e instanceof ApiError) || e.status !== 403) _plansLoadFailed = true;
+      console.warn('[riskLifecycle] treatment-plan fetch failed:', e);
+      _plansHydrated = true;
+      emit();
+    });
+  return _plansPromise;
+}
+
+export function areTreatmentPlansHydrated(): boolean { return _plansHydrated; }
+export function treatmentPlansLoadFailed(): boolean { return _plansLoadFailed; }
 
 export function loadTreatmentPlans(): TreatmentPlan[] {
-  if (typeof window === 'undefined') return SEED_TREATMENT_PLANS;
-  try {
-    const raw = window.localStorage.getItem(TREATMENT_KEY);
-    if (!raw) return SEED_TREATMENT_PLANS;
-    return JSON.parse(raw) as TreatmentPlan[];
-  } catch { return SEED_TREATMENT_PLANS; }
+  return _plans;
 }
 
 export function plansForRisk(riskId: number): TreatmentPlan[] {
-  return loadTreatmentPlans().filter(p => p.riskId === riskId);
+  return _plans.filter(p => p.riskId === riskId);
 }
 
-export function saveTreatmentPlan(plan: TreatmentPlan): TreatmentPlan {
-  const existing = loadTreatmentPlans();
-  const next = [...existing.filter(p => p.id !== plan.id), plan];
-  try { window.localStorage.setItem(TREATMENT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  // F2-202: no REST mirror here. `mirrorSaveToBackend`/`mirrorTransitionToBackend`
-  // used to be called on this line; both returned before sending anything because the
-  // persistence-mode switch they read had no setter in the product. This store is
-  // declared BROWSER_LOCAL in `lib/lifecycleStores.ts` with its real endpoint and
-  // measured row count — that declaration is gated; a silent no-op was not.
+/** The legal next states, empty for terminal AND for a status the machine does not declare. */
+export function nextTreatmentStatuses(status: string): readonly TreatmentStatus[] {
+  return (TREATMENT_ALLOWED[status] ?? []) as readonly TreatmentStatus[];
+}
+
+export function isTreatmentStatusManaged(status: string): boolean {
+  return Object.prototype.hasOwnProperty.call(TREATMENT_ALLOWED, status);
+}
+
+/** Derived from the machine, never typed twice (F2-196). */
+export const TREATMENT_TERMINAL: readonly string[] =
+  Object.keys(TREATMENT_ALLOWED).filter(k => TREATMENT_ALLOWED[k].length === 0);
+
+/** A label for any status, including one this build has never heard of. */
+export function treatmentStatusLabel(status: string, lang: 'en' | 'ar'): string {
+  const e = TREATMENT_STATUS_LABEL[status as TreatmentStatus];
+  return e ? e[lang] : status;
+}
+
+/**
+ * Raise a treatment plan. The SERVER mints the reference.
+ *
+ * F2-204: this used to mint `TP-<year>-<n>` from the length of the local cache — which
+ * included seeded plans, so the first real plan on a fresh tenant would have been TP-…-004.
+ * Only the server may issue a reference (F2-172).
+ */
+export async function createTreatmentPlan(
+  riskId: number, strategy: TreatmentStrategy,
+  rationaleEn: string, rationaleAr: string, costSarK: number,
+): Promise<TreatmentPlan> {
+  const saved = fromDto(await treatmentPlanApi.create({
+    riskId, strategy, rationaleEn, rationaleAr, costSarK,
+  }));
+  _plans = [saved, ..._plans.filter(p => p.id !== saved.id)];
   emit();
-  return plan;
+  return saved;
 }
 
-export function deleteTreatmentPlan(id: string): void {
-  const next = loadTreatmentPlans().filter(p => p.id !== id);
-  try { window.localStorage.setItem(TREATMENT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  // F2-202: no REST mirror here — see `lib/lifecycleStores.ts`.
+/**
+ * Decide on a plan. The row comes back FROM THE SERVER.
+ *
+ * F2-204: no `by` parameter — the approver is the authenticated principal, stamped by
+ * `TreatmentPlanService` (F2-22b(vi)). `reason` is the rejecting officer's own words and the
+ * caller must not default it. The status is never computed here; the cache is replaced with
+ * whatever the server returned, so a transition the machine refuses cannot appear to succeed.
+ */
+export async function transitionPlan(
+  id: string, status: TreatmentStatus, reason?: string,
+): Promise<TreatmentPlan> {
+  const saved = fromDto(await treatmentPlanApi.transition(id, {
+    status, rejectedReason: status === 'REJECTED' ? reason : undefined,
+  }));
+  _plans = _plans.map(p => p.id === id ? saved : p);
   emit();
-}
-
-export function createTreatmentPlan(riskId: number, strategy: TreatmentStrategy, rationaleEn: string, rationaleAr: string, costSarK: number): TreatmentPlan {
-  const id = `TP-${new Date().getFullYear()}-${String(loadTreatmentPlans().length + 1).padStart(3, '0')}`;
-  const plan: TreatmentPlan = {
-    id, riskId, strategy,
-    rationaleEn, rationaleAr,
-    status: 'DRAFT', costSarK,
-    costBenefitEn: '', costBenefitAr: '',
-    actions: [],
-    createdAt: new Date().toISOString(),
-  };
-  return saveTreatmentPlan(plan);
-}
-
-export function addPlanAction(planId: string, titleEn: string, titleAr: string, ownerRole: string, targetDate: string, expectedRiskReduction: number): TreatmentPlan | null {
-  const p = loadTreatmentPlans().find(x => x.id === planId);
-  if (!p) return null;
-  const newAction: TreatmentAction = {
-    id: `TA-${Date.now().toString(36).slice(-4)}`,
-    titleEn, titleAr, ownerRole, targetDate,
-    status: 'PENDING', expectedRiskReduction,
-  };
-  return saveTreatmentPlan({ ...p, actions: [...p.actions, newAction] });
-}
-
-export function transitionPlan(id: string, status: TreatmentStatus, by?: string, reason?: string): TreatmentPlan | null {
-  const plan = loadTreatmentPlans().find(p => p.id === id);
-  if (!plan) return null;
-  const updated: TreatmentPlan = { ...plan, status };
-  const now = new Date().toISOString();
-  if (status === 'SUBMITTED') updated.submittedAt = now;
-  if (status === 'APPROVED') { updated.approvedBy = by; updated.approvedAt = now; }
-  if (status === 'REJECTED') { updated.rejectedReason = reason; }
-  // F2-202: no REST mirror here — see `lib/lifecycleStores.ts`.
-  return saveTreatmentPlan(updated);
-}
-
-export function updateActionStatus(planId: string, actionId: string, status: TreatmentAction['status'], evidenceRef?: string): TreatmentPlan | null {
-  const plan = loadTreatmentPlans().find(p => p.id === planId);
-  if (!plan) return null;
-  const updated: TreatmentPlan = {
-    ...plan,
-    actions: plan.actions.map(a =>
-      a.id === actionId
-        ? { ...a, status, evidenceRef: evidenceRef ?? a.evidenceRef, completedAt: status === 'COMPLETED' ? new Date().toISOString() : a.completedAt }
-        : a,
-    ),
-  };
-  // Auto-close plan when all actions complete.
-  const allDone = updated.actions.every(a => a.status === 'COMPLETED');
-  if (allDone && updated.status === 'IN_PROGRESS') updated.status = 'COMPLETED';
-  return saveTreatmentPlan(updated);
+  return saved;
 }
 
 // ─── Persistence: KRI breach events ─────────────────────────────────────────
@@ -389,7 +471,10 @@ export function subscribeRiskLifecycle(cb: () => void): () => void {
   const handler = () => cb();
   window.addEventListener(EVENT, handler);
   const storage = (e: StorageEvent) => {
-    if (e.key === TREATMENT_KEY || e.key === KRI_BREACH_KEY || e.key === ACCEPT_KEY) cb();
+    // F2-204: TREATMENT_KEY is gone — treatment plans are server-backed, so a cross-tab
+    // localStorage event can no longer signal a change to them. The two remaining keys are the
+    // NO_SERVER_SURFACE stores (KRI breaches, risk acceptances), declared in lib/lifecycleStores.
+    if (e.key === KRI_BREACH_KEY || e.key === ACCEPT_KEY) cb();
   };
   window.addEventListener('storage', storage);
   return () => {
@@ -456,30 +541,10 @@ export function runMonteCarlo(input: MonteCarloInput): MonteCarloResult {
 
 const _now = Date.now();
 const _daysAgo = (n: number) => new Date(_now - n * 86_400_000).toISOString();
-const _daysAhead = (n: number) => new Date(_now + n * 86_400_000).toISOString().slice(0, 10);
 
-const SEED_TREATMENT_PLANS: TreatmentPlan[] = [
-  {
-    id: 'TP-2026-001',
-    riskId: MOCK_RISKS[0]?.id ?? 1,
-    strategy: 'MITIGATE',
-    rationaleEn: 'Reduce ransomware likelihood through MFA on all privileged accounts + EDR rollout to remaining 12% of fleet.',
-    rationaleAr: 'تقليل احتمالية الفدية عبر فرض المصادقة متعدّدة العوامل على جميع الحسابات المُميَّزة ونشر EDR على 12٪ المتبقّية.',
-    status: 'IN_PROGRESS',
-    costSarK: 1_400,
-    costBenefitEn: 'SAR 1.4M one-time + SAR 280k/yr OpEx vs avoided expected loss ~SAR 8.2M (3-yr horizon).',
-    costBenefitAr: '1.4 مليون ريال لمرّة واحدة + 280 ألف ريال سنوياً مقابل خسارة متوقّعة مُتجنَّبة نحو 8.2 مليون ريال (3 سنوات).',
-    actions: [
-      { id: 'TA-001', titleEn: 'Roll out MFA to all admin accounts', titleAr: 'نشر المصادقة متعدّدة العوامل على حسابات المشرفين', ownerRole: 'CISO',  targetDate: _daysAhead(30), status: 'IN_PROGRESS', expectedRiskReduction: 0.4 },
-      { id: 'TA-002', titleEn: 'Deploy EDR to remaining 12% endpoints', titleAr: 'نشر EDR على 12٪ من النقاط المتبقّية',          ownerRole: 'IT Ops', targetDate: _daysAhead(45), status: 'IN_PROGRESS', expectedRiskReduction: 0.3 },
-      { id: 'TA-003', titleEn: 'Tabletop exercise validating playbook',  titleAr: 'تمرين طاولة لاختبار الإجراء',                       ownerRole: 'CSIRT lead', targetDate: _daysAhead(60), status: 'PENDING', expectedRiskReduction: 0.1 },
-    ],
-    createdAt: _daysAgo(20),
-    submittedAt: _daysAgo(15),
-    approvedBy: 'Sara Al-Zahrani (CISO) + Mohammed Al-Mahmoud (CRO)',
-    approvedAt: _daysAgo(12),
-  },
-];
+// F2-204: `SEED_TREATMENT_PLANS` is deleted. The register holds 10 real rows in dev and
+// prod; a tenant with none now sees none, and an unreachable server is reported as a
+// failure rather than replaced with invented plans (the F2-158 fallback shape).
 
 const SEED_BREACHES: KriBreachEvent[] = [
   {

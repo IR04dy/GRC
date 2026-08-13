@@ -5,7 +5,6 @@
 // silos — a finding in audit creates a treatment plan in risk; a critical
 // vulnerability creates a SOC alert; a PDPL breach creates an incident.
 
-import { createTreatmentPlan } from './riskLifecycle';
 import { createCapa, type Finding } from './auditLifecycle';
 import { createSocAlert, transitionVuln, type Vulnerability } from './cyberLifecycle';
 
@@ -15,21 +14,26 @@ import { createSocAlert, transitionVuln, type Vulnerability } from './cyberLifec
  * (we don't have a strong link in our model so we attach to risk id 1 by
  * default; in production this would walk the entity-anchor graph).
  */
-export function chainFindingToRiskAndCapa(finding: Finding): { planId: string; capaId: string } {
-  const plan = createTreatmentPlan(
-    1, // default risk id; production: derive from finding.controlCrosswalk → risk anchors
-    'MITIGATE',
-    `Audit finding ${finding.refNumber}: ${finding.titleEn}. Treatment plan auto-generated to address the root cause.`,
-    `ملاحظة تدقيق ${finding.refNumber}: ${finding.titleAr}. خطة معالجة مُولَّدة تلقائياً لمعالجة السبب الجذري.`,
-    finding.severity === 'CRITICAL' ? 500 : 200,
-  );
+export function chainFindingToRiskAndCapa(finding: Finding): { capaId: string } {
+  // ⚠⚠ F2-204: the treatment-plan half is REMOVED, and wiring the store is exactly why.
+  //
+  // It called `createTreatmentPlan(1, …)` — a hard-coded risk id, with the comment
+  // "production: derive from finding.controlCrosswalk → risk anchors" standing in for the
+  // derivation. While the store was browser-local that produced a wrong linkage in
+  // localStorage. Now that `createTreatmentPlan` POSTs, it would **persist** a treatment plan
+  // against whatever risk happens to be id 1 in the tenant, attributed to an audit finding
+  // that has nothing to do with it — so wiring the store makes this call worse, not better.
+  //
+  // Deriving the right risk from a finding's control crosswalk is a product decision, not
+  // plumbing (F2-201's precedent for `chainBreachToDsr`). Filed. The CAPA half is a real
+  // server write and stays.
   const capa = createCapa(
     finding.id, 'CORRECTIVE',
     `Address finding ${finding.refNumber}: ${finding.recommendationEn || finding.titleEn}`,
     `معالجة الملاحظة ${finding.refNumber}: ${finding.recommendationAr || finding.titleAr}`,
     finding.ownerRole ?? 'Owner',
   );
-  return { planId: plan.id, capaId: capa.id };
+  return { capaId: capa.id };
 }
 
 /**

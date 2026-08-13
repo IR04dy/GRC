@@ -976,6 +976,68 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   correct complement — over `SEED_DSR` in the browser, so it is evidence the correct rule was **written down**,
   not that any screen showed a correct number. It is also a **fourth** DSR register shadowing a real API
   (`/api/privacy-lc/dsr-cases`), still open. Checking `loadDsr()` is what stopped that being cited as proof.
+  ⚠⚠ **A registry is only as honest as the rule that decided its membership, and that rule is usually
+  implicit** (F2-204, measured 2026-08-13). `lib/lifecycleStores.ts` — shipped one slice earlier — declared
+  **6 of the 16** browser-local corpora the four lifecycle modules own, because it admitted a corpus if it
+  happened to have a controller: a rule never stated and therefore never checked, so ten were invisible while
+  `BASELINE_BROWSER_LOCAL_STORES = 6` read as *"6 stores remain"*. Same shape as F2-198's finding about
+  `demoFallbackContract`, committed in the artefact built to replace that decoy. **The fix is a DERIVED
+  population**: the gate now reads the modules' own `grc.*.v1` localStorage keys, so membership is a
+  measurement rather than a recollection.
+  ⚠⚠ **Seven populated registers have no endpoint of any kind — 69 rows in dev AND prod.**
+  `risk_lc.kri_breaches` 12 · `bcm_lc.bia_records` 8 · `bcm_lc.recovery_strategies` 8 · `bcm_lc.drills` 5 ·
+  `cyber_lc.assets` 14 · `cyber_lc.cyber_incidents` 10 · `cyber_lc.threat_intel` 12. **Resolve this by
+  searching EVERY `@RequestMapping` path, never by looking under `module/*_lc/`** — similar objects DO have
+  controllers in other modules over DIFFERENT tables (`/api/v1/bcm/bia-assessments`,
+  `/api/v1/socops/ot-assets`, `/api/v1/cyber/threat-intel`), which is F2-196's disjoint-register shape and
+  exactly what makes *"there is no endpoint"* easy to get wrong in the reassuring direction. 🔑 **An
+  unwireable store and an unwired one are different facts**; the `NO_SERVER_SURFACE` state exists so the next
+  slice does not re-measure all of it.
+  ⚠⚠ **A decrease-only ratchet cannot express "the population was undercounted" — raising the number is
+  indistinguishable from tolerating a regression.** Declaring the real 16 would have meant 6 → 17. So no figure
+  was raised: the ratchet was **re-scoped** to *stores that have an endpoint and still do not write to it*
+  (7 → 6, honestly decreasing), the unwireable set got its own decrease-only figure, and the total is asserted
+  **exactly** so the next omission fails rather than shrinks a count. 🔑 **When a ratchet's number has to go
+  up, ask whether its QUESTION was wrong.**
+  ⚠⚠ **My own new gate refuted 2 of my 11 claims on its first run, and the live probe refuted a third.**
+  `noServerSurfaceStoresReallyHaveNone` verifies a "nothing serves this" claim **structurally** — a controller
+  cannot serve a table no `@Entity` maps to — and it fired on `socops.pentest_engagement` (served at
+  `/api/v1/socops/pentests`) and `risk_lc.treatment_actions` (a `TreatmentAction` entity exists). Same 2-in-11
+  rate F2-188 and F2-192 found in their predecessors' reasons. 🔑 **The argument for such a gate is that
+  rate, not the count it produces — expect roughly two in ten of a new instrument's own claims to fall.**
+  ⚠⚠ **F2-172(d) has a FOURTH instance and I had already written that it did not.**
+  `TreatmentPlanService.create` honoured `req.getId()`, so a client could name an ERM treatment plan's
+  reference. I had written *"the server mints it"* into the new API client on the assumption that F2-203 had
+  found the last one; only the live probe disagreed. 🔑 **An assumption that a family of defects is closed
+  is the cheapest thing to check and the easiest to skip.** Grep `req.getId() != null ?` before claiming any
+  create path mints its own reference.
+  ⚠⚠ **A page can invent the SUBSTANCE of a governance decision, not just its author — and the server may
+  persist it.** `RiskLifecyclePage` passed `'Mohammed Al-Mahmoud (CRO)'` as the approving Chief Risk Officer
+  **and** the literal `'Insufficient cost-benefit justification'` as the rejection reason. `TreatmentPlanService`
+  writes `rejectedReason` to the column, so **wiring the store naively would have written invented text into
+  `risk_lc.treatment_plans.rejected_reason` as a real officer's stated rationale.** Fourth invented officer in
+  three slices. A rejection reason comes from the rejecting officer or not at all.
+  ⚠⚠ **An undo affordance over a server-enforced state machine is a promise the machine forbids.** The
+  page's undoable toast called `transitionPlan(id, priorStatus)` — a BACKWARDS transition. `ALLOWED` has exactly
+  one reverse edge (`REJECTED → DRAFT`), so un-submitting, un-approving and un-completing each answer 409
+  (probed). While the store was browser-local the undo silently worked and the register drifted from anything
+  the machine would ever have permitted. If reversal is a requirement it is a reverse EDGE plus an audit reason,
+  decided server-side — not a client-side rewind.
+  ⚠ **One file short is the whole error, third instance.** I wrote *"TreatmentPlanDto has no actions field"*
+  into a registry note and two comments, from reading the FRONTEND interface in `lib/api.ts`. The **server's**
+  DTO declares `List<TreatmentActionDto> actions` and maps all 10 rows on every read — F2-198's
+  `crossBorderTransfer` shape, where the value is on the wire and the client type never mentioned it. Only the
+  WRITE is missing (no actions sub-resource), so the list is restored read-only and the "Mark done" control
+  stays removed.
+  ⚠ **A registry whose whole purpose is measured numbers had two of them wrong.** `risk-treatment` said 11
+  rows — 11 exist, **10 are live** (the count included a soft-deleted one); `privacy-dpia` said 6/6 and prod
+  holds **5**. The two databases are not identical everywhere, and asserting they are stops the figure being a
+  measurement. And **a register's size is not what a persona sees**: `listForOrg` is tenant-scoped, so two of my
+  probe's expectations (10 plans, 10 actions) were wrong against a correct server — the tenant sees 9 and 8.
+  ⚠ **A per-module check over a per-corpus property fails as soon as one module hosts two corpora.** The
+  existing leg asserted that a `localKey: ''` store's module writes NO keys at all — true only while every
+  module hosted exactly one declared store. Re-scoped to "every key the module writes is claimed by SOME store".
+  Same defect F2-203 fixed in its disclosure leg; it fails loudly here, which is why it was cheap.
   ⚠⚠ **A latent crash in a display path is held shut by whatever else is broken around it, so fixing one
   defect is what detonates the next** (F2-203, measured 2026-08-13). The internal-audit workspace had
   **three** `LABEL_MAP[row.status][lang]` TypeErrors, each on real rows, **none reachable**: the findings one

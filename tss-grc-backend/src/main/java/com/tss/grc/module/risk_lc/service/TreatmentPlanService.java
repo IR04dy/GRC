@@ -119,7 +119,18 @@ public class TreatmentPlanService {
     public TreatmentPlanDto create(TreatmentPlanDto req) {
         Long orgId = TenantContext.requireOrganisationId();
         TreatmentPlan p = new TreatmentPlan();
-        p.setExternalId(req.getId() != null ? req.getId() : generateExternalId(orgId));
+        // F2-204. The caller's `id` is IGNORED — the reference is minted here, always.
+        //
+        // This was `req.getId() != null ? req.getId() : generateExternalId(orgId)`, so a client
+        // could name the reference of an ERM treatment plan. That is F2-172(d)'s defect and this
+        // is its FOURTH instance, after the intake substrate, F2-202's DSR cases and F2-203's
+        // audit findings. 🔑 I had already written in the frontend client that "the server mints
+        // it" and only the live probe disagreed — the assumption was that F2-203 had found the
+        // last one, and the check that would have shown otherwise was two minutes of reading.
+        //
+        // Nothing supplies an id: the browser-local store this slice replaced minted its own and
+        // never sent it, and no test sets one. Refusing it cannot break a working caller.
+        p.setExternalId(generateExternalId(orgId));
         p.setOrganisationId(orgId);
         p.setRiskId(req.getRiskId());
         p.setStrategy(req.getStrategy());
