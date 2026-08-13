@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import {
   Stamp, Calendar, FileText, ClipboardCheck, AlertTriangle,
   CheckCircle2, Download, ThumbsUp, Send, Eye, BookOpen,
-  Wrench, Activity, AlertOctagon, GitBranch,
+  Wrench, Activity, AlertOctagon,
 } from 'lucide-react';
-import { LifecyclePipeline, type PipelineStage, type PipelineCard, dueLabel } from '../../components/lifecycle/LifecyclePipeline';
 import { printPacket, packetTextToSections } from '../../lib/packetPrint';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -23,20 +21,26 @@ import {
   loadFindings, findingsForEngagement, transitionFinding,
   loadCapas, transitionCapa,
   subscribeAuditLifecycle, aggregateAuditLifecycle,
+  auditLifecycleLoadFailed, hydrateAuditLifecycle,
   buildAcPacket, buildAcSheets,
-  pickEngagementByCode,
+  pickEngagementByCode, registerEngagementCodes,
   createFinding, createWorkingPaper,
-  PLAN_STATUS_LABEL, PLAN_STATUS_TONE,
-  WP_TYPE_LABEL, WP_STATUS_TONE,
-  SEVERITY_TONE, FINDING_STATUS_LABEL,
-  CAPA_STATUS_TONE, CAPA_STATUS_LABEL,
-  type AnnualPlan, type WorkingPaper, type Finding, type CapaTask,
-  type FindingSeverity, type WorkingPaperType,
+  nextFindingStatuses, isFindingOpen, findingStatusLabel,
+  nextPlanStatuses, isPlanStatusManaged, planStatusLabel,
+  nextWorkingPaperStatuses, isWorkingPaperStatusManaged, workingPaperStatusLabel,
+  capaStatusLabel,
+  PLAN_STATUS_TONE,
+  workingPaperTypeLabel, WP_STATUS_TONE,
+  type AnnualPlan, type WorkingPaper,
+  type WorkingPaperType, type ManagedAnnualPlanStatus, type ManagedWorkingPaperStatus,
 } from '../../lib/auditLifecycle';
 import { chainFindingToRiskAndCapa } from '../../lib/lifecycleChains';
-import { AUDIT_ENGAGEMENTS } from '../compliance/mockCompliance';
+// F2-203: `AUDIT_ENGAGEMENTS` (a demoRows() corpus for a DIFFERENT register) used to be
+// imported here as the engagement authority. The picker now offers the codes the
+// findings and working-paper registers actually reference — see registerEngagementCodes.
 import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import { useRealtimeOrgEvent } from '../../lib/useRealtimeEntity';
+import { FindingsTab, CapaTab, PacketTab, FindingsPipeline } from './AuditLifecycleTabs';
 import '../../styles/pages/audit-lifecycle.css';
 
 type AlcTab = 'pipeline' | 'plan' | 'workingpapers' | 'findings' | 'capa' | 'packet';
@@ -46,9 +50,18 @@ export function AuditLifecyclePage() {
   const toast = useToast();
 
   const [tab, setTab] = useState<AlcTab>('pipeline');
-  const [engagementCode, setEngagementCode] = useState<string>(AUDIT_ENGAGEMENTS[0]?.engagementCode ?? '');
+  const [engagementCode, setEngagementCode] = useState<string>('');
   const [_tick, setTick] = useState(0);
   useEffect(() => subscribeAuditLifecycle(() => setTick(t => t + 1)), []);
+
+  // F2-203: the selectable engagements are the ones the registers reference, so the
+  // Working papers / Findings / CAPA tabs cannot be empty for every option — which is
+  // exactly what they were, on all eight options, while 20 findings and 12 working
+  // papers sat in the tables.
+  const engagementCodes = useMemo(() => registerEngagementCodes(), [_tick]);
+  useEffect(() => {
+    if (!engagementCode && engagementCodes.length > 0) setEngagementCode(engagementCodes[0]);
+  }, [engagementCode, engagementCodes]);
 
   // Sprint 4 §2.7 — backend `audit_lc.FindingService` broadcasts on every
   // finding transition. Tick the same counter so memoised data re-derives
@@ -57,6 +70,7 @@ export function AuditLifecyclePage() {
 
   const stats = useMemo(() => aggregateAuditLifecycle(), [_tick]);
   const plan = useMemo(() => loadAnnualPlan(), [_tick]);
+  const loadFailed = useMemo(() => auditLifecycleLoadFailed(), [_tick]);
   const wps = useMemo(() => workingPapersForEngagement(engagementCode), [engagementCode, _tick]);
   const findings = useMemo(() => findingsForEngagement(engagementCode), [engagementCode, _tick]);
   const allFindings = useMemo(() => loadFindings(), [_tick]);
@@ -64,6 +78,21 @@ export function AuditLifecyclePage() {
 
   const [brand, setBrand] = useState(() => loadWhiteLabel());
   useEffect(() => subscribeWhiteLabel(() => setBrand(loadWhiteLabel())), []);
+
+  /**
+   * F2-203: every mutation on this page used to be synchronous and unconditionally
+   * followed by a success toast, over a store that wrote nothing. A write that fails
+   * must say so — and must not leave the screen showing a state the server rejected,
+   * which is why each caller re-reads from the store the handler updated.
+   */
+  async function run(work: () => Promise<unknown>, okMsg: string) {
+    try {
+      await work();
+      toast.success(okMsg);
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر الحفظ' : 'Could not save'));
+    }
+  }
 
   function downloadPacket() {
     const text = buildAcPacket(brand.organisationNameEn, brand.organisationNameAr, getQuarter());
@@ -117,6 +146,19 @@ export function AuditLifecyclePage() {
         }
       />
 
+      {loadFailed && (
+        <Card title={lang === 'ar' ? 'تعذّر تحميل سجلّات التدقيق' : 'Audit registers could not be loaded'} Icon={AlertOctagon}>
+          <div className="alc-card-sub">
+            {lang === 'ar'
+              ? 'فشل تحميل واحد أو أكثر من سجلّات التدقيق من الخادم. الأرقام أدناه غير مكتملة — أعد المحاولة قبل الاعتماد عليها.'
+              : 'One or more audit registers failed to load from the server. The figures below are incomplete — retry before relying on them.'}
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => void hydrateAuditLifecycle(true)}>
+            {lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+          </Button>
+        </Card>
+      )}
+
       <div className="kpi-grid mb-lg">
         <Kpi Icon={Stamp}             label={t('alcKpiEngs')}           value={String(stats.totalEngagements)}     tone="primary" onClick={() => setTab('plan')} />
         <Kpi Icon={ClipboardCheck}     label={t('alcKpiInFlight')}        value={String(stats.engagementsInFlight)}  tone="info" onClick={() => setTab('plan')} />
@@ -150,16 +192,16 @@ export function AuditLifecyclePage() {
         <FindingsPipeline
           allFindings={allFindings}
           onAdvance={(findingId, fromStatus) => {
-            const next: Record<string, Finding['status']> = {
-              OPEN: 'MGMT_RESPONSE',
-              MGMT_RESPONSE: 'IN_REMEDIATION',
-              IN_REMEDIATION: 'AWAITING_VERIFICATION',
-              AWAITING_VERIFICATION: 'CLOSED',
-            };
-            const target = next[fromStatus];
-            if (!target) return;
-            transitionFinding(findingId, target);
-            toast.success(t('lpcAdvancedToast'));
+            // F2-203: this was a fourth copy of the machine, written as a lookup map.
+            // Ask the one table instead — it is pinned against FindingService.ALLOWED.
+            const target = nextFindingStatuses(fromStatus)[0];
+            if (!target) {
+              toast.info(lang === 'ar'
+                ? `لا يوجد انتقال مُعلَن من الحالة ${fromStatus}`
+                : `No transition is declared out of ${fromStatus}`);
+              return;
+            }
+            void run(() => transitionFinding(findingId, target), t('lpcAdvancedToast'));
           }}
           onCardClick={(findingId) => {
             // Switch to findings tab + select the engagement that owns it.
@@ -172,34 +214,42 @@ export function AuditLifecyclePage() {
         />
       )}
 
+      {/* F2-203: one handler taking the target from the table, replacing three buttons each
+          gated on a hard-coded `plan.status === …`. The plan the organisation is executing
+          holds APPROVED, which the machine has no edge out of, so all three were dead on it —
+          and `PLAN_STATUS_LABEL[plan.status][lang]` crashed the tab outright. No approver
+          argument either: the server stamps the authenticated principal (SEC-IAM-002), and
+          this used to pass an invented name and display it. */}
       {tab === 'plan' && <PlanTab plan={plan}
-        onSubmitForReview={() => { transitionPlan('AC_REVIEW'); toast.info(t('alcPlanSubmittedToast')); }}
-        onApprove={() => { transitionPlan('AC_APPROVED', 'Khalid Al-Falih (AC Chair)'); toast.success(t('alcPlanApprovedToast')); }}
-        onExecute={() => { transitionPlan('EXECUTING'); toast.info(t('alcPlanExecutingToast')); }} />}
+        onTransition={(to) => void run(() => transitionPlan(to),
+          `${t('alcStatus')}: ${planStatusLabel(to, lang)}`)} />}
 
       {(tab === 'workingpapers' || tab === 'findings' || tab === 'capa') && (
-        <EngagementPicker code={engagementCode} onChange={setEngagementCode} />
+        <EngagementPicker codes={engagementCodes} code={engagementCode} onChange={setEngagementCode} />
       )}
 
+      {/* F2-203: same shape. No reviewer/author arguments — the author one was worse than a
+          display bug, because the server saved that invented name. */}
       {tab === 'workingpapers' && <WpTab wps={wps} engagementCode={engagementCode}
-        onPeerReview={(wp) => { transitionWorkingPaper(wp.id, 'PEER_REVIEW'); toast.info(t('alcWpReviewToast')); }}
-        onApprove={(wp) => { transitionWorkingPaper(wp.id, 'APPROVED', 'Sara Al-Zahrani (Audit Manager)'); toast.success(t('alcWpApprovedToast')); }}
-        onReject={(wp) => { transitionWorkingPaper(wp.id, 'REJECTED'); toast.danger(t('alcWpRejectedToast')); }}
-        onCreate={(type, titleEn, titleAr, hours) => { createWorkingPaper(engagementCode, type, titleEn, titleAr, 'Faisal Al-Otaibi (Auditor)', hours); toast.success(t('alcWpCreatedToast')); }} />}
+        onTransition={(wp, to) => void run(() => transitionWorkingPaper(wp.id, to),
+          `${t('alcStatus')}: ${workingPaperStatusLabel(to, lang)}`)}
+        onCreate={(type, titleEn, titleAr, hours) =>
+          void run(() => createWorkingPaper(engagementCode, type, titleEn, titleAr, hours), t('alcWpCreatedToast'))} />}
 
       {tab === 'findings' && <FindingsTab findings={findings} engagementCode={engagementCode}
-        onTransition={(f, status) => { transitionFinding(f.id, status); toast.info(`${t('alcStatus')}: ${FINDING_STATUS_LABEL[status][lang]}`); }}
-        onCreate={(titleEn, titleAr, severity, conditionEn, conditionAr) => {
-          createFinding(engagementCode, titleEn, titleAr, severity, conditionEn, conditionAr, 'Owner role');
-          toast.success(t('alcFindingCreatedToast'));
-        }}
+        onTransition={(f, status) =>
+          void run(() => transitionFinding(f.id, status), `${t('alcStatus')}: ${findingStatusLabel(status, lang)}`)}
+        onCreate={(titleEn, titleAr, severity, conditionEn, conditionAr, ownerRole) =>
+          void run(() => createFinding(engagementCode, titleEn, titleAr, severity, conditionEn, conditionAr, ownerRole),
+                   t('alcFindingCreatedToast'))}
         onChainToRisk={(f) => {
           const { planId, capaId } = chainFindingToRiskAndCapa(f);
           toast.success(`${t('alcChainedToast')}: ${planId} + ${capaId}`);
         }} />}
 
       {tab === 'capa' && <CapaTab findings={findings} allCapas={allCapas}
-        onTransition={(c, status) => { transitionCapa(c.id, status); toast.info(`${t('alcStatus')}: ${CAPA_STATUS_LABEL[status][lang]}`); }} />}
+        onTransition={(c, status) => { transitionCapa(c.id, status); toast.info(`${t('alcStatus')}: ${capaStatusLabel(status, lang)}`); }} />}
+
 
       {tab === 'packet' && <PacketTab plan={plan} findings={allFindings} capas={allCapas} stats={stats} />}
     </Shell>
@@ -214,24 +264,36 @@ function getQuarter(): string {
 
 // ─── Engagement picker ──────────────────────────────────────────────────────
 
-function EngagementPicker({ code, onChange }: { code: string; onChange: (c: string) => void }) {
+function EngagementPicker({ codes, code, onChange }: {
+  codes: string[]; code: string; onChange: (c: string) => void;
+}) {
   const { t, lang } = useI18n();
+  if (codes.length === 0) {
+    return (
+      <Card title={t('alcPickEngagement')} Icon={Stamp}>
+        <InlineEmpty>
+          {lang === 'ar'
+            ? 'لا يوجد ارتباط مُشار إليه في أي ورقة عمل أو ملاحظة في هذا السجلّ.'
+            : 'No engagement is referenced by any working paper or finding in this register.'}
+        </InlineEmpty>
+      </Card>
+    );
+  }
   return (
     <Card title={t('alcPickEngagement')} Icon={Stamp}>
       <div className="alc-pick-row">
-        {AUDIT_ENGAGEMENTS.slice(0, 8).map(e => {
-          const isOn = e.engagementCode === code;
-          const title = lang === 'ar' && e.titleAr ? e.titleAr : e.titleEn;
+        {codes.map(c => {
+          // The real catalogue supplies a title WHEN the code is in it. It is a separate
+          // register with its own code space, so most codes resolve to nothing — and the
+          // code itself is then all the platform honestly knows about the engagement.
+          const known = pickEngagementByCode(c);
+          const title = known ? (lang === 'ar' && known.titleAr ? known.titleAr : known.titleEn) : '';
           return (
-            <button key={e.engagementCode ?? String(e.id)} onClick={() => onChange(e.engagementCode ?? String(e.id))}
-              className={`alc-pick-chip${isOn ? ' alc-pick-chip--on' : ''}`}>
-              <span className="mono alc-pick-chip-code">{e.engagementCode}</span>
-              <span className="alc-pick-chip-title">
-                {title}
-              </span>
-              <Badge tone={e.status === 'FIELDWORK' ? 'warning' : e.status === 'PLANNED' ? 'info' : e.status === 'CLOSED' ? 'success' : 'primary'}>
-                {e.status}
-              </Badge>
+            <button key={c} onClick={() => onChange(c)}
+              className={`alc-pick-chip${c === code ? ' alc-pick-chip--on' : ''}`}>
+              <span className="mono alc-pick-chip-code">{c}</span>
+              {title && <span className="alc-pick-chip-title">{title}</span>}
+              {known?.status && <Badge tone={isFindingOpen(known.status) ? 'info' : 'success'}>{known.status}</Badge>}
             </button>
           );
         })}
@@ -242,13 +304,34 @@ function EngagementPicker({ code, onChange }: { code: string; onChange: (c: stri
 
 // ─── Plan tab ───────────────────────────────────────────────────────────────
 
-function PlanTab({ plan, onSubmitForReview, onApprove, onExecute }: {
-  plan: AnnualPlan;
-  onSubmitForReview: () => void;
-  onApprove: () => void;
-  onExecute: () => void;
+/** Keyed on the TARGET state, so a new edge surfaces as a missing key, not a missing button. */
+const PLAN_ADVANCE_LABEL_KEY: Record<ManagedAnnualPlanStatus, string> = {
+  DRAFT:       'alcStatus',
+  AC_REVIEW:   'alcSubmitForAc',
+  AC_APPROVED: 'alcAcApprove',
+  EXECUTING:   'alcStartExec',
+  CLOSED:      'alcStatus',
+};
+
+function PlanTab({ plan, onTransition }: {
+  plan: AnnualPlan | null;
+  onTransition: (to: ManagedAnnualPlanStatus) => void;
 }) {
   const { t, lang } = useI18n();
+  // F2-203: an empty register used to be filled with SEED_PLAN — an invented Audit
+  // Committee chair, an invented approval date, and a green "AC approved" badge. Saying
+  // nothing is recorded is the only honest thing to show here (F2-197).
+  if (!plan) {
+    return (
+      <Card title={t('alcPlanTitle')} Icon={Calendar}>
+        <InlineEmpty>
+          {lang === 'ar'
+            ? 'لا توجد خطة تدقيق سنوية مُسجَّلة لهذه الجهة.'
+            : 'No annual audit plan is recorded for this organisation.'}
+        </InlineEmpty>
+      </Card>
+    );
+  }
   const quarters = [
     { label: 'Q1', codes: plan.q1 },
     { label: 'Q2', codes: plan.q2 },
@@ -261,7 +344,14 @@ function PlanTab({ plan, onSubmitForReview, onApprove, onExecute }: {
         <div>
           <div className="alc-plan-badges">
             <span className="mono alc-plan-id">{plan.id}</span>
-            <Badge tone={PLAN_STATUS_TONE[plan.status]}>{PLAN_STATUS_LABEL[plan.status][lang]}</Badge>
+            <Badge tone={PLAN_STATUS_TONE[plan.status] ?? 'neutral'}>{planStatusLabel(plan.status, lang)}</Badge>
+            {!isPlanStatusManaged(plan.status) && (
+              <span role="status">
+                <Badge tone="warning">
+                  {lang === 'ar' ? 'لا يوجد انتقال مُعلَن' : 'No declared transition'}
+                </Badge>
+              </span>
+            )}
             <Badge tone="info">{plan.year}</Badge>
             <Badge tone="primary">{plan.budgetHours.toLocaleString()} {t('alcHours')}</Badge>
           </div>
@@ -273,9 +363,13 @@ function PlanTab({ plan, onSubmitForReview, onApprove, onExecute }: {
           )}
         </div>
         <div className="alc-plan-actions">
-          {plan.status === 'DRAFT' && <Button variant="primary" Icon={Send} onClick={onSubmitForReview}>{t('alcSubmitForAc')}</Button>}
-          {plan.status === 'AC_REVIEW' && <Button variant="primary" Icon={ThumbsUp} onClick={onApprove}>{t('alcAcApprove')}</Button>}
-          {plan.status === 'AC_APPROVED' && <Button variant="primary" onClick={onExecute}>{t('alcStartExec')}</Button>}
+          {nextPlanStatuses(plan.status).map(to => (
+            <Button key={to} variant="primary"
+                    Icon={to === 'AC_REVIEW' ? Send : to === 'AC_APPROVED' ? ThumbsUp : undefined}
+                    onClick={() => onTransition(to)}>
+              {t(PLAN_ADVANCE_LABEL_KEY[to])}
+            </Button>
+          ))}
         </div>
       </div>
 
@@ -291,17 +385,22 @@ function PlanTab({ plan, onSubmitForReview, onApprove, onExecute }: {
       <div className="alc-quarter-grid">
         {quarters.map(q => (
           <div key={q.label} className="alc-quarter-card">
-            <div className="alc-quarter-title">{q.label} 2026</div>
+            {/* F2-203: this was the literal `2026`, so the 2027 plan's quarters were
+                labelled 2026 — a hard-coded year beside a real one from the same row. */}
+            <div className="alc-quarter-title">{q.label} {plan.year}</div>
             {q.codes.length === 0
               ? <InlineEmpty>—</InlineEmpty>
               : q.codes.map(code => {
+                  // F2-203: `if (!e) return null` dropped the row, so a quarter with
+                  // three scheduled engagements rendered as an empty card — and the
+                  // annual plan's codes (ENG-CYBER-2026Q1…) are in none of the five
+                  // engagement code spaces, so that was every quarter of both plans.
                   const e = pickEngagementByCode(code);
-                  if (!e) return null;
-                  const title = lang === 'ar' && e.titleAr ? e.titleAr : e.titleEn;
+                  const title = e ? (lang === 'ar' && e.titleAr ? e.titleAr : e.titleEn) : '';
                   return (
                     <div key={code} className="alc-quarter-row">
                       <div className="mono alc-quarter-row-code">{code}</div>
-                      <div className="alc-quarter-row-title">{title}</div>
+                      {title && <div className="alc-quarter-row-title">{title}</div>}
                     </div>
                   );
                 })}
@@ -314,12 +413,17 @@ function PlanTab({ plan, onSubmitForReview, onApprove, onExecute }: {
 
 // ─── Working papers tab ─────────────────────────────────────────────────────
 
-function WpTab({ wps, engagementCode: _ec, onPeerReview, onApprove, onReject, onCreate }: {
+const WP_ADVANCE_LABEL_KEY: Record<ManagedWorkingPaperStatus, string> = {
+  DRAFT:       'alcWpSendReview',
+  PEER_REVIEW: 'alcWpSendReview',
+  APPROVED:    'alcApprove',
+  REJECTED:    'alcReject',
+};
+
+function WpTab({ wps, engagementCode: _ec, onTransition, onCreate }: {
   wps: WorkingPaper[];
   engagementCode: string;
-  onPeerReview: (w: WorkingPaper) => void;
-  onApprove: (w: WorkingPaper) => void;
-  onReject: (w: WorkingPaper) => void;
+  onTransition: (w: WorkingPaper, to: ManagedWorkingPaperStatus) => void;
   onCreate: (type: WorkingPaperType, titleEn: string, titleAr: string, hours: number) => void;
 }) {
   const { t, lang } = useI18n();
@@ -338,8 +442,15 @@ function WpTab({ wps, engagementCode: _ec, onPeerReview, onApprove, onReject, on
                   <div className="alc-item-main">
                     <div className="alc-item-badges">
                       <span className="mono alc-item-code">{wp.refNumber}</span>
-                      <Badge tone={WP_STATUS_TONE[wp.status]}>{wp.status}</Badge>
-                      <Badge tone="info">{WP_TYPE_LABEL[wp.type][lang]}</Badge>
+                      <Badge tone={WP_STATUS_TONE[wp.status] ?? 'neutral'}>{workingPaperStatusLabel(wp.status, lang)}</Badge>
+                      {!isWorkingPaperStatusManaged(wp.status) && (
+                        <span role="status">
+                          <Badge tone="warning">
+                            {lang === 'ar' ? 'لا يوجد انتقال مُعلَن' : 'No declared transition'}
+                          </Badge>
+                        </span>
+                      )}
+                      <Badge tone="info">{workingPaperTypeLabel(wp.type, lang)}</Badge>
                       <Badge tone="neutral">{wp.hours}h</Badge>
                     </div>
                     <div className="alc-item-title">
@@ -352,13 +463,17 @@ function WpTab({ wps, engagementCode: _ec, onPeerReview, onApprove, onReject, on
                     </div>
                   </div>
                   <div className="alc-item-actions">
-                    {wp.status === 'DRAFT' && <Button size="sm" variant="primary" Icon={Send} onClick={() => onPeerReview(wp)}>{t('alcWpSendReview')}</Button>}
-                    {wp.status === 'PEER_REVIEW' && (
-                      <>
-                        <Button size="sm" variant="primary" Icon={ThumbsUp} onClick={() => onApprove(wp)}>{t('alcApprove')}</Button>
-                        <Button size="sm" variant="ghost" onClick={() => onReject(wp)}>{t('alcReject')}</Button>
-                      </>
-                    )}
+                    {/* F2-203: from the table. 8 of the 12 working papers hold REVIEWED, which
+                        WP_TRANSITIONS has no edge out of, so both hard-coded buttons were dead
+                        on two thirds of the register with nothing saying why. */}
+                    {nextWorkingPaperStatuses(wp.status).map(to => (
+                      <Button key={to} size="sm"
+                              variant={to === 'REJECTED' ? 'ghost' : 'primary'}
+                              Icon={to === 'PEER_REVIEW' ? Send : to === 'APPROVED' ? ThumbsUp : undefined}
+                              onClick={() => onTransition(wp, to)}>
+                        {t(WP_ADVANCE_LABEL_KEY[to])}
+                      </Button>
+                    ))}
                   </div>
                 </div>
                 <div className="alc-field-grid">
@@ -390,299 +505,5 @@ function WpTab({ wps, engagementCode: _ec, onPeerReview, onApprove, onReject, on
         }
       </Card>
     </div>
-  );
-}
-
-// ─── Findings tab ───────────────────────────────────────────────────────────
-
-function FindingsTab({ findings, engagementCode: _ec, onTransition, onCreate, onChainToRisk }: {
-  findings: Finding[];
-  engagementCode: string;
-  onTransition: (f: Finding, status: Finding['status']) => void;
-  onCreate: (titleEn: string, titleAr: string, severity: FindingSeverity, conditionEn: string, conditionAr: string) => void;
-  onChainToRisk: (f: Finding) => void;
-}) {
-  const { t, lang } = useI18n();
-  const navigate = useNavigate();
-  return (
-    <div className="alc-section">
-      <Card title={t('alcFindingTitle')} Icon={AlertTriangle}
-        action={<Button size="sm" variant="primary" onClick={() => onCreate('New finding', 'ملاحظة جديدة', 'MEDIUM', 'Condition observed during fieldwork.', 'حالة مرصودة أثناء العمل الميداني.')}>{t('alcFindingCreate')}</Button>}>
-        <div className="alc-card-sub">
-          {t('alcFindingSub')}
-        </div>
-        {findings.length === 0
-          ? <InlineEmpty>{t('alcFindingEmpty')}</InlineEmpty>
-          : findings.map(f => (
-              <div key={f.id} className="alc-item">
-                <div className="alc-item-head">
-                  <div className="alc-item-main">
-                    <div className="alc-item-badges">
-                      <span className="mono alc-item-code">{f.refNumber}</span>
-                      <Badge tone={SEVERITY_TONE[f.severity]}>{f.severity}</Badge>
-                      <Badge tone={f.status === 'CLOSED' ? 'success' : f.status === 'OPEN' ? 'danger' : 'warning'}>
-                        {FINDING_STATUS_LABEL[f.status][lang]}
-                      </Badge>
-                      {f.targetDate && <Badge tone="info">{t('alcDue')}: <span className="mono">{f.targetDate}</span></Badge>}
-                    </div>
-                    <div className="alc-item-title--strong">
-                      {lang === 'ar' ? f.titleAr : f.titleEn}
-                    </div>
-                    <div className="alc-item-sub--plain">
-                      {f.ownerRole && <>{t('alcOwner')}: <b>{f.ownerRole}</b></>}
-                    </div>
-                  </div>
-                  <div className="alc-item-actions alc-item-actions--wrap">
-                    {/* Sprint 11 — open the Risk-Control-Finding pivot view in a new tab. */}
-                    <Button size="sm" variant="ghost" Icon={GitBranch}
-                            onClick={() => navigate(`/governance/pivot/finding/${f.id}`)}>
-                      {lang === 'ar' ? 'محور' : 'Pivot'}
-                    </Button>
-                    {f.status === 'OPEN' && <Button size="sm" variant="primary" onClick={() => onTransition(f, 'MGMT_RESPONSE')}>{t('alcAwaitMgmt')}</Button>}
-                    {f.status === 'MGMT_RESPONSE' && <Button size="sm" variant="primary" onClick={() => onTransition(f, 'IN_REMEDIATION')}>{t('alcStartRemediation')}</Button>}
-                    {f.status === 'IN_REMEDIATION' && <Button size="sm" variant="primary" onClick={() => onTransition(f, 'AWAITING_VERIFICATION')}>{t('alcAwaitVerif')}</Button>}
-                    {f.status === 'AWAITING_VERIFICATION' && <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => onTransition(f, 'CLOSED')}>{t('alcCloseFinding')}</Button>}
-                    {(f.severity === 'CRITICAL' || f.severity === 'HIGH') && f.status !== 'CLOSED' && (
-                      <Button size="sm" variant="ghost" onClick={() => onChainToRisk(f)}>{t('alcChainToRisk')}</Button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Crosswalk */}
-                {f.controlCrosswalk.length > 0 && (
-                  <div className="alc-crosswalk">
-                    <span className="alc-controls-label">{t('alcCrosswalk')}:</span>
-                    {f.controlCrosswalk.map(c => (
-                      <Badge key={c.controlCode} tone="info">{c.framework}/{c.controlCode}</Badge>
-                    ))}
-                  </div>
-                )}
-
-                {/* Condition / Criteria / Cause / Recommendation */}
-                <div className="alc-field-grid alc-field-grid--mb">
-                  <FieldBlock label={t('alcCondition')} en={f.conditionEn} ar={f.conditionAr} lang={lang} />
-                  <FieldBlock label={t('alcCriteria')}  en={f.criteriaEn}  ar={f.criteriaAr}  lang={lang} />
-                  <FieldBlock label={t('alcCause')}     en={f.causeEn}     ar={f.causeAr}     lang={lang} />
-                  <FieldBlock label={t('alcRecommendation')} en={f.recommendationEn} ar={f.recommendationAr} lang={lang} />
-                </div>
-
-                {/* Mgmt response */}
-                {f.mgmtResponseEn && (
-                  <div className="alc-mgmt-response" data-accepted={String(!!f.mgmtAccepts)}>
-                    <div className="alc-mgmt-head">
-                      <span className="alc-mgmt-head-label">
-                        {t('alcMgmtResponse')}
-                      </span>
-                      <Badge tone={f.mgmtAccepts ? 'success' : 'warning'}>
-                        {f.mgmtAccepts ? t('alcAccepted') : t('alcDisagreed')}
-                      </Badge>
-                      {f.mgmtResponseAuthor && <span className="alc-mgmt-head-author">· <b>{f.mgmtResponseAuthor}</b></span>}
-                    </div>
-                    {lang === 'ar' ? f.mgmtResponseAr : f.mgmtResponseEn}
-                  </div>
-                )}
-              </div>
-            ))
-        }
-      </Card>
-    </div>
-  );
-}
-
-function FieldBlock({ label, en, ar, lang }: { label: string; en: string; ar: string; lang: 'en' | 'ar' }) {
-  return (
-    <div>
-      <div className="alc-field-label">{label}</div>
-      <div className="alc-field-value">
-        {lang === 'ar' ? ar : en}
-      </div>
-    </div>
-  );
-}
-
-// ─── CAPA tab ──────────────────────────────────────────────────────────────
-
-function CapaTab({ findings, allCapas, onTransition }: {
-  findings: Finding[];
-  allCapas: CapaTask[];
-  onTransition: (c: CapaTask, status: CapaTask['status']) => void;
-}) {
-  const { t, lang } = useI18n();
-  // CAPAs for the engagement's findings
-  const findingIds = new Set(findings.map(f => f.id));
-  const relevantCapas = allCapas.filter(c => findingIds.has(c.findingId));
-
-  return (
-    <div className="alc-section">
-      <Card title={t('alcCapaTitle')} Icon={Wrench}>
-        <div className="alc-card-sub">
-          {t('alcCapaSub')}
-        </div>
-        {relevantCapas.length === 0
-          ? <InlineEmpty>{t('alcCapaEmpty')}</InlineEmpty>
-          : (
-            <table className="tbl tbl--full">
-              <thead>
-                <tr>
-                  <th>{t('alcCapaId')}</th>
-                  <th>{t('alcCapaKind')}</th>
-                  <th>{t('alcCapaTitleCol')}</th>
-                  <th>{t('alcCapaOwner')}</th>
-                  <th>{t('alcCapaTarget')}</th>
-                  <th>{t('alcCapaStatus')}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {relevantCapas.map(c => {
-                  const overdue = new Date(c.targetDate) < new Date() && c.status !== 'CLOSED';
-                  return (
-                    <tr key={c.id}>
-                      <td className="mono alc-cell-evidence">{c.id}</td>
-                      <td>
-                        <Badge tone={c.kind === 'CORRECTIVE' ? 'warning' : 'info'}>
-                          {c.kind === 'CORRECTIVE' ? t('alcCorrective') : t('alcPreventive')}
-                        </Badge>
-                      </td>
-                      <td className="alc-cell-narrow">
-                        <div className="alc-cell-strong">{lang === 'ar' ? c.titleAr : c.titleEn}</div>
-                        {c.evidenceRef && <div className="mono alc-cell-evidence">{c.evidenceRef}</div>}
-                      </td>
-                      <td className="alc-item-sub--plain">{c.ownerRole}</td>
-                      <td className={`mono alc-item-sub--plain${overdue ? ' alc-cell-due-late' : ''}`}>
-                        {c.targetDate}
-                      </td>
-                      <td>
-                        <Badge tone={overdue ? 'danger' : CAPA_STATUS_TONE[c.status]}>
-                          {overdue ? t('alcCapaOverdueBadge') : CAPA_STATUS_LABEL[c.status][lang]}
-                        </Badge>
-                      </td>
-                      <td>
-                        {c.status === 'OPEN' && <Button size="sm" variant="ghost" onClick={() => onTransition(c, 'IN_PROGRESS')}>{t('alcStart')}</Button>}
-                        {c.status === 'IN_PROGRESS' && <Button size="sm" variant="ghost" onClick={() => onTransition(c, 'AWAITING_VERIFICATION')}>{t('alcSubmit')}</Button>}
-                        {c.status === 'AWAITING_VERIFICATION' && <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => onTransition(c, 'CLOSED')}>{t('alcVerify')}</Button>}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-      </Card>
-    </div>
-  );
-}
-
-// ─── AC packet tab ─────────────────────────────────────────────────────────
-
-function PacketTab({ plan, findings, capas: _capas, stats }: { plan: AnnualPlan; findings: Finding[]; capas: CapaTask[]; stats: ReturnType<typeof aggregateAuditLifecycle> }) {
-  const { t, lang } = useI18n();
-  const sevCounts = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'OBSERVATION'].map(s => ({
-    sev: s,
-    count: findings.filter(f => f.severity === s).length,
-  }));
-  return (
-    <div className="alc-section">
-      <Card title={t('alcPacketTitle')} Icon={BookOpen}>
-        <div className="alc-card-sub">
-          {t('alcPacketSub')}
-        </div>
-
-        <div className="alc-packet-grid">
-          <div>
-            <div className="alc-packet-head">{t('alcPacketSevSection')}</div>
-            <table className="tbl tbl--full">
-              <thead>
-                <tr><th>{t('alcSev')}</th><th>{t('alcCount')}</th></tr>
-              </thead>
-              <tbody>
-                {sevCounts.map(s => (
-                  <tr key={s.sev}>
-                    <td>
-                      <Badge tone={s.sev === 'CRITICAL' || s.sev === 'HIGH' ? 'danger' : s.sev === 'MEDIUM' ? 'warning' : 'info'}>{s.sev}</Badge>
-                    </td>
-                    <td className="mono alc-cell-strong">{s.count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div>
-            <div className="alc-packet-head">{t('alcPacketCapaSection')}</div>
-            <div className={`stat-tile stat-tile-${stats.closureRate >= 80 ? 'success' : 'warning'} alc-packet-tile`}>
-              <div className="stat-tile-label">{t('alcCapaClosureRate')}</div>
-              <div className="stat-tile-value">{stats.closureRate}%</div>
-              <div className="alc-packet-tile-meta">
-                <span>{t('alcCapaClosed')}: <b>{stats.capaClosed}</b></span>
-                <span>{t('alcCapaTotal')}: <b>{stats.capaTotal}</b></span>
-                <span className={stats.capaOverdue > 0 ? 'alc-packet-overdue' : undefined}>
-                  {t('alcCapaOverdueLabel')}: <b>{stats.capaOverdue}</b>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="alc-packet-section-head">{t('alcPacketPlanSection')}</div>
-        <div className="alc-packet-plan">
-          <div><b>{plan.id}</b> · <Badge tone={PLAN_STATUS_TONE[plan.status]}>{PLAN_STATUS_LABEL[plan.status][lang]}</Badge></div>
-          {plan.acApprovedBy && <div className="alc-packet-plan-row">{t('alcApprovedBy')}: {plan.acApprovedBy}</div>}
-          <div className="alc-packet-plan-meta">
-            <span>Q1: {plan.q1.length}</span>
-            <span>Q2: {plan.q2.length}</span>
-            <span>Q3: {plan.q3.length}</span>
-            <span>Q4: {plan.q4.length}</span>
-            <span>· {plan.budgetHours.toLocaleString()} {t('alcHours')}</span>
-          </div>
-        </div>
-
-        <div className="alc-packet-hint">
-          {t('alcPacketHint')}
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-// ─── Findings pipeline (interactive kanban) ────────────────────────────────
-
-function FindingsPipeline({ allFindings, onAdvance, onCardClick }: {
-  allFindings: Finding[];
-  onAdvance: (id: string, fromStatus: string, toStatus: string | null) => void;
-  onCardClick: (id: string) => void;
-}) {
-  const stages: PipelineStage[] = [
-    { code: 'OPEN',                  labelEn: 'Open',                 labelAr: 'مفتوحة',           tone: 'danger',  Icon: AlertOctagon },
-    { code: 'MGMT_RESPONSE',         labelEn: 'Mgmt response',        labelAr: 'ردّ الإدارة',      tone: 'warning', Icon: Send },
-    { code: 'IN_REMEDIATION',        labelEn: 'In remediation',       labelAr: 'قيد المعالجة',     tone: 'info',    Icon: Wrench },
-    { code: 'AWAITING_VERIFICATION', labelEn: 'Awaiting verification', labelAr: 'بانتظار التحقق',  tone: 'warning', Icon: Eye },
-    { code: 'CLOSED',                labelEn: 'Closed',               labelAr: 'مُغلَقة',          tone: 'success', Icon: CheckCircle2 },
-  ];
-  const cards: PipelineCard[] = allFindings.map(f => {
-    const due = dueLabel(f.targetDate, () => '');
-    return {
-      id: f.id, status: f.status, refCode: f.refNumber,
-      titleEn: f.titleEn, titleAr: f.titleAr,
-      subtitleEn: f.engagementCode + (f.ownerRole ? ' · ' + f.ownerRole : ''),
-      subtitleAr: f.engagementCode + (f.ownerRole ? ' · ' + f.ownerRole : ''),
-      badges: [
-        { label: f.severity, tone: f.severity === 'CRITICAL' || f.severity === 'HIGH' ? 'danger' : f.severity === 'MEDIUM' ? 'warning' : 'info' as const },
-        ...f.controlCrosswalk.slice(0, 1).map(c => ({ label: c.framework, tone: 'info' as const })),
-      ],
-      urgent: due?.urgent && f.status !== 'CLOSED',
-      dueLabel: due?.label,
-    };
-  });
-  return (
-    <LifecyclePipeline
-      stages={stages}
-      cards={cards}
-      introEn="Live findings pipeline across all engagements. Click a card to drill into its engagement; click the arrow to advance the finding to the next stage."
-      introAr="مسار الملاحظات الحيّ عبر جميع الارتباطات. انقر على بطاقة للانتقال إلى ارتباطها، وانقر السهم لتقدّم الملاحظة إلى المرحلة التالية."
-      onAdvance={onAdvance}
-      onCardClick={onCardClick}
-      emptyEn="No findings raised yet across any engagement."
-      emptyAr="لا ملاحظات مرفوعة بعد عبر أي ارتباط."
-    />
   );
 }

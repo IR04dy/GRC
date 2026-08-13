@@ -75,10 +75,23 @@ public class FindingService {
         Long orgId = TenantContext.requireOrganisationId();
         long count = repo.findByOrganisationIdAndEngagementCodeOrderByRaisedAtDesc(orgId, req.getEngagementCode()).size();
         Finding f = new Finding();
-        f.setExternalId(req.getId() != null ? req.getId() : generateExternalId());
+        // F2-203. The caller's `id` and `refNumber` are IGNORED — both are minted here.
+        //
+        // This was `req.getId() != null ? req.getId() : generateExternalId()`, so a client
+        // could name the reference of an internal-audit finding. That is F2-172(d)'s defect
+        // ("only the server may issue a tracking code"), closed on the intake substrate and
+        // then again on DSR cases in F2-202; this is its third instance. The browser-local
+        // copy F2-203 retired was minting exactly such a reference —
+        // `FIN-<year>-<4 base-36 chars>` — alongside its own `FIN-%03d` sequence counted over
+        // a cache that included a seeded finding, so the first real finding raised on an
+        // engagement would have been numbered FIN-002.
+        //
+        // Nothing supplies either field: no test sets them, and the only client that now
+        // POSTs here deliberately omits both. Refusing them cannot break a working caller.
+        f.setExternalId(generateExternalId());
         f.setOrganisationId(orgId);
         f.setEngagementCode(req.getEngagementCode());
-        f.setRefNumber(req.getRefNumber() != null ? req.getRefNumber() : String.format("FIN-%03d", count + 1));
+        f.setRefNumber(String.format("FIN-%03d", count + 1));
         f.setTitleEn(req.getTitleEn()); f.setTitleAr(req.getTitleAr());
         f.setSeverity(req.getSeverity()); f.setStatus("OPEN");
         f.setControlCrosswalk(req.getControlCrosswalk());

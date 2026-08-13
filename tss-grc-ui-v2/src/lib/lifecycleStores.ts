@@ -53,13 +53,17 @@ export type LifecycleStoreState =
    * Reads come from the server; writes do not leave the browser.
    *
    * ⚠ This third state was not in the first draft of this file, and finding it is why the
-   * gate exists. `auditLifecycle.ts` fetches four `/api/audit-lc/*` resources in
-   * `hydrateAuditLifecycle()`, so its list is real — but every mutation writes a
-   * module-level array and the only thing that ever looked like a server write was the
-   * no-op mirror this slice deleted. So a finding closed on that screen is gone on reload,
-   * while the screen it was closed on looks server-backed. It also carries the F2-158
-   * fallback shape: `if (_findings.length === 0) _findings = SEED_FINDINGS`, so a tenant
-   * with an empty register sees invented findings rather than an empty one.
+   * gate exists — `auditLifecycle.ts` was in it, and a store whose LIST is real is harder to
+   * notice than an honestly local one.
+   *
+   * ⚠⚠ NO STORE IS IN THIS STATE TODAY. F2-203 closed the only member. The state is kept
+   * declared because it is a shape this codebase demonstrably produces, and a reviewer who
+   * finds another one needs somewhere to put it — but nothing below may claim it without a
+   * measurement, and `theThirdStateHasNoMembers` in the frontend gate asserts the emptiness
+   * so that re-introducing it is a deliberate act. The previous version of this comment
+   * described `auditLifecycle.ts` in the present tense; leaving that in place would have
+   * been F2-184's shape — a comment answering the question a reader was about to ask, with
+   * an answer that had stopped being true.
    */
   | 'SERVER_READ_LOCAL_WRITE';
 
@@ -178,7 +182,7 @@ export const LIFECYCLE_STORES: readonly LifecycleStore[] = [
   {
     id: 'audit-findings',
     module: 'lib/auditLifecycle.ts',
-    state: 'SERVER_READ_LOCAL_WRITE',
+    state: 'SERVER_BACKED',
     endpoint: '/api/audit-lc/findings',
     table: 'audit_lc.findings',
     rowsDev: 20,
@@ -187,13 +191,15 @@ export const LIFECYCLE_STORES: readonly LifecycleStore[] = [
     // does not even survive a reload, let alone reach another user.
     localKey: '',
     note:
-      'The one store that READS the server and does not write it. hydrateAuditLifecycle() '
-      + 'fetches annual-plans, working-papers, findings and capas, so the 20 rows are real; but '
-      + 'every mutation assigns a module-level array and the deleted mirror was the only thing '
-      + 'resembling a write. An internal-audit finding closed here is gone on reload and was '
-      + 'never visible to a second auditor. It also seeds SEED_FINDINGS when the server returns '
-      + 'zero rows, which is the F2-158 fallback shape: an empty register renders as invented '
-      + 'findings rather than as empty.',
+      'CLOSED by F2-203. It was the one store that READ the server and did not write it: '
+      + 'hydrateAuditLifecycle() fetched all four registers, so the 20 rows were real, but every '
+      + 'mutation assigned a module-level array and the mirror F2-202 deleted was the only thing '
+      + 'resembling a write — an internal-audit finding closed here was gone on reload and never '
+      + 'visible to a second auditor. createFinding and transitionFinding now POST to '
+      + '/api/audit-lc/findings and /{id}/transition and replace the row from the response; the '
+      + 'four SEED_* corpora are deleted, so an empty register reads as empty and an unreachable '
+      + 'one reads as a failure. 7 of the 20 rows carry a status the server machine declares no '
+      + 'edge out of and so cannot be advanced by any route — disclosed on the row, filed.',
   },
   {
     id: 'bcm-invocations',

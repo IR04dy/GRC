@@ -271,13 +271,22 @@ function useSaudiRegulatorTiles(): RegulatorTile[] {
 
   // ── CMA, CITC, ZATCA, NCEMA ─────────────────────────
   // These four used audit-engagement coverage as a proxy, read from the mock
-  // AUDIT_ENGAGEMENTS array. There is NO live list endpoint for audit engagements
-  // (lib/auditEngagement.ts only derives milestones from one already fetched — the same gap
-  // W2-1a-i hit when indexing them for search), so there is nothing to substitute. Rather
-  // than keep a fabricated count or substitute a zero, the metric is null and the tile
-  // renders an em dash: the tenant may well have CMA obligations, and claiming "0" would be
-  // a stronger and more wrong statement than "not measured here". Clicking through to the
-  // authority workspace still reaches the real data.
+  // AUDIT_ENGAGEMENTS array. They stay unmeasured — but NOT for the reason this comment
+  // used to give.
+  //
+  // ⚠ F2-203 correction. It read: "There is NO live list endpoint for audit engagements
+  // (lib/auditEngagement.ts only derives milestones from one already fetched …), so there is
+  // nothing to substitute." That is false and was false when written:
+  // `complianceApi.auditEngagements()` calls `GET /api/v1/compliance/audit-engagements`,
+  // which `AuditEngagementController` has served all along, and `CompliancePage` reads it
+  // through `useApiList`. 12 real rows in dev and prod. A comment that answers the question
+  // a reader was about to ask, wrongly, is worse than no comment (F2-184) — and this one
+  // erred conservatively, which is why nobody caught it: an em dash looks like caution.
+  //
+  // The real reason these four are unmeasured is that engagement coverage is not an
+  // obligation count for CMA, CITC, ZATCA or NCEMA. Wiring the number now available would
+  // put a measured figure under a label it does not answer, which is a fabrication with a
+  // provenance. Clicking through to the authority workspace still reaches the real data.
   const cmaCount   = null;
   const citcCount  = null;
   const zatcaCount = null;

@@ -95,7 +95,15 @@ public class AuditLifecycleController {
 
     @PostMapping("/working-papers")
     @PreAuthorize("hasPermission('AUDIT','WRITE')")
-    public ResponseEntity<WorkingPaper> createWorkingPaper(@RequestBody WorkingPaper body) {
+    public ResponseEntity<WorkingPaper> createWorkingPaper(@RequestBody WorkingPaper body,
+                                                           Authentication auth) {
+        // F2-203. The author is the authenticated principal, never a body field — the same
+        // rule `transitionWorkingPaper` below already applies to `reviewer`, and the reason
+        // the two differed mattered: `createWorkingPaper` saved the body verbatim, and the
+        // page was passing the literal string "Faisal Al-Otaibi (Auditor)". So an invented
+        // auditor was PERSISTED as the author of an IIA Standard 2330 working paper, while
+        // the reviewer on the very next transition was recorded correctly.
+        body.setAuthor(actor(auth));
         return ResponseEntity.ok(service.createWorkingPaper(body));
     }
 

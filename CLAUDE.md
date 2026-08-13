@@ -976,6 +976,72 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   correct complement — over `SEED_DSR` in the browser, so it is evidence the correct rule was **written down**,
   not that any screen showed a correct number. It is also a **fourth** DSR register shadowing a real API
   (`/api/privacy-lc/dsr-cases`), still open. Checking `loadDsr()` is what stopped that being cited as proof.
+  ⚠⚠ **A latent crash in a display path is held shut by whatever else is broken around it, so fixing one
+  defect is what detonates the next** (F2-203, measured 2026-08-13). The internal-audit workspace had
+  **three** `LABEL_MAP[row.status][lang]` TypeErrors, each on real rows, **none reachable**: the findings one
+  behind an engagement picker that filtered every row away, the annual-plan one behind a `plans[0]` that
+  happened to select the other row, the CAPA one behind a ternary whose `overdue` branch won. **This slice's
+  own fix to plan selection opened the second — in the browser, minutes after the gate went green.** 🔑 **When
+  you fix a filter, a selector or a fallback, assume something downstream has never run, and run it.**
+  ⚠⚠ **`audit_lc` has ZERO CHECK constraints and ALL FOUR of its registers hold statuses their own service's
+  vocabulary does not declare** — identical in dev and prod: `findings` 7/20 (`IN_PROGRESS`/`REMEDIATED`/
+  `VERIFIED`), `annual_plans` 1/2 (`APPROVED`, where the service declares `AC_APPROVED`), `working_papers`
+  8/12 (`REVIEWED`), `capa_tasks` 3/12 (`VERIFIED`). **19 of 46 rows cannot be advanced by ANY route**, because
+  every service does `TRANSITIONS.getOrDefault(status, Set.of())` → empty → 409 with an empty allowed-set. The
+  sharpest is the annual plan: the one `APPROVED` row is the **2026 plan the organisation is executing** and it
+  can never reach EXECUTING or CLOSED. **Do not fold them into the declared vocabulary** — each is a synonym
+  and collapsing synonyms rewrites 19 live rows in two databases (F2-183/F2-196's rule). Declared, labelled
+  bilingually, disclosed on the row with an announced `role="status"` badge, no button offered, filed for an
+  owner. ⚠ It is not only `status`: `working_papers.type` holds `DESIGN_TEST`/`OPERATING_TEST`/`SAMPLE_TEST`/
+  `FOLLOW_UP` — **11 of 12 prod rows** — against a five-value union.
+  ⚠⚠ **A gate keyed on the maps you know about cannot see the map you did not list, and the omission reads
+  exactly like coverage.** F2-203's first label-map leg named four maps and passed while `WP_TYPE_LABEL[wp.type]
+  [lang]` sat in the same file; the browser found it by crashing **after** the gate was green. Ban the **shape**
+  (`SOMETHING[expr][lang]`), not a list of names, and carry a positive control proving the detector fires on it.
+  ⚠⚠ **A one-hop "is there server data in scope" provenance rule certifies the FILE, not the FIGURE.** F2-199's
+  `exportProvenance` passed the CMA Article 95 Audit Committee packet because `auditLifecycle.ts` does call
+  `api.get` — while section 2 and the whole *Engagements* sheet came from `AUDIT_ENGAGEMENTS`, a `demoRows()`
+  corpus for a **different** register. The exported document listed eight invented engagements each reporting
+  "WPs: 0 · Findings: 0" beside a section counting 20 real findings: **it contradicted itself on the same
+  page.** Tenth instrument in this lineage, blind for a tenth distinct reason. The next question after *does
+  this page call a server?* (F2-198), *does this file emit a document?* (F2-199) and *does the call reach
+  anything?* (F2-202) is **which of this file's data reaches the thing it emits.**
+  ⚠⚠ **A picker built from a catalogue can show an empty list; a picker built from the groups its own lists
+  contain cannot.** `engagement_code` is free text with no FK and no CHECK, and there are **five disjoint code
+  spaces** (findings `ENG-IA-00x`/`IA-2026-001`, working papers `IA-2026-001`, `compliance.audit_engagements`
+  `AUD-2026-00x`, `audit_lc.ia_engagement` `ENG-2026-00x`, `annual_plans.q*_codes` `ENG-CYBER-2026Q1`…). A
+  fourth broken join sat beside them: `capa_tasks.finding_id` holds the **ref number** in every seeded row while
+  the module's own `createCapa` writes the **external id**, so all 12 CAPAs were invisible. Read tolerantly and
+  file — reconciling 32 rows across two databases is an owner decision.
+  ⚠ **`FindingService.create` honoured a client-supplied `id` AND `refNumber`** — F2-172(d)'s defect for the
+  third time after the intake substrate and F2-202's DSR cases. **Grep for `req.getId() != null ?` before
+  assuming a create path mints its own reference.** And the client-side sequence it replaced counted a cache
+  that included a seeded row, so the first real finding on an engagement would have been numbered FIN-002.
+  ⚠ **An invented officer's name can be display-only on two writes and PERSISTED on a third in the same file.**
+  `transitionAnnualPlan`/`transitionWorkingPaper` stamp `actor(auth)` and ignore the body — but nothing read the
+  response, so the screen credited an Audit Committee approval to a person who does not exist while the audit
+  trail recorded the real user. `createWorkingPaper` saved the body verbatim, so an invented auditor **was** the
+  stored author of an IIA 2330 working paper. **Replacing the row from the server's response fixes both halves
+  and removes any need for a client-side identity.**
+  ⚠ **A selection fix can reintroduce the bug it names.** Replacing `plans[0]` with "most recent year first"
+  made a **Q3-2026** Audit Committee packet report the **2027 DRAFT** plan — the exact shadowing the
+  replacement's own comment claimed to prevent — and neither version is visible in a passing test. **The
+  artefact has to be read.** (`pickCurrentPlan` takes the current year; the Plan tab was also hard-coding `2026`
+  in its quarter titles beside a real `plan.year` from the same row.)
+  ⚠⚠ **Two more of my own gate bugs, both F2-192's defect in a gate written after quoting F2-192.** (a) A ban on
+  `IN_PROGRESS:` written for the FINDING table fired on `CAPA_ALLOWED`'s legitimate edge the moment the sibling
+  machines were declared — **scope a scan to the shape of its claim.** (b) The disclosure leg counted
+  `role="status"` across both files with a `>= 4` floor (there are five, so deleting one still passed) *and*
+  asserted each guard token against `pageCode() + tabsCode()`, so deleting the plan disclosure from the *page*
+  passed on `PacketTab`'s occurrence in the *tabs* file. 🔑 **A count with a floor cannot see one member vanish,
+  and a token asserted across concatenated files is satisfied by the other file.** Only the mutation harness
+  found either.
+  ⚠ **A probe that writes rows must be RE-RUNNABLE, which is a different property from excluding its own
+  writes** (F2-202's lesson, one run later): a fixed `externalId` made the second run fail on the unique index,
+  which reads exactly like the fix having broken.
+  ⚠ **The port check is not proof the app is up.** `mvn -o test` recompiles into `target/classes` and DevTools
+  restarts the context **while the listener stays bound** — `netstat` showed LISTENING through a window where
+  every request was refused with `ConnectionRefused`. **Poll `/actuator/health`, not the port.**
 - ⚠⚠ **A declared state machine is only a control if the code that changes state consults it** (F2-189,
   measured 2026-08-11). `WorkflowRequestService.TRANSITIONS` is the workflow engine's lifecycle — `transition()`
   answers **409** outside it, and the FE and `WorkflowEvidenceBridge` read it to know what is reachable. It

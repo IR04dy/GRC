@@ -88,7 +88,7 @@ describe('F2-202 — the lifecycle-store registry', () => {
    * measured.
    */
   const BASELINE_BROWSER_LOCAL_STORES = 6;
-  const BASELINE_NOT_FULLY_SERVER_BACKED = 7;
+  const BASELINE_NOT_FULLY_SERVER_BACKED = 6;   // F2-203 wired audit-findings (was 7)
 
   it('no new browser-local lifecycle store appears', () => {
     expect(
@@ -112,14 +112,23 @@ describe('F2-202 — the lifecycle-store registry', () => {
     ).toBeLessThanOrEqual(BASELINE_NOT_FULLY_SERVER_BACKED);
   });
 
-  it('exactly the DSR store is server-backed today', () => {
+  it('exactly the DSR and audit-finding stores are server-backed today', () => {
     const backed = LIFECYCLE_STORES.filter(s => s.state === 'SERVER_BACKED').map(s => s.id);
     // Enforced in BOTH directions. The forward half stops an entry being flipped to
     // SERVER_BACKED without wiring; the reverse half means wiring the next one must update
     // this list, so the gate cannot silently describe a stale world (F2-199's lesson: the
     // reverse leg is the one nobody writes first, and the one that catches an entry that was
-    // never in the population).
-    expect(backed).toEqual(['privacy-dsr']);
+    // never in the population). It fired as designed when F2-203 wired audit-findings.
+    expect(backed).toEqual(['privacy-dsr', 'audit-findings']);
+  });
+
+  it('the SERVER_READ_LOCAL_WRITE state has no members', () => {
+    // F2-203 closed the only one. Asserted rather than left implicit, because a state with
+    // zero members and a paragraph of documentation reads exactly like a state with one — and
+    // that documentation described `auditLifecycle.ts` in the present tense until this slice.
+    // If a future store genuinely belongs here, deleting this leg is the deliberate act.
+    expect(LIFECYCLE_STORES.filter(s => s.state === 'SERVER_READ_LOCAL_WRITE').map(s => s.id))
+      .toEqual([]);
   });
 
   /**

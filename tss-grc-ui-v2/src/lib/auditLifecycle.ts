@@ -19,30 +19,213 @@
 //      engagement progress, finding aging, CAPA closure rate and the next
 //      quarter's plan.
 //
-// Persistence: in-memory module cache hydrated once from /api/audit-lc/*
-// (annual-plans / working-papers / findings / capas). Writes are sync to
-// the caller and fire-and-forget to the backend. The page subscribes via
-// {@link subscribeAuditLifecycle} and triggers re-renders through the
-// emit() channel whenever the cache changes.
+// Persistence: in-memory module cache hydrated from /api/audit-lc/*
+// (annual-plans / working-papers / findings / capas) plus the real audit-engagement
+// catalogue at /api/v1/compliance/audit-engagements. EVERY mutation goes to the
+// server and the cache is replaced from the server's response — see F2-203 below.
+// The page subscribes via {@link subscribeAuditLifecycle} and re-renders through
+// the emit() channel whenever the cache changes.
+//
+// ── F2-203 ───────────────────────────────────────────────────────────────────
+// This file used to be the store F2-202 declared SERVER_READ_LOCAL_WRITE: it read
+// four real registers and dropped every finding write on the floor. `saveFinding`
+// and `transitionFinding` assigned a module-level array and returned, so an auditor
+// closing an internal-audit finding under IIA Standard 2500 got a success toast and
+// nothing was written — a reload put it back. The server side was complete and
+// hardened the whole time (`POST /api/audit-lc/findings`, `POST /{id}/transition`
+// with a guarded machine that answers 409, AUDIT:WRITE, FINDING_CREATED /
+// FINDING_TRANSITIONED domain events, and a realtime broadcast this page ALREADY
+// subscribed to — an event its own actions could never cause).
+//
+// It also treated `AUDIT_ENGAGEMENTS` — a `demoRows()` corpus mocking a DIFFERENT
+// register — as the engagement authority. That corpus keys on AUD-2026-00x while
+// the findings register keys on ENG-IA-00x / IA-2026-001, so `findingsForEngagement`
+// and `workingPapersForEngagement` returned 0 rows for every one of the eight
+// selectable engagements while 20 findings and 12 working papers sat in the table.
+// 🔑 The empty tab was hiding a crash: `FINDING_STATUS_LABEL[f.status][lang]` is a
+// TypeError for the 7 of 20 rows whose status the label map does not declare, and
+// the only reason it never fired is that the filter removed every row first.
+//
+// `engagement_code`, `capa_tasks.finding_id` and `annual_plans.q*_codes` are free
+// text with no foreign key and no CHECK — `audit_lc` has ZERO check constraints —
+// so the code spaces cannot be reconciled from here. They are read tolerantly and
+// the divergence is filed; rewriting 32 rows in two databases to agree is an owner
+// decision, not a side effect of a display fix (F2-183's rule).
 
-import { api, ApiError } from './api';
-import { AUDIT_ENGAGEMENTS as MOCK_ENGAGEMENTS } from '../pages/compliance/mockCompliance';
+import { api, ApiError, complianceApi } from './api';
 import type { AuditEngagementDto } from './api';
-// F2-202: the `platformPersistence` import that used to sit here is gone with the file.
-// This store is BROWSER_LOCAL — declared, with its real endpoint and measured row count,
-// in `lib/lifecycleStores.ts`.
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type AnnualPlanStatus = 'DRAFT' | 'AC_REVIEW' | 'AC_APPROVED' | 'EXECUTING' | 'CLOSED';
+/**
+ * ⚠⚠ ALL FOUR of this module's registers hold status values their own service's vocabulary
+ * does not declare, and `audit_lc` has ZERO CHECK constraints — not a subset, none — so
+ * nothing ever refused them. Measured 2026-08-13, identical in dev and prod:
+ *
+ *   findings        7 of 20   IN_PROGRESS ×3, REMEDIATED ×2, VERIFIED ×2
+ *   annual_plans    1 of 2    APPROVED            (the service declares AC_APPROVED)
+ *   working_papers  8 of 12   REVIEWED            (the service declares PEER_REVIEW/APPROVED)
+ *   capa_tasks      3 of 12   VERIFIED            (the service declares AWAITING_VERIFICATION)
+ *   ────────────────────────
+ *                  19 of 46 rows cannot be advanced by ANY route: each service does
+ *                  `TRANSITIONS.getOrDefault(status, Set.of())`, so an undeclared status has
+ *                  no outgoing edge and every transition answers 409 with an empty set.
+ *
+ * The annual-plan one is the sharpest: the single APPROVED row is the 2026 plan the
+ * organisation is executing, and it can never be moved to EXECUTING or CLOSED.
+ *
+ * 🔑 Two of the three label maps crashed on these values — `MAP[status][lang]` is a TypeError
+ * on an undeclared token — and the crash was hidden by accidents: for findings, a broken
+ * engagement picker filtered every row away; for the annual plan, `plans[0]` happened to
+ * select the DRAFT row. **F2-203's own fix to plan selection is what exposed it**, which is
+ * the argument for the `*_UNMANAGED` declarations below: they are what makes the register
+ * renderable at all.
+ *
+ * They are NOT folded into the managed vocabularies. Each reads as a synonym of a declared
+ * state (APPROVED≈AC_APPROVED, REVIEWED≈APPROVED, VERIFIED≈CLOSED/AWAITING_VERIFICATION), and
+ * collapsing synonyms rewrites 19 live rows in two databases — an owner decision, not a side
+ * effect of a display fix (F2-183, F2-196).
+ */
+export type ManagedAnnualPlanStatus =
+  'DRAFT' | 'AC_REVIEW' | 'AC_APPROVED' | 'EXECUTING' | 'CLOSED';
+export type AnnualPlanStatus = ManagedAnnualPlanStatus | 'APPROVED';
 
-export type WorkingPaperType = 'TEST' | 'INTERVIEW' | 'OBSERVATION' | 'DOCUMENT_REVIEW' | 'WALKTHROUGH';
-export type WorkingPaperStatus = 'DRAFT' | 'PEER_REVIEW' | 'APPROVED' | 'REJECTED';
+/**
+   * ⚠⚠ It is not only `status`. `working_papers.type` holds DESIGN_TEST, FOLLOW_UP,
+   * OPERATING_TEST and SAMPLE_TEST — **11 of the 12 rows in prod carry a type this union did
+   * not declare**, and `WP_TYPE_LABEL[wp.type][lang]` was indexed directly on it, so the
+   * Working papers tab was a TypeError away from the same crash as the Plan and CAPA tabs.
+   * It never fired because the broken engagement picker filtered every row away first.
+   *
+   * 🔑 This is what a gate keyed on the maps you already know about cannot see. The first
+   * version of F2-203's gate listed four label maps by name and passed — `WP_TYPE_LABEL` was
+   * simply not one of the four. The rule is structural now: no label map may be indexed
+   * directly ANYWHERE on this page, whatever it is called.
+   */
+export type DeclaredWorkingPaperType =
+  'TEST' | 'INTERVIEW' | 'OBSERVATION' | 'DOCUMENT_REVIEW' | 'WALKTHROUGH';
+export type StoredWorkingPaperType =
+  'DESIGN_TEST' | 'OPERATING_TEST' | 'SAMPLE_TEST' | 'FOLLOW_UP';
+export type WorkingPaperType = DeclaredWorkingPaperType | StoredWorkingPaperType;
+export type ManagedWorkingPaperStatus = 'DRAFT' | 'PEER_REVIEW' | 'APPROVED' | 'REJECTED';
+export type WorkingPaperStatus = ManagedWorkingPaperStatus | 'REVIEWED';
 
 export type FindingSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'OBSERVATION';
-export type FindingStatus = 'OPEN' | 'MGMT_RESPONSE' | 'IN_REMEDIATION' | 'AWAITING_VERIFICATION' | 'CLOSED';
 
-export type CapaStatus = 'OPEN' | 'IN_PROGRESS' | 'AWAITING_VERIFICATION' | 'CLOSED' | 'OVERDUE';
+/** The states `FindingService.ALLOWED` declares edges for. Pinned against the server. */
+export type ManagedFindingStatus =
+  'OPEN' | 'MGMT_RESPONSE' | 'IN_REMEDIATION' | 'AWAITING_VERIFICATION' | 'CLOSED';
+
+/**
+ * States real rows carry that the server's machine declares NO edge out of.
+ *
+ * F2-203: `audit_lc.findings.status` has no CHECK constraint — `audit_lc` has none at
+ * all — so the vocabulary lives only in the heads of its readers, and they disagree.
+ * 7 of 20 rows in dev AND prod hold one of these three, meaning those findings cannot
+ * be advanced or closed through any route: `ALLOWED.getOrDefault(status, Set.of())` is
+ * empty, so every transition answers 409 with an empty allowed-set. They are declared
+ * here so the platform can DISPLAY them and say so, rather than crash on a missing
+ * label or offer a button that errors.
+ *
+ * They are NOT mapped onto the managed states. IN_PROGRESS/REMEDIATED/VERIFIED read as
+ * synonyms of IN_REMEDIATION/AWAITING_VERIFICATION/CLOSED, and collapsing synonyms
+ * rewrites live rows in two databases — an owner decision, not a side effect of a
+ * display fix (F2-196's rule, applied to a second register).
+ */
+export type UnmanagedFindingStatus = 'IN_PROGRESS' | 'REMEDIATED' | 'VERIFIED';
+
+export type FindingStatus = ManagedFindingStatus | UnmanagedFindingStatus;
+
+export type ManagedCapaStatus =
+  'OPEN' | 'IN_PROGRESS' | 'AWAITING_VERIFICATION' | 'CLOSED' | 'OVERDUE';
+export type CapaStatus = ManagedCapaStatus | 'VERIFIED';
+
+// ── One predicate, four machines ────────────────────────────────────────────
+//
+// F2-178's shape: the thing that decides what is reachable is written ONCE and every surface
+// reads it. Each register keeps its own declared table — the vocabularies genuinely differ —
+// but there is a single implementation of "what can this row become?", so a fifth caller
+// cannot invent a sixth answer. Before F2-203 the findings machine alone had four copies.
+
+/** The legal next states for a row, or none for a terminal OR undeclared status. */
+function nextFrom<S extends string>(
+  table: Record<string, readonly S[]>, status: string,
+): readonly S[] {
+  return table[status] ?? [];
+}
+
+function declares(table: Record<string, unknown>, status: string): boolean {
+  return Object.prototype.hasOwnProperty.call(table, status);
+}
+
+/**
+ * A label for any status, including one this build has never heard of.
+ *
+ * Falling back to the raw token shows the operator what the column holds rather than blanking
+ * the row or taking the page down — and with no CHECK on any of the four columns, a ninth
+ * value can arrive from a data fix or an integration at any time.
+ */
+function labelFrom(
+  map: Record<string, { en: string; ar: string }>, status: string, lang: 'en' | 'ar',
+): string {
+  return map[status] ? map[status][lang] : status;
+}
+
+/** Terminal = declared with no outgoing edge. Derived, never typed twice (F2-196). */
+function terminalOf<S extends string>(table: Record<string, readonly S[]>): readonly string[] {
+  return Object.keys(table).filter(s => table[s].length === 0);
+}
+
+/**
+ * The IIA finding machine — the ONE table this module consults, mirroring
+ * `FindingService.ALLOWED` edge for edge. `AuditFindingMachineParityTest` fails the
+ * build if the two drift.
+ *
+ * Before F2-203 the frontend held THREE copies of it: an `onAdvance` lookup map, four
+ * hard-coded `if (f.status === …)` buttons, and `transitionFinding` accepting any
+ * target at all. That is the F2-189/F2-190/F2-191 shape — a lifecycle with more
+ * writers than readers of its own table — and here the extra copies let the UI offer
+ * `OPEN → CLOSED`, which the server refuses.
+ */
+export const FINDING_ALLOWED: Record<ManagedFindingStatus, readonly ManagedFindingStatus[]> = {
+  OPEN:                  ['MGMT_RESPONSE'],
+  MGMT_RESPONSE:         ['IN_REMEDIATION'],
+  IN_REMEDIATION:        ['AWAITING_VERIFICATION'],
+  AWAITING_VERIFICATION: ['CLOSED'],
+  CLOSED:                [],
+};
+
+export const FINDING_MANAGED_STATUSES =
+  Object.keys(FINDING_ALLOWED) as ManagedFindingStatus[];
+
+/** Derived from the machine, never typed twice (F2-196). */
+export const FINDING_TERMINAL: readonly ManagedFindingStatus[] =
+  terminalOf(FINDING_ALLOWED) as ManagedFindingStatus[];
+
+export const FINDING_UNMANAGED_STATUSES: readonly UnmanagedFindingStatus[] =
+  ['IN_PROGRESS', 'REMEDIATED', 'VERIFIED'];
+
+/** The legal next states for a finding — empty for terminal AND for unmanaged rows. */
+export function nextFindingStatuses(status: string): readonly ManagedFindingStatus[] {
+  return nextFrom(FINDING_ALLOWED, status);
+}
+
+/** Does the server's machine know this status at all? */
+export function isFindingStatusManaged(status: string): boolean {
+  return declares(FINDING_ALLOWED, status);
+}
+
+/**
+ * "Open" is the COMPLEMENT of the derived terminal set, never a second list (F2-196).
+ *
+ * That deliberately counts the three unmanaged statuses as open. VERIFIED and
+ * REMEDIATED read as finished, but nothing in this platform declares them terminal, so
+ * saying a finding is closed on that basis would be the platform blessing a synonym it
+ * has not adopted. For an audit finding the safe direction is to keep chasing it.
+ */
+export function isFindingOpen(status: string): boolean {
+  return !(FINDING_TERMINAL as readonly string[]).includes(status);
+}
 
 export interface AnnualPlan {
   /** e.g. "AP-2026". */
@@ -404,94 +587,20 @@ function fromBackendFinding(b: BackendFinding): Finding {
   };
 }
 
-// ─── Seeded fallback data ───────────────────────────────────────────────────
-// Used as the in-memory default before hydrate completes — the AC packet
-// and aggregation must always have something to compute against even when
-// the backend hasn't been reached yet (login screen, dev mock mode, etc.).
-
-const _now = Date.now();
-const _daysAgo = (n: number) => new Date(_now - n * 86_400_000).toISOString();
-const _daysAhead = (n: number) => new Date(_now + n * 86_400_000).toISOString().slice(0, 10);
-
-const SEED_PLAN: AnnualPlan = {
-  id: 'AP-2026',
-  year: 2026,
-  status: 'EXECUTING',
-  lastUpdated: _daysAgo(45),
-  acApprovedBy: 'Khalid Al-Falih (Audit Committee Chair)',
-  acApprovedAt: _daysAgo(40),
-  q1: MOCK_ENGAGEMENTS.slice(0, 2).map(e => e.engagementCode).filter((c): c is string => !!c),
-  q2: MOCK_ENGAGEMENTS.slice(2, 4).map(e => e.engagementCode).filter((c): c is string => !!c),
-  q3: MOCK_ENGAGEMENTS.slice(4, 6).map(e => e.engagementCode).filter((c): c is string => !!c),
-  q4: MOCK_ENGAGEMENTS.slice(6, 8).map(e => e.engagementCode).filter((c): c is string => !!c),
-  budgetHours: 4_800,
-  acNotesEn: 'Approved at AC meeting 2026-01-15. SAMA Cyber Resilience focus added per Q3 supervisory letter. Banking subsidiary scope expanded.',
-  acNotesAr: 'اعتُمدت في اجتماع لجنة المراجعة 15-01-2026. أُضيفت محاور المرونة السيبراني لساما وفق خطاب الإشراف للربع الثالث. تمّ توسيع نطاق التابعة المصرفية.',
-};
-
-const SEED_WPS: WorkingPaper[] = [
-  {
-    id: 'WP-2026-001',
-    engagementCode: MOCK_ENGAGEMENTS[0]?.engagementCode ?? 'ENG-001',
-    type: 'TEST',
-    refNumber: 'WP-001',
-    titleEn: 'Privileged access management — sample testing of 25 admin accounts',
-    titleAr: 'إدارة الوصول المُميَّز — اختبار عيّنة من 25 حساب مشرف',
-    author: 'Faisal Al-Otaibi (Senior Auditor)',
-    createdAt: _daysAgo(12),
-    status: 'APPROVED',
-    reviewer: 'Sara Al-Zahrani (Audit Manager)',
-    reviewedAt: _daysAgo(10),
-    procedureEn: 'Selected 25 of 142 active admin accounts using random sampling. For each, verified: (a) MFA enrolled, (b) last 90-day access review completed, (c) join/move/leave triggers had run, (d) PAM session recording was active.',
-    procedureAr: 'اختير 25 من 142 حساب مشرف نشط بالعيّنة العشوائية. لكل حساب جرى التحقق من: (أ) تسجيل المصادقة متعدّدة العوامل، (ب) إكمال مراجعة الوصول كل 90 يوماً، (ج) تشغيل محفّزات الانضمام/التنقّل/المغادرة، (د) فعالية تسجيل جلسات PAM.',
-    conclusionEn: '23/25 fully compliant. 2 findings raised — one MFA gap (FIN-001), one missing access-review evidence (FIN-002).',
-    conclusionAr: '23/25 ملتزمة بالكامل. رُفعت ملاحظتان — فجوة MFA (FIN-001) ونقص دليل مراجعة الوصول (FIN-002).',
-    controlsCovered: ['ECC-2-3-1', 'ECC-2-2-1', 'CSF-3-2-4'],
-    hours: 18,
-  },
-];
-
-const SEED_FINDINGS: Finding[] = [
-  {
-    id: 'FIN-2026-001',
-    engagementCode: MOCK_ENGAGEMENTS[0]?.engagementCode ?? 'ENG-001',
-    refNumber: 'FIN-001',
-    titleEn: 'MFA not enforced on 2 admin accounts',
-    titleAr: 'المصادقة متعدّدة العوامل غير مُفعَّلة على حسابَي مشرف',
-    severity: 'HIGH',
-    status: 'IN_REMEDIATION',
-    controlCrosswalk: [{ framework: 'NCA-ECC-V3', controlCode: 'ECC-2-3-1' }],
-    conditionEn: 'Sample testing of 25 admin accounts revealed 2 accounts (8%) without MFA enrolled.',
-    conditionAr: 'اختبار عيّنة من 25 حساب مشرف كشف 2 حسابات (8٪) دون تسجيل المصادقة متعدّدة العوامل.',
-    criteriaEn: 'NCA ECC v3 control 2-3-1 mandates multi-factor authentication on all privileged accounts.',
-    criteriaAr: 'يُلزم ضابط NCA ECC v3 رقم 2-3-1 بالمصادقة متعدّدة العوامل على جميع الحسابات المُميَّزة.',
-    causeEn: 'Service-account exemption process was undocumented.',
-    causeAr: 'عملية استثناء حسابات الخدمة كانت غير موثَّقة.',
-    recommendationEn: 'Enrol the 2 affected accounts in MFA within 7 days.',
-    recommendationAr: 'تسجيل الحسابَين في MFA خلال 7 أيام.',
-    targetDate: _daysAhead(14),
-    ownerRole: 'CISO',
-    raisedAt: _daysAgo(10),
-    capaIds: ['CAPA-2026-001'],
-  },
-];
-
-const SEED_CAPAS: CapaTask[] = [
-  {
-    id: 'CAPA-2026-001',
-    findingId: 'FIN-2026-001',
-    kind: 'CORRECTIVE',
-    titleEn: 'Enrol both affected admin accounts in MFA',
-    titleAr: 'تسجيل الحسابَين المُتأثَّرَين في MFA',
-    ownerRole: 'CISO',
-    targetDate: _daysAhead(2),
-    status: 'CLOSED',
-    closedAt: _daysAgo(5),
-    verificationNotesEn: 'Verified — both accounts now in MFA.',
-    verificationNotesAr: 'تمّ التحقق — الحسابان الآن في MFA.',
-    evidenceRef: 'EVD-2026-MFA-217',
-  },
-];
+// ─── F2-203: the seed corpus is deleted ─────────────────────────────────────
+//
+// Four `SEED_*` constants used to stand in whenever a register came back empty —
+// `if (_findings.length === 0) _findings = SEED_FINDINGS` — plus a second fallback
+// inside every `loadX()`. That is the F2-158 shape that made a 500 invisible for the
+// whole Role Management API: a client-side fallback renders plausible rows, so nobody
+// looks at the endpoint. Here the harm was sharper than a hidden error, because the
+// content was governance attribution: `SEED_PLAN` named an invented individual —
+// "Khalid Al-Falih (Audit Committee Chair)" — as having APPROVED the annual audit plan
+// under CMA Corporate Governance Regulations Article 95, with an approval date minted
+// from `Date.now()` at module load so it could never look stale (F2-194).
+//
+// A tenant whose audit register is genuinely empty now sees that it is empty. An
+// unreachable server is a DIFFERENT fact and is reported as one — see `_loadFailed`.
 
 // ─── In-memory cache + hydrate ──────────────────────────────────────────────
 
@@ -499,42 +608,62 @@ let _plan: AnnualPlan | null = null;
 let _wps: WorkingPaper[] = [];
 let _findings: Finding[] = [];
 let _capas: CapaTask[] = [];
+/** The REAL audit-engagement catalogue — `compliance.audit_engagements`, 12 rows. */
+let _engagements: AuditEngagementDto[] = [];
 let _hydratePromise: Promise<void> | null = null;
 let _hydrated = false;
+let _loadFailed = false;
 
 const EVENT = 'grc.audit.lifecycle.changed';
 
 /**
- * Fetch the four audit-lifecycle resources from the backend and seed the
- * in-memory cache. Safe to call multiple times — only the first call
- * actually hits the API; later calls return the same promise.
+ * Fetch the four audit-lifecycle registers plus the real engagement catalogue.
+ * Safe to call repeatedly — only the first call hits the API unless `force`.
  *
- * <p>Fall back to the in-memory SEED_* constants on network failure so
- * the page renders something even in offline / unauthenticated mode.
+ * <p>F2-203: there is no seed fallback. An empty register renders as empty and an
+ * unreachable server renders as a failure — two different facts that the previous
+ * `catch → SEED_*` collapsed into one plausible-looking screen.
  */
+/**
+ * Which annual plan an Audit Committee packet is about.
+ *
+ * ⚠ This function exists because of a mistake I made and only caught by rendering the
+ * document. `plans[0]` — insertion order — was replaced with "most recent year first", whose
+ * comment claimed it stopped a 2027 DRAFT shadowing the 2026 APPROVED plan. It does the exact
+ * shadowing it claimed to prevent, in the other direction: a Q3-2026 packet was built from
+ * next year's DRAFT, budget and quarters included. 🔑 A selection fix can reintroduce the bug
+ * it names, and neither version is visible in a passing test — the artefact has to be read.
+ *
+ * The plan a packet is about is the one for the CURRENT year. Falling back to the most recent
+ * is deliberate over falling back to nothing: an organisation whose 2026 plan was never
+ * entered still has a real 2025 plan, and the packet says which year it is showing.
+ */
+function pickCurrentPlan(plans: BackendAnnualPlan[]): BackendAnnualPlan {
+  const thisYear = new Date().getFullYear();
+  return plans.find(p => p.year === thisYear)
+    ?? [...plans].sort((a, b) => (b.year ?? 0) - (a.year ?? 0))[0];
+}
+
 export function hydrateAuditLifecycle(force = false): Promise<void> {
   if (_hydratePromise && !force) return _hydratePromise;
+  _loadFailed = false;
   _hydratePromise = (async () => {
-    try {
-      const plans    = await api.get<BackendAnnualPlan[]>('/api/audit-lc/annual-plans').catch(logAndEmpty<BackendAnnualPlan>);
-      const wps      = await api.get<BackendWorkingPaper[]>('/api/audit-lc/working-papers').catch(logAndEmpty<BackendWorkingPaper>);
-      const findings = await api.get<BackendFinding[]>('/api/audit-lc/findings').catch(logAndEmpty<BackendFinding>);
-      const capas    = await api.get<BackendCapaTask[]>('/api/audit-lc/capas').catch(logAndEmpty<BackendCapaTask>);
-      _plan = (plans.length > 0) ? fromBackendPlan(plans[0]) : SEED_PLAN;
-      _wps      = wps.map(fromBackendWp);
-      _findings = findings.map(fromBackendFinding);
-      _capas    = capas.map(fromBackendCapa);
-      if (_wps.length === 0)      _wps      = SEED_WPS;
-      if (_findings.length === 0) _findings = SEED_FINDINGS;
-      if (_capas.length === 0)    _capas    = SEED_CAPAS;
-      _hydrated = true;
-      emit();
-    } catch (e) {
-      console.warn('[auditLifecycle] hydrate failed, falling back to seed:', e);
-      _plan = SEED_PLAN; _wps = SEED_WPS; _findings = SEED_FINDINGS; _capas = SEED_CAPAS;
-      _hydrated = true;
-      emit();
-    }
+    const plans    = await api.get<BackendAnnualPlan[]>('/api/audit-lc/annual-plans').catch(logAndEmpty<BackendAnnualPlan>);
+    const wps      = await api.get<BackendWorkingPaper[]>('/api/audit-lc/working-papers').catch(logAndEmpty<BackendWorkingPaper>);
+    const findings = await api.get<BackendFinding[]>('/api/audit-lc/findings').catch(logAndEmpty<BackendFinding>);
+    const capas    = await api.get<BackendCapaTask[]>('/api/audit-lc/capas').catch(logAndEmpty<BackendCapaTask>);
+    // The engagement catalogue the AC packet and the KPI strip need. `CompliancePage`
+    // has read this endpoint all along; only this module was using a mock of it.
+    const engs = await complianceApi.auditEngagements(0, 200)
+      .then(p => p.content)
+      .catch(logAndEmpty<AuditEngagementDto>);
+    _plan = plans.length > 0 ? fromBackendPlan(pickCurrentPlan(plans)) : null;
+    _wps         = wps.map(fromBackendWp);
+    _findings    = findings.map(fromBackendFinding);
+    _capas       = capas.map(fromBackendCapa);
+    _engagements = engs;
+    _hydrated = true;
+    emit();
   })();
   return _hydratePromise;
 }
@@ -543,16 +672,61 @@ function logAndEmpty<T>(e: unknown): T[] {
   if (!(e instanceof ApiError) || e.status >= 500) {
     console.warn('[auditLifecycle] backend fetch failed:', e);
   }
+  // F2-203: an empty register and an unreachable one must not look the same. A 403 is
+  // an entitlement answer, not a failure, so it is not flagged.
+  if (!(e instanceof ApiError) || e.status !== 403) _loadFailed = true;
   return [] as T[];
 }
 
 /** Has hydrate() finished at least once? Exposed for tests / sanity checks. */
 export function isAuditLifecycleHydrated(): boolean { return _hydrated; }
 
+/**
+ * Did any register fail to load? The page must say so instead of rendering an empty
+ * list, which is the defect `RiskControlFindingPivotPage` still carries.
+ */
+export function auditLifecycleLoadFailed(): boolean { return _loadFailed; }
+
+// ─── Engagements (the real catalogue, and the codes the registers actually use) ──
+
+/** The real audit-engagement catalogue. Empty until hydrate resolves. */
+export function loadEngagements(): AuditEngagementDto[] { return _engagements; }
+
+/** A terminal engagement status — the complement is "in flight" (F2-196, not a list). */
+const ENGAGEMENT_TERMINAL: readonly string[] = ['CLOSED'];
+
+export function isEngagementInFlight(status: string | undefined): boolean {
+  return !!status && !ENGAGEMENT_TERMINAL.includes(status);
+}
+
+/**
+ * The engagement codes the findings and working-paper registers actually reference.
+ *
+ * F2-203: this — not a catalogue — is what the picker must offer. `engagement_code` is
+ * free text on both tables with no foreign key, and the five code spaces in play
+ * (findings `ENG-IA-00x`/`IA-2026-001`, working papers `IA-2026-001`, the real
+ * catalogue `AUD-2026-00x`, `audit_lc.ia_engagement` `ENG-2026-00x`, and the annual
+ * plan's `ENG-CYBER-2026Q1`…) do not intersect. A picker built from the groups its own
+ * lists contain cannot show an empty tab; a picker built from a catalogue can, and did,
+ * for all eight of its options.
+ */
+export function registerEngagementCodes(): string[] {
+  const codes = new Set<string>();
+  _findings.forEach(f => { if (f.engagementCode) codes.add(f.engagementCode); });
+  _wps.forEach(w => { if (w.engagementCode) codes.add(w.engagementCode); });
+  return [...codes].sort();
+}
+
 // ─── Annual plan ────────────────────────────────────────────────────────────
 
-export function loadAnnualPlan(): AnnualPlan {
-  return _plan ?? SEED_PLAN;
+/**
+ * The most recent annual audit plan, or null when the register holds none.
+ *
+ * F2-203: this used to return `SEED_PLAN` — an invented Audit Committee chair and an
+ * approval date — rather than admit the register was empty.
+ */
+export function loadAnnualPlan(): AnnualPlan | null {
+  return _plan;
 }
 
 export function saveAnnualPlan(plan: AnnualPlan): AnnualPlan {
@@ -573,31 +747,34 @@ export function saveAnnualPlan(plan: AnnualPlan): AnnualPlan {
   return next;
 }
 
-export function transitionPlan(status: AnnualPlanStatus, by?: string): AnnualPlan {
+/**
+ * Move the annual plan through its Audit-Committee lifecycle, taking the row back
+ * from the server.
+ *
+ * F2-203: the `by` parameter is gone. The caller used to pass
+ * `'Khalid Al-Falih (AC Chair)'` — an invented individual — and this function wrote it
+ * into the local cache as `acApprovedBy` while the server stamped the AUTHENTICATED
+ * principal (`AuditLifecycleController` takes the actor from `Authentication` and
+ * ignores the body, per SEC-IAM-002). Nothing read the response, so the screen credited
+ * an Audit Committee approval to a person who does not exist while the audit trail
+ * recorded someone else. Replacing the row from the response fixes both halves and
+ * removes any need for the client to name an approver at all.
+ */
+export async function transitionPlan(status: AnnualPlanStatus): Promise<AnnualPlan> {
   const plan = loadAnnualPlan();
-  const updated: AnnualPlan = { ...plan, status };
-  if (status === 'AC_APPROVED') { updated.acApprovedBy = by; updated.acApprovedAt = new Date().toISOString(); }
-  _plan = { ...updated, lastUpdated: new Date().toISOString() };
+  if (!plan) throw new Error('no annual plan loaded');
+  const saved = fromBackendPlan(await api.post<BackendAnnualPlan>(
+    `/api/audit-lc/annual-plans/${encodeURIComponent(plan.id)}/transition`,
+    { to: status }));
+  _plan = saved;
   emit();
-  // Server enforces the legal transitions; if it rejects, fall back to a
-  // full save so the displayed status doesn't drift from the server.
-  void api.post<BackendAnnualPlan>(
-    `/api/audit-lc/annual-plans/${encodeURIComponent(updated.id)}/transition`,
-    { to: status })
-    .catch(err => {
-      if (err instanceof ApiError && err.status === 404) {
-        void api.post<BackendAnnualPlan>('/api/audit-lc/annual-plans', toBackendPlan(updated));
-      } else {
-        console.warn('[auditLifecycle] transition plan failed:', err);
-      }
-    });
-  return _plan;
+  return saved;
 }
 
 // ─── Working papers ─────────────────────────────────────────────────────────
 
 export function loadWorkingPapers(): WorkingPaper[] {
-  return _wps.length > 0 ? _wps : SEED_WPS;
+  return _wps;
 }
 
 export function workingPapersForEngagement(code: string): WorkingPaper[] {
@@ -618,100 +795,130 @@ export function saveWorkingPaper(wp: WorkingPaper): WorkingPaper {
   return wp;
 }
 
-export function transitionWorkingPaper(id: string, status: WorkingPaperStatus, reviewer?: string): WorkingPaper | null {
-  const wp = loadWorkingPapers().find(w => w.id === id);
-  if (!wp) return null;
-  const updated: WorkingPaper = {
-    ...wp, status,
-    reviewer: status === 'APPROVED' || status === 'REJECTED' ? reviewer ?? wp.reviewer : wp.reviewer,
-    reviewedAt: status === 'APPROVED' || status === 'REJECTED' ? new Date().toISOString() : wp.reviewedAt,
-  };
-  _wps = _wps.map(w => w.id === id ? updated : w);
-  emit();
-  void api.post<BackendWorkingPaper>(
+/**
+ * F2-203: `reviewer` is gone for the same reason `by` left {@link transitionPlan} — the
+ * caller passed the invented `'Sara Al-Zahrani (Audit Manager)'` while
+ * `AuditLifecycleService.transitionWorkingPaper` stamps `actor(auth)`. Take the row back.
+ */
+export async function transitionWorkingPaper(id: string, status: WorkingPaperStatus): Promise<WorkingPaper> {
+  const saved = fromBackendWp(await api.post<BackendWorkingPaper>(
     `/api/audit-lc/working-papers/${encodeURIComponent(id)}/transition`,
-    { to: status })
-    .catch(e => console.warn('[auditLifecycle] transition wp failed:', e));
-  return updated;
+    { to: status }));
+  _wps = _wps.map(w => w.id === id ? saved : w);
+  emit();
+  return saved;
 }
 
-export function createWorkingPaper(engagementCode: string, type: WorkingPaperType, titleEn: string, titleAr: string, author: string, hours: number): WorkingPaper {
-  const existing = loadWorkingPapers().filter(w => w.engagementCode === engagementCode);
+/**
+ * F2-203: no `author` parameter. The page passed `'Faisal Al-Otaibi (Auditor)'` and,
+ * unlike the two transitions above, `createWorkingPaper` on the server saves the body
+ * verbatim — so that invented auditor was PERSISTED as the author of an IIA Standard
+ * 2330 working paper. The server now stamps the authenticated principal.
+ *
+ * `externalId` is still minted here because `AuditLifecycleService.createWorkingPaper`
+ * throws without one — that contract is the same on annual plans and CAPAs, and
+ * changing all three is filed rather than done in a findings slice.
+ */
+export async function createWorkingPaper(
+  engagementCode: string, type: WorkingPaperType,
+  titleEn: string, titleAr: string, hours: number,
+): Promise<WorkingPaper> {
+  const existing = _wps.filter(w => w.engagementCode === engagementCode);
   const refNumber = `WP-${String(existing.length + 1).padStart(3, '0')}`;
   const id = `WP-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-  const wp: WorkingPaper = {
-    id, engagementCode, type, refNumber,
-    titleEn, titleAr,
-    author,
-    createdAt: new Date().toISOString(),
-    status: 'DRAFT',
-    procedureEn: '', procedureAr: '',
-    conclusionEn: '', conclusionAr: '',
-    controlsCovered: [],
-    hours,
-  };
-  return saveWorkingPaper(wp);
+  const saved = fromBackendWp(await api.post<BackendWorkingPaper>('/api/audit-lc/working-papers', {
+    externalId: id, engagementCode, type, refNumber,
+    titleEn, titleAr, status: 'DRAFT',
+    procedureEn: '', procedureAr: '', conclusionEn: '', conclusionAr: '',
+    controlsCovered: '', hours,
+  }));
+  _wps = [..._wps.filter(w => w.id !== saved.id), saved];
+  emit();
+  return saved;
 }
 
 // ─── Findings ───────────────────────────────────────────────────────────────
 
 export function loadFindings(): Finding[] {
-  return _findings.length > 0 ? _findings : SEED_FINDINGS;
+  return _findings;
 }
 
 export function findingsForEngagement(code: string): Finding[] {
-  return loadFindings().filter(f => f.engagementCode === code);
+  return _findings.filter(f => f.engagementCode === code);
 }
 
-export function saveFinding(f: Finding): Finding {
-  _findings = [..._findings.filter(x => x.id !== f.id), f];
+/**
+ * Raise a finding. The SERVER mints the reference and the sequence number.
+ *
+ * F2-203: this used to mint `FIN-<year>-<4 base-36 chars>` as the external id and
+ * `FIN-%03d` as the ref number, then hand both to a function that wrote neither
+ * anywhere. `FindingService.create` mints both when the request omits them — and it
+ * used to HONOUR them when supplied, which is F2-172(d)'s defect ("only the server may
+ * issue a tracking code"); that half is closed in the same commit. The client-side
+ * sequence was wrong regardless: it counted the local cache, which included a seeded
+ * finding, so the first real finding on an engagement would have been FIN-002.
+ *
+ * `ownerRole` is a required argument with no default on purpose — the page used to pass
+ * the literal string `'Owner role'`.
+ */
+export async function createFinding(
+  engagementCode: string, titleEn: string, titleAr: string,
+  severity: FindingSeverity, conditionEn: string, conditionAr: string, ownerRole: string,
+): Promise<Finding> {
+  const saved = fromBackendFinding(await api.post<BackendFinding>('/api/audit-lc/findings', {
+    engagementCode, titleEn, titleAr, severity,
+    conditionEn, conditionAr, ownerRole,
+  }));
+  _findings = [saved, ..._findings.filter(x => x.id !== saved.id)];
   emit();
-  // F2-202: no REST mirror here. `mirrorSaveToBackend`/`mirrorTransitionToBackend`
-  // used to be called on this line; both returned before sending anything because the
-  // persistence-mode switch they read had no setter in the product. This store is
-  // declared BROWSER_LOCAL in `lib/lifecycleStores.ts` with its real endpoint and
-  // measured row count — that declaration is gated; a silent no-op was not.
-  return f;
+  return saved;
 }
 
-export function createFinding(engagementCode: string, titleEn: string, titleAr: string, severity: FindingSeverity, conditionEn: string, conditionAr: string, ownerRole: string): Finding {
-  const existing = loadFindings().filter(f => f.engagementCode === engagementCode);
-  const refNumber = `FIN-${String(existing.length + 1).padStart(3, '0')}`;
-  const id = `FIN-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-  const f: Finding = {
-    id, engagementCode, refNumber,
-    titleEn, titleAr, severity, status: 'OPEN',
-    controlCrosswalk: [],
-    conditionEn, conditionAr,
-    criteriaEn: '', criteriaAr: '',
-    causeEn: '', causeAr: '',
-    recommendationEn: '', recommendationAr: '',
-    targetDate: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
-    ownerRole,
-    raisedAt: new Date().toISOString(),
-    capaIds: [],
-  };
-  return saveFinding(f);
-}
-
-export function transitionFinding(id: string, status: FindingStatus): Finding | null {
-  const f = loadFindings().find(x => x.id === id);
-  if (!f) return null;
-  const updated = { ...f, status };
-  _findings = _findings.map(x => x.id === id ? updated : x);
+/**
+ * Advance a finding through the IIA lifecycle. The row comes back FROM THE SERVER.
+ *
+ * F2-203: the whole body used to be three lines of local array assignment. Nothing was
+ * written, so an auditor who closed a finding saw it close and a reload undid it. The
+ * caller must pick `status` from {@link nextFindingStatuses} — this function does not
+ * validate, because the server's machine is the authority and answers 409; what it must
+ * not do is compute the new status itself, which is why the cache is replaced from the
+ * response rather than patched with the requested value.
+ *
+ * `mgmtResponse*` ride on the transition because that is where the server accepts them
+ * — there is no PUT on findings at all (filed).
+ */
+export async function transitionFinding(
+  id: string, status: ManagedFindingStatus,
+  mgmt?: { responseEn?: string; responseAr?: string },
+): Promise<Finding> {
+  const saved = fromBackendFinding(await api.post<BackendFinding>(
+    `/api/audit-lc/findings/${encodeURIComponent(id)}/transition`,
+    { status, mgmtResponseEn: mgmt?.responseEn, mgmtResponseAr: mgmt?.responseAr }));
+  _findings = _findings.map(x => x.id === id ? saved : x);
   emit();
-  // F2-202: no REST mirror here — see `lib/lifecycleStores.ts`.
-  return updated;
+  return saved;
 }
 
 // ─── CAPAs ──────────────────────────────────────────────────────────────────
 
 export function loadCapas(): CapaTask[] {
-  return _capas.length > 0 ? _capas : SEED_CAPAS;
+  return _capas;
 }
 
-export function capasForFinding(findingId: string): CapaTask[] {
-  return loadCapas().filter(c => c.findingId === findingId);
+/**
+ * The CAPAs raised against a finding.
+ *
+ * F2-203: takes the FINDING, not an id, because `audit_lc.capa_tasks.finding_id` has two
+ * writers that disagree about what it holds. The seeded rows carry the finding's
+ * `ref_number` (`F-2026-001`); this module's own `createCapa` sends the `external_id`
+ * (a GUID). It is free text with no foreign key, so `capasForFinding(f.id)` matched
+ * nothing and all 12 CAPAs in dev and prod were invisible on the CAPA tab.
+ *
+ * Matching either key is a tolerant read, deliberately: picking one and rewriting the
+ * other's rows in two databases is an owner decision (F2-183). Filed.
+ */
+export function capasForFinding(finding: Pick<Finding, 'id' | 'refNumber'>): CapaTask[] {
+  return _capas.filter(c => c.findingId === finding.id || c.findingId === finding.refNumber);
 }
 
 export function saveCapa(c: CapaTask): CapaTask {
@@ -729,7 +936,7 @@ export function saveCapa(c: CapaTask): CapaTask {
 }
 
 export function createCapa(findingId: string, kind: 'CORRECTIVE' | 'PREVENTIVE', titleEn: string, titleAr: string, ownerRole: string): CapaTask {
-  const id = `CAPA-${new Date().getFullYear()}-${String(loadCapas().length + 1).padStart(3, '0')}`;
+  const id = `CAPA-${new Date().getFullYear()}-${String(_capas.length + 1).padStart(3, '0')}`;
   const c: CapaTask = {
     id, findingId, kind,
     titleEn, titleAr, ownerRole,
@@ -737,9 +944,12 @@ export function createCapa(findingId: string, kind: 'CORRECTIVE' | 'PREVENTIVE',
     status: 'OPEN',
   };
   saveCapa(c);
-  // Link CAPA to its finding.
-  const f = loadFindings().find(x => x.id === findingId);
-  if (f) saveFinding({ ...f, capaIds: [...f.capaIds, id] });
+  // F2-203: the back-link used to be written here, as `saveFinding({...f, capaIds: [...]})`
+  // — into a function that wrote nothing. There is no endpoint that updates a finding, so
+  // the finding's `capa_ids` column is the server's own denormalised copy and a client
+  // cannot maintain it. The authoritative link is `capa_tasks.finding_id`, which this row
+  // carries; {@link capasForFinding} reads that. Filed: nothing on the server populates
+  // `findings.capa_ids` either — it is NULL on all 20 rows in both databases.
   return c;
 }
 
@@ -787,10 +997,56 @@ function emit() {
 }
 
 // ─── AC packet generator ───────────────────────────────────────────────────
+//
+// F2-203: this is an EXPORT — .txt download, print-to-PDF classified "CONFIDENTIAL —
+// AUDIT COMMITTEE", and a branded XLSX/DOCX through the server's reporting subsystem.
+// Section 2 and the whole "Engagements" sheet used to be built from `MOCK_ENGAGEMENTS`,
+// so the document an Audit Committee receives under CMA Article 95 listed eight
+// invented engagements — each joined against the real registers and therefore each
+// reporting "WPs: 0 · Findings: 0" while section 3 counted 20 real findings. The packet
+// contradicted itself on the same page.
+//
+// 🔑 F2-199's `exportProvenance` gate passed it, because the gate asks whether server
+// data is in scope for the emitting file and this file DOES call `api.get`. A one-hop
+// scope rule cannot tell WHICH data reaches the document, so a file that mixes real and
+// fabricated sources reads as fully backed. That is the ninth instrument in this
+// lineage and the ninth distinct reason one of them was blind.
+
+/** A row of section 2 — measured from the registers, not from a catalogue. */
+function engagementProgressRows(): { code: string; title: string; wps: number; findings: number }[] {
+  return registerEngagementCodes().map(code => {
+    const known = _engagements.find(e => e.engagementCode === code);
+    return {
+      code,
+      // No title rather than an invented one when the code resolves in no catalogue —
+      // which today is all of them, because the five code spaces do not intersect.
+      title: known?.titleEn ?? '',
+      wps: _wps.filter(w => w.engagementCode === code).length,
+      findings: _findings.filter(f => f.engagementCode === code).length,
+    };
+  });
+}
+
+/**
+ * Severity tally that cannot produce NaN. `audit_lc.findings.severity` has no CHECK
+ * either — only `FindingDto`'s `@Pattern` narrows the API path, and the seed rows were
+ * inserted around it — so `sevCounts[f.severity]++` on an undeclared token would have
+ * put NaN into a document going to an Audit Committee.
+ */
+function tallySeverities(findings: Finding[]): Record<string, number> {
+  const out: Record<string, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, OBSERVATION: 0 };
+  findings.forEach(f => { out[f.severity] = (out[f.severity] ?? 0) + 1; });
+  return out;
+}
+
+/** Overdue = past its target date and not in the DERIVED terminal set (F2-196). */
+function countOverdueFindings(findings: Finding[]): number {
+  const today = new Date();
+  return findings.filter(f => f.targetDate && new Date(f.targetDate) < today && isFindingOpen(f.status)).length;
+}
 
 export function buildAcPacket(orgEn: string, orgAr: string, quarter: string): string {
   const plan = loadAnnualPlan();
-  const wps = loadWorkingPapers();
   const findings = loadFindings();
   const capas = loadCapas();
 
@@ -809,30 +1065,41 @@ export function buildAcPacket(orgEn: string, orgAr: string, quarter: string): st
   lines.push('');
 
   lines.push('1. ANNUAL AUDIT PLAN STATUS · حالة خطة التدقيق السنوية');
-  lines.push(`   Plan ID  : ${plan.id} (${plan.year})`);
-  lines.push(`   Status   : ${plan.status}`);
-  lines.push(`   Approved : ${plan.acApprovedBy ?? '—'} on ${plan.acApprovedAt ? dt(plan.acApprovedAt) : '—'}`);
-  lines.push(`   Budget   : ${plan.budgetHours.toLocaleString()} hours`);
-  lines.push(`   Q1 (${plan.q1.length}): ${plan.q1.join(', ')}`);
-  lines.push(`   Q2 (${plan.q2.length}): ${plan.q2.join(', ')}`);
-  lines.push(`   Q3 (${plan.q3.length}): ${plan.q3.join(', ')}`);
-  lines.push(`   Q4 (${plan.q4.length}): ${plan.q4.join(', ')}`);
+  if (!plan) {
+    // F2-197: an absence must read as unmeasured, never as an all-clear. The previous
+    // code could not reach this branch — it substituted an invented approved plan.
+    lines.push('   No annual audit plan is recorded for this organisation.');
+    lines.push('   لا توجد خطة تدقيق سنوية مُسجَّلة لهذه الجهة.');
+  } else {
+    lines.push(`   Plan ID  : ${plan.id} (${plan.year})`);
+    lines.push(`   Status   : ${plan.status}`);
+    lines.push(`   Approved : ${plan.acApprovedBy ?? '—'} on ${plan.acApprovedAt ? dt(plan.acApprovedAt) : '—'}`);
+    lines.push(`   Budget   : ${plan.budgetHours.toLocaleString()} hours`);
+    lines.push(`   Q1 (${plan.q1.length}): ${plan.q1.join(', ')}`);
+    lines.push(`   Q2 (${plan.q2.length}): ${plan.q2.join(', ')}`);
+    lines.push(`   Q3 (${plan.q3.length}): ${plan.q3.join(', ')}`);
+    lines.push(`   Q4 (${plan.q4.length}): ${plan.q4.join(', ')}`);
+  }
   lines.push('');
 
   lines.push('2. ENGAGEMENT PROGRESS · تقدّم الارتباطات');
-  MOCK_ENGAGEMENTS.slice(0, 8).forEach(e => {
-    const wpsForEng = wps.filter(w => w.engagementCode === e.engagementCode);
-    const findingsForEng = findings.filter(f => f.engagementCode === e.engagementCode);
-    lines.push(`   [${e.engagementCode}] ${e.titleEn} / ${e.titleAr}`);
-    lines.push(`     Status: ${e.status} · WPs: ${wpsForEng.length} · Findings: ${findingsForEng.length}`);
-  });
+  const progress = engagementProgressRows();
+  if (progress.length === 0) {
+    lines.push('   No engagement is referenced by any working paper or finding.');
+    lines.push('   لا يوجد ارتباط مُشار إليه في أي ورقة عمل أو ملاحظة.');
+  } else {
+    progress.forEach(r => {
+      lines.push(`   [${r.code}]${r.title ? ` ${r.title}` : ''}`);
+      lines.push(`     WPs: ${r.wps} · Findings: ${r.findings}`);
+    });
+  }
+  lines.push(`   Engagements in the audit-engagement catalogue: ${_engagements.length}`);
   lines.push('');
 
   lines.push('3. FINDINGS BY SEVERITY · الملاحظات بحسب الخطورة');
-  const sevCounts: Record<FindingSeverity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, OBSERVATION: 0 };
-  findings.forEach(f => sevCounts[f.severity]++);
+  const sevCounts = tallySeverities(findings);
   Object.entries(sevCounts).forEach(([sev, n]) => lines.push(`   ${sev.padEnd(12)}: ${n}`));
-  const overdue = findings.filter(f => f.targetDate && new Date(f.targetDate) < new Date() && f.status !== 'CLOSED').length;
+  const overdue = countOverdueFindings(findings);
   lines.push(`   Overdue     : ${overdue}`);
   lines.push('');
 
@@ -851,7 +1118,8 @@ export function buildAcPacket(orgEn: string, orgAr: string, quarter: string): st
   findings
     .filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH')
     .forEach(f => {
-      lines.push(`   [${f.refNumber}] ${f.severity} · ${f.status}`);
+      lines.push(`   [${f.refNumber}] ${f.severity} · ${f.status}`
+        + (isFindingStatusManaged(f.status) ? '' : ' (no transition declared for this status)'));
       lines.push(`     EN: ${f.titleEn}`);
       lines.push(`     AR: ${f.titleAr}`);
       lines.push(`     Owner: ${f.ownerRole ?? '—'}`);
@@ -870,12 +1138,10 @@ export function buildAcPacket(orgEn: string, orgAr: string, quarter: string): st
  *  "Severity"/"Status" headers drive the workbook's conditional formatting. */
 export function buildAcSheets(): { name: string; headers: string[]; rows: string[][] }[] {
   const plan = loadAnnualPlan();
-  const wps = loadWorkingPapers();
   const findings = loadFindings();
   const capas = loadCapas();
-  const sev: Record<FindingSeverity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, OBSERVATION: 0 };
-  findings.forEach(f => sev[f.severity]++);
-  const overdue = findings.filter(f => f.targetDate && new Date(f.targetDate) < new Date() && f.status !== 'CLOSED').length;
+  const sev = tallySeverities(findings);
+  const overdue = countOverdueFindings(findings);
   const totalCapas = capas.length;
   const closedCapas = capas.filter(c => c.status === 'CLOSED').length;
   const overdueCapas = capas.filter(c => new Date(c.targetDate) < new Date() && c.status !== 'CLOSED').length;
@@ -883,20 +1149,20 @@ export function buildAcSheets(): { name: string; headers: string[]; rows: string
     {
       name: 'Annual Plan',
       headers: ['Field', 'Value'],
-      rows: [
+      rows: plan ? [
         ['Plan ID', `${plan.id} (${plan.year})`],
         ['Status', plan.status],
         ['Approved by', plan.acApprovedBy ?? '—'],
         ['Budget (hours)', String(plan.budgetHours)],
         ['Q1 / Q2 / Q3 / Q4', `${plan.q1.length} / ${plan.q2.length} / ${plan.q3.length} / ${plan.q4.length}`],
-      ],
+      ] : [['Plan', 'No annual audit plan is recorded for this organisation']],
     },
     {
+      // F2-203: the engagements this register actually covers. The row used to be one
+      // per invented engagement, each reporting 0 working papers and 0 findings.
       name: 'Engagements',
-      headers: ['Code', 'Title', 'Status', 'Working Papers', 'Findings'],
-      rows: MOCK_ENGAGEMENTS.map(e => [e.engagementCode ?? '', e.titleEn ?? '', e.status ?? '',
-        String(wps.filter(w => w.engagementCode === e.engagementCode).length),
-        String(findings.filter(f => f.engagementCode === e.engagementCode).length)]),
+      headers: ['Code', 'Title', 'Working Papers', 'Findings'],
+      rows: engagementProgressRows().map(r => [r.code, r.title, String(r.wps), String(r.findings)]),
     },
     {
       name: 'Findings by Severity',
@@ -918,7 +1184,9 @@ export function buildAcSheets(): { name: string; headers: string[]; rows: string
       name: 'Key Findings',
       headers: ['Ref', 'Severity', 'Status', 'Title', 'Owner', 'Target', 'Frameworks'],
       rows: findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').map(f =>
-        [f.refNumber, f.severity, f.status, f.titleEn, f.ownerRole ?? '—', f.targetDate ?? '—',
+        [f.refNumber, f.severity,
+          f.status + (isFindingStatusManaged(f.status) ? '' : ' (unmanaged)'),
+          f.titleEn, f.ownerRole ?? '—', f.targetDate ?? '—',
           f.controlCrosswalk.map(c => `${c.framework}/${c.controlCode}`).join(', ')]),
     },
   ];
@@ -932,11 +1200,37 @@ export const PLAN_STATUS_LABEL: Record<AnnualPlanStatus, { en: string; ar: strin
   AC_APPROVED:  { en: 'AC approved',    ar: 'مُعتمَدة من لجنة المراجعة' },
   EXECUTING:    { en: 'Executing',      ar: 'قيد التنفيذ' },
   CLOSED:       { en: 'Closed',         ar: 'مُغلَقة' },
+  // F2-203: the value the 2026 plan actually holds. Indexing this map directly on it is a
+  // TypeError that took the whole Plan tab down — and only `plans[0]` happening to select the
+  // OTHER row kept it from firing. This slice's own plan-selection fix is what exposed it.
+  APPROVED:     { en: 'Approved',       ar: 'مُعتمَدة' },
 };
 
 export const PLAN_STATUS_TONE: Record<AnnualPlanStatus, 'neutral' | 'info' | 'success' | 'primary'> = {
   DRAFT: 'neutral', AC_REVIEW: 'info', AC_APPROVED: 'success', EXECUTING: 'primary', CLOSED: 'neutral',
+  APPROVED: 'success',
 };
+
+/** Mirrors `AuditLifecycleService.AP_TRANSITIONS`. Pinned by AuditFindingMachineParityTest. */
+export const PLAN_ALLOWED: Record<ManagedAnnualPlanStatus, readonly ManagedAnnualPlanStatus[]> = {
+  DRAFT:       ['AC_REVIEW'],
+  AC_REVIEW:   ['AC_APPROVED', 'DRAFT'],
+  AC_APPROVED: ['EXECUTING'],
+  EXECUTING:   ['CLOSED'],
+  CLOSED:      [],
+};
+
+export const PLAN_UNMANAGED_STATUSES: readonly string[] = ['APPROVED'];
+
+export function nextPlanStatuses(status: string): readonly ManagedAnnualPlanStatus[] {
+  return nextFrom(PLAN_ALLOWED, status);
+}
+export function isPlanStatusManaged(status: string): boolean {
+  return declares(PLAN_ALLOWED, status);
+}
+export function planStatusLabel(status: string, lang: 'en' | 'ar'): string {
+  return labelFrom(PLAN_STATUS_LABEL, status, lang);
+}
 
 export const WP_TYPE_LABEL: Record<WorkingPaperType, { en: string; ar: string }> = {
   TEST:            { en: 'Test',             ar: 'اختبار' },
@@ -944,11 +1238,54 @@ export const WP_TYPE_LABEL: Record<WorkingPaperType, { en: string; ar: string }>
   OBSERVATION:     { en: 'Observation',      ar: 'ملاحظة' },
   DOCUMENT_REVIEW: { en: 'Document review',  ar: 'مراجعة مستند' },
   WALKTHROUGH:     { en: 'Walkthrough',      ar: 'تجوال' },
+  // F2-203: the four types the register actually holds, 11 of 12 rows in prod. Unlike the
+  // status vocabularies these carry no lifecycle, so labelling them is the whole fix —
+  // there is no transition to disclose as unavailable.
+  DESIGN_TEST:     { en: 'Design test',      ar: 'اختبار تصميم' },
+  OPERATING_TEST:  { en: 'Operating test',   ar: 'اختبار تشغيل' },
+  SAMPLE_TEST:     { en: 'Sample test',      ar: 'اختبار عيّنة' },
+  FOLLOW_UP:       { en: 'Follow-up',        ar: 'متابعة' },
 };
+
+export function workingPaperTypeLabel(type: string, lang: 'en' | 'ar'): string {
+  return labelFrom(WP_TYPE_LABEL, type, lang);
+}
 
 export const WP_STATUS_TONE: Record<WorkingPaperStatus, 'neutral' | 'warning' | 'success' | 'danger'> = {
   DRAFT: 'neutral', PEER_REVIEW: 'warning', APPROVED: 'success', REJECTED: 'danger',
+  // F2-203: 8 of the 12 working papers hold this. An undeclared key here gave
+  // `tone={undefined}` rather than a crash, so this instance was quieter than the plan's —
+  // and just as stuck: WP_TRANSITIONS has no edge out of REVIEWED.
+  REVIEWED: 'success',
 };
+
+export const WP_STATUS_LABEL: Record<WorkingPaperStatus, { en: string; ar: string }> = {
+  DRAFT:       { en: 'Draft',       ar: 'مسوّدة' },
+  PEER_REVIEW: { en: 'Peer review', ar: 'مراجعة الأقران' },
+  APPROVED:    { en: 'Approved',    ar: 'مُعتمَدة' },
+  REJECTED:    { en: 'Rejected',    ar: 'مرفوضة' },
+  REVIEWED:    { en: 'Reviewed',    ar: 'تمّت المراجعة' },
+};
+
+/** Mirrors `AuditLifecycleService.WP_TRANSITIONS`. */
+export const WP_ALLOWED: Record<ManagedWorkingPaperStatus, readonly ManagedWorkingPaperStatus[]> = {
+  DRAFT:       ['PEER_REVIEW'],
+  PEER_REVIEW: ['APPROVED', 'REJECTED'],
+  REJECTED:    ['DRAFT'],          // the re-work loop
+  APPROVED:    [],
+};
+
+export const WP_UNMANAGED_STATUSES: readonly string[] = ['REVIEWED'];
+
+export function nextWorkingPaperStatuses(status: string): readonly ManagedWorkingPaperStatus[] {
+  return nextFrom(WP_ALLOWED, status);
+}
+export function isWorkingPaperStatusManaged(status: string): boolean {
+  return declares(WP_ALLOWED, status);
+}
+export function workingPaperStatusLabel(status: string, lang: 'en' | 'ar'): string {
+  return labelFrom(WP_STATUS_LABEL, status, lang);
+}
 
 export const SEVERITY_TONE: Record<FindingSeverity, 'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low' | 'neutral'> = {
   CRITICAL: 'risk-crit', HIGH: 'risk-high', MEDIUM: 'risk-med', LOW: 'risk-low', OBSERVATION: 'neutral',
@@ -960,10 +1297,30 @@ export const FINDING_STATUS_LABEL: Record<FindingStatus, { en: string; ar: strin
   IN_REMEDIATION:        { en: 'In remediation',        ar: 'قيد المعالجة' },
   AWAITING_VERIFICATION: { en: 'Awaiting verification', ar: 'بانتظار التحقق' },
   CLOSED:                { en: 'Closed',                ar: 'مُغلَقة' },
+  // F2-203: the three statuses real rows carry that the server's machine has no edge
+  // out of. Labelled so the register can be displayed; see UnmanagedFindingStatus for
+  // why they are not folded into the five above.
+  IN_PROGRESS:           { en: 'In progress',           ar: 'قيد التنفيذ' },
+  REMEDIATED:            { en: 'Remediated',            ar: 'تمّت المعالجة' },
+  VERIFIED:              { en: 'Verified',              ar: 'تمّ التحقق' },
 };
+
+/**
+ * A label for any status string, including one this build has never heard of.
+ *
+ * F2-203: `FINDING_STATUS_LABEL[f.status][lang]` was indexed directly, which is a
+ * TypeError on an undeclared token — and `audit_lc.findings.status` has NO CHECK
+ * constraint, so a ninth value can arrive from a data fix or an integration at any
+ * time. Falling back to the raw token shows the operator what the column holds rather
+ * than blanking the row or taking the page down.
+ */
+export function findingStatusLabel(status: string, lang: 'en' | 'ar'): string {
+  return labelFrom(FINDING_STATUS_LABEL, status, lang);
+}
 
 export const CAPA_STATUS_TONE: Record<CapaStatus, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   OPEN: 'neutral', IN_PROGRESS: 'info', AWAITING_VERIFICATION: 'warning', CLOSED: 'success', OVERDUE: 'danger',
+  VERIFIED: 'success',
 };
 
 export const CAPA_STATUS_LABEL: Record<CapaStatus, { en: string; ar: string }> = {
@@ -972,7 +1329,32 @@ export const CAPA_STATUS_LABEL: Record<CapaStatus, { en: string; ar: string }> =
   AWAITING_VERIFICATION: { en: 'Awaiting verification', ar: 'بانتظار التحقق' },
   CLOSED:                { en: 'Closed',                ar: 'مُغلَقة' },
   OVERDUE:               { en: 'Overdue',               ar: 'متأخّرة' },
+  // F2-203: 3 of the 12 CAPAs hold this, and the CAPA tab indexed this map directly — the
+  // same TypeError as the Plan tab, dodged only when the row was ALSO past its target date
+  // and the "overdue" branch won the ternary.
+  VERIFIED:              { en: 'Verified',              ar: 'تمّ التحقق' },
 };
+
+/** Mirrors `AuditLifecycleService.CAPA_TRANSITIONS`. */
+export const CAPA_ALLOWED: Record<ManagedCapaStatus, readonly ManagedCapaStatus[]> = {
+  OPEN:                  ['IN_PROGRESS', 'AWAITING_VERIFICATION'],
+  IN_PROGRESS:           ['AWAITING_VERIFICATION', 'OPEN'],
+  AWAITING_VERIFICATION: ['CLOSED', 'IN_PROGRESS'],
+  OVERDUE:               ['IN_PROGRESS', 'AWAITING_VERIFICATION'],
+  CLOSED:                [],
+};
+
+export const CAPA_UNMANAGED_STATUSES: readonly string[] = ['VERIFIED'];
+
+export function nextCapaStatuses(status: string): readonly ManagedCapaStatus[] {
+  return nextFrom(CAPA_ALLOWED, status);
+}
+export function isCapaStatusManaged(status: string): boolean {
+  return declares(CAPA_ALLOWED, status);
+}
+export function capaStatusLabel(status: string, lang: 'en' | 'ar'): string {
+  return labelFrom(CAPA_STATUS_LABEL, status, lang);
+}
 
 // ─── Aggregation ────────────────────────────────────────────────────────────
 
@@ -989,22 +1371,29 @@ export interface AuditLifecycleStats {
   closureRate: number;
 }
 
+/**
+ * F2-203: every figure here is now measured from a register the server answered.
+ *
+ * `totalEngagements` was `MOCK_ENGAGEMENTS.length` — the length of a demo corpus, so
+ * every tenant's Audit Committee workspace reported the same 6. `engagementsInFlight`
+ * was an INCLUSION list (`PLANNED || FIELDWORK`) over a 7-value status vocabulary, so it
+ * silently dropped ENGAGED, MGMT_RESPONSE, OPENING_MEETING and REPORTING — 5 of 12 real
+ * engagements where 10 are not closed. It is the complement of a declared terminal set
+ * now, which is F2-196's rule: an unrecognised status is chased, not excused.
+ */
 export function aggregateAuditLifecycle(): AuditLifecycleStats {
   const findings = loadFindings();
   const capas = loadCapas();
   const wps = loadWorkingPapers();
-  const engagementsInFlight = MOCK_ENGAGEMENTS.filter(e => e.status === 'PLANNED' || e.status === 'FIELDWORK').length;
-  const findingsOpen = findings.filter(f => f.status !== 'CLOSED').length;
-  const findingsCritical = findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length;
   const capaClosed = capas.filter(c => c.status === 'CLOSED').length;
   const capaOverdue = capas.filter(c => new Date(c.targetDate) < new Date() && c.status !== 'CLOSED').length;
   return {
-    totalEngagements: MOCK_ENGAGEMENTS.length,
-    engagementsInFlight,
+    totalEngagements: _engagements.length,
+    engagementsInFlight: _engagements.filter(e => isEngagementInFlight(e.status)).length,
     workingPapersTotal: wps.length,
     workingPapersInReview: wps.filter(w => w.status === 'PEER_REVIEW').length,
-    findingsOpen,
-    findingsCritical,
+    findingsOpen: findings.filter(f => isFindingOpen(f.status)).length,
+    findingsCritical: findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length,
     capaTotal: capas.length,
     capaClosed,
     capaOverdue,
@@ -1012,6 +1401,16 @@ export function aggregateAuditLifecycle(): AuditLifecycleStats {
   };
 }
 
+/**
+ * Resolve an engagement code against the REAL catalogue.
+ *
+ * Returns undefined when the code is not in it — which today is every code the annual
+ * plan schedules (`ENG-CYBER-2026Q1`…) and every code the registers reference. The
+ * caller must render the code itself in that case, not drop the row: this function
+ * used to search a mock corpus and its callers treated undefined as "nothing to show",
+ * so the Plan tab's quarter cards rendered empty while three engagements were scheduled
+ * in each.
+ */
 export function pickEngagementByCode(code: string): AuditEngagementDto | undefined {
-  return MOCK_ENGAGEMENTS.find(e => e.engagementCode === code);
+  return _engagements.find(e => e.engagementCode === code);
 }

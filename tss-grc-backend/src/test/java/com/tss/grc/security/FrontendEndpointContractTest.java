@@ -121,7 +121,7 @@ class FrontendEndpointContractTest {
      * slice rather than a follow-up. A ceiling that only ever complains upward would have let a
      * fifth dark endpoint land beside the four it was replacing.
      */
-    private static final int BASELINE_CLIENTLESS_ENDPOINTS = 413;
+    private static final int BASELINE_CLIENTLESS_ENDPOINTS = 411;
 
     /**
      * Of those, the ones that are guarded WRITES — a governed capability with no caller at all.
@@ -146,7 +146,7 @@ class FrontendEndpointContractTest {
      * roles — so the pair is a worked example of what this number is for: not unbuilt UI here, but
      * a built workflow whose front door nobody could reach.
      */
-    private static final int BASELINE_CLIENTLESS_GUARDED_WRITES = 203;
+    private static final int BASELINE_CLIENTLESS_GUARDED_WRITES = 201;
 
     // ── the two populations ────────────────────────────────────────────────────────────────────
 

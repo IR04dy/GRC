@@ -189,8 +189,10 @@ const KNOWN_UNREACHED: readonly string[] = [
   'lib/ndiSettings.ts#getSettingByKey',
   'lib/ndiSettings.ts#listSettings',
   'lib/ndiSubmission.ts#getSubmission',
-  // Governance / committees / policy / audit — 13
-  'lib/auditLifecycle.ts#hydrateAuditLifecycle',
+  // Governance / committees / policy / audit — 12
+  // F2-203 removed `hydrateAuditLifecycle` from this list: the audit-lifecycle page's new
+  // load-failure banner has a Retry button that calls it with force=true. It had been
+  // unreached because the only entry point was `subscribeAuditLifecycle`'s implicit kick.
   'lib/auditLifecycle.ts#saveAnnualPlan',
   'lib/auditLifecycle.ts#saveCapa',
   'lib/auditLifecycle.ts#saveWorkingPaper',

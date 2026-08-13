@@ -1718,6 +1718,7 @@ asserting the implementation rather than the requirement** — F2-183's first dr
 fixture as 3-versus-2 is what surfaced this.
 
 ✔ **F2-202 CLOSED 2026-08-13 — a persistence-mode switch with no setter, and the Knowledge Base
+- **F2-203 — the internal-audit workspace** ✅ CLOSED 2026-08-13. Closing an IIA finding wrote nothing (the server side was complete and hardened, and the page already subscribed to its broadcast); the engagement picker was a mock of a DIFFERENT register so every list was empty on all eight options while 20 findings / 12 working papers / 12 CAPAs sat in the tables; and **all four `audit_lc` registers hold statuses their own service does not declare — 19 of 46 rows in dev AND prod cannot be advanced by any route** (zero CHECK constraints in the schema). Two label maps crashed on them; each crash was held shut by a different accident and **this slice's own plan-selection fix detonated the second**. The CMA Article 95 Audit Committee packet's engagement section was fabricated. Invented officers named as approver/reviewer/author, one of them persisted. FE 668/668, backend 3,805, mutation 32/32, pre-fix control 21/21, live probe 33/33. Ratchets: `BASELINE_NOT_FULLY_SERVER_BACKED` 7→6, clientless endpoints 413→411, guarded writes 203→201, `fe_pages` 351→352. **Filed as an owner decision: reconcile the four vocabularies (or add the CHECKs) and the five disjoint engagement code spaces.**
 list nobody could see.** The item F2-201 filed as needing its own slice. Lineage F2-42 → F2-193 → …
 → F2-199 → F2-201 → this.
 
