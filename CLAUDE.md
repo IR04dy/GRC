@@ -1199,6 +1199,108 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   ⚠ **`cyber_lc` has zero CHECK constraints in the whole schema** — same as `audit_lc` (F2-203). All 36 stored
   statuses ARE in the machine today, so unlike `audit_lc` it is latent rather than live; **that was checked,
   not assumed**, which is the only reason it can be stated.
+  ⚠⚠ **A BROWSER STORE MERGED WITH A REAL REGISTER IS NOT A SHADOW, IT IS CAMOUFLAGE — AND THE
+  RELOAD TEST RECRUITS THE USER INTO CONFIRMING IT** (F2-208, measured 2026-08-13). `useCapas()`
+  merged three sources into one list: `GET /api/capa/tasks` (**14 live rows, dev = prod**), a
+  **507-line corpus of twenty invented CAPAs** with eleven invented owner mailboxes at the real
+  company domain (two carrying `auditSignedOffBy: 'audit.lead@tss.sa'`), and a `localStorage`
+  overlay. So the register showed **34 rows where 14 exist** with nothing on the row to tell them
+  apart — and the overlay's patches were applied **on top of the server's rows**, so advancing a
+  REAL CAPA to "audit signed-off" changed what the screen said about a record the server had never
+  been told about, attributed to the literal `'demo.user@tss.sa'`. 🔑 **It outlived F2-201's
+  fabricated approvals page for one reason: a localStorage overlay is DURABLE. F2-201 reverted on
+  refresh, which is part of what gave it away; here the cheapest test a user knows becomes evidence
+  FOR the defect.**
+  ⚠⚠ **The tell was the vocabulary, and nothing compared the two.** The client declared **eight**
+  states against `CapaTaskService.ALLOWED`'s **five**, and `fromCapaTaskDto`'s STATUS_MAP had no
+  source for three of them — so `OWNER_TESTED`, `AUDIT_SIGNED_OFF` and `VERIFICATION_FAILED` were
+  producible **only by a local write**. 🔑 **A state only the browser can reach is a state only the
+  browser knows about**, and two of those three are the owner test and the independent sign-off an
+  ISO 9001 §10.2 / IIA 2500 reviewer asks to see. `CapaMachineParityTest` now compares the FE table,
+  the union and the request's `@Pattern` against the service's own map by reflection, both ways.
+  ⚠⚠ **F2-207's rule has a SECOND answer, and this is it.** There, wiring was impossible because the
+  client's tokens were **refused** by the column's CHECK, so the answer was retire. Here the server's
+  machine is merely **COARSER** — nothing is refused — so the answer is rewire and **delete the extra
+  granularity**, which is what F2-201 did when a fabricated approver chain met a server carrying one
+  assignee. 🔑 **F2-199 twice more: a fabrication more granular than the platform's own model is what
+  makes it look more finished.** Ask which of the two cases you are in before choosing.
+  ⚠⚠ **Deleting invented figures can ASSERT HEALTH, so four digest figures were removed rather than
+  zeroed.** `audCommitteeDigest` reported verification failures, recurrent CAPAs, customer
+  disclosures and top root causes — all from fields with **no column on `capa.tasks` (26 columns,
+  read from `sys.columns`)** — each rendered `tone={x > 0 ? 'danger' : 'success'}`. Keeping them
+  would have shown an audit committee *"verification failures: 0 · recurrent: 0"* **in green**
+  (F2-197). Also deleted: `RECIPIENT_FOR_KIND`, mapping each signal to an invented mailbox under the
+  field name *"suggested recipient"* while nothing delivers a CAPA notification at all (F2-38d) — a
+  recipient nothing sends to is a claim with no source.
+  ⚠ **`lib/paTriggers.ts` was deleted BECAUSE the rewire would have made it dangerous**: it derived
+  *"a KRI has breached — file a preventive action"* from `pages/risk/mockRisks` and offered a
+  one-click **create**. 🔑 **A real write driven by a fabricated signal is worse than a fake write
+  driven by one.** And no `create` wrapper shipped: its only caller would have been that modal
+  (F2-207's *an unused client method should not ship*), so `POST /api/capa/tasks` stays clientless on
+  purpose — the register is filled by the intake substrate and other modules' automation, and the
+  comment at `BASELINE_CLIENTLESS_GUARDED_WRITES` now records that wiring it would be the **wrong**
+  kind of progress.
+  ⚠ **Three real columns the client never read** (`progress_notes_en/ar`, `evidence_refs`, populated
+  on 7–10 of 14 rows) plus one the **server DTO** never declared: `created_at` is NOT NULL on all 14
+  rows, so a CAPA's age was computed from `startedAt ?? targetDate` — an unstarted CAPA aged from its
+  own deadline and could never be old. F2-198's `crossBorderTransfer` shape, both halves in one file.
+  ⚠⚠ **F2-172(d) HAS BEEN FIXED ONE INSTANCE PER SLICE FOR SEVEN SLICES AND SIX WERE STILL OPEN.**
+  `req.getId() != null ?` returned `bcm_lc/InvocationService` (a BCP invocation raised *during* a
+  crisis), `board_pack/BoardPackService`, `capa/CapaTaskService`, `knowledge/KbArticleService`,
+  **`nca_ecc/NcaEccFilingService`** (the NCA ECC self-assessment return) and
+  `regchange/RegulatoryChangeService`. 🔑 **Six survivors after seven fixes is not bad luck, it is
+  what fixing instances of a shape produces — sweep the population and gate the shape.**
+  `ClientSuppliedReferenceRatchetTest` holds it at zero over the 25 `create*` reference-setter sites.
+  ⚠⚠ **And the grep this file instructs you to run cannot see the whole family.** `req.getId() != null ?`
+  is one SPELLING; across all **48** `setExternalId(`/`setRefNumber(` sites the caller's value also
+  arrives as `req.externalId()` (a record accessor — no `get`, no null test) and `in.getExternalId()`
+  (an entity bound from the body). F2-192's headline turned on CLAUDE.md's own instruction, so the
+  gate is written on the **defect's signature** — a null-coalesce on a reference setter inside a
+  `create*` method — not on a spelling. ⚙ All five caller-derived sites **outside** create paths were
+  refuted by reading: each carries an upstream system's identifier (a SIEM event id that is the dedup
+  key one line above, a Splunk alert id, a scanner finding id, a threat-intel advisory id), and they
+  are named with a reason each, enforced both ways.
+  ⚠ **`NcaEccFilingService`'s constant `-001` suffix is CORRECT and must not be "fixed"** — it would
+  be F2-48's collision bug on any other table, and is safe only because `uk_ncaecc_year` is UNIQUE on
+  `(organisation_id, fiscal_year)`. Checked against `sys.indexes`, not assumed. ⚙ All four stored
+  filing references read `NCA-ECC-<year>`, which the generator does not produce — they come from
+  `seed_real_data.py` and V122, so the API path was **latent** there, not exercised.
+  ⚠⚠ **A `\b` WRITTEN INTO A BASH HEREDOC BECOMES A LITERAL BACKSPACE (0x08), AND THE REGEX CAN THEN
+  NEVER MATCH.** The pre-fix control reported one detector SILENT; the same pattern run standalone
+  found the defect at once. The bytes were `r'\x08set[A-Z]…'`. 🔑 **A regex that cannot match reads
+  exactly like "the code is clean", and the escape looks correct in every source listing.** It
+  **under**-reports, the dangerous direction. **Write scan scripts with a file write, never a
+  heredoc** — and this is the whole argument for running every detector against `git show master:`
+  before trusting it.
+  ⚠⚠ **My load-bearing detector was SILENT on the defect it was written for.** Its first draft banned
+  `{ ...c, status: to }`; the real code built `{ ...existingPatch, ...stampField, ...(extra ?? {}),
+  status: to, history: [...] }` — three spreads between the brace and the property. 🔑 **A detector
+  written for the shape you imagine rather than the shape that existed is a passing gate.** Rewritten
+  as *no status may reach a React state setter* (walking each setter's brace-balanced argument) — and
+  **that was still not enough**: the harness showed `setItems(… { ...c, ...body })` SURVIVING, because
+  a spread carries the status without naming it. **Assert the POSITIVE**: every write to register
+  state must be the server's row (`saved` / `fromCapaTaskDto`) or an explicit clear.
+  ⚠ **Two of sixteen mutations "survived" and both were the harness's fault**: those legs are asserted
+  by the **backend** cross-codebase gate that reads `lib/capa.ts`, and I had classified the mutations
+  by the file they edit rather than by the gate that should catch them. 🔑 **A cross-codebase gate
+  breaks the file-to-runner correspondence — classify a mutation by its assertion.** 16/16 after.
+  ⚠⚠ **FOUND IN THE BROWSER AFTER EVERY GATE WAS GREEN, TWICE.** (a) `capaPageSub` still promised
+  *"a documented root cause, verification gates, and effectiveness check"* — two of the three have no
+  column. **Third consecutive slice** where the browser finds a text-level claim no code-scoped gate
+  can see (F2-205, F2-207, this); the new leg over the `capa*` keys fired on **three** strings I had
+  not fixed. (b) Three **Arabic** digest labels named a STATE where the predicate counts a PERIOD
+  (`capaCommitteeOpened` rendered *"مفتوحة"* for `createdAt ∈ quarter`). The English carried the past
+  tense and the Arabic did not, and Arabic is the primary language (house rule 7). 🔑 **F2-196's
+  label-versus-predicate question applies per LANGUAGE, not per key.**
+  ⚙ **Filed:** **five CAPA-ish registers, 78 rows, five disjoint status vocabularies**, identical in
+  dev and prod — `capa.tasks` 14, `audit_lc.capa_tasks` 12, `bcm.corrective_actions` 10,
+  `ndi.corrective_action` 17, `sust.corrective_action` 25 (F2-196's shape at five tables for one
+  concept; F2-203 already filed the `audit_lc` half). The whole **`capa` schema has ZERO CHECK
+  constraints**, so `status` is narrowed only by the DTO's `@Pattern` and `severity` by nothing.
+  `/capa`'s primary button opens the intake form for a control observation, which lands in a
+  **different** register — the label now says what it does, but this register has no create path from
+  any screen. And PA suggestions over the **real** KRI register, the capability the deleted trigger
+  engine faked.
   ⚠⚠ **THREE PDPL STATUTORY REGISTERS WERE KEPT IN `localStorage` AND MUTATED BY A ROUTED PAGE, BESIDE
   THE REAL ONES** (F2-207, measured 2026-08-13). `/privacy-lifecycle` had five tabs; three were
   `SEED_ROPA` (Art. 31 processing activities), `SEED_DPIA` (Art. 25 impact assessments) and `SEED_CBT`
