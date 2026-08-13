@@ -1199,6 +1199,103 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   ⚠ **`cyber_lc` has zero CHECK constraints in the whole schema** — same as `audit_lc` (F2-203). All 36 stored
   statuses ARE in the machine today, so unlike `audit_lc` it is latent rather than live; **that was checked,
   not assumed**, which is the only reason it can be stated.
+  ⚠⚠ **THREE PDPL STATUTORY REGISTERS WERE KEPT IN `localStorage` AND MUTATED BY A ROUTED PAGE, BESIDE
+  THE REAL ONES** (F2-207, measured 2026-08-13). `/privacy-lifecycle` had five tabs; three were
+  `SEED_ROPA` (Art. 31 processing activities), `SEED_DPIA` (Art. 25 impact assessments) and `SEED_CBT`
+  (Art. 29 cross-border transfers) under `grc.privacy.ropa.v1` / `.dpia.v1` / `.cbt.v1`. The page did not
+  merely render them — approving a ROPA, signing off a DPIA and approving a transfer of personal data out
+  of the Kingdom each wrote to one operator's browser and nowhere else. All three real registers are
+  populated (`privacy.processing_activities` **11**, `privacy.dpia` **6**, `privacy.cross_border_transfers`
+  **9**, probed live as `compliance`) and **already had a complete server-backed surface**, so this is a
+  RETIRE under ADR-017 §D-5 — a second real client for one statutory object is F2-196's own defect.
+  `lib/privacyLifecycle.ts` is **deleted** (511 lines); `privacyRegisterRetirement.test.ts` and
+  `LifecycleStoreBackingContractTest` refuse its re-creation from both sides.
+  ⚠⚠ **Wiring it was impossible in principle, and that is the reusable test for this shape.** `CbtStatus`
+  declared DRAFT/ASSESSING/APPROVED/BLOCKED/PERIODIC_REVIEW against `CK_cbt_status`'s
+  REQUESTED/ASSESSED/APPROVED/REJECTED/EXPIRED, and `SafeguardMechanism` fared the same against
+  `CK_cbt_mechanism` — **4 of 5 refused in each, and three of those were the same concept differently
+  spelled** (`STANDARD_CLAUSES`/`SCC`, `BINDING_CORPORATE_RULES`/`BCR`, `NONE_NEEDED`/`ADEQUACY`), which is
+  F2-180's *"being right about what a state means is not evidence about what the column stores it in."* A
+  naive rewire converts today's silent local writes into constraint violations (F2-183). **Before wiring a
+  browser corpus, diff its vocabulary against the target column's CHECK — if the tokens do not match, the
+  answer is probably retire, not rewire.**
+  ⚠⚠ **And the handlers passed INVENTED OFFICERS as the author of statutory decisions** — `'Layla
+  Al-Ghamdi (DPO)'` as the Data Protection Officer signing an Article 25 assessment and the literal
+  `'DPO + CRO'` as the ROPA approver. `dpoSignedBy`/`approvedBy` are persisted columns, so a rewire would
+  have recorded a person who does not exist as having signed a PDPL assessment — the trap F2-204 caught one
+  commit before shipping.
+  ⚠ **The four retired KPI tiles are F2-198's shape and F2-195's gate could not see them**: a CORRECT
+  predicate over an INVENTED corpus, so the value came from a function rather than a literal. They were
+  **deleted rather than rewired** because each one's real equivalent was *verified to exist* on the surface
+  the page now points at (`/privacy?tab=ropa` renders the register count and the 5-of-11 cross-border count;
+  `/data-lifecycle?tab=cbt` renders four real status tiles). 🔑 **Retiring a tile is only safe once you have
+  checked the signal survives somewhere real** — and three of these also LINKED to a different register than
+  they counted, F2-197's rule.
+  ⚠⚠ **A `?tab=` LINK CAN LAND ON A PAGE THAT IGNORES `?tab`, AND IT READS AS THE READER'S OWN MISTAKE.**
+  Three KPI tiles here linked `to="?tab=dsr"` while the page held its tab in `useState` and never read the
+  query string, so each navigated, re-mounted on the default tab, and looked like a control that does
+  nothing. F2-197's rule one step earlier: there a tile's *figure* disagreed with the list it opened, here
+  the *navigation* is the false claim. ⚠⚠ **My first detector reported a population of 1 and was wrong** —
+  it matched only RELATIVE (`to="?tab=x"`) links, the shape I had just found. Resolving every link to its
+  **target page** gives **5 across 3 pages of 22 total**: `AuditWorkspacePage` links its own absolute path,
+  and `SocOpsEventsPage` links `/cyber?tab=incidents` to a `CyberPage` that also ignored it. 🔑 **A detector
+  scoped to the shape that produced the finding returns a SMALLER population, which reads exactly like "the
+  rest are fine."** `tabLinkTargets.test.ts` holds it at a hard zero with no exemptions. ⚙ Two sub-rules:
+  derive the tab FROM the url (`PrivacyPage`'s idiom) rather than syncing two sources of truth; and delete a
+  link whose tab does not exist rather than inventing the tab — `WsTabId` never had `engagements`, and the
+  list behind it is F2-203's filed corpus.
+  ⚠⚠ **`<Navigate to="/x">` DOES NOT CARRY THE SEARCH STRING, so a `?tab=` link through a redirect loses
+  the tab — and the gate caught this on the link THIS SLICE HAD JUST WRITTEN.** `/pdpl-extensions` is a
+  redirect to `/data-lifecycle`; the link looked right only because that page's default tab happens to be
+  `cbt`. 🔑 F2-202's rule one layer out: **a plausible path string is worth nothing until something resolves
+  it** — fifth guessed-path error in this lineage, and the first caught by a gate written in the same commit.
+  ⚠⚠ **FOUND IN THE BROWSER, AFTER EVERY GATE ASSERTION WAS GREEN: the page header still advertised the
+  three registers it no longer had.** `prcEyebrow` read *"Privacy · PDPL Article 22 / 25 / 29 / 4"* and
+  `prcPageSub` described *"ROPA Article 22 register, DPIA Article 25 high-risk assessment, Article 29
+  cross-border transfer adequacy"*. 🔑 **F2-205's lesson, second instance: a claim about what a surface DOES
+  can live anywhere a user reads text, and a gate scoped to code cannot see the place written specifically to
+  be read. Retiring a tab means retiring the sentence that advertised it.** ⚠ It also carried a wrong
+  citation — four places said ROPA was PDPL **"Article 22"** while every other citation in the tree says
+  **Article 31**, including `lib/moduleAnchors.ts`, the regulator-citation catalogue W2-1a-i deliberately
+  keeps (`PDPL / Article 31 / "Records of processing activities."`). Scope such a leg to the module's own
+  keys, as F2-205 required.
+  ⚠⚠ **TWO OF MY OWN GATE LEGS FIRED ON CORRECT PRE-EXISTING CODE, and measuring what they caught produced
+  two populations far larger than the slice — both filed, and both are why those legs are scoped.**
+  **(a) 65 distinct invented person-names across 39 product files.** The five officers on the retired tabs
+  are a SHARED CAST, deepest in `lib/userDirectory.ts` (18) and `lib/crisis.ts` (16), also in `assets.ts`,
+  `bcmLifecycle.ts`, `regulatoryChange.ts`, `monitoring.ts`, `approvalChains.ts`, `auditCommittee.ts`,
+  `cyberLifecycle.ts`, `policyLifecycle.ts`, `auditors.ts`, `vendorPortal.ts`. ⚠ **Most are NOT named
+  `mock*`**, so the population sits largely outside the de-mocking boundary F2-194 measured — the same blind
+  spot one level up. **(b) 14 client-side business-reference minters in 12 files**, entropy from
+  `Math.random`: `NCA-ACK-…`, `SAMA-CTI-…` (regulator-facing), `WP-…` (IIA working papers), `CAPA-…`,
+  `ACC-…` (risk acceptances), `INV-…`, `IR-…`, `SOC-…`, `KRI-BR-…`. F2-172(d) has been applied one instance
+  at a time (F2-202's DSR minter, F2-203's finding refs) with nobody measuring the frontend population.
+  🔑 **A gate that fails on code the slice did not touch is a gate nobody can keep green — scope the
+  assertion and file the measurement.**
+  ⚠ **A THIRD leg I wrote, ran and DELETED, because the deletion is the finding.** It asserted *"every page
+  that reads `?tab` narrows it to a declared tab"* — true, verified by reading all 12 — and flagged
+  `ChangesPage`, `CompliancePage` and `EsgPage`, **3 for 3 false positives**, because each narrows it
+  differently (`TAB_IDS.includes`, `isTabId(…)`, `isEsgTab(…)`, `VALID_TABS.includes`). "Is this value
+  narrowed before use?" is a dataflow question a regex cannot answer (F2-182). 🔑 **A gate that fails on
+  correct code is worse than no gate: it trains the next reader to edit the assertion rather than the code.**
+  ⚠ **A dead-translation-key scan MUST strip comments, and for a DELETE it must over-approximate usage.**
+  The page's new header comment explains the retirement by naming the four KPI keys it deleted, so a raw scan
+  reported them as still in use — F2-202/F2-205's *"prose about code, stored as data, invents callers"*, the
+  9th instance here. ⚙ Direction matters: comment-blind **under**-reports dead keys, so it fails safe for a
+  delete. And the key regex must match QUOTED keys: `'prcCbtTrigger Review'` — declared with a literal space
+  in **both** dictionaries — read as never declared, which looked like *"a button labelled with a raw key."*
+  It was not. Final: **52 dead keys removed, 8 added, 0 undeclared**, and `prcKpiAvgDays` was already dead.
+  ⚠⚠ **BOTH REGISTRY RATCHETS WERE ALREADY ONE ABOVE THE TRUTH BEFORE THIS SLICE TOUCHED THEM.** F2-204 set
+  `BASELINE_BROWSER_LOCAL_STORES` and `BASELINE_ENDPOINT_BEARING_NOT_WIRED` to 6 correctly; F2-205 then wired
+  `cyber-vulnerabilities` and **lowered neither**, so each ceiling silently tolerated a store that no longer
+  existed. 🔑 **House rule 3's warning arriving from the inside: a ceiling left in place after a sweep makes
+  a tolerated member indistinguishable from a reviewed one. When you change a store's state, lower the
+  ceiling in the SAME commit — and re-derive the number rather than subtracting from the one written there.**
+  Now **2 / 2**, with `DECLARED_CORPORA` **18 → 15** asserted exactly.
+  ⚙ **Filed:** `privacy.processing_activities.transfer_mechanism` holds `DATA_OFFICE_APPROVAL` under **no
+  CHECK at all** — a token `CK_cbt_mechanism` on the sibling table would refuse, i.e. F2-196's
+  disjoint-vocabulary shape across two tables for one concept. And `privacy.dpia`'s one `UNDER_REVIEW` row
+  still cannot be advanced by any route (F2-206's filing, re-confirmed live).
   ⚠⚠ **AN INVARIANT ENFORCED BY A SUPERCLASS COVERS EXACTLY ITS SUBCLASSES, AND A PROBE THAT EXTENDS
   THAT SUPERCLASS CAN ONLY EVER MEASURE THE COVERED HALF** (F2-206, measured 2026-08-13).
   `MassAssignmentRatchetTest` has asserted *"id must not bind — a create could retarget an existing row"*
