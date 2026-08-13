@@ -123,7 +123,9 @@ public class RegulatoryChangeService {
     public RegulatoryChangeDto create(RegulatoryChangeDto req) {
         Long orgId = TenantContext.requireOrganisationId();
         RegulatoryChange c = new RegulatoryChange();
-        c.setExternalId(req.getId() != null ? req.getId() : generateExternalId());
+        // F2-208 — swept. See ClientSuppliedReferenceRatchetTest. A regulatory-change reference
+        // is cited in the impact assessment filed with the regulator that issued the change.
+        c.setExternalId(generateExternalId());
         c.setOrganisationId(orgId);
         c.setRegulator(req.getRegulator());
         c.setCitation(req.getCitation());

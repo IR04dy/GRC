@@ -104,7 +104,11 @@ public class CapaTaskService {
     public CapaTaskDto create(CapaTaskDto req) {
         Long orgId = TenantContext.requireOrganisationId();
         CapaTask t = new CapaTask();
-        t.setExternalId(req.getId() != null ? req.getId() : generateExternalId());
+        // ⚠⚠ F2-208 — swept, not drip-fed. See ClientSuppliedReferenceRatchetTest.
+        // A CAPA reference is what an ISO 9001 §10.2 / IIA 2500 audit trail cites to say WHICH
+        // corrective action was verified. A caller that chooses it can point two CAPAs at one
+        // reference, or reuse the reference of an action already signed off.
+        t.setExternalId(generateExternalId());
         t.setOrganisationId(orgId);
         t.setOriginType(req.getOriginType());
         t.setOriginId(req.getOriginId());

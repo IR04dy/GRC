@@ -59,7 +59,9 @@ public class BoardPackService {
     public BoardPackDto create(BoardPackDto req) {
         Long orgId = TenantContext.requireOrganisationId();
         BoardPack p = new BoardPack();
-        p.setExternalId(req.getId() != null ? req.getId() : generateExternalId(req.getPeriodLabel()));
+        // F2-208 — swept. See ClientSuppliedReferenceRatchetTest. A board-pack reference names
+        // the papers a board resolution was taken on.
+        p.setExternalId(generateExternalId(req.getPeriodLabel()));
         p.setOrganisationId(orgId);
         p.setTitleEn(req.getTitleEn()); p.setTitleAr(req.getTitleAr());
         p.setPeriodLabel(req.getPeriodLabel());

@@ -73,7 +73,11 @@ public class InvocationService {
     public InvocationDto create(InvocationDto req) {
         Long orgId = TenantContext.requireOrganisationId();
         Invocation v = new Invocation();
-        v.setExternalId(req.getId() != null ? req.getId() : generateExternalId());
+        // F2-208 — swept. See ClientSuppliedReferenceRatchetTest for why this whole family is
+        // now a hard zero rather than one fix per slice. A BCP invocation reference is raised
+        // DURING a crisis and cited in the NCEMA after-action record; two invocations sharing
+        // one reference is unresolvable after the fact.
+        v.setExternalId(generateExternalId());
         v.setOrganisationId(orgId);
         v.setTitleEn(req.getTitleEn());
         v.setTitleAr(req.getTitleAr());

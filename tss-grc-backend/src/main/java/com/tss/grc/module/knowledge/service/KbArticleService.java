@@ -100,7 +100,9 @@ public class KbArticleService {
             throw new IllegalArgumentException("Article with slug '" + req.getSlug() + "' already exists");
         }
         KbArticle a = new KbArticle();
-        a.setExternalId(req.getId() != null ? req.getId() : generateExternalId());
+        // F2-208 — swept. See ClientSuppliedReferenceRatchetTest. The slug is the caller's to
+        // choose (it is checked for uniqueness three lines above); the external id is not.
+        a.setExternalId(generateExternalId());
         a.setOrganisationId(org);
         a.setSlug(req.getSlug());
         a.setCategoryCode(req.getCategoryCode());

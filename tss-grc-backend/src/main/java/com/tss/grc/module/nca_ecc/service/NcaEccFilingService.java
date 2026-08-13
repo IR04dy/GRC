@@ -66,7 +66,16 @@ public class NcaEccFilingService {
     public NcaEccFilingDto create(NcaEccFilingDto req) {
         Long orgId = TenantContext.requireOrganisationId();
         NcaEccFiling f = new NcaEccFiling();
-        f.setExternalId(req.getId() != null ? req.getId() : String.format("NCA-%d-001", req.getFiscalYear()));
+        // ⚠⚠ F2-208 — swept. See ClientSuppliedReferenceRatchetTest. This is the reference on the
+        // National Cybersecurity Authority ECC self-assessment return, so it is the sharpest
+        // member of the family: a caller could name a filing after a year it does not cover.
+        //
+        // ⚠ The constant "-001" suffix is CORRECT here and must not be "fixed" into a sequence:
+        // uk_ncaecc_year is UNIQUE on (organisation_id, fiscal_year), so a tenant can hold at
+        // most one filing per year and the suffix can never collide. Checked against sys.indexes
+        // rather than assumed — the identical shape WOULD be F2-48's collision bug on any table
+        // without that constraint.
+        f.setExternalId(String.format("NCA-%d-001", req.getFiscalYear()));
         f.setOrganisationId(orgId);
         f.setFiscalYear(req.getFiscalYear());
         f.setFrameworkVersion(req.getFrameworkVersion() != null ? req.getFrameworkVersion() : "ECC-2:2024");
