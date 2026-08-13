@@ -1199,6 +1199,82 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   ⚠ **`cyber_lc` has zero CHECK constraints in the whole schema** — same as `audit_lc` (F2-203). All 36 stored
   statuses ARE in the machine today, so unlike `audit_lc` it is latent rather than live; **that was checked,
   not assumed**, which is the only reason it can be stated.
+  ⚠⚠ **AN INVARIANT ENFORCED BY A SUPERCLASS COVERS EXACTLY ITS SUBCLASSES, AND A PROBE THAT EXTENDS
+  THAT SUPERCLASS CAN ONLY EVER MEASURE THE COVERED HALF** (F2-206, measured 2026-08-13).
+  `MassAssignmentRatchetTest` has asserted *"id must not bind — a create could retarget an existing row"*
+  since F2-22a, in those words, and was **green while the defect was live on 177 of the 214 endpoints it
+  counts**. It is not wrong: the mitigation is `@JsonProperty(access = READ_ONLY)` on `BaseEntity`, and the
+  test proves it through **`class Probe extends BaseEntity`**. Measured by reflection: **174 of 432 entities
+  extend that mapped superclass, 258 do not, and NONE of the 258 annotated its own `id`.** Its risk profile
+  could not rank it either — that scan **breaks its field walk at `BaseEntity`** (correctly, those fields are
+  READ_ONLY) and `id` is in none of its TENANT/AUTHORITY/OUTCOME/STATE vocabularies, so **`id` was
+  structurally unrankable by the scan built to rank this defect**. 🔑 **Before trusting a green gate, say out
+  loud what its probe IS, and ask what is not that.** Fifth instance of F2-198's shape: the invariant is real,
+  its POPULATION is narrower than it looks — a filename, a three-entry allow-list, a module name, a
+  controller-bearing table, and here an `extends` clause.
+  ⚠⚠ **The defect it hid: a create endpoint answered `201 Created` while DESTROYING the record it named.**
+  `POST /api/v1/privacy/ropa` with `{"id": n}` — `CrudRepository#save` calls `merge()`, not `persist()`, when
+  the id is non-null, so the "create" retargets row `n` and **every column the body omits is written NULL**.
+  Probed live as `compliance`: `activity_name_ar`, `purpose_en`, `retention_period_months` and
+  `data_categories_json` nulled, PDPL Article 5 lawful basis `LEGAL_OBLIGATION` → `CONSENT`, and
+  `special_category_flag` cleared — **the flag that makes the activity Article 25 high-risk.** On `POST /dsrs`
+  an `ERASURE` request became `ACCESS` with the data subject's email nulled. ⚠ **Cross-tenant reach was
+  probed and REFUTED** (500, row untouched) — which matters because `DpiaService.create`'s own comment warns
+  about `merge()` *"into a potentially cross-tenant row"*, i.e. **the comment recording the risk named the
+  half that is NOT reachable**, and the half that was live is not what it warns about.
+  ⚠ **Fixed with ONE Jackson introspector, not 258 annotations** — `common/json/ServerOwnedIdentityModule`
+  reports `READ_ONLY` for the `id` of any `@Entity`/`@MappedSuperclass`. **An introspector has no population
+  to get wrong**: it is consulted for every property of every type Jackson binds, so a new entity is covered
+  the day it is written. `READ_ONLY` and never `@JsonIgnore` — the whole frontend resolves records by `id`,
+  and the property is **not removed** from the deserialiser either, because the FE echoes whole records back
+  on update paths and under `FAIL_ON_UNKNOWN_PROPERTIES` that would turn working requests into 400s.
+  ⚠⚠ **A test that mirrors the framework must mirror its CONFIGURATION, not just its modules.** The gate's
+  first draft reported *"0 entities bind id"* while **most round-trips were throwing**: `new ObjectMapper()`
+  defaults `FAIL_ON_UNKNOWN_PROPERTIES` to **true** and Spring Boot turns it off. The only reason that was
+  caught is that the gate counted the entities it *could not* check — 🔑 **an exception during a probe is
+  indistinguishable from the probe passing unless something counts it.**
+  ⚠ **And a probe body that asserts more than its claim fails for reasons unrelated to the claim.** One
+  combined hostile body made **34 entities unprobeable** because they map `isDeleted` as `Short` not
+  `Boolean` — and the casualties were `TreatmentPlan`, `Vulnerability`, `DsrCase`, `Finding`,
+  `CrossBorderTransfer`, i.e. exactly the statutory registers. **One field per question.**
+  ⚠⚠ **A PROBE CANNOT CERTIFY ITS OWN SUCCESS, and the mutation harness needed three attempts to show it.**
+  v1 *relaxed the assertion* and survived — **you can always delete an assertion, so mutating the CHECK
+  proves nothing** (F2-192 recorded this and I did it anyway). v2 flipped a `Probed(ok, …)` success flag and
+  **also** survived, because the positive count added to catch exactly that was **derived from the same
+  flag**. v3: the probe has no try/catch and no flag at all — an unverifiable entity throws out of the test —
+  and is killed. 🔑 **If a probe reports "I worked", something outside it must be able to disagree.**
+  ⚠ **9 of 10 killed, and the survivor is an EQUIVALENT MUTANT, recorded rather than "fixed"**: Jackson
+  unifies the `id` property from both the field and the accessors, so either spelling is correct. **A
+  surviving mutant is a hole only if the mutated code is WRONG** — sometimes it is telling you the code has a
+  branch nothing needs, which is how the accessor branch got deleted from the introspector.
+  ⚠⚠ **AN INTERRUPTED MUTATION HARNESS LEAVES THE TREE MUTATED, and the mutation left behind may be the one
+  that makes the gate vacuous.** The harness timed out mid-run and never restored `HOSTILE_ID`, leaving
+  `{ }` — the "probe an empty body" mutation. **The corpus leg then stayed GREEN over a body that asserts
+  nothing**; only the negative control noticed, and its failure (`expected 999999L but was null`) reads
+  exactly like the fix having broken. Diagnosed by printing what a bare mapper actually binds instead of
+  reasoning about it. **Check the harness's own anchors are intact before believing a post-harness failure.**
+  ⚠⚠ **MY PROBE DESTROYED A REAL SEEDED ROW, and this is the rule that follows.** The first probe targeted
+  `id: 1` — a real `Customer KYC Processing` record — to prove the same-tenant case. It worked, which is the
+  finding, and it also overwrote live data without authorisation (house rule 6). Restored field-for-field
+  from prod (identical seed, never in scope); 11/11 live rows in both databases. 🔑 **A probe that
+  demonstrates a destructive defect must PLANT ITS OWN VICTIM first — "it is only dev data" is not the
+  standard, and the row that best proves the point is always a real one.**
+  ⚠ **The locator's first number was 3.6× too high, for a reason worth knowing.** It resolved
+  `ResponseEntity.ok(service.create(body))` to `ResponseEntity.ok` and reported **72 candidates / 50
+  defended**; restricted to calls on a declared `private final <Type> <field>` the answer is **20 / 102**.
+  🔑 **A locator that resolves to the OUTER call reports every wrapped handler as unresolvable, and
+  "unresolved" reads exactly like "undefended."** Of the 20, **2 were refuted by reading** — one returns a
+  `Long` and never saves, one delegates to a defended `create()` one call deeper — the same ~2-in-10 rate
+  F2-188/F2-192/F2-204 each measured.
+  ⚠ **F2-172(d) has SIXTH and SEVENTH instances and the grep is now three-for-three.**
+  `ApprovalRequestService.create` and `AuditEngagementService.create` both honoured `req.getId()` for the
+  external reference — the id an approver cites to say which request they decided, and the code IIA working
+  papers hang off (F2-203 already measured five disjoint engagement code spaces). **Grep
+  `req.getId() != null ?` before claiming any create path mints its own reference.**
+  ⚙ **Filed:** one `privacy.dpia` row holds `UNDER_REVIEW`, which `DpiaService`'s machine does not declare,
+  so it **can never be approved, rejected or expired by any route** (identical in dev and prod — F2-203's
+  `audit_lc` shape on a PDPL register; a synonym, so collapsing it rewrites live rows and is an owner call).
+  And **34 entities map `is_deleted` as `Short`** where `BaseEntity` uses `Boolean`.
   ⚠⚠ **There are TWO live vulnerability registers and picking one is an OWNER decision.**
   `cyber.vulnerabilities` **21 rows** at `/api/v1/cyber/vulnerabilities` (rendered by `CyberPage`) and
   `cyber_lc.vulnerabilities` **36 rows** at `/api/cyber-lc/vulnerabilities` (F2-205), plus
