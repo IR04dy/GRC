@@ -4214,13 +4214,21 @@ export const automationApi = {
 };
 
 // ── CAPA tasks ─────────────────────────────────────────────────────────
-//    PR #59 expanded this from a sidebar-counter-only client to the full
-//    GET /api/capa/tasks list. useCapas now merges these rows with the
-//    static seed + localStorage overlay so backend-created CAPAs show up
-//    in /capa and /capa/:id alongside demo seed entries. Each backend
-//    row carries `numericId` (Long PK) — the v2 Capa interface maps
-//    this to `backendId` so EntityActivityTimeline + EntityAutomationRuns
-//    light up on the detail page.
+//    F2-208 — this client is now the ONLY source of CAPA rows.
+//
+//    It used to be list-only, and `useCapas()` merged what it returned with a
+//    twenty-row corpus in the browser plus a localStorage overlay of "added"
+//    rows and per-row "patches". So the register showed 34 rows where 14
+//    existed, `create()` wrote nowhere, and advancing a CAPA — including the
+//    independent-verification sign-off — wrote a patch that was applied on top
+//    of the REAL server rows on render. `POST /api/capa/tasks` and
+//    `POST /{id}/transition` had existed the whole time; the second even stamps
+//    the verifier from the authenticated principal (F2-22b(vi)) because a
+//    caller-supplied verifier name is a governance defect.
+//
+//    Each row carries `numericId` (the Long PK) so EntityActivityTimeline +
+//    EntityAutomationRuns can fetch the real audit_log / rule_run rows on the
+//    detail page — which is also why no local event history is kept any more.
 export interface CapaCountsDto {
   /** Non-terminal CAPAs (everything except CLOSED + CANCELLED). */
   open:    number;
@@ -4254,10 +4262,50 @@ export interface CapaTaskDto {
   progressNotesEn?:             string | null;
   progressNotesAr?:             string | null;
   evidenceRefs?:                string | null;
+  /** When the CAPA was raised — `capa.tasks.created_at`, server-stamped. */
+  createdAt?:                   string | null;
+}
+/**
+ * ⚠ There is deliberately NO create wrapper here, and the reason is worth reading
+ * before adding one.
+ *
+ * `POST /api/capa/tasks` exists and is guarded `CAPA:WRITE`, but no screen creates
+ * a CAPA and none should through this client: the module's front door is the
+ * intake substrate (DD-76 — a CONTROL_OBSERVATION submission is triaged into a
+ * finding, and a CAPA follows from the finding), and the four non-seeded rows in
+ * `capa.tasks` were all raised server-side by other modules' automation
+ * (`origin_type` = `rca`, `processor_assessment`).
+ *
+ * F2-208 nearly shipped a `create` here to replace the deleted browser-local one.
+ * It would have had exactly one caller — a modal fed by a fabricated
+ * preventive-action trigger engine reading mock KRIs — which is worse than none:
+ * an unused client method should not ship (F2-207), and a real write driven by an
+ * invented signal is worse than a fake write driven by one.
+ *
+ * If a create screen is genuinely wanted, add the wrapper in that commit, and see
+ * the filed finding first: `/capa`'s "New CAPA" button opens the intake form for a
+ * control observation, which lands in a DIFFERENT register.
+ */
+/**
+ * Body for `POST /api/capa/tasks/{id}/transition`. `status` is the TARGET state and
+ * is validated server-side against the machine — an illegal edge is a 409, not a
+ * silent no-op.
+ *
+ * No `verifiedBy`: the server stamps the verifier from the authenticated principal
+ * and the field was removed from the request DTO for that reason. Do not add one.
+ */
+export interface CapaTaskTransitionRequest {
+  status: 'OPEN' | 'IN_PROGRESS' | 'AWAITING_VERIFICATION' | 'CLOSED' | 'CANCELLED';
+  cancellationReasonEn?: string;
+  progressNotesEn?: string;
+  progressNotesAr?: string;
+  evidenceRefs?: string;
 }
 export const capaTaskApi = {
   counts:   () => api.get<CapaCountsDto>('/api/capa/tasks/counts'),
   list:     () => api.get<CapaTaskDto[]>('/api/capa/tasks'),
+  transition: (id: string, body: CapaTaskTransitionRequest) =>
+    api.post<CapaTaskDto>(`/api/capa/tasks/${encodeURIComponent(id)}/transition`, body),
 };
 
 // ── Compliance Calendar (PR #60 backend) ──────────────────────────────

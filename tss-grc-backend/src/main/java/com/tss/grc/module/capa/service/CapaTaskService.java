@@ -41,13 +41,37 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CapaTaskService {
 
+    /**
+     * The CAPA lifecycle. {@link #transition} answers 409 outside it.
+     *
+     * <p>F2-208: the two terminal states are now KEYS with empty edge sets rather than being
+     * absent. Two reasons. It makes the table total, so {@code ALLOWED.keySet()} is the state
+     * vocabulary and {@link #TERMINAL} can be derived from it instead of written out again; and it
+     * lets {@code CapaMachineParityTest} compare this table with the frontend's key-for-key, which
+     * is what catches a client declaring a state the server cannot store — the defect F2-208 found,
+     * where {@code lib/capa.ts} declared eight states against these five.
+     */
     private static final Map<String, Set<String>> ALLOWED = Map.of(
         "OPEN",                  Set.of("IN_PROGRESS", "CANCELLED"),
         "IN_PROGRESS",           Set.of("AWAITING_VERIFICATION", "CANCELLED"),
-        "AWAITING_VERIFICATION", Set.of("CLOSED", "IN_PROGRESS", "CANCELLED")
+        "AWAITING_VERIFICATION", Set.of("CLOSED", "IN_PROGRESS", "CANCELLED"),
+        "CLOSED",                Set.of(),
+        "CANCELLED",             Set.of()
     );
 
-    private static final List<String> TERMINAL = List.of("CLOSED", "CANCELLED");
+    /**
+     * DERIVED — the states with no outgoing edge. Never typed a second time.
+     *
+     * <p>It was {@code List.of("CLOSED", "CANCELLED")}, which is F2-196's defect: a second list
+     * over the same vocabulary drifts from the machine, and here it feeds the "open" and "overdue"
+     * queries, so a drift would silently exclude a state from the overdue sweep. F2-205 made the
+     * identical conversion in {@code VulnerabilityService}.
+     */
+    private static final List<String> TERMINAL = ALLOWED.entrySet().stream()
+        .filter(e -> e.getValue().isEmpty())
+        .map(Map.Entry::getKey)
+        .sorted()
+        .toList();
 
     private final CapaTaskRepository       repo;
     private final AuditLogService          audit;

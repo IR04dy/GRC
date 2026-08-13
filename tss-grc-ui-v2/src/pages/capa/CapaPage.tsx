@@ -1,10 +1,34 @@
+/*
+ * The CAPA register — /capa.
+ *
+ * ⚠⚠ F2-208. This page used to render `useCapas()`'s merge of the real register
+ * with a twenty-row browser corpus and a localStorage overlay, and its two write
+ * controls wrote into that overlay:
+ *
+ *   • "Advance" called `advance(c.id, to, 'demo.user@tss.sa')` — a patch keyed on
+ *     the row id, applied on render on top of the SERVER rows too. So advancing a
+ *     real CAPA to audit sign-off changed what this screen said about a record the
+ *     server had never been told about, and it survived reload.
+ *   • "Start RCA" captured a root-cause analysis into the same overlay. There is
+ *     no RCA column anywhere on `capa.tasks`, so that modal could never have been
+ *     wired; it is deleted, not rewired.
+ *
+ * Both are now the server's: `POST /api/capa/tasks/{id}/transition`, replacing the
+ * row from the response. The 409 an illegal edge earns is surfaced, because a
+ * screen that disagrees with the register is the defect this slice removed.
+ *
+ * Tabs removed with the corpus, each because its whole input was invented:
+ *   • Pareto — grouped by `rootCauseCategory`, which has no column.
+ *   • PA triggers — `lib/paTriggers.ts` derived "a KRI has breached, file a
+ *     preventive action" from `pages/risk/mockRisks`. Wiring `create` would have
+ *     turned an invented breach into a real CAPA, which is worse than the fake
+ *     write it replaced. Deleted; the capability is filed.
+ */
 import { useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-  ListChecks, Hourglass, BarChart3, Network, Workflow, Zap,
-  Plus, Search, Send, CheckCheck, Repeat, AlertTriangle,
-  Filter, Download, ShieldCheck, TrendingUp, Activity,
-  Stamp, Bell, FileText,
+  ListChecks, Hourglass, Workflow, Plus, Search, Send, AlertTriangle,
+  Filter, Download, ShieldCheck, Stamp, Bell, FileText, CheckCircle2,
 } from 'lucide-react';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -13,56 +37,48 @@ import { Card } from '../../components/ui/Card';
 import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { Modal } from '../../components/ui/Modal';
 import { FilterModal, distinctValues, type FilterField } from '../../components/ui/FilterModal';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { Progress } from '../../components/ui/Progress';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
+import { getErrorDisplayMessage } from '../../lib/apiError';
 import {
   useCapas, CAPA_STATUS_LABEL, CAPA_STATUS_TONE, CAPA_SEVERITY_TONE,
-  CAPA_FORWARD_TRANSITIONS, agingBucket, daysUntilDue, paretoCauses,
-  effectivenessOverdue,
-  type Capa, type CapaStatus, type RcaMethod, type RootCauseCategory,
+  CAPA_ALLOWED, CAPA_SOURCE_LABEL, agingBucket, daysUntilDue, isCapaOpen,
+  type Capa, type CapaStatus,
 } from '../../lib/capa';
-import { scanPaTriggers, type PaTrigger } from '../../lib/paTriggers';
 import { deriveCapaNotifs, audCommitteeDigest, type CapaNotif } from '../../lib/capaNotifications';
 import { downloadCsv, stampFilename, type ExportRow } from '../../lib/clientExport';
 import '../../styles/pages/capa.css';
 
-type TabId = 'register' | 'aging' | 'pareto' | 'workflow' | 'triggers' | 'committee';
+type TabId = 'register' | 'aging' | 'workflow' | 'committee';
 
-const ROOT_CAUSE_CATS: { id: RootCauseCategory; en: string; ar: string }[] = [
-  { id: 'PEOPLE',     en: 'People',     ar: 'بشري' },
-  { id: 'PROCESS',    en: 'Process',    ar: 'عملية' },
-  { id: 'TECHNOLOGY', en: 'Technology', ar: 'تقنية' },
-  { id: 'POLICY',     en: 'Policy',     ar: 'سياسة' },
-  { id: 'TRAINING',   en: 'Training',   ar: 'تدريب' },
-  { id: 'EXTERNAL',   en: 'External',   ar: 'خارجية' },
-  { id: 'MANAGEMENT', en: 'Management', ar: 'إدارة' },
-  { id: 'UNKNOWN',    en: 'Unknown',    ar: 'غير محدّد' },
-];
+/**
+ * The forward step the register offers per state.
+ *
+ * ⚠ DERIVED from CAPA_ALLOWED, never a second table: the forward step is the one
+ * allowed target that is not CANCELLED and not a step backwards. F2-196's rule —
+ * a restated vocabulary drifts from the one that decides, and here the one that
+ * decides answers 409.
+ */
+function forwardStep(status: CapaStatus): CapaStatus | null {
+  const back: Partial<Record<CapaStatus, CapaStatus>> = { AWAITING_VERIFICATION: 'IN_PROGRESS' };
+  return CAPA_ALLOWED[status].find(s => s !== 'CANCELLED' && s !== back[status]) ?? null;
+}
 
 export function CapaPage() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
-  const { items: apiItems, advance, create, update } = useCapas();
-  // DD-75: surface CAPAs that originated from a promoted CONTROL_OBSERVATION
-  // intake. Promoted CAPAs are display-only — the lifecycle still operates
-  // on the underlying source intake until a real backend lands.
-  const items = apiItems;
+  const { items, loading, error, transition } = useCapas();
   const [tab, setTab] = useState<TabId>('register');
   const [q, setQ] = useState('');
   const [filterStatus, setFilterStatus] = useState<CapaStatus | 'ALL'>('ALL');
   const [filterType, setFilterType] = useState<'ALL' | 'CORRECTIVE' | 'PREVENTIVE'>('ALL');
-  const [rcaTarget, setRcaTarget] = useState<Capa | null>(null);
-  const [triggerTarget, setTriggerTarget] = useState<PaTrigger | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [advFilters, setAdvFilters] = useState<Record<string, string | undefined>>({});
 
-  const triggers = useMemo(() => scanPaTriggers(items), [items]);
-  const openTriggers = triggers.filter(t => !t.alreadyCovered);
   const notifs = useMemo(() => deriveCapaNotifs(items), [items]);
   const criticalNotifs = notifs.filter(n => n.severity === 'CRITICAL');
   const digest = useMemo(() => audCommitteeDigest(items), [items]);
@@ -72,27 +88,22 @@ export function CapaPage() {
     return items.filter(c => {
       if (filterStatus !== 'ALL' && c.status !== filterStatus) return false;
       if (filterType !== 'ALL' && c.type !== filterType) return false;
-      // Advanced filters from the FilterModal
-      if (advFilters.severity      && c.severity !== advFilters.severity) return false;
-      if (advFilters.source        && c.source !== advFilters.source) return false;
-      if (advFilters.rootCauseCategory && c.rootCauseCategory !== advFilters.rootCauseCategory) return false;
-      if (advFilters.owner) {
-        if (!c.owner.toLowerCase().includes(advFilters.owner.toLowerCase())) return false;
-      }
+      if (advFilters.severity && c.severity !== advFilters.severity) return false;
+      if (advFilters.source && c.source !== advFilters.source) return false;
+      if (advFilters.owner && !c.owner.toLowerCase().includes(advFilters.owner.toLowerCase())) return false;
       if (advFilters.dueAfter && c.dueDate < advFilters.dueAfter) return false;
       if (advFilters.dueBefore && c.dueDate > advFilters.dueBefore) return false;
       if (!ql) return true;
       return (
-        c.code.toLowerCase().includes(ql) ||
+        c.id.toLowerCase().includes(ql) ||
         c.titleEn.toLowerCase().includes(ql) ||
         (c.titleAr ?? '').toLowerCase().includes(ql) ||
         c.owner.toLowerCase().includes(ql) ||
-        (c.rootCause ?? '').toLowerCase().includes(ql)
+        c.originId.toLowerCase().includes(ql)
       );
     });
   }, [items, q, filterStatus, filterType, advFilters]);
 
-  // ── Filter modal config — DD-47 ────────────────────────────────────────
   const filterFields: FilterField[] = [
     { key: 'severity', label: t('capaFilterFieldSeverity'), kind: 'select',
       options: [
@@ -103,39 +114,44 @@ export function CapaPage() {
       ] },
     { key: 'source', label: t('capaFilterFieldSource'), kind: 'select',
       options: distinctValues(items, 'source') },
-    { key: 'rootCauseCategory', label: t('capaFilterFieldRcCategory'), kind: 'select',
-      options: distinctValues(items.filter(c => c.rootCauseCategory), 'rootCauseCategory' as const) },
-    { key: 'owner', label: t('capaFilterFieldOwner'), kind: 'text',
-      placeholder: 'e.g. dpo@tss.sa' },
+    { key: 'owner', label: t('capaFilterFieldOwner'), kind: 'text' },
     { key: 'dueAfter',  label: t('capaFilterFieldDueAfter'),  kind: 'date' },
     { key: 'dueBefore', label: t('capaFilterFieldDueBefore'), kind: 'date' },
   ];
 
-  // KPI rollups
-  const open = items.filter(c => c.status !== 'CLOSED' && c.status !== 'CANCELLED');
+  // KPI rollups — every one of these is a count over a real column.
+  const open = items.filter(isCapaOpen);
   const overdue = open.filter(c => daysUntilDue(c) < 0);
-  const failed = items.filter(c => c.status === 'VERIFICATION_FAILED');
-  const effectivenessDue = items.filter(c => effectivenessOverdue(c));
+  const awaiting = items.filter(c => c.status === 'AWAITING_VERIFICATION');
   const preventive = items.filter(c => c.type === 'PREVENTIVE');
+  const criticalOpen = open.filter(c => c.severity === 'HIGH' || c.severity === 'CRITICAL');
 
   const tabs: TabItem<TabId>[] = [
     { id: 'register',  label: t('capaTabRegister') },
-    { id: 'triggers',  label: `${t('capaTabTriggers')}${openTriggers.length ? ` · ${openTriggers.length}` : ''}` },
     { id: 'aging',     label: t('capaTabAging') },
-    { id: 'pareto',    label: t('capaTabPareto') },
     { id: 'workflow',  label: t('capaTabWorkflow') },
     { id: 'committee', label: `${t('capaTabCommittee')}${criticalNotifs.length ? ` · ${criticalNotifs.length}` : ''}` },
   ];
 
-  function quickAdvance(c: Capa) {
-    const allowed = CAPA_FORWARD_TRANSITIONS[c.status];
-    const to = allowed.find(s => s !== 'CANCELLED' && s !== 'VERIFICATION_FAILED');
-    if (!to) {
-      toast.info(t('capaNoTransition'));
-      return;
+  /**
+   * Take the one forward step the machine allows, through the server.
+   *
+   * ⚠ Nothing here computes the resulting status: the row is replaced with what
+   * came back. An edge the server refuses arrives as a 409 and is shown — the
+   * previous version could not fail, because it only wrote to the browser.
+   */
+  async function advance(c: Capa) {
+    const to = forwardStep(c.status);
+    if (!to) { toast.info(t('capaNoTransition')); return; }
+    setBusyId(c.id);
+    try {
+      const saved = await transition(c.id, { status: to });
+      toast.success(`${saved.id} → ${CAPA_STATUS_LABEL[saved.status][lang === 'ar' ? 'ar' : 'en']}`);
+    } catch (e) {
+      toast.danger(getErrorDisplayMessage(e));
+    } finally {
+      setBusyId(null);
     }
-    advance(c.id, to, 'demo.user@tss.sa');
-    toast.success(`${c.code} → ${CAPA_STATUS_LABEL[to][lang === 'ar' ? 'ar' : 'en']}`);
   }
 
   return (
@@ -149,42 +165,62 @@ export function CapaPage() {
             {t('actionFilter')}{Object.values(advFilters).filter(Boolean).length > 0 ? ` · ${Object.values(advFilters).filter(Boolean).length}` : ''}
           </Button>
           <Button variant="ghost" Icon={Download} onClick={() => {
+            // Every column here is a column on capa.tasks. The previous export
+            // wrote the merged list — twenty invented CAPAs alongside the real
+            // ones — into a CSV an audit committee could attach to its minutes.
             const rows: ExportRow[] = filtered.map(c => ({
-              code: c.code,
+              reference: c.id,
               type: c.type,
-              source: c.source,
+              originType: c.originType,
+              originId: c.originId,
               titleEn: c.titleEn,
-              titleAr: c.titleAr ?? '',
+              titleAr: c.titleAr,
               status: c.status,
               severity: c.severity,
               owner: c.owner,
-              openedAt: c.openedAt,
-              dueDate: c.dueDate,
-              progressPct: c.progressPct,
-              rootCauseCategory: c.rootCauseCategory ?? '',
-              rootCause: c.rootCause ?? '',
-              rcaMethod: c.rcaMethod,
-              parentCapaId: c.parentCapaId ?? '',
-              effectivenessDueDate: c.effectivenessDueDate ?? '',
-              customerDisclosureRequired: c.customerDisclosureRequired ? 'Y' : 'N',
-              frameworkRefs: (c.frameworkRefs ?? []).join('; '),
+              raisedAt: c.createdAt?.slice(0, 10) ?? '',
+              targetDate: c.dueDate,
+              startedAt: c.startedAt?.slice(0, 10) ?? '',
+              submittedForVerificationAt: c.submittedForVerificationAt?.slice(0, 10) ?? '',
+              verifiedAt: c.verifiedAt?.slice(0, 10) ?? '',
+              verifiedBy: c.verifiedBy ?? '',
+              closedAt: c.closedAt?.slice(0, 10) ?? '',
+              cancellationReason: c.cancellationReason ?? '',
+              progressNotesEn: c.progressNotesEn ?? '',
+              evidenceRefs: c.evidenceRefs ?? '',
             }));
             downloadCsv(rows, stampFilename('capa-register', 'csv'));
             toast.success(t('capaExportDone'));
           }}>{t('actionExport')}</Button>
-          {/* DD-76: CAPAs originate from control failures / observations.
-              Front door is the CONTROL_OBSERVATION intake which gets triaged
-              into a finding, which then becomes a CAPA. */}
-          <Button variant="primary" Icon={Plus} onClick={() => navigate('/intake/control_observation')}>{t('capaNew')}</Button>
+          {/* DD-76 — the front door is the intake substrate. ⚠ F2-208: this
+              button used to be labelled "New CAPA", and a CONTROL_OBSERVATION
+              submission is triaged into a FINDING, not into this register. The
+              label now says what the control does. */}
+          <Button variant="primary" Icon={Plus} onClick={() => navigate('/intake/control_observation')}>
+            {t('capaReportObservation')}
+          </Button>
         </>}
       />
 
+      {error && (
+        <div className="capa-alert-banner" role="status">
+          <AlertTriangle size={18} color="var(--danger-fg)" />
+          <div className="capa-alert-banner__body">
+            <div className="capa-alert-banner__title">{t('capaLoadFailed')}</div>
+            <div className="capa-alert-banner__sub">{error}</div>
+          </div>
+        </div>
+      )}
+
       <div className="kpi-grid capa-kpi-strip">
-        <Kpi Icon={ListChecks}    label={t('capaKpiOpen')}            value={open.length}                tone="primary" to="/capa" />
-        <Kpi Icon={AlertTriangle} label={t('capaKpiOverdue')}         value={overdue.length}             tone="danger" to="/capa" />
-        <Kpi Icon={Repeat}        label={t('capaKpiVerificationFail')} value={failed.length}             tone="warning" onClick={() => setFilterStatus('VERIFICATION_FAILED')} active={filterStatus === 'VERIFICATION_FAILED'} />
-        <Kpi Icon={Hourglass}     label={t('capaKpiEffectiveness')}    value={effectivenessDue.length}   tone="warning" to="/capa" />
-        <Kpi Icon={Workflow}      label={t('capaKpiPreventive')}      value={preventive.length}          tone="info" onClick={() => setFilterType('PREVENTIVE')} active={filterType === 'PREVENTIVE'} />
+        <Kpi Icon={ListChecks}    label={t('capaKpiOpen')}         value={open.length}         tone="primary" />
+        <Kpi Icon={AlertTriangle} label={t('capaKpiOverdue')}      value={overdue.length}      tone="danger"
+             onClick={() => { setTab('aging'); }} />
+        <Kpi Icon={CheckCircle2}  label={t('capaKpiAwaiting')}     value={awaiting.length}     tone="accent"
+             onClick={() => setFilterStatus('AWAITING_VERIFICATION')} active={filterStatus === 'AWAITING_VERIFICATION'} />
+        <Kpi Icon={ShieldCheck}   label={t('capaKpiCriticalOpen')} value={criticalOpen.length} tone="warning" />
+        <Kpi Icon={Workflow}      label={t('capaKpiPreventive')}   value={preventive.length}   tone="info"
+             onClick={() => setFilterType('PREVENTIVE')} active={filterType === 'PREVENTIVE'} />
       </div>
 
       <Tabs items={tabs} active={tab} onChange={setTab} />
@@ -196,9 +232,7 @@ export function CapaPage() {
             <div className="capa-alert-banner__title">
               {criticalNotifs.length} {t('capaAlertsStripTitle')}
             </div>
-            <div className="capa-alert-banner__sub">
-              {t('capaAlertsStripBody')}
-            </div>
+            <div className="capa-alert-banner__sub">{t('capaAlertsStripBody')}</div>
           </div>
           <Button variant="primary" size="sm" Icon={Send} onClick={() => setTab('committee')}>
             {t('capaAlertsStripCta')}
@@ -217,13 +251,13 @@ export function CapaPage() {
                 className="capa-search-input"
               />
             </div>
-            <select value={filterType} onChange={e => setFilterType(e.target.value as any)}
+            <select value={filterType} onChange={e => setFilterType(e.target.value as typeof filterType)}
               className="capa-input">
               <option value="ALL">{t('capaFilterTypeAll')}</option>
               <option value="CORRECTIVE">{t('capaFilterTypeCA')}</option>
               <option value="PREVENTIVE">{t('capaFilterTypePA')}</option>
             </select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)}
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as typeof filterStatus)}
               className="capa-input">
               <option value="ALL">{t('capaFilterStatusAll')}</option>
               {(Object.keys(CAPA_STATUS_LABEL) as CapaStatus[]).map(s =>
@@ -232,10 +266,12 @@ export function CapaPage() {
             <Badge tone="primary">{filtered.length}</Badge>
           </div>}>
           {filtered.length === 0
-            ? <EmptyState Icon={ListChecks} title={t('capaEmptyTitle')} sub={t('capaEmptyBody')} />
+            ? <EmptyState Icon={ListChecks}
+                title={loading ? t('capaLoading') : t('capaEmptyTitle')}
+                sub={loading ? '' : t('capaEmptyBody')} />
             : <div className="capa-row-list">
                 {filtered.map(c => (
-                  <CapaRow key={c.id} c={c} onAdvance={() => quickAdvance(c)} onRca={() => setRcaTarget(c)} />
+                  <CapaRow key={c.id} c={c} busy={busyId === c.id} onAdvance={() => void advance(c)} />
                 ))}
               </div>
           }
@@ -243,33 +279,8 @@ export function CapaPage() {
       )}
 
       {tab === 'aging' && <AgingTab items={items} />}
-      {tab === 'pareto' && <ParetoTab items={items} />}
       {tab === 'workflow' && <WorkflowTab items={items} />}
-      {tab === 'triggers' && (
-        <TriggersTab triggers={triggers} onOpenPa={setTriggerTarget} />
-      )}
-      {tab === 'committee' && (
-        <CommitteeTab notifs={notifs} digest={digest} />
-      )}
-
-      {rcaTarget && (
-        <RcaModal
-          c={rcaTarget}
-          onClose={() => setRcaTarget(null)}
-          update={update}
-        />
-      )}
-      {triggerTarget && (
-        <NewPaModal
-          trig={triggerTarget}
-          onClose={() => setTriggerTarget(null)}
-          onCreate={(newPa) => {
-            create(newPa);
-            toast.success(t('capaPaCreated'));
-            setTriggerTarget(null);
-          }}
-        />
-      )}
+      {tab === 'committee' && <CommitteeTab notifs={notifs} digest={digest} />}
 
       <FilterModal
         open={filterOpen}
@@ -283,35 +294,31 @@ export function CapaPage() {
   );
 }
 
-function CapaRow({ c, onAdvance, onRca }: { c: Capa; onAdvance: () => void; onRca: () => void }) {
+function CapaRow({ c, busy, onAdvance }: { c: Capa; busy: boolean; onAdvance: () => void }) {
   const { t, lang } = useI18n();
   const dueIn = daysUntilDue(c);
-  const overdue = dueIn < 0 && c.status !== 'CLOSED' && c.status !== 'CANCELLED';
+  const open = isCapaOpen(c);
+  const overdue = dueIn < 0 && open;
   const title = lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn;
+  const next = forwardStep(c.status);
+  const source = CAPA_SOURCE_LABEL[c.source];
 
   return (
     <div className="capa-row">
       <div>
-        <div className="mono capa-row__code">{c.code}</div>
+        <div className="mono capa-row__code">{c.id}</div>
         <Badge tone={c.type === 'PREVENTIVE' ? 'info' : 'primary'}>{c.type === 'PREVENTIVE' ? 'PA' : 'CA'}</Badge>
       </div>
 
       <div className="capa-row__title-block">
-        <Link to={`/capa/${c.id}`}
-              title={t('capaDetailOpenLink')}
-              className="capa-row__title-link">
+        <Link to={`/capa/${c.id}`} title={t('capaDetailOpenLink')} className="capa-row__title-link">
           {title}
         </Link>
-        {c.sourceRecordTitle && (
-          <div className="capa-row__source">
-            {t('capaSourceLabel')}: <span className="capa-row__source-target">{c.sourceRecordTitle}</span>
-          </div>
-        )}
-        {c.parentCapaId && (
-          <div className="capa-row__recurrence">
-            ↑ {t('capaRecurrenceOf')} {c.parentCapaId}
-          </div>
-        )}
+        <div className="capa-row__source">
+          {t('capaSourceLabel')}: <span className="capa-row__source-target">
+            {source[lang === 'ar' ? 'ar' : 'en']} · {c.originId}
+          </span>
+        </div>
       </div>
 
       <Badge tone={CAPA_SEVERITY_TONE[c.severity]}>{c.severity}</Badge>
@@ -320,33 +327,34 @@ function CapaRow({ c, onAdvance, onRca }: { c: Capa; onAdvance: () => void; onRc
         {CAPA_STATUS_LABEL[c.status][lang === 'ar' ? 'ar' : 'en']}
       </Badge>
 
-      <div>
-        <Progress label={t('capaProgressLabel')} value={c.progressPct} />
-      </div>
+      <div className="capa-row__owner">{c.owner}</div>
 
       <div>
         <div className={`mono capa-row__due${overdue ? ' capa-row__due--overdue' : ''}`}>
           {c.dueDate}
         </div>
         <div className={`capa-row__remaining${overdue ? ' capa-row__remaining--overdue' : ''}`}>
-          {overdue ? `${Math.abs(dueIn)}d ${t('capaOverdue')}` : c.status === 'CLOSED' ? t('capaClosed') : `${dueIn}d ${t('capaRemaining')}`}
+          {overdue ? `${Math.abs(dueIn)}d ${t('capaOverdue')}`
+            : !open ? t('capaClosed')
+            : `${dueIn}d ${t('capaRemaining')}`}
         </div>
       </div>
 
-      <div className="capa-row__rca-block">
-        {c.rcaMethod !== 'NONE' && c.rootCause
-          ? <>
-              <div className="capa-row__rca-label">{t('capaRootCauseLabel')} · <Badge tone="neutral">{c.rcaMethod.replace('_', '-')}</Badge></div>
-              <div className="capa-row__rca-text">{c.rootCause}</div>
-            </>
-          : <Button variant="ghost" size="sm" Icon={Network} onClick={onRca}>{t('capaStartRca')}</Button>
-        }
+      {/* Verification attribution — the server stamps it from the authenticated
+          principal when it closes the CAPA, so this is a real name or nothing.
+          It used to be a client-supplied string. */}
+      <div className="capa-row__verifier">
+        {c.verifiedBy
+          ? <><span className="capa-row__verifier-label">{t('capaVerifiedBy')}</span> {c.verifiedBy}</>
+          : <span className="capa-row__verifier-none">—</span>}
       </div>
 
       <div className="capa-row__actions">
-        {c.rcaMethod !== 'NONE' && <Button variant="ghost" size="sm" Icon={Network} onClick={onRca}>{t('capaViewRca')}</Button>}
-        {CAPA_FORWARD_TRANSITIONS[c.status].length > 0 && (c.status !== 'CLOSED') && (
-          <Button variant="primary" size="sm" Icon={Send} onClick={onAdvance}>{t('capaAdvance')}</Button>
+        {next && (
+          <Button variant="primary" size="sm" Icon={Send} disabled={busy} onClick={onAdvance}
+            title={t('capaAdvanceTo')}>
+            {CAPA_STATUS_LABEL[next][lang === 'ar' ? 'ar' : 'en']}
+          </Button>
         )}
       </div>
     </div>
@@ -355,28 +363,38 @@ function CapaRow({ c, onAdvance, onRca }: { c: Capa; onAdvance: () => void; onRc
 
 function AgingTab({ items }: { items: Capa[] }) {
   const { t } = useI18n();
-  const buckets: Record<string, Capa[]> = { OVERDUE: [], '0-30': [], '31-60': [], '61-90': [], '90+': [] };
+  const buckets: Record<string, Capa[]> = {
+    OVERDUE: [], '0-30': [], '31-60': [], '61-90': [], '90+': [], UNKNOWN: [],
+  };
   for (const c of items) {
     const b = agingBucket(c);
     if (b === 'CLOSED') continue;
     buckets[b].push(c);
   }
-  const order: Array<keyof typeof buckets> = ['OVERDUE', '0-30', '31-60', '61-90', '90+'];
+  // ⚠ UNKNOWN is a real bucket, not a hidden one: a CAPA whose raise date the
+  // server did not send cannot be aged, and dropping it would make the buckets
+  // sum to less than the open population without saying so (F2-197).
+  const order = ['OVERDUE', '0-30', '31-60', '61-90', '90+', 'UNKNOWN'] as const;
   return (
     <Card title={t('capaTabAging')} Icon={Hourglass}>
       <div className="capa-aging-grid">
-        {order.map(b => (
+        {order.filter(b => b !== 'UNKNOWN' || buckets.UNKNOWN.length > 0).map(b => (
           <div key={b} className="capa-bucket">
             <div className="capa-bucket__head">
-              <Badge tone={b === 'OVERDUE' ? 'danger' : b === '90+' ? 'warning' : b === '61-90' ? 'warning' : b === '31-60' ? 'info' : 'success'}>
-                {b === 'OVERDUE' ? t('capaAgingOverdue') : `${b} ${t('capaDaysSuffix')}`}
+              <Badge tone={b === 'OVERDUE' ? 'danger'
+                : b === '90+' || b === '61-90' ? 'warning'
+                : b === '31-60' ? 'info'
+                : b === 'UNKNOWN' ? 'neutral' : 'success'}>
+                {b === 'OVERDUE' ? t('capaAgingOverdue')
+                  : b === 'UNKNOWN' ? t('capaAgingUnknown')
+                  : `${b} ${t('capaDaysSuffix')}`}
               </Badge>
               <span className="mono capa-bucket__count">{buckets[b].length}</span>
             </div>
             <div className="capa-bucket__list">
               {buckets[b].map(c => (
                 <div key={c.id} className="capa-bucket__item">
-                  <span className="mono capa-bucket__item-code">{c.code}</span> · {c.severity}
+                  <span className="mono capa-bucket__item-code">{c.id}</span> · {c.severity}
                 </div>
               ))}
               {buckets[b].length === 0 && <span className="capa-bucket__empty">—</span>}
@@ -384,48 +402,16 @@ function AgingTab({ items }: { items: Capa[] }) {
           </div>
         ))}
       </div>
-    </Card>
-  );
-}
-
-function ParetoTab({ items }: { items: Capa[] }) {
-  const { t, lang } = useI18n();
-  const withCause = items.filter(c => c.rootCauseCategory);
-  const top = paretoCauses(withCause, 8);
-  const max = top[0]?.count ?? 1;
-
-  return (
-    <Card title={t('capaTabPareto')} Icon={BarChart3}
-      action={<Badge tone="primary">{withCause.length} {t('capaParetoCausedTotal')}</Badge>}>
-      {top.length === 0
-        ? <EmptyState Icon={BarChart3} title={t('capaParetoEmpty')} sub={t('capaParetoEmptyBody')} />
-        : <div className="capa-pareto-stack">
-            {top.map(row => {
-              const cat = ROOT_CAUSE_CATS.find(c => c.id === row.category);
-              return (
-                <div key={row.category} className="capa-pareto-row">
-                  <div className="capa-pareto-label">
-                    {cat ? (lang === 'ar' ? cat.ar : cat.en) : row.category}
-                  </div>
-                  <div className="capa-pareto-bar">
-                    <div className="capa-pareto-fill" style={{ width: `${(row.count / max) * 100}%` }} />
-                  </div>
-                  <div className="mono capa-pareto-count">{row.count} ({row.pct}%)</div>
-                </div>
-              );
-            })}
-            <div className="capa-footnote">
-              {t('capaParetoFootnote')}
-            </div>
-          </div>
-      }
+      <div className="capa-footnote-plain">{t('capaAgingFootnote')}</div>
     </Card>
   );
 }
 
 function WorkflowTab({ items }: { items: Capa[] }) {
   const { t, lang } = useI18n();
-  const stages: CapaStatus[] = ['IDENTIFIED','IMPLEMENTING','OWNER_TESTED','INDEPENDENT_TESTED','AUDIT_SIGNED_OFF','CLOSED'];
+  // ⚠ Lanes are the machine's own key order, not a hand-written list. The old
+  // version named six stages, three of which the server has no state for.
+  const stages = Object.keys(CAPA_ALLOWED) as CapaStatus[];
 
   return (
     <Card title={t('capaTabWorkflow')} Icon={Workflow}>
@@ -440,8 +426,8 @@ function WorkflowTab({ items }: { items: Capa[] }) {
               </div>
               <div className="capa-kanban-list">
                 {lane.map(c => (
-                  <div key={c.id} className="capa-kanban-card">
-                    <div className="mono capa-kanban-card__code">{c.code}</div>
+                  <Link key={c.id} to={`/capa/${c.id}`} className="capa-kanban-card">
+                    <div className="mono capa-kanban-card__code">{c.id}</div>
                     <div className="capa-kanban-card__title">
                       {(lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn).slice(0, 60)}
                     </div>
@@ -449,7 +435,7 @@ function WorkflowTab({ items }: { items: Capa[] }) {
                       <Badge tone={CAPA_SEVERITY_TONE[c.severity]}>{c.severity}</Badge>
                       <Badge tone={c.type === 'PREVENTIVE' ? 'info' : 'neutral'}>{c.type === 'PREVENTIVE' ? 'PA' : 'CA'}</Badge>
                     </div>
-                  </div>
+                  </Link>
                 ))}
                 {lane.length === 0 && <div className="capa-kanban-empty">—</div>}
               </div>
@@ -464,328 +450,15 @@ function WorkflowTab({ items }: { items: Capa[] }) {
   );
 }
 
-// ── RCA wizard modal ──────────────────────────────────────────────────
-// Read + edit a CAPA's root-cause analysis. Demo mode: shows the seeded
-// FIVE_WHYS / FISHBONE / PARETO content. New CAPAs can pick a method
-// and capture answers; the captured RCA is persisted via useCapas.update.
-
-function RcaModal({ c, onClose, update }: {
-  c: Capa;
-  onClose: () => void;
-  update: (id: string, patch: Partial<Capa>) => void;
-}) {
-  const { t, lang } = useI18n();
-  const toast = useToast();
-  const [method, setMethod] = useState<RcaMethod>(c.rcaMethod);
-  const [steps, setSteps] = useState<string[]>(c.rcaSteps.length ? c.rcaSteps : initialStepsFor(method));
-  const [rootCause, setRootCause] = useState(c.rootCause ?? '');
-  const [category, setCategory] = useState<RootCauseCategory>(c.rootCauseCategory ?? 'PROCESS');
-
-  function initialStepsFor(m: RcaMethod): string[] {
-    if (m === 'FIVE_WHYS') return ['', '', '', '', ''];
-    if (m === 'FISHBONE') return ['', '', '', '', '', ''];
-    if (m === 'PARETO') return [''];
-    return [];
-  }
-
-  function setMethodAndSeed(m: RcaMethod) {
-    setMethod(m);
-    setSteps(prev => prev.length ? prev : initialStepsFor(m));
-  }
-
-  function save() {
-    update(c.id, {
-      rcaMethod: method,
-      rcaSteps: steps,
-      rootCause: rootCause.trim(),
-      rootCauseCategory: category,
-    });
-    toast.success(t('capaRcaSaved'));
-    onClose();
-  }
-
-  const fishboneLabels = ['People', 'Process', 'Technology', 'Materials', 'Environment', 'Management'];
-  const fishboneLabelsAr = ['بشري', 'عملية', 'تقنية', 'مواد', 'بيئة', 'إدارة'];
-
-  return (
-    <Modal open onClose={onClose} title={`${c.code} — ${t('capaRcaTitle')}`} size="lg"
-      footer={<>
-        <Button variant="ghost" onClick={onClose}>{t('actionCancel')}</Button>
-        <Button variant="primary" Icon={CheckCheck} onClick={save}>{t('actionSave')}</Button>
-      </>}>
-      <div className="capa-modal-stack">
-        <div className="capa-subject-block">
-          <div className="capa-modal-eyebrow">{t('capaSubject')}</div>
-          <div className="capa-modal-title">
-            {lang === 'ar' && c.titleAr ? c.titleAr : c.titleEn}
-          </div>
-          <div className="capa-modal-body">
-            {lang === 'ar' && c.descriptionAr ? c.descriptionAr : c.descriptionEn}
-          </div>
-        </div>
-
-        <div>
-          <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaRcaMethod')}</div>
-          <div className="capa-pill-row">
-            {(['FIVE_WHYS', 'FISHBONE', 'PARETO', 'NONE'] as RcaMethod[]).map(m => (
-              <button key={m} onClick={() => setMethodAndSeed(m)}
-                className={`capa-pill${method === m ? ' is-active' : ''}`}>
-                {m === 'FIVE_WHYS' ? t('capaRcaFiveWhys') :
-                 m === 'FISHBONE' ? t('capaRcaFishbone') :
-                 m === 'PARETO' ? t('capaRcaPareto') : t('capaRcaNone')}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {method === 'FIVE_WHYS' && (
-          <div>
-            <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaRcaFiveWhys')}</div>
-            <div className="capa-bucket__list">
-              {steps.slice(0, 5).map((s, i) => (
-                <div key={i} className="capa-why-row">
-                  <Badge tone="primary">{t('capaRcaWhy')} {i + 1}</Badge>
-                  <input value={s} onChange={e => setSteps(prev => prev.map((x, j) => j === i ? e.target.value : x))}
-                    placeholder={t('capaRcaWhyPh')}
-                    className="capa-input capa-input--full" />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {method === 'FISHBONE' && (
-          <div>
-            <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaRcaFishbone')} (6M)</div>
-            <div className="capa-fishbone-grid">
-              {fishboneLabels.map((label, i) => (
-                <div key={i}>
-                  <div className="capa-fishbone-label">
-                    {lang === 'ar' ? fishboneLabelsAr[i] : label}
-                  </div>
-                  <input value={steps[i] ?? ''} onChange={e => setSteps(prev => {
-                      const next = [...prev]; while (next.length < 6) next.push(''); next[i] = e.target.value; return next;
-                    })}
-                    placeholder={t('capaRcaFishbonePh')}
-                    className="capa-input capa-input--full" />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {method === 'PARETO' && (
-          <div>
-            <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaRcaPareto')}</div>
-            <textarea value={steps.join('\n')} onChange={e => setSteps(e.target.value.split('\n'))}
-              placeholder={t('capaRcaParetoPh')}
-              rows={6}
-              className="capa-input capa-input--full capa-input--textarea" />
-          </div>
-        )}
-
-        <div>
-          <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaRootCauseLabel')}</div>
-          <input value={rootCause} onChange={e => setRootCause(e.target.value)}
-            placeholder={t('capaRootCausePh')}
-            className="capa-input capa-input--full" />
-        </div>
-
-        <div>
-          <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaRcaCategory')}</div>
-          <div className="capa-pill-row capa-pill-row--wrap">
-            {ROOT_CAUSE_CATS.filter(c => c.id !== 'UNKNOWN').map(cat => (
-              <button key={cat.id} onClick={() => setCategory(cat.id)}
-                className={`capa-pill capa-pill--xs${category === cat.id ? ' is-active' : ''}`}>
-                {lang === 'ar' ? cat.ar : cat.en}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-// ── PA Triggers tab + new-PA modal ────────────────────────────────
-// Triggers are derived from KRIs in amber/red, residual-equals-
-// inherent open risks, and root-cause categories that account for
-// >= 30% of CAPA history. Each trigger row offers a one-click
-// "Open PA" action that pre-fills a PREVENTIVE Capa via useCapas.
-// create — DD-43.
-
-function TriggersTab({ triggers, onOpenPa }: { triggers: PaTrigger[]; onOpenPa: (t: PaTrigger) => void }) {
-  const { t, lang } = useI18n();
-  const KIND_ICON: Record<string, typeof Zap> = {
-    KRI_BREACH: TrendingUp, RISK_TREND: Activity, RECURRENCE_PATTERN: Repeat,
-  };
-  const KIND_LABEL: Record<string, { en: string; ar: string }> = {
-    KRI_BREACH:         { en: 'KRI breach',          ar: 'تجاوز مؤشر' },
-    RISK_TREND:         { en: 'Risk trend',          ar: 'اتجاه الخطر' },
-    RECURRENCE_PATTERN: { en: 'Recurrence pattern',  ar: 'نمط تكرار' },
-  };
-
-  if (triggers.length === 0) {
-    return (
-      <Card title={t('capaTabTriggers')} Icon={Zap}>
-        <EmptyState Icon={ShieldCheck} title={t('capaTriggersEmpty')} sub={t('capaTriggersEmptyBody')} />
-      </Card>
-    );
-  }
-
-  return (
-    <Card title={t('capaTabTriggers')} Icon={Zap}
-      action={<Badge tone={triggers.some(t => !t.alreadyCovered) ? 'warning' : 'success'}>
-        {triggers.filter(t => !t.alreadyCovered).length} {t('capaTriggersOpen')}
-      </Badge>}>
-      <div className="capa-trigger-intro">
-        {t('capaTriggersIntro')}
-      </div>
-      <div className="capa-trigger-list">
-        {triggers.map(trig => {
-          const Icon = KIND_ICON[trig.kind] ?? Zap;
-          return (
-            <div key={trig.id} className="capa-trigger-row">
-              <Icon size={20} strokeWidth={1.8} color="var(--warning-fg)" />
-              <Badge tone={trig.kind === 'KRI_BREACH' ? 'warning' : trig.kind === 'RISK_TREND' ? 'info' : 'accent'}>
-                {KIND_LABEL[trig.kind][lang === 'ar' ? 'ar' : 'en']}
-              </Badge>
-              <div className="capa-trigger-main">
-                <div className="capa-trigger-title">
-                  {lang === 'ar' ? trig.titleAr : trig.titleEn}
-                </div>
-                <div className="capa-trigger-rationale">
-                  {lang === 'ar' ? trig.rationaleAr : trig.rationaleEn}
-                </div>
-                <div className="capa-trigger-refs">
-                  {trig.frameworkRefs.map(ref => <Badge key={ref} tone="neutral">{ref}</Badge>)}
-                </div>
-              </div>
-              <Badge tone={trig.suggestedSeverity === 'CRITICAL' ? 'danger' : trig.suggestedSeverity === 'HIGH' ? 'warning' : 'info'}>
-                {trig.suggestedSeverity}
-              </Badge>
-              <div className="mono capa-trigger-owner">
-                {trig.suggestedOwner}
-              </div>
-              <div className="capa-trigger-actions">
-                {trig.alreadyCovered
-                  ? <Badge tone="success" dot>{t('capaTriggerCovered')}</Badge>
-                  : <Button variant="primary" size="sm" Icon={Plus} onClick={() => onOpenPa(trig)}>{t('capaTriggerOpenPa')}</Button>
-                }
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="capa-footnote--plain">
-        {t('capaTriggersFootnote')}
-      </div>
-    </Card>
-  );
-}
-
-function NewPaModal({ trig, onClose, onCreate }: {
-  trig: PaTrigger;
-  onClose: () => void;
-  onCreate: (init: Parameters<ReturnType<typeof useCapas>['create']>[0]) => void;
-}) {
-  const { t, lang } = useI18n();
-  const [titleEn, setTitleEn] = useState(`PA — ${trig.titleEn}`);
-  const [titleAr, setTitleAr] = useState(`إجراء وقائي — ${trig.titleAr}`);
-  const [descriptionEn, setDescriptionEn] = useState(trig.rationaleEn);
-  const [owner, setOwner] = useState(trig.suggestedOwner);
-  const [severity, setSeverity] = useState<PaTrigger['suggestedSeverity']>(trig.suggestedSeverity);
-  // Default due date: 90 days out — typical PA implementation horizon
-  const [dueDate, setDueDate] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 90); return d.toISOString().slice(0, 10);
-  });
-
-  function submit() {
-    const today = new Date().toISOString().slice(0, 10);
-    onCreate({
-      code: `CAPA-${new Date().getFullYear()}-PA-${Math.floor(Math.random() * 900 + 100)}`,
-      titleEn, titleAr, descriptionEn,
-      type: 'PREVENTIVE',
-      source: trig.kind === 'KRI_BREACH' ? 'KRI_BREACH' : trig.kind === 'RISK_TREND' ? 'RISK_TREND' : 'PROCESS_REVIEW',
-      sourceRecordKey: trig.sourceRecordKey,
-      sourceRecordTitle: trig.sourceRecordTitle,
-      frameworkRefs: trig.frameworkRefs,
-      severity,
-      owner,
-      status: 'IDENTIFIED',
-      openedAt: today,
-      dueDate,
-      rcaMethod: 'NONE',
-      rcaSteps: [],
-    });
-  }
-
-  return (
-    <Modal open onClose={onClose} title={t('capaNewPaTitle')} size="lg"
-      footer={<>
-        <Button variant="ghost" onClick={onClose}>{t('actionCancel')}</Button>
-        <Button variant="primary" Icon={Plus} onClick={submit}>{t('capaNewPaCreate')}</Button>
-      </>}>
-      <div className="capa-modal-stack capa-modal-stack--tight">
-        <div className="capa-trigger-banner">
-          <div className="capa-trigger-banner__head">
-            <Zap size={14} /> {t('capaNewPaTriggerLabel')}
-          </div>
-          <div className="capa-trigger-banner__title">
-            {lang === 'ar' ? trig.titleAr : trig.titleEn}
-          </div>
-          <div className="capa-trigger-banner__body">
-            {lang === 'ar' ? trig.rationaleAr : trig.rationaleEn}
-          </div>
-        </div>
-
-        <Field label={t('capaNewPaTitleEn')} value={titleEn} onChange={setTitleEn} />
-        <Field label={t('capaNewPaTitleAr')} value={titleAr} onChange={setTitleAr} />
-        <Field label={t('capaNewPaDescription')} value={descriptionEn} onChange={setDescriptionEn} multiline />
-
-        <div className="capa-three-col">
-          <Field label={t('capaNewPaOwner')} value={owner} onChange={setOwner} />
-          <div>
-            <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaNewPaSeverity')}</div>
-            <div className="capa-severity-row">
-              {(['LOW','MEDIUM','HIGH','CRITICAL'] as const).map(s =>
-                <button key={s} onClick={() => setSeverity(s)}
-                  className={`capa-pill capa-pill--xs${severity === s ? ' is-active' : ''}`}>{s}</button>
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{t('capaNewPaDueDate')}</div>
-            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-              className="capa-input capa-input--full" />
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function Field({ label, value, onChange, multiline }: { label: string; value: string; onChange: (v: string) => void; multiline?: boolean }) {
-  return (
-    <div>
-      <div className="capa-modal-eyebrow capa-modal-eyebrow--mb">{label}</div>
-      {multiline
-        ? <textarea value={value} onChange={e => onChange(e.target.value)} rows={3}
-            className="capa-input capa-input--full capa-input--textarea" />
-        : <input value={value} onChange={e => onChange(e.target.value)}
-            className="capa-input capa-input--full" />
-      }
-    </div>
-  );
-}
-
-// ── Audit Committee tab — derived notifications + quarterly digest ──
-// Combines two readouts in a single "tell the Audit Committee" pane:
-//   1. The live notification stream (DUE_SOON / OVERDUE / VERIFICATION
-//      _FAILED / etc) sorted newest-first
-//   2. The current-quarter rollup digest (opened, closed, overdue,
-//      recurrent, customer disclosures, top root causes)
-
+/**
+ * Audit-Committee readout — the quarterly rollup plus the live signal list.
+ *
+ * ⚠ F2-208 removed four digest figures (verification failures, recurrent CAPAs,
+ * customer disclosures, top root causes) rather than letting them read zero. Each
+ * was derived from a field with no column, so a zero here would have told an audit
+ * committee that the same root cause has not come back — an invented all-clear,
+ * which F2-197 records as worse than an invented number.
+ */
 function CommitteeTab({ notifs, digest }: {
   notifs: CapaNotif[];
   digest: ReturnType<typeof audCommitteeDigest>;
@@ -793,47 +466,32 @@ function CommitteeTab({ notifs, digest }: {
   const { t, lang } = useI18n();
   const toast = useToast();
 
-  const KIND_LABEL: Record<string, { en: string; ar: string }> = {
-    NEW_CRITICAL:           { en: 'New critical CAPA',          ar: 'إجراء حرج جديد' },
-    DUE_SOON:               { en: 'Due in ≤ 7 days',            ar: 'يستحق خلال ≤ 7 أيام' },
-    OVERDUE:                { en: 'Overdue',                    ar: 'متأخر' },
-    EFFECTIVENESS_OVERDUE:  { en: 'Effectiveness re-test due',  ar: 'استحقاق إعادة اختبار الفاعلية' },
-    VERIFICATION_FAILED:    { en: 'Verification failed',        ar: 'فشل التحقق' },
-    CUSTOMER_DISCLOSURE:    { en: 'Customer disclosure window', ar: 'نافذة إبلاغ العميل' },
+  const KIND_LABEL: Record<CapaNotif['kind'], { en: string; ar: string }> = {
+    NEW_CRITICAL: { en: 'New critical CAPA', ar: 'إجراء حرج جديد' },
+    DUE_SOON:     { en: 'Due in ≤ 7 days',   ar: 'يستحق خلال ≤ 7 أيام' },
+    OVERDUE:      { en: 'Overdue',           ar: 'متأخر' },
   };
-  const KIND_TONE: Record<string, 'danger' | 'warning' | 'info' | 'accent'> = {
-    NEW_CRITICAL: 'danger', OVERDUE: 'danger', VERIFICATION_FAILED: 'danger',
-    DUE_SOON: 'warning', EFFECTIVENESS_OVERDUE: 'warning',
-    CUSTOMER_DISCLOSURE: 'info',
-  };
-
-  const ROOT_CAUSE_LABEL: Record<string, { en: string; ar: string }> = {
-    PEOPLE: { en: 'People', ar: 'بشري' }, PROCESS: { en: 'Process', ar: 'عملية' },
-    TECHNOLOGY: { en: 'Technology', ar: 'تقنية' }, POLICY: { en: 'Policy', ar: 'سياسة' },
-    TRAINING: { en: 'Training', ar: 'تدريب' }, EXTERNAL: { en: 'External', ar: 'خارجية' },
-    MANAGEMENT: { en: 'Management', ar: 'إدارة' }, UNKNOWN: { en: 'Unknown', ar: 'غير محدد' },
+  const KIND_TONE: Record<CapaNotif['kind'], 'danger' | 'warning'> = {
+    NEW_CRITICAL: 'danger', OVERDUE: 'danger', DUE_SOON: 'warning',
   };
 
   return (
     <div className="capa-committee-stack">
-      {/* Quarterly digest card */}
       <Card title={`${t('capaCommitteeDigest')} — ${digest.quarterLabel}`} Icon={Stamp}
         action={<Button variant="ghost" size="sm" Icon={FileText}
           onClick={() => {
-            // Real export: render the digest's per-metric rows as a CSV the
-            // audit committee can attach to the quarterly minutes pack.
             const rows: ExportRow[] = [
-              { metric: t('capaCommitteeOpened'),               value: String(digest.opened) },
-              { metric: t('capaCommitteeClosed'),               value: String(digest.closed) },
-              { metric: t('capaCommitteeInFlight'),             value: String(digest.inFlight) },
-              { metric: t('capaCommitteeOverdue'),              value: String(digest.overdue) },
-              { metric: t('capaCommitteeVerificationFailed'),   value: String(digest.verificationFailed) },
-              { metric: t('capaCommitteeRecurrent'),            value: String(digest.recurrent) },
-              { metric: t('capaCommitteePreventive'),           value: String(digest.preventive) },
-              { metric: t('capaCommitteeCustomerDisclosures'),  value: String(digest.customerDisclosures) },
-              { metric: 'quarter',                              value: digest.quarterLabel },
-              { metric: 'period_start',                         value: digest.quarterStart },
-              { metric: 'period_end',                           value: digest.quarterEnd },
+              { metric: t('capaCommitteeOpened'),        value: String(digest.opened) },
+              { metric: t('capaCommitteeClosed'),        value: String(digest.closed) },
+              { metric: t('capaCommitteeInFlight'),      value: String(digest.inFlight) },
+              { metric: t('capaCommitteeOverdue'),       value: String(digest.overdue) },
+              { metric: t('capaCommitteeCriticalOpen'),  value: String(digest.criticalOpen) },
+              { metric: t('capaCommitteeAwaiting'),      value: String(digest.awaitingVerification) },
+              { metric: t('capaCommitteePreventive'),    value: String(digest.preventive) },
+              { metric: t('capaCommitteeUndated'),       value: String(digest.undatedRows) },
+              { metric: 'quarter',                       value: digest.quarterLabel },
+              { metric: 'period_start',                  value: digest.quarterStart },
+              { metric: 'period_end',                    value: digest.quarterEnd },
             ];
             downloadCsv(rows, stampFilename(`capa-committee-${digest.quarterLabel}`, 'csv'));
             toast.success(t('exportCsvDone'));
@@ -844,41 +502,26 @@ function CommitteeTab({ notifs, digest }: {
           {t('capaCommitteeDigestPeriod')}: <span className="mono">{digest.quarterStart} → {digest.quarterEnd}</span>
         </div>
         <div className="capa-digest-grid">
-          <DigestStat label={t('capaCommitteeOpened')}              value={digest.opened}            tone="info" />
-          <DigestStat label={t('capaCommitteeClosed')}              value={digest.closed}            tone="success" />
-          <DigestStat label={t('capaCommitteeInFlight')}            value={digest.inFlight}          tone="primary" />
-          <DigestStat label={t('capaCommitteeOverdue')}             value={digest.overdue}           tone={digest.overdue > 0 ? 'danger' : 'success'} />
-          <DigestStat label={t('capaCommitteeVerificationFailed')}  value={digest.verificationFailed} tone={digest.verificationFailed > 0 ? 'danger' : 'success'} />
-          <DigestStat label={t('capaCommitteeRecurrent')}           value={digest.recurrent}         tone={digest.recurrent > 0 ? 'warning' : 'success'} />
-          <DigestStat label={t('capaCommitteePreventive')}          value={digest.preventive}        tone="accent" />
-          <DigestStat label={t('capaCommitteeCustomerDisclosures')} value={digest.customerDisclosures} tone={digest.customerDisclosures > 0 ? 'warning' : 'success'} />
+          <DigestStat label={t('capaCommitteeOpened')}       value={digest.opened}   tone="info" />
+          <DigestStat label={t('capaCommitteeClosed')}       value={digest.closed}   tone="success" />
+          <DigestStat label={t('capaCommitteeInFlight')}     value={digest.inFlight} tone="primary" />
+          <DigestStat label={t('capaCommitteeOverdue')}      value={digest.overdue}
+            tone={digest.overdue > 0 ? 'danger' : 'success'} />
+          <DigestStat label={t('capaCommitteeCriticalOpen')} value={digest.criticalOpen}
+            tone={digest.criticalOpen > 0 ? 'warning' : 'success'} />
+          <DigestStat label={t('capaCommitteeAwaiting')}     value={digest.awaitingVerification} tone="accent" />
+          <DigestStat label={t('capaCommitteePreventive')}   value={digest.preventive} tone="accent" />
         </div>
-        {digest.topRootCauses.length > 0 && (
-          <div className="capa-roots-block">
-            <div className="capa-modal-eyebrow capa-roots-block__title">
-              {t('capaCommitteeTopRootCauses')}
-            </div>
-            <div className="capa-roots-list">
-              {digest.topRootCauses.map(rc => {
-                const lbl = ROOT_CAUSE_LABEL[rc.category];
-                return (
-                  <div key={rc.category} className="capa-root-chip">
-                    <span className="capa-root-chip__label">
-                      {lbl ? (lang === 'ar' ? lbl.ar : lbl.en) : rc.category}
-                    </span>
-                    <Badge tone="primary">{rc.count} ({rc.pct}%)</Badge>
-                  </div>
-                );
-              })}
-            </div>
+        {/* The denominator disclosure. A quarter's "opened" count is only as
+            complete as the raise dates behind it. */}
+        {digest.undatedRows > 0 && (
+          <div className="capa-footnote" role="status">
+            {digest.undatedRows} {t('capaCommitteeUndatedNote')}
           </div>
         )}
-        <div className="capa-footnote">
-          {t('capaCommitteeFootnote')}
-        </div>
+        <div className="capa-footnote">{t('capaCommitteeFootnote')}</div>
       </Card>
 
-      {/* Live notification stream */}
       <Card title={t('capaCommitteeLiveStream')} Icon={Bell}
         action={<Badge tone={notifs.some(n => n.severity === 'CRITICAL') ? 'danger' : 'primary'}>
           {notifs.length}
@@ -893,12 +536,11 @@ function CommitteeTab({ notifs, digest }: {
                     {KIND_LABEL[n.kind][lang === 'ar' ? 'ar' : 'en']}
                   </Badge>
                   <div className="capa-stream-main">
-                    <div className="mono capa-stream-code">{n.capaCode}</div>
+                    <div className="mono capa-stream-code">{n.capaId}</div>
                     <div className="capa-stream-message">
                       {lang === 'ar' ? n.messageAr : n.messageEn}
                     </div>
                   </div>
-                  <span className="mono capa-stream-recipient">{n.recipient}</span>
                   <Badge tone={n.severity === 'CRITICAL' ? 'danger' : n.severity === 'WARN' ? 'warning' : 'info'}>
                     {n.severity}
                   </Badge>
@@ -911,7 +553,10 @@ function CommitteeTab({ notifs, digest }: {
   );
 }
 
-function DigestStat({ label, value, tone }: { label: string; value: number; tone: 'info' | 'success' | 'primary' | 'danger' | 'warning' | 'accent' }) {
+function DigestStat({ label, value, tone }: {
+  label: string; value: number;
+  tone: 'info' | 'success' | 'primary' | 'danger' | 'warning' | 'accent';
+}) {
   return (
     <div className="capa-digest-stat" data-tone={tone}>
       <div className="mono capa-digest-stat__value">{value}</div>

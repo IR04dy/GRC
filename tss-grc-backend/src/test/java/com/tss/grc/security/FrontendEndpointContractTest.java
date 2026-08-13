@@ -121,7 +121,7 @@ class FrontendEndpointContractTest {
      * slice rather than a follow-up. A ceiling that only ever complains upward would have let a
      * fifth dark endpoint land beside the four it was replacing.
      */
-    private static final int BASELINE_CLIENTLESS_ENDPOINTS = 408;   // F2-205: -2, vulnLifecycleApi (list + transition)
+    private static final int BASELINE_CLIENTLESS_ENDPOINTS = 407;   // F2-208: -1, capaTaskApi.transition
 
     /**
      * Of those, the ones that are guarded WRITES — a governed capability with no caller at all.
@@ -146,7 +146,17 @@ class FrontendEndpointContractTest {
      * roles — so the pair is a worked example of what this number is for: not unbuilt UI here, but
      * a built workflow whose front door nobody could reach.
      */
-    private static final int BASELINE_CLIENTLESS_GUARDED_WRITES = 199;   // F2-205: -1, POST /api/cyber-lc/vulnerabilities/{id}/transition
+    /*
+     * <p><b>199 -> 198 on 2026-08-13 (F2-208):</b> `POST /api/capa/tasks/{id}/transition`. A
+     * governed write with no caller for as long as it existed, while the CAPA register advanced its
+     * rows in `localStorage` — including the independent-verification sign-off. Note what did NOT
+     * move: `POST /api/capa/tasks` is still clientless and deliberately so. That register is filled
+     * by the intake substrate and by other modules' automation, and the only caller a create
+     * wrapper would have had was a modal fed by a fabricated preventive-action trigger engine.
+     * 🔑 This number counts capabilities nothing reaches; some of them should not be reached from a
+     * screen, and lowering it by wiring one of those would be the wrong kind of progress.
+     */
+    private static final int BASELINE_CLIENTLESS_GUARDED_WRITES = 198;   // F2-208: -1, POST /api/capa/tasks/{id}/transition
 
     // ── the two populations ────────────────────────────────────────────────────────────────────
 

@@ -35,6 +35,18 @@ public class CapaTaskDto {
     private String progressNotesEn;
     private String progressNotesAr;
     private String evidenceRefs;
+    /**
+     * When the CAPA was raised. F2-208: {@code capa.tasks.created_at} has been NOT NULL and
+     * populated on all 14 rows since the table was created, and this DTO never declared it — so
+     * the register had no origin date and the frontend computed a CAPA's age from
+     * {@code startedAt ?? targetDate}, i.e. from when it went IN_PROGRESS or from its deadline.
+     * F2-198's {@code crossBorderTransfer} shape: the value was in the column all along and the
+     * client's own type was the thing that did not mention it.
+     *
+     * <p>Read-only in effect — {@code create()} never reads it, the entity stamps it — so it is
+     * declared here rather than being minted anywhere on the client.
+     */
+    private LocalDateTime createdAt;
 
     public static CapaTaskDto from(CapaTask e) {
         return CapaTaskDto.builder()
@@ -52,6 +64,7 @@ public class CapaTaskDto {
             .cancelledAt(e.getCancelledAt()).cancellationReasonEn(e.getCancellationReasonEn())
             .progressNotesEn(e.getProgressNotesEn()).progressNotesAr(e.getProgressNotesAr())
             .evidenceRefs(e.getEvidenceRefs())
+            .createdAt(e.getCreatedAt())
             .build();
     }
 
