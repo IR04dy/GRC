@@ -121,7 +121,7 @@ class FrontendEndpointContractTest {
      * slice rather than a follow-up. A ceiling that only ever complains upward would have let a
      * fifth dark endpoint land beside the four it was replacing.
      */
-    private static final int BASELINE_CLIENTLESS_ENDPOINTS = 410;
+    private static final int BASELINE_CLIENTLESS_ENDPOINTS = 408;   // F2-205: -2, vulnLifecycleApi (list + transition)
 
     /**
      * Of those, the ones that are guarded WRITES — a governed capability with no caller at all.
@@ -146,7 +146,7 @@ class FrontendEndpointContractTest {
      * roles — so the pair is a worked example of what this number is for: not unbuilt UI here, but
      * a built workflow whose front door nobody could reach.
      */
-    private static final int BASELINE_CLIENTLESS_GUARDED_WRITES = 200;
+    private static final int BASELINE_CLIENTLESS_GUARDED_WRITES = 199;   // F2-205: -1, POST /api/cyber-lc/vulnerabilities/{id}/transition
 
     // ── the two populations ────────────────────────────────────────────────────────────────────
 

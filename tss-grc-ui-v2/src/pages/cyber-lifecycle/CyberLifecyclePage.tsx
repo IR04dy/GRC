@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ShieldCheck, AlertTriangle, Activity, Server, Bug, Radio,
-  Download, Send, ThumbsUp, CheckCircle2, ArrowUpRight, Clock,
+  Send, ThumbsUp, CheckCircle2, ArrowUpRight, Clock,
   AlertOctagon, Wrench,
 } from 'lucide-react';
 import { LifecyclePipeline, type PipelineStage, type PipelineCard, dueLabel } from '../../components/lifecycle/LifecyclePipeline';
-import { printPacket, packetTextToSections } from '../../lib/packetPrint';
-import { reportingApi, ApiError } from '../../lib/api';
+import { ApiError } from '../../lib/api';
 import { Shell } from '../../components/layout/Shell';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -18,22 +17,23 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
   loadFiling, transitionFiling,
-  loadVulns, transitionVuln,
+  loadVulns, transitionVuln, hydrateVulns, vulnsLoadFailed,
+  nextVulnStatuses, primaryNextVulnStatus, isVulnStatusManaged, isVulnOpen, isVulnOverdue,
+  vulnStatusLabel, vulnStatusTone,
   loadAssets, createAsset, markPatched, reclassifyAsset,
   loadThreats, acknowledgeThreat, createThreat,
   loadSocAlerts, transitionSocAlert, createSocAlert,
   loadPenTests, schedulePenTest, transitionPenTest, recordPenTestFindings,
-  subscribeCyber, aggregateCyber, buildHaseenPacket, buildHaseenSheets,
+  subscribeCyber, aggregateCyber,
   FILING_STATUS_LABEL, FILING_STATUS_TONE,
   TIER_LABEL, TIER_TONE,
-  VULN_SEVERITY_TONE, VULN_STATUS_LABEL, VULN_STATUS_TONE,
+  VULN_SEVERITY_TONE,
   SOC_SEVERITY_TONE, SOC_STATUS_LABEL, SOC_STATUS_TONE,
   THREAT_SOURCE_LABEL,
   PENTEST_STATUS_LABEL, PENTEST_STATUS_TONE,
   type EccFiling, type Vulnerability, type CyberAsset, type ThreatAdvisory, type SocAlert, type PenTest,
   type EccFilingStatus, type VulnStatus, type SocStatus, type AssetTier, type PenTestStatus,
 } from '../../lib/cyberLifecycle';
-import { loadWhiteLabel, subscribeWhiteLabel } from '../../lib/whiteLabel';
 import '../../styles/pages/cyber-lifecycle.css';
 
 type CycTab = 'pipeline' | 'ecc' | 'vulns' | 'assets' | 'threats' | 'soc' | 'pentest';
@@ -47,6 +47,7 @@ function isCycTab(value: string | null | undefined): value is CycTab {
 export function CyberLifecyclePage() {
   const { t, lang } = useI18n();
   const toast = useToast();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   // Honor `?tab=` deep-links from other pages (e.g. the V2 vulnerabilities
@@ -65,42 +66,32 @@ export function CyberLifecyclePage() {
   const alerts = useMemo(() => loadSocAlerts(), [_tick]);
   const tests = useMemo(() => loadPenTests(), [_tick]);
 
-  const [brand, setBrand] = useState(() => loadWhiteLabel());
-  useEffect(() => subscribeWhiteLabel(() => setBrand(loadWhiteLabel())), []);
+  // F2-205: the white-label subscription is gone with the export. Its only use was naming the
+  // reporting entity on the fabricated NCA Haseen cover — the same role `brandName` played in
+  // F2-199's ECC submission, where "TSS GRC Platform" (the software product) was filed as the
+  // reporting organisation for every tenant.
 
-  function downloadHaseenPacket() {
-    const text = buildHaseenPacket(brand.organisationNameEn, brand.organisationNameAr);
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `NCA-Haseen-${filing.year}.txt`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success(t('cycHaseenDownloadedToast'));
-  }
+  // ⚠⚠ F2-205: `downloadHaseenPacket`, `printHaseenPdf` and `exportHaseen` are DELETED. All
+  // three emitted the "NCA Haseen — ECC v3 Annual Self-Assessment Filing" — .txt download,
+  // print-to-PDF stamped "CONFIDENTIAL — REGULATOR", and branded .xlsx/.docx through the
+  // platform's export subsystem — entirely out of `lib/cyberLifecycle.ts`'s browser constants.
+  // The real register is `nca_ecc.filings` (4 filings, dev and prod) and `NcaEccFilingsPage`
+  // already renders it at /nca-ecc/filings, so this is ADR-017 §D-5 retirement, the same answer
+  // F2-42, F2-198 and F2-199 reached. See the note at the deleted generators for why F2-199's
+  // own export gate passed this page, and `exportProvenance.test.ts` for the fix.
 
-  function printHaseenPdf() {
-    const text = buildHaseenPacket(brand.organisationNameEn, brand.organisationNameAr);
-    printPacket({
-      titleEn: 'NCA Haseen — ECC v3 Annual Self-Assessment Filing',
-      titleAr: 'حصين — التقديم السنوي للتقييم الذاتي للضوابط الأساسية v3',
-      eyebrowEn: 'NCA · Annual Filing',
-      eyebrowAr: 'الهيئة الوطنية للأمن السيبراني · تقديم سنوي',
-      referenceId: filing.id,
-      classificationEn: 'CONFIDENTIAL — REGULATOR',
-      classificationAr: 'سرّي — جهة تنظيمية',
-      sections: packetTextToSections(text),
-    }, lang);
-  }
+  // F2-205: the vulnerability register is SERVER-BACKED now. Three pages hydrate this store and
+  // `hydrateVulns` shares one request between them.
+  useEffect(() => { void hydrateVulns(); }, []);
 
-  async function exportHaseen(kind: 'xlsx' | 'docx') {
-    const payload = { module: 'NCA', exportType: 'HaseenECC', lang, sheets: buildHaseenSheets() };
+  /** Surface a server refusal instead of swallowing it — the machine answers 409, not silence. */
+  async function runVuln(action: () => Promise<unknown>, okMsg: string) {
     try {
-      await (kind === 'xlsx' ? reportingApi.packetXlsx(payload) : reportingApi.packetDocx(payload));
-      toast.success(lang === 'ar' ? 'تم التصدير' : 'Exported');
+      await action();
+      toast.success(okMsg);
     } catch (e) {
-      toast.danger(e instanceof ApiError ? e.message : (lang === 'ar' ? 'تعذّر التصدير' : 'Export failed'));
+      toast.danger(e instanceof ApiError ? e.message
+        : (lang === 'ar' ? 'تعذّر تنفيذ الإجراء' : 'The action could not be completed'));
     }
   }
 
@@ -111,14 +102,25 @@ export function CyberLifecyclePage() {
         title={t('cycTitle')}
         sub={t('cycPageSub')}
         actions={
-          <>
-            <Button variant="primary" onClick={printHaseenPdf}>{t('cycPrintHaseenPdf')}</Button>
-            <Button variant="secondary" Icon={Download} onClick={() => exportHaseen('xlsx')}>{lang === 'ar' ? 'تصدير Excel' : 'Export Excel'}</Button>
-            <Button variant="secondary" Icon={Download} onClick={() => exportHaseen('docx')}>{lang === 'ar' ? 'تصدير Word' : 'Export Word'}</Button>
-            <Button variant="ghost" Icon={Download} onClick={downloadHaseenPacket}>{t('cycDownloadHaseen')}</Button>
-          </>
+          // F2-205: the four NCA Haseen export buttons stood here. See the comment above
+          // `runVuln` — every figure they emitted was a browser constant, and the real filing
+          // register is rendered at /nca-ecc/filings.
+          <Button variant="secondary" onClick={() => navigate('/nca-ecc/filings')}>
+            {lang === 'ar' ? 'سجل تقديمات الهيئة' : 'NCA filing register'}
+          </Button>
         }
       />
+
+      {vulnsLoadFailed() && (
+        <div className="cyc-load-error" role="alert">
+          {lang === 'ar'
+            ? 'تعذّر تحميل سجل الثغرات من الخادم. الأرقام أدناه غير مكتملة.'
+            : 'The vulnerability register could not be loaded from the server. The figures below are incomplete.'}
+          <Button size="sm" variant="ghost" onClick={() => { void hydrateVulns(true); }}>
+            {lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+          </Button>
+        </div>
+      )}
 
       <div className="kpi-grid cyc-kpi-strip">
         <Kpi Icon={ShieldCheck}    label={t('cycKpiMaturity')}      value={`${stats.filingMaturity}/5`} tone={stats.filingMaturity >= 4 ? 'success' : 'warning'} to="/nca-ecc/filings" />
@@ -150,32 +152,37 @@ export function CyberLifecyclePage() {
         ))}
       </div>
 
+      {/* ⚠⚠ F2-205: this handler used to hold its OWN linear `Record<string, VulnStatus>` — a
+          third vocabulary for the machine, with no branch to RISK_ACCEPTED or FALSE_POSITIVE, so
+          neither disposition was reachable from the pipeline at all. It now asks
+          `primaryNextVulnStatus`, which is declared once in the lib and gated against
+          `VULN_ALLOWED`, and the transition is performed by the SERVER. */}
       {tab === 'pipeline' && <VulnPipeline vulns={vulns} assets={assets}
         onAdvance={(id, fromStatus) => {
-          const next: Record<string, VulnStatus> = {
-            NEW: 'TRIAGED',
-            TRIAGED: 'OWNER_ASSIGNED',
-            OWNER_ASSIGNED: 'IN_REMEDIATION',
-            IN_REMEDIATION: 'AWAITING_VERIFICATION',
-            AWAITING_VERIFICATION: 'CLOSED',
-          };
-          const target = next[fromStatus];
+          const target = primaryNextVulnStatus(fromStatus);
           if (!target) return;
-          transitionVuln(id, target);
-          toast.success(t('lpcAdvancedToast'));
+          void runVuln(() => transitionVuln(id, target), t('lpcAdvancedToast'));
         }}
         onCardClick={() => setTab('vulns')} />}
 
+      {/* ⚠⚠ F2-205: this passed `'Mohammed Al-Sulaiman (Head of Cyber Defense)'` and
+          `'Sara Al-Zahrani (CISO)'` as the officers who peer-reviewed and CISO-approved the ECC
+          return — two invented individuals presented as this organisation's cyber leadership,
+          the fifth and sixth in this programme after F2-201's approver registry and F2-204's CRO.
+          Nothing persists them today because the filing store is still browser-local, and that
+          is precisely why they had to go NOW: F2-204's finding was a naive wire turning an
+          invented officer into a stored one, and whoever wires `nca_ecc.filings` next would have
+          inherited these. An approval is attributed by the server from the authenticated
+          principal or not at all. */}
       {tab === 'ecc' && <EccTab filing={filing}
         onTransition={(s) => {
-          const by = s === 'PEER_REVIEW' ? 'Mohammed Al-Sulaiman (Head of Cyber Defense)' :
-                     s === 'CISO_APPROVAL' ? 'Sara Al-Zahrani (CISO)' :
-                     s === 'SUBMITTED' ? 'Sara Al-Zahrani (CISO)' : undefined;
-          transitionFiling(s, by);
+          transitionFiling(s);
           toast.info(`${FILING_STATUS_LABEL[s][lang]}`);
         }} />}
       {tab === 'vulns' && <VulnsTab vulns={vulns} assets={assets}
-        onTransition={(v, s) => { transitionVuln(v.id, s); toast.info(`${VULN_STATUS_LABEL[s][lang]}`); }} />}
+        onTransition={(v, st) => {
+          void runVuln(() => transitionVuln(v.id, st), vulnStatusLabel(st, lang));
+        }} />}
       {tab === 'assets' && <AssetsTab assets={assets} vulns={vulns}
         onCreate={() => { createAsset('new-asset', 'New asset', 'أصل جديد', 'TIER-3-MEDIUM', 'Owner', false, 'RIYADH-PRIMARY'); toast.success(t('cycAssetCreatedToast')); }}
         onMarkPatched={(a) => { markPatched(a.id); toast.success(t('cycAssetPatchedToast')); }}
@@ -307,10 +314,14 @@ function VulnsTab({ vulns, assets, onTransition }: {
   onTransition: (v: Vulnerability, s: VulnStatus) => void;
 }) {
   const { t, lang } = useI18n();
+  // F2-205: `isVulnOpen` is the complement of the DERIVED terminal set, and rows with no
+  // deadline yet (not triaged) sort last among open ones rather than to an Invalid Date.
   const sorted = [...vulns].sort((a, b) => {
-    if (a.status === 'CLOSED' && b.status !== 'CLOSED') return 1;
-    if (a.status !== 'CLOSED' && b.status === 'CLOSED') return -1;
-    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    const ao = isVulnOpen(a.status), bo = isVulnOpen(b.status);
+    if (ao !== bo) return ao ? -1 : 1;
+    const ad = a.slaDeadline ? new Date(a.slaDeadline).getTime() : Number.MAX_SAFE_INTEGER;
+    const bd = b.slaDeadline ? new Date(b.slaDeadline).getTime() : Number.MAX_SAFE_INTEGER;
+    return ad - bd;
   });
 
   return (
@@ -333,7 +344,8 @@ function VulnsTab({ vulns, assets, onTransition }: {
         <tbody>
           {sorted.map(v => {
             const asset = assets.find(a => a.id === v.assetId);
-            const overdue = new Date(v.dueDate) < new Date() && v.status !== 'CLOSED';
+            const overdue = isVulnOverdue(v);
+            const managed = isVulnStatusManaged(v.status);
             return (
               <tr key={v.id}>
                 <td>
@@ -342,9 +354,12 @@ function VulnsTab({ vulns, assets, onTransition }: {
                 </td>
                 <td>
                   <div className="cyc-cell-title">{lang === 'ar' ? v.titleAr : v.titleEn}</div>
-                  {v.notesEn && (
+                  {/* F2-205: the server's `description`, not the deleted corpus's invented
+                      `notes`. `remediation_method` is populated on 0 of the 36 real rows, so the
+                      confident remediation narratives the seed carried were not stale data. */}
+                  {(lang === 'ar' ? v.descriptionAr : v.descriptionEn) && (
                     <div className="cyc-cell-notes">
-                      {lang === 'ar' ? v.notesAr : v.notesEn}
+                      {lang === 'ar' ? v.descriptionAr : v.descriptionEn}
                     </div>
                   )}
                 </td>
@@ -355,19 +370,57 @@ function VulnsTab({ vulns, assets, onTransition }: {
                 <td>
                   <Badge tone={VULN_SEVERITY_TONE[v.severity]}>{v.cvssScore} · {v.severity}</Badge>
                 </td>
+                {/* F2-205: `slaDeadline` is the row's own fact. `SLA {v.slaDays}d` stood here
+                    and there is no such column — the server computes the deadline once, at
+                    triage, from its NCA ECC severity matrix. Re-deriving the matrix in the
+                    browser would be a second copy of the policy, which is this slice's defect.
+                    A row not yet triaged has no deadline, and reads as unset rather than as
+                    today (F2-197: an absence must never read as health). */}
                 <td className={`mono cyc-cell-due${overdue ? ' cyc-cell-due--overdue' : ''}`}>
-                  {v.dueDate}
-                  <div className="cyc-cell-due__sla">SLA {v.slaDays}d</div>
+                  {v.slaDeadline ?? (
+                    <span title={lang === 'ar'
+                      ? 'يُحدَّد الموعد النهائي عند الفرز'
+                      : 'The deadline is set at triage'}>—</span>
+                  )}
+                  {typeof v.breachCount === 'number' && v.breachCount > 0 && (
+                    <div className="cyc-cell-due__sla">
+                      {lang === 'ar' ? `تجاوزات: ${v.breachCount}` : `Breaches: ${v.breachCount}`}
+                    </div>
+                  )}
                 </td>
                 <td>
-                  <Badge tone={VULN_STATUS_TONE[v.status]}>{VULN_STATUS_LABEL[v.status][lang]}</Badge>
+                  <Badge tone={vulnStatusTone(v.status)}>{vulnStatusLabel(v.status, lang)}</Badge>
+                  {!managed && (
+                    <div className="cyc-cell-notes" role="status">
+                      {lang === 'ar'
+                        ? 'حالة غير معروفة لآلة المعالجة — لا يمكن تقديمها'
+                        : 'A status the remediation machine does not declare — it cannot be advanced'}
+                    </div>
+                  )}
+                  {v.status === 'RISK_ACCEPTED' && !v.riskAcceptedBy && (
+                    <div className="cyc-cell-notes" role="status">
+                      {lang === 'ar'
+                        ? 'قابل المخاطرة غير مُسجَّل'
+                        : 'No risk acceptor recorded'}
+                    </div>
+                  )}
                 </td>
+                {/* ⚠⚠ F2-205: five hand-written `v.status === '…' &&` branches stood here, one
+                    per stage of the linear path. Between them they offered NEITHER
+                    `RISK_ACCEPTED` nor `FALSE_POSITIVE` from any state — so this table, the
+                    pipeline's `onAdvance`, the `VulnStatus` union and the overview's stage list
+                    were four surfaces that agreed the ECC machine had no branches. It has two.
+                    The buttons are now the machine's own answer, so a state that gains an edge
+                    gains a control and one that loses an edge loses it. */}
                 <td>
-                  {v.status === 'NEW' && <Button size="sm" variant="ghost" onClick={() => onTransition(v, 'TRIAGED')}>{t('cycTriage')}</Button>}
-                  {v.status === 'TRIAGED' && <Button size="sm" variant="ghost" onClick={() => onTransition(v, 'OWNER_ASSIGNED')}>{t('cycAssign')}</Button>}
-                  {v.status === 'OWNER_ASSIGNED' && <Button size="sm" variant="ghost" onClick={() => onTransition(v, 'IN_REMEDIATION')}>{t('cycStartRem')}</Button>}
-                  {v.status === 'IN_REMEDIATION' && <Button size="sm" variant="ghost" onClick={() => onTransition(v, 'AWAITING_VERIFICATION')}>{t('cycSubmitVerif')}</Button>}
-                  {v.status === 'AWAITING_VERIFICATION' && <Button size="sm" variant="primary" Icon={CheckCircle2} onClick={() => onTransition(v, 'CLOSED')}>{t('cycCloseVuln')}</Button>}
+                  {nextVulnStatuses(v.status).map(target => (
+                    <Button key={target} size="sm"
+                      variant={target === 'CLOSED' ? 'primary' : 'ghost'}
+                      Icon={target === 'CLOSED' ? CheckCircle2 : undefined}
+                      onClick={() => onTransition(v, target)}>
+                      {vulnStatusLabel(target, lang)}
+                    </Button>
+                  ))}
                 </td>
               </tr>
             );
@@ -685,30 +738,43 @@ function VulnPipeline({ vulns, assets, onAdvance, onCardClick }: {
     { code: 'OWNER_ASSIGNED',        labelEn: 'Owner assigned',       labelAr: 'تم تعيين المالك',        tone: 'info',    Icon: Send },
     { code: 'IN_REMEDIATION',        labelEn: 'In remediation',       labelAr: 'قيد المعالجة',           tone: 'warning', Icon: Wrench },
     { code: 'AWAITING_VERIFICATION', labelEn: 'Awaiting verification', labelAr: 'بانتظار التحقق',        tone: 'info',    Icon: Clock },
+    // F2-205: RISK_ACCEPTED and FALSE_POSITIVE were absent from this list, so 7 of the 36 real
+    // rows had no column to land in and simply did not appear on the pipeline.
+    { code: 'RISK_ACCEPTED',         labelEn: 'Risk accepted',         labelAr: 'مقبولة كمخاطرة',        tone: 'neutral', Icon: ThumbsUp },
+    { code: 'FALSE_POSITIVE',        labelEn: 'False positive',        labelAr: 'إنذار كاذب',             tone: 'neutral', Icon: AlertTriangle },
     { code: 'CLOSED',                labelEn: 'Closed',                labelAr: 'مُغلَقة',                tone: 'success', Icon: CheckCircle2 },
   ];
   const cards: PipelineCard[] = vulns.map(v => {
     const asset = assets.find(a => a.id === v.assetId);
-    const due = dueLabel(v.dueDate, () => '');
+    const due = v.slaDeadline ? dueLabel(v.slaDeadline, () => '') : undefined;
     return {
       id: v.id, status: v.status, refCode: v.cveId,
       titleEn: v.titleEn, titleAr: v.titleAr,
       subtitleEn: asset ? `${asset.name} · ${asset.tier.split('-')[1]}` : v.assetId,
       subtitleAr: asset ? `${asset.name} · ${asset.tier.split('-')[1]}` : v.assetId,
+      // F2-205: the `SLA {v.slaDays}d` badge is gone with the field — see the Vulnerability
+      // interface. `breachCount` is a real column and says something the deadline cannot.
       badges: [
-        { label: `CVSS ${v.cvssScore}`, tone: v.severity === 'CRITICAL' ? 'danger' : v.severity === 'HIGH' ? 'warning' : v.severity === 'MEDIUM' ? 'info' : 'neutral' as const },
-        { label: `SLA ${v.slaDays}d`, tone: 'neutral' as const },
+        { label: `CVSS ${v.cvssScore ?? '—'}`, tone: v.severity === 'CRITICAL' ? 'danger' : v.severity === 'HIGH' ? 'warning' : v.severity === 'MEDIUM' ? 'info' : 'neutral' as const },
+        ...(typeof v.breachCount === 'number' && v.breachCount > 0
+          ? [{ label: `SLA ×${v.breachCount}`, tone: 'danger' as const }]
+          : []),
       ],
-      urgent: due?.urgent && v.status !== 'CLOSED',
+      urgent: due?.urgent && isVulnOpen(v.status),
       dueLabel: due?.label,
     };
   });
+  // ⚠ F2-205: the intro below asserted the SLA matrix as "Critical 7d / High 14d / Medium 30d /
+  // Low 60d" — a FOURTH copy of a server policy, and wrong: `VulnerabilityService.SLA_DAYS` is
+  // CRITICAL 7 / HIGH 30 / MEDIUM 60 / LOW 90, so it told an operator High was due in 14 days
+  // when the server had stamped 30. Restating a server constant in prose cannot be gated, so it
+  // is not restated: the deadline the server computed is on every row.
   return (
     <LifecyclePipeline
       stages={stages}
       cards={cards}
-      introEn="Live vulnerability pipeline. SLA in days driven by CVSS severity (Critical 7d / High 14d / Medium 30d / Low 60d). Click a card to drill into the detailed vulnerability tab."
-      introAr="مسار الثغرات الحيّ. SLA بالأيام مدفوع بخطورة CVSS (حرجة 7 / عالية 14 / متوسطة 30 / منخفضة 60). انقر على بطاقة للانتقال إلى تبويب تفاصيل الثغرات."
+      introEn="Live vulnerability pipeline over the NCA ECC remediation register. The deadline on each card is the one the server stamped at triage from its ECC severity matrix. Click a card to drill into the detailed vulnerability tab."
+      introAr="مسار الثغرات الحيّ على سجل معالجة الضوابط الأساسية. الموعد النهائي على كل بطاقة هو ما حدّده الخادم عند الفرز وفق مصفوفة الخطورة. انقر على بطاقة للانتقال إلى تبويب تفاصيل الثغرات."
       onAdvance={onAdvance}
       onCardClick={onCardClick}
       emptyEn="No vulnerabilities recorded yet."

@@ -11,13 +11,19 @@ import { Kpi } from '../../components/ui/Kpi';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
 import { LifecyclePipeline, type PipelineStage, type PipelineCard, dueLabel } from '../../components/lifecycle/LifecyclePipeline';
-import { loadTreatmentPlans, subscribeRiskLifecycle, aggregateRiskLifecycle } from '../../lib/riskLifecycle';
-import { loadFindings, subscribeAuditLifecycle, aggregateAuditLifecycle } from '../../lib/auditLifecycle';
+import {
+  loadTreatmentPlans, subscribeRiskLifecycle, aggregateRiskLifecycle, hydrateTreatmentPlans,
+} from '../../lib/riskLifecycle';
+import {
+  loadFindings, subscribeAuditLifecycle, aggregateAuditLifecycle, hydrateAuditLifecycle,
+} from '../../lib/auditLifecycle';
 import { subscribePrivacy } from '../../lib/privacyLifecycle';
 // F2-202 — the DSR lane is the one lane on this page fed by a real server register.
 import { dsrApi, aggregateDsr, isPastDeadline, isOpen as isOpenDsr, type DsrCase } from '../../lib/privacyLcApi';
 import { loadInvocations, subscribeBcm, aggregateBcm, pickPlanById } from '../../lib/bcmLifecycle';
-import { loadVulns, loadAssets, subscribeCyber, aggregateCyber } from '../../lib/cyberLifecycle';
+import {
+  loadVulns, loadAssets, subscribeCyber, aggregateCyber, hydrateVulns, isVulnOpen,
+} from '../../lib/cyberLifecycle';
 
 /**
  * Executive Lifecycle Overview — Phase 4 of the gap fill.
@@ -41,13 +47,35 @@ export function LifecycleOverviewPage() {
     return () => { off1(); off2(); off3(); off4(); off5(); };
   }, []);
 
+  // ⚠⚠ F2-205: THREE lanes on this page are server-backed and NONE of them was hydrated here.
+  //
+  // This is a regression the wiring slices themselves introduced and did not notice. F2-203 made
+  // `loadFindings()` return a cached server array and F2-204 did the same for
+  // `loadTreatmentPlans()`; both replaced a function that used to return a seeded corpus
+  // synchronously. Every consumer that hydrates got real rows — and this page, which does not,
+  // silently started rendering an EMPTY internal-audit lane and an empty ERM treatment lane.
+  //
+  // 🔑 F2-203's own lesson, turned on the slices that recorded it: when you fix a store, a filter
+  // or a selector, assume something downstream has never run since, and run it. The reason it
+  // stayed invisible is that an empty lane looks like a tenant with no findings rather than like
+  // a page that forgot to ask — the same "an absence reads as health" shape as F2-197, one level
+  // up. Nothing in the type system or the test suite can see it: the call is simply absent.
+  useEffect(() => {
+    void hydrateVulns();
+    void hydrateAuditLifecycle();
+    void hydrateTreatmentPlans();
+  }, []);
+
   const riskStats = useMemo(() => aggregateRiskLifecycle(), [_t]);
   const auditStats = useMemo(() => aggregateAuditLifecycle(), [_t]);
   const bcmStats = useMemo(() => aggregateBcm(), [_t]);
   const cyberStats = useMemo(() => aggregateCyber(), [_t]);
 
-  // F2-202 — DSR is the one lane here whose rows come from a server. It loads asynchronously,
-  // so it is `null` until the response lands and stays `null` if the request fails.
+  // F2-202 — DSR was the one lane here whose rows came from a server when this comment was
+  // written; F2-203 (audit findings), F2-204 (ERM treatment plans) and F2-205 (the ECC
+  // vulnerability register) have since made it four, which is why the effect above exists. DSR
+  // keeps its own state because it is fetched here rather than through a lifecycle store: it is
+  // `null` until the response lands and stays `null` if the request fails.
   const [dsrs, setDsrs] = useState<DsrCase[] | null>(null);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -208,10 +236,15 @@ export function LifecycleOverviewPage() {
           { code: 'OWNER_ASSIGNED',        labelEn: 'Owner',                labelAr: 'المالك',                  tone: 'info' },
           { code: 'IN_REMEDIATION',        labelEn: 'Remediating',          labelAr: 'معالجة',                  tone: 'warning' },
           { code: 'AWAITING_VERIFICATION', labelEn: 'Verification',          labelAr: 'تحقّق',                   tone: 'info' },
+          // F2-205: RISK_ACCEPTED and FALSE_POSITIVE were missing here too — this stage list was
+          // the third of four client vocabularies for one server machine, and 7 of the 36 real
+          // rows had no column to appear in.
+          { code: 'RISK_ACCEPTED',         labelEn: 'Risk accepted',         labelAr: 'مقبولة',                 tone: 'neutral' },
+          { code: 'FALSE_POSITIVE',        labelEn: 'False positive',        labelAr: 'إنذار كاذب',              tone: 'neutral' },
           { code: 'CLOSED',                labelEn: 'Closed',                labelAr: 'مُغلَقة',                 tone: 'success' },
         ]}
         cards={loadVulns().map(v => {
-          const due = dueLabel(v.dueDate, () => '');
+          const due = v.slaDeadline ? dueLabel(v.slaDeadline, () => '') : undefined;
           const asset = loadAssets().find(a => a.id === v.assetId);
           return {
             id: v.id, status: v.status, refCode: v.cveId,
@@ -220,7 +253,7 @@ export function LifecycleOverviewPage() {
             subtitleEn: asset?.name,
             subtitleAr: asset?.name,
             badges: [{ label: `CVSS ${v.cvssScore}`, tone: (v.severity === 'CRITICAL' ? 'danger' : v.severity === 'HIGH' ? 'warning' : 'info') as 'danger' | 'warning' | 'info' }],
-            urgent: due?.urgent && v.status !== 'CLOSED',
+            urgent: due?.urgent && isVulnOpen(v.status),
             dueLabel: due?.label,
           };
         })}

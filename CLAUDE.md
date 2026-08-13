@@ -1104,6 +1104,110 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   ⚠ **The port check is not proof the app is up.** `mvn -o test` recompiles into `target/classes` and DevTools
   restarts the context **while the listener stays bound** — `netstat` showed LISTENING through a window where
   every request was refused with `ConnectionRefused`. **Poll `/actuator/health`, not the port.**
+  ⚠⚠ **A LIVE SERVER WIRE CAN TERMINATE IN A BROWSER CONSTANT, and from either end that reads as an
+  integration that works** (F2-205, measured 2026-08-13). `VulnerabilityService.transition` calls
+  `broadcaster.broadcastEntityUpdate(orgId, "vulnerability", …)` → `/topic/org.{id}.changed.vulnerability`;
+  `VulnerabilitiesV2Page` subscribed to **exactly** that topic (checked against `RealtimeBroadcaster`'s format
+  string, not assumed) — and its handler was `setAllVulns(loadVulns())`, where `loadVulns()` read
+  `localStorage`. So another user's real transition arrived as a websocket frame that refreshed a constant no
+  server event could ever change. **The backend sees a subscriber; the frontend sees a handler firing.** 🔑 No
+  instrument in this tree can see it, because every component is genuine except the direction the data flows —
+  a reachability scan asks whether a symbol is *called* (F2-202), a provenance gate asks whether a page *calls a
+  server* (F2-198), and both answer yes. **When you find a realtime subscription, read what its handler does
+  with the frame.**
+  ⚠⚠ **And the export gate's blind spot is the same question one level sharper: the server call it found was
+  the one CARRYING THE FABRICATION OUT.** `/cyber-lifecycle` emitted an *"NCA HASEEN — ECC v3 ANNUAL
+  SELF-ASSESSMENT FILING"* four ways (a `.txt` download, print-to-PDF stamped **"CONFIDENTIAL — REGULATOR"**,
+  and branded `.xlsx`/`.docx` through the platform's own export subsystem) entirely out of browser constants —
+  and F2-199's `exportProvenance` was **green** over it, because the page's **only two** `SERVER_CALL` tokens
+  were `reportingApi.packetXlsx(` / `packetDocx(`, which take the fabricated payload as their **argument**.
+  🔑 **A rule that asks "does this page talk to a server?" cannot tell an inbound READ from an outbound WRITE,
+  and at an export endpoint that difference is the entire question.** The discriminator is mechanical and
+  enumerable — a `reportingApi` member taking a caller-supplied `body` is an EMITTER; every other member is a
+  `downloadFile` GET the server builds from its own data — and the gate now checks that classification against
+  `api.ts` in both directions, so a third body-taking export endpoint fails until it is classified.
+  ⚠⚠ **Correcting that revealed two more members, so the hard zero is GONE — and the reason is worth the
+  words.** `/crisis-management` emits an **NCEMA** crisis packet and `/bcm-lifecycle` a **SAMA
+  operational-resilience** packet, both from browser constants, both certified for the identical reason. The
+  BCM one is **not wireable by a frontend slice**: three of its four registers are F2-204's `NO_SERVER_SURFACE`
+  stores (21 rows, no controller). They are recorded as measured, **filed defects** in an exactly-asserted
+  decrease-only map, never as designs. 🔑 **F2-204's rule points the other way here: there a ratchet's QUESTION
+  was wrong, so it was re-scoped; here the question was right and the ANSWER was under-measured, so the number
+  moves and says so. A hard zero over a population the instrument cannot see is the most reassuring possible
+  artefact.**
+  ⚠⚠ **FIVE client vocabularies for one server machine, and what let them survive is that they agreed with
+  EACH OTHER.** `VulnStatus` declared `ACCEPTED` (a state the server does not have) and no `FALSE_POSITIVE`;
+  the workspace pipeline held a private linear `Record<string, VulnStatus>`; its table had five hard-coded
+  `status === '…'` button branches; the lifecycle overview's `stages` listed six codes; the V2 page's **filter
+  options** listed six. Consequence: **7 of 36 live rows (dev = prod) carried a status no screen could name, no
+  control could reach and no filter could select** — so marking a vulnerability a false positive, a lawful NCA
+  ECC disposition with its own bilingual reason columns, was impossible. 🔑 **Any two copies read side by side
+  looked consistent; the one they all disagreed with was the only one with a vote.** F2-196's question ("how
+  many things read this status, and do they agree?") needs the follow-up **"and which of them is the server?"**
+  — and **consistency among copies is not evidence, it is the mechanism of concealment.**
+  ⚠ **The browser had NO transition table**, so `transitionVuln` was `{ ...v, status }` and `NEW → CLOSED` was
+  permitted: a critical exposure marked closed having never been triaged, assigned, remediated or verified,
+  with no `verified_by` and no audit row. The server answers **409** (probed). **31 of 36 rows are past their
+  ECC deadline and not closed**, including all 9 open CRITICALs, and `GET ?overdueOnly=true` — which serves
+  exactly that list — had no caller. The fabrication showed **one** overdue row: **third consecutive
+  fabrication erring in the flattering direction** after F2-193's cadences and F2-195's KPI tiles.
+  ⚠⚠ **SIX copies of a server policy constant, and the sixth was in the TRANSLATION FILES.** Five were code.
+  The sixth is `cycVulnsSub` in both `en.ts` and `ar.ts`: *"Critical 7d / High 14d / Medium 30d / Low 60d …
+  and asset tier (Tier-1 halves the window)"*. `SLA_DAYS` is **7 / 30 / 60 / 90**, so it told an operator HIGH
+  was due in 14 days where the server had stamped 30 — **and the server has no asset-tier rule at all.** Found
+  in the BROWSER, after every gate assertion was green. 🔑 **A claim about server behaviour can live anywhere a
+  user reads text, and a gate scoped to code cannot see the one place written specifically to be read.** Scope
+  such a leg to the module's own keys — other modules legitimately state their own SLA rules in prose — and run
+  a negative control, because a new leg that passes is indistinguishable from a vacuous one.
+  ⚠⚠ **A REGRESSION MY OWN TWO PREVIOUS SLICES INTRODUCED AND NEITHER NOTICED.** F2-203 made `loadFindings()`
+  return a cached server array and F2-204 did the same for `loadTreatmentPlans()`; both replaced functions that
+  had returned a seeded corpus **synchronously**. `LifecycleOverviewPage` never hydrates, so its internal-audit
+  and ERM treatment lanes had been rendering **empty** ever since. 🔑 F2-203's own lesson turned on the slices
+  that recorded it: **when you fix a store, a filter or a selector, assume something downstream has never run
+  since, and run it.** It stayed invisible because an empty lane reads as a tenant with no rows rather than a
+  page that forgot to ask (F2-197's absence-reads-as-health), and **nothing in the type system can see a
+  missing call** — so it is asserted now.
+  ⚠⚠ **The mutation harness found two holes in my own new gate, both of kinds this file already names.**
+  (a) The terminal-set ban was `doesNotContain("List.of(\"CLOSED\")")` over the whole file — it banned **the
+  exact literal the slice had just deleted**, so `TERMINAL = Set.of("CLOSED")` with the stream expression parked
+  on an unused field SURVIVED. **F2-192's headline inside a gate written after quoting it.** Re-scoped to
+  `TERMINAL`'s own initialiser. (b) The hydration leg was `contains("hydrateVulns")`, and deleting all three
+  call sites SURVIVED **because the name is still in the import list** — F2-194's substring-satisfied-by-an-
+  import, verbatim, in a gate built to catch a missing call. 🔑 **Assert the call shape (`name\s*\(`), never the
+  token; and scope a ban to the shape of its claim, never to the spelling you just removed.** 16/16 after.
+  ⚠ **And the gate caught a real miss in the fix, one line from where I had made it**: `bulkTriage` was
+  converted to ask `nextVulnStatuses`, and the BulkActionsBar's **enablement predicate** was left as
+  `r.status === 'NEW'`. 🔑 **A surface consults a status in more than one place, and the one deciding whether a
+  control is OFFERED is the easy one to miss, because it is not the one that does the work.**
+  ⚠⚠ **A token-matching instrument over a codebase that documents its deletions will read the epitaph as the
+  corpse.** `lifecycleStoreContract`'s derived-key leg read raw source, and the note explaining that
+  `VULN_KEY = 'grc.cyber.vuln.v1'` is deleted **contains the key** — so it demanded a store for a corpus that
+  no longer exists, on a correct tree. Same family as F2-193, F2-196 and F2-202. **Strip comments in every
+  scan.** ⚙ Note the error direction: comment-blind **over**-reports, so it fails loudly rather than shrinking
+  a population — the opposite of F2-198's stripper bug, and the safe direction to be wrong in.
+  ⚠ **F2-172(d) has a FIFTH instance and grepping for it first is now two-for-two.**
+  `VulnerabilityService.create` honoured `req.getId()`, letting a client name the reference an NCA ECC reviewer
+  cites — in a generator F2-48 had **already** had to fix for collisions. **Grep `req.getId() != null ?` before
+  claiming any create path mints its own reference.**
+  ⚙ **Two things only the browser found**: a status column with no cell renderer, printing `RISK_ACCEPTED` into
+  an Arabic-primary UI (house rule 7); and a "by status" chart using raw tokens as axis labels **and** ordering
+  categories by whatever the server returned first (F2-197's declaration-order-as-meaning). ⚠ Also expect one
+  Vite **HMR** false alarm per slice that adds a lib export: a new `export const` read by an already-loaded page
+  throws `ReferenceError: X is not defined` until a full reload. **Verify with a fresh tab before believing
+  it** — this repo has a precedent of an "HMR artefact" being a real context-duplication bug, so check rather
+  than assume in either direction.
+  ⚠ **`cyber_lc` has zero CHECK constraints in the whole schema** — same as `audit_lc` (F2-203). All 36 stored
+  statuses ARE in the machine today, so unlike `audit_lc` it is latent rather than live; **that was checked,
+  not assumed**, which is the only reason it can be stated.
+  ⚠⚠ **There are TWO live vulnerability registers and picking one is an OWNER decision.**
+  `cyber.vulnerabilities` **21 rows** at `/api/v1/cyber/vulnerabilities` (rendered by `CyberPage`) and
+  `cyber_lc.vulnerabilities` **36 rows** at `/api/cyber-lc/vulnerabilities` (F2-205), plus
+  `cyber.vulnerability_sla_finding` 11, `cyber.vulnerability_sla_policy` 4 and `cyber.vuln_exceptions` 3. They
+  are **not the same object at the same fidelity** — only `cyber_lc` carries the ECC machine, the
+  server-stamped SLA deadline and the `triaged_by`/`verified_by`/`risk_accepted_by` attributions an ECC
+  reviewer reads. F2-205 wired the unserved one because `CyberPage` already renders the other and retiring
+  either changes what the platform reports to the National Cybersecurity Authority. The two clients are
+  declared **adjacent in `api.ts` on purpose** so a reader cannot pick one without seeing the other.
 - ⚠⚠ **A declared state machine is only a control if the code that changes state consults it** (F2-189,
   measured 2026-08-11). `WorkflowRequestService.TRANSITIONS` is the workflow engine's lifecycle — `transition()`
   answers **409** outside it, and the FE and `WorkflowEvidenceBridge` read it to know what is reachable. It

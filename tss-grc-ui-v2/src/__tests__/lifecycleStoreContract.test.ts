@@ -152,10 +152,22 @@ describe('F2-202 — the lifecycle-store registry', () => {
     // 🔑 THE LEG THAT WOULD HAVE CAUGHT F2-202's UNDERCOUNT. The population is DERIVED from the
     // modules' own localStorage keys, so a corpus cannot be omitted by not being thought of —
     // which is how ten of sixteen went undeclared in a reviewed file.
+    //
+    // ⚠⚠ F2-205: the scan MUST strip comments first, and this leg did not. When the vulnerability
+    // store was wired, `VULN_KEY` was deleted and a comment was left in its place saying so — and
+    // because that comment QUOTES the retired key, the raw-source scan reported
+    // `grc.cyber.vuln.v1` as still being written and the gate demanded a store for a corpus that
+    // no longer exists. The fix direction matters: a comment-blind scan OVER-reports keys, so it
+    // fails loudly rather than shrinking the population, which is the opposite of F2-198's
+    // stripper bug. Same family all the same — F2-193 (a claim detector that read the sentence a
+    // correction was quoting), F2-196 (a page scan that fired on its own correction comment) and
+    // F2-202 (prose about code, stored as data, inventing callers in a token scan). 🔑 In a
+    // codebase whose convention is to explain a deletion by quoting what was deleted, every
+    // token-matching instrument must strip comments or it will read the epitaph as the corpse.
     const MODULES = ['privacyLifecycle', 'riskLifecycle', 'bcmLifecycle', 'cyberLifecycle'];
     const keys = new Set<string>();
     for (const m of MODULES) {
-      const src = readFileSync(join(__dirname, '..', 'lib', `${m}.ts`), 'utf8');
+      const src = stripComments(readFileSync(join(__dirname, '..', 'lib', `${m}.ts`), 'utf8'));
       for (const k of src.match(/'(grc\.[a-z0-9.]+\.v\d+)'/g) ?? []) keys.add(k.slice(1, -1));
     }
     const declared = new Set(LIFECYCLE_STORES.map(s => s.localKey).filter(Boolean));
@@ -183,14 +195,15 @@ describe('F2-202 — the lifecycle-store registry', () => {
     }
   });
 
-  it('exactly the DSR and audit-finding stores are server-backed today', () => {
+  it('exactly the DSR, audit-finding and ECC-vulnerability stores are server-backed today', () => {
     const backed = LIFECYCLE_STORES.filter(s => s.state === 'SERVER_BACKED').map(s => s.id);
     // Enforced in BOTH directions. The forward half stops an entry being flipped to
     // SERVER_BACKED without wiring; the reverse half means wiring the next one must update
     // this list, so the gate cannot silently describe a stale world (F2-199's lesson: the
     // reverse leg is the one nobody writes first, and the one that catches an entry that was
     // never in the population). It fired as designed when F2-203 wired audit-findings.
-    expect(backed).toEqual(['privacy-dsr', 'audit-findings']);
+    // F2-205 added `cyber-vulnerabilities`: 36 rows, the largest store in the registry.
+    expect(backed).toEqual(['privacy-dsr', 'audit-findings', 'cyber-vulnerabilities']);
     // risk-treatment is PARTIALLY_SERVER_BACKED, not SERVER_BACKED: the plan is wired and
     // `risk_lc.treatment_actions` (10 rows) has no sub-resource, so per-action progress cannot
     // be persisted by any client. Recording that as "wired" would overstate it.

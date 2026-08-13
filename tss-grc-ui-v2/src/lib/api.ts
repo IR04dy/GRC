@@ -2425,6 +2425,96 @@ export const cyberApi = {
   // dashboard: moved up (typed as CyberDashboardDto)
 };
 
+// ─── Vulnerability LIFECYCLE register (cyber_lc) — a SECOND register, deliberately adjacent ──
+
+/**
+ * ⚠⚠ There are TWO vulnerability registers in this platform and confusing them is the whole
+ * risk of this client existing. They are placed side by side here so a reader cannot pick one
+ * without seeing the other.
+ *
+ *   `cyberApi.vulns`      → `/api/v1/cyber/vulnerabilities`   → `cyber.vulnerabilities`     (21 rows)
+ *   `vulnLifecycleApi`    → `/api/cyber-lc/vulnerabilities`   → `cyber_lc.vulnerabilities`  (36 rows)
+ *
+ * Both counts measured 2026-08-13 and identical in dev and prod. They are NOT the same object
+ * at the same fidelity: the `cyber_lc` register carries the NCA ECC remediation state machine,
+ * an SLA deadline computed from the ECC severity matrix, and the three attribution columns
+ * (`triaged_by` / `verified_by` / `risk_accepted_by`) an ECC reviewer reads to see who decided
+ * what. `cyber.vulnerabilities` has none of that.
+ *
+ * F2-205 wired this one because `CyberPage`'s tab already renders the other, and the 36 rows
+ * behind this endpoint had NO client at all — the three pages that display them were reading
+ * six hard-coded rows out of `localStorage`. Which register should survive is an OWNER decision
+ * (F2-196's two-registers-one-object question) and is filed, not resolved here: retiring either
+ * one changes what the platform reports to the National Cybersecurity Authority.
+ */
+export interface VulnLifecycleDto {
+  id: string;
+  assetId: string;
+  cveId?: string | null;
+  titleEn: string;
+  titleAr: string;
+  descriptionEn?: string | null;
+  descriptionAr?: string | null;
+  severity: string;
+  cvssScore?: number | null;
+  detectionSource?: string | null;
+  status: string;
+  detectedAt?: string | null;
+  triagedAt?: string | null;
+  triagedBy?: string | null;
+  ownerAssignedAt?: string | null;
+  owner?: string | null;
+  remediationStartedAt?: string | null;
+  remediationMethodEn?: string | null;
+  remediationMethodAr?: string | null;
+  verificationAt?: string | null;
+  verifiedBy?: string | null;
+  closedAt?: string | null;
+  slaDeadline?: string | null;
+  breachCount?: number | null;
+  slaExtended?: boolean | null;
+  riskAcceptedBy?: string | null;
+  riskAcceptanceExpiry?: string | null;
+  riskAcceptanceReasonEn?: string | null;
+  riskAcceptanceReasonAr?: string | null;
+  falsePositiveReasonEn?: string | null;
+  falsePositiveReasonAr?: string | null;
+  threatIntelId?: string | null;
+}
+
+export const vulnLifecycleApi = {
+  /** The tenant's remediation register, newest detection first. `CYBER:READ`. */
+  list: () => api.get<VulnLifecycleDto[]>('/api/cyber-lc/vulnerabilities'),
+
+  /**
+   * Move a vulnerability through the NCA ECC remediation machine, taking the row back from the
+   * server so the caller never has to compute the new state.
+   *
+   * ⚠ There is deliberately no `triagedBy`, `verifiedBy` or `riskAcceptedBy` here: F2-22b(vi)
+   * removed all three from `TransitionRequest` because the server stamps them from the
+   * authenticated principal. Accepting a vulnerability's risk is an AUTHORITY claim — it is what
+   * an ECC reviewer reads to see who chose to live with the exposure — so it is never the body's
+   * to name. The reason fields ARE the caller's, because they are the deciding officer's words.
+   */
+  transition: (id: string, body: {
+    status: string;
+    owner?: string;
+    remediationMethodEn?: string;
+    remediationMethodAr?: string;
+    riskAcceptanceExpiry?: string;
+    riskAcceptanceReasonEn?: string;
+    riskAcceptanceReasonAr?: string;
+    falsePositiveReasonEn?: string;
+    falsePositiveReasonAr?: string;
+  }) => api.post<VulnLifecycleDto>(
+    `/api/cyber-lc/vulnerabilities/${encodeURIComponent(id)}/transition`, body),
+
+  // ⚠ `get`, `create` and `delete` are NOT wrapped. All three endpoints exist and are guarded,
+  // but no screen opens a vulnerability detail view, creates one by hand (detection is what
+  // creates these) or deletes one — and F2-201's gate leg fired on exactly this: an unused
+  // client method should not ship. Add each in the commit that adds the screen calling it.
+};
+
 // ─── Privacy ────────────────────────────────────────────────────────────────
 export interface PrivacyDsrDto {
   id: number; requestType: string;

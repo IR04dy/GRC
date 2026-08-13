@@ -3191,7 +3191,12 @@ export const en = {
   cycRemediation:         'in remediation',
   cycMaturity:            'Maturity',
   cycVulnsTitle:          'Vulnerability management',
-  cycVulnsSub:            'CVE intake → triage → owner assigned → in remediation → awaiting verification → closed. SLA in days driven by CVSS severity (Critical 7d / High 14d / Medium 30d / Low 60d) and asset tier (Tier-1 halves the window).',
+  // ⚠ F2-205: this restated the server's NCA ECC SLA matrix as "Critical 7d / High 14d /
+  // Medium 30d / Low 60d" — the sixth copy of it in the codebase, wrong on HIGH (the server
+  // stamps 30, not 14), and it also promised an asset-tier rule ("Tier-1 halves the window")
+  // that `VulnerabilityService.SLA_DAYS` has never implemented. Found in the BROWSER after the
+  // gate was green: a scan of page source cannot see a claim held in a translation file.
+  cycVulnsSub:            'The NCA ECC remediation register. A vulnerability is triaged, assigned an owner, remediated and verified — or dispositioned as an accepted risk or a false positive, each with a recorded reason. The deadline on each row is the one the server stamped at triage from its ECC severity matrix.',
   cycVulnId:              'ID',
   cycVulnTitle:           'Title',
   cycVulnAsset:           'Asset',

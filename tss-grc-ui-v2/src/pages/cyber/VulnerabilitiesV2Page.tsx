@@ -15,8 +15,11 @@ import { SavedViewSelector } from '../../components/ui/SavedViewSelector';
 import { BulkActionsBar } from '../../components/ui/BulkActionsBar';
 import { BarChart, PieChart } from '../../components/charts';
 import {
-  loadVulns, transitionVuln, type Vulnerability, type VulnSeverity, type VulnStatus,
+  loadVulns, transitionVuln, hydrateVulns, vulnsLoadFailed, nextVulnStatuses,
+  vulnStatusLabel, vulnStatusTone, ALL_VULN_STATUSES,
+  type Vulnerability, type VulnSeverity, type VulnStatus,
 } from '../../lib/cyberLifecycle';
+import { ApiError } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import { useRealtimeOrgEvent } from '../../lib/useRealtimeEntity';
@@ -32,6 +35,21 @@ import { useRealtimeOrgEvent } from '../../lib/useRealtimeEntity';
  *
  * This page is the reference implementation. Other 30+ list pages migrate
  * by following the same pattern.
+ *
+ * ⚠⚠ F2-205 — which is exactly why its data source mattered more than most. Every one of those
+ * six mechanisms was real and wired, and the rows they operated on were SIX HARD-CODED
+ * `Vulnerability` literals in `lib/cyberLifecycle.ts`, while `cyber_lc.vulnerabilities` held 36
+ * real rows in dev and prod behind a complete guarded controller with no client at all. A page
+ * whose own comment nominates it as the pattern to copy teaches whatever it does, including this.
+ *
+ * 🔑 The sharpest part was the realtime subscription below, and it is a shape no instrument in
+ * this tree could see. `VulnerabilityService.transition` really does call
+ * `broadcaster.broadcastEntityUpdate(orgId, "vulnerability", …)`, which publishes to
+ * `/topic/org.{orgId}.changed.vulnerability`; this page really did subscribe to exactly that
+ * topic. The wire was live, correct and end-to-end — and its handler re-read `localStorage`. So
+ * another user's real transition arrived here as a websocket frame that triggered a refresh of a
+ * browser constant. **A live server wire terminating in a constant reads, from either end, as
+ * an integration that works**: the backend sees a subscriber, the frontend sees a handler firing.
  */
 export function VulnerabilitiesV2Page() {
   const { lang } = useI18n();
@@ -42,15 +60,21 @@ export function VulnerabilitiesV2Page() {
   const [filterOpen, setFilterOpen] = useState(false);
 
   useEffect(() => {
-    setAllVulns(loadVulns());
+    void hydrateVulns().then(() => setAllVulns(loadVulns()));
   }, []);
 
   // Sprint 4 §2.7 — subscribe to live vulnerability transitions on this org.
   // The backend broadcaster emits to /topic/org.{orgId}.changed.vulnerability
   // on every transition, so any list page viewing the same data stays in sync
   // without polling. Details below in lib/useRealtimeEntity.ts.
+  //
+  // ⚠⚠ F2-205: this handler was `setAllVulns(loadVulns())` — and `loadVulns()` read
+  // `localStorage`. The subscription was correct, the topic matched, the frame arrived, and the
+  // response was to re-read a constant that no server event could ever have changed. It now
+  // re-fetches (`force` — a broadcast means the server's copy has moved, so the cached promise
+  // must not be reused), which is the only reading under which the subscription means anything.
   useRealtimeOrgEvent('changed.vulnerability', () => {
-    setAllVulns(loadVulns());
+    void hydrateVulns(true).then(() => setAllVulns(loadVulns()));
   });
 
   // ─── Filter state ────────────────────────────────────────────────
@@ -63,15 +87,13 @@ export function VulnerabilitiesV2Page() {
         { value: 'MEDIUM',   label: 'MEDIUM' },
         { value: 'LOW',      label: 'LOW' },
       ]},
+    // ⚠⚠ F2-205: a FIFTH restatement of the vocabulary lived here, and it had the same two
+    // omissions as the other four — six options, no RISK_ACCEPTED and no FALSE_POSITIVE. So even
+    // once the rows were real, 7 of the 36 could not have been filtered for: an analyst asking
+    // "show me everything whose risk we have accepted" had no way to ask it. Derived from the
+    // machine now, so a state cannot exist and be unfilterable.
     { key: 'status',   label: lang === 'ar' ? 'الحالة' : 'Status',     type: 'select',
-      options: [
-        { value: 'NEW',                   label: 'NEW' },
-        { value: 'TRIAGED',               label: 'TRIAGED' },
-        { value: 'OWNER_ASSIGNED',        label: 'OWNER_ASSIGNED' },
-        { value: 'IN_REMEDIATION',        label: 'IN_REMEDIATION' },
-        { value: 'AWAITING_VERIFICATION', label: 'AWAITING_VERIFICATION' },
-        { value: 'CLOSED',                label: 'CLOSED' },
-      ]},
+      options: ALL_VULN_STATUSES.map(s => ({ value: s, label: vulnStatusLabel(s, lang) })) },
     { key: 'cvssScore', label: 'CVSS',                                 type: 'number' },
     { key: 'detectedAt', label: lang === 'ar' ? 'تاريخ الاكتشاف' : 'Detected', type: 'date' },
   ], [lang]);
@@ -109,8 +131,18 @@ export function VulnerabilitiesV2Page() {
       header: lang === 'ar' ? 'الخطورة' : 'Severity',
       cell: ({ getValue }) => <SeverityBadge sev={getValue() as VulnSeverity} /> },
     { id: 'cvss',     accessorKey: 'cvssScore', header: 'CVSS' },
+    // ⚠ F2-205: this column had no cell renderer, so it printed the raw token — and the browser
+    // check is what surfaced it: an Arabic-primary UI showing `RISK_ACCEPTED`. It mattered less
+    // when the rows were six invented ones with familiar-looking statuses; it matters now that
+    // eight real ECC states reach the screen, two of which no reader has seen before. House rule
+    // 7 (user-visible records are bilingual) and the labels already exist — read through the
+    // total function, never `MAP[status][lang]` (F2-203 found three TypeErrors of that shape).
     { id: 'status',   accessorKey: 'status',
-      header: lang === 'ar' ? 'الحالة' : 'Status' },
+      header: lang === 'ar' ? 'الحالة' : 'Status',
+      cell: ({ getValue }) => {
+        const st = getValue() as string;
+        return <Badge tone={vulnStatusTone(st)}>{vulnStatusLabel(st, lang)}</Badge>;
+      } },
     { id: 'detected', accessorKey: 'detectedAt',
       header: lang === 'ar' ? 'الاكتشاف' : 'Detected',
       cell: ({ getValue }) => new Date(getValue() as string).toLocaleDateString(lang) },
@@ -132,18 +164,45 @@ export function VulnerabilitiesV2Page() {
   }, [filtered]);
 
   // ─── Bulk actions ────────────────────────────────────────────────
-  const bulkTriage = (rows: Vulnerability[]) => {
-    let ok = 0, skip = 0;
-    rows.forEach(r => {
-      if (r.status === 'NEW') {
-        transitionVuln(r.id, 'TRIAGED'); ok++;
-      } else { skip++; }
-    });
+  /**
+   * Triage every selected row the machine permits it for, one server call each.
+   *
+   * ⚠⚠ F2-205. Three things were wrong with the version this replaces, and they compound:
+   *
+   *   1. `transitionVuln` wrote to `localStorage`, so the whole action persisted nothing — an
+   *      analyst triaged forty findings, read "Triaged 40", and reloaded to find none of them
+   *      triaged.
+   *   2. `r.status === 'NEW'` is a second opinion about the machine. It happens to agree here,
+   *      and would silently stop agreeing the moment TRIAGED became reachable from anywhere
+   *      else. It asks `nextVulnStatuses` now.
+   *   3. The toast counted INTENTIONS. Nothing could fail, so `ok` was just "how many rows I
+   *      looped over" — which is the reporting-success-without-acting shape F2-201 found on the
+   *      approvals page. Against a real server a row CAN be refused (409 from a concurrent
+   *      change, 403 mid-session), so the count now reports what the server actually did, and a
+   *      failure is named rather than folded into "skipped".
+   *
+   * Sequential rather than `Promise.all` on purpose: these are governance transitions that each
+   * write an audit row and publish a domain event, and a burst of forty parallel writes to one
+   * register is how ROWVERSION contention gets discovered in production.
+   */
+  const bulkTriage = async (rows: Vulnerability[]) => {
+    let done = 0, skipped = 0, failed = 0;
+    for (const r of rows) {
+      if (!nextVulnStatuses(r.status).includes('TRIAGED')) { skipped++; continue; }
+      try {
+        await transitionVuln(r.id, 'TRIAGED');
+        done++;
+      } catch (e) {
+        failed++;
+        console.warn('[vulns] triage refused for', r.id, e instanceof ApiError ? e.message : e);
+      }
+    }
     setAllVulns(loadVulns());
     setSelectedRows([]);
-    toast.success(lang === 'ar'
-      ? `تم فرز ${ok} (تجاوز ${skip} غير الجديدة)`
-      : `Triaged ${ok} (skipped ${skip} not in NEW)`);
+    const msg = lang === 'ar'
+      ? `تم فرز ${done}${skipped ? ` · تم تجاوز ${skipped}` : ''}${failed ? ` · فشل ${failed}` : ''}`
+      : `Triaged ${done}${skipped ? ` · ${skipped} not triageable` : ''}${failed ? ` · ${failed} refused` : ''}`;
+    if (failed) toast.danger(msg); else toast.success(msg);
   };
 
   // ─── Saved-view snapshot/apply ───────────────────────────────────
@@ -176,13 +235,31 @@ export function VulnerabilitiesV2Page() {
         </Card>
         <Card title={lang === 'ar' ? 'حسب الحالة' : 'By status'}>
           <BarChart
-            data={statusCounts(filtered)}
+            data={statusCounts(filtered, lang)}
             xKey="status"
             series={[{ key: 'count', name: lang === 'ar' ? 'العدد' : 'Count' }]}
             height={220}
           />
         </Card>
       </div>
+
+      {/* F2-205: a load failure is stated, not shown as an empty register. An empty list on a
+          page whose data used to be six constants is exactly the "absence reads as health"
+          shape F2-197 closed one level up. */}
+      {vulnsLoadFailed() && (
+        <div role="alert" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '10px 14px', marginBottom: 12, border: '1px solid var(--danger)', borderRadius: 6, fontSize: 13 }}>
+          <span>
+            {lang === 'ar'
+              ? 'تعذّر تحميل سجل الثغرات من الخادم. القائمة أدناه ليست السجل.'
+              : 'The vulnerability register could not be loaded from the server. The list below is not the register.'}
+          </span>
+          <button type="button"
+            onClick={() => { void hydrateVulns(true).then(() => setAllVulns(loadVulns())); }}
+            style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface-1)', cursor: 'pointer', fontSize: 12 }}>
+            {lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+          </button>
+        </div>
+      )}
 
       <Card title={lang === 'ar' ? 'القائمة' : 'List'}>
         {/* Toolbar */}
@@ -238,7 +315,14 @@ export function VulnerabilitiesV2Page() {
             id: 'triage', label: lang === 'ar' ? 'فرز الجديدة' : 'Triage NEW',
             icon: <UserCheck size={14} />,
             onClick: bulkTriage,
-            disabled: (rows) => !rows.some(r => r.status === 'NEW'),
+            // ⚠ F2-205: this read `r.status === 'NEW'`, and the new gate caught it AFTER I had
+            // already fixed `bulkTriage` itself to ask the machine. Leaving it meant the button's
+            // enabled state and the action's behaviour were two separate opinions about the same
+            // question — which is the defect this slice is about, reintroduced one line from the
+            // fix. 🔑 A surface has more than one place that consults a status, and the one that
+            // decides whether a control is OFFERED is easy to miss because it is not the one that
+            // does the work.
+            disabled: (rows) => !rows.some(r => nextVulnStatuses(r.status).includes('TRIAGED')),
           },
           {
             id: 'clear', label: lang === 'ar' ? 'إلغاء' : 'Clear',
@@ -251,10 +335,21 @@ export function VulnerabilitiesV2Page() {
   );
 }
 
-function statusCounts(rows: Vulnerability[]) {
+/**
+ * The "by status" chart's categories.
+ *
+ * ⚠ F2-205: this returned the raw token as the axis label, so the chart read `RISK_ACCEPTED` in an
+ * Arabic-primary UI — the same gap as the table column, found the same way (by looking at the
+ * page). It also ordered categories by first appearance in the filtered rows, i.e. by whatever the
+ * server happened to return first, which is F2-197's "declaration order dressed up as meaning".
+ * Ordered by the machine now, and a status with no rows is simply absent rather than a zero bar.
+ */
+function statusCounts(rows: Vulnerability[], lang: 'en' | 'ar') {
   const c: Record<string, number> = {};
   rows.forEach(r => { c[r.status] = (c[r.status] ?? 0) + 1; });
-  return Object.entries(c).map(([status, count]) => ({ status, count }));
+  return ALL_VULN_STATUSES
+    .filter(s => c[s])
+    .map(s => ({ status: vulnStatusLabel(s, lang), count: c[s] }));
 }
 
 function SeverityBadge({ sev }: { sev: VulnStatus | VulnSeverity | string }) {

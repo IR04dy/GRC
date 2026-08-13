@@ -422,16 +422,26 @@ export const LIFECYCLE_STORES: readonly LifecycleStore[] = [
   {
     id: 'cyber-vulnerabilities',
     module: 'lib/cyberLifecycle.ts',
-    state: 'BROWSER_LOCAL',
+    // F2-205 WIRED. `vulnLifecycleApi.list()` + `/transition`, hydrated by all three consumers
+    // (VulnerabilitiesV2Page, the cyber-lifecycle workspace, the lifecycle overview), and the
+    // ECC machine is mirrored as `VULN_ALLOWED` with `VulnerabilityMachineParityTest` comparing
+    // it to `VulnerabilityService.ALLOWED` by reflection.
+    state: 'SERVER_BACKED',
     endpoint: '/api/cyber-lc/vulnerabilities',
     table: 'cyber_lc.vulnerabilities',
     rowsDev: 36,
     rowsProd: 36,
-    localKey: 'grc.cyber.vuln.v1',
+    // No localStorage key any more — `VULN_KEY` is deleted, which is what moves this entry's
+    // state in the DERIVED population the gate builds from this module's `grc.*.v1` literals.
+    localKey: '',
     note:
-      'The largest of the eight — 36 real vulnerabilities no client reads. Both '
-      + 'VulnerabilitiesV2Page and the cyber-lifecycle workspace render the browser corpus, '
-      + 'so remediation progress recorded on either is local to that browser.',
+      'The largest store in this registry — 36 real vulnerabilities that no client read. Three '
+      + 'pages rendered six browser constants instead, and the workspace permitted NEW -> CLOSED '
+      + 'because the browser had no transition table at all. 31 of the 36 are past their NCA ECC '
+      + 'SLA deadline and not closed, in dev and prod; the fabrication showed one. Its sharpest '
+      + 'part: VulnerabilitiesV2Page subscribed to the server broadcast the real transition '
+      + 'publishes (/topic/org.{id}.changed.vulnerability) and answered it by re-reading '
+      + 'localStorage — a live wire terminating in a constant.',
   },
 ];
 

@@ -20,9 +20,18 @@
 //   6. Penetration test programme — quarterly red-team for Tier-1 entities
 //      per NCA ECC 2-5-1 + SAMA CSF 4.5 with finding integration.
 
-// F2-202: the `platformPersistence` import that used to sit here is gone with the file.
-// This store is BROWSER_LOCAL — declared, with its real endpoint and measured row count,
-// in `lib/lifecycleStores.ts`.
+// ⚠⚠ F2-205: this file holds SIX corpora and exactly ONE of them is now server-backed.
+//
+//   VULNERABILITIES  → SERVER (`/api/cyber-lc/vulnerabilities`, `cyber_lc.vulnerabilities`,
+//                      36 rows in dev AND prod). Wired by F2-205.
+//   filing / assets / threats / soc / pentests → still BROWSER_LOCAL.
+//
+// The five that remain are declared, with their real endpoints and measured row counts, in
+// `lib/lifecycleStores.ts`, and that declaration is gated. Do not add a sixth localStorage
+// corpus here: `lifecycleStoreContract.test.ts` derives its population from the `grc.*.v1`
+// keys this file writes, so a new one fails the build until it is declared.
+
+import { vulnLifecycleApi, ApiError, type VulnLifecycleDto } from './api';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -33,7 +42,28 @@ export type EccFilingStatus = 'DRAFT' | 'PEER_REVIEW' | 'CISO_APPROVAL' | 'SUBMI
 export type AssetTier = 'TIER-1-CRITICAL' | 'TIER-2-HIGH' | 'TIER-3-MEDIUM' | 'TIER-4-LOW';
 
 export type VulnSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-export type VulnStatus = 'NEW' | 'TRIAGED' | 'OWNER_ASSIGNED' | 'IN_REMEDIATION' | 'AWAITING_VERIFICATION' | 'CLOSED' | 'ACCEPTED';
+
+/**
+ * ⚠⚠ F2-205 CORRECTED. This union used to end `| 'CLOSED' | 'ACCEPTED'` — and both halves of
+ * that were wrong against the server it now talks to.
+ *
+ *   • `ACCEPTED` is not a state `VulnerabilityService` has. The server's word is `RISK_ACCEPTED`,
+ *     and its `TransitionRequest.@Pattern` refuses anything else — so every button offering
+ *     `ACCEPTED` would have 409'd the moment this store was wired, from every state.
+ *   • `FALSE_POSITIVE` was absent ENTIRELY. It is a lawful NCA ECC disposition with its own
+ *     bilingual reason columns, reachable from `NEW` and from `TRIAGED`.
+ *
+ * Between them, **7 of the 36 live rows carried a status this file could not name** (4
+ * RISK_ACCEPTED + 3 FALSE_POSITIVE, identical in dev and prod). F2-203's `audit_lc` shape
+ * INVERTED: there the register held statuses the server's machine did not declare; here the
+ * server was right and the CLIENT was short of it — which is worse in one specific way, because
+ * a client vocabulary that omits a state does not merely mislabel a row, it removes the
+ * operator's ability to reach it at all. Marking a vulnerability a false positive was not a
+ * thing this platform could do.
+ */
+export type VulnStatus =
+  | 'NEW' | 'TRIAGED' | 'OWNER_ASSIGNED' | 'IN_REMEDIATION' | 'AWAITING_VERIFICATION'
+  | 'RISK_ACCEPTED' | 'FALSE_POSITIVE' | 'CLOSED';
 
 export type SocSeverity = 'P1' | 'P2' | 'P3' | 'P4';
 export type SocStatus = 'OPEN' | 'INVESTIGATING' | 'CONTAINED' | 'ESCALATED_TO_IR' | 'CLOSED';
@@ -99,30 +129,59 @@ export interface CyberAsset {
   lastPatchedAt?: string;
 }
 
+/**
+ * A row of `cyber_lc.vulnerabilities`, as `VulnerabilityDto` puts it on the wire.
+ *
+ * ⚠ F2-205 renamed four fields and dropped one, so the type says what the server says:
+ *   `discoveredAt` → `detectedAt`, `dueDate` → `slaDeadline`, `currentOwner` → `owner`,
+ *   `notesEn/Ar` → `descriptionEn/Ar`.
+ *
+ * ⚠⚠ `slaDays` is DELETED rather than renamed, and that is the interesting one. There is no such
+ * column: the server computes the deadline once, at TRIAGED, from the NCA ECC severity matrix
+ * (`SLA_DAYS` — CRITICAL 7 / HIGH 30 / MEDIUM 60 / LOW 90) and stores only `sla_deadline`. The
+ * table used to render `SLA {v.slaDays}d` beside the due date, so re-deriving it here would mean
+ * a SECOND copy of that matrix in the browser — which is the exact defect class this slice
+ * exists to close. The deadline is the row's fact; the matrix is the server's policy.
+ */
 export interface Vulnerability {
+  /** The server-minted external reference (`VULN-…`). Never client-chosen — see F2-205. */
   id: string;
-  cveId: string;
+  cveId?: string;
   titleEn: string;
   titleAr: string;
-  /** Linked asset id. */
+  descriptionEn?: string;
+  descriptionAr?: string;
+  /** Linked asset id (`cyber_lc.assets.external_id`-shaped, free text on the column). */
   assetId: string;
-  cvssScore: number;
+  cvssScore?: number;
   severity: VulnSeverity;
-  /** SLA in days based on severity + asset tier. */
-  slaDays: number;
-  /** Discovery date. */
-  discoveredAt: string;
-  /** Auto-computed due date. */
-  dueDate: string;
-  /** Current status. */
   status: VulnStatus;
-  /** Owner currently responsible. */
-  currentOwner?: string;
-  /** Remediation notes. */
-  notesEn?: string;
-  notesAr?: string;
-  /** Closure date. */
+  detectionSource?: string;
+  detectedAt?: string;
+  /** The ECC remediation deadline, stamped at TRIAGED. Absent until then. */
+  slaDeadline?: string;
+  triagedAt?: string;
+  /** Stamped by the server from the authenticated principal — never sent by a client. */
+  triagedBy?: string;
+  ownerAssignedAt?: string;
+  owner?: string;
+  remediationStartedAt?: string;
+  remediationMethodEn?: string;
+  remediationMethodAr?: string;
+  verificationAt?: string;
+  verifiedBy?: string;
   closedAt?: string;
+  /** How many times this row has already breached its deadline. 8 of 36 carry 1. */
+  breachCount?: number;
+  slaExtended?: boolean;
+  /** Who accepted the exposure. NULL on all four RISK_ACCEPTED rows today — see F2-205. */
+  riskAcceptedBy?: string;
+  riskAcceptanceExpiry?: string;
+  riskAcceptanceReasonEn?: string;
+  riskAcceptanceReasonAr?: string;
+  falsePositiveReasonEn?: string;
+  falsePositiveReasonAr?: string;
+  threatIntelId?: string;
 }
 
 // ─── Threat intel ──────────────────────────────────────────────────────────
@@ -212,7 +271,10 @@ export interface PenTest {
 // ─── Storage ────────────────────────────────────────────────────────────────
 
 const FILING_KEY = 'grc.cyber.filing.v1';
-const VULN_KEY = 'grc.cyber.vuln.v1';
+// F2-205: `VULN_KEY = 'grc.cyber.vuln.v1'` is DELETED. The register is served; nothing about it
+// is kept in the browser. `lifecycleStoreContract.test.ts` derives its browser-local population
+// from the `grc.*.v1` literals in this file, so removing the key is what moves the store's state
+// in that registry — the declaration cannot drift from the code.
 const ASSET_KEY = 'grc.cyber.asset.v1';
 const THREAT_KEY = 'grc.cyber.threat.v1';
 const SOC_KEY = 'grc.cyber.soc.v1';
@@ -221,7 +283,10 @@ const EVENT = 'grc.cyber.lifecycle.changed';
 
 const _now = Date.now();
 const _daysAgo = (n: number) => new Date(_now - n * 86_400_000).toISOString();
-const _daysAhead = (n: number) => new Date(_now + n * 86_400_000).toISOString().slice(0, 10);
+// F2-205: `_daysAhead` is deleted — its only callers were `SEED_VULNS`' invented due dates.
+// `_daysAgo` survives because four browser-local corpora still remain in this file (filing,
+// assets, threats, soc, pentests); it is a clock-minted timestamp of exactly the F2-194 kind and
+// goes when the last of them is wired.
 
 // ─── NCA ECC v3 — domain catalogue ─────────────────────────────────────────
 
@@ -273,52 +338,20 @@ const SEED_ASSETS: CyberAsset[] = [
   { id: 'AST-007', name: 'ldap-server',          descriptionEn: 'LDAP directory server',                    descriptionAr: 'خادم دليل LDAP',                       tier: 'TIER-2-HIGH',     owner: 'Head of Identity', externalFacing: false, location: 'RIYADH-PRIMARY', lastPatchedAt: _daysAgo(40).slice(0, 10) },
 ];
 
-const SEED_VULNS: Vulnerability[] = [
-  { id: 'VLN-2026-001', cveId: 'CVE-2025-3041',
-    titleEn: 'RCE in Spring Web — public web frontend',
-    titleAr: 'تنفيذ كود عن بُعد في Spring Web — الواجهة العامة',
-    assetId: 'AST-003', cvssScore: 9.8, severity: 'CRITICAL', slaDays: 7,
-    discoveredAt: _daysAgo(5), dueDate: _daysAhead(2),
-    status: 'IN_REMEDIATION', currentOwner: 'Head of Digital',
-    notesEn: 'Patch tested in staging. Production deployment scheduled for tonight 2am-3am window.',
-    notesAr: 'تم اختبار التصحيح في بيئة الاختبار. النشر الإنتاجي مقرّر الليلة 2-3 صباحاً.' },
-  { id: 'VLN-2026-002', cveId: 'CVE-2025-2918',
-    titleEn: 'SSRF in API gateway plugin',
-    titleAr: 'SSRF في إضافة بوابة API',
-    assetId: 'AST-004', cvssScore: 8.4, severity: 'HIGH', slaDays: 14,
-    discoveredAt: _daysAgo(8), dueDate: _daysAhead(6),
-    status: 'OWNER_ASSIGNED', currentOwner: 'Head of API',
-    notesEn: 'Owner assigned; remediation plan in draft.',
-    notesAr: 'تم تعيين المالك؛ خطة المعالجة في مرحلة المسوّدة.' },
-  { id: 'VLN-2026-003', cveId: 'CVE-2025-2104',
-    titleEn: 'SQL injection in reporting service',
-    titleAr: 'حقن SQL في خدمة التقارير',
-    assetId: 'AST-001', cvssScore: 8.0, severity: 'HIGH', slaDays: 14,
-    discoveredAt: _daysAgo(12), dueDate: _daysAhead(2),
-    status: 'AWAITING_VERIFICATION', currentOwner: 'CIO',
-    notesEn: 'Hotfix deployed 2026-04-25; awaiting verification scan.',
-    notesAr: 'نُشر التصحيح العاجل في 25-04-2026؛ بانتظار فحص التحقق.' },
-  { id: 'VLN-2026-004', cveId: 'CVE-2024-9831',
-    titleEn: 'Authentication bypass in Jenkins plugin',
-    titleAr: 'تجاوز المصادقة في إضافة Jenkins',
-    assetId: 'AST-006', cvssScore: 6.5, severity: 'MEDIUM', slaDays: 30,
-    discoveredAt: _daysAgo(18), dueDate: _daysAhead(12),
-    status: 'TRIAGED' },
-  { id: 'VLN-2026-005', cveId: 'CVE-2024-7712',
-    titleEn: 'Reflected XSS in wiki search',
-    titleAr: 'XSS منعكس في بحث الويكي',
-    assetId: 'AST-005', cvssScore: 4.2, severity: 'LOW', slaDays: 60,
-    discoveredAt: _daysAgo(25), dueDate: _daysAhead(35),
-    status: 'NEW' },
-  { id: 'VLN-2026-006', cveId: 'CVE-2024-5641',
-    titleEn: 'Privilege escalation in LDAP overlay',
-    titleAr: 'تصعيد الصلاحيات في طبقة LDAP',
-    assetId: 'AST-007', cvssScore: 9.1, severity: 'CRITICAL', slaDays: 7,
-    discoveredAt: _daysAgo(35), dueDate: _daysAgo(28).slice(0, 10),
-    status: 'CLOSED', closedAt: _daysAgo(30),
-    notesEn: 'Patched 2026-04-02; verified 2026-04-04.',
-    notesAr: 'تم التصحيح 02-04-2026؛ تم التحقق 04-04-2026.' },
-];
+// ⚠⚠ F2-205: `SEED_VULNS` — six invented vulnerabilities — is DELETED.
+//
+// It carried CVE numbers, CVSS scores, named owners ('Head of Digital', 'CIO') and remediation
+// narratives ('Patch tested in staging. Production deployment scheduled for tonight 2am-3am
+// window.'), all minted relative to `Date.now()` at module load so they could never look stale
+// — F2-194's clock-anchored fabrication, which has no tell. Meanwhile `cyber_lc.vulnerabilities`
+// held 36 real rows in dev and prod behind a complete, hardened controller with no client.
+//
+// 🔑 Two measurements say what the corpus was doing. Of the 36 real rows, `remediation_method`
+// is populated on ZERO — so the confident remediation notes were not a stale copy of anything,
+// they were invented outright. And 31 of the 36 are past their SLA deadline and not closed,
+// while the six invented rows showed one overdue: the fabrication was not merely wrong, it was
+// wrong in the flattering direction, which is the third time in this programme after F2-193's
+// connector cadences and F2-195's KPI tiles.
 
 const SEED_THREATS: ThreatAdvisory[] = [
   { id: 'THR-2026-001', source: 'NCA-HASEEN', sourceRef: 'NCA-AD-2026-0148',
@@ -452,34 +485,228 @@ export function transitionFiling(status: EccFilingStatus, by?: string): EccFilin
   return saveFiling(updated);
 }
 
-export function loadVulns(): Vulnerability[] {
-  if (typeof window === 'undefined') return SEED_VULNS;
-  try {
-    const raw = window.localStorage.getItem(VULN_KEY);
-    return raw ? JSON.parse(raw) as Vulnerability[] : SEED_VULNS;
-  } catch { return SEED_VULNS; }
+// ─── Vulnerability register — SERVER-BACKED (F2-205) ───────────────────────
+
+/**
+ * The NCA ECC remediation machine, mirroring `VulnerabilityService.ALLOWED` edge for edge.
+ *
+ * `VulnerabilityMachineParityTest` compares this table against the server's by reflection and
+ * fails the build on any divergence, in BOTH directions. It exists because this workspace used to
+ * hold THREE incompatible ideas of the same machine and none of them was the server's:
+ *
+ *   1. `VulnStatus` — 7 states, one of which (`ACCEPTED`) the server does not have, and missing
+ *      `FALSE_POSITIVE` entirely.
+ *   2. `CyberLifecyclePage`'s pipeline `onAdvance` — a LINEAR `Record<string, VulnStatus>` from
+ *      NEW to CLOSED with no branches at all, so neither risk acceptance nor false-positive
+ *      disposition was reachable from the pipeline.
+ *   3. `LifecycleOverviewPage`'s `stages` array — six codes, the same two omissions.
+ *
+ * 🔑 F2-196's question — "how many things read this status, and do they agree?" — answered four
+ * (counting the server) with four different vocabularies. What let it survive is that all three
+ * CLIENT vocabularies agreed with each other about the happy path, so any two of them compared
+ * side by side looked consistent. The one they all disagreed with was the only one that decides.
+ */
+export const VULN_ALLOWED: Record<string, readonly VulnStatus[]> = {
+  NEW:                   ['TRIAGED', 'FALSE_POSITIVE'],
+  TRIAGED:               ['OWNER_ASSIGNED', 'RISK_ACCEPTED', 'FALSE_POSITIVE'],
+  OWNER_ASSIGNED:        ['IN_REMEDIATION', 'RISK_ACCEPTED'],
+  IN_REMEDIATION:        ['AWAITING_VERIFICATION'],
+  AWAITING_VERIFICATION: ['CLOSED', 'IN_REMEDIATION'],
+  RISK_ACCEPTED:         ['CLOSED'],
+  FALSE_POSITIVE:        ['CLOSED'],
+};
+
+/**
+ * DERIVED from {@link VULN_ALLOWED} — the states that are reachable and have no outgoing edges.
+ * Never typed a second time: F2-196's rule, learned where an inclusion list over the PDPL DSR
+ * vocabulary meant the extended statutory deadline could never be enforced. The server derives
+ * its own the same way (`VulnerabilityService.TERMINAL`, which F2-205 also converted from a
+ * hand-written `List.of("CLOSED")`).
+ */
+export const VULN_TERMINAL: readonly string[] =
+  [...new Set(Object.values(VULN_ALLOWED).flat())]
+    .filter(st => (VULN_ALLOWED[st] ?? []).length === 0);
+
+/**
+ * Every state the register can hold, DERIVED — keys plus targets, in declaration order.
+ *
+ * ⚠ F2-205: the vulnerability vocabulary was restated FIVE times across this codebase and all
+ * five client copies shared the same two omissions. Anything that needs the full list — a filter's
+ * options, a pipeline's stage columns, a legend — must derive it rather than type a sixth.
+ */
+export const ALL_VULN_STATUSES: readonly VulnStatus[] = [
+  ...Object.keys(VULN_ALLOWED) as VulnStatus[],
+  ...(Object.values(VULN_ALLOWED).flat() as VulnStatus[])
+    .filter(s => !Object.prototype.hasOwnProperty.call(VULN_ALLOWED, s)),
+].filter((s, i, a) => a.indexOf(s) === i);
+
+/** The legal next states — empty for a terminal state AND for one the machine does not declare. */
+export function nextVulnStatuses(status: string): readonly VulnStatus[] {
+  return VULN_ALLOWED[status] ?? [];
 }
 
-export function saveVuln(v: Vulnerability): Vulnerability {
-  const existing = loadVulns();
-  const next = [...existing.filter(x => x.id !== v.id), v];
-  try { window.localStorage.setItem(VULN_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  // F2-202: no REST mirror here. `mirrorSaveToBackend`/`mirrorTransitionToBackend`
-  // used to be called on this line; both returned before sending anything because the
-  // persistence-mode switch they read had no setter in the product. This store is
-  // declared BROWSER_LOCAL in `lib/lifecycleStores.ts` with its real endpoint and
-  // measured row count — that declaration is gated; a silent no-op was not.
+/**
+ * The single step a one-button "advance" control means — the REMEDIATION path, declared.
+ *
+ * ⚠⚠ The pipeline needs one target per stage, and the machine branches: `NEW` can go to TRIAGED
+ * or FALSE_POSITIVE, `TRIAGED` to OWNER_ASSIGNED or RISK_ACCEPTED or FALSE_POSITIVE. Three ways
+ * to resolve that are wrong:
+ *
+ *   • Take `nextVulnStatuses(s)[0]`. That makes the ARRAY ORDER of `VULN_ALLOWED` silently
+ *     load-bearing — F2-190's defect exactly, where a lifecycle hop picked by whichever state a
+ *     `Set` yielded first became a control nobody had chosen.
+ *   • Advance only when there is exactly one successor. Then `NEW` and `TRIAGED` never advance
+ *     from the pipeline at all, which is most of the register.
+ *   • Keep the page's own linear map. That is what was there: a `Record<string, VulnStatus>`
+ *     inside `onAdvance`, a third vocabulary, with no branch to risk acceptance or false positive
+ *     anywhere in it.
+ *
+ * So it is declared here, once, and `vulnerabilityLifecycle.test.ts` asserts every entry is a
+ * legal edge of {@link VULN_ALLOWED} — a shortcut through the machine, never around it. The
+ * dispositions that are judgements rather than progress (RISK_ACCEPTED, FALSE_POSITIVE) are
+ * deliberately NOT reachable from a one-click control: they need a reason from the deciding
+ * officer, which the detail table collects.
+ */
+export const VULN_PRIMARY_PATH: Record<string, VulnStatus> = {
+  NEW:                   'TRIAGED',
+  TRIAGED:               'OWNER_ASSIGNED',
+  OWNER_ASSIGNED:        'IN_REMEDIATION',
+  IN_REMEDIATION:        'AWAITING_VERIFICATION',
+  AWAITING_VERIFICATION: 'CLOSED',
+  RISK_ACCEPTED:         'CLOSED',
+  FALSE_POSITIVE:        'CLOSED',
+};
+
+/** The remediation-path successor, or null where a one-click advance has no honest meaning. */
+export function primaryNextVulnStatus(status: string): VulnStatus | null {
+  return VULN_PRIMARY_PATH[status] ?? null;
+}
+
+/** Does the machine know this status at all? A terminal state is managed but has no successors. */
+export function isVulnStatusManaged(status: string): boolean {
+  return Object.prototype.hasOwnProperty.call(VULN_ALLOWED, status)
+    || VULN_TERMINAL.includes(status);
+}
+
+/**
+ * "Open" as the COMPLEMENT of the derived terminal set, never a second inclusion list.
+ *
+ * Every overdue/critical count in this file used to read `v.status !== 'CLOSED'`, which is the
+ * same answer today and stops being so the moment a second terminal state is added — and the
+ * product argument for making `RISK_ACCEPTED` terminal is a real one. With a complement, an
+ * unrecognised status is chased rather than excused, which for an ECC remediation clock is the
+ * safe direction.
+ */
+export function isVulnOpen(status: string): boolean { return !VULN_TERMINAL.includes(status); }
+
+/** Past its ECC deadline and not finished. No deadline = not yet triaged = not yet overdue. */
+export function isVulnOverdue(v: Vulnerability, now = new Date()): boolean {
+  return !!v.slaDeadline && isVulnOpen(v.status) && new Date(v.slaDeadline) < now;
+}
+
+/** Server rows, cached. Empty until {@link hydrateVulns} resolves. */
+let _vulns: Vulnerability[] = [];
+let _vulnsHydrated = false;
+let _vulnsLoadFailed = false;
+let _vulnsPromise: Promise<void> | null = null;
+
+function fromVulnDto(d: VulnLifecycleDto): Vulnerability {
+  return {
+    id: d.id,
+    cveId: d.cveId ?? undefined,
+    titleEn: d.titleEn,
+    titleAr: d.titleAr,
+    descriptionEn: d.descriptionEn ?? undefined,
+    descriptionAr: d.descriptionAr ?? undefined,
+    assetId: d.assetId,
+    cvssScore: d.cvssScore ?? undefined,
+    severity: d.severity as VulnSeverity,
+    status: d.status as VulnStatus,
+    detectionSource: d.detectionSource ?? undefined,
+    detectedAt: d.detectedAt ?? undefined,
+    slaDeadline: d.slaDeadline ?? undefined,
+    triagedAt: d.triagedAt ?? undefined,
+    triagedBy: d.triagedBy ?? undefined,
+    ownerAssignedAt: d.ownerAssignedAt ?? undefined,
+    owner: d.owner ?? undefined,
+    remediationStartedAt: d.remediationStartedAt ?? undefined,
+    remediationMethodEn: d.remediationMethodEn ?? undefined,
+    remediationMethodAr: d.remediationMethodAr ?? undefined,
+    verificationAt: d.verificationAt ?? undefined,
+    verifiedBy: d.verifiedBy ?? undefined,
+    closedAt: d.closedAt ?? undefined,
+    breachCount: d.breachCount ?? undefined,
+    slaExtended: d.slaExtended ?? undefined,
+    riskAcceptedBy: d.riskAcceptedBy ?? undefined,
+    riskAcceptanceExpiry: d.riskAcceptanceExpiry ?? undefined,
+    riskAcceptanceReasonEn: d.riskAcceptanceReasonEn ?? undefined,
+    riskAcceptanceReasonAr: d.riskAcceptanceReasonAr ?? undefined,
+    falsePositiveReasonEn: d.falsePositiveReasonEn ?? undefined,
+    falsePositiveReasonAr: d.falsePositiveReasonAr ?? undefined,
+    threatIntelId: d.threatIntelId ?? undefined,
+  };
+}
+
+/**
+ * Fetch the tenant's remediation register. Idempotent — concurrent callers share one request,
+ * which matters because three separate pages hydrate this store.
+ *
+ * A 403 is not a load failure: a persona without `CYBER:READ` is correctly refused, and the page
+ * should show an empty register rather than an error banner blaming the server.
+ */
+export function hydrateVulns(force = false): Promise<void> {
+  if (_vulnsPromise && !force) return _vulnsPromise;
+  _vulnsLoadFailed = false;
+  _vulnsPromise = vulnLifecycleApi.list()
+    .then(rows => { _vulns = rows.map(fromVulnDto); _vulnsHydrated = true; emit(); })
+    .catch(e => {
+      if (!(e instanceof ApiError) || e.status !== 403) _vulnsLoadFailed = true;
+      console.warn('[cyberLifecycle] vulnerability fetch failed:', e);
+      _vulnsHydrated = true;
+      emit();
+    });
+  return _vulnsPromise;
+}
+
+export function areVulnsHydrated(): boolean { return _vulnsHydrated; }
+export function vulnsLoadFailed(): boolean { return _vulnsLoadFailed; }
+
+export function loadVulns(): Vulnerability[] { return _vulns; }
+
+/**
+ * Advance a vulnerability through the ECC machine — SERVER-SIDE — and replace the cached row with
+ * whatever the server returns.
+ *
+ * ⚠⚠ This used to be `{ ...v, status }` written into `localStorage`, with NO transition table of
+ * any kind. Two consequences, both live until F2-205:
+ *
+ *   • Nothing was persisted. An analyst closed a CRITICAL vulnerability, saw a success toast, and
+ *     a reload put it back — while the real row sat untouched in a register no screen read.
+ *   • The browser permitted transitions the machine forbids, including `NEW -> CLOSED`: a critical
+ *     exposure marked closed having never been triaged, assigned, remediated or verified, with no
+ *     `verified_by` and no audit row. That is the ECC remediation control itself, absent.
+ *
+ * 🔑 Replacing the row from the server's response is what makes both halves impossible to
+ * reintroduce: there is no local status to write, and no second machine to consult.
+ */
+export async function transitionVuln(
+  id: string,
+  status: VulnStatus,
+  detail?: {
+    owner?: string;
+    remediationMethodEn?: string;
+    remediationMethodAr?: string;
+    riskAcceptanceExpiry?: string;
+    riskAcceptanceReasonEn?: string;
+    riskAcceptanceReasonAr?: string;
+    falsePositiveReasonEn?: string;
+    falsePositiveReasonAr?: string;
+  },
+): Promise<Vulnerability> {
+  const saved = fromVulnDto(await vulnLifecycleApi.transition(id, { status, ...detail }));
+  _vulns = _vulns.map(v => (v.id === id ? saved : v));
   emit();
-  return v;
-}
-
-export function transitionVuln(id: string, status: VulnStatus): Vulnerability | null {
-  const v = loadVulns().find(x => x.id === id);
-  if (!v) return null;
-  const updated: Vulnerability = { ...v, status };
-  if (status === 'CLOSED') updated.closedAt = new Date().toISOString();
-  // F2-202: no REST mirror here — see `lib/lifecycleStores.ts`.
-  return saveVuln(updated);
+  return saved;
 }
 
 export function saveAsset(a: CyberAsset): CyberAsset {
@@ -639,7 +866,10 @@ export function subscribeCyber(cb: () => void): () => void {
   const handler = () => cb();
   window.addEventListener(EVENT, handler);
   const storage = (e: StorageEvent) => {
-    if ([FILING_KEY, VULN_KEY, ASSET_KEY, THREAT_KEY, SOC_KEY, PENTEST_KEY].includes(e.key ?? '')) cb();
+    // F2-205: VULN_KEY is gone from this list along with the key itself. Cross-tab sync for the
+    // vulnerability register now comes from the server's own broadcast — see the note on
+    // `useRealtimeOrgEvent('changed.vulnerability')` in VulnerabilitiesV2Page.
+    if ([FILING_KEY, ASSET_KEY, THREAT_KEY, SOC_KEY, PENTEST_KEY].includes(e.key ?? '')) cb();
   };
   window.addEventListener('storage', storage);
   return () => {
@@ -650,98 +880,41 @@ export function subscribeCyber(cb: () => void): () => void {
 
 function emit() { try { window.dispatchEvent(new CustomEvent(EVENT)); } catch { /* ignore */ } }
 
-// ─── NCA Haseen filing packet generator ────────────────────────────────────
-
-export function buildHaseenPacket(orgEn: string, orgAr: string): string {
-  const filing = loadFiling();
-  const vulns = loadVulns();
-  const tests = loadPenTests();
-
-  const lines: string[] = [];
-  const div = '─'.repeat(64);
-
-  lines.push(div);
-  lines.push('NCA HASEEN — ECC v3 ANNUAL SELF-ASSESSMENT FILING');
-  lines.push('حصين — التقييم الذاتي السنوي للضوابط الأساسية v3');
-  lines.push(div);
-  lines.push(`Reporting entity: ${orgEn}`);
-  lines.push(`الجهة          : ${orgAr}`);
-  lines.push(`Reporting year: ${filing.year}`);
-  lines.push(`Filing ID     : ${filing.id}`);
-  lines.push(`Status        : ${filing.status}`);
-  lines.push(`CISO          : ${filing.ciSpoc}`);
-  if (filing.submittedAt) lines.push(`Submitted     : ${filing.submittedAt}`);
-  if (filing.ncaAckRef)   lines.push(`NCA ack ref   : ${filing.ncaAckRef}`);
-  lines.push('');
-  lines.push(`Composite maturity: ${filing.compositeMaturity}/5`);
-  lines.push('');
-
-  filing.scores.forEach(s => {
-    lines.push(`DOMAIN ${s.domain} — ${s.nameEn}`);
-    lines.push(`              ${s.nameAr}`);
-    lines.push(`  Maturity     : ${s.maturity === 0 ? 'N/A' : `${s.maturity}/5`}`);
-    lines.push(`  Controls     : ${s.controlsTotal} total · ${s.evidencedControls} evidenced · ${s.remediationControls} in remediation`);
-    lines.push(`  EN: ${s.narrativeEn}`);
-    lines.push(`  AR: ${s.narrativeAr}`);
-    lines.push('');
-  });
-
-  lines.push('VULNERABILITY MANAGEMENT POSTURE · حالة إدارة الثغرات');
-  const sevCounts: Record<VulnSeverity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
-  vulns.forEach(v => sevCounts[v.severity]++);
-  Object.entries(sevCounts).forEach(([sev, n]) => lines.push(`  ${sev.padEnd(10)}: ${n}`));
-  const overdue = vulns.filter(v => new Date(v.dueDate) < new Date() && v.status !== 'CLOSED').length;
-  lines.push(`  Overdue   : ${overdue}`);
-  lines.push('');
-
-  lines.push('PENETRATION TEST PROGRAMME · برنامج اختبار الاختراق');
-  tests.forEach(t => {
-    lines.push(`  [${t.scheduledQuarter}] ${t.scope} — ${t.vendor} · ${t.status}`);
-    if (t.completedAt) {
-      lines.push(`    Findings: ${t.criticalFindings}C / ${t.highFindings}H / ${t.mediumFindings}M · Remediation ${t.remediationPct}%`);
-    }
-  });
-  lines.push('');
-
-  lines.push(div);
-  lines.push('Generated by TSS GRC Platform · upload to NCA Haseen portal');
-  lines.push(div);
-  return lines.join('\n');
-}
-
-/** Export P5 — NCA Haseen ECC filing as tabular sheets for a branded .xlsx
- *  (POST /api/v1/reporting/packet.xlsx). The "Severity" header drives conditional formatting. */
-export function buildHaseenSheets(): { name: string; headers: string[]; rows: string[][] }[] {
-  const filing = loadFiling();
-  const vulns = loadVulns();
-  const tests = loadPenTests();
-  const sev: Record<VulnSeverity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
-  vulns.forEach(v => sev[v.severity]++);
-  const overdue = vulns.filter(v => new Date(v.dueDate) < new Date() && v.status !== 'CLOSED').length;
-  return [
-    {
-      name: 'ECC Domains',
-      headers: ['Domain', 'Name', 'Maturity', 'Controls', 'Evidenced', 'In Remediation'],
-      rows: filing.scores.map(s => [s.domain, s.nameEn, s.maturity === 0 ? 'N/A' : `${s.maturity}/5`,
-        String(s.controlsTotal), String(s.evidencedControls), String(s.remediationControls)]),
-    },
-    {
-      name: 'Vulnerability Posture',
-      headers: ['Severity', 'Count'],
-      rows: [
-        ['CRITICAL', String(sev.CRITICAL)], ['HIGH', String(sev.HIGH)],
-        ['MEDIUM', String(sev.MEDIUM)], ['LOW', String(sev.LOW)], ['Overdue', String(overdue)],
-      ],
-    },
-    {
-      name: 'Penetration Tests',
-      headers: ['Quarter', 'Scope', 'Vendor', 'Status', 'Critical', 'High', 'Medium', 'Remediation %'],
-      rows: tests.map(t => [t.scheduledQuarter, t.scope, t.vendor, t.status,
-        t.completedAt ? String(t.criticalFindings) : '', t.completedAt ? String(t.highFindings) : '',
-        t.completedAt ? String(t.mediumFindings) : '', t.completedAt ? String(t.remediationPct) : '']),
-    },
-  ];
-}
+// ─── The NCA Haseen submission generator — RETIRED (F2-205) ────────────────
+//
+// ⚠⚠ `buildHaseenPacket()` and `buildHaseenSheets()` were here, and both are DELETED.
+//
+// Together they produced the "NCA HASEEN — ECC v3 ANNUAL SELF-ASSESSMENT FILING": a cover naming
+// the reporting entity, per-domain maturity scores, an "evidenced controls" count, a
+// VULNERABILITY MANAGEMENT POSTURE section, the pen-test programme, and the footer "Generated by
+// TSS GRC Platform · upload to NCA Haseen portal". `CyberLifecyclePage` emitted it FOUR ways: a
+// `.txt` download, a print-to-PDF stamped "CONFIDENTIAL — REGULATOR" with a reference id, and
+// branded .xlsx / .docx through the platform's own export subsystem.
+//
+// Every figure in it came from this file's browser constants.
+//
+// 🔑 This is the SAME fabricated ECC return F2-199 retired at `/nca-ecc-export`, reached through
+// a second door — and the reason F2-199 did not find it is the reusable part. Its
+// `exportProvenance` gate asks whether a page that emits a document has server-derived data in
+// scope. This page does: `reportingApi.packetXlsx(payload)` and `reportingApi.packetDocx(payload)`
+// are the ONLY two `SERVER_CALL` tokens on it, and both take the fabricated payload as their
+// ARGUMENT. **The server call the provenance gate found is the one that carries the invented
+// figures out.** A gate that asks "does this page talk to a server?" cannot tell an inbound read
+// from an outbound write, and an export endpoint is the one place where the difference is the
+// whole question. `exportProvenance.test.ts` now separates them.
+//
+// Retiring rather than rewiring is ADR-017 §D-5, ratified for this shape in F2-42 and applied
+// again in F2-198 and F2-199: `nca_ecc.filings` holds 4 real filings with per-domain scores, peer
+// review, CISO approval and an NCA submission reference, and `NcaEccFilingsPage` already renders
+// all of it at `/nca-ecc/filings`. Rebuilding this packet from that register is NOT a rewire:
+// F2-199 measured `responses_json` NULL on all 4 filings in both databases, so the per-control
+// detail underneath the domain scores does not exist to be rendered, and inventing it is
+// F2-196's defect. A server-side ECC export generator is filed as the real fix.
+//
+// ⚠ The vulnerability section was the one part this slice COULD have made real, and that is
+// exactly why it had to go with the rest: a document whose posture table is server-derived and
+// whose ECC maturity scores are invented is F2-203's self-contradicting export — worse than a
+// uniformly fabricated one, because the accurate half vouches for the other.
 
 // ─── Display helpers ───────────────────────────────────────────────────────
 
@@ -772,20 +945,44 @@ export const VULN_SEVERITY_TONE: Record<VulnSeverity, 'risk-crit' | 'risk-high' 
   CRITICAL: 'risk-crit', HIGH: 'risk-high', MEDIUM: 'risk-med', LOW: 'risk-low',
 };
 
+/**
+ * Bilingual labels for all EIGHT server states. `ACCEPTED` was renamed to the server's
+ * `RISK_ACCEPTED` and `FALSE_POSITIVE` added — until F2-205 seven of the 36 live rows rendered
+ * with no label at all, and `VULN_STATUS_LABEL[s][lang]` on an unmapped status is a TypeError of
+ * exactly the kind F2-203 found three of in `audit_lc`. Read it through {@link vulnStatusLabel},
+ * never by direct index.
+ */
 export const VULN_STATUS_LABEL: Record<VulnStatus, { en: string; ar: string }> = {
   NEW:                   { en: 'New',                    ar: 'جديدة' },
   TRIAGED:               { en: 'Triaged',                ar: 'مفروزة' },
   OWNER_ASSIGNED:        { en: 'Owner assigned',         ar: 'تم تعيين المالك' },
   IN_REMEDIATION:        { en: 'In remediation',         ar: 'قيد المعالجة' },
   AWAITING_VERIFICATION: { en: 'Awaiting verification',  ar: 'بانتظار التحقق' },
+  RISK_ACCEPTED:         { en: 'Risk accepted',          ar: 'مقبولة كمخاطرة' },
+  FALSE_POSITIVE:        { en: 'False positive',         ar: 'إنذار كاذب' },
   CLOSED:                { en: 'Closed',                 ar: 'مُغلَقة' },
-  ACCEPTED:              { en: 'Risk accepted',          ar: 'مقبول كمخاطرة' },
 };
+
+/**
+ * Total-function label lookup. A status the map does not carry returns the raw token rather than
+ * throwing — the F2-203 rule, where a `MAP[row.status][lang]` crash was held shut by a filter
+ * that removed every row, and fixing the filter is what detonated it in the browser.
+ */
+export function vulnStatusLabel(status: string, lang: 'en' | 'ar'): string {
+  const e = VULN_STATUS_LABEL[status as VulnStatus];
+  return e ? e[lang] : status;
+}
 
 export const VULN_STATUS_TONE: Record<VulnStatus, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   NEW: 'danger', TRIAGED: 'warning', OWNER_ASSIGNED: 'info', IN_REMEDIATION: 'warning',
-  AWAITING_VERIFICATION: 'info', CLOSED: 'success', ACCEPTED: 'neutral',
+  AWAITING_VERIFICATION: 'info', RISK_ACCEPTED: 'neutral', FALSE_POSITIVE: 'neutral',
+  CLOSED: 'success',
 };
+
+/** Total-function tone lookup, for the same reason as {@link vulnStatusLabel}. */
+export function vulnStatusTone(status: string): 'neutral' | 'info' | 'warning' | 'success' | 'danger' {
+  return VULN_STATUS_TONE[status as VulnStatus] ?? 'neutral';
+}
 
 export const SOC_SEVERITY_TONE: Record<SocSeverity, 'risk-crit' | 'risk-high' | 'risk-med' | 'risk-low'> = {
   P1: 'risk-crit', P2: 'risk-high', P3: 'risk-med', P4: 'risk-low',
@@ -856,8 +1053,10 @@ export function aggregateCyber(): CyberLifecycleStats {
   return {
     filingMaturity: filing.compositeMaturity,
     filingStatus: filing.status,
-    vulnsCritical: vulns.filter(v => v.severity === 'CRITICAL' && v.status !== 'CLOSED').length,
-    vulnsOverdue: vulns.filter(v => new Date(v.dueDate) < new Date() && v.status !== 'CLOSED').length,
+    // F2-205: `isVulnOpen` is the complement of the DERIVED terminal set, and `isVulnOverdue`
+    // reads the server's `slaDeadline` (there is no `dueDate` — see the Vulnerability interface).
+    vulnsCritical: vulns.filter(v => v.severity === 'CRITICAL' && isVulnOpen(v.status)).length,
+    vulnsOverdue: vulns.filter(v => isVulnOverdue(v)).length,
     vulnsClosedThisMonth: closedThisMonth,
     threatsAcknowledged: threats.filter(t => t.acknowledged).length,
     threatsTotal: threats.length,
