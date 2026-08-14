@@ -1199,6 +1199,118 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   ⚠ **`cyber_lc` has zero CHECK constraints in the whole schema** — same as `audit_lc` (F2-203). All 36 stored
   statuses ARE in the machine today, so unlike `audit_lc` it is latent rather than live; **that was checked,
   not assumed**, which is the only reason it can be stated.
+  ⚠⚠ **ASK WHAT AN EMITTED DOCUMENT ASSERTS THAT NO COLUMN RECORDS — PER FIELD, NOT PER FILE — AND THE
+  ANSWER WAS A FABRICATED PDPL ARTICLE 25 SUBMISSION TO SDAIA** (F2-209, measured 2026-08-13/14).
+  `lib/pdplBreach.ts`'s `generateSdaiaNotification` returned a complete personal-data-breach notification: the
+  reporting controller's identity, the categories of personal data affected, the likely consequences for data
+  subjects, the containment measures taken and the remediation measures proposed. `PdplBreachConsole` rendered
+  it and `downloadPacket` wrote `JSON.stringify({ packet, breach })` — the invention and the genuine server row
+  **in one file**, named from a client-minted `PDPL-N-<id>-<year>`. Measured against `sys.columns`:
+  `privacy.data_breaches` has **25 columns, 17 live rows, 0 CHECKs, identical dev and prod**, and **no column
+  for any of it**. `categoriesAffected` came from the **severity band**, so *"Financial / transactional data"*
+  was asserted to a regulator because a row count crossed a threshold.
+  🔑 **F2-199's harm ladder gains a rung: a fabricated dashboard misleads whoever looks at it; a fabricated
+  export leaves the platform; a fabricated STATEMENT OF CONDUCT invites the regulator to ask for an artefact
+  that may not exist.** `containmentMeasures` read *"Affected systems isolated from the network within the first
+  hour of detection … Forensic image of impacted hosts captured for SDAIA inspection"* — identical for every
+  breach in every tenant — and the platform's own runbook says the DPO transcribes it into the SDAIA portal **by
+  hand**, so the text was authored to be copied out.
+  ⚠⚠ **The controller was the software vendor, with ONE CR number, for every tenant** — `'TSS Saudi Holding'` +
+  CR **`1010299292`**, the *same literal F2-199 found on the fabricated NCA ECC return*, plus an invented DPO
+  (`'Mona Al-Bishi'`, `dpo@tss.sa`). Second regulator, same rule: **a tenant-specific fact appearing as a
+  literal in a shipped bundle cannot be right for more than one tenant.** ⚠ That name is in **eight other
+  product files** (F2-207's measured 65-name cast), which is why this slice's identity gate is scoped to the two
+  files it owns — **a gate that fails on code the slice did not touch is a gate nobody can keep green.**
+  ⚠⚠ **F2-199's `exportProvenance` and F2-203's refinement were both GREEN over it, and the reason is the
+  reusable part: this was a HYBRID document.** `exportProvenance` asks *does the emitting page have server data
+  in scope?* (yes). F2-203 sharpened it to *which of this file's data reaches what it emits?* (the same data
+  does). **Both are FILE-level.** `breach.id`, `descriptionEn`, `dataSubjectsAffectedCount` and `discoveredAt`
+  were real; the controller, categories, consequences, containment and proposed measures were literals. 🔑 **The
+  real fields are what made the invented ones credible** — F2-203's CMA packet contradicted itself on the page
+  and that is part of how it was caught; this one was seamless. The 11th instrument asks per **FIELD**:
+  `ARTICLE_25_FIELDS` declares, per Article 25 field, the DTO property it reads or `null`, and
+  `Article25FieldBackingContractTest` resolves every claim against the real entity by reflection (the F2-193
+  pair — the FE half cannot tell a real DTO property from a plausible string).
+  ⚠⚠ **THE LIVE HALF: a statutory gate read the breach LIFECYCLE status, not the column the server owns.** The
+  console answered *"has SDAIA been notified?"* with `breach.status === 'NOTIFIED'` while the platform keeps
+  `sdaia_notification_status` with a four-state machine (`NOT_REPORTED → IN_PREPARATION|SUBMITTED →
+  ACKNOWLEDGED`, terminal, guarded) in `PrivacyService`. Probed live: **4 of 17 live breaches in BOTH databases
+  are `status = NOTIFIED` with `sdaia_notification_status = NOT_REPORTED`** (ids 8, 9, 13, 16), all four flagged
+  as requiring notification and **113–193 days past** a 72-hour window — and `needsSdaia` excluded exactly
+  those four. 🔑 **The one screen built to surface an undischarged Article 25 clock was the screen that hid the
+  four breaches furthest past it.** Tenant-wide: **10 rows require notification, have never been reported and
+  are past 72h; 0 of 17 carry `sdaia_submitted_at`**, so the discharge has never once been stamped.
+  🔑 **And the correct reader was 200 lines below in the SAME FILE, under a comment reading *"authoritative,
+  server-backed"*.** F2-196's question with F2-205's follow-up (*which of them is the server?*), except both
+  readers were in one component and the wrong one decided what the operator saw.
+  ⚠⚠ **`onDispatch` was REMOVED, not repointed, and the prop's own contract stated the rule it broke.** It was
+  documented as the *"Real SDAIA dispatch action"* warning *"we never want this regulatory action to 'succeed'
+  without actually transitioning state"* — and the one call site passed `notifyDataOffice`, whose whole body is
+  `setPdpcNotificationRequired(true)` + `setPdpcNotifiedAt(now)`. It never writes the SDAIA columns, never
+  writes `sdaia_submitted_at` (which the server's own javadoc calls the discharge of the Article 31 clock), and
+  emits **neither** the F7 audit row **nor** the F8 `BREACH_REPORTED_TO_SDAIA` event that `recordSdaiaSubmission`
+  — in the same service — emits. Latent: **0 rows carry `pdpc_notified_at`**, so it had never been clicked.
+  F2-184's shape on a prop contract. ⚠ **And it could not be repointed: nothing in this platform can dispatch to
+  SDAIA** (no machine-readable API; the entity javadoc says so). 🔑 **When a control's label describes something
+  the platform cannot do at all, the fix is deletion, not rewiring.**
+  ⚠⚠ **F2-207's diff-the-tokens question has a THIRD answer.** Refused by a CHECK → retire (F2-207); the
+  server's machine merely COARSER → rewire and delete the granularity (F2-208); **no column at all → the fields
+  cannot be reconstructed**, which is why F2-198 *deleted* `lastReviewedAt` rather than inventing it.
+  ⚠ **Deleting the section would have ASSERTED READINESS** (F2-197 on a statutory filing), so it was replaced.
+  Three states, and the last two must not look alike: a **value**; *"not yet recorded"* (a column exists and is
+  empty — somebody can fill it in here); and **em-dash + "DPO supplies"** with a bilingual hint on `title` *and*
+  `aria-label` (no column exists — no data entry here will ever produce it). **6 held / 6 not held.**
+  ⚠⚠ **MY FIRST FIX HAD THE SAME DEFECT ONE NOTCH MILDER, and what found it was asking why an export had no
+  caller.** I used `isSdaiaReported` for the urgency pool and the countdown KPI, leaving `isSdaiaSubmitted`
+  unused. `IN_PREPARATION` **discharges nothing** — so the pool would have dropped a notification begun six
+  months ago and never sent, and the 72-hour KPI would have gone **success green** for it. 🔑 **An exported
+  predicate with no caller is a question about the predicates that DO have callers.**
+  ⚠⚠ **MY OWN GATE COMMITTED F2-203'S DEFECT IN A LEG WRITTEN AFTER QUOTING IT.** The shared-predicate leg
+  counted `isSdaiaReported(` with a floor of **`>= 2`**; there are three call sites, so the mutation reverting
+  the panel to an inline comparison left two behind and **SURVIVED**. Replaced by a ban on the **shape** — no
+  inline comparison against any of the four SDAIA tokens anywhere in the console. 🔑 **Scope an assertion to
+  the shape of its claim, never to a population count.**
+  ⚠ **Two more instrument errors, both caught by running things.** (a) The stripper self-test used a surviving-
+  **character** ratio (`> 40%`) and failed on a correct tree: this file is legitimately **62% comment**, because
+  the header explaining a retirement is longer than the code replacing it. F2-199 already recorded the right
+  instrument — count declarations **anchored to line starts**, which a comment can never satisfy — and I reached
+  for a ratio anyway. (b) Adding `format: 'datetime'` to two inventory entries made **both** parsers (TS and
+  Java) return **10 of 12**, dropping exactly the two entries that had changed. 🔑 **A gate keyed to a literal
+  entry shape reports a SMALLER population the moment a field gains a property**, and it failed loudly *only*
+  because the leg asserts a minimum size — without that anti-vacuity floor it would have silently stopped
+  checking the two most recently edited entries.
+  ⚠⚠ **A dead-translation-key detector must match every call shape, and `t\(` matches the `t(` inside `set(`.**
+  The scan reported **32** dead `pdpl*` keys; **17 were false positives built by concatenation**
+  (`t('pdplSev' + severity…)`) — the tell is that the concatenation **stem** appears in the
+  referenced-but-undeclared list, which is self-diagnosing once you look. It also called `pdplReportable` and
+  `sdaiaDraftEn` undeclared keys; both are **object property names** in `set('pdplReportable', v)`. Honest
+  answer: **15 dead removed** (exactly what the retirement orphaned), 19 added, 0 undeclared.
+  ⚠⚠ **FOUND IN THE BROWSER AFTER EVERY GATE WAS GREEN — fourth consecutive slice.** The new text leg over the
+  module's own keys first caught `pdplConsoleEmpty`: *"All historical incidents are closed **and notifications
+  dispatched**"* — the empty state is reached by there being no OPEN breach and knows nothing about SDAIA, and
+  all 17 live rows are `NOT_REPORTED`. 🔑 **An empty state may report what it measured and must not vouch for
+  what it did not look at.** Then the browser found the clause citation rendering **`25(A)`** because the
+  enclosing label is `text-transform: uppercase` — **a CSS rule was silently altering a regulatory reference**,
+  which the Implementing Regulations cite in lower case — and the awareness timestamp printing raw
+  `2026-08-14T12:21:45` beside localised dates everywhere else, on an Arabic-primary surface (house rule 7), in
+  the field that starts the statutory clock. Plus a stale `PrivacyPage` comment still describing *"the
+  auto-generated SDAIA notification packet"*.
+  ⚠ **Authorization: two gate mechanisms with DISJOINT holder sets on one statutory control.** Reading a breach
+  is `hasPermission('PRIVACY','READ')`; recording the SDAIA submission is
+  `hasAnyRole('DPO','CISO','PLATFORM_ADMIN')`. Measured: `compliance` holds PRIVACY READ/WRITE/DELETE/EXPORT and
+  is **403** on the record (probed); `so_officer` **is** CISO and holds **no PRIVACY grant at all**. **No
+  non-admin persona can both read a breach and record its notification**, and `DPO` — the role the guard names
+  first — exists in `iam.roles` with **0 active holders**.
+  ⚙ **Filed:** `privacy.data_breaches` has **no `title_ar` and no `description_ar`**, so a PDPL statutory record
+  cannot be described in the platform's primary language; the breach `status` vocabulary is **open** (7 stored
+  values, no CHECK, no declared machine, read by two *exclusion* lists — F2-196's rule unapplied, with
+  `REMEDIATED` and `INVESTIGATED` treated as open); `PrivacyBreachDto` declares `severity`/`occurredAt`/
+  `reportedAt`/`affectedRecords` and the wire carries a non-null value for **none** of them, so PrivacyPage's
+  breach **Severity column renders `—` for every row and its severity filter can never match**; and the
+  remaining minter population is **49 prefix sites in 24 files, 41 with browser entropy** — of which the sharp
+  bucket is **authority-owned** references (`NCA-ACK-`, `NCA-AD-`, `SAMA-CTI-`, `NCEMA-`, `SAMA-OPRES-`).
+  🔑 **A reference only an outside authority can issue is not one the server may mint either — it is received
+  and recorded, or it is absent.**
   ⚠⚠ **A BROWSER STORE MERGED WITH A REAL REGISTER IS NOT A SHADOW, IT IS CAMOUFLAGE — AND THE
   RELOAD TEST RECRUITS THE USER INTO CONFIRMING IT** (F2-208, measured 2026-08-13). `useCapas()`
   merged three sources into one list: `GET /api/capa/tasks` (**14 live rows, dev = prod**), a
