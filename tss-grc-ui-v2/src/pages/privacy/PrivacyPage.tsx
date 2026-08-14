@@ -449,10 +449,22 @@ export function PrivacyPage() {
       {tab === 'breaches' && (
         <>
           {/* Sprint 4 — PDPL 72-hour response console. Picks the most
-              time-sensitive open breach automatically and surfaces the
-              auto-generated SDAIA notification packet (PDPL Art. 25). */}
+              time-sensitive breach whose SDAIA notification is still
+              undischarged, and lists the Article 25 fields with per-field
+              provenance. (⚠ F2-209: this comment used to say it "surfaces the
+              auto-generated SDAIA notification packet" — there was no such
+              thing to surface honestly, and a stale comment describing a
+              retired surface is how the next reader re-adds it.) */}
           <div style={{ marginBottom: 12 }}>
-            <PdplBreachConsole breaches={allBreaches} onDispatch={notifyDataOfficeAction} onRecorded={() => breaches.reload()} />
+            {/* ⚠⚠ F2-209: `onDispatch={notifyDataOfficeAction}` was removed, not
+                repointed. The console rendered it as "Dispatch to SDAIA" on a
+                72-hour statutory countdown, and `notifyDataOffice` writes
+                `pdpc_notification_required` + `pdpc_notified_at` — never
+                `sdaia_notification_status`, never `sdaia_submitted_at` (the
+                server's own discharge field), and with no audit row. The real
+                recorder is inside the console's own SDAIA panel. The row action
+                below keeps `notifyDataOffice` under its own honest label. */}
+            <PdplBreachConsole breaches={allBreaches} onRecorded={() => breaches.reload()} />
           </div>
           <Card padded={false}>
             {breaches.loading

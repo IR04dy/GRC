@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Fingerprint, Send, ShieldAlert, Clock, FileDown, AlertOctagon, CheckCircle2, Users, Landmark } from 'lucide-react';
+import { Fingerprint, ShieldAlert, Clock, AlertOctagon, CheckCircle2, Users, Landmark } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -8,9 +8,10 @@ import { FormModal, type FieldDef } from '../ui/FormModal';
 import { useI18n } from '../../lib/i18n';
 import {
   PDPL_BREACH_STAGES, computeBreachClock, classifySeverity,
-  generateSdaiaNotification, requiresDataSubjectNotification,
-  formatHoursLabel, cumulativeBudgetTo,
-  type BreachClock, type PdplSeverity, type SdaiaNotificationPacket,
+  requiresDataSubjectNotification, severityIsProvisional,
+  formatHoursLabel, cumulativeBudgetTo, dataSubjectsDeadline,
+  isSdaiaReported, isSdaiaSubmitted, ARTICLE_25_FIELDS, article25Value, article25NotHeld,
+  type BreachClock, type PdplSeverity, type Article25Field, type PdplSeverityInputs,
 } from '../../lib/pdplBreach';
 import { formatHijri } from '../../lib/sla';
 import { useToast } from '../../lib/toast';
@@ -20,23 +21,40 @@ import { privacyApi, ApiError, type PrivacyBreachDto, type PrivacySdaiaStatus, t
  * PDPL 72-hour breach response console — Sprint 4.
  *
  * Operational hero panel for the highest-priority open breach. Hour-precise
- * countdown driven by the breach `reportedAt` timestamp; auto-generated
- * SDAIA notification packet (PDPL Art. 25 fields) ready for DPO dispatch;
+ * countdown from the awareness timestamp; the Article 25 field inventory with
+ * per-field provenance; the authoritative SDAIA submission record; and a
  * separate 7-day data-subjects notification track when severity ≥ HIGH.
  *
  * Picks the most-time-sensitive open breach automatically. If none, returns
  * a "compliant" empty state.
+ *
+ * ⚠⚠ F2-209 — there is no `onDispatch` prop any more, and its removal is the
+ * finding. It was documented as the "Real SDAIA dispatch action", with the
+ * warning "we never want this regulatory action to 'succeed' without actually
+ * transitioning state" — and the one call site passed `notifyDataOfficeAction`,
+ * i.e. `POST /breaches/{id}/notify-data-office`, which sets
+ * `pdpc_notification_required = true` and stamps `pdpc_notified_at`. It does
+ * NOT write `sdaia_notification_status`, does NOT write `sdaia_submitted_at`
+ * (the field the server's own javadoc calls the discharge of the Article 31
+ * clock), and emits neither the F7 audit row nor the F8
+ * `BREACH_REPORTED_TO_SDAIA` event that the real recorder — in the same service
+ * — emits. So a button reading "Dispatch to SDAIA" on a 72-hour statutory
+ * countdown recorded no notification, wrote no audit trail, and left the
+ * platform's authoritative status at NOT_REPORTED. Latent, not live: 0 rows in
+ * either database carry `pdpc_notified_at`, so it had never been clicked.
+ *
+ * 🔑 The prop's own contract stated the rule and the wiring broke it — F2-184's
+ * shape, where a comment answers the question a reader was about to ask.
+ *
+ * And nothing in this platform can dispatch to SDAIA: SDAIA has no
+ * machine-readable API, the submission is a human filling in the SDAIA portal,
+ * and the entity javadoc says so. A button that claims otherwise cannot be
+ * fixed by pointing it at a better endpoint. The honest control is the one that
+ * already existed below — record the outcome of the manual submission — so that
+ * is now the only one, promoted to primary.
  */
-export function PdplBreachConsole({ breaches, onDispatch, onRecorded }: {
+export function PdplBreachConsole({ breaches, onRecorded }: {
   breaches: ReadonlyArray<PrivacyBreachDto>;
-  /**
-   * Real SDAIA dispatch action. When provided, the "Dispatch to SDAIA"
-   * button calls this with the active breach (parent owns the API call,
-   * confirm dialog, error toast, and reload). Without it the button
-   * is disabled — we never want this regulatory action to "succeed"
-   * without actually transitioning state.
-   */
-  onDispatch?: (breach: PrivacyBreachDto) => Promise<void> | void;
   /**
    * Called after a SDAIA submission is recorded so the parent can reload
    * its breach list (the console owns the API call + toast for this one,
@@ -45,7 +63,6 @@ export function PdplBreachConsole({ breaches, onDispatch, onRecorded }: {
   onRecorded?: () => void;
 }) {
   const { t, lang } = useI18n();
-  const [dispatching, setDispatching] = useState(false);
   const [now, setNow] = useState<Date>(() => new Date());
 
   // Re-tick every 30s — operational console, fast feedback.
@@ -67,7 +84,20 @@ export function PdplBreachConsole({ breaches, onDispatch, onRecorded }: {
     // the console renders an empty state against real data.
     const awareOf = (b: PrivacyBreachDto) => b.reportedAt ?? b.occurredAt ?? b.discoveredAt ?? '';
     const open = breaches.filter(b => b.status !== 'CLOSED' && awareOf(b));
-    const needsSdaia = open.filter(b => b.status !== 'NOTIFIED');
+    // ⚠⚠ F2-209: this was `b.status !== 'NOTIFIED'` — the breach LIFECYCLE
+    // status, not the SDAIA notification status the platform keeps in its own
+    // column. Measured in dev and prod: 4 of 17 live breaches are
+    // `status = NOTIFIED` with `sdaia_notification_status = NOT_REPORTED`, all
+    // four flagged as requiring notification and 113–193 days past the 72-hour
+    // window. They were filtered out of this pool, so the one screen built to
+    // surface an undischarged Article 25 clock never showed them.
+    //
+    // ⚠ And SUBMITTED, not merely "reported": `IN_PREPARATION` means somebody
+    // started drafting, which discharges nothing. Excluding it here would drop a
+    // notification begun six months ago and never sent out of the urgent pool —
+    // the same defect one notch milder, which is how the first version of this
+    // fix was written.
+    const needsSdaia = open.filter(b => !isSdaiaSubmitted(b.sdaiaNotificationStatus));
     const pool = needsSdaia.length > 0 ? needsSdaia : open;
     const enriched = pool.map(b => ({
       breach: b,
@@ -95,15 +125,29 @@ export function PdplBreachConsole({ breaches, onDispatch, onRecorded }: {
   // Backend DTO ships `dataSubjectsAffectedCount`, not `affectedRecords`.
   const records = breach.affectedRecords ?? breach.dataSubjectsAffectedCount ?? 0;
   const aware = breach.reportedAt ?? breach.occurredAt ?? breach.discoveredAt ?? '';
-  const nb = { ...breach, affectedRecords: records };
-  const severity = classifySeverity({
-    affectedRecords: records,
-    financial: breach.breachType === 'CONFIDENTIALITY' && records > 5_000,
-  });
+  // ⚠ F2-209: the second argument used to be
+  //   `financial: breach.breachType === 'CONFIDENTIALITY' && records > 5_000`
+  // — an inference no column supports, asserting that a large confidentiality
+  // breach involved financial data, which promotes the band to HIGH and with it
+  // the Article 26 "you must notify the data subjects directly" determination.
+  // `privacy.data_breaches` has no special-category flag, no data-category list
+  // and no `severity` column, so the affected-record count is the only input
+  // the platform actually holds. Passing only that makes the band provisional,
+  // which is what `severityIsProvisional` then discloses on the badge.
+  const severityInputs: PdplSeverityInputs = { affectedRecords: records };
+  const severity = classifySeverity(severityInputs);
+  const provisional = severityIsProvisional(severityInputs);
 
-  const packet = generateSdaiaNotification(nb, severity);
   const needsDataSubjectNotice = requiresDataSubjectNotification(severity);
-  const reportedReady = breach.status === 'NOTIFIED';
+  const subjectsDeadline = dataSubjectsDeadline(aware);
+  // The SDAIA question, answered from the column the server owns for it.
+  //
+  // ⚠ `isSdaiaSubmitted`, not `isSdaiaReported`: only SUBMITTED and ACKNOWLEDGED
+  // discharge the 72-hour clock (the server's javadoc puts the discharge at
+  // `sdaia_submitted_at`). Rendering the countdown KPI in success green for a
+  // breach that is merely IN_PREPARATION would be an invented all-clear on a
+  // statutory deadline — F2-197's trap, on the one tile that exists to show it.
+  const discharged = isSdaiaSubmitted(breach.sdaiaNotificationStatus);
 
   return (
     <Card title={t('pdplConsoleTitle')} Icon={ShieldAlert}
@@ -131,10 +175,20 @@ export function PdplBreachConsole({ breaches, onDispatch, onRecorded }: {
             {breach.descriptionEn}
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-            <Badge tone={SEVERITY_TONE[severity]}>{t('pdplSev' + severity[0] + severity.slice(1).toLowerCase()) || severity}</Badge>
+            <Badge tone={SEVERITY_TONE[severity]}
+              title={provisional ? t('pdplSevProvisionalHint') : undefined}>
+              {t('pdplSev' + severity[0] + severity.slice(1).toLowerCase()) || severity}
+              {provisional && <span aria-label={t('pdplSevProvisionalHint')}> ·&nbsp;{t('pdplSevProvisional')}</span>}
+            </Badge>
             <Badge tone="info">{breach.breachType ?? '—'}</Badge>
             <Badge tone="neutral">{records.toLocaleString()} {t('pdplRecords')}</Badge>
             <Badge tone="neutral">{t('pdplAwareLabel')} {fmtAware(aware, lang)}</Badge>
+            {/* F2-209: the column the hero row used to ignore, stated on the row
+                it decides. A breach can be `status = NOTIFIED` and still have
+                never been reported to SDAIA — 4 of 17 live rows are. */}
+            <Badge tone={SDAIA_STATUS_TONE[breach.sdaiaNotificationStatus ?? 'NOT_REPORTED'] ?? 'neutral'} dot>
+              {sdaiaStatusLabel(t, breach.sdaiaNotificationStatus)}
+            </Badge>
           </div>
         </div>
       </div>
@@ -142,7 +196,17 @@ export function PdplBreachConsole({ breaches, onDispatch, onRecorded }: {
       {/* ── KPI row ────────────────────────────────────────────────── */}
       <div className="kpi-grid" style={{ marginBottom: 16 }}>
         <Kpi Icon={Clock}      label={t('pdplKpiHoursElapsed')}  value={formatHoursLabel(clock.hoursElapsed, lang)} tone="info" to="/data-officer/breaches" />
-        <Kpi Icon={AlertOctagon} label={t('pdplKpiSdaiaDue')}    value={clock.hoursRemaining < 0 ? t('pdplBreachedLabel') : formatHoursLabel(clock.hoursRemaining, lang)} tone={clock.tier === 'GREEN' ? 'success' : clock.tier === 'AMBER' ? 'warning' : 'danger'} to="/data-officer/breaches" />
+        {/* F2-209: once the server records the notification as away, the
+            72-hour countdown is answered and a red "OVERDUE" beside it would be
+            a second, contradicting claim about the same fact. Reported is not
+            invented health — it is what `sdaia_notification_status` says. */}
+        <Kpi Icon={AlertOctagon} label={t('pdplKpiSdaiaDue')}
+          value={discharged ? sdaiaStatusLabel(t, breach.sdaiaNotificationStatus)
+                 : clock.hoursRemaining < 0 ? t('pdplBreachedLabel')
+                 : formatHoursLabel(clock.hoursRemaining, lang)}
+          tone={discharged ? 'success'
+                : clock.tier === 'GREEN' ? 'success' : clock.tier === 'AMBER' ? 'warning' : 'danger'}
+          to="/data-officer/breaches" />
         <Kpi Icon={Users}      label={t('pdplKpiDataSubjects')}  value={needsDataSubjectNotice ? formatHoursLabel(clock.hoursToDataSubjects, lang) : t('pdplNotRequired')} tone={needsDataSubjectNotice ? 'warning' : 'success'} to="/data-officer/breaches" />
         <Kpi Icon={Fingerprint} label={t('pdplKpiBudget')}       value={`${clock.pctConsumed}%`} tone={clock.pctConsumed >= 100 ? 'danger' : clock.pctConsumed >= 80 ? 'warning' : clock.pctConsumed >= 50 ? 'info' : 'success'} to="/data-officer/breaches" />
       </div>
@@ -196,35 +260,17 @@ export function PdplBreachConsole({ breaches, onDispatch, onRecorded }: {
         </div>
       </div>
 
-      {/* ── Auto-generated SDAIA packet preview ──────────────────── */}
+      {/* ── Article 25 field inventory (per-field provenance) ─────── */}
       <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ marginBottom: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-2)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            {t('pdplSdaiaPacketTitle')}
+            {t('pdplArt25Title')}
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <Button variant="secondary" Icon={FileDown} onClick={() => downloadPacket(packet, breach)}>
-              {t('pdplDownloadPacket')}
-            </Button>
-            <Button Icon={Send} disabled={reportedReady || dispatching || !onDispatch}
-              onClick={async () => {
-                if (!onDispatch) return;
-                setDispatching(true);
-                try {
-                  await onDispatch(breach);
-                  // Success toast is owned by the parent (it has the canonical
-                  // bilingual copy + reload flow). We just clear the busy state.
-                } catch {
-                  // Parent owns error toast — swallow here so dispatching flips back.
-                } finally {
-                  setDispatching(false);
-                }
-              }}>
-              {reportedReady ? t('pdplDispatched') : t('pdplDispatchToSdaia')}
-            </Button>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3, lineHeight: 1.5 }}>
+            {t('pdplArt25Sub').replace('{n}', String(article25NotHeld()))}
           </div>
         </div>
-        <PacketPreview packet={packet} lang={lang} t={t} />
+        <Article25Inventory breach={breach} lang={lang} t={t} />
       </div>
 
       {/* ── SDAIA submission tracking (authoritative, server-backed) ─── */}
@@ -243,8 +289,8 @@ export function PdplBreachConsole({ breaches, onDispatch, onRecorded }: {
           <div>
             {t('pdplDataSubjectsBody')
               .replace('{count}', records.toLocaleString())
-              .replace('{deadline}', packet.dataSubjectsNotificationPlannedAt
-                ? `${new Date(packet.dataSubjectsNotificationPlannedAt).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-GB')} · ${formatHijri(packet.dataSubjectsNotificationPlannedAt, lang)}`
+              .replace('{deadline}', subjectsDeadline
+                ? `${new Date(subjectsDeadline).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-GB')} · ${formatHijri(subjectsDeadline, lang)}`
                 : '—')}
           </div>
         </div>
@@ -297,7 +343,11 @@ function SdaiaSubmissionPanel({ breach, onRecorded }: {
 
   const deadline = status?.pdplArticle31DeadlineAt ? new Date(status.pdplArticle31DeadlineAt) : null;
   const hoursToDeadline = deadline ? (deadline.getTime() - Date.now()) / 3_600_000 : null;
-  const reported = (status?.sdaiaNotificationStatus ?? 'NOT_REPORTED') !== 'NOT_REPORTED';
+  // F2-209: the same predicate the hero row uses, so one component cannot hold
+  // two answers to "has SDAIA been notified?" again. It used to be a `!==
+  // 'NOT_REPORTED'` comparison here and a `status === 'NOTIFIED'` read on a
+  // different column 200 lines above.
+  const reported = isSdaiaReported(status?.sdaiaNotificationStatus);
   const st = status?.sdaiaNotificationStatus ?? 'NOT_REPORTED';
 
   const fields: FieldDef[] = [
@@ -424,29 +474,84 @@ function CountdownRing({ clock, t }: { clock: BreachClock; t: (k: string) => str
   );
 }
 
-function PacketPreview({ packet, lang, t }: { packet: SdaiaNotificationPacket; lang: 'en' | 'ar'; t: (k: string) => string }) {
-  const rows: Array<[string, string]> = [
-    [t('pdplFieldRef'), packet.internalRef],
-    [t('pdplFieldController'), `${packet.controller.nameEn} / ${packet.controller.nameAr} (CR ${packet.controller.crNumber})`],
-    [t('pdplFieldDpo'), `${packet.controller.dpoNameEn} · ${packet.controller.dpoEmail}`],
-    [t('pdplFieldNature'), lang === 'ar' ? packet.natureOfBreach.ar : packet.natureOfBreach.en],
-    [t('pdplFieldCategories'), packet.categoriesAffected.join(' · ')],
-    [t('pdplFieldSubjects'), `${packet.approximateSubjects.toLocaleString()} ${t('pdplFieldSubjectsUnit')}`],
-    [t('pdplFieldConsequences'), lang === 'ar' ? packet.likelyConsequences.ar : packet.likelyConsequences.en],
-    [t('pdplFieldContainment'), lang === 'ar' ? packet.containmentMeasures.ar : packet.containmentMeasures.en],
-    [t('pdplFieldProposed'), lang === 'ar' ? packet.proposedMeasures.ar : packet.proposedMeasures.en],
-  ];
+/**
+ * The Article 25 field inventory — what SDAIA's notification asks for, and per
+ * field whether this platform holds it.
+ *
+ * ⚠⚠ F2-209: replaces `PacketPreview`, which rendered a generated submission
+ * whose controller identity, affected-data categories, likely consequences,
+ * containment measures and proposed measures were literals in the bundle. There
+ * is no column for any of them, so they could not be wired; reconstructing them
+ * is F2-196's defect.
+ *
+ * Three states, and the distinction between the last two is the point:
+ *   • a value      — read from the property `ARTICLE_25_FIELDS` declares
+ *   • "not yet recorded" — the platform HAS a column and the row is empty, so
+ *                    somebody can fill it in here
+ *   • "not held by the platform" — there is no column, so the DPO must supply
+ *                    it in the SDAIA portal and no amount of data entry here
+ *                    will produce it
+ *
+ * The third state is never rendered as an empty value or a zero: an absence
+ * that looks like a blank field reads as "nothing further is required"
+ * (F2-197), and this is a statutory submission. Em-dash + a bilingual hint on
+ * both `title` and `aria-label` is UX-008's convention, the same treatment
+ * F2-195 and F2-197 used for a metric the platform cannot compute.
+ */
+function Article25Inventory({ breach, lang, t }: {
+  breach: PrivacyBreachDto; lang: 'en' | 'ar'; t: (k: string) => string;
+}) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {rows.map(([label, value], i) => (
-        <div key={i} style={{
-          display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12,
-          padding: '8px 0', borderBottom: '1px dashed var(--border)',
-        }}>
-          <span style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
-          <span style={{ fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.5 }}>{value}</span>
-        </div>
+      {ARTICLE_25_FIELDS.map(f => (
+        <Article25Row key={f.key} field={f} breach={breach} lang={lang} t={t} />
       ))}
+    </div>
+  );
+}
+
+function Article25Row({ field, breach, lang, t }: {
+  field: Article25Field; breach: PrivacyBreachDto; lang: 'en' | 'ar'; t: (k: string) => string;
+}) {
+  const value = article25Value(field, breach, lang);
+  const held = field.source !== null;
+  const notHeldHint = t('pdplArt25NotHeldHint');
+
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '190px 1fr auto', gap: 12,
+      padding: '8px 0', borderBottom: '1px dashed var(--border)', alignItems: 'baseline',
+    }}>
+      <span style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        {/* ⚠ `textTransform: none` — the enclosing label is uppercased, which
+            rendered the citation as "25(A)". The PDPL Implementing Regulations
+            cite sub-paragraphs in lower case, so the uppercase style was
+            silently altering a regulatory reference. Found in the browser. */}
+        <span style={{ color: 'var(--ink-4)', marginInlineEnd: 5, textTransform: 'none' }}>
+          {field.clause === 'contact' || field.clause === 'ref' ? '' : `25(${field.clause})`}
+        </span>
+        {t('pdplArt25' + field.key)}
+      </span>
+
+      {value !== undefined ? (
+        <span style={{ fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.5 }}>{value}</span>
+      ) : held ? (
+        <span style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+          {t('pdplArt25Empty')}
+        </span>
+      ) : (
+        <span style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}
+          title={notHeldHint} aria-label={notHeldHint}>
+          —
+        </span>
+      )}
+
+      {!held && (
+        <Badge tone="neutral">{t('pdplArt25DpoSupplies')}</Badge>
+      )}
+      {held && value === undefined && (
+        <Badge tone="warning">{lang === 'ar' ? 'غير مُدخَل' : 'Blank'}</Badge>
+      )}
     </div>
   );
 }
@@ -473,14 +578,18 @@ function fmtAware(iso: string, lang: 'en' | 'ar'): string {
   return `${d.toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`;
 }
 
-function downloadPacket(packet: SdaiaNotificationPacket, breach: PrivacyBreachDto) {
-  const blob = new Blob([JSON.stringify({ packet, breach }, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${packet.internalRef}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
+// ⚠⚠ F2-209: `downloadPacket` used to live here. It wrote
+//   JSON.stringify({ packet, breach })
+// — the invented Article 25 submission and the genuine server row, side by side
+// in one file, named `PDPL-N-<id>-<year>.json` from a client-minted reference.
+//
+// 🔑 That is why F2-199's `exportProvenance` gate was green over it: the page
+// does call a server, and the emitted object does contain real server data. A
+// file-level provenance rule cannot see that HALF a document is invented, and
+// the real half is what makes the invented half credible. The gate this slice
+// adds asks the question one level down — per FIELD, not per file.
+//
+// Nothing replaces it. A download of the inventory above would be a worksheet
+// of five real values and five em-dashes, and the DPO fills the SDAIA portal in
+// by hand anyway (SDAIA has no machine-readable API). Offering a file whose
+// name looks like a submission reference is what got us here.

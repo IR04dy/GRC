@@ -1171,7 +1171,12 @@ export const en = {
   sdaiaRecordTitle:        'Record SDAIA submission',
   sdaiaFieldStatus:        'Notification status',
   sdaiaFieldRef:           'SDAIA portal reference',
-  pdplConsoleEmpty:        'No open personal-data breaches. All historical incidents are closed and notifications dispatched.',
+  // ⚠ F2-209: this read "...are closed and notifications dispatched." The empty
+  // state is reached by there being no OPEN breach; it knows nothing about
+  // whether SDAIA was ever notified, and in both live databases the answer for
+  // all 17 breaches is NOT_REPORTED. An empty state may report what it measured
+  // and must not vouch for what it did not look at (F2-197).
+  pdplConsoleEmpty:        'No open personal-data breaches. Closed incidents are not shown here — check each one’s SDAIA notification status on the breach register.',
   pdplActiveBreach:        'Active breach',
   pdplAwareLabel:          'Aware:',
   pdplRecords:             'records',
@@ -1197,21 +1202,32 @@ export const en = {
   pdplSevMedium:           'Medium risk',
   pdplSevHigh:             'High risk',
   pdplSevCritical:         'Critical risk',
-  pdplSdaiaPacketTitle:    'Auto-generated SDAIA notification packet (PDPL Art. 25)',
-  pdplDownloadPacket:      'Download JSON',
-  pdplDispatchToSdaia:     'Dispatch to SDAIA',
-  pdplDispatched:          'SDAIA notified',
-  pdplDispatchToast:       'Notification {ref} queued for dispatch to SDAIA. DPO will receive a copy.',
-  pdplFieldRef:            'Internal reference',
-  pdplFieldController:     'Controller',
-  pdplFieldDpo:            'DPO contact',
-  pdplFieldNature:         'Nature of breach',
-  pdplFieldCategories:     'Categories of data',
-  pdplFieldSubjects:       'Approx. subjects',
-  pdplFieldSubjectsUnit:   'data subjects',
-  pdplFieldConsequences:   'Likely consequences',
-  pdplFieldContainment:    'Containment measures',
-  pdplFieldProposed:       'Proposed measures',
+  // F2-209: the 15 keys that used to sit here belonged to the retired
+  // "auto-generated SDAIA notification packet" — a submission whose controller
+  // identity, data categories, likely consequences, containment measures and
+  // proposed measures were literals in the bundle, with no column behind any of
+  // them. `pdplDispatchToSdaia`/`pdplDispatched`/`pdplDispatchToast` labelled a
+  // button that never wrote the statutory field. Nothing in this platform can
+  // dispatch to SDAIA — the DPO files through the SDAIA portal by hand.
+  pdplArt25Title:          'PDPL Article 25 notification — what SDAIA asks for',
+  pdplArt25Sub:            'The platform does not hold {n} of these fields. There is no column for them, so the DPO supplies them in the SDAIA portal — this list does not answer on the organisation’s behalf.',
+  pdplArt25Empty:          'Not yet recorded',
+  pdplArt25NotHeldHint:    'Not held by the platform — no column records this. Supply it in the SDAIA portal.',
+  pdplArt25DpoSupplies:    'DPO supplies',
+  pdplArt25Nature:         'Nature of breach',
+  pdplArt25Narrative:      'Description',
+  pdplArt25Subjects:       'Approx. data subjects',
+  pdplArt25Categories:     'Categories of personal data',
+  pdplArt25Consequences:   'Likely consequences',
+  pdplArt25Containment:    'Measures taken',
+  pdplArt25Proposed:       'Measures proposed',
+  pdplArt25Controller:     'Reporting controller',
+  pdplArt25Dpo:            'DPO contact',
+  pdplArt25AwareAt:        'Awareness timestamp',
+  pdplArt25PortalRef:      'SDAIA portal reference',
+  pdplArt25SubmittedAt:    'Submitted to SDAIA',
+  pdplSevProvisional:      'provisional',
+  pdplSevProvisionalHint:  'Band derived from the affected-record count alone. The platform records no special-category flag, data-category list or severity for a breach, so this is not a completed Article 25 risk assessment.',
   pdplDataSubjectsTitle:   'Data subjects must be notified within 7 days (PDPL Art. 26)',
   pdplDataSubjectsBody:    '{count} affected subjects identified. Direct notification deadline: {deadline}.',
 

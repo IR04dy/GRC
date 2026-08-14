@@ -1,4 +1,5 @@
-// PDPL 72-hour breach response engine — Sprint 4.
+// PDPL 72-hour breach response — clock, severity rubric, and the Article 25
+// field inventory.
 //
 // Saudi PDPL (Personal Data Protection Law) Article 25 + Implementing
 // Regulations require notification to SDAIA "without undue delay and within
@@ -6,13 +7,57 @@
 // and notification to affected data subjects "without undue delay" where
 // the breach is likely to result in high risk to their rights.
 //
-// This module:
-//   1. Splits the 72-hour budget into stage sub-budgets so the response
-//      team sees micro-deadlines, not just the macro one.
-//   2. Generates a draft SDAIA notification packet with every Article 25
-//      field populated, ready for DPO review and dispatch.
-//   3. Provides a separate 7-day window for affected-subjects
-//      notification when severity ≥ HIGH.
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠⚠ F2-209 — this module used to GENERATE the SDAIA notification, and that
+// is what was wrong with it.
+//
+// `generateSdaiaNotification(breach, severity)` returned a complete Article 25
+// packet: the reporting controller's identity, the categories of personal data
+// affected, the likely consequences for data subjects, the containment measures
+// taken and the remediation measures proposed. `PdplBreachConsole` rendered it
+// and offered it as a download.
+//
+// Measured against `privacy.data_breaches` (25 columns, read from sys.columns,
+// identical in dev and prod): there is NO COLUMN for any of it. Every
+// substantive field was a literal in the bundle:
+//
+//   controller        'TSS Saudi Holding' + CR 1010299292 + DPO 'Mona Al-Bishi'
+//                     — the same hard-coded CR number F2-199 found on the
+//                       fabricated NCA ECC return. A tenant-specific fact
+//                       appearing as a literal in a shipped bundle cannot be
+//                       right for more than one tenant.
+//   categoriesAffected  derived from the SEVERITY BAND, not from any record —
+//                       so "Financial / transactional data" was asserted to the
+//                       regulator because a row count crossed a threshold.
+//   likelyConsequences  one of three canned paragraphs.
+//   containmentMeasures 'Affected systems isolated from the network within the
+//                       first hour of detection. Privileged access tokens
+//                       revoked. Forensic image of impacted hosts captured for
+//                       SDAIA inspection.'  — identical for every breach in
+//                       every tenant.
+//   proposedMeasures    likewise.
+//
+// 🔑 The last two are not metrics, they are STATEMENTS OF FACT about what the
+// organisation did, addressed to a data-protection regulator, inside a 72-hour
+// statutory window — and the platform's own documented workflow is that the DPO
+// transcribes them into the SDAIA portal by hand. F2-199's harm argument one
+// step further: a fabricated dashboard misleads whoever looks at it; a
+// fabricated export leaves the platform; a fabricated STATEMENT OF CONDUCT
+// invites the regulator to ask for a forensic image that may not exist.
+//
+// It was not rewireable — F2-207's diff-the-tokens test has a third answer
+// here: not "the column refuses these tokens" and not "the server's machine is
+// coarser", but "there is no column at all". F2-198 deleted `lastReviewedAt`
+// for exactly this reason: reconstructing a field the schema does not hold is
+// F2-196's defect.
+//
+// So the generator is GONE and {@link ARTICLE_25_FIELDS} replaces it: the same
+// field list, each entry declaring the `PrivacyBreachDto` property it is read
+// from — or `null`, meaning the platform records no source for it and the DPO
+// must supply it in the portal. Deleting the section outright would have been
+// worse than leaving it: an empty space where a submission draft used to be
+// reads as "nothing further is required" (F2-197).
+// ─────────────────────────────────────────────────────────────────────────────
 
 import type { PrivacyBreachDto } from './api';
 
@@ -43,6 +88,53 @@ export function cumulativeBudgetTo(stage: PdplStageCode): number {
 export const SDAIA_DEADLINE_HOURS = 72;       // notify regulator
 export const DATA_SUBJECTS_DEADLINE_HOURS = 168; // 7 days; "without undue delay"
 
+// ─── The SDAIA notification state, as the SERVER defines it ─────────────────
+//
+// ⚠⚠ F2-209: the console used to answer "has SDAIA been notified?" by reading
+// the breach LIFECYCLE status (`status === 'NOTIFIED'`). The platform owns a
+// dedicated column for the question — `sdaia_notification_status`, with the
+// state machine below declared in `PrivacyService` — and the two disagree on
+// real rows: 4 of 17 live breaches in BOTH databases are `status = NOTIFIED`
+// while `sdaia_notification_status = NOT_REPORTED`, 113 to 193 days past a
+// 72-hour statutory window, all four flagged as requiring notification.
+//
+// Reading the lifecycle column excluded exactly those four from the console's
+// "needs SDAIA" pool, so the one screen built to surface an undischarged
+// Article 25 clock was the screen that hid them.
+//
+// F2-196's question ("how many things read this status, and do they agree?")
+// with F2-205's follow-up ("and which of them is the server?"). The answer was
+// 200 lines below in the same file, under a comment reading
+// "authoritative, server-backed".
+
+/** The server's vocabulary — mirrors `PrivacyService.SDAIA_STATES`. */
+export const SDAIA_NOTIFICATION_STATES = [
+  'NOT_REPORTED', 'IN_PREPARATION', 'SUBMITTED', 'ACKNOWLEDGED',
+] as const;
+
+export type SdaiaNotificationState = typeof SDAIA_NOTIFICATION_STATES[number];
+
+/**
+ * Has the Article 31 / Article 25 notification left the building?
+ *
+ * The one predicate both halves of the console consult, so the question cannot
+ * be asked two ways in one component again (F2-178's shape). `NOT_REPORTED` and
+ * anything unrecognised are "no": for a statutory clock, an unknown status must
+ * be chased rather than excused (F2-196).
+ */
+export function isSdaiaReported(state: string | null | undefined): boolean {
+  return state === 'IN_PREPARATION' || state === 'SUBMITTED' || state === 'ACKNOWLEDGED';
+}
+
+/**
+ * Has the notification actually been POSTED — i.e. is the 72-hour clock
+ * discharged? `IN_PREPARATION` is progress, not discharge; the server's own
+ * javadoc puts the discharge at `sdaia_submitted_at` being set.
+ */
+export function isSdaiaSubmitted(state: string | null | undefined): boolean {
+  return state === 'SUBMITTED' || state === 'ACKNOWLEDGED';
+}
+
 // ─── Severity rubric ────────────────────────────────────────────────────────
 //
 // PDPL doesn't enumerate severity bands explicitly; it asks the controller
@@ -54,6 +146,14 @@ export const DATA_SUBJECTS_DEADLINE_HOURS = 168; // 7 days; "without undue delay
 //   HIGH     — financial / health / location data OR 10k–100k subjects
 //   MEDIUM   — contact data only OR 1k–10k subjects
 //   LOW      — minimal data, < 1k subjects, encrypted at rest
+//
+// ⚠ F2-209: the rubric is sound and the CALL SITE was not. The console passed
+// `financial: breachType === 'CONFIDENTIALITY' && records > 5_000` — an
+// inference no column supports, asserting that a large confidentiality breach
+// involved financial data. `privacy.data_breaches` holds no special-category
+// flag, no data-category list and no `severity` column, so the only input the
+// platform actually has is the affected-record count. The band is therefore
+// PROVISIONAL and the console says so; see {@link severityIsProvisional}.
 
 export type PdplSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
@@ -77,110 +177,125 @@ export function classifySeverity(b: PdplSeverityInputs): PdplSeverity {
   return 'LOW';
 }
 
+/**
+ * True when the band was derived from the record count alone because the
+ * platform records none of the qualitative inputs the rubric asks for. Always
+ * true today — every flag in {@link PdplSeverityInputs} except
+ * `affectedRecords` maps to a column `privacy.data_breaches` does not have.
+ * It is a function rather than a constant so that adding those columns turns
+ * one disclosure off in one place instead of leaving a stale caveat behind.
+ */
+export function severityIsProvisional(inputs: PdplSeverityInputs): boolean {
+  return inputs.specialCategory === undefined
+      && inputs.financial === undefined
+      && inputs.health === undefined
+      && inputs.identifying === undefined
+      && inputs.encryptedAtRest === undefined;
+}
+
 /** Whether this severity requires data-subject notification (PDPL Art. 26). */
 export function requiresDataSubjectNotification(severity: PdplSeverity): boolean {
   return severity === 'HIGH' || severity === 'CRITICAL';
 }
 
-// ─── SDAIA notification packet ──────────────────────────────────────────────
+// ─── Article 25 field inventory ─────────────────────────────────────────────
 //
-// Mirrors the fields SDAIA's online notification form expects (PDPL IR
-// Art. 25). Generating this from the breach record gives the DPO a draft
-// to review and dispatch rather than a blank form.
+// What SDAIA's notification asks for, and — per field — whether this platform
+// holds it. This replaces the generator: it tells the DPO the same list without
+// answering on the organisation's behalf.
+//
+// `source` is a property of `PrivacyBreachDto` or `null`. `null` is a MEASURED
+// FACT about `privacy.data_breaches`, not a TODO: the column does not exist in
+// dev or prod, so the value can only come from the DPO. The backend half of the
+// gate (`Article25FieldBackingContractTest`) resolves every non-null `source`
+// against the real `DataBreach` entity by reflection and fails the build if one
+// names a field the server does not have — so a future edit cannot quietly
+// claim provenance this schema does not provide.
 
-export interface SdaiaNotificationPacket {
-  /** Internal reference — populates SDAIA submission ID once dispatched. */
-  internalRef: string;
-  /** Reporting controller details. */
-  controller: {
-    nameEn: string;
-    nameAr: string;
-    crNumber?: string;
-    dpoNameEn: string;
-    dpoNameAr: string;
-    dpoEmail: string;
-    dpoPhone: string;
-  };
-  /** Article 25(a) — nature of the breach. */
-  natureOfBreach: { en: string; ar: string };
-  /** Article 25(b) — categories and approximate count. */
-  categoriesAffected: string[];
-  approximateSubjects: number;
-  approximateRecords: number;
-  /** Article 25(c) — likely consequences. */
-  likelyConsequences: { en: string; ar: string };
-  /** Article 25(d) — measures taken. */
-  containmentMeasures: { en: string; ar: string };
-  /** Article 25(d) — measures proposed. */
-  proposedMeasures: { en: string; ar: string };
-  /** Detection / awareness timestamps. */
-  detectedAt: string;
-  awareAt: string;
-  /** Whether data subjects have been or will be notified separately. */
-  dataSubjectsNotified: boolean;
-  dataSubjectsNotificationPlannedAt?: string;
+export interface Article25Field {
+  /** Stable key; the console's translation keys are `pdplArt25<Key>`. */
+  key: string;
+  /** Which sub-paragraph of the Implementing Regulations this discharges. */
+  clause: 'a' | 'b' | 'c' | 'd' | 'contact' | 'ref';
+  /**
+   * The `PrivacyBreachDto` property this field is read from, or `null` when
+   * the platform records no source for it.
+   */
+  source: keyof PrivacyBreachDto | null;
+  /**
+   * How to present the value. `datetime` matters: found in the browser after
+   * every gate assertion was green, the awareness timestamp rendered as the raw
+   * `2026-08-14T12:21:45` while every other date on the same screen was
+   * localised — on an Arabic-primary surface (house rule 7), in the field that
+   * starts a statutory 72-hour clock. Declared rather than inferred from the
+   * property name so a new date field cannot be added without deciding.
+   */
+  format?: 'datetime';
 }
 
-const DEFAULT_CONTROLLER: SdaiaNotificationPacket['controller'] = {
-  nameEn: 'TSS Saudi Holding',
-  nameAr: 'القابضة السعودية للتقنية',
-  crNumber: '1010299292',
-  dpoNameEn: 'Mona Al-Bishi',
-  dpoNameAr: 'منى البيشي',
-  dpoEmail: 'dpo@tss.sa',
-  dpoPhone: '+966 11 200 0000',
-};
+export const ARTICLE_25_FIELDS: readonly Article25Field[] = [
+  // (a) nature of the breach — the platform holds the type and the English
+  //     narrative. There is no `description_ar` column, so the Arabic half of
+  //     an Arabic-primary submission cannot be produced from the record
+  //     (filed: house rule 7 on a statutory register).
+  { key: 'Nature',        clause: 'a',       source: 'breachType' },
+  { key: 'Narrative',     clause: 'a',       source: 'descriptionEn' },
+  // (b) categories and approximate counts — the count is real; the CATEGORIES
+  //     of personal data involved are not recorded anywhere.
+  { key: 'Subjects',      clause: 'b',       source: 'dataSubjectsAffectedCount' },
+  { key: 'Categories',    clause: 'b',       source: null },
+  // (c) likely consequences for the data subjects — no column.
+  { key: 'Consequences',  clause: 'c',       source: null },
+  // (d) measures taken and measures proposed — no column. These are the two
+  //     the retired generator invented as statements of fact.
+  { key: 'Containment',   clause: 'd',       source: null },
+  { key: 'Proposed',      clause: 'd',       source: null },
+  // Controller identity and DPO contact. The breach record carries neither;
+  //     the tenant's own identity is not on this table, and inventing it is
+  //     how the retired packet came to name a software product, with one CR
+  //     number, as every tenant's filing entity.
+  { key: 'Controller',    clause: 'contact', source: null },
+  { key: 'Dpo',           clause: 'contact', source: null },
+  // Awareness timestamp — starts the 72-hour clock. Real.
+  { key: 'AwareAt',       clause: 'ref',     source: 'discoveredAt', format: 'datetime' },
+  // The portal reference SDAIA returns, and when the submission was posted.
+  //     Both real, both written by the record-submission endpoint.
+  { key: 'PortalRef',     clause: 'ref',     source: 'sdaiaSubmissionRef' },
+  { key: 'SubmittedAt',   clause: 'ref',     source: 'sdaiaSubmittedAt', format: 'datetime' },
+];
+
+/** How many Article 25 fields the platform can fill from the record. */
+export function article25Held(): number {
+  return ARTICLE_25_FIELDS.filter(f => f.source !== null).length;
+}
+
+/** How many the DPO must supply in the portal because no column holds them. */
+export function article25NotHeld(): number {
+  return ARTICLE_25_FIELDS.filter(f => f.source === null).length;
+}
 
 /**
- * Generate a draft SDAIA notification packet from a breach record. The
- * narrative fields are deterministic so a DPO can edit-then-send rather
- * than draft from scratch. Bilingual by design.
+ * Read a field's value off a breach row. Returns `undefined` for a field with
+ * no source AND for a sourced field the row leaves empty — the console
+ * distinguishes the two from `source`, never from the value, because "the
+ * platform cannot record this" and "nobody has filled it in" are different
+ * facts and only one of them is the DPO's to fix.
  */
-export function generateSdaiaNotification(
+export function article25Value(
+  f: Article25Field,
   breach: PrivacyBreachDto,
-  severity: PdplSeverity = 'HIGH',
-): SdaiaNotificationPacket {
-  const cats = ['Identification data', 'Contact data'];
-  if (severity === 'HIGH' || severity === 'CRITICAL') cats.push('Financial / transactional data');
-  if (severity === 'CRITICAL') cats.push('Special-category data');
-
-  return {
-    internalRef: `PDPL-N-${breach.id}-${new Date().getFullYear()}`,
-    controller: DEFAULT_CONTROLLER,
-    natureOfBreach: {
-      en: `${breach.breachType ?? 'Confidentiality'} breach involving ${breach.affectedRecords?.toLocaleString() ?? 'an undetermined number of'} record(s). ${breach.descriptionEn ?? ''}`,
-      ar: `حادثة إخلال بـ${breach.breachType === 'AVAILABILITY' ? 'التوافر' : breach.breachType === 'INTEGRITY' ? 'السلامة' : 'السرية'} تشمل ${breach.affectedRecords?.toLocaleString() ?? 'عدد غير محدد من'} سجل(ات).`,
-    },
-    categoriesAffected: cats,
-    approximateSubjects: breach.affectedRecords ?? 0,
-    approximateRecords: breach.affectedRecords ?? 0,
-    likelyConsequences: {
-      en: severity === 'CRITICAL'
-        ? 'High risk of identity theft, financial loss, or unauthorised account access for affected data subjects. Affected subjects will be notified directly.'
-        : severity === 'HIGH'
-          ? 'Elevated risk of unsolicited contact, phishing, or unauthorised marketing. Direct notification to affected data subjects required under PDPL Art. 26.'
-          : 'Limited risk to affected subjects given encryption at rest and prompt containment. No direct notification required.',
-      ar: severity === 'CRITICAL'
-        ? 'مخاطر مرتفعة جداً تشمل سرقة الهوية والخسائر المالية والوصول غير المصرّح به للحسابات. سيتمّ إبلاغ أصحاب البيانات مباشرة.'
-        : severity === 'HIGH'
-          ? 'مخاطر مرتفعة من الاتصال غير المرغوب فيه أو التصيّد أو التسويق غير المصرّح به. الإبلاغ المباشر مطلوب وفق المادة 26 من نظام حماية البيانات.'
-          : 'مخاطر محدودة على أصحاب البيانات بفضل التشفير أثناء التخزين والاحتواء السريع. لا يلزم إبلاغ مباشر.',
-    },
-    containmentMeasures: {
-      en: 'Affected systems isolated from the network within the first hour of detection. Privileged access tokens revoked. Forensic image of impacted hosts captured for SDAIA inspection.',
-      ar: 'تمّ عزل الأنظمة المتأثّرة عن الشبكة خلال الساعة الأولى من الكشف، وإلغاء الرموز الإمتيازية، والتقاط صورة جنائية للأنظمة المتأثرة لفحص سدايا.',
-    },
-    proposedMeasures: {
-      en: 'Reset of all credentials in scope, mandatory MFA enforcement, third-party DLP scan, and a post-incident review reported to the Risk Committee within 30 days.',
-      ar: 'إعادة تعيين بيانات الدخول، وفرض التحقق الثنائي الإلزامي، وفحص DLP بطرف ثالث، ومراجعة ما بعد الحادثة تُقدَّم للجنة المخاطر خلال 30 يوماً.',
-    },
-    detectedAt: breach.occurredAt ?? new Date().toISOString(),
-    awareAt: breach.reportedAt ?? breach.occurredAt ?? new Date().toISOString(),
-    dataSubjectsNotified: breach.status === 'CLOSED',
-    dataSubjectsNotificationPlannedAt: requiresDataSubjectNotification(severity)
-      ? addHours(breach.reportedAt ?? new Date().toISOString(), DATA_SUBJECTS_DEADLINE_HOURS)
-      : undefined,
-  };
+  lang: 'en' | 'ar' = 'en',
+): string | undefined {
+  if (f.source === null) return undefined;
+  const v = breach[f.source];
+  if (v === null || v === undefined || v === '') return undefined;
+  if (f.format === 'datetime') {
+    const d = new Date(String(v));
+    if (Number.isNaN(d.getTime())) return String(v);
+    return d.toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-GB',
+      { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  return String(v);
 }
 
 // ─── Hour-precision countdown ──────────────────────────────────────────────
@@ -231,9 +346,17 @@ export function computeBreachClock(
   };
 }
 
-function addHours(iso: string, hours: number): string {
-  const d = new Date(iso);
-  d.setTime(d.getTime() + hours * 3_600_000);
+/**
+ * The PDPL Article 26 data-subject notification deadline: 7 days from the
+ * awareness timestamp that starts the Article 25 clock. Derived from a real
+ * column (`discovered_at`), unlike the retired packet's version, which was one
+ * field of an otherwise invented document.
+ */
+export function dataSubjectsDeadline(awareAt: string): string | undefined {
+  if (!awareAt) return undefined;
+  const d = new Date(awareAt);
+  if (Number.isNaN(d.getTime())) return undefined;
+  d.setTime(d.getTime() + DATA_SUBJECTS_DEADLINE_HOURS * 3_600_000);
   return d.toISOString();
 }
 
