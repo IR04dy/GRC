@@ -1199,6 +1199,55 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   ⚠ **`cyber_lc` has zero CHECK constraints in the whole schema** — same as `audit_lc` (F2-203). All 36 stored
   statuses ARE in the machine today, so unlike `audit_lc` it is latent rather than live; **that was checked,
   not assumed**, which is the only reason it can be stated.
+  ⚠⚠ **DIFF THE CLIENT'S FIELD NAMES AGAINST THE WIRE IN BOTH DIRECTIONS — AND WHEN AN ENDPOINT BINDS
+  AN ENTITY, AN UNKNOWN KEY IS A SILENT DELETION, NOT AN ERROR** (F2-210, measured 2026-08-14/15).
+  `POST /api/v1/privacy/ropa` takes `@RequestBody ProcessingActivity` and Spring Boot disables
+  `FAIL_ON_UNKNOWN_PROPERTIES`, so `PrivacyRopaRequest`'s `processNameEn`/`processNameAr`/
+  `dataCategories`/`retentionPeriod` were discarded on every call. Probed with the **exact** payload
+  `RopaWizard` sends: **HTTP 400, *"A required field was not supplied"*** — `activity_name_en` is NOT
+  NULL and arrived null — while the entity's own names return **201**. 🔑 **Only `status` bound, so the
+  failure looked partial, and the diagnostic names no field on a form where nothing is missing.** The
+  PDPL Article 31 register's creation path had never once worked; all 11 rows in dev and prod are
+  seeded. The wizard also **collected a purpose of processing and never sent it**, and composed the
+  retention into prose for a key nothing binds, losing an INT column's value.
+  ⚠⚠ **The read half inverts a completeness check into a false accusation.** The wire carries
+  `retentionPeriodMonths` (non-null **11 of 11**); the client read `retentionPeriod` (**0 of 11**), so
+  `RopaDetailPage`'s *"Completeness check (SDAIA examiner expectations)"* rendered
+  `<Check yes={!!item.retentionPeriod}>Retention period set` UNCHECKED for every activity — **telling a
+  DPO the statutory register is incomplete where it is complete.**
+  🔑 **The DIRECTION is the new part: F2-193, F2-195 and F2-205 all erred FLATTERINGLY and the register
+  said "do not assume that again". This one errs PESSIMISTICALLY** — no false assurance, but far less
+  likely to be reported, because *"no data yet"* is a plausible reading of an empty column while a
+  suspiciously good number invites a question.
+  ⚠⚠ **F2-198 and F2-207 both CITED this wizard as evidence the real ROPA surface was complete, and
+  neither probed the create.** 🔑 **"There is a wizard" is not "the wizard works"** — a capability claim
+  is the least-verified thing in a filing, and this is the first instance of that rule landing on my own
+  earlier reasoning rather than someone else's.
+  ⚠⚠ **The general instrument was BUILT AND REJECTED, which is the reusable judgement.** Diffing every
+  FE `*Dto` against its backend type by name resolved **73 of 163** interfaces, and its 96 "orphans"
+  were dominated by `BaseEntity` fields (`id`, `createdAt`, `organisationId`) a per-file scan cannot
+  see. F2-206's rule: **"unresolved" reads identically to "missing"**, so it would have manufactured
+  findings at scale. **Ground truth is the wire** — union the keys across rows and require a non-null
+  value somewhere (F2-202's `non_null` rule).
+  ⚠⚠ **And measuring from the wire STILL produced 4 false positives out of 5, because I paired the
+  endpoints to the DTOs by hand.** Verified against the endpoint each client actually calls,
+  `KriDefinitionDto`'s three renames are refuted (the column rendering `greenMax`/`amberMax` is
+  `FrameworkKriRowDto` from another endpoint; `RiskRegisterPage` explicitly maps
+  `greenMax: d.greenThreshold`) and `BcmBiaDto.overallImpact` is refuted (I compared `/bcm/bia-assessments`
+  while the client calls `/bcm/bia`, where it is non-null 10 of 10). 🔑 **A scan locates; THE PAIRING IS
+  THE MEASUREMENT, and a guessed pairing manufactures phantom findings** — 1 of 5 survived, a worse rate
+  than the ~2-in-10 F2-188/F2-192/F2-204 each measured, and the cause was entirely mine.
+  ⚠ **Align a newly-enabled writer to the register's STORED vocabulary, not the form's.** The wizard
+  wrote `PUBLISHED`/`REVIEWED`; the table has **no CHECK**, the tone map and completeness panel read
+  `DRAFT`/`UNDER_REVIEW`/`APPROVED`/`ACTIVE`, and the stored values are **ACTIVE 10 / UNDER_REVIEW 1**.
+  Enabling a create while keeping the old words would have introduced F2-196's disjoint-vocabulary
+  defect on a statutory register — free to avoid here only because no row carries them yet.
+  ⚙ **Filed:** `PrivacyBreachDto`'s four value-less fields (the breach Severity column and filter are
+  inert); `CyberVulnDto`'s four dead declarations, defended today by `r.workflowStatus ?? r.status`;
+  `IncidentDto` never declaring `lessonsLearned`/`resolutionDate`/`timelineJson` which the wire carries
+  (F2-198's shape); the wizard having no Arabic activity-name field (house rule 7); and
+  `processing_activities.status` having no CHECK — now cheap to add, since this slice fixed its only
+  writer.
   ⚠⚠ **ASK WHAT AN EMITTED DOCUMENT ASSERTS THAT NO COLUMN RECORDS — PER FIELD, NOT PER FILE — AND THE
   ANSWER WAS A FABRICATED PDPL ARTICLE 25 SUBMISSION TO SDAIA** (F2-209, measured 2026-08-13/14).
   `lib/pdplBreach.ts`'s `generateSdaiaNotification` returned a complete personal-data-breach notification: the
