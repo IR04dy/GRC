@@ -90,3 +90,32 @@ export function formatPercent(value: number | null | undefined, locale: 'en' | '
     maximumFractionDigits: 1,
   }).format(capped / 100);
 }
+
+/**
+ * PDPL Article 31 retention period, stored as a whole number of months.
+ *
+ * ⚠ F2-210: `privacy.processing_activities.retention_period_months` is an INT and
+ * the wire carries `retentionPeriodMonths`. The client used to declare a string
+ * `retentionPeriod` that the server has never sent, so three surfaces — the ROPA
+ * register's Retention column, the detail rail, and the "Completeness check
+ * (SDAIA examiner expectations)" panel — read `undefined` on every row. One
+ * formatter, read by all of them, so the months-to-label rule cannot drift
+ * between the list and the detail view (F2-178's one-predicate shape).
+ *
+ * Returns an em-dash for absent, which is honest: no row in either database has
+ * a null retention today, but a new activity can be created without one and
+ * "0 months" would be a different and wrong claim.
+ */
+export function formatRetentionMonths(
+  months: number | null | undefined,
+  locale: 'en' | 'ar' = 'en',
+): string {
+  if (months == null || Number.isNaN(months)) return '—';
+  const years = months / 12;
+  if (Number.isInteger(years) && years >= 1) {
+    return locale === 'ar'
+      ? (years === 1 ? 'سنة واحدة' : years === 2 ? 'سنتان' : `${years} سنوات`)
+      : `${years} year${years === 1 ? '' : 's'}`;
+  }
+  return locale === 'ar' ? `${months} شهراً` : `${months} months`;
+}

@@ -17,6 +17,7 @@ import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { privacyApi, ApiError, type PrivacyRopaDto } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { formatRetentionMonths } from '../../lib/format';
 
 type TabId = 'overview' | 'docs' | 'activity';
 
@@ -142,7 +143,17 @@ export function RopaDetailPage() {
                     <Check yes={!!item.activityNameEn}>{isAr ? 'اسم النشاط محدد' : 'Activity name set'}</Check>
                     <Check yes={!!item.purposeEn}>{isAr ? 'غرض المعالجة موثّق' : 'Purpose documented'}</Check>
                     <Check yes={!!item.legalBasis}>{isAr ? 'الأساس النظامي محدد' : 'Legal basis defined'}</Check>
-                    <Check yes={!!item.retentionPeriod}>{isAr ? 'مدة الاحتفاظ محددة' : 'Retention period set'}</Check>
+                    {/* ⚠⚠ F2-210: this asked `!!item.retentionPeriod`, a key the
+                        server has never sent — so a panel headed "what a SDAIA
+                        examiner expects to see" reported the retention period
+                        MISSING on every activity in the register, while all 11
+                        record one. PDPL Article 31 makes it mandatory, so the
+                        platform was reporting a complete statutory register as
+                        incomplete. `retentionPeriodMonths` is what the wire
+                        carries; `!= null` rather than `!!` because 0 months is a
+                        value the field could legitimately hold and truthiness
+                        would read it as absent (F2-197's `!value` trap). */}
+                    <Check yes={item.retentionPeriodMonths != null}>{isAr ? 'مدة الاحتفاظ محددة' : 'Retention period set'}</Check>
                     <Check yes={item.status === 'APPROVED' || item.status === 'ACTIVE'}>
                       {isAr ? 'تمت الموافقة / نشط' : 'Approved / active'}
                     </Check>
@@ -188,7 +199,7 @@ export function RopaDetailPage() {
               <RailFieldGroup>
                 <RailField
                   label={isAr ? 'المدة' : 'Period'}
-                  value={item.retentionPeriod ?? '—'}
+                  value={formatRetentionMonths(item.retentionPeriodMonths, isAr ? 'ar' : 'en')}
                   mono />
               </RailFieldGroup>
             </Card>

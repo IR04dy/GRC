@@ -101,18 +101,42 @@ export function RopaWizard() {
         draft.lawfulBasisJustification?.trim() ? `Basis note: ${draft.lawfulBasisJustification}` : null,
       ].filter(Boolean).join(' · ');
 
-      const retentionPeriod = draft.retentionRule?.trim()
-        ? `${draft.retentionMonths} months — ${draft.retentionRule}`
-        : `${draft.retentionMonths} months`;
+      // ⚠⚠ F2-210: the retention period is an INTEGER COLUMN
+      // (`retention_period_months`), not prose. This used to compose
+      // `"60 months — <rule>"` into a `retentionPeriod` string the endpoint does
+      // not bind, so the number was lost and the rule with it. The months now go
+      // to their own column; the free-text rule joins the composite blob, which
+      // is where this wizard already documents everything the row has no column
+      // for (see `dataCategoriesBlob` above).
+      const blobWithRetention = [
+        dataCategoriesBlob,
+        draft.retentionRule?.trim() ? `Retention rule: ${draft.retentionRule.trim()}` : null,
+      ].filter(Boolean).join(' · ');
 
       const created = await privacyApi.createRopa({
-        processNameEn: draft.activityName,
-        processNameAr: undefined,
+        // ⚠⚠ F2-210: was `processNameEn` / `processNameAr` / `dataCategories` /
+        // `retentionPeriod` — none of which `POST /ropa` binds, because it takes
+        // the `ProcessingActivity` entity. Unknown keys are dropped silently, so
+        // `activity_name_en` (NOT NULL) arrived null and every submission 400'd
+        // with "A required field was not supplied" naming no field. Probed.
+        activityNameEn: draft.activityName,
+        // `purposeEn` was collected by step 1 of this wizard and never sent at
+        // all — the purpose of processing is a mandatory PDPL Article 31 field.
+        purposeEn: draft.purposeEn || undefined,
         legalBasis: draft.lawfulBasis,
-        dataCategories: dataCategoriesBlob,
-        retentionPeriod,
-        status: draft.isPublished ? 'PUBLISHED'
-              : draft.dpoReviewed ? 'REVIEWED'
+        retentionPeriodMonths: draft.retentionMonths,
+        dataCategoriesJson: blobWithRetention,
+        // ⚠ F2-210: was PUBLISHED / REVIEWED / DRAFT. `processing_activities.status`
+        // has no CHECK, so those would have stored verbatim — but the register's
+        // own tone map and the detail page's completeness check read
+        // DRAFT / UNDER_REVIEW / APPROVED / ACTIVE, so a wizard-created row would
+        // have rendered with a neutral badge and failed the "Approved / active"
+        // check forever. Since this create path has never once succeeded, no
+        // stored row carries the old words and aligning now costs nothing —
+        // whereas enabling the create while keeping them would have introduced
+        // F2-196's disjoint-vocabulary defect on a statutory register.
+        status: draft.isPublished ? 'ACTIVE'
+              : draft.dpoReviewed ? 'UNDER_REVIEW'
               : 'DRAFT',
       });
       toast.success(isAr

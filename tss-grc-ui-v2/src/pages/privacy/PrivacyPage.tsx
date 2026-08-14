@@ -16,6 +16,7 @@ import { FormModal, type FieldDef } from '../../components/ui/FormModal';
 import { RowActions } from '../../components/ui/RowActions';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
+import { formatRetentionMonths } from '../../lib/format';
 import { SEVERITY_TONE, severityLabel, STATUS_TONE, statusLabel } from '../../lib/labels';
 import { isDsrOpen, isDsrTerminal } from '../../lib/dsrLifecycle';
 import { useApiList } from '../../lib/useApiResource';
@@ -234,7 +235,10 @@ export function PrivacyPage() {
     { header: t('colActivity'),    cell: r => <div><div style={{ fontWeight: 600 }}>{r.activityNameEn}</div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{r.activityNameAr ?? ''}</div></div> },
     { header: t('colPurpose'),     cell: r => <span style={{ color: 'var(--ink-2)', fontSize: 12 }}>{(r.purposeEn ?? '—').slice(0, 60)}</span> },
     { header: t('colLegalBasis'),  cell: r => <Badge tone="primary">{(r.legalBasis ?? '').replace(/_/g, ' ')}</Badge> },
-    { header: t('colRetention'),   cell: r => r.retentionPeriod ?? '—', mono: true },
+    // F2-210: was `r.retentionPeriod`, a key the server has never sent — this
+    // column rendered an em-dash on all 11 rows while every one of them records
+    // a retention period.
+    { header: t('colRetention'),   cell: r => formatRetentionMonths(r.retentionPeriodMonths, lang), mono: true },
     { header: t('colStatus'),      cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
   ];
 

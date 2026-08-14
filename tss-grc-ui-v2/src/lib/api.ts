@@ -2558,7 +2558,31 @@ export interface SdaiaSubmissionRequest {
 export interface PrivacyRopaDto {
   id: number; activityNameEn: string; activityNameAr?: string;
   purposeEn?: string; legalBasis?: string;
-  retentionPeriod?: string; status?: string;
+  /**
+   * ⚠⚠ F2-210 — this was declared `retentionPeriod?: string` and the server has
+   * never sent a key by that name. `GET /api/v1/privacy/ropa` returns the
+   * `ProcessingActivity` entity, whose column is `retention_period_months`, so
+   * the wire carries `retentionPeriodMonths` — probed live: **non-null on 11 of
+   * 11 rows** (24 / 36 / 60 / 84 / 120), while `retentionPeriod` was non-null on
+   * **0 of 11**.
+   *
+   * Three surfaces read the wrong name, and the third is the reason this is a
+   * defect rather than a cosmetic slip:
+   *   • `PrivacyPage`'s ROPA "Retention" column rendered an em-dash on every row
+   *   • `RopaDetailPage`'s "Data retention → Period" rail card, likewise
+   *   • `RopaDetailPage`'s **"Completeness check (SDAIA examiner expectations)"**
+   *     panel, whose `<Check yes={!!item.retentionPeriod}>Retention period set`
+   *     therefore reported UNCHECKED for every activity in the register.
+   *
+   * 🔑 PDPL Article 31 makes the retention period a mandatory ROPA field, so the
+   * platform was telling a DPO its statutory register was incomplete on a point
+   * where it is complete. Note the DIRECTION: F2-193, F2-195 and F2-205 all erred
+   * flatteringly; this one errs pessimistically, which does not create false
+   * assurance but does send someone to fix data that is already correct — and it
+   * is far less likely to be reported, because "no data yet" is a plausible
+   * reading of an empty column.
+   */
+  retentionPeriodMonths?: number; status?: string;
   /**
    * F2-198 — PDPL Article 29 cross-border transfer flag. `GET /api/v1/privacy/ropa` returns the
    * `ProcessingActivity` entity, so this has always been on the wire (probed: present on all 11
@@ -2573,10 +2597,35 @@ export interface PrivacyBreachRequest {
   affectedRecords?: number | null; discoveredAt?: string;
   reportedToAuthority?: boolean; status?: string;
 }
+/**
+ * ⚠⚠ F2-210 — this type declared `processNameEn` / `processNameAr` /
+ * `dataCategories` / `retentionPeriod`, and **the endpoint binds none of them**.
+ * `POST /api/v1/privacy/ropa` takes `@RequestBody ProcessingActivity` — the
+ * entity — whose properties are `activityNameEn`, `activityNameAr`, `purposeEn`,
+ * `legalBasis`, `retentionPeriodMonths`, `dataCategoriesJson`, `status`.
+ * Spring Boot disables `FAIL_ON_UNKNOWN_PROPERTIES`, so every unrecognised key
+ * was silently discarded and `activity_name_en` (NOT NULL) arrived null.
+ *
+ * 🔑 Probed live with the exact payload `RopaWizard` sent: **HTTP 400,
+ * "A required field was not supplied. Check the request body against the
+ * endpoint's schema."** — a message that names no field, on a form where nothing
+ * is in fact missing. The same probe with the entity's own names returns **201**.
+ * So the PDPL Article 31 register's creation wizard has never been able to
+ * create a record, which is why all 11 rows in dev and prod are seeded.
+ *
+ * ⚠ F2-198 and F2-207 both cited `RopaWizard` as the real creation path when
+ * deciding to retire a fabricated ROPA surface — as evidence the real one was
+ * complete. Neither probed the create. **A capability claim is the
+ * least-verified thing in a filing**, and "there is a wizard" is not "the wizard
+ * works".
+ */
 export interface PrivacyRopaRequest {
-  processNameEn: string; processNameAr?: string;
-  legalBasis?: string; dataCategories?: string;
-  retentionPeriod?: string; status?: string;
+  activityNameEn: string; activityNameAr?: string;
+  purposeEn?: string;
+  legalBasis?: string;
+  retentionPeriodMonths?: number;
+  dataCategoriesJson?: string;
+  status?: string;
 }
 export const privacyApi = {
   dsrs:           (page = 0, size = 50) => api.get<PageResponse<PrivacyDsrDto>>(`/api/v1/privacy/dsrs${pageQ(page, size)}`),
