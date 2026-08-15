@@ -260,16 +260,38 @@ class TenantWriteGuardInterceptorTest {
     }
 
     /**
-     * A null tenant on the row is not a cross-tenant write. It is a NOT NULL violation about to
-     * happen, and the database reports that far more usefully than a SecurityException would —
-     * it is also the shape a service produces when it stamps the tenant after building the entity.
+     * A null tenant on the row is not a cross-tenant write, so the guard passes — that much was
+     * always right, and it is what this test verifies.
+     *
+     * <p>⚠⚠ <b>F2-216 — this test used to be called
+     * {@code allowsAnInsertWithNoTenantOnTheRowAndLetsTheColumnComplain}</b>, and its reason read:
+     * <em>"It is a NOT NULL violation about to happen, and the database reports that far more
+     * usefully than a SecurityException would."</em> Measured from {@code sys.columns}: <b>11 of
+     * 427 org-bearing tables declare {@code organisation_id} NULLABLE</b>, and on eight of those
+     * NULL is a value meaning <b>platform-global — visible to every tenant</b> (169 rows in dev,
+     * 158 in prod). For those tables no column complains and nothing is a violation; a null
+     * tenant publishes the row to the whole platform.
+     *
+     * <p>🔑 <b>The assertion was correct and everything around it was wrong, which is the worst
+     * combination.</b> A reader auditing this exemption found a green test whose NAME told them
+     * the database would catch it, and stopped — so the name was doing the opposite of the work
+     * a test name is for. F2-159's decoy and F2-175's rule in one artefact: a test written by
+     * reading the implementation can only agree with it, and that agreement is hardest to see
+     * when the description is accurate about the code and false about the world.
+     *
+     * <p>The behaviour is unchanged and deliberately so: throwing here would break the eight
+     * legitimately-global catalogues and the ordinary stamp-after-build shape (F2-183 — never
+     * add a constraint while its writers are open). What makes the exemption safe is that no
+     * write endpoint binds a globally-visible entity, which is now a build failure rather than
+     * an accident — see {@link TenantGuardNullExemptionContractTest}.
      */
     @Test
-    void allowsAnInsertWithNoTenantOnTheRowAndLetsTheColumnComplain() {
+    void allowsAnInsertWithANullTenantOnTheRow() {
         TenantContext.setCurrentTenant(1L);
 
         assertThatCode(() ->
             guard.decideInsert(new FakeEntity(), null, new Object[] { null }, ORG_ONLY))
+            .as("the guard must pass — but NOT because the column will refuse it; see the javadoc")
             .doesNotThrowAnyException();
     }
 

@@ -128,15 +128,85 @@ public class TenantWriteGuardInterceptor implements Interceptor {
      * "unchanged" is meaningless; the invariant is that a new row must belong to the tenant on
      * whose request it is being written. Two deliberate exemptions:
      * <ul>
-     *   <li>{@code organisationId == null} — not a cross-tenant write. It is a NOT NULL violation
-     *       about to happen, and the database says so far more clearly than a SecurityException
-     *       would. Also the shape a service produces when it stamps the tenant <em>after</em>
-     *       building the entity.</li>
+     *   <li>{@code organisationId == null} — <b>see the section below. This is the exemption
+     *       whose stated reason was false.</b></li>
      *   <li>no tenant on the thread — schedulers, sweeps and bootstrap run off-request, where
      *       {@code TenantContext} is unset (landmine: {@code TenantContext} isn't populated off
      *       -request). With nothing to compare against there is no judgement to make, and
      *       throwing here would break every sweep the moment the flag is switched on.</li>
      * </ul>
+     *
+     * <h3>⚠⚠ F2-216 — a NULL tenant is not "missing", it is "every tenant"</h3>
+     *
+     * <p>This exemption used to read: <em>"not a cross-tenant write. It is a NOT NULL violation
+     * about to happen, and the database says so far more clearly than a SecurityException
+     * would."</em> Measured 2026-08-15 from {@code sys.columns} in both databases: of the
+     * <b>427 tables carrying an {@code organisation_id}</b> (421 in prod), <b>11 declare it
+     * NULLABLE</b> — so for those eleven the database says nothing at all, and the sentence
+     * describing what would happen instead was the only analysis anybody had done.
+     *
+     * <p>Worse than merely permissive. On <b>eight</b> of the eleven, NULL is not an absence,
+     * it is a <b>value with a meaning</b>: {@code aml.sanctions_list},
+     * {@code aml.sanctions_list_entry}, {@code fraud.fraud_typology}, {@code iam.roles},
+     * {@code iam.sod_rules}, {@code opres.opres_pillar}, {@code platform.help_topic} and
+     * {@code platform.three_lines_role_mapping} are all read by a repository asking
+     * {@code organisationId IS NULL OR organisationId = :orgId}, and
+     * {@code SanctionsListRepository}'s own javadoc states it — <em>"Lists with
+     * organisation_id IS NULL are platform-global"</em>. <b>169 of their 177 rows in dev, 158
+     * of 166 in prod, are stored that way.</b>
+     *
+     * <p>🔑 <b>So the value this guard declines to judge is precisely the value that publishes
+     * a row to every tenant on the platform.</b> A caller who could reach one of these tables
+     * with a null tenant would not be committing the "NOT NULL violation" the comment predicted;
+     * they would be adding an entry to every other tenant's sanctions screening, or a role to
+     * every other tenant's IAM catalogue, and the platform-wide cross-tenant backstop would
+     * return {@code false} without logging a line.
+     *
+     * <p><b>Note the internal inconsistency this exposes, which is the tell.</b> The UPDATE leg
+     * treats the same value as protected: {@code decide} compares old against new, so a
+     * platform-global row being pulled into one tenant ({@code null → 5}) throws, and
+     * {@code TenantWriteGuardInterceptorTest.blocksWhenOrganisationIdGoesFromNullToValue} has
+     * asserted that since the beginning. One value, guarded on update, unjudged on insert.
+     *
+     * <h3>REFUTED, and the refutation is why this is documented rather than changed</h3>
+     *
+     * <p><b>No caller can reach it today.</b> Measured, not assumed: none of the eight
+     * globally-visible entities is bound by any write endpoint (the authority is
+     * {@code MassAssignmentRatchetTest}'s reflection scan — 202 entity-bound writes, none of
+     * them these), and all four services that write those tables stamp the tenant from
+     * {@code TenantContext} on the create path ({@code SanctionsListService#create},
+     * {@code AccessGovernanceService#createRole}, {@code HelpTopicService}, {@code ThreeLinesService}).
+     * So this is <b>latent</b>, and it stays latent only because of a property nobody had
+     * written down, let alone enforced.
+     *
+     * <p>⚠ <b>Which is the F2-182 rule: reachability is a fact about today, not a property of a
+     * control.</b> Throwing on a null tenant here is <em>not</em> the fix — it is F2-183's
+     * defect, a constraint added while its writers are open: eight tables legitimately hold
+     * 169 such rows, the tenant-onboarding bootstrap creates them off-request, and the
+     * exemption is also the shape a service produces when it stamps the tenant <em>after</em>
+     * building the entity. The honest fix is to state the true reason and enforce the property
+     * that makes it safe, which is what
+     * {@code TenantGuardNullExemptionContractTest.noEntityBoundWriteBindsAPlatformGlobalEntity}
+     * does — a hard zero over a population <b>derived from the repositories</b>, so a ninth
+     * globally-visible entity is covered the day its repository is written.
+     *
+     * <p>⚠⚠ <b>And the branch WAS tested — which is worse, and is the part worth carrying
+     * forward.</b> My first draft of this note claimed it had no test; the test list disproved
+     * that. {@code TenantWriteGuardInterceptorTest} covers it, and covered it from the start.
+     * But the test was <b>named for the false premise</b> —
+     * {@code allowsAnInsertWithNoTenantOnTheRowAndLetsTheColumnComplain} — and its javadoc
+     * repeated the claim word for word: <em>"It is a NOT NULL violation about to happen, and
+     * the database reports that far more usefully than a SecurityException would."</em> Its
+     * assertion is correct (the guard must pass); everything a reader uses to decide whether
+     * the branch is <em>right</em> was wrong.
+     *
+     * <p>🔑 <b>A green test whose NAME asserts the behaviour under review is the strongest
+     * possible reason not to look further.</b> An untested branch at least reads as untested.
+     * This is F2-159's decoy and F2-175's rule in one artefact: a test written by reading the
+     * implementation can only agree with it, and the agreement is hardest to spot when the
+     * description is accurate about the code and wrong about the world. Renamed to
+     * {@code allowsAnInsertWithANullTenantOnTheRow} — what it verifies — with the reason
+     * corrected.
      *
      * @return {@code false} always — this interceptor inspects, it never mutates the state array.
      */
@@ -215,7 +285,12 @@ public class TenantWriteGuardInterceptor implements Interceptor {
         }
         Object rowOrg = state[orgIdx];
         if (rowOrg == null) {
-            return false;                       // see javadoc — let the NOT NULL column speak
+            // F2-216 — NOT "the NOT NULL column will speak": 11 of 427 org-bearing tables allow
+            // NULL, and on 8 of them NULL means PLATFORM-GLOBAL (readable by every tenant). We
+            // pass because throwing would break the 169 legitimate global rows and the
+            // stamp-after-build shape, and because no write endpoint binds a globally-visible
+            // entity — an invariant TenantGuardNullExemptionContractTest holds at zero.
+            return false;
         }
         Long current = TenantContext.getCurrentTenant();
         if (current == null || Objects.equals(current, rowOrg)) {

@@ -15,31 +15,34 @@ import java.util.Map;
  * Wires {@link TenantWriteGuardInterceptor} into Hibernate as a session-level
  * interceptor — Sprint-6 platform-wide mass-assignment defense activation.
  *
- * <p>The interceptor itself was added in PR #125 as a Spring bean but was
- * intentionally not connected to the SessionFactory so it could be
- * code-reviewed and tested separately. This config completes the wiring
- * via Spring Boot's {@code HibernatePropertiesCustomizer} hook, which is
- * preferred over the raw {@code hibernate.session_factory.interceptor}
- * property because it lets the interceptor keep its {@code @Autowired}
- * dependencies (audit log service).
+ * <p>This config wires it via Spring Boot's {@code HibernatePropertiesCustomizer} hook,
+ * which is preferred over the raw {@code hibernate.session_factory.interceptor} property
+ * because it lets the interceptor keep its {@code @Autowired} dependencies (audit log
+ * service).
  *
- * <h3>Feature flag — default OFF</h3>
+ * <h3>Flag — the CODE default is off; every shipped profile turns it ON</h3>
  *
- * Controlled by the property {@code grc.security.tenant-write-guard.enabled}
- * (default {@code false}). To activate in a deployment, set:
+ * Controlled by {@code grc.security.tenant-write-guard.enabled}. The
+ * {@code @Value} default below is {@code false}, but that default is reached by no
+ * deployment this repository ships: {@code application-dev.yml} sets it {@code true}
+ * literally and {@code application-prod.yml} sets {@code ${TENANT_WRITE_GUARD_ENABLED:true}}
+ * (a placeholder, per F2-149 — a kill-switch that cannot be thrown is not a kill-switch).
+ * Both legs of the interceptor run on every request in dev and in prod.
  *
- * <pre>
- * # application-prod.yml or env override
- * grc:
- *   security:
- *     tenant-write-guard:
- *       enabled: true
- * </pre>
+ * <p>⚠ <b>F2-216 — this javadoc described the opposite, and said so in three places.</b> It
+ * claimed the interceptor was <em>"intentionally not connected to the SessionFactory"</em>,
+ * headed its flag section <em>"default OFF"</em>, and told operators to
+ * <em>"activate first in staging, watch the audit log … for a sprint, then flip to true in
+ * prod."</em> All three stopped being true when F2-22b added the {@code onSave} leg and
+ * enabled the flag. 🔑 <b>A stale claim about whether a security control RUNS is not a
+ * documentation nit: it is the input to somebody's next threat model.</b> Read together with
+ * {@code TenantContext}'s matching comment, the pair told a reader that the platform-wide
+ * cross-tenant backstop was unbuilt and unwired, while it was in fact adjudicating every
+ * insert and every update in both environments.
  *
- * Default-off because the interceptor is new code; operators should
- * activate first in staging, watch the audit log for any
- * {@code SECURITY_BLOCK} entries on legitimate flows for a sprint, then
- * flip to {@code true} in prod.
+ * <p>{@code TenantGuardNullExemptionContractTest} now asserts the wiring status these
+ * comments assert against the profiles that actually set the property, in both directions,
+ * so neither can drift again without failing the build.
  *
  * <p>See {@code docs/security/MASS_ASSIGNMENT_DEFENSE.md} for the full
  * design and pre-activation checklist.

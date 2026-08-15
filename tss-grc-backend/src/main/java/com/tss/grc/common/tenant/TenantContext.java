@@ -71,13 +71,26 @@ public final class TenantContext {
         CROSS_TENANT_WRITE_ALLOWED.remove();
     }
 
-    // ─── Sprint-6 cross-tenant write guard ──────────────────────────────
+    // ─── Cross-tenant write guard ───────────────────────────────────────
     //
-    // These helpers exist to support the platform-wide mass-assignment
-    // backstop proposed in docs/security/MASS_ASSIGNMENT_DEFENSE.md.
-    // The Hibernate interceptor is not yet wired in — these are the
-    // building blocks so the interceptor PR is a small, focused change
-    // when someone can run it locally to verify.
+    // These helpers back the platform-wide mass-assignment backstop in
+    // docs/security/MASS_ASSIGNMENT_DEFENSE.md.
+    //
+    // ⚠ F2-216 — this comment said "The Hibernate interceptor is not yet wired in — these
+    // are the building blocks so the interceptor PR is a small, focused change when someone
+    // can run it locally to verify." That stopped being true when F2-22b added the insert
+    // leg and turned the flag on: TenantWriteGuardInterceptor is wired by
+    // TenantWriteGuardConfig and `grc.security.tenant-write-guard.enabled` is TRUE in both
+    // application-dev.yml and application-prod.yml. Both legs run, on every request.
+    //
+    // 🔑 The correction matters more than the fact. A reader who opens the class that DEFINES
+    // the mechanism is told the platform-wide cross-tenant backstop does not run — so they
+    // either build a redundant per-service guard, or conclude that whatever guard they are
+    // looking at is the only thing standing between a request body and another tenant's data.
+    // A comment describing a control as absent is worse than no comment, because it answers
+    // the question the reader came to ask (F2-184's shape, on a security control's own
+    // wiring status). TenantGuardNullExemptionContractTest fails the build if either this
+    // comment or TenantWriteGuardConfig's javadoc drifts back out of step with the profiles.
 
     /**
      * Opens a scope in which the current thread is permitted to write
