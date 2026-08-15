@@ -1256,6 +1256,65 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   `breachSeverityInputs`, `isSdaiaSubmitted`). ⚙ And a `??` chain can be **right by accident**:
   `b.reportedAt ?? b.occurredAt ?? b.discoveredAt` always resolved to the third because the first two have no
   column — a correct outcome via two dead operands, reading as a preference the schema cannot express.
+  ⚠⚠ **A WIRE-CONTRACT GATE PROVES THE TYPES AGREE AND CANNOT PROVE THE PAYLOAD BUILDER SENDS WHAT THE
+  TYPE PERMITS — AND WHERE THE VERB IS A FULL-REPLACE `PUT`, THAT GAP IS SILENT DATA DESTRUCTION**
+  (F2-212, measured 2026-08-15). `IncidentService.update` calls `setLessonsLearned(req.lessonsLearned())`
+  — and the same for `lessonsLearnedAr`/`resolutionDate`/`timelineJson` — **unconditionally**, so a field the
+  client omits arrives null and is **written** null. `incToReq`, which builds every PUT payload, carried none
+  of the four: **opening any incident, changing one word and saving destroyed its post-incident record**
+  (NIST 800-61r2 §3.4). Proven live against a planted row. 🔑 **Invisible from both ends is what made it
+  survive** — the read type did not declare them either, so nothing rendered them before, during or after
+  (F2-198's shape as the *cause* of a destructive write, not merely an unused column). Populated on 3 / 6 / 3
+  of 44 rows, dev = prod. ⚠ **`WireContractTest` could not have caught it**: it checks the types stay in step,
+  and a payload builder may omit a field the type happily permits. Assert the **assignment** at the call site
+  (`new RegExp(f + '\\s*:\\s*i\\.')`), not the field's presence on the type.
+  ⚠⚠ **The adjudicator is the type the HANDLER RETURNS, which is not always the entity.** F2-211's rule needed
+  exactly one refinement to leave privacy: `/api/v1/privacy/*` and `/api/v1/cyber/vulnerabilities` return
+  **entities**, `/api/v1/incidents` returns `Page<IncidentResponse>` — a response record. Adjudicating against
+  `Incident` would have measured the wrong artefact and every finding on it would be noise. Declare the resolved
+  return type per register; never assume the entity. ⚙ Re-measuring F2-210's filing: **3 of its 4 `CyberVulnDto`
+  fields are genuinely dead** (`status`/`discoveryDate`/`targetResolutionDate` — `cyber.vulnerabilities` has 22
+  columns and none of them) and **`capaId` is REFUTED** — a real column, null on all 20 rows. Same 1-in-4 rate as
+  F2-211's DPIA half.
+  ⚠⚠ **A REGISTER GATED ON AN INCLUSION LIST OF STATUSES HID EVERY REAL ROW AND INVENTED ONE FOR THE REST.**
+  The lessons-learned register filtered `CLOSED || RECOVERED`: `RECOVERED` appears in **zero** rows and
+  `RESOLVED` (**10 of 44**) was missing, while all three incidents carrying a real lesson are
+  `INVESTIGATING`/`OPEN`/`OPEN` — so **0 of 3 were admitted in both databases**. F2-196's rule again. What it
+  showed instead was derived from the **severity band** (F2-209's shape), cited a minted `CAPA-<1000+id>` against
+  real references like `CAPA-2026-19E164FC4A7-00`, and kept operator entries in `localStorage` (F2-208's shape)
+  beside a server that already stored, returned **and accepted writes for** all four fields. A lesson exists
+  because somebody wrote one — **not because the record reached a state the page happens to list**.
+  ⚠⚠ **REMOVING A FILTER CAN TURN A LABEL THAT ACCURATELY DESCRIBED IT INTO A FALSE CLAIM — and the slice
+  that fixes the predicate is the one that breaks the label.** The badge read `{n} closed` / `{n} مغلقة`; while
+  the register filtered CLOSED||RECOVERED that word was true, and after the fix it was wrong for **3 of 3** rows.
+  F2-208's label-versus-predicate rule arriving from the inside, and it is **per language** — check the Arabic
+  half separately (house rule 7; F2-208 found exactly this drift in the Arabic only). 🔑 **The predicate and the
+  words above it are two artefacts, and only one of them is in the diff you are reading.**
+  ⚠⚠ **Found in the BROWSER after every gate was green — FIFTH CONSECUTIVE SLICE — six lines below the register
+  this slice had just made honest.** *"CAPA Themes (90d)"* rendered five **inline** hard-coded themes with counts
+  summing to **18** against a live register of 16 rows in dev and 13 in prod; `capa.tasks` has 26 columns and
+  **no theme, root-cause or incident-link column**, so a theme is not reconstructible at all (F2-209's third
+  state), and the "(90d)" was a second claim with nothing behind it. 🔑 **Three de-mocking gates were blind at
+  once, each for a reason already on the record**: `kpiProvenance` keys on the `<Kpi>` tag (F2-195),
+  `pageDataProvenance` asks whether the *page* calls a server and this one does (F2-198), and F2-194's census
+  looks for an exported `const` array while this literal is **inline in JSX**. Sixth instance of *the invariant is
+  real, its POPULATION is narrower than it looks*. Replaced with the relation the platform does record — CAPAs
+  whose `origin_type` is an incident, **exactly 1 in both databases**, with its real server-minted reference.
+  ⚠ **A cross-module courtesy panel needs a permission check, and "you cannot see this" must not read as
+  "there are none".** The replacement CAPA card calls a *different* module's register: measured identical in
+  dev and prod, **11 of the 29 roles holding `INCIDENT:READ` do not hold `CAPA:READ`**, including `IR_LEAD`,
+  `FORENSICS_LEAD` and `REGULATOR_VIEWER`. Put the hook in a subcomponent mounted only when entitled (no
+  pointless 403) and word the no-access state so it cannot be read as a clean bill — the panel now says *"this
+  is not a statement that none exist."* 🔑 **An empty panel says two things at once, and the permission
+  boundary is a source of that confusion just as fabrication is.**
+  ⚠ **And a gate keyed on an IDENTIFIER breaks on your own refactor**: the leg asserted `incidentCapas` and went
+  red when extraction renamed the local to `items` — F2-197's rule on a gate written after quoting it. Assert the
+  **shape** of the selection (`originType?.trim().toLowerCase() === 'incident'`), with a self-test that the bare
+  literal comparison fails, so it survives renaming and still catches a dropped normalisation.
+  ⚠ **An ANCHOR-MISS in a mutation harness is not a surviving mutant, and counting only failures conflates
+  them.** Two anchors spanned lines against a **CRLF** tree (4,646 CRLF, 0 bare LF), so `\n` could never match;
+  both were reported SURVIVED, and both were **KILLED** once the working copy was normalised. Make it a distinct
+  outcome that exits non-zero — 🔑 **a harness that declines to run reads exactly like a gate that passed.**
   ⚠⚠ **DIFF THE CLIENT'S FIELD NAMES AGAINST THE WIRE IN BOTH DIRECTIONS — AND WHEN AN ENDPOINT BINDS
   AN ENTITY, AN UNKNOWN KEY IS A SILENT DELETION, NOT AN ERROR** (F2-210, measured 2026-08-14/15).
   `POST /api/v1/privacy/ropa` takes `@RequestBody ProcessingActivity` and Spring Boot disables
@@ -1299,10 +1358,12 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   `DRAFT`/`UNDER_REVIEW`/`APPROVED`/`ACTIVE`, and the stored values are **ACTIVE 10 / UNDER_REVIEW 1**.
   Enabling a create while keeping the old words would have introduced F2-196's disjoint-vocabulary
   defect on a statutory register — free to avoid here only because no row carries them yet.
-  ⚙ **Filed:** `PrivacyBreachDto`'s four value-less fields (the breach Severity column and filter are
-  inert); `CyberVulnDto`'s four dead declarations, defended today by `r.workflowStatus ?? r.status`;
+  ⚙ **Filed** (first three now CLOSED — do not re-open them): `PrivacyBreachDto`'s four value-less fields
+  (the breach Severity column and filter are inert) — **closed by F2-211**; `CyberVulnDto`'s *"four dead
+  declarations"* — **closed by F2-212, and it was THREE: `capaId` is a real column, null on all 20 rows**;
   `IncidentDto` never declaring `lessonsLearned`/`resolutionDate`/`timelineJson` which the wire carries
-  (F2-198's shape); the wizard having no Arabic activity-name field (house rule 7); and
+  (F2-198's shape) — **closed by F2-212, where it turned out to be the read half of a destructive write**.
+  Still open: the wizard having no Arabic activity-name field (house rule 7); and
   `processing_activities.status` having no CHECK — now cheap to add, since this slice fixed its only
   writer.
   ⚠⚠ **ASK WHAT AN EMITTED DOCUMENT ASSERTS THAT NO COLUMN RECORDS — PER FIELD, NOT PER FILE — AND THE
