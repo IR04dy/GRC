@@ -2400,6 +2400,144 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-217 · An internal-audit plan could be created already approved by the Audit Committee, and the ratchet built for forged authority spelled the columns differently
+
+| | |
+|---|---|
+| **ID** | F2-217 |
+| **Severity** | **P2 — live, not latent.** Three governance registers accepted a create that both named a terminal state and forged the attribution for it. Reachable by any holder of `AUDIT:WRITE`; probed live and reproduced on all three. Not P1 only because the affected registers are internal-audit artefacts rather than a statutory filing, and no evidence of use exists in dev or prod. |
+| **Status** | **CLOSED 2026-08-15** (`3e0fcd7c`). Backend refuses a non-initial status and clears the transition-stamped columns; the ranking instrument is corrected; 6 of the surfaced endpoints adjudicated, 55 filed as a measured work list. |
+| **Where** | `module/audit_lc/service/AuditLifecycleService` (3 creates), `security/MassAssignmentRatchetTest`, `tss-grc-ui-v2/src/lib/auditLifecycle.ts` |
+
+**What was asked.** [[F2-216]] left one item on its Status row: *"`MassAssignmentRatchetTest`'s **184 TENANT-tier
+rows have an EMPTY adjudication column**, and its own header says the adjudication column is the authority, not
+the tier."* This is that population, read.
+
+**The instrument was ranking a field it had already closed, and hiding one it had not.** The tier ladder read
+`tenant && (authority||outcome) ? CRIT : (authority||outcome) ? HIGH : tenant ? TENANT : state ? STATE : LOW`.
+Two problems, and they reinforced each other:
+
+- **`tenant` outranked `state`.** 145 of the 214 endpoints bind `organisationId` **and** a state field, so they
+  ranked TENANT and the state binding never appeared in the tier at all. The STATE tier read **4**.
+- **`tenant` was also required to reach CRIT**, on the premise that a bindable `organisationId` is an
+  unmitigated cross-tenant write. [[F2-216]] measured that premise one slice earlier and it no longer holds:
+  202 entity-bound writes all stamp the tenant, and the interceptor is wired and enabled in dev *and* prod.
+
+🔑 **A ranking whose top discriminator has been CLOSED no longer ranks risk — and while it stays on top it
+MASKS whatever it outranks.**
+
+**And the authority vocabulary was a literal list of field names.** `AUTHORITY` held `approvedBy`,
+`reviewedBy`, `closedBy` — written from the four bypasses this class was built after (DF-3, DF-4, [[F2-25]],
+the roster link), i.e. **from those four instances' spellings**. Measured from the regenerated profile:
+**24 distinct authority-shaped names on 64 of the 214 endpoints** the list did not spell — `acApprovedBy`,
+`reviewer`, `reviewedAt`, `closedAt`, `approverName` (13 endpoints), `reviewerName` (14), `publishedAt`,
+`ratifiedAt`, `integrityVerifiedAt`, `loiSignedAt`, `pirReviewedBy`…
+🔑 **A census keyed on a list of names measures the list, not the codebase** — the eighth appearance of
+[[F2-198]]'s shape here (*the invariant is real, its POPULATION is narrower than it looks*), and the sharpest,
+because this instrument's own javadoc says it exists **because** *"ranking 214 endpoints by hand is how the
+first four were found — one at a time, over months."*
+
+**The live defect underneath.** All three `audit_lc` creates persist the request entity and validated `status`
+only for **membership of the vocabulary**, never for being a state a record may *start* in. Probed live as
+`compliance` (not `admin` — the guard is `AUDIT:WRITE` and the defect is post-guard):
+
+| create | sent | stored | the guarded route, same transition |
+|---|---|---|---|
+| `POST /annual-plans` | `status=AC_APPROVED`, `acApprovedBy="Nobody Who Approved This"`, `acApprovedAt=2001-01-01` | **200**, all three | `DRAFT → AC_APPROVED` → **409** |
+| `POST /working-papers` | `status=APPROVED`, `reviewer="Nobody Who Reviewed This"`, `reviewedAt=2001-01-01` | **200**, all three | machine requires `PEER_REVIEW` first |
+| `POST /capas` | `status=CLOSED`, `closedAt=2001-01-01` | **200**, both | `CLOSED` only from `AWAITING_VERIFICATION` |
+
+So: an internal-audit annual plan filed as **approved by the Audit Committee** with no approval; an **IIA
+Standard 2330 working paper** created already peer-reviewed, attributed to a name of the caller's choosing; a
+corrective action **closed without ever being verified**, backdated. That is DF-3/DF-4's defect — forged
+authority — sitting in the tier the instrument mis-ranked.
+
+⚠⚠ **The fix that preceded it names the field it left open.** [[F2-203]] closed `author` on
+`createWorkingPaper` — *"an invented auditor was PERSISTED as the author of an IIA Standard 2330 working
+paper"* — and its comment says *"the same rule `transitionWorkingPaper` below already applies to `reviewer`."*
+True of the transition; **false of the create it is written on.** The live probe returned
+`author=compliance`, correctly stamped, **beside a `reviewer` the caller had chosen**. 🔑 [[F2-215]]'s headline
+one level down: **fixing the field you noticed leaves the remainder looking covered, because the mechanism
+that covers them is visibly present** — and here a comment explicitly cites the sibling protection as
+evidence.
+
+**Fix — two rules, and the second is what makes them checkable.** Each register declares its **initial state**
+once, read by *both* the default applied when the caller says nothing *and* the new guard, so the value the
+server picks and the value it accepts cannot drift ([[F2-178]]'s one-predicate shape). The transition-stamped
+columns are cleared on create. ⚠ Refusing rather than coercing follows [[F2-182]]'s rule — *ask what is
+already refusing*: the create already rejected anything outside the vocabulary, so the only requests this
+newly refuses are ones performing an unguarded transition, and **a request that performs an unguarded
+transition is not a working request**. The 400 names the field and the route that can record who decided.
+⚠ Server-**derived** state still runs — `applyOverdue` may still move a new CAPA to `OVERDUE` from its target
+date, and a test asserts it, because *"a create always lands in the initial state"* would be an equally
+passing and wrong reading of the change.
+
+**Instrument fix.** The authority vocabulary becomes a **shape** — an act (`verb` + `By`/`At`, matched as a
+suffix so `acApprovedBy` is caught with the bare form) or an actor (agent noun + optional `Id`/`Name`) — with
+the literal list retained **only** to split the CRIT population in two. Tiers move **CRIT 18 → 79, HIGH 3 →
+merged, TENANT 184 → 29, STATE 4 → 101.**
+
+⚠⚠ **The number the assertion holds went UP, and that is the finding, not a regression.** The pre-F2-217 CRIT
+set keeps its **hard zero** — every endpoint the old ladder ranked CRIT is still adjudicated. The 55 the
+widening surfaced ride a separate decrease-only figure, printed **NEEDS-VERDICT** into
+`target/mass-assignment-risk.txt` with the fields that put each there, so it is a work list rather than a
+count. 🔑 [[F2-205]]'s rule, not [[F2-204]]'s: **there a ratchet's QUESTION was wrong so it was re-scoped;
+here the question was right and the ANSWER was under-measured, so the figure moves and says so. A hard zero
+over a population the instrument cannot see is the most reassuring possible artefact.** 6 adjudicated in this
+slice (3 creates CLOSED, 3 updates INERT — all three updates are field whitelists that never mention status or
+the authority columns); 55 remain, deliberately **not** given manufactured reasons ([[F2-188]]'s failure mode,
+[[F2-194]]'s ratified alternative).
+
+⚠⚠ **My detector under-reported and only a second measurement caught it.** `AUTHORITY_SHAPE`'s first draft was
+lower-case-only, so it did not match `acApprovedBy` — **the two `AnnualPlan` endpoints whose live probe
+motivated the whole slice ranked STATE, and the build was green.** Found by diffing against the throwaway
+census that had used `CASE_INSENSITIVE`. 🔑 **A detector that cannot match reads exactly like a clean tree, and
+it UNDER-reports** — the argument for keeping the scratch measurement until the shipped gate reproduces it.
+
+⚠⚠ **The mutation harness found a hole two shape assertions had left between them.** Restoring only the
+`tenant &&` half of the old ladder **SURVIVED**: it lowers the CRIT count, which a `<=` ceiling reads as
+progress; it leaves no TENANT row binding a state field, so the masking leg is satisfied; and it quietly
+demotes the three endpoints binding an approval field on a body with no `organisationId`. 🔑 **Two shape
+assertions that each look complete can still leave the predicate between them free to move.** Closed with
+`anEndpointBindingAnAuthorityOrOutcomeFieldIsAlwaysRankedCrit`.
+
+⚠ **A gate leg of mine failed on correct code and was narrowed, not exempted.** The frontend gate asserted
+`to:` on every transition payload; `transitionFinding` posts `{ status, mgmtResponseEn, … }` while the
+plan/paper/CAPA routes post `{ to }`. **A gate that fails on correct code is worse than no gate — it trains
+the next reader to edit the assertion rather than the code** ([[F2-214]]).
+
+⚠ **Probe-harness landmine, and it is [[F2-215]]'s defect seen from the other side.** `DELETE` here is a
+**soft** delete while the UNIQUE index on `(organisation_id, external_id)` still sees the row, so a re-run with
+a fixed `externalId` fails on the index — **which reads exactly like the fix having broken**. Every run now
+mints a fresh suffix ([[F2-203]]: a probe that writes rows must be re-runnable).
+
+⚠⚠ **Correction to [[F2-216]]'s environment note.** That entry recorded *":8084 MAY NOT BE YOUR BACKEND"* and
+concluded the listener belonged to another session, from its log timestamp. It did not: the process's own
+`-Djava.io.tmpdir` names **this** session's scratchpad. 🔑 **A log timestamp is not process identity — the
+JVM's own arguments are.** The practical consequence was the opposite of the one recorded: the listener was
+mine to restart, and it needed restarting, because `mvn -o test` had rewritten `target/classes` **without**
+DevTools reloading the context — the post-fix probe scored 7/14 against code the running process had never
+loaded. 🔑 **A stale listener answers `/actuator/health` 200 and serves the OLD behaviour, which is the most
+misleading possible result for a fix-verification probe.**
+
+**Verification.** Backend **3,878/0/0**; frontend **756/0/0** across 69 files + `tsc` clean. Mutation
+**13/13 killed, 0 survived, 0 anchor-miss**. Pre-fix control: both changed files restored from `master` and
+the gates **fail**, as they must. Live probe **14/14 post-fix** on a restarted backend (**7/14 pre-fix**, same
+script). 15 `[REVIEW-TEST]` rows removed with `CHARINDEX`. **No migration, no endpoint change, no schema
+change.**
+
+**Filed.** The **55 NEEDS-VERDICT rows** are the next slice of F2-22b, already sorted by the fields that put
+them there — `approverName` (13), `reviewerName` (14), `closedAt` (12), `reviewedAt` (11), `publishedAt` (7),
+`lastReviewedAt` (8) — and the largest clusters are `PolicyController`, `CyberController`, `NdiEvidenceItem`,
+`SustainabilityEvidence` and `ControlLibraryController`. Each needs its service read; the verdict is CLOSED /
+INERT / BY DESIGN, and lowering `BASELINE_UNADJUDICATED_NEW_CRIT` belongs in the same commit.
+
+**Lesson.** 🔑 **A risk ranking built from a literal name list finds exactly the spellings its author had
+already seen — so the instrument built to stop a defect recurring reproduces the blind spot that let it
+happen.** And its corollary, which is what made this one findable: **when a ranking's top discriminator gets
+closed, re-read the ladder, because a closed field at the top is not neutral — it hides everything beneath
+it.**
+
 ## F2-216 · The platform-wide tenant backstop exempts the one value that means "every tenant", and the reason it gives is false
 
 | | |

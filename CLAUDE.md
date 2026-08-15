@@ -1872,6 +1872,61 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A RISK RANKING BUILT FROM A LITERAL FIELD-NAME LIST FINDS EXACTLY THE SPELLINGS ITS AUTHOR HAD ALREADY
+  SEEN, AND A CLOSED FIELD AT THE TOP OF THE LADDER HIDES EVERYTHING BENEATH IT** (F2-217, measured
+  2026-08-15). `MassAssignmentRatchetTest` ranks each entity-bound write by matching the body type's fields
+  against vocabularies. Its `AUTHORITY` list was written from the four bypasses the class was built after
+  (DF-3, DF-4, F2-25, the roster link) — **from those four instances' spellings** — so it holds `approvedBy`,
+  `reviewedBy`, `closedBy` while the platform's columns are also `acApprovedBy`, `reviewer`, `reviewedAt`,
+  `closedAt`, `approverName` (13 endpoints), `reviewerName` (14), `publishedAt`, `ratifiedAt`,
+  `integrityVerifiedAt`, `loiSignedAt`: **24 names on 64 of the 214 endpoints, nearly all ranked below CRIT
+  and therefore never adjudicated.** 🔑 **A census keyed on a list of names measures the list, not the
+  codebase** — 8th appearance of F2-198's shape, and the sharpest, because this instrument's javadoc says it
+  exists *because* "ranking 214 endpoints by hand is how the first four were found."
+  ⚠⚠ **The second half is the ladder.** It read `tenant && (authority||outcome) ? CRIT : … : tenant ? TENANT :
+  state ? STATE : LOW`, so **`tenant` outranked `state`** — 145 of 214 endpoints bind `organisationId` *and* a
+  state field, ranked TENANT, and the STATE tier read **4** where 149 bodies bind one. And `tenant` was
+  *required* for CRIT, on the premise F2-216 had measured away one slice earlier. 🔑 **When a ranking's top
+  discriminator gets CLOSED, re-read the ladder: a closed field at the top is not neutral, it masks what it
+  outranks.** Corrected: authority is now a **shape** (act = verb+`By`/`At` matched as a suffix; actor = agent
+  noun), `tenant` drops below `state`; tiers move **CRIT 18→79, HIGH 3→merged, TENANT 184→29, STATE 4→101**.
+  ⚠⚠ **The live defect it hid, P2 and probed as `compliance`:** all three `audit_lc` creates persist the
+  request entity and validated `status` only for **membership of the vocabulary**, never for being a state a
+  record may *start* in. `POST /api/audit-lc/annual-plans` with `status=AC_APPROVED` +
+  `acApprovedBy="Nobody Who Approved This"` + a 2001 `acApprovedAt` answered **200 and stored all three**,
+  while the guarded `/transition` answered **409** for `DRAFT → AC_APPROVED`. Same shape gave an **IIA Standard
+  2330 working paper** created `APPROVED` with a chosen `reviewer`/`reviewedAt`, and a CAPA created `CLOSED`
+  with a backdated `closedAt` — a corrective action closed without verification. **DF-3/DF-4's defect exactly.**
+  ⚠⚠ **F2-203 fixed `author` on that very method, and its comment cites `reviewer` as already covered** — true
+  of `transitionWorkingPaper`, false of the create it is written on. The probe returned `author=compliance`,
+  correctly stamped, **beside a `reviewer` the caller had chosen.** 🔑 **Fixing the field you noticed leaves the
+  remainder looking covered, because the mechanism that covers them is visibly present** (F2-215's headline one
+  level down). **Rule now:** each register declares its **initial state** once, read by *both* the default and
+  the guard so the value the server picks and the value it accepts cannot drift; transition-stamped columns are
+  cleared on create. ⚠ **Refuse, do not coerce** — F2-182's test (*what is already refusing?*) says the create
+  already rejected anything outside the vocabulary, so the only requests newly refused are ones performing an
+  unguarded transition, and **a request that performs an unguarded transition is not a working request**.
+  ⚠ Server-**derived** state must survive the fix: `applyOverdue` still moves a new CAPA to `OVERDUE` from its
+  target date, asserted — *"a create always lands in the initial state"* is an equally passing, wrong reading.
+  ⚠⚠ **The gate's held number went UP, and that is the finding.** The pre-F2-217 CRIT set keeps its **hard
+  zero**; the **55** rows the widening surfaced ride a separate decrease-only figure and are printed
+  `NEEDS-VERDICT` into `target/mass-assignment-risk.txt` with the fields that put each there — a work list, not
+  a count. 🔑 **F2-205's rule, not F2-204's: there a ratchet's QUESTION was wrong so it was re-scoped; here the
+  question was right and the ANSWER was under-measured, so the figure moves and says so.** Do **not** give the
+  55 manufactured reasons (F2-188's failure mode); read the service, record CLOSED/INERT/BY DESIGN, lower the
+  figure in the same commit.
+  ⚠⚠ **My own detector UNDER-reported and only a second measurement caught it.** `AUTHORITY_SHAPE`'s first
+  draft was lower-case-only, so it never matched `acApprovedBy` — **the two endpoints whose live probe
+  motivated the whole slice ranked STATE and the build was green.** Found by diffing against the throwaway
+  census, which had used `CASE_INSENSITIVE`. 🔑 **A detector that cannot match reads exactly like a clean tree**
+  — keep the scratch measurement until the shipped gate reproduces it.
+  ⚠⚠ **And the mutation harness found a hole two shape assertions had left between them**: restoring only the
+  `tenant &&` half of the old ladder SURVIVED, because it **lowers** the CRIT count and a `<=` ceiling reads
+  that as progress. 🔑 **Two shape assertions that each look complete can still leave the predicate between
+  them free to move** — assert that binding an authority field is *sufficient* for CRIT, in its own leg.
+  ⚠ **A probe that writes rows must survive its own cleanup**: `DELETE` here is a **soft** delete while the
+  UNIQUE index on `(organisation_id, external_id)` still sees the row (F2-215's shape), so a fixed `externalId`
+  makes run 2 fail on the index — **which reads exactly like the fix having broken**. Mint a fresh suffix.
 - ⚠⚠ **A NULL `organisation_id` IS NOT "MISSING" — ON EIGHT TABLES IT MEANS *EVERY TENANT*, AND THE
   PLATFORM-WIDE BACKSTOP EXEMPTS EXACTLY THAT VALUE** (F2-216, measured 2026-08-15).
   `TenantWriteGuardInterceptor#decideInsert` passes a row whose tenant is null, on the stated ground that it is
@@ -1912,13 +1967,20 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   not this session's — mine stopped three hours earlier) ended up rejecting **every token it issues**
   (`WWW-Authenticate: Bearer`, curl agrees). It was **not killed**. Check whose process owns the port before
   trusting a live probe, and before assuming a 401 is your finding.
+  ⚠⚠ **Correction (F2-217): identify the process by its ARGUMENTS, not by a log timestamp — that one WAS this
+  session's.** `Get-CimInstance Win32_Process -Filter "ProcessId = N" | Select CommandLine` prints
+  `-Djava.io.tmpdir=…/<session-id>/scratchpad`, which names the session that launched it; the log had merely
+  stopped because nothing had hit the app for hours. 🔑 **A log timestamp is not process identity.** The
+  practical consequence was the opposite of the one recorded above: the listener was mine to restart, and it
+  **needed** restarting — `mvn -o test` rewrote `target/classes` and **DevTools did not reload the context**,
+  so a post-fix probe scored 7/14 against code the running process had never loaded. 🔑 **A stale listener
+  answers `/actuator/health` 200 and serves the OLD behaviour**, which is the most misleading possible result
+  for a fix-verification probe: it looks exactly like the fix not working. Restart, then re-probe.
   ⚙ **Probe-harness landmine:** Python 3.14's `http.client` rejects this server's chunk terminator and raises
   `IncompleteRead` **after buffering the whole payload** — `e.partial` held all 5,305 bytes curl reported.
   Reading the body inside the `with` and letting that escape discarded a healthy 200 and reported the backend
   down for 180 s. 🔑 **A probe that cannot read a reply looks exactly like a server that never sent one.**
-  ⚙ **Still open:** `MassAssignmentRatchetTest`'s **184 TENANT-tier rows have an EMPTY adjudication column**
-  (the 18 CRIT ones were F2-22b's work), and its own header says the adjudication column is the authority, not
-  the tier. `READ_ONLY` and never `@JsonIgnore` — the whole frontend resolves records by `id`,
+  ⚙ **That TENANT-tier item is now CLOSED as F2-217 — and the ranking was itself the defect (see below).** `READ_ONLY` and never `@JsonIgnore` — the whole frontend resolves records by `id`,
   and the property is **not removed** from the deserialiser either, because the FE echoes whole records back
   on update paths and under `FAIL_ON_UNKNOWN_PROPERTIES` that would turn working requests into 400s.
   ⚠⚠ **A test that mirrors the framework must mirror its CONFIGURATION, not just its modules.** The gate's
