@@ -70,19 +70,27 @@ public class CrisisCommsService {
     }
 
     @Transactional
+    /**
+     * F2-214 — absent means "leave alone"; {@code crisisCommsApi.updateTemplate} sends a
+     * {@code Partial<CrisisCommsTemplateDto>}. Writing all eleven unconditionally meant an edit
+     * that omitted any of them erased it: the code, both language names, the audience, the
+     * channel, both subjects, both bodies, the severity band and the version — every one
+     * populated on 5/5 live rows in dev and prod. A crisis communication template with a null
+     * body is a template that produces nothing at the moment it is needed.
+     */
     public CrisisCommsTemplate updateTemplate(Long id, CrisisCommsTemplate req) {
         CrisisCommsTemplate t = mustGetTemplate(id);
-        t.setCode(req.getCode());
-        t.setNameEn(req.getNameEn());
-        t.setNameAr(req.getNameAr());
-        t.setAudienceRole(req.getAudienceRole());
-        t.setChannel(req.getChannel());
-        t.setSubjectEn(req.getSubjectEn());
-        t.setSubjectAr(req.getSubjectAr());
-        t.setBodyEn(req.getBodyEn());
-        t.setBodyAr(req.getBodyAr());
-        t.setSeverityBand(req.getSeverityBand());
-        t.setVersion(req.getVersion());
+        if (req.getCode() != null)         t.setCode(req.getCode());
+        if (req.getNameEn() != null)       t.setNameEn(req.getNameEn());
+        if (req.getNameAr() != null)       t.setNameAr(req.getNameAr());
+        if (req.getAudienceRole() != null) t.setAudienceRole(req.getAudienceRole());
+        if (req.getChannel() != null)      t.setChannel(req.getChannel());
+        if (req.getSubjectEn() != null)    t.setSubjectEn(req.getSubjectEn());
+        if (req.getSubjectAr() != null)    t.setSubjectAr(req.getSubjectAr());
+        if (req.getBodyEn() != null)       t.setBodyEn(req.getBodyEn());
+        if (req.getBodyAr() != null)       t.setBodyAr(req.getBodyAr());
+        if (req.getSeverityBand() != null) t.setSeverityBand(req.getSeverityBand());
+        if (req.getVersion() != null)      t.setVersion(req.getVersion());
         t.setUpdatedAt(LocalDateTime.now());
         return templateRepo.save(t);
     }
@@ -122,11 +130,18 @@ public class CrisisCommsService {
         CrisisCommsAudience a = audienceRepo.findById(id)
             .filter(x -> x.getOrganisationId().equals(TenantContext.getCurrentTenant()))
             .orElseThrow(() -> new EntityNotFoundException("Audience not found: " + id));
-        a.setName(req.getName());
-        a.setNameAr(req.getNameAr());
-        a.setAudienceRole(req.getAudienceRole());
-        a.setContactsCsv(req.getContactsCsv());
-        a.setRecipientCount(countRecipients(req.getContactsCsv()));
+        // F2-214 — absent means "leave alone"; the client sends a Partial<CrisisCommsAudienceDto>.
+        // `recipientCount` is DERIVED from contactsCsv, so it has to move with it: recomputing
+        // from an absent list is not a null but a **0**, and a zero recipient count reads as
+        // "this audience has nobody in it" rather than as missing data. All four fields are
+        // populated on 4/4 live rows in dev and prod.
+        if (req.getName() != null)         a.setName(req.getName());
+        if (req.getNameAr() != null)       a.setNameAr(req.getNameAr());
+        if (req.getAudienceRole() != null) a.setAudienceRole(req.getAudienceRole());
+        if (req.getContactsCsv() != null) {
+            a.setContactsCsv(req.getContactsCsv());
+            a.setRecipientCount(countRecipients(req.getContactsCsv()));
+        }
         return audienceRepo.save(a);
     }
 

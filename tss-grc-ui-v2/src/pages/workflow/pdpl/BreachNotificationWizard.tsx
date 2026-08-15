@@ -12,9 +12,11 @@ import { privacyApi } from '../../../lib/api';
 /**
  * PDPL §7.4 #8 — Personal Data Breach notification wizard.
  *
- * <p>PDPL Article 23 mandates SDAIA notification within 72 hours of
- * becoming aware of a personal-data breach. This wizard walks the DPO
- * through:
+ * <p>PDPL Article 20 sets the 72-hour window for notifying SDAIA after becoming aware of a
+ * personal-data breach. (This file cited "Article 23" in two places until F2-214; Article 23
+ * is the data-subject-request article, and `lib/moduleAnchors.ts` — the regulator-citation
+ * catalogue W2-1a-i deliberately keeps — records Article 20 as the breach window. Same shape
+ * as F2-207's ROPA "Article 22" for "Article 31".) The wizard walks the DPO through:
  *   1. Detect — when, who, what
  *   2. Severity — categories, volumes, special-category flag
  *   3. Scope — affected data subjects, data categories
@@ -22,10 +24,34 @@ import { privacyApi } from '../../../lib/api';
  *   5. Drafted notification (SDAIA + subjects)
  *   6. Approval + submission
  *
- * <p>Status mirrors the CrisisEvent pdpl_72h fields from V115; on submit
- * the wizard would create or update the crisis event + filing.
+ * <p>⚠⚠ F2-214 — <b>submitting this wizard had never once created a record.</b> It posted
+ * `description` / `severity` / `affectedRecords` / `reportedToAuthority`, none of which is a
+ * property of the `DataBreach` entity the route binds, and it never sent `breachType`, which
+ * is NOT NULL. Spring Boot disables FAIL_ON_UNKNOWN_PROPERTIES, so the four unknown keys were
+ * discarded in silence and the missing one produced **HTTP 400, "A required field was not
+ * supplied"** — a diagnostic naming no field, on a form where nothing looks missing. Probed
+ * live 2026-08-15; the entity's own names return 201. All 17 rows in dev and prod are seeded.
+ *
+ * <p>`severity` has no column on `privacy.data_breaches` at all (F2-211 retired it from the
+ * read type for the same reason). It is not dropped — it drives the triage default below and
+ * is written into the narrative — but it must never be sent as a field: inventing a column
+ * for it is a schema change, and sending it is what made this form silently lossy.
  */
 type Severity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+/**
+ * The twelve values `privacy.data_breaches.breach_type` already holds (17 live rows, dev =
+ * prod), with the `UNAUTHORISED`/`UNAUTHORIZED` spelling split collapsed to the British form
+ * the rest of the platform uses. The column has **no CHECK constraint** and is not given one
+ * here: other writers are still open, and collapsing the stored spelling variants rewrites
+ * live rows in two databases, which is an owner decision (F2-183). Narrowing what *this*
+ * writer can produce needs no constraint.
+ */
+const BREACH_TYPES = [
+  'ACCIDENTAL_DISCLOSURE', 'UNAUTHORISED_ACCESS', 'LOSS_OF_DEVICE', 'PHISHING',
+  'MISCONFIGURATION', 'INSIDER_THREAT', 'VENDOR_BREACH', 'CYBERATTACK',
+  'PHYSICAL_TAMPERING', 'WEB_VULN_EXPLOIT', 'DATA_EXPOSURE_LOWER_ENV', 'OTHER',
+] as const;
 
 interface BreachDraft {
   titleEn: string;
@@ -33,6 +59,8 @@ interface BreachDraft {
   detectedByName: string;
 
   severity: Severity;
+  /** NOT NULL on privacy.data_breaches — the field whose absence made every submit a 400. */
+  breachType: string;
   affectedSubjectCount?: number;
   specialCategory: boolean;
   dataCategories: string;         // comma-separated tags
@@ -62,7 +90,7 @@ export function BreachNotificationWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [draft, setDraft] = useState<BreachDraft>({
     titleEn: '', detectionTime: NOW(), detectedByName: '',
-    severity: 'MEDIUM', specialCategory: false,
+    severity: 'MEDIUM', breachType: '', specialCategory: false,
     dataCategories: '', affectedScopeEn: '', containmentSummaryEn: '',
     approvedByDpo: false, approvedByCounsel: false,
   });
@@ -88,6 +116,10 @@ export function BreachNotificationWizard() {
       // endpoint is the canonical record (cross-references back to the BCM
       // crisis event via the wizard's containment summary when applicable).
       const description = [
+        // `severity` has no column on privacy.data_breaches. It is recorded here, in the
+        // free-text column that does exist, rather than sent as a field the entity would
+        // discard — F2-209's third state: where no column exists, do not invent one.
+        `Severity (DPO assessment): ${draft.severity}`,
         draft.affectedScopeEn?.trim() ? `Scope: ${draft.affectedScopeEn}` : null,
         draft.containmentSummaryEn?.trim() ? `Containment: ${draft.containmentSummaryEn}` : null,
         draft.dataCategories?.trim() ? `Data categories: ${draft.dataCategories}` : null,
@@ -101,15 +133,21 @@ export function BreachNotificationWizard() {
         draft.approvedByCounsel ? 'Counsel approved' : null,
       ].filter(Boolean).join(' · ');
 
+      // Every key here is a property of the DataBreach entity this route binds. Adding one
+      // that is not does not fail — Spring Boot discards it in silence, which is precisely
+      // how four of this payload's fields went missing for the life of the wizard (F2-214).
       const created = await privacyApi.createBreach({
         titleEn: draft.titleEn,
-        description: description || undefined,
-        severity: draft.severity,
-        affectedRecords: draft.affectedSubjectCount ?? null,
+        descriptionEn: description || undefined,
+        breachType: draft.breachType,
+        dataSubjectsAffectedCount: draft.affectedSubjectCount ?? null,
         discoveredAt: draft.detectionTime
           ? new Date(draft.detectionTime).toISOString()
           : new Date().toISOString(),
-        reportedToAuthority: draft.decision === 'NOTIFY_SDAIA',
+        // The DPO's triage decision IS the "does this require authority notification"
+        // determination the column records. `pdpcNotifiedAt` is NOT set here: that is the
+        // evidence the data office was actually told, and `notifyDataOffice` stamps it.
+        pdpcNotificationRequired: draft.decision === 'NOTIFY_SDAIA',
         status: draft.approvedByDpo && draft.approvedByCounsel ? 'NOTIFIED'
               : draft.decision ? 'IN_REVIEW'
               : 'NEW',
@@ -151,7 +189,7 @@ export function BreachNotificationWizard() {
           {deadline && (
             <div className="wf-summary" style={{ gridColumn: '1 / -1' }}>
               <Badge tone={breached ? 'danger' : (hoursLeft! < 24 ? 'warning' : 'info')}>
-                PDPL Art. 23
+                PDPL Art. 20
               </Badge>{' '}
               {breached
                 ? (isAr ? 'تم تجاوز نافذة ٧٢ ساعة.' : 'The 72-hour window has elapsed.')
@@ -170,6 +208,8 @@ export function BreachNotificationWizard() {
       Icon: AlertOctagon,
       validate: () => !draft.severity
         ? (isAr ? 'اختر الشدة' : 'Pick a severity')
+        : !draft.breachType
+        ? (isAr ? 'اختر نوع الخرق' : 'Pick a breach type')
         : null,
       content: () => (
         <div className="wf-form-grid">
@@ -180,6 +220,17 @@ export function BreachNotificationWizard() {
               <option value="MEDIUM">Medium</option>
               <option value="HIGH">High</option>
               <option value="CRITICAL">Critical</option>
+            </select>
+          </Field>
+          {/* F2-214 — breach_type is NOT NULL. The wizard collected no such field, so every
+              submit was a 400 whose message named nothing. Required here for that reason. */}
+          <Field label={isAr ? 'نوع الخرق' : 'Breach type'} required>
+            <select className="input" value={draft.breachType}
+                    onChange={e => set('breachType', e.target.value)}>
+              <option value="">{isAr ? '— اختر —' : '— select —'}</option>
+              {BREACH_TYPES.map(t => (
+                <option key={t} value={t}>{t.replace(/_/g, ' ').toLowerCase()}</option>
+              ))}
             </select>
           </Field>
           <Field label={isAr ? 'عدد المتأثرين (تقدير)' : 'Affected subjects (estimate)'}>

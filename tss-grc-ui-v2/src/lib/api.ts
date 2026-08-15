@@ -2534,7 +2534,11 @@ export interface PrivacyDsrDto {
 export interface PrivacyDsrRequest {
   requestType: string; requesterName: string; requesterEmail?: string;
   receivedAt?: string; dueDate?: string; status?: string;
-  description?: string;
+  // F2-214 — `description` was declared here and `DataSubjectRequest` has no such property
+  // (fourteen fields, none of them free text). `POST|PUT /api/v1/privacy/dsrs` binds that
+  // entity, so the DSR fulfilment wizard's composed narrative — including its identity
+  // verification evidence — was discarded on every submission. Filed by F2-213, closed here
+  // by the same gate that found the breach half. Do not re-add it without a column.
 }
 // ⚠⚠ F2-211: this interface declared `severity`, `occurredAt`, `reportedAt` and
 // `affectedRecords`. `GET /api/v1/privacy/breaches` returns the DataBreach ENTITY,
@@ -2616,11 +2620,35 @@ export interface PrivacyRopaDto {
    */
   crossBorderTransfer?: boolean;
 }
+/**
+ * F2-214 — the write twin of `PrivacyBreachDto`, corrected against the same entity.
+ *
+ * F2-211 adjudicated the READ types against `DataBreach` by reflection and retired
+ * `severity` / `affectedRecords` / `occurredAt` / `reportedAt`. This type sat eight lines
+ * below the one it corrected and kept every retired name, because a request type has no
+ * wire to nominate from — nothing ever returns it — so it was outside that instrument by
+ * construction. `POST|PUT /api/v1/privacy/breaches` binds the ENTITY, and Spring Boot
+ * disables FAIL_ON_UNKNOWN_PROPERTIES, so each of those names was discarded in silence.
+ *
+ * Probed live 2026-08-15 with the exact payload `BreachNotificationWizard` sends:
+ * **HTTP 400, "A required field was not supplied"** — `breach_type` is NOT NULL and the
+ * wizard named `severity` instead. The entity's own names return 201. The PDPL Article 20
+ * breach register has never been creatable from that wizard; all 17 rows are seeded.
+ *
+ * `pdpcNotifiedAt` is deliberately absent: it is stamped by `notifyDataOffice` and is the
+ * evidence the data office was told, not a form field (F2-213's `completedAt` rule).
+ * There is no `severity` and no `titleAr` column on `privacy.data_breaches` — do not
+ * re-add either here; the second is filed as a real gap against house rule 7.
+ */
 export interface PrivacyBreachRequest {
-  titleEn: string; titleAr?: string;
-  description?: string; severity?: string;
-  affectedRecords?: number | null; discoveredAt?: string;
-  reportedToAuthority?: boolean; status?: string;
+  titleEn: string;
+  descriptionEn?: string;
+  /** NOT NULL on privacy.data_breaches. Omitting it is a 400 that names no field. */
+  breachType: string;
+  discoveredAt?: string;
+  dataSubjectsAffectedCount?: number | null;
+  pdpcNotificationRequired?: boolean;
+  status?: string;
 }
 /**
  * ⚠⚠ F2-210 — this type declared `processNameEn` / `processNameAr` /
@@ -2651,6 +2679,14 @@ export interface PrivacyRopaRequest {
   retentionPeriodMonths?: number;
   dataCategoriesJson?: string;
   status?: string;
+  /**
+   * F2-214 — `PrivacyService.updateRopa` writes this unconditionally and this type did not
+   * declare it, so `PUT /ropa/{id}` sent null and cleared the PDPL Article 29 cross-border
+   * flag on every edit. Non-null on 11 of 11 live rows in dev and prod, 5 of them true —
+   * and `PrivacyPage`'s cross-border tile (the one signal F2-198 preserved when it retired
+   * the fabricated `/ropa` page) counts exactly this column.
+   */
+  crossBorderTransfer?: boolean;
 }
 export const privacyApi = {
   dsrs:           (page = 0, size = 50) => api.get<PageResponse<PrivacyDsrDto>>(`/api/v1/privacy/dsrs${pageQ(page, size)}`),

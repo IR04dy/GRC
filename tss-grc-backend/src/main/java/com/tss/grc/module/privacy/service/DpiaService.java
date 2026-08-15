@@ -114,18 +114,34 @@ public class DpiaService {
     }
 
     @Transactional
+    /**
+     * F2-214 — absent means "leave alone", because the only client is typed to send a subset.
+     *
+     * <p>This wrote all ten fields unconditionally while {@code dpiaApi.update} takes a
+     * {@code Partial<DpiaDto>}. A client type that positively permits omitting a field, against
+     * a server that writes every field, is a contradiction whose cost is silent erasure: editing
+     * one property of a PDPL Article 25 impact assessment would have nulled its title in both
+     * languages, its trigger, its residual-risk rating, its assessment date, its next review
+     * date and its conclusion — populated on 5/5, 5/5, 5/5, 5/5, 4/5 and 2/5 live rows,
+     * identical in dev and prod.
+     *
+     * <p>Latent only because that client has no caller: the reachability red list records it as
+     * a missing edit screen. That entry reads as an invitation to build one, and building one
+     * is what would have fired this. The guard is the idiom {@code PolicyManagementService#update}
+     * already uses, and it cannot break a caller that does send the field.
+     */
     public Dpia update(Long id, Dpia req) {
         Dpia d = mustGet(id);
-        d.setProcessingActivityId(req.getProcessingActivityId());
-        d.setTitleEn(req.getTitleEn());
-        d.setTitleAr(req.getTitleAr());
-        d.setTriggerReason(req.getTriggerReason());
-        d.setOverallResidualRisk(req.getOverallResidualRisk());
-        d.setDpoId(req.getDpoId());
-        d.setAssessorId(req.getAssessorId());
-        d.setAssessmentDate(req.getAssessmentDate());
-        d.setNextReviewDate(req.getNextReviewDate());
-        d.setConclusion(req.getConclusion());
+        if (req.getProcessingActivityId() != null) d.setProcessingActivityId(req.getProcessingActivityId());
+        if (req.getTitleEn() != null)              d.setTitleEn(req.getTitleEn());
+        if (req.getTitleAr() != null)              d.setTitleAr(req.getTitleAr());
+        if (req.getTriggerReason() != null)        d.setTriggerReason(req.getTriggerReason());
+        if (req.getOverallResidualRisk() != null)  d.setOverallResidualRisk(req.getOverallResidualRisk());
+        if (req.getDpoId() != null)                d.setDpoId(req.getDpoId());
+        if (req.getAssessorId() != null)           d.setAssessorId(req.getAssessorId());
+        if (req.getAssessmentDate() != null)       d.setAssessmentDate(req.getAssessmentDate());
+        if (req.getNextReviewDate() != null)       d.setNextReviewDate(req.getNextReviewDate());
+        if (req.getConclusion() != null)           d.setConclusion(req.getConclusion());
         d.setUpdatedAt(LocalDateTime.now());
         return dpiaRepo.save(d);
     }

@@ -83,7 +83,14 @@ public class PrivacyService {
         existing.setDiscoveredAt(req.getDiscoveredAt());
         existing.setDataSubjectsAffectedCount(req.getDataSubjectsAffectedCount());
         existing.setPdpcNotificationRequired(req.getPdpcNotificationRequired());
-        existing.setPdpcNotifiedAt(req.getPdpcNotifiedAt());
+        // F2-214 — `pdpcNotifiedAt` is NOT editable through this endpoint and must not be
+        // taken from its payload. It is the evidence the Saudi Data Office was actually told,
+        // stamped by `notifyDataOffice`; `PrivacyBreachRequest` (the only client) cannot
+        // declare it, so it arrived null on every call and was written null. Same shape as
+        // F2-213's `completedAt` on the DSR update, and latent for the same reason — the
+        // column is null on all 17 live rows in dev and prod, so there was nothing to lose
+        // yet. A defect with nothing to damage is not a smaller defect; it is one nobody can
+        // notice until the feature is used.
         existing.setStatus(req.getStatus());
         return breachRepo.save(existing);
     }

@@ -342,24 +342,56 @@ class WireContractTest {
             .contains("retentionPeriodMonths");
     }
 
-    @Test
-    @DisplayName("every PrivacyRopaRequest field is a property POST /ropa can bind")
-    void everyRequestFieldIsBindable() throws IOException {
-        List<String> declared = fieldsOf(api(), "PrivacyRopaRequest");
-        assertThat(declared)
-            .as("no fields parsed — an empty parse makes this gate vacuous")
-            .hasSizeGreaterThanOrEqualTo(5);
+    /**
+     * F2-214 — the WRITE half of the same contract, for every request type whose endpoint binds
+     * an entity.
+     *
+     * <p>F2-210 added this leg for {@code PrivacyRopaRequest} alone. That was the shape of the
+     * defect it had just found, and scoping a gate to the shape that produced the finding returns
+     * a smaller population — which reads exactly like "the rest are fine". They were not:
+     * {@code PrivacyBreachRequest} sat eight lines below the {@code PrivacyBreachDto} that F2-211
+     * corrected and still declared every name F2-211 retired ({@code severity},
+     * {@code affectedRecords}), plus {@code description} for {@code descriptionEn},
+     * {@code reportedToAuthority} for nothing, and {@code titleAr} for a column that does not
+     * exist. It never declared NOT NULL {@code breachType}, so the PDPL Article 20 breach wizard
+     * answered <b>400 on every submission</b> and the register has never been creatable from it.
+     *
+     * <p>🔑 The reason F2-211's instrument could not see this: it adjudicates types nominated by
+     * the WIRE, and a request type has no wire to be nominated from — nothing ever returns one.
+     * The entire write-side vocabulary was outside that population by construction.
+     */
+    private record WriteRegister(String iface, Class<?> boundEntity, String endpoint) { }
 
-        Set<String> bindable = propertiesOf(ProcessingActivity.class);
-        assertThat(declared.stream().filter(f -> !bindable.contains(f)).toList())
-            .as("""
-                PrivacyRopaRequest names a field POST /api/v1/privacy/ropa cannot bind. That \
-                endpoint takes the ProcessingActivity ENTITY and Spring Boot ignores unknown \
-                properties silently, so such a field is not a type error, a 4xx, or a log line \
-                — it is simply discarded, and the record is written without it. That is exactly \
-                how the PDPL Article 31 creation wizard came to fail on every submission with a \
-                400 that named no field.""")
-            .isEmpty();
+    private static final List<WriteRegister> WRITE_REGISTERS = List.of(
+        new WriteRegister("PrivacyRopaRequest",   ProcessingActivity.class,
+            "POST|PUT /api/v1/privacy/ropa"),
+        new WriteRegister("PrivacyBreachRequest", DataBreach.class,
+            "POST|PUT /api/v1/privacy/breaches"),
+        new WriteRegister("PrivacyDsrRequest",    DataSubjectRequest.class,
+            "POST|PUT /api/v1/privacy/dsrs"));
+
+    @Test
+    @DisplayName("every write-type field is a property the endpoint it feeds can actually bind")
+    void everyRequestFieldIsBindable() throws IOException {
+        String src = api();
+        for (WriteRegister r : WRITE_REGISTERS) {
+            List<String> declared = fieldsOf(src, r.iface());
+            assertThat(declared)
+                .as("%s — no fields parsed, which makes this gate vacuous", r.iface())
+                .hasSizeGreaterThanOrEqualTo(5);
+
+            Set<String> bindable = propertiesOf(r.boundEntity());
+            assertThat(declared.stream().filter(f -> !bindable.contains(f)).toList())
+                .as("""
+                    %s names a field %s cannot bind. That endpoint takes the %s ENTITY and Spring \
+                    Boot ignores unknown properties silently, so such a field is not a type error, \
+                    a 4xx, or a log line — it is simply discarded, and the record is written \
+                    without it. Where the discarded name stands in for a NOT NULL column the \
+                    client therefore never sends, the result is a 400 that names no field, on a \
+                    form where nothing looks missing.""",
+                    r.iface(), r.endpoint(), r.boundEntity().getSimpleName())
+                .isEmpty();
+        }
     }
 
     /**

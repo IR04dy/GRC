@@ -68,20 +68,21 @@ export function DsrFulfilmentWizard() {
       const dueDate = new Date(now);
       dueDate.setDate(dueDate.getDate() + 30); // PDPL Art. 4 — 30-day SLA
 
-      // Bundle verification + RoPA links + delivery into the description so
-      // the saved case captures the wizard context without needing a
-      // dedicated subschema. (V115 added sla_breached_at to dsr_cases.)
-      const description = [
-        `ID last4: ${draft.nationalIdLast4}`,
-        draft.verificationMethod ? `Verified via ${draft.verificationMethod}` : null,
-        draft.identityNotes?.trim() ? `ID notes: ${draft.identityNotes}` : null,
-        draft.ropaActivities?.trim() ? `RoPA scope: ${draft.ropaActivities}` : null,
-        draft.dataSummary?.trim() ? `Data summary: ${draft.dataSummary}` : null,
-        draft.deliveryMethod ? `Delivery: ${draft.deliveryMethod}` : null,
-        draft.redactionComplete ? 'Redaction complete' : null,
-        draft.dpoApproved ? 'DPO approved' : null,
-      ].filter(Boolean).join(' · ');
-
+      // ⚠⚠ F2-214 — this used to compose the identity evidence, the RoPA scope, the data
+      // summary, the delivery method and both approvals into a `description` string and send
+      // it. The comment here claimed that "captures the wizard context without needing a
+      // dedicated subschema". It did not: `DataSubjectRequest` has FOURTEEN properties and not
+      // one of them is free text, `POST /api/v1/privacy/dsrs` binds that entity, and Spring
+      // Boot discards unknown keys in silence — so every one of those facts, including the
+      // identity-verification evidence that is the control stopping personal data going to
+      // the wrong person, was dropped on submission. A comment describing a mechanism that
+      // does not exist is worse than no comment: it answers the question a reader was about
+      // to ask (F2-184).
+      //
+      // There is no column to move it to, so it is NOT silently re-homed and NOT quietly
+      // dropped — the operator is told, on the step where they submit, to attach it as
+      // evidence. F2-209's third state: where no column exists, disclose; inventing one is a
+      // schema change and an owner decision.
       const created = await privacyApi.createDsr({
         requestType: draft.type,
         requesterName: draft.subjectName,
@@ -89,7 +90,6 @@ export function DsrFulfilmentWizard() {
         receivedAt: now.toISOString(),
         dueDate: dueDate.toISOString().slice(0, 10),
         status: draft.dpoApproved && draft.redactionComplete ? 'CLOSED' : 'IN_PROGRESS',
-        description: description || undefined,
       });
       toast.success(isAr
         ? `تم إنشاء طلب صاحب البيانات (#${created.id})`
@@ -250,6 +250,19 @@ export function DsrFulfilmentWizard() {
             <Row k={isAr ? 'التحقق' : 'Verification'} v={draft.verificationMethod ?? '—'} />
             <Row k={isAr ? 'الأنشطة' : 'RoPA activities'} v={draft.ropaActivities || '—'} />
             <Row k="DPO" v={draft.dpoApproved ? '✓' : '—'} />
+          </div>
+          {/* F2-214 — the DSR record stores the type, the requester, the dates and the status.
+              It has no free-text column, so the verification evidence and the fulfilment
+              narrative below are NOT retained on it. Saying so is the point: this wizard used
+              to send them and they were discarded without a trace. */}
+          <div className="wf-summary" style={{ gridColumn: '1 / -1' }}>
+            {isAr
+              ? 'ملاحظة: يحفظ سجل الطلب النوع وصاحب البيانات والتواريخ والحالة فقط. '
+                + 'أدلة التحقق من الهوية وملخص البيانات وطريقة التسليم لا تُحفظ على السجل — '
+                + 'أرفقها كدليل بعد الإنشاء.'
+              : 'Note: the DSR record stores the request type, the data subject, the dates and '
+                + 'the status. The identity-verification evidence, data summary and delivery '
+                + 'method are not retained on it — attach them as evidence after creation.'}
           </div>
         </div>
       ),

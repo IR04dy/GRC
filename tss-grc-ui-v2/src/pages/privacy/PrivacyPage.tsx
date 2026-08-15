@@ -63,7 +63,7 @@ const STATUS_OPTIONS = [
 // FIELDS now built inside component
 const EMPTY: PrivacyDsrRequest = {
   requestType: 'ACCESS', requesterName: '', requesterEmail: '',
-  receivedAt: '', dueDate: '', status: 'PENDING', description: '',
+  receivedAt: '', dueDate: '', status: 'PENDING',
 };
 
 function dsrToReq(d: PrivacyDsrDto): PrivacyDsrRequest {
@@ -164,7 +164,14 @@ export function PrivacyPage() {
     { kind: 'select', key: 'status',         label: t('fldStatusLbl'), options: STATUS_OPTIONS, span: 4 },
     { kind: 'date',   key: 'receivedAt',     label: t('fldReceivedAt'), span: 4 },
     { kind: 'date',   key: 'dueDate',        label: t('fldDueDate'), span: 6 },
-    { kind: 'textarea', key: 'description',  label: t('fldDescriptionLbl'), rows: 3, span: 12 },
+    // F2-214 — a "Description" textarea used to sit here. `DataSubjectRequest` has fourteen
+    // properties and none of them is free text, and POST|PUT /api/v1/privacy/dsrs binds that
+    // entity, so whatever the operator typed was discarded on save and came back empty on the
+    // next open. An input that accepts text and stores none is worse than no input: it invites
+    // someone to record the substance of a PDPL Article 23 request there. Removed rather than
+    // given a column — adding one is a schema change and an owner decision (F2-209's third
+    // state). The two other senders of this key were the DSR fulfilment wizard and this form's
+    // own EMPTY default.
   ];
 
   const tabs: TabItem<TabId>[] = [

@@ -431,9 +431,15 @@ class FullReplaceUpdateContractTest {
         put("PUT /api/v1/privacy/dsrs/{id} :: receivedAt",
             "When the request arrived. Stamped once at creation; a later edit must not restyle "
             + "the start of the PDPL Article 23 clock.");
-        put("PUT /api/v1/privacy/dsrs/{id} :: description",
-            "Declared by the frontend request type and matched by no column on "
-            + "privacy.data_subject_requests — F2-211's shape, filed there, not invented here.");
+        // ⚠ `PUT /api/v1/privacy/dsrs/{id} :: description` was the second entry here and is
+        // CLOSED by F2-214: `DataSubjectRequest` has fourteen properties and not one is free
+        // text, so the DSR fulfilment wizard's composed narrative — its identity-verification
+        // evidence included — was discarded on every submission, and PrivacyPage offered a
+        // "Description" textarea that stored nothing. The field is gone from the request type,
+        // both senders and the form. Its entry is deleted rather than left as tolerated, which
+        // is what this leg's exact assertion is for: a ceiling would have let the closure pass
+        // unnoticed and made a tolerated field indistinguishable from a reviewed one.
+        //
         // ⚠ I predicted a third entry here — regulatory-changes :: status — and this leg refuted
         // it on its first run. `RegulatoryChangeRequest` never declared `status` at all, which is
         // exactly WHY the server writing it was the defect: there was nothing on the wire to
@@ -530,5 +536,218 @@ class FullReplaceUpdateContractTest {
                 stopped resolving them and the structural leg above is greener than the tree.""")
             .isLessThanOrEqualTo(ENTITY_BOUND_PUT_HANDLERS)
             .isGreaterThan(60);
+    }
+
+    // ── leg 4: a client typed to send a subset needs a server that tolerates one ───────────
+
+    /**
+     * F2-214 — every entity-bound PUT whose client sends a {@code Partial<T>}, and the method
+     * that answers it. Enforced in BOTH directions by the two tests below: a new such endpoint
+     * must be added here, and an entry that stops being one must be removed.
+     *
+     * <p>Measured 2026-08-15. All three wrote every field unconditionally.
+     */
+    private static final Map<String, String> PARTIAL_PAYLOAD_ENTITY_PUTS = Map.ofEntries(
+        Map.entry("/api/v1/privacy/dpias/{}",       "DpiaService#update"),
+        Map.entry("/api/v1/bcm/comms/templates/{}", "CrisisCommsService#updateTemplate"),
+        Map.entry("/api/v1/bcm/comms/audiences/{}", "CrisisCommsService#updateAudience"),
+        Map.entry("/api/v1/ethics/cases/{}",        "EthicsCaseService#update"),
+        Map.entry("/api/v1/ethics/disclosures/{}",  "DisclosureService#update"),
+        Map.entry("/api/v1/ethics/kyc/{}",          "KycService#update"),
+        Map.entry("/api/v1/ethics/aml-alerts/{}",   "AmlAlertService#update"),
+        Map.entry("/api/v1/changes/{}",             "ChangeManagementService#update"),
+        Map.entry("/api/v1/changes/tasks/{}",       "ChangeManagementService#updateTask"),
+        Map.entry("/api/v1/reporting/schedules/{}", "ReportScheduleService#update"),
+        Map.entry("/api/v1/cyber/policies/{}",      "PolicyManagementService#update"));
+
+    /**
+     * Fields written from the request WITHOUT a null guard on the same accessor.
+     *
+     * <p>This distinction is the whole finding, and a setter-site scan cannot make it — F2-182
+     * recorded that a guard hides in at least four places a regex cannot see, and it cost this
+     * slice a false alarm: {@code PolicyManagementService#update} reads as twenty unconditional
+     * writes and is in fact twenty guarded ones, i.e. a correct partial update. A gate that
+     * failed on it would have been worse than no gate.
+     */
+    static Set<String> unguardedWritesFromRequest(String src, String method) {
+        Matcher m = Pattern.compile(
+            "(?:public|protected|private)\\s+[\\w<>,\\s\\[\\]]+?\\s+" + Pattern.quote(method)
+                + "\\s*\\(([^)]*)\\)\\s*\\{").matcher(src);
+        if (!m.find()) {
+            return Set.of();
+        }
+        List<String> reqVars = new ArrayList<>();
+        for (String param : m.group(1).split(",")) {
+            String[] parts = param.trim().split("\\s+");
+            if (parts.length >= 2) {
+                reqVars.add(parts[parts.length - 1]);
+            }
+        }
+        String body = bodyAt(src, m.end() - 1);
+        Set<String> out = new LinkedHashSet<>();
+        for (String v : reqVars) {
+            Matcher s = Pattern.compile(
+                "\\.\\s*set([A-Z]\\w*)\\s*\\(\\s*" + Pattern.quote(v)
+                    + "\\s*\\.\\s*(get|is)?(\\w+)\\s*\\(\\s*\\)").matcher(body);
+            while (s.find()) {
+                String accessor = (s.group(2) == null ? "" : s.group(2)) + s.group(3);
+                String before = body.substring(Math.max(0, s.start() - 240), s.start());
+                boolean guarded = Pattern.compile(
+                    "\\b" + Pattern.quote(v) + "\\s*\\.\\s*" + Pattern.quote(accessor)
+                        + "\\s*\\(\\s*\\)\\s*(?:!=|==)\\s*null").matcher(before).find();
+                if (!guarded) {
+                    out.add(Character.toLowerCase(s.group(1).charAt(0)) + s.group(1).substring(1));
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Normalised paths of every PUT handler that binds a JPA entity. */
+    static Set<String> entityBoundPutPaths() {
+        Set<String> entities = entitySimpleNames();
+        Set<String> paths = new LinkedHashSet<>();
+        for (Path p : javaSources()) {
+            if (!p.getFileName().toString().endsWith("Controller.java")) {
+                continue;
+            }
+            String src = stripComments(read(p));
+            Matcher base = Pattern.compile("@RequestMapping\\s*\\(\\s*\"([^\"]*)\"").matcher(src);
+            String prefix = base.find() ? base.group(1) : "";
+            Matcher m = Pattern.compile("@PutMapping\\s*\\(([^)]*)\\)([\\s\\S]{0,1500}?)\\)\\s*\\{")
+                .matcher(src);
+            while (m.find()) {
+                Matcher b = Pattern.compile(
+                    "@RequestBody\\s+(?:@Valid\\s+)?([A-Z]\\w*)|@Valid\\s+@RequestBody\\s+([A-Z]\\w*)")
+                    .matcher(m.group(2));
+                if (!b.find()) {
+                    continue;
+                }
+                String t = b.group(1) != null ? b.group(1) : b.group(2);
+                if (!entities.contains(t)) {
+                    continue;
+                }
+                Matcher sub = Pattern.compile("\"([^\"]*)\"").matcher(m.group(1));
+                paths.add(normalisePath(prefix + (sub.find() ? sub.group(1) : "")));
+            }
+        }
+        return paths;
+    }
+
+    /** {@code /a/{id}} and {@code /a/${id}} both become {@code /a/{}} so the two sides compare. */
+    static String normalisePath(String p) {
+        String out = p.replaceAll("\\$\\{[^}]*}|\\{[^}]*}", "{}").replace("//", "/");
+        return out.endsWith("/") ? out.substring(0, out.length() - 1) : out;
+    }
+
+    /** Normalised paths of every {@code api.put} whose payload parameter is a {@code Partial<>}. */
+    static Set<String> partialPayloadPutPaths(String api) {
+        Set<String> out = new LinkedHashSet<>();
+        Matcher m = Pattern.compile(
+            "api\\.put\\s*(?:<[^>]*>)?\\s*\\(\\s*[`'\"]([^`'\"]+)[`'\"]\\s*,\\s*(\\w+)\\s*[,)]")
+            .matcher(api);
+        while (m.find()) {
+            String before = api.substring(Math.max(0, m.start() - 400), m.start());
+            if (Pattern.compile(Pattern.quote(m.group(2)) + "\\s*:\\s*Partial<").matcher(before).find()) {
+                out.add(normalisePath(m.group(1)));
+            }
+        }
+        return out;
+    }
+
+    @Test
+    @DisplayName("an update whose client sends a Partial<> may not write any field unconditionally")
+    void aPartialClientRequiresAGuardedServerWrite() throws IOException {
+        Map<String, String> offenders = new LinkedHashMap<>();
+        for (Map.Entry<String, String> e : PARTIAL_PAYLOAD_ENTITY_PUTS.entrySet()) {
+            String[] parts = e.getValue().split("#");
+            Path svc = javaSources().stream()
+                .filter(p -> p.getFileName().toString().equals(parts[0] + ".java"))
+                .findFirst().orElseThrow(() ->
+                    new AssertionError("declared service does not exist: " + e.getValue()));
+            Set<String> bad = unguardedWritesFromRequest(stripComments(read(svc)), parts[1]);
+            if (!bad.isEmpty()) {
+                offenders.put(e.getValue() + "  (" + e.getKey() + ")", String.join(", ", bad));
+            }
+        }
+        assertThat(offenders)
+            .as("""
+                The client for this endpoint is typed `Partial<T>` — it positively permits sending \
+                a subset — and the server writes these fields unconditionally, so every field the \
+                caller omits is written null. Measured 2026-08-15: DpiaService#update would erase a \
+                PDPL Article 25 assessment's title in both languages, its trigger, its residual-risk \
+                rating and its dates (5/5, 5/5, 5/5, 4/5 live rows, dev = prod). Guard each write — \
+                PolicyManagementService#update is the idiom — or change the client off Partial<>.""")
+            .isEmpty();
+    }
+
+    @Test
+    @DisplayName("the Partial-payload entity-PUT population is exactly what is declared")
+    void thePartialPayloadPopulationIsExactlyDeclared() throws IOException {
+        String api = stripComments(Files.readString(FE_API));
+        Set<String> computed = new LinkedHashSet<>(partialPayloadPutPaths(api));
+        computed.retainAll(entityBoundPutPaths());
+
+        assertThat(partialPayloadPutPaths(api))
+            .as("no api.put takes a Partial<> payload — the scan has rotted, not the tree")
+            .hasSizeGreaterThan(10);
+        assertThat(computed)
+            .as("""
+                Entity-bound PUTs whose client sends a Partial<>. Asserted EXACTLY, in both \
+                directions: a new one must be declared in PARTIAL_PAYLOAD_ENTITY_PUTS and checked \
+                by the leg above, and one that stops being Partial<> must lose its entry. A \
+                decrease-only ceiling would let a new offender hide behind a removed one.""")
+            .containsExactlyInAnyOrderElementsOf(PARTIAL_PAYLOAD_ENTITY_PUTS.keySet());
+    }
+
+    @Test
+    @DisplayName("the guard detector separates a partial update from a full replace (positive control)")
+    void theGuardDetectorIsNotVacuous() {
+        String preFix = """
+            public class Sample {
+                public Dpia update(Long id, Dpia req) {
+                    Dpia d = mustGet(id);
+                    d.setTitleEn(req.getTitleEn());
+                    d.setConclusion(req.getConclusion());
+                    return dpiaRepo.save(d);
+                }
+            }
+            """;
+        assertThat(unguardedWritesFromRequest(preFix, "update"))
+            .as("the detector no longer fires on the exact pre-fix code — it has rotted")
+            .containsExactlyInAnyOrder("titleEn", "conclusion");
+
+        String fixed = """
+            public class Sample {
+                public Dpia update(Long id, Dpia req) {
+                    Dpia d = mustGet(id);
+                    if (req.getTitleEn() != null) d.setTitleEn(req.getTitleEn());
+                    if (req.getConclusion() != null) d.setConclusion(req.getConclusion());
+                    return dpiaRepo.save(d);
+                }
+            }
+            """;
+        assertThat(unguardedWritesFromRequest(fixed, "update"))
+            .as("the detector fires on the corrected shape — it would fail on a clean tree")
+            .isEmpty();
+
+        // ⚠ The false alarm this leg had to survive: a block-bodied guard, and a guard on a
+        // BOOLEAN accessor spelled `isX()` rather than `getX()`. Both are correct code.
+        String blockGuard = """
+            public class Sample {
+                public Audience update(Long id, Audience req) {
+                    Audience a = mustGet(id);
+                    if (req.getContactsCsv() != null) {
+                        a.setContactsCsv(req.getContactsCsv());
+                        a.setRecipientCount(count(req.getContactsCsv()));
+                    }
+                    if (req.isActive() != null) { a.setActive(req.isActive()); }
+                    return repo.save(a);
+                }
+            }
+            """;
+        assertThat(unguardedWritesFromRequest(blockGuard, "update"))
+            .as("a block-bodied guard, and an `isX()` boolean accessor, are guards")
+            .isEmpty();
     }
 }
