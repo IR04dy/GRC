@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -134,6 +135,23 @@ class MassAssignmentRatchetTest {
      * so the count still matters.
      */
     private static final int BASELINE_ENTITY_BOUND_WRITES = 214;
+
+    /**
+     * F2-217 — CRIT endpoints the widened authority vocabulary surfaced, still unadjudicated.
+     *
+     * <p><b>MUST only ever decrease.</b> Measured 2026-08-15, after this slice adjudicated the six
+     * it proved live. The number went UP from an apparent zero and that is the point: the previous
+     * zero was over the population a literal name list could see, and
+     * <b>a hard zero over a population the instrument cannot see is the most reassuring possible
+     * artefact</b> (F2-205). The question the assertion asks — has every authority-bearing
+     * entity-bound write been read? — was right; the ANSWER was under-measured, so the figure moves
+     * and says so, rather than the assertion being re-scoped to keep it at zero.
+     *
+     * <p>Each row is printed to {@code target/mass-assignment-risk.txt} marked NEEDS-VERDICT with
+     * the fields that put it there, so this is a work list rather than a count. Read the service,
+     * record CLOSED / INERT / BY DESIGN in {@link #ADJUDICATED}, lower this in the same commit.
+     */
+    private static final int BASELINE_UNADJUDICATED_NEW_CRIT = 55;
 
     @Test
     void noNewEntityBoundWriteEndpoints() {
@@ -251,26 +269,48 @@ class MassAssignmentRatchetTest {
         lines.add("# CANNOT see, so those rows still read CRIT while being closed. The tier count is");
         lines.add("# therefore NOT a progress metric; the adjudication column is.");
         lines.add("#");
-        lines.add("# ADJUDICATED: verdict recorded from reading the service (F2-22b iv-vii)");
+        lines.add("# ADJUDICATED: verdict recorded from reading the service (F2-22b iv-vii, F2-217)");
         lines.add("# (blank)    : not yet adjudicated — read the service before annotating anything");
         lines.add("#");
+        lines.add("# F2-217 widened the authority vocabulary from a literal name list to a shape, and");
+        lines.add("# stopped `tenant` outranking `state`. Rows marked NEEDS-VERDICT below are the ones");
+        lines.add("# that surfaced: real authority fields (acApprovedBy, reviewer, reviewedAt, closedAt,");
+        lines.add("# approverName, publishedAt, ratifiedAt ...) that the old list did not spell. They are");
+        lines.add("# a WORK LIST, not a tolerated set — BASELINE_UNADJUDICATED_NEW_CRIT holds the count.");
+        lines.add("#");
         for (Ranked r : ranked) {
-            String verdict = ADJUDICATED.getOrDefault(r.site, "");
+            String verdict = ADJUDICATED.getOrDefault(r.site,
+                "CRIT".equals(r.tier) ? "NEEDS-VERDICT (F2-217 surfaced) — read the service" : "");
             lines.add(String.format("%-6s %-64s %-46s %s",
                 r.tier, r.site, String.join(",", r.fields), verdict));
         }
         Files.write(out, lines);
 
-        long unadjudicatedCrit = ranked.stream()
-            .filter(r -> "CRIT".equals(r.tier) && !ADJUDICATED.containsKey(r.site))
+        // ── Leg 1: the population the PRE-F2-217 instrument could see stays at a hard zero. ──
+        List<String> unadjudicatedLegacy = ranked.stream()
+            .filter(r -> r.visibleBeforeF2_217 && !ADJUDICATED.containsKey(r.site))
+            .map(Ranked::site).sorted().toList();
+        System.out.println("[F2-22b risk profile] pre-F2-217 CRIT rows with no verdict = " + unadjudicatedLegacy);
+        assertThat(unadjudicatedLegacy)
+            .as("Every endpoint the pre-F2-217 ladder ranked CRIT has been read service-by-service "
+                + "across tranches (iv)-(vii). A new one here means a new entity-bound write "
+                + "appeared — read its service and record the verdict rather than annotating the "
+                + "entity blind, which is the F2-40 trap that would break a designed assertion.")
+            .isEmpty();
+
+        // ── Leg 2: what widening the vocabulary surfaced. Decrease-only, with the reason. ──
+        long newCrit = ranked.stream()
+            .filter(r -> "CRIT".equals(r.tier) && !r.visibleBeforeF2_217 && !ADJUDICATED.containsKey(r.site))
             .count();
-        System.out.println("[F2-22b risk profile] CRIT rows with no recorded verdict = " + unadjudicatedCrit);
-        assertThat(unadjudicatedCrit)
-            .as("Every CRIT endpoint has been read service-by-service across tranches (iv)-(vii). "
-                + "A new unadjudicated CRIT row means a new entity-bound write appeared — read its "
-                + "service and record the verdict here rather than annotating the entity blind, "
-                + "which is the F2-40 trap that would break a designed assertion.")
-            .isZero();
+        System.out.println("[F2-217] CRIT rows surfaced by the widened vocabulary, still unadjudicated = " + newCrit);
+        assertThat(newCrit)
+            .as("F2-217 surfaced authority-bearing entity-bound writes the literal name list could "
+                + "not see, and adjudicated the six it proved live (audit_lc). The rest are a "
+                + "measured work list in target/mass-assignment-risk.txt — read the service, record "
+                + "the verdict, LOWER this number in the same commit. It may never be raised: a "
+                + "ceiling left in place after a sweep makes a tolerated row indistinguishable from "
+                + "a reviewed one (house rule 3).")
+            .isLessThanOrEqualTo(BASELINE_UNADJUDICATED_NEW_CRIT);
 
         Map<String, Long> byTier = new TreeMap<>();
         for (Ranked r : ranked) {
@@ -285,6 +325,100 @@ class MassAssignmentRatchetTest {
             .as("The risk profile is empty, which means the scan broke — not that 214 "
                 + "entity-bound endpoints expose nothing.")
             .isNotEmpty();
+    }
+
+    /**
+     * F2-217 — the vocabulary recognises the names the literal list did not spell.
+     *
+     * <p>⚠ This leg exists because {@link #BASELINE_UNADJUDICATED_NEW_CRIT} is a CEILING, and a
+     * ceiling cannot see a detector that stopped matching: narrowing {@link #AUTHORITY_SHAPE} back
+     * to its lower-case-only first draft makes the count go DOWN, which a {@code <=} assertion
+     * reads as progress. <b>An anti-vacuity guard has to know what the wrong answer looks like</b>
+     * (F2-215). The 24 names below are the measured population, so a pattern that drops any of
+     * them fails here rather than quietly shrinking the work list.
+     *
+     * <p>The negative half matters as much: a shape wide enough to catch {@code createdAt} or
+     * {@code lastUpdated} would re-tier most of the platform and make the profile useless, which is
+     * a different way of not being read.
+     */
+    @Test
+    void theAuthorityVocabularyRecognisesTheNamesTheLiteralListMissed() {
+        List<String> measuredOnRealEntities = List.of(
+            "acApprovedAt", "acApprovedBy", "approverName", "attestedAt", "closedAt",
+            "counterpartySigner", "escalatedAt", "integrityVerifiedAt", "lastAttestedAt",
+            "lastReviewedAt", "lastReviewedBy", "loiSignedAt", "pirReviewedAt", "pirReviewedBy",
+            "publishedAt", "ratificationEscalatedAt", "ratifiedAt", "rejectedAt", "reviewedAt",
+            "reviewer", "reviewerId", "reviewerName", "reviewerUserId", "signerName");
+
+        assertThat(measuredOnRealEntities).allSatisfy(n ->
+            assertThat(isAuthorityField(n))
+                .as("'%s' is an authority act or actor on a real entity in this codebase, and the "
+                    + "pre-F2-217 literal list did not spell it. If this fails the pattern has "
+                    + "narrowed and the CRIT population is silently shrinking.", n)
+                .isTrue());
+
+        assertThat(AUTHORITY_PRE_F2_217).allSatisfy(n ->
+            assertThat(isAuthorityField(n))
+                .as("'%s' was already in the vocabulary; widening must not drop it", n).isTrue());
+
+        List<String> notAuthority = List.of(
+            "createdAt", "updatedAt", "lastUpdated", "deletedAt", "titleEn", "status",
+            "organisationId", "targetDate", "hours", "externalId", "engagementCode", "severity");
+        assertThat(notAuthority).allSatisfy(n ->
+            assertThat(isAuthorityField(n))
+                .as("'%s' is not an authority field. A shape this wide would re-tier the platform "
+                    + "and make the profile unreadable, which is its own failure mode.", n)
+                .isFalse());
+    }
+
+    /**
+     * F2-217 — {@code organisationId} may never be the reason a bindable state field is hidden.
+     *
+     * <p>The old ladder put {@code tenant} above {@code state}, so 145 of the 214 endpoints ranked
+     * TENANT while also binding {@code status}/{@code approvalStatus}/{@code workflowStatus}, and
+     * the STATE tier read <b>4</b>. Reverting the ladder lowers the CRIT count too, so the ceiling
+     * above cannot catch it either — this leg asserts the SHAPE instead of a number.
+     */
+    /**
+     * F2-217 — binding an authority or outcome field is sufficient for CRIT, on its own.
+     *
+     * <p>⚠ Found by the mutation harness: restoring only the {@code tenant &&} half of the old
+     * ladder SURVIVED every other leg. It lowers the CRIT count, which the {@code <=} ceiling reads
+     * as progress; it leaves no TENANT row binding a state field, so the masking leg is satisfied;
+     * and it quietly demotes the three endpoints that bind an approval field on a body with no
+     * {@code organisationId} — {@code DpiaController#addMitigation}/{@code #addReview} and
+     * {@code KycController#recordHit}, the old HIGH tier. 🔑 <b>Two shape assertions that each look
+     * complete can still leave the predicate between them free to move.</b>
+     */
+    @Test
+    void anEndpointBindingAnAuthorityOrOutcomeFieldIsAlwaysRankedCrit() {
+        List<String> demoted = rankEntityBoundWrites().stream()
+            .filter(r -> !"CRIT".equals(r.tier))
+            .filter(r -> r.fields.stream().anyMatch(f -> isAuthorityField(f) || OUTCOME.contains(f)))
+            .map(Ranked::site).sorted().toList();
+
+        assertThat(demoted)
+            .as("These endpoints let a caller set who approved / reviewed / signed a record, or the "
+                + "outcome itself — DF-3 and DF-4's defect exactly — and are ranked below CRIT. "
+                + "Nothing else about the body reduces that: not a stamped tenant, not a whitelist "
+                + "in the service. The verdict for a service that overwrites the field is INERT, "
+                + "recorded in ADJUDICATED; it is not a lower tier.")
+            .isEmpty();
+    }
+
+    @Test
+    void aBodyBindingBothATenantAndAStateFieldIsNeverRankedTenant() {
+        List<String> masked = rankEntityBoundWrites().stream()
+            .filter(r -> "TENANT".equals(r.tier))
+            .filter(r -> r.fields.stream().anyMatch(STATE::contains))
+            .map(Ranked::site).sorted().toList();
+
+        assertThat(masked)
+            .as("These endpoints bind a state field AND organisationId, and are ranked as though "
+                + "only the tenant field were at risk. F2-216 measured organisationId as defended "
+                + "at every reachable point, so ranking it above state hides the live risk behind "
+                + "a closed one.")
+            .isEmpty();
     }
 
     /**
@@ -343,16 +477,103 @@ class MassAssignmentRatchetTest {
         Map.entry("NdiGapController#updateGap(NdiGap)",
             "BY DESIGN — as createGap. NOTE riskScore is never computed OR updated anywhere: stale by construction"),
         Map.entry("CommitteeResolutionController#create(CommitteeResolution)",
-            "BY DESIGN — F2-40 settled it: the minute-taking form. Provenance (tally_source), not a DTO")
+            "BY DESIGN — F2-40 settled it: the minute-taking form. Provenance (tally_source), not a DTO"),
+
+        // ── F2-217: the six the widened vocabulary surfaced first, read and probed live ────
+        // The three creates persisted the request entity, so the caller chose both the state and
+        // the attribution; the three updates are field whitelists that never mention either.
+        Map.entry("AuditLifecycleController#createAnnualPlan(AnnualPlan)",
+            "CLOSED F2-217 — was 200 for status=AC_APPROVED + a chosen acApprovedBy while /transition "
+            + "answered 409; create now refuses a non-initial status and clears the AC stamp"),
+        Map.entry("AuditLifecycleController#createWorkingPaper(WorkingPaper)",
+            "CLOSED F2-217 — was 200 for status=APPROVED + a chosen reviewer/reviewedAt on an IIA 2330 "
+            + "working paper, beside the author F2-203 had already fixed; both now cleared"),
+        Map.entry("AuditLifecycleController#createCapa(CapaTask)",
+            "CLOSED F2-217 — was 200 for status=CLOSED + a backdated closedAt, i.e. a corrective action "
+            + "closed without verification; closedAt now stamped only by transitionCapa"),
+        Map.entry("AuditLifecycleController#updateAnnualPlan(AnnualPlan)",
+            "INERT — updateAnnualPlan is a whitelist (year/q*Codes/budgetHours/acNotes*); it never "
+            + "mentions status, acApprovedBy or acApprovedAt"),
+        Map.entry("AuditLifecycleController#updateWorkingPaper(WorkingPaper)",
+            "INERT — updateWorkingPaper is a whitelist (title*/type/procedure*/conclusion*/"
+            + "controlsCovered/hours); it never mentions status, reviewer or reviewedAt"),
+        Map.entry("AuditLifecycleController#updateCapa(CapaTask)",
+            "INERT — updateCapa is a whitelist (title*/ownerRole/targetDate/evidenceRef/"
+            + "verificationNotes*); closedAt and status are transitionCapa's and applyOverdue's")
     );
 
     /** Field names that decide tenancy, state or authority — never a caller's to set. */
     private static final List<String> TENANT = List.of("organisationId");
-    private static final List<String> AUTHORITY = List.of(
+
+    /**
+     * Authority-bearing names the {@link #AUTHORITY_SHAPE} pattern below cannot express — an
+     * id/name suffix on a bare agent noun, or a phrase.
+     *
+     * <p>⚠⚠ <b>F2-217 — this list used to be the WHOLE authority vocabulary, and a literal list
+     * can only ever find the spellings whoever wrote it happened to think of.</b> It was written
+     * from the four bypasses this class was built after (DF-3, DF-4, F2-25, the roster link), so
+     * it holds {@code approvedBy}, {@code reviewedBy} and {@code closedBy} — and the platform's
+     * columns are also called {@code acApprovedBy}, {@code reviewer}, {@code reviewedAt},
+     * {@code closedAt}, {@code approverName}, {@code publishedAt}, {@code ratifiedAt},
+     * {@code integrityVerifiedAt}. Measured 2026-08-15 from the regenerated profile: <b>24 distinct
+     * authority-shaped names on 64 of the 214 endpoints</b>, nearly all of them ranked below CRIT
+     * and therefore never adjudicated. With the vocabulary widened and the ladder corrected the
+     * tiers move <b>CRIT 18 → 79, HIGH 3 → merged, TENANT 184 → 29, STATE 4 → 101</b>.
+     *
+     * <p>🔑 <b>A census keyed on a list of names measures the list, not the codebase</b> — the
+     * eighth appearance of F2-198's shape here (the invariant is real, its POPULATION is narrower
+     * than it looks), and the sharpest, because this instrument's own javadoc says it exists
+     * <em>because</em> "ranking 214 endpoints by hand is how the first four were found".
+     */
+    private static final List<String> AUTHORITY_EXTRA = List.of(
+        "approverId", "recordedByUserId", "recordedByName", "onBehalf");
+
+    /**
+     * The literal list exactly as it stood before F2-217 widened it. Kept — and only used — to
+     * split the CRIT population into the half the old instrument could see and the half it could
+     * not, so {@link #riskProfileIsRecordedForF2_22b()} can hold the first at a hard zero while
+     * the second decreases. Never consult it for ranking; {@link #isAuthorityField} is the rule.
+     */
+    private static final List<String> AUTHORITY_PRE_F2_217 = List.of(
         "approvedBy", "approvedAt", "approverId", "rejectedBy", "decidedBy", "decidedAt",
         "signedBy", "signedAt", "verifiedBy", "verifiedAt", "reviewedBy", "recordedBy",
         "recordedByUserId", "recordedByName", "onBehalf", "closedBy", "publishedBy",
         "authorisedBy", "authorizedBy", "certifiedBy", "attestedBy", "escalatedBy");
+
+    /**
+     * An authority ACT: a concept verb plus {@code By} (who did it) or {@code At} (when).
+     * Matched as a suffix so a qualified column — {@code acApprovedBy}, {@code pirReviewedAt},
+     * {@code lastAttestedAt}, {@code loiSignedAt} — is caught with the bare form.
+     *
+     * <p>⚠ The verb alternation spells both cases ({@code [Aa]pproved}) rather than using
+     * {@code CASE_INSENSITIVE}, and the {@code By|At} suffix stays case-SENSITIVE, because Java
+     * fields are camelCase and {@code ...approvedat} is not a name this codebase produces. The
+     * first draft of this pattern was lower-case-only and therefore did not match
+     * {@code acApprovedBy} — so the two {@code AnnualPlan} endpoints whose live probe motivated
+     * this whole slice ranked STATE rather than CRIT, and the build was green. 🔑 <b>A detector
+     * that cannot match reads exactly like a clean tree, and it UNDER-reports</b> — caught only by
+     * diffing against the throwaway census that had used {@code CASE_INSENSITIVE}, which is the
+     * argument for keeping a second measurement until the gate reproduces it.
+     */
+    private static final Pattern AUTHORITY_SHAPE = Pattern.compile(
+        "(?:^|[a-z0-9])(?:[Aa]pproved|[Rr]ejected|[Ss]igned|[Vv]erified|[Rr]eviewed|[Dd]ecided"
+        + "|[Cc]ertified|[Aa]ttested|[Aa]uthorised|[Aa]uthorized|[Cc]losed|[Pp]ublished"
+        + "|[Ee]ndorsed|[Aa]cknowledged|[Rr]atified|[Ww]itnessed|[Ee]scalated|[Aa]ccepted"
+        + "|[Vv]alidated|[Ss]anctioned|[Cc]ountersigned|[Dd]ispositioned|[Aa]djudicated"
+        + "|[Cc]onfirmed|[Cc]leared|[Ww]aived|[Ee]xempted|[Dd]elegated|[Rr]ecorded)(?:By|At)$");
+
+    /** An authority ACTOR: the agent noun rather than the act. {@code reviewer}, {@code signerName}. */
+    private static final Pattern AGENT_SHAPE = Pattern.compile(
+        "^(?:.*[a-z0-9])?(?:[Rr]eviewer|[Aa]pprover|[Ss]ignatory|[Ss]igner|[Vv]erifier|[Cc]ertifier"
+        + "|[Aa]ttester|[Ww]itness|[Ee]ndorser|[Aa]uthoriser|[Aa]uthorizer|[Aa]djudicator)"
+        + "(?:Id|Name|UserId)?$");
+
+    /** True when a field name names an authority act or the actor who performed it. */
+    static boolean isAuthorityField(String n) {
+        return AUTHORITY_EXTRA.contains(n)
+            || AUTHORITY_SHAPE.matcher(n).find()
+            || AGENT_SHAPE.matcher(n).matches();
+    }
     private static final List<String> OUTCOME = List.of(
         "voteFor", "voteAgainst", "voteAbstain", "votesFor", "votesAgainst", "votesAbstain",
         "quorumMet", "quorumSource", "tallySource", "outcome", "verdict", "residualScore",
@@ -361,8 +582,15 @@ class MassAssignmentRatchetTest {
         "status", "state", "workflowStatus", "approvalStatus", "lifecycleStatus", "isApproved",
         "isActive", "isLocked", "isPublished", "isVerified", "isSigned", "isClosed");
 
-    /** One endpoint plus the risky fields its body type still exposes. */
-    record Ranked(String tier, String site, List<String> fields) { }
+    /**
+     * One endpoint plus the risky fields its body type still exposes.
+     *
+     * @param visibleBeforeF2_217 true when the pre-F2-217 ladder also ranked this row CRIT — i.e.
+     *        its authority field is a literal member of {@link #AUTHORITY_PRE_F2_217} and it also
+     *        binds {@code organisationId}. That population is adjudicated and must stay so; the
+     *        complement is what widening the vocabulary surfaced.
+     */
+    record Ranked(String tier, String site, List<String> fields, boolean visibleBeforeF2_217) { }
 
     static List<Ranked> rankEntityBoundWrites() {
         var scanner = new ClassPathScanningCandidateComponentProvider(false);
@@ -386,6 +614,7 @@ class MassAssignmentRatchetTest {
                     Class<?> type = param.getType();
                     List<String> hits = new ArrayList<>();
                     boolean tenant = false, authority = false, outcome = false, state = false;
+                    boolean literalAuthority = false;
                     for (Class<?> k = type; k != null && k != Object.class; k = k.getSuperclass()) {
                         // BaseEntity's fields are READ_ONLY platform-wide (F2-22a) — skip them so
                         // the ranking shows only what is still bindable.
@@ -404,22 +633,48 @@ class MassAssignmentRatchetTest {
                                 continue;
                             }
                             if (TENANT.contains(n)) { hits.add(n); tenant = true; }
-                            else if (AUTHORITY.contains(n)) { hits.add(n); authority = true; }
+                            else if (isAuthorityField(n)) {
+                                hits.add(n);
+                                authority = true;
+                                if (AUTHORITY_PRE_F2_217.contains(n)) literalAuthority = true;
+                            }
                             else if (OUTCOME.contains(n)) { hits.add(n); outcome = true; }
                             else if (STATE.contains(n)) { hits.add(n); state = true; }
                         }
                     }
-                    String tier = tenant && (authority || outcome) ? "CRIT"
-                                : (authority || outcome) ? "HIGH"
-                                : tenant ? "TENANT"
-                                : state ? "STATE" : "LOW";
+                    // ⚠⚠ F2-217 — this ladder used to read
+                    //   tenant && (authority||outcome) ? CRIT : (authority||outcome) ? HIGH
+                    //     : tenant ? TENANT : state ? STATE : LOW
+                    // which is wrong in two ways that reinforced each other.
+                    //
+                    // (a) `tenant` sat ABOVE `state`, so a body binding organisationId AND status
+                    //     ranked TENANT and its status never showed in the tier at all. That was
+                    //     145 of the 214 endpoints — and it is why the STATE tier read FOUR while
+                    //     149 bodies bind a state field.
+                    // (b) `tenant` was also required to reach CRIT, on the premise that a bindable
+                    //     organisationId is an unmitigated cross-tenant write. F2-216 measured that
+                    //     premise and it no longer holds: all 202 entity-bound writes stamp the
+                    //     tenant from TenantContext on their create path, and
+                    //     TenantWriteGuardInterceptor is wired and enabled in dev AND prod with
+                    //     both legs (probed: a body naming org 2 from an org-1 caller stores org 1).
+                    //
+                    // 🔑 A ranking whose top discriminator has been CLOSED no longer ranks risk —
+                    // and while it stays on top it MASKS whatever it outranks. So tenant drops to
+                    // the bottom of the ladder (it is still reported, because Jackson still binds
+                    // it), and authority/outcome — the DF-3/DF-4 forged-authority class — is CRIT
+                    // on its own. That merges the old HIGH tier in, which is the same question
+                    // once tenant stops multiplying it.
+                    String tier = (authority || outcome) ? "CRIT"
+                                : state ? "STATE"
+                                : tenant ? "TENANT" : "LOW";
                     Collections.sort(hits);
                     out.add(new Ranked(tier, c.getSimpleName() + "#" + m.getName()
-                                             + "(" + type.getSimpleName() + ")", hits));
+                                             + "(" + type.getSimpleName() + ")", hits,
+                                       tenant && (literalAuthority || outcome)));
                 }
             }
         }
-        List<String> order = List.of("CRIT", "HIGH", "TENANT", "STATE", "LOW");
+        List<String> order = List.of("CRIT", "STATE", "TENANT", "LOW");
         out.sort(Comparator.<Ranked, Integer>comparing(r -> order.indexOf(r.tier))
                           .thenComparing(Ranked::site));
         return out;

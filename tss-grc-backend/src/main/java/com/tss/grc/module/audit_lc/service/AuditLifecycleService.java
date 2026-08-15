@@ -32,6 +32,40 @@ import java.util.Set;
  *   <li>{@code CapaTask}: OPEN → IN_PROGRESS → AWAITING_VERIFICATION → CLOSED. Service flips to OVERDUE
  *       when target_date is past and status is non-terminal.</li>
  * </ul>
+ *
+ * <h2>⚠⚠ F2-217 — a create that names the state does not need the machine</h2>
+ *
+ * <p>All three {@code create*} methods below persist the request entity, and each validated the
+ * supplied {@code status} only for <em>membership of the vocabulary</em> — never for being the
+ * state a record is allowed to <em>start</em> in. Probed live 2026-08-15 as {@code compliance}:
+ * {@code POST /api/audit-lc/annual-plans} carrying
+ * {@code {"status":"AC_APPROVED","acApprovedBy":"Nobody Who Approved This",
+ * "acApprovedAt":"2001-01-01T00:00:00"}} answered <b>200</b> and stored all three, while the
+ * guarded {@code /transition} route answered <b>409</b> for {@code DRAFT → AC_APPROVED} on an
+ * identical plan. The same shape produced an IIA Standard 2330 working paper created
+ * {@code APPROVED} with a named {@code reviewer} and a backdated {@code reviewedAt}, and a CAPA
+ * created {@code CLOSED} with a backdated {@code closedAt} — a corrective action closed without
+ * ever being verified.
+ *
+ * <p>🔑 <b>This is DF-3/DF-4's defect exactly — forged authority — and it was invisible to the
+ * ratchet built to find it.</b> {@code MassAssignmentRatchetTest} ranks a body type by matching
+ * field names against a literal list, and that list holds {@code approvedBy}, {@code reviewedBy}
+ * and {@code closedBy}. This module's columns are {@code acApprovedBy}, {@code reviewer},
+ * {@code reviewedAt} and {@code closedAt} — the same concepts, spelled differently — so all six
+ * endpoints ranked TENANT rather than CRIT and were never adjudicated.
+ *
+ * <p>⚠ <b>And the fix that preceded it names the field it left open.</b> F2-203 closed
+ * {@code author} on {@code createWorkingPaper} because an invented auditor was being persisted,
+ * and its comment reads <em>"the same rule {@code transitionWorkingPaper} below already applies
+ * to {@code reviewer}"</em>. True of the transition; false of the create it is written on. 🔑
+ * <b>Fixing the field you noticed leaves the remainder looking covered, because the mechanism
+ * that covers them is visibly present</b> — the live probe returned {@code author=compliance},
+ * correctly stamped, beside a {@code reviewer} the caller had chosen.
+ *
+ * <p>Two rules now, applied by {@link #initialStatusOnly} and the {@code clear*} calls in each
+ * create: a record is created in its register's <b>initial state</b>, and the columns a
+ * transition stamps are <b>never</b> a caller's to set. The initial state is declared once per
+ * register and read by both the default and the guard, so the two cannot disagree.
  */
 @Service
 @RequiredArgsConstructor
@@ -61,6 +95,48 @@ public class AuditLifecycleService {
         "AWAITING_VERIFICATION", Set.of("CLOSED", "IN_PROGRESS"),
         "OVERDUE",               Set.of("IN_PROGRESS", "AWAITING_VERIFICATION"));
 
+    /**
+     * F2-217 — the one state each register may be created in.
+     *
+     * <p>Declared rather than derived: "initial" is not "has no incoming edge", because all three
+     * machines loop back to their first state ({@code AC_REVIEW → DRAFT},
+     * {@code REJECTED → DRAFT}, {@code IN_PROGRESS → OPEN}). What makes these safe is that each
+     * constant has exactly <b>two</b> readers inside its own create — the default applied when the
+     * caller says nothing, and {@link #initialStatusOnly}'s guard — so the value the server picks
+     * and the value it accepts cannot drift apart. Before this they were separate literals and only
+     * the default existed.
+     */
+    private static final String AP_INITIAL   = "DRAFT";
+    private static final String WP_INITIAL   = "DRAFT";
+    private static final String CAPA_INITIAL = "OPEN";
+
+    /**
+     * Returns the initial state, or refuses a caller trying to start somewhere else.
+     *
+     * <p>⚠ This cannot break a working request. The create already refused anything outside the
+     * register's vocabulary, so every value that succeeds today is a declared state — and the only
+     * ones this newly refuses are the non-initial ones, i.e. requests performing a transition that
+     * the {@code /transition} route would have adjudicated and recorded. <b>A request that performs
+     * an unguarded transition is not a working request.</b> (F2-182's rule for choosing between
+     * refusing and coercing: ask what is already refusing.)
+     *
+     * <p>Refusing rather than silently coercing to the initial state is deliberate. A caller that
+     * believes it is filing an approved plan must be told it is not, and be sent to the route that
+     * can record who approved it; a quiet downgrade would leave the caller's own copy disagreeing
+     * with the register (F2-197's rule that a silent all-clear is worse than a visible gap).
+     */
+    private static String initialStatusOnly(String supplied, String initial, String register) {
+        // `register` carries its own article ("an annual plan") — "a " + register produced
+        // "a annual plan" in the 400 body, which a caller reads before anything else here.
+        if (supplied == null || supplied.equals(initial)) {
+            return initial;
+        }
+        throw new IllegalArgumentException(
+            "status: " + register + " is created in " + initial + ". '" + supplied + "' has to be "
+            + "reached through POST /{externalId}/transition, which checks the state machine and "
+            + "records who made the change. Send status=" + initial + ", or omit it.");
+    }
+
     private final AnnualPlanRepository annualPlans;
     private final WorkingPaperRepository workingPapers;
     private final CapaTaskRepository capas;
@@ -86,9 +162,14 @@ public class AuditLifecycleService {
         if (body.getYear() == null)       throw new IllegalArgumentException("year is required");
         body.setId(null);
         body.setOrganisationId(org());
-        if (body.getStatus() == null) body.setStatus("DRAFT");
+        body.setStatus(initialStatusOnly(body.getStatus(), AP_INITIAL, "an annual plan"));
         if (!AP_STATUSES.contains(body.getStatus()))
             throw new IllegalArgumentException("Invalid annual-plan status: " + body.getStatus());
+        // F2-217 — transitionAnnualPlan stamps these when it reaches AC_APPROVED. A plan being
+        // created has been approved by nobody, so there is nothing here to preserve; accepting
+        // them let a caller assert an Audit Committee approval that never happened.
+        body.setAcApprovedBy(null);
+        body.setAcApprovedAt(null);
         body.setLastUpdated(LocalDateTime.now());
         return annualPlans.save(body);
     }
@@ -155,9 +236,14 @@ public class AuditLifecycleService {
         if (body.getTitleEn() == null)        throw new IllegalArgumentException("titleEn is required");
         body.setId(null);
         body.setOrganisationId(org());
-        if (body.getStatus() == null) body.setStatus("DRAFT");
+        body.setStatus(initialStatusOnly(body.getStatus(), WP_INITIAL, "a working paper"));
         if (!WP_STATUSES.contains(body.getStatus()))
             throw new IllegalArgumentException("Invalid working-paper status: " + body.getStatus());
+        // F2-217 — transitionWorkingPaper stamps these on APPROVED/REJECTED. The controller has
+        // already stamped `author` from the authenticated principal (F2-203); these two are the
+        // half that fix left open, and they carry the IIA Standard 2330 review attribution.
+        body.setReviewer(null);
+        body.setReviewedAt(null);
         if (body.getCreatedAt() == null) body.setCreatedAt(LocalDateTime.now());
         return workingPapers.save(body);
     }
@@ -222,9 +308,14 @@ public class AuditLifecycleService {
         if (body.getKind() == null)       body.setKind("CORRECTIVE");
         body.setId(null);
         body.setOrganisationId(org());
-        if (body.getStatus() == null) body.setStatus("OPEN");
+        body.setStatus(initialStatusOnly(body.getStatus(), CAPA_INITIAL, "a CAPA task"));
         if (!CAPA_STATUSES.contains(body.getStatus()))
             throw new IllegalArgumentException("Invalid CAPA status: " + body.getStatus());
+        // F2-217 — transitionCapa stamps closedAt when it reaches CLOSED. A CAPA created CLOSED
+        // with a backdated closure is a corrective action that was never verified.
+        body.setClosedAt(null);
+        // applyOverdue may still move OPEN -> OVERDUE from target_date; that is server-derived,
+        // which is the distinction this whole fix draws.
         applyOverdue(body);
         return capas.save(body);
     }

@@ -445,6 +445,28 @@ function parseCrosswalk(json: string | undefined): { framework: string; controlC
   } catch { return []; }
 }
 
+/**
+ * F2-217. Strip the fields a create endpoint mints or stamps for itself.
+ *
+ * The `toBackend*` mappers below serve both PUT and POST. On PUT that is right — the server's
+ * update methods are whitelists that ignore `status` and the review/approval columns. On POST
+ * it was not: all three creates persisted the request entity, so an `AC_APPROVED` plan with an
+ * `acApprovedBy` of our choosing, an `APPROVED` working paper with a named `reviewer`, or a
+ * `CLOSED` CAPA with a backdated `closedAt` all stored exactly as sent — with no transition, no
+ * state-machine check and no record of who decided (probed live: create 200, the equivalent
+ * guarded transition 409).
+ *
+ * The server now refuses a non-initial status and clears the stamps. This keeps the client from
+ * sending keys it has no business setting, so a rejection is impossible rather than merely
+ * handled — and, unlike a silently-discarded key, a field that is never sent cannot be mistaken
+ * for one the server honoured (F2-214).
+ */
+function forCreate<T extends object>(body: T, ...serverOwned: (keyof T)[]): Partial<T> {
+  const out: Partial<T> = { ...body };
+  for (const k of serverOwned) delete out[k];
+  return out;
+}
+
 function fromBackendPlan(b: BackendAnnualPlan): AnnualPlan {
   return {
     id: b.externalId,
@@ -738,7 +760,11 @@ export function saveAnnualPlan(plan: AnnualPlan): AnnualPlan {
   void api.put<BackendAnnualPlan>(`/api/audit-lc/annual-plans/${encodeURIComponent(next.id)}`, toBackendPlan(next))
     .catch(async (err) => {
       if (err instanceof ApiError && err.status === 404) {
-        try { await api.post<BackendAnnualPlan>('/api/audit-lc/annual-plans', toBackendPlan(next)); }
+        // F2-217: created as DRAFT, not as whatever this browser last saw. If the server has no
+        // such plan, this client holds no evidence of an Audit Committee approval — only a
+        // memory of one — and re-asserting it here is how an approval acquires no approver.
+        try { await api.post<BackendAnnualPlan>('/api/audit-lc/annual-plans',
+                forCreate(toBackendPlan(next), 'status', 'acApprovedBy', 'acApprovedAt')); }
         catch (e) { console.warn('[auditLifecycle] save plan create-fallback failed:', e); }
       } else {
         console.warn('[auditLifecycle] save plan failed:', err);
@@ -789,7 +815,8 @@ export function saveWorkingPaper(wp: WorkingPaper): WorkingPaper {
     void api.put<BackendWorkingPaper>(`/api/audit-lc/working-papers/${encodeURIComponent(wp.id)}`, toBackendWp(wp))
       .catch(e => console.warn('[auditLifecycle] save wp failed:', e));
   } else {
-    void api.post<BackendWorkingPaper>('/api/audit-lc/working-papers', toBackendWp(wp))
+    void api.post<BackendWorkingPaper>('/api/audit-lc/working-papers',
+        forCreate(toBackendWp(wp), 'status', 'reviewer', 'reviewedAt'))
       .catch(e => console.warn('[auditLifecycle] create wp failed:', e));
   }
   return wp;
@@ -929,7 +956,8 @@ export function saveCapa(c: CapaTask): CapaTask {
     void api.put<BackendCapaTask>(`/api/audit-lc/capas/${encodeURIComponent(c.id)}`, toBackendCapa(c))
       .catch(e => console.warn('[auditLifecycle] save capa failed:', e));
   } else {
-    void api.post<BackendCapaTask>('/api/audit-lc/capas', toBackendCapa(c))
+    void api.post<BackendCapaTask>('/api/audit-lc/capas',
+        forCreate(toBackendCapa(c), 'status', 'closedAt'))
       .catch(e => console.warn('[auditLifecycle] create capa failed:', e));
   }
   return c;
