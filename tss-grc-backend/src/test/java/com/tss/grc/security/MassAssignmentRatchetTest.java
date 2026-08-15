@@ -88,12 +88,29 @@ import static org.assertj.core.api.Assertions.assertThat;
  * those fields are {@code READ_ONLY}, and {@code id} is in none of its risk vocabularies — so
  * {@code id} was structurally unrankable by the very scan built to rank this defect.
  *
- * <p>{@code ServerOwnedIdentityModule} generalises the fix to every mapped type and
- * {@link ServerOwnedIdentityInvariantTest} asserts it over the whole population with a negative
+ * <p>{@code ServerOwnedFieldsModule} generalises the fix to every mapped type and
+ * {@link ServerOwnedFieldsInvariantTest} asserts it over the whole population with a negative
  * control, so nothing here needs a per-entity change. <b>The three tests below are unchanged and
  * still correct — read them as claims about {@code BaseEntity}, which is what they test.</b>
  *
- * @see ServerOwnedIdentityInvariantTest F2-206 — the same claims over all 407 entities
+ * <h2>⚠⚠ F2-215 — and that correction was itself only one ninth of the way</h2>
+ *
+ * <p>F2-206 widened the population from "{@code BaseEntity} subclasses" to "every mapped type"
+ * <b>for {@code id}</b>. The other eight fields listed above stayed exactly as scoped as the
+ * paragraph it was correcting. Measured 2026-08-15: of the 259 entities outside
+ * {@code BaseEntity}, 209 declare their own {@code isDeleted}, 222 their own {@code createdAt},
+ * 111 their own {@code createdBy} — <b>960 declarations, none annotated</b>, reachable on
+ * <b>170 of the 214 endpoints this ratchet counts</b>. Proved live on
+ * {@code POST /api/v1/controls}: {@code createdBy} stored as the caller sent it,
+ * {@code createdAt} backdated to 2001, and {@code isDeleted:true} creating a row invisible to
+ * every query while the UNIQUE index still saw it.
+ *
+ * <p>🔑 <b>Generalising an invariant one field at a time leaves the remainder looking covered,
+ * because the mechanism that covers them is visibly present.</b> The module now mirrors
+ * {@code BaseEntity}'s field list and a gate asserts the two are equal in both directions, so
+ * the next field cannot drift apart silently.
+ *
+ * @see ServerOwnedFieldsInvariantTest F2-206/F2-215 — all nine fields over all 433 entities
  * @see ControllerAuthorizationRatchetTest sibling ratchet — whether a write is guarded at all
  * @see ExportAuthorizationRatchetTest sibling ratchet — whether a file export requires EXPORT
  */
@@ -143,10 +160,10 @@ class MassAssignmentRatchetTest {
      * <p>⚠ F2-206: this is the {@code BaseEntity} half of F2-22a, not a platform-wide half. The
      * previous wording here — "whatever any individual endpoint does with its body, these nine
      * fields can no longer arrive from a caller" — was the claim a reader would have relied on,
-     * and it did not hold for the 252 entities that do not extend {@code BaseEntity}. The probe
+     * and it did not hold for the 259 entities that do not extend {@code BaseEntity}. The probe
      * below extends it, so this test can only ever speak for the types that do.
-     * {@link ServerOwnedIdentityInvariantTest} makes the platform-wide claim and proves it over
-     * every {@code @Entity}.
+     * {@link ServerOwnedFieldsInvariantTest} makes the platform-wide claim and, since F2-215,
+     * proves it for all nine fields over every {@code @Entity} rather than for {@code id} alone.
      */
     @Test
     void serverOwnedFieldsCannotBeSetFromJson() throws Exception {
