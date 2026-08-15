@@ -1872,6 +1872,88 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A CREATE THAT NAMES THE STATE IS A TRANSITION NOBODY GUARDED, AND THE COMMENT REMOVING ONE
+  FIELD FROM THE WHITELIST SAT ONE LINE ABOVE THE DECISION ITSELF** (F2-218, measured 2026-08-15).
+  `NdiEvidenceItemService.approve()` carries the SEC-NDI-003 maker/checker control — `NDI:APPROVE`
+  at the controller, an SoD check in the service (*the evidence owner may not approve their own
+  item*), the reviewer resolved from the authenticated principal, an audit transition row. Probed
+  live as **`ranalyst`** (holds `NDI:WRITE`, **not** `NDI:APPROVE`): `POST /{id}/approve` → **403**,
+  while `POST /api/ndi/evidence` with `status=ACTIVE`, `reviewerName="Nobody Who Reviewed This"` and
+  `reviewedAt=2001-01-01` → **200 with all three stored**, and `PUT /{id} {"status":"ACTIVE"}` on a
+  PENDING row **performed exactly the transition the guard had just refused** — no reviewer, no SoD,
+  **no audit row** either time.
+  🔑 **The update's own comment was right about ONE of the three fields the same control owns.** It
+  read *"reviewerName is the attribution field for the maker/checker SoD control — it is stamped
+  server-side from the authenticated principal at approve/reject, never bound from the request
+  body"*, directly above `if (body.getReviewedAt() != null) …` and `if (body.getStatus() != null) …`.
+  `reviewerName` is the **attribution**, `status` is the **decision**, `reviewedAt` is **when** —
+  **removing the name while leaving the decision meant a WRITE-only caller could approve evidence;
+  the record simply did not say who.** F2-215's headline one level down, and the **fourth** instance
+  in this lineage of the correct artefact sitting beside the wrong one (F2-209's reader 200 lines
+  below, F2-213's `CyberEvidenceService`, F2-214's `PrivacyBreachRequest` eight lines below).
+  ⚠⚠ **`if (x == null) x = INITIAL` IS A DEFAULT, NOT A GUARD, AND THE TWO ARE INDISTINGUISHABLE TO
+  ANY SCAN THAT ONLY ASKS WHETHER THE SETTER IS PRESENT.** `body.setStatus("DRAFT")` discards what
+  the caller sent; `if (body.getStatus() == null) body.setStatus("DRAFT")` keeps it. That is how the
+  assessment cycle could be created `SUBMITTED` or `CLOSED`. 🔑 **The discriminator is not the
+  guard, it is the VALUE** — a literal, a clock reading or the principal means the server owns the
+  field; an expression reading the request means the caller does.
+  ⚠⚠ **The verdict column of a mass-assignment ratchet is DERIVABLE, and deriving it is what stops
+  it being 55 pieces of plausible prose.** F2-217 proved a census keyed on a list of field names
+  measures the list. The generalisation is not a longer list: **the authority a field carries is a
+  fact about the service that owns it, and the service already states it** — in the methods that
+  stamp the field after checking a state and recording who acted. `ServerStampedFieldContractTest`
+  intersects, **per service AND per entity type**, the fields a service's guarded routes stamp with
+  the fields its create/update paths take from the request. 4 services hard-zero; **8** on a
+  decrease-only work list with the evidence printed per site into
+  `target/server-stamped-fields.txt` — deliberately **not** a named map of reasons (F2-188's
+  failure mode).
+  ⚠⚠ **FOUR detector bugs in one slice, and the direction matters more than the count.** Three
+  **shrank** the population, which reads exactly like a clean tree: a DEFAULT read as a guard
+  (`[^)]*` cannot cross the `)` in `getStatus()`); an inverted null test (`!= null`) read as an
+  unconditional server write, clearing 7 wide-open sites; and both halves keyed by **service**, so
+  `NdiImprovementPlanService#addItem` — which persists an *item* — was charged with three fields of
+  the *plan* (🔑 **a service that owns two entities has two field vocabularies**; F2-191's shape one
+  level down). The fourth **grew** it onto correct code: a **scalar method parameter** read as a
+  server value, so `markUnderReview(Long id, String reviewerName)` looked like a stamp. 🔑 **A
+  scalar method parameter is still caller data**, and a gate that fails on correct code is the one
+  failure a gate must never have (F2-214). 11 raw sites → 8, three refuted by the gate's own
+  corrections.
+  ⚠⚠ **A GATE MEASURING THE SERVICE LAYER CANNOT SEE A FIX MADE AT THE WIRE LAYER.** 7 of the first
+  24 findings were `isDeleted`/`updatedAt`, already closed platform-wide by F2-206/F2-215's
+  `ServerOwnedFieldsModule`. Subtract them **explicitly**, with the exclusion list checked against
+  the introspector's own source in both directions — an exclusion nobody can audit is an assumption
+  wearing a citation.
+  ⚠ **Refuse, do not coerce** (F2-182's test, third clean application): the create already rejected
+  anything outside the register's vocabulary, so every value that succeeds today is a declared
+  state and the only requests newly refused are ones performing an unguarded transition — **a
+  request that performs an unguarded transition is not a working request.** What made it safe to
+  enforce was measurable: the create form sends no status at all, and the entity's own
+  `@PrePersist` already defaults to `PENDING`.
+  ⚠ **Server-DERIVED state must survive the fix, and it needs asserting in both directions.** Rule 6
+  still flips an item to `EXPIRED` at `approve()`; a CAPA still lands `OVERDUE` from its target
+  date. *"A create always lands in the initial state"* is an equally passing and wrong reading, and
+  the next reader deletes the derivation. Derive the initial state where the machine already
+  declares it — the cycle's is `FORWARD_FLOW.get(0)`, never a second literal (F2-196's rule).
+  ⚠⚠ **A SURVIVING MUTANT THE GATE LEGITIMATELY CANNOT SEE IS AN UNASSERTED BEHAVIOUR, NOT A LOOSE
+  INSTRUMENT.** Two survived the first harness run; widening the gate to catch them would have meant
+  treating a caller-supplied parameter as a server stamp again — reinstating detector bug 4. The
+  answer was a test (`NdiCreateInitialStateTest`), and 11/11 after. ⚠ Two **anchor misses** in the
+  same run, because **the services are CRLF and the files this slice wrote are LF**, so a multi-line
+  anchor with either separator misses on half the tree.
+  ⚠ **Half a post-fix probe's legs belong to the guarded route still working.** Approve still
+  reaches ACTIVE, the reviewer is still the principal, the audit row is still written, SoD still
+  answers **409** — without those, a slice that closed the bypass by breaking the approval workflow
+  scores identically. 17/17 post-fix, 12/12 pre-fix.
+  ⚠ **A parameter the server discards is a claim about where the attribution comes from.**
+  `approveEvidence(id, reviewerName?)` passed the literal `'admin'` from its one call site; SEC-NDI-003
+  has always ignored it. Deleted rather than left as decoration (F2-184's shape on a client signature).
+  ⚙ **Filed:** 8 services on the derived work list with per-site evidence — `TcfdItem` created with
+  `approvalStatus`/`approvedAt`/`approvedBy`, `ProcessorAssessment#approvedAt,approverName`,
+  `PolicyDocument#approverName,publishedAt`, `DataSharingAgreement#counterpartySigner,signedAt,
+  signerName`, `ClimateRiskOpportunity#assessedAt,closedAt,treatedAt`, `SgiCommitment#currentValue*`,
+  `NdiComplianceAssessment` (5 fields), `NdiSetting#valueText`, `SustainabilityEvidence#supersedesId`.
+  Some will be **BY DESIGN** — an M&A letter-of-intent signing date genuinely is the caller's — which
+  is exactly why they ship as a work list and not as verdicts.
 - ⚠⚠ **A RISK RANKING BUILT FROM A LITERAL FIELD-NAME LIST FINDS EXACTLY THE SPELLINGS ITS AUTHOR HAD ALREADY
   SEEN, AND A CLOSED FIELD AT THE TOP OF THE LADDER HIDES EVERYTHING BENEATH IT** (F2-217, measured
   2026-08-15). `MassAssignmentRatchetTest` ranks each entity-bound write by matching the body type's fields
@@ -1914,7 +1996,9 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   a count. 🔑 **F2-205's rule, not F2-204's: there a ratchet's QUESTION was wrong so it was re-scoped; here the
   question was right and the ANSWER was under-measured, so the figure moves and says so.** Do **not** give the
   55 manufactured reasons (F2-188's failure mode); read the service, record CLOSED/INERT/BY DESIGN, lower the
-  figure in the same commit.
+  figure in the same commit. ⚙ **F2-218 took the first 7** (5 CLOSED, 1 INERT, 1 BY DESIGN — the NDI
+  registers), leaving **48**, and built the instrument that makes the rest adjudicable by MEASUREMENT rather
+  than by hand — see the F2-218 block above.
   ⚠⚠ **My own detector UNDER-reported and only a second measurement caught it.** `AUTHORITY_SHAPE`'s first
   draft was lower-case-only, so it never matched `acApprovedBy` — **the two endpoints whose live probe
   motivated the whole slice ranked STATE and the build was green.** Found by diffing against the throwaway

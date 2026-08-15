@@ -2400,6 +2400,145 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-218 · A caller holding only NDI:WRITE could approve NDI evidence, and the comment removing the reviewer's name sat one line above the decision itself
+
+**Found** 2026-08-15, taking F2-217's filed work list (the 55 NEEDS-VERDICT rows). **P2.**
+**Closed** the same day. No migration, no endpoint change.
+
+### The defect, probed live as `ranalyst` (holds `NDI:WRITE`, **not** `NDI:APPROVE`)
+
+| request | result |
+|---|---|
+| `POST /api/ndi/evidence/1/approve` | **403** |
+| `POST /api/ndi/evidence` `{status: ACTIVE, reviewerName: "Nobody Who Reviewed This", reviewedAt: 2001-01-01, ownerName: "ranalyst"}` | **200**, all three stored |
+| `PUT /api/ndi/evidence/{id}` `{status: ACTIVE}` on a PENDING row | **200**, transition performed |
+
+`NdiEvidenceItemService.approve()` carries the SEC-NDI-003 maker/checker control: `NDI:APPROVE`
+at the controller, a segregation-of-duties check in the service (*the evidence owner may not
+approve their own item*), the reviewer resolved from the authenticated principal, and an audit
+transition row. **Both write paths reached the same end state with none of it**, and neither
+wrote an audit row. 12/12 probe legs pre-fix.
+
+KEY: **the comment was right about one of the three fields the same control owns.** The update
+carried, verbatim: *"reviewerName is the attribution field for the maker/checker SoD control - it
+is stamped server-side from the authenticated principal at approve/reject, never bound from the
+request body."* Directly beneath it sat `if (body.getReviewedAt() != null) e.setReviewedAt(...)`
+and `if (body.getStatus() != null) e.setStatus(...)`. `reviewerName` is the *attribution*,
+`status` is the **decision**, `reviewedAt` is *when*. **Removing the name while leaving the
+decision meant a WRITE-only caller could approve evidence; the record simply did not say who.**
+F2-215's headline one level down, and the fourth instance in this lineage of the correct artefact
+sitting beside the wrong one (F2-209's reader 200 lines below, F2-213's `CyberEvidenceService`,
+F2-214's `PrivacyBreachRequest` eight lines below).
+
+Two sibling registers, same shape: an improvement plan created `COMPLETED` with
+`approverName="Nobody Who Approved This"` (skipping `DRAFT -> APPROVED` and the whole machine
+under it), and an assessment cycle whose `if (status == null) status = "DRAFT"` let any declared
+status through.
+
+### KEY: a default and a guard are indistinguishable to any scan that only asks whether the setter is present
+
+`body.setStatus("DRAFT")` **discards** what the caller sent. `if (body.getStatus() == null)
+body.setStatus("DRAFT")` **keeps** it. My scratch census reported both as `sets:status` - a scrub
+- because its guard regex used `[^)]*`, which cannot cross the `)` in `getStatus()`. **The
+discriminator is not the guard, it is the VALUE**: a literal, a clock or the principal means the
+server owns the field; an expression reading the request means the caller does.
+
+### The instrument: the verdict is DERIVED, not another name list
+
+F2-217 established that a census keyed on a list of field names measures the list. The lesson
+generalises past widening the list: **the authority a field carries is a fact about the service
+that owns it, and the service already states it** - in the methods that stamp the field after
+checking a state and recording who acted. `ServerStampedFieldContractTest` intersects, per
+service and **per entity type**, the fields its guarded routes stamp with the fields its
+create/update paths take from the request. Four services are a **hard zero**; the remaining
+**8** ride a decrease-only figure with the evidence printed per site into
+`target/server-stamped-fields.txt` - a work list, **not** a set of manufactured reasons
+(F2-188's failure mode, avoided deliberately).
+
+KEY: **this is what makes `MassAssignmentRatchetTest`'s verdict column derivable rather than 55
+pieces of plausible prose.**
+
+### Three detector bugs, and the direction each failed in
+
+| # | bug | direction |
+|---|---|---|
+| 1 | a DEFAULT read as a guard (`[^)]*` cannot cross `getStatus()`'s paren) | **shrank** the population - reads as a clean tree |
+| 2 | an inverted null test (`!= null`) read as an unconditional server write | **shrank** it - cleared 7 wide-open sites |
+| 3 | a **scalar method parameter** read as a server value (`markUnderReview(String reviewerName)`) | **grew** it - a false positive on correct code |
+
+The third is the worse one. **A gate that fails on correct code trains the next reader to edit
+the assertion rather than the code** (F2-214). 11 raw sites -> 8, three refuted by the gate's own
+corrections. And a fourth, caught on the gate's first run: both halves were keyed by **service**,
+so `NdiImprovementPlanService#addItem` - which persists an *item* - was charged with accepting
+three fields of the *plan*. KEY: **a service that owns two entities has two field vocabularies**;
+F2-191 recorded the same shape one level up (*a same-package proxy is not same-entity*).
+
+### KEY: a gate measuring the service layer cannot see a fix made at the wire layer
+
+7 of the gate's first 24 findings were `isDeleted` and `updatedAt` - already closed by
+F2-206/F2-215's `ServerOwnedFieldsModule`, an introspector that marks `BaseEntity`'s nine fields
+READ_ONLY on every entity Jackson binds. Subtracted explicitly, with the exclusion list checked
+against the introspector's own source in both directions rather than restated.
+
+### What was NOT done
+
+Server-**derived** state still differs from the initial state, asserted in both directions: Rule 6
+still flips an item to `EXPIRED` at `approve()`, and a CAPA still lands `OVERDUE` from its target
+date. *"A create always lands in the initial state"* is an equally passing and wrong reading of
+this change. The cycle's initial state is `FORWARD_FLOW.get(0)` - **derived, never typed**
+(F2-196's rule).
+
+`ServerOwnedState` **refuses** rather than coercing, per F2-182's test (*what is already refusing
+this?*): the create already rejected anything outside the register's vocabulary, so every value
+that succeeds today is a declared state, and the only requests newly refused are ones performing
+an unguarded transition. **A request that performs an unguarded transition is not a working
+request.** The create form sends no status at all, and the entity's own `@PrePersist` already
+defaults to `PENDING`, which is what made this safe to enforce.
+
+### Verification
+
+Backend **3,897/0/0** - frontend **756/0/0** + `tsc` clean - mutation **11/11 killed, 0 survived,
+0 anchor-miss** - pre-fix control fires on all three services - live probe **17/17** post-fix
+(12/12 pre-fix demonstrating the bypass). The post-fix probe deliberately spends half its legs on
+the guarded routes still working - approve reaches ACTIVE, the reviewer is `compliance` from the
+principal, the audit row is written, SoD answers **409** - because a slice that closed the bypass
+by breaking the approval workflow would otherwise score identically. `[REVIEW-TEST]` rows removed
+with `CHARINDEX`.
+
+WARNING: two mutations survived the first run and **neither was a gate hole**: the gate
+legitimately cannot see them (the plan's approver is caller-supplied on *both* routes; the cycle's
+derivation is one line). KEY: **a surviving mutant the gate cannot see is an unasserted behaviour,
+not a loose instrument** - the answer was `NdiCreateInitialStateTest`, not a wider gate. Widening
+it would have meant treating a caller-supplied parameter as a server stamp again, i.e.
+reinstating detector bug 3.
+
+WARNING: two anchor misses, from multi-line anchors - **the services are CRLF and the files this
+slice wrote are LF**, so either separator misses on half the tree. ANCHOR-MISS is a distinct
+non-zero outcome precisely so it does not read as a pass (F2-212).
+
+### Also
+
+`ndiEvidence.ts`'s `approveEvidence`/`rejectEvidence` dropped their inert `reviewerName`
+parameter; the single call site passed the literal `'admin'`. The server has always ignored it
+(SEC-NDI-003) - **a parameter the server discards is a claim about where the attribution comes
+from.**
+
+### Filed
+
+- **8 services** on the derived work list, with evidence:
+  `TcfdItem#approvalStatus,approvedAt,approvedBy` on create; `ProcessorAssessment#approvedAt,
+  approverName`; `PolicyDocument#approverName,publishedAt` (create and update);
+  `DataSharingAgreement#counterpartySigner,signedAt,signerName`;
+  `ClimateRiskOpportunity#assessedAt,closedAt,treatedAt`; `SgiCommitment#currentValue*`;
+  `NdiComplianceAssessment` (5 fields); `NdiSetting#valueText`;
+  `SustainabilityEvidence#supersedesId`. Some will be BY DESIGN - an M&A letter-of-intent signing
+  date is genuinely the caller's - which is why they are a work list and not a verdict.
+- `MassAssignmentRatchetTest`'s remaining **48** NEEDS-VERDICT rows (was 55; 7 adjudicated here:
+  5 CLOSED, 1 INERT, 1 BY DESIGN).
+- The **83 entity-bound PUT handlers** (F2-22) remain the structural root.
+
+---
+
 ## F2-217 · An internal-audit plan could be created already approved by the Audit Committee, and the ratchet built for forged authority spelled the columns differently
 
 | | |
