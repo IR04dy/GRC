@@ -2,6 +2,7 @@ package com.tss.grc.module.ndi.cycle.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.ndi.audit.service.NdiAuditPublisher;
 import com.tss.grc.module.ndi.cycle.entity.NdiAssessmentCycle;
 import com.tss.grc.module.ndi.cycle.repository.NdiAssessmentCycleRepository;
@@ -72,6 +73,14 @@ public class NdiAssessmentCycleService {
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
+    /**
+     * The state a cycle is created in — <b>derived</b> from the head of {@link #FORWARD_FLOW}, not
+     * typed again. F2-196's rule: a second literal is a second thing to keep in step, and the whole
+     * point of this constant is that the state the server files a cycle in and the state its
+     * machine starts from cannot disagree. Reordering FORWARD_FLOW moves this with it.
+     */
+    private static final String INITIAL_STATUS = FORWARD_FLOW.get(0);
+
     // ── Reads ─────────────────────────────────────────────────────────
     public Page<NdiAssessmentCycle> list(Pageable p) {
         return repo.findByOrganisationIdOrderByReportingYearDescIdDesc(org(), p);
@@ -89,7 +98,20 @@ public class NdiAssessmentCycleService {
     public NdiAssessmentCycle create(NdiAssessmentCycle req) {
         req.setId(null);
         req.setOrganisationId(org());
-        if (req.getStatus() == null || req.getStatus().isBlank()) req.setStatus("DRAFT");
+        // F2-218: this was a DEFAULT, not a guard — `if (status == null) status = "DRAFT"` leaves
+        // the caller's value in place whenever they send one, so a cycle could be created straight
+        // into SUBMITTED or CLOSED, skipping transition()'s forward-flow check and the timestamps
+        // it stamps. A default and a guard are indistinguishable to any scan that only asks whether
+        // the setter is present, which is why this survived the earlier sweeps.
+        req.setStatus(ServerOwnedState.requireInitial(
+            req.getStatus(), INITIAL_STATUS, "an assessment cycle", "POST /{id}/transition"));
+        // transition() stamps these three per target state; a cycle being created has reached none
+        // of those states, so a supplied value can only be a claim about something that did not
+        // happen. Cleared rather than refused: unlike `status` they carry no vocabulary, so there
+        // is nothing for a 400 to name back to the caller.
+        req.setApprovedAt(null);
+        req.setSubmittedAt(null);
+        req.setClosedAt(null);
         validate(req);
         guardOneActivePerYear(req.getReportingYear(), null);
         NdiAssessmentCycle saved = repo.save(req);

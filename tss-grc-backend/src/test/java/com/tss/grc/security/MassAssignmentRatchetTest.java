@@ -151,7 +151,7 @@ class MassAssignmentRatchetTest {
      * the fields that put it there, so this is a work list rather than a count. Read the service,
      * record CLOSED / INERT / BY DESIGN in {@link #ADJUDICATED}, lower this in the same commit.
      */
-    private static final int BASELINE_UNADJUDICATED_NEW_CRIT = 55;
+    private static final int BASELINE_UNADJUDICATED_NEW_CRIT = 48;
 
     @Test
     void noNewEntityBoundWriteEndpoints() {
@@ -482,6 +482,41 @@ class MassAssignmentRatchetTest {
         // ── F2-217: the six the widened vocabulary surfaced first, read and probed live ────
         // The three creates persisted the request entity, so the caller chose both the state and
         // the attribution; the three updates are field whitelists that never mention either.
+        // ── F2-218 — the NDI registers: a WRITE-permission caller reached an APPROVE gate ────
+        //
+        // Probed live as `ranalyst` (NDI:WRITE, no NDI:APPROVE): POST /api/ndi/evidence/1/approve
+        // answered 403, while the create stored status=ACTIVE with a chosen reviewerName and a
+        // 2001 reviewedAt, and PUT /{id} moved a PENDING row to ACTIVE. NdiEvidenceItemService's
+        // approve() enforces a maker/checker SoD check (owner != reviewer); neither write path did.
+        //
+        // ⚠ The update carried a comment saying reviewerName "is stamped server-side ... never
+        // bound from the request body" — correct, one line above the two that copied `status` (the
+        // decision) and `reviewedAt` (when). Fixing the field you noticed leaves the rest looking
+        // covered, because the mechanism that covers them is visibly present (F2-215's headline).
+        Map.entry("NdiEvidenceItemController#create(NdiEvidenceItem)",
+            "CLOSED F2-218 — create forces PENDING and clears reviewerName/reviewedAt; ACTIVE is "
+            + "approve()'s, behind NDI:APPROVE and the SoD check"),
+        Map.entry("NdiEvidenceItemController#update(NdiEvidenceItem)",
+            "CLOSED F2-218 — the whitelist no longer copies status or reviewedAt; PUT was "
+            + "performing the PENDING -> ACTIVE approval that POST /{id}/approve had just refused"),
+        Map.entry("NdiImprovementPlanController#create(NdiImprovementPlan)",
+            "CLOSED F2-218 — create forces DRAFT (the only state approve() acts on, one constant) "
+            + "and clears approverName/approvedAt; was 200 for status=COMPLETED"),
+        Map.entry("NdiImprovementPlanController#update(NdiImprovementPlan)",
+            "CLOSED F2-218 — update no longer copies status or approverName; both are approve()'s "
+            + "and transition()'s, which record the change"),
+        Map.entry("NdiAssessmentCycleController#create(NdiAssessmentCycle)",
+            "CLOSED F2-218 — `if (status == null) status = DRAFT` was a DEFAULT, not a guard, so a "
+            + "cycle could start SUBMITTED or CLOSED; approvedAt/submittedAt/closedAt now cleared"),
+
+        Map.entry("NdiAssessmentCycleController#update(NdiAssessmentCycle)",
+            "INERT F2-218 — the whitelist omits status and closedAt entirely, and END_STATUSES "
+            + "refuses editing a closed cycle; both are transition()'s"),
+        Map.entry("NdiMaturityAssessmentController#update(NdiMaturityAssessment)",
+            "BY DESIGN F2-218 — reviewerName here is an ASSIGNMENT (who should review), taken from "
+            + "the caller by markUnderReview() too, not an attribution derived from the principal; "
+            + "status is not copied, and an APPROVED row is read-only"),
+
         Map.entry("AuditLifecycleController#createAnnualPlan(AnnualPlan)",
             "CLOSED F2-217 — was 200 for status=AC_APPROVED + a chosen acApprovedBy while /transition "
             + "answered 409; create now refuses a non-initial status and clears the AC stamp"),

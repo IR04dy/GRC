@@ -2,6 +2,7 @@ package com.tss.grc.module.audit_lc.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.audit_lc.entity.AnnualPlan;
 import com.tss.grc.module.audit_lc.entity.CapaTask;
 import com.tss.grc.module.audit_lc.entity.WorkingPaper;
@@ -128,13 +129,13 @@ public class AuditLifecycleService {
     private static String initialStatusOnly(String supplied, String initial, String register) {
         // `register` carries its own article ("an annual plan") — "a " + register produced
         // "a annual plan" in the 400 body, which a caller reads before anything else here.
-        if (supplied == null || supplied.equals(initial)) {
-            return initial;
-        }
-        throw new IllegalArgumentException(
-            "status: " + register + " is created in " + initial + ". '" + supplied + "' has to be "
-            + "reached through POST /{externalId}/transition, which checks the state machine and "
-            + "records who made the change. Send status=" + initial + ", or omit it.");
+        //
+        // F2-218 moved the body to common/validation/ServerOwnedState the first time a second
+        // register (NDI evidence, whose create bypassed a maker/checker SoD check) needed the same
+        // rule. This stays as the module's own name for it — the delegation is what stops a third
+        // register hand-rolling a third copy that then drifts.
+        return ServerOwnedState.requireInitial(
+            supplied, initial, register, "POST /{externalId}/transition");
     }
 
     private final AnnualPlanRepository annualPlans;

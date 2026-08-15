@@ -1,6 +1,7 @@
 package com.tss.grc.module.ndi.plan.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.ndi.gap.entity.NdiCorrectiveAction;
 import com.tss.grc.module.ndi.gap.repository.NdiCorrectiveActionRepository;
 import com.tss.grc.module.ndi.plan.entity.NdiImprovementPlan;
@@ -50,6 +51,13 @@ public class NdiImprovementPlanService {
 
     private Long org() { return TenantContext.getCurrentTenant(); }
 
+    /**
+     * The state a plan is created in. Read by both this create's guard and {@link #approve}'s
+     * precondition, so the state the server files a plan in and the only state it will approve
+     * from are one value (F2-218).
+     */
+    private static final String INITIAL_STATUS = "DRAFT";
+
     public record PlanRollup(
         Long planId,
         int totalItems,
@@ -92,6 +100,16 @@ public class NdiImprovementPlanService {
             throw new IllegalArgumentException("periodEnd must be on or after periodStart");
         body.setId(null);
         body.setOrganisationId(org());
+        // F2-218: DRAFT is the only state approve() will act on and the only one this create
+        // accepts, read from one constant so the two cannot drift. Probed live as `ranalyst`:
+        // POST /api/ndi/plans with status=COMPLETED and approverName="Nobody Who Approved This"
+        // answered 200 and stored both — skipping DRAFT -> APPROVED (which stamps the approver from
+        // the argument and emits an audit transition) and the whole APPROVED -> IN_FLIGHT ->
+        // COMPLETED machine underneath it.
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), INITIAL_STATUS, "an improvement plan", "POST /{id}/approve"));
+        body.setApproverName(null);
+        body.setApprovedAt(null);
         return plans.save(body);
     }
 
@@ -106,8 +124,10 @@ public class NdiImprovementPlanService {
         if (body.getPeriodEnd()      != null) p.setPeriodEnd(body.getPeriodEnd());
         if (body.getOwnerName()      != null) p.setOwnerName(body.getOwnerName());
         if (body.getOwnerEmail()     != null) p.setOwnerEmail(body.getOwnerEmail());
-        if (body.getApproverName()   != null) p.setApproverName(body.getApproverName());
-        if (body.getStatus()         != null) p.setStatus(body.getStatus());
+        // F2-218: approverName and status are approve()'s and transition()'s to write. Copying
+        // them here let a PUT perform DRAFT -> APPROVED with an approver of the caller's choosing
+        // and no audit row — the same bypass as the create above, through the other verb. Editing
+        // a plan's name, dates, owner or budget is what this route is for.
         if (body.getBudgetTotal()    != null) p.setBudgetTotal(body.getBudgetTotal());
         if (body.getBudgetCurrency() != null) p.setBudgetCurrency(body.getBudgetCurrency());
         if (body.getNotes()          != null) p.setNotes(body.getNotes());
@@ -116,7 +136,7 @@ public class NdiImprovementPlanService {
 
     public NdiImprovementPlan approve(Long id, String approverName) {
         NdiImprovementPlan p = get(id);
-        if (!"DRAFT".equals(p.getStatus()))
+        if (!INITIAL_STATUS.equals(p.getStatus()))
             throw new IllegalStateException("Only DRAFT plans can be approved (was " + p.getStatus() + ")");
         p.setStatus("APPROVED");
         p.setApproverName(approverName);

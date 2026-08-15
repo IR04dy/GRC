@@ -1,6 +1,7 @@
 package com.tss.grc.module.ndi.evidence.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.ndi.evidence.entity.NdiEvidenceItem;
 import com.tss.grc.module.ndi.evidence.repository.NdiEvidenceItemRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -35,6 +36,15 @@ public class NdiEvidenceItemService {
     }
 
     private Long org() { return TenantContext.getCurrentTenant(); }
+
+    /**
+     * The state evidence is filed in. Declared once and read by both the create's guard and
+     * {@link #approve}'s precondition, so the state the server files a record in and the only state
+     * it will approve from cannot drift apart. It agrees with {@code NdiEvidenceItem}'s own
+     * {@code @PrePersist} default, which is what made this safe to enforce: the create form sends
+     * no status at all, so nothing that works today starts failing.
+     */
+    private static final String INITIAL_STATUS = "PENDING";
 
     /**
      * SEC-NDI-003: the reviewer who approves/rejects evidence must be the
@@ -72,6 +82,19 @@ public class NdiEvidenceItemService {
             .orElseThrow(() -> new EntityNotFoundException("Evidence not found: " + id));
     }
 
+    /**
+     * F2-218: a create files evidence for review. It does not review it.
+     *
+     * <p>Before this, the three fields {@link #approve} and {@link #reject} stamp — the decision
+     * ({@code status}), who made it ({@code reviewerName}) and when ({@code reviewedAt}) — were all
+     * bound from the request body. Probed live 2026-08-15 as {@code ranalyst}, who holds
+     * {@code NDI:WRITE} and <b>not</b> {@code NDI:APPROVE}: {@code POST /{id}/approve} answered
+     * <b>403</b>, and this method answered <b>200</b> to {@code status=ACTIVE} with
+     * {@code reviewerName="Nobody Who Reviewed This"} and {@code reviewedAt=2001-01-01}, on an item
+     * whose {@code ownerName} was the caller. That is the SEC-NDI-003 maker/checker control —
+     * reviewer resolved from the principal, reviewer != owner — bypassed in full, with no audit
+     * transition row, by the unguarded route beside the guarded one.
+     */
     public NdiEvidenceItem create(NdiEvidenceItem body) {
         if (body.getTitleEn() == null || body.getTitleEn().isBlank())
             throw new IllegalArgumentException("titleEn is required");
@@ -79,6 +102,20 @@ public class NdiEvidenceItemService {
             throw new IllegalArgumentException("evidenceType is required");
         body.setId(null);
         body.setOrganisationId(org());
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), INITIAL_STATUS, "an evidence item", "POST /{id}/approve or /reject"));
+        // The attribution and its timestamp belong to whoever performs the review. A create has
+        // been reviewed by nobody, so any value here is a claim about a review that did not happen.
+        body.setReviewerName(null);
+        body.setReviewedAt(null);
+        body.setRejectionReason(null);
+        // Rule 6 still runs on every write path, as the class javadoc says — but it is a no-op here
+        // now, because it only flips ACTIVE -> EXPIRED and a created item is PENDING. The flip that
+        // matters happens in approve(), which sets ACTIVE and then applies the rule, so evidence
+        // approved with an expiry date already past is EXPIRED immediately. Left in place so the
+        // stated invariant holds for the next state this method might legitimately derive; a
+        // comment claiming it expires anything on create would be describing a branch that cannot
+        // run, which is worse than no comment (F2-184).
         applyExpiryRule(body);
         return repo.save(body);
     }
@@ -102,10 +139,18 @@ public class NdiEvidenceItemService {
         // SEC-NDI-003: reviewerName is the attribution field for the maker/checker
         // SoD control — it is stamped server-side from the authenticated principal
         // at approve/reject, never bound from the request body.
+        //
+        // ⚠⚠ F2-218: that comment was correct and it covered ONE of the three fields the same
+        // control owns. `reviewerName` is the attribution, `status` is the DECISION, and
+        // `reviewedAt` is when it was made — and the two lines below the comment copied both of
+        // the others straight from the request. Probed live as `ranalyst` (NDI:WRITE, no
+        // NDI:APPROVE): POST /{id}/approve answered 403 and PUT /{id} with {"status":"ACTIVE"}
+        // performed exactly that transition, 200, with no reviewer, no SoD check and no audit row.
+        // Removing the name while leaving the decision meant a WRITE-only caller could approve
+        // evidence; the record simply did not say who. Approving, rejecting and superseding are
+        // POST /{id}/approve, /reject and /supersede-by/{newId}.
         if (body.getEffectiveDate()   != null) e.setEffectiveDate(body.getEffectiveDate());
         if (body.getExpiryDate()      != null) e.setExpiryDate(body.getExpiryDate());
-        if (body.getReviewedAt()      != null) e.setReviewedAt(body.getReviewedAt());
-        if (body.getStatus()          != null) e.setStatus(body.getStatus());
         if (body.getTags()            != null) e.setTags(body.getTags());
         if (body.getNotes()           != null) e.setNotes(body.getNotes());
         applyExpiryRule(e);

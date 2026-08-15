@@ -2599,7 +2599,7 @@ function EvidenceTab() {
 
   async function onApprove(e: NdiEvidenceItem) {
     try {
-      await approveEvidence(e.id!, 'admin');
+      await approveEvidence(e.id!);
       toast.success(isAr ? 'تم الاعتماد' : 'Approved');
       await reload();
     } catch (err) {
@@ -2615,7 +2615,7 @@ function EvidenceTab() {
     });
     if (!reason) return;
     try {
-      await rejectEvidence(e.id!, reason, 'admin');
+      await rejectEvidence(e.id!, reason);
       toast.success(isAr ? 'تم الرفض' : 'Rejected');
       await reload();
     } catch (err) {

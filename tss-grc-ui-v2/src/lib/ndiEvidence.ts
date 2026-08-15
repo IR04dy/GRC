@@ -104,12 +104,17 @@ export function updateEvidence(id: number, body: Partial<NdiEvidenceItem>) {
   return api.put<NdiEvidenceItem>(`${BASE}/${id}`, body);
 }
 
-export function approveEvidence(id: number, reviewerName?: string) {
-  return api.post<NdiEvidenceItem>(`${BASE}/${id}/approve`, { reviewerName });
+// F2-218: no `reviewerName` parameter. SEC-NDI-003 resolves the reviewer from the
+// authenticated principal server-side and ignores any body field, so the old parameter was
+// inert — and the one call site passed the literal 'admin', which read as the client naming
+// who approved the evidence. A parameter the server discards is a claim about where the
+// attribution comes from.
+export function approveEvidence(id: number) {
+  return api.post<NdiEvidenceItem>(`${BASE}/${id}/approve`);
 }
 
-export function rejectEvidence(id: number, reason: string, reviewerName?: string) {
-  return api.post<NdiEvidenceItem>(`${BASE}/${id}/reject`, { reason, reviewerName });
+export function rejectEvidence(id: number, reason: string) {
+  return api.post<NdiEvidenceItem>(`${BASE}/${id}/reject`, { reason });
 }
 
 export function supersedeEvidence(oldId: number, newId: number) {
