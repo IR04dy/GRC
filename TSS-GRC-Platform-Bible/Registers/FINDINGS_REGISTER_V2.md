@@ -2400,6 +2400,123 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-216 · The platform-wide tenant backstop exempts the one value that means "every tenant", and the reason it gives is false
+
+| | |
+|---|---|
+| **ID** | F2-216 |
+| **Severity** | **P3 — latent.** No caller can reach it today. Recorded because what makes it unreachable is a property nobody had written down, and because two neighbouring classes described the control as not running at all. |
+| **Status** | **CLOSED 2026-08-15** (`666d8526`). Reason corrected, invariant gated, wiring claims fixed. Behaviour deliberately unchanged. |
+| **Where** | `common/tenant/TenantWriteGuardInterceptor#decideInsert`, `common/tenant/TenantContext`, `config/TenantWriteGuardConfig` |
+
+**What was asked.** F2-215 filed `organisationId` as the last unclosed field of `MassAssignmentRatchetTest`'s
+TENANT tier — *"services assign it explicitly from `TenantContext`, so closing it at the wire needs its own
+measurement."* This is that measurement, and it went the other way: **`organisationId` is defended at every
+reachable point.** 202 entity-bound write endpoints, every one with a tenant stamp on its create path; the
+`TenantWriteGuardInterceptor` wired and enabled in dev **and** prod with both legs (F2-22b added the insert
+leg). Probed live: `POST /api/v1/controls` with `organisationId: 2` from an org-1 caller stores org 1.
+🔑 **A filed item that measures as already-defended is a result, not a dead end — the value is in what the
+measurement passes on the way.**
+
+**What the measurement found.** `decideInsert` waves through a row whose `organisationId` is null, and says
+why: *"not a cross-tenant write. It is a NOT NULL violation about to happen, and the database says so far
+more clearly than a SecurityException would."* Read from `sys.columns` in both databases: of the **427
+org-bearing tables** (421 in prod), **11 declare the column NULLABLE** — so for those the database says
+nothing, and the sentence predicting what it would say was the only analysis anybody had done.
+
+**And on eight of the eleven, NULL is not an absence — it is a value meaning PLATFORM-GLOBAL.**
+`aml.sanctions_list`, `aml.sanctions_list_entry`, `fraud.fraud_typology`, `iam.roles`, `iam.sod_rules`,
+`opres.opres_pillar`, `platform.help_topic`, `platform.three_lines_role_mapping` are each read by a repository
+asking `organisationId IS NULL OR organisationId = :orgId`, and `SanctionsListRepository`'s own javadoc states
+it. **169 of their 177 rows in dev, 158 of 166 in prod, are stored that way.** Verified with the repositories'
+own predicate as SQL: org 1 reads back **5 sanctions lists, 8 SoD rules and 69 roles that no tenant owns**.
+
+🔑 **So the value the platform-wide cross-tenant backstop declines to judge is precisely the value that
+publishes a row to every tenant.** Not the NOT NULL violation the comment predicted — an entry added to every
+other tenant's sanctions screening, or a role added to every other tenant's IAM catalogue, with the backstop
+watching and returning `false` without logging a line.
+
+⚠⚠ **The internal inconsistency is the tell, and it was visible the whole time.** The UPDATE leg treats the
+same value as protected: `decide` compares old against new, so a global row pulled into one tenant
+(`null → 5`) throws, and `blocksWhenOrganisationIdGoesFromNullToValue` has asserted that since the leg was
+written. **One value: guarded on update, unjudged on insert.**
+
+**REFUTED, and the refutation is why nothing was changed.** None of the eight globally-visible entities is
+bound by any write endpoint (authority: `MassAssignmentRatchetTest`'s reflection scan, 202 entity-bound
+writes), and all four services that write those tables stamp from `TenantContext` on create. Making
+`decideInsert` throw would be **F2-183's defect** — a constraint added while its writers are open: 169
+legitimate global rows, tenant onboarding creating them off-request, and "null now, stamped a moment later"
+is the ordinary shape of a service that builds an entity before stamping it. ⚠ **F2-182's rule is the whole
+point: reachability is a fact about today, not a property of a control.** So the reason was corrected and the
+property that makes it safe became a build failure.
+
+⚠⚠ **THE BRANCH WAS TESTED, WHICH IS WORSE THAN UNTESTED — and my first draft of this finding claimed it had
+no test.** `TenantWriteGuardInterceptorTest` covered it from the beginning (15 methods, not the 12 my
+truncated `head -25` showed). But the test was **named for the false premise** —
+`allowsAnInsertWithNoTenantOnTheRowAndLetsTheColumnComplain` — and its javadoc repeated the claim word for
+word. Its assertion was correct; everything a reader uses to judge whether the branch is *right* was wrong.
+🔑 **A green test whose NAME asserts the behaviour under review is the strongest possible reason not to look
+further.** An untested branch at least reads as untested. F2-159's decoy and F2-175's rule in one artefact: a
+test written by reading the implementation can only agree with it, and the agreement is hardest to see when
+the description is accurate about the code and false about the world.
+
+⚠⚠ **Two neighbouring classes described the control as not running.** `TenantContext`: *"The Hibernate
+interceptor is not yet wired in — these are the building blocks…"*. `TenantWriteGuardConfig`: *"intentionally
+not connected to the SessionFactory"*, a heading reading *"Feature flag — default OFF"*, and *"operators
+should activate first in staging, watch the audit log … for a sprint, then flip to true in prod."* All three
+stopped being true when F2-22b added `onSave` and enabled the flag; the dev log has printed
+`[TenantWriteGuard] interceptor WIRED` on every boot since. 🔑 **A stale claim about whether a security
+control RUNS is not a documentation nit — it is the input to somebody's next threat model**, and read
+together the pair told a reader the backstop was unbuilt while it adjudicated every insert and update in both
+environments.
+
+**Gate — `TenantGuardNullExemptionContractTest` (4 legs).** The load-bearing one is a hard zero: **no write
+endpoint may bind an entity whose rows can be platform-global**, with the population **derived from the
+repositories** (an entity is global if some repository queries it with `organisationId IS NULL`) rather than
+listed, so a ninth is covered the day its repository is written. Asserted **exactly**, not as a floor
+(F2-204). Plus: the banned reason and the required one, and the wiring status checked against the profiles in
+**both** directions — turn dev's flag off and the comments claiming it runs become false, and the build says so.
+
+⚠ **My hand-written population was wrong and the gate corrected it on its first run** — I listed seven and
+`HelpTopic` is the eighth. F2-213/F2-214's rule for the third time: **write the sweep as the gate, in the same
+language, over the same tree.** A Python locator had already told me all 202 sites carry a stamp, which was
+true but is not the same question.
+
+⚠⚠ **Three instrument bugs of mine, each caught by running something.** (a) `unquoted()` applied to a whole
+Java file **pairs a javadoc citation's quotes with a string literal's quotes** elsewhere in the file, leaving
+the citation exposed — fixed by isolating `commentsOnly()` first. (b) A **phrase ban cannot tell an assertion
+from a denial**: my own sentence *"would not be committing the NOT NULL violation the comment predicted"*
+tripped the detector. F2-193's convention extends to denial — **cite the retired wording in quotes even when
+you are refuting it**, because the alternative is a detector that has to parse negation. (c) A prose claim
+**wraps across lines**, so a raw `contains` can only anchor on whichever fragment you picked, and the mutation
+gutting the consequence survived *twice* before I asserted **flowed** javadoc text. A multi-line expected
+string is not the fix either — this tree is CRLF and an embedded `\n` can never match (F2-212).
+
+**Verification.** Backend **3,865/0/0**. Mutation **10/10 as expected, 0 anchor-miss** — 7 killed, **3
+recorded as EQUIVALENT with measured reasons** rather than counted as holes (F2-206/F2-211: a surviving
+mutant is a hole only if the mutated code is *wrong*; two of my first-round "survivors" were a mis-targeted
+anchor and a 1-of-2-sites replacement, and one was an invalid mutation — **weakening an assertion always
+passes**). Pre-fix control: both claim legs fire on master's text. **No migration, no endpoint change.**
+
+⚠ **The live half is partial and says so.** The body-is-ignored leg was probed live (`controls` → org 1,
+`departments` → 403); the NULL-is-global leg was verified at **SQL level with the repositories' own
+predicate**, not through the API, because :8084 entered a state where every token it issues is rejected
+(`WWW-Authenticate: Bearer`, curl agrees). That process is **not this session's** — my backend log stops at
+13:04 and the listener was still serving at 16:47 — which is the recorded F2-74 hazard: **another session's
+DevTools backend loads THIS tree's `target/classes`, so twelve `mvn -o test` runs hot-restarted it into my
+working tree.** Not killed, deliberately.
+⚙ **A probe-harness landmine worth carrying:** Python 3.14's `http.client` rejects this server's chunk
+terminator and raises `IncompleteRead` **after buffering the whole payload** — `e.partial` held all 5,305
+bytes curl reported. Reading the body inside the `with` and letting that escape discarded a healthy 200 and
+reported the backend down for 180 s. 🔑 **A probe that cannot read a reply looks exactly like a server that
+never sent one.**
+
+**Filed.** The `organisationId` item F2-215 left open is **closed as measured-and-defended**, not as a fix.
+Still open and untouched: the **83 entity-bound PUT handlers** (F2-22) that make this whole family
+representable, and `MassAssignmentRatchetTest`'s **184 TENANT-tier rows with an empty adjudication column** —
+the 18 CRIT ones were F2-22b's work and the profile's own header says the adjudication column is the
+authority, not the tier.
+
 ## F2-215 · An invariant generalised one field at a time covers exactly that field — eight of BaseEntity's nine were never widened
 
 |  |  |

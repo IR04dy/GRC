@@ -1868,9 +1868,57 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   to whichever sorts first (it reported `Control extends BaseEntity` for an entity that does not) and
   `npx vitest run` from the repo root reports **182 phantom failures**. Scope filesystem sweeps to the working
   tree; reflection over `target/classes` is immune, which is why the measurements held.
-  ⚙ **Still open: `organisationId` binds from the body on every entity-bound endpoint** — F2-22's TENANT tier
-  and F2-25's actual bypass field. Deliberately not closed here: services assign it explicitly from
-  `TenantContext`, so it needs its own measurement. `externalId` likewise stays per-service (F2-172(d)). `READ_ONLY` and never `@JsonIgnore` — the whole frontend resolves records by `id`,
+  ⚙ **`organisationId` is now MEASURED AND DEFENDED, not open** (F2-216): all **202** entity-bound write
+  endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
+  **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
+  `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A NULL `organisation_id` IS NOT "MISSING" — ON EIGHT TABLES IT MEANS *EVERY TENANT*, AND THE
+  PLATFORM-WIDE BACKSTOP EXEMPTS EXACTLY THAT VALUE** (F2-216, measured 2026-08-15).
+  `TenantWriteGuardInterceptor#decideInsert` passes a row whose tenant is null, on the stated ground that it is
+  *"a NOT NULL violation about to happen, and the database says so far more clearly than a SecurityException
+  would."* From `sys.columns`: of **427 org-bearing tables** (421 in prod) **11 declare the column NULLABLE**,
+  so for those the database says nothing — and on eight of them NULL is a *value*: six repositories read
+  `organisationId IS NULL OR organisationId = :orgId` (`aml.sanctions_list`, `sanctions_list_entry`,
+  `fraud.fraud_typology`, `iam.roles`, `iam.sod_rules`, `opres.opres_pillar`, `platform.help_topic`,
+  `platform.three_lines_role_mapping`), **169 of 177 rows in dev and 158 of 166 in prod** are stored that way,
+  and running that predicate as SQL org 1 reads back **5 sanctions lists, 8 SoD rules and 69 roles it does not
+  own**. 🔑 **The value the cross-tenant guard declines to judge is precisely the value that publishes a row
+  to every tenant.** ⚠ The tell was visible the whole time: the **UPDATE** leg treats the same value as
+  protected (`null → 5` throws, asserted since the leg was written) while the **INSERT** leg waves it through.
+  **REFUTED as live** — none of the eight is bound by a write endpoint (202-row scan is the authority) and all
+  four writers stamp from `TenantContext`. Throwing would be **F2-183's defect**, a constraint added while its
+  writers are open; so the reason was corrected and the property that keeps it safe is now a build failure
+  (`TenantGuardNullExemptionContractTest`, population **derived from the repositories**, asserted exactly).
+  ⚠⚠ **The branch WAS tested, which is worse than untested, and it was NAMED FOR THE FALSE PREMISE** —
+  `allowsAnInsertWithNoTenantOnTheRowAndLetsTheColumnComplain`, javadoc repeating the claim verbatim. The
+  assertion was right; everything a reader judges the branch by was wrong. 🔑 **A green test whose NAME asserts
+  the behaviour under review is the strongest possible reason not to look further** (F2-159's decoy, F2-175's
+  rule). My own first draft claimed the branch had **no** test — `head -25` had truncated the list.
+  ⚠⚠ **And two neighbouring classes said the control does not run**: `TenantContext` (*"not yet wired in"*)
+  and `TenantWriteGuardConfig` (*"intentionally not connected"*, *"default OFF"*, *"activate first in
+  staging"*) — all false since F2-22b, while the dev log prints `interceptor WIRED` on every boot. 🔑 **A
+  stale claim about whether a security control RUNS is the input to somebody's next threat model.**
+  ⚠ **A phrase-ban detector cannot tell an assertion from a DENIAL** — F2-193's `unquoted()` convention
+  extends to refutation: **cite the retired wording in quotes even when you are denying it.** And
+  `unquoted()` over a **whole Java file** pairs a javadoc citation's quotes with a string literal's quotes
+  elsewhere; isolate the comments first. Assert a prose claim against **flowed** javadoc — a claim wraps, so a
+  raw `contains` only anchors on whichever fragment you picked (a mutation gutting the consequence survived
+  twice), and an embedded `\n` can never match on this **CRLF** tree (F2-212).
+  ⚠ **Two of three first-round "surviving" mutants were the MUTATION's fault** (a mis-targeted anchor; a
+  1-of-2-sites replacement) **and one was invalid — weakening an assertion always passes** (F2-206). Three
+  more are recorded **EQUIVALENT with measured reasons** rather than counted as holes.
+  ⚠⚠ **:8084 MAY NOT BE YOUR BACKEND, AND `mvn` WILL HOT-RESTART IT INTO YOUR WORKING TREE** — the recorded
+  F2-74 hazard, hit here: twelve `mvn -o test` runs rewrote `target/classes`, and the listener (whose log was
+  not this session's — mine stopped three hours earlier) ended up rejecting **every token it issues**
+  (`WWW-Authenticate: Bearer`, curl agrees). It was **not killed**. Check whose process owns the port before
+  trusting a live probe, and before assuming a 401 is your finding.
+  ⚙ **Probe-harness landmine:** Python 3.14's `http.client` rejects this server's chunk terminator and raises
+  `IncompleteRead` **after buffering the whole payload** — `e.partial` held all 5,305 bytes curl reported.
+  Reading the body inside the `with` and letting that escape discarded a healthy 200 and reported the backend
+  down for 180 s. 🔑 **A probe that cannot read a reply looks exactly like a server that never sent one.**
+  ⚙ **Still open:** `MassAssignmentRatchetTest`'s **184 TENANT-tier rows have an EMPTY adjudication column**
+  (the 18 CRIT ones were F2-22b's work), and its own header says the adjudication column is the authority, not
+  the tier. `READ_ONLY` and never `@JsonIgnore` — the whole frontend resolves records by `id`,
   and the property is **not removed** from the deserialiser either, because the FE echoes whole records back
   on update paths and under `FAIL_ON_UNKNOWN_PROPERTIES` that would turn working requests into 400s.
   ⚠⚠ **A test that mirrors the framework must mirror its CONFIGURATION, not just its modules.** The gate's
