@@ -872,16 +872,24 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   arithmetic, so it passes F2-195's gate (no literal) *and* F2-196's (which assumes the rows are real). Fourth
   shape in that lineage. And it outlived the others because `ropaConsent.ts` minted every `lastReviewedAt` from
   `Date.now()` at module load: **a clock-anchored fabrication has no tell** (F2-194).
-  ⚠⚠ **STRIP LINE COMMENTS AND BLOCK COMMENTS IN ONE LEFT-TO-RIGHT ALTERNATION — the order is load-bearing and
-  getting it wrong silently shrinks your population.** Written the obvious way (`s/\/\*[\s\S]*?\*\///` first,
-  then `//`), the census **deleted 40,247 of `App.tsx`'s 89,522 characters — 45% of the file** — because line 122
+  ⚠⚠ **STRIP LINE COMMENTS AND BLOCK COMMENTS IN ONE LEFT-TO-RIGHT ALTERNATION — using one alternation is
+  load-bearing and getting it wrong silently shrinks your population.** Written the obvious way
+  (`s/\/\*[\s\S]*?\*\///` first, **then** `//`, as TWO SEQUENTIAL PASSES), the census **deleted 40,247 of `App.tsx`'s 89,522 characters — 45% of the file** — because line 122
   is a `//` prose comment whose text contains a literal `/*`, so the block pattern ran from there to the next
   closing delimiter and took the `lazy()` declarations for the very pages being measured. It reported **24**
   server-less pages instead of **74** and **0** sidebar instances instead of **8**, silently excluding all four
   fabricated pages already known by name. 🔑 **A corrupted source yields a SMALLER population, which reads
   exactly like "those pages are fine"** — the quietest way for a scan to be wrong, and the 7th instance here of
   a detector satisfied by something other than its claim. Use `/(?<!:)\/\/[^\n]*|\/\*[\s\S]*?\*\//g`: at a `//`
-  an inner `/*` can never open a block, and at a `/*` a URL cannot truncate it. Pin **both** directions. ⚠⚠ **This was a REPEAT: `Appendix/scripts/baseline_census.py` lines 139–142 already carry the correct alternation and a comment saying F2-68(c) found this same bug in the frontend scanner.** I wrote a second scanner over the same tree without reading the first. 🔑 **Before writing a scanner, read the scanner this repo already has.**
+  an inner `/*` can never open a block, and at a `/*` a URL cannot truncate it. Pin **both** directions.
+  ⚠ **Correction (F2-211, measured in node): WITHIN one alternation the BRANCH ORDER is a no-op, so "line
+  comments first" is not the rule and a mutation that merely swaps the branches is an EQUIVALENT MUTANT.**
+  `//` and `/*` can never match at the same position, so leftmost-match consumes the line comment first
+  whichever branch is written first — both orderings return the same answer on the exact `App.tsx` shape.
+  The defect is **two passes, not branch order**. This matters when you write the negative control: a
+  self-test whose "broken" variant is the reordered alternation passes on a correct tree *and* on a rotted
+  one. Make the control the two-pass form. 🔑 **A surviving mutant is a hole only if the mutated code is
+  actually WRONG — check before treating survival as a gap** (F2-206's rule, second instance). ⚠⚠ **This was a REPEAT: `Appendix/scripts/baseline_census.py` lines 139–142 already carry the correct alternation and a comment saying F2-68(c) found this same bug in the frontend scanner.** I wrote a second scanner over the same tree without reading the first. 🔑 **Before writing a scanner, read the scanner this repo already has.**
   ⚠⚠ **The next question in that lineage is what a page EMITS, not what it asserts — and it found a regulator submission generated from a browser constant** (F2-199, measured 2026-08-12). `/nca-ecc-export` rendered an *"NCA ECC-1 Self-Assessment Submission"* for the National Cybersecurity Authority — cover, six coverage KPIs, a **30-control matrix** with statuses/maturities/evidence references, **CISO and CEO signature lines**, a CSV download and a print-to-PDF path — routed, sidebar-linked as the group header, and making **no server call of any kind**; every figure came from `lib/ncaEcc.ts`. 🔑 **The harm differs in KIND from the six findings before it: a fabricated dashboard misleads whoever is looking at it, and looking again corrects it; a fabricated EXPORT leaves the platform — downloaded, signed, filed — where nothing downstream can tell the figures were invented and a signature line invites a human to vouch for them.** ⚠⚠ **The cover named `brandName` — "TSS GRC Platform", the software product — as the filing entity, beside a hard-coded CR number `1010299292`**, so every tenant's return identified the vendor, identically. 🔑 **A tenant-specific fact appearing as a literal in a shipped bundle cannot be right for more than one tenant and is most likely right for none.** Real, probed live and identical in dev and prod: `nca_ecc.filings` holds **4 filings** with five per-domain scores each, peer review, CISO approval and an NCA submission reference — and `NcaEccFilingsPage` **already rendered all of it**, so this was a retire (ADR-017 §D-5), not a rewire. 🔑 **The fabrication was MORE GRANULAR than the platform's own filing model, which is why it looked more finished**: the ECC-2:2024 return is scored **per domain 1–5**, and the page invented a per-control matrix underneath it. That matrix was unrebuildable anyway — **`responses_json` is NULL on all 4 filings in both databases** — and inventing it would have been F2-196's defect.
   ⚠⚠ **A gate keyed on EMISSION is the eighth instrument, and the seven before it are each keyed on a mechanism**: a filename (`demoFallbackContract`), a three-entry filename allow-list (its F2-169 zero), an opt-in tag (F2-168), a hook (`isDemo`), a JSX tag (F2-195), a prop (F2-197), a routed component that calls nothing (F2-198). `exportProvenance.test.ts` asks instead whether the thing **producing a file** has server data behind it — census **21 files emit a document**, zero routed pages unbacked after the fix, so it ships as a **hard zero with an EMPTY exemption map**.
   ⚠⚠ **Its first draft did exactly what F2-188 warns about, and only the REVERSE leg caught it.** I wrote two exemptions with fluent multi-sentence reasons — one a whole security narrative about browser-local MFA — and **both named Sprint 4 §3.3 CULLED pages** whose routes were removed, so neither was ever in the population. The forward assertion passed because the population was already zero. 🔑 **A reason written for something that is not in the population reads exactly like a reason for something that is**, and the direction that catches it is the one nobody writes first.
@@ -1199,6 +1207,55 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   ⚠ **`cyber_lc` has zero CHECK constraints in the whole schema** — same as `audit_lc` (F2-203). All 36 stored
   statuses ARE in the machine today, so unlike `audit_lc` it is latent rather than live; **that was checked,
   not assumed**, which is the only reason it can be stated.
+  ⚠⚠ **THE WIRE NOMINATES, `sys.columns` ADJUDICATES — AND A DEMO FALLBACK CORPUS IS A SECOND WIRE
+  CONTRACT THAT NOTHING WAS CHECKING** (F2-211, measured 2026-08-15). `PrivacyBreachDto` declared
+  `severity`/`occurredAt`/`reportedAt`/`affectedRecords`; `GET /privacy/breaches` returns the `DataBreach`
+  **entity** and `privacy.data_breaches` has **25 columns, none of them** (17 live rows, dev = prod). So the
+  register's Severity badge, Records count and *Occurred* date rendered an em-dash on **every** row — and the
+  column headed with the **PDPL Article 20 72-hour clock** opened `if (!r.occurredAt) return '—'`, so **the
+  statutory countdown had never once displayed against real data, for any tenant.** The severity filter
+  compared `undefined`, so choosing any band **emptied the whole register**. 🔑 **An inert control is a
+  nuisance; a control that empties a statutory register produces a false all-clear** — an empty table reads
+  as "there are none of those", not as "this is broken".
+  ⚠⚠ **"Absent from the wire" CANNOT distinguish "no column" from "column exists, every row null", and the
+  two want OPPOSITE fixes.** Under `default-property-inclusion: non_null` they are byte-identical. Measuring
+  from the wire named **ten** dead fields across the four privacy DTOs; the entity says **four**.
+  `sdaiaSubmissionRef`/`sdaiaSubmittedAt` are real columns awaiting a first SDAIA submission, and **all six**
+  suspect `DpiaDto` fields (`processing_activity_id`, `dpo_id`, `assessor_id`, `approved_at`, `rejected_at`,
+  `rejection_reason`) exist and are simply null on all 6 rows — **6 of 6 refuted**, worse than the ~2-in-10
+  rate F2-188/F2-192/F2-204 each measured, because the instrument could not see the distinction. **Reflection
+  over the entity is the adjudicator** (`PrivacyWireContractTest`, which generalises and **replaces**
+  `RopaWireContractTest` — two instruments answering one question is this programme's own recurring defect).
+  ⚠⚠ **`export const BREACHES: PrivacyBreachDto[] = demoRows([…])` ENFORCES NOTHING.** `demoRows<T>(rows:
+  T[]): T[]` is generic, so TS infers `T` from the literal and then checks **assignability**, where extra
+  properties are legal — the excess-property check never runs. The corpus set all four dead fields with
+  `occurredAt` minted from `Date.now()`, so those columns and the countdown rendered **only in fallback mode**
+  and rendered plausibly (F2-194: a clock-anchored fabrication has no tell). **This is the mechanism under
+  F2-158's "hit the endpoint directly before believing the page."** Not theoretical: F2-210 renamed
+  `retentionPeriod` → `retentionPeriodMonths` one slice earlier and the ROPA corpus kept setting the retired
+  key **through a full clean typecheck**. `demoCorpusWireContract.test.ts` derives its population from the
+  tree (50 typed corpora, 49 resolved) and holds a hard zero.
+  🔑 **Neither gate is sufficient and the composition is the contract: corpus ⊆ DTO ⊆ entity.** The corpus
+  gate catches a corpus that DRIFTED from its type — it would **not** have caught this, because the DTO
+  declared all four too.
+  ⚠ **Scope such a leg to the two holes the type system leaves, not to the field names.** A first draft
+  banned `\.severity` on the breach surfaces and fired at once on `advFilters.severity`, the **filter-state
+  key**. Writing it properly showed the useful thing: once the DTO stops declaring them, **`tsc` already
+  refuses `r.severity`**. Exactly two shapes escape it and both produced this defect — a **widening cast**
+  (`item as PrivacyBreachDto & { reportedToAuthority?: boolean }`, how a badge read a key the wire has never
+  carried) and a **corpus key**.
+  ⚠⚠ **THE HEREDOC LANDMINE FIRED TWICE IN ONE SLICE AND A SELF-TEST IS THE ONLY REASON IT WAS CAUGHT.**
+  This file already says to write scan scripts with a file write, never a heredoc. Once it was a loud
+  `SyntaxError`; the second time `\\b` in a `cat >>`-written gate collapsed to `\b`, which **inside a
+  template literal is a backspace (0x08)** — so the leg reported *"no surface reads a dead field"* over a
+  tree full of them. 🔑 **A detector that cannot match reads exactly like a clean tree, and it
+  UNDER-reports.** Every detector was then re-run against `git show master:` — **22/22 fire, 0 silent**.
+  ⚠ **F2-209's own headline, one component up, missed by the slice that wrote it**: `PrivacyPage` renders the
+  corrected `PdplBreachConsole` and the register table **immediately below it** did none of what F2-209 had
+  just fixed. Three predicates are now shared by all three surfaces (`breachAwarenessAt`,
+  `breachSeverityInputs`, `isSdaiaSubmitted`). ⚙ And a `??` chain can be **right by accident**:
+  `b.reportedAt ?? b.occurredAt ?? b.discoveredAt` always resolved to the third because the first two have no
+  column — a correct outcome via two dead operands, reading as a preference the schema cannot express.
   ⚠⚠ **DIFF THE CLIENT'S FIELD NAMES AGAINST THE WIRE IN BOTH DIRECTIONS — AND WHEN AN ENDPOINT BINDS
   AN ENTITY, AN UNKNOWN KEY IS A SILENT DELETION, NOT AN ERROR** (F2-210, measured 2026-08-14/15).
   `POST /api/v1/privacy/ropa` takes `@RequestBody ProcessingActivity` and Spring Boot disables
