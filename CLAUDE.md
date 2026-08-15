@@ -1813,10 +1813,64 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   probed and REFUTED** (500, row untouched) — which matters because `DpiaService.create`'s own comment warns
   about `merge()` *"into a potentially cross-tenant row"*, i.e. **the comment recording the risk named the
   half that is NOT reachable**, and the half that was live is not what it warns about.
-  ⚠ **Fixed with ONE Jackson introspector, not 258 annotations** — `common/json/ServerOwnedIdentityModule`
-  reports `READ_ONLY` for the `id` of any `@Entity`/`@MappedSuperclass`. **An introspector has no population
+  ⚠ **Fixed with ONE Jackson introspector, not 258 annotations** — `common/json/ServerOwnedFieldsModule`
+  (named `ServerOwnedIdentityModule` until F2-215) reports `READ_ONLY` for any of `BaseEntity`'s nine
+  server-owned fields on any `@Entity`/`@MappedSuperclass`. **An introspector has no population
   to get wrong**: it is consulted for every property of every type Jackson binds, so a new entity is covered
-  the day it is written. `READ_ONLY` and never `@JsonIgnore` — the whole frontend resolves records by `id`,
+  the day it is written.
+  ⚠⚠ **AND IT COVERED ONE OF THE NINE FOR TWO MONTHS** (F2-215, measured 2026-08-15). `BaseEntity` declares
+  **nine** `READ_ONLY` fields and its javadoc explains each — forged attribution, backdating, *"an ordinary
+  update could soft-delete or resurrect a record, bypassing whatever guard the DELETE endpoint carries"*,
+  optimistic locking. F2-206 widened the population correctly and fixed **`id`**; its own lesson *"one field
+  per question"* was about the PROBE and silently became the scope of the FIX. 🔑 **Generalising an invariant
+  one field at a time leaves the remainder looking covered, because the mechanism that covers them is visibly
+  present** — a reader who finds a platform-wide introspector does not then check which fields it names.
+  Fifth depth of F2-198's shape, and here the narrowing is neither a filename, an allow-list, a module name
+  nor an `extends` clause but **a field-name list inside the fix itself**.
+  ⚠⚠ **And the gate said so, in a comment, ONE TEST METHOD BELOW the leg that had just widened the same
+  population**: *"createdBy/updatedBy/isDeleted are `BaseEntity`'s own columns; a type that does not extend it
+  has no such property for a caller to set."* **False.** Of the 259 entities outside `BaseEntity`: `createdAt`
+  **222**, `isDeleted` **209**, `updatedAt` 146, `createdBy` 111, `updatedBy` 104, `deletedBy` 56,
+  `rowVersion` 52, `deletedAt` 50 — **960 declarations, none annotated**, on **170 of the 214 entity-bound
+  write endpoints**. 🔑 **The comment names the right worry and reaches the wrong conclusion because it
+  assumed rather than measured — and nothing can contradict it, since a skipped entity and a clean entity
+  produce the same green.** Proved live on `POST /api/v1/controls`: `createdBy` stored verbatim, `createdAt`
+  backdated to 2001 over the entity's own `now()` initialiser, and `isDeleted: true` on a **create** storing a
+  row `@Where(is_deleted = 0)` hides from every query **including the service's own duplicate check** while
+  the UNIQUE index still sees it — burning that control code, with the **status code as evidence** (409 raw
+  index pre-fix, 400 service check post-fix).
+  ⚠ **REFUTED, and it is why this is closed at the WIRE**: soft-delete through the UPDATE endpoint does not
+  work — `updateControl` copies a nine-field whitelist (F2-22b's INERT verdict). Whether a bound field
+  *reaches the row* depends on each service, so a list of the ones that let it through is wrong the next time
+  somebody writes `repo.save(body)` — and `createControl` does exactly that, four lines after hand-scrubbing
+  `setId(null)` and `setOrganisationId(org())`. **The author scrubbed the two fields with a recorded defect;
+  there was no mechanism for the other eight because a superclass was supposed to own them.**
+  ⚠⚠ **Before marking a field READ_ONLY, measure what fills it if the wire stops — and there are FOUR
+  mechanisms, one of which reflection cannot see.** Annotation, lifecycle callback, field initialiser, and
+  **`insertable = false`** (the database default). The scan reported **10 entities with a NOT NULL
+  `createdAt` and nothing filling it**; all ten were `insertable = false`. 🔑 **A mechanism the instrument
+  cannot see reads exactly like a missing value**, and acting on that 10 would have meant refusing a real fix
+  — the F2-40 trap in reverse. Also check the writers: **0 of 378** `setCreatedAt`/`setIsDeleted`/… sites take
+  a request value.
+  ⚠⚠ **A probe's SHAPE is part of its population, and F2-206 recorded the observation without drawing the
+  edge.** Its note says a `Short`-typed `isDeleted` made 34 entities *unprobeable*. That typing never made
+  them **safe**: `{"isDeleted": true}` binds on 177 and throws on 35, **`{"isDeleted": 1}` binds on all 209**.
+  Build a hostile value from the field's **declared type**, and make the builder **throw** on a type it does
+  not know rather than return something harmless — a skipped field scores exactly like a clean one.
+  ⚠⚠ **AN INITIALISED FIELD CANNOT BE PROBED BY PRESENCE, ONLY BY IDENTITY.** Asking *"is the field set?"*
+  reported **161 false positives**, almost every `createdAt`, because those carry `= LocalDateTime.now()` and
+  are non-null whether the hostile value arrived or not. **The test is "does it hold WHAT I SENT".**
+  ⚠⚠ **AN ANTI-VACUITY FLOOR MUST SIT ABOVE THE LARGEST *WRONG* ANSWER, NOT ABOVE ZERO.** The floor was
+  1,000; re-narrowing the leg back to `BaseEntity` subclasses leaves 174 × 8 ≈ **1,392**, so the mutation that
+  recreates the original blind spot **SURVIVED**. 🔑 **A floor set to "obviously not broken" cannot see a
+  population narrowed to a real subset — you have to know what the wrong answer would be.**
+  ⚠ **Three `git worktree` copies live under `.claude/worktrees/`**, so a bare `find . -name X.java` resolves
+  to whichever sorts first (it reported `Control extends BaseEntity` for an entity that does not) and
+  `npx vitest run` from the repo root reports **182 phantom failures**. Scope filesystem sweeps to the working
+  tree; reflection over `target/classes` is immune, which is why the measurements held.
+  ⚙ **Still open: `organisationId` binds from the body on every entity-bound endpoint** — F2-22's TENANT tier
+  and F2-25's actual bypass field. Deliberately not closed here: services assign it explicitly from
+  `TenantContext`, so it needs its own measurement. `externalId` likewise stays per-service (F2-172(d)). `READ_ONLY` and never `@JsonIgnore` — the whole frontend resolves records by `id`,
   and the property is **not removed** from the deserialiser either, because the FE echoes whole records back
   on update paths and under `FAIL_ON_UNKNOWN_PROPERTIES` that would turn working requests into 400s.
   ⚠⚠ **A test that mirrors the framework must mirror its CONFIGURATION, not just its modules.** The gate's
