@@ -4445,7 +4445,7 @@ export const en = {
   incidentsEmptyTitle:     'No incidents yet',
   incidentsEmptySub:       'Recent incidents will form a chronological timeline here.',
   incidentsCardLessons:    'Lessons Learned',
-  incidentsLessonsClosed:  'closed',
+  incidentsLessonsRecorded: 'with a lesson recorded',
   incidentsLessonsEmpty:   'No closed incidents yet',
   incidentsLessonsEmptySub:'Once incidents close, lessons feed back into preventive controls.',
   incidentsLessonAddBtn:    'Add lesson',
@@ -4455,7 +4455,14 @@ export const en = {
   incidentsLessonFldCapa:     'CAPA reference',
   incidentsLessonAddedToast:  'Lesson learned recorded',
   incidentsLessonUserBadge:   'Custom',
-  incidentsCardCapa:       'CAPA Themes (90d)',
+  // F2-212: was 'CAPA Themes (90d)' over five invented themes. `capa.tasks` records
+  // no theme and no 90-day relation, so both halves of that title were claims with
+  // nothing behind them. This card now lists the real CAPAs whose origin is an incident.
+  incidentsCardCapa:       'Corrective actions from incidents',
+  incidentsCapaFromIncidentsNone:    'No corrective action raised from an incident',
+  incidentsCapaFromIncidentsNoneSub: 'CAPAs appear here once an incident is promoted into the CAPA register.',
+  incidentsCapaFromIncidentsError:   'The CAPA register could not be read',
+  incidentsCapaOpenRegister:         'Open the CAPA register',
   incidentsProcessBarTitle: 'Incident Management — Processes & Lifecycles',
   incidentsProcessBarSub:  'NIST SP 800-61 + ISO 27035 + Saudi regulator (NCA HEY 24-hr / SDA 72-hr / CITC 24-hr) — every named process active in this domain.',
   incidentsPostureTitle:   'Regulator Posture · Incident Management',

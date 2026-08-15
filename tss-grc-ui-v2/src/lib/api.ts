@@ -2290,12 +2290,21 @@ export interface CyberVulnDto {
   vulnerabilityType?: string; cveId?: string;
   ownerName?: string;
   slaDays?: number; dueDate?: string;
-  workflowStatus?: string; status?: string;
+  // ⚠ F2-212: `status`, `discoveryDate` and `targetResolutionDate` were declared here
+  // and `cyber.vulnerabilities` (22 columns, read from sys.columns) has NO COLUMN for
+  // any of them — `GET /api/v1/cyber/vulnerabilities` returns the `Vulnerability`
+  // ENTITY, so they could never arrive. `workflowStatus` is the column that exists;
+  // `r.workflowStatus ?? r.status` on CyberPage was a chain whose second operand was
+  // dead, the third instance of that shape after F2-211's two.
+  //
+  // `capaId` STAYS: `capa_id` is a real column, null on all 20 live rows because no
+  // vulnerability has been linked to a CAPA yet. That is a data fact, not a contract
+  // fact — F2-211's distinction, and 1 of the 4 fields F2-210 filed as dead.
+  workflowStatus?: string;
   remediationNotes?: string;
   capaId?: number;
   overdue?: boolean;
   reopenedCount?: number;
-  discoveryDate?: string; targetResolutionDate?: string;
 }
 export interface CyberVulnRequest {
   assetId?: number;
@@ -2995,17 +3004,37 @@ export const tprmApi = {
 };
 
 // ─── Incidents ──────────────────────────────────────────────────────────────
+// ⚠⚠ F2-212: these two types declared 9 of the 15 fields `IncidentResponse` sends and
+// 8 of the 12 `IncidentRequest` accepts. The six the read side never mentioned —
+// `resolutionDate`, `timelineJson`, `lessonsLearned`, `lessonsLearnedAr`, `createdAt`,
+// `updatedAt` — are all real columns on `cyber.incidents`, all on the wire, and
+// `lessons_learned` / `lessons_learned_ar` are populated on 3 of 44 live incidents in
+// BOTH databases. Nothing could render them, so `IncidentsPage` built a lessons-learned
+// register that DERIVED its text from the severity band and kept operator-authored
+// entries in `localStorage` — beside a server that already stores and returns them.
+// F2-198's shape (the wire carries it, the client never declares it) as the cause of
+// F2-208's shape (a browser store shadowing a populated column).
 export interface IncidentDto {
   id: number; title: string; titleAr?: string;
   severity: string; category?: string; status: string;
   assignee?: string; discoveryDate?: string;
   description?: string;
+  /** Post-incident activity (NIST 800-61r2 §3.4). Real columns, on the wire. */
+  resolutionDate?: string;
+  timelineJson?: string;
+  lessonsLearned?: string; lessonsLearnedAr?: string;
+  createdAt?: string; updatedAt?: string;
 }
 export interface IncidentRequest {
   title: string; titleAr?: string;
   severity: string; category?: string; status?: string;
   assignee?: string; discoveryDate?: string;
   description?: string;
+  // The server's `IncidentRequest` has accepted these four since it was written, and
+  // `IncidentService` persists them; the client simply never sent them.
+  resolutionDate?: string;
+  timelineJson?: string;
+  lessonsLearned?: string; lessonsLearnedAr?: string;
 }
 export interface IncidentPhaseSnapshot {
   id: number; status: string; nistPhase: string;

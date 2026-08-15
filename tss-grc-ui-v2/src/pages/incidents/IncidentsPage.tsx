@@ -40,6 +40,7 @@ import { INCIDENT_LIFECYCLES } from '../../lib/moduleLifecycles';
 import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { INCIDENT_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
+import { useCapas } from '../../lib/capa';
 
 type TabId = 'overview' | 'register' | 'timeline' | 'lessons' | 'comms';
 
@@ -95,12 +96,25 @@ const EMPTY: IncidentRequest = {
   status: 'OPEN', discoveryDate: '', assignee: '', description: '',
 };
 
+// ⚠⚠ F2-212 — DATA LOSS, not just a display gap. `PUT /api/v1/incidents/{id}` is a
+// FULL REPLACE and `IncidentService.update` calls `setLessonsLearned(req.lessonsLearned())`
+// (and the same for `lessonsLearnedAr`, `resolutionDate`, `timelineJson`) unconditionally.
+// This function omitted all four, so every field it left out arrived null and was written
+// null: editing an incident through the register's own form ERASED its post-incident
+// lesson, its resolution date and its response timeline, silently and irreversibly.
+//
+// Nothing on the page could show those fields — `IncidentDto` did not declare them — so
+// the loss was invisible from both ends: the operator never saw the value before the edit
+// and never saw it disappear after. Round-tripping every field the request accepts is the
+// fix; the gate asserts the two types stay in step.
 function incToReq(i: IncidentDto): IncidentRequest {
   return {
     title: i.title, titleAr: i.titleAr,
     severity: i.severity, category: i.category,
     status: i.status, discoveryDate: i.discoveryDate,
     assignee: i.assignee, description: i.description,
+    resolutionDate: i.resolutionDate, timelineJson: i.timelineJson,
+    lessonsLearned: i.lessonsLearned, lessonsLearnedAr: i.lessonsLearnedAr,
   };
 }
 
@@ -300,26 +314,40 @@ export function IncidentsPage() {
       createLabel: (typed) => lang === 'ar' ? `+ إنشاء حادثة جديدة: "${typed}"` : `+ Create new incident: "${typed}"`,
       span: 12 },
     { kind: 'textarea', key: 'lesson', label: t('incidentsLessonFldLesson') + ' *', rows: 3, span: 12 },
-    { kind: 'text', key: 'capa', label: t('incidentsLessonFldCapa'), placeholder: 'CAPA-1234', span: 12 },
+    // F2-212: a free-text CAPA field was here, defaulting to a minted `CAPA-<1000+id>`.
+    // `cyber.incidents` has no CAPA column, so whatever was typed went nowhere, and the
+    // default matched no reference the CAPA register has ever issued. Linking an
+    // incident to a corrective action is a real capability (`capa.tasks`) and it is not
+    // this text box — inventing the citation is worse than not offering one.
   ];
-  function onAddLesson(values: Record<string, string>) {
-    const incidentId = values.incidentId;
+  // F2-212: writes the lesson to `cyber.incidents.lessons_learned(_ar)` through the
+  // server, which has accepted it all along. It used to append a row to localStorage
+  // and mint a CAPA reference nothing had issued. The record is replaced from the
+  // server's response rather than patched locally, so the screen cannot disagree with
+  // what was stored (F2-201/F2-203's rule).
+  async function onAddLesson(values: Record<string, string>) {
     const lessonText = String(values.lesson ?? '').trim();
-    const incident = allIncidents.find(i => String(i.id) === incidentId);
+    const incident = allIncidents.find(i => String(i.id) === values.incidentId);
     if (!incident || !lessonText) {
       toast.danger(t('toastValidationFailed') ?? 'Required fields missing');
       return;
     }
-    const newRow: LessonRow = {
-      id: `user-${Date.now()}`,
-      incident: incident.title,
-      lesson: lessonText,
-      capa: String(values.capa ?? '').trim() || `CAPA-${1000 + incident.id}`,
-      userAdded: true,
-    };
-    persistUserLessons([newRow, ...userLessons]);
-    setAddLessonOpen(false);
-    toast.success(t('incidentsLessonAddedToast'));
+    setBusy(true);
+    try {
+      // PUT is a full replace, so start from the record as it stands and change the
+      // one field. Arabic is the primary language (house rule 7) and the column pair
+      // exists, so the lesson lands in the column matching the authoring language.
+      const body: IncidentRequest = {
+        ...incToReq(incident),
+        ...(lang === 'ar' ? { lessonsLearnedAr: lessonText } : { lessonsLearned: lessonText }),
+      };
+      await incidentApi.update(incident.id, body);
+      incidents.reload();
+      setAddLessonOpen(false);
+      toast.success(t('incidentsLessonAddedToast'));
+    } catch (err) {
+      toast.danger(err instanceof ApiError ? err.message : 'Save failed');
+    } finally { setBusy(false); }
   }
 
   const tabs: TabItem<TabId>[] = [
@@ -396,34 +424,55 @@ export function IncidentsPage() {
     finally { setBusy(false); setConfirmDel(null); }
   }
 
-  // ── Lessons learned ─────────────────────────────────────────────────
-  // Two sources: (a) auto-derived from closed/recovered incidents (the
-  // historical demo shape), (b) user-authored entries persisted to
-  // localStorage. The "Add lesson" CTA on the Lessons tab opens a
-  // FormModal that writes into (b); both are rendered together.
-  type LessonRow = { id: string | number; incident: string; lesson: string; capa: string; userAdded?: boolean };
-  const LESSON_STORE_KEY = 'tss.incidents.lessonsLearned';
-  const [userLessons, setUserLessons] = useState<LessonRow[]>(() => {
-    try { return JSON.parse(localStorage.getItem(LESSON_STORE_KEY) ?? '[]') as LessonRow[]; }
-    catch { return []; }
-  });
-  function persistUserLessons(next: LessonRow[]) {
-    setUserLessons(next);
-    try { localStorage.setItem(LESSON_STORE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  }
+  // ── Lessons learned (NIST 800-61r2 §3.4 post-incident activity) ─────
+  //
+  // ⚠⚠ F2-212: this register used to have TWO sources and neither was the server.
+  //
+  //  (a) `derivedLessons` INVENTED the lesson text from the severity band —
+  //      `severity === 'CRITICAL' ? 'Add to tabletop scenarios next quarter' :
+  //       category === 'PRIVACY' ? 'Update DSR/breach playbook' :
+  //       'Tighten alerting thresholds'` — which is F2-209's defect exactly: a
+  //      statement about what an organisation concluded, asserted because a field
+  //      crossed a threshold. It also minted `capa: 'CAPA-' + (1000 + i.id)`; real
+  //      references look like `CAPA-2026-19E164FC4A7-00`, so the citation resolved
+  //      to nothing (F2-207's client-side minter population).
+  //
+  //  (b) operator-authored entries went to `localStorage` under
+  //      `tss.incidents.lessonsLearned` — one browser, invisible to everyone else,
+  //      while `cyber.incidents.lessons_learned` / `_ar` already existed, were
+  //      already returned by `IncidentResponse`, and were already accepted for
+  //      WRITE by the server's `IncidentRequest`. The client type simply never
+  //      declared the fields, so nothing could read or send them.
+  //
+  // ⚠ And the filter inverted the register. It admitted `CLOSED || RECOVERED`:
+  // `RECOVERED` appears in ZERO rows (a token the vocabulary does not contain),
+  // `RESOLVED` — 10 of 44 — was missing, and all three incidents that actually
+  // carry a recorded lesson are INVESTIGATING/OPEN/OPEN. Measured in dev and prod:
+  // **0 incidents with a real lesson were admitted**, so every lesson displayed was
+  // invented and every real one was hidden. F2-196's rule — an inclusion list over
+  // an open vocabulary silently drops whatever nobody remembered — so the register
+  // is now simply "every incident that has a lesson recorded", with no status
+  // predicate at all: a lesson exists because someone wrote one, not because the
+  // incident reached a state this page happens to list.
+  type LessonRow = { id: number; incident: string; lesson: string };
   const [addLessonOpen, setAddLessonOpen] = useState(false);
 
-  const derivedLessons = incidents.data
-    .filter(i => i.status === 'CLOSED' || i.status === 'RECOVERED')
-    .slice(0, 5)
+  const lessons: LessonRow[] = incidents.data
+    .filter(i => (lang === 'ar' ? i.lessonsLearnedAr || i.lessonsLearned : i.lessonsLearned))
     .map(i => ({
-      id: i.id, incident: i.title,
-      lesson: i.severity === 'CRITICAL' ? 'Add to tabletop scenarios next quarter'
-            : i.category === 'PRIVACY' ? 'Update DSR/breach playbook'
-            : 'Tighten alerting thresholds',
-      capa: `CAPA-${1000 + i.id}`,
+      id: i.id,
+      incident: i.title,
+      lesson: (lang === 'ar' ? i.lessonsLearnedAr || i.lessonsLearned : i.lessonsLearned) ?? '',
     }));
-  const lessons: LessonRow[] = [...userLessons, ...derivedLessons];
+
+  // F2-212: the real corrective actions raised from an incident, replacing the
+  // fabricated "CAPA Themes (90d)" list below. `origin_type` is stored lower-case
+  // (`incident`) and the column is case-INSENSITIVE, so the comparison normalises
+  // rather than matching a literal — F2-179's collation rule.
+  const capas = useCapas();
+  const incidentCapas = useMemo(
+    () => capas.items.filter(c => c.originType?.trim().toLowerCase() === 'incident'),
+    [capas.items]);
 
   const isDemo = incidents.isDemo;
 
@@ -534,7 +583,15 @@ export function IncidentsPage() {
           <Card title={t('incidentsCardLessons')} Icon={Lightbulb}
             action={
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <Badge tone="primary">{lessons.length} {t('incidentsLessonsClosed')}</Badge>
+                {/* ⚠ F2-212, found in the browser after every gate was green: this badge
+                    read `{n} closed` / `{n} مغلقة`, and THE FIX ABOVE IS WHAT MADE IT FALSE.
+                    While the register filtered CLOSED||RECOVERED the word described the
+                    predicate; removing the filter left a label asserting a state the rows
+                    do not hold — all three lesson-bearing incidents are INVESTIGATING/OPEN/
+                    OPEN. F2-208's label-versus-predicate rule, except the slice that fixed
+                    the predicate is what broke the label: when you remove a filter, read
+                    every label that was describing it. */}
+                <Badge tone="primary">{lessons.length} {t('incidentsLessonsRecorded')}</Badge>
                 <Button size="sm" variant="primary" Icon={Plus} onClick={() => setAddLessonOpen(true)}>
                   {t('incidentsLessonAddBtn')}
                 </Button>
@@ -546,31 +603,57 @@ export function IncidentsPage() {
                   {lessons.map(l => (
                     <div key={l.id} style={{ padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', border: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>
-                          {l.incident}
-                          {l.userAdded && <span style={{ marginInlineStart: 6 }}><Badge tone="success">{t('incidentsLessonUserBadge')}</Badge></span>}
-                        </div>
-                        <Badge tone="primary">{l.capa}</Badge>
+                        {/* F2-212: the "user added" badge distinguished a localStorage
+                            row from a derived one; both sources are gone, so every row
+                            here is now the server's. The CAPA badge printed a minted
+                            `CAPA-<1000+id>` that matched no real reference — a citation
+                            is either issued by the CAPA register or absent. */}
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{l.incident}</div>
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>→ {l.lesson}</div>
                     </div>
                   ))}
                 </div>}
           </Card>
+          {/* ⚠⚠ F2-212, found in the BROWSER six lines below the register this slice had
+              just made honest — F2-211's own headline, one card across. This was titled
+              "CAPA Themes (90d)" and rendered five INLINE hard-coded themes with counts
+              7/4/3/2/2. Measured: `capa.tasks` has 26 columns (read from sys.columns) and
+              NO theme, root-cause, category or incident_id column, so a theme is not
+              reconstructible at all (F2-209's third state); the counts summed to 18 against
+              a register holding 16 live rows in dev and 13 in prod; and exactly ONE CAPA
+              carries `origin_type = 'incident'` in both databases. The "(90d)" window was
+              a second claim with nothing behind it.
+              🔑 Three de-mocking gates were blind to it at once, each for a reason already
+              recorded: `kpiProvenance` keys on the `<Kpi>` tag (F2-195), `pageDataProvenance`
+              asks whether the PAGE calls a server and this one does (F2-198), and F2-194's
+              corpus census looks for an exported `const` array — this literal is INLINE in
+              JSX, so it is in none of the three populations.
+              What replaces it is the real relation the platform does record: corrective
+              actions whose origin is an incident, read from `GET /api/capa/tasks` through
+              the register hook F2-208 rewired. No window is claimed, and an empty result
+              says "none recorded" rather than rendering a green all-clear (F2-197). */}
           <Card title={t('incidentsCardCapa')} Icon={FileText}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
-              {[
-                { theme: 'Phishing simulation cadence',  count: 7 },
-                { theme: 'Access review automation',     count: 4 },
-                { theme: 'Backup integrity tests',       count: 3 },
-                { theme: 'Vendor incident coordination', count: 2 },
-                { theme: 'Logging gap remediation',      count: 2 },
-              ].map(it => (
-                <div key={it.theme} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', fontSize: 13 }}>
-                  <span>{it.theme}</span>
-                  <Badge tone="primary">{it.count}</Badge>
-                </div>
-              ))}
+            {capas.error
+              ? <EmptyState Icon={FileText} title={t('incidentsCapaFromIncidentsError')} sub={capas.error} />
+              : incidentCapas.length === 0
+                ? <EmptyState Icon={FileText} title={t('incidentsCapaFromIncidentsNone')}
+                    sub={t('incidentsCapaFromIncidentsNoneSub')} />
+                : <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
+                    {incidentCapas.map(c => (
+                      <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', fontSize: 13 }}>
+                        <span>
+                          <span style={{ fontWeight: 600 }}>{lang === 'ar' ? c.titleAr || c.titleEn : c.titleEn}</span>
+                          <span style={{ color: 'var(--ink-3)', marginInlineStart: 6 }}>{c.id}</span>
+                        </span>
+                        <Badge tone={STATUS_TONE[c.status] ?? 'neutral'}>{statusLabel(t, c.status)}</Badge>
+                      </div>
+                    ))}
+                  </div>}
+            <div style={{ paddingTop: 10 }}>
+              <Button size="sm" variant="ghost" Icon={ArrowRight} onClick={() => navigate('/capa')}>
+                {t('incidentsCapaOpenRegister')}
+              </Button>
             </div>
           </Card>
         </div>
@@ -589,7 +672,7 @@ export function IncidentsPage() {
         open={addLessonOpen}
         title={t('incidentsLessonAddTitle')}
         fields={LESSON_FIELDS}
-        initial={{ incidentId: '', lesson: '', capa: '' }}
+        initial={{ incidentId: '', lesson: '' }}
         onClose={() => setAddLessonOpen(false)}
         onSubmit={onAddLesson}
       />

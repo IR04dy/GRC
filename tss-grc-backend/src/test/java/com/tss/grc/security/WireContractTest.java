@@ -3,6 +3,9 @@ package com.tss.grc.security;
 import com.tss.grc.module.privacy.entity.DataBreach;
 import com.tss.grc.module.privacy.entity.DataSubjectRequest;
 import com.tss.grc.module.privacy.entity.Dpia;
+import com.tss.grc.module.cyber.entity.Vulnerability;
+import com.tss.grc.module.incident.dto.IncidentRequest;
+import com.tss.grc.module.incident.dto.IncidentResponse;
 import com.tss.grc.module.privacy.entity.ProcessingActivity;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,7 +70,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>Hermetic: reads one source file and four compiled entities. No database.
  */
-class PrivacyWireContractTest {
+class WireContractTest {
 
     private static final Path API_TS = Path.of("..", "tss-grc-ui-v2", "src", "lib", "api.ts");
 
@@ -79,11 +82,24 @@ class PrivacyWireContractTest {
      */
     private record Register(String iface, Class<?> entity, String endpoint) { }
 
+    /**
+     * ⚠⚠ F2-212 — THE ADJUDICATOR IS THE TYPE THE HANDLER RETURNS, WHICH IS NOT
+     * ALWAYS THE ENTITY. Every privacy endpoint and {@code /cyber/vulnerabilities}
+     * return the JPA entity, so the entity adjudicates. {@code /api/v1/incidents}
+     * returns {@code Page<IncidentResponse>} — a response record — so the record
+     * adjudicates, and checking it against {@code Incident} would answer a question
+     * nobody asked. Resolve what the handler returns before adding an entry; a
+     * guessed adjudicator manufactures findings exactly as a guessed pairing does.
+     */
     private static final List<Register> REGISTERS = List.of(
         new Register("PrivacyDsrDto",    DataSubjectRequest.class, "GET /api/v1/privacy/dsrs"),
         new Register("PrivacyBreachDto", DataBreach.class,         "GET /api/v1/privacy/breaches"),
         new Register("PrivacyRopaDto",   ProcessingActivity.class, "GET /api/v1/privacy/ropa"),
-        new Register("DpiaDto",          Dpia.class,               "GET /api/v1/privacy/dpias")
+        new Register("DpiaDto",          Dpia.class,               "GET /api/v1/privacy/dpias"),
+        // F2-212 — beyond privacy.
+        new Register("CyberVulnDto",     Vulnerability.class,      "GET /api/v1/cyber/vulnerabilities"),
+        new Register("IncidentDto",      IncidentResponse.class,   "GET /api/v1/incidents"),
+        new Register("IncidentRequest",  IncidentRequest.class,    "PUT /api/v1/incidents/{id}")
     );
 
     /**
@@ -232,6 +248,77 @@ class PrivacyWireContractTest {
         assertThat(declared)
             .as("the clock needs the awareness stamp and whether notification is required at all")
             .contains("discoveredAt", "dataSubjectsAffectedCount", "pdpcNotificationRequired");
+    }
+
+    /**
+     * F2-212 — the round-trip invariant, and the reason it is not cosmetic.
+     *
+     * <p>{@code PUT /api/v1/incidents/{id}} is a FULL REPLACE: {@code IncidentService.update}
+     * calls {@code setLessonsLearned(req.lessonsLearned())} and the same for
+     * {@code lessonsLearnedAr}, {@code resolutionDate} and {@code timelineJson},
+     * unconditionally. A field the client omits therefore arrives null and is WRITTEN
+     * null. The client's request type declared 8 of the server's 12, so editing an
+     * incident through the register's own form silently erased its post-incident
+     * lesson, its resolution date and its response timeline — and because the client's
+     * READ type did not declare them either, the loss was invisible from both ends.
+     *
+     * <p>Probed live against a planted row: the pre-fix payload nulled all four; the
+     * round-tripped payload preserves them and still applies the edit.
+     *
+     * <p>Two directions, and both matter. A field the server accepts but the client
+     * cannot SEND is a field the next PUT destroys; a field the server returns but the
+     * client cannot READ is a field no round-trip can carry back.
+     */
+    @Test
+    @DisplayName("a full-replace PUT cannot silently drop a field: request and response stay in step")
+    void everyServerAcceptedIncidentFieldSurvivesAClientRoundTrip() throws IOException {
+        String src = api();
+        Set<String> serverAccepts = propertiesOf(IncidentRequest.class);
+        Set<String> clientSends = Set.copyOf(fieldsOf(src, "IncidentRequest"));
+        Set<String> clientReads = Set.copyOf(fieldsOf(src, "IncidentDto"));
+
+        List<String> cannotSend = serverAccepts.stream().filter(f -> !clientSends.contains(f)).sorted().toList();
+        assertThat(cannotSend)
+            .as("""
+                The server's IncidentRequest accepts these fields and the client's does not \
+                declare them. PUT is a full replace, so every one of them arrives null on the \
+                next edit and is written null — silent, irreversible loss of a governance \
+                record. Declare them, or the round-trip destroys them.""")
+            .isEmpty();
+
+        List<String> cannotRead = clientSends.stream().filter(f -> !clientReads.contains(f)).sorted().toList();
+        assertThat(cannotRead)
+            .as("""
+                The client can SEND these fields but its read type cannot receive them, so \
+                nothing can populate them before a PUT re-sends the record — the same data \
+                loss with an extra step.""")
+            .isEmpty();
+
+        assertThat(serverAccepts)
+            .as("if the server's request record shrinks below the post-incident fields this "
+                + "gate exists to protect, the assertions above go quietly vacuous")
+            .contains("lessonsLearned", "lessonsLearnedAr", "resolutionDate", "timelineJson");
+    }
+
+    @Test
+    @DisplayName("the vulnerability register reads the columns cyber.vulnerabilities actually keeps")
+    void vulnerabilityFieldsAreTheOnesTheSchemaKeeps() throws IOException {
+        List<String> declared = fieldsOf(api(), "CyberVulnDto");
+        assertThat(declared)
+            .as("`status` has no column — `workflow_status` is the one that exists, and "
+                + "`r.workflowStatus ?? r.status` was a chain whose second operand could "
+                + "never be defined")
+            .doesNotContain("status");
+        assertThat(declared)
+            .as("`discoveryDate` / `targetResolutionDate` have no column in "
+                + "cyber.vulnerabilities (22 columns, measured); `due_date` and `sla_days` "
+                + "are what the schema keeps")
+            .doesNotContain("discoveryDate", "targetResolutionDate");
+        assertThat(declared)
+            .as("`capaId` IS a real column (null on all 20 live rows because nothing has been "
+                + "linked yet) — deleting it would be the mirror error, removing a correct "
+                + "declaration because no row has filled it in")
+            .contains("capaId", "workflowStatus", "dueDate", "slaDays");
     }
 
     @Test
