@@ -3924,6 +3924,13 @@ export const ar = {
   statusExpired: 'منتهية',
   statusDraft: 'مسودة',
   statusContained: 'محتواة',
+  // F2-211: تسميات حالات حوادث تسريب البيانات. كانت تُعرض بقيمها الخام بالإنجليزية
+  // في ١١ من ١٧ صفًّا لأن `statusLabel` يرجع إلى الرمز نفسه عند غياب المفتاح.
+  statusNotified: 'تم الإبلاغ',
+  statusInvestigating: 'قيد التحقيق',
+  statusInvestigated: 'اكتمل التحقيق',
+  statusEscalated: 'مُصعَّدة',
+  statusRemediated: 'تمت المعالجة',
   statusEradicated: 'منزَّلة',
   statusRecovered: 'متعافية',
 
@@ -4194,6 +4201,9 @@ export const ar = {
   colRequestType: 'نوع الطلب',
   colRequester: 'مقدم الطلب',
   colOccurred: 'تاريخ الوقوع',
+  // F2-211: تاريخ علم الجهة المتحكّمة بالحادثة، وهو ما تُحتسب منه المُهل النظامية،
+  // وليس تاريخ وقوعها — عمودان مختلفان لواقعتين مختلفتين.
+  colDiscovered: 'تاريخ الاكتشاف',
   colRecords: 'السجلات',
   colActivity: 'النشاط',
   colLegalBasis: 'الأساس القانوني',
@@ -4411,6 +4421,12 @@ export const ar = {
 
   // Privacy page
   privacyBreachNotified:   'تم الإبلاغ',
+  // F2-211: يظهر بدل العدّاد عندما تكون الحادثة مُسجّلة على أنّها لا تستوجب إبلاغ
+  // الجهة التنظيمية. الشرطة المجرّدة تُقرأ كبيانات ناقصة، وهذا يذكر التقييم الفعلي.
+  privacyBreachOverdue:         'تأخير',
+  privacyBreachLeft:            'متبقٍ',
+  privacyBreachNotRequired:     'لا تستوجب الإبلاغ',
+  privacyBreachNotRequiredHint: 'مُسجّلة على أنّها لا تستوجب إبلاغ الجهة التنظيمية، فلا تسري عليها مهلة المادة 20 من نظام حماية البيانات الشخصية.',
   privacyBreachesEmpty:    'لا توجد اختراقات للبيانات مُسجّلة',
   privacyBreachesEmptySub: 'بلّغ عن الاختراقات هنا خلال مهلة 72 ساعة المنصوص عليها في PDPL.',
   privacyRopaEmpty:        'لا توجد أنشطة معالجة',

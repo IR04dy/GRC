@@ -23,93 +23,121 @@ export const DSRS: PrivacyDsrDto[] = demoRows([
 ]);
 
 // ── Data breaches ──────────────────────────────────────────────────────────
-// Sprint 4 — synthesise a "still in 72h window" breach at module load so
-// the PDPL response console always has an actively-counting case to show
-// in demo mode. The reportedAt anchors at "30 hours ago" relative to now,
-// landing the case in the AMBER tier with ~42h to SDAIA notification.
+//
+// ⚠⚠ F2-211: THIS CORPUS IS A SECOND WIRE CONTRACT, AND NOTHING WAS CHECKING IT.
+// Every row used to set `severity`, `occurredAt`, `reportedAt` and
+// `affectedRecords` — four fields `privacy.data_breaches` has no column for, so
+// the real endpoint can never send any of them. The register's Severity badge,
+// Records count, Occurred date and PDPL Article 20 countdown all read exactly
+// those four, which means those columns rendered ONLY here, and rendered an
+// em-dash against every real row in dev and prod.
+//
+// The annotation above is not what it looks like: `demoRows<T>(rows: T[]): T[]`
+// infers `T` from the literal, so `PrivacyBreachDto[]` is only checked for
+// assignability and excess properties are legal. A fallback corpus can therefore
+// populate keys the DTO does not even declare, and the type that appears to bind
+// it enforces nothing. `demoCorpusWireContract.test.ts` is the check that does.
+//
+// F2-158's lesson was "when a page has a client-side fallback, hit its endpoint
+// directly before believing the page." This is the mechanism underneath it — and
+// F2-194's: the countdown anchored on `Date.now()` at module load, so the one
+// fabricated figure on the page could never look stale.
+//
+// The rows now carry only fields the server can actually send. `discoveredAt` is
+// the awareness stamp the schema keeps (NOT NULL) and the clock runs from it;
+// severity is derived from the subject count by the same rubric the console uses,
+// so these rows classify exactly as a real row with the same count would.
 const _now = new Date();
 const _thirtyHoursAgo = new Date(_now.getTime() - 30 * 3_600_000).toISOString();
-const _thirtyOneHoursAgo = new Date(_now.getTime() - 31 * 3_600_000).toISOString();
 
 export const BREACHES: PrivacyBreachDto[] = demoRows([
   { id: 10, titleEn: 'Customer database export downloaded by terminated employee',
     descriptionEn: 'Departing analyst downloaded a 47k-row customer export 18 hours before access revocation. Dataset contains name, mobile, IBAN-suffix.',
-    breachType: 'CONFIDENTIALITY', severity: 'HIGH', status: 'INVESTIGATING',
-    occurredAt: _thirtyOneHoursAgo, reportedAt: _thirtyHoursAgo,
-    affectedRecords: 47_220 },
+    breachType: 'INSIDER_THREAT', status: 'INVESTIGATING',
+    discoveredAt: _thirtyHoursAgo, dataSubjectsAffectedCount: 47_220,
+    pdpcNotificationRequired: true, sdaiaNotificationStatus: 'NOT_REPORTED' },
   { id: 11, titleEn: 'Lost laptop with customer contact data',
     descriptionEn: 'Marketing exec laptop stolen at airport — encrypted at rest, 72h notification not required.',
-    breachType: 'CONFIDENTIALITY', severity: 'LOW', status: 'CLOSED',
-    occurredAt: '2026-04-08T14:30:00', reportedAt: '2026-04-08T18:15:00',
-    affectedRecords: 0 },
+    breachType: 'LOSS_OF_DEVICE', status: 'CLOSED',
+    discoveredAt: '2026-04-08T18:15:00', dataSubjectsAffectedCount: 0,
+    pdpcNotificationRequired: false, sdaiaNotificationStatus: 'NOT_REPORTED' },
   { id: 12, titleEn: 'Misdirected payroll spreadsheet',
     descriptionEn: 'HR spreadsheet emailed to wrong distribution list (32 recipients in payroll team).',
-    breachType: 'CONFIDENTIALITY', severity: 'MEDIUM', status: 'INVESTIGATING',
-    occurredAt: '2026-04-19T09:42:00', reportedAt: '2026-04-19T10:20:00',
-    affectedRecords: 482 },
+    breachType: 'ACCIDENTAL_DISCLOSURE', status: 'INVESTIGATING',
+    discoveredAt: '2026-04-19T10:20:00', dataSubjectsAffectedCount: 482,
+    pdpcNotificationRequired: true, sdaiaNotificationStatus: 'IN_PREPARATION' },
   { id: 13, titleEn: 'Vendor system mis-configuration exposed customer records',
     descriptionEn: 'Third-party loyalty platform left S3 bucket public; customer phone+email exposed for 6 hours.',
-    breachType: 'CONFIDENTIALITY', severity: 'HIGH', status: 'NOTIFIED',
-    occurredAt: '2026-04-02T22:00:00', reportedAt: '2026-04-03T08:30:00',
-    affectedRecords: 18_440 },
+    breachType: 'MISCONFIGURATION', status: 'NOTIFIED',
+    discoveredAt: '2026-04-03T08:30:00', dataSubjectsAffectedCount: 18_440,
+    pdpcNotificationRequired: true, sdaiaNotificationStatus: 'SUBMITTED' },
   { id: 14, titleEn: 'Ransomware impact on legacy file share',
     descriptionEn: 'CRYPTO-locker on legacy file share; no PII confirmed exfiltrated.',
-    breachType: 'AVAILABILITY', severity: 'HIGH', status: 'OPEN',
-    occurredAt: '2026-04-19T03:42:00', reportedAt: '2026-04-19T04:15:00',
-    affectedRecords: 0 },
+    breachType: 'CYBERATTACK', status: 'OPEN',
+    discoveredAt: '2026-04-19T04:15:00', dataSubjectsAffectedCount: 0,
+    pdpcNotificationRequired: false, sdaiaNotificationStatus: 'NOT_REPORTED' },
   { id: 15, titleEn: 'Phishing-driven credential exposure',
     descriptionEn: 'Three customer-service agents fell to spear-phishing; tokens revoked within 90 minutes.',
-    breachType: 'CONFIDENTIALITY', severity: 'MEDIUM', status: 'CLOSED',
-    occurredAt: '2026-03-28T15:00:00', reportedAt: '2026-03-28T17:30:00',
-    affectedRecords: 0 },
+    breachType: 'PHISHING', status: 'CLOSED',
+    discoveredAt: '2026-03-28T17:30:00', dataSubjectsAffectedCount: 0,
+    pdpcNotificationRequired: false, sdaiaNotificationStatus: 'NOT_REPORTED' },
   { id: 16, titleEn: 'Test data containing real customer IDs',
     descriptionEn: 'QA database refreshed from production without redaction.',
-    breachType: 'CONFIDENTIALITY', severity: 'LOW', status: 'CLOSED',
-    occurredAt: '2026-03-15T11:00:00', reportedAt: '2026-03-15T13:00:00',
-    affectedRecords: 4_120 },
+    breachType: 'DATA_EXPOSURE_LOWER_ENV', status: 'CLOSED',
+    discoveredAt: '2026-03-15T13:00:00', dataSubjectsAffectedCount: 4_120,
+    pdpcNotificationRequired: true, sdaiaNotificationStatus: 'ACKNOWLEDGED' },
 ]);
 
 // ── RoPA (Records of Processing Activity) ──────────────────────────────────
+//
+// ⚠ F2-211: every row set `retentionPeriod`, a prose string. F2-210 corrected
+// `PrivacyRopaDto` to the column the server actually sends
+// (`retention_period_months`, an INT, non-null on all 11 live rows) and this
+// corpus was left behind — invisible because `demoRows` erases the excess-property
+// check, so the orphaned key survived a full typecheck. The retention column would
+// have rendered an em-dash here for the same reason it did against the server.
+// The last row keeps no retention value at all: "duration of programme" is not a
+// month count, and inventing one would be worse than leaving the column empty.
 export const ROPA: PrivacyRopaDto[] = demoRows([
   { id: 21, activityNameEn: 'Customer onboarding (KYC)',           activityNameAr: 'استقطاب العملاء',
     purposeEn: 'Identity verification + AML screening per SAMA AML.',
-    legalBasis: 'LEGAL_OBLIGATION', retentionPeriod: '10 years post-relationship',
+    legalBasis: 'LEGAL_OBLIGATION', retentionPeriodMonths: 120,
     status: 'ACTIVE' },
   { id: 22, activityNameEn: 'Marketing communications',            activityNameAr: 'التواصل التسويقي',
     purposeEn: 'Personalised offers and product updates by SMS / e-mail.',
-    legalBasis: 'CONSENT',          retentionPeriod: '24 months from last interaction',
+    legalBasis: 'CONSENT',          retentionPeriodMonths: 24,
     status: 'ACTIVE' },
   { id: 23, activityNameEn: 'Customer service transcripts',        activityNameAr: 'تسجيلات خدمة العملاء',
     purposeEn: 'Quality assurance and dispute resolution.',
-    legalBasis: 'LEGITIMATE_INTEREST', retentionPeriod: '12 months',
+    legalBasis: 'LEGITIMATE_INTEREST', retentionPeriodMonths: 12,
     status: 'ACTIVE' },
   { id: 24, activityNameEn: 'Salary disbursement',                 activityNameAr: 'صرف الرواتب',
     purposeEn: 'Payroll processing + tax + GOSI + government reporting.',
-    legalBasis: 'CONTRACT',         retentionPeriod: '15 years (HRSD)',
+    legalBasis: 'CONTRACT',         retentionPeriodMonths: 180,
     status: 'ACTIVE' },
   { id: 25, activityNameEn: 'CCTV at branches',                    activityNameAr: 'كاميرات المراقبة في الفروع',
     purposeEn: 'Premises security + theft / fraud detection.',
-    legalBasis: 'LEGITIMATE_INTEREST', retentionPeriod: '90 days',
+    legalBasis: 'LEGITIMATE_INTEREST', retentionPeriodMonths: 3,
     status: 'ACTIVE' },
   { id: 26, activityNameEn: 'Web analytics + cookies',             activityNameAr: 'تحليلات الموقع والكوكيز',
     purposeEn: 'Site performance + segment analysis.',
-    legalBasis: 'CONSENT',          retentionPeriod: '13 months',
+    legalBasis: 'CONSENT',          retentionPeriodMonths: 13,
     status: 'ACTIVE' },
   { id: 27, activityNameEn: 'Loan-application credit scoring',     activityNameAr: 'تقييم طلبات التمويل',
     purposeEn: 'Risk-based pricing + adverse-action notice generation.',
-    legalBasis: 'CONTRACT',         retentionPeriod: '7 years',
+    legalBasis: 'CONTRACT',         retentionPeriodMonths: 84,
     status: 'ACTIVE' },
   { id: 28, activityNameEn: 'Fraud monitoring (transactions)',     activityNameAr: 'مراقبة المعاملات للاحتيال',
     purposeEn: 'Real-time scoring of transactions to detect fraud.',
-    legalBasis: 'LEGAL_OBLIGATION', retentionPeriod: '5 years',
+    legalBasis: 'LEGAL_OBLIGATION', retentionPeriodMonths: 60,
     status: 'ACTIVE' },
   { id: 29, activityNameEn: 'Sanctions / PEP screening',           activityNameAr: 'فحص العقوبات والأشخاص ذوي النفوذ',
     purposeEn: 'AML / CFT compliance + watchlist matching per FATF.',
-    legalBasis: 'LEGAL_OBLIGATION', retentionPeriod: '10 years',
+    legalBasis: 'LEGAL_OBLIGATION', retentionPeriodMonths: 120,
     status: 'ACTIVE' },
   { id: 30, activityNameEn: 'Employee health programme',           activityNameAr: 'برنامج صحة الموظفين',
     purposeEn: 'Voluntary wellness programme (special-category data).',
-    legalBasis: 'CONSENT',          retentionPeriod: 'Duration of programme',
+    legalBasis: 'CONSENT',
     status: 'UNDER_REVIEW' },
 ]);
 

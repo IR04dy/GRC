@@ -36,6 +36,15 @@ const STATUS_KEY: Record<string, string> = {
   ACTIVE: 'statusActive', EXPIRED: 'statusExpired', DRAFT: 'statusDraft',
   CONTAINED: 'statusContained', ERADICATED: 'statusEradicated', RECOVERED: 'statusRecovered',
   IMPLEMENTED: 'statusActive', NOT_IMPLEMENTED: 'statusDraft',
+  // F2-211 — the five PDPL breach statuses this map did not carry. `statusLabel`
+  // falls back to the raw token, so these printed `NOTIFIED` / `INVESTIGATING` /
+  // `ESCALATED` / `INVESTIGATED` / `REMEDIATED` in an Arabic-primary UI on 11 of the
+  // 17 live rows, beside correctly-localised neighbours. Measured against the stored
+  // vocabulary of privacy.data_breaches (7 values), not guessed from the machine —
+  // that column has no CHECK and no declared machine, which is filed separately.
+  NOTIFIED: 'statusNotified', INVESTIGATING: 'statusInvestigating',
+  INVESTIGATED: 'statusInvestigated', ESCALATED: 'statusEscalated',
+  REMEDIATED: 'statusRemediated',
 };
 
 const SEVERITY_KEY: Record<string, string> = {

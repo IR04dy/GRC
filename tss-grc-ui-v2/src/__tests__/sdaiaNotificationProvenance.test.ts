@@ -406,3 +406,190 @@ describe('F2-209 — SDAIA Article 25 notification provenance', () => {
     expect(anchoredExports(lib), 'no exports parsed at all — the check would be vacuous').toBeGreaterThan(8);
   });
 });
+
+/**
+ * F2-211 — the breach REGISTER, one component below the console this file was
+ * written for, read four fields the schema has no column for.
+ *
+ * `privacy.data_breaches` has 25 columns (sys.columns, dev == prod) and none named
+ * `severity`, `occurred_at`, `reported_at` or `affected_records`. The register's
+ * Severity badge, Records count and Occurred date therefore rendered an em-dash on
+ * all 17 live rows; its severity filter compared against `undefined`, so choosing
+ * any band emptied the register — a false all-clear; and the column titled with the
+ * PDPL Article 20 72-hour clock returned early on `!r.occurredAt` and had never once
+ * shown a countdown against real data.
+ *
+ * ⚠ F2-209's own headline, one component up and unnoticed by the slice that wrote
+ * it: the correct reader was already on the same page. The console derived severity
+ * from the subject count, resolved awareness from `discoveredAt` and discharged the
+ * clock from `sdaiaNotificationStatus`, while the table beside it did none of those.
+ * F2-196's question — how many things read this, and do they agree? — with the two
+ * readers in one route.
+ */
+describe('F2-211 — the breach register reads only fields the schema keeps', () => {
+  const DETAIL_PATH = join(SRC, 'pages', 'detail', 'PrivacyBreachDetailPage.tsx');
+  const MOCK_PATH   = join(SRC, 'pages', 'privacy', 'mockPrivacy.ts');
+  const detail = stripComments(readFileSync(DETAIL_PATH, 'utf8'));
+  const mock   = stripComments(readFileSync(MOCK_PATH, 'utf8'));
+
+  /** The four with no column. Named, so restoring one takes a deliberate edit. */
+  const NO_COLUMN = ['severity', 'occurredAt', 'reportedAt', 'affectedRecords'] as const;
+
+  const SURFACES: Array<[string, string]> = [
+    ['PrivacyPage', page], ['PrivacyBreachDetailPage', detail],
+    ['PdplBreachConsole', consoleCode], ['mockPrivacy', mock],
+  ];
+
+  /**
+   * ⚠ SCOPE THIS TO THE TWO HOLES `tsc` LEAVES, NOT TO THE FIELD NAMES.
+   *
+   * The first draft banned `\.severity` anywhere on these four surfaces and fired
+   * immediately on `advFilters.severity` — the filter-state key, which is a
+   * perfectly good use of the word. A gate that fails on correct code trains the
+   * next reader to edit the assertion rather than the code (F2-207), and a scan
+   * not scoped to the shape of its claim invents findings (F2-192, F2-203).
+   *
+   * Writing it properly showed the useful thing: now that `PrivacyBreachDto` does
+   * not declare these four, `tsc` ALREADY refuses `r.severity` on a typed breach.
+   * Re-banning that is redundant. What the type system does NOT catch is exactly
+   * two shapes, and they are the two that produced this defect:
+   *
+   *   (a) a WIDENING CAST that adds the field back —
+   *       `(item as PrivacyBreachDto & { reportedToAuthority?: boolean })`, which
+   *       is how the detail page's "SDAIA notified" badge came to read a key the
+   *       wire has never carried; and
+   *   (b) a CORPUS KEY, because `demoRows<T>(rows: T[])` infers `T` from the
+   *       literal, so excess properties survive a clean typecheck.
+   */
+  it('nothing widens the breach type with a cast to re-add an absent field', () => {
+    for (const [name, src] of SURFACES) {
+      expect(/as\s+PrivacyBreachDto\s*&/.test(src),
+        `${name} widens PrivacyBreachDto with an intersection cast. That is how `
+        + '`reportedToAuthority` was read for months: the cast asserts a field the server has '
+        + 'never sent, tsc believes it, and the badge it gates simply never renders. If the '
+        + 'server grows the field, declare it on the DTO — the backend gate checks it against '
+        + 'the entity.').toBe(false);
+    }
+  });
+
+  it('the breach corpus sets no key the schema has no column for', () => {
+    for (const field of NO_COLUMN) {
+      // Object KEY only — `severity: 'HIGH'` in a corpus row. Comments are
+      // stripped first: mockPrivacy.ts now carries a header naming all four.
+      const shape = new RegExp(`(?:^|[{,\\s])${field}\\s*:`, 'm');
+      expect(shape.test(mock),
+        `mockPrivacy sets \`${field}\`, which privacy.data_breaches has no column for. `
+        + 'The `: PrivacyBreachDto[]` annotation does not catch this — demoRows infers its type '
+        + 'parameter from the literal, so only assignability is checked. A key here renders in '
+        + 'fallback mode and as an em-dash against every real row, which is what made four '
+        + 'register columns and the Article 20 countdown look alive.').toBe(false);
+    }
+  });
+
+  /**
+   * ⚠⚠ A PRESENCE CHECK CANNOT SEE ONE OF N SITES REVERT — and this leg shipped
+   * with that hole until the mutation harness found it.
+   *
+   * `PrivacyPage` calls `breachAwarenessAt` TWICE (the Discovered column and the
+   * Article 20 clock). The mutation that inlined ONE of them to `r.discoveredAt ??
+   * ''` SURVIVED, because the other call kept the assertion true. That is F2-203's
+   * count-with-a-floor and F2-209's `>= 2` defect for the third time in this
+   * lineage, in a gate written after quoting both.
+   *
+   * The fix is not a bigger number — it is to ban the SHAPE. `lib/pdplBreach.ts`
+   * is the only file allowed to touch the raw column; a surface that reads it
+   * directly fails no matter how many other sites still ask the accessor.
+   */
+  it('no surface reads the raw awareness column instead of asking the accessor', () => {
+    for (const [name, src] of SURFACES) {
+      expect(/\.discoveredAt\b/.test(src),
+        `${name} reads \`.discoveredAt\` directly. Only lib/pdplBreach.ts may: the awareness `
+        + 'stamp is the instant every PDPL clock on this record runs from, and inlining it here '
+        + 'is how one surface comes to disagree with another about a statutory deadline. Call '
+        + 'breachAwarenessAt().').toBe(false);
+    }
+    // …and the accessor must actually be the thing that reads it, or the ban above
+    // is satisfied by nobody reading the column at all.
+    expect(/return\s+breach\.discoveredAt\s*\?\?\s*''/.test(lib),
+      'breachAwarenessAt must resolve the column it exists to resolve').toBe(true);
+  });
+
+  it('the register asks the statutory questions through the shared predicates', () => {
+    // ⚠ Assert the CALL SHAPE, never the bare token: F2-194 and F2-205 both shipped
+    // a leg satisfied by the name's presence in an IMPORT statement, so deleting
+    // every call site survived. `name(` cannot be satisfied by an import.
+    for (const [name, src] of [['PrivacyPage', page], ['PrivacyBreachDetailPage', detail]] as const) {
+      expect(/breachAwarenessAt\s*\(/.test(src),
+        `${name} must resolve the awareness stamp through breachAwarenessAt() — the clock runs from it`).toBe(true);
+      expect(/breachSeverityInputs\s*\(/.test(src),
+        `${name} must build severity inputs through breachSeverityInputs(), so the band that drives the `
+        + 'Article 26 data-subject determination cannot be computed two ways on one page').toBe(true);
+      expect(/isSdaiaSubmitted\s*\(/.test(src),
+        `${name} must discharge the 72-hour clock through isSdaiaSubmitted() over the server's own column`).toBe(true);
+    }
+  });
+
+  it('no breach surface compares a SDAIA state literal by hand', () => {
+    // The F2-209 ban, widened to the two surfaces that were outside it. Scoped to
+    // the SHAPE, not to a count of call sites: F2-203 and F2-209 each shipped a leg
+    // with a `>= N` floor and the mutation that reverted ONE site survived it.
+    for (const [name, src] of SURFACES) {
+      for (const state of ['NOT_REPORTED', 'IN_PREPARATION', 'SUBMITTED', 'ACKNOWLEDGED']) {
+        for (const op of ['===', '!==']) {
+          expect(new RegExp(`${op}\\s*['"]${state}['"]`).test(src),
+            `${name} compares a SDAIA state to '${state}' inline (${op}); ask the predicate`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('the severity a register displays is disclosed as derived, not shown as stored', () => {
+    // Deleting the disclosure would leave a badge that reads as a recorded severity
+    // assessment. There is no such column; the band comes from one number.
+    expect(/severityIsProvisional\s*\(/.test(page),
+      'PrivacyPage must disclose that the band is provisional — it is derived from the affected-subject '
+      + 'count alone, and an undisclosed badge asserts an Article 25 risk assessment the platform has not made').toBe(true);
+    expect(/severityIsProvisional\s*\(/.test(detail),
+      'PrivacyBreachDetailPage must disclose the same').toBe(true);
+    // …and the filter must compare the same derived band, or the control and the
+    // column disagree and picking a band empties the register again.
+    expect(/advFilters\.severity\s*&&\s*classifySeverity\s*\(/.test(page),
+      'the severity filter must compare the derived band; comparing a stored `severity` field filtered '
+      + 'EVERY row away, which reads as "no breaches of that severity" rather than as a broken control').toBe(true);
+  });
+
+  /**
+   * ⚠ Both detectors above pass on a clean tree AND on a rotted regex. Feed them
+   * the exact pre-fix text and require each to fire — the first draft of the
+   * corpus-key pattern was written into a shell heredoc, which collapsed `\\b`
+   * into a literal backspace (0x08) so it could never match anything. It reported
+   * "no surface reads a dead field" over a tree that was full of them, and only
+   * this leg disagreed. That is CLAUDE.md's own landmine, and the reason it says
+   * to write scan scripts with a file write rather than a heredoc.
+   */
+  it('SELF-TEST: both detectors fire on the exact pre-fix shapes', () => {
+    // (a) the widening cast, verbatim from PrivacyBreachDetailPage before the fix
+    const preFixCast =
+      'const reportedToAuthority = (item as PrivacyBreachDto & { reportedToAuthority?: boolean }).reportedToAuthority ?? false;';
+    expect(/as\s+PrivacyBreachDto\s*&/.test(preFixCast),
+      'the cast detector must fire on the shape that was actually there').toBe(true);
+    expect(/as\s+PrivacyBreachDto\s*&/.test('const b = row as PrivacyBreachDto;'),
+      'a plain cast is not a widening cast — the gate must not ban it').toBe(false);
+
+    // (b) the corpus keys, verbatim from mockPrivacy before the fix
+    const preFixCorpus =
+      "{ id: 10, breachType: 'CONFIDENTIALITY', severity: 'HIGH', status: 'INVESTIGATING',\n"
+      + '    occurredAt: _thirtyOneHoursAgo, reportedAt: _thirtyHoursAgo,\n'
+      + '    affectedRecords: 47_220 },';
+    const firesKey = (src: string, field: string) =>
+      new RegExp(`(?:^|[{,\\s])${field}\\s*:`, 'm').test(src);
+    for (const field of NO_COLUMN) {
+      expect(firesKey(preFixCorpus, field), `the corpus detector must fire on \`${field}\``).toBe(true);
+    }
+    // …and must NOT fire on the replacements, or the gate would ban the fix.
+    expect(firesKey('    discoveredAt: _thirtyHoursAgo, dataSubjectsAffectedCount: 47_220,', 'affectedRecords'),
+      '`dataSubjectsAffectedCount` must not read as `affectedRecords`').toBe(false);
+    expect(firesKey('    discoveredAt: _thirtyHoursAgo,', 'occurredAt')).toBe(false);
+    expect(firesKey("    sdaiaNotificationStatus: 'NOT_REPORTED',", 'severity')).toBe(false);
+  });
+});

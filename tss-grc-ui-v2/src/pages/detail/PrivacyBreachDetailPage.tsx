@@ -18,6 +18,13 @@ import { Button } from '../../components/ui/Button';
 import { InlineEmpty } from '../../components/ui/InlineEmpty';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { privacyApi, ApiError, type PrivacyBreachDto } from '../../lib/api';
+// F2-211: the detail page asks the same four questions the register and the breach
+// console ask, through the same predicates — awareness stamp, SDAIA discharge and
+// the provisional severity band.
+import {
+  breachAwarenessAt, breachSeverityInputs, classifySeverity,
+  severityIsProvisional, isSdaiaSubmitted, breachTypeLabel,
+} from '../../lib/pdplBreach';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 
@@ -33,15 +40,12 @@ const SEVERITY_TONE: Record<string, BadgeTone> = {
   CRITICAL: 'risk-crit', HIGH: 'risk-high', MEDIUM: 'risk-med', LOW: 'risk-low',
 };
 
-const BREACH_TYPE_LABEL: Record<string, { en: string; ar: string }> = {
-  CONFIDENTIALITY: { en: 'Confidentiality',  ar: 'سرية البيانات' },
-  INTEGRITY:       { en: 'Integrity',         ar: 'سلامة البيانات' },
-  AVAILABILITY:    { en: 'Availability',      ar: 'توافر البيانات' },
-  LOSS:            { en: 'Loss',              ar: 'فقد البيانات' },
-  THEFT:           { en: 'Theft',             ar: 'سرقة البيانات' },
-  UNAUTHORISED_ACCESS:  { en: 'Unauthorised access',  ar: 'وصول غير مصرح' },
-  UNAUTHORISED_DISCLOSURE: { en: 'Unauthorised disclosure', ar: 'إفشاء غير مصرح' },
-};
+// F2-211: this page held its own seven-token breach-type map, of which exactly ONE
+// (`UNAUTHORISED_ACCESS`) appears in any live row — the other six are the vocabulary
+// the DEMO CORPUS used, so the map had been written against the fabrication rather
+// than the database, and eleven of the twelve stored tokens fell through its raw-token
+// fallback. The map now lives in lib/pdplBreach.ts, covers the measured twelve, and is
+// shared with the register so the two surfaces cannot label one column two ways.
 
 /**
  * Detail page for a single personal-data breach (PDPL Article 20).
@@ -94,11 +98,7 @@ export function PrivacyBreachDetailPage() {
     }
   }
 
-  function typeLabel(code: string): string {
-    const m = BREACH_TYPE_LABEL[code];
-    if (!m) return code.replace(/_/g, ' ');
-    return isAr ? m.ar : m.en;
-  }
+  const typeLabel = (code: string) => breachTypeLabel(code, isAr ? 'ar' : 'en');
 
   if (loading) {
     return <Shell title="PDPL"><InlineEmpty>{isAr ? 'جارٍ التحميل…' : 'Loading…'}</InlineEmpty></Shell>;
@@ -114,12 +114,30 @@ export function PrivacyBreachDetailPage() {
   }
 
   // ── PDPL Article 20 — 72-hour countdown ────────────────────────────
-  const reportedToAuthority = (item as PrivacyBreachDto & { reportedToAuthority?: boolean }).reportedToAuthority ?? false;
+  //
+  // ⚠⚠ F2-211: every input here used to be a field with no column in
+  // `privacy.data_breaches`. `reportedToAuthority` was cast in with `as` and the
+  // wire has never carried it, so the "SDAIA notified" badge could not render for
+  // any breach; `occurredAt` does not exist either, so `hoursRemaining` was null on
+  // every row and the countdown badge — guarded by `hoursRemaining != null` — never
+  // appeared. The whole Article 20 treatment on this page was inert against real
+  // data and visible only under the demo fallback corpus.
+  const reportedToAuthority = isSdaiaSubmitted(item.sdaiaNotificationStatus);
   const terminal = item.status === 'CLOSED' || reportedToAuthority;
-  const hoursElapsed = item.occurredAt
-    ? Math.floor((Date.now() - new Date(item.occurredAt).getTime()) / 3_600_000)
+  const aware = breachAwarenessAt(item);
+  const hoursElapsed = aware
+    ? Math.floor((Date.now() - new Date(aware).getTime()) / 3_600_000)
     : null;
   const hoursRemaining = hoursElapsed != null ? 72 - hoursElapsed : null;
+  // Derived, provisional, and disclosed as such — the same inputs the register and
+  // the breach console classify from. There is no stored severity to show.
+  const severityInputs = breachSeverityInputs(item);
+  const severity = classifySeverity(severityInputs);
+  const severityProvisional = severityIsProvisional(severityInputs);
+  const severityHint = isAr
+    ? 'صُنِّفت الدرجة من عدد الأشخاص المتأثّرين فقط؛ لا تحفظ المنصّة درجة خطورة للحادثة.'
+    : 'Band derived from the affected-subject count alone — the platform stores no severity for a breach.';
+  const affected = item.dataSubjectsAffectedCount;
 
   const tabs: TabItem<TabId>[] = [
     { id: 'overview', label: isAr ? 'نظرة عامة' : 'Overview' },
@@ -140,7 +158,9 @@ export function PrivacyBreachDetailPage() {
         sub={item.descriptionEn?.slice(0, 200)}
         badges={<>
           <Badge tone={STATUS_TONE[item.status ?? ''] ?? 'neutral'} dot>{(item.status ?? '—').replace(/_/g, ' ')}</Badge>
-          {item.severity && <Badge tone={SEVERITY_TONE[item.severity] ?? 'neutral'}>{item.severity}</Badge>}
+          <Badge tone={SEVERITY_TONE[severity] ?? 'neutral'} title={severityProvisional ? severityHint : undefined}>
+            {severity}{severityProvisional && <span aria-label={severityHint}> ·&nbsp;{isAr ? 'مبدئي' : 'provisional'}</span>}
+          </Badge>
           {item.breachType && <Badge tone="primary">{typeLabel(item.breachType)}</Badge>}
           {reportedToAuthority && (
             <Badge tone="success" dot>{isAr ? 'بُلِّغت الهيئة' : 'SDAIA notified'}</Badge>
@@ -192,14 +212,14 @@ export function PrivacyBreachDetailPage() {
                   </div>
                 </div>
 
-                {item.affectedRecords != null && item.affectedRecords > 0 && (
+                {affected != null && affected > 0 && (
                   <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 6 }}>
                     <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase',
                                   letterSpacing: '0.06em', marginBottom: 4 }}>
                       {isAr ? 'عدد السجلات المتأثرة' : 'Affected records'}
                     </div>
                     <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--danger-fg)' }}>
-                      {item.affectedRecords.toLocaleString()}
+                      {affected.toLocaleString()}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
                       {isAr
@@ -257,10 +277,13 @@ export function PrivacyBreachDetailPage() {
           <>
             <Card title={isAr ? 'المسار الزمني' : 'Lifecycle'} Icon={Calendar}>
               <RailFieldGroup>
-                <RailField label={isAr ? 'وقعت في' : 'Occurred at'} value={fmtDate(item.occurredAt)} mono />
-                {item.reportedAt && (
-                  <RailField label={isAr ? 'بُلّغ عنها في' : 'Reported at'} value={fmtDate(item.reportedAt)} mono />
-                )}
+                {/* F2-211: "Occurred at" read a field with no column. The stamp the
+                    schema keeps is `discovered_at` — when the controller became
+                    aware — which is a different fact and the one the statutory
+                    clock runs from, so the label says which. The "Reported at" row
+                    below it was removed rather than relabelled: no column records
+                    when the breach was reported internally. */}
+                <RailField label={isAr ? 'اكتُشفت في' : 'Discovered at'} value={fmtDate(aware || undefined)} mono />
                 <RailField
                   label={isAr ? 'مدّة الاستجابة (72 ساعة)' : '72-hour clock'}
                   value={
@@ -288,12 +311,12 @@ export function PrivacyBreachDetailPage() {
                     : '—'} />
                 <RailField
                   label={isAr ? 'الشدّة' : 'Severity'}
-                  value={item.severity
-                    ? <Badge tone={SEVERITY_TONE[item.severity] ?? 'neutral'}>{item.severity}</Badge>
-                    : '—'} />
+                  value={<Badge tone={SEVERITY_TONE[severity] ?? 'neutral'} title={severityProvisional ? severityHint : undefined}>
+                    {severity}{severityProvisional && <span aria-label={severityHint}> ·&nbsp;{isAr ? 'مبدئي' : 'provisional'}</span>}
+                  </Badge>} />
                 <RailField
-                  label={isAr ? 'السجلات المتأثرة' : 'Affected records'}
-                  value={item.affectedRecords?.toLocaleString() ?? '—'}
+                  label={isAr ? 'الأشخاص المتأثرون' : 'Affected subjects'}
+                  value={affected?.toLocaleString() ?? '—'}
                   mono />
               </RailFieldGroup>
             </Card>

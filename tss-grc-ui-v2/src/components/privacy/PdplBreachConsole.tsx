@@ -10,7 +10,8 @@ import {
   PDPL_BREACH_STAGES, computeBreachClock, classifySeverity,
   requiresDataSubjectNotification, severityIsProvisional,
   formatHoursLabel, cumulativeBudgetTo, dataSubjectsDeadline,
-  isSdaiaReported, isSdaiaSubmitted, ARTICLE_25_FIELDS, article25Value, article25NotHeld,
+  isSdaiaReported, isSdaiaSubmitted, breachAwarenessAt, breachSeverityInputs,
+  ARTICLE_25_FIELDS, article25Value, article25NotHeld,
   type BreachClock, type PdplSeverity, type Article25Field, type PdplSeverityInputs,
 } from '../../lib/pdplBreach';
 import { formatHijri } from '../../lib/sla';
@@ -79,10 +80,11 @@ export function PdplBreachConsole({ breaches, onRecorded }: {
   //      (still recoverable / actionable today).
   //   3. Any open breach (e.g. NOTIFIED awaiting data-subjects step).
   const target = useMemo(() => {
-    // Awareness timestamp drives the 72h clock. The backend DTO only ships
-    // `discoveredAt` (no reportedAt/occurredAt), so fall back to it — otherwise
-    // the console renders an empty state against real data.
-    const awareOf = (b: PrivacyBreachDto) => b.reportedAt ?? b.occurredAt ?? b.discoveredAt ?? '';
+    // F2-211: was `b.reportedAt ?? b.occurredAt ?? b.discoveredAt ?? ''`. The
+    // first two are fields the schema has no column for, so the chain always
+    // resolved to the third — right answer, two dead operands, and it implied a
+    // "reported" stamp the platform does not keep. One accessor now.
+    const awareOf = breachAwarenessAt;
     const open = breaches.filter(b => b.status !== 'CLOSED' && awareOf(b));
     // ⚠⚠ F2-209: this was `b.status !== 'NOTIFIED'` — the breach LIFECYCLE
     // status, not the SDAIA notification status the platform keeps in its own
@@ -122,9 +124,10 @@ export function PdplBreachConsole({ breaches, onRecorded }: {
   }
 
   const { breach, clock } = target;
-  // Backend DTO ships `dataSubjectsAffectedCount`, not `affectedRecords`.
-  const records = breach.affectedRecords ?? breach.dataSubjectsAffectedCount ?? 0;
-  const aware = breach.reportedAt ?? breach.occurredAt ?? breach.discoveredAt ?? '';
+  // F2-211: `affectedRecords` was the first operand here and has no column —
+  // it could only ever have been supplied by the demo fallback corpus.
+  const records = breach.dataSubjectsAffectedCount ?? 0;
+  const aware = breachAwarenessAt(breach);
   // ⚠ F2-209: the second argument used to be
   //   `financial: breach.breachType === 'CONFIDENTIALITY' && records > 5_000`
   // — an inference no column supports, asserting that a large confidentiality
@@ -134,7 +137,12 @@ export function PdplBreachConsole({ breaches, onRecorded }: {
   // and no `severity` column, so the affected-record count is the only input
   // the platform actually holds. Passing only that makes the band provisional,
   // which is what `severityIsProvisional` then discloses on the badge.
-  const severityInputs: PdplSeverityInputs = { affectedRecords: records };
+  //
+  // F2-211: built by `breachSeverityInputs` so the register table opposite
+  // classifies from exactly the same inputs — the band drives the Article 26
+  // "notify the data subjects directly" determination, and two surfaces on one
+  // page disagreeing about it is F2-196's defect.
+  const severityInputs: PdplSeverityInputs = breachSeverityInputs(breach);
   const severity = classifySeverity(severityInputs);
   const provisional = severityIsProvisional(severityInputs);
 

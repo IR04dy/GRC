@@ -3959,6 +3959,16 @@ export const en = {
   statusExpired: 'Expired',
   statusDraft: 'Draft',
   statusContained: 'Contained',
+  // F2-211: `statusLabel` falls back to the RAW TOKEN for any status it cannot map,
+  // so these five printed `NOTIFIED` / `INVESTIGATING` / `ESCALATED` / `INVESTIGATED`
+  // / `REMEDIATED` into an Arabic-primary UI on 11 of the 17 live breach rows — beside
+  // correctly-localised neighbours, which is what makes it read as data rather than a
+  // missing translation. Measured from privacy.data_breaches, not guessed.
+  statusNotified: 'Notified',
+  statusInvestigating: 'Investigating',
+  statusInvestigated: 'Investigated',
+  statusEscalated: 'Escalated',
+  statusRemediated: 'Remediated',
   statusEradicated: 'Eradicated',
   statusRecovered: 'Recovered',
 
@@ -4231,6 +4241,10 @@ export const en = {
   colRequestType: 'Request Type',
   colRequester: 'Requester',
   colOccurred: 'Occurred',
+  // F2-211: a breach register column header. `privacy.data_breaches` records when
+  // the controller became AWARE (`discovered_at`, NOT NULL), not when the breach
+  // occurred — a different fact, and the one PDPL runs its clocks from.
+  colDiscovered: 'Discovered',
   colRecords: 'Records',
   colActivity: 'Activity',
   colLegalBasis: 'Legal Basis',
@@ -4448,6 +4462,13 @@ export const en = {
 
   // Privacy page (DD-18)
   privacyBreachNotified:   'Notified',
+  // F2-211: shown instead of a countdown when the controller has recorded that this
+  // breach does not require authority notification. A bare em-dash there reads as
+  // missing data; this states the assessment that was actually made.
+  privacyBreachOverdue:         'overdue',
+  privacyBreachLeft:            'left',
+  privacyBreachNotRequired:     'Not notifiable',
+  privacyBreachNotRequiredHint: 'Recorded as not requiring authority notification, so no PDPL Article 20 clock applies to this breach.',
   privacyBreachesEmpty:    'No data breaches recorded',
   privacyBreachesEmptySub: 'Report breaches here within the 72-hour PDPL deadline.',
   privacyRopaEmpty:        'No processing activities',

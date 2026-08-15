@@ -135,6 +135,93 @@ export function isSdaiaSubmitted(state: string | null | undefined): boolean {
   return state === 'SUBMITTED' || state === 'ACKNOWLEDGED';
 }
 
+/**
+ * When the controller became aware of the breach — the instant every PDPL clock
+ * on this record runs from.
+ *
+ * ⚠⚠ F2-211: both surfaces used to open with
+ * `b.reportedAt ?? b.occurredAt ?? b.discoveredAt`. The first two operands are
+ * fields `privacy.data_breaches` has no column for, so they are ALWAYS undefined
+ * and the chain always resolved to the third — a correct outcome reached by two
+ * dead operands, which reads as though the platform prefers a "reported" stamp
+ * and merely falls back. It does not have one. The register table opposite made
+ * the same assumption without the fallback (`if (!r.occurredAt) return '—'`) and
+ * its Article 20 countdown therefore never rendered at all.
+ *
+ * One accessor, so the question cannot be asked two ways again (F2-178's shape),
+ * and so that adding a real `reported_at` column later is one edit here rather
+ * than a hunt for `??` chains.
+ */
+export function breachAwarenessAt(breach: Pick<PrivacyBreachDto, 'discoveredAt'>): string {
+  return breach.discoveredAt ?? '';
+}
+
+/**
+ * Bilingual labels for `privacy.data_breaches.breach_type`.
+ *
+ * ⚠⚠ F2-211: this map used to live on the detail page and carried SEVEN tokens, of
+ * which exactly ONE (`UNAUTHORISED_ACCESS`) appears in any live row. The other six —
+ * `CONFIDENTIALITY`, `INTEGRITY`, `AVAILABILITY`, `LOSS`, `THEFT`,
+ * `UNAUTHORISED_DISCLOSURE` — are the vocabulary the DEMO CORPUS used, so the map had
+ * been written against the fabrication rather than against the database. Eleven of the
+ * twelve stored tokens therefore fell through to the raw-token fallback, and the
+ * register had no map at all, printing `UNAUTHORIZED_ACCESS` and `ACCIDENTAL_DISCLOSURE`
+ * into an Arabic-primary UI on all 17 rows (house rule 7).
+ *
+ * The twelve stored values were read from the column, not guessed. The seven legacy
+ * tokens are KEPT: other writers may still produce them and dropping a label can only
+ * make a row render worse.
+ *
+ * ⚠ `UNAUTHORISED_ACCESS` and `UNAUTHORIZED_ACCESS` are BOTH stored — one concept, two
+ * spellings, on a column with no CHECK. They are labelled identically here because
+ * labelling is display; collapsing them in the database rewrites live rows in two
+ * databases and is an owner decision (F2-183/F2-196's rule), so it is filed, not done.
+ */
+export const BREACH_TYPE_LABEL: Record<string, { en: string; ar: string }> = {
+  // measured in privacy.data_breaches (12 distinct values, 17 live rows)
+  ACCIDENTAL_DISCLOSURE:   { en: 'Accidental disclosure',   ar: 'إفشاء غير مقصود' },
+  LOSS_OF_DEVICE:          { en: 'Loss of device',          ar: 'فقد جهاز' },
+  UNAUTHORISED_ACCESS:     { en: 'Unauthorised access',     ar: 'وصول غير مصرّح به' },
+  UNAUTHORIZED_ACCESS:     { en: 'Unauthorised access',     ar: 'وصول غير مصرّح به' },
+  VENDOR_BREACH:           { en: 'Vendor breach',           ar: 'اختراق لدى مورّد' },
+  WEB_VULN_EXPLOIT:        { en: 'Web vulnerability',       ar: 'استغلال ثغرة ويب' },
+  MISCONFIGURATION:        { en: 'Misconfiguration',        ar: 'خطأ في الإعدادات' },
+  PHISHING:                { en: 'Phishing',                ar: 'تصيّد إلكتروني' },
+  PHYSICAL_TAMPERING:      { en: 'Physical tampering',      ar: 'عبث مادي' },
+  CYBERATTACK:             { en: 'Cyberattack',             ar: 'هجوم سيبراني' },
+  DATA_EXPOSURE_LOWER_ENV: { en: 'Exposure in a lower environment', ar: 'انكشاف في بيئة غير إنتاجية' },
+  INSIDER_THREAT:          { en: 'Insider threat',          ar: 'تهديد داخلي' },
+  // legacy tokens no live row carries — kept so an older writer still renders
+  CONFIDENTIALITY:         { en: 'Confidentiality',         ar: 'سرية البيانات' },
+  INTEGRITY:               { en: 'Integrity',               ar: 'سلامة البيانات' },
+  AVAILABILITY:            { en: 'Availability',            ar: 'توافر البيانات' },
+  LOSS:                    { en: 'Loss',                    ar: 'فقد البيانات' },
+  THEFT:                   { en: 'Theft',                   ar: 'سرقة البيانات' },
+  UNAUTHORISED_DISCLOSURE: { en: 'Unauthorised disclosure', ar: 'إفشاء غير مصرّح به' },
+};
+
+/** Label a breach type, falling back to the de-underscored token. */
+export function breachTypeLabel(code: string | null | undefined, lang: 'en' | 'ar'): string {
+  if (!code) return '—';
+  const m = BREACH_TYPE_LABEL[code];
+  return m ? m[lang] : code.replace(/_/g, ' ');
+}
+
+/**
+ * The severity inputs this platform can actually supply for a breach.
+ *
+ * `privacy.data_breaches` has no `severity` column and none of the qualitative
+ * flags {@link PdplSeverityInputs} asks for, so the affected-subject count is the
+ * only real input — which is what makes every band {@link severityIsProvisional}.
+ * Both the console and the register read this, so the two cannot disagree about
+ * a band that drives the Article 26 data-subject notification determination.
+ */
+export function breachSeverityInputs(
+  breach: Pick<PrivacyBreachDto, 'dataSubjectsAffectedCount'>,
+): PdplSeverityInputs {
+  return { affectedRecords: breach.dataSubjectsAffectedCount ?? 0 };
+}
+
 // ─── Severity rubric ────────────────────────────────────────────────────────
 //
 // PDPL doesn't enumerate severity bands explicitly; it asks the controller

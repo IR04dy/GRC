@@ -2527,14 +2527,30 @@ export interface PrivacyDsrRequest {
   receivedAt?: string; dueDate?: string; status?: string;
   description?: string;
 }
+// ⚠⚠ F2-211: this interface declared `severity`, `occurredAt`, `reportedAt` and
+// `affectedRecords`. `GET /api/v1/privacy/breaches` returns the DataBreach ENTITY,
+// and `privacy.data_breaches` — read from sys.columns, 25 columns, identical in dev
+// and prod — has NO COLUMN for any of the four. They could never arrive, so the
+// register's Severity badge, Records count and Occurred date rendered an em-dash on
+// all 17 live rows, its severity filter could never match a row, and the column
+// titled with the PDPL Article 20 72-hour clock returned early on `!r.occurredAt`
+// and so never once displayed a countdown against real data.
+//
+// ⚠ Two fields that LOOK identical in a wire probe are NOT dead and stay declared:
+// `sdaiaSubmissionRef` and `sdaiaSubmittedAt` have real columns that are null on
+// all 17 rows. `default-property-inclusion: non_null` renders "no column" and
+// "column exists, every row null" identically, and they demand opposite fixes —
+// only sys.columns adjudicates. Measuring from the wire alone called 6 fields dead
+// here and 6 more on DpiaDto; the entity says 4 and 0.
 export interface PrivacyBreachDto {
   id: number; titleEn: string; descriptionEn?: string;
-  breachType?: string; severity?: string; status?: string;
-  occurredAt?: string; reportedAt?: string;
-  affectedRecords?: number;
-  /** Backend's canonical affected-count field (DTO returns this, not affectedRecords). */
+  breachType?: string; status?: string;
+  /** The affected-subject count the server actually keeps (17/17 non-null). */
   dataSubjectsAffectedCount?: number;
+  /** Whether this breach requires authority notification at all (17/17 non-null). */
+  pdpcNotificationRequired?: boolean;
   // SDAIA notification workflow (PDPL Article 31 — 72-hour notification)
+  /** NOT NULL on the entity — the awareness stamp the statutory clock runs from. */
   discoveredAt?: string;
   sdaiaNotificationStatus?: string;   // NOT_REPORTED | IN_PREPARATION | SUBMITTED | ACKNOWLEDGED
   sdaiaSubmissionRef?: string | null;

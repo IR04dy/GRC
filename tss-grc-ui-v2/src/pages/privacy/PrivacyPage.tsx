@@ -18,6 +18,14 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useI18n } from '../../lib/i18n';
 import { formatRetentionMonths } from '../../lib/format';
 import { SEVERITY_TONE, severityLabel, STATUS_TONE, statusLabel } from '../../lib/labels';
+// F2-211: the register classifies severity, resolves the awareness stamp and asks
+// whether SDAIA has been notified through exactly the predicates the breach console
+// on this same page uses — the two surfaces cannot answer a statutory question two
+// ways again (F2-196's defect, previously with both readers inside one component).
+import {
+  classifySeverity, severityIsProvisional, breachSeverityInputs,
+  breachAwarenessAt, isSdaiaSubmitted, breachTypeLabel, formatHoursLabel,
+} from '../../lib/pdplBreach';
 import { isDsrOpen, isDsrTerminal } from '../../lib/dsrLifecycle';
 import { useApiList } from '../../lib/useApiResource';
 import { useLiveRefresh } from '../../lib/useLiveRefresh';
@@ -126,8 +134,14 @@ export function PrivacyPage() {
     if (advFilters.requestType && d.requestType !== advFilters.requestType) return false;
     return true;
   }), [allDsrs, advFilters]);
+  // ⚠⚠ F2-211: this was `b.severity !== advFilters.severity` over a field with no
+  // column, so `severity` was `undefined` on every row and picking ANY band filtered
+  // the whole register away. That is worse than an inert control: an empty table
+  // reads as "no breaches of that severity" — a false all-clear on a PDPL register.
+  // It now filters the same derived band the column displays, so the control and the
+  // column cannot disagree.
   const filteredBreaches = useMemo(() => allBreaches.filter(b => {
-    if (advFilters.severity && b.severity !== advFilters.severity) return false;
+    if (advFilters.severity && classifySeverity(breachSeverityInputs(b)) !== advFilters.severity) return false;
     if (advFilters.status   && b.status !== advFilters.status) return false;
     return true;
   }), [allBreaches, advFilters]);
@@ -202,22 +216,72 @@ export function PrivacyPage() {
 
   const breachCols: Column<PrivacyBreachDto>[] = [
     { header: t('colTitle'),    cell: r => <div><div style={{ fontWeight: 600 }}>{r.titleEn}{breachProv.has(String(r.id)) && <PromotedBadge sourceReferenceCode={breachProv.get(String(r.id))!} />}</div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{(r.descriptionEn ?? '').slice(0, 80)}</div></div> },
-    { header: t('colType'),     cell: r => <Badge tone="info">{r.breachType ?? '—'}</Badge> },
-    { header: t('colSeverity'), cell: r => <Badge tone={SEVERITY_TONE[r.severity ?? ''] ?? 'neutral'} dot>{severityLabel(t, r.severity ?? '—')}</Badge> },
-    { header: t('colRecords'),  cell: r => r.affectedRecords?.toLocaleString() ?? '—', mono: true },
-    { header: t('colOccurred'), cell: r => fmtDate(r.occurredAt), mono: true },
+    // F2-211: rendered `r.breachType` raw, so all 17 rows printed tokens like
+    // `UNAUTHORIZED_ACCESS` into an Arabic-primary UI (house rule 7).
+    { header: t('colType'),     cell: r => <Badge tone="info">{breachTypeLabel(r.breachType, lang)}</Badge> },
+    // ⚠⚠ F2-211: this column read `r.severity`, a field with no column in
+    // `privacy.data_breaches` — so it rendered a neutral em-dash badge on all 17
+    // live rows. The band is DERIVED from the affected-subject count, exactly as
+    // the console above derives it, and carries the same provisional disclosure:
+    // the platform records no special-category flag and no severity, so this is
+    // not a completed Article 25 risk assessment and must not read as one.
+    { header: t('colSeverity'), cell: r => {
+        const inputs = breachSeverityInputs(r);
+        const sev = classifySeverity(inputs);
+        const provisional = severityIsProvisional(inputs);
+        return (
+          <Badge tone={SEVERITY_TONE[sev] ?? 'neutral'} dot
+            title={provisional ? t('pdplSevProvisionalHint') : undefined}>
+            {severityLabel(t, sev)}
+            {provisional && <span aria-label={t('pdplSevProvisionalHint')}> ·&nbsp;{t('pdplSevProvisional')}</span>}
+          </Badge>
+        );
+      } },
+    // F2-211: was `r.affectedRecords`, no column. The count the server keeps is
+    // `data_subjects_affected_count`, non-null on all 17 rows — the console one
+    // component above was already reading it.
+    { header: t('colRecords'),  cell: r => r.dataSubjectsAffectedCount?.toLocaleString() ?? '—', mono: true },
+    // F2-211: was `colOccurred` over `r.occurredAt`, no column. `discovered_at` is
+    // NOT NULL and is a DIFFERENT fact — when the controller became aware, which is
+    // what PDPL runs the clock from — so the header says so rather than relabelling
+    // a discovery stamp as the moment of occurrence.
+    { header: t('colDiscovered'), cell: r => fmtDate(breachAwarenessAt(r) || undefined), mono: true },
     // PDPL Article 20 72-hour notification clock
+    //
+    // ⚠⚠ F2-211: this cell returned early on `!r.occurredAt` — a field the schema
+    // has no column for — so the countdown NEVER rendered against real data, on
+    // every row, for every tenant. It only ever displayed under the demo fallback
+    // corpus, which mints `occurredAt` from `Date.now()` and so always produced a
+    // plausible live countdown (F2-194: a clock-anchored fabrication has no tell).
+    //
+    // Discharge is `isSdaiaSubmitted` over the server's own notification column —
+    // the same predicate the console uses. It used to be a `reportedToAuthority`
+    // boolean cast in with `as`, which the wire does not carry either, so the
+    // "Notified" badge could not render for any row.
     { header: t('privacyBreachClock'),
       cell: r => {
         if (r.status === 'CLOSED') return <span style={{ color: 'var(--ink-3)' }}>—</span>;
-        const reportedToAuthority = (r as PrivacyBreachDto & { reportedToAuthority?: boolean }).reportedToAuthority ?? false;
-        if (reportedToAuthority) return <Badge tone="success" dot>{t('privacyBreachNotified')}</Badge>;
-        if (!r.occurredAt) return <span style={{ color: 'var(--ink-3)' }}>—</span>;
-        const ms = Date.now() - new Date(r.occurredAt).getTime();
-        const hours = Math.floor(ms / 3600000);
-        const remaining = 72 - hours;
+        // A breach the controller has assessed as not notifiable has no Article 20
+        // clock to show. Stated, not left as a bare dash that reads as missing data.
+        if (r.pdpcNotificationRequired === false) {
+          return <span style={{ color: 'var(--ink-3)' }} title={t('privacyBreachNotRequiredHint')}>{t('privacyBreachNotRequired')}</span>;
+        }
+        if (isSdaiaSubmitted(r.sdaiaNotificationStatus)) return <Badge tone="success" dot>{t('privacyBreachNotified')}</Badge>;
+        const aware = breachAwarenessAt(r);
+        if (!aware) return <span style={{ color: 'var(--ink-3)' }}>—</span>;
+        const remaining = 72 - Math.floor((Date.now() - new Date(aware).getTime()) / 3_600_000);
         const colour = remaining < 0 ? 'var(--danger)' : remaining <= 12 ? 'var(--accent-700)' : 'var(--success-fg)';
-        return <span className="mono" style={{ color: colour, fontWeight: 700 }}>{remaining < 0 ? `${Math.abs(remaining)}h overdue` : `${remaining}h left`}</span>;
+        // F2-211: `formatHoursLabel` rather than raw hours. Once the clock actually
+        // ran, the real rows read "3486h overdue" — arithmetically right and useless;
+        // nobody converts that to 145 days in their head, on a statutory deadline.
+        // The console beside this table already used this formatter.
+        return (
+          <span className="mono" style={{ color: colour, fontWeight: 700 }}>
+            {remaining < 0
+              ? `${formatHoursLabel(remaining, lang)} ${t('privacyBreachOverdue')}`
+              : `${formatHoursLabel(remaining, lang)} ${t('privacyBreachLeft')}`}
+          </span>
+        );
       } },
     { header: t('colStatus'),   cell: r => <Badge tone={STATUS_TONE[r.status ?? ''] ?? 'neutral'} dot>{statusLabel(t, r.status ?? '—')}</Badge> },
     { header: '', align: 'end', width: '210px',
