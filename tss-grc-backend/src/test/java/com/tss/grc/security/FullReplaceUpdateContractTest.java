@@ -116,6 +116,14 @@ class FullReplaceUpdateContractTest {
             "PUT /api/v1/privacy/dsrs/{id}"),
         new Site("RegulatoryChangeService", "update", "RegulatoryChangeRequest",
             "PUT /api/v1/compliance/regulatory-changes/{id}")
+        // ⚠ UserService#update is FIXED by this slice (it was nulling job titles) but is
+        // deliberately NOT listed. The coverage leg compares property NAMES, and that endpoint
+        // transforms two of them: `password` becomes `setPasswordHash(encoder.encode(...))` and
+        // `roles` becomes rows in the iam.user_roles join table, with no property on User at all.
+        // Listing it made the leg report `passwordHash` as a field the client cannot send — a
+        // false positive on correct code, which is the one thing a gate must never do, because it
+        // trains the next reader to edit the assertion instead of the code. The structural leg
+        // still covers the class. A name-mapping leg would be a different instrument.
     );
 
     // ── source access ─────────────────────────────────────────────────────────────────────
@@ -403,6 +411,62 @@ class FullReplaceUpdateContractTest {
                 form collect it — F2-213 chose per field, and the choice is recorded beside \
                 each setter.""")
             .isEmpty();
+    }
+
+    /**
+     * The other direction: a field the client sends that the server does not write.
+     *
+     * <p>Not automatically a defect — some are deliberate (an immutable username; a status the
+     * workflow owns) and some are inert form inputs that quietly do nothing. Either way it is a
+     * decision, so it is recorded rather than tolerated silently. Enforced EXACTLY, in both
+     * directions: a new one fails, and an entry whose field starts being written must be deleted
+     * in the same commit.
+     *
+     * <p>⚠ This leg exists because the mutation harness found the gap: deleting a write from an
+     * {@code applyEditable} shrinks the written set, which is still a valid SUBSET of what the
+     * client declares — so the coverage leg above stayed green while a field silently became
+     * uneditable. A one-directional check over a two-directional contract.
+     */
+    private static final Map<String, String> DECLARED_BUT_NOT_WRITTEN = new LinkedHashMap<>() {{
+        put("PUT /api/v1/privacy/dsrs/{id} :: receivedAt",
+            "When the request arrived. Stamped once at creation; a later edit must not restyle "
+            + "the start of the PDPL Article 23 clock.");
+        put("PUT /api/v1/privacy/dsrs/{id} :: description",
+            "Declared by the frontend request type and matched by no column on "
+            + "privacy.data_subject_requests — F2-211's shape, filed there, not invented here.");
+        // ⚠ I predicted a third entry here — regulatory-changes :: status — and this leg refuted
+        // it on its first run. `RegulatoryChangeRequest` never declared `status` at all, which is
+        // exactly WHY the server writing it was the defect: there was nothing on the wire to
+        // write. A field the client cannot send cannot also be a field the client sends and the
+        // server ignores. Predicting a gate's output and being wrong is the cheapest possible
+        // version of this programme's recurring lesson about unverified claims.
+    }};
+
+    @Test
+    @DisplayName("a field the client sends and the server ignores is recorded, not silent")
+    void everyIgnoredClientFieldIsAccountedFor() {
+        String api = stripComments(read(FE_API));
+        Map<String, String> found = new LinkedHashMap<>();
+        for (Site site : SITES) {
+            Path svc = javaSources().stream()
+                .filter(p -> p.getFileName().toString().equals(site.service() + ".java"))
+                .findFirst().orElseThrow();
+            Set<String> written = writtenFromRequest(stripComments(read(svc)), site.method());
+            for (String key : feKeys(api, site.feType())) {
+                if (!written.contains(key)) {
+                    found.put(site.endpoint() + " :: " + key, "");
+                }
+            }
+        }
+        assertThat(found.keySet())
+            .as("""
+                Either the server stopped writing a field its form still collects — which is how \
+                an input silently becomes decorative — or a new optional field was added to the \
+                request type. Say which, in DECLARED_BUT_NOT_WRITTEN, with a reason.""")
+            .containsExactlyInAnyOrderElementsOf(DECLARED_BUT_NOT_WRITTEN.keySet());
+        assertThat(DECLARED_BUT_NOT_WRITTEN.values())
+            .as("a reason must actually give one — a bare label is not an explanation")
+            .allSatisfy(r -> assertThat(r).hasSizeGreaterThan(40));
     }
 
     @Test
