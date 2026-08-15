@@ -173,8 +173,15 @@ describe('F2-212 — what the browser found after the gates were green', () => {
     // by the import statement, and a mutation deleting every call site survives it.
     expect(/useCapas\s*\(/.test(page),
       'the CAPA card must read the register from the server through useCapas()').toBe(true);
-    expect(/incidentCapas/.test(page),
-      'the card must render the CAPAs whose origin is an incident').toBe(true);
+    // Assert the SHAPE of the selection, not the variable's NAME. The first draft
+    // asserted `incidentCapas` and went red the moment the card was extracted into a
+    // component where the local is called `items` — F2-197's rule (a check keyed on a
+    // name cannot see the alias) arriving on my own gate, one refactor later. What is
+    // actually being claimed is that the card selects on the origin column, normalised
+    // because the value is stored lower-case under a case-insensitive collation.
+    expect(/originType\s*\?\.\s*trim\(\)\.toLowerCase\(\)\s*===\s*'incident'/.test(page),
+      'the card must select the CAPAs whose origin is an incident, normalising the '
+      + 'stored value rather than matching a literal (F2-179).').toBe(true);
     // The retired title claimed a 90-day window nothing computes.
     for (const [name, dict] of [['en', en], ['ar', ar]] as const) {
       const title = new RegExp("incidentsCardCapa:\\s*'([^']*)'").exec(dict)?.[1] ?? '';
@@ -201,5 +208,12 @@ describe('F2-212 — what the browser found after the gates were green', () => {
     expect(/theme:\s*'/.test('const incidentCapas = capas.items.filter(...)')).toBe(false);
     // The call-shape check must reject a bare import, which is what F2-194 got wrong.
     expect(/useCapas\s*\(/.test("import { useCapas } from '../../lib/capa';")).toBe(false);
+    // The origin selection must be matched by SHAPE, so it survives renaming the local
+    // and still fails if the normalisation is dropped for a bare literal comparison.
+    const sel = /originType\s*\?\.\s*trim\(\)\.toLowerCase\(\)\s*===\s*'incident'/;
+    expect(sel.test("c.originType?.trim().toLowerCase() === 'incident'")).toBe(true);
+    expect(sel.test("c.originType === 'incident'"),
+      'dropping the normalisation must fail: the column is case-insensitive and stores '
+      + 'the value lower-case, so a bare literal comparison is the F2-179 defect').toBe(false);
   });
 });

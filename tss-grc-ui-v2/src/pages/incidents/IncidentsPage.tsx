@@ -41,8 +41,71 @@ import { OverviewStrip } from '../../components/layout/OverviewStrip';
 import { INCIDENT_ANCHORS } from '../../lib/moduleAnchors';
 import { CommsPanel } from '../../components/comms/CommsPanel';
 import { useCapas } from '../../lib/capa';
+import { hasAnyRole } from '../../lib/auth';
 
 type TabId = 'overview' | 'register' | 'timeline' | 'lessons' | 'comms';
+
+/**
+ * F2-212 — the corrective actions actually raised from an incident, replacing a
+ * fabricated "CAPA Themes (90d)" list of five inline hard-coded themes.
+ *
+ * It lives in its own component so the hook only mounts for someone entitled to the
+ * register: **11 of the 29 roles holding INCIDENT:READ do not hold CAPA:READ**
+ * (measured in dev and prod), and they include `IR_LEAD`, `FORENSICS_LEAD` and
+ * `REGULATOR_VIEWER` — the people most likely to be reading this page. Calling
+ * `useCapas()` unconditionally would fire a pointless 403 for all of them and render
+ * a raw server error where a courtesy panel belongs.
+ *
+ * 🔑 And the state that matters is the one this whole programme keeps finding: an
+ * empty list must not be able to mean two things. "You cannot see this register" and
+ * "no corrective action has been raised" are different facts, so they say different
+ * things — a missing permission may not read as a clean bill.
+ */
+function CapaFromIncidents({ t, lang }: { t: (k: string, fb?: string) => string; lang: 'en' | 'ar' }) {
+  const navigate = useNavigate();
+  const mayRead = hasAnyRole('CAPA_READ', 'PLATFORM_ADMIN');
+  return mayRead
+    ? <CapaFromIncidentsList t={t} lang={lang} navigate={navigate} />
+    : <Card title={t('incidentsCardCapa')} Icon={FileText}>
+        <EmptyState Icon={FileText} title={t('incidentsCapaNoAccess')} sub={t('incidentsCapaNoAccessSub')} />
+      </Card>;
+}
+
+function CapaFromIncidentsList({ t, lang, navigate }: {
+  t: (k: string, fb?: string) => string; lang: 'en' | 'ar'; navigate: (to: string) => void;
+}) {
+  const capas = useCapas();
+  // `origin_type` is stored lower-case (`incident`) and the column is
+  // case-INSENSITIVE, so this normalises rather than matching a literal (F2-179).
+  const items = useMemo(
+    () => capas.items.filter(c => c.originType?.trim().toLowerCase() === 'incident'),
+    [capas.items]);
+  return (
+    <Card title={t('incidentsCardCapa')} Icon={FileText}>
+      {capas.error
+        ? <EmptyState Icon={FileText} title={t('incidentsCapaFromIncidentsError')} sub={capas.error} />
+        : items.length === 0
+          ? <EmptyState Icon={FileText} title={t('incidentsCapaFromIncidentsNone')}
+              sub={t('incidentsCapaFromIncidentsNoneSub')} />
+          : <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
+              {items.map(c => (
+                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', fontSize: 13 }}>
+                  <span>
+                    <span style={{ fontWeight: 600 }}>{lang === 'ar' ? c.titleAr || c.titleEn : c.titleEn}</span>
+                    <span style={{ color: 'var(--ink-3)', marginInlineStart: 6 }}>{c.id}</span>
+                  </span>
+                  <Badge tone={STATUS_TONE[c.status] ?? 'neutral'}>{statusLabel(t, c.status)}</Badge>
+                </div>
+              ))}
+            </div>}
+      <div style={{ paddingTop: 10 }}>
+        <Button size="sm" variant="ghost" Icon={ArrowRight} onClick={() => navigate('/capa')}>
+          {t('incidentsCapaOpenRegister')}
+        </Button>
+      </div>
+    </Card>
+  );
+}
 
 const SEVERITY_OPTIONS = [
   { value: 'CRITICAL', label: 'Critical' }, { value: 'HIGH', label: 'High' },
@@ -465,15 +528,6 @@ export function IncidentsPage() {
       lesson: (lang === 'ar' ? i.lessonsLearnedAr || i.lessonsLearned : i.lessonsLearned) ?? '',
     }));
 
-  // F2-212: the real corrective actions raised from an incident, replacing the
-  // fabricated "CAPA Themes (90d)" list below. `origin_type` is stored lower-case
-  // (`incident`) and the column is case-INSENSITIVE, so the comparison normalises
-  // rather than matching a literal — F2-179's collation rule.
-  const capas = useCapas();
-  const incidentCapas = useMemo(
-    () => capas.items.filter(c => c.originType?.trim().toLowerCase() === 'incident'),
-    [capas.items]);
-
   const isDemo = incidents.isDemo;
 
   // Sprint 4 §2.7 — live incidents (NIST 800-61r2 phase machine + regulator notify)
@@ -633,29 +687,7 @@ export function IncidentsPage() {
               actions whose origin is an incident, read from `GET /api/capa/tasks` through
               the register hook F2-208 rewired. No window is claimed, and an empty result
               says "none recorded" rather than rendering a green all-clear (F2-197). */}
-          <Card title={t('incidentsCardCapa')} Icon={FileText}>
-            {capas.error
-              ? <EmptyState Icon={FileText} title={t('incidentsCapaFromIncidentsError')} sub={capas.error} />
-              : incidentCapas.length === 0
-                ? <EmptyState Icon={FileText} title={t('incidentsCapaFromIncidentsNone')}
-                    sub={t('incidentsCapaFromIncidentsNoneSub')} />
-                : <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
-                    {incidentCapas.map(c => (
-                      <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', fontSize: 13 }}>
-                        <span>
-                          <span style={{ fontWeight: 600 }}>{lang === 'ar' ? c.titleAr || c.titleEn : c.titleEn}</span>
-                          <span style={{ color: 'var(--ink-3)', marginInlineStart: 6 }}>{c.id}</span>
-                        </span>
-                        <Badge tone={STATUS_TONE[c.status] ?? 'neutral'}>{statusLabel(t, c.status)}</Badge>
-                      </div>
-                    ))}
-                  </div>}
-            <div style={{ paddingTop: 10 }}>
-              <Button size="sm" variant="ghost" Icon={ArrowRight} onClick={() => navigate('/capa')}>
-                {t('incidentsCapaOpenRegister')}
-              </Button>
-            </div>
-          </Card>
+          <CapaFromIncidents t={t} lang={lang} />
         </div>
       )}
       {tab === 'comms' && <CommsPanel module="INCIDENT" />}

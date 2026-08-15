@@ -4419,6 +4419,8 @@ export const ar = {
   incidentsCapaFromIncidentsNoneSub: 'تظهر الإجراءات التصحيحية هنا بعد ترقية الحادثة إلى سجل الإجراءات التصحيحية.',
   incidentsCapaFromIncidentsError:   'تعذّرت قراءة سجل الإجراءات التصحيحية',
   incidentsCapaOpenRegister:         'فتح سجل الإجراءات التصحيحية',
+  incidentsCapaNoAccess:    'الإجراءات التصحيحية غير متاحة لك',
+  incidentsCapaNoAccessSub: 'يتطلب عرض الإجراءات التصحيحية الناشئة عن الحوادث صلاحية الوصول إلى سجل الإجراءات التصحيحية. هذا ليس إقراراً بعدم وجودها.',
   incidentsProcessBarTitle: 'إدارة الحوادث — العمليات ودورات الحياة',
   incidentsProcessBarSub:  'NIST SP 800-61 + ISO 27035 + الجهات السعودية (NCA HEY خلال 24 ساعة / SDA خلال 72 ساعة / CITC خلال 24 ساعة) — كل عملية مُسماة فعّالة في هذا النطاق.',
   incidentsPostureTitle:   'موقف الجهات · إدارة الحوادث',

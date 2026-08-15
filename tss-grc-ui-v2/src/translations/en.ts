@@ -4463,6 +4463,11 @@ export const en = {
   incidentsCapaFromIncidentsNoneSub: 'CAPAs appear here once an incident is promoted into the CAPA register.',
   incidentsCapaFromIncidentsError:   'The CAPA register could not be read',
   incidentsCapaOpenRegister:         'Open the CAPA register',
+  // Measured: 11 of the 29 roles holding INCIDENT:READ do not hold CAPA:READ,
+  // including IR_LEAD, FORENSICS_LEAD and REGULATOR_VIEWER. "You cannot see this"
+  // and "there are none" must not look alike.
+  incidentsCapaNoAccess:    'Corrective actions are not visible to you',
+  incidentsCapaNoAccessSub: 'Viewing corrective actions raised from incidents requires access to the CAPA register. This is not a statement that none exist.',
   incidentsProcessBarTitle: 'Incident Management — Processes & Lifecycles',
   incidentsProcessBarSub:  'NIST SP 800-61 + ISO 27035 + Saudi regulator (NCA HEY 24-hr / SDA 72-hr / CITC 24-hr) — every named process active in this domain.',
   incidentsPostureTitle:   'Regulator Posture · Incident Management',
