@@ -1256,6 +1256,73 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   `breachSeverityInputs`, `isSdaiaSubmitted`). ⚙ And a `??` chain can be **right by accident**:
   `b.reportedAt ?? b.occurredAt ?? b.discoveredAt` always resolved to the third because the first two have no
   column — a correct outcome via two dead operands, reading as a preference the schema cannot express.
+  ⚠⚠ **A SERVICE THAT PERSISTS THE REQUEST OBJECT HAS NO WRITTEN-FIELD LIST TO CHECK — ITS WRITTEN SET IS
+  EVERY PROPERTY THE ENTITY HAS** (F2-213, measured 2026-08-15). Nine services did `repo.save(req)` after
+  copying back only id / organisationId / externalId / createdAt, so every other column became whatever a
+  freshly-deserialised entity holds. Probed live against a **planted** `[REVIEW-TEST]` row (F2-206's rule):
+  editing only the **title** of a cyber incident nulled `incident_number`, `affected_asset_name`,
+  `detected_at`, `reported_at` and `resolved_at`, reset both link counts to 0, and flipped
+  **`notification_sent` TRUE → false** — the flag recording that an authority had been told. Populated on
+  **24/24, 17, 25, 24, 10 and 19 of 24** live rows, dev = prod.
+  🔑 **A RESET IS WORSE THAN A NULL, and this family produces resets**: `notificationSent = false`,
+  `overdue = false`, `reopenedCount = 0`, `evidenceCount = 0` are **field initialisers**, so a cleared
+  SLA-breach flag reads as a fact rather than as missing data. F2-212 was the *mitigated* version of this —
+  there the service at least named the four fields it wrote.
+  ⚠⚠ **MY PYTHON LOCATOR FOUND 5 SITES; THE JAVA GATE FOUND 9.** The four it missed use
+  `findByIdAndOrganisationId(`, which its `findById(` pattern could not match — so they read as **absent**
+  rather than **unresolved**, hiding 44% of the population from the instrument I was about to trust
+  (F2-206's rule at full strength). **Write the sweep as the gate, over the same tree, in the same language.**
+  ⚠⚠ **The discriminator that separates this defect from a legitimate create is `setId`.** A create-or-update
+  method contains BOTH branches in one body, so "saves the request" and "has a loaded same-type local" are
+  both true of perfectly correct code — 4 sites flagged, **all 4 refuted by reading**
+  (`DetectionRuleService#save`, `ThreatIntelService#save`, `AppsecFindingService#ingest`,
+  `LicensingService#upsertInternal`). `req.setId(null)` means *this row is new*; `req.setId(existing.getId())`
+  means *aim this payload at that row*, which is the replace. ⚠ And the FIRST draft counted the save's **own
+  result** (`CyberIncident saved = repo.save(inc)`) as evidence a row had been loaded, reporting **41** sites,
+  nearly all creates — the Nth instance here of a detector satisfied by something other than its claim.
+  ⚠⚠ **THE CODEBASE ALREADY KNEW, AT ONE SITE, FOR TWO FIELDS.** `CyberEvidenceService` carried `staleSince`
+  and `reRequestId` across by hand under a CY-J comment calling them *"sweep-managed, never client-editable"* —
+  the correct rule — and left `assessmentId` exposed beside them. The premise the comment gave was also false:
+  the frontend does **not** *"round-trip the whole entity"*, it sends `CyberEvidenceRequest`, eleven fields of
+  nineteen. 🔑 **Naming two fields to rescue is what a reader does when the editable list is implicit** — the
+  fix is to name the editable set, so everything else is safe by construction and a gate can check it. Same
+  shape as F2-195's `|| N`, where the correct rule sat in prose three lines from where it was not applied.
+  ⚠ **The one that is LATENT is the statutory one, and that is why it survived**: `PrivacyService.updateDsr`
+  wrote `assignedTo` and `completedAt` from a request that declares neither, so a PDPL Article 23 request's
+  owner and its **completion timestamp — the evidence the statutory response was made in time** — were nulled
+  on every edit. Both columns are null on all 20 rows in both databases. 🔑 **A defect with nothing to damage
+  yet is not a smaller defect; it is one nobody can notice until the feature is used.**
+  ⚠ **Refuted by reading, 3 of 12, and the loudest first.** `UserService`'s `passwordHash` sits inside
+  `if (req.password() != null && !req.password().isBlank())` — my guard detector missed it because the guard
+  tests `password()` while the setter is `setPasswordHash`. `/api/v1/scm/vendors` was a **guessed pairing**
+  (it goes to `ScmService` with a real DTO, not `TprmService`). `CyberControlRequest` declares all thirteen
+  editable columns, so that site lost nothing — **converted anyway**, so the hazard is absent rather than
+  latent and the family reads as one shape.
+  ⚙ **`FullReplaceUpdateContractTest`** (hermetic; reads `api.ts` from disk as `ConnectorBackingContractTest`
+  does) holds: a **structural hard zero** — no method may load a `T` and then persist its own `T` parameter;
+  a **coverage hard zero** — every field an update writes from its request must be declarable by the frontend
+  type feeding it; the reverse direction as an exactly-asserted map; two positive controls carrying the literal
+  pre-fix and post-fix shapes; and the entity-bound PUT population (**83**, F2-22's) asserted decrease-only.
+  ⚠⚠ **The mutation harness found my own gate was ONE-DIRECTIONAL over a TWO-DIRECTIONAL contract**: the
+  coverage leg is a SUBSET test, so deleting a write from an `applyEditable` shrinks the written set, stays a
+  valid subset, and leaves the gate green **while a form input silently becomes decorative**. The new reverse
+  leg then refuted two of my own claims on its first run — a predicted `regulatory-changes :: status` entry
+  that cannot exist (the request type never declared `status` **at all**, which is exactly why the server
+  writing it was the defect), and `UserService`, whose `password → passwordHash` transform made the leg report
+  a false positive on correct code. 🔑 **A gate that fails on correct code is worse than no gate: it trains the
+  next reader to edit the assertion rather than the code** — scoped out with the reason recorded, never
+  papered over with an exemption.
+  ⚠ **An anti-vacuity floor elsewhere failed and was RIGHT TO ASK.** `ClientSuppliedReferenceRatchetTest`
+  counts reference-setter sites with a floor of 40 and found **39**: exactly the nine
+  `req.setExternalId(existing.getExternalId())` lines this slice deleted. 🔑 **Those lines existed only to
+  carry the reference ACROSS a full replace — compensation for the defect, not reference writes.** Floor
+  re-measured to 33 with that reason recorded, because **a population that falls after a fix is not
+  automatically rot, but it is always worth asking which.**
+  ⚙ **Filed:** TPRM vendor contact name/email/contract-start and a user's job title are now preserved but
+  still **not editable** (no form input exists for any of them — offering them is a product change);
+  `PrivacyDsrRequest` declares `description`, matching no column (F2-211's shape on a fifth register); and the
+  **83 entity-bound PUT handlers** remain the structural root — a request DTO per endpoint would make this
+  whole class unrepresentable, and is bigger than one slice.
   ⚠⚠ **A WIRE-CONTRACT GATE PROVES THE TYPES AGREE AND CANNOT PROVE THE PAYLOAD BUILDER SENDS WHAT THE
   TYPE PERMITS — AND WHERE THE VERB IS A FULL-REPLACE `PUT`, THAT GAP IS SILENT DATA DESTRUCTION**
   (F2-212, measured 2026-08-15). `IncidentService.update` calls `setLessonsLearned(req.lessonsLearned())`
