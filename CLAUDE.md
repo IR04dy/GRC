@@ -1320,9 +1320,55 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   automatically rot, but it is always worth asking which.**
   ⚙ **Filed:** TPRM vendor contact name/email/contract-start and a user's job title are now preserved but
   still **not editable** (no form input exists for any of them — offering them is a product change);
-  `PrivacyDsrRequest` declares `description`, matching no column (F2-211's shape on a fifth register); and the
-  **83 entity-bound PUT handlers** remain the structural root — a request DTO per endpoint would make this
-  whole class unrepresentable, and is bigger than one slice.
+  `PrivacyDsrRequest` declares `description`, matching no column (F2-211's shape on a fifth register — **CLOSED
+  by F2-214**); and the **83 entity-bound PUT handlers** remain the structural root — a request DTO per endpoint
+  would make this whole class unrepresentable, and is bigger than one slice.
+- ⚠⚠ **A REQUEST TYPE HAS NO WIRE TO BE NOMINATED FROM, SO THE WHOLE WRITE VOCABULARY SAT OUTSIDE F2-211'S
+  INSTRUMENT BY CONSTRUCTION** (F2-214, measured 2026-08-15). *The wire nominates, `sys.columns` adjudicates*
+  only ever nominated from the **read** wire — nothing returns a `*Request`. `PrivacyBreachRequest` sits **eight
+  lines below** the `PrivacyBreachDto` F2-211 corrected, in the same file, and still declared `severity` and
+  `affectedRecords` (two of the exact four F2-211 retired) plus `description` for `descriptionEn`,
+  `reportedToAuthority` for nothing and `titleAr` for a column that does not exist. 🔑 **Third instance in this
+  lineage of the correct artefact sitting beside the wrong one** (F2-209's reader 200 lines below, F2-213's
+  `CyberEvidenceService`). ⚠ **The live consequence was a 400, not a silent loss**: `POST /privacy/breaches`
+  binds the **entity** and Spring Boot disables `FAIL_ON_UNKNOWN_PROPERTIES`, so the four unknown keys were
+  discarded in silence and the one field the wizard never sent — NOT NULL `breach_type` — produced *"A required
+  field was not supplied"*, naming nothing, on a form where nothing looks missing. **The PDPL Article 20 breach
+  wizard had never once created a record**; all 17 rows in dev and prod are seeded. F2-210's ROPA defect one
+  endpoint over — and **F2-209 and F2-211 both worked on this register without probing its create.**
+  ⚠⚠ **A `Partial<T>` CLIENT AGAINST AN UNCONDITIONAL SERVER IS A CONTRADICTION, AND IT DEFEATS F2-213'S
+  COVERAGE LEG BY CONSTRUCTION.** That leg asks whether a written field is *declarable*; `Partial<T>` makes
+  every field declarable and none mandatory, so it is green exactly where the client is typed to send subsets.
+  Three such endpoints wrote everything unconditionally — `DpiaService#update` would erase a PDPL Article 25
+  assessment's titles, trigger, residual-risk rating and dates (5/5, 5/5, 5/5, 4/5 live rows, dev = prod).
+  🔑 **All five clients are dark, and `apiClientMethodReachability` already records them — *"HOLE: a breach can
+  be created, contained and closed, never corrected"*. That entry adjudicates the CLIENT and says nothing about
+  the ENDPOINT: it reads as an invitation to build the edit screen that would fire the erasure.** The inverse of
+  F2-201, where a clientless server side had been *hardened* first and was safe to wire.
+  ⚠⚠ **MY PYTHON LOCATOR FOUND 3; THE JAVA GATE FOUND 11** — F2-213's lesson one slice later, for a new reason:
+  my scan reported only sites where its own resolver found unguarded writes, so the **8 already-guarded** ones
+  read as *absent* rather than *classified*. **Write the sweep as the gate, and assert the intersection
+  exactly.** ⚠ And the guard detector is the load-bearing part, because F2-182's rule lands here:
+  `PolicyManagementService#update` reads as twenty unconditional writes and is twenty **null-guarded** ones — a
+  correct partial update. A gate built on the naive scan would have failed on correct code, **the one thing a
+  gate must never do**. Its positive control carries the two shapes that fooled the first draft: a
+  **block-bodied** guard and an **`isX()`** boolean accessor.
+  ⚠ **Move a DERIVED field inside the guard with its source**: `recipientCount` recomputed from an absent
+  `contactsCsv` is not a null but a **0**, and a zero recipient count reads as *"this audience has nobody in
+  it"* rather than as missing data — F2-213's reset-is-worse-than-a-null, one layer out.
+  ⚠ **Two more live instances of the same discarded key, both governance records.** `DsrFulfilmentWizard`
+  composed its identity-verification evidence into a `description` key `DataSubjectRequest` has no property for
+  (**fourteen fields, none free text**), under a comment claiming it *"captures the wizard context without
+  needing a dedicated subschema"* — F2-184's shape; and `PrivacyPage` offered a **Description textarea that
+  stored nothing**. Where no column exists the answer is disclose, not re-home and not silently drop (F2-209's
+  third state). ⚠ The wizard also cited **PDPL Article 23** for the 72-hour breach window in two places;
+  Article 23 is the DSR article and `lib/moduleAnchors.ts` records **Article 20** — F2-207's shape.
+  ⚙ **Filed:** `privacy.data_breaches.breach_type` is free text with **no CHECK**, 12 values over 17 rows
+  including both `UNAUTHORISED_ACCESS` and `UNAUTHORIZED_ACCESS` (F2-196's shape inside one column — collapsing
+  them rewrites live rows, an owner call); the breach `status` vocabulary is likewise open; the table still has
+  **no `title_ar`/`description_ar`** (house rule 7); a DSR has nowhere to record identity-verification evidence;
+  and the Article 20/25/31 citations for the breach lifecycle are used inconsistently across `PrivacyPage` and
+  `PdplBreachConsole` — only the plainly-wrong Article 23 was corrected.
   ⚠⚠ **A WIRE-CONTRACT GATE PROVES THE TYPES AGREE AND CANNOT PROVE THE PAYLOAD BUILDER SENDS WHAT THE
   TYPE PERMITS — AND WHERE THE VERB IS A FULL-REPLACE `PUT`, THAT GAP IS SILENT DATA DESTRUCTION**
   (F2-212, measured 2026-08-15). `IncidentService.update` calls `setLessonsLearned(req.lessonsLearned())`
