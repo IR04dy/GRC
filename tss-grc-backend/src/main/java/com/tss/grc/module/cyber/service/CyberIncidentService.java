@@ -98,16 +98,47 @@ public class CyberIncidentService {
         return incidentRepo.save(saved);
     }
 
+    /**
+     * F2-213 — the fields an operator can actually edit through this endpoint.
+     *
+     * This method used to persist the REQUEST OBJECT itself (`incidentRepo.save(req)`),
+     * keeping only id/org/externalId/createdAt/canonicalIncidentId. Every other column
+     * therefore became whatever a freshly-deserialised entity holds: null, or — worse —
+     * the field's own initialiser, which reads as a real value rather than as missing data.
+     *
+     * Probed live 2026-08-15 against a planted [REVIEW-TEST] row: editing only the title
+     * nulled incident_number, affected_asset_name, detected_at, reported_at and
+     * resolved_at, reset linked_vulnerabilities_count and linked_evidence_count to 0, and
+     * flipped notification_sent from TRUE to false — the flag recording that an authority
+     * had been told. Populated on 24/24, 17, 25, 24, 10 and 19 of 24 live rows
+     * respectively, identically in dev and prod.
+     *
+     * The editable set is exactly what `CyberIncidentRequest` declares in
+     * tss-grc-ui-v2/src/lib/api.ts. FullReplaceUpdateContractTest compares the two by
+     * reflection in BOTH directions, so neither side can gain or lose a field alone.
+     * Everything absent from that list is written by another path — the register mirror,
+     * the response workflow, the evidence and vulnerability links — and a payload the
+     * operator's form never collected must not be allowed to overwrite it.
+     */
+    private void applyEditable(CyberIncident existing, CyberIncident req) {
+        // CY-H — title_en is NOT NULL; reject a blank body with 400, not a DB 500.
+        existing.setTitleEn(CyberInputValidation.requireText(req.getTitleEn(), "titleEn"));
+        existing.setTitleAr(req.getTitleAr());
+        existing.setIncidentType(req.getIncidentType());
+        existing.setAffectedAssetId(req.getAffectedAssetId());
+        existing.setSeverity(req.getSeverity());
+        existing.setImpact(req.getImpact());
+        existing.setWorkflowStatus(req.getWorkflowStatus());
+        existing.setIncidentLead(req.getIncidentLead());
+        existing.setBcmHandoff(req.getBcmHandoff());
+        existing.setLessonsLearned(req.getLessonsLearned());
+    }
+
     @Transactional
     public CyberIncident updateIncident(Long id, CyberIncident req) {
         CyberIncident existing = getIncident(id);
-        req.setId(existing.getId());
-        req.setOrganisationId(existing.getOrganisationId());
-        req.setExternalId(existing.getExternalId());
-        req.setCreatedAt(existing.getCreatedAt());
-        req.setCanonicalIncidentId(existing.getCanonicalIncidentId());   // CY-B: keep the register link
-        req.setIsDeleted(false);
-        CyberIncident saved = incidentRepo.save(req);
+        applyEditable(existing, req);
+        CyberIncident saved = incidentRepo.save(existing);
         // CY-B: reflect any workflow/status change onto the canonical register row.
         registerService.syncStatusFromWorkspace(saved.getOrganisationId(), saved.getId(),
                 workflowToStatus(saved.getWorkflowStatus()));

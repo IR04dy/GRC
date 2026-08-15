@@ -68,14 +68,35 @@ public class CyberAssessmentService {
     }
 
     @Transactional
+    /**
+     * F2-213 — the fields an operator can actually edit through this endpoint.
+     *
+     * Persisting the REQUEST OBJECT reset `evidenceCount` to 0 (an `int` initialiser, so
+     * the assessment read as having no evidence rather than as unknown) and nulled
+     * `capaId`. Measured on 21 live rows, dev = prod: evidence_count > 0 on 4.
+     *
+     * Editable set == `CyberAssessmentRequest`; evidence_count is maintained by the
+     * evidence-link path and capa_id by the CAPA link.
+     */
+    private void applyEditable(ControlAssessment existing, ControlAssessment req) {
+        existing.setControlId(req.getControlId());
+        existing.setAssessmentDate(req.getAssessmentDate());
+        existing.setAssessorName(req.getAssessorName());
+        existing.setReviewerName(req.getReviewerName());
+        existing.setResult(req.getResult());
+        existing.setMaturityScore(req.getMaturityScore());
+        existing.setGapIdentified(req.getGapIdentified());
+        existing.setGapDescription(req.getGapDescription());
+        existing.setRiskLevel(req.getRiskLevel());
+        existing.setAssessorComments(req.getAssessorComments());
+        existing.setReviewerComments(req.getReviewerComments());
+        existing.setStatus(req.getStatus());
+    }
+
     public ControlAssessment updateAssessment(Long id, ControlAssessment req) {
         ControlAssessment existing = getAssessment(id);
-        req.setId(existing.getId());
-        req.setOrganisationId(existing.getOrganisationId());
-        req.setExternalId(existing.getExternalId());
-        req.setCreatedAt(existing.getCreatedAt());
-        req.setIsDeleted(false);
-        return assessmentRepo.save(req);
+        applyEditable(existing, req);
+        return assessmentRepo.save(existing);
     }
 
     @Transactional

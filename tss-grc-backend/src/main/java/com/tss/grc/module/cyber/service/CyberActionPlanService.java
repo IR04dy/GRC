@@ -51,14 +51,37 @@ public class CyberActionPlanService {
     }
 
     @Transactional
+    /**
+     * F2-213 — the fields an operator can actually edit through this endpoint.
+     *
+     * Persisting the REQUEST OBJECT erased everything `CyberActionPlanRequest` does not
+     * declare: source_id / source_ref (the finding this plan answers), linked_control_id,
+     * validation_notes, completed_at, and the escalation trail — escalated_at nulled,
+     * reminder_count and last_reminder_at reset to their initialisers, so a plan that had
+     * been chased 14 times read as never chased. Measured on 13 live rows, dev = prod:
+     * source_ref on 17, linked_control_id on 14, reminder_count > 0 on 14, escalated_at
+     * on 5.
+     *
+     * Editable set == `CyberActionPlanRequest`; the reminder and escalation columns are
+     * written by the scheduler, and the source link at creation.
+     */
+    private void applyEditable(CyberActionPlan existing, CyberActionPlan req) {
+        existing.setTitleEn(req.getTitleEn());
+        existing.setTitleAr(req.getTitleAr());
+        existing.setDescriptionEn(req.getDescriptionEn());
+        existing.setSourceType(req.getSourceType());
+        existing.setPriority(req.getPriority());
+        existing.setOwnerName(req.getOwnerName());
+        existing.setDueDate(req.getDueDate());
+        existing.setWorkflowStatus(req.getWorkflowStatus());
+        existing.setProgressPct(req.getProgressPct());
+        existing.setCompletionEvidence(req.getCompletionEvidence());
+    }
+
     public CyberActionPlan updateActionPlan(Long id, CyberActionPlan req) {
         CyberActionPlan existing = getActionPlan(id);
-        req.setId(existing.getId());
-        req.setOrganisationId(existing.getOrganisationId());
-        req.setExternalId(existing.getExternalId());
-        req.setCreatedAt(existing.getCreatedAt());
-        req.setIsDeleted(false);
-        return actionPlanRepo.save(req);
+        applyEditable(existing, req);
+        return actionPlanRepo.save(existing);
     }
 
     @Transactional

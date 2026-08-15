@@ -58,14 +58,37 @@ public class CyberControlService {
     }
 
     @Transactional
+    /**
+     * F2-213 — the fields an operator can actually edit through this endpoint.
+     *
+     * ⚠ This is the one member of the family that was NOT losing data: `CyberControlRequest`
+     * happens to declare all thirteen editable columns, so nothing the client omits was in
+     * fact omitted. It was converted anyway, because persisting the REQUEST OBJECT leaves
+     * the hazard latent rather than absent — the day somebody adds a column to
+     * `CyberControl` without adding it to the frontend type, every edit starts erasing it,
+     * silently. Closing a harmless drift is cheaper than the reader who later has to work
+     * out why four siblings are one shape and this one another.
+     */
+    private void applyEditable(CyberControl existing, CyberControl req) {
+        existing.setFrameworkId(req.getFrameworkId());
+        existing.setFrameworkName(req.getFrameworkName());
+        existing.setDomain(req.getDomain());
+        existing.setControlNumber(req.getControlNumber());
+        existing.setTitleEn(req.getTitleEn());
+        existing.setTitleAr(req.getTitleAr());
+        existing.setProcedureEn(req.getProcedureEn());
+        existing.setControlType(req.getControlType());
+        existing.setControlOwner(req.getControlOwner());
+        existing.setReviewFrequency(req.getReviewFrequency());
+        existing.setMaturityLevel(req.getMaturityLevel());
+        existing.setImplementationStatus(req.getImplementationStatus());
+        existing.setStatus(req.getStatus());
+    }
+
     public CyberControl updateControl(Long id, CyberControl req) {
         CyberControl existing = getControl(id);
-        req.setId(existing.getId());
-        req.setOrganisationId(existing.getOrganisationId());
-        req.setExternalId(existing.getExternalId());
-        req.setCreatedAt(existing.getCreatedAt());
-        req.setIsDeleted(false);
-        return controlRepo.save(req);
+        applyEditable(existing, req);
+        return controlRepo.save(existing);
     }
 
     @Transactional

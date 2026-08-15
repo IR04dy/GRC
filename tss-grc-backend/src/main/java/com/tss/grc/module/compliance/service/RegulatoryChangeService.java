@@ -58,9 +58,14 @@ public class RegulatoryChangeService {
         e.setEffectiveDate(req.getEffectiveDate());
         e.setApplicability(req.getApplicability());
         e.setImpactLevel(req.getImpactLevel());
-        e.setStatus(req.getStatus());
+        // F2-213 — `status` and `controlsUpdatedCount` are NOT editable through this
+        // endpoint. `RegulatoryChangeRequest` (the only client) declares neither, so both
+        // arrived null on every edit: the status was written null and the count coerced to
+        // 0 by the guard on the line below, which read as "no controls updated" rather than
+        // as missing. Both are populated on 35 of 35 live rows in dev and prod. The status
+        // belongs to the assessment workflow and the count is derived from the control
+        // links — a payload that cannot express either must not be allowed to reset them.
         e.setImpactSummary(req.getImpactSummary());
-        e.setControlsUpdatedCount(req.getControlsUpdatedCount() == null ? 0 : req.getControlsUpdatedCount());
         e.setAssignedToId(req.getAssignedToId());
         return repo.save(e);
     }

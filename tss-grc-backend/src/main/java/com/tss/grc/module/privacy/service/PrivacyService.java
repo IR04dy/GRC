@@ -276,8 +276,14 @@ public class PrivacyService {
         existing.setRequesterEmail(req.getRequesterEmail());
         existing.setDueDate(req.getDueDate());
         existing.setStatus(req.getStatus());
-        existing.setAssignedTo(req.getAssignedTo());
-        existing.setCompletedAt(req.getCompletedAt());
+        // F2-213 — `assignedTo` and `completedAt` are NOT editable through this endpoint and
+        // must not be taken from its payload. `PrivacyDsrRequest` (the only client) cannot
+        // declare either, so both arrived null on every call and were written null: editing
+        // a PDPL Article 23 request would have discarded its owner and `completed_at`, the
+        // timestamp that evidences the statutory response was made in time. Latent today —
+        // both columns are null on all 20 live rows in dev and prod — which is exactly why
+        // it survived: there was nothing to destroy yet. `completedAt` is stamped by the
+        // fulfil path, `assignedTo` by assignment.
         return dsrRepo.save(existing);
     }
 

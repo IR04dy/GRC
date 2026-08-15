@@ -95,7 +95,11 @@ public class UserService {
         user.setEmail(req.email());
         user.setFullNameEn(req.fullNameEn());
         user.setFullNameAr(req.fullNameAr());
-        user.setJobTitleEn(req.jobTitleEn());
+        // F2-213 — `AdminUserRequest` has no jobTitleEn and the admin form has no input for
+        // it, so editing a user (to change a role, say) wrote null over their job title.
+        // Populated on 2 of 7 live rows in both databases. Preserving takes away nothing an
+        // operator has today; offering it means adding the field, which is filed, not
+        // invented here. `create` above still takes it — a create has nothing to preserve.
         Boolean active = req.effectiveActive();
         if (active != null) user.setIsActive(active);
         if (req.password() != null && !req.password().isBlank()) {

@@ -56,12 +56,28 @@ public class CyberSubControlService {
         // SEC-CYB-001: scope by tenant — never load another org's row by id.
         CyberSubControl existing = subControlRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("CyberSubControl not found: " + id));
-        req.setId(existing.getId());
-        req.setOrganisationId(existing.getOrganisationId());
-        req.setExternalId(existing.getExternalId());
-        req.setCreatedAt(existing.getCreatedAt());
-        req.setIsDeleted(false);
-        return subControlRepo.save(req);
+        applyEditable(existing, req);
+        return subControlRepo.save(existing);
+    }
+
+    /**
+     * F2-213 — the fields an operator can actually edit through this endpoint.
+     *
+     * Persisting the REQUEST OBJECT nulled `descriptionAr`, which `CyberSubControlRequest`
+     * does not declare — so editing an NCA ECC sub-control through the English form deleted
+     * its Arabic description, in a platform whose primary language is Arabic (house rule 7).
+     * Preserved here; offering it means adding the input, which is filed, not invented.
+     */
+    private void applyEditable(CyberSubControl existing, CyberSubControl req) {
+        existing.setControlId(req.getControlId());
+        existing.setSubControlNumber(req.getSubControlNumber());
+        existing.setTitleEn(req.getTitleEn());
+        existing.setTitleAr(req.getTitleAr());
+        existing.setDescriptionEn(req.getDescriptionEn());
+        existing.setControlOwner(req.getControlOwner());
+        existing.setImplementationStatus(req.getImplementationStatus());
+        existing.setMaturityLevel(req.getMaturityLevel());
+        existing.setEvidenceRequired(req.getEvidenceRequired());
     }
 
     @Transactional

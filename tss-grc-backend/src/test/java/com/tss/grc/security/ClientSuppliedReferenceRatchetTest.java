@@ -114,7 +114,16 @@ class ClientSuppliedReferenceRatchetTest {
     // create* method. These are FLOORS, not equalities: the point is that a rotted regex fails
     // here loudly rather than reporting a clean zero in the leg below. F2-195's lesson — a corpus
     // assertion passes both when the code is clean and when the detector has stopped working.
-    private static final int MIN_REFERENCE_SETTER_SITES = 40;
+    //
+    // ⚠ Re-measured 2026-08-15: 39 sites. This leg FAILED at 39 against the old floor of 40, which
+    // is the leg doing its job — but the drop is legitimate and the reason is worth keeping. F2-213
+    // converted nine services from "persist the request object" to "apply the editable fields to
+    // the loaded row". Each of those nine carried a `req.setExternalId(existing.getExternalId())`
+    // line whose ONLY purpose was to carry the reference across a full replace: compensation for
+    // the defect, not a reference write. Removing the defect removed the need for them.
+    // 🔑 A population that falls after a fix is not automatically rot — but it is always worth
+    // asking which it is, which is exactly what this floor forced.
+    private static final int MIN_REFERENCE_SETTER_SITES = 33;
     private static final int MIN_CREATE_PATH_SITES      = 20;
 
     private record Site(String file, String method, String argument) {

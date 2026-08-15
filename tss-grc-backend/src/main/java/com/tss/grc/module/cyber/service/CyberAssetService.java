@@ -55,12 +55,29 @@ public class CyberAssetService {
         // SEC-CYB-001: scope by tenant — never load another org's row by id.
         CyberAsset existing = assetRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("CyberAsset not found: " + id));
-        req.setId(existing.getId());
-        req.setOrganisationId(existing.getOrganisationId());
-        req.setExternalId(existing.getExternalId());
-        req.setCreatedAt(existing.getCreatedAt());
-        req.setIsDeleted(false);
-        return assetRepo.save(req);
+        applyEditable(existing, req);
+        return assetRepo.save(existing);
+    }
+
+    /**
+     * F2-213 — the fields an operator can actually edit through this endpoint.
+     *
+     * Persisting the REQUEST OBJECT reset the three link counters to their `int` initialiser
+     * of 0, so an asset carrying vulnerabilities, incidents and controls read as carrying
+     * none after any edit. `CyberAssetRequest` declares neither; they are maintained by the
+     * link paths.
+     */
+    private void applyEditable(CyberAsset existing, CyberAsset req) {
+        existing.setAssetName(req.getAssetName());
+        existing.setAssetType(req.getAssetType());
+        existing.setBusinessOwner(req.getBusinessOwner());
+        existing.setTechnicalOwner(req.getTechnicalOwner());
+        existing.setClassification(req.getClassification());
+        existing.setCriticality(req.getCriticality());
+        existing.setIpAddress(req.getIpAddress());
+        existing.setHostname(req.getHostname());
+        existing.setOperatingSystem(req.getOperatingSystem());
+        existing.setStatus(req.getStatus());
     }
 
     @Transactional

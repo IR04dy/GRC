@@ -57,11 +57,15 @@ public class TprmService {
         existing.setVendorNameAr(req.getVendorNameAr());
         existing.setVendorType(req.getVendorType());
         existing.setCountry(req.getCountry());
-        existing.setContactName(req.getContactName());
-        existing.setContactEmail(req.getContactEmail());
+        // F2-213 — contactName, contactEmail and contractStartDate are absent from
+        // `TprmVendorRequest` and from the vendor form, so they arrived null on every edit
+        // and were written null: changing a vendor's risk rating silently deleted its
+        // contact and the start of its contract. Populated on 8 of 28 live rows in both
+        // databases. Preserving them takes no capability away — the form never offered
+        // them, so today the only thing an operator can do to these columns is destroy
+        // them. Making them editable means adding the inputs; filed, not invented here.
         existing.setRiskRating(req.getRiskRating());
         existing.setStatus(req.getStatus());
-        existing.setContractStartDate(req.getContractStartDate());
         existing.setContractEndDate(req.getContractEndDate());
         existing.setDescription(req.getDescription());
         existing.setUpdatedAt(LocalDateTime.now());

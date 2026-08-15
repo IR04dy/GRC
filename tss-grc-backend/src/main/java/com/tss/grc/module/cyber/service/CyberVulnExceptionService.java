@@ -60,12 +60,29 @@ public class CyberVulnExceptionService {
         // SEC-CYB-001: scope by tenant — never load another org's row by id.
         VulnException existing = exceptionRepo.findByIdAndOrganisationId(id, TenantContext.requireOrganisationId())
                 .orElseThrow(() -> new EntityNotFoundException("VulnException not found: " + id));
-        req.setId(existing.getId());
-        req.setOrganisationId(existing.getOrganisationId());
-        req.setExternalId(existing.getExternalId());
-        req.setCreatedAt(existing.getCreatedAt());
-        req.setIsDeleted(false);
-        return exceptionRepo.save(req);
+        applyEditable(existing, req);
+        return exceptionRepo.save(existing);
+    }
+
+    /**
+     * F2-213 — the fields an operator can actually edit through this endpoint.
+     *
+     * Persisting the REQUEST OBJECT nulled `approvedAt` — the timestamp recording when a
+     * vulnerability exception (a formal decision to accept a known exposure) was approved.
+     * `CyberExceptionRequest` cannot carry it, so any later edit of the exception erased the
+     * evidence of its own approval while leaving `approverName` and `workflowStatus` saying it
+     * had been approved. The stamp belongs to the approve path.
+     */
+    private void applyEditable(VulnException existing, VulnException req) {
+        existing.setVulnerabilityId(req.getVulnerabilityId());
+        existing.setTitleEn(req.getTitleEn());
+        existing.setExceptionReason(req.getExceptionReason());
+        existing.setWorkflowStatus(req.getWorkflowStatus());
+        existing.setOwnerName(req.getOwnerName());
+        existing.setApproverName(req.getApproverName());
+        existing.setCompensatingControls(req.getCompensatingControls());
+        existing.setImpactAssessment(req.getImpactAssessment());
+        existing.setExpiryDate(req.getExpiryDate());
     }
 
     @Transactional

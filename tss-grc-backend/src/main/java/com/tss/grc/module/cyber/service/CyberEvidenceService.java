@@ -53,16 +53,34 @@ public class CyberEvidenceService {
         CyberEvidence existing = evidenceRepo.findByIdAndOrganisationId(id, orgId)
                 .orElseThrow(() -> new EntityNotFoundException("CyberEvidence not found: " + id));
         validate(req, orgId);
-        req.setId(existing.getId());
-        req.setOrganisationId(existing.getOrganisationId());
-        req.setExternalId(existing.getExternalId());
-        req.setCreatedAt(existing.getCreatedAt());
-        // CY-J — staleSince / reRequestId are sweep-managed, never client-editable: carry them over
-        // so a manual edit (the FE round-trips the whole entity) can't wipe the expiry bookkeeping.
-        req.setStaleSince(existing.getStaleSince());
-        req.setReRequestId(existing.getReRequestId());
-        req.setIsDeleted(false);
-        return evidenceRepo.save(req);
+        applyEditable(existing, req);
+        return evidenceRepo.save(existing);
+    }
+
+    /**
+     * F2-213 — the fields an operator can actually edit through this endpoint.
+     *
+     * ⚠ This site half-knew. CY-J had already carried `staleSince` and `reRequestId` across by
+     * hand, with a comment saying they are "sweep-managed, never client-editable" — the right
+     * rule, applied to the two fields somebody happened to think of. `assessmentId` was left
+     * exposed and went null on every edit, and the premise given for the workaround was in any
+     * case false: the frontend does NOT "round-trip the whole entity", it sends
+     * `CyberEvidenceRequest`, which is eleven fields of nineteen. Naming two fields to rescue is
+     * what a reader does when the list is implicit; naming the editable set makes the rest safe
+     * by construction and lets a gate check it.
+     */
+    private void applyEditable(CyberEvidence existing, CyberEvidence req) {
+        existing.setTitleEn(req.getTitleEn());
+        existing.setTitleAr(req.getTitleAr());
+        existing.setEvidenceType(req.getEvidenceType());
+        existing.setControlId(req.getControlId());
+        existing.setFrameworkRequirement(req.getFrameworkRequirement());
+        existing.setOwnerName(req.getOwnerName());
+        existing.setVersion(req.getVersion());
+        existing.setReviewDate(req.getReviewDate());
+        existing.setExpiryDate(req.getExpiryDate());
+        existing.setFileName(req.getFileName());
+        existing.setStatus(req.getStatus());
     }
 
     /**
