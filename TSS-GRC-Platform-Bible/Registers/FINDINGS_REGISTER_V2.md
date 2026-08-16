@@ -2400,6 +2400,129 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-222 · A scalar parameter is caller data at the declaration and the principal at the call site — the C-6 approval control, its input and its attribution
+
+**Found** 2026-08-16, asking what F2-218's derived gate cannot see. **P2** — a segregation-of-duty
+control defeated in three calls with one permission. **Closed** the same day. No migration, no
+endpoint change, no frontend change.
+
+### The blind spot
+
+`ServerStampedFieldContractTest` asks: *does a create ACCEPT a field that a guarded route on the
+same service STAMPS?* That question needs a control to exist and needs the gate to recognise the
+stamp. Its **fourth detector correction** — *"a scalar method parameter is still caller data"* — was
+added in F2-218 because `markUnderReview(Long id, String reviewerName)` is filled from a body field
+and was reading as a server stamp.
+
+🔑 **That correction is right at the DECLARATION and wrong at the CALL SITE.**
+`PolicyManagementService#transition(Long id, String to, String actor)` is called exactly once, as
+`service.transition(id, body.get("to"), actor(auth), isComplianceAdmin(auth))`. `actor` is the
+authenticated principal, so `p.setApproverName(actor)` **is** a server stamp — and because the gate
+decided otherwise, `PolicyDocument#approverName` never entered the stamped set and `update()`
+writing it from the request was not a contradiction by that gate's stated question.
+
+### What it hid: leg 1, the attribution
+
+`transition()` enforces C-6 segregation of duty — *"the policy author/owner cannot approve their own
+policy"* — the S5 committee-referral resolution check, and CH-10 document control, then stamps
+`approverName` from the acting principal. `update()` is guarded by the **same** permission
+(`COMPLIANCE:WRITE`, **13 roles, 5 of them with an active holder**, identical in dev and prod) and
+copied `approverName`/`approverEmail` straight out of the body.
+
+Probed live as `auditor` and `compliance` against policies the probe **planted** (F2-206):
+
+```
+POST /documents/{id}/transition {to: APPROVED}   as the author  -> 403  C-6 fires
+POST /documents/{id}/transition {to: APPROVED}   as another     -> 200  approverName="auditor"
+PUT  /documents/{id} {approverName:"Nobody Who Approved This"}  -> 200  STORED, still APPROVED
+PUT  /documents/{id} {approverName:"compliance"}  as the author -> 200  the act C-6 refused
+```
+
+🔑 **The freeze was already there and was written for the wrong state.** The top of `update()` says
+*"Once PUBLISHED, only metadata fields are editable"* and excludes the approver — but the stamp
+happens at **APPROVED**, so the attribution was frozen **one state too late**.
+
+### Leg 2, sharper: the control's own input
+
+C-6 compares the actor against `createdBy`, `ownerName` and `ownerEmail`. `createdBy` is immutable
+(`READ_ONLY` at the wire, F2-215). `ownerName` was editable through `update()` in REVIEW:
+
+```
+POST /documents/{id}/transition {to: APPROVED}  as the owner   -> 403
+PUT  /documents/{id} {ownerName: "somebody else"} as the owner -> 200
+POST /documents/{id}/transition {to: APPROVED}  as the owner   -> 200
+```
+
+🔑 **The party a control constrains could edit the control's own input through an adjacent route
+with the same permission.** Leg 1 defeats the *record* of the control; leg 2 defeats the *control*.
+Note the detail: in leg 2 `approverName` is stamped correctly, so the audit trail tells the truth
+about who acted while the control that should have stopped them did not run.
+
+### The fix, and what it deliberately does not break
+
+- `approverName`/`approverEmail` stay editable in **DRAFT/REVIEW**: of the **24 of 41** live dev
+  rows (**23 of 37** in prod) that name an approver, most name an **office** — `'رئيس الهيئة'` ×12,
+  `'Board Risk Committee'`, `'Audit Committee Chair'`. Refusing those is breaking a working request,
+  the one thing a fix must not do (F2-182). ⚠ So the column carries **two meanings** — a principal
+  from the stamp, an office from the form — which is F2-196's shape inside one column. **Filed**, not
+  collapsed: separating them is a column and a product decision.
+- `ownerName`/`ownerEmail` freeze at **REVIEW**. Reassignment is not removed: the machine's
+  `REVIEW → DRAFT` edge is the route, so the window narrows rather than the capability disappearing.
+- `BEFORE_APPROVAL` is **derived**, not typed: the test drives the real machine for every value of
+  `ck_policy_status` and asserts membership is exactly *"APPROVED is still reachable from here"*
+  (F2-196). An **inclusion** list is the safe direction — an unrecognised status protects the
+  attribution rather than exposing it.
+
+### The gate
+
+`PrincipalStampedFieldContractTest` resolves the parameter where the answer lives: a field written
+from a scalar that **every** controller call site fills from the principal is an attribution, and no
+write path on that service may then write it from the request. Hard zero. Its narrowings are
+self-tested in both directions — *any* call site filled from the body makes the field caller data
+(F2-218's correction, kept), and **unresolved is never an attribution**, because *"no call site"* and
+*"a principal at every call site"* are the two answers this programme keeps confusing.
+
+⚠ An anti-vacuity leg asserts the gate still **resolves** `PolicyDocument#approverName`: at zero, a
+rotted detector and a finished sweep are indistinguishable (F2-219).
+
+### What was refuted on the way
+
+The scan that found this raised 32 candidates; reading them killed most.
+
+- **`DpiaService#addMitigation`** — the value is
+  `"VERIFIED".equals(req.getStatus()) ? LocalDateTime.now() : null`. 🔑 **A ternary whose CONDITION
+  reads the request but whose BRANCHES are both server values is a server stamp**, not a caller
+  write — a sixth shape after F2-219's five detector corrections.
+- **`RegReportFiling#preparerUserId/reviewerUserId/approverUserId`** — set as a trio: that is stage
+  **assignment**, not attribution.
+- **`next*ReviewDate` across seven services** — a plan, not a record of an act.
+- **19 "cross-class" candidates, all spurious.** A first scan keyed `Type#field` on the **simple**
+  type name and reported creates in one class contradicting stamps in another. All four pairs are
+  **duplicate simple names in different packages** (`Vulnerability`, `CapaTask`, `ScreeningHit`,
+  `RegulatoryChange`). 🔑 **A type name in scope is not the type that governs** — F2-221's constant
+  lesson, one level out.
+
+⚙ **Filed, and latent rather than live: 15 of 433 entity simple names are declared in two packages**
+(30 classes, 30 distinct tables), and three shipped gates key on `Type#field` by simple name.
+Measured: **no key collapses two registers today**, because only one twin of each pair has a machine
+or a guarded route. Nobody is maintaining that — F2-177's *"close a harmless drift anyway"*.
+
+### My own errors
+
+- ⚠ **The first `authorityish` shape matched a stem anywhere in the name, so `clos` matched inside
+  `linkedCmaDisclosureId`** — a link, not an authority act. Scoped to camelCase word starts.
+- ⚠⚠ **The population measurement ran AFTER the first probe and counted its own row.** It reported
+  *"42 live, 25 with an approver, **1 whose approver equals its own createdBy**"* — and that 1 was
+  the probe's own forgery. 🔑 **A measurement taken after the probe counts the probe's rows, and the
+  artefact it invents looks exactly like a finding about the platform.** Real: 41 / 24 / 21 / **0**.
+- ⚠ A guard-resolution scan keyed on the method name `update` matched every controller in the tree
+  — the unscoped-scan mistake this register keeps recording.
+
+| | |
+|---|---|
+| **Status** | ✅ **CLOSED 2026-08-16.** Backend **3,960/0/0** · mutation **12 killed / 0 survived / 0 anchor-miss** · live probe **13/13 pre-fix, 13/13 post-fix** · pre-fix control fires 5 of 10 behaviour legs and the gate's hard zero. |
+| **Lesson** | 🔑 **Whether a scalar parameter is caller data or a server value is a fact about its CALL SITES, and the gate that had to decide it only had the declaration.** A narrowing added to stop a gate firing on correct code is itself a claim about the codebase, and it inherits a population — here, every attribution that reaches its service as a parameter. 🔑 And: **a control's INPUT deserves the same protection as its VERDICT.** Freezing the attribution alone would have left the owner editing themselves out of the check. |
+
 ## F2-221 · A state machine and its column are two artefacts, and nothing compared them — 28 machines, not the nine the previous slice happened to visit
 
 **Found** 2026-08-16, taking F2-220's filed item (`platform.issues` and `bcm.crisis_events` have no

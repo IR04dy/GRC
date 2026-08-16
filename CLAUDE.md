@@ -1872,6 +1872,71 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **WHETHER A SCALAR PARAMETER IS CALLER DATA OR A SERVER VALUE IS A FACT ABOUT ITS CALL
+  SITES, AND THE GATE THAT HAD TO DECIDE IT ONLY HAD THE DECLARATION** (F2-222, measured
+  2026-08-16). F2-218's fourth detector correction — *"a scalar method parameter is still caller
+  data"* — exists because `markUnderReview(Long id, String reviewerName)` is filled from a body
+  field, and a gate that fails on correct code is the one failure a gate must never have. It is
+  **right at the declaration and wrong at the call site**:
+  `PolicyManagementService#transition(Long id, String to, String actor)` is called as
+  `service.transition(id, body.get("to"), actor(auth), isComplianceAdmin(auth))`, so
+  `p.setApproverName(actor)` IS a server stamp — and because `ServerStampedFieldContractTest` could
+  not see that, `PolicyDocument#approverName` never entered the stamped set and `update()` writing
+  it from the request was not a contradiction by that gate's stated question. 🔑 **A narrowing added
+  to stop a gate firing on correct code is itself a claim about the codebase, and it inherits a
+  population** — here every attribution that reaches its service as a parameter.
+  ⚠⚠ **The live defect, P2, probed 13/13 against PLANTED policies (F2-206).** `transition()` carries
+  **C-6 segregation of duty** — *"the policy author/owner cannot approve their own policy"* — the S5
+  committee-referral check and CH-10 document control, then stamps `approverName` from the acting
+  principal. `update()` is guarded by the **same** permission (`COMPLIANCE:WRITE`, **13 roles, 5 with
+  an active holder**, dev = prod) and copied the approver out of the body: the author refused with a
+  **403** wrote their own name with a **200**, on a document that stayed APPROVED.
+  ⚠⚠ **THE FREEZE WAS ALREADY THERE AND WAS WRITTEN FOR THE WRONG STATE.** The top of `update()`
+  says *"Once PUBLISHED, only metadata fields are editable"* and already excludes the approver — but
+  the stamp happens at **APPROVED**, so the attribution was frozen **one state too late**. Sixth
+  instance in this lineage of the correct artefact sitting beside the wrong one.
+  ⚠⚠ **AND A CONTROL'S INPUT DESERVES THE SAME PROTECTION AS ITS VERDICT — leg 2 is the sharper
+  one.** C-6 compares the actor against `createdBy` (immutable, F2-215), `ownerName` and
+  `ownerEmail`. Probed: owner refused **403**, `PUT {ownerName: "somebody else"}` **200**, approve
+  **200**. 🔑 **The party a control constrains could edit the control's own input through an adjacent
+  route with the same permission.** Leg 1 defeats the RECORD of the control; leg 2 defeats the
+  CONTROL — and in leg 2 the attribution is stamped correctly, so the audit trail tells the truth
+  about who acted while nothing stopped them.
+  ⚠ **The fix must not refuse what works.** The approver stays editable in DRAFT/REVIEW: of the
+  **24 of 41** live dev rows (**23 of 37** prod) naming an approver, most name an **office**
+  (`'رئيس الهيئة'` ×12, `'Board Risk Committee'`, `'Audit Committee Chair'`), so the column carries
+  **two meanings** — F2-196's shape inside one column, **filed** rather than collapsed. Owner fields
+  freeze at REVIEW, with the machine's `REVIEW → DRAFT` edge as the reassignment route, so the window
+  narrows rather than the capability disappearing. `BEFORE_APPROVAL` is **derived** by driving the
+  real machine, and is an **inclusion** list so an unrecognised status protects the attribution
+  rather than exposing it (F2-196).
+  ⚠⚠ **A TYPE NAME IN SCOPE IS NOT THE TYPE THAT GOVERNS.** A first scan keyed `Type#field` on the
+  **simple** name and produced **19 cross-class contradictions**; every one was spurious, because all
+  four pairs are duplicate simple names in different packages (`Vulnerability` cyber/cyber_lc,
+  `CapaTask` audit_lc/capa, `ScreeningHit` aml/ethics, `RegulatoryChange` compliance/regchange).
+  F2-221's constant lesson one level out. ⚙ **Filed, latent not live: 15 of 433 entity simple names
+  are declared in two packages** (30 classes, 30 distinct tables) and three shipped gates key on the
+  simple name — measured, **no key collapses two registers today**, because only one twin of each
+  pair has a machine or a guarded route, and nobody is maintaining that (F2-177).
+  ⚠⚠ **A MEASUREMENT TAKEN AFTER THE PROBE COUNTS THE PROBE'S OWN ROWS, AND THE ARTEFACT IT INVENTS
+  LOOKS EXACTLY LIKE A FINDING ABOUT THE PLATFORM.** My population query ran after probe 1 had
+  planted a policy and reported *"42 live, 25 with an approver, **1 whose approver equals its own
+  createdBy**"* — that 1 was the probe's own forgery. The honest figures are **41 / 24 / 21 / 0** in
+  dev and **37 / 23 / 20 / 0** in prod. Re-measure after cleanup, and reconcile the count.
+  ⚙ **Three more refuted by reading, each an instrument rule.** A **ternary whose CONDITION reads the
+  request but whose BRANCHES are both server values** is a stamp, not a caller write
+  (`DpiaService#addMitigation` — a sixth shape after F2-219's five). A
+  **preparer/reviewer/approver trio written together** is stage ASSIGNMENT, not attribution
+  (`RegReportFiling`). **`next*ReviewDate`** is a plan. And a guard-resolution scan keyed on the
+  method name `update` matched every controller in the tree — scope the scan to the shape of its
+  claim, yet again.
+  ⚙ **Filed:** `LargeExposureLimit#approvedAt` + `approvedByUserId` are written straight from the
+  body by `CptyService#upsertLimit`, whose route is `CPTY:APPROVE` — a permission **V369 created
+  specifically** because *"deciding the rating and the limit is the credit authority's"* under SAMA's
+  large-exposure rules. 0 of 74 rows carry the column in either database, so it is latent, and the
+  fix needs a principal→user-id resolution this slice did not build. Also filed: the two meanings in
+  `policy.documents.approver_name`; and the remaining **31** authority fields written from the
+  request with no guarded route stamping them anywhere.
 - ⚠⚠ **A STATE MACHINE'S VOCABULARY AND ITS COLUMN'S CHECK ARE TWO ARTEFACTS, AND NOTHING WAS
   COMPARING THEM** (F2-221, measured 2026-08-16). F2-220 filed two status columns as unconstrained.
   That filing's population was **the nine registers F2-220 happened to visit**; the same structural
