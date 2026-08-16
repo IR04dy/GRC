@@ -3,6 +3,7 @@ package com.tss.grc.module.sust.climate.service;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import jakarta.persistence.EntityNotFoundException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.risk.dto.RiskLinkDtos;
 import com.tss.grc.module.risk.entity.RiskLink;
@@ -41,6 +42,10 @@ import java.util.Set;
 public class ClimateRiskOpportunityService {
 
     private static final Set<String> STATUSES = Set.of("IDENTIFIED","ASSESSED","TREATED","CLOSED","RETIRED");
+
+    /** F2-219 — the one state a climate risk/opportunity may be CREATED in; the rest are reached
+     *  through {@link #transition}, which enforces the linear machine and stamps the date. */
+    private static final String INITIAL_STATUS = "IDENTIFIED";
     private static final Set<String> KINDS    = Set.of("RISK", "OPPORTUNITY");
     private static final Set<String> RISK_CATEGORIES = Set.of(
         "PHYSICAL","TRANSITION","REGULATORY","MARKET","TECHNOLOGY","REPUTATION","SUPPLY_CHAIN");
@@ -147,7 +152,16 @@ public class ClimateRiskOpportunityService {
         req.setOrganisationId(org());
         validateAxes(req);
         recomputeScore(req);
-        if (req.getStatus() == null || req.getStatus().isBlank()) req.setStatus("IDENTIFIED");
+        // F2-219 — was a DEFAULT, so a create could name CLOSED and skip the linear
+        // IDENTIFIED -> ASSESSED -> TREATED -> CLOSED machine transition() enforces.
+        req.setStatus(ServerOwnedState.requireInitial(
+            req.getStatus(), INITIAL_STATUS, "a climate risk/opportunity",
+            "POST /{id}/assess, /treat, /close or /retire"));
+        // Each of these is stamped by transition() when the item REACHES that state. On a create
+        // they are dates for assessments, treatments and closures that have not happened.
+        req.setAssessedAt(null);
+        req.setTreatedAt(null);
+        req.setClosedAt(null);
         if (req.getIdentifiedAt() == null) req.setIdentifiedAt(LocalDateTime.now());
         ClimateRiskOpportunity saved = repo.save(req);
         audit.log("CREATE", "ClimateRiskOpportunity", saved.getId(),

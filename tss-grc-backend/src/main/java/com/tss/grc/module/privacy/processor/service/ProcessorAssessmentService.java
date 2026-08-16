@@ -65,6 +65,16 @@ public class ProcessorAssessmentService {
                 + "approve or reject it — those transitions derive the outcome and risk score "
                 + "from the eight Art. 28 controls and stamp the approver.");
         }
+        // ⚙ F2-219 — REFUTED, and the measurement is worth keeping. This create persists the request
+        // object, so it looks like it accepts approvedAt / approverName / assessedAt / assessedBy /
+        // assessorName / overallOutcome / riskScore beside an IN_PROGRESS row. All SEVEN already
+        // carry @JsonProperty(access = READ_ONLY) on the entity, so the wire cannot supply any of
+        // them. A scrub here would be decoration, and an inert construct is worse than none because
+        // it answers the question a reader was about to ask (F2-184) — so there is deliberately no
+        // scrub, and this comment is the answer instead.
+        //
+        // 🔑 It appeared on F2-218's work list only because that gate knew BaseEntity's nine
+        // server-owned names and no per-field annotations; F2-219 taught it to read them.
         return repo.save(req);
     }
 

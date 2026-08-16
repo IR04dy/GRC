@@ -2,6 +2,7 @@ package com.tss.grc.module.policy.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
 import com.tss.grc.module.compliance.entity.Control;
@@ -54,6 +55,13 @@ public class PolicyManagementService {
         "REQUESTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "EXPIRED", "REVOKED");
     private static final Set<String> ATT_STATUSES = Set.of(
         "PENDING", "ATTESTED", "DECLINED", "EXPIRED");
+
+    /**
+     * F2-219 — the one state an attestation may be CREATED in. Assigning is the only thing
+     * {@code createAttestation} does; every other member of {@link #ATT_STATUSES} is the outcome of
+     * a route that checks who is asking ({@link #attest}, {@link #decline}) or of the expiry sweep.
+     */
+    private static final String ATTESTATION_INITIAL_STATUS = "PENDING";
 
     private final PolicyDocumentRepository docs;
 
@@ -326,6 +334,12 @@ public class PolicyManagementService {
                 "Policy version already exists: " + body.getPolicyCode() + " v" + body.getVersion());
         body.setId(null);
         body.setOrganisationId(org());
+        // F2-219 — PM-C2 above forces the STATUS and stops there; `publishedAt` is the other thing
+        // transition() stamps when a policy reaches PUBLISHED, and a create could name it. A DRAFT
+        // carrying a publication date is the attribution half of the same bypass, and it feeds the
+        // "published this period" reporting the register drives. 🔑 The comment recording the defect
+        // is the one that scrubbed the field its author noticed (F2-215).
+        body.setPublishedAt(null);
         // CH-7 (SoD): stamp the authenticated creator so transition()'s approval guard
         // (author cannot approve their own policy) has a real identity to compare
         // against — createdBy was previously never populated, so that guard never fired.
@@ -796,7 +810,27 @@ public class PolicyManagementService {
         if (body.getUserUsername() == null) throw new IllegalArgumentException("userUsername is required");
         body.setId(null);
         body.setOrganisationId(org());
-        if (body.getStatus() == null) body.setStatus("PENDING");
+        // ⚠⚠ F2-219 — this was `if (body.getStatus() == null) body.setStatus("PENDING")`, a DEFAULT
+        // and not a guard: the caller's value survived whenever they sent one. Probed live as
+        // `ranalyst`, who holds COMPLIANCE:READ and nothing else — POST /api/policy/attestations
+        // with {userUsername: "compliance", status: "ATTESTED", attestedAt: "2001-01-01"} answered
+        // 200 and stored all three. That is a completed attestation-of-record in another person's
+        // name, which is precisely what SEC-CMP-004 exists to prevent on attest(): only the
+        // assignee (or an admin) may complete one. No ATTEST audit row and no POLICY_ATTESTED event
+        // either, so the forgery is also invisible to the trail an auditor reads. 32 roles hold the
+        // permission this endpoint is guarded by.
+        //
+        // Refuse rather than coerce (F2-182): the only requests newly refused are ones performing a
+        // decision the assign route does not own, and a request that forges an attestation is not a
+        // working request. Assigning one — the whole purpose of this route — is untouched.
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), ATTESTATION_INITIAL_STATUS, "a policy attestation",
+            "POST /api/policy/attestations/{id}/attest or /decline"));
+        // The completion stamps belong to whoever completes it. An assignment has been attested by
+        // nobody and declined by nobody, so any value here describes an act that did not happen.
+        body.setAttestedAt(null);
+        body.setDeclinedAt(null);
+        body.setDeclinedReason(null);
         PolicyAttestation saved = attestations.save(body);
         audit.log("CREATE", "PolicyAttestation", saved.getId(),
             "Attestation assigned to " + nullSafe(saved.getUserUsername()) + " on policy " + saved.getPolicyId());

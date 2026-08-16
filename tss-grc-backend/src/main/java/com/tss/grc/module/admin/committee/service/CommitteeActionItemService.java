@@ -1,6 +1,7 @@
 package com.tss.grc.module.admin.committee.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.admin.committee.entity.CommitteeActionItem;
 import com.tss.grc.module.admin.committee.repository.CommitteeActionItemRepository;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
@@ -35,6 +36,10 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class CommitteeActionItemService {
+
+    /** F2-219 — the one state an action item may be CREATED in. IN_PROGRESS, COMPLETED, CANCELLED,
+     *  DEFERRED and OVERDUE each belong to a route that records who moved it and why. */
+    private static final String INITIAL_STATUS = "OPEN";
 
     private final CommitteeActionItemRepository repo;
     private final AuditLogService               audit;
@@ -119,7 +124,21 @@ public class CommitteeActionItemService {
         Long org = TenantContext.getCurrentTenant();
         in.setOrganisationId(org);
         in.setCreatedAt(LocalDateTime.now());
-        if (in.getStatus() == null) in.setStatus("OPEN");
+        // ⚠⚠ F2-219 — `if (status == null) OPEN` is a DEFAULT, not a guard. Probed live: a create
+        // naming status=COMPLETED answered 200 and stored it, so the action item never passed
+        // complete(), which stamps completed_at, records the completion notes, writes the
+        // ACTION_COMPLETE audit row and publishes the transition event the committee pack reads.
+        // A governance action closed on arrival looks identical to one that was done.
+        in.setStatus(ServerOwnedState.requireInitial(
+            in.getStatus(), INITIAL_STATUS, "a committee action item",
+            "POST /{id}/start, /complete, /cancel or /defer"));
+        // The completion record belongs to complete(). Nothing has been completed on arrival, so
+        // these three describe an act that did not happen. (The gate that found the status could
+        // not see these: complete() has no state check, so it is not a "guarded route" — the reason
+        // they are closed here is that they are the same claim, not that a scan demanded it.)
+        in.setCompletedAt(null);
+        in.setCompletedBy(null);
+        in.setCompletionNotesEn(null);
         CommitteeActionItem saved = repo.save(in);
 
         audit.log("ACTION_CREATE", "CommitteeActionItem", saved.getId(),

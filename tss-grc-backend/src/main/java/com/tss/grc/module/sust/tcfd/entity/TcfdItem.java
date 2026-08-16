@@ -60,6 +60,12 @@ public class TcfdItem {
     @Column(name = "owner_email",    length = 255) private String ownerEmail;
     @Column(name = "reviewer_name",  length = 255) private String reviewerName;
     @Column(name = "last_reviewed_at")              private LocalDateTime lastReviewedAt;
+    // ⚠ F2-219 — this was the ONE approval field of the three without the annotation. Two accidents
+    // were keeping it shut: TcfdItemCreateRequest does not declare it, and update()'s whitelist does
+    // not copy it — so it is INERT today, protected by nothing that says so. 🔑 Marking two of three
+    // and leaving the sibling is F2-215's shape, and the reader who finds the annotation present
+    // does not then ask which fields lack it. Closed here so the protection is a mechanism.
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approval_status", length = 30)  private String approvalStatus;
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @Column(name = "approved_by",    length = 255)  private String approvedBy;

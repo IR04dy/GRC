@@ -1,6 +1,7 @@
 package com.tss.grc.module.privacy.dsa.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.privacy.dsa.entity.DataSharingAgreement;
 import com.tss.grc.module.privacy.dsa.repository.DataSharingAgreementRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -25,6 +26,10 @@ public class DataSharingAgreementService {
 
     private static final Set<String> STATUSES = Set.of("DRAFT", "IN_REVIEW", "ACTIVE", "EXPIRED", "TERMINATED");
 
+    /** F2-219 — the one state an agreement may be CREATED in; the rest are {@link #submit}'s,
+     *  {@link #activate}'s, {@link #expire}'s and {@link #terminate}'s to write. */
+    private static final String INITIAL_STATUS = "DRAFT";
+
     private final DataSharingAgreementRepository repo;
 
     @Transactional(readOnly = true)
@@ -48,9 +53,20 @@ public class DataSharingAgreementService {
     public DataSharingAgreement create(DataSharingAgreement req) {
         req.setOrganisationId(TenantContext.getCurrentTenant());
         req.setId(null);
-        if (req.getStatus() == null) req.setStatus("DRAFT");
-        if (!STATUSES.contains(req.getStatus()))
-            throw new IllegalArgumentException("status must be one of " + STATUSES);
+        // ⚠⚠ F2-219 — `if (status == null) DRAFT` followed by a membership test is a DEFAULT plus a
+        // VOCABULARY check, and neither is a guard. 🔑 Checking that a value is in the vocabulary is
+        // not checking that it is a value a record may START in (F2-217's sentence about audit_lc).
+        // Probed live as `compliance`: POST with {status: "ACTIVE", signerName: "Nobody Who Signed
+        // This"} answered 201 and stored both — a data-sharing agreement live and signed without
+        // submit() (DRAFT -> IN_REVIEW) or activate() (which stamps signed_at from the clock).
+        req.setStatus(ServerOwnedState.requireInitial(
+            req.getStatus(), INITIAL_STATUS, "a data sharing agreement",
+            "POST /{id}/submit then POST /{id}/activate"));
+        // The signatures belong to activate(). `signedAt` already carries
+        // @JsonProperty(access = READ_ONLY) so the wire cannot reach it; these two do not, and a
+        // DRAFT naming its signatories asserts an execution that has not happened.
+        req.setSignerName(null);
+        req.setCounterpartySigner(null);
         return repo.save(req);
     }
 

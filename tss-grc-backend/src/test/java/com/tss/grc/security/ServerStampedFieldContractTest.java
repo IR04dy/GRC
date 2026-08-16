@@ -99,10 +99,52 @@ class ServerStampedFieldContractTest {
      * number that drifts up.
      */
     private static final Set<String> CLOSED = Set.of(
-        "AuditLifecycleService",        // F2-217
-        "NdiEvidenceItemService",       // F2-218 — the SoD bypass above
-        "NdiImprovementPlanService",    // F2-218
-        "NdiAssessmentCycleService");   // F2-218
+        "AuditLifecycleService",           // F2-217
+        "NdiEvidenceItemService",          // F2-218 — the SoD bypass above
+        "NdiImprovementPlanService",       // F2-218
+        "NdiAssessmentCycleService",       // F2-218
+        "PolicyManagementService",         // F2-219 — the SEC-CMP-004 attestation forgery
+        "DataSharingAgreementService",     // F2-219 — created ACTIVE and signed
+        "CommitteeActionItemService",      // F2-219 — created COMPLETED
+        "ClimateRiskOpportunityService",   // F2-219
+        "TcfdItemService");                // F2-219 — closed at the wire, see TcfdItem#approvalStatus
+    // ⚙ ProcessorAssessmentService is deliberately NOT here. It was on F2-218's list and needed no
+    // change: all seven fields already carry @JsonProperty(READ_ONLY). Listing it would make a
+    // service that was never open indistinguishable from one that was read and fixed — house rule
+    // 3's warning about a ceiling left standing after a sweep, applied to a set of names.
+
+    /**
+     * Sites where the write path SHOULD accept the field — read in F2-219, one at a time.
+     *
+     * <p>⚠ Deliberately tiny, and it stays that way. F2-188 measured five reasons in a predecessor
+     * artefact and <b>all five were false</b>; what made that possible was writing reasons at scale
+     * for a population nobody had opened. These three were each read in the slice that added them,
+     * and the map is enforced in <b>both</b> directions — an entry that stops contradicting must be
+     * deleted in the same commit, so it cannot quietly outlive its subject.
+     *
+     * <p>The honest artefact for an <i>unread</i> population is still {@link #REPORT} plus
+     * {@link #BASELINE_CONTRADICTED_SERVICES}, which is why that figure survives at zero rather than
+     * being replaced by this map.
+     */
+    private static final Map<String, String> BY_DESIGN = Map.of(
+        "NdiSettingService",
+        "resetToDefault() restores value_text FROM THE ROW's own default_value, which is a server "
+        + "value only because the row already holds it. Supplying the value is the entire point of "
+        + "creating a setting; there is no decision, no attribution and no state being reached.",
+
+        "SgiCommitmentService",
+        "refreshValue() pulls current_value from a linked ESG_METRIC or GHG_TOTAL source, and gates "
+        + "on value_source != MANUAL. For a MANUAL commitment the class javadoc states that a human "
+        + "owns the number, so create/update writing it is the declared design. The APPROVE-guarded "
+        + "achieve() reads it, and is defended separately: Rule C refuses an achiever who is the "
+        + "last editor, and Rule D requires attached evidence.",
+
+        "NdiComplianceAssessmentService",
+        "update() is a null-guarded partial update on the same NDI:WRITE authority as setStatus() "
+        + "and attachEvidence(); recording compliance_status and evidence_status is what an assessor "
+        + "does on this register. The approval that IS guarded is lifecycle_status, and both paths "
+        + "refuse an APPROVED row outright. complianceStatus additionally goes through "
+        + "ClosedVocabulary#require on both routes, so the vocabularies cannot diverge.");
 
     /**
      * Everything else, as a decrease-only figure rather than a set of hand-written verdicts.
@@ -118,7 +160,7 @@ class ServerStampedFieldContractTest {
      * output rather than subtracting from the number written here (F2-207's rule: a ceiling left in
      * place after a sweep makes a tolerated member indistinguishable from a reviewed one).
      */
-    private static final int BASELINE_CONTRADICTED_SERVICES = 8;
+    private static final int BASELINE_CONTRADICTED_SERVICES = 0;
 
     // ── source plumbing ──────────────────────────────────────────────────────
 
@@ -192,9 +234,40 @@ class ServerStampedFieldContractTest {
         return type + "#" + field;
     }
 
+    /**
+     * ⚠ F2-219 — the {@code (?s)} is load-bearing and its absence was invisible. {@code String#matches}
+     * anchors the whole value, and without DOTALL a {@code .} cannot cross a newline — so <b>every
+     * setter whose argument wraps</b> read as not mentioning the request at all. The house idiom
+     * {@code setStatus(ServerOwnedState.requireInitial(\n    body.getStatus(), …))} wraps by width,
+     * so the four services F2-218 had just closed were passing the hard zero for the wrong reason.
+     *
+     * <p>🔑 <b>A line-blind matcher UNDER-reports, which reads exactly like a clean tree</b>, and here
+     * it was cancelled out by a second bug in the opposite direction ({@link #refusesTheRequestValue}
+     * did not exist, so a refusal wrapper would have read as an acceptance). Two errors agreeing
+     * produce a green that neither one earns.
+     */
     private static boolean readsRequest(String value, Set<String> requestLocals) {
         return requestLocals.stream().anyMatch(
-            r -> value.matches(".*\\b" + Pattern.quote(r) + "\\s*\\.\\s*(get|is)\\w+\\s*\\(.*"));
+            r -> value.matches("(?s).*\\b" + Pattern.quote(r) + "\\s*\\.\\s*(get|is)\\w+\\s*\\(.*"));
+    }
+
+    /**
+     * A value that passes the caller's own value through the platform's refusal primitive:
+     * {@code setStatus(ServerOwnedState.requireInitial(body.getStatus(), INITIAL, …))} <em>reads</em>
+     * the request in order to <b>reject</b> anything but the initial state, so the caller's value
+     * cannot survive unless it already equals the server's.
+     *
+     * <p>Without this the fix above would fail on correct code — the shape F2-217/F2-218 introduced
+     * as the house answer to this whole family would be reported as the defect it prevents, which is
+     * the one failure a gate must never have (F2-214).
+     *
+     * <p>⚠ This keys on a <b>declared refusal primitive</b>, not on a field name — F2-217's lesson is
+     * that a census keyed on names measures the names. {@link #theRefusalPrimitiveIsResolvedNotAssumed}
+     * checks the class it names still exists and still throws, so deleting the guard inside
+     * {@code ServerOwnedState} cannot leave this exemption standing over it.
+     */
+    private static boolean refusesTheRequestValue(String value) {
+        return value.matches("(?s).*\\bServerOwnedState\\s*\\.\\s*require\\w*\\s*\\(.*");
     }
 
     /** Every parameter name of a method, whatever its type. */
@@ -227,7 +300,66 @@ class ServerStampedFieldContractTest {
     private static boolean callerSupplied(String value, Set<String> requestLocals,
                                           Set<String> paramNames) {
         if (readsRequest(value, requestLocals)) return true;
-        return paramNames.stream().anyMatch(p -> value.matches(".*\\b" + Pattern.quote(p) + "\\b.*"));
+        return paramNames.stream().anyMatch(
+            p -> value.matches("(?s).*\\b" + Pattern.quote(p) + "\\b.*"));
+    }
+
+    /**
+     * ⚠ F2-219 — caller data reaching a setter through a LOCAL, which {@link #callerSupplied} could
+     * not see because the value is then a bare identifier naming neither the request nor a parameter.
+     *
+     * <p>{@code NdiComplianceAssessmentService#setStatus} does
+     * {@code String j = naJustification != null ? naJustification : cur.getNaJustification();
+     * cur.setNaJustification(j);} — so {@code j} read as a server stamp and the register's own
+     * (correct, null-guarded) update then read as a contradiction. F2-197 recorded this exact shape
+     * in the other direction: 🔑 <b>a rule keyed on a name cannot see the local alias.</b>
+     *
+     * <p>Deliberately narrow: only a value that IS a bare identifier is resolved, and only against
+     * assignments in the same body. Anything larger is a dataflow question a regex cannot answer
+     * (F2-182), and guessing would push the population up onto correct code.
+     */
+    private static boolean aliasesCallerData(String value, String body, Set<String> requestLocals,
+                                             Set<String> paramNames) {
+        if (!value.matches("\\w+")) return false;
+        Matcher m = Pattern.compile(
+            "\\b(?:[A-Za-z_][\\w<>,.\\[\\] ]*\\s+)?" + Pattern.quote(value) + "\\s*=([^;]*);")
+            .matcher(body);
+        while (m.find()) {
+            if (callerSupplied(m.group(1).trim(), requestLocals, paramNames)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Entity fields the wire already refuses per-field, via
+     * {@code @JsonProperty(access = JsonProperty.Access.READ_ONLY)}.
+     *
+     * <p>⚠ F2-219 — {@link #CLOSED_AT_THE_WIRE} names {@code BaseEntity}'s nine, and a reader who
+     * finds that subtraction present does not then ask which OTHER fields are closed the same way.
+     * {@code DataSharingAgreement#signedAt} carries the annotation on the field itself and was on
+     * F2-218's work list as open. 🔑 <b>Generalising an exclusion one mechanism at a time leaves the
+     * remainder looking covered, because the mechanism that covers them is visibly present</b>
+     * (F2-215's headline, here on the gate rather than on a fix). Derived from the entity source,
+     * never a second list of names.
+     */
+    static Map<String, Set<String>> readOnlyOnTheWire() {
+        Map<String, Set<String>> out = new LinkedHashMap<>();
+        try (var s = Files.walk(MAIN_JAVA)) {
+            for (Path p : s.filter(f -> f.getFileName().toString().endsWith(".java")).toList()) {
+                String src = read(p);
+                if (!src.contains("JsonProperty.Access.READ_ONLY")) continue;
+                String type = p.getFileName().toString().replace(".java", "");
+                Matcher m = Pattern.compile(
+                    "JsonProperty\\.Access\\.READ_ONLY\\s*\\)[\\s\\S]{0,400}?"
+                    + "\\b\\w[\\w<>,.\\[\\]]*\\s+(\\w+)\\s*[;=]").matcher(src);
+                while (m.find()) {
+                    out.computeIfAbsent(type, k -> new TreeSet<>()).add(m.group(1));
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return out;
     }
 
     /**
@@ -241,7 +373,9 @@ class ServerStampedFieldContractTest {
         while (m.find()) {
             String value = m.group(3).trim();
             if (value.isEmpty() || value.equals("null")) continue;
-            if (callerSupplied(value, requestLocals, paramNames)) continue;
+            if (!refusesTheRequestValue(value)
+                && (callerSupplied(value, requestLocals, paramNames)
+                    || aliasesCallerData(value, body, requestLocals, paramNames))) continue;
             String type = types.get(m.group(1));
             if (type != null) out.add(key(type, lower(m.group(2))));
         }
@@ -254,9 +388,141 @@ class ServerStampedFieldContractTest {
         Set<String> out = new TreeSet<>();
         Matcher m = SETTER.matcher(body);
         while (m.find()) {
-            if (!readsRequest(m.group(3).trim(), requestLocals)) continue;
+            String value = m.group(3).trim();
+            if (refusesTheRequestValue(value)) continue;
+            if (!readsRequest(value, requestLocals)) continue;
             String type = types.get(m.group(1));
             if (type != null) out.add(key(type, lower(m.group(2))));
+        }
+        return out;
+    }
+
+    // ── F2-219 — a DEFAULT is not a settlement ───────────────────────────────
+
+    /**
+     * The source span from the previous statement boundary back to this setter — the guard around
+     * it, if there is one.
+     *
+     * <p>Stops at {@code ;} and {@code }} but deliberately <b>not</b> at <code>{</code>, so a
+     * block-bodied guard ({@code if (…) {\n  x.setA(LIT);\n}}) is seen exactly like the inline form.
+     * Stopping at the brace would return whitespace and every block-bodied default would read as an
+     * unconditional stamp.
+     */
+    static String guardBefore(String body, int setterStart) {
+        int i = setterStart;
+        while (i > 0) {
+            char c = body.charAt(i - 1);
+            if (c == ';' || c == '}') break;
+            i--;
+        }
+        return body.substring(i, setterStart);
+    }
+
+    /** Index just past the {@code )} matching the {@code (} at {@code open}; -1 if unbalanced. */
+    private static int pastParen(String src, int open) {
+        int depth = 0;
+        for (int i = open; i < src.length(); i++) {
+            char c = src.charAt(i);
+            if (c == '(') depth++;
+            else if (c == ')' && --depth == 0) return i + 1;
+        }
+        return -1;
+    }
+
+    /** Index just past one statement starting at {@code from} — a {@code {…}} block, or up to {@code ;}. */
+    private static int pastStatement(String src, int from) {
+        int i = from;
+        while (i < src.length() && Character.isWhitespace(src.charAt(i))) i++;
+        if (i < src.length() && src.charAt(i) == '{') {
+            int depth = 0;
+            for (int j = i; j < src.length(); j++) {
+                char c = src.charAt(j);
+                if (c == '{') depth++;
+                else if (c == '}' && --depth == 0) return j + 1;
+            }
+            return src.length();
+        }
+        int semi = src.indexOf(';', i);
+        return semi < 0 ? src.length() : semi + 1;
+    }
+
+    /**
+     * The whole {@code if … else if … else …} chain beginning at {@code ifAt}.
+     *
+     * <p>The chain is what decides whether a conditional literal is a default: its {@code else}
+     * branches are the alternative the caller's value takes. A {@code throw} in a <i>separate,
+     * following</i> statement is not part of it — and that distinction is the finding, not an
+     * implementation detail (see {@link #aDefaultIsNotASettlement}).
+     */
+    static String ifChainAt(String src, int ifAt) {
+        int i = src.indexOf('(', ifAt);
+        if (i < 0) return "";
+        i = pastParen(src, i);
+        if (i < 0) return "";
+        while (true) {
+            i = pastStatement(src, i);
+            int j = i;
+            while (j < src.length() && Character.isWhitespace(src.charAt(j))) j++;
+            if (!src.startsWith("else", j)) return src.substring(ifAt, i);
+            int k = j + "else".length();
+            while (k < src.length() && Character.isWhitespace(src.charAt(k))) k++;
+            if (src.startsWith("if", k)) {
+                int p = src.indexOf('(', k);
+                if (p < 0) return src.substring(ifAt, i);
+                int q = pastParen(src, p);
+                if (q < 0) return src.substring(ifAt, i);
+                i = q;
+            } else {
+                i = k;
+            }
+        }
+    }
+
+    /**
+     * Fields this method assigns a literal <b>only when the caller left them absent</b>.
+     *
+     * <p>🔑 <b>{@code if (x == null) x = INITIAL} is a DEFAULT, not a guard — the caller's value
+     * survives whenever they send one.</b> F2-218 named that as its headline and then this gate
+     * counted such a write as having settled the field, so it dropped out of the ACCEPTED set. The
+     * result was an under-report of exactly the shape the gate was built to find: F2-218's own work
+     * list showed {@code DataSharingAgreement#signedAt} and not {@code #status}, although
+     * {@code submit()} and {@code activate()} both stamp the status behind a state refusal.
+     *
+     * <p>Two narrowings, both deliberate, both measured:
+     * <ul>
+     *   <li>The guard must test <b>this field, on the request</b>. {@code if (isNew) e.setStatus(L)}
+     *       is some other condition; widening to "any conditional" would grow the population onto
+     *       correct code, which is the direction that trains a reader to edit the assertion (F2-214).</li>
+     *   <li>A chain whose own {@code else} refuses is not a default —
+     *       {@code ProcessorAssessmentService#create}'s {@code else if (!"IN_PROGRESS".equals(…))
+     *       throw} closes the field, and it is excluded for that reason, verified by reading.</li>
+     * </ul>
+     *
+     * <p>⚠ The refusal must come from the chain, <b>not merely from a {@code throw} somewhere in the
+     * method</b>. {@code DataSharingAgreementService#create} follows its default with
+     * {@code if (!STATUSES.contains(req.getStatus())) throw …} — a <i>vocabulary membership</i> test
+     * that admits {@code ACTIVE}. 🔑 <b>Checking that a value is in the vocabulary is not checking
+     * that it is a value a record may START in</b> (F2-217's sentence about {@code audit_lc}), so a
+     * detector cannot infer "settled" from the presence of a throw.
+     */
+    static Set<String> defaults(String body, Map<String, String> types, Set<String> requestLocals) {
+        Set<String> out = new TreeSet<>();
+        Matcher m = SETTER.matcher(body);
+        while (m.find()) {
+            String type = types.get(m.group(1));
+            if (type == null) continue;
+            String field = m.group(2);
+            String guard = guardBefore(body, m.start());
+            int rel = guard.lastIndexOf("if");
+            if (rel < 0) continue;
+            String cond = guard.substring(rel);
+            if (!cond.matches("(?s)\\s*if\\s*\\(.*")) continue;
+            boolean testsOwnField = requestLocals.stream().anyMatch(r -> cond.matches(
+                "(?s).*\\b" + Pattern.quote(r) + "\\s*\\.\\s*(get|is)" + Pattern.quote(field)
+                + "\\s*\\(.*"));
+            if (!testsOwnField) continue;
+            if (ifChainAt(body, m.start() - guard.length() + rel).contains("throw new")) continue;
+            out.add(key(type, lower(field)));
         }
         return out;
     }
@@ -359,14 +625,18 @@ class ServerStampedFieldContractTest {
                                  Set<String> stampedBy) { }
 
     /** {@code Type#field} → the guarded routes that stamp it. */
-    static Map<String, Set<String>> stampedBy(List<Method> methods) {
+    static Map<String, Set<String>> stampedBy(List<Method> methods,
+                                              Map<String, Set<String>> readOnly) {
         Map<String, Set<String>> out = new LinkedHashMap<>();
         for (Method m : methods) {
             if (!isGuardedRoute(m.name(), m.body())) continue;
             Map<String, String> types = localTypes(m.params(), m.body());
             Set<String> params = allParamNames(m.params());
             for (String f : stampsServerValue(m.body(), types, requestParams(m.params()), params)) {
-                if (CLOSED_AT_THE_WIRE.contains(f.substring(f.indexOf('#') + 1))) continue;
+                String type = f.substring(0, f.indexOf('#'));
+                String field = f.substring(f.indexOf('#') + 1);
+                if (CLOSED_AT_THE_WIRE.contains(field)) continue;
+                if (readOnly.getOrDefault(type, Set.of()).contains(field)) continue;
                 out.computeIfAbsent(f, k -> new TreeSet<>()).add(m.name());
             }
         }
@@ -391,6 +661,8 @@ class ServerStampedFieldContractTest {
             Set<String> settled = new TreeSet<>(
                 stampsServerValue(m.body(), types, req, allParamNames(m.params())));
             settled.addAll(clears(m.body(), types));
+            // F2-219 — a literal written only when the caller sent nothing has settled nothing.
+            settled.removeAll(defaults(m.body(), types, req));
             String prefix = e.getValue() + "#";
             for (String f : stampedBy.keySet()) {
                 if (f.startsWith(prefix) && !settled.contains(f)) accepted.add(f);
@@ -402,12 +674,13 @@ class ServerStampedFieldContractTest {
 
     static List<Contradiction> measure() {
         List<Contradiction> out = new ArrayList<>();
+        Map<String, Set<String>> readOnly = readOnlyOnTheWire();
         for (Path p : serviceSources()) {
             String cls = p.getFileName().toString().replace(".java", "");
             String src = stripComments(read(p));
             List<Method> methods = publicMethods(src);
 
-            Map<String, Set<String>> stampedBy = stampedBy(methods);
+            Map<String, Set<String>> stampedBy = stampedBy(methods, readOnly);
             if (stampedBy.isEmpty()) continue;
 
             for (Method m : methods) {
@@ -444,7 +717,8 @@ class ServerStampedFieldContractTest {
     void theRemainingPopulationIsMeasuredAndOnlyEverShrinks() throws IOException {
         List<Contradiction> all = measure();
         Set<String> services = all.stream().map(Contradiction::service)
-            .filter(s -> !CLOSED.contains(s)).collect(Collectors.toCollection(TreeSet::new));
+            .filter(s -> !CLOSED.contains(s) && !BY_DESIGN.containsKey(s))
+            .collect(Collectors.toCollection(TreeSet::new));
 
         Map<String, List<Contradiction>> grouped = new TreeMap<>(all.stream()
             .filter(c -> !CLOSED.contains(c.service()))
@@ -481,15 +755,46 @@ class ServerStampedFieldContractTest {
                 from tolerating a regression.""".formatted(services.size(), REPORT))
             .isLessThanOrEqualTo(BASELINE_CONTRADICTED_SERVICES);
 
-        // Anti-vacuity. A rotted SETTER pattern or a stricter isGuardedRoute reports a SMALLER
-        // population, which reads exactly like progress — and the corpus assertions pass either
-        // way. The floor is deliberately shallow (a real slice closes one or two services and must
-        // not have to touch this), because the load-bearing rot protection is the pair of positive
-        // controls below: they drive the shipped predicate over literal source, so a detector that
-        // cannot match fails there rather than quietly reporting a clean tree.
-        assertThat(services.size())
-            .as("the scan found almost nothing — check the detectors before believing the fix")
-            .isGreaterThanOrEqualTo(BASELINE_CONTRADICTED_SERVICES - 3);
+        // ⚠ F2-219 — anti-vacuity, and the shape had to change with the number. The old floor was
+        // `>= BASELINE - 3`; with the figure at zero that reads `>= -3` and can never fail. 🔑 A
+        // floor is only worth having if it sits above the largest WRONG answer (F2-215), and here
+        // the wrong answer IS zero, because a rotted detector reports an empty population and that
+        // is indistinguishable from a finished sweep.
+        //
+        // So the floor is no longer a number: the three BY_DESIGN services are known to contradict
+        // — they were read, and the reason each is correct is recorded above — so the detector must
+        // still SEE them. That check is the reverse leg below, and it doubles as the anti-vacuity
+        // guard, which a bare count could not.
+        assertThat(BY_DESIGN).as("the adjudicated set is the anti-vacuity floor; do not empty it")
+            .isNotEmpty();
+    }
+
+    /**
+     * The adjudicated set, enforced the other way round: a service recorded as accepting a field
+     * BY DESIGN must still be doing so.
+     *
+     * <p>🔑 Without this the map is write-only — an entry outlives the code it describes and reads,
+     * to the next person, as a reviewed decision about something that is no longer true. It is also
+     * this class's anti-vacuity guard: a detector that stops matching empties the population, and
+     * an empty population looks exactly like a finished sweep.
+     */
+    @Test
+    void everyByDesignEntryStillDescribesSomethingTheScanFinds() {
+        Set<String> measured = measure().stream().map(Contradiction::service)
+            .collect(Collectors.toCollection(TreeSet::new));
+
+        assertThat(measured)
+            .as("""
+                A BY_DESIGN entry names a service whose write path accepts a field its own guarded \
+                routes stamp, WITH a reason that was verified by reading. If the scan no longer \
+                finds it, either the code changed (delete the entry in the same commit) or a \
+                detector rotted (fix the detector — a shrinking population is not progress).""")
+            .containsAll(BY_DESIGN.keySet());
+
+        assertThat(BY_DESIGN.keySet()).doesNotContainAnyElementsOf(CLOSED);
+        BY_DESIGN.forEach((svc, why) -> assertThat(why.length())
+            .as("%s's reason must say why the field is genuinely the caller's, not label it", svc)
+            .isGreaterThan(120));
     }
 
     /**
@@ -509,9 +814,19 @@ class ServerStampedFieldContractTest {
             .as("a default assigns a literal, so the field reads as server-stamped here...")
             .contains("Foo#status");
         assertThat(writesFromRequest(aDefault, types, req))
-            .as("...and crucially it does NOT read as a caller write, which is why the create-side "
-                + "check must be 'did anything overwrite it before the save', not 'is a setter present'")
+            .as("...and it does NOT read as a caller write either, because the caller's value never "
+                + "appears on the right-hand side")
             .doesNotContain("Foo#status");
+        // ⚠⚠ F2-219 — and THAT is why the create-side check cannot stop at "was it overwritten".
+        // This assertion used to read "...which is why the create-side check must be 'did anything
+        // overwrite it before the save'" — and the answer here is yes, so `status` was counted as
+        // SETTLED and dropped out of the accepted set. 🔑 F2-218's own headline, inside the gate
+        // F2-218 built to enforce it: a default and a guard are indistinguishable to any scan that
+        // only asks whether the setter is present. The control below asserted the defect as correct
+        // — F2-159's shape, a test that is hardest to spot because it describes the code accurately.
+        assertThat(defaults(aDefault, types, req))
+            .as("a literal written ONLY when the caller sent nothing has settled nothing")
+            .contains("Foo#status");
 
         String aCopy = """
             { if (body.getStatus() != null) e.setStatus(body.getStatus()); return repo.save(e); }""";
@@ -532,6 +847,96 @@ class ServerStampedFieldContractTest {
             .as("clearing is not stamping — it is counted separately, because a create that nulls a "
                 + "field has closed it without claiming to have derived a value for it")
             .doesNotContain("Foo#reviewerName");
+    }
+
+    /**
+     * F2-219's five corrections, each driven over literal source. Three of them SHRANK the
+     * population and two GREW it onto correct code, and both directions had to be pinned: a
+     * detector that cannot match reads exactly like a clean tree, and one that over-matches trains
+     * the next reader to edit the assertion rather than the code (F2-214).
+     */
+    @Test
+    void theFiveWaysThisDetectorMisreadTheTree() {
+        Map<String, String> types = Map.of("body", "Foo", "e", "Foo");
+        Set<String> req = Set.of("body");
+
+        // (1) A value that WRAPS. String#matches anchors the whole input and `.` does not cross a
+        // newline without (?s), so every multi-line setter argument read as mentioning nothing.
+        String wrapped = """
+            { e.setStatus(pick(
+                  body.getStatus(), OTHER)); }""";
+        assertThat(writesFromRequest(wrapped, types, req))
+            .as("a wrapped argument still mentions the request — without (?s) this was invisible, "
+                + "and the house idiom setStatus(ServerOwnedState.requireInitial(\\n body.getX()…)) "
+                + "wraps by width, so the four services F2-218 closed passed for the wrong reason")
+            .contains("Foo#status");
+
+        // (2) ...but the house REFUSAL primitive reads the request precisely in order to reject it.
+        String refused = """
+            { body.setStatus(ServerOwnedState.requireInitial(
+                  body.getStatus(), INITIAL_STATUS, "a thing", "POST /{id}/approve")); }""";
+        assertThat(writesFromRequest(refused, types, req))
+            .as("requireInitial() lets the caller's value through only when it already equals the "
+                + "server's, so this is a settlement, not an acceptance — without it, correcting (1) "
+                + "would report the fix F2-217/F2-218 introduced as the defect it prevents")
+            .doesNotContain("Foo#status");
+        assertThat(stampsServerValue(refused, types, req, Set.of())).contains("Foo#status");
+
+        // (3) A DEFAULT whose own else-chain refuses IS settled — ProcessorAssessmentService#create.
+        String defaultThenRefuse = """
+            { if (body.getStatus() == null) body.setStatus("IN_PROGRESS");
+              else if (!"IN_PROGRESS".equals(body.getStatus())) { throw new IllegalArgumentException("no"); }
+              repo.save(body); }""";
+        assertThat(defaults(defaultThenRefuse, types, req))
+            .as("the else branch is the alternative the caller's value takes, and it throws")
+            .doesNotContain("Foo#status");
+
+        // ...whereas a following, separate vocabulary test is NOT part of the chain, and admits
+        // every member of the vocabulary. 🔑 Checking a value is IN the vocabulary is not checking
+        // it is one a record may START in (F2-217). This is DataSharingAgreementService#create.
+        String defaultThenVocabulary = """
+            { if (body.getStatus() == null) body.setStatus("DRAFT");
+              if (!STATUSES.contains(body.getStatus())) throw new IllegalArgumentException("bad");
+              repo.save(body); }""";
+        assertThat(defaults(defaultThenVocabulary, types, req))
+            .as("ACTIVE is in STATUSES, so this create could file an agreement live and signed")
+            .contains("Foo#status");
+
+        // (4) Caller data arriving through a LOCAL — NdiComplianceAssessmentService#setStatus.
+        String aliased = """
+            { String j = note != null ? note : cur.getNaJustification();
+              e.setNaJustification(j); }""";
+        assertThat(stampsServerValue(aliased, types, req, Set.of("id", "note")))
+            .as("`j` names neither the request nor a parameter, so it read as a server value and "
+                + "the register's own correct, null-guarded update then read as a contradiction")
+            .doesNotContain("Foo#naJustification");
+
+        // (5) A field the wire refuses per-field. Derived from the entity, not a second name list.
+        Map<String, Set<String>> readOnly = readOnlyOnTheWire();
+        assertThat(readOnly.getOrDefault("DataSharingAgreement", Set.of()))
+            .as("DataSharingAgreement#signedAt carries @JsonProperty(READ_ONLY) and was on F2-218's "
+                + "work list as open — CLOSED_AT_THE_WIRE knows BaseEntity's nine and no others")
+            .contains("signedAt");
+        assertThat(readOnly.getOrDefault("TcfdItem", Set.of()))
+            .as("all three TCFD approval fields are closed at the wire as of F2-219")
+            .contains("approvedBy", "approvedAt", "approvalStatus");
+    }
+
+    /**
+     * {@link #refusesTheRequestValue} exempts a value on the strength of a named class. That class
+     * must exist and must actually refuse, or the exemption is an assumption wearing a citation.
+     */
+    @Test
+    void theRefusalPrimitiveIsResolvedNotAssumed() {
+        String src = read(Path.of("src", "main", "java", "com", "tss", "grc", "common",
+                                  "validation", "ServerOwnedState.java"));
+        assertThat(src).contains("requireInitial").contains("throw new IllegalArgumentException");
+        assertThat(refusesTheRequestValue("ServerOwnedState.requireInitial(b.getStatus(), I, \"x\")"))
+            .isTrue();
+        assertThat(refusesTheRequestValue("VOCAB.require(b.getStatus())"))
+            .as("a ClosedVocabulary check narrows the value; it does NOT pin it to the initial "
+                + "state, so it must not buy the same exemption")
+            .isFalse();
     }
 
     /**
@@ -563,6 +968,25 @@ class ServerStampedFieldContractTest {
             .as("overwriting the state and clearing the stamp closes it — this is exactly the "
                 + "shape F2-218 applied to the three NDI services")
             .isEmpty();
+
+        // ⚠ F2-219 — the DEFAULT, driven through the SHIPPED predicate rather than through
+        // defaults() directly. Without this the subtraction could be deleted from
+        // acceptedAndStamped and the corpus would not notice: the three BY_DESIGN services do not
+        // reach the gate through a default, so the population would be unchanged and the mutation
+        // would survive. 🔑 Asserting a helper is not asserting that the helper is CONSULTED.
+        String defaulted = """
+            public Foo create(Foo body) { body.setId(null);
+              if (body.getStatus() == null) body.setStatus("PENDING"); return repo.save(body); }
+            public Foo approve(Long id) { Foo e = get(id);
+              if (!"PENDING".equals(e.getStatus())) throw new IllegalStateException("no");
+              e.setStatus("ACTIVE"); return repo.save(e); }
+            """;
+        assertThat(contradictionsIn(defaulted))
+            .as("a default leaves the caller's status intact, so the create still accepts a field "
+                + "approve() stamps behind a state check — this is DataSharingAgreementService, "
+                + "CommitteeActionItemService and PolicyManagementService#createAttestation, none "
+                + "of which appeared on F2-218's work list")
+            .contains("Foo#status");
     }
 
     /**
@@ -572,7 +996,7 @@ class ServerStampedFieldContractTest {
      */
     private static Set<String> contradictionsIn(String src) {
         List<Method> methods = publicMethods(src);
-        Map<String, Set<String>> stamped = stampedBy(methods);
+        Map<String, Set<String>> stamped = stampedBy(methods, Map.of());
         Set<String> hits = new TreeSet<>();
         for (Method m : methods) hits.addAll(acceptedAndStamped(m, stamped));
         return hits;
