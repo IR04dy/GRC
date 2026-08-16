@@ -1872,6 +1872,75 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A STATE MACHINE'S VOCABULARY AND ITS COLUMN'S CHECK ARE TWO ARTEFACTS, AND NOTHING WAS
+  COMPARING THEM** (F2-221, measured 2026-08-16). F2-220 filed two status columns as unconstrained.
+  That filing's population was **the nine registers F2-220 happened to visit**; the same structural
+  discriminator (`ServerStampedFieldContractTest#machineOwned`) finds **28** declared machines, so
+  the nine were only the subset whose create *also* accepted the field. 🔑 **A filed item inherits
+  the population of the slice that filed it — re-derive the denominator before executing a filing.**
+  Ninth appearance of F2-198's shape here, after a filename, a three-entry allow-list, a module
+  name, a controller-bearing table, an `extends` clause, a field-name list inside a fix, a name list
+  in a census and a claim shape in a gate. Measured across all 28: **12 AGREE · 7 NO CHECK (now 5) ·
+  6 constrained with no named constant to mirror · 5 not a vocabulary at all · 0 DISAGREE**. The
+  whole-database denominator is **324 state-ish text columns, 201 with no CHECK, 177 populated** —
+  do not try to close those in one sweep, most still have an open writer (F2-183).
+  ⚠⚠ **The live finding was a register the filing never mentioned: 11 of 30 ethics cases cannot be
+  advanced by ANY route, identical in dev and prod.** `EthicsCaseService.transition` opens
+  `TRANSITIONS.getOrDefault(c.getStatus(), Set.of())`; `ethics.cases` stores **INVESTIGATING (8)**
+  and **TRIAGED (3)** and neither is a KEY, so `allowed` is empty and every target throws. 🔑 **Both
+  are near-synonyms of real keys (`INVESTIGATION`, `TRIAGE`), which is exactly why nobody noticed** —
+  a reader skimming the register reads INVESTIGATING as the investigation state. A whistleblowing or
+  misconduct case that cannot be substantiated, dismissed, escalated to a regulator or closed.
+  F2-203's `audit_lc` shape in a module nobody had checked. ⚠ **Filed, not fixed, and that is the
+  rule rather than reticence**: F2-22b(v) already made `create` and `update` refuse a body-set
+  status, so these rows are seed-origin; a CHECK would fail Flyway on them and collapsing the
+  synonyms rewrites live rows in two real databases (F2-183/F2-196/F2-203). Proved live against a
+  **planted** case (F2-206), never a seeded governance record: 5/5 declared targets refused, then
+  the same case moved to `INVESTIGATION` advanced with a 200 — **the token, not the route.**
+  ⚠⚠ **"THE ROW IS STUCK" AND "THE ROW IS FINISHED" ARE THE SAME OBSERVATION unless the machine
+  declares its terminal states explicitly.** A `switch (from) { … default -> false }` machine
+  declares terminality by OMITTING a case, so a label-based scan reported `ControlAssessment`'s 17
+  dev / 16 prod `APPROVED` rows as untransitionable when they are simply approved. Only a machine
+  whose terminals are explicit keys (`"CLOSED", Set.of()`) can distinguish them — which is why the
+  ethics finding stands and that one was thrown away. Ask which shape you have before believing a
+  reachability count.
+  ⚠ **A constant that is in scope is not the constant that governs.** The scratch census reported a
+  DISAGREE on `ChangeRequest#status` by matching `OUTCOMES.contains(...)` — the vocabulary of
+  `change_requests.outcome`, in the same method — and on `NdiAssessmentCycle#status` by matching
+  `JUMP_STATUSES = Set.of("ARCHIVED")`, one jump target. `StateMachineColumnMirrorTest` resolves the
+  constant by **reflection** and the CHECK from the migration SQL, so neither mistake is available
+  to it; nothing in it is a regex over Java.
+  ⚠⚠ **HOUSE RULE 5 IS NOT ONLY ABOUT TEST DATA — `cc.definition LIKE '%[status]%'` IS A CHARACTER
+  CLASS.** It matched any definition containing s/t/a/u, i.e. every CHECK on the table, and reported
+  five registers that AGREE as DISAGREE. **CHARINDEX for literals, in detectors too.**
+  ⚠⚠ **And the gate's own claim-verifier had the same defect one layer up.**
+  `migrationDeclaresCheckOn` was `CONSTRAINT \w+ CHECK\([^;]{0,4000}?\bcolumn\b` over any file
+  whose text mentioned the table, and it reported CHECKs on `ethics.cases.status`,
+  `ethics.disclosures.status` and `risk.risk_treatments.status`, none of which has one. A
+  4000-character window around the commonest word in the schema matches a constraint on a different
+  column of a different table. 🔑 **Scope a scan to the shape of its claim** — third instance in one
+  slice. ⚙ Both errors **over**-reported, which fails loudly; the quiet direction is the dangerous one.
+  ⚠⚠ **TWO MUTATIONS SURVIVED AND NEITHER WAS A HOLE IN THE GATE.** The un-scoping mutation survived
+  because **`ethics.cases` has zero CHECK constraints**, so an un-scoped detector had nothing to
+  falsely match and answered correctly by accident — 🔑 **a negative control has to reach the code it
+  controls**, F2-220's headline one slice later, in my own harness. Re-fixtured on `bcm.gaps`, which
+  carries three vocabulary CHECKs and is not a table V376 touches, so the control keeps
+  discriminating on a pre-V376 tree. The second survived because on a green tree every constraint
+  resolves, so the unresolvable branch is unreachable from the corpus and only the pre-fix control
+  reached it; extracted as `mirrorDrift` and asserted directly. ⚙ Recorded rather than patched:
+  first-vs-last declaration is an **equivalent** mutant, because every mirrored constraint is
+  declared exactly once — now its own assertion rather than an implicit assumption. And raising a
+  decrease-only ceiling is an **invalid** mutation: you can always weaken an assertion (F2-206), and
+  a ceiling can only be tested by growing the population.
+  ⚠ **A range is not a vocabulary**, and that limit is asserted rather than accidental:
+  `CK_crisis_events_severity` is `severity BETWEEN 1 AND 5` and is deliberately invisible to this
+  gate. ⚠ V376 adds **no casing normalisation** unlike V375, and that was checked rather than
+  assumed — both writers compare case-EXACTLY, so a variant is refused at the boundary rather than
+  stored; the pre-flight THROWs if a historical row ever proves otherwise.
+  ⚙ **Filed:** the ethics 11 rows (owner decision); `BcmBiaAssessment#approvalStatus` and
+  `RiskTreatment#status` both have a named vocabulary constant and no CHECK, so they are the readiest
+  candidates after these two — blocked only on reading their writers; and the **199** remaining
+  unconstrained state columns.
 - ⚠⚠ **A CREATE THAT NAMES THE STATE SKIPS THE MACHINE'S *EVIDENCE REQUIREMENTS*, AND A GATE
   CANNOT SEE IT WHEN THE TARGET STATE ARRIVES AS A PARAMETER** (F2-220, measured 2026-08-16).
   F2-219 filed this shape as unmeasured; it is **nine registers, every field a `status`, 0 of 9
