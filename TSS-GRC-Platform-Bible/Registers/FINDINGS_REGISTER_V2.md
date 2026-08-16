@@ -2400,6 +2400,171 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-219 · A default is not a settlement — the gate F2-218 built to catch that counted one as a settlement, and hid a forged policy attestation
+
+**Found** 2026-08-16, taking F2-218's derived work list (the 8 services). **P2.**
+**Closed** the same day. No migration, no endpoint change, no frontend change.
+
+### The instrument was wrong first
+
+F2-218's headline is that **`if (x == null) x = INITIAL` is a DEFAULT, not a guard**, and its gate
+then computed the create-side answer as *"did anything overwrite the field before the save?"* — for
+which a default answers **yes**. So a defaulted field dropped out of the ACCEPTED set entirely.
+
+🔑 **F2-218's own headline, inside the gate F2-218 built to enforce it.** Worse, the positive
+control asserted the behaviour as correct, in those words: *"crucially it does NOT read as a caller
+write, which is why the create-side check must be 'did anything overwrite it before the save'"*.
+F2-159's shape — **a test can lock in a defect, and it is hardest to spot when it describes the
+code accurately.**
+
+Correcting it moved the population **8 → 9 services**, and every field it added was a **`status`**:
+the decisions.
+
+### Five detector corrections, and the direction of each
+
+| # | correction | direction | what it hid or invented |
+|---|---|---|---|
+| 1 | `readsRequest` was line-blind (`String#matches` with no `(?s)`) | **under**-reported | Every setter whose argument WRAPS. The house idiom `setStatus(ServerOwnedState.requireInitial(\n body.getStatus(), …))` wraps by width, so the four services F2-218 closed were passing the hard zero **for the wrong reason**. |
+| 2 | the refusal primitive was not recognised | would have **over**-reported | Fixing (1) alone reports `requireInitial(...)` as an acceptance — i.e. the fix F2-217/F2-218 introduced, reported as the defect it prevents. |
+| 3 | a DEFAULT counted as a settlement | **under**-reported | The finding itself: 3 registers, all `status`. |
+| 4 | a bare-identifier local aliasing caller data | **over**-reported | `NdiComplianceAssessmentService`'s correct, null-guarded update read as a contradiction. |
+| 5 | per-field `@JsonProperty(READ_ONLY)` was invisible | **over**-reported | `DataSharingAgreement#signedAt`, on F2-218's list as open, has carried the annotation all along. |
+
+🔑 **Two of them cancelled out.** (1) and (2) were both live, in opposite directions, so the CLOSED
+services passed a hard zero that neither error earned. **Two errors agreeing produce a green.**
+
+🔑 **On (5): `CLOSED_AT_THE_WIRE` names `BaseEntity`'s nine and no per-field annotations, and a
+reader who finds that subtraction present does not then ask which OTHER fields are closed the same
+way.** F2-215's headline, one level up, on the gate rather than on a fix. It is now DERIVED from the
+entity source.
+
+### The live defect it hid, probed as `ranalyst` (holds `COMPLIANCE:READ`, held by **32 roles**)
+
+| request | result |
+|---|---|
+| `POST /api/policy/attestations` `{policyId: 1, userUsername: "compliance", status: "ATTESTED", attestedAt: "2001-01-01"}` | **200**, all three stored |
+| `POST /api/policy/attestations/{id}/attest` on a record assigned to someone else | **403** |
+
+`PolicyManagementService.attest()` carries **SEC-CMP-004** — in its own words, *"only the assignee
+(or an admin override) may complete an attestation-of-record"* — plus a PENDING gate, `attestedAt`
+from the clock, the acting principal recorded in `updatedBy` *"for non-repudiation"*, an ATTEST
+audit row and a `POLICY_ATTESTED` event. **None of it ran**, and no ATTEST audit row was written, so
+the forgery is invisible to the trail an auditor reads.
+
+A policy attestation is the artefact produced to show that a **named individual** personally
+acknowledged a policy. Both endpoints are guarded by `COMPLIANCE:READ` — deliberately, because
+attesting is a duty, like the ADR-010 intake exception — so the object-level check is the *only*
+control, and the create route sat two lines away from it without one.
+
+⚠ **No permission escalation, and that is worth stating plainly.** Unlike F2-218 there is no
+403-vs-200 asymmetry: the same permission opens both routes. What is bypassed is the object-level
+authorization, the state gate, the clock, the attribution and the audit row.
+
+### Two more confirmed live, same shape
+
+- **`DataSharingAgreementService#create`** — `POST /api/privacy/data-sharing` with
+  `{status: "ACTIVE", signerName: "Nobody Who Signed This"}` → **201**, stored: a third-party
+  data-sharing agreement live and signed without `submit()` or `activate()` (which stamps
+  `signed_at` from the clock). ⚠ Its `if (status == null) DRAFT` was followed by
+  `if (!STATUSES.contains(status)) throw` — 🔑 **checking a value is IN the vocabulary is not
+  checking it is one a record may START in** (F2-217's sentence about `audit_lc`). A detector
+  cannot infer "settled" from the presence of a throw, which is exactly why the DEFAULT test is
+  scoped to the guard's own `if/else` chain.
+- **`CommitteeActionItemService#create`** — a governance action item created `COMPLETED`, never
+  passing `complete()`, which stamps `completed_at`, records the notes, writes the
+  `ACTION_COMPLETE` audit row and publishes the transition the committee pack reads.
+
+### Two refuted, both for the same reason
+
+- **`TcfdItem#approvalStatus,approvedAt,approvedBy`** — INERT. `TcfdItemCreateRequest` declares
+  none of them, and `update()`'s whitelist does not copy them. ⚠ But `approvedBy` and `approvedAt`
+  carry `@JsonProperty(READ_ONLY)` **and `approvalStatus` did not** — two of three marked, the
+  sibling left, F2-215's shape again. Closed with the annotation (F2-182: close a refuted site when
+  it gates a control), so the protection is a mechanism rather than two accidents.
+- **`ProcessorAssessment#approvedAt`** — **all seven** of the fields that create appears to accept
+  already carry `@JsonProperty(READ_ONLY)`. A scrub would be decoration, and an inert construct is
+  worse than none because it answers the question a reader was about to ask (F2-184) — so the fix
+  was **reverted** and replaced by the measurement as a comment. `ProcessorAssessmentService` is
+  deliberately NOT in `CLOSED`: listing a service that was never open makes it indistinguishable
+  from one that was read and fixed.
+
+**2 of 6 refuted** — the ~2-in-10 rate F2-188/F2-192/F2-204 each measured, and both refutations have
+one cause: **the gate measures the service layer while the closure lives at the wire.**
+
+### The shape the gate still cannot see, named rather than papered over
+
+`ClimateRiskOpportunityService#transition(Long id, String to)` enforces the linear machine and then
+writes `cur.setStatus(to)` — from a **parameter**. A scalar parameter is caller data (F2-218's third
+detector bug), so `status` never enters the STAMPED set and a create accepting it is not a
+contradiction by this gate's stated question. The mutation restoring that default **SURVIVED the
+whole build**. 🔑 **A surviving mutant the gate legitimately cannot see is an unasserted behaviour,
+not a loose instrument** — widening the gate would mean treating a caller-supplied parameter as a
+server stamp again, reinstating the correction that stopped it failing on correct code. The answer
+was a test. **Filed: every register whose transition route takes its target state as an argument is
+outside this instrument by construction.**
+
+### The figure
+
+`BASELINE_CONTRADICTED_SERVICES` **8 → 0**, with `CLOSED` at 10 and a **three-entry `BY_DESIGN` map**
+(`NdiSettingService`, `SgiCommitmentService`, `NdiComplianceAssessmentService`), each read in this
+slice and enforced in **both** directions so an entry cannot outlive its subject.
+
+⚠ **The anti-vacuity floor had to change shape with the number.** It was `>= BASELINE - 3`; at zero
+that reads `>= -3` and can never fail. 🔑 **A floor is only worth having if it sits above the largest
+WRONG answer (F2-215) — and here the wrong answer IS zero**, because a rotted detector reports an
+empty population and that is indistinguishable from a finished sweep. The floor is now the reverse
+leg over `BY_DESIGN`, which a bare count could not be.
+
+### Verification
+
+Backend **3,914/0/0** · mutation **16/16 killed, 0 survived, 0 anchor-miss** · live probe **30/30**
+post-fix (**18/22** pre-fix, where the four failures were the probe's own and are recorded below).
+Half the post-fix legs assert the guarded routes still work — SEC-CMP-004 still answers 403 to a
+non-assignee, the assignee still attests with a clock stamp and an audit row, `submit()`/`activate()`
+still run and stamp `signed_at`, `complete()` still records its notes, `approve()` still stamps the
+principal — because a slice that closed a bypass by breaking the control it protects would score
+identically. Probe run twice, identical (F2-203: a probe that writes rows must be re-runnable).
+`[REVIEW-TEST]` rows removed with `CHARINDEX`. **No frontend file changed**, so no FE run is claimed.
+
+WARNING: **four of the pre-fix probe's failures were mine, not refutations** — TCFD answers **201**
+where I asserted 200; a caller-chosen `2001-01-01` stores as `2000-12-31 21:00` because the box is
+**UTC+3** and the server is UTC; and two payloads were missing NOT NULL columns, one of them
+`title_ar` (house rule 7). ⚠ I also guessed a column (`permissions.module_code`, really `module`)
+and two tables (`policy.policy_documents` → `policy.documents`, `sust.tcfd_items` → `sust.tcfd_item`)
+— **resolve from `sys.columns`/`sys.tables`, never guess** (F2-198/F2-199, recurring).
+
+WARNING: **my own new test failed on the unmutated tree and the harness did not notice.**
+`validateAxes()` runs before the status guard in the climate create, so an incomplete fixture threw
+for the wrong reason — and the assertion passed on a message unrelated to its claim. 🔑 **A test
+that fails on the unmutated tree makes every mutation routed through it read as KILLED.** Found by
+the full suite, not by the harness; the harness was re-run against a green tree afterwards.
+
+WARNING: **ANCHOR-MISS on the one multi-line anchor, in a harness whose own docstring says the
+services are CRLF.** Second instance of F2-212 in two slices. 🔑 **Naming a trap does not exempt you
+from it** (F2-192's rule, now three-for-three).
+
+### Also
+
+F2-218's register row had **no `**Status**` cell**, so `FindingsRegisterConsistencyTest` was red on
+master for a day. That slice's final re-run named five gate classes — including the two it had just
+written — and not this one. 🔑 **A targeted re-run after a docs commit is not the suite, and the docs
+gate is precisely the gate a docs commit can break.** Corrected here.
+
+### Filed
+
+- **The transition-by-parameter blind spot** (above). Two known instances:
+  `ClimateRiskOpportunityService#transition` and `TcfdItemService#transition`. The population is
+  unmeasured; measuring it is the next slice's first job.
+- `TcfdItem#approvalStatus` is **NULL** on a fresh row, not `PENDING`, although `APPROVAL_STATUSES`
+  declares `PENDING` and the entity has no default. Pre-existing; unchanged deliberately.
+- The **48** remaining `NEEDS-VERDICT` rows in `MassAssignmentRatchetTest`, and the **83
+  entity-bound PUT handlers** (F2-22), still the structural root of this whole family.
+
+| **Status** | ✅ **CLOSED 2026-08-16.** Five detector corrections, three live defects fixed, two refuted and one reverted as dead code. `BASELINE_CONTRADICTED_SERVICES` 8 → 0; `CLOSED` 10 services; `BY_DESIGN` 3, verified by reading and enforced both ways. |
+| **Lesson** | 🔑 **F2-218's headline inside the gate F2-218 built: a default and a guard are indistinguishable to any scan that only asks whether the setter is present — including one written to answer that very finding.** And **two detector errors in opposite directions produce a green that neither one earns.** |
+
+---
+
 ## F2-218 · A caller holding only NDI:WRITE could approve NDI evidence, and the comment removing the reviewer's name sat one line above the decision itself
 
 **Found** 2026-08-15, taking F2-217's filed work list (the 55 NEEDS-VERDICT rows). **P2.**
@@ -2533,6 +2698,16 @@ from.**
   `NdiComplianceAssessment` (5 fields); `NdiSetting#valueText`;
   `SustainabilityEvidence#supersedesId`. Some will be BY DESIGN - an M&A letter-of-intent signing
   date is genuinely the caller's - which is why they are a work list and not a verdict.
+
+| **Status** | ✅ **CLOSED 2026-08-15.** Fix `bbdbd1c1`, docs `279a3f08`, tracker `953969f0`. The three NDI registers refuse a create that names a non-initial state; `ServerStampedFieldContractTest` holds four services at a hard zero and the remainder on a derived work list. F2-219 then took that list — and found this entry's own numbers under-measured, because the gate counted a DEFAULT as a settlement. |
+| **Lesson** | 🔑 **Removing the attribution while leaving the decision means a WRITE-only caller can approve, and the record just does not say who** — the comment naming `reviewerName` as server-stamped sat one line above the two lines copying `status` and `reviewedAt`. And **`if (x == null) x = INITIAL` is a default, not a guard: the discriminator is not the guard, it is the VALUE.** |
+
+⚠ **This row had no `**Status**` cell until F2-219 added it, and the suite says so.**
+`FindingsRegisterConsistencyTest.everyRowExposesAState` was red on master for a day. The slice's
+final re-run covered five gate classes by name — including the two it had just written — and not
+this one. 🔑 **A targeted re-run after a docs commit is not the suite, and the docs gate is
+precisely the gate a docs commit can break.** Run the suite after the last commit, not the last
+code commit.
 - `MassAssignmentRatchetTest`'s remaining **48** NEEDS-VERDICT rows (was 55; 7 adjudicated here:
   5 CLOSED, 1 INERT, 1 BY DESIGN).
 - The **83 entity-bound PUT handlers** (F2-22) remain the structural root.

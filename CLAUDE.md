@@ -1872,6 +1872,93 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A DEFAULT IS NOT A SETTLEMENT, AND THE GATE F2-218 BUILT TO CATCH THAT COUNTED ONE AS A
+  SETTLEMENT** (F2-219, measured 2026-08-16). F2-218's headline is that
+  `if (x == null) x = INITIAL` is a default, not a guard; its gate then computed the create-side
+  answer as *"did anything overwrite the field before the save?"*, for which a default answers
+  **yes** — so a defaulted field dropped out of the ACCEPTED set. 🔑 **F2-218's own headline, inside
+  the instrument F2-218 built to enforce it**, and the positive control **asserted the behaviour as
+  correct** in those words (*"crucially it does NOT read as a caller write, which is why the
+  create-side check must be 'did anything overwrite it before the save'"*) — F2-159's shape, a test
+  that locks in a defect and is hardest to spot because it describes the code accurately.
+  Correcting it moved the population **8 → 9 services**, and **every field it added was a `status`**.
+  ⚠⚠ **THE LIVE DEFECT IT HID WAS A FORGED POLICY ATTESTATION.** Probed as `ranalyst`, who holds
+  `COMPLIANCE:READ` and nothing else — the permission guarding **both** routes, held by **32 roles**:
+  `POST /api/policy/attestations {userUsername: "compliance", status: "ATTESTED", attestedAt:
+  "2001-01-01"}` → **200 with all three stored**, while `POST /attestations/{id}/attest` on a record
+  assigned to someone else → **403**. `attest()` carries **SEC-CMP-004** — *"only the assignee (or an
+  admin override) may complete an attestation-of-record"* — plus a PENDING gate, the clock, the
+  acting principal in `updatedBy` *"for non-repudiation"*, an ATTEST audit row and a POLICY_ATTESTED
+  event. **None of it ran, and no ATTEST row was written**, so the forgery is invisible to the trail
+  an auditor reads. A policy attestation is the artefact showing a **named individual** acknowledged
+  a policy. ⚠ **No permission escalation here**, unlike F2-218: the same permission opens both
+  routes (deliberately — attesting is a duty, like the ADR-010 intake exception), so the
+  object-level check is the *only* control and the create sat two lines from it without one.
+  ⚠⚠ **CHECKING THAT A VALUE IS IN THE VOCABULARY IS NOT CHECKING THAT IT IS ONE A RECORD MAY START
+  IN** (F2-217's sentence about `audit_lc`, now a detector rule). `DataSharingAgreementService#create`
+  defaulted to DRAFT and then threw on `!STATUSES.contains(status)` — which admits `ACTIVE`, so a
+  third-party data-sharing agreement could be created live and signed, skipping `submit()` and
+  `activate()` (which stamps `signed_at` from the clock). 🔑 **A detector cannot infer "settled" from
+  the presence of a throw**; the DEFAULT test is scoped to the guard's own `if/else` chain, which is
+  what correctly excludes `ProcessorAssessmentService#create`'s refusing `else if`.
+  ⚠⚠ **FIVE DETECTOR CORRECTIONS, AND TWO OF THEM CANCELLED EACH OTHER OUT.** (1) `readsRequest`
+  used `String#matches` with **no `(?s)`**, so every setter whose argument WRAPS read as mentioning
+  nothing — and the house idiom `setStatus(ServerOwnedState.requireInitial(\n body.getStatus(), …))`
+  wraps by width, so **the four services F2-218 closed were passing the hard zero for the wrong
+  reason**. (2) fixing (1) alone reports the refusal primitive as an acceptance, i.e. **the fix
+  F2-217/F2-218 introduced, reported as the defect it prevents**. (3) the DEFAULT. (4) a bare-
+  identifier **local** aliasing caller data (`String j = note != null ? note : cur.getX(); e.setX(j)`)
+  read as a server stamp, so a correct null-guarded update read as a contradiction — F2-197's *a rule
+  keyed on a name cannot see the local alias*, in the opposite direction. (5) per-field
+  `@JsonProperty(access = READ_ONLY)` was invisible. 🔑 **Two errors in opposite directions produce a
+  green that neither one earns.**
+  ⚠⚠ **`CLOSED_AT_THE_WIRE` NAMES `BaseEntity`'S NINE AND NO PER-FIELD ANNOTATIONS, AND A READER WHO
+  FINDS THAT SUBTRACTION PRESENT DOES NOT ASK WHICH OTHER FIELDS ARE CLOSED THE SAME WAY.** F2-215's
+  headline one level up, on the gate rather than on a fix. `DataSharingAgreement#signedAt` was on
+  F2-218's work list as open and has carried the annotation all along; **all seven**
+  `ProcessorAssessment` fields likewise, so that "fix" was **reverted** as dead code (F2-184: an
+  inert construct is worse than none, because it answers the question a reader was about to ask) and
+  the service is deliberately **not** listed as CLOSED — listing one that was never open makes it
+  indistinguishable from one that was read and fixed. Now DERIVED from the entity source.
+  ⚠ Conversely `TcfdItem` marked `approvedBy` and `approvedAt` READ_ONLY and **left
+  `approvalStatus`** — two of three, sibling forgotten, F2-215 again; it was INERT only because the
+  create DTO omits it and `update()`'s whitelist skips it. **Two accidents are not a mechanism**;
+  closed with the annotation (F2-182).
+  ⚠⚠ **THE SHAPE THIS GATE STILL CANNOT SEE, NAMED RATHER THAN PAPERED OVER: a transition whose
+  TARGET STATE ARRIVES AS A PARAMETER.** `ClimateRiskOpportunityService#transition(Long id, String
+  to)` enforces the linear machine and writes `cur.setStatus(to)`; a scalar parameter is caller data,
+  so `status` never enters the STAMPED set and a create accepting it is not a contradiction by this
+  gate's stated question — the mutation restoring that default **SURVIVED the whole build**.
+  🔑 **A surviving mutant the gate legitimately cannot see is an unasserted behaviour, not a loose
+  instrument** (F2-218's rule, second application): widening it would mean treating a caller-supplied
+  parameter as a server stamp again. The answer is a test. **Filed — the population of
+  transition-by-parameter registers is unmeasured.**
+  ⚠⚠ **AN ANTI-VACUITY FLOOR HAS TO CHANGE SHAPE WHEN THE FIGURE REACHES ZERO.** The floor was
+  `>= BASELINE - 3`; at `BASELINE = 0` that reads `>= -3` and can never fail. 🔑 **A floor is only
+  worth having if it sits above the largest WRONG answer (F2-215) — and here the wrong answer IS
+  zero**, because a rotted detector reports an empty population and that is indistinguishable from a
+  finished sweep. Replaced by a reverse leg over a three-entry `BY_DESIGN` map (each read in the
+  slice, enforced both ways) — which a bare count could not be.
+  ⚠ **My own new test failed on the UNMUTATED tree and the harness scored it as a kill.**
+  `validateAxes()` runs before the status guard in the climate create, so an incomplete fixture threw
+  for the wrong reason and the assertion passed on an unrelated message. 🔑 **A test that fails on the
+  unmutated tree makes every mutation routed through it read as KILLED** — the full suite found it,
+  the harness could not, and the harness was re-run against a green tree afterwards.
+  ⚠ **ANCHOR-MISS on the one multi-line anchor, in a harness whose own docstring says the services
+  are CRLF** — second instance of F2-212 in two slices. 🔑 Naming a trap does not exempt you from it.
+  ⚠ **Four pre-fix probe "failures" were mine**: TCFD answers **201** where I asserted 200; a
+  caller-chosen `2001-01-01` stores as `2000-12-31 21:00` because this box is **UTC+3** and the
+  server is UTC; and two payloads omitted NOT NULL columns, one of them `title_ar` (house rule 7).
+  I also guessed one column (`iam.permissions.module_code`, really `module`) and two tables
+  (`policy.policy_documents` → `policy.documents`, `sust.tcfd_items` → `sust.tcfd_item`) — **resolve
+  from `sys.columns`/`sys.tables`, never guess**, recurring since F2-198.
+  ⚠ **F2-218's register row shipped with no `**Status**` cell and `FindingsRegisterConsistencyTest`
+  was red on master for a day.** That slice's final re-run named five gate classes — including the
+  two it had just written — and not this one. 🔑 **A targeted re-run after a docs commit is not the
+  suite, and the docs gate is precisely the gate a docs commit can break.**
+  ⚙ **Filed:** the transition-by-parameter population; `TcfdItem#approvalStatus` is NULL rather than
+  `PENDING` on a fresh row although the vocabulary declares PENDING; the **48** remaining
+  NEEDS-VERDICT rows; the **83 entity-bound PUT handlers** (F2-22), still the structural root.
 - ⚠⚠ **A CREATE THAT NAMES THE STATE IS A TRANSITION NOBODY GUARDED, AND THE COMMENT REMOVING ONE
   FIELD FROM THE WHITELIST SAT ONE LINE ABOVE THE DECISION ITSELF** (F2-218, measured 2026-08-15).
   `NdiEvidenceItemService.approve()` carries the SEC-NDI-003 maker/checker control — `NDI:APPROVE`
