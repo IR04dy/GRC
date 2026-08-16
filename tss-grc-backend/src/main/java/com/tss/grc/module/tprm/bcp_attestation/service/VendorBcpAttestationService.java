@@ -1,6 +1,7 @@
 package com.tss.grc.module.tprm.bcp_attestation.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -197,9 +198,18 @@ public class VendorBcpAttestationService {
         if (req != null) {
             a.setReviewerCommentEn(req.reviewerCommentEn());
             a.setReviewerCommentAr(req.reviewerCommentAr());
-            a.setReviewedByName(req.reviewedByName());
-            a.setReviewedByUserId(req.reviewedByUserId());
         }
+        // F2-224 — the reviewer is the authenticated principal, never a body field. All three
+        // routes reaching here (accept / reject / mark-out-of-scope) are guarded by
+        // TPRM:WRITE, so a principal always exists; the frontend was asking the operator to
+        // TYPE a reviewer name into a prompt placeholdered with an invented officer.
+        //
+        // ⚠ Do NOT copy this to doSubmit(). That method's other caller is submitByToken, whose
+        // route is @PreAuthorize("permitAll()") — the vendor portal, where the submitter is an
+        // external contact and there is no principal to resolve at all. The two halves of this
+        // class genuinely differ, which is why only one of them was closed.
+        a.setReviewedByName(CurrentActor.username());
+        a.setReviewedByUserId(CurrentActor.userId());
         a.setReviewedAt(now);
         a.setUpdatedAt(now);
 

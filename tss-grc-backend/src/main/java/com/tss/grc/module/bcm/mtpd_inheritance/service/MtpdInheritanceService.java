@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.mtpd_inheritance.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.entity.BiaRecord;
 import com.tss.grc.module.bcm.entity.CriticalProcess;
@@ -406,8 +407,11 @@ public class MtpdInheritanceService {
         LocalDateTime now = LocalDateTime.now();
         a.setIsPublished(true);
         a.setPublishedAt(now);
+        // F2-224 — publishing an MTPD inheritance assessment for audit/board is an act, and the
+        // server stamps publishedAt from its own clock one line above. Whoever released these
+        // figures to the audit committee is the authenticated principal, not a body field.
+        a.setPublishedByUserId(CurrentActor.userId());
         if (req != null) {
-            if (req.publishedByUserId() != null) a.setPublishedByUserId(req.publishedByUserId());
             if (req.notesEn() != null) a.setNotesEn(req.notesEn());
             if (req.notesAr() != null) a.setNotesAr(req.notesAr());
         }

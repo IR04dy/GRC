@@ -127,7 +127,7 @@ class ErmGapServiceTest {
         when(risks.findById(99L)).thenReturn(Optional.of(other));
 
         assertThatThrownBy(() -> service.attestRisk(99L,
-            new ErmGapService.AttestBody("CONFIRMED", "ok", "موافق", "Tester")))
+            new ErmGapService.AttestBody("CONFIRMED", "ok", "موافق")))
             .isInstanceOf(EntityNotFoundException.class);
 
         verify(riskAttestations, never()).save(any());
@@ -143,14 +143,18 @@ class ErmGapServiceTest {
 
         ArgumentCaptor<RiskAttestation> cap = ArgumentCaptor.forClass(RiskAttestation.class);
 
+        // F2-224 — the attester is the authenticated principal, not a body field.
+        authAs("khalid.mutairi", 51L);
         service.attestRisk(1L, new ErmGapService.AttestBody("CONFIRMED",
-            "Risk reviewed, controls effective", "تمت المراجعة", "Khalid Al-Mutairi"));
+            "Risk reviewed, controls effective", "تمت المراجعة"));
 
         verify(riskAttestations).save(cap.capture());
         RiskAttestation saved = cap.getValue();
         assertThat(saved.getOrganisationId()).isEqualTo(ORG_ID);
         assertThat(saved.getRiskId()).isEqualTo(1L);
         assertThat(saved.getDecision()).isEqualTo("CONFIRMED");
+        // F2-224 — was: whatever the caller typed. A risk attestation names a person.
+        assertThat(saved.getAttestedByName()).isEqualTo("khalid.mutairi");
         assertThat(saved.getNextDueDate()).isEqualTo(LocalDate.now().plusDays(90));
         // And the risk's own next_attestation_date got advanced.
         assertThat(r.getNextAttestationDate()).isEqualTo(LocalDate.now().plusDays(90));
@@ -165,9 +169,26 @@ class ErmGapServiceTest {
 
         ArgumentCaptor<RiskAttestation> cap = ArgumentCaptor.forClass(RiskAttestation.class);
 
-        service.attestRisk(1L, new ErmGapService.AttestBody("", null, null, null));
+        authAs("khalid.mutairi", 51L);
+        service.attestRisk(1L, new ErmGapService.AttestBody("", null, null));
 
         verify(riskAttestations).save(cap.capture());
         assertThat(cap.getValue().getDecision()).isEqualTo("CONFIRMED");
     }
+
+    /**
+     * F2-224 — a real principal in the SecurityContext, because the service now takes the actor
+     * from {@code CurrentActor} rather than from the request. {@code CurrentActor} requires the
+     * principal to be a {@link com.tss.grc.security.GrcUserDetails}, so a bare username token
+     * would resolve to null and the assertion would be about nothing.
+     */
+    private static void authAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, 1L, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
+    }
+
 }

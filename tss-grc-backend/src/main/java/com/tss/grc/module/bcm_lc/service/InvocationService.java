@@ -1,6 +1,7 @@
 package com.tss.grc.module.bcm_lc.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.platform.realtime.RealtimeBroadcaster;
 import jakarta.persistence.EntityNotFoundException;
@@ -107,7 +108,12 @@ public class InvocationService {
 
         if ("DECLARED".equals(req.getStatus())) {
             v.setDeclaredAt(now);
-            if (req.getDeclaredBy() != null) v.setDeclaredBy(req.getDeclaredBy());
+            // F2-224 — declaring a BCP invocation is an act, and the server stamps when it
+            // happened from its own clock on the line above. Because declaredAt is "now", the
+            // declaration IS this call, so its declarer is this caller and cannot be a body
+            // field. (Contrast CrossBorderTransferService#assess, which lets the caller supply
+            // the clock too — there the act may have happened earlier and elsewhere.)
+            v.setDeclaredBy(CurrentActor.username());
         }
         if ("INVOKED".equals(req.getStatus())) {
             v.setInvokedAt(now);
@@ -120,6 +126,19 @@ public class InvocationService {
         }
         if ("STAND_DOWN".equals(req.getStatus())) {
             v.setStandDownAt(now);
+            // F2-224 — FILED, deliberately not changed. Structurally this is the same split as
+            // declaredBy above: the server stamps standDownAt from its own clock and the caller
+            // says who authorised it. It differs in that the field names a DISTINCT ROLE rather
+            // than the verb — a crisis stand-down is authorised by the CMT chair or an
+            // executive and typically recorded by the BCM coordinator, so the authoriser may
+            // genuinely not be the caller. Which of the two this register wants is an owner
+            // decision (the CrossBorderTransferService#assess::residencyCheckBy shape).
+            //
+            // 🔑 Worth knowing for the instrument, not just this field: NEITHER the shipped
+            // SplitAttributionContractTest NOR the permissive re-derivation F2-224 ran can see
+            // this pair, because "standDown" and "authoriser" share no root — the actor field
+            // names the ROLE PERFORMED instead of the verb, so no root-matching detector can
+            // pair them. It was found by reading. That shape is named in the gate's javadoc.
             if (req.getStandDownAuthoriser() != null) v.setStandDownAuthoriser(req.getStandDownAuthoriser());
             if (req.getEstimatedLossSar() != null)    v.setEstimatedLossSar(req.getEstimatedLossSar());
         }

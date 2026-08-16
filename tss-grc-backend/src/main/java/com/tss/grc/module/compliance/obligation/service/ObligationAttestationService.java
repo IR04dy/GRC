@@ -1,6 +1,7 @@
 package com.tss.grc.module.compliance.obligation.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.AttestationRecordRequest;
 import com.tss.grc.module.compliance.obligation.dto.ObligationDtos.AttestationResponse;
@@ -127,8 +128,24 @@ public class ObligationAttestationService {
         guardAttest(from, req.attestationStatus());
 
         LocalDateTime now = LocalDateTime.now();
+        // F2-224 — the attester is the authenticated principal, never a body field. An
+        // obligation attestation is the artefact recording that a NAMED person asserted the
+        // organisation met a regulatory obligation for a period; the server stamping attestedAt
+        // from its own clock below is it declaring that it is the recorder of that act.
+        //
+        // This REFUSES rather than storing null, and that is not a new obligation on callers:
+        // AttestationRecordRequest already carried @NotNull @Positive on the field, so the
+        // server demanded an attribution it never verified (F2-223's annual-plan shape). The
+        // frontend was sending the literal 1 with the comment "wired via JWT claim in v2", so
+        // every attestation on the tenant was filed against user 1 whoever was signed in.
+        Long attester = CurrentActor.userId();
+        if (attester == null) {
+            throw new IllegalStateException(
+                "No authenticated principal to record as the attester of obligation "
+                + req.obligationId() + ". An attestation with no attester is not an attestation.");
+        }
         a.setAttestationStatus(req.attestationStatus());
-        a.setAttestedByUserId(req.attestedByUserId());
+        a.setAttestedByUserId(attester);
         a.setAttestedAt(now);
         a.setAttestationTextEn(req.attestationTextEn());
         a.setAttestationTextAr(req.attestationTextAr());
@@ -151,8 +168,11 @@ public class ObligationAttestationService {
         // attestation is genuine (ATTESTED / ATTESTED_WITH_EXCEPTIONS).
         if ("ATTESTED".equals(saved.getAttestationStatus())
                 || "ATTESTED_WITH_EXCEPTIONS".equals(saved.getAttestationStatus())) {
+            // F2-224 — read the attester off the SAVED ROW, never off the request: the roll
+            // forward records who moved the obligation's next due date, and if that disagreed
+            // with the row it would be a second, unverified attribution of the same act.
             obligationService.rollForwardAfterAttestation(
-                saved.getObligationId(), req.attestedByUserId(), now);
+                saved.getObligationId(), saved.getAttestedByUserId(), now);
         }
 
         audit.log("ATTEST", "ObligationAttestation", saved.getId(),
@@ -175,8 +195,20 @@ public class ObligationAttestationService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+        // F2-224 — the reviewer is the authenticated principal. Same reasoning as
+        // recordAttestation above, and the same pre-existing @NotNull on the request field, so
+        // refusing cannot break a caller who is supplying one today. Note the two routes share
+        // roles (COMPLIANCE_OFFICER, CISO, PLATFORM_ADMIN), so an attester can still review
+        // their own attestation — but until both ends were stamped from the principal the
+        // platform could not even SEE that, because both were whatever the caller typed.
+        Long reviewer = CurrentActor.userId();
+        if (reviewer == null) {
+            throw new IllegalStateException(
+                "No authenticated principal to record as the reviewer of attestation " + id
+                + ". A review with no reviewer is not a review.");
+        }
         a.setReviewerDecision(req.reviewerDecision());
-        a.setReviewerUserId(req.reviewerUserId());
+        a.setReviewerUserId(reviewer);
         a.setReviewedAt(now);
         a.setReviewerCommentEn(req.reviewerCommentEn());
         a.setReviewerCommentAr(req.reviewerCommentAr());

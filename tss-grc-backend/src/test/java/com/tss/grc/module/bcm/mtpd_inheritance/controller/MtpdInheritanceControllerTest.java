@@ -70,7 +70,7 @@ class MtpdInheritanceControllerTest {
 
     @Test void publish_dispatchesToService() {
         when(service.publishAssessment(eq(5001L), any())).thenReturn(stub(5001L, true));
-        AssessmentResponse out = controller.publish(5001L, new PublishRequest(null, null, 42L));
+        AssessmentResponse out = controller.publish(5001L, new PublishRequest(null, null));
         assertThat(out.isPublished()).isTrue();
     }
 

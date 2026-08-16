@@ -138,9 +138,9 @@ export const ermGap = {
   appetiteVariance: () =>
     api.get<AppetiteVariance>('/api/v1/risk/appetite/variance'),
 
+  // F2-224 — attestedByName removed; the server stamps the attester from the principal.
   attest: (riskId: number, body: {
     decision: string; statementEn?: string; statementAr?: string;
-    attestedByName?: string;
   }) =>
     api.post<RiskAttestation>(`/api/v1/risk/risks/${riskId}/attestations`, body),
 

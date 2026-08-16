@@ -63,12 +63,15 @@ class InvocationServiceTest {
         when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(invocation("STANDBY")));
         when(repo.save(any(Invocation.class))).thenAnswer(inv -> inv.getArgument(0));
 
+        // F2-224 — declaredBy is no longer a request field. declaredAt is stamped from
+        // the server's clock, so the declaration IS this call and its declarer is the
+        // caller. Was: r.setDeclaredBy("CISO") and an assertion that "CISO" came back.
+        authAs("bcm.coordinator", 61L);
         InvocationDto.TransitionRequest r = req("DECLARED");
-        r.setDeclaredBy("CISO");
         InvocationDto result = service.transition(EXT_ID, r);
 
         assertThat(result.getStatus()).isEqualTo("DECLARED");
-        assertThat(result.getDeclaredBy()).isEqualTo("CISO");
+        assertThat(result.getDeclaredBy()).isEqualTo("bcm.coordinator");
         assertThat(result.getDeclaredAt()).isNotNull();
     }
 
@@ -125,4 +128,20 @@ class InvocationServiceTest {
         assertThatThrownBy(() -> service.transition("INV-X", req("DECLARED")))
             .isInstanceOf(EntityNotFoundException.class);
     }
+
+    /**
+     * F2-224 — a real principal in the SecurityContext, because the service now takes the actor
+     * from {@code CurrentActor} rather than from the request. {@code CurrentActor} requires the
+     * principal to be a {@link com.tss.grc.security.GrcUserDetails}, so a bare username token
+     * would resolve to null and the assertion would be about nothing.
+     */
+    private static void authAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, 1L, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
+    }
+
 }

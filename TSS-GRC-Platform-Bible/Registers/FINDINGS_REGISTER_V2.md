@@ -2400,6 +2400,119 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-224 · Two detector errors in opposite directions, and the green neither earned
+
+**Found** 2026-08-16, executing F2-223's filed work list. **P2** — six governance registers,
+including two statutory attestation-of-record surfaces, recorded a person the caller named. One
+frontend screen filed **every** attestation on the tenant against user id 1. **Closed** the same
+day. No migration; 6 backend services, 8 request-DTO fields, 2 frontend surfaces.
+
+### The filing was executable, and re-deriving it first is what found the instrument bug
+
+F2-223 shipped **10 unadjudicated sites** as a work list, deliberately without reasons (F2-188).
+Per F2-221 — *a filed item inherits the population of the slice that filed it* — the denominator
+was re-derived before the list was executed. A deliberately **permissive** pairing (a set of
+candidate verb keys per field rather than one reduced root) found **15** sites where the shipped
+detector's green build pins the population at exactly **13**.
+
+The two extra were `EvidenceReviewService#create::reviewerId` and
+`MlModelAuditService#recordAudit::auditorUserId` — and **both are refuted**, by the rule F2-223
+itself recorded: the clock in each is `req.x() == null ? now() : req.x()`, a caller-supplied value
+with a fallback, not a server stamp. An ISO/IEC 42001 model audit is routinely performed by an
+external firm; `MlModelAudit` declares `auditorExternalParty` one line below `auditorUserId`.
+
+🔑 **The finding about the instrument: the two sites were absent from the population for an
+accidental reason, and absent reads identically to correctly excluded.** The root reduction could
+not pair `auditDate` with `auditorUserId`; had it been able to, `isServerClock` would have
+reported both as splits. **Two defects in opposite directions produced a green that neither
+earned** — F2-219's rule, now inside the gate F2-223 built. The widening (`…Date`/`…On` are WHEN
+fields; pair on a key SET) and the narrowing (a clock the caller may override is not a stamp) are
+therefore one commit. Widening alone manufactures two confident false findings whose obvious
+"fix" forges an attribution onto an external auditor's work.
+
+### The ten, adjudicated
+
+**8 CONFIRMED and closed · 2 BY DESIGN (verified, not guessed) · 0 left open.**
+
+| site | verdict |
+| `ObligationAttestationService#recordAttestation::attestedByUserId` | CLOSED — attestation of record |
+| `ObligationAttestationService#reviewAttestation::reviewerUserId` | CLOSED |
+| `VendorBcpAttestationService#transitionAttestation::reviewedByName` + `reviewedByUserId` | CLOSED — all three routes `TPRM:WRITE` |
+| `ErmGapService#attestRisk::attestedByName` | CLOSED — a named person confirms a residual score |
+| `InvocationService#transition::declaredBy` | CLOSED — `declaredAt` is *now*, so the act is this call |
+| `RegulatoryChangeService#transition::assessedBy` | CLOSED |
+| `MtpdInheritanceService#publishAssessment::publishedByUserId` | CLOSED |
+| `VendorBcpAttestationService#doSubmit::submittedByContactEmail` + `…Name` | **BY DESIGN** |
+
+🔑 **F2-223 guessed exactly one thing and marked it a guess — and it was right.** The vendor-portal
+pair is by design: `doSubmit`'s second caller is `submitByToken`, whose route is
+`@PreAuthorize("permitAll()")`, so there is no principal to resolve at all. **A correct guess and
+a verified claim are indistinguishable in prose**, which is the entire argument for keeping
+`WORK_LIST` and `BY_DESIGN` as two buckets rather than one map of reasons.
+
+### The live half — probed 12/12 pre-fix and 12/12 post-fix on PLANTED rows
+
+Every leg as `compliance` (user 3), forging user 4 / `"Nobody Who Approved This"`. F2-206: a probe
+demonstrating a forgery plants its own victim.
+
+| leg | pre-fix | post-fix |
+| obligation attestation with `attestedByUserId: 4` | **stored 4** (actor is 3) | stored 3 |
+| the same, **omitting** the attester | **400 — required** | 201, records the principal |
+| obligation review with `reviewerUserId: 4` | **stored 4** | stored 3 |
+| regulatory change → ASSESSED with a forged `assessedBy` | **stored the forgery** | `"compliance"` |
+| BCP invocation → DECLARED with a forged `declaredBy` | **stored the forgery** | `"compliance"` |
+| risk attestation with a forged `attestedByName` | **stored the forgery** | `"compliance"` |
+
+⚠⚠ **`AttestationRecordRequest` carried `@NotNull @Positive Long attestedByUserId`, so the server
+REQUIRED an attribution it never verified** — third instance of that exact shape after F2-223's
+annual plan, and the reason the fix refuses rather than storing null: the request contract already
+made it mandatory, so no working caller is broken.
+
+### The frontend half
+
+`ObligationDetailPage` sent `attestedByUserId: 1, // current user — wired via JWT claim in v2` and
+`reviewerUserId: 1`. **Every obligation attestation and every review recorded from that screen was
+filed against user id 1 regardless of who was signed in** — a comment promising a fix, load-bearing
+for two years. `VendorBcpCampaignDetailPage` asked the operator to TYPE the reviewer into a prompt
+placeholdered `'e.g. Salman Al-Otaibi (TPRM Lead)'` — **seventh recorded instance of an invented
+officer in a placeholder teaching an operator to type somebody else's name.**
+
+### The shape no root-matching detector can see, named rather than papered over
+
+`InvocationService#transition` writes `setStandDownAt(now)` and, three lines below the `declaredBy`
+this slice closed, `standDownAuthoriser` from the request. Structurally the same split — and
+**invisible to the shipped detector AND to the permissive re-derivation**, because the actor field
+names the ROLE PERFORMED (`authoriser`) rather than the verb (`standDown`), so the two halves share
+no root. It was found by reading. `anActorFieldNamingTheRoleRatherThanTheVerbIsNotPaired()` asserts
+the blind spot so it cannot be mistaken for coverage; the site itself is **filed, not blessed** — a
+crisis stand-down is authorised by the CMT chair and typically recorded by the coordinator.
+
+### Two more instrument corrections, both in gates written by earlier slices of this lineage
+
+⚠ **`noReasonIsABareLabel` demanded `REFUTED` or `FILED`** — the two verdicts F2-223 happened to
+have reached — and rejected a correct, verified `BY DESIGN` reason. F2-217's headline (*a census
+keyed on a list measures the list*) applied to a **gate's own verdict vocabulary**. The failure
+mode is the benign-looking one: it hides no defect, it pushes the next author to reword a true
+statement until the regex is happy.
+
+⚠ **The gate keys sites on a SIMPLE class name**, and `RegulatoryChangeService` exists in both
+`module/compliance` and `module/regchange` (F2-222 measured 15 entity names declared twice). Only
+one has the pair, so nothing collapses today — *a fact about today, not a property of the key, and
+nobody was maintaining it*. `aSiteKeyResolvesToExactlyOneFile()` now fails if two files ever
+produce one key.
+
+| | |
+|---|---|
+| **Severity** | **P2** — forged attribution on two attestation-of-record surfaces (SAMA obligation attestation, IIA/TPRM vendor BCP review), one ERM risk attestation, one NCEMA BCP invocation declaration |
+| **Current State** | Closed. `WORK_LIST` **10 → 0** (hard zero); `BY_DESIGN` 3 → 4 (2 added, 1 removed — `CrossBorderTransferService#assess::residencyCheckBy` is now excluded **structurally** by the caller-defaultable-clock rule rather than by a hand-written reason, which is strictly better: it covers every future site of the shape and cannot rot) |
+| **Recommendation** | The `standDownAuthoriser` shape needs an owner decision, not a wider regex. Do **not** close it by pairing on semantics until somebody decides whether that column means *the caller* or *the executive who authorised it* |
+| **Effort** | **M** |
+| **Priority** | **Done** |
+| **Verification** | Backend **3,971/0/0** (was 3,968; +3 gate legs) · FE `tsc --noEmit` clean · FE **756/756** · `SplitAttributionContractTest` **11/11** · live probe **12/12 pre-fix, 12/12 post-fix** against planted rows as `compliance` · **pre-fix control**: the shipped detector run over `git show master:` fires on **12** sites — the 4 `BY_DESIGN` plus all 8 this slice closed; the same mirror reproduces the shipped gate's **4** on HEAD before its master answer was trusted (F2-217) · 13 planted `[REVIEW-TEST]` rows deleted with CHARINDEX, all four registers back to baseline (12/32/14/3) · dev and prod identical across all six registers |
+| **Status** | ✅ **CLOSED 2026-08-16** |
+| **References** | `security/SplitAttributionContractTest`, `ObligationAttestationService`, `VendorBcpAttestationService`, `ErmGapService`, `InvocationService`, `RegulatoryChangeService`, `MtpdInheritanceService`, `pages/compliance/ObligationDetailPage.tsx`, `pages/tprm/VendorBcpCampaignDetailPage.tsx`, `common/validation/RequestSizeCapMirrorTest` (floor 8 → 7) |
+| **Lesson** | **Two detector errors in opposite directions produce a green that neither earns, and the one that SHRINKS the population is what hides the other.** The root reduction could not pair `auditDate` with `auditorUserId`; that miss is the only reason `isServerClock` never mis-reported a caller-defaultable clock as a server stamp. Fixing either alone is wrong — widening manufactures two false findings, narrowing alone changes nothing visible. 🔑 And the second-order lesson: **a filed work list is executable exactly once, and re-deriving its denominator first is what turns executing it into measuring it.** F2-223's list was correct; the value of re-deriving was not correcting the list but discovering that the gate producing it was green for the wrong reason |
+
 ## F2-223 · The server stamps WHEN, the caller says WHO — one attribution split across two owners
 
 **Found** 2026-08-16, re-deriving F2-222's filed denominator. **P2** — eleven governance and

@@ -149,11 +149,14 @@ export interface AttestationSubmitRequest {
   submittedByContactName?: string;
 }
 
+/**
+ * F2-224 — reviewedByName/reviewedByUserId are gone: the server stamps the reviewer from the
+ * authenticated principal. They remain on the RESPONSE type above, which is where they belong —
+ * the register still displays who reviewed each attestation, it just no longer asks the browser.
+ */
 export interface AttestationReviewRequest {
   reviewerCommentEn?: string;
   reviewerCommentAr?: string;
-  reviewedByName?: string;
-  reviewedByUserId?: number;
 }
 
 // ─── Catalogs / labels ────────────────────────────────────────────────

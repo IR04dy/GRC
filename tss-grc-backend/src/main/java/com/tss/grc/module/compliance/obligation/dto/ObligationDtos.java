@@ -124,7 +124,9 @@ public final class ObligationDtos {
         LocalDate periodEnd,
         @NotNull LocalDate dueDate,
         @NotBlank @Pattern(regexp = "ATTESTED|ATTESTED_WITH_EXCEPTIONS|NOT_APPLICABLE") String attestationStatus,
-        @NotNull @Positive Long attestedByUserId,
+        // F2-224 — attestedByUserId is gone. It carried @NotNull @Positive, so the server
+        // REQUIRED an attribution it never verified; the attester is now the authenticated
+        // principal (ObligationAttestationService#recordAttestation).
         @Size(max = 2000) String attestationTextEn,
         @Size(max = 2000) String attestationTextAr,
         @Size(max = 8000) String evidenceRefs,
@@ -134,7 +136,7 @@ public final class ObligationDtos {
 
     public record AttestationReviewRequest(
         @NotBlank @Pattern(regexp = "ACCEPTED|REJECTED|REQUEST_CHANGES") String reviewerDecision,
-        @NotNull @Positive Long reviewerUserId,
+        // F2-224 — reviewerUserId is gone, for the same reason as attestedByUserId above.
         @Size(max = 1000) String reviewerCommentEn,
         @Size(max = 1000) String reviewerCommentAr
     ) {}

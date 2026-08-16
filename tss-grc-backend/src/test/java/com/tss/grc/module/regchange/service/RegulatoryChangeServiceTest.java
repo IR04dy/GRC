@@ -67,8 +67,9 @@ class RegulatoryChangeServiceTest {
         when(repo.findByOrganisationIdAndExternalId(ORG_ID, EXT_ID)).thenReturn(Optional.of(change("NEW")));
         when(repo.save(any(RegulatoryChange.class))).thenAnswer(inv -> inv.getArgument(0));
 
+        // F2-224 — assessedBy is no longer a request field; the assessor is the caller.
+        authAs("complianceofficer", 3L);
         RegulatoryChangeDto.TransitionRequest t = tx("ASSESSED");
-        t.setAssessedBy("complianceofficer");
         t.setApplicability("APPLICABLE");
         RegulatoryChangeDto out = service.transition(EXT_ID, t);
 
@@ -131,4 +132,20 @@ class RegulatoryChangeServiceTest {
         assertThatThrownBy(() -> service.transition("RC-X", tx("ASSESSED")))
             .isInstanceOf(EntityNotFoundException.class);
     }
+
+    /**
+     * F2-224 — a real principal in the SecurityContext, because the service now takes the actor
+     * from {@code CurrentActor} rather than from the request. {@code CurrentActor} requires the
+     * principal to be a {@link com.tss.grc.security.GrcUserDetails}, so a bare username token
+     * would resolve to null and the assertion would be about nothing.
+     */
+    private static void authAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, 1L, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
+    }
+
 }

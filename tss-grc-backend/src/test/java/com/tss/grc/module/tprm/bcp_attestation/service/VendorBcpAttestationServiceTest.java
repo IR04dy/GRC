@@ -63,7 +63,9 @@ class VendorBcpAttestationServiceTest {
     @Mock private ApplicationEventPublisher publisher;
     @InjectMocks private VendorBcpAttestationService service;
 
-    @BeforeEach void setUp() { TenantContext.setCurrentTenant(ORG_ID); }
+    @BeforeEach void setUp() {
+        // F2-224 — the service resolves the actor from CurrentActor now.
+        authAs("tprm.lead", 41L); TenantContext.setCurrentTenant(ORG_ID); }
     @AfterEach  void tearDown() { TenantContext.clear(); }
 
     // ─── Fixtures ────────────────────────────────────────────────────
@@ -165,11 +167,14 @@ class VendorBcpAttestationServiceTest {
 
         AttestationResponse out = service.acceptAttestation(501L,
             new AttestationReviewRequest("Evidence sufficient. RTO/MTPD within SLA.",
-                "الأدلة كافية. RTO/MTPD ضمن نطاق اتفاقية مستوى الخدمة.",
-                "Salman Al-Otaibi (TPRM Lead)", 42L));
+                "الأدلة كافية. RTO/MTPD ضمن نطاق اتفاقية مستوى الخدمة."));
 
         assertThat(out.status()).isEqualTo("ACCEPTED");
-        assertThat(out.reviewedByName()).contains("Salman Al-Otaibi");
+        // F2-224 — was contains("Salman Al-Otaibi"), an invented officer the FE prompt used as
+        // its placeholder. All three review routes are TPRM:WRITE, so the reviewer is the
+        // authenticated principal.
+        assertThat(out.reviewedByName()).isEqualTo("tprm.lead");
+        assertThat(out.reviewedByUserId()).isEqualTo(41L);
         assertThat(out.reviewedAt()).isNotNull();
     }
 
@@ -182,8 +187,7 @@ class VendorBcpAttestationServiceTest {
 
         AttestationResponse out = service.rejectAttestation(501L,
             new AttestationReviewRequest("Last BCP test older than 12 months — please retest.",
-                "آخر اختبار لخطة الاستمرارية يتجاوز 12 شهراً — يرجى إعادة الاختبار.",
-                "TPRM Lead", null));
+                "آخر اختبار لخطة الاستمرارية يتجاوز 12 شهراً — يرجى إعادة الاختبار."));
 
         assertThat(out.status()).isEqualTo("REJECTED");
         assertThat(out.reviewerCommentAr()).contains("يرجى إعادة الاختبار");
@@ -198,8 +202,7 @@ class VendorBcpAttestationServiceTest {
 
         AttestationResponse out = service.markOutOfScope(501L,
             new AttestationReviewRequest("Vendor contract terminated before campaign open.",
-                "تم إنهاء العقد مع المورّد قبل بدء الحملة.",
-                "TPRM Lead", null));
+                "تم إنهاء العقد مع المورّد قبل بدء الحملة."));
 
         assertThat(out.status()).isEqualTo("NA_OUT_OF_SCOPE");
     }
@@ -210,7 +213,7 @@ class VendorBcpAttestationServiceTest {
             .thenReturn(Optional.of(a));
         // Cannot accept without a submission — caller must wait for SUBMITTED.
         assertThatThrownBy(() -> service.acceptAttestation(501L,
-            new AttestationReviewRequest(null, null, null, null)))
+            new AttestationReviewRequest(null, null)))
             .isInstanceOf(IllegalTransitionException.class);
         verify(attestationRepo, never()).save(any());
     }
@@ -220,7 +223,7 @@ class VendorBcpAttestationServiceTest {
         when(attestationRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, 501L))
             .thenReturn(Optional.of(a));
         assertThatThrownBy(() -> service.rejectAttestation(501L,
-            new AttestationReviewRequest(null, null, null, null)))
+            new AttestationReviewRequest(null, null)))
             .isInstanceOf(IllegalTransitionException.class);
     }
 
@@ -250,7 +253,7 @@ class VendorBcpAttestationServiceTest {
         when(attestationRepo.save(any(VendorBcpAttestation.class))).thenAnswer(inv -> inv.getArgument(0));
         when(campaignRepo.findById(101L)).thenReturn(Optional.of(new VendorBcpCampaign()));
 
-        service.acceptAttestation(501L, new AttestationReviewRequest(null, null, "Lead", null));
+        service.acceptAttestation(501L, new AttestationReviewRequest(null, null));
 
         ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
         verify(publisher).publishEvent(captor.capture());
@@ -284,4 +287,20 @@ class VendorBcpAttestationServiceTest {
         assertThat(out.vendorName()).isEqualTo("Microsoft Azure KSA");
         assertThat(out.vendorNameAr()).isEqualTo("مايكروسوفت أزور — السعودية");
     }
+
+    /**
+     * F2-224 — a real principal in the SecurityContext, because the service now takes the actor
+     * from {@code CurrentActor} rather than from the request. {@code CurrentActor} requires the
+     * principal to be a {@link com.tss.grc.security.GrcUserDetails}, so a bare username token
+     * would resolve to null and the assertion would be about nothing.
+     */
+    private static void authAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, 1L, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
+    }
+
 }

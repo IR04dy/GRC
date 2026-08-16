@@ -1,6 +1,7 @@
 package com.tss.grc.module.regchange.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -162,7 +163,10 @@ public class RegulatoryChangeService {
 
         if ("ASSESSED".equals(req.getStatus())) {
             c.setAssessedAt(now);
-            if (req.getAssessedBy() != null) c.setAssessedBy(req.getAssessedBy());
+            // F2-224 — the assessor is the authenticated principal. assessedAt is stamped from
+            // the server's clock one line above, so the assessment IS this call; who judged a
+            // regulator's change applicable to this organisation is not a body field.
+            c.setAssessedBy(CurrentActor.username());
             if (req.getApplicability() != null) c.setApplicability(req.getApplicability());
         }
         if ("IMPACT_ANALYSED".equals(req.getStatus())) {

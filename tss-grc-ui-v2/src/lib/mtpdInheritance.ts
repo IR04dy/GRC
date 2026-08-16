@@ -121,7 +121,7 @@ export interface ComputeRequest {
 export interface PublishRequest {
   notesEn?: string;
   notesAr?: string;
-  publishedByUserId?: number;
+  // F2-224 — publishedByUserId removed; the server stamps the publisher from the principal.
 }
 
 export interface CapaCreateRequest {

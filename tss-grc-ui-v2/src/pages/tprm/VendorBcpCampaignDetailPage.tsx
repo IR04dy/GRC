@@ -126,17 +126,15 @@ export function VendorBcpCampaignDetailPage() {
       required: action !== 'accept',
     });
     if (commentAr === null) return;
-    const who = await dialog.prompt({
-      title: isAr ? 'اسم المراجع' : 'Reviewer name',
-      placeholder: 'e.g. Salman Al-Otaibi (TPRM Lead)',
-      required: true,
-    });
-    if (who === null) return;
+    // F2-224 — the "Reviewer name" prompt is gone. It asked the operator to TYPE who reviewed a
+    // vendor's BCP attestation, placeholdered with an invented officer, and the server stored
+    // whatever was typed beside a reviewedAt it stamped from its own clock. All three routes
+    // reaching this handler are guarded by TPRM:WRITE, so the reviewer is the authenticated
+    // principal and the server resolves it.
     try {
       const body = {
         reviewerCommentEn: commentEn,
         reviewerCommentAr: commentAr,
-        reviewedByName: who,
       };
       if (action === 'accept') await acceptAttestation(att.id, body);
       else if (action === 'reject') await rejectAttestation(att.id, body);

@@ -162,7 +162,11 @@ export function ObligationDetailPage() {
         periodLabel: new Date().toISOString().slice(0, 7),
         dueDate: obligation.nextDueDate,
         attestationStatus: status.trim() as 'ATTESTED' | 'ATTESTED_WITH_EXCEPTIONS' | 'NOT_APPLICABLE',
-        attestedByUserId: 1, // current user — wired via JWT claim in v2
+        // F2-224 — the attester is no longer sent. This line read
+        // `attestedByUserId: 1, // current user — wired via JWT claim in v2`, so every
+        // attestation recorded from this screen was filed against user 1 regardless of who was
+        // signed in. The server now takes it from the authenticated principal, which is what
+        // the comment was promising; "v2" is here.
         attestationTextEn: textEn || undefined,
         attestationTextAr: textAr || undefined,
         exceptionsNotedEn: exEn || undefined,
@@ -189,7 +193,7 @@ export function ObligationDetailPage() {
     try {
       await reviewAttestation(att.id, {
         reviewerDecision: decision,
-        reviewerUserId: 1,
+        // F2-224 — reviewerUserId: 1 removed; the server stamps the principal.
         reviewerCommentEn: commentEn || undefined,
         reviewerCommentAr: commentAr || undefined,
       });

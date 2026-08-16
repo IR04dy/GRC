@@ -65,6 +65,8 @@ class ObligationAttestationServiceTest {
     private ObligationAttestationService service;
 
     @BeforeEach void setUp() {
+        // F2-224 — the service resolves the actor from CurrentActor now.
+        authAs("compliance.officer", 31L);
         TenantContext.setCurrentTenant(ORG_ID);
         service = new ObligationAttestationService(repo, obligationRepo, obligationService, audit, publisher);
     }
@@ -103,7 +105,7 @@ class ObligationAttestationServiceTest {
             1001L, 201L,
             "Q2-2026",
             LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30), LocalDate.of(2026, 7, 15),
-            status, 99L,
+            status,
             "I confirm the Q2 2026 SAMA monthly CAR returns were filed on time.",
             "أُقِر بأن تقارير كفاية رأس المال الشهرية للربع الثاني 2026 قُدِّمت في موعدها.",
             "[evidence-pack-1]", exEn, exAr
@@ -122,9 +124,12 @@ class ObligationAttestationServiceTest {
         AttestationResponse out = service.recordAttestation(recordReq("ATTESTED", null, null));
 
         assertThat(out.attestationStatus()).isEqualTo("ATTESTED");
-        assertThat(out.attestedByUserId()).isEqualTo(99L);
+        // F2-224 — was isEqualTo(99L), the id the CALLER passed. An obligation attestation
+        // names the person who asserted compliance; that is the principal.
+        assertThat(out.attestedByUserId()).isEqualTo(31L);
         assertThat(out.attestedAt()).isNotNull();
-        verify(obligationService).rollForwardAfterAttestation(eq(1001L), eq(99L), any());
+        // F2-224 — the roll-forward reads the attester off the SAVED ROW, not the request.
+        verify(obligationService).rollForwardAfterAttestation(eq(1001L), eq(31L), any());
     }
 
     @Test void recordAttestation_withExceptions_preservesExceptionText() {
@@ -188,7 +193,7 @@ class ObligationAttestationServiceTest {
         when(repo.save(any(ObligationAttestation.class))).thenAnswer(inv -> inv.getArgument(0));
 
         AttestationResponse out = service.reviewAttestation(501L,
-            new AttestationReviewRequest("ACCEPTED", 77L, "Looks good", "جيد"));
+            new AttestationReviewRequest("ACCEPTED", "Looks good", "جيد"));
 
         assertThat(out.reviewerDecision()).isEqualTo("ACCEPTED");
         assertThat(out.attestationStatus()).isEqualTo("ATTESTED");
@@ -201,7 +206,7 @@ class ObligationAttestationServiceTest {
         when(repo.save(any(ObligationAttestation.class))).thenAnswer(inv -> inv.getArgument(0));
 
         AttestationResponse out = service.reviewAttestation(501L,
-            new AttestationReviewRequest("REJECTED", 77L, "Insufficient evidence", "أدلة غير كافية"));
+            new AttestationReviewRequest("REJECTED", "Insufficient evidence", "أدلة غير كافية"));
 
         assertThat(out.reviewerDecision()).isEqualTo("REJECTED");
         assertThat(out.attestationStatus()).isEqualTo("ATTESTED_WITH_EXCEPTIONS");
@@ -213,7 +218,7 @@ class ObligationAttestationServiceTest {
         when(repo.save(any(ObligationAttestation.class))).thenAnswer(inv -> inv.getArgument(0));
 
         AttestationResponse out = service.reviewAttestation(501L,
-            new AttestationReviewRequest("REQUEST_CHANGES", 77L,
+            new AttestationReviewRequest("REQUEST_CHANGES",
                 "Please attach the actual filing receipt.",
                 "يرجى إرفاق إيصال التقديم الفعلي."));
 
@@ -225,13 +230,13 @@ class ObligationAttestationServiceTest {
         when(repo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, 501L))
             .thenReturn(Optional.of(existing("DUE")));
         assertThatThrownBy(() -> service.reviewAttestation(501L,
-            new AttestationReviewRequest("ACCEPTED", 77L, "ok", "تمام")))
+            new AttestationReviewRequest("ACCEPTED", "ok", "تمام")))
             .isInstanceOf(IllegalTransitionException.class);
     }
 
     @Test void reviewAttestation_invalidDecisionRejected() {
         assertThatThrownBy(() -> service.reviewAttestation(501L,
-            new AttestationReviewRequest("MAYBE", 77L, "x", "س")))
+            new AttestationReviewRequest("MAYBE", "x", "س")))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("reviewerDecision");
     }
@@ -241,7 +246,7 @@ class ObligationAttestationServiceTest {
             .thenReturn(Optional.of(existing("ATTESTED")));
         when(repo.save(any(ObligationAttestation.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        service.reviewAttestation(501L, new AttestationReviewRequest("ACCEPTED", 77L, "ok", "تمام"));
+        service.reviewAttestation(501L, new AttestationReviewRequest("ACCEPTED", "ok", "تمام"));
 
         ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
         verify(publisher).publishEvent(captor.capture());
@@ -284,4 +289,20 @@ class ObligationAttestationServiceTest {
         verify(publisher, times(2)).publishEvent(captor.capture());
         assertThat(captor.getAllValues()).allMatch(e -> "OBLIGATION_OVERDUE".equals(e.triggerEvent()));
     }
+
+    /**
+     * F2-224 — a real principal in the SecurityContext, because the service now takes the actor
+     * from {@code CurrentActor} rather than from the request. {@code CurrentActor} requires the
+     * principal to be a {@link com.tss.grc.security.GrcUserDetails}, so a bare username token
+     * would resolve to null and the assertion would be about nothing.
+     */
+    private static void authAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, 1L, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
+    }
+
 }

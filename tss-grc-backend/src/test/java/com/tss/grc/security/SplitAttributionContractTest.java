@@ -82,18 +82,26 @@ class SplitAttributionContractTest {
      * an entry whose site is fixed must be deleted in the same commit (F2-218).
      */
     private static final Map<String, String> BY_DESIGN = Map.of(
+        "VendorBcpAttestationService#doSubmit::submittedByContactEmail",
+        "BY DESIGN — VERIFIED, not guessed. doSubmit has two callers: submitAttestation (the "
+        + "TPRM Lead transcribing a vendor's reply) and submitByToken, whose route is "
+        + "@PreAuthorize(\"permitAll()\") — the vendor portal, where the token IS the credential "
+        + "and there is no authenticated principal to resolve at all. On both paths the "
+        + "submitter is an external vendor contact, so CurrentActor would be either null or the "
+        + "wrong person. F2-223 recorded this as a GUESS and put it on the work list for exactly "
+        + "that reason; reading the controller is what turned it into a fact. Contrast "
+        + "#transitionAttestation in the same class, which F2-224 DID close: its three routes "
+        + "are all TPRM:WRITE.",
+
+        "VendorBcpAttestationService#doSubmit::submittedByContactName",
+        "BY DESIGN — same site and same reason as submittedByContactEmail above: the vendor "
+        + "portal submit route is permitAll() and the submitter is an external contact.",
+
         "ObService#revokeConsent::revokedBy",
         "REFUTED — revokedBy is a PARTY, not a person. ObConsentsPage declares "
         + "useState<RevokedBy>('BANK') and badges CUSTOMER differently; the Open Banking consent "
         + "may be revoked by the customer, the bank or the TPP, and which of them it was is not "
         + "derivable from whoever happens to call the endpoint.",
-
-        "CrossBorderTransferService#assess::residencyCheckBy",
-        "FILED — the method also lets the caller supply residencyCheckAt (defaulting to now), and "
-        + "that is evidence the PDPL Art.29 residency check may have been performed earlier and "
-        + "elsewhere, so its performer need not be the caller. Where a method accepts the clock "
-        + "too, the act may not be this call. Deciding whether this register wants an external "
-        + "assessor's name or the principal is an owner decision, not a side effect of this fix.",
 
         "ControlLibraryService#updateMapping::reviewerUserId",
         "FILED — ambiguous between attribution and ASSIGNMENT, and the site has a second defect "
@@ -125,8 +133,31 @@ class SplitAttributionContractTest {
     private static final Pattern CLOCK_LOCAL = Pattern.compile(
         "\\b\\w+\\s+(\\w+)\\s*=\\s*[^;]*?(?:now\\s*\\(|Instant\\.now|System\\.currentTimeMillis)");
 
-    /** True when this setter argument carries a reading of the server's own clock. */
+    /**
+     * True when this setter argument carries a reading of the server's own clock —
+     * <b>and the caller could not have supplied it instead.</b>
+     *
+     * <p>⚠ DETECTOR GAP 8 (F2-224). {@code req.auditDate() == null ? LocalDate.now() :
+     * req.auditDate()} contains {@code now()}, so a bare search called it a server stamp. It is
+     * not: it is a caller-supplied value with a fallback, and F2-223 already recorded what that
+     * means — <i>where a method lets the caller supply the clock too, the act may not be this
+     * call, so its performer need not be the caller.</i> An ISO/IEC 42001 model audit is
+     * routinely performed by an external firm ({@code MlModelAuditService#recordAudit} declares
+     * {@code auditorExternalParty} one line below {@code auditorUserId}); an evidence review may
+     * have happened offline. Stamping the principal there would record the recording clerk as
+     * the auditor.
+     *
+     * <p>🔑 <b>This narrowing and the {@code Date}/{@code On} widening below had to land in the
+     * SAME commit, and that is the finding about this instrument.</b> The two defects cancelled:
+     * the root reduction could not pair {@code auditDate} with {@code auditorUserId}, so the two
+     * sites this predicate would have mis-reported were absent for an unrelated, accidental
+     * reason — and <b>absent reads identically to correctly excluded</b>. The gate was green for
+     * the wrong reason (F2-219: two errors in opposite directions produce a green neither
+     * earns). Widening alone would have manufactured two false findings, and the obvious "fix"
+     * for them would have been to forge an attribution onto an external auditor's work.
+     */
     static boolean isServerClock(String arg, String methodBody) {
+        if (REQUEST_VALUE.matcher(arg).find()) return false;
         if (SERVER_CLOCK.matcher(arg).find()) return true;
         String bare = arg.trim();
         if (!bare.matches("\\w+")) return false;
@@ -135,6 +166,48 @@ class SplitAttributionContractTest {
             if (m.group(1).equals(bare)) return true;
         }
         return false;
+    }
+
+    /** A field naming WHEN an act happened: {@code …At}, {@code …Date}, {@code …On}. */
+    private static final Pattern TIME_TAIL = Pattern.compile("(?:At|Date|On)$");
+
+    /**
+     * Every verb key a field name could pair on, rather than the single reduced root.
+     *
+     * <p>⚠ Part two of DETECTOR GAP 8. {@link #verbRoot}'s last step keeps only the trailing
+     * CamelCase word, which was added so {@code approvedByLegalName} would meet
+     * {@code approvedByLegalAt}. It is lossy the other way: {@code auditDate} reduces to
+     * {@code audit} but {@code auditorUserId} reduces to {@code audit} only by luck of the
+     * {@code -or} rule, and {@code standDownAt} reduces to {@code down}. Keeping the whole base
+     * AND each CamelCase suffix lets a qualified name meet an unqualified one without the
+     * reduction ever splitting a genuine pair.
+     */
+    static Set<String> verbKeys(String field) {
+        Set<String> keys = new LinkedHashSet<>();
+        keys.add(verbRoot(field));
+        String base = field;
+        int by = base.indexOf("By");
+        if (by > 0) {
+            base = base.substring(0, by);
+        } else {
+            base = TIME_TAIL.matcher(base).replaceAll("");
+            for (String tail : new String[]{"UserId", "Name", "Email", "Id"}) {
+                if (base.endsWith(tail) && base.length() > tail.length()) {
+                    base = base.substring(0, base.length() - tail.length());
+                    break;
+                }
+            }
+        }
+        base = base.replaceAll("(?:ed|er|or)$", "");
+        if (!base.isEmpty()) keys.add(base.toLowerCase());
+        Matcher w = Pattern.compile("[A-Z][a-z]*").matcher(base);
+        while (w.find()) {
+            String suffix = base.substring(w.start());
+            keys.add(suffix.toLowerCase());
+            keys.add(suffix.replaceAll("(?:ed|er|or)$", "").toLowerCase());
+        }
+        keys.remove("");
+        return keys;
     }
 
     /** A value that came off the wire. */
@@ -211,22 +284,21 @@ class SplitAttributionContractTest {
         for (String[] m : methodsOf(strippedSource)) {
             String name = m[0];
             String body = m[1];
-            Map<String, String> clockRoots = new LinkedHashMap<>();
+            Set<String> clockKeys = new LinkedHashSet<>();
             Map<String, Set<String>> callerActors = new LinkedHashMap<>();
             Matcher sm = SETTER.matcher(body);
             while (sm.find()) {
                 String field = Character.toLowerCase(sm.group(1).charAt(0)) + sm.group(1).substring(1);
                 String arg = balancedArg(body, sm.start());
-                String root = verbRoot(field);
-                if (field.endsWith("At") && isServerClock(arg, body)) {
-                    clockRoots.putIfAbsent(root, field);
+                if (TIME_TAIL.matcher(field).find() && isServerClock(arg, body)) {
+                    clockKeys.addAll(verbKeys(field));
                 } else if (ACTOR_TAIL.matcher(field).find() && REQUEST_VALUE.matcher(arg).find()) {
-                    callerActors.computeIfAbsent(root, k -> new LinkedHashSet<>()).add(field);
+                    callerActors.put(field, verbKeys(field));
                 }
             }
             for (Map.Entry<String, Set<String>> e : callerActors.entrySet()) {
-                if (clockRoots.containsKey(e.getKey())) {
-                    for (String f : e.getValue()) found.add(name + "::" + f);
+                if (e.getValue().stream().anyMatch(clockKeys::contains)) {
+                    found.add(name + "::" + e.getKey());
                 }
             }
         }
@@ -278,33 +350,26 @@ class SplitAttributionContractTest {
     // ─── the contract ────────────────────────────────────────────────────────
 
     /**
-     * Sites surfaced by the CLOCK-LOCAL widening (detector gap 7) after F2-223 had already read and
-     * closed its eleven. They are <b>NOT adjudicated</b>: nobody has yet read whether each is an
-     * attribution to close, an assignment, or genuinely the caller's.
+     * <b>EMPTY — F2-224 read and adjudicated all ten.</b> Eight were real attributions and are
+     * closed against {@link com.tss.grc.common.security.CurrentActor}; two
+     * ({@code VendorBcpAttestationService#doSubmit}) moved into {@link #BY_DESIGN} once the
+     * controller was read rather than guessed at.
      *
-     * <p>🔑 <b>They are a work list and deliberately NOT a map of reasons.</b> F2-188 measured what
+     * <p>🔑 <b>Why it shipped as a work list and not as ten reasons.</b> F2-188 measured what
      * happens when a slice writes a reason for something it has not read: five "sharpest bucket"
      * claims, all five false, and the fluency of the prose was what made them look verified.
-     * Writing ten reasons here would produce ten plausible sentences and no knowledge.
+     * F2-223 guessed exactly one thing here — that the vendor-portal pair was by design — and
+     * marked it a guess. It was right, and the reason it can now be stated as a fact is that
+     * somebody opened {@code VendorBcpAttestationController} and found
+     * {@code @PreAuthorize("permitAll()")} on the token route. <b>A correct guess and a verified
+     * claim are indistinguishable in prose, which is the whole argument for the two buckets.</b>
      *
-     * <p>⚠ At least one is very likely BY DESIGN — {@code VendorBcpAttestationService#doSubmit}
-     * takes {@code submittedByContactName/Email} on a VENDOR PORTAL submission, where the
-     * submitter is an external contact and may not be an authenticated platform principal at all.
-     * That is a guess, which is exactly why it is on this list rather than in {@link #BY_DESIGN}.
-     *
-     * <p>Decrease-only. Read one, fix or classify it, and take it out in the same commit.
+     * <p>Decrease-only, and now a hard zero: a new split fails
+     * {@link #noMethodSplitsOneAttributionBetweenTheServerAndTheCaller()} outright. Do not
+     * re-open this set to park a finding — read it, then either fix it or give it a
+     * {@link #BY_DESIGN} reason that survives {@link #noReasonIsABareLabel()}.
      */
-    private static final Set<String> WORK_LIST = Set.of(
-        "ErmGapService#attestRisk::attestedByName",
-        "InvocationService#transition::declaredBy",
-        "MtpdInheritanceService#publishAssessment::publishedByUserId",
-        "ObligationAttestationService#recordAttestation::attestedByUserId",
-        "ObligationAttestationService#reviewAttestation::reviewerUserId",
-        "RegulatoryChangeService#transition::assessedBy",
-        "VendorBcpAttestationService#doSubmit::submittedByContactEmail",
-        "VendorBcpAttestationService#doSubmit::submittedByContactName",
-        "VendorBcpAttestationService#transitionAttestation::reviewedByName",
-        "VendorBcpAttestationService#transitionAttestation::reviewedByUserId");
+    private static final Set<String> WORK_LIST = Set.of();
 
     @Test
     @DisplayName("no NEW method stamps WHEN from the server's clock and takes WHO from the request")
@@ -323,28 +388,71 @@ class SplitAttributionContractTest {
     }
 
     /**
-     * The work list may only shrink. F2-205's rule rather than F2-204's: the QUESTION was right
-     * and the ANSWER was under-measured, so the figure moves and says so — it is not re-scoped to
-     * hide the growth.
+     * The work list is empty and may not be re-opened.
+     *
+     * <p>⚠ This assertion used to be {@code isLessThanOrEqualTo(10)}. At zero a ceiling is
+     * vacuous — and worse than vacuous, because <b>a rotted detector reports an empty population
+     * and that is indistinguishable from a finished sweep</b> (F2-219, which had to change the
+     * SHAPE of an anti-vacuity floor for exactly this reason). What carries the weight now is
+     * {@link #theDetectorIsNotVacuous()}, which drives the detector over fixtures of every shape
+     * it must catch AND every shape it must not.
      */
     @Test
-    @DisplayName("the unadjudicated work list only decreases")
+    @DisplayName("the unadjudicated work list stays empty — F2-224 read all ten")
     void theWorkListOnlyDecreases() {
         Set<String> found = new TreeSet<>(scanTree().keySet());
         Set<String> stillOpen = new TreeSet<>(WORK_LIST);
         stillOpen.retainAll(found);
 
-        assertThat(stillOpen.size())
-            .as("F2-223 surfaced these 10 after widening the detector; each must be read and "
-                + "removed, never added to. Currently open:%n  %s",
-                String.join("\n  ", stillOpen))
-            .isLessThanOrEqualTo(10);
+        assertThat(stillOpen)
+            .as("F2-224 adjudicated all ten of F2-223's sites: eight fixed, two moved to "
+                + "BY_DESIGN. Park nothing here — read it and fix or classify it.")
+            .isEmpty();
 
         Set<String> stale = new TreeSet<>(WORK_LIST);
         stale.removeAll(found);
         assertThat(stale)
             .as("a work-list entry whose site is fixed must be deleted in the same commit — "
                 + "otherwise a closed item is indistinguishable from an open one (F2-199)")
+            .isEmpty();
+    }
+
+    /**
+     * 🔑 <b>The gate's key is a SIMPLE class name, and this platform has 15 entity names declared
+     * in two packages (F2-222).</b> Services collide too: {@code RegulatoryChangeService} exists
+     * in both {@code module/compliance} and {@code module/regchange}, and only the second has
+     * the {@code assessedBy} pair — so today no key collapses two sites. That is a fact about
+     * today, not a property of the key, and nobody was maintaining it (F2-177). If a second file
+     * ever produces the same {@code Class#method::field}, one real finding would be hidden
+     * behind another's adjudication.
+     */
+    @Test
+    @DisplayName("no two files produce the same key — a simple class name is not identity")
+    void aSiteKeyResolvesToExactlyOneFile() {
+        Map<String, String> firstSeen = new LinkedHashMap<>();
+        Map<String, String> collisions = new LinkedHashMap<>();
+        try (Stream<Path> files = Files.walk(MAIN)) {
+            for (Path p : files.filter(f -> f.toString().endsWith(".java")).toList()) {
+                String src;
+                try {
+                    src = Files.readString(p, StandardCharsets.UTF_8);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                if (!src.contains(".set")) continue;
+                String cls = p.getFileName().toString().replace(".java", "");
+                for (String hit : splitsIn(strip(src))) {
+                    String key = cls + "#" + hit;
+                    String prior = firstSeen.putIfAbsent(key, p.toString());
+                    if (prior != null) collisions.put(key, prior + "  AND  " + p);
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        assertThat(collisions)
+            .as("two different files produced one key, so one site's verdict is silently "
+                + "adjudicating the other's — key by package, or rename")
             .isEmpty();
     }
 
@@ -369,9 +477,17 @@ class SplitAttributionContractTest {
             assertThat(e.getValue().length())
                 .as("reason for %s is too short to be a judgement (F2-188)", e.getKey())
                 .isGreaterThan(140);
+            // ⚠ F2-224 added "BY DESIGN". The first draft of this leg listed only REFUTED and
+            // FILED — the two verdicts F2-223 happened to have reached — so the gate rejected a
+            // correct, verified reason for the only new verdict the next slice produced.
+            // 🔑 F2-217's headline (a census keyed on a list measures the list) applies to a
+            // gate's own vocabulary too, and the failure mode is the benign-looking one: it does
+            // not hide a defect, it pushes the next author to reword a true statement until the
+            // regex is happy. Add a verdict here when you first reach one; do not paraphrase
+            // around it.
             assertThat(e.getValue())
                 .as("reason for %s must state its verdict", e.getKey())
-                .containsAnyOf("REFUTED", "FILED");
+                .containsAnyOf("REFUTED", "FILED", "BY DESIGN");
         }
     }
 
@@ -406,17 +522,91 @@ class SplitAttributionContractTest {
                     h.setCfoApprovedAt(LocalDateTime.now());
                     h.setCfoApproverName(req.approverName());
                 }
+                public void dateTailNotAtTail(Long id, Req req) {
+                    a.setAuditDate(LocalDate.now());
+                    a.setAuditorUserId(req.auditorUserId());
+                }
             }
             """;
         assertThat(splitsIn(strip(fixture)))
             .as("the -or agent spelling and the qualified <verb>By<Qualifier>Name form each broke "
-                + "a draft of verbRoot(), and each failure SHRANK the population")
+                + "a draft of verbRoot(), and each failure SHRANK the population. dateTailNotAtTail "
+                + "is F2-224's widening: a WHEN field may be named ...Date, not only ...At")
             .containsExactlyInAnyOrder(
                 "approveById::approvedByUserId",
                 "reviewByName::reviewerUserId",
                 "executeOrAgent::executorName",
                 "qualifiedAgent::approvedByLegalName",
-                "qualifiedVerb::cfoApproverName");
+                "qualifiedVerb::cfoApproverName",
+                "dateTailNotAtTail::auditorUserId");
+    }
+
+    /**
+     * F2-224's narrowing, as its own leg because it is the half that keeps the widening honest.
+     *
+     * <p>A clock reading that the caller can override is <b>not</b> a server stamp, so the pair
+     * is not a split. Both real instances are governance records performed elsewhere — an
+     * external model auditor, an evidence review done offline — and stamping the principal on
+     * either would record the recording clerk as the actor.
+     *
+     * <p>⚠ This fixture is the reason the widening above was safe to ship. Run the two changes
+     * apart and the tree yields two confident false findings whose obvious "fix" forges an
+     * attribution. The negative control is that removing the {@code REQUEST_VALUE} guard from
+     * {@link #isServerClock} makes this method fail.
+     */
+    @Test
+    @DisplayName("a clock the caller may supply is not a server stamp — so it is not a split")
+    void aCallerDefaultableClockIsNotAServerStamp() {
+        String fixture = """
+            class Probe {
+                public void ternaryFallback(Long id, Req req) {
+                    a.setAuditDate(req.auditDate() == null ? LocalDate.now() : req.auditDate());
+                    a.setAuditorUserId(req.auditorUserId());
+                }
+                public void ternaryFallbackOtherOrder(Long id, Req body) {
+                    t.setResidencyCheckAt(body.residencyCheckAt() != null ? body.residencyCheckAt() : LocalDateTime.now());
+                    t.setResidencyCheckBy(body.residencyCheckBy());
+                }
+            }
+            """;
+        assertThat(splitsIn(strip(fixture)))
+            .as("the server did not claim to be the recorder here — it offered a default. "
+                + "F2-223: where a method lets the caller supply the clock too, the act may not "
+                + "be this call, so its performer need not be the caller.")
+            .isEmpty();
+    }
+
+    /**
+     * 🔑 <b>The shape this gate cannot see, recorded rather than papered over.</b>
+     *
+     * <p>When the actor field names the ROLE PERFORMED instead of the verb, the two halves share
+     * no root and no root-matching detector can pair them. {@code InvocationService#transition}
+     * writes {@code setStandDownAt(now)} and, three lines on, {@code standDownAuthoriser} from
+     * the request — structurally the same split as {@code declaredBy} on the line above it,
+     * invisible to both the shipped detector and to the deliberately-permissive re-derivation
+     * F2-224 ran to find what the reduction was losing. It was found by READING.
+     *
+     * <p>This test asserts the blind spot so it cannot be mistaken for coverage. Making it fire
+     * needs a semantic pairing (authoriser↔authorise↔stand-down), not a longer suffix list, and
+     * the site itself is an owner decision — a crisis stand-down is authorised by the CMT chair
+     * and typically recorded by the coordinator. Filed, not blessed.
+     */
+    @Test
+    @DisplayName("KNOWN BLIND SPOT: an actor field naming the role, not the verb, is not paired")
+    void anActorFieldNamingTheRoleRatherThanTheVerbIsNotPaired() {
+        String fixture = """
+            class Probe {
+                public void standDown(Long id, Req req) {
+                    v.setStandDownAt(LocalDateTime.now());
+                    v.setStandDownAuthoriser(req.getStandDownAuthoriser());
+                }
+            }
+            """;
+        assertThat(splitsIn(strip(fixture)))
+            .as("if this ever starts firing the blind spot has closed — delete this test, "
+                + "adjudicate InvocationService#transition::standDownAuthoriser, and re-run the "
+                + "whole tree, because the same widening will surface siblings nobody has read")
+            .isEmpty();
     }
 
     /**

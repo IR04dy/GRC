@@ -64,7 +64,9 @@ public class RegulatoryChangeDto {
     public static class TransitionRequest {
         @NotBlank @Pattern(regexp = "NEW|ASSESSED|IMPACT_ANALYSED|IN_IMPLEMENTATION|IMPLEMENTED|CLOSED|DEPRIORITISED")
         private String status;
-        private String assessedBy;
+        // F2-224 — assessedBy is gone: the assessor is the authenticated principal, resolved in
+        // RegulatoryChangeService#transition. implementationOwner below is an ASSIGNMENT (who
+        // will do the work), not an attribution of an act, so it stays.
         private String applicability;
         private Integer impactScore;
         private String impactSummaryEn;

@@ -133,10 +133,13 @@ public final class MtpdInheritanceDtos {
 
     // ─── Publish + CAPA actions ─────────────────────────────────────
 
+    /**
+     * F2-224 — {@code publishedByUserId} is gone: the publisher is the authenticated principal,
+     * resolved in {@code MtpdInheritanceService#publishAssessment}.
+     */
     public record PublishRequest(
         @Size(max = 2000) String notesEn,
-        @Size(max = 2000) String notesAr,
-        Long publishedByUserId
+        @Size(max = 2000) String notesAr
     ) {}
 
     public record CapaCreateRequest(

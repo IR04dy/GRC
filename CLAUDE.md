@@ -1872,6 +1872,61 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **TWO DETECTOR ERRORS IN OPPOSITE DIRECTIONS PRODUCE A GREEN THAT NEITHER EARNS, AND THE
+  ONE THAT SHRINKS THE POPULATION IS WHAT HIDES THE OTHER** (F2-224, measured 2026-08-16). Executing
+  F2-223's filed 10-entry work list, the denominator was re-derived first (F2-221). A deliberately
+  **permissive** pairing found **15** split-attribution sites where the shipped gate's green build
+  pins the population at **13** — and both extras were **REFUTED**, because their clock is
+  `req.x() == null ? now() : req.x()`: a caller-supplied value with a fallback, not a server stamp.
+  🔑 **They were absent from the population for an ACCIDENTAL reason — the root reduction could not
+  pair `auditDate` with `auditorUserId` — and absent reads identically to correctly excluded.** Had
+  the reduction worked, `isServerClock` would have reported both as splits, and the obvious "fix"
+  would have forged an attribution onto an **external** auditor's work (`MlModelAudit` declares
+  `auditorExternalParty` one line below `auditorUserId`; an ISO/IEC 42001 audit is routinely done by
+  a firm). So the widening (`…Date`/`…On` are WHEN fields; pair on a key SET, not one reduced root)
+  and the narrowing (a clock the caller may override is not a stamp) **must land in the same
+  commit** — F2-219's rule, now inside the gate F2-223 built to enforce F2-219's rule.
+  ⚠⚠ **The live half was two statutory attestation-of-record surfaces.** Probed **12/12 pre-fix and
+  12/12 post-fix** as `compliance` (user 3) against **planted** rows (F2-206): a SAMA obligation
+  attestation with `attestedByUserId: 4` **stored 4**, and **omitting the attester was a 400** —
+  `AttestationRecordRequest` carried `@NotNull @Positive`, so the server **required an attribution it
+  never verified**, the third instance of that exact shape after F2-223's IIA annual plan. Also the
+  obligation review, a regulatory-change ASSESSED, a BCP invocation DECLARED and an ERM risk
+  attestation. **Refuse rather than store null** is safe precisely because the field was already
+  mandatory: no working caller is broken (F2-182).
+  ⚠⚠ **`ObligationDetailPage` sent `attestedByUserId: 1, // current user — wired via JWT claim in
+  v2`.** Every obligation attestation and every review recorded from that screen was filed against
+  **user id 1 regardless of who was signed in** — a comment promising a fix, load-bearing.
+  `VendorBcpCampaignDetailPage` asked the operator to TYPE the reviewer into a prompt placeholdered
+  `'e.g. Salman Al-Otaibi (TPRM Lead)'` — **seventh recorded instance of an invented officer in a
+  placeholder teaching an operator to type somebody else's name.**
+  🔑 **F2-223 guessed exactly one thing, marked it a guess, and was right.** The vendor-portal pair
+  is BY DESIGN: `doSubmit`'s second caller is `submitByToken`, whose route is
+  `@PreAuthorize("permitAll()")`, so there is no principal to resolve at all. **A correct guess and a
+  verified claim are indistinguishable in prose** — which is the entire argument for keeping
+  `WORK_LIST` and `BY_DESIGN` as two buckets instead of one map of reasons (F2-188). Adjudication:
+  **8 closed · 2 BY DESIGN · 0 open**, `WORK_LIST` 10 → 0.
+  ⚠⚠ **The shape NO root-matching detector can see, named rather than papered over.**
+  `InvocationService#transition` writes `setStandDownAt(now)` and, three lines below the `declaredBy`
+  this slice closed, `standDownAuthoriser` from the request. Same split — **invisible to the shipped
+  detector AND to the permissive re-derivation**, because the actor field names the **ROLE PERFORMED**
+  (`authoriser`) rather than the verb (`standDown`), so the halves share no root. Found by reading.
+  `anActorFieldNamingTheRoleRatherThanTheVerbIsNotPaired()` asserts the blind spot so it cannot be
+  mistaken for coverage; the site is **filed, not blessed** — a crisis stand-down is authorised by the
+  CMT chair and typically recorded by the coordinator, so which one the column means is an owner call.
+  ⚠ **Two more instrument corrections, both in gates from earlier slices of this lineage.**
+  (a) `noReasonIsABareLabel` demanded `REFUTED` or `FILED` — **the two verdicts F2-223 happened to
+  reach** — and rejected a correct, verified `BY DESIGN` reason. F2-217's headline (*a census keyed on
+  a list measures the list*) applied to a **gate's own verdict vocabulary**; the failure mode is the
+  benign-looking one, since it hides no defect but pushes the next author to reword a true statement
+  until the regex is happy. (b) The gate keys sites on a **simple class name** and
+  `RegulatoryChangeService` exists in `module/compliance` *and* `module/regchange` (F2-222 measured 15
+  entity names declared twice). Only one has the pair, so nothing collapses **today** — a fact about
+  today, not a property of the key, and nobody was maintaining it (F2-177).
+  ⚙ `RequestSizeCapMirrorTest`'s floor went **8 → 7** with the reason recorded: the vendor-BCP
+  `reviewedByName` cap went with its request field. Second consecutive slice to lower it, and both
+  times the answer to *"is this rot?"* was **the field is gone, not the check** (F2-213).
+
 - ⚠⚠ **THE SERVER STAMPS *WHEN* FROM ITS OWN CLOCK AND THE CALLER SAYS *WHO* — ONE ATTRIBUTION
   SPLIT ACROSS TWO OWNERS** (F2-223, measured 2026-08-16). F2-222 filed *"31 authority fields
   written from the request"*, measured by a **name-shape** test — the instrument class F2-217 had

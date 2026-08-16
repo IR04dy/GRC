@@ -68,7 +68,9 @@ public class InvocationDto {
     public static class TransitionRequest {
         @NotBlank @Pattern(regexp = "STANDBY|DECLARED|INVOKED|STABILISED|STAND_DOWN|POST_INCIDENT_REVIEW|CLOSED")
         private String status;
-        private String declaredBy;
+        // F2-224 — declaredBy is gone: the declarer is the authenticated principal, resolved in
+        // InvocationService#transition. standDownAuthoriser below is left ALONE and FILED, not
+        // blessed — see the STAND_DOWN branch of that method.
         private String invokedStrategies;       // comma-sep RS external ids
         private String standDownAuthoriser;
         private BigDecimal actualRtoHours;

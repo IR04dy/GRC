@@ -164,11 +164,17 @@ public final class VendorBcpAttestationDtos {
      * start failing. {@code RequestSizeCapMirrorTest} holds the equality so the number cannot drift
      * away from the column later.
      */
+    /**
+     * F2-224 — {@code reviewedByName} and {@code reviewedByUserId} are gone: the reviewer is the
+     * authenticated principal, resolved in
+     * {@code VendorBcpAttestationService#transitionAttestation}. Its {@code @Size(max = 255)}
+     * landing in {@code RequestSizeCapMirrorTest} was deleted with it, and that test's
+     * anti-vacuity floor lowered by one with the reason recorded (F2-213: a population that
+     * falls after a fix is not automatically rot, but it is always worth asking which).
+     */
     public record AttestationReviewRequest(
         @Size(max = 1000) String reviewerCommentEn,
-        @Size(max = 1000) String reviewerCommentAr,
-        @Size(max = 255) String reviewedByName,
-        Long reviewedByUserId
+        @Size(max = 1000) String reviewerCommentAr
     ) {}
 
     public record EscalateRequest(

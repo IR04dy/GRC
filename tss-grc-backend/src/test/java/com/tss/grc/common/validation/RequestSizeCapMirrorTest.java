@@ -80,9 +80,6 @@ class RequestSizeCapMirrorTest {
         new Landing(VendorBcpAttestationDtos.AttestationReviewRequest.class, "reviewerCommentAr",
             VendorBcpAttestation.class, "reviewerCommentAr",
             "Same setter block as the English comment."),
-        new Landing(VendorBcpAttestationDtos.AttestationReviewRequest.class, "reviewedByName",
-            VendorBcpAttestation.class, "reviewedByName",
-            "Same setter block; F2-184 recorded this one as 'needs checking'."),
         new Landing(OutsourcingDtos.MonitoringEventResolveRequest.class, "actionTakenEn",
             OutsourcingMonitoringEvent.class, "actionTakenEn",
             "OutsourcingService#resolveMonitoringEvent — the SAMA remediation record."),
@@ -273,13 +270,14 @@ class RequestSizeCapMirrorTest {
         // Anti-vacuity. Both assertions above are "no problems found", which an empty MIRRORED list
         // satisfies perfectly — the failure mode that makes a green build meaningless.
         //
-        // ⚠ 9 → 8 at F2-223, and the reason is recorded rather than the number being nudged: the
-        // BowTie `approverName` cap was deleted along with its request field, because the approver
-        // is now stamped from the authenticated principal and there is no caller value left to
-        // cap. A population that FALLS after a fix is not automatically rot, but it is always
-        // worth asking which (F2-213).
-        assertThat(MIRRORED).hasSizeGreaterThanOrEqualTo(8);
-        assertThat(COVERED).hasSizeGreaterThanOrEqualTo(8);
+        // ⚠ 9 → 8 at F2-223, then 8 → 7 at F2-224, and both reasons are recorded rather than the
+        // number being nudged. F2-223: the BowTie `approverName` cap went with its request field.
+        // F2-224: `AttestationReviewRequest#reviewedByName` likewise — the vendor-BCP reviewer is
+        // now stamped from the authenticated principal, so there is no caller value left to cap.
+        // A population that FALLS after a fix is not automatically rot, but it is always worth
+        // asking which (F2-213). Both times the answer was "the field is gone, not the check".
+        assertThat(MIRRORED).hasSizeGreaterThanOrEqualTo(7);
+        assertThat(COVERED).hasSizeGreaterThanOrEqualTo(7);
         Map<String, Integer> caps = new LinkedHashMap<>();
         for (Landing l : MIRRORED) caps.put(key(l.requestType(), l.component()), capOf(l.requestType(), l.component()));
         assertThat(caps.values()).allMatch(v -> v != null && v > 0);

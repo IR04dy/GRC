@@ -185,7 +185,9 @@ export interface AttestationRecordRequest {
   periodEnd?: string;
   dueDate: string;
   attestationStatus: 'ATTESTED' | 'ATTESTED_WITH_EXCEPTIONS' | 'NOT_APPLICABLE';
-  attestedByUserId: number;
+  // F2-224 — attestedByUserId is gone. The server stamps the attester from the authenticated
+  // principal; this page was sending the literal 1 with the comment "wired via JWT claim in v2",
+  // so every attestation on the tenant was filed against user 1 whoever was signed in.
   attestationTextEn?: string;
   attestationTextAr?: string;
   evidenceRefs?: string;
@@ -195,7 +197,7 @@ export interface AttestationRecordRequest {
 
 export interface AttestationReviewRequest {
   reviewerDecision: ReviewerDecision;
-  reviewerUserId: number;
+  // F2-224 — reviewerUserId is gone; the server stamps the reviewer from the principal.
   reviewerCommentEn?: string;
   reviewerCommentAr?: string;
 }

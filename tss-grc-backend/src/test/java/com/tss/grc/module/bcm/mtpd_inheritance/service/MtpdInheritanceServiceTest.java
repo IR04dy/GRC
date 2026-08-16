@@ -93,7 +93,9 @@ class MtpdInheritanceServiceTest {
 
     @InjectMocks private MtpdInheritanceService service;
 
-    @BeforeEach void setUp() { TenantContext.setCurrentTenant(ORG_ID); }
+    @BeforeEach void setUp() {
+        // F2-224 — the service resolves the actor from CurrentActor now.
+        authAs("bcm.manager", 51L); TenantContext.setCurrentTenant(ORG_ID); }
     @AfterEach  void tearDown() { TenantContext.clear(); }
 
     // ─── Fixtures ────────────────────────────────────────────────────
@@ -332,11 +334,13 @@ class MtpdInheritanceServiceTest {
         when(assessRepo.save(any(MtpdInheritanceAssessment.class))).thenAnswer(inv -> inv.getArgument(0));
 
         AssessmentResponse out = service.publishAssessment(5001L,
-            new PublishRequest("Audit-ready snapshot.", "صورة جاهزة للمراجعة الرقابية.", 42L));
+            new PublishRequest("Audit-ready snapshot.", "صورة جاهزة للمراجعة الرقابية."));
 
         assertThat(out.isPublished()).isTrue();
         assertThat(out.publishedAt()).isNotNull();
-        assertThat(out.publishedByUserId()).isEqualTo(42L);
+        // F2-224 — was isEqualTo(42L), the id the CALLER passed. The publisher of an MTPD
+        // assessment for the audit committee is the authenticated principal.
+        assertThat(out.publishedByUserId()).isEqualTo(51L);
 
         ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
         verify(publisher).publishEvent(captor.capture());
@@ -494,4 +498,20 @@ class MtpdInheritanceServiceTest {
         assertThat(detail.findings().get(0).severity()).isEqualTo("CRITICAL");
         assertThat(detail.findings().get(1).severity()).isEqualTo("LOW");
     }
+
+    /**
+     * F2-224 — a real principal in the SecurityContext, because the service now takes the actor
+     * from {@code CurrentActor} rather than from the request. {@code CurrentActor} requires the
+     * principal to be a {@link com.tss.grc.security.GrcUserDetails}, so a bare username token
+     * would resolve to null and the assertion would be about nothing.
+     */
+    private static void authAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, 1L, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
+    }
+
 }

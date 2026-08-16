@@ -1,5 +1,6 @@
 package com.tss.grc.module.platform.completion;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -175,8 +176,12 @@ public class ErmGapService {
     // trail even if the risk drifts later.
     // ══════════════════════════════════════════════════════════════
 
+    /**
+     * F2-224 — {@code attestedByName} is gone. The attester of a risk is the authenticated
+     * principal; see {@link #attestRisk} for why the clock proves it.
+     */
     public record AttestBody(String decision, String statementEn,
-                             String statementAr, String attestedByName) {}
+                             String statementAr) {}
 
     @Transactional
     public RiskAttestation attestRisk(Long riskId, AttestBody body) {
@@ -198,7 +203,13 @@ public class ErmGapService {
         att.setOrganisationId(o);
         att.setRiskId(riskId);
         att.setAttestedAt(now);
-        att.setAttestedByName(body.attestedByName());
+        // F2-224 — the attester is the authenticated principal, never a body field. This method
+        // stamps attestedAt from the server's own clock one line above, which is the server
+        // declaring that it is the recorder of this act; taking WHO from the request splits one
+        // attribution across two owners. A risk attestation is the artefact saying a named person
+        // confirmed the residual score below is still current, so a caller-chosen name is the
+        // whole value of the record.
+        att.setAttestedByName(CurrentActor.username());
         att.setDecision(decision);
         att.setStatementEn(body.statementEn());
         att.setStatementAr(body.statementAr());
