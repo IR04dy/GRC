@@ -206,7 +206,7 @@ class ServerStampedFieldContractTest {
         return src.substring(i);
     }
 
-    private record Method(String name, String params, String body) { }
+    record Method(String name, String params, String body) { }
 
     static List<Method> publicMethods(String src) {
         List<Method> out = new ArrayList<>();

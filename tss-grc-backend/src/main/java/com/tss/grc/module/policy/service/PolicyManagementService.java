@@ -63,6 +63,18 @@ public class PolicyManagementService {
      */
     private static final String ATTESTATION_INITIAL_STATUS = "PENDING";
 
+    /**
+     * F2-222 — the statuses from which {@link #transition} can still reach {@code APPROVED}, and
+     * therefore the only ones in which the approval attribution has not yet been stamped.
+     *
+     * <p>Read straight off the machine in {@code transition}: {@code DRAFT -> REVIEW} and
+     * {@code REVIEW -> APPROVED}, so {@code APPROVED} is reachable from exactly these two.
+     * {@code PolicyApprovalAttributionTest} drives every value of {@code ck_policy_status} through
+     * the machine and asserts that membership here is that reachability and not a second list
+     * somebody has to remember (F2-196: derive the set, never type it).
+     */
+    private static final Set<String> BEFORE_APPROVAL = Set.of("DRAFT", "REVIEW");
+
     private final PolicyDocumentRepository docs;
 
     /** Track D (S5): route policy approval through the committee engine.
@@ -375,10 +387,33 @@ public class PolicyManagementService {
         if (body.getContentMd() != null)       p.setContentMd(body.getContentMd());   // CH-10 inline content
         if (body.getCategory() != null)        p.setCategory(body.getCategory());
         if (body.getApplicabilityScope() != null) p.setApplicabilityScope(body.getApplicabilityScope());
-        if (body.getOwnerName() != null)       p.setOwnerName(body.getOwnerName());
-        if (body.getOwnerEmail() != null)      p.setOwnerEmail(body.getOwnerEmail());
-        if (body.getApproverName() != null)    p.setApproverName(body.getApproverName());
-        if (body.getApproverEmail() != null)   p.setApproverEmail(body.getApproverEmail());
+        // F2-222 — ownerName/ownerEmail are INPUTS TO THE C-6 SoD CHECK in transition(), which
+        // refuses an approval by the policy's author or owner. Leaving them editable in REVIEW let
+        // the party the control constrains edit the control's own input: probed live, the owner was
+        // refused with a 403, rewrote ownerName through this route with a 200, and then approved
+        // with a 200 — three calls, one permission, the control defeated. createdBy is the other
+        // input and is already immutable (READ_ONLY at the wire, F2-215). Reassigning an owner
+        // remains possible; the machine's REVIEW -> DRAFT edge is the route for it, so a policy
+        // cannot change hands during the window in which that change would decide the approval.
+        if ("DRAFT".equals(p.getStatus())) {
+            if (body.getOwnerName() != null)   p.setOwnerName(body.getOwnerName());
+            if (body.getOwnerEmail() != null)  p.setOwnerEmail(body.getOwnerEmail());
+        }
+        // F2-222 — approverName/approverEmail are the ATTRIBUTION of that same approval: transition()
+        // stamps approverName from the authenticated principal once C-6 has passed. The freeze at the
+        // top of this method was written for PUBLISHED, but the stamp happens at APPROVED, so the
+        // field was frozen ONE STATE TOO LATE and any COMPLIANCE:WRITE holder — 13 roles, 5 of them
+        // seated — could rewrite who is recorded as having approved an APPROVED policy, including the
+        // author C-6 had just refused. Editable while the policy is still being drafted or reviewed,
+        // because that is how the intended approving body is recorded before the act — of the 24 of
+        // 41 live dev rows (23 of 37 in prod) that name an approver, most name an OFFICE rather than
+        // a principal ('رئيس الهيئة' x12, 'Board Risk Committee', 'Audit Committee Chair');
+        // never editable afterwards. An inclusion list is the safe direction here — an unrecognised
+        // status protects the attribution rather than exposing it (F2-196).
+        if (BEFORE_APPROVAL.contains(p.getStatus())) {
+            if (body.getApproverName() != null)  p.setApproverName(body.getApproverName());
+            if (body.getApproverEmail() != null) p.setApproverEmail(body.getApproverEmail());
+        }
         if (body.getEffectiveDate() != null)   p.setEffectiveDate(body.getEffectiveDate());
         if (body.getExpiryDate() != null)      p.setExpiryDate(body.getExpiryDate());
         if (body.getNextReviewDate() != null)  p.setNextReviewDate(body.getNextReviewDate());
