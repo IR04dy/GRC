@@ -1,5 +1,6 @@
 package com.tss.grc.module.tprm.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -63,7 +64,18 @@ public class QuestionnaireService {
 
     private static final Logger log = LoggerFactory.getLogger(QuestionnaireService.class);
 
-    private static final Set<String> TEMPLATE_STATUSES = Set.of("DRAFT", "ACTIVE", "ARCHIVED");
+    /**
+     * F2-220 — the state a template is CREATED in; ACTIVE is transitionTemplate()'s, which
+     * refuses to activate a template with no questions.
+     *
+     * <p>⚠ {@code TEMPLATE_STATUSES}, the DRAFT/ACTIVE/ARCHIVED set that stood here, is gone
+     * rather than left unread. Its only reader was the create's membership test — the very check
+     * that admitted ACTIVE — and {@code transitionTemplate}'s switch is exhaustive, so an
+     * unrecognised target already throws through {@code default -> false}. An inert construct is
+     * worse than none, because it answers the question a reader was about to ask (F2-184). The
+     * vocabulary is stated by the machine and by {@code ck_qt_status} on the column.
+     */
+    private static final String INITIAL_TEMPLATE_STATUS = "DRAFT";
     private static final Set<String> ANSWER_TYPES = Set.of("SCALE_1_5", "BOOLEAN", "SELECT", "TEXT");
 
     private final QuestionnaireTemplateRepository templates;
@@ -119,9 +131,15 @@ public class QuestionnaireService {
             throw new IllegalArgumentException("Template already exists: " + body.getTemplateCode() + " v" + body.getVersion());
         body.setId(null);
         body.setOrganisationId(org());
-        if (body.getStatus() == null) body.setStatus("DRAFT");
-        if (!TEMPLATE_STATUSES.contains(body.getStatus()))
-            throw new IllegalArgumentException("Invalid status: " + body.getStatus());
+        // F2-220 — a DEFAULT, not a guard: the membership test admitted ACTIVE, so a template
+        // could be created active with zero questions — the exact case transitionTemplate()
+        // refuses ("Cannot activate a template with no questions") — and then be sent to
+        // vendors as an assessment. activatedAt was never stamped either.
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), INITIAL_TEMPLATE_STATUS, "a questionnaire template",
+            "POST /api/v1/tprm/questionnaire-templates/{id}/transition"));
+        body.setActivatedAt(null);
+        body.setArchivedAt(null);
         return templates.save(body);
     }
 

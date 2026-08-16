@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.*;
 import com.tss.grc.module.bcm.cycle.repository.*;
@@ -61,6 +62,9 @@ public class CrisisEventService {
 
     private static final Set<String> STATUSES = Set.of(
         "DETECTED", "ASSESSING", "ACTIVATED", "CONTAINED", "RECOVERED", "CLOSED", "CANCELLED");
+    /** F2-220 — the state a crisis event is CREATED in. transition() owns the rest and,
+     *  per spec §J.13, refuses CLOSED without a root cause and a lessons-learned record. */
+    private static final String INITIAL_STATUS = "DETECTED";
     private static final Set<String> TRIGGER_SOURCES = Set.of(
         "MANUAL", "INCIDENT", "EXERCISE", "THREAT_INTEL", "SUPPLIER", "CYBER", "EXTERNAL_ALERT");
     private static final Set<String> REGULATORS = Set.of(
@@ -307,7 +311,16 @@ public class CrisisEventService {
         body.setId(null);
         Long org = TenantContext.getCurrentTenant();
         body.setOrganisationId(org);
-        if (body.getStatus() == null) body.setStatus("DETECTED");
+        // F2-220 — a DEFAULT with no vocabulary check, and bcm.crisis_events has no CHECK on
+        // status either, so a crisis could be created straight to CLOSED. transition() enforces
+        // spec §J.13 there: a root cause and a lessons-learned record before closure. Probed
+        // live 2026-08-16 as rmanager — created CLOSED with neither, no closure_time, and none
+        // of the BCM_CRISIS_* events a crisis is supposed to leave behind.
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), INITIAL_STATUS, "a crisis event",
+            "POST /api/v1/bcm/crisis-events/{id}/transition"));
+        body.setActivationTime(null);
+        body.setClosureTime(null);
         if (body.getEventCode() == null || body.getEventCode().isBlank()) {
             body.setEventCode(nextCode());
         }

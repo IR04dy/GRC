@@ -1044,4 +1044,293 @@ class ServerStampedFieldContractTest {
             .as("touch() checks nothing, so it is not evidence that status is server-owned")
             .isEmpty();
     }
+
+    // ── F2-220 — the second question: a machine whose TARGET STATE is a parameter ────────────
+
+    /*
+     * ⚠⚠ Everything above asks: does a create accept a field a guarded route STAMPS with a
+     * server-derived value? A transition route written as `transition(Long id, String to)` writes
+     * `cur.setStatus(to)` — and a scalar method parameter is caller data (F2-218's fourth detector
+     * bug, the only one that pushed the population onto correct code). So `status` never enters the
+     * STAMPED set, and a create accepting `status` is not a contradiction by that question.
+     *
+     * F2-219 hit this as a SURVIVING MUTANT and recorded the right verdict: a surviving mutant the
+     * gate legitimately cannot see is an unasserted behaviour, not a loose instrument. It answered
+     * with one test and filed the population as unmeasured. F2-220 measured it: NINE registers, and
+     * every field was a `status`.
+     *
+     * 🔑 The two questions are complements, which is why this lives in the same class rather than a
+     * second instrument (two artefacts answering one question is this programme's own most repeated
+     * defect). `stampsServerValue` EXCLUDES caller-supplied values; this catches exactly what that
+     * exclusion drops, in the case where the exclusion is a state machine.
+     *
+     * The discriminator is structural and carries NO list of field names (F2-217: a census keyed on
+     * a list of names measures the list). A method is a TRANSITION ROUTE for field F when it
+     *
+     *   (1) loads a row,        (2) READS F on that row,
+     *   (3) throws conditionally,   and   (4) writes F on that row from a scalar parameter.
+     *
+     * (2) and (4) together are what make it a machine rather than a setter with a longer name: the
+     * value it will accept depends on the value already there.
+     */
+
+    /** Scalar parameters — caller data that is not a payload object. */
+    private static final Set<String> SCALARS = Set.of(
+        "String", "Long", "Integer", "Boolean", "Short", "Double", "BigDecimal",
+        "LocalDate", "LocalDateTime");
+
+    /**
+     * The nine registers F2-220 measured and closed, as (type#field → the route that owns it).
+     *
+     * <p>This is the anti-vacuity guard, and it is deliberately not a count. F2-219's lesson: a
+     * floor is only worth having if it sits above the largest WRONG answer, and the wrong answer
+     * for a detector that has stopped matching is an EMPTY population — indistinguishable from a
+     * finished sweep. A bare {@code machineOwned.size() >= N} would catch total rot and miss a
+     * detector that quietly stopped recognising, say, block-bodied guards. Naming the nine means a
+     * register whose machine is deleted, renamed or rewritten fails here and says which.
+     */
+    private static final Map<String, String> MEASURED_MACHINES = Map.ofEntries(
+        Map.entry("AuthorityDocument#status", "transition"),
+        Map.entry("BcmGap#status", "transitionGap"),
+        Map.entry("BcmRisk#status", "transition"),
+        Map.entry("BcpPlan#status", "transition"),
+        Map.entry("ContinuityStrategy#approvalStatus", "transitionApproval"),
+        Map.entry("ControlAssessment#workflowStatus", "transitionAssessment"),
+        Map.entry("CrisisEvent#status", "transition"),
+        Map.entry("Issue#status", "transition"),
+        Map.entry("QuestionnaireTemplate#status", "transitionTemplate"));
+
+    /** {@code Type#field} → the routes that transition it from a caller-supplied target state. */
+    static Map<String, Set<String>> machineOwned(List<Method> methods) {
+        Map<String, Set<String>> out = new LinkedHashMap<>();
+        for (Method m : methods) {
+            if (isWritePath(m.name())) continue;
+            String body = m.body();
+            if (!body.matches("(?s).*\\b(get|find\\w*)\\s*\\(.*")) continue;
+            if (!body.matches("(?s).*\\bthrow new \\w*(IllegalState|IllegalArgument"
+                              + "|IllegalTransition)\\w*Exception.*")) continue;
+
+            Map<String, String> ptypes = requestParamTypes(m.params());
+            Set<String> scalarParams = new LinkedHashSet<>();
+            for (String p : m.params().split(",")) {
+                String[] parts = p.trim().split("\\s+");
+                if (parts.length >= 2 && SCALARS.contains(parts[parts.length - 2])) {
+                    scalarParams.add(parts[parts.length - 1]);
+                }
+            }
+            if (scalarParams.isEmpty()) continue;
+            Map<String, String> types = localTypes(m.params(), body);
+
+            Matcher s = SETTER.matcher(body);
+            while (s.find()) {
+                String target = s.group(1);
+                String field = s.group(2);
+                if (!scalarParams.contains(s.group(3).trim())) continue;
+                String type = types.get(target);
+                // A payload parameter is the caller's whole object; writing one of its fields from
+                // another of the caller's own parameters is not a transition of a loaded row.
+                if (type == null || ptypes.containsKey(target)) continue;
+                if (!body.matches("(?s).*\\b" + Pattern.quote(target) + "\\s*\\.\\s*(get|is)"
+                                  + Pattern.quote(field) + "\\s*\\(.*")) continue;
+                out.computeIfAbsent(key(type, lower(field)), k -> new TreeSet<>()).add(m.name());
+            }
+        }
+        return out;
+    }
+
+    /** As {@link #acceptedAndStamped}, against the machine-owned map instead of the stamped one. */
+    static Set<String> acceptedAndMachineOwned(Method m, Map<String, Set<String>> owned) {
+        if (!isWritePath(m.name())) return Set.of();
+        Map<String, String> paramTypes = requestParamTypes(m.params());
+        if (paramTypes.isEmpty()) return Set.of();
+        Map<String, String> types = localTypes(m.params(), m.body());
+        Set<String> req = paramTypes.keySet();
+
+        Set<String> accepted = new TreeSet<>(writesFromRequest(m.body(), types, req));
+        for (var e : paramTypes.entrySet()) {
+            if (!m.body().matches("(?s).*\\.save\\s*\\(\\s*" + Pattern.quote(e.getKey()) + "\\s*\\).*")) {
+                continue;
+            }
+            Set<String> settled = new TreeSet<>(
+                stampsServerValue(m.body(), types, req, allParamNames(m.params())));
+            settled.addAll(clears(m.body(), types));
+            settled.removeAll(defaults(m.body(), types, req));   // F2-219 — a default settles nothing
+            String prefix = e.getValue() + "#";
+            for (String f : owned.keySet()) {
+                if (f.startsWith(prefix) && !settled.contains(f)) accepted.add(f);
+            }
+        }
+        accepted.retainAll(owned.keySet());
+        return accepted;
+    }
+
+    private record MachineBypass(String service, String writeMethod, Set<String> fields,
+                                 Set<String> routes) { }
+
+    static List<MachineBypass> measureMachineBypasses() {
+        List<MachineBypass> out = new ArrayList<>();
+        for (Path p : serviceSources()) {
+            String src = stripComments(read(p));
+            List<Method> methods = publicMethods(src);
+            Map<String, Set<String>> owned = machineOwned(methods);
+            if (owned.isEmpty()) continue;
+            for (Method m : methods) {
+                Set<String> hit = acceptedAndMachineOwned(m, owned);
+                if (!hit.isEmpty()) {
+                    Set<String> routes = new TreeSet<>();
+                    hit.forEach(f -> routes.addAll(owned.get(f)));
+                    out.add(new MachineBypass(p.getFileName().toString().replace(".java", ""),
+                                              m.name(), hit, routes));
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * A create may not name a state that a transition route adjudicates.
+     *
+     * <p>A hard zero with no exemption map, because the whole measured population was read and
+     * closed in one slice. Every one of the nine had a precondition on the far side of the machine
+     * that the create simply skipped — a successor document, a linked corrective action, an RTO or
+     * RPO, at least one question, a resolution code, a root cause and a lessons-learned record.
+     * <b>The create did not merely bypass the machine; it bypassed the machine's evidence
+     * requirements.</b>
+     */
+    @Test
+    void noCreateMayNameAStateATransitionRouteAdjudicates() {
+        assertThat(measureMachineBypasses())
+            .as("""
+                A create writing this field lands the record in a state the register's own \
+                transition route decides — with none of the checks that route makes, no audit row \
+                naming the from- and to-states, and none of the events it publishes. Route the \
+                value through ServerOwnedState.requireInitial (or requireCreatable, which owes a \
+                recorded reason); do not add an exemption.""")
+            .isEmpty();
+    }
+
+    /**
+     * The nine machines this gate was built over must still be visible to it.
+     *
+     * <p>🔑 Anti-vacuity. The assertion above is a hard zero, and a hard zero over a population the
+     * instrument can no longer see is the most reassuring possible artefact — F2-198's shape, which
+     * this programme has now met at a filename, a three-entry allow-list, a module name, a
+     * controller-bearing table, an {@code extends} clause and a field-name list. Enforced both
+     * ways: a machine that disappears fails here, and a machine this map does not know about is
+     * reported so the map cannot silently stop describing the tree.
+     */
+    @Test
+    void theMeasuredMachinesAreStillRecognised() {
+        Map<String, Set<String>> found = new TreeMap<>();
+        for (Path p : serviceSources()) {
+            machineOwned(publicMethods(stripComments(read(p))))
+                .forEach((f, routes) -> found.computeIfAbsent(f, k -> new TreeSet<>()).addAll(routes));
+        }
+
+        assertThat(found.keySet())
+            .as("""
+                F2-220 measured these nine parameter-driven machines and closed the create that \
+                went around each. If one is missing, either its transition route changed (update \
+                the map in the same commit, having re-read it) or a detector rotted — and a \
+                shrinking population is not progress.""")
+            .containsAll(MEASURED_MACHINES.keySet());
+
+        MEASURED_MACHINES.forEach((field, route) -> assertThat(found.get(field))
+            .as("%s is adjudicated by %s", field, route)
+            .contains(route));
+    }
+
+    /**
+     * The pre-fix shape, as literal source, run through the SHIPPED predicates.
+     *
+     * <p>Every detector in this class was also re-run against {@code git show master:} before the
+     * fix landed; this is the part of that control that survives into the build. 🔑 A detector that
+     * cannot match reads exactly like a clean tree, and the corpus assertion above passes either
+     * way.
+     */
+    @Test
+    void thePreFixShapeIsDetectedAndTheFixedOneIsNot() {
+        String broken = """
+            public Foo transition(Long id, String to) {
+                Foo e = get(id);
+                if (!ALLOWED.getOrDefault(e.getStatus(), Set.of()).contains(to))
+                    throw new IllegalStateException("no");
+                e.setStatus(to);
+                return repo.save(e);
+            }
+            public Foo create(Foo body) {
+                if (body.getStatus() == null) body.setStatus("DRAFT");
+                if (!STATUSES.contains(body.getStatus()))
+                    throw new IllegalArgumentException("bad");
+                return repo.save(body);
+            }
+            """;
+        List<Method> brokenMethods = publicMethods(broken);
+        Map<String, Set<String>> brokenOwned = machineOwned(brokenMethods);
+        assertThat(brokenOwned).as("the transition writes status from a scalar parameter after "
+            + "reading it — that is a machine").containsKey("Foo#status");
+        Set<String> brokenHits = new TreeSet<>();
+        for (Method m : brokenMethods) brokenHits.addAll(acceptedAndMachineOwned(m, brokenOwned));
+        assertThat(brokenHits)
+            .as("a DEFAULT plus a membership test is exactly what nine registers had, and it is "
+                + "not a settlement — checking a value is IN the vocabulary is not checking it is "
+                + "one a record may START in")
+            .contains("Foo#status");
+
+        String fixed = """
+            public Foo transition(Long id, String to) {
+                Foo e = get(id);
+                if (!ALLOWED.getOrDefault(e.getStatus(), Set.of()).contains(to))
+                    throw new IllegalStateException("no");
+                e.setStatus(to);
+                return repo.save(e);
+            }
+            public Foo create(Foo body) {
+                body.setStatus(ServerOwnedState.requireInitial(
+                    body.getStatus(), INITIAL_STATUS, "a foo", "POST /{id}/transition"));
+                return repo.save(body);
+            }
+            """;
+        List<Method> fixedMethods = publicMethods(fixed);
+        Map<String, Set<String>> fixedOwned = machineOwned(fixedMethods);
+        assertThat(fixedOwned).as("the machine is unchanged by the fix").containsKey("Foo#status");
+        Set<String> fixedHits = new TreeSet<>();
+        for (Method m : fixedMethods) fixedHits.addAll(acceptedAndMachineOwned(m, fixedOwned));
+        assertThat(fixedHits).as("the refusal primitive settles it").isEmpty();
+    }
+
+    /**
+     * A method taking the caller's payload AND a scalar is not thereby a machine.
+     *
+     * <p>Without the {@code ptypes.containsKey(target)} narrowing, {@code update(Long id, Foo body,
+     * String note)} writing {@code body.setNote(note)} would register {@code Foo#note} as
+     * machine-owned and every create would then "bypass" it. A gate that fails on correct code is
+     * the one failure a gate must never have (F2-214), and this is the exact shape that produced
+     * F2-218's fourth detector bug one question over.
+     */
+    @Test
+    void writingTheCallersOwnPayloadFromAnotherParameterIsNotATransition() {
+        // ⚠ The fixture reads `body.getNote()` on purpose, and that is the whole control. Its
+        // first draft read the field on the LOADED row (`e.getNote()`) instead, so the
+        // read-the-same-field requirement already excluded it and the payload narrowing was never
+        // exercised — the mutation deleting that narrowing SURVIVED. 🔑 A negative control that
+        // does not actually reach the code it is controlling proves nothing, and its passing reads
+        // exactly like the narrowing being sound (F2-197: a control that does not break the thing
+        // is not a control). Every other clause here must hold, so that the narrowing is the only
+        // thing standing between this fixture and a false finding.
+        String notAMachine = """
+            public Foo edit(Long id, Foo body, String note) {
+                Foo e = get(id);
+                if (e.getNote() == null) throw new IllegalStateException("no");
+                if (body.getNote() != null) body.setNote(note);
+                return repo.save(body);
+            }
+            """;
+        assertThat(machineOwned(publicMethods(notAMachine)))
+            .as("body is the caller's whole object, not a loaded row: writing one of its fields "
+                + "from another of the caller's own parameters is a partial update, not a "
+                + "transition. Without this narrowing every create would then 'bypass' it, and a "
+                + "gate that fails on correct code is the one failure a gate must never have.")
+            .doesNotContainKey("Foo#note");
+    }
 }

@@ -1,5 +1,6 @@
 package com.tss.grc.module.platform.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -39,6 +40,9 @@ public class IssueService {
 
     private static final Set<String> STATUSES = Set.of(
         "OPEN", "IN_PROGRESS", "BLOCKED", "RESOLVED", "CLOSED", "CANCELLED");
+    /** F2-220 — the state an issue is CREATED in. update() already refuses to change status
+     *  ("Use transition() to change status"); the create did not. */
+    private static final String INITIAL_STATUS = "OPEN";
     private static final Set<String> SEVERITIES = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
     private static final Set<String> PRIORITIES = Set.of("LOW", "NORMAL", "HIGH", "URGENT");
     private static final Set<String> RESOLUTIONS = Set.of(
@@ -92,7 +96,19 @@ public class IssueService {
         validateBase(body);
         body.setId(null);
         body.setOrganisationId(TenantContext.getCurrentTenant());
-        if (body.getStatus() == null) body.setStatus("OPEN");
+        // F2-220 — update() has refused to change status since this class was written ("Use
+        // transition() to change status", and the class javadoc says that is to keep the state
+        // machine inspectable). The create did not, and had no vocabulary check either — and
+        // platform.issues carries no CHECK constraints at all, so an arbitrary string was
+        // storable and transition()'s `default -> false` then made the row permanently
+        // untransitionable. Closing an issue through here also skipped the mandatory resolution
+        // code and both timestamps.
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), INITIAL_STATUS, "an issue",
+            "POST /api/v1/issues/{id}/transition"));
+        body.setResolution(null);
+        body.setResolvedAt(null);
+        body.setClosedAt(null);
         if (body.getIssueCode() == null || body.getIssueCode().isBlank()) {
             body.setIssueCode(nextCode());
         }

@@ -1,5 +1,8 @@
 package com.tss.grc.common.validation;
 
+import java.util.Set;
+import java.util.TreeSet;
+
 /**
  * F2-218 — a record is created in its register's <b>initial state</b>, and never anywhere else.
  *
@@ -86,5 +89,45 @@ public final class ServerOwnedState {
             "status: " + register + " is created in " + initial + ". '" + supplied + "' has to be "
             + "reached through " + route + ", which checks the state machine and records who made "
             + "the change. Send status=" + initial + ", or omit it.");
+    }
+
+    /**
+     * F2-220 — as {@link #requireInitial}, for the register where <b>more than one</b> state is a
+     * legitimate starting point.
+     *
+     * <p>⚠ Reach for this only when {@code requireInitial} would refuse a request that works today.
+     * There is exactly one such register: {@code platform.authority_documents} is a <i>library</i>
+     * of regulatory instruments whose create defaults to ACTIVE — most documents are simply in
+     * force — while its machine's root is DRAFT, for one being prepared. Both are entry states and
+     * both are accepted by the API today; DEPRECATED and SUPERSEDED are lifecycle <i>outcomes</i>,
+     * and SUPERSEDED's transition demands a successor document it verifies exists and is not the
+     * document itself. Forcing one initial state there would have broken a working create, which is
+     * the failure F2-182's test exists to prevent — so the rule bends for the measurement, not the
+     * measurement for the rule.
+     *
+     * <p>🔑 This is deliberately <b>not</b> the general form. A per-register list of allowed states
+     * is exactly the artefact F2-217 found measuring its own list rather than the codebase; the
+     * default is one initial state, and every use of this overload owes a recorded reason.
+     *
+     * @param creatable states this register may be created in; must contain {@code initial}
+     */
+    public static String requireCreatable(String supplied, Set<String> creatable, String initial,
+                                          String register, String route) {
+        if (!creatable.contains(initial)) {
+            throw new IllegalStateException(
+                "Register '" + register + "' declares initial state " + initial
+                + ", which is not in its creatable set " + new TreeSet<>(creatable)
+                + ". The state the server picks and the states it accepts cannot disagree.");
+        }
+        if (supplied == null || supplied.isBlank()) {
+            return initial;
+        }
+        if (creatable.contains(supplied)) {
+            return supplied;
+        }
+        throw new IllegalArgumentException(
+            "status: " + register + " is created in " + new TreeSet<>(creatable) + ". '" + supplied
+            + "' has to be reached through " + route + ", which checks the state machine and "
+            + "records who made the change. Send status=" + initial + ", or omit it.");
     }
 }

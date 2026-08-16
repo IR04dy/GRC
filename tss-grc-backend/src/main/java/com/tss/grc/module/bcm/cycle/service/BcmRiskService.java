@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.BcmRisk;
@@ -39,6 +40,8 @@ public class BcmRiskService {
 
     private static final Set<String> STATUSES = Set.of(
         "DRAFT", "ASSESSED", "TREATMENT_PLANNED", "ACCEPTED", "MITIGATED", "CLOSED");
+    /** F2-220 — the state a BCM risk is CREATED in; the rest belong to transition(). */
+    private static final String INITIAL_STATUS = "DRAFT";
     private static final Set<String> EFFECTIVENESS = Set.of(
         "EFFECTIVE", "NEEDS_IMPROVEMENT", "INEFFECTIVE", "NOT_TESTED");
     private static final Set<String> CATEGORIES = Set.of(
@@ -83,9 +86,12 @@ public class BcmRiskService {
             throw new IllegalArgumentException("controlEffectiveness must be one of " + EFFECTIVENESS);
         body.setId(null);
         body.setOrganisationId(org());
-        if (body.getStatus() == null) body.setStatus("DRAFT");
-        if (!STATUSES.contains(body.getStatus()))
-            throw new IllegalArgumentException("Invalid status: " + body.getStatus());
+        // F2-220 — a DEFAULT, not a guard: the membership test admitted ACCEPTED and CLOSED, so a
+        // BCM risk could be accepted or closed on arrival with no TRANSITION audit row and,
+        // for TREATMENT_PLANNED, none of the AR-T1 ERM fan-out the machine publishes.
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), INITIAL_STATUS, "a BCM risk",
+            "POST /api/v1/bcm/risks/{id}/transition"));
         recalcScores(body);
         BcmRisk saved = risks.save(body);
         auditEvent(saved, "CREATE", null, saved.getStatus(),

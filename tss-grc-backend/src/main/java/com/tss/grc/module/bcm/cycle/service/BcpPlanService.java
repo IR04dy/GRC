@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -66,6 +67,9 @@ public class BcpPlanService {
 
     private static final Set<String> STATUSES = Set.of(
         "DRAFT", "UNDER_REVIEW", "APPROVED", "PUBLISHED", "ARCHIVED", "SUPERSEDED", "CANCELLED");
+    /** F2-220 — the state a plan is CREATED in; APPROVED/PUBLISHED are transition()'s, and
+     *  it snapshots the sections into a BcpVersion row on the way. */
+    private static final String INITIAL_STATUS = "DRAFT";
     private static final Set<String> PLAN_TYPES = Set.of("BCP", "DRP");
 
     /**
@@ -162,7 +166,15 @@ public class BcpPlanService {
         body.setId(null);
         Long org = TenantContext.getCurrentTenant();
         body.setOrganisationId(org);
-        if (body.getStatus() == null) body.setStatus("DRAFT");
+        // F2-220 — a DEFAULT with no vocabulary check at all, so a plan could be created
+        // PUBLISHED: never reviewed, never approved, and with no BcpVersion snapshot, which is
+        // the artefact recording what was approved. isLocked() then refuses to edit it.
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), INITIAL_STATUS, "a continuity plan",
+            "POST /api/v1/bcm/plans/{id}/transition"));
+        body.setApprovedBy(null);
+        body.setApprovedAt(null);
+        body.setPublishedAt(null);      // transition()'s; see BcpPlan#publishedAt
         if (body.getCurrentVersion() == null) body.setCurrentVersion(1);
         if (body.getPlanCode() == null || body.getPlanCode().isBlank()) {
             body.setPlanCode(nextCode(body.getPlanType()));

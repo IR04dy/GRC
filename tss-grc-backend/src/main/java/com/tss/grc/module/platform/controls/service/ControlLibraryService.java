@@ -1,5 +1,6 @@
 package com.tss.grc.module.platform.controls.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.controls.entity.Control;
@@ -57,6 +58,9 @@ public class ControlLibraryService {
         "EFFECTIVE", "NEEDS_IMPROVEMENT", "INEFFECTIVE", "NOT_TESTED");
     private static final Set<String> ASSESSMENT_STATUSES = Set.of(
         "DRAFT", "UNDER_REVIEW", "APPROVED", "REJECTED");
+    /** F2-220 — the workflow state an assessment is CREATED in; the rest are
+     *  transitionAssessment()'s. */
+    private static final String INITIAL_ASSESSMENT_STATUS = "DRAFT";
 
     private final ControlObjectiveRepository objectives;
     private final ControlRepository controls;
@@ -352,7 +356,12 @@ public class ControlLibraryService {
             throw new IllegalArgumentException("effectiveness must be one of " + EFFECTIVENESS);
         body.setId(null);
         body.setOrganisationId(org());
-        if (body.getWorkflowStatus() == null) body.setWorkflowStatus("DRAFT");
+        // F2-220 — a DEFAULT with no vocabulary check, so a control assessment could be created
+        // APPROVED, skipping the DRAFT → UNDER_REVIEW → APPROVED walk entirely. All 17 live rows
+        // in dev (16 in prod) are APPROVED, so nothing distinguishes a reviewed one.
+        body.setWorkflowStatus(ServerOwnedState.requireInitial(
+            body.getWorkflowStatus(), INITIAL_ASSESSMENT_STATUS, "a control assessment",
+            "POST /api/v1/control-assessments/{id}/transition"));
         return assessments.save(body);
     }
 

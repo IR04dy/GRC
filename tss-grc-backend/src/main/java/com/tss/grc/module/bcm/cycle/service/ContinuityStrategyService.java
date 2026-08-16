@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.ContinuityStrategy;
@@ -32,6 +33,9 @@ public class ContinuityStrategyService {
 
     private static final Set<String> APPROVAL_STATUSES =
         Set.of("DRAFT", "UNDER_REVIEW", "APPROVED", "REJECTED", "ARCHIVED");
+    /** F2-220 — the approval state a strategy is CREATED in; APPROVED is
+     *  transitionApproval()'s, which refuses a strategy with no RTO or RPO. */
+    private static final String INITIAL_APPROVAL_STATUS = "DRAFT";
     private static final Set<String> IMPL_STATUSES =
         Set.of("NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD");
     private static final Set<String> STRATEGIES = Set.of(
@@ -79,9 +83,13 @@ public class ContinuityStrategyService {
             throw new IllegalArgumentException("rpoRequirementHours cannot be negative");
         body.setId(null);
         body.setOrganisationId(org());
-        if (body.getApprovalStatus() == null) body.setApprovalStatus("DRAFT");
-        if (!APPROVAL_STATUSES.contains(body.getApprovalStatus()))
-            throw new IllegalArgumentException("Invalid approval status: " + body.getApprovalStatus());
+        // F2-220 — a DEFAULT, not a guard: the membership test admitted APPROVED, so a strategy
+        // could be created already approved — defeating the one thing transitionApproval() checks
+        // on the way in, that a strategy has an RTO or an RPO. An approved continuity strategy
+        // with no recovery objective is the case its own guard comment names.
+        body.setApprovalStatus(ServerOwnedState.requireInitial(
+            body.getApprovalStatus(), INITIAL_APPROVAL_STATUS, "a continuity strategy",
+            "POST /api/v1/bcm/strategies/{id}/transition"));
         if (body.getImplementationStatus() != null && !IMPL_STATUSES.contains(body.getImplementationStatus()))
             throw new IllegalArgumentException("Invalid implementation status: " + body.getImplementationStatus());
         ContinuityStrategy saved = strategies.save(body);

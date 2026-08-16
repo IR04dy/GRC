@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.cycle.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.exception.IllegalTransitionException;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.BcmCorrectiveAction;
@@ -45,6 +46,8 @@ public class BcmRemediationService {
     // ── Gap statuses ──
     private static final Set<String> GAP_STATUSES = Set.of(
         "OPEN", "ASSIGNED", "IN_PROGRESS", "UNDER_REVIEW", "CLOSED", "ACCEPTED_RISK", "REOPENED");
+    /** F2-220 — the state a gap is CREATED in; every other GAP_STATUS is transitionGap()'s. */
+    private static final String INITIAL_GAP_STATUS = "OPEN";
     private static final Set<String> GAP_SEVERITIES = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
     private static final Set<String> GAP_SOURCES = Set.of(
         "BIA", "BCP", "DRP", "EXERCISE", "CALL_TREE", "AUDIT", "RISK", "MANUAL", "EVIDENCE");
@@ -151,9 +154,12 @@ public class BcmRemediationService {
             throw new IllegalArgumentException("Invalid severity: " + body.getSeverity());
         body.setId(null);
         body.setOrganisationId(org());
-        if (body.getStatus() == null) body.setStatus("OPEN");
-        if (!GAP_STATUSES.contains(body.getStatus()))
-            throw new IllegalArgumentException("Invalid status: " + body.getStatus());
+        // F2-220 — a DEFAULT, not a guard: the membership test below it admitted CLOSED, so a
+        // create could close a gap. transitionGap() refuses to CLOSE a HIGH or CRITICAL gap
+        // without at least one linked corrective action; this route asked for none.
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), INITIAL_GAP_STATUS, "a BCM gap",
+            "POST /api/v1/bcm/gaps/{id}/transition"));
         BcmGap saved = gaps.save(body);
         audit("BcmGap", saved.getId(), saved.getTitleEn(), "CREATE", null, saved.getStatus(),
             "Gap created: " + saved.getTitleEn());

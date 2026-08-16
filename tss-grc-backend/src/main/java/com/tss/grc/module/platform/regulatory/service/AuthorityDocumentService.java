@@ -1,5 +1,6 @@
 package com.tss.grc.module.platform.regulatory.service;
 
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.regulatory.entity.AuthorityDocument;
 import com.tss.grc.module.platform.regulatory.entity.AuthorityDocumentCitation;
@@ -40,6 +41,19 @@ public class AuthorityDocumentService {
     private static final Logger log = LoggerFactory.getLogger(AuthorityDocumentService.class);
 
     private static final Set<String> STATUSES = Set.of("DRAFT", "ACTIVE", "DEPRECATED", "SUPERSEDED");
+    /**
+     * F2-220 — the states a document may be CREATED in, and the one the server picks when the
+     * caller says nothing. Read by the create; the rest of {@link #STATUSES} is
+     * {@link #transition}'s, which walks DRAFT → ACTIVE → DEPRECATED → SUPERSEDED and, for
+     * SUPERSEDED, demands a successor document it verifies exists and is not this one.
+     *
+     * <p>⚠ This is the ONE register in the sweep needing a set rather than a single initial state:
+     * the default is ACTIVE (a library of instruments already in force) while the machine's root is
+     * DRAFT (one being prepared), and both are accepted today. See
+     * {@link ServerOwnedState#requireCreatable}.
+     */
+    private static final Set<String> CREATABLE_STATUSES = Set.of("DRAFT", "ACTIVE");
+    private static final String INITIAL_STATUS = "ACTIVE";
     private static final Set<String> TRANSLATION_STATUSES = Set.of(
         "EN_ONLY", "AR_AUTO", "AR_HUMAN_REVIEWED", "AR_OFFICIAL");
 
@@ -76,9 +90,14 @@ public class AuthorityDocumentService {
         if (body.getJurisdiction() == null) throw new IllegalArgumentException("jurisdiction is required");
         if (body.getIssuer() == null)       throw new IllegalArgumentException("issuer is required");
         if (body.getVersion() == null)      body.setVersion("1.0");
-        if (body.getStatus() == null)       body.setStatus("ACTIVE");
-        if (!STATUSES.contains(body.getStatus()))
-            throw new IllegalArgumentException("Invalid status: " + body.getStatus());
+        // F2-220 — `if (status == null) ACTIVE` is a DEFAULT, not a guard: it kept whatever the
+        // caller sent, and the check below it only asked whether that was a declared state. So a
+        // create could file a document SUPERSEDED — the one transition that demands a successor —
+        // with nothing superseding it, or DEPRECATED, a claim that it was once in force.
+        body.setStatus(ServerOwnedState.requireCreatable(
+            body.getStatus(), CREATABLE_STATUSES, INITIAL_STATUS, "an authority document",
+            "POST /api/v1/regulatory/authority-documents/{id}/transition"));
+        body.setSupersededById(null);   // transition()'s, and only when it reaches SUPERSEDED
         if (body.getTranslationStatus() == null) body.setTranslationStatus("EN_ONLY");
         if (!TRANSLATION_STATUSES.contains(body.getTranslationStatus()))
             throw new IllegalArgumentException("Invalid translation status: " + body.getTranslationStatus());
