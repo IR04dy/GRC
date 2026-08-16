@@ -1872,6 +1872,71 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A CREATE THAT NAMES THE STATE SKIPS THE MACHINE'S *EVIDENCE REQUIREMENTS*, AND A GATE
+  CANNOT SEE IT WHEN THE TARGET STATE ARRIVES AS A PARAMETER** (F2-220, measured 2026-08-16).
+  F2-219 filed this shape as unmeasured; it is **nine registers, every field a `status`, 0 of 9
+  refuted by reading**. `ServerStampedFieldContractTest` asks whether a create accepts a field a
+  guarded route *stamps with a server value*; `transition(Long id, String to)` writes
+  `cur.setStatus(to)` from a **scalar parameter**, which is caller data (F2-218's fourth detector
+  correction, the one that stopped the gate failing on correct code) — so `status` never entered the
+  STAMPED set and the create was not a contradiction by that question. 🔑 **The two questions are
+  complements**, which is why the second lives in the same class and not a second instrument.
+  ⚠⚠ **The harm is not "the record is in the wrong state", it is that each transition demands
+  something ON THE WAY THROUGH and the create supplies none of it.** Probed live, all nine, each as
+  a persona holding the module's WRITE: `platform.authority_documents` created **SUPERSEDED** with
+  nothing superseding it (the transition resolves a successor and refuses one that is the document
+  itself); a **CRITICAL** `bcm.gaps` created **CLOSED** with no corrective action; `bcm.bcp_plans`
+  created **PUBLISHED**, so no `BcpVersion` snapshot — *the artefact recording what was approved* —
+  and `isLocked()` then refuses to edit it; `bcm.continuity_strategies` created **APPROVED** with
+  neither RTO nor RPO, **the exact case its own guard comment names**; `bcm.crisis_events` created
+  **CLOSED** with no root cause and no lessons-learned record (**spec §J.13**); `platform.issues`
+  created **CLOSED** with no resolution code and no timestamps; `tprm.questionnaire_templates`
+  created **ACTIVE with zero questions**, then sent to vendors as an assessment. In every case
+  `/transition` answered **400 or 409 for the identical edge**.
+  ⚠ **No privilege escalation — same permission on both routes throughout**, so this is F2-219's
+  shape and not F2-218's: the object-level machine is the *only* control, and it sat one method away
+  with nothing consulting it. Say which of the two you have; they read alike in a summary.
+  ⚠⚠ **Four of the nine checked no vocabulary at all, and for two the database does not either.**
+  `platform.issues` has **no CHECK constraints whatsoever** and `bcm.crisis_events` none on
+  `status`, so an arbitrary string was storable — and `transition()`'s `default -> false` then makes
+  the row **permanently untransitionable by any route**. That is F2-203's `audit_lc` shape (19 of 46
+  rows stuck), creatable on demand through the API rather than inherited from a seed.
+  ⚠⚠ **ONE register needed a different primitive, and only measuring the live rows showed it.**
+  `platform.authority_documents` defaults to **ACTIVE** (a library of instruments already in force)
+  while its machine's root is **DRAFT** (one being prepared), and both are accepted today — so
+  `requireInitial` would have **refused a working create**, the one failure F2-182's test exists to
+  prevent. `ServerOwnedState.requireCreatable` takes the creatable set and **self-checks that the
+  default is in it**, because taking the two as separate arguments reopens exactly the drift
+  F2-217's one-constant rule closed. 🔑 It is deliberately **not** the general form: a per-register
+  list of allowed states is the artefact F2-217 found measuring its own list. Every use owes a
+  recorded reason.
+  ⚠ **The discriminator is structural and carries NO field-name list**: a method is a transition
+  route for F when it (1) loads a row, (2) **READS F on that row**, (3) throws conditionally and
+  (4) writes F from a scalar parameter. (2)+(4) are what separate a machine from a setter with a
+  longer name — *the value it accepts depends on the value already there*. The narrowing that stops
+  it firing on correct code is that the target must **not** be a payload parameter: `update(Long id,
+  Foo body, String note)` doing `body.setNote(note)` is a partial update, not a transition.
+  ⚠⚠ **A NEGATIVE CONTROL THAT DOES NOT REACH THE CODE IT CONTROLS PROVES NOTHING, AND ITS PASSING
+  READS EXACTLY LIKE THE NARROWING BEING SOUND.** The mutation deleting that payload narrowing
+  **SURVIVED**, and the fault was mine: the control's fixture read the field on the *loaded row*
+  (`e.getNote()`), so the read-the-same-field clause already excluded it and the narrowing was never
+  exercised. F2-197 recorded the same shape for a mutation that failed to break its target. **Check
+  which clause is doing the work before believing a control.** 20/20 after.
+  ⚠ **The Java gate and the scratch Python census agreed 9/9 — the first exact agreement in this
+  lineage** (F2-213: 5 vs 9; F2-214: 3 vs 11, both because the locator's resolver was narrower than
+  the gate's). Keeping the scratch measurement until the shipped gate reproduces it (F2-217) is what
+  makes a hard zero mean anything; the new gate was also run against the pre-fix tree and reports
+  **exactly the nine**.
+  ⚙ **Two things found in passing, both already-named shapes.** `BcpPlan` marks `approvedBy` and
+  `approvedAt` `@JsonProperty(READ_ONLY)` and **leaves `publishedAt`** — F2-215's two-of-three,
+  sibling forgotten, one slice after `TcfdItem`; the create scrubs all three so the answer does not
+  depend on which were annotated. And `TEMPLATE_STATUSES` was **deleted, not left unread**: its only
+  reader was the create's membership test (the check that admitted ACTIVE) and
+  `transitionTemplate`'s switch is exhaustive, so keeping it would be F2-184's inert construct.
+  ⚙ **Filed:** `PLATFORM:WRITE` is held by **one role with zero active users**, so the Issue
+  register's write routes are reachable in dev only by `admin`; and `platform.issues` /
+  `bcm.crisis_events` still have no CHECK on `status` — now cheap to add, since this slice closed
+  their only open writers (F2-183's rule: the constraint and its writer land in the same commit).
 - ⚠⚠ **A DEFAULT IS NOT A SETTLEMENT, AND THE GATE F2-218 BUILT TO CATCH THAT COUNTED ONE AS A
   SETTLEMENT** (F2-219, measured 2026-08-16). F2-218's headline is that
   `if (x == null) x = INITIAL` is a default, not a guard; its gate then computed the create-side

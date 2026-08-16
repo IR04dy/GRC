@@ -2400,6 +2400,134 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-220 · A create that names the state skips the machine's EVIDENCE requirements — nine registers, and the gate could not see any of them by construction
+
+**Found** 2026-08-16, taking F2-219's filed item (the transition-by-parameter blind spot, population
+unmeasured). **P2.** **Closed** the same day. No migration, no endpoint change, no frontend change.
+
+### The shape, and why no instrument could see it
+
+`ServerStampedFieldContractTest` asks: *does a create accept a field a guarded route **stamps** with
+a server-derived value?* A transition written as `transition(Long id, String to)` writes
+`cur.setStatus(to)` — and **a scalar method parameter is caller data** (F2-218's fourth detector bug,
+the only one that pushed its population onto correct code). So `status` never enters the STAMPED set,
+and a create accepting `status` is not a contradiction by that question.
+
+F2-219 met this as a **surviving mutant** and recorded the right verdict — *a surviving mutant the
+gate legitimately cannot see is an unasserted behaviour, not a loose instrument* — answered it with
+one test, and filed the population as unmeasured. This slice measured it.
+
+The discriminator carries **no list of field names** (F2-217: a census keyed on a list of names
+measures the list). A method is a transition route for field F when it **(1)** loads a row,
+**(2)** READS F on that row, **(3)** throws conditionally, and **(4)** writes F on that row from a
+scalar parameter. (2) and (4) together are what make it a machine rather than a setter with a longer
+name: *the value it will accept depends on the value already there.*
+
+**Nine registers. Every field a `status`. 0 of 9 refuted by reading** — unusual for this programme,
+and attributable to the structural discriminator being tight rather than to luck.
+
+### 🔑 The headline: the create did not merely bypass the machine, it bypassed the machine's evidence requirements
+
+Each transition demands something *on the way through*, and a create landing straight in the end
+state supplies none of it. All nine probed live 2026-08-16 (**36/36 pre-fix legs**), each as a
+persona that holds the module's WRITE:
+
+| register | create reached | what the transition demands that the create skipped |
+|---|---|---|
+| `platform.authority_documents` | `SUPERSEDED` | a successor document, resolved and verified not to be itself |
+| `bcm.gaps` | `CLOSED` on a **CRITICAL** gap | at least one linked corrective action |
+| `bcm.bcm_risks` | `CLOSED` | the TRANSITION audit row; the AR-T1 ERM fan-out |
+| `bcm.bcp_plans` | `PUBLISHED` | review, approval, and the `BcpVersion` **snapshot of what was approved** |
+| `bcm.continuity_strategies` | `APPROVED` | an RTO **or** an RPO — its guard's own comment says a strategy with no recovery target should not be approved |
+| `platform.control_assessments` | `APPROVED` | the DRAFT → UNDER_REVIEW → APPROVED walk |
+| `bcm.crisis_events` | `CLOSED` | **spec §J.13** — a root cause AND a lessons-learned record |
+| `platform.issues` | `CLOSED` | a validated resolution code, `resolved_at`, `closed_at` |
+| `tprm.questionnaire_templates` | `ACTIVE` | **at least one question** — then sent to vendors as an assessment |
+
+In every case the `/transition` route answered **400 or 409 for the identical edge**, so the control
+exists and the create walked around it.
+
+### Authorization: this is F2-219's shape, not F2-218's
+
+**No privilege escalation.** All nine carry the *same* permission on the create and on the
+transition, so the object-level machine is the **only** control — and it sat one method away with
+nothing consulting it. Worth saying plainly, because F2-218's instance *was* an escalation and the
+two read alike in a summary.
+
+⚙ Measured in passing: **`PLATFORM:WRITE` is held by one role with zero active users**, so the Issue
+register's write routes are reachable in dev only by `admin` (which proves nothing about
+authorization — CLAUDE.md's rule — but the finding here is object-level, not permission-level).
+
+### Four of the nine had no vocabulary check at all, and two have no CHECK constraint either
+
+`BcpPlanService`, `ControlLibraryService`, `CrisisEventService` and `IssueService` tested nothing.
+`platform.issues` has **no CHECK constraints at all** and `bcm.crisis_events` none on `status`, so
+for those two **an arbitrary string was storable** — and `transition()`'s `default -> false` then
+makes the row **permanently untransitionable by any route**. That is F2-203's `audit_lc` shape (19
+of 46 rows stuck in states no route can leave), creatable on demand through the API.
+
+### 🔑 One register needed a different primitive, and measuring is what showed it
+
+`platform.authority_documents` defaults to **ACTIVE** while its machine's root is **DRAFT**, and both
+are accepted today. Forcing one initial state would have **refused a working create** — the one
+failure F2-182's test exists to prevent. So `ServerOwnedState` gained a second overload,
+`requireCreatable(supplied, creatable, initial, register, route)`, used by exactly this register with
+the reason recorded, and it **self-checks that the default is in its own creatable set** so the value
+the server picks and the values it accepts cannot disagree. Deliberately *not* the general form: a
+per-register list of allowed states is precisely the artefact F2-217 found measuring its own list.
+
+### Verification
+
+- **Pre-fix live probe 36/36** and **post-fix 45/45**, run twice. Every row planted by the probe
+  (F2-206), tagged `[REVIEW-TEST] F2-220`, removed with `CHARINDEX`, children first — resolved from
+  `sys.foreign_keys`, because the first draft invented `bcp_plan_sections` and a 547 on cleanup reads
+  exactly like the probe having gone wrong.
+- **Backend 3,939/0/0** (from 3,914: +14 behaviour, +4 gate, +7 primitive).
+- **Mutation 20/20 killed, 0 survived, 0 anchor-miss.**
+- **The pre-fix control**: the new gate run against `git stash`-reverted main sources reports
+  **exactly the nine**, so the hard zero is a measurement and not an empty population.
+
+### 🔑 The Java gate and the scratch census agreed 9/9 — the first exact agreement in this lineage
+
+F2-213's locator found 5 where its gate found 9; F2-214's found 3 where its gate found 11. Both
+recorded the rule *write the sweep as the gate, over the same tree, in the same language*, and both
+kept the scratch measurement until the shipped gate reproduced it (F2-217). Doing both here cost one
+extra hour and bought the only evidence that the hard zero means anything.
+
+### My own errors, all caught by running things
+
+- **Three probe payload bugs**: two guessed vocabulary tokens (`CYBER` for `CYBERATTACK`,
+  `ALTERNATE_SITE` for `BACKUP_SITE`) and a **guessed column name** (`notes` on
+  `control_assessments`, really `notes_en`). Recurring since F2-198 — **resolve from `sys.columns`,
+  never guess** — and each one failed in the direction that reads like a refutation.
+- **A CRLF anchor miss** in the import script: `^import .*?;$` under `re.M` cannot match, because
+  `$` sits before the `\n` and there is a `\r` after the `;`. Third slice running.
+- ⚠⚠ **One mutation SURVIVED and the control was wrong, not the gate.** M18 deletes the narrowing
+  that stops the caller's own payload counting as a loaded row — and my negative control read the
+  field on the loaded row (`e.getNote()`) rather than on the payload, so the *read-the-same-field*
+  clause already excluded the fixture and the narrowing was never exercised. 🔑 **A negative control
+  that does not reach the code it controls proves nothing, and its passing reads exactly like the
+  narrowing being sound** (F2-197's rule). Fixed, and M18 is killed.
+
+### ⚙ One inert construct removed rather than left
+
+`TEMPLATE_STATUSES` in `QuestionnaireService` had exactly one reader — the create's membership test,
+the very check that admitted ACTIVE — and `transitionTemplate`'s switch is exhaustive, so an
+unrecognised target already throws. Deleting it beat leaving it unread (F2-184: an inert construct is
+worse than none, because it answers the question a reader was about to ask). The vocabulary is stated
+by the machine and by `ck_qt_status`.
+
+### ⚙ F2-215's headline, one more time, found in passing
+
+`BcpPlan` marks `approvedBy` and `approvedAt` `@JsonProperty(READ_ONLY)` and **leaves `publishedAt`** —
+two of three, sibling forgotten, exactly as `TcfdItem` did in F2-219. The create scrubs all three so
+the answer does not depend on which were annotated.
+
+| | |
+|---|---|
+| **Status** | ✅ **CLOSED 2026-08-16.** Nine creates routed through the refusal primitive; hard zero in `ServerStampedFieldContractTest#noCreateMayNameAStateATransitionRouteAdjudicates` with the nine machines named so the population cannot silently empty; `CreateMayNotNameATransitionStateTest` (14) and `ServerOwnedStateTest` (7) pin the behaviour. Backend 3,939/0/0 · mutation 20/20 · probe 36/36 pre, 45/45 post. |
+| **Lesson** | 🔑 **A create that names the state does not merely skip the machine — it skips the machine's evidence requirements**, and those are the whole reason the machine exists: a successor document, a linked corrective action, a recovery objective, one question, a resolution code, a root cause. 🔑 And **a gate cannot see a defect whose value arrives by a route the gate classifies as caller data** — F2-219 named that blind spot rather than papering over it, which is the only reason this was findable. |
+
 ## F2-219 · A default is not a settlement — the gate F2-218 built to catch that counted one as a settlement, and hid a forged policy attestation
 
 **Found** 2026-08-16, taking F2-218's derived work list (the 8 services). **P2.**
