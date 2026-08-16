@@ -42,8 +42,6 @@ public final class StrategyRoiDtos {
     // ─── Recommendation transition ──────────────────────────────────
     public record RecommendationRequest(
         @NotBlank @Pattern(regexp = "APPROVED|REJECTED|DEFERRED|PENDING_REVIEW") String recommendation,
-        @Size(max = 255) String decidedByName,
-        Long decidedByUserId,
         @Size(max = 1000) String recommendationRationaleEn,
         @Size(max = 1000) String recommendationRationaleAr
     ) {}

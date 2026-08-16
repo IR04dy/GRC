@@ -1,6 +1,7 @@
 package com.tss.grc.module.bcm.comms.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.ApprovalTransitionRequest;
 import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.TemplateRequest;
@@ -151,12 +152,20 @@ public class CrisisCommsTemplateService {
 
         t.setApprovalStatus(to);
         LocalDateTime now = LocalDateTime.now();
+        // F2-223 — both approval names are the authenticated principal. The block below already
+        // clears them on re-open so that "a second approval requires a new APPROVED_BY_*
+        // transition", and its comment calls the result an honest governance trail — but the name
+        // written into that trail was whatever the caller typed. This is the state
+        // CrisisCommsDispatchService enforces before it will send anything
+        // ("only APPROVED_BY_CISO templates may be dispatched"), so the identity of the CISO who
+        // approved it is the evidence behind that gate.
+        String approver = CurrentActor.username();
         if ("APPROVED_BY_LEGAL".equals(to)) {
             t.setApprovedByLegalAt(now);
-            t.setApprovedByLegalName(req.approverName());
+            t.setApprovedByLegalName(approver);
         } else if ("APPROVED_BY_CISO".equals(to)) {
             t.setApprovedByCisoAt(now);
-            t.setApprovedByCisoName(req.approverName());
+            t.setApprovedByCisoName(approver);
         } else if ("DRAFT".equals(to) || "IN_REVIEW".equals(to)) {
             // Re-opening clears the relevant approval stamp so the
             // governance trail is honest — a "second approval" requires
@@ -181,7 +190,7 @@ public class CrisisCommsTemplateService {
         CrisisCommsTemplateV2 saved = repo.save(t);
         audit.log("TRANSITION", "CrisisCommsTemplateV2", saved.getId(),
             "Template approval transition " + saved.getTemplateCode() + ": " + from + " → " + to
-                + (req.approverName() != null ? " (by " + req.approverName() + ")" : ""));
+                + (approver != null ? " (by " + approver + ")" : ""));
         emit("CRISIS_COMMS_TEMPLATE_TRANSITIONED", saved, from);
         return toResponse(saved);
     }

@@ -240,5 +240,5 @@ public final class BowTieDtos {
      * "unconfirmed (no bowtie approver_name found)" — because it searched for the DTO's field name
      * rather than following the setter, and the column is {@code approvedByName}.
      */
-    public record ApproveRequest(@Size(max = 255) String approverName) {}
+    public record ApproveRequest() {}
 }

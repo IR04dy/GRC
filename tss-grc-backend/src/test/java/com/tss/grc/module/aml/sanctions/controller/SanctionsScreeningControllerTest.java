@@ -117,7 +117,7 @@ class SanctionsScreeningControllerTest {
 
     @Test void reviewHit_dispatches() {
         HitReviewRequest req = new HitReviewRequest(
-            "FALSE_POSITIVE", 42L, "common name", "اسم شائع", null);
+            "FALSE_POSITIVE", "common name", "اسم شائع", null);
         when(hitService.reviewHit(eq(900L), any())).thenReturn(stubHit());
         controller.reviewHit(900L, req);
         verify(hitService).reviewHit(900L, req);

@@ -96,7 +96,6 @@ public final class BiaQuantitativeDtos {
 
     // ─── CFO approve/reject ─────────────────────────────────────────
     public record CfoApprovalRequest(
-        @NotBlank @Size(max = 255) String approverName,
         String comments,
         @NotBlank @Pattern(regexp = "APPROVE|REJECT") String decision,
         String rejectionReason

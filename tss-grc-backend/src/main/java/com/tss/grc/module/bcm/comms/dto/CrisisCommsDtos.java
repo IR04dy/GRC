@@ -39,7 +39,6 @@ public final class CrisisCommsDtos {
     // ─── Approval transition ────────────────────────────────────────
     public record ApprovalTransitionRequest(
         @NotBlank @Pattern(regexp = "DRAFT|IN_REVIEW|APPROVED_BY_LEGAL|APPROVED_BY_CISO|RETIRED") String approvalStatus,
-        @Size(max = 255) String approverName,
         Long approverUserId
     ) {}
 
@@ -79,9 +78,7 @@ public final class CrisisCommsDtos {
         @NotNull List<@Pattern(regexp = "EMAIL|SMS|WHATSAPP|TEAMS|VOICE_BLAST") String> channels,
         @Size(max = 40) String audienceFilter,
         List<@NotBlank String> recipients,
-        Map<String, String> placeholders,
-        @Size(max = 255) String dispatchedByName,
-        Long dispatchedByUserId
+        Map<String, String> placeholders
     ) {}
 
     // ─── Cascade response ───────────────────────────────────────────

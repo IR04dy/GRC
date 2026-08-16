@@ -159,7 +159,6 @@ export interface ScreenRequest {
 
 export interface HitReviewRequest {
   newStatus: HitStatus;
-  reviewerUserId?: number;
   dispositionEn?: string;
   dispositionAr?: string;
   capaTaskId?: number;

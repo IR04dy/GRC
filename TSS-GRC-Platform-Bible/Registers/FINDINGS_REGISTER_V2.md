@@ -2400,6 +2400,147 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-223 · The server stamps WHEN, the caller says WHO — one attribution split across two owners
+
+**Found** 2026-08-16, re-deriving F2-222's filed denominator. **P2** — eleven governance and
+regulatory registers recorded a person who did not perform the act. **Closed** the same day. No
+migration; 11 backend services, 6 frontend surfaces, 19 request-DTO fields deleted.
+
+### Re-deriving the filing, and why the number was the wrong question
+
+F2-222 filed *"the remaining 31 authority fields written from the request with no guarded route
+stamping them anywhere"*. That 31 came from a **name-shape** test — the same instrument class
+F2-217 had just proved measures its own vocabulary rather than the codebase. Per F2-221, the
+denominator was re-derived, and the better question turned out to be structural:
+
+🔑 **When one method writes `set<verb>At(<the server's own clock>)` and, for the SAME verb, writes
+`set<verb>By…` / `set<verb>erUserId(…)` FROM THE REQUEST, it has split one attribution across two
+owners. The clock half is the proof: by stamping the time itself the server has already declared
+that it — not the caller — is the recorder of this act.**
+
+Nothing in that pairing depends on which spellings anyone thought of; the verb root comes from the
+code. Population, **after the pre-fix control forced a seventh detector correction**: **23 split
+sites**, plus **2** the split detector is structurally blind to = **25**. Of those, **11 CONFIRMED
+and fixed · 2 FILED · 1 REFUTED · 10 UNADJUDICATED** on a decrease-only work list.
+
+🔑 **The 10 are the argument for running the control at all.** The shipped detector was run over
+`git show master:` and reported `CrisisCommsTemplateService` SILENT — a file this slice had already
+fixed by hand. There the clock reaches the setter through a **local variable**
+(`LocalDateTime now = LocalDateTime.now(); … setApprovedByLegalAt(now)`), which an argument-only
+test for `now(` cannot see. Teaching the detector that shape immediately surfaced ten more sites
+across ERM, BCM invocation, MTPD inheritance, obligation attestation, regulatory change and vendor
+BCP attestation. **A green scan on the fixed tree cannot tell you the detector works; only running
+it against the defect can.**
+
+⚠ They ship **unadjudicated, as a work list and NOT as reasons**. F2-188 measured what happens when
+a slice writes a reason for something it has not read: five claims, five false, and the fluency of
+the prose is what made them look verified. At least one is probably BY DESIGN —
+`VendorBcpAttestationService#doSubmit` takes `submittedByContactName/Email` on a **vendor portal**
+submission, where the submitter is an external contact and may not be an authenticated principal at
+all — and that is a guess, which is exactly why it is on the list rather than in `BY_DESIGN`.
+
+### The complementary question, and why both are needed
+
+A second, independent scan asked: *which routes are guarded by a permission whose ACTION NAMES AN
+ACT (`MODULE:APPROVE` — 17 catalogued permissions in dev, 11 in prod) and let the body say who
+performed it?* That found `CptyService#assignRating` and `#upsertLimit`, which the split detector
+**cannot see** — because there the client supplied `approvedAt` too, minting a SAMA large-exposure
+approval date in the browser. 🔑 **A detector keyed on an asymmetry cannot see the case where both
+halves fell the same way.**
+
+### The live defect, probed 14/14 pre-fix and 18/18 post-fix against PLANTED rows (F2-206)
+
+As `compliance` (user id 3), which holds `AML:APPROVE`, `AUDIT:WRITE`, `ETHICS:APPROVE`,
+`BCM:APPROVE` and `PRIVACY:WRITE`:
+
+| leg | pre-fix | post-fix |
+|---|---|---|
+| IIA Std 2010 annual audit plan → APPROVED with `approverUserId: 4` | **stored 4** (actor is 3) | stored 3, forgery ignored |
+| the same, **omitting** the approver | **400 — required** | 200, records the principal |
+| PDPL Art.18 disposal certificate `verify` + `complete` | **`verifierName` = `executorName` = `"Nobody Who Approved This"`** | both `"compliance"`, `verifiedBy` id agrees |
+| AML sanctions hit review with `reviewerUserId: 4` | **stored 4** | stored 3, and the audit row reads `by user=3` |
+
+🔑 **The sharpest is the annual plan: the server did not merely ACCEPT an approver, it REQUIRED
+one and threw if absent** — insisting on an attribution it never verified while stamping the time
+itself on the next line. And **F2-217 closed the CREATE path on that same register**, which
+funnelled every approval through this method.
+
+🔑 **The audit row quoted the caller's claim.** `SanctionsHitService` logged
+`" by user=" + req.reviewerUserId()`, so a forged attribution was invisible to the trail an
+auditor reads. Every audit line in the population now reads off the SAVED ROW.
+
+### The fix already existed in the tree, one file away
+
+`KycService#disposition` resolves the decider from `CurrentActor` and refuses to proceed without
+one — *"An AML disposition with no decider is not a disposition."* It is in the **same package** as
+`AmlAlertService`, over the **same concept** (`decidedByName` on a screening hit), and was never
+copied. Seventh instance in this lineage of the correct artefact sitting beside the wrong one.
+F2-222's filing said the CPTY fix was blocked on *"a principal→user-id resolution this slice did
+not build"* — the resolution is `currentUserId()`, **one line above the defect**.
+
+### The visible half: the UI asked the operator to type it
+
+`EthicsPage` opened `window.prompt(t('amlDecidedByPrompt'))` and sent the answer as the decider of
+an AML alert — including `STR_FILED`, a Suspicious Transaction Report to the Saudi FIU — with
+`?? ''` on Cancel, so the attribution could be the empty string. `StrategyRoiPage` and
+`QuantitativeBiaPage` used `dialog.prompt` with the placeholder *"e.g. Faisal Al-Subaie — Group
+CFO"*, and `CrisisCommsDispatchWizard` had a free-text *"Dispatched by (name)"* input. 🔑 **An
+invented officer in a placeholder is how a free-text attribution field teaches an operator to type
+somebody else's name.** All six removed; 19 request-DTO fields deleted on both sides of the wire
+so no client can offer them again (F2-184).
+
+### Six detector corrections, five of them shrinking the population
+
+| # | bug | direction |
+|---|---|---|
+| 1 | `@PreAuthorize(CONSTANT)` invisible — the house idiom in `CptyController` | under |
+| 2 | nested DTO types (`CptyDtos.UpsertLimitRequest`) unresolvable by `<Name>.java` lookup | under |
+| 3 | fields declared `@NotBlank @Size(…) private String x;` — the regex anchored on the modifier | under |
+| 4 | the `-or` agent noun: `executorName` reduced to root `name` | under |
+| 5 | a qualifier BETWEEN verb and tail: `approvedByLegalName` matched no tail | under |
+| 6 | *(the same, in `ACTOR_TAIL`)* — found only when the gate's own vacuity fixture failed | under |
+
+🔑 **Every one shrank the population, which reads exactly like a clean tree.** Bug 4 was found only
+because the fix for `DisposalCertificateService#verify` sat one method below `#complete`, an
+identical site the scan had never reported — **the class looked measured**. Bug 5/6 cost a real
+site: `CrisisCommsTemplateService#transition`, found by a residual grep rather than by the
+instrument, and it is the CISO sign-off `CrisisCommsDispatchService` refuses to send a crisis
+cascade without (*"only APPROVED_BY_CISO templates may be dispatched"*). Its own comment called the
+result *"an honest governance trail"*.
+
+### Refuted and filed
+
+- **REFUTED** — `ObService#revokeConsent::revokedBy` is a **party** (`CUSTOMER`/`BANK`/`TPP`), not a
+  person; `ObConsentsPage` declares `useState<RevokedBy>('BANK')`.
+- **FILED** — `CrossBorderTransferService#assess::residencyCheckBy`. 🔑 **Where a method lets the
+  caller supply the clock TOO, the act may not be this call, so its performer need not be the
+  caller.** Whether the PDPL Art.29 register wants an external assessor's name is an owner call.
+- **FILED** — `ControlLibraryService#updateMapping::reviewerUserId`, ambiguous between attribution
+  and assignment, and blocked on a second defect: `setLastReviewedAt(now())` fires on **every**
+  update, so editing a rationale already records the mapping as reviewed.
+
+### The gate
+
+`SplitAttributionContractTest` (hermetic, source-only) derives the population and holds it at a
+**hard zero** outside a 3-entry `BY_DESIGN` map enforced in both directions, plus:
+a **vacuity fixture** replaying all five shapes this slice fixed (at zero, a rotted detector and a
+finished sweep look identical — F2-219); a **negative fixture** proving it does not fire on a
+server-stamped actor, on an unpaired actor, or on two different verbs in one method (a gate that
+fails on correct code is the one failure a gate must never have — F2-214); and the ACT-guarded half
+asserted against `CptyService` and `SanctionsHitService` by call shape.
+
+**Verification** — backend suite, FE `tsc --noEmit` clean, FE **756/756**, gate **7/7**, live probe
+**14/14 pre-fix · 18/18 post-fix**, 17 planted rows deleted with CHARINDEX (0 remaining; registers
+back to `screening_hit` 3, `credit_rating` 108, `large_exposure_limit` 74).
+
+| Field | Value |
+|---|---|
+| **Status** | ✅ **CLOSED 2026-08-16.** Backend **3,968/0/0** - FE typecheck clean, FE **756/756** - gate **8/8** - live probe **14/14 pre-fix, 18/18 post-fix** against PLANTED rows - pre-fix control fires the shipped detector on 12 sites across 9 files - 17 planted rows deleted with CHARINDEX (0 remaining). 11 sites fixed; **10 unadjudicated on a decrease-only work list**; 2 filed; 1 refuted. No migration. |
+
+**Filed for the next slice** — the two above; and the remaining authority fields written from the
+request with **no** paired server clock and **no** act-guarded route, whose population is still
+measured only by a name shape.
+
 ## F2-222 · A scalar parameter is caller data at the declaration and the principal at the call site — the C-6 approval control, its input and its attribution
 
 **Found** 2026-08-16, asking what F2-218's derived gate cannot see. **P2** — a segregation-of-duty

@@ -95,7 +95,6 @@ export interface AssignRatingRequest {
   outlook?: Outlook;
   rationaleEn?: string;
   rationaleAr?: string;
-  approvedByUserId?: number;
 }
 
 export interface CreateRatingActionRequest {
@@ -120,7 +119,6 @@ export interface UpsertLimitRequest {
   utilisedSarM: number;
   approvedAt?: string;
   nextReviewAt?: string;
-  approvedByUserId?: number;
 }
 
 export interface RecordUtilisationRequest {

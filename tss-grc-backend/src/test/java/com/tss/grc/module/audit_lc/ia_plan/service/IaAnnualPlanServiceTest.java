@@ -160,7 +160,7 @@ class IaAnnualPlanServiceTest {
         p.setMethodologySummaryAr(null);
         when(planRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, PLAN_ID)).thenReturn(Optional.of(p));
 
-        PlanTransitionRequest req = new PlanTransitionRequest("BOARD_REVIEW", null, null, null);
+        PlanTransitionRequest req = new PlanTransitionRequest("BOARD_REVIEW", null, null);
         assertThatThrownBy(() -> service.transition(PLAN_ID, req))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("methodologySummary");
@@ -173,7 +173,7 @@ class IaAnnualPlanServiceTest {
         when(planRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, PLAN_ID)).thenReturn(Optional.of(p));
         when(planRepo.save(any(IaAnnualPlan.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        PlanTransitionRequest req = new PlanTransitionRequest("BOARD_REVIEW", null, null, null);
+        PlanTransitionRequest req = new PlanTransitionRequest("BOARD_REVIEW", null, null);
         PlanResponse out = service.transition(PLAN_ID, req);
         assertThat(out.status()).isEqualTo("BOARD_REVIEW");
 
@@ -182,13 +182,21 @@ class IaAnnualPlanServiceTest {
         assertThat(ev.getValue().triggerEvent()).isEqualTo("IA_PLAN_SUBMITTED");
     }
 
-    @Test void transition_boardReviewToApproved_requiresApprover() {
+    /**
+     * F2-223 — REPURPOSED. This used to assert that the caller MUST name the approver, which was
+     * the defect itself: the server demanded an attribution it never verified, and stored whatever
+     * came back (probed live — actor 3 approving as user 4). What must still hold is the half that
+     * protects the record — an approval with no approver is not an approval — so the refusal now
+     * fires when there is no authenticated principal to record.
+     */
+    @Test void transition_boardReviewToApproved_refusedWithNoAuthenticatedApprover() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
         IaAnnualPlan p = plan("BOARD_REVIEW");
         when(planRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, PLAN_ID)).thenReturn(Optional.of(p));
-        PlanTransitionRequest req = new PlanTransitionRequest("APPROVED", null, null, null);
+        PlanTransitionRequest req = new PlanTransitionRequest("APPROVED", null, null);
         assertThatThrownBy(() -> service.transition(PLAN_ID, req))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("approverUserId");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("not an approval");
     }
 
     @Test void transition_boardReviewToApproved_stampsApprover() {
@@ -196,7 +204,9 @@ class IaAnnualPlanServiceTest {
         when(planRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, PLAN_ID)).thenReturn(Optional.of(p));
         when(planRepo.save(any(IaAnnualPlan.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        PlanTransitionRequest req = new PlanTransitionRequest("APPROVED", 77L, "ok", "حسناً");
+        f223AuthAs("audit.director", 77L);
+        // F2-223 — the approver is NOT in the request any more; 77L is the principal.
+        PlanTransitionRequest req = new PlanTransitionRequest("APPROVED", "ok", "حسناً");
         PlanResponse out = service.transition(PLAN_ID, req);
         assertThat(out.status()).isEqualTo("APPROVED");
         assertThat(out.approvedByUserId()).isEqualTo(77L);
@@ -211,7 +221,7 @@ class IaAnnualPlanServiceTest {
         IaAnnualPlan p = plan("DRAFT");
         when(planRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, PLAN_ID)).thenReturn(Optional.of(p));
         // DRAFT → APPROVED is not allowed; you must go through BOARD_REVIEW.
-        PlanTransitionRequest req = new PlanTransitionRequest("APPROVED", 1L, null, null);
+        PlanTransitionRequest req = new PlanTransitionRequest("APPROVED", null, null);
         assertThatThrownBy(() -> service.transition(PLAN_ID, req))
             .isInstanceOf(IllegalTransitionException.class);
     }
@@ -227,7 +237,7 @@ class IaAnnualPlanServiceTest {
         when(engagementRepo.findByOrganisationIdAndPlanIdAndIsDeletedFalseOrderByEngagementCodeAsc(ORG_ID, PLAN_ID))
             .thenReturn(List.of(openEng));
 
-        PlanTransitionRequest req = new PlanTransitionRequest("COMPLETED", null, null, null);
+        PlanTransitionRequest req = new PlanTransitionRequest("COMPLETED", null, null);
         assertThatThrownBy(() -> service.transition(PLAN_ID, req))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("still open");
@@ -249,7 +259,7 @@ class IaAnnualPlanServiceTest {
             .thenReturn(List.of(closed, cancelled));
         when(planRepo.save(any(IaAnnualPlan.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        PlanTransitionRequest req = new PlanTransitionRequest("COMPLETED", null, null, null);
+        PlanTransitionRequest req = new PlanTransitionRequest("COMPLETED", null, null);
         PlanResponse out = service.transition(PLAN_ID, req);
         assertThat(out.status()).isEqualTo("COMPLETED");
 
@@ -290,5 +300,20 @@ class IaAnnualPlanServiceTest {
         assertThat(d.engagementsInFieldwork()).isEqualTo(1);
         assertThat(d.planCode()).isEqualTo("IAP-2026");
         assertThat(d.onTimePercentage()).isNull(); // nothing measurable yet
+    }
+
+    /**
+     * F2-223 — a real principal in the SecurityContext, because the service now takes the actor
+     * from {@code CurrentActor} rather than from the request. {@code CurrentActor} requires the
+     * principal to be a {@link com.tss.grc.security.GrcUserDetails}, so a bare username token
+     * would resolve to null and the assertion would be about nothing.
+     */
+    private static void f223AuthAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, 1L, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
     }
 }

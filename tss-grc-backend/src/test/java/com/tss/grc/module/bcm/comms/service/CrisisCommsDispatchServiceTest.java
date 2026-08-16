@@ -117,9 +117,7 @@ class CrisisCommsDispatchServiceTest {
             channels,
             "CUSTOMERS",
             recipients,
-            placeholders,
-            "Crisis Manager — Faisal Al-Subaie",
-            42L);
+            placeholders);
     }
 
     // ─── Happy path ──────────────────────────────────────────────────

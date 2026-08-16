@@ -235,7 +235,7 @@ class QuantitativeBiaServiceTest {
         BiaQuantitative h = existing("DRAFT");
         when(repo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, h.getExternalId()))
             .thenReturn(Optional.of(h));
-        CfoApprovalRequest req = new CfoApprovalRequest("Faisal Al-Subaie", "ok", "APPROVE", null);
+        CfoApprovalRequest req = new CfoApprovalRequest( "ok", "APPROVE", null);
         assertThatThrownBy(() -> service.cfoApprove(h.getExternalId(), req))
             .isInstanceOf(IllegalTransitionException.class);
         verify(repo, never()).save(any());
@@ -250,12 +250,13 @@ class QuantitativeBiaServiceTest {
         when(repo.save(any(BiaQuantitative.class))).thenAnswer(inv -> inv.getArgument(0));
 
         CfoApprovalRequest req = new CfoApprovalRequest(
-            "Faisal Al-Subaie (Group CFO)",
             "Approved with dual-site remediation mandated.",
             "APPROVE", null);
+        f223AuthAs("Faisal Al-Subaie (Group CFO)", 9L);
         BiaQuantitativeResponse out = service.cfoApprove(h.getExternalId(), req);
 
         assertThat(out.status()).isEqualTo("CFO_APPROVED");
+        // F2-223 — the CFO is the authenticated principal, not a name in the body.
         assertThat(out.cfoApproverName()).isEqualTo("Faisal Al-Subaie (Group CFO)");
         assertThat(out.cfoApprovedAt()).isNotNull();
         assertThat(out.mtpdBreachAt()).isEqualTo("72h");      // recomputed at approval-time
@@ -265,7 +266,7 @@ class QuantitativeBiaServiceTest {
         BiaQuantitative h = existing("CFO_REVIEW");
         when(repo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, h.getExternalId()))
             .thenReturn(Optional.of(h));
-        CfoApprovalRequest req = new CfoApprovalRequest("Faisal Al-Subaie", null, "REJECT", null);
+        CfoApprovalRequest req = new CfoApprovalRequest( null, "REJECT", null);
         assertThatThrownBy(() -> service.cfoApprove(h.getExternalId(), req))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("rejectionReason");
@@ -276,8 +277,7 @@ class QuantitativeBiaServiceTest {
         when(repo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, h.getExternalId()))
             .thenReturn(Optional.of(h));
         when(repo.save(any(BiaQuantitative.class))).thenAnswer(inv -> inv.getArgument(0));
-        CfoApprovalRequest req = new CfoApprovalRequest(
-            "Faisal Al-Subaie", null, "REJECT",
+        CfoApprovalRequest req = new CfoApprovalRequest( null, "REJECT",
             "Revenue baseline understated — re-do with audited annual report figures.");
         BiaQuantitativeResponse out = service.cfoApprove(h.getExternalId(), req);
         assertThat(out.status()).isEqualTo("REJECTED");
@@ -374,5 +374,20 @@ class QuantitativeBiaServiceTest {
         l.setIsEstimate(true);
         l.setOrganisationId(ORG_ID);
         return l;
+    }
+
+    /**
+     * F2-223 — a real principal in the SecurityContext, because the service now takes the actor
+     * from {@code CurrentActor} rather than from the request. {@code CurrentActor} requires the
+     * principal to be a {@link com.tss.grc.security.GrcUserDetails}, so a bare username token
+     * would resolve to null and the assertion would be about nothing.
+     */
+    private static void f223AuthAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, 1L, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
     }
 }

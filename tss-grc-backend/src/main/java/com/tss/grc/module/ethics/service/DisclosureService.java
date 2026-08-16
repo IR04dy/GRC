@@ -1,5 +1,6 @@
 package com.tss.grc.module.ethics.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ethics.entity.Disclosure;
 import com.tss.grc.module.ethics.repository.DisclosureRepository;
@@ -77,7 +78,10 @@ public class DisclosureService {
         if (List.of("APPROVED", "REJECTED", "RECUSED", "MITIGATED").contains(target)) {
             d.setDecision(body.get("decision") != null ? body.get("decision").toString() : target);
             d.setDecisionNotes(body.get("notes") != null ? body.get("notes").toString() : null);
-            d.setDecidedByName(body.get("decidedBy") != null ? body.get("decidedBy").toString() : null);
+            // F2-223 — see AmlAlertService#transition and KycService#disposition. The officer who
+            // approves, rejects, recuses or mitigates a conflict-of-interest disclosure is the
+            // authenticated principal; the clock on the next line already was.
+            d.setDecidedByName(CurrentActor.username());
             d.setDecidedAt(LocalDateTime.now());
         }
         d.setStatus(target);

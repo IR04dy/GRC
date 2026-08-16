@@ -1,6 +1,7 @@
 package com.tss.grc.module.bcm.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.dto.BiaQuantitativeDtos.BiaQuantitativeLossLineDto;
 import com.tss.grc.module.bcm.dto.BiaQuantitativeDtos.BiaQuantitativeRequest;
@@ -187,12 +188,14 @@ public class QuantitativeBiaService {
 
             h.setStatus("CFO_APPROVED");
             h.setCfoApprovedAt(LocalDateTime.now());
-            h.setCfoApproverName(req.approverName());
+            // F2-223 — the CFO decision is attributed to the authenticated principal, never to a
+            // name the client typed into a dialog.prompt().
+            h.setCfoApproverName(CurrentActor.username());
             h.setCfoComments(req.comments());
             h.setUpdatedAt(LocalDateTime.now());
             BiaQuantitative saved = repo.save(h);
             audit.log("APPROVE", "BiaQuantitative", saved.getId(),
-                "Quantitative BIA approved by CFO " + req.approverName()
+                "Quantitative BIA approved by CFO " + saved.getCfoApproverName()
                     + ": " + saved.getAssessmentCode()
                     + (saved.getMtpdBreachAt() != null
                         ? " (MTPD breach at " + saved.getMtpdBreachAt() + ")"
@@ -205,12 +208,14 @@ public class QuantitativeBiaService {
             }
             h.setStatus("REJECTED");
             h.setRejectionReason(req.rejectionReason());
-            h.setCfoApproverName(req.approverName());
+            // F2-223 — the CFO decision is attributed to the authenticated principal, never to a
+            // name the client typed into a dialog.prompt().
+            h.setCfoApproverName(CurrentActor.username());
             h.setCfoComments(req.comments());
             h.setUpdatedAt(LocalDateTime.now());
             BiaQuantitative saved = repo.save(h);
             audit.log("REJECT", "BiaQuantitative", saved.getId(),
-                "Quantitative BIA rejected by CFO " + req.approverName()
+                "Quantitative BIA rejected by CFO " + saved.getCfoApproverName()
                     + ": " + saved.getAssessmentCode() + " — " + req.rejectionReason());
             emit("BIA_QUANT_REJECTED", saved, from);
             return toResponse(saved);

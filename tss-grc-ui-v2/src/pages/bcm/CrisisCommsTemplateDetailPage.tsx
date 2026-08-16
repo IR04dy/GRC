@@ -8,7 +8,6 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
-import { useDialog } from '../../lib/dialog';
 import { ApiError } from '../../lib/api';
 import {
   getTemplate, createTemplate, updateTemplate, transitionTemplate,
@@ -36,7 +35,6 @@ export function CrisisCommsTemplateDetailPage() {
   const { lang } = useI18n();
   const isAr = lang === 'ar';
   const toast = useToast();
-  const dialog = useDialog();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isNew = id === 'new' || !id;
@@ -114,15 +112,12 @@ export function CrisisCommsTemplateDetailPage() {
 
   async function transition(to: ApprovalStatus) {
     if (!tpl) return;
-    const approver = await dialog.prompt({
-      title: isAr ? 'اسم المُعتمِد' : 'Approver name',
-      placeholder: isAr ? 'مثال: محمد العتيبي — المستشار القانوني' : 'e.g. Mohammed Al-Otaibi — Legal Counsel',
-      required: true,
-    });
-    if (approver === null) return;
+    // F2-223 — CrisisCommsTemplateService stamps approvedByLegalName / approvedByCisoName from
+    // the authenticated principal. This is the sign-off CrisisCommsDispatchService refuses to
+    // send a crisis cascade without, so its holder may not be a name somebody typed.
     try {
       const updated = await transitionTemplate(tpl.externalId, {
-        approvalStatus: to, approverName: approver,
+        approvalStatus: to,
       });
       setTpl(updated);
       toast.success(isAr ? 'تمت العملية' : 'Transition applied');

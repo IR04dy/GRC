@@ -1,6 +1,7 @@
 package com.tss.grc.module.privacy.extensions.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.DisposalCompleteRequest;
 import com.tss.grc.module.privacy.extensions.dto.PdplExtensionDtos.DisposalCreate;
@@ -87,7 +88,12 @@ public class DisposalCertificateService {
         d.setStatus("COMPLETED");
         d.setExecutedAt(LocalDateTime.now());
         if (d.getExecutedBy() == null) d.setExecutedBy(executorId);
-        d.setExecutorName(body.executorName());
+        // F2-223 — the executor's NAME is the same person as executedBy, which the controller
+        // already resolved from the authenticated principal and passed in. Taking the id from
+        // the principal and the name from the request body split one attribution across two
+        // owners; the server's own clock on the line above is the proof that it considered
+        // itself the recorder of this act.
+        d.setExecutorName(CurrentActor.username());
         d.setEvidenceRef(body.evidenceRef());
         return repo.save(d);
     }
@@ -101,7 +107,11 @@ public class DisposalCertificateService {
         d.setStatus("VERIFIED");
         d.setVerifiedAt(LocalDateTime.now());
         d.setVerifiedBy(verifierId);
-        d.setVerifierName(body.verifierName());
+        // F2-223 — see complete(): verifiedBy and verifierName are the same person, and the
+        // controller resolves that person from the Authentication it already binds. A disposal
+        // certificate is the PDPL Article 18 evidence that personal data was destroyed; the
+        // party attesting to that may not be named by whoever calls the endpoint.
+        d.setVerifierName(CurrentActor.username());
         d.setSignatureTxId(body.signatureTxId());
         return repo.save(d);
     }

@@ -1872,6 +1872,94 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **THE SERVER STAMPS *WHEN* FROM ITS OWN CLOCK AND THE CALLER SAYS *WHO* — ONE ATTRIBUTION
+  SPLIT ACROSS TWO OWNERS** (F2-223, measured 2026-08-16). F2-222 filed *"31 authority fields
+  written from the request"*, measured by a **name-shape** test — the instrument class F2-217 had
+  just proved measures its own vocabulary. Re-derived per F2-221, the question is structural:
+  **when one method writes `set<verb>At(<the server's clock>)` and, for the SAME verb, writes
+  `set<verb>By…` / `set<verb>erUserId(…)` FROM THE REQUEST, it has split one attribution across two
+  owners — and the clock half is the proof, because by stamping the time itself the server has
+  already declared that it is the recorder of this act.** No field-name list; the verb root comes
+  from the code. **23 split sites + 2 the detector is structurally blind to = 25**: 11 fixed, 2
+  filed, 1 refuted, **10 unadjudicated** on a decrease-only work list.
+  ⚠⚠ **The complementary question is needed because the split detector cannot see the worst case.**
+  *Which routes are guarded by a permission whose ACTION NAMES AN ACT (`MODULE:APPROVE` — 17
+  catalogued in dev, 11 in prod) and let the body say who performed it?* That found
+  `CptyService#assignRating` and `#upsertLimit`, invisible to the split scan **because there the
+  client supplied `approvedAt` too**, minting a SAMA large-exposure approval date in the browser.
+  🔑 **A detector keyed on an ASYMMETRY cannot see the case where both halves fell the same way.**
+  ⚠⚠ **Probed 14/14 pre-fix and 18/18 post-fix as `compliance` against PLANTED rows (F2-206).** An
+  IIA Standard 2010 annual audit plan approved with `approverUserId: 4` **stored 4** while the actor
+  was 3 — and **omitting the approver was a 400**: the server *required* an attribution it never
+  verified, while stamping the time itself on the next line. A PDPL Art.18 disposal certificate
+  stored `verifierName` = `executorName` = *"Nobody Who Approved This"* **beside a `verifiedBy` id
+  holding the real principal** the controller had already resolved and passed in. An AML sanctions
+  hit recorded the forged reviewer, **and the audit row quoted the caller's claim**
+  (`" by user=" + req.reviewerUserId()`) — 🔑 **the trail quoting the claim is what makes a forged
+  attribution invisible to whoever audits it.** Every audit line now reads off the SAVED ROW.
+  ⚠ **F2-217 closed the CREATE path on the annual-plan register and so funnelled every approval
+  through the method that had the same defect.**
+  🔑 **THE FIX ALREADY EXISTED ONE FILE AWAY.** `KycService#disposition` resolves the decider from
+  `CurrentActor` and refuses to proceed without one — *"An AML disposition with no decider is not a
+  disposition."* Same package as `AmlAlertService`, same concept (`decidedByName` on a screening
+  hit), never copied. Seventh instance in this lineage of the correct artefact beside the wrong one.
+  And F2-222's *"blocked on a principal→user-id resolution this slice did not build"* is **refuted
+  by the line above the defect**: `currentUserId()` → `CurrentActor.userId()`.
+  ⚠⚠ **The visible half: the UI asked the operator to TYPE it.** `EthicsPage` opened
+  `window.prompt(t('amlDecidedByPrompt'))` and sent the answer as the decider of an AML alert —
+  including `STR_FILED`, a Suspicious Transaction Report to the Saudi FIU — with `?? ''` on Cancel,
+  so the attribution could be the empty string. `StrategyRoiPage`/`QuantitativeBiaPage` used
+  `dialog.prompt` placeholdered *"e.g. Faisal Al-Subaie — Group CFO"*, and
+  `CrisisCommsDispatchWizard` had a free-text *"Dispatched by (name)"* input. 🔑 **An invented
+  officer in a placeholder is how a free-text attribution field teaches an operator to type somebody
+  else's name.** 6 surfaces and **19 request-DTO fields** deleted on both sides of the wire (F2-184).
+  ⚠⚠ **SEVEN detector corrections, ALL SEVEN SHRINKING THE POPULATION — the direction that reads
+  exactly like a clean tree.** (1) `@PreAuthorize(CONSTANT)` invisible to a literal-only regex — the
+  house idiom in `CptyController`. (2) A nested DTO (`CptyDtos.UpsertLimitRequest`) unresolvable by a
+  `<Name>.java` file lookup, so **no fields read as no authority fields**. (3) `@NotBlank @Size(…)
+  private String x;` — the field regex anchored on the modifier, so four body types reported ZERO
+  fields. (4) The **`-or`** agent noun: `executorName` reduced to root `name`, so it could never pair
+  with `executedAt` — found only because the fix for `#verify` sat one method below an identical
+  `#complete` the scan had never reported, i.e. **the class looked measured**. (5)/(6) A **qualifier
+  BETWEEN the verb and the tail** (`approvedByLegalName`) defeating both the root extractor and
+  `ACTOR_TAIL`; it cost a real site, `CrisisCommsTemplateService`, found by a residual grep rather
+  than by the instrument — and that is the CISO sign-off `CrisisCommsDispatchService` refuses to
+  dispatch without, whose own comment called the result *"an honest governance trail"*.
+  ⚠⚠ **(7) THE CLOCK REACHED THE SETTER THROUGH A LOCAL VARIABLE, AND ONLY THE PRE-FIX CONTROL
+  FOUND IT.** Running the shipped detector over `git show master:` reported
+  `CrisisCommsTemplateService` **SILENT** — a file this slice had already fixed by hand — because
+  there it is `LocalDateTime now = LocalDateTime.now(); … setApprovedByLegalAt(now)`, which an
+  argument-only test for `now(` cannot see. Teaching the detector that shape **immediately surfaced
+  ten more sites** across ERM, BCM invocation, MTPD inheritance, obligation attestation, regulatory
+  change and vendor BCP attestation. 🔑 **A green scan on the fixed tree cannot tell you the
+  detector works; only running it against the defect can — and closing a detector gap is how you
+  find the population you did not know you had.**
+  ⚠ **The ten ship as a WORK LIST and deliberately NOT as reasons.** F2-188 measured what happens
+  when a slice writes a reason for something it has not read: five claims, five false, and the
+  fluency was what made them look verified. At least one is probably BY DESIGN
+  (`VendorBcpAttestationService#doSubmit` takes `submittedByContactName/Email` on a **vendor portal**
+  submission, where the submitter may not be an authenticated principal at all) — and that is a
+  guess, which is exactly why it is on the list rather than in the adjudicated map.
+  ⚠⚠ **`mvn -o test` REPORTED 46 `NoSuchMethodError` FAILURES WHILE `mvn -o test-compile` SAID
+  "Nothing to compile — all classes are up to date".** Maven's incremental test compiler keys on
+  TEST source timestamps, so changing a **main** DTO leaves the previously-compiled test classes in
+  place and the suite runs **stale bytecode**. 🔑 **A run against stale test classes reads as 46
+  broken tests rather than as "the tests were never recompiled."** The authoritative list only
+  appears after `rm -rf target/test-classes` — which is also how to force it **without** `mvn clean`,
+  the command that kills the dev backend.
+  ⚠ **Six unit tests asserted the OLD contract** — that the value the CALLER passed was the value
+  STORED, which is precisely the defect (F2-159). `transition_boardReviewToApproved_requiresApprover`
+  asserted the 400 as correct and was **repurposed**: the refusal now fires when there is no
+  authenticated principal to record, keeping the half that protects the record.
+  ⚙ **`RequestSizeCapMirrorTest`'s own reverse leg fired** when its `approverName` landing outlived
+  the field, and its anti-vacuity floor went 9 → 8 with the reason recorded — **a population that
+  falls after a fix is not automatically rot, but it is always worth asking which** (F2-213).
+  ⚙ **Filed:** the 10 unadjudicated sites; `CrossBorderTransferService#assess::residencyCheckBy`
+  (🔑 **where a method lets the caller supply the clock TOO, the act may not be this call, so its
+  performer need not be the caller** — a PDPL Art.29 owner decision); and
+  `ControlLibraryService#updateMapping::reviewerUserId`, blocked on a second defect —
+  `setLastReviewedAt(now())` fires on **every** update, so editing a rationale already records the
+  mapping as reviewed.
 - ⚠⚠ **WHETHER A SCALAR PARAMETER IS CALLER DATA OR A SERVER VALUE IS A FACT ABOUT ITS CALL
   SITES, AND THE GATE THAT HAD TO DECIDE IT ONLY HAD THE DECLARATION** (F2-222, measured
   2026-08-16). F2-218's fourth detector correction — *"a scalar method parameter is still caller

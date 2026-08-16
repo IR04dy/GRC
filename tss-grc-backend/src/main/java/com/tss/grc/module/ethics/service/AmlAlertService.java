@@ -1,5 +1,6 @@
 package com.tss.grc.module.ethics.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.ethics.entity.AmlAlert;
 import com.tss.grc.module.ethics.repository.AmlAlertRepository;
@@ -82,7 +83,12 @@ public class AmlAlertService {
             case "CLEARED" -> {
                 a.setDisposition(body.get("disposition") != null ? body.get("disposition").toString() : "FALSE_POSITIVE");
                 a.setDispositionNotes(body.get("notes") != null ? body.get("notes").toString() : null);
-                a.setDecidedByName(body.get("decidedBy") != null ? body.get("decidedBy").toString() : null);
+                // F2-223 — the decision-maker is the authenticated principal. KycService#disposition,
+                // in this same package and over the same concept, already does exactly this and
+                // says why: "An AML disposition with no decider is not a disposition." Here the
+                // client filled it from a window.prompt(), and `?? ''` on Cancel meant the STR
+                // filed with the Saudi FIU could be attributed to the empty string.
+                a.setDecidedByName(CurrentActor.username());
                 a.setDecidedAt(LocalDateTime.now());
             }
             case "ESCALATED" -> {
@@ -95,7 +101,12 @@ public class AmlAlertService {
                 a.setStrFiledAt(LocalDateTime.now());
                 a.setDisposition(body.get("disposition") != null ? body.get("disposition").toString() : "TRUE_POSITIVE");
                 a.setDispositionNotes(body.get("notes") != null ? body.get("notes").toString() : null);
-                a.setDecidedByName(body.get("decidedBy") != null ? body.get("decidedBy").toString() : null);
+                // F2-223 — the decision-maker is the authenticated principal. KycService#disposition,
+                // in this same package and over the same concept, already does exactly this and
+                // says why: "An AML disposition with no decider is not a disposition." Here the
+                // client filled it from a window.prompt(), and `?? ''` on Cancel meant the STR
+                // filed with the Saudi FIU could be attributed to the empty string.
+                a.setDecidedByName(CurrentActor.username());
                 if (a.getDecidedAt() == null) a.setDecidedAt(LocalDateTime.now());
             }
             case "CLOSED" -> { /* keep all decision metadata as-is */ }

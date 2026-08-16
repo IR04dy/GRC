@@ -170,13 +170,9 @@ export function StrategyRoiPage() {
 
   // ─── Actions ──────────────────────────────────────────────────────
   async function decide(item: StrategyRoiAnalysis, decision: Recommendation) {
-    const who = await dialog.prompt({
-      title: isAr ? 'اسم متخذ القرار' : 'Decided by (name)',
-      placeholder: isAr ? 'مثال: فيصل السبيعي — المدير المالي للمجموعة'
-        : 'e.g. Faisal Al-Subaie — Group CFO',
-      required: true,
-    });
-    if (who === null) return;
+    // F2-223 — no "decided by" prompt: StrategyRoiService stamps the decision-maker from the
+    // authenticated principal. The placeholder here named an invented officer, which is how a
+    // free-text attribution field teaches an operator to type somebody else's name.
     const rationaleEn = await dialog.prompt({
       title: 'Rationale (English)', type: 'textarea',
       placeholder: 'Why this recommendation? Cite BIA numbers + regulatory drivers.',
@@ -190,7 +186,6 @@ export function StrategyRoiPage() {
     try {
       await recommendStrategyRoi(item.externalId, {
         recommendation: decision,
-        decidedByName: who,
         recommendationRationaleEn: rationaleEn,
         recommendationRationaleAr: rationaleAr,
       });

@@ -93,7 +93,6 @@ export interface BiaQuantitativeRequest {
 }
 
 export interface CfoApprovalRequest {
-  approverName: string;
   comments?: string;
   decision: 'APPROVE' | 'REJECT';
   rejectionReason?: string;

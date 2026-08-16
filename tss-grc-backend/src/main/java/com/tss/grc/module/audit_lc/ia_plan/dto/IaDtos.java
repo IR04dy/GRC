@@ -57,7 +57,6 @@ public final class IaDtos {
 
     public record PlanTransitionRequest(
         @NotBlank @Pattern(regexp = PLAN_STATUS_REGEX) String newStatus,
-        Long approverUserId,
         @Size(max = 1000) String noteEn,
         @Size(max = 1000) String noteAr
     ) {}

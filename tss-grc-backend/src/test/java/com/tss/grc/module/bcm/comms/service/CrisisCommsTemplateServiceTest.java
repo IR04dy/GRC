@@ -143,17 +143,19 @@ class CrisisCommsTemplateServiceTest {
         when(repo.save(any(CrisisCommsTemplateV2.class))).thenAnswer(inv -> inv.getArgument(0));
 
         TemplateResponse step1 = service.transition(t.getExternalId(),
-            new ApprovalTransitionRequest("IN_REVIEW", "BCM Lead — Manal", null));
+            new ApprovalTransitionRequest("IN_REVIEW", null));
         assertThat(step1.approvalStatus()).isEqualTo("IN_REVIEW");
 
+        f223AuthAs("Mohammed.Al-Otaibi", 5L);
         TemplateResponse step2 = service.transition(t.getExternalId(),
-            new ApprovalTransitionRequest("APPROVED_BY_LEGAL", "Legal — Mohammed Al-Otaibi", null));
+            new ApprovalTransitionRequest("APPROVED_BY_LEGAL", null));
         assertThat(step2.approvalStatus()).isEqualTo("APPROVED_BY_LEGAL");
         assertThat(step2.approvedByLegalAt()).isNotNull();
+        // F2-223 — the legal sign-off names the authenticated principal.
         assertThat(step2.approvedByLegalName()).contains("Mohammed");
 
         TemplateResponse step3 = service.transition(t.getExternalId(),
-            new ApprovalTransitionRequest("APPROVED_BY_CISO", "CISO — Saad Al-Harthy", null));
+            new ApprovalTransitionRequest("APPROVED_BY_CISO", null));
         assertThat(step3.approvalStatus()).isEqualTo("APPROVED_BY_CISO");
         assertThat(step3.approvedByCisoAt()).isNotNull();
     }
@@ -165,7 +167,7 @@ class CrisisCommsTemplateServiceTest {
             .thenReturn(Optional.of(t));
 
         assertThatThrownBy(() -> service.transition(t.getExternalId(),
-            new ApprovalTransitionRequest("APPROVED_BY_CISO", "x", null)))
+            new ApprovalTransitionRequest("APPROVED_BY_CISO", null)))
             .isInstanceOf(IllegalTransitionException.class);
         verify(repo, never()).save(any());
     }
@@ -182,7 +184,7 @@ class CrisisCommsTemplateServiceTest {
         when(repo.save(any(CrisisCommsTemplateV2.class))).thenAnswer(inv -> inv.getArgument(0));
 
         TemplateResponse out = service.transition(t.getExternalId(),
-            new ApprovalTransitionRequest("IN_REVIEW", "BCM Lead", null));
+            new ApprovalTransitionRequest("IN_REVIEW", null));
 
         assertThat(out.approvalStatus()).isEqualTo("IN_REVIEW");
         assertThat(out.approvedByCisoAt()).isNull();
@@ -197,7 +199,7 @@ class CrisisCommsTemplateServiceTest {
         when(repo.save(any(CrisisCommsTemplateV2.class))).thenAnswer(inv -> inv.getArgument(0));
 
         TemplateResponse out = service.transition(t.getExternalId(),
-            new ApprovalTransitionRequest("IN_REVIEW", "BCM Lead", null));
+            new ApprovalTransitionRequest("IN_REVIEW", null));
         assertThat(out.approvalStatus()).isEqualTo("IN_REVIEW");
     }
 
@@ -208,7 +210,7 @@ class CrisisCommsTemplateServiceTest {
         when(repo.save(any(CrisisCommsTemplateV2.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.transition(t.getExternalId(),
-            new ApprovalTransitionRequest("IN_REVIEW", "BCM Lead", null));
+            new ApprovalTransitionRequest("IN_REVIEW", null));
 
         ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
         verify(publisher).publishEvent(captor.capture());
@@ -267,5 +269,20 @@ class CrisisCommsTemplateServiceTest {
         service.create(validRequest("CCT-001", "BOARD", "GENERIC_MAJOR"));
 
         assertThat(captor.getValue().getOrganisationId()).isEqualTo(ORG_ID);
+    }
+
+    /**
+     * F2-223 — a real principal in the SecurityContext, because the service now takes the actor
+     * from {@code CurrentActor} rather than from the request. {@code CurrentActor} requires the
+     * principal to be a {@link com.tss.grc.security.GrcUserDetails}, so a bare username token
+     * would resolve to null and the assertion would be about nothing.
+     */
+    private static void f223AuthAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, 1L, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
     }
 }

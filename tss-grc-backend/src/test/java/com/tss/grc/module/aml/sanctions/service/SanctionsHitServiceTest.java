@@ -108,12 +108,14 @@ class SanctionsHitServiceTest {
             .thenReturn(Optional.of(hit("PENDING_REVIEW")));
         when(hitRepo.save(any(ScreeningHit.class))).thenAnswer(inv -> inv.getArgument(0));
 
+        f223AuthAs("aml.officer", 42L);
         HitResponse out = service.reviewHit(HIT_ID,
-            new HitReviewRequest("FALSE_POSITIVE", 42L,
+            new HitReviewRequest("FALSE_POSITIVE",
                 "Common Arab name — different DOB, different country, different ID. Not a match.",
                 "اسم عربي شائع — تاريخ ميلاد وبلد ووثيقة هوية مختلفة. ليس تطابقاً.",
                 null));
         assertThat(out.status()).isEqualTo("FALSE_POSITIVE");
+        // F2-223 — the reviewer is the authenticated principal, not a body field.
         assertThat(out.reviewerUserId()).isEqualTo(42L);
         assertThat(out.dispositionEn()).containsIgnoringCase("not a match");
 
@@ -131,7 +133,7 @@ class SanctionsHitServiceTest {
         when(checkRepo.save(any(ScreeningCheck.class))).thenAnswer(inv -> inv.getArgument(0));
 
         HitResponse out = service.reviewHit(HIT_ID,
-            new HitReviewRequest("TRUE_POSITIVE", 42L, "confirmed", "مؤكَّد", null));
+            new HitReviewRequest("TRUE_POSITIVE", "confirmed", "مؤكَّد", null));
         assertThat(out.status()).isEqualTo("TRUE_POSITIVE");
 
         ArgumentCaptor<ScreeningCheck> chk = ArgumentCaptor.forClass(ScreeningCheck.class);
@@ -148,7 +150,7 @@ class SanctionsHitServiceTest {
         when(checkRepo.save(any(ScreeningCheck.class))).thenAnswer(inv -> inv.getArgument(0));
 
         HitResponse out = service.reviewHit(HIT_ID,
-            new HitReviewRequest("TRUE_POSITIVE", 42L, "x", "س", 12345L));
+            new HitReviewRequest("TRUE_POSITIVE", "x", "س", 12345L));
         assertThat(out.capaTaskId()).isEqualTo(12345L);
     }
 
@@ -157,7 +159,7 @@ class SanctionsHitServiceTest {
             .thenReturn(Optional.of(hit("CLOSED")));
 
         assertThatThrownBy(() -> service.reviewHit(HIT_ID,
-            new HitReviewRequest("PENDING_REVIEW", 42L, null, null, null)))
+            new HitReviewRequest("PENDING_REVIEW", null, null, null)))
             .isInstanceOf(IllegalTransitionException.class);
     }
 
@@ -167,7 +169,7 @@ class SanctionsHitServiceTest {
         when(hitRepo.save(any(ScreeningHit.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.reviewHit(HIT_ID,
-            new HitReviewRequest("CLOSED", 42L, "case closed", "أُغلقت القضية", null));
+            new HitReviewRequest("CLOSED", "case closed", "أُغلقت القضية", null));
 
         ArgumentCaptor<DomainEvent> ev = ArgumentCaptor.forClass(DomainEvent.class);
         verify(publisher, atLeastOnce()).publishEvent(ev.capture());
@@ -250,5 +252,20 @@ class SanctionsHitServiceTest {
         List<HitResponse> out = service.listByStatus("PENDING_REVIEW");
         assertThat(out).hasSize(1);
         assertThat(out.get(0).status()).isEqualTo("PENDING_REVIEW");
+    }
+
+    /**
+     * F2-223 — a real principal in the SecurityContext, because the service now takes the actor
+     * from {@code CurrentActor} rather than from the request. {@code CurrentActor} requires the
+     * principal to be a {@link com.tss.grc.security.GrcUserDetails}, so a bare username token
+     * would resolve to null and the assertion would be about nothing.
+     */
+    private static void f223AuthAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, 1L, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
     }
 }

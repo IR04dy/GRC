@@ -159,7 +159,14 @@ public class CptyService {
         r.setRationaleEn(req.getRationaleEn());
         r.setRationaleAr(req.getRationaleAr());
         r.setAssignedByUserId(currentUserId());
-        r.setApprovedByUserId(req.getApprovedByUserId());
+        // F2-223 — this route is guarded by CPTY:APPROVE, and this class's own javadoc says why:
+        // "assignRating and upsertLimit are POSTs on APPROVE because deciding the rating and the
+        // limit is the credit authority's." The caller of an APPROVE route IS the approver, so
+        // naming somebody else in the body contradicted the guard's stated purpose — while the
+        // line directly above already resolved that same principal. F2-222's filing recorded this
+        // as blocked on "a principal→user-id resolution this slice did not build"; the resolution
+        // is currentUserId(), one line up.
+        r.setApprovedByUserId(currentUserId());
         CreditRating saved = ratingRepo.save(r);
 
         // Cache latest rating on the counterparty.
@@ -289,9 +296,15 @@ public class CptyService {
         l.setUtilisedSarM(req.getUtilisedSarM());
         l.setUtilisationPct(computeUtilisationPct(req.getLimitSarM(), req.getUtilisedSarM()));
         l.setBand(computeBand(l.getUtilisationPct()));
-        l.setApprovedAt(req.getApprovedAt());
+        // F2-223 — approvedAt and approvedByUserId record the SAMA large-exposure approval this
+        // CPTY:APPROVE route performs, so both come from the server. The client was minting
+        // approvedAt in the BROWSER (`new Date().toISOString()`), which also meant an upsert of
+        // an existing limit silently re-dated an approval taken months earlier — 74 of 74 rows in
+        // dev and prod carry the column. nextReviewAt stays the caller's: it is a plan, not a
+        // record of something that happened (F2-222).
+        l.setApprovedAt(java.time.LocalDate.now());
         l.setNextReviewAt(req.getNextReviewAt());
-        l.setApprovedByUserId(req.getApprovedByUserId());
+        l.setApprovedByUserId(currentUserId());
         l.setUtilisationRefreshedAt(java.time.LocalDate.now());
         LargeExposureLimit saved = limitRepo.save(l);
 

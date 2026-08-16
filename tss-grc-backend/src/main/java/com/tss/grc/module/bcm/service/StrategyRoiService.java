@@ -1,6 +1,7 @@
 package com.tss.grc.module.bcm.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.dto.StrategyRoiDtos.RecommendationRequest;
 import com.tss.grc.module.bcm.dto.StrategyRoiDtos.StrategyRoiComparison;
@@ -206,8 +207,11 @@ public class StrategyRoiService {
         a.setRecommendationRationaleEn(req.recommendationRationaleEn());
         a.setRecommendationRationaleAr(req.recommendationRationaleAr());
         if (!"PENDING_REVIEW".equals(to)) {
-            a.setDecidedByName(req.decidedByName());
-            a.setDecidedByUserId(req.decidedByUserId());
+            // F2-223 — the decision-maker is the authenticated principal. The clock on the third
+            // line was already the server's; taking the person from the request split one
+            // attribution across two owners, and the client filled it from a dialog.prompt().
+            a.setDecidedByName(CurrentActor.username());
+            a.setDecidedByUserId(CurrentActor.userId());
             a.setDecidedAt(LocalDateTime.now());
         } else {
             // Re-opening — clear the decision stamp.
@@ -220,7 +224,9 @@ public class StrategyRoiService {
         StrategyRoiAnalysis saved = repo.save(a);
         audit.log("TRANSITION", "StrategyRoiAnalysis", saved.getId(),
             "ROI recommendation " + saved.getAnalysisCode() + ": " + from + " → " + to
-                + (req.decidedByName() != null ? " (decided by " + req.decidedByName() + ")" : ""));
+                // F2-223 — read the decider off the SAVED ROW, never off the request.
+                + (saved.getDecidedByName() != null
+                    ? " (decided by " + saved.getDecidedByName() + ")" : ""));
         emit("STRATEGY_ROI_RECOMMENDATION", saved, from);
         return toResponse(saved);
     }

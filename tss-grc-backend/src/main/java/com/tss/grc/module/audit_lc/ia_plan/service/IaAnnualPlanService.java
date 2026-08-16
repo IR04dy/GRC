@@ -1,6 +1,7 @@
 package com.tss.grc.module.audit_lc.ia_plan.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.audit_lc.ia_plan.dto.IaDtos.PlanCreateRequest;
 import com.tss.grc.module.audit_lc.ia_plan.dto.IaDtos.PlanDashboardResponse;
@@ -214,10 +215,21 @@ public class IaAnnualPlanService {
             }
         }
         if ("APPROVED".equals(to)) {
-            if (req.approverUserId() == null) {
-                throw new IllegalArgumentException("approverUserId is required to transition to APPROVED");
+            // F2-223 — the IIA Standard 2010 annual audit plan is approved by whoever calls this
+            // route, so the approver is the authenticated principal.
+            //
+            // The old form REQUIRED the caller to name the approver and threw if they did not —
+            // the server insisting on an attribution it never verified, while stamping the time
+            // itself on the next line. F2-217 closed the CREATE path on this same register so
+            // that a plan can no longer be born AC_APPROVED with a chosen acApprovedBy; that fix
+            // funnelled every approval through this method, which had the same defect.
+            Long approver = CurrentActor.userId();
+            if (approver == null) {
+                throw new IllegalStateException(
+                    "No authenticated principal to record as the approver of annual plan " + id
+                    + ". An audit-plan approval with no approver is not an approval.");
             }
-            p.setApprovedByUserId(req.approverUserId());
+            p.setApprovedByUserId(approver);
             p.setApprovedAt(LocalDateTime.now());
         }
         if ("COMPLETED".equals(to)) {
@@ -239,7 +251,9 @@ public class IaAnnualPlanService {
 
         audit.log("TRANSITION", "IaAnnualPlan", saved.getId(),
             "Plan " + saved.getPlanCode() + " transitioned " + from + " → " + to
-                + (req.approverUserId() != null ? " (approver=" + req.approverUserId() + ")" : ""));
+                // F2-223 — read the approver off the SAVED ROW, never off the request.
+                + (saved.getApprovedByUserId() != null
+                    ? " (approver=" + saved.getApprovedByUserId() + ")" : ""));
 
         String trigger = switch (to) {
             case "BOARD_REVIEW" -> "IA_PLAN_SUBMITTED";

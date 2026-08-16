@@ -342,11 +342,11 @@ class StrategyRoiServiceTest {
 
         StrategyRoiResponse out = service.recommend(a.getExternalId(),
             new RecommendationRequest("APPROVED",
-                "Faisal Al-Subaie (Group CFO)", null,
                 "Approved with dual-site mandate.",
                 "اعتُمد مع تكليف بمواقع مزدوجة."));
 
         assertThat(out.recommendation()).isEqualTo("APPROVED");
+        // F2-223 — the decision-maker is the authenticated principal.
         assertThat(out.decidedByName()).contains("Faisal Al-Subaie");
         assertThat(out.decidedAt()).isNotNull();
     }
@@ -360,7 +360,6 @@ class StrategyRoiServiceTest {
         // PENDING → DEFERRED
         StrategyRoiResponse out1 = service.recommend(a.getExternalId(),
             new RecommendationRequest("DEFERRED",
-                "BCM Lead", null,
                 "Awaiting risk committee assessment.",
                 "بانتظار تقييم لجنة المخاطر."));
         assertThat(out1.recommendation()).isEqualTo("DEFERRED");
@@ -369,7 +368,6 @@ class StrategyRoiServiceTest {
         // (mock returns the same entity instance — state has advanced)
         StrategyRoiResponse out2 = service.recommend(a.getExternalId(),
             new RecommendationRequest("APPROVED",
-                "Faisal Al-Subaie (Group CFO)", null,
                 "Re-considered after risk-committee briefing.",
                 "أُعيد النظر بعد إحاطة لجنة المخاطر."));
         assertThat(out2.recommendation()).isEqualTo("APPROVED");
@@ -382,8 +380,7 @@ class StrategyRoiServiceTest {
             .thenReturn(Optional.of(a));
 
         assertThatThrownBy(() -> service.recommend(a.getExternalId(),
-            new RecommendationRequest("DEFERRED",
-                "actor", null, null, null)))
+            new RecommendationRequest("DEFERRED", null, null)))
             .isInstanceOf(IllegalTransitionException.class);
         verify(repo, never()).save(any());
     }
@@ -396,7 +393,6 @@ class StrategyRoiServiceTest {
 
         StrategyRoiResponse out = service.recommend(a.getExternalId(),
             new RecommendationRequest("PENDING_REVIEW",
-                null, null,
                 "Re-opening to incorporate revised BIA figures.",
                 "إعادة الفتح لإدماج أرقام BIA المُحدَّثة."));
 
@@ -413,8 +409,7 @@ class StrategyRoiServiceTest {
 
         // PENDING → PENDING is a no-op — guard should reject.
         assertThatThrownBy(() -> service.recommend(a.getExternalId(),
-            new RecommendationRequest("PENDING_REVIEW",
-                "actor", null, null, null)))
+            new RecommendationRequest("PENDING_REVIEW", null, null)))
             .isInstanceOf(IllegalTransitionException.class);
     }
 
@@ -450,7 +445,6 @@ class StrategyRoiServiceTest {
 
         service.recommend(a.getExternalId(),
             new RecommendationRequest("APPROVED",
-                "Faisal Al-Subaie", null,
                 "ok.", "حسناً."));
 
         ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);

@@ -1,5 +1,6 @@
 package com.tss.grc.module.bcm.comms.service;
 
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.comms.channel.ChannelSender;
 import com.tss.grc.module.bcm.comms.dto.CrisisCommsDtos.CascadeResponse;
@@ -166,8 +167,11 @@ public class CrisisCommsDispatchService {
             c.setRenderedBody(body);
             c.setRecipientCount(recipients.size());
             c.setDispatchedAt(LocalDateTime.now());
-            c.setDispatchedByName(req.dispatchedByName());
-            c.setDispatchedByUserId(req.dispatchedByUserId());
+            // F2-223 — who sent a crisis communication is the authenticated principal. The wizard
+            // offered a free-text "dispatched by" input, so an NCEMA cascade to staff, regulators
+            // or the public could be attributed to anyone the sender chose to type.
+            c.setDispatchedByName(CurrentActor.username());
+            c.setDispatchedByUserId(CurrentActor.userId());
 
             if (sender == null) {
                 c.setStatus("FAILED");

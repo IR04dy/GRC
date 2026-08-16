@@ -450,7 +450,7 @@ class BowTieAnalysisServiceTest {
         when(bowtieRepo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, BOWTIE_EX))
                 .thenReturn(Optional.of(b));
 
-        assertThatThrownBy(() -> service.approve(BOWTIE_EX, new ApproveRequest("CRO")))
+        assertThatThrownBy(() -> service.approve(BOWTIE_EX, new ApproveRequest()))
                 .isInstanceOf(IllegalTransitionException.class);
 
         // Bad-state guard must not fire an F8 event or write audit (mirrors
@@ -477,7 +477,8 @@ class BowTieAnalysisServiceTest {
         when(consequenceRepo.findByOrganisationIdAndBowtieIdAndIsDeletedFalseOrderByConsequenceOrderAsc(ORG_ID, BOWTIE_ID))
                 .thenReturn(List.of(consequenceEntity(21L, BOWTIE_ID, "MODERATE"))); // 3 → 9 = MEDIUM
 
-        BowTieAnalysisResponse out = service.approve(BOWTIE_EX, new ApproveRequest("Group CRO"));
+        f223AuthAs("Group CRO", 3L);
+        BowTieAnalysisResponse out = service.approve(BOWTIE_EX, new ApproveRequest());
 
         assertThat(out.status()).isEqualTo("APPROVED");
         assertThat(out.approvedAt()).isNotNull();
@@ -525,7 +526,7 @@ class BowTieAnalysisServiceTest {
         when(bowtieRepo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, BOWTIE_EX))
                 .thenReturn(Optional.empty());   // simulating no row visible to ORG_ID
 
-        assertThatThrownBy(() -> service.approve(BOWTIE_EX, new ApproveRequest("X")))
+        assertThatThrownBy(() -> service.approve(BOWTIE_EX, new ApproveRequest()))
                 .isInstanceOf(EntityNotFoundException.class);
 
         verify(eventPublisher, never()).publishEvent(any(DomainEvent.class));
@@ -545,5 +546,20 @@ class BowTieAnalysisServiceTest {
         assertThat(b.getIsDeleted()).isTrue();
         assertThat(b.getDeletedAt()).isNotNull();
         verify(bowtieRepo).save(b);
+    }
+
+    /**
+     * F2-223 — a real principal in the SecurityContext, because the service now takes the actor
+     * from {@code CurrentActor} rather than from the request. {@code CurrentActor} requires the
+     * principal to be a {@link com.tss.grc.security.GrcUserDetails}, so a bare username token
+     * would resolve to null and the assertion would be about nothing.
+     */
+    private static void f223AuthAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, 1L, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
     }
 }

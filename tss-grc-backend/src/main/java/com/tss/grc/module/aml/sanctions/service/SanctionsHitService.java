@@ -1,6 +1,7 @@
 package com.tss.grc.module.aml.sanctions.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.aml.sanctions.dto.SanctionsDtos.HitEscalateRequest;
 import com.tss.grc.module.aml.sanctions.dto.SanctionsDtos.HitResponse;
@@ -136,7 +137,12 @@ public class SanctionsHitService {
             throw new IllegalTransitionException(from, to, allowed);
         }
         h.setStatus(to);
-        h.setReviewerUserId(req.reviewerUserId());
+        // F2-223 — the reviewer of a sanctions hit is the authenticated principal, never a body
+        // field. The route is guarded by AML:APPROVE, i.e. the platform's own statement that it
+        // controls who may adjudicate a hit; letting the same request say WHO adjudicated meant
+        // the permission guarded the door while the caller wrote the log. The clock on the next
+        // line was already the server's, which is what makes the split visible.
+        h.setReviewerUserId(CurrentActor.userId());
         h.setReviewedAt(LocalDateTime.now(clock));
         if (req.dispositionEn() != null) h.setDispositionEn(req.dispositionEn());
         if (req.dispositionAr() != null) h.setDispositionAr(req.dispositionAr());
@@ -146,7 +152,10 @@ public class SanctionsHitService {
 
         audit.log("REVIEW", "ScreeningHit", saved.getId(),
             "Hit " + saved.getId() + " " + from + " -> " + to
-                + (req.reviewerUserId() != null ? " by user=" + req.reviewerUserId() : ""));
+                // F2-223 — read the reviewer back off the SAVED ROW, never off the request. The
+                // audit trail quoting the caller's claim is the half that makes a forged
+                // attribution invisible to the person auditing it.
+                + (saved.getReviewerUserId() != null ? " by user=" + saved.getReviewerUserId() : ""));
 
         // Promote the parent check's result when we confirm a true positive
         if (CONFIRMED_HIT_STATUSES.contains(to)) {

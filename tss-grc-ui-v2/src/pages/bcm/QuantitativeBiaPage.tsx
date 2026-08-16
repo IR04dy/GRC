@@ -311,13 +311,8 @@ export function QuantitativeBiaPage() {
 
   async function cfoApprove() {
     if (!current?.externalId) return;
-    const approver = await dialog.prompt({
-      title: isAr ? 'اسم المدير المالي المعتمِد' : 'CFO approver name',
-      placeholder: isAr ? 'مثال: فيصل السبيعي — المدير المالي للمجموعة'
-        : 'e.g. Faisal Al-Subaie — Group CFO',
-      required: true,
-    });
-    if (approver === null) return;
+    // F2-223 — QuantitativeBiaService stamps cfoApproverName from the authenticated principal,
+    // so asking for it could only collect a claim (and the placeholder named an invented CFO).
     const comments = await dialog.prompt({
       title: isAr ? 'تعليقات الاعتماد (اختياري)' : 'Approval comments (optional)',
       type: 'textarea',
@@ -327,7 +322,7 @@ export function QuantitativeBiaPage() {
     if (comments === null) return;
     try {
       const out = await cfoApproveQuantitativeBia(current.externalId, {
-        approverName: approver, comments, decision: 'APPROVE',
+        comments, decision: 'APPROVE',
       });
       setCurrent(out);
       setForm(draftFrom(out));
@@ -339,10 +334,7 @@ export function QuantitativeBiaPage() {
 
   async function cfoReject() {
     if (!current?.externalId) return;
-    const approver = await dialog.prompt({
-      title: isAr ? 'اسم المدير المالي' : 'CFO name', required: true,
-    });
-    if (approver === null) return;
+    // F2-223 — see cfoApprove(): the CFO is the authenticated principal, not a typed name.
     const reason = await dialog.prompt({
       title: isAr ? 'سبب الرفض' : 'Rejection reason',
       type: 'textarea', required: true,
@@ -352,7 +344,7 @@ export function QuantitativeBiaPage() {
     if (reason === null) return;
     try {
       const out = await cfoApproveQuantitativeBia(current.externalId, {
-        approverName: approver, decision: 'REJECT', rejectionReason: reason,
+        decision: 'REJECT', rejectionReason: reason,
       });
       setCurrent(out);
       setForm(draftFrom(out));

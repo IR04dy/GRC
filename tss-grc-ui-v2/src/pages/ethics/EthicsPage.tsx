@@ -734,17 +734,19 @@ function AmlAlertsTab({ t, lang, toast, demoMode, ethicsFwOptions }: {
   }
   async function transition(a: AmlAlertDto, target: string) {
     let body: Record<string, unknown> = { target };
+    // F2-223 — the decision-maker is NOT asked for. The server records the authenticated
+    // principal (AmlAlertService#transition, matching KycService#disposition on the sibling
+    // register), so a "decided by" prompt could only ever collect a claim. Its `?? ''` on Cancel
+    // meant the STR filed with the Saudi FIU could be attributed to the empty string.
     if (target === 'CLEARED') {
       const notes = window.prompt(t('amlCleardNotesPrompt'), '') ?? '';
-      const decidedBy = window.prompt(t('amlDecidedByPrompt'), '') ?? '';
-      body = { ...body, disposition: 'FALSE_POSITIVE', notes, decidedBy };
+      body = { ...body, disposition: 'FALSE_POSITIVE', notes };
     }
     if (target === 'STR_FILED') {
       const ref = window.prompt(t('amlStrRefPrompt'), '');
       if (!ref) return;
       const notes = window.prompt(t('amlStrNotesPrompt'), '') ?? '';
-      const decidedBy = window.prompt(t('amlDecidedByPrompt'), '') ?? '';
-      body = { ...body, disposition: 'TRUE_POSITIVE', strReference: ref, notes, decidedBy };
+      body = { ...body, disposition: 'TRUE_POSITIVE', strReference: ref, notes };
     }
     if (target === 'ESCALATED') {
       const notes = window.prompt(t('amlEscalateNotesPrompt'), '') ?? '';

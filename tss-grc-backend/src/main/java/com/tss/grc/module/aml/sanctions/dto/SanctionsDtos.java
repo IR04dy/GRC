@@ -204,7 +204,6 @@ public final class SanctionsDtos {
 
     public record HitReviewRequest(
         @NotBlank @Pattern(regexp = HIT_STATUS_REGEX) String newStatus,
-        @Positive Long reviewerUserId,
         @Size(max = 2000) String dispositionEn,
         @Size(max = 2000) String dispositionAr,
         Long capaTaskId

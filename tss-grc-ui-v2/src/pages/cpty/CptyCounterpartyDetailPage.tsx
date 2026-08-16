@@ -165,7 +165,7 @@ export function CptyCounterpartyDetailPage() {
         displayNameAr: lDisplayAr.trim(),
         limitSarM: lLimit,
         utilisedSarM: lUtilised,
-        approvedAt: new Date().toISOString().slice(0, 10),
+        // F2-223 — approvedAt is the server's: a SAMA large-exposure approval date minted
       });
       closeModal(); await reload();
     } catch (err) {

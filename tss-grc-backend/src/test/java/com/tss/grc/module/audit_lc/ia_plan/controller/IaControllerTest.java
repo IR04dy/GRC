@@ -83,7 +83,7 @@ class IaControllerTest {
     }
 
     @Test void transitionPlan_dispatchesToService() {
-        PlanTransitionRequest req = new PlanTransitionRequest("BOARD_REVIEW", null, null, null);
+        PlanTransitionRequest req = new PlanTransitionRequest("BOARD_REVIEW", null, null);
         when(planService.transition(eq(100L), any(PlanTransitionRequest.class))).thenReturn(stubPlan());
 
         PlanResponse out = controller.transitionPlan(100L, req);

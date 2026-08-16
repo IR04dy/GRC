@@ -55,7 +55,7 @@ export function CrisisCommsDispatchWizard() {
   // Step-3 state
   const [placeholders, setPlaceholders] = useState<Record<string, string>>({});
   const [recipientsRaw, setRecipientsRaw] = useState('');
-  const [dispatchedByName, setDispatchedByName] = useState('');
+  // F2-223 — who dispatched is the authenticated principal, stamped server-side.
 
   // Result
   const [result, setResult] = useState<DispatchResult | null>(null);
@@ -161,7 +161,7 @@ export function CrisisCommsDispatchWizard() {
         audienceFilter: audienceFilter || undefined,
         recipients,
         placeholders,
-        dispatchedByName: dispatchedByName || undefined,
+
       });
       setResult(out);
       setStep(5);
@@ -452,16 +452,6 @@ export function CrisisCommsDispatchWizard() {
             <div style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-3)' }}>
               {recipients.length} {isAr ? 'مستلم' : 'recipients'}
             </div>
-          </Field>
-          <Field label={isAr ? 'المُرسِل' : 'Dispatched by (name)'}>
-            <input
-              value={dispatchedByName}
-              onChange={e => setDispatchedByName(e.target.value)}
-              placeholder={isAr
-                ? 'مثال: فيصل السبيعي — قائد الأزمة'
-                : 'e.g. Faisal Al-Subaie — Crisis Manager'}
-              style={inputStyle}
-            />
           </Field>
           <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between' }}>
             <Button variant="ghost" onClick={() => setStep(2)}>

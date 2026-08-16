@@ -128,12 +128,10 @@ public final class PdplExtensionDtos {
     ) { }
 
     public record DisposalCompleteRequest(
-            String executorName,
             @Size(max = 120) String evidenceRef
     ) { }
 
     public record DisposalVerifyRequest(
-            String verifierName,
             Long signatureTxId
     ) { }
 

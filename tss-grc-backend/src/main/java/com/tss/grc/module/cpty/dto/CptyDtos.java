@@ -101,7 +101,6 @@ public final class CptyDtos {
         @Size(max = 16) private String outlook;
         @Size(max = 4000) private String rationaleEn;
         @Size(max = 4000) private String rationaleAr;
-        private Long approvedByUserId;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
@@ -165,9 +164,11 @@ public final class CptyDtos {
         @NotBlank @Size(max = 256) private String displayNameAr;
         @NotNull private BigDecimal limitSarM;
         @NotNull private BigDecimal utilisedSarM;
-        private LocalDate approvedAt;
+        // F2-223 — approvedAt is the server's: this route is CPTY:APPROVE, so the call IS the
+        // approval. The client was minting it in the browser, which let a SAMA large-exposure
+        // approval be backdated and silently re-dated every time the limit was edited.
+        // nextReviewAt stays the caller's — it is a plan, not a record of something that happened.
         private LocalDate nextReviewAt;
-        private Long approvedByUserId;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder

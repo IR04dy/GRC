@@ -72,8 +72,6 @@ export interface StrategyRoiRequest {
 
 export interface RecommendationRequest {
   recommendation: Recommendation;
-  decidedByName?: string;
-  decidedByUserId?: number;
   recommendationRationaleEn?: string;
   recommendationRationaleAr?: string;
 }

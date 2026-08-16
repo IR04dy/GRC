@@ -74,7 +74,6 @@ export interface TemplateRequest {
 
 export interface ApprovalTransitionRequest {
   approvalStatus: ApprovalStatus;
-  approverName?: string;
   approverUserId?: number;
 }
 
@@ -85,8 +84,6 @@ export interface DispatchRequest {
   audienceFilter?: string;
   recipients?: string[];
   placeholders?: Record<string, string>;
-  dispatchedByName?: string;
-  dispatchedByUserId?: number;
 }
 
 export interface CascadeResponse {

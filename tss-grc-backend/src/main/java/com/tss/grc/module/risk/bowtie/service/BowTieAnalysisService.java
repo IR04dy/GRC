@@ -1,6 +1,7 @@
 package com.tss.grc.module.risk.bowtie.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.platform.auditlog.service.AuditLogService;
 import com.tss.grc.module.platform.automation.event.DomainEvent;
@@ -304,9 +305,10 @@ public class BowTieAnalysisService {
         String prev = b.getStatus();
         b.setStatus("APPROVED");
         b.setApprovedAt(LocalDateTime.now());
-        if (req != null && req.approverName() != null && !req.approverName().isBlank()) {
-            b.setApprovedByName(req.approverName());
-        }
+        // F2-223 — the approver is the authenticated principal. The old form was conditional, so
+        // omitting the field left the PREVIOUS approver's name against this approval, which is a
+        // second way for the record to name somebody who did not perform the act.
+        b.setApprovedByName(CurrentActor.username());
         // Recompute scores now that the bow-tie is being signed off.
         recomputeOverallEffectiveness(b);
         b.setOverallResidualRating(inferResidualRating(b));

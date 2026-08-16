@@ -174,12 +174,12 @@ class PdplExtensionsServiceTest {
             assertThat(started.getStatus()).isEqualTo("IN_PROGRESS");
 
             DisposalCertificate completed = service.complete(20L,
-                    new DisposalCompleteRequest("Sarah", "EV-2026-DC-001"), 5L);
+                    new DisposalCompleteRequest( "EV-2026-DC-001"), 5L);
             assertThat(completed.getStatus()).isEqualTo("COMPLETED");
             assertThat(completed.getEvidenceRef()).isEqualTo("EV-2026-DC-001");
 
             DisposalCertificate verified = service.verify(20L,
-                    new DisposalVerifyRequest("Ahmed", 99L), 7L);
+                    new DisposalVerifyRequest( 99L), 7L);
             assertThat(verified.getStatus()).isEqualTo("VERIFIED");
             assertThat(verified.getSignatureTxId()).isEqualTo(99L);
             assertThat(verified.getVerifiedAt()).isNotNull();

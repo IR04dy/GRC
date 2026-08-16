@@ -92,11 +92,11 @@ class RequestSizeCapMirrorTest {
         new Landing(PdplExtensionDtos.NoticeArchiveRequest.class, "archiveReasonEn",
             PrivacyNotice.class, "archiveReasonEn",
             "PrivacyNoticeService#archive line 130 — the one edge F2-184 measured as a mismatch, "
-            + "and it is an exact match."),
-        new Landing(BowTieDtos.ApproveRequest.class, "approverName",
-            BowTieAnalysis.class, "approvedByName",
-            "BowTieAnalysisService#approve setApprovedByName — the field is RENAMED in transit, "
-            + "which is why searching for the DTO's name found no column.")
+            + "and it is an exact match.")
+        // F2-223 — the BowTieDtos.ApproveRequest#approverName landing is DELETED with its field.
+        // `approvedByName` is now stamped from CurrentActor, so there is no caller-supplied value
+        // for a cap to guard. This gate's own reverse leg is what required the entry to go in the
+        // same commit (F2-185(b)), and it fired.
     );
 
     /**
@@ -272,7 +272,13 @@ class RequestSizeCapMirrorTest {
     void theMappingItselfIsNotEmpty() {
         // Anti-vacuity. Both assertions above are "no problems found", which an empty MIRRORED list
         // satisfies perfectly — the failure mode that makes a green build meaningless.
-        assertThat(MIRRORED).hasSizeGreaterThanOrEqualTo(9);
+        //
+        // ⚠ 9 → 8 at F2-223, and the reason is recorded rather than the number being nudged: the
+        // BowTie `approverName` cap was deleted along with its request field, because the approver
+        // is now stamped from the authenticated principal and there is no caller value left to
+        // cap. A population that FALLS after a fix is not automatically rot, but it is always
+        // worth asking which (F2-213).
+        assertThat(MIRRORED).hasSizeGreaterThanOrEqualTo(8);
         assertThat(COVERED).hasSizeGreaterThanOrEqualTo(8);
         Map<String, Integer> caps = new LinkedHashMap<>();
         for (Landing l : MIRRORED) caps.put(key(l.requestType(), l.component()), capOf(l.requestType(), l.component()));
