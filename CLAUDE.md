@@ -1923,6 +1923,16 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   .findByIdAndOrganisationId`, because CLAUDE.md is right that **no mock can reproduce the failure**
   — mocked repositories have no `row_version` — so the assertion has to be the structure the fix
   guarantees.
+  ⚠⚠ **AND THE HEREDOC LANDMINE HAS A SIBLING THAT FIRED TWICE IN ONE SESSION: `py -c "…"` INSIDE
+  A BASH COMMAND LETS BASH EXPAND EVERY BACKTICK AS COMMAND SUBSTITUTION BEFORE PYTHON SEES IT.**
+  Prose about code is mostly backticks, so this eats the identifiers and leaves the sentence:
+  `KEY: ** is a , so every one fell into`. It ate a whole memory section and, separately, F2-226's
+  plan SHA (`(\`PENDING\`)` → `PENDING: command not found`). 🔑 **Both times the script printed its
+  own success line, so the failure and the confirmation arrived together** — the same signature as
+  the `\b`-in-a-heredoc trap two landmines up. The existing rule ("write scan scripts with a file
+  write, never a heredoc") extends to **any** inline `py -c` carrying backticks; and the repair
+  script should re-read what it wrote and assert the identifiers survived, because a mangled
+  paragraph still reads like prose.
   ⚙ **Filed as the structural root:** annotating `rowVersion` `@Generated(event = {INSERT, UPDATE})`
   would make this whole family **unrepresentable** by having Hibernate re-read the database's value
   after every write — at the cost of a post-write `SELECT` on every write to all 174 `BaseEntity`
