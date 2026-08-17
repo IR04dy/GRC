@@ -159,9 +159,36 @@ public class ApprovalChainInstanceService {
 
     // ─── Writes ─────────────────────────────────────────────────────
 
+    /**
+     * Start a chain. SECURITY (SEC-IAM-001, F2-225): {@code actingUserId} MUST be the
+     * authenticated principal id, never a body field — the originator is not a
+     * property of the request, it is who made it.
+     *
+     * <p>⚠ Until F2-225 this read {@code req.originatorUserId()}, a {@code @NotNull
+     * @Positive} body field, and wrote it straight onto the row beside a
+     * {@code startedAt} the server stamped from its own clock. That is one
+     * attribution split across two owners (F2-223) — and here the attribution is
+     * also an ACCESS-CONTROL INPUT, because {@link #withdraw} has no other:
+     *
+     * <p>🔑 <b>Probed live as {@code compliance} (id 3) naming {@code so_officer}
+     * (id 8): the chain stored originator 8, the REAL raiser was then refused 403
+     * on their own chain, and the named stranger was GRANTED the withdraw. Naming
+     * a nonexistent id (999999) left the chain withdrawable by nobody.</b> One
+     * forged field denies the actor, grants a third party, or orphans the record —
+     * three outcomes, all from a value nothing verified.
+     *
+     * <p>F2-224's rule applies to the clock: the server stamping {@code startedAt}
+     * itself is what declares it the recorder of this act, so the actor half was
+     * never the caller's to give.
+     */
     @Transactional
-    public InstanceResponse startChain(InstanceStartRequest req) {
+    public InstanceResponse startChain(InstanceStartRequest req, Long actingUserId) {
         Long orgId = org();
+        if (actingUserId == null) {
+            throw new IllegalStateException(
+                "No authenticated principal to record as the originator of this approval chain. "
+                + "An approval chain with no originator is one nobody can withdraw.");
+        }
         if (req.sourceWorkflowSubmissionId() == null
             && (req.sourceEntityType() == null || req.sourceEntityId() == null)) {
             throw new IllegalArgumentException(
@@ -183,13 +210,18 @@ public class ApprovalChainInstanceService {
         i.setStatus("IN_PROGRESS"); // Started chains immediately move from PENDING -> IN_PROGRESS.
         i.setStartedAt(LocalDateTime.now());
         i.setCurrentStepOrder(1);
-        i.setOriginatorUserId(req.originatorUserId());
+        i.setOriginatorUserId(actingUserId);
         i.setTitleEn(req.titleEn() != null ? req.titleEn() : t.getTitleEn());
         i.setTitleAr(req.titleAr() != null ? req.titleAr() : t.getTitleAr());
         ApprovalChainInstance saved = instanceRepo.save(i);
 
+        // F2-223: the trail reads off the SAVED ROW, never off the caller's claim —
+        // an audit line that quotes the request is what makes a forged attribution
+        // invisible to whoever audits it. The originator is named because it is the
+        // only input withdraw() has.
         audit.log("CREATE", "ApprovalChainInstance", saved.getId(),
             "Approval-chain instance started: template=" + t.getTemplateCode()
+                + ", originator=" + saved.getOriginatorUserId()
                 + (saved.getSourceWorkflowSubmissionId() != null
                     ? ", submission=" + saved.getSourceWorkflowSubmissionId()
                     : ", source=" + saved.getSourceEntityType() + "#" + saved.getSourceEntityId()));

@@ -47,6 +47,20 @@ import java.util.Set;
  *     POST   /api/v1/workflow/chains/{id}/withdraw
  *     GET    /api/v1/workflow/chains/pending-for-me
  * </pre>
+ *
+ * <p><b>Identity rule for all three write routes (SEC-IAM-001).</b> {@code start},
+ * {@code actions} and {@code withdraw} each take their acting identity from the
+ * authenticated principal. No request body on this controller carries a user id.
+ *
+ * <p>⚠ F2-225: that used to be true of two of the three. {@code actions} and
+ * {@code withdraw} each carried a {@code @NotNull @Positive Long actorUserId} the
+ * service correctly ignored, and each said so in a comment; {@code start} carried
+ * {@code @NotNull @Positive Long originatorUserId} and the service wrote it onto the
+ * row. 🔑 <b>All three fields had the same wire shape, so nothing a caller or a
+ * reader could see distinguished the honoured one from the ignored ones — and the
+ * honoured one is the sole input to {@code withdraw}'s authorisation check.</b> The
+ * two comments made it worse: a reader who finds the rule stated twice does not then
+ * ask about the third route. All three fields are deleted.
  */
 @RestController
 @RequestMapping("/api/v1/workflow/chains")
@@ -123,7 +137,11 @@ public class ApprovalChainController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN','COMPLIANCE_OFFICER','RISK_MANAGER','CISO','DPO','RISK_OWNER')")
     public InstanceResponse start(@RequestBody @Valid InstanceStartRequest req) {
-        return instanceService.startChain(req);
+        // SECURITY (SEC-IAM-001, F2-225): the originator is the authenticated
+        // principal. It used to arrive in the body — and this is the route that
+        // ESTABLISHES the identity the two routes below check against, so it was
+        // the one that most needed the rule the two below had already documented.
+        return instanceService.startChain(req, acting().userId());
     }
 
     @PostMapping("/{id}/actions")

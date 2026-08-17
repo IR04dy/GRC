@@ -1,6 +1,7 @@
 package com.tss.grc.module.nca_ecc.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.nca_ecc.dto.NcaEccFilingDto;
 import com.tss.grc.module.nca_ecc.entity.NcaEccFiling;
@@ -62,6 +63,26 @@ public class NcaEccFilingService {
             .orElseThrow(() -> new EntityNotFoundException("NCA ECC filing not found for year: " + year));
     }
 
+    /**
+     * The authenticated principal, or a refusal (F2-223/F2-225).
+     *
+     * <p>Refusing rather than storing null is safe precisely because both fields were
+     * already mandatory in practice — {@code drafted_by} is NOT NULL and
+     * {@code cisoApprover} was the only thing the CISO_APPROVAL branch recorded — so no
+     * request that works today starts failing (F2-182). What it stops is a filing whose
+     * attribution nothing can vouch for.
+     */
+    private static String requireActor(String role, Integer fiscalYear) {
+        String who = CurrentActor.username();
+        if (who == null || who.isBlank()) {
+            throw new IllegalStateException(
+                "No authenticated principal to record as the " + role
+                + " of the NCA ECC filing for " + fiscalYear
+                + ". A regulator self-assessment with no named " + role + " is not a filing.");
+        }
+        return who;
+    }
+
     @Transactional
     public NcaEccFilingDto create(NcaEccFilingDto req) {
         Long orgId = TenantContext.requireOrganisationId();
@@ -83,7 +104,16 @@ public class NcaEccFilingService {
         applyScores(f, req);
         f.setResponsesJson(req.getResponsesJson());
         f.setGapSummaryEn(req.getGapSummaryEn()); f.setGapSummaryAr(req.getGapSummaryAr());
-        f.setDraftedBy(req.getDraftedBy());
+        // ⚠ F2-225. draftedBy used to be @NotBlank from the request, beside a drafted_at the
+        // entity fills from its own FIELD INITIALISER (= LocalDateTime.now()). That is F2-223's
+        // split attribution — the server owns WHEN and the caller was naming WHO — and it is the
+        // one shape no setter-matching scan can find, because the clock never appears as a
+        // setX(now()) call anywhere. It was found by reading the entity, and it is why F2-215's
+        // four filling mechanisms matter to a detector, not just to a fix.
+        //
+        // Probed live: a filing created as `compliance` with draftedBy "Nobody Who Drafted This"
+        // stored that string on the NCA ECC self-assessment return.
+        f.setDraftedBy(requireActor("drafter", req.getFiscalYear()));
         f.setStatus("DRAFT");
         NcaEccFilingDto out = NcaEccFilingDto.from(repo.save(f));
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "nca_ecc_filing", f.getExternalId(), out);
@@ -121,7 +151,24 @@ public class NcaEccFilingService {
             case "CISO_APPROVAL" -> {
                 f.setPeerReviewCompletedAt(now);
                 f.setCisoApprovalAt(now);
-                if (req.getCisoApprover() != null) f.setCisoApprover(req.getCisoApprover());
+                // ⚠ F2-225. This branch stamps cisoApprovalAt from the server's own clock and
+                // used to copy cisoApprover out of the request body — F2-223's split attribution
+                // on the return this organisation files with the National Cybersecurity
+                // Authority. The clock half is the proof: by timestamping the approval itself the
+                // server has already declared that it is the recorder of this act, so the actor
+                // half was never the caller's to give.
+                //
+                // 🔑 The blind spot that hid it is a NOMINALISATION, not the role-noun F2-224
+                // filed: `cisoApprover` reduces to `approv` and `cisoApprovalAt` to `approval`,
+                // so the two halves of one attribution share no root and no root-matching
+                // detector can pair them. Probed live as `compliance`: "Nobody Who Approved
+                // This" was stored as the CISO who approved the filing.
+                //
+                // peerReviewer above is deliberately NOT changed: at PEER_REVIEW entry the
+                // reviewer is being NOMINATED (peerReviewStartedAt), not recording a review they
+                // have performed, and peerReviewCompletedAt is stamped here without touching it.
+                // That is assignment-then-completion, which is a legitimate two-step (F2-222).
+                f.setCisoApprover(requireActor("CISO approver", f.getFiscalYear()));
             }
             case "SUBMITTED" -> {
                 f.setSubmittedAt(now);

@@ -104,19 +104,40 @@ public final class ApprovalChainDtos {
 
     // ─── Instance start / record / withdraw ───────────────────────────
 
+    /**
+     * ⚠ F2-225. These three records carried an identity field each, with the
+     * SAME wire shape — {@code @NotNull @Positive Long} — and three different
+     * fates: {@code actorUserId} on the two hardened routes was required and
+     * silently IGNORED, while {@code originatorUserId} here was required and
+     * HONOURED. All three are gone.
+     *
+     * <p>🔑 <b>The wire could not tell a reader which was which, and the two
+     * that were safe are the two that looked identical to the one that was
+     * not.</b> {@code ApprovalChainController} documented the ignoring twice
+     * (SEC-IAM-001, on {@code recordAction} and {@code withdraw}) and left
+     * {@code start} — the route that ESTABLISHES the identity the other two
+     * check against — with no comment and a body field the service wrote
+     * straight onto the row. F2-215's headline: generalising an invariant one
+     * site at a time leaves the remainder looking covered, because the
+     * mechanism that covers them is visibly present.
+     *
+     * <p>A required field the server discards is worse than an absent one: it
+     * tells the caller their value matters (F2-184). A required field the
+     * server TRUSTS for an authorisation decision is worse again — see
+     * {@link ApprovalChainInstanceService#withdraw}, whose control reads
+     * {@code originatorUserId} and has no other input.
+     */
     public record InstanceStartRequest(
         @NotNull @Positive Long templateId,
         Long sourceWorkflowSubmissionId,
         @Size(max = 40) String sourceEntityType,
         Long sourceEntityId,
-        @NotNull @Positive Long originatorUserId,
         @Size(max = 500) String titleEn,
         @Size(max = 500) String titleAr
     ) {}
 
     public record InstanceActionRequest(
         @NotNull @Positive Integer stepOrder,
-        @NotNull @Positive Long actorUserId,
         @NotBlank @Pattern(regexp = ACTION_REGEX) String action,
         @Size(max = 4000) String commentEn,
         @Size(max = 4000) String commentAr,
@@ -124,7 +145,6 @@ public final class ApprovalChainDtos {
     ) {}
 
     public record InstanceWithdrawRequest(
-        @NotNull @Positive Long actorUserId,
         @Size(max = 1000) String reasonEn,
         @Size(max = 1000) String reasonAr
     ) {}

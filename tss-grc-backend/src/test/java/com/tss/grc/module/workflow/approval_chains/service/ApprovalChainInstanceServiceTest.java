@@ -39,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -134,15 +135,15 @@ class ApprovalChainInstanceServiceTest {
         return i;
     }
 
-    private static InstanceActionRequest action(int order, long actor, String act) {
-        return new InstanceActionRequest(order, actor, act, "ok", "حسناً", null);
+    private static InstanceActionRequest action(int order, String act) {
+        return new InstanceActionRequest(order, act, "ok", "حسناً", null);
     }
 
     // ─── Start ──────────────────────────────────────────────────────
 
     @Test void startChain_persistsInstanceAndEmitsStartedEvent() {
         InstanceStartRequest req = new InstanceStartRequest(
-            TPL_ID, 900L, null, null, 99L, "CAPA closure", "إغلاق CAPA");
+            TPL_ID, 900L, null, null, "CAPA closure", "إغلاق CAPA");
         when(templateRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, TPL_ID))
             .thenReturn(Optional.of(template()));
         when(stepRepo.countByOrganisationIdAndTemplateIdAndIsDeletedFalse(ORG_ID, TPL_ID)).thenReturn(4L);
@@ -152,7 +153,7 @@ class ApprovalChainInstanceServiceTest {
             return i;
         });
 
-        InstanceResponse out = service.startChain(req);
+        InstanceResponse out = service.startChain(req, 99L);
 
         assertThat(out.status()).isEqualTo("IN_PROGRESS");
         assertThat(out.currentStepOrder()).isEqualTo(1);
@@ -166,21 +167,64 @@ class ApprovalChainInstanceServiceTest {
 
     @Test void startChain_requiresSomeSource() {
         InstanceStartRequest req = new InstanceStartRequest(
-            TPL_ID, null, null, null, 99L, null, null);
-        assertThatThrownBy(() -> service.startChain(req))
+            TPL_ID, null, null, null, null, null);
+        assertThatThrownBy(() -> service.startChain(req, 99L))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("source");
     }
 
     @Test void startChain_rejectsTemplateWithZeroSteps() {
         InstanceStartRequest req = new InstanceStartRequest(
-            TPL_ID, 900L, null, null, 99L, null, null);
+            TPL_ID, 900L, null, null, null, null);
         when(templateRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, TPL_ID))
             .thenReturn(Optional.of(template()));
         when(stepRepo.countByOrganisationIdAndTemplateIdAndIsDeletedFalse(ORG_ID, TPL_ID)).thenReturn(0L);
-        assertThatThrownBy(() -> service.startChain(req))
+        assertThatThrownBy(() -> service.startChain(req, 99L))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("no steps configured");
+    }
+
+    /**
+     * F2-225. The originator is the authenticated principal, never a body field.
+     *
+     * <p>Before this, {@code InstanceStartRequest} carried {@code @NotNull @Positive
+     * Long originatorUserId} and the service wrote it onto the row — so a caller could
+     * name anyone. That is not only a forged attribution: {@link
+     * ApprovalChainInstanceService#withdraw} reads {@code originatorUserId} and has no
+     * other input, so the forged value decided who may withdraw. Probed live: naming
+     * another user locked the real raiser out (403) and granted the stranger the
+     * withdraw (200); naming a nonexistent id left the chain withdrawable by nobody.
+     */
+    @Test void startChain_recordsTheActingPrincipalAsOriginator_notAnyBodyField() {
+        InstanceStartRequest req = new InstanceStartRequest(
+            TPL_ID, 900L, null, null, "CAPA closure", "إغلاق CAPA");
+        when(templateRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, TPL_ID))
+            .thenReturn(Optional.of(template()));
+        when(stepRepo.countByOrganisationIdAndTemplateIdAndIsDeletedFalse(ORG_ID, TPL_ID)).thenReturn(4L);
+        ArgumentCaptor<ApprovalChainInstance> cap = ArgumentCaptor.forClass(ApprovalChainInstance.class);
+        when(instanceRepo.save(cap.capture())).thenAnswer(inv -> {
+            ApprovalChainInstance i = inv.getArgument(0);
+            i.setId(INSTANCE_ID);
+            return i;
+        });
+
+        service.startChain(req, 4242L);
+
+        assertThat(cap.getValue().getOriginatorUserId()).isEqualTo(4242L);
+    }
+
+    /**
+     * F2-223's shape: refuse rather than store null. Safe because the field was already
+     * mandatory on the wire, so no request that worked before starts failing (F2-182) —
+     * and a chain with no originator is one nobody can ever withdraw.
+     */
+    @Test void startChain_withNoAuthenticatedPrincipal_isRefused() {
+        InstanceStartRequest req = new InstanceStartRequest(
+            TPL_ID, 900L, null, null, null, null);
+        assertThatThrownBy(() -> service.startChain(req, null))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("no originator");
+        verify(instanceRepo, never()).save(any(ApprovalChainInstance.class));
     }
 
     // ─── Record action — serial advance ──────────────────────────────
@@ -207,7 +251,7 @@ class ApprovalChainInstanceServiceTest {
         when(stepRepo.findByOrganisationIdAndTemplateIdAndStepOrderAndIsDeletedFalse(ORG_ID, TPL_ID, 2))
             .thenReturn(List.of(s2));
 
-        InstanceResponse out = service.recordAction(INSTANCE_ID, action(1, 42L, "APPROVED"), ACTOR, ROLES);
+        InstanceResponse out = service.recordAction(INSTANCE_ID, action(1, "APPROVED"), ACTOR, ROLES);
 
         assertThat(out.currentStepOrder()).isEqualTo(2);
         assertThat(out.status()).isEqualTo("IN_PROGRESS");
@@ -231,7 +275,7 @@ class ApprovalChainInstanceServiceTest {
         when(actionRepo.findByOrganisationIdAndInstanceIdAndIsDeletedFalseOrderByStepOrderAscDecidedAtAsc(ORG_ID, INSTANCE_ID))
             .thenReturn(List.of());
 
-        InstanceResponse out = service.recordAction(INSTANCE_ID, action(4, 42L, "APPROVED"), ACTOR, ROLES);
+        InstanceResponse out = service.recordAction(INSTANCE_ID, action(4, "APPROVED"), ACTOR, ROLES);
 
         assertThat(out.status()).isEqualTo("APPROVED");
         assertThat(out.completedAt()).isNotNull();
@@ -258,7 +302,7 @@ class ApprovalChainInstanceServiceTest {
         when(actionRepo.findByOrganisationIdAndInstanceIdAndIsDeletedFalseOrderByStepOrderAscDecidedAtAsc(ORG_ID, INSTANCE_ID))
             .thenReturn(List.of());
 
-        InstanceResponse out = service.recordAction(INSTANCE_ID, action(2, 42L, "REJECTED"), ACTOR, ROLES);
+        InstanceResponse out = service.recordAction(INSTANCE_ID, action(2, "REJECTED"), ACTOR, ROLES);
 
         assertThat(out.status()).isEqualTo("REJECTED");
         assertThat(out.completedAt()).isNotNull();
@@ -290,7 +334,7 @@ class ApprovalChainInstanceServiceTest {
         when(actionRepo.findByOrganisationIdAndInstanceIdAndIsDeletedFalseOrderByStepOrderAscDecidedAtAsc(ORG_ID, INSTANCE_ID))
             .thenReturn(List.of());
 
-        InstanceResponse out = service.recordAction(INSTANCE_ID, action(2, 42L, "APPROVED"), ACTOR, ROLES);
+        InstanceResponse out = service.recordAction(INSTANCE_ID, action(2, "APPROVED"), ACTOR, ROLES);
 
         // CISO approved, DPO not yet — chain MUST stay on step 2.
         assertThat(out.currentStepOrder()).isEqualTo(2);
@@ -319,7 +363,7 @@ class ApprovalChainInstanceServiceTest {
         when(stepRepo.findByOrganisationIdAndTemplateIdAndStepOrderAndIsDeletedFalse(ORG_ID, TPL_ID, 3))
             .thenReturn(List.of(s3));
 
-        InstanceResponse out = service.recordAction(INSTANCE_ID, action(2, 42L, "APPROVED"), ACTOR, ROLES);
+        InstanceResponse out = service.recordAction(INSTANCE_ID, action(2, "APPROVED"), ACTOR, ROLES);
 
         assertThat(out.currentStepOrder()).isEqualTo(3);
         assertThat(out.status()).isEqualTo("IN_PROGRESS");
@@ -347,7 +391,7 @@ class ApprovalChainInstanceServiceTest {
         when(stepRepo.findByOrganisationIdAndTemplateIdAndStepOrderAndIsDeletedFalse(ORG_ID, TPL_ID, 3))
             .thenReturn(List.of(s3));
 
-        InstanceResponse out = service.recordAction(INSTANCE_ID, action(2, 42L, "APPROVED"), ACTOR, ROLES);
+        InstanceResponse out = service.recordAction(INSTANCE_ID, action(2, "APPROVED"), ACTOR, ROLES);
 
         // CISO is mandatory and approved, DPO is non-mandatory — chain advances.
         assertThat(out.currentStepOrder()).isEqualTo(3);
@@ -370,7 +414,7 @@ class ApprovalChainInstanceServiceTest {
             .thenReturn(List.of());
 
         InstanceActionRequest delReq = new InstanceActionRequest(
-            1, 42L, "DELEGATED", "stepping out", "متغيب", 77L);
+            1, "DELEGATED", "stepping out", "متغيب", 77L);
         InstanceResponse out = service.recordAction(INSTANCE_ID, delReq, ACTOR, ROLES);
 
         assertThat(out.currentStepOrder()).isEqualTo(1); // unchanged
@@ -393,7 +437,7 @@ class ApprovalChainInstanceServiceTest {
             .thenReturn(List.of(s1));
 
         InstanceActionRequest delReq = new InstanceActionRequest(
-            1, 42L, "DELEGATED", null, null, 77L);
+            1, "DELEGATED", null, null, 77L);
         assertThatThrownBy(() -> service.recordAction(INSTANCE_ID, delReq, ACTOR, ROLES))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("does not allow delegation");
@@ -409,7 +453,7 @@ class ApprovalChainInstanceServiceTest {
             .thenReturn(List.of(s1));
 
         InstanceActionRequest delReq = new InstanceActionRequest(
-            1, 42L, "DELEGATED", null, null, null);
+            1, "DELEGATED", null, null, null);
         assertThatThrownBy(() -> service.recordAction(INSTANCE_ID, delReq, ACTOR, ROLES))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("delegatedToUserId");
@@ -421,7 +465,7 @@ class ApprovalChainInstanceServiceTest {
         ApprovalChainInstance i = instance("APPROVED", 4);
         when(instanceRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, INSTANCE_ID))
             .thenReturn(Optional.of(i));
-        assertThatThrownBy(() -> service.recordAction(INSTANCE_ID, action(4, 42L, "APPROVED"), ACTOR, ROLES))
+        assertThatThrownBy(() -> service.recordAction(INSTANCE_ID, action(4, "APPROVED"), ACTOR, ROLES))
             .isInstanceOf(IllegalTransitionException.class);
     }
 
@@ -429,7 +473,7 @@ class ApprovalChainInstanceServiceTest {
         ApprovalChainInstance i = instance("IN_PROGRESS", 1);
         when(instanceRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, INSTANCE_ID))
             .thenReturn(Optional.of(i));
-        assertThatThrownBy(() -> service.recordAction(INSTANCE_ID, action(3, 42L, "APPROVED"), ACTOR, ROLES))
+        assertThatThrownBy(() -> service.recordAction(INSTANCE_ID, action(3, "APPROVED"), ACTOR, ROLES))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("current step");
     }
@@ -448,7 +492,7 @@ class ApprovalChainInstanceServiceTest {
         // role nor its required user. Previously this forged an approval via the
         // rows.get(0) fallback; it must now be rejected with 403.
         assertThatThrownBy(() -> service.recordAction(
-                INSTANCE_ID, action(1, 42L, "APPROVED"), 42L, Set.of("AUDITOR")))
+                INSTANCE_ID, action(1, "APPROVED"), 42L, Set.of("AUDITOR")))
             .isInstanceOf(AccessDeniedException.class)
             .hasMessageContaining("authorised approver");
     }
@@ -466,7 +510,7 @@ class ApprovalChainInstanceServiceTest {
             .thenReturn(List.of());
 
         InstanceResponse out = service.withdraw(INSTANCE_ID,
-            new InstanceWithdrawRequest(99L, "no longer needed", "لم يعد ضرورياً"), 99L);
+            new InstanceWithdrawRequest("no longer needed", "لم يعد ضرورياً"), 99L);
 
         assertThat(out.status()).isEqualTo("WITHDRAWN");
         assertThat(out.completedAt()).isNotNull();
@@ -477,7 +521,7 @@ class ApprovalChainInstanceServiceTest {
         when(instanceRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, INSTANCE_ID))
             .thenReturn(Optional.of(i));
         assertThatThrownBy(() -> service.withdraw(INSTANCE_ID,
-                new InstanceWithdrawRequest(123L, null, null), 123L))
+                new InstanceWithdrawRequest(null, null), 123L))
             .isInstanceOf(AccessDeniedException.class)
             .hasMessageContaining("originator");
     }
@@ -487,7 +531,7 @@ class ApprovalChainInstanceServiceTest {
         when(instanceRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, INSTANCE_ID))
             .thenReturn(Optional.of(i));
         assertThatThrownBy(() -> service.withdraw(INSTANCE_ID,
-                new InstanceWithdrawRequest(99L, null, null), 99L))
+                new InstanceWithdrawRequest(null, null), 99L))
             .isInstanceOf(IllegalTransitionException.class);
     }
 

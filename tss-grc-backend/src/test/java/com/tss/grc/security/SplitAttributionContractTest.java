@@ -172,6 +172,31 @@ class SplitAttributionContractTest {
     private static final Pattern TIME_TAIL = Pattern.compile("(?:At|Date|On)$");
 
     /**
+     * A nominalising suffix: {@code approval} is the NOUN for the act {@code approve}.
+     *
+     * <p>⚠ DETECTOR GAP 9 (F2-225), and it cost a live finding on the return this
+     * organisation files with the National Cybersecurity Authority.
+     * {@code NcaEccFilingService#transition} stamps {@code cisoApprovalAt} from the
+     * server's own clock and used to copy {@code cisoApprover} out of the request body
+     * in the same {@code switch} branch — one attribution, two owners, F2-223's shape
+     * exactly. It was invisible because {@code cisoApprover} reduces to {@code approv}
+     * and {@code cisoApprovalAt} to {@code approval}: <b>the clock half is named after
+     * the NOUN and the actor half after the VERB, so the two halves of one attribution
+     * share no key.</b>
+     *
+     * <p>🔑 This is a different blind spot from F2-224's, which was the actor field
+     * naming the ROLE PERFORMED ({@code standDownAuthoriser}). That one is still blind
+     * and still asserted as such below. <b>Two distinct ways for one attribution's two
+     * halves to share no root have now been found; assume a third.</b>
+     *
+     * <p>Emitted as an EXTRA key rather than replacing the reduction, so the widening
+     * can only ADD pairings — which is what makes it safe to reason about. Verified
+     * against all 9 pairs the gate already reports plus 11 that must never pair
+     * ({@link #aNominalisedClockPairsWithItsAgentNoun()}): it adds exactly one.
+     */
+    private static final Pattern NOMINAL = Pattern.compile("(?:al|ion|ment|ance|ence)$");
+
+    /**
      * Every verb key a field name could pair on, rather than the single reduced root.
      *
      * <p>⚠ Part two of DETECTOR GAP 8. {@link #verbRoot}'s last step keeps only the trailing
@@ -205,6 +230,11 @@ class SplitAttributionContractTest {
             String suffix = base.substring(w.start());
             keys.add(suffix.toLowerCase());
             keys.add(suffix.replaceAll("(?:ed|er|or)$", "").toLowerCase());
+        }
+        // GAP 9 (F2-225): let a nominalised clock meet its agent noun — approval ↔ approv.
+        for (String k : new LinkedHashSet<>(keys)) {
+            String stem = NOMINAL.matcher(k).replaceAll("");
+            if (!stem.isEmpty() && !stem.equals(k)) keys.add(stem);
         }
         keys.remove("");
         return keys;
@@ -607,6 +637,161 @@ class SplitAttributionContractTest {
                 + "adjudicate InvocationService#transition::standDownAuthoriser, and re-run the "
                 + "whole tree, because the same widening will surface siblings nobody has read")
             .isEmpty();
+    }
+
+    /**
+     * GAP 9's self-test: the widening adds EXACTLY the pairing it was written for.
+     *
+     * <p>A widening is only safe to reason about if you know what it adds. This drives the
+     * nine pairs the gate already reports — which must keep pairing, or the widening has
+     * broken the instrument — and eleven that must never pair, drawn from the three
+     * buckets F2-225 measured over the 79 unpaired candidates: an ordinary English word
+     * ending {@code -er}/{@code -or} that is no agent noun at all, an ASSIGNMENT naming
+     * who WILL act, and a NOMINATION. It adds one pairing: {@code cisoApprover} ↔
+     * {@code cisoApprovalAt}.
+     *
+     * <p>🔑 The eleventh case is {@code standDownAuthoriser}, and it must still NOT pair.
+     * F2-224's blind spot and F2-225's are different shapes, and closing one says nothing
+     * about the other — which is the reason both are asserted rather than described.
+     */
+    @Test
+    @DisplayName("GAP 9: a nominalised clock pairs with its agent noun, and nothing else does")
+    void aNominalisedClockPairsWithItsAgentNoun() {
+        // Each row: actor field, clock field. These MUST share a key.
+        String[][] mustPair = {
+            {"cisoApprover", "cisoApprovalAt"},              // the F2-225 miss
+            {"submittedByContactEmail", "submittedAt"},      // shipped BY_DESIGN
+            {"submittedByContactName", "submittedAt"},       // shipped BY_DESIGN
+            {"revokedBy", "revokedAt"},                      // shipped BY_DESIGN
+            {"reviewerUserId", "lastReviewedAt"},            // shipped BY_DESIGN
+            {"attestedByName", "attestedAt"},                // F2-224 closed
+            {"declaredBy", "declaredAt"},                    // F2-224 closed
+            {"approvedByLegalName", "approvedByLegalAt"},    // F2-223's qualified agent
+            {"executorName", "executedAt"},                  // F2-223's -or agent noun
+        };
+        // These must NOT: a noise word, an assignment, a recipient, a nomination.
+        String[][] mustNotPair = {
+            {"ownerUserId", "updatedAt"},
+            {"reporterName", "submittedAt"},
+            {"escalatedToUserId", "escalatedAt"},
+            {"assignedToUserId", "detectedAt"},
+            {"vendorId", "reportedAt"},
+            {"stepOrder", "decidedAt"},
+            {"lineNumber", "discoveredAt"},
+            {"isCrossBorder", "discoveredAt"},
+            {"regulatoryAnchor", "submittedAt"},
+            {"peerReviewer", "peerReviewStartedAt"},
+            {"standDownAuthoriser", "standDownAt"},
+        };
+        for (String[] p : mustPair) {
+            Set<String> a = verbKeys(p[0]);
+            a.retainAll(verbKeys(p[1]));
+            assertThat(a)
+                .as("%s must pair with %s — if this is empty the reduction has been "
+                    + "narrowed and real splits have gone quiet", p[0], p[1])
+                .isNotEmpty();
+        }
+        for (String[] p : mustNotPair) {
+            Set<String> a = verbKeys(p[0]);
+            a.retainAll(verbKeys(p[1]));
+            assertThat(a)
+                .as("%s must NOT pair with %s — a false pairing manufactures a finding, "
+                    + "and the obvious fix for a false split forges an attribution", p[0], p[1])
+                .isEmpty();
+        }
+    }
+
+    /**
+     * KNOWN BLIND SPOT 2 (F2-225): the clock is a FIELD INITIALISER, so it is never
+     * written by a setter at all and no scan over setter calls can see it.
+     *
+     * <p>{@code NcaEccFiling.draftedAt} is {@code = LocalDateTime.now()} on the field —
+     * F2-215's third of four filling mechanisms — while {@code draftedBy} was
+     * {@code @NotBlank} from the request. That is the same split, and this detector was
+     * structurally incapable of reporting it: it was found by reading the entity.
+     *
+     * <p><b>Measured before being filed</b> (F2-221: a filed item inherits the population
+     * of the slice that filed it). Of 67 entities carrying a clock-initialised field that
+     * names an ACT rather than the row, <b>19 sites</b> also take an actor-shaped field
+     * from the request — 4 noise words, 6 assignments, and 9 in the attribution bucket, of
+     * which this slice fixed 1 ({@code NcaEccFilingService#create}) and refuted 4 by
+     * reading: two are the SUBJECT of a public complaint or whistleblowing report, and
+     * {@code CoiService#recordRecusal}'s clock is
+     * {@code req.recusalDate() != null ? … : now()} — F2-224's caller-overridable clock,
+     * arriving through an initialiser this time, which is worth knowing on its own:
+     * <b>a field initialiser is only a server stamp while no writer overrides it.</b>
+     *
+     * <p>The remaining 4 are a WORK LIST and deliberately not reasons (F2-188): they need
+     * their callers read, and a plausible reason for something nobody has read is the
+     * failure mode this register keeps recording.
+     */
+    @Test
+    @DisplayName("KNOWN BLIND SPOT: a clock filled by a field initialiser is never seen")
+    void aClockFilledByAFieldInitialiserIsNotSeen() {
+        String fixture = """
+            class Probe {
+                public void create(Req req) {
+                    NcaEccFiling f = new NcaEccFiling();
+                    f.setDraftedBy(req.getDraftedBy());
+                    repo.save(f);
+                }
+            }
+            """;
+        assertThat(splitsIn(strip(fixture)))
+            .as("there is no setDraftedAt(now()) here — the clock lives on the entity as "
+                + "`= LocalDateTime.now()`. If this ever fires, the detector has learned to "
+                + "resolve the constructed type's initialisers, and the 4 remaining work-list "
+                + "sites must be adjudicated in the same commit")
+            .isEmpty();
+    }
+
+    /**
+     * The two registers this slice closed must not drift back. Structural, because the
+     * pairing detector cannot see either of them: the ECC one is GAP 9's nominalisation
+     * (now closed) and the chain one has no clock/actor name relationship at all —
+     * {@code startedAt} against {@code originatorUserId}.
+     */
+    @Test
+    @DisplayName("F2-225's two closed registers still resolve their actor from the principal")
+    void theClosedRegistersResolveTheirActorFromThePrincipal() {
+        String ecc = read("module/nca_ecc/service/NcaEccFilingService.java");
+        assertThat(strip(ecc))
+            .as("the NCA ECC filing's drafter and CISO approver are the authenticated "
+                + "principal — a regulator self-assessment may not name an approver the "
+                + "server cannot vouch for")
+            .doesNotContain("req.getDraftedBy()")
+            .doesNotContain("req.getCisoApprover()")
+            .contains("requireActor(");
+
+        String chain = read(
+            "module/workflow/approval_chains/service/ApprovalChainInstanceService.java");
+        assertThat(strip(chain))
+            .as("the chain originator is the acting principal. It is not merely an "
+                + "attribution: withdraw() reads it and has no other input, so a body-set "
+                + "originator decided who may withdraw")
+            .doesNotContain("req.originatorUserId()")
+            .contains("i.setOriginatorUserId(actingUserId)");
+
+        // ⚠ Scope this to the REQUEST records. A first draft banned the tokens across the
+        // whole file and failed on correct code: InstanceResponse and
+        // PendingDecisionResponse legitimately carry originatorUserId, because telling a
+        // client who raised a chain is the whole point of reading one. A gate that fails
+        // on correct code trains the next reader to edit the assertion (F2-214), and
+        // "scope a scan to the shape of its claim" is the most repeated lesson in this
+        // lineage — here it landed on a leg written while quoting it.
+        String dtos = strip(read("module/workflow/approval_chains/dto/ApprovalChainDtos.java"));
+        for (String rec : new String[]{"InstanceStartRequest", "InstanceActionRequest",
+                                       "InstanceWithdrawRequest"}) {
+            int at = dtos.indexOf("record " + rec + "(");
+            assertThat(at).as("%s must still exist", rec).isGreaterThan(0);
+            String body = dtos.substring(at, dtos.indexOf(")", at) + 1);
+            assertThat(body)
+                .as("%s must carry no user id. Two of these three used to have a required "
+                    + "one the service silently ignored and one used to have a required one "
+                    + "the service honoured — identical wire shapes, opposite fates, and "
+                    + "the honoured one decided who may withdraw", rec)
+                .doesNotContain("UserId");
+        }
     }
 
     /**

@@ -92,7 +92,6 @@ export function NcaEccFilingsPage() {
         fiscalYear: Number(v.fiscalYear),
         frameworkVersion: v.frameworkVersion || 'ECC-2:2024',
         titleEn: v.titleEn?.trim() || undefined,
-        draftedBy: v.draftedBy,
         domain1Score: numOrUndef(v.domain1Score), domain2Score: numOrUndef(v.domain2Score),
         domain3Score: numOrUndef(v.domain3Score), domain4Score: numOrUndef(v.domain4Score),
         domain5Score: numOrUndef(v.domain5Score),
@@ -116,11 +115,10 @@ export function NcaEccFilingsPage() {
   const createFields: FieldDef[] = [
     { kind: 'number', key: 'fiscalYear', label: isAr ? 'السنة المالية *' : 'Fiscal year *', required: true, min: 2024, max: 2100, span: 6 },
     { kind: 'text', key: 'frameworkVersion', label: isAr ? 'إصدار الإطار' : 'Framework version', span: 6 },
-    { kind: 'text', key: 'draftedBy', label: isAr ? 'مُعِدّ البلاغ *' : 'Drafted by *', required: true, span: 12 },
     scoreField(1), scoreField(2), scoreField(3), scoreField(4), scoreField(5),
     { kind: 'textarea', key: 'gapSummaryEn', label: isAr ? 'ملخّص الفجوات' : 'Gap summary', rows: 2, span: 12 },
   ];
-  const createInitial = { fiscalYear: year, frameworkVersion: 'ECC-2:2024', draftedBy: '', domain1Score: '3', domain2Score: '3', domain3Score: '3', domain4Score: '3', domain5Score: '3', gapSummaryEn: '' };
+  const createInitial = { fiscalYear: year, frameworkVersion: 'ECC-2:2024', domain1Score: '3', domain2Score: '3', domain3Score: '3', domain4Score: '3', domain5Score: '3', gapSummaryEn: '' };
 
   return (
     <Shell title={isAr ? 'بلاغات الضوابط الأساسية (NCA ECC)' : 'NCA ECC filings'}
@@ -260,9 +258,11 @@ function advanceFields(to: string, isAr: boolean): FieldDef[] {
     { kind: 'text', key: 'peerReviewer', label: isAr ? 'مراجع الأقران' : 'Peer reviewer', span: 12 },
     { kind: 'textarea', key: 'peerReviewCommentsEn', label: isAr ? 'ملاحظات' : 'Comments', rows: 2, span: 12 },
   ];
-  if (to === 'CISO_APPROVAL') return [
-    { kind: 'text', key: 'cisoApprover', label: isAr ? 'معتمِد (رئيس الأمن)' : 'CISO approver', span: 12 },
-  ];
+  // F2-225: no "CISO approver" input. The approval happens on this call — the server
+  // stamps cisoApprovalAt from its own clock — so its performer is whoever is signed
+  // in, and asking an operator to TYPE the approver is how a free-text attribution
+  // field teaches them to enter somebody else's name (7 recorded instances).
+  if (to === 'CISO_APPROVAL') return [];
   if (to === 'SUBMITTED') return [
     { kind: 'text', key: 'submissionReference', label: isAr ? 'مرجع التقديم للهيئة' : 'NCA submission reference', span: 12, placeholder: 'NCA-ECC-2026-XXXXXX' },
   ];
@@ -270,7 +270,7 @@ function advanceFields(to: string, isAr: boolean): FieldDef[] {
 }
 function advanceInitial(to: string): Record<string, string> {
   if (to === 'PEER_REVIEW') return { peerReviewer: '', peerReviewCommentsEn: '' };
-  if (to === 'CISO_APPROVAL') return { cisoApprover: '' };
+  if (to === 'CISO_APPROVAL') return {};
   if (to === 'SUBMITTED') return { submissionReference: '' };
   return {};
 }

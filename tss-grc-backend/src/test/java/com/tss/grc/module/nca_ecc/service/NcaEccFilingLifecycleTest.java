@@ -51,25 +51,41 @@ import org.springframework.test.util.ReflectionTestUtils;
  * only because all four of that module's maps happen to declare terminal states as explicit
  * {@code Set.of()} entries — accidentally, not by design.
  *
- * <h3>What is deliberately NOT asserted, and why that is the honest choice</h3>
- * This filing has a three-step assurance chain — drafted, peer-reviewed, CISO-approved — and
- * {@code peerReviewer} and {@code cisoApprover} are <b>strings taken from the request body</b>, with
- * no comparison between them and no reference to the security context. One caller can therefore
- * drive {@code DRAFT → PEER_REVIEW → CISO_APPROVAL → SUBMITTED} while typing both names, and the
- * filing that reaches the regulator records a four-eyes review that never happened.
+ * <h3>The assurance chain: F2-117's two halves, one of them now server-owned</h3>
+ * This filing has a three-step assurance chain — drafted, peer-reviewed, CISO-approved. Until
+ * F2-225 <b>all three names were strings taken from the request body</b>, with no comparison between
+ * them and no reference to the security context, so one caller could drive
+ * {@code DRAFT → PEER_REVIEW → CISO_APPROVAL → SUBMITTED} while typing every name, and the filing
+ * that reaches the regulator recorded a four-eyes review that never happened.
  *
- * <p>That is <b>F2-117</b>, and it is filed rather than fixed here. Building the comparison now would
- * knowingly reproduce F2-112: measured in dev, <b>0 of the 4 people-labels</b> across
- * {@code drafted_by}/{@code peer_reviewer}/{@code ciso_approver} resolve to a platform user — they
- * are display names and an email address, while the identity a gate could compare is a user id that
- * no column holds. A refusal over those strings would answer "cannot tell" every time and refuse
- * nothing, which is precisely the shipped-but-inert control this programme keeps finding. The remedy
- * is V357's shape: identity columns plus principal capture, then the gate.
+ * <p>Two separable defects were filed as one, and that is why half of it stayed open:
+ * <ul>
+ *   <li><b>ATTRIBUTION</b> — who the drafter and CISO approver ARE. <b>CLOSED</b>: both are now
+ *       {@code CurrentActor.username()}, and the service refuses when there is no principal. It
+ *       needed no migration and no new column. Found independently by F2-225's split-attribution
+ *       re-derivation, because the CISO_APPROVAL branch stamps {@code cisoApprovalAt} from the
+ *       server's own clock two lines above — one attribution, two owners (F2-223).</li>
+ *   <li><b>SEGREGATION</b> — that the approver is not the peer reviewer. <b>STILL OPEN</b>, and its
+ *       blocker is genuine: no {@code *_user_id} column exists for either assurance role, so a
+ *       refusal over these strings would answer "cannot tell" every time and refuse nothing — the
+ *       shipped-but-inert control this programme keeps finding. V357's shape is the remedy.</li>
+ * </ul>
  *
- * <p>So {@link #theAssuranceChainIsCallerAssertedAndNothingComparesIt()} asserts the <em>mechanism</em>
- * — that the service never consults the security context — rather than asserting that self-review
- * succeeds. Asserting the permissive behaviour would pin the defect as a specification, which is the
- * trap F2-115 sprang on this row's first module.
+ * <p>🔑 <b>The recorded blocker was an argument about segregation, and it was applied to
+ * attribution.</b> This javadoc used to reason that a comparison would be inert because 0 of the 4
+ * people-labels resolved to a platform user — correct, and irrelevant to stamping the principal.
+ * Worse, the dependency ran the other way: comparing a reviewer against an approver is meaningless
+ * while the approver is whatever the caller typed, so attribution was the PREREQUISITE for the
+ * comparison the blocker was protecting. F2-178's "re-measure a recorded blocker before believing
+ * its estimate", one level up — the estimate was right about a fix that was not the one blocked.
+ *
+ * <p>⚙ One input to the old measurement has moved: {@code ciso_approver} now holds a username,
+ * which does resolve to a platform user, so "0 of 4 labels resolve" no longer describes it.
+ *
+ * <p>The peer reviewer stays caller-supplied deliberately: at PEER_REVIEW entry the reviewer is
+ * being NOMINATED, not recording a review they have performed, and {@code peerReviewCompletedAt} is
+ * stamped later without touching the name. Assignment-then-completion is a legitimate two-step
+ * (F2-222); stamping the principal there would record a review nobody performed.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -85,12 +101,27 @@ class NcaEccFilingLifecycleTest {
     @BeforeEach
     void setUp() {
         TenantContext.setCurrentTenant(ORG);
+        // F2-225: the drafter and the CISO approver are the authenticated principal, and the
+        // service REFUSES without one — so every test that creates or CISO-approves a filing
+        // needs a principal. That refusal is the fix, not an inconvenience: a regulator
+        // self-assessment with no named approver is not a filing.
+        authAs("ciso.office", 77L);
         when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
     }
 
     @AfterEach
     void tearDown() {
         TenantContext.clear();
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    private static void authAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, ORG, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
     }
 
     // ── the machine ──────────────────────────────────────────────────────────
@@ -287,35 +318,72 @@ class NcaEccFilingLifecycleTest {
     // ── F2-117: the assurance chain nothing verifies ─────────────────────────
 
     /**
-     * See the class javadoc. This asserts the <b>mechanism</b> — that the service derives no actor
-     * from the security context and takes both assurance names from the request — rather than
-     * asserting that self-review succeeds, which would pin the defect as a specification.
+     * F2-117 — the ATTRIBUTION half is now server-owned; the four-eyes comparison stays OPEN.
+     * The half that moved is the one the recorded blocker said could not move yet.
      *
-     * <p>When F2-117 is fixed this test must fail, and that is intended: the fix adds principal
-     * capture, at which point this assertion is the reminder to replace it with a refusal test.
+     * <p>⚠ This javadoc deliberately avoids the {@code 'F2-nnn … CLOSED'} adjacency.
+     * {@code FindingsRegisterConsistencyTest} reads it as a claim that the WHOLE finding is closed,
+     * and it fired here — correctly, because half of this one is not. 🔑 <b>A binary closure gate
+     * cannot express a half-closed finding, and the safe direction is for the TEST to under-claim
+     * rather than for the register to over-claim:</b> the register is what an auditor is handed, so
+     * marking a P1 closed to satisfy a regex would have retired a control that is still half
+     * unbuilt. ⚙ Worth knowing rather than fixing here: that gate cannot tell a quotation from a
+     * claim (F2-193's shape), and the {@code unquoted()} convention that solves it elsewhere
+     * carries its own warning against being applied to a whole Java file (F2-216) — so naming the
+     * shape with the placeholder id, exactly as the gate's own failure message does, is the honest
+     * way to reference it without instantiating it.
+     *
+     * <p>This test used to assert the defect's <b>mechanism</b>: that the service never consults
+     * the security context and takes both assurance names from the body. It said so in its name,
+     * and it carried an exit condition — <i>"when F2-117 is fixed this test must fail, and that
+     * is intended."</i> It did fail, exactly as designed, which is the honest version of a pinned
+     * known defect and is why this rewrite is a handover rather than a correction.
+     *
+     * <p>🔑 <b>But the pin outlived the reason for it, because the class javadoc's blocker argument
+     * covered TWO fixes and only one was blocked.</b> It reasoned that a comparison over these
+     * strings would answer "cannot tell" every time, since 0 of 4 people-labels resolved to a
+     * platform user — true, and it is an argument about SEGREGATION (approver ≠ peer reviewer),
+     * which does need identity columns. It was applied to ATTRIBUTION (who the approver IS), which
+     * needed nothing but {@code CurrentActor}. And attribution is the PREREQUISITE for segregation:
+     * comparing a reviewer against an approver is meaningless while the approver is a string the
+     * caller typed. <b>The recorded blocker inverted its own dependency</b> — F2-178's "re-measure
+     * a recorded blocker before believing its estimate", in a new shape.
+     *
+     * <p>What F2-225 closed, proved live as {@code compliance} against a planted filing:
+     * {@code cisoApprover} and {@code draftedBy} are the authenticated principal. What remains
+     * open is the four-eyes comparison, and its blocker is now genuine and unchanged: no
+     * {@code *_user_id} column exists for either assurance role. ⚙ One thing did move for it —
+     * {@code ciso_approver} now holds a username, which DOES resolve to a platform user, so the
+     * "0 of 4 labels resolve" measurement no longer describes that column.
      */
     @Test
-    @DisplayName("F2-117: the peer reviewer and CISO approver are caller-asserted, and nothing compares them")
+    @DisplayName("F2-117: the CISO approver is server-stamped; the four-eyes comparison is still unbuilt")
     void theAssuranceChainIsCallerAssertedAndNothingComparesIt() throws IOException {
         String src = Files.readString(Paths.get("src", "main", "java", "com", "tss", "grc", "module",
             "nca_ecc", "service", "NcaEccFilingService.java").toAbsolutePath().normalize(),
             StandardCharsets.UTF_8);
 
         assertThat(src).as(
-            "F2-117 — if the service now reads a principal, the assurance chain may finally be "
-            + "verifiable. Replace this test with one that REFUSES self-review, and close F2-117.")
-            .doesNotContain("SecurityContextHolder")
-            .doesNotContain("Authentication");
+            "F2-225: the CISO approval branch stamps cisoApprovalAt from the server's clock, so its "
+            + "approver is whoever is signed in — not a name the caller types into a form")
+            .doesNotContain("req.getCisoApprover()")
+            .doesNotContain("req.getDraftedBy()")
+            .contains("requireActor(");
 
-        assertThat(src).as("both names still come straight from the request body")
-            .contains("f.setPeerReviewer(req.getPeerReviewer())")
-            .contains("f.setCisoApprover(req.getCisoApprover())");
+        assertThat(src).as(
+            "the PEER REVIEWER stays caller-supplied on purpose: at PEER_REVIEW entry the reviewer "
+            + "is being NOMINATED, and peerReviewCompletedAt is stamped later without touching the "
+            + "name. Assignment-then-completion is a legitimate two-step (F2-222) and stamping the "
+            + "principal there would record a review nobody performed")
+            .contains("f.setPeerReviewer(req.getPeerReviewer())");
 
-        // And there is no identity to compare even if someone wrote the comparison: the entity holds
-        // names, not user ids. This is the measured reason the fix needs a migration first.
+        // F2-117's RESIDUAL, and its blocker is real: with no identity column for either assurance
+        // role a self-review gate would answer "cannot tell" every time and refuse nothing — the
+        // shipped-but-inert control this programme keeps finding. V357's shape is the prerequisite.
         assertThat(NcaEccFiling.class.getDeclaredFields())
-            .as("no *_user_id column exists for either assurance role, so a gate would have nothing "
-                + "to compare — V357's shape is the prerequisite, not the comparison")
+            .as("no *_user_id column exists for either assurance role, so the four-eyes comparison "
+                + "still has nothing to compare. If these columns ever appear, write the refusal "
+                + "test and close F2-117 — the attribution half is already done")
             .noneMatch(f -> f.getName().equals("peerReviewerUserId")
                          || f.getName().equals("cisoApproverUserId"));
     }

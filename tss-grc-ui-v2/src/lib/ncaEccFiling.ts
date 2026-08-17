@@ -44,9 +44,13 @@ export interface NcaEccFiling {
 
 export interface NcaEccTransition {
   status: string;
+  /** Nominated on entry to PEER_REVIEW — who is being ASKED to review, not who has. */
   peerReviewer?: string;
   peerReviewCommentsEn?: string;
-  cisoApprover?: string;
+  // F2-225: `cisoApprover` is gone. The server stamps cisoApprovalAt from its own clock
+  // in the same branch, so the approver is the authenticated principal. It is removed
+  // from the type as well as the form, because a field the server ignores tells the
+  // next caller their value matters (F2-184).
   submissionReference?: string;
   cancellationReasonEn?: string;
 }
@@ -56,7 +60,10 @@ export interface NcaEccFilingCreate {
   frameworkVersion?: string;
   titleEn?: string;
   titleAr?: string;
-  draftedBy: string;
+  // F2-225: `draftedBy` is gone. drafted_at is filled by the entity's own field
+  // initialiser, so the server owns WHEN the draft was made and therefore owns WHO
+  // made it. The server marks it READ_ONLY on the wire and refuses a create with no
+  // authenticated principal.
   domain1Score?: number;
   domain2Score?: number;
   domain3Score?: number;
