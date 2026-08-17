@@ -344,10 +344,23 @@ public class ExerciseRuntimeService {
         if (!"PENDING".equals(inj.getStatus())) {
             throw new IllegalTransitionException(inj.getStatus(), "DISPATCHED", Set.of("PENDING"));
         }
-        inj.setActualDispatchedAt(LocalDateTime.now());
-        inj.setStatus("DISPATCHED");
+        stampDispatched(inj);
         ExerciseRunInject saved = runInjectRepo.save(inj);
+        announceDispatched(orgId, run, saved);
+        return toInjectView(orgId, saved);
+    }
 
+    /**
+     * The F7 audit row, the F8 event and the live broadcast for a dispatched inject.
+     *
+     * <p>F2-227 — shared by {@link #dispatchInject} and {@link #addCustomInject}'s
+     * {@code dispatchNow} path. It used to be reached by the latter CALLING the former, which is
+     * what wrote the row twice. Extracting the announcement rather than duplicating it is what
+     * keeps the two paths' trails identical: F2-188 measured what happens when a transition is
+     * duplicated instead of shared — the duplicate agrees on the part that is easy to check and
+     * differs on the audit trail, which nothing asserts.
+     */
+    private void announceDispatched(Long orgId, ExerciseRun run, ExerciseRunInject saved) {
         audit.log("UPDATE", "ExerciseRunInject", saved.getId(),
             "Inject dispatched on run " + run.getRunCode() + " (type=" + saved.getInjectType()
                 + ", planned=T+" + saved.getPlannedTimeOffsetMinutes() + "m)");
@@ -376,7 +389,6 @@ public class ExerciseRuntimeService {
             "plannedOffsetMinutes", String.valueOf(saved.getPlannedTimeOffsetMinutes()),
             "dispatchedAt",         String.valueOf(saved.getActualDispatchedAt())
         ));
-        return toInjectView(orgId, saved);
     }
 
     @Transactional
@@ -415,6 +427,34 @@ public class ExerciseRuntimeService {
         ri.setExpectedActionEn(req.expectedActionEn());
         ri.setExpectedActionAr(req.expectedActionAr());
         ri.setStatus("PENDING");
+
+        // ⚠⚠ F2-227 — the dispatch is stamped BEFORE the single save, never by re-loading and
+        // saving the row a second time.
+        //
+        // This used to be `save(ri)` here and then, at the bottom,
+        // `return dispatchInject(run.getId(), saved.getId())` — which re-loads the row it just
+        // inserted and saves it again inside the SAME transaction. `dispatchNow` DEFAULTS TO
+        // TRUE, so the facilitator's ordinary "throw an inject now" action answered
+        // **HTTP 500** for every tenant, on a live BCM exercise. Measured, not inferred: the
+        // dedicated dispatch route answers 200 on the identical row, and once F2-227's
+        // optimistic-locking handler existed the response named the cause —
+        // ObjectOptimisticLockingFailureException on ExerciseRunInject, "Row was updated or
+        // deleted by another transaction (or unsaved-value mapping was incorrect)".
+        //
+        // 🔑 Why it fails is the mapping: `BaseEntity.rowVersion` is a SQL Server ROWVERSION
+        // mapped `@Version @Column(insertable = false, updatable = false)`, so the DATABASE
+        // generates it and Hibernate never re-reads it. `findByIdAndOrganisationId` inside
+        // dispatchInject forces flush-before-query, the INSERT goes out, the row gets a version
+        // this session has never seen — and the second save's `WHERE row_version = ?` matches
+        // zero rows. CLAUDE.md's landmine, third recorded instance after F2-175.
+        //
+        // ⚠ `audit.log` and `emit` are NOT what breaks it, which is why most of this shape in
+        // the platform is latent: AuditLogEntry is IDENTITY-generated, so its insert goes out
+        // alone without flushing the caller's pending changes. **A QUERY is the flusher.**
+        boolean dispatchNow = req.dispatchNow() == null || req.dispatchNow();
+        if (dispatchNow) {
+            stampDispatched(ri);
+        }
         ExerciseRunInject saved = runInjectRepo.save(ri);
 
         audit.log("CREATE", "ExerciseRunInject", saved.getId(),
@@ -427,9 +467,12 @@ public class ExerciseRuntimeService {
             "injectType",  type
         ));
 
-        boolean dispatchNow = req.dispatchNow() == null || req.dispatchNow();
         if (dispatchNow) {
-            return dispatchInject(run.getId(), saved.getId());
+            // The row is already DISPATCHED on disk. Everything below is the trail and the
+            // broadcast, which dispatchInject also does — reusing them here keeps the two entry
+            // points emitting the same events without either of them writing the row twice.
+            announceDispatched(orgId, run, saved);
+            return toInjectView(orgId, saved);
         }
         realtime.broadcastOrgEvent(orgId, "exercise-run." + run.getId(), Map.of(
             "type",        "CUSTOM_INJECT_ADDED",
@@ -438,6 +481,15 @@ public class ExerciseRuntimeService {
             "injectType",  type
         ));
         return toInjectView(orgId, saved);
+    }
+
+    /**
+     * Stamp an inject as dispatched, in memory. F2-227 — the only writer of these two fields,
+     * so neither entry point can drift and neither has to re-load the row to set them.
+     */
+    private static void stampDispatched(ExerciseRunInject inj) {
+        inj.setActualDispatchedAt(LocalDateTime.now());
+        inj.setStatus("DISPATCHED");
     }
 
     // ─── Participant responses ──────────────────────────────────────────

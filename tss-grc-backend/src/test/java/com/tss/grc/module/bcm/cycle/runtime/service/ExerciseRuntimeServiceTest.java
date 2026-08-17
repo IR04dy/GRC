@@ -52,6 +52,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -554,24 +555,68 @@ class ExerciseRuntimeServiceTest {
         verify(audit).log(eq("CREATE"), eq("ExerciseRunInject"), anyLong(), anyString());
     }
 
+    /**
+     * F2-227 — {@code dispatchNow} must write the row ONCE.
+     *
+     * <p>⚠ This test used to stub {@code runInjectRepo.findByIdAndOrganisationId} with the comment
+     * <i>"After save, the dispatchInject step needs the inject to be findable"</i> — and that stub
+     * is precisely the defect: the method saved the INSERT and then re-loaded and saved the same
+     * row inside one transaction. Because {@code BaseEntity.rowVersion} is a database-generated
+     * SQL Server ROWVERSION that Hibernate never re-reads, the query's flush-before-query left the
+     * in-memory version stale and the second UPDATE matched zero rows —
+     * <b>HTTP 500 on the default path of a live BCM exercise</b>, since {@code dispatchNow}
+     * defaults to true.
+     *
+     * <p>🔑 <b>No mock can reproduce that failure</b> — CLAUDE.md is explicit that mocked
+     * repositories have no {@code row_version}, which is why the suite was green over it. So this
+     * asserts the STRUCTURE the fix guarantees, which a mock CAN see: one save, and no re-read of
+     * the row at all. The stub's disappearance is the evidence.
+     */
     @Test
-    void addCustomInject_with_dispatchNow_dispatches_immediately() {
+    void addCustomInject_with_dispatchNow_savesTheRowOnceAndNeverReloadsIt() {
         ExerciseRun run = runFixture("IN_PROGRESS");
         when(runRepo.findByIdAndOrganisationId(RUN_ID, ORG_ID)).thenReturn(Optional.of(run));
         List<ExerciseRunInject> captured = new ArrayList<>();
         stubInjectSaveAssignsId(captured);
-        // After save, the dispatchInject step needs the inject to be findable.
-        when(runInjectRepo.findByIdAndOrganisationId(anyLong(), eq(ORG_ID)))
-            .thenAnswer(inv -> {
-                Long id = inv.getArgument(0);
-                return captured.stream().filter(r -> id.equals(r.getId())).findFirst();
-            });
 
         InjectView out = service.addCustomInject(RUN_ID, new CustomInjectRequest(
             "Custom now", null, null, null, "INFORMATION", null, true));
 
         assertThat(out.status()).isEqualTo("DISPATCHED");
         assertThat(out.actualDispatchedAt()).isNotNull();
+
+        // The row is written exactly once, already DISPATCHED.
+        verify(runInjectRepo, times(1)).save(any(ExerciseRunInject.class));
+        assertThat(captured).hasSize(1);
+        assertThat(captured.get(0).getStatus()).isEqualTo("DISPATCHED");
+        assertThat(captured.get(0).getActualDispatchedAt()).isNotNull();
+
+        // And it is never re-read. This is the assertion that fails if anyone restores the
+        // `return dispatchInject(run.getId(), saved.getId())` shape.
+        verify(runInjectRepo, never()).findByIdAndOrganisationId(anyLong(), anyLong());
+
+        // Both trails still fire — the create AND the dispatch — because the announcement was
+        // extracted rather than duplicated (F2-188: a duplicated transition agrees on the row and
+        // differs on the audit trail, which is the part nothing asserts).
+        verify(audit).log(eq("CREATE"), eq("ExerciseRunInject"), anyLong(), anyString());
+        verify(audit).log(eq("UPDATE"), eq("ExerciseRunInject"), anyLong(),
+            org.mockito.ArgumentMatchers.contains("Inject dispatched"));
+    }
+
+    /** The dedicated dispatch route still works, and still writes once. */
+    @Test
+    void dispatchInject_savesOnce_andStampsTheSameTwoFields() {
+        ExerciseRun run = runFixture("IN_PROGRESS");
+        ExerciseRunInject ri = runInjectFixture(701L, RUN_ID, "PENDING", 1L);
+        when(runRepo.findByIdAndOrganisationId(RUN_ID, ORG_ID)).thenReturn(Optional.of(run));
+        when(runInjectRepo.findByIdAndOrganisationId(701L, ORG_ID)).thenReturn(Optional.of(ri));
+        when(runInjectRepo.save(any(ExerciseRunInject.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        InjectView out = service.dispatchInject(RUN_ID, 701L);
+
+        assertThat(out.status()).isEqualTo("DISPATCHED");
+        assertThat(out.actualDispatchedAt()).isNotNull();
+        verify(runInjectRepo, times(1)).save(any(ExerciseRunInject.class));
     }
 
     // ─── Tenant isolation ────────────────────────────────────────────────

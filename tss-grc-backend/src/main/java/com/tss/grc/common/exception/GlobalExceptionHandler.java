@@ -663,16 +663,76 @@ public class GlobalExceptionHandler {
         return close < 0 ? null : msg.substring(at + "constraint [".length(), close);
     }
 
+    /**
+     * F2-227 — a row changed under the caller. <b>409, and it says which entity.</b>
+     *
+     * <p>⚠⚠ <b>Why this handler had to exist before the defect it reports could be found.</b>
+     * {@link org.springframework.dao.OptimisticLockingFailureException} is a
+     * {@link DataAccessException}, so until now every one of them fell into
+     * {@link #handleMissingDbObject} and came back as a bare <i>"An unexpected database error
+     * occurred."</i> — <b>with no exception class, even in dev with
+     * {@code grc.errors.verbose=true} explicitly on</b>, because that handler builds its own
+     * ProblemDetail instead of delegating to {@link #handleGeneral}, which is the only place the
+     * verbose diagnostics live.
+     *
+     * <p>🔑 <b>So the handler that intercepted this exception class was the one handler that
+     * discarded the diagnostic verbose mode exists to provide</b> — and the exception class in
+     * question is the one the ROWVERSION double-flush landmine produces (CLAUDE.md's second
+     * landmine, recorded at F2-175 and hit again at F2-226). A platform-wide defect family was
+     * undiagnosable by construction. F2-180's rule, inverted: a wrong-but-specific diagnostic at
+     * least sends the reader somewhere; a *generic* diagnostic from a *specific* handler sends
+     * them nowhere and looks deliberate.
+     *
+     * <p>409 rather than 500 is the honest status: nothing is broken server-side, the row simply
+     * moved. {@code ObjectOptimisticLockingFailureException} carries the entity type and
+     * identifier, so the message can name them — which is what turns "retry?" into a diagnosis.
+     */
+    @ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLocking(
+            org.springframework.dao.OptimisticLockingFailureException ex) {
+        String what = null;
+        if (ex instanceof org.springframework.orm.ObjectOptimisticLockingFailureException o) {
+            String type = o.getPersistentClassName();
+            if (type != null) {
+                int dot = type.lastIndexOf('.');
+                what = (dot < 0 ? type : type.substring(dot + 1))
+                    + (o.getIdentifier() != null ? " " + o.getIdentifier() : "");
+            }
+        }
+        log.error("Optimistic locking failure on {}: {}",
+            what == null ? "an entity" : what, ex.getMessage(), ex);
+
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+            (what == null
+                ? "This record was modified by another operation while you were saving it."
+                : "This " + what + " was modified by another operation while you were saving it.")
+            + " Nothing was written. Reload and try again — and if this is reproducible rather"
+            + " than a race, the request is writing the same row twice in one transaction.");
+        pd.setTitle("Concurrent Modification");
+        pd.setType(URI.create("https://grc.tss.com/errors/optimistic-lock"));
+        pd.setProperty("conflictKind", "STALE_ROW");
+        if (what != null) pd.setProperty("entity", what);
+        // SEC-CFG-001: the class name and root message are dev-only, same gate as the catch-all.
+        if (verboseErrors) {
+            pd.setProperty("exception", ex.getClass().getName());
+            pd.setProperty("rootCause", rootMessage(ex));
+        }
+        pd.setProperty("timestamp", Instant.now());
+        return pd;
+    }
+
     @ExceptionHandler(DataAccessException.class)
     public ProblemDetail handleMissingDbObject(DataAccessException ex) {
         if (isMissingObjectError(ex)) {
             return missingObjectResponse(ex);
         }
-        // Otherwise it's a genuine SQL syntax error or similar — let
-        // the catch-all handle it with a 500.
-        log.error("Data-access error: {}", ex.getMessage(), ex);
-        return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
-            "An unexpected database error occurred.");
+        // F2-227 — this used to build its own bare 500, while the comment here said "let the
+        // catch-all handle it with a 500". It did not: `handleGeneral` is where SEC-CFG-001's
+        // verbose diagnostics live, so every DataAccessException that reached this branch lost
+        // its exception class and root message even in dev. A comment describing a behaviour the
+        // code does not have is worse than no comment, because it answers the question a reader
+        // was about to ask (F2-184's shape, in an exception handler). Now it actually delegates.
+        return handleGeneral(ex);
     }
 
     /** Shared body builder for the 503 "module not bootstrapped"
