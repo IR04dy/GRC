@@ -2400,6 +2400,73 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-232 · Reading the one unread lead refuted it, and that is the argument for the rejection
+
+|  |  |
+|---|---|
+| **ID** | F2-232 |
+| **Title** | Both net-new findings from F2-231's rejected stamp-half widening are false positives — 2 of 2 |
+| **Severity** | Instrument correction (no defect; no code change) |
+| **Status** | 🟢 CLOSED 2026-08-17 |
+| **Programme** | Platform Bible F2 · instrument integrity |
+| **Modules** | `admin/committee` (read), `security` (the gate's own record) |
+
+### What was measured
+
+F2-231 built the mirror of its own write-half widening — following private helpers on the **stamp**
+half — measured it at **11 → 15 services**, narrowed it twice back to 13, and rejected it because one
+of the two net-new findings was a demonstrated false positive (`ChangeManagementService#addLink`
+reported as accepting a `ChangeLink`'s own data fields *"stamped by transition"*). It named the other
+as the one lead worth reading, **with no verdict** (F2-188).
+
+Read, it is **BY DESIGN with provenance, and F2-40 built the mechanism.**
+`CommitteeResolutionService#create` accepts `voteFor`/`voteAgainst`/`voteAbstain` because the
+secretariat form posts the tally straight from the minutes for a committee that votes in the room —
+the normal path — and the row records *which kind of tally it is*:
+
+- `ASSERTED`, with the recorder taken from `Authentication` and **never** from the body (the DF-3 rule;
+  `tallyRecordedByUserId`/`Name` are explicitly nulled before being set), versus
+- `COMPUTED` for a resolution created empty and decided through `recordVote`.
+
+Measured 2026-08-17: **22 live rows in dev, 20 in prod.** `ASSERTED_LEGACY` **20 / 20** — F2-40's
+honest label for rows that predate the mechanism, carrying no recorder because none was ever recorded
+through the API — and **0** rows carrying `ASSERTED` with a recorder, so the provenance path is
+**latent and correct** rather than bypassed.
+
+### Why this is worth its own entry
+
+🔑 **A population produced by a detector already judged unsafe refuted at 2 of 2**, where this
+programme's usual rate against a predecessor's claims is about 2 in 10 (F2-188, F2-192, F2-204,
+F2-211, F2-228). That takes the stamp-half widening from *"needs care"* to *measurably wrong as
+formulated*, and it is the argument for the rejection rather than a footnote to it.
+
+**Do not re-enable the stamp half expecting a defect behind either name.** If it is ever revisited,
+the missing distinction is between a helper implementing a **guarded route's** stamp and one
+implementing an **invariant every path shares** — and neither refuted site turned on that distinction,
+which is exactly why two narrowings did not rescue it.
+
+### What shipped
+
+No code change. The correction lands in three places so it cannot be read past: the gate's own
+blind-spot javadoc (which quotes the sentence it replaces), F2-231's register spec, and CLAUDE.md.
+Gate 16/16 after the correction.
+
+### The instrument findings
+
+⚠ **Two probe errors of mine, both loud, and both the recurring guessed-name error.**
+`admin.committee_resolutions` has **no `is_deleted` column**, so a `WHERE is_deleted = 0` scoped query
+answered *"Invalid column name"* — which F2-199 records as reading exactly like *"the data isn't
+there"* — and the tally columns had to be resolved from `sys.columns` rather than assumed. **Resolve
+from `sys.columns`; never guess.** Recurring since F2-198.
+
+⚠⚠ **The docs gate caught this entry's own absence, which is the third instance of F2-219's lesson in
+this lineage.** Referencing `F2-232` in the plan pushed `specsOwedOnlyEverDecreases` from 29 to 30
+before this spec existed. 🔑 **A docs commit is precisely what a docs gate breaks, and a correction
+recorded only inside the finding it corrects is a correction an auditor reading the register's index
+will not find.**
+
+---
+
 ## F2-231 · A gate's hard zero is only as wide as its predicate
 
 | | |
@@ -2611,6 +2678,30 @@ claim.
   `\\s` to `\s` and `\\n` to a literal newline inside Python string literals, even with a quoted
   delimiter. Two were loud (a Java compile error, a `SyntaxError`); the dangerous mode is the silent
   one this file already records. **Use the Write/Edit tools for anything containing escapes.**
+
+### ⚠⚠ Correction (F2-232, same day) — both net-new findings are false positives, 2 of 2
+
+This spec said of the second one: *"the one unread lead named (`CommitteeResolutionService#create` ::
+`voteFor`/`voteAgainst`/`voteAbstain`, a resolution created with its vote tallies already filled in)"*.
+Read, it is **BY DESIGN with provenance, and F2-40 built the mechanism.** The secretariat form posts the
+tally straight from the minutes for a committee that votes in the room — the normal path — and the row
+records *which kind of tally it is*: `ASSERTED`, with the recorder taken from `Authentication` and never
+from the body (the DF-3 rule; `tallyRecordedByUserId`/`Name` are explicitly nulled before being set),
+versus `COMPUTED` for a resolution created empty and decided through `recordVote`.
+
+Measured 2026-08-17: **22 live rows in dev, 20 in prod**, of which `ASSERTED_LEGACY` **20 / 20** —
+F2-40's honest label for rows that predate the mechanism, carrying no recorder because none was ever
+recorded through the API — and **0** carrying `ASSERTED` with a recorder, so the provenance path is
+latent and correct rather than bypassed.
+
+🔑 **That is the argument for the rejection rather than a footnote to it.** A population produced by a
+detector already judged unsafe refuted at **2 of 2**, where this programme's usual rate against a
+predecessor's claims is about 2 in 10 (F2-188, F2-192, F2-204, F2-211, F2-228). **Do not re-enable the
+stamp half expecting a defect behind either name.** If it is ever revisited, the missing distinction is
+between a helper implementing a GUARDED ROUTE's stamp and one implementing an invariant every path
+shares — and neither refuted site turned on that distinction, which is exactly why two narrowings did
+not rescue it.
+
 
 ### Filed
 

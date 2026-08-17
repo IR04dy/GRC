@@ -1535,10 +1535,30 @@ class ServerStampedFieldContractTest {
      * <p>The consequence is worth stating plainly, because it is the sharper half: a service that
      * extracts its stamping into a private helper <b>drops out of the population entirely</b> — not
      * one field, the whole service — because {@code measure()} skips a source whose stamped map is
-     * empty. The one lead worth reading first is {@code CommitteeResolutionService#create}, reported
-     * as accepting {@code voteFor / voteAgainst / voteAbstain} against {@code recordVote}: a committee
-     * resolution created with its vote tallies already filled in. <b>Unread — no verdict is offered
-     * here</b> (F2-188).
+     * empty.
+     *
+     * <p>⚠⚠ <b>CORRECTION (F2-232) — both net-new findings are false positives, so the count is
+     * 2 of 2 and not 1 of 2.</b> This javadoc said of the second one: <i>"The one lead worth reading
+     * first is {@code CommitteeResolutionService#create}, reported as accepting {@code voteFor /
+     * voteAgainst / voteAbstain} against {@code recordVote}: a committee resolution created with its
+     * vote tallies already filled in. Unread — no verdict is offered here (F2-188)."</i> Read, it is
+     * <b>BY DESIGN with provenance, and F2-40 built the mechanism</b>: the secretariat form posts the
+     * tally straight from the minutes for a committee that votes in the room, which is the normal
+     * path, and the row records <em>which kind of tally it is</em> — {@code ASSERTED} with the
+     * recorder taken from {@code Authentication} (never the body — the DF-3 rule, and
+     * {@code tallyRecordedBy*} is explicitly nulled before being set), versus {@code COMPUTED} for a
+     * resolution created empty and decided through {@code recordVote}. Measured 2026-08-17: 22 live
+     * rows in dev and 20 in prod, of which {@code ASSERTED_LEGACY} 20/20 — F2-40's honest label for
+     * rows that predate the mechanism — and <b>0</b> carrying {@code ASSERTED} with a recorder, so
+     * the provenance path is latent and correct rather than bypassed.
+     *
+     * <p>🔑 <b>That is the argument for the rejection, not a footnote to it.</b> A population produced
+     * by a detector already judged unsafe refuted at 2 of 2, where this programme's usual rate against
+     * a predecessor's claims is about 2 in 10 (F2-188, F2-192, F2-204, F2-211, F2-228). <b>Do not
+     * re-enable the stamp half expecting a defect behind either name.</b> If it is ever revisited, the
+     * missing distinction is between a helper that implements a GUARDED ROUTE's stamp and one that
+     * implements an invariant every path shares — and neither refuted site turned on that distinction,
+     * which is why two narrowings did not rescue it.
      */
     @Test
     void followingHelperStampsIsAMeasuredBlindSpotAndNotCoverage() {
