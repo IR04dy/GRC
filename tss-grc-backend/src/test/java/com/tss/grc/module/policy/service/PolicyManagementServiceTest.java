@@ -28,6 +28,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import org.springframework.security.access.AccessDeniedException;
@@ -665,6 +666,74 @@ class PolicyManagementServiceTest {
         ArgumentCaptor<List<PolicyDocumentControlLink>> add = ArgumentCaptor.forClass(List.class);
         verify(controlLinks).saveAll(add.capture());
         assertThat(add.getValue()).extracting(PolicyDocumentControlLink::getControlId).containsExactly(11L);
+    }
+
+    // ── F2-231 — a policy exception is FILED, not granted ────────────────────────────────────
+
+    /**
+     * ⚠⚠ {@code createException} bound the entity and used DEFAULTS, not guards, so a caller holding
+     * only {@code COMPLIANCE:WRITE} — the same permission {@code /transition} carries — could file a
+     * policy waiver already APPROVED, naming its own approver and reviewer and backdating every
+     * stamp. Probed live as {@code auditor}: 200, all six stored, one CREATE audit row and no
+     * TRANSITION row, so the trail an auditor reads had no record of the approval and the
+     * {@code POLICY_EXCEPTION_APPROVED} trigger this class calls "the legally significant one" never
+     * fired.
+     *
+     * <p>🔑 {@code approvedAt} was already refused, because {@code PolicyException} annotates that ONE
+     * field {@code @JsonProperty(READ_ONLY)} and not its five siblings — F2-215's two-of-three shape,
+     * at one of six, in a service {@link com.tss.grc.security.ServerStampedFieldContractTest}'s CLOSED
+     * set already covered <em>for the attestation register</em>. A service declared closed for one
+     * register it owns is not closed for another.
+     */
+    @Test
+    void createException_refusesANonInitialState() {
+        PolicyException body = new PolicyException();
+        body.setPolicyId(1L);
+        body.setTitleEn("Legacy TLS on the branch gateway");
+        body.setJustificationEn("Vendor firmware upgrade lands next quarter.");
+        body.setStatus("APPROVED");
+
+        assertThatThrownBy(() -> service.createException(body))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("REQUESTED")
+            // F2-180 — the diagnostic has to send the caller somewhere, not just refuse.
+            .hasMessageContaining("/transition");
+        verify(exceptions, never()).save(any());
+    }
+
+    @Test
+    void createException_clearsEveryColumnTheReviewAndApprovalStatesProduce() {
+        PolicyException body = new PolicyException();
+        body.setPolicyId(1L);
+        body.setTitleEn("Legacy TLS on the branch gateway");
+        body.setJustificationEn("Vendor firmware upgrade lands next quarter.");
+        body.setStatus("REQUESTED");                       // exactly what PolicyManagementPage sends
+        body.setReviewerName("Nobody Who Reviewed This");
+        body.setReviewedAt(LocalDateTime.of(2001, 1, 1, 0, 0));
+        body.setApproverName("Nobody Who Approved This");
+        body.setApprovedAt(LocalDateTime.of(2001, 1, 2, 0, 0));
+        body.setRejectedAt(LocalDateTime.of(2001, 1, 3, 0, 0));
+        body.setRejectionReason("Invented rationale nobody wrote");
+        body.setRequestedAt(LocalDateTime.of(2001, 1, 4, 0, 0));
+        when(exceptions.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        PolicyException saved = service.createException(body);
+
+        assertThat(saved.getStatus()).isEqualTo("REQUESTED");
+        assertThat(saved.getReviewerName()).isNull();
+        assertThat(saved.getReviewedAt()).isNull();
+        assertThat(saved.getApproverName()).isNull();
+        assertThat(saved.getApprovedAt()).isNull();
+        assertThat(saved.getRejectedAt()).isNull();
+        assertThat(saved.getRejectionReason()).isNull();
+        assertThat(saved.getRequestedAt())
+            .as("the request happened NOW — left as a default, a caller could backdate the clock a "
+                + "waiver's age is measured from")
+            .isAfter(LocalDateTime.of(2020, 1, 1, 0, 0));
+        assertThat(saved.getRiskLevel())
+            .as("riskLevel stays a real default: the form offers it, and ck_policy_exc_risk already "
+                + "narrows it, so it is data entry rather than a decision")
+            .isEqualTo("MEDIUM");
     }
 
     private static Control ctl(Long id, String code, String nameEn, String nameAr, String framework) {

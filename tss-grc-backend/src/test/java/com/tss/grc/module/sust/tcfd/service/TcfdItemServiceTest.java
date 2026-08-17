@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -170,6 +171,93 @@ class TcfdItemServiceTest {
         TcfdItem after = service.linkClimateRisk(9L, null);
 
         assertThat(after.getRelatedClimateRiskId()).isNull();   // link cleared, no validation lookup
+    }
+
+    // ── F2-231 — the review clock, and who is allowed to claim one ───
+
+    /**
+     * A create must not claim a review date. All three guarded routes stamp {@code lastReviewedAt}
+     * from the server's own clock, so accepting it from the caller let a brand-new TCFD item arrive
+     * carrying the date an IFRS S2 / TCFD reader takes as "when this recommendation was last looked
+     * at". The mirror, {@code CmaDisclosureService#create}, has scrubbed it since SEC-ESG-003.
+     */
+    @Test
+    void create_refusesACallerSuppliedReviewDateAndApprovalTrio() {
+        TcfdItem req = item();
+        req.setId(null);
+        req.setEvidenceRef("EV-1");
+        req.setLastReviewedAt(LocalDateTime.of(2001, 1, 1, 0, 0));
+        req.setApprovalStatus("APPROVED");
+        req.setApprovedBy("Nobody Who Approved This");
+        req.setApprovedAt(LocalDateTime.of(2001, 1, 2, 0, 0));
+        when(repo.save(any(TcfdItem.class))).thenAnswer(i -> i.getArgument(0));
+
+        TcfdItem saved = service.create(req);
+
+        assertThat(saved.getLastReviewedAt())
+            .as("a create files an item nobody has reviewed yet")
+            .isNull();
+        assertThat(saved.getApprovalStatus()).isNull();
+        assertThat(saved.getApprovedBy()).isNull();
+        assertThat(saved.getApprovedAt()).isNull();
+    }
+
+    /**
+     * ⚠ An ECHO is not a review. Both ESG tabs send the current {@code disclosureStatus} back on
+     * every save — they have to, because the entity's field initialiser makes an omitted key
+     * indistinguishable from a real {@code UNDER_REVIEW} — so an unchanged value must leave the review
+     * clock and the audit action alone.
+     */
+    @Test
+    void update_echoingTheSameStatusIsNotAReview() {
+        TcfdItem cur = item();
+        cur.setEvidenceRef("EV-1");
+        cur.setLastReviewedAt(LocalDateTime.of(2026, 1, 1, 9, 0));
+        when(repo.findByIdAndOrganisationId(9L, ORG_ID)).thenReturn(Optional.of(cur));
+        when(repo.save(any(TcfdItem.class))).thenAnswer(i -> i.getArgument(0));
+
+        TcfdItem req = new TcfdItem();
+        req.setTitleEn("Resilience under climate scenarios (reworded)");
+        req.setDisclosureStatus("UNDER_REVIEW");          // the echo
+
+        TcfdItem saved = service.update(9L, req);
+
+        assertThat(saved.getLastReviewedAt())
+            .as("nothing was reviewed, so the clock must not move")
+            .isEqualTo(LocalDateTime.of(2026, 1, 1, 9, 0));
+        verify(audit).log(org.mockito.ArgumentMatchers.eq("UPDATE"),
+                          org.mockito.ArgumentMatchers.eq("TcfdItem"),
+                          org.mockito.ArgumentMatchers.any(),
+                          org.mockito.ArgumentMatchers.anyString());
+    }
+
+    /**
+     * ⚠⚠ A CHANGE is. {@code update} performing the classification change {@code transition} performs
+     * must do what {@code transition} does — stamp the review clock through the one shared writer and
+     * record a TRANSITION naming from and to. F2-188/F2-191: a duplicated transition agrees with the
+     * original on the row and differs on the parts nothing asserts.
+     */
+    @Test
+    void update_changingTheStatusStampsTheReviewClockAndLogsATransition() {
+        TcfdItem cur = item();
+        cur.setEvidenceRef("EV-1");
+        cur.setLastReviewedAt(LocalDateTime.of(2026, 1, 1, 9, 0));
+        when(repo.findByIdAndOrganisationId(9L, ORG_ID)).thenReturn(Optional.of(cur));
+        when(repo.save(any(TcfdItem.class))).thenAnswer(i -> i.getArgument(0));
+
+        TcfdItem req = new TcfdItem();
+        req.setDisclosureStatus("DISCLOSED");
+
+        TcfdItem saved = service.update(9L, req);
+
+        assertThat(saved.getDisclosureStatus()).isEqualTo("DISCLOSED");
+        assertThat(saved.getLastReviewedAt())
+            .as("the classification changed, so the review clock is the server's")
+            .isAfter(LocalDateTime.of(2026, 1, 1, 9, 0));
+        verify(audit).log(org.mockito.ArgumentMatchers.eq("TRANSITION"),
+                          org.mockito.ArgumentMatchers.eq("TcfdItem"),
+                          org.mockito.ArgumentMatchers.any(),
+                          org.mockito.ArgumentMatchers.contains("UNDER_REVIEW -> DISCLOSED"));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────

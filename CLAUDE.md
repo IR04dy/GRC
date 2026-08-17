@@ -1872,6 +1872,123 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A GATE'S HARD ZERO IS ONLY AS WIDE AS ITS PREDICATE, AND `isGuardedRoute` SAW 280 OF 409
+  SERVER-STAMPED FIELD PAIRS** (F2-231, measured 2026-08-17). `ServerStampedFieldContractTest`'s
+  `BASELINE_CONTRADICTED_SERVICES = 0` was green over the other **32%**. Two clauses were narrower than
+  their intent and **both fired on `PrivacyService`**, hiding all five of its guarded routes at once:
+  `if (isWritePath(name)) return false;` — and `isWritePath` matches `record`, so
+  **`recordSdaiaSubmission` never reached line two** although it refuses on the terminal ACKNOWLEDGED
+  state and stamps `sdaiaSubmittedAt`, the discharge of the PDPL Article 31 clock — and `refuses` named
+  two exception families **inline**, while `containBreach`/`closeBreach`/`startDsr`/`fulfilDsr`/
+  `rejectDsr` all throw `IllegalArgumentException` and `DpiaService#approve` refuses through a shared
+  `require(d, "IN_REVIEW")` helper. That second one is F2-182's rule ("a guard sits in at least four
+  places a setter-site regex cannot see", one of them a shared `validate()`) applied to **refusal**
+  detection rather than to setter detection. 🔑 **The name test was never load-bearing**: a create
+  cannot refuse on a state it has not loaded, so *loads a row AND refuses on that row's own state* is
+  the whole discriminator, and the name clause only ever removed transitions. Widened as a provable
+  **UNION** — replacing the predicate LOST 96 pairs, so 280 + 129 = 409 (F2-225: verify a widening by
+  what it ADDS, in both directions). **Before trusting a gate's zero, ask what its predicate resolves
+  and what it therefore cannot see** — F2-198's shape, eleventh instance, and the narrowing here is
+  neither a filename nor an allow-list but **a name test inside the predicate itself**.
+  ⚠⚠ **THE LIVE ONE: A POLICY WAIVER GRANTED BY THE ROUTE THAT FILES IT.**
+  `PolicyManagementService#createException` bound the entity and used **defaults, not guards** —
+  `if (body.getStatus() == null) body.setStatus("REQUESTED")` discards nothing (F2-218's headline).
+  Probed live as `auditor`, who holds `COMPLIANCE:WRITE`, **the same permission `/transition` carries**,
+  so no escalation: the state machine was the only control and the create sat beside it without one.
+  `POST /api/policy/exceptions` answered **200** storing `status=APPROVED`, an invented approver AND
+  reviewer, backdated `reviewed_at`/`rejected_at`/`requested_at` and an invented `rejection_reason`, on
+  a **CRITICAL** exception — a formal acceptance of residual risk with compensating controls that never
+  passed review. **One CREATE audit row, no TRANSITION row**, so the trail an auditor reads had no
+  record of the approval, and `POLICY_EXCEPTION_APPROVED` — which the class's own comment calls the
+  legally significant trigger — never fired. 🔑 **`approvedAt` was already refused, because
+  `PolicyException` annotates that ONE field `@JsonProperty(READ_ONLY)` and not its five siblings** —
+  F2-215's two-of-three shape at **one of six**, in a service F2-219 had put in the gate's `CLOSED` set
+  **for the attestation register**. 🔑 **A service declared closed for one register it owns is not
+  closed for another.** Fixed with one rule: a create **files a request**, so `status` goes through
+  `ServerOwnedState.requireInitial` (sharing the constant the machine's root now reads), `requestedAt`
+  is the server's clock unconditionally, and every column the review/approval/rejection states produce
+  is cleared. `require` not `coerce` (F2-182): `ck_policy_exc_status` already refuses non-vocabulary
+  values and `PolicyManagementPage` sends `status: 'REQUESTED'` with no input for any stamp.
+  ⚠ **REFUTED — an IDENTITY read is not a STATE read.** `NdiImprovementPlanService#reorder` was
+  classified a guarded transition of `sequenceOrder` for doing `byId.put(r.getId(), r)` and
+  `if (r == null) throw`: an identity read and a **membership** refusal. It then renumbers from a
+  counter **without ever reading the previous value**, so F2-220's discriminator — *the value accepted
+  depends on the value already there* — is not satisfied, and `sequence_order` is display order (no
+  CHECK, 1–4 and 10–40 over 15 rows, dev = prod) which `addItem` openly defaults. Narrowed with
+  `IDENTITY_ACCESSORS`, asserted **both** ways: add one real state read and the same shape counts again.
+  ⚠⚠ **MY OWN FIX FELL INTO THE GATE'S OTHER BLIND SPOT, AND THE CLOSURE IT PRODUCED WAS FAKE.**
+  Extracting `markReviewed()` — the right design, one writer of the `(status, review-clock)` pair — took
+  the setter out of `update()`'s body, and `TcfdItemService#update` left the population **looking
+  closed**. 🔑 **To a setter-site scan, a refactor that RELOCATES a write is indistinguishable from a
+  fix that REMOVED it, and the population shrinks either way — the quiet direction.**
+  `writesFromRequest` now follows a one-hop private helper, keyed by the helper's declared parameter
+  types and only when the call passes something that reads the request.
+  ⚠⚠ **THE MIRROR OF THAT WIDENING WAS BUILT, MEASURED AND REJECTED, WHICH IS THE REUSABLE JUDGEMENT.**
+  Following helper **stamps** moved the unexplained population **11 → 15**; two narrowings brought it
+  back to 13 (a route may not be its own stamping route; **a helper the write path itself calls is not
+  a control it bypasses** — `applyRules` and `maybeAutoCapa` are invariants every route shares); and at
+  13 one net-new finding was **still a demonstrated false positive** — `ChangeManagementService#addLink`
+  reported as accepting `ChangeLink#changeRequestId`/`entityId`/`entityType`/`linkType`/`notes` *"stamped
+  by transition"*, the link's own data fields on the route whose purpose is to supply them. 🔑 **F2-214
+  settles it: a gate that fails on correct code is worse than no gate**, and raising a decrease-only
+  ceiling to accommodate noise is house rule 3's own warning. So the write half ships and the stamp half
+  is an **asserted, measured blind spot** carrying its numbers, a demonstrating corpus and one unread
+  lead (`CommitteeResolutionService#create` :: `voteFor`/`voteAgainst`/`voteAbstain`). Its consequence is
+  the sharper half: a service that extracts its stamping into a helper drops out of the population
+  **entirely** — not one field — because `measure()` skips a source whose stamped map is empty.
+  ⚠⚠ **A PER-SERVICE VERDICT CANNOT EXPRESS A PER-FIELD FINDING.** `TcfdItemService` is closed for
+  everything except one genuinely-by-design field, and the service-keyed `BY_DESIGN` map forced a false
+  choice: drop the whole service out of the hard zero, or refuse a correct design. Re-keyed to
+  `Service::Type#field` — **F2-185b's headline one level up, the granularity of the verdict has to match
+  the granularity of the finding** — which also stops a service already carrying an exemption from
+  hiding a NEW contradiction on a different field of the same type.
+  ⚠ **BY DESIGN, mechanically rather than by taste, and the defect was hiding inside it.** `TcfdItem`
+  declares `= "UNDER_REVIEW"` as a **field initialiser**, so an omitted key deserialises to that value
+  and a null-guarded whitelist cannot tell absence from a real UNDER_REVIEW — which is why both ESG tabs
+  echo the status back, in a comment saying exactly that, and why refusing the field would silently
+  downgrade every reviewer's classification. But `update` performed the same classification change
+  `transition` performs while leaving `last_reviewed_at` stale and writing a generic *"updated"* audit
+  row (F2-188/F2-191: a duplicated transition agrees on the row and differs on the parts nothing
+  asserts). Both routes now go through one `markReviewed()`: `transition` unconditionally (an explicit
+  re-mark IS a review), `update` only when the value differs. 🔑 **An echo is not a review; a change
+  is.** Fixed identically in `CmaDisclosureService`, the service TCFD's own javadoc says it mirrors.
+  ⚠ **And the create's other field had its correct twin in the sibling file all along**: all three
+  guarded routes stamp `lastReviewedAt` from the server's clock, so the create accepting it let a
+  brand-new item claim the date an IFRS S2 reader takes as *when this was last looked at* (16 of 85
+  rows, dev = prod) — while `CmaDisclosureService#create` has scrubbed exactly that under an
+  SEC-ESG-003 comment since it was written. Fourth instance in this lineage of the correct artefact
+  sitting beside the wrong one.
+  ⚠ **A finding found by READING must not be reported as a gate catch.** `PrivacyService#createBreach`/
+  `#createDsr` left `sdaiaSubmittedAt`, `sdaiaSubmissionRef`, `pdpcNotifiedAt` and `completedAt`
+  caller-writable — the exact fields F2-209 and F2-213 wrote comments to protect on the **updates two
+  lines below** — and the pre-fix control established that `PrivacyService` does not appear in the gate's
+  output either way. All four are 0 non-null in dev and prod and none is client-declarable, so clearing
+  them cannot break a working request. 🔑 **Attributing it to the widened gate would have been a better
+  story and a false one.**
+  ⚙ **The mutation harness predicted a gap and then proved it.** 14 killed / 3 survived / 0
+  anchor-miss: one **equivalent** (a compile-time-constant `case` label IS the literal), one **invalid**
+  (weakening an assertion always passes — F2-206), and one real — reverting the CMA half **survived**
+  because only the TCFD half had behaviour tests. 🔑 **Fixing two services and testing one leaves the
+  untested one free to drift back, which is how the mirrored pair diverged in the first place.** Closed
+  with two CMA tests. ⚠ Two harness bugs of mine, both loud: `shell=True` on Windows is cmd.exe, where
+  a bash-style `VAR='x' mvn …` prefix is a syntax error and the run prints **nothing** (the baseline
+  check read that as red), and `| grep` has no cmd.exe equivalent — filter in Python.
+  ⚠⚠ **THE HEREDOC LANDMINE FIRED THREE TIMES IN ONE SLICE, INCLUDING INTO A JAVA FILE.** `<<'PYEOF'`
+  and `<<'JAVA'` — **quoted** delimiters — still collapsed `\\s` → `\s`, `\\b` → `\b` and `\\n` → a
+  literal newline inside the payload. Two were loud (a javac error, a Python `SyntaxError`); the
+  dangerous mode is the silent one this file already records, where a regex quietly stops matching.
+  **The rule extends past shell scripts to any file content with escapes: use the Write/Edit tools.**
+  ⚙ **Filed:** the **11-service work list** with per-site evidence in
+  `target/server-stamped-fields.txt` and deliberately **no verdicts** (F2-188); the helper-stamp blind
+  spot; **`privacy.data_subject_requests.due_date`, where the PDPL Article 4 statutory deadline is
+  client-declarable and nothing refuses it** (only the server may issue a statutory deadline — F2-202 —
+  but `DsrRequestLifecycle` declares only a terminal set, so `requireInitial` has no initial state to
+  enforce and the fix needs a product decision about back-dated imports first); `status` on both privacy
+  registers (**no CHECK, no declared machine**, so there is nothing for a create to be held to —
+  F2-221's shape); `sust.cma_disclosure.clause` holding two disjoint notation schemes plus the literal
+  `'None'` on 10 rows; `consumer.complaint.complaint_no` never restarting its sequence per year; and the
+  remaining **45** `MassAssignmentRatchetTest` NEEDS-VERDICT rows.
+
 - ⚠⚠ **GRADING IS ONLY ONE WAY TO BE ORDERED, AND A POPULATION KEYED ON A COLUMN'S NAME
   MEASURES THE NAMES ITS AUTHOR LISTED** (F2-230, measured 2026-08-17). Executing F2-229's filed
   six-entry graded-String work list, the population was re-derived first (F2-221) — and re-derived

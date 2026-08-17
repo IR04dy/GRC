@@ -66,6 +66,28 @@ public class TcfdItemService {
         req.setOrganisationId(org());
         if (req.getDisclosureStatus() == null || req.getDisclosureStatus().isBlank())
             req.setDisclosureStatus("UNDER_REVIEW");
+        // F2-231 — the mass-assignment scrub CmaDisclosureService#create has carried since SEC-ESG-003
+        // and this MIRROR did not. lastReviewedAt is stamped from the server's own clock by all three
+        // guarded routes (transition, recordGap, attachEvidence), so a create accepting it lets a
+        // caller claim a review date for an item nobody has reviewed — the evidence an IFRS S2 / TCFD
+        // reader takes as the date this recommendation was last looked at. Populated on 16 of 85 rows,
+        // dev = prod. 🔑 This class's own javadoc says it mirrors CmaDisclosureService; the correct
+        // artefact was in the sibling file the whole time (F2-209/F2-213/F2-214's recurring shape).
+        //
+        // The approval trio is already refused at the wire (TcfdItem marks all three READ_ONLY since
+        // F2-219). Scrubbed here as well, exactly as the mirror does, so the protection does not
+        // depend on which fields somebody remembered to annotate — F2-219 found this entity with two
+        // of the three marked and the sibling forgotten.
+        //
+        // ⚙ disclosureStatus is deliberately NOT refused: see the BY_DESIGN note in
+        // ServerStampedFieldContractTest. The entity declares `= "UNDER_REVIEW"` as a field
+        // initialiser, so an omitted key deserialises to that value and update()'s null-guard cannot
+        // tell absence from a real UNDER_REVIEW — which is why both ESG tabs echo the current status
+        // back, in a comment that says so. Refusing it would break the working edit form.
+        req.setLastReviewedAt(null);
+        req.setApprovalStatus(null);
+        req.setApprovedBy(null);
+        req.setApprovedAt(null);
         validate(req);
         validateClimateRiskRef(req.getRelatedClimateRiskId());   // S-F: no dangling climate-risk link
         applyRules(req);
@@ -80,6 +102,7 @@ public class TcfdItemService {
     public TcfdItem update(Long id, TcfdItem req) {
         TcfdItem cur = get(id);
         assertNotApproved(cur);
+        String priorStatus = cur.getDisclosureStatus();
         if (req.getTitleEn() != null)              cur.setTitleEn(req.getTitleEn());
         if (req.getTitleAr() != null)              cur.setTitleAr(req.getTitleAr());
         if (req.getRecommendationEn() != null)     cur.setRecommendationEn(req.getRecommendationEn());
@@ -95,14 +118,38 @@ public class TcfdItemService {
         if (req.getOwnerEmail() != null)           cur.setOwnerEmail(req.getOwnerEmail());
         if (req.getReviewerName() != null)         cur.setReviewerName(req.getReviewerName());
         if (req.getNotes() != null)                cur.setNotes(req.getNotes());
-        if (req.getDisclosureStatus() != null)     cur.setDisclosureStatus(req.getDisclosureStatus());
+        // F2-231 — an ECHO is not a review, and a CHANGE is. The ESG tab sends the current status
+        // back on every save (it has to: the entity's field initialiser makes an omitted key
+        // indistinguishable from a real UNDER_REVIEW), so this route legitimately accepts the field.
+        // What it must not do is perform the same classification change transition() performs while
+        // leaving the review clock stale and writing only a generic "updated" audit row —
+        // F2-188/F2-191's shape: a duplicated transition agrees with the original on the row and
+        // differs on the parts nothing asserts.
+        boolean statusChanged = req.getDisclosureStatus() != null
+            && !req.getDisclosureStatus().equals(priorStatus);
+        if (statusChanged) markReviewed(cur, req.getDisclosureStatus());
         validate(cur);
         applyRules(cur);
         TcfdItem saved = repo.save(cur);
-        audit.log("UPDATE", "TcfdItem", saved.getId(),
-                "TCFD item updated");
+        audit.log(statusChanged ? "TRANSITION" : "UPDATE", "TcfdItem", saved.getId(),
+                statusChanged ? "TCFD item " + priorStatus + " -> " + saved.getDisclosureStatus()
+                              : "TCFD item updated");
         maybeAutoCapa(saved);
         return saved;
+    }
+
+    /**
+     * F2-231 — the one writer of the {@code (disclosure_status, last_reviewed_at)} pair.
+     *
+     * <p>Both routes that change a classification go through here, so the review stamp cannot be
+     * attached by one and forgotten by the other. {@link #transition} calls it unconditionally —
+     * an explicit re-mark IS a review, even to the same value — while {@link #update} calls it only
+     * when the incoming value differs from the stored one, because the edit form echoes the current
+     * status back and echoing is not reviewing (F2-190: one predicate, not a second opinion).
+     */
+    private void markReviewed(TcfdItem cur, String to) {
+        cur.setDisclosureStatus(to);
+        cur.setLastReviewedAt(LocalDateTime.now());
     }
 
     @Transactional
@@ -111,8 +158,7 @@ public class TcfdItemService {
         assertNotApproved(cur);
         if (!STATUSES.contains(to))
             throw new IllegalArgumentException("Unknown disclosure_status: " + to);
-        cur.setDisclosureStatus(to);
-        cur.setLastReviewedAt(LocalDateTime.now());
+        markReviewed(cur, to);
         applyRules(cur);
         TcfdItem saved = repo.save(cur);
         audit.log("TRANSITION", "TcfdItem", saved.getId(),

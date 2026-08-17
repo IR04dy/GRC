@@ -64,6 +64,16 @@ public class PolicyManagementService {
     private static final String ATTESTATION_INITIAL_STATUS = "PENDING";
 
     /**
+     * F2-231 — the one state a policy exception may be CREATED in, and the root of
+     * {@link #transitionException}'s machine, read from here so the two cannot drift (F2-218).
+     *
+     * <p>{@code createException} files a REQUEST. Every other member of
+     * {@link #EXCEPTION_STATUSES} is the outcome of a route that checks the current state, records
+     * the acting principal and emits the trigger an approved waiver needs — or of the expiry sweep.
+     */
+    private static final String EXCEPTION_INITIAL_STATUS = "REQUESTED";
+
+    /**
      * F2-222 — the statuses from which {@link #transition} can still reach {@code APPROVED}, and
      * therefore the only ones in which the approval attribution has not yet been stamped.
      *
@@ -740,9 +750,41 @@ public class PolicyManagementService {
         if (body.getJustificationEn() == null) throw new IllegalArgumentException("justificationEn is required");
         body.setId(null);
         body.setOrganisationId(org());
-        if (body.getStatus() == null)    body.setStatus("REQUESTED");
+        // F2-231 — a create FILES A REQUEST, so every column the review / approval / rejection
+        // states produce belongs to transitionException() and to nothing else. Two lines above this
+        // were `if (status == null) setStatus("REQUESTED")` and `if (requestedAt == null) …now()` —
+        // ⚠ DEFAULTS, NOT GUARDS (F2-218's headline): they discard nothing the caller sent.
+        //
+        // Probed live as `auditor` (holds COMPLIANCE:WRITE — the SAME permission /transition
+        // carries, so this is not an escalation; the state machine was the only control and the
+        // create sat beside it without one). POST /api/policy/exceptions answered 200 and stored:
+        // status=APPROVED, approver_name="Nobody Who Approved This",
+        // reviewer_name="Nobody Who Reviewed This", a 2001 reviewed_at / rejected_at / requested_at
+        // and an invented rejection_reason — i.e. a formal acceptance of residual risk with
+        // compensating controls and an expiry, on a CRITICAL exception, that never passed review.
+        // The audit ledger held ONE CREATE row and no TRANSITION row, so the trail an auditor reads
+        // has no record of the approval at all, and the POLICY_EXCEPTION_APPROVED trigger — which
+        // this class's own comment calls "the legally significant one" — never fired.
+        //
+        // 🔑 approvedAt was ALREADY refused, because PolicyException annotates that ONE field
+        // @JsonProperty(READ_ONLY) and not its five siblings. Its refusal in the same probe is the
+        // discriminator: the wire mechanism works, and the omission is F2-215's two-of-three shape
+        // (one of six here) in a service F2-219 had put in ServerStampedFieldContractTest's CLOSED
+        // set — for the ATTESTATION register. A service declared closed for one register it owns is
+        // not closed for another.
+        body.setStatus(ServerOwnedState.requireInitial(
+            body.getStatus(), EXCEPTION_INITIAL_STATUS, "a policy exception",
+            "POST /api/policy/exceptions/{id}/transition"));
         if (body.getRiskLevel() == null) body.setRiskLevel("MEDIUM");
-        if (body.getRequestedAt() == null) body.setRequestedAt(LocalDateTime.now());
+        // The request happened NOW. Left as a default, a caller could backdate the request a waiver
+        // is measured from (F2-223: the server owns WHEN, or it owns nothing about this act).
+        body.setRequestedAt(LocalDateTime.now());
+        body.setReviewerName(null);
+        body.setReviewedAt(null);
+        body.setApproverName(null);
+        body.setApprovedAt(null);
+        body.setRejectedAt(null);
+        body.setRejectionReason(null);
         PolicyException saved = exceptions.save(body);
         audit.log("CREATE", "PolicyException", saved.getId(),
             "Policy exception requested on policy " + saved.getPolicyId() + " (risk " + nullSafe(saved.getRiskLevel()) + ")");
@@ -774,7 +816,9 @@ public class PolicyManagementService {
         PolicyException e = getException(id);
         String from = e.getStatus();
         boolean ok = switch (from) {
-            case "REQUESTED"    -> "UNDER_REVIEW".equals(to) || "REJECTED".equals(to);
+            // F2-231 — the same constant the create's guard uses, so the state the server files an
+            // exception in and the state this machine starts from are one value.
+            case EXCEPTION_INITIAL_STATUS -> "UNDER_REVIEW".equals(to) || "REJECTED".equals(to);
             case "UNDER_REVIEW" -> "APPROVED".equals(to) || "REJECTED".equals(to) || "REQUESTED".equals(to);
             case "APPROVED"     -> "EXPIRED".equals(to) || "REVOKED".equals(to);
             default             -> false;
