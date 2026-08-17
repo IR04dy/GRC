@@ -65,7 +65,11 @@ class ClosedVocabularyPinTest {
         // F2-183 — the `consumer` schema's first constraints of any kind. Listed here for the reason
         // the javadoc above gives: without them this test passes over V375 whether it read it or not.
         "CK_complaint_channel", "CK_complaint_category", "CK_complaint_severity",
-        "CK_complaint_status", "CK_complaint_id_type", "CK_cmpl_update_type");
+        "CK_complaint_status", "CK_complaint_id_type", "CK_cmpl_update_type",
+        // F2-229 — V377, the fourth-party register's first constraints of any kind. Listed for the
+        // same reason: without them this test passes over V377 whether it read it or not.
+        "CK_fpe_concentration_risk", "CK_fpe_downstream_criticality",
+        "CK_fpe_dependency_type", "CK_fpe_status");
 
     @Test
     @DisplayName("every declared vocabulary matches the CHECK constraint it names")

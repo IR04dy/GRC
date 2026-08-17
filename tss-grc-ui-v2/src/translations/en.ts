@@ -5799,7 +5799,7 @@ export const en = {
   f4pPageSub:           'Map vendors-of-vendors and detect concentration risk where one fourth party sits behind multiple primaries.',
   f4pKpiTotal:          'Edges mapped',
   f4pKpiValidated:      'Validated',
-  f4pKpiHighConc:       'High concentration',
+  f4pKpiHighConc:       'Concentration ≥ high',
   f4pKpiCritical:       'Critical downstream',
   f4pTabAll:            'All',
   f4pTabDiscovered:     'Discovered',
