@@ -1846,7 +1846,7 @@ public class ChangeManagementService {
     @Transactional(readOnly = true)
     public List<ChangeAuthorisationMatrix> authorisationMatrix() {
         if (authMatrixRepo == null) return List.of();
-        return authMatrixRepo.findByOrganisationIdOrderByChangeTypeAscRiskLevelAsc(TenantContext.getCurrentTenant());
+        return authMatrixRepo.findMatrixRanked(TenantContext.getCurrentTenant());
     }
 
     /** CH-17: the authorisation required for a specific change (gate / min

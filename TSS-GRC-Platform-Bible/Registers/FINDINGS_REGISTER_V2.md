@@ -2400,6 +2400,194 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-230 · Grading is only one way to be ordered, and a lexical sort ranks neither
+
+| | |
+|---|---|
+| **ID** | F2-230 |
+| **Title** | An ORDERED vocabulary ranked by an alphabetical sort — four registers, and the population was keyed on a NAME |
+| **Severity** | P2 |
+| **Status** | 🟢 CLOSED 2026-08-17 |
+| **Programme** | Platform Bible F2 · reliability / correctness |
+| **Modules** | `tprm/cyber`, `admin/committee`, `ndi/gap`, `change_mgmt`, `scm/fourthparty`, `common/validation` |
+
+### What was measured
+
+Executing F2-229's filed six-entry graded-String work list, the population was **re-derived first**
+(F2-221) — and re-derived from the values the columns actually *store* rather than from the words in
+their names, because a graded-name locator is the instrument class F2-217 proved measures its own
+author's vocabulary.
+
+```
+483  columns are sorted by some repository query (853 ORDER BY terms across 429 repositories)
+118  of those are String-typed
+ 57  hold a closed vocabulary (<= 12 distinct UPPER_SNAKE values in the live database)
+  6  of the 57 are ORDERED — a ladder. The other 51 are CATEGORICAL.
+```
+
+Four other shapes were checked and are **absent**: `MAX()`/`MIN()` over a graded column (0),
+`>`/`<`/`>=`/`BETWEEN` against a graded token (0), `Sort.by(<graded>)` at a call site (0), and Java
+`compareTo`/`Comparator.comparing` on a graded getter (2, both on a numeric `riskScore`). The four
+frontend `.sort` sites on graded fields already used explicit rank maps. **That is a result, not a
+dead end** (F2-216): the family really does live in `ORDER BY`.
+
+### The four defects, adjudicated
+
+| Column | Verdict |
+|---|---|
+| `tprm.third_party_cyber_assessments.residual_risk_tier` | **CLOSED** — five-rung ladder, DESC ranked MODERATE > LOW > HIGH > ELEVATED > CRITICAL |
+| `admin.committee_member_skills.skill_level` | **CLOSED** — DESC ranked INTERMEDIATE above EXPERT on the CMA Article 54 query |
+| `ndi.gap.severity` | **CLOSED** — ASC is right on the top two rungs and transposes MEDIUM and LOW |
+| `change_mgmt.change_authorisation_matrix.risk_level` | **CLOSED** — presentation: the grid could not be read as an escalation |
+| `ai_governance.ml_model.risk_tier` | **REFUTED**, and the refutation is now *checked* rather than argued |
+| `bcm.mtpd_inheritance_finding.severity` | **REFUTED** — an in-memory `severityRank` overrides the DB order |
+
+**2 of 6 refuted, in opposite directions** — the same ~2-in-10 rate F2-188, F2-192, F2-204, F2-211
+and F2-228 each measured in their predecessor's claims.
+
+#### The sharpest: a paged register that put its most exposed vendor last
+
+`ThirdPartyCyberAssessmentService.recompute` derives a **five**-rung ladder
+(`LOW < MODERATE < ELEVATED < HIGH < CRITICAL`) that existed **only as an inline ternary chain**. The
+register's default ordering was the derived method
+`findByOrganisationIdOrderByResidualRiskTierDescIdDesc` — a lexical sort of an NVARCHAR column
+presented as a severity ranking. Descending alphabetically those five read
+**MODERATE > LOW > HIGH > ELEVATED > CRITICAL**, so **CRITICAL sorted last and LOW sorted second**.
+
+Measured 2026-08-17, byte-identical in dev and prod: 16 rows holding LOW 7 / MODERATE 7 / ELEVATED 2,
+and `ORDER BY residual_risk_tier DESC` returned six MODERATE rows before either ELEVATED one. The
+endpoint is **paged**, so on a larger tenant the most exposed third parties are not merely
+mis-ordered — they are on a page nobody opens. There is an index on
+`(organisation_id, residual_risk_tier)` from V53, which is what made the wrong ordering fast: **a
+lexical sort backed by a covering index reads like a considered decision.**
+
+The vocabulary was declared nowhere server-side: no CHECK, an entity carrying only a `"MODERATE"`
+default, and the service's own `INHERENT` set is a *different* four-token risk vocabulary on the same
+entity overlapping this one only at LOW. 🔑 **The frontend had it right all along** —
+`TpcResidual` declares all five rungs in order with a complete tone map. The half that was wrong is
+the half that decides what an operator sees first (F2-205: when two copies disagree, ask which is the
+server).
+
+#### The governance one: an alphabetical sort answering a CMA Article 54 question
+
+`CommitteeMemberSkillRepository#findByDimension` ended `ORDER BY s.skillLevel DESC` over
+`BASIC | INTERMEDIATE | EXPERT`, whose alphabetical descent reads **INTERMEDIATE, EXPERT, BASIC**. Its
+own javadoc says what it is for: *"Used to answer 'does this committee have a financial expert?' (CMA
+Article 54, SAMA RGov 5.3.2)"*. Probed live in dev and prod: the query returned six INTERMEDIATE
+members and the **single EXPERT last of seven**.
+
+That javadoc also described a filter that does not exist — it claimed to return members "at a given
+level or above" and the method takes no level parameter of any kind (F2-184's shape). The **ordering**
+is fixed; the missing threshold is **not added**, because no caller asks for one and inventing a
+capability to make a comment true is the wrong direction. The comment is corrected instead.
+
+⚠ Blast radius stated honestly: no frontend client calls that endpoint, so today the wrong order
+reaches API callers rather than the skills-matrix screen. **A fact about today, not a property of the
+control** (F2-182).
+
+### The reusable lesson
+
+🔑 **The property that decides whether a lexical sort is a defect is whether the vocabulary is
+ORDERED — and grading is only ONE way to be ordered.** Measuring from stored values rather than from
+names surfaced two ordered vocabularies whose names sound like nothing of the kind:
+
+- `consumer.complaint_aggregate_report.report_period` holds `Q4-2025`, and a lexical sort of
+  `Q<n>-<year>` orders by **QUARTER before YEAR** — so `'Q4-2025' > 'Q1-2026'` and the most recent
+  SAMA quarterly complaints return is not first. Latent (1 row each). The column is `@NotBlank` free
+  text with **no format contract**, so a fix has to settle a format first — **FILED**.
+- `tprm.questionnaire_templates.version` sorted lexically would put `'10.0'` before `'9.0'`. Latent
+  (only `'1.0'` stored) — **FILED**.
+
+**Time and version are ordered too.** F2-229's name-keyed locator could not see either by
+construction.
+
+### What shipped
+
+- **`common/validation/OrderedVocabulary`** — a `ClosedVocabulary` plus an order: `rank`, `outranks`,
+  `atLeast`, `bottom`, `top`, and `isAlphabetical()`, which exists so an accidentally-correct sort is
+  *expressible* rather than argued about in a comment. `ConcentrationTier` (F2-229) now delegates to
+  it rather than being a second mechanism (F2-190).
+- Four declared ladders — `ResidualRiskTier`, `SkillLevel`, `NdiGapSeverity`, `ChangeRiskLevel` — plus
+  `FourthPartyExposureService.DOWNSTREAM_CRITICALITY_LADDER` (see the instrument note below).
+- Six repository queries re-ranked with an explicit `CASE` ladder. `recompute` now **indexes** the
+  ladder via declared score bands instead of naming the five rungs in a ternary, with a static check
+  that the bands divide the ladder exactly.
+- **`OrderedVocabularySortContractTest`** — the invariant (no declared ladder is sorted lexically
+  unless the sort is *provably* safe) plus the census (every CHECK-constrained column still sorted
+  lexically, exactly asserted, **no verdicts**, because a hard zero over 57 would fail on correct
+  code — F2-214).
+- **V378** — the register's first three CHECK constraints, scoped to the writers this same commit
+  closed (F2-183), measured clean in both databases first, applied twice to dev.
+- The create no longer *defaults* its status but **forces** the initial state — F2-220's shape,
+  tenth instance. `if (status == null) status = "DRAFT"` is a default, not a guard, so a caller could
+  create an assessment already APPROVED and skip `submit()`/`approve()`, the only writers of
+  `assessedAt`, `approvedAt` and `approverName`.
+- Frontend: `TPC_RESIDUAL_LADDER` + `isResidualAtLeast`, replacing **six** separately-spelled readers.
+
+### The instrument findings
+
+⚠⚠ **Introducing a wrapper type around a value an instrument discovers by exact type silently removes
+it from that instrument's population.** `ClosedVocabularyPinTest` narrows on the source string
+`ClosedVocabulary.of(` and reflects on `ClosedVocabulary.class.equals(f.getType())` — so all four new
+ladders would have been invisible **twice over**. Fixed in the same commit, and their constraint names
+are in `MUST_BE_FOUND` precisely so the widening cannot quietly un-widen. Tenth instance of F2-198's
+shape after a filename, a three-entry allow-list, a module name, a controller-bearing table, an
+`extends` clause, a field-name list inside a fix, a name list in a census and a claim shape in a gate.
+
+⚠⚠ **My own anti-vacuity floor found a real hole by being wrong.** I set the CASE-ladder floor to 8
+and the parse found 7 — because F2-229 wrote a `CASE` ladder for
+`scm.fourth_party_exposures.downstream_criticality` into the register's `@Query` and **declared no
+ladder for it**, so the SQL held an order nothing in Java could contradict. 🔑 **A ranking written
+only in SQL is still a second copy of a vocabulary's order; it just has nothing to disagree with.**
+
+⚠ **One of my gate's own assertions was wrong and the gate was right.** I asserted that widening
+`IN ('CRITICAL','HIGH')` to include MEDIUM would break the safety proof; it does not —
+alphabetically CRITICAL, HIGH, MEDIUM has ranks 3, 2, 1, which is monotone, so that subset is
+genuinely safe. LOW is the token that breaks it. F2-206's rule (a surviving mutant is a hole only if
+the mutated code is actually wrong) applied to an assertion rather than a mutation.
+
+### Verification
+
+- Backend suite (hermetic, `mvn -o clean package`) — see the plan row for the count.
+- Frontend `npx tsc --noEmit` clean, `npx vitest run` **771/771**.
+- **Pre-fix control: 13 of 13 detectors fire on `master` and are clean on the fixed tree.** Two
+  harness bugs of my own on the way there, both loud: reading the "after" side as `git show HEAD:`
+  compared master with itself while the fix was uncommitted (F2-229 recorded this exact misuse), and
+  five detectors reported STILL THERE because **my own comments quote the shapes they retired** —
+  F2-193's rule, so the harness strips comments, except for the one detector whose *claim is about a
+  comment*, which uses `unquoted()` instead.
+- **Live probe 33/33** against the running dev stack: the register leads with both ELEVATED rows where
+  the lexical sort led with MODERATE; the CMA Article 54 query leads with the EXPERT; the NDI register
+  no longer transposes MEDIUM and LOW; the matrix rises within each change type; a create naming
+  APPROVED or RETIRED is refused **400** while one naming nothing returns **201 / DRAFT**; all three
+  V378 constraints refuse an out-of-vocabulary value; and the 16 seeded rows are byte-identical
+  afterwards.
+- ⚠ Two probe bugs, both mine: the route was **guessed** (`/api/v1/tprm/...`; it is
+  `/api/tprm/cyber-assessments`, no `v1` — recurring since F2-198), and the constraint checks targeted
+  `WHERE id = (SELECT MIN(id) … tagged)` with no tagged row planted, so `WHERE id = NULL` matched zero
+  rows and every UPDATE "succeeded". 🔑 **An operation that touches nothing looks exactly like an
+  operation that was allowed** — the section now plants its own victim (F2-206) and asserts the row
+  count with a legal value first.
+
+### Filed
+
+- **10 of 16 rows' stored `residual_risk_tier` is LOWER than the service's own derivation from the
+  `risk_score` stored beside it; 0 are higher. Identical in dev and prod.** Found in the browser after
+  every gate was green — **seventh consecutive slice**. The sharpest is `TPC-GOV-001`, score **90.00**
+  of 100 (higher = worse) recorded as **LOW** residual risk, and `TPC-GOV-003` at 88 likewise; the
+  register renders both figures on the same row, so it contradicts itself in one line (F2-203's
+  shape). `recompute` runs only on create and `recordPosture`, so these seed-written rows have never
+  been through the derivation — and the first operator to record posture on TPC-GOV-001 will watch it
+  jump LOW → CRITICAL. Uniformly **flattering**, the direction F2-196 warned not to assume. Re-deriving
+  rewrites 10 live rows in two real databases: **an owner decision** (F2-183/F2-196), not a side
+  effect of an ordering fix.
+- The two ordered-but-not-graded members above (`report_period`, `version`).
+- The **51 categorical** lexically-sorted vocabularies: no defect unless a reader finds one of them
+  ordered, which is a question this gate deliberately does not answer.
+- F2-221's **201** state-ish columns with no CHECK, which no leg of this gate can see.
+
+---
+
 ## F2-229 · A derived value narrower than its own column destroys what it cannot express
 
 **Found** 2026-08-17, executing F2-228's filed concentration-recompute defect. **P2** — every write

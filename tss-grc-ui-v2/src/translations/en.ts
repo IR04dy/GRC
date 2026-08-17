@@ -5930,7 +5930,7 @@ export const en = {
   tpcPageTitle:      'Third-party cyber risk',
   tpcPageSub:        'Cyber-specific risk assessment of every third party — certifications, external posture, breach history, derived residual tier.',
   tpcKpiApproved:    'Approved',
-  tpcKpiHigh:        'High residual',
+  tpcKpiHigh:        'Residual ≥ elevated',
   tpcKpiCritical:    'Critical residual',
   tpcKpiReview:      'In review / draft',
   tpcTabAll:         'All',

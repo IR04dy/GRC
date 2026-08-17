@@ -45,7 +45,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ClosedVocabularyPinTest {
 
     private static final Path MAIN_SOURCES = Path.of("src/main/java");
-    private static final String DECLARATION = "ClosedVocabulary.of(";
+
+    /**
+     * The declaration forms this scan narrows on.
+     *
+     * <p>⚠⚠ <b>{@code OrderedVocabulary.of(} is the second entry and F2-230 nearly shipped without
+     * it.</b> That class wraps a {@code ClosedVocabulary} in a private field, so the four ladders it
+     * introduced would have been invisible to this test <b>twice over</b>: their source files do not
+     * contain the string {@code ClosedVocabulary.of(}, and their public constant's type is not
+     * {@code ClosedVocabulary.class}, which the reflection below matched by exact type.
+     *
+     * <p>🔑 <b>Introducing a wrapper type around a value an instrument discovers by exact type
+     * silently removes it from that instrument's population</b> — and a shrunken population reads
+     * exactly like a clean tree. Same shape as every entry in F2-198's lineage (a filename, an
+     * allow-list, a module name, an {@code extends} clause, a field-name list): the invariant is real,
+     * the POPULATION is the narrowing nobody re-checks. The four new constraint names are in
+     * {@link #MUST_BE_FOUND} precisely so this cannot happen quietly next time.
+     */
+    private static final List<String> DECLARATIONS =
+        List.of("ClosedVocabulary.of(", "OrderedVocabulary.of(");
 
     /**
      * The vocabularies expected to exist, so a regex that stops matching fails loudly rather than
@@ -69,7 +87,12 @@ class ClosedVocabularyPinTest {
         // F2-229 — V377, the fourth-party register's first constraints of any kind. Listed for the
         // same reason: without them this test passes over V377 whether it read it or not.
         "CK_fpe_concentration_risk", "CK_fpe_downstream_criticality",
-        "CK_fpe_dependency_type", "CK_fpe_status");
+        "CK_fpe_dependency_type", "CK_fpe_status",
+        // F2-230 — the four ORDERED vocabularies. Listed here for a sharper reason than the others:
+        // they are declared through OrderedVocabulary, a wrapper this scan could not see until the
+        // same commit taught it to, so without these names the widening could silently un-widen.
+        "CK_tpc_residual_risk_tier", "CK_tpc_status", "CK_tpc_inherent_cyber_risk",
+        "CK_member_skill_level", "ck_ndi_gap_sev", "CK_cam_risk");
 
     @Test
     @DisplayName("every declared vocabulary matches the CHECK constraint it names")
@@ -145,12 +168,18 @@ class ClosedVocabularyPinTest {
         Map<String, ClosedVocabulary> out = new LinkedHashMap<>();
         for (Class<?> c : candidateClasses()) {
             for (Field f : c.getDeclaredFields()) {
-                if (!Modifier.isStatic(f.getModifiers())
-                    || !ClosedVocabulary.class.equals(f.getType())) {
-                    continue;
-                }
+                if (!Modifier.isStatic(f.getModifiers())) continue;
+                boolean plain   = ClosedVocabulary.class.equals(f.getType());
+                boolean ordered = OrderedVocabulary.class.equals(f.getType());
+                if (!plain && !ordered) continue;
                 f.setAccessible(true);
-                ClosedVocabulary v = (ClosedVocabulary) f.get(null);
+                Object raw = f.get(null);
+                if (raw == null) continue;
+                // An OrderedVocabulary IS a ClosedVocabulary plus an order; unwrapping keeps one
+                // population rather than two instruments answering the same question (F2-190).
+                ClosedVocabulary v = plain
+                    ? (ClosedVocabulary) raw
+                    : ((OrderedVocabulary) raw).vocabulary();
                 ClosedVocabulary prior = out.put(v.constraint(), v);
                 // Two declarations of one constraint are allowed only if they agree; if they differ,
                 // one of them is already drifting and the pin below would report whichever won.
@@ -170,7 +199,8 @@ class ClosedVocabularyPinTest {
         Set<String> seen = new LinkedHashSet<>();
         try (Stream<Path> walk = Files.walk(MAIN_SOURCES)) {
             for (Path p : walk.filter(x -> x.getFileName().toString().endsWith(".java")).toList()) {
-                if (!Files.readString(p).contains(DECLARATION)) continue;
+                String src = Files.readString(p);
+                if (DECLARATIONS.stream().noneMatch(src::contains)) continue;
                 String name = MAIN_SOURCES.relativize(p).toString()
                     .replace('\\', '.').replace('/', '.').replaceAll("\\.java$", "");
                 if (!seen.add(name)) continue;

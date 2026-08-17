@@ -5872,7 +5872,7 @@ export const ar = {
   tpcPageTitle:      'مخاطر الطرف الثالث السيبرانية',
   tpcPageSub:        'تقييم سيبراني مخصّص لكل طرف ثالث — الشهادات، الوضع الخارجي، تاريخ الاختراقات، والمخاطر المتبقية المُشتقّة.',
   tpcKpiApproved:    'معتمد',
-  tpcKpiHigh:        'متبقي عالٍ',
+  tpcKpiHigh:        'متبقي ≥ مرتفع',
   tpcKpiCritical:    'متبقي حرج',
   tpcKpiReview:      'قيد المراجعة',
   tpcTabAll:         'الكل',

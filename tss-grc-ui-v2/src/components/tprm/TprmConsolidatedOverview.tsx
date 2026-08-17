@@ -9,7 +9,7 @@ import { Kpi } from '../ui/Kpi';
 import { Badge } from '../ui/Badge';
 import { useI18n } from '../../lib/i18n';
 import { listFourthParty, isConcentrationAtLeast, type FourthPartyExposure } from '../../lib/fourthParty';
-import { listTpc,                type ThirdPartyCyberAssessment } from '../../lib/thirdPartyCyber';
+import { listTpc, isResidualAtLeast, type ThirdPartyCyberAssessment } from '../../lib/thirdPartyCyber';
 import { listSrt,                type SupplierResilienceTest } from '../../lib/resilienceTests';
 import { listProcessorAssessments, type ProcessorAssessment } from '../../lib/processorAssessments';
 import { listDsas,               type DataSharingAgreement } from '../../lib/dataSharing';
@@ -58,8 +58,16 @@ export function TprmConsolidatedOverview() {
   // F2-229: a threshold over the declared ladder. `=== 'HIGH'` skipped the CRITICAL row — and this
   // file already ranked the adjacent residual tier with tierRank(), so the idiom was here all along.
   const fpHighConc   = fp.filter(r => isConcentrationAtLeast(r.concentrationRisk, 'HIGH')).length;
-  const tpcHigh      = tpc.filter(r => r.residualRiskTier === 'HIGH' || r.residualRiskTier === 'CRITICAL').length;
-  const tpcOk        = tpc.filter(r => r.residualRiskTier === 'LOW' || r.residualRiskTier === 'MODERATE').length;
+  // F2-230 — these were two separate inclusion lists (`HIGH || CRITICAL` and `LOW || MODERATE`) which
+  // between them omitted ELEVATED, so on 16 real rows (dev = prod) the two ELEVATED assessments were
+  // in NEITHER bucket and the pair did not sum to the register. F2-196's rule on a tier: "elevated"
+  // must be a threshold over the declared ladder, and "fine" must be its COMPLEMENT — never a second
+  // list, because a second list drops whichever rung its author did not think of.
+  //
+  // The threshold is ELEVATED, matching ThirdPartyCyberPage's own "high-risk" tab. Those two surfaces
+  // previously held DIFFERENT thresholds for one question and each looked self-consistent.
+  const tpcHigh      = tpc.filter(r => isResidualAtLeast(r.residualRiskTier, 'ELEVATED')).length;
+  const tpcOk        = tpc.length - tpcHigh;
   const procFail     = proc.filter(r => r.overallOutcome === 'FAIL').length;
   const srtFail      = srt.filter(r => r.outcome === 'FAIL').length;
   const srtUpcoming  = srt.filter(r => r.status === 'SCHEDULED').length;
@@ -176,6 +184,16 @@ function vendorScore(r: { fpHighConc: number; tpcResidual: string | null; procFa
   s += r.srtFail * 8;
   return s;
 }
+/**
+ * Worst-case rank across the modules this strip merges. Deliberately NOT `tpcResidualRank`: this one
+ * spans two vocabularies — the residual ladder and TPRM's own MEDIUM-bearing tiers — which is why
+ * MEDIUM shares MODERATE's rung. F2-230 left it as its own function for that reason and repointed the
+ * five single-vocabulary readers instead; a shared rank that quietly accepted a token from a different
+ * ladder would be the drift this finding is about, one level up.
+ *
+ * ⚠ Unknown ranks 0, not -1, because this feeds a "worst signal per vendor" reduction where a row with
+ * no tier must not outrank a real LOW.
+ */
 function tierRank(t: string | null): number {
   const r: Record<string, number> = { LOW: 0, MODERATE: 1, ELEVATED: 2, HIGH: 3, CRITICAL: 4, MEDIUM: 1 };
   return t ? (r[t] ?? 0) : 0;

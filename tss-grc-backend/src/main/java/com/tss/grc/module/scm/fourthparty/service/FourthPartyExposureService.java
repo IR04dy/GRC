@@ -2,6 +2,7 @@ package com.tss.grc.module.scm.fourthparty.service;
 
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.common.validation.ClosedVocabulary;
+import com.tss.grc.common.validation.OrderedVocabulary;
 import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.CreateRequest;
 import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.UpdateRequest;
 import com.tss.grc.module.scm.fourthparty.entity.FourthPartyExposure;
@@ -47,9 +48,21 @@ public class FourthPartyExposureService {
     private static final ClosedVocabulary DEPENDENCY_TYPE = ClosedVocabulary.of(
             "dependencyType", "CK_fpe_dependency_type",
             "DATA_PROCESSING", "INFRASTRUCTURE", "SOFTWARE", "LOGISTICS", "FINANCIAL", "SUPPORT");
-    private static final ClosedVocabulary DOWNSTREAM_CRITICALITY = ClosedVocabulary.of(
+    /**
+     * F2-230 promoted this from a plain {@code ClosedVocabulary} to an {@link OrderedVocabulary}, and
+     * the reason is a hole F2-230's own anti-vacuity floor exposed: F2-229 wrote a {@code CASE} ladder
+     * for this column into {@code findRegisterByConcentration}'s {@code @Query} — the register's
+     * secondary sort — and there was <b>no declaration anywhere for that ladder to be checked
+     * against</b>. The SQL held an order nothing in Java could contradict.
+     *
+     * <p>🔑 A ranking written only in SQL is still a second copy of a vocabulary's order; it just has
+     * nothing to disagree with. {@code OrderedVocabularySortContractTest} compares it now.
+     */
+    public static final OrderedVocabulary DOWNSTREAM_CRITICALITY_LADDER = OrderedVocabulary.of(
             "downstreamCriticality", "CK_fpe_downstream_criticality",
             "LOW", "MEDIUM", "HIGH", "CRITICAL");
+    private static final ClosedVocabulary DOWNSTREAM_CRITICALITY =
+            DOWNSTREAM_CRITICALITY_LADDER.vocabulary();
     static final ClosedVocabulary STATUS = ClosedVocabulary.of(
             "status", "CK_fpe_status", "DISCOVERED", "VALIDATED", "MITIGATED", "RETIRED");
 
