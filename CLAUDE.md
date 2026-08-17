@@ -1872,6 +1872,101 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A NOMINALISED CLOCK HIDES AN ATTRIBUTION: THE HALVES ARE NAMED AFTER THE NOUN AND THE
+  VERB, SO THEY SHARE NO ROOT** (F2-225, measured 2026-08-17). Executing F2-224's filed blind spot,
+  the population was re-derived first (F2-221): a permissive (clock, actor) co-occurrence scan
+  reports **79** unpaired candidates where the shipped gate reports 4, and the honest split is
+  **18 NOISE-WORD** (ordinary English words the agent-noun suffix matches — `lineNumber`,
+  `stepOrder`, `isCrossBorder`, `regulatoryAnchor`, `vendorName`), **34 ASSIGNMENT** (names who
+  WILL act, or the act's target — `ownerUserId`, `assignedToUserId`, `escalatedToUserId`) and
+  **27 CANDIDATE**. 3 confirmed, 2 fixed, 1 filed. 🔑 **The classification is the finding as much
+  as the count is: a suffix rule measures spellings, and two thirds of what it returns is not an
+  attribution at all.**
+  ⚠⚠ **The live half was a regulator return.** `NcaEccFilingService#transition` stamps
+  `cisoApprovalAt` from the server's own clock and copied `cisoApprover` out of the request body in
+  the **same `switch` branch** — F2-223's shape exactly, on the NCA ECC self-assessment this
+  organisation files with the National Cybersecurity Authority — and it was invisible because
+  `cisoApprover` reduces to `approv` while `cisoApprovalAt` reduces to `approval`. Probed 13/13
+  pre-fix and 13/13 post-fix as `compliance` against **planted** rows (F2-206): *"Nobody Who
+  Approved This"* stored as the CISO who approved the filing, beside two server clocks 0.14 s
+  apart. Structurally different from F2-224's role-named actor (`standDownAuthoriser`), which is
+  still blind and still asserted — 🔑 **two distinct ways for one attribution's two halves to share
+  no root have now been found; assume a third.**
+  ⚠⚠ **AND THE SAME REGISTER CARRIES A SECOND SPLIT NO SETTER-MATCHING SCAN CAN EVER SEE:
+  `drafted_at` is a FIELD INITIALISER.** F2-215's third of four filling mechanisms means the server
+  owns WHEN with no `setX(now())` anywhere for a detector to find, while `draftedBy` was
+  `@NotBlank` from the body. Found by reading the entity, not by any instrument. **Measured before
+  filing** (F2-221): of 67 entities carrying a clock-initialised field that names an ACT rather
+  than the row, **19 sites** also take an actor from the request — 4 noise, 6 assignments, 9
+  attributions, of which 1 was fixed and 4 refuted by reading. 🔑 One refutation is its own rule:
+  `CoiService#recordRecusal`'s clock is `req.recusalDate() != null ? … : now()`, so **a field
+  initialiser is only a server stamp while no writer overrides it** — F2-224's caller-overridable
+  clock, one layer down. ⚠ `createdAt`/`updatedAt` are **row** stamps, not act clocks: every row
+  has one, so they can never be the proof F2-223's rule rests on. Including them inflates the raw
+  count from 19 to 46, almost all creates.
+  ⚠⚠ **A FORGED ATTRIBUTION THAT IS ALSO AN AUTHORISATION INPUT HAS THREE OUTCOMES, NOT ONE.**
+  `ApprovalChainInstanceService#startChain` took `originatorUserId` from the body, and
+  `withdraw()` reads that column with **no other input**. Probed as `compliance`(3) naming
+  `so_officer`(8): the chain stored 8, **the real raiser was then refused 403 on their own chain,
+  the named stranger was GRANTED the withdraw, and naming a nonexistent id (999999) left the chain
+  withdrawable by nobody.** 🔑 **`ApprovalChainController` had hardened AND documented the other
+  two identity-bearing routes (SEC-IAM-001, on `recordAction` and `withdraw`) and left this one —
+  the route that ESTABLISHES the identity the other two check against.** F2-215's headline again:
+  generalising an invariant one site at a time leaves the remainder looking covered, because the
+  mechanism that covers them is visibly present. ⚠⚠ **All three request records declared
+  `@NotNull @Positive Long <x>UserId` — identical wire shapes, opposite fates: two
+  required-and-IGNORED, one required-and-HONOURED. Nothing a caller or a reader could see
+  distinguished them.** All three deleted (F2-184: a required field the server discards tells the
+  caller their value matters; one it TRUSTS for an authorisation decision is worse again).
+  ⚠ **No FE client calls `/api/v1/workflow/chains` at all** — the three routed pages render
+  `SEED_*` corpora (F2-207's filed population) — so the fix carried zero frontend risk, and the
+  body field was an invitation to build the screen that would fire it (F2-214's shape).
+  ⚠⚠ **F2-117 IS HALF CLOSED, AND THE HALF THAT MOVED IS THE ONE ITS RECORDED BLOCKER SAID COULD
+  NOT.** That row reasoned a four-eyes comparison would be inert because **0 of 4 people-labels
+  resolve to a platform user** — correct about **SEGREGATION** (approver ≠ reviewer, which does
+  need identity columns) and **applied to ATTRIBUTION** (who the approver IS, which needed nothing
+  but `CurrentActor`). 🔑 **The dependency ran the other way: comparing a reviewer against an
+  approver is meaningless while the approver is whatever the caller typed, so attribution was the
+  PREREQUISITE for the comparison the blocker was protecting.** F2-178's *"re-measure a recorded
+  blocker before believing its estimate"* in a new shape — the estimate was right about a fix that
+  was not the one being blocked. ⚙ One of its inputs has also moved: `ciso_approver` now holds a
+  username, which **does** resolve to a platform user.
+  ⚠⚠ **A PINNED KNOWN-DEFECT TEST PASSES ON A DEFECTIVE TREE BY DESIGN, SO THE CODEBASE'S OWN
+  RECORD OF THIS DEFECT WAS INVISIBLE TO EVERY SCAN — THE FINDING HAD TO BE MADE TWICE.**
+  `NcaEccFilingLifecycleTest` asserted the mechanism (*the service consults no security context*)
+  with an explicit exit condition, and it was honest and well built. It still surfaced nothing:
+  🔑 **a green pin and a green clean tree are indistinguishable from outside.** Its tripwire then
+  worked exactly as designed — it failed the build the moment the service read a principal, and
+  `FindingsRegisterConsistencyTest` refused the commit until the register cell was updated. Two
+  instruments in series, both doing their job.
+  ⚠⚠ **A BINARY CLOSURE GATE CANNOT EXPRESS A HALF-CLOSED FINDING, AND THE SAFE DIRECTION IS FOR
+  THE TEST TO UNDER-CLAIM RATHER THAN THE REGISTER TO OVER-CLAIM.** `readsOpen()` is true when an
+  OPEN mark precedes a CLOSED one, so a 🟡 *"HALF CLOSED"* cell reads open — correctly — while a
+  javadoc saying `F2-nnn … CLOSED` claims the whole finding. **The register is what an auditor is
+  handed, so marking a P1 closed to satisfy a regex would have retired a control that is still
+  half unbuilt.** ⚙ That gate also cannot tell a quotation from a claim (F2-193's shape) and the
+  `unquoted()` convention that solves it elsewhere carries its own warning against whole-Java-file
+  use (F2-216) — so name the shape with the **placeholder id**, exactly as the gate's own failure
+  message does, rather than paraphrasing away your evidence.
+  ⚠ **My own new gate leg failed on correct code.** It banned `originatorUserId` file-wide and the
+  RESPONSE records legitimately carry it — telling a client who raised a chain is the point of
+  reading one. Re-scoped to the three request records. *Scope a scan to the shape of its claim*,
+  landing yet again on a leg written while quoting it; **a gate that fails on correct code trains
+  the next reader to edit the assertion rather than the code** (F2-214).
+  ⚙ **Verify a widening by what it ADDS, in both directions.** The nominalising stem is emitted as
+  an EXTRA key so it can only add pairings, and it was checked against **9 must-pair** (every pair
+  the gate already reports, which must keep pairing) and **11 must-not-pair** cases drawn from the
+  three measured buckets: it adds **exactly one**. Then the pre-fix control over `git show master:`
+  reported **4 narrow / 5 widened**, which is the only evidence that the widening is load-bearing
+  rather than decorative — F2-223's rule: *a green scan on the fixed tree cannot tell you the
+  detector works.* ⚠ Note what is in NEITHER: the chain finding, because `startedAt` and
+  `originatorUserId` share no root and never will. **It was found by reading, and a structural leg
+  is what protects it.**
+  ⚠ **A `TOP n DISTINCT` is a syntax error in SQL Server** (`DISTINCT TOP n`), and my table-name
+  guess was wrong again — `workflow.approval_chain_instance`, singular. The measurement script
+  looked the name up in `sys.tables` and printed near-misses instead of reporting "no data", which
+  is the only reason that cost nothing. **Resolve from `sys.tables`/`sys.columns`; never guess.**
+
 - ⚠⚠ **TWO DETECTOR ERRORS IN OPPOSITE DIRECTIONS PRODUCE A GREEN THAT NEITHER EARNS, AND THE
   ONE THAT SHRINKS THE POPULATION IS WHAT HIDES THE OTHER** (F2-224, measured 2026-08-16). Executing
   F2-223's filed 10-entry work list, the denominator was re-derived first (F2-221). A deliberately
