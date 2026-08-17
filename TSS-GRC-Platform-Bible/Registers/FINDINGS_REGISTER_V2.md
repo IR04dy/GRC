@@ -2400,6 +2400,105 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-227 · The double save nobody could gate, and the handler that hid it
+
+**Found** 2026-08-17, executing F2-226's filed 500. **P2** — the facilitator's ordinary
+"throw an inject now" action on a live BCM exercise answered HTTP 500 for every tenant, and the
+platform-wide defect family behind it had been undiagnosable from a response since the handler was
+written. **Closed** the same day. No migration; 2 backend classes, 1 new gate.
+
+### The diagnostic had to come first, because the defect could not be diagnosed without it
+
+F2-226 identified the 500 **by inference** — the dedicated dispatch route answered 200 on the
+identical row, the combined path 500 — and recorded it as a ROWVERSION double flush. That was a
+good inference and it was not a measurement.
+
+Measuring it meant fixing the diagnostic. `OptimisticLockingFailureException` is a
+`DataAccessException`, so every one of them fell into `handleMissingDbObject` and came back as a
+bare *"An unexpected database error occurred."* with **no exception class, even in dev with
+`grc.errors.verbose=true` explicitly on** — because that handler built its own `ProblemDetail`
+instead of delegating to `handleGeneral`, which is the only place the verbose diagnostics live. Its
+comment said *"let the catch-all handle it with a 500."* It did not.
+
+🔑 **The handler that intercepted this exception class was the one handler that discarded the
+diagnostic verbose mode exists to provide** — and the exception class in question is the one
+CLAUDE.md's second landmine produces, recorded at F2-175 and hit again at F2-226. **A
+platform-wide defect family was undiagnosable by construction.** F2-180's rule inverted: a
+wrong-but-specific diagnostic at least sends the reader somewhere; a *generic* diagnostic from a
+*specific* handler sends them nowhere and looks deliberate. F2-184's shape, in an exception handler.
+
+With the handler in place the response named it: **`ObjectOptimisticLockingFailureException` on
+`ExerciseRunInject 16`, "Row was updated or deleted by another transaction (or unsaved-value
+mapping was incorrect)"**. A stale row is now a **409** that names the entity and its id, because
+"retry?" is not a diagnosis.
+
+### Why the shape is fatal, from the mapping
+
+`BaseEntity.rowVersion` is
+`@Version @Column(name = "row_version", insertable = false, updatable = false) byte[]` — a SQL
+Server ROWVERSION the **database** generates and Hibernate never re-reads. So the instant a flush
+reaches the database the in-memory version is stale, and the next `UPDATE … WHERE row_version = ?`
+matches zero rows. Hibernate's own parenthetical, *"or unsaved-value mapping was incorrect"*, is
+the hint that the version was never populated.
+
+### ⚠⚠ The discriminator, corrected — and a scan gets this wrong in the flattering direction
+
+A first derivation treated any intervening repository write as the flusher and reported **18 live
+sites**. The tell was `PolicyManagementService#update`: it has the shape and F2-222 probed it
+**13/13 working**. Reading `AuditLogService.log` settled it — it is `@Transactional` (joining the
+caller's transaction) and saves an IDENTITY-generated row, so Hibernate executes that one insert
+immediately to obtain the id **without flushing the caller's other pending changes**.
+
+🔑 **`audit.log` and `emit` are not flushers. A QUERY is** — flush-before-query sends everything
+pending. That single correction is the whole difference between 18 live sites and one, and it is
+why this platform works while carrying the shape in **39** places (18 with a query between the
+saves, 21 without).
+
+### The population, and what is decidable
+
+| | |
+|---|---|
+| **Cross-method** (save, then a sibling re-loads that repository's row and saves it) | **8 sites.** 1 FIXED (`ExerciseRuntimeService#dispatchInject` — the live 500). 1 REFUTED by reading: `ApprovalChainTemplateService#clearOtherDefaults` queries `…AndIdNot(`, so it provably saves *other* rows. **6 on a decrease-only work list.** |
+| **Same-method** (`save(x)` … `save(x)`) | Measured and filed. The scan cannot tell "the same row twice" from "a different row", and a hard zero over unread code is a gate failing on code the slice never examined (F2-214). |
+
+The six ship as a **work list and deliberately not as reasons** (F2-188 measured what happens when
+a slice writes a reason for something it has not read: five claims, five false, and the fluency was
+what made them look verified): `AttackSurfaceAssetService#recomputeRiskScore`,
+`FourthPartyExposureService#recomputeConcentration`, `ObService#recountTpp`,
+`PolicyManagementService#supersedePriorPublished`, `WorkflowRequestService#advanceRouting`,
+`WorkflowRequestService#notifyStep`. Each needs one question answered by reading: **does the
+sibling save the row the caller just saved, or a different one?**
+
+### The fix, and why it is not "call dispatchInject later"
+
+`addCustomInject` now stamps the dispatch **in memory** before its single save, and both entry
+points share one `announceDispatched` rather than one calling the other. F2-188 measured what a
+duplicated transition does: the duplicate agrees with the original on the row, which is easy to
+check, and differs on the audit trail, which nothing asserts. `setActualDispatchedAt` has exactly
+one writer, asserted.
+
+⚠ **The existing test stubbed the re-load with the comment *"After save, the dispatchInject step
+needs the inject to be findable"* — and that stub was the defect.** It became an
+`UnnecessaryStubbingException` the moment the fix landed, which is the cleanest possible evidence.
+Repurposed to assert `times(1)` on save and `never()` on the re-read, since — as CLAUDE.md says —
+no mock can reproduce the failure itself.
+
+### Lesson
+
+🔑 **A landmine that cannot be diagnosed from a response will be rediscovered instead of fixed.**
+This one was recorded three times over two years of slices and never once identified from an error
+message, because the handler for its exception class threw the class name away. **Before measuring
+a defect family, check that its failure is legible** — and: **the discriminator that separates live
+from latent is worth more than the count, because getting it wrong inflates a population 18-fold in
+the direction that manufactures findings.**
+
+| | |
+|---|---|
+| **ID** | F2-227 |
+| **Severity** | **P2.** The default path of a facilitator control on a live BCM exercise answered 500 for every tenant; and a documented defect family produced anonymous 500s platform-wide. |
+| **Status** | ✅ **CLOSED 2026-08-17** (`20c7c634`). Backend 3,992/0/0, gate 6/6, probe 9/9 post-fix, three-stage evidence chain (500 → 409 naming the class → 201 DISPATCHED). |
+| **Filed** | The 6 unadjudicated cross-method sites; the 21 latent same-method sites; and the structural root — annotating `rowVersion` `@Generated(INSERT, UPDATE)` would make the whole family unrepresentable at the cost of a post-write select on every one of 174 `BaseEntity` subclasses, which is an owner trade-off and not a side effect of a bug fix. |
+
 ## F2-226 · The clock the caller cannot reach at all — and a request that named its own approver
 
 **Found** 2026-08-17, executing F2-225's filed field-initialiser work list. **P2** — the

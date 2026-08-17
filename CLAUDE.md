@@ -1872,6 +1872,63 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A LANDMINE THAT CANNOT BE DIAGNOSED FROM A RESPONSE GETS REDISCOVERED INSTEAD OF FIXED**
+  (F2-227, measured 2026-08-17). The ROWVERSION double-flush above has been recorded three times —
+  F2-175 fixed one instance, F2-226 tripped over a live one by accident — and had **never once been
+  identified from an error message**, because `OptimisticLockingFailureException` is a
+  `DataAccessException` and so fell into `GlobalExceptionHandler#handleMissingDbObject`, which
+  returned a bare *"An unexpected database error occurred."* **with no exception class even in dev
+  with `grc.errors.verbose=true` ON** — it built its own `ProblemDetail` instead of delegating to
+  `handleGeneral`, where the verbose diagnostics live. Its own comment said *"let the catch-all
+  handle it with a 500"*. 🔑 **The handler intercepting this exception class was the one handler
+  that discarded the diagnostic verbose mode exists to provide.** F2-180's rule inverted: a
+  wrong-but-specific diagnostic at least sends the reader somewhere; a *generic* diagnostic from a
+  *specific* handler sends them nowhere and looks deliberate. **A stale row is now a 409 naming the
+  entity and its id** (`ObjectOptimisticLockingFailureException` carries both), and the fall-through
+  delegates. **Before measuring a defect family, check that its failure is legible.**
+  ⚠⚠ **THE LIVE DEFECT WAS THE DEFAULT PATH OF A FACILITATOR CONTROL.**
+  `POST /api/v1/bcm/exercise-runs/{id}/custom-inject` saved the new inject and then called
+  `dispatchInject`, which re-loads that row and saves it again in one transaction — and
+  **`dispatchNow` DEFAULTS TO TRUE**, so the ordinary "throw an inject now" action on a live BCM
+  exercise answered **HTTP 500 for every tenant**. Fixed by stamping the dispatch in memory before
+  the single save; both entry points now share one `announceDispatched` rather than one calling the
+  other (F2-188: a duplicated transition agrees on the row and differs on the audit trail, which is
+  the part nothing asserts). `setActualDispatchedAt` has exactly one writer, asserted.
+  ⚠⚠ **THE DISCRIMINATOR IS A QUERY, NOT A WRITE — AND GETTING IT WRONG INFLATES THE POPULATION
+  18-FOLD IN THE FLATTERING DIRECTION.** A first derivation treated any intervening repository write
+  as the flusher and reported **18 live sites**. The tell was `PolicyManagementService#update`: it
+  has the shape and F2-222 probed it **13/13 working**. `AuditLogService.log` is `@Transactional`
+  (joining the caller's transaction) and saves an **IDENTITY-generated** row, so Hibernate executes
+  that one insert immediately to obtain the id **without flushing the caller's other pending
+  changes**. 🔑 **`audit.log` and `emit` are not flushers; flush-before-QUERY is.** That is the whole
+  difference between 18 live sites and one, and why the platform works while carrying the shape in
+  **39** places — 18 with a query between the two saves, 21 without. ⚠ The mapping is what makes it
+  fatal: `BaseEntity.rowVersion` is `@Version @Column(insertable = false, updatable = false)` on a
+  SQL Server ROWVERSION the **database** generates and Hibernate **never re-reads**, so the moment a
+  flush lands the in-memory version is stale. Hibernate's own *"or unsaved-value mapping was
+  incorrect"* is the hint that the version was never populated.
+  ⚠ **The decidable half is the CROSS-METHOD shape**: a method saves a row, then hands it to a
+  sibling that re-loads and saves it. `DoubleSaveContractTest` bans that; population **8** — 1
+  fixed, 1 refuted by reading (`ApprovalChainTemplateService#clearOtherDefaults` queries
+  `…AndIdNot(`, so it provably saves *other* rows), **6 on a decrease-only work list and
+  deliberately NOT given reasons** (F2-188). A hard zero over unread code is a gate failing on code
+  the slice never examined (F2-214), and the same-method variant is undecidable by scan.
+  ⚠⚠ **THE EXISTING TEST'S STUB WAS THE DEFECT, AND ITS REMOVAL IS THE PROOF.**
+  `addCustomInject_with_dispatchNow_dispatches_immediately` stubbed
+  `runInjectRepo.findByIdAndOrganisationId` under the comment *"After save, the dispatchInject step
+  needs the inject to be findable"* — i.e. the test documented the re-load as a requirement. It
+  became an `UnnecessaryStubbingException` the instant the fix landed. 🔑 **A stub that describes
+  the defective mechanism reads as setup, not as a finding** — third instance of a test locking in a
+  defect (F2-159, F2-175, this). Repurposed to `verify(times(1)).save` + `verify(never())
+  .findByIdAndOrganisationId`, because CLAUDE.md is right that **no mock can reproduce the failure**
+  — mocked repositories have no `row_version` — so the assertion has to be the structure the fix
+  guarantees.
+  ⚙ **Filed as the structural root:** annotating `rowVersion` `@Generated(event = {INSERT, UPDATE})`
+  would make this whole family **unrepresentable** by having Hibernate re-read the database's value
+  after every write — at the cost of a post-write `SELECT` on every write to all 174 `BaseEntity`
+  subclasses. That is an owner trade-off, not a side effect of a bug fix (F2-213's rule about the 83
+  entity-bound PUTs).
+
 - ⚠⚠ **A WORK LIST AND ITS CLASSIFIER ARE TWO ARTEFACTS, AND THE SLICE THAT BUILT BOTH DID NOT
   MAKE THEM AGREE** (F2-226, measured 2026-08-17). Executing F2-225's filed field-initialiser work
   list, the population was re-derived first (F2-221) — and the filing had measured **one of
