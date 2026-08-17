@@ -248,6 +248,45 @@ class CoiServiceTest {
                 .containsExactly("COI_DECLARATION_SUBMITTED", "COI_AUTO_FLAGGED_RECUSAL");
     }
 
+    /**
+     * F2-228 — the declaration row must be written EXACTLY ONCE.
+     *
+     * <p>It used to be saved, then re-saved to carry the auto-flagged outcome once the items had
+     * been inserted. Because the first save is an IDENTITY INSERT and {@code BaseEntity} maps
+     * {@code row_version} {@code @Version insertable=false updatable=false} over a SQL Server
+     * ROWVERSION, the in-memory version was null afterwards and the second UPDATE matched zero
+     * rows. Probed live: <b>any declaration disclosing an item answered HTTP 409 and rolled
+     * back</b>, so the conflict-of-interest register could record everything except a conflict.
+     *
+     * <p>⚠ Structural, because no mock can reproduce the failure — a mocked repository has no
+     * {@code row_version}, which is exactly why this family went unmeasured (CLAUDE.md). The
+     * assertion is therefore the property the fix guarantees, as F2-227 did for the exercise
+     * inject: one save, and the outcome decided before it.
+     */
+    @Test
+    void submitDeclaration_withADisclosedItem_savesTheDeclarationExactlyOnce() {
+        CoiDeclarationCampaign c = campaign("OPEN");
+        when(campaignRepo.findByOrganisationIdAndIdAndIsDeletedFalse(ORG_ID, CAMPAIGN_ID))
+                .thenReturn(Optional.of(c));
+        when(declarationRepo.save(any(CoiDeclaration.class))).thenAnswer(inv -> {
+            CoiDeclaration d = inv.getArgument(0);
+            if (d.getId() == null) d.setId(100L);
+            return d;
+        });
+        when(itemRepo.save(any(CoiDisclosedItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ArgumentCaptor<CoiDeclaration> saved = ArgumentCaptor.forClass(CoiDeclaration.class);
+        DeclarationResponse out = service.submitDeclaration(
+                submitReq(List.of(item("RELATED_PARTY", new BigDecimal("5000")))));
+
+        verify(declarationRepo, times(1)).save(saved.capture());
+        assertThat(saved.getValue().getReviewOutcome())
+                .as("the auto-flagged outcome must be decided BEFORE the single save, not "
+                    + "written by a second one")
+                .isEqualTo("RECUSAL_REQUIRED");
+        assertThat(out.reviewOutcome()).isEqualTo("RECUSAL_REQUIRED");
+    }
+
     @Test
     void submitDeclaration_directorshipItem_autoFlagsMitigationRequired() {
         CoiDeclarationCampaign c = campaign("OPEN");
