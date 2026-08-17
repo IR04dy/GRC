@@ -1978,6 +1978,18 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   literal newline inside the payload. Two were loud (a javac error, a Python `SyntaxError`); the
   dangerous mode is the silent one this file already records, where a regex quietly stops matching.
   **The rule extends past shell scripts to any file content with escapes: use the Write/Edit tools.**
+  ⚠⚠ **CORRECTION (F2-232, same day): BOTH net-new findings are false positives — 2 of 2, not 1 of 2.**
+  The block above named *"one unread lead (`CommitteeResolutionService#create` :: `voteFor`/`voteAgainst`/
+  `voteAbstain`)"*. Read, it is **BY DESIGN with provenance, and F2-40 built the mechanism**: the
+  secretariat form posts the tally straight from the minutes for a committee that votes in the room, and
+  the row records WHICH KIND of tally it is — `ASSERTED` with the recorder from `Authentication`, never
+  the body (the DF-3 rule), versus `COMPUTED` for a resolution created empty and decided through
+  `recordVote`. Measured: 22 live rows dev / 20 prod, `ASSERTED_LEGACY` **20/20** (F2-40's honest label
+  for rows predating the mechanism) and **0** `ASSERTED`-with-recorder, so the path is latent and
+  correct rather than bypassed. 🔑 **A population produced by a detector already judged unsafe
+  refuted at 2 of 2, against this programme's usual ~2-in-10 rate — that is the argument FOR the
+  rejection, not a footnote to it. Do not re-enable the stamp half expecting a defect behind either
+  name.**
   ⚙ **Filed:** the **11-service work list** with per-site evidence in
   `target/server-stamped-fields.txt` and deliberately **no verdicts** (F2-188); the helper-stamp blind
   spot; **`privacy.data_subject_requests.due_date`, where the PDPL Article 4 statutory deadline is
