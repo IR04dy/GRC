@@ -2400,6 +2400,189 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-229 · A derived value narrower than its own column destroys what it cannot express
+
+**Found** 2026-08-17, executing F2-228's filed concentration-recompute defect. **P2** — every write
+anywhere in the SAMA fourth-party register flattened nine of its thirteen concentration tiers, the
+register's default ordering put its most concentrated row last, and the top tier was invisible to
+every surface that reads it. **Closed** the same day. V377; 3 backend classes, 4 frontend files, 3
+gates, 2 behaviour test classes.
+
+### The recompute ASSIGNED where the code's own two comments said ELEVATE
+
+`FourthPartyExposureService.recomputeConcentration` runs across the whole tenant on every create and
+every update. Three artefacts described it as an elevation:
+
+* the service javadoc — *"when the same fourth party appears behind ≥3 primaries it's auto-elevated
+  to HIGH"*;
+* `FourthPartyExposureRepository#concentrationCounts`'s javadoc — *"the service uses this to elevate
+  `concentration_risk` to HIGH"*;
+* the auto-CAPA hook, written as a **rising edge** (`"HIGH".equals(tier) && !"HIGH".equals(previous)`)
+  — a shape that only makes sense if the value is monotone.
+
+The code did `ex.setConcentrationRisk(tier)`, unconditionally. Measured 2026-08-17 and **identical in
+dev and prod**: all 13 live rows carry **13 distinct** fourth-party names, so `concentrationCounts`
+returns an empty map and the computed tier is LOW for every row — and any write **lowered 9 of the
+13**, including all three HIGH rows and the sole CRITICAL one (*"Underlying hyperscaler region
+(sub-infrastructure)"*). Same family as F2-195's `|| N`: the correct rule was written down in prose
+beside the place it was not applied.
+
+🔑 **The range of the derivation is a strict subset of the range of the column, which is what made
+the flattening irreversible.** Multiplicity can justify LOW, MEDIUM or HIGH; no row count produces
+CRITICAL. So a CRITICAL assessment overwritten by the derivation could never be restored by it. That
+is the reusable shape, and it generalises past this register: **a recompute whose output range is
+narrower than its column's vocabulary destroys the values it cannot express.**
+
+The fix is one declared ladder (`ConcentrationTier`) read by the recompute, the CAPA rising edge and
+the ordering. `multiplicityFloor` says what the row count alone justifies; `outranks` decides whether
+that floor is worth raising a stored assessment to; nothing lowers one. A **RETIRED** edge no longer
+props up anybody's floor — which matters *more* under elevation than it did under assignment, because
+an inflated floor is now permanent. Latent today (no fourth-party name appears twice in either
+database), so it is asserted by test rather than observed in data.
+
+### The ordering was an alphabetical sort presented as a severity ranking
+
+`findByOrganisationIdOrderByConcentrationRiskDescDownstreamCriticalityDesc` is a derived Spring Data
+method on two `NVARCHAR` columns. Descending **alphabetically**, LOW|MEDIUM|HIGH|CRITICAL reads
+MEDIUM, LOW, HIGH, CRITICAL. Measured read-only against the live register: the row that came back
+**last of 13 was the CRITICAL/CRITICAL one**, with the three HIGH/CRITICAL rows 10th, 11th and 12th.
+The frontend requests `size=200` and renders the server's order, so the most concentrated fourth
+party in the register was the last row on the page.
+
+🔑 **A lexical sort is a ranking only where the vocabulary happens to be in alphabetical order, and
+severity ladders never are.** Replaced with a `CASE` rank whose tokens are checked, in order, against
+`ConcentrationTier.ladder()` by reflection over the `@Query` annotation — a `@Query` string is
+necessarily a second copy of the order, and that is what stops it drifting from the first.
+
+### CRITICAL had no declaration anywhere, and six reader questions each dropped it
+
+The entity's field javadoc said `LOW | MEDIUM | HIGH`. The frontend's `FpConcentration` said the
+same. The table had **no CHECK constraint of any kind**. And the column held CRITICAL on one row in
+both databases. Consequences, all measured:
+
+* `FP_CONC_TONE[r.concentrationRisk]` was `undefined` for that row;
+* the concentration tab filtered `HIGH || MEDIUM`, so **the tab built to surface concentration risk
+  excluded the most concentrated row in the register**;
+* its chip under-counted (8 where 9 qualify), and it was computed by summing *two separately spelled*
+  inclusion lists rather than by the predicate the tab filters with (F2-197);
+* `TprmConsolidatedOverview`'s roll-up and per-vendor count, and the dashboard widget's `fpHigh`, all
+  asked `=== 'HIGH'`.
+
+F2-196's rule on a tier instead of a status: **"elevated" must be a threshold over a declared ladder,
+never a second inclusion list.** Measured against master, **7 equality comparisons across 3 files**
+implementing those 6 reader questions; all 7 now ask `isConcentrationAtLeast`. ⚠ The rule was already
+in the tree one component over — `TprmConsolidatedOverview` ranks the *adjacent* `residualRiskTier`
+with its own `tierRank()` helper, and the concentration column beside it never used it.
+
+### V377 — the table's first CHECK constraints, scoped to the writers this slice closed
+
+Four constraints on a table that had zero, per F2-183: `concentration_risk` and `status` are
+server-owned (two literal write sites each), and `dependency_type`/`downstream_criticality` are
+routed through `ClosedVocabulary.require()` in the same commit. Measured in **both** databases
+first — 13 rows each, **0 violations and 0 non-canonical casings** in all four columns — so no
+`WITH NOCHECK`, and **no casing UPDATE**, checked rather than assumed because every writer either
+normalises or writes a Java literal. Applied twice to dev via pyodbc; the dev rows were byte-identical
+afterwards.
+
+⚠ `require` rather than `coerce` throughout, per F2-182's test: the hand-rolled `Set.contains` this
+replaces already **refused** anything outside the vocabulary, so nothing that succeeds today starts
+failing. What changes is that `'high'` is now normalised to `HIGH` instead of 400-ing.
+
+### The platform-wide measurement, and the detector bug that hid most of it
+
+`LexicalSeveritySortContractTest` is reflection over `target/classes` — repository interfaces and
+their `@Query` annotations are runtime-retained, so no regex reads Java. Measured: **429 repository
+interfaces, 644 derived `OrderBy` methods, 91 `@Query` with an `ORDER BY`, 857 lexical order terms**,
+of which **15 columns** carry a CHECK vocabulary of three or more tokens.
+
+⚠⚠ **A hard zero over those 15 would fail on correct code, which is the one thing a gate must never
+do (F2-214).** Most are **categorical**: `sust.esg_metric.category` is
+[ENVIRONMENTAL, SOCIAL, GOVERNANCE], `admin.committee_form_templates.form_type` is
+[AGENDA, ATTENDANCE, MOTION, …], and sorting those alphabetically is a deterministic grouping that
+claims nothing. Only an **ordered** vocabulary turns an alphabetical sort into an assertion about
+which row matters most. So the leg is an exactly-asserted **census** with no verdicts (F2-188), and a
+separate 6-entry graded-String work list covers the two columns that have no CHECK and are therefore
+invisible to it.
+
+⚠ **Two of the six were read while measuring, and they fall in opposite directions** — which is the
+argument for the work list carrying no reasons. `MlModelRepository`'s two queries are **accidentally
+correct**: `WHERE m.riskTier IN ('CRITICAL','HIGH')` narrows the vocabulary to two tokens whose
+alphabetical order *is* their severity order. `CommitteeMemberSkillRepository#findByDimension` sorts
+`skillLevel DESC` over [BASIC, INTERMEDIATE, EXPERT] to answer *"does this committee have a financial
+expert?"* (CMA Article 54) — so it ranks INTERMEDIATE above EXPERT.
+
+⚠⚠ **MY OWN DETECTOR UNDER-REPORTED, AND ONLY THE ANTI-VACUITY LEG KNEW.**
+`MigrationVocabularies` keys its vocabularies `schema.table.column`; my first draft built the
+entity-side key as `table.column` from `@Table(name)`, ignoring `@Table(schema)`. Every lookup
+therefore missed, every column read as having **no CHECK**, and the hard zero I had written
+**passed** — over a population of 15. The throwaway census using the same key printed *"total columns
+affected: 0"* and I read that as a measurement. What caught it was
+`theCheckDrivenLegIsNotVacuous` asserting that V377's own four constraints are findable. 🔑 **A
+detector that cannot match reads exactly like a clean tree, and it under-reports — the quiet
+direction.** Nothing about the shape of the wrong answer looked wrong: two of the fifteen are in
+`admin`, four in `sust`. `theSchemaSegmentOfTheKeyIsLoadBearing` now asserts the failure mode
+directly, and the mutation that restores the bug is killed.
+
+### The narrowing that matters is the field TYPE, and it is pinned by measurement
+
+A name-based locator over graded-sounding column names returns **10** lexically-sorted columns after
+the fix (12 before it), and **4 of them are numeric** — `platform.automation_rules.priority`,
+`sust.climate_risk_opportunity.risk_score`, `bcm.communication_contacts.escalation_level`,
+`socops.ot_asset.purdue_level` — where a lexical sort *is* a correct numeric sort. Counting those
+would inflate the population by 40%. `theNumericNarrowingIsLoadBearing` holds them exactly, so
+deleting the String narrowing changes an answer rather than an opinion.
+
+### Verification
+
+* **17/17 mutations killed**, plus **one recorded EQUIVALENT** (the CAPA rising edge asking `equals`
+  instead of `atLeast`: the branch is only reached when `outranks(floor, stored)` holds and the floor
+  can never be CRITICAL, so the two agree on every reachable input — F2-206's rule that a surviving
+  mutant is a hole only if the mutated code is wrong).
+* ⚠ **Two harness results were mine, not the gate's.** M10 (the first `CASE` ladder flipped to `ASC`)
+  **survived** a bare `contains("END DESC")` because the *second*, untouched ladder still matched —
+  F2-194's substring-satisfied-by-something-else, so the leg now asserts by **count**. And M13's first
+  form mutated the gate's own assertion to a weaker one, which always survives (F2-206); replaced by
+  a **data** mutation that adds a phantom member.
+* ⚠ **The CRLF trap fired for the third time in this lineage** (F2-212, F2-219): the frontend files
+  are CRLF and the harness's anchors are LF, so two multi-line anchors reported ANCHOR-MISS. The
+  harness now normalises anchors to the target file's own line endings, and an anchor miss exits
+  non-zero as a distinct outcome — a harness that declines to run reads exactly like a gate that
+  passed.
+* **Live probe 26/26 post-fix** as `compliance` (holds `SCM:WRITE`; never `admin`), against
+  **planted** `[REVIEW-TEST]` rows. The load-bearing assertion is that the 13 seeded rows are
+  **byte-identical after five writes** — which is precisely the property the fix establishes, so a
+  wrong fix fails the probe. The CRITICAL row now returns **first**; two live primaries elevate to
+  MEDIUM; a RETIRED edge among three earns only MEDIUM; three live primaries elevate to HIGH; a
+  lower-case `dependencyType` is normalised, an invented one is a 400 naming the field; and the
+  database refuses `SEVERE` on the tier column.
+* ⚠ **The pre-fix half was deliberately NOT re-run.** F2-228 already observed the flattening live —
+  and damaged this exact register doing it — while the arithmetic (13 distinct names → every computed
+  tier LOW) and the mis-ordering are both reproducible **read-only**. Re-running a destructive
+  experiment to re-confirm a recorded result is not verification.
+* **Pre-fix control**: every text detector run against `git show master:` — 7 comparisons on master,
+  0 on HEAD; no ladder on master, one on HEAD; the lexical `OrderBy` present on master, the ranked
+  query on HEAD; the recompute assigning on master, elevating on HEAD. ⚠ Its own tone-map check first
+  matched **`FP_CRIT_TONE`**, the *criticality* map, which has always had CRITICAL — so the control
+  reported master as already fixed. Scoped to `FP_CONC_TONE`.
+* **Browser** (the change is observable, and five consecutive slices in this programme found
+  something there after every gate was green): the CRITICAL row renders first and in danger tone, the
+  KPI moved **3 → 4**, the tab chip **8 → 9**, and the chip's figure equals the 9 rows the tab opens.
+* ⚠ **The browser is also what surfaced a label**: `f4pKpiHighConc` read *"High concentration"*,
+  which was **exact** while the predicate counted exactly the HIGH rows and became imprecise the
+  moment it counted HIGH *and above*. F2-212's rule from the inside — the slice that fixes a
+  predicate is the slice that must fix the label that described it — and checked **per language**,
+  because F2-208 found this drift in the Arabic only. Both now read as thresholds
+  (`Concentration ≥ high` / `تركّز عالٍ+`), matching the tab label's own established convention.
+* **Backend 4,017/0/0** · **frontend 763/763** across 70 files · `npx tsc --noEmit` clean · dev and
+  prod byte-identical, zero `[REVIEW-TEST]` rows in either.
+
+| | |
+|---|---|
+| **ID** | F2-229 |
+| **Severity** | **P2.** Every write in the SAMA fourth-party register flattened 9 of 13 concentration tiers, irreversibly for the CRITICAL one; the register's default ordering placed its most concentrated row last of 13; and the top tier was excluded from the concentration tab, its count and two dashboards. |
+| **Status** | ✅ **CLOSED 2026-08-17** (`PENDING`). Backend 4,017/0/0, frontend 763/763, mutation 17/17 + 1 equivalent, live probe 26/26 post-fix, V377 applied twice to dev and pre-flighted against prod. |
+| **Filed** | The 6-entry graded-String lexical-sort work list, of which `admin.committee_member_skills.skill_level` (CMA Art. 54) is the sharpest and `ai_governance.ml_model.risk_tier` is accidentally correct; the 15-column closed-vocabulary census, where a defect requires the vocabulary to be ORDERED and that is a question for a reader; and F2-221's 201 state-ish columns with no CHECK, which no leg of this gate can see. |
+
 ## F2-228 · The reading confirmed three sites the probe refuted, and the fatal one is the INSERT
 
 **Found** 2026-08-17, executing F2-227's filed six-site work list. **P2** — the

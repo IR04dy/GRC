@@ -124,7 +124,7 @@ SQL Server Express `localhost:1433`, DB `TSS_GRC`, `sa/tss.123`. Dev schema is
 ODBC Driver 17.
 
 Migrations live in `tss-grc-backend/src/main/resources/db/migration/sqlserver/`
-— **V1→V375 packaged; next free V376** (363 files; ⚠ this line said "V1→V295 / next free
+— **V1→V377 packaged; next free V378** (365 files; ⚠ this line said "V1→V295 / next free
 V296" for weeks, 54 behind — reusing a taken version number is a Flyway checksum failure on
 the deployed server, so **read the directory, not this line**: `ls .../sqlserver | tail -3`.
 `Appendix/scripts/baseline_census.py` prints it and `MeasuredBaselineFreshnessTest` gates it).
@@ -137,8 +137,8 @@ short of dev (`ORG_ADMIN` −30, unable to read seven modules), and re-running t
 *snapshot*, not a rule; `RoleGrantDerivationRatchetTest` pins the 6 legacy sites and fails a 7th.
 Convention for new migrations: write them **idempotent** with self-checks that `THROW`,
 apply to the dev DB **twice via pyodbc** (Flyway off in dev), and let prod pick them up via
-Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V375 are pending** the
-next jar — 31 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
+Flyway (baseline 292 on the deployed server; head **V344**, so **V345–V377 are pending** the
+next jar — 33 files). `flyway.clean` is disabled — never run `mvn flyway:clean`.
 
 ### Default dev credentials
 
@@ -195,7 +195,7 @@ and `auditor` (EVIDENCE_WRITE + COMPLIANCE_WRITE + BCM_READ) — between them th
 |---|---|
 | Backend | Spring Boot 3.5.x, **Java 17 (pinned — Lombok breaks on newer)**, Spring Security 6 |
 | Auth | JJWT — Bearer access token + HttpOnly refresh cookie; FE auto-refreshes on 401 |
-| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V375 (OFF in dev) |
+| DB | SQL Server 2019+, UTF-8 collation, 50+ schemas, Flyway V1–V377 (OFF in dev) |
 | ORM | Hibernate 6 / Spring Data JPA, `ddl-auto=none` |
 | Exports | Apache POI (XLSX/DOCX/PPTX) + OpenPDF (RTL Arabic, bundled Amiri font) |
 | Frontend | React 18 + Vite + TypeScript (`tss-grc-ui-v2`), Recharts, STOMP/SockJS |
@@ -1872,6 +1872,109 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A DERIVED VALUE WHOSE OUTPUT RANGE IS NARROWER THAN ITS COLUMN'S VOCABULARY DESTROYS THE
+  VALUES IT CANNOT EXPRESS** (F2-229, measured 2026-08-17). Executing F2-228's filed defect, the
+  population was re-derived first (F2-221). `FourthPartyExposureService.recomputeConcentration` runs
+  across the **whole tenant** on every create and every update, and it **ASSIGNED** the derived tier
+  where three artefacts said elevate: the service javadoc (*"auto-elevated to HIGH"*), the
+  repository javadoc (*"the service uses this to elevate `concentration_risk`"*) and the auto-CAPA
+  hook, written as a **rising edge** — a shape that only makes sense if the value is monotone.
+  Measured, identical in dev and prod: all 13 live rows carry **13 DISTINCT** fourth-party names, so
+  the multiplicity rule matches nothing and computes LOW for every row, and any write **lowered 9 of
+  13** — all three HIGH rows and the sole CRITICAL one (an underlying hyperscaler region). Same
+  family as F2-195's `|| N`: the correct rule sat in prose beside the place it was not applied.
+  🔑 **Multiplicity can justify LOW, MEDIUM or HIGH and no row count yields CRITICAL, so what the
+  derivation overwrote at the top of the ladder could never be restored by it.** Fixed with one
+  declared ladder (`ConcentrationTier`) read by the recompute, the CAPA edge and the ordering:
+  `multiplicityFloor` is a **floor**, `outranks` decides whether to raise, nothing lowers.
+  ⚠ **A RETIRED edge earns nobody a floor, and that matters MORE under elevation than under
+  assignment** — an inflated floor is now permanent, so excluding retired dependencies is part of
+  making the monotone rule sound rather than decoration. Latent today (no name appears twice in
+  either database), so it is asserted by test rather than observed in data.
+  ⚠⚠ **SECOND DEFECT, SAME REGISTER: A LEXICAL SORT PRESENTED AS A SEVERITY RANKING.**
+  `findByOrganisationIdOrderByConcentrationRiskDescDownstreamCriticalityDesc` is a derived method on
+  two NVARCHAR columns, and descending **alphabetically** LOW|MEDIUM|HIGH|CRITICAL reads MEDIUM,
+  LOW, HIGH, CRITICAL — so the **CRITICAL/CRITICAL row came back LAST of 13**, the three
+  HIGH/CRITICAL rows 10th–12th, on a page the frontend requests at `size=200` and renders in server
+  order. 🔑 **A lexical sort is a ranking only where the vocabulary happens to be in alphabetical
+  order, and severity ladders never are.** Replaced by a `CASE` rank checked token-for-token against
+  `ConcentrationTier.ladder()` by **reflection over the `@Query` annotation** — a `@Query` string is
+  necessarily a second copy of the order, and that is what stops it drifting.
+  ⚠⚠ **THIRD DEFECT: THE TOP TIER HAD NO DECLARATION ANYWHERE, AND SIX READER QUESTIONS EACH
+  DROPPED IT.** The entity's field javadoc said `LOW | MEDIUM | HIGH`, the frontend's
+  `FpConcentration` said the same, the table had **no CHECK constraint of any kind** — and the
+  column held CRITICAL on one row in both databases. So `FP_CONC_TONE[tier]` was `undefined`, the
+  concentration tab filtered `HIGH || MEDIUM` and **excluded the most concentrated row in the
+  register**, its chip under-counted (8 where 9 qualify) by summing *two separately spelled*
+  inclusion lists rather than the predicate the tab filters with (F2-197), and
+  `TprmConsolidatedOverview` plus the dashboard widget asked `=== 'HIGH'`. F2-196's rule on a tier:
+  **"elevated" must be a threshold over a declared ladder, never a second inclusion list** —
+  **7 equality comparisons across 3 files**, all now asking `isConcentrationAtLeast`. ⚠ The idiom
+  was already one component over: `TprmConsolidatedOverview` ranks the *adjacent* `residualRiskTier`
+  with its own `tierRank()` and the concentration column beside it never used it.
+  ⚠⚠ **MY OWN DETECTOR UNDER-REPORTED AND THE ANTI-VACUITY LEG IS THE ONLY REASON I KNOW.**
+  `MigrationVocabularies` keys its vocabularies **`schema.table.column`**; my first draft built the
+  entity-side key as `table.column` from `@Table(name)`, ignoring `@Table(schema)`. Every lookup
+  missed, every column read as having **no CHECK**, and the hard zero I had written **PASSED over a
+  population of 15** — while the throwaway census using the same key printed *"total columns
+  affected: 0"* and I read that as a measurement. Caught only by the leg asserting V377's own four
+  constraints are findable. 🔑 **A detector that cannot match reads exactly like a clean tree, and
+  it UNDER-reports — the quiet direction.** Nothing about the wrong answer's shape looked wrong.
+  ⚠⚠ **AND A HARD ZERO OVER THOSE 15 WOULD FAIL ON CORRECT CODE, WHICH IS THE ONE THING A GATE MUST
+  NEVER DO** (F2-214). A lexical sort of a closed vocabulary is a false ranking only where the
+  vocabulary is **ORDERED**; most of the 15 are **categorical** — `sust.esg_metric.category` is
+  [ENVIRONMENTAL, SOCIAL, GOVERNANCE], `admin.committee_form_templates.form_type` is
+  [AGENDA, ATTENDANCE, MOTION, …] — where an alphabetical sort is a deterministic grouping that
+  claims nothing. So the leg is an **exactly-asserted census with no verdicts** (F2-188), plus a
+  6-entry graded-String work list covering the two columns with no CHECK at all.
+  ⚠ **Two of the six were read, and they fall in OPPOSITE directions** — which is the whole argument
+  for a work list carrying no reasons. `MlModelRepository` is **accidentally correct**:
+  `WHERE m.riskTier IN ('CRITICAL','HIGH')` narrows the vocabulary to two tokens whose alphabetical
+  order *is* their severity order. `CommitteeMemberSkillRepository#findByDimension` sorts
+  `skillLevel DESC` over [BASIC, INTERMEDIATE, EXPERT] to answer *"does this committee have a
+  financial expert?"* (CMA Article 54) — ranking INTERMEDIATE above EXPERT.
+  ⚠ **The load-bearing narrowing is the field TYPE, and it is pinned by measurement.** A
+  graded-name locator returns 10 columns after the fix (12 before) and **4 are numeric**
+  (`automation_rules.priority`, `climate_risk_opportunity.risk_score`,
+  `communication_contacts.escalation_level`, `ot_asset.purdue_level`), where a lexical sort *is* a
+  correct numeric sort — 40% of the raw population. Held exactly, so deleting the String narrowing
+  changes an answer rather than an opinion.
+  ⚙ **V377** adds the table's **first four CHECK constraints**, scoped to the writers the same commit
+  closes (F2-183): `concentration_risk`/`status` are server-owned, and
+  `dependency_type`/`downstream_criticality` go through `ClosedVocabulary.require()`. Measured in
+  **both** databases first — 13 rows each, 0 violations and 0 non-canonical casings — so no
+  `WITH NOCHECK` and **no casing UPDATE**, checked rather than assumed because every writer either
+  normalises or writes a Java literal. `require` not `coerce`, per F2-182: the hand-rolled
+  `Set.contains` already refused, so nothing that succeeds today starts failing.
+  ⚠ **The pre-fix half was deliberately NOT re-run.** F2-228 already observed the flattening live —
+  and damaged this exact register doing it — while both defects are reproducible **read-only** (the
+  arithmetic, and the ordering). 🔑 **Re-running a destructive experiment to re-confirm a recorded
+  result is not verification, it is damage.** The post-fix probe plants its own rows and its
+  load-bearing assertion is that the 13 seeded rows are byte-identical after five writes, which is
+  exactly the property the fix establishes — so a wrong fix fails the probe.
+  ⚠ **Two harness results were mine, not the gate's.** M10 (the FIRST `CASE` ladder flipped to
+  `ASC`) **survived** a bare `contains("END DESC")` because the *second, untouched* ladder still
+  matched — F2-194's substring-satisfied-by-something-else, so the leg asserts by **count** now. And
+  M13's first form mutated the gate's own assertion to a weaker one, which always survives (F2-206);
+  replaced by a **data** mutation adding a phantom member. 17/17 after, plus one recorded
+  **EQUIVALENT** (the CAPA edge asking `equals` instead of `atLeast` — unreachable difference,
+  because the branch only runs when `outranks(floor, stored)` holds and the floor is never CRITICAL).
+  ⚠ **The CRLF anchor trap fired for the THIRD time in this lineage** (F2-212, F2-219): the frontend
+  is CRLF, the harness's anchors are LF, and two multi-line anchors reported ANCHOR-MISS. Normalise
+  the anchor to the target file's own line endings, and make an anchor miss exit non-zero as a
+  distinct outcome.
+  ⚠⚠ **FOUND IN THE BROWSER AFTER EVERY GATE WAS GREEN — SIXTH CONSECUTIVE SLICE — and it was the
+  LABEL.** `f4pKpiHighConc` read *"High concentration"*, which was **exact** while the predicate
+  counted exactly the HIGH rows and became imprecise the moment it counted HIGH *and above*.
+  🔑 **F2-212's rule from the inside: the slice that fixes a predicate is the slice that must fix the
+  label that accurately described the old one** — and check it **per language** (F2-208 found this
+  drift in the Arabic only, and Arabic is primary, house rule 7). Both now read as thresholds,
+  matching the tab label's own established `≥` convention.
+  ⚙ **Filed:** the 6-entry graded-String work list (`skill_level` is the sharpest);
+  the 15-column closed-vocabulary census, where a defect requires the vocabulary to be ORDERED and
+  that is a question for a reader; and F2-221's **201** state-ish columns with no CHECK, which no leg
+  of this gate can see.
+
 - ⚠⚠ **THE FATAL DOUBLE SAVE IS THE ONE WHOSE FIRST SAVE IS AN *INSERT*, AND THE READING
   CONFIRMED THREE SITES THE PROBE REFUTED** (F2-228, measured 2026-08-17). Executing F2-227's filed
   six-site work list, the population was re-derived first (F2-221) and **the detector was wrong in

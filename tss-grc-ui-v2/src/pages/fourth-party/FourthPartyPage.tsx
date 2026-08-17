@@ -18,7 +18,7 @@ import { statusLabel } from '../../lib/statusLabels';
 import { useToast } from '../../lib/toast';
 import {
   listFourthParty, validateFourthParty, mitigateFourthParty, retireFourthParty,
-  FP_STATUS_TONE, FP_CRIT_TONE, FP_CONC_TONE,
+  FP_STATUS_TONE, FP_CRIT_TONE, FP_CONC_TONE, isConcentrationAtLeast,
   type FourthPartyExposure,
 } from '../../lib/fourthParty';
 
@@ -58,22 +58,32 @@ export function FourthPartyPage() {
                 highConc: 0, critical: 0 };
     rows.forEach(r => {
       s[r.status]++;
-      if (r.concentrationRisk === 'HIGH') s.highConc++;
+      // F2-229: a threshold over the declared ladder, not `=== 'HIGH'`. The register holds a
+      // CRITICAL row in both databases and this counter skipped it.
+      if (isConcentrationAtLeast(r.concentrationRisk, 'HIGH')) s.highConc++;
       if (r.downstreamCriticality === 'CRITICAL') s.critical++;
     });
     return s;
   }, [rows]);
 
+  // The concentration tab is "at least MEDIUM", asked once. Spelled out as
+  // `HIGH || MEDIUM` it excluded the one CRITICAL row in the register — the tab built to
+  // surface concentration risk hid the most concentrated fourth party in it.
+  const isElevated = (r: FourthPartyExposure) =>
+    isConcentrationAtLeast(r.concentrationRisk, 'MEDIUM');
+
   const filtered = useMemo(() => {
     if (tab === 'all')           return rows;
-    if (tab === 'concentration') return rows.filter(r => r.concentrationRisk === 'HIGH' || r.concentrationRisk === 'MEDIUM');
+    if (tab === 'concentration') return rows.filter(isElevated);
     return rows.filter(r => r.status === tab);
   }, [tab, rows]);
 
   // `count` on each tab feeds the chip in Tabs.tsx; combined with
   // <Tabs hideEmpty> below, any status tab with 0 rows is dropped from
   // the bar entirely. "All" never gets `count` so it always stays visible.
-  const concentrationCount = stats.highConc + rows.filter(r => r.concentrationRisk === 'MEDIUM').length;
+  // Counted with the SAME predicate the tab filters by, so the chip cannot disagree with the list
+  // it opens (F2-197). It previously summed two separately-spelled inclusion lists.
+  const concentrationCount = rows.filter(isElevated).length;
   const tabs: TabItem<TabId>[] = [
     { id: 'all',           label: t('f4pTabAll') },
     { id: 'DISCOVERED',    label: t('f4pTabDiscovered'),    count: stats.DISCOVERED },

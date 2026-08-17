@@ -5741,7 +5741,7 @@ export const ar = {
   f4pPageSub:           'رسم خريطة موردي الموردين ورصد تركّز المخاطر حين يقف طرف رابع خلف أكثر من مورد رئيسي.',
   f4pKpiTotal:          'العلاقات المرسومة',
   f4pKpiValidated:      'تم التحقق',
-  f4pKpiHighConc:       'تركّز عالٍ',
+  f4pKpiHighConc:       'تركّز عالٍ+',
   f4pKpiCritical:       'حرج المسار',
   f4pTabAll:            'الكل',
   f4pTabDiscovered:     'مُكتشف',

@@ -1,6 +1,7 @@
 package com.tss.grc.module.scm.fourthparty.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ClosedVocabulary;
 import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.CreateRequest;
 import com.tss.grc.module.scm.fourthparty.dto.FourthPartyExposureDtos.UpdateRequest;
 import com.tss.grc.module.scm.fourthparty.entity.FourthPartyExposure;
@@ -18,31 +19,52 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Service surface for {@link FourthPartyExposure}.
  *
- * <p>{@code concentration_risk} is derived: when the same fourth party appears
- * behind ≥3 primaries it's auto-elevated to HIGH; ≥2 → MEDIUM; otherwise LOW.
- * Re-runs every time we save.
+ * <p>{@code concentration_risk} is an <b>assessment</b> of how systemically important a fourth party
+ * is, which the platform may raise but never lower: when the same fourth party appears behind ≥3
+ * live primaries it is auto-elevated to at least HIGH; ≥2 → at least MEDIUM. See
+ * {@link ConcentrationTier} for the ladder and for what the word "elevated" cost when the code said
+ * it and did something else (F2-229).
  */
 @Service
 @RequiredArgsConstructor
 public class FourthPartyExposureService {
 
-    private static final Set<String> DEPENDENCY_TYPES = Set.of(
+    /**
+     * The four vocabularies this register enforces, each naming the {@code CHECK} V377 adds. Before
+     * V377 the table had <b>no check constraints at all</b>, so these sets were the only narrowing
+     * and nothing compared them with the column.
+     *
+     * <p>{@code require} rather than {@code coerce} throughout, per F2-182's test: the previous
+     * hand-rolled sets already <em>refused</em> anything outside the vocabulary, so every value that
+     * succeeds today is a case-variant of a legal token and refusing cannot break a working request.
+     * What changes is that {@code 'high'} is now normalised to {@code HIGH} instead of 400-ing, and
+     * the 400s that remain name the field and the allowed set.
+     */
+    private static final ClosedVocabulary DEPENDENCY_TYPE = ClosedVocabulary.of(
+            "dependencyType", "CK_fpe_dependency_type",
             "DATA_PROCESSING", "INFRASTRUCTURE", "SOFTWARE", "LOGISTICS", "FINANCIAL", "SUPPORT");
-    private static final Set<String> CRIT = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
-    private static final Set<String> STATUSES = Set.of("DISCOVERED", "VALIDATED", "MITIGATED", "RETIRED");
+    private static final ClosedVocabulary DOWNSTREAM_CRITICALITY = ClosedVocabulary.of(
+            "downstreamCriticality", "CK_fpe_downstream_criticality",
+            "LOW", "MEDIUM", "HIGH", "CRITICAL");
+    static final ClosedVocabulary STATUS = ClosedVocabulary.of(
+            "status", "CK_fpe_status", "DISCOVERED", "VALIDATED", "MITIGATED", "RETIRED");
+
+    /** The workflow states this service writes. Server-owned: no caller supplies a status. */
+    static final String DISCOVERED = "DISCOVERED";
+    static final String VALIDATED = "VALIDATED";
+    static final String MITIGATED = "MITIGATED";
+    static final String RETIRED = "RETIRED";
 
     private final FourthPartyExposureRepository repo;
     @Autowired(required = false) private TprmAutomationService automation;
 
     @Transactional(readOnly = true)
     public Page<FourthPartyExposure> list(Pageable pageable) {
-        return repo.findByOrganisationIdOrderByConcentrationRiskDescDownstreamCriticalityDesc(
-                TenantContext.getCurrentTenant(), pageable);
+        return repo.findRegisterByConcentration(TenantContext.getCurrentTenant(), pageable);
     }
 
     @Transactional(readOnly = true)
@@ -68,8 +90,8 @@ public class FourthPartyExposureService {
         e.setPrimaryVendorName(req.primaryVendorName());
         e.setFourthPartyName(req.fourthPartyName());
         e.setFourthPartyCountry(req.fourthPartyCountry());
-        e.setDependencyType(req.dependencyType());
-        e.setDownstreamCriticality(req.downstreamCriticality());
+        e.setDependencyType(DEPENDENCY_TYPE.require(req.dependencyType()));
+        e.setDownstreamCriticality(DOWNSTREAM_CRITICALITY.require(req.downstreamCriticality()));
         e.setServiceDescriptionEn(req.serviceDescriptionEn());
         e.setServiceDescriptionAr(req.serviceDescriptionAr());
         e.setDataCategoriesShared(req.dataCategoriesShared());
@@ -81,8 +103,10 @@ public class FourthPartyExposureService {
         validate(e);
         e.setId(null);
         e.setOrganisationId(TenantContext.getCurrentTenant());
-        e.setStatus("DISCOVERED");           // force initial workflow state
-        e.setConcentrationRisk("LOW");        // derived by recomputeConcentration()
+        e.setStatus(DISCOVERED);             // force initial workflow state
+        // The initial assessment. recomputeConcentration() may RAISE it if this fourth party already
+        // sits behind two or more live primaries; nothing lowers it afterwards.
+        e.setConcentrationRisk(ConcentrationTier.ladder().get(0));
         e.setIsDeleted((short) 0);
         e.setIsActive((short) 1);
         FourthPartyExposure saved = repo.save(e);
@@ -97,8 +121,10 @@ public class FourthPartyExposureService {
         if (req.primaryVendorName() != null) existing.setPrimaryVendorName(req.primaryVendorName());
         if (req.fourthPartyName() != null) existing.setFourthPartyName(req.fourthPartyName());
         existing.setFourthPartyCountry(req.fourthPartyCountry());
-        if (req.dependencyType() != null) existing.setDependencyType(req.dependencyType());
-        if (req.downstreamCriticality() != null) existing.setDownstreamCriticality(req.downstreamCriticality());
+        if (req.dependencyType() != null)
+            existing.setDependencyType(DEPENDENCY_TYPE.require(req.dependencyType()));
+        if (req.downstreamCriticality() != null)
+            existing.setDownstreamCriticality(DOWNSTREAM_CRITICALITY.require(req.downstreamCriticality()));
         if (req.serviceDescriptionEn() != null) existing.setServiceDescriptionEn(req.serviceDescriptionEn());
         existing.setServiceDescriptionAr(req.serviceDescriptionAr());
         existing.setDataCategoriesShared(req.dataCategoriesShared());
@@ -117,7 +143,7 @@ public class FourthPartyExposureService {
     @Transactional
     public FourthPartyExposure validate(Long id, String validatorName) {
         FourthPartyExposure ex = get(id);
-        ex.setStatus("VALIDATED");
+        ex.setStatus(VALIDATED);
         ex.setLastValidatedAt(LocalDateTime.now());
         ex.setValidatorName(validatorName);
         return repo.save(ex);
@@ -126,7 +152,7 @@ public class FourthPartyExposureService {
     @Transactional
     public FourthPartyExposure mitigate(Long id, String notesEn) {
         FourthPartyExposure ex = get(id);
-        ex.setStatus("MITIGATED");
+        ex.setStatus(MITIGATED);
         ex.setMitigationNotesEn(notesEn);
         return repo.save(ex);
     }
@@ -134,40 +160,63 @@ public class FourthPartyExposureService {
     @Transactional
     public FourthPartyExposure retire(Long id) {
         FourthPartyExposure ex = get(id);
-        ex.setStatus("RETIRED");
+        ex.setStatus(RETIRED);
         return repo.save(ex);
     }
 
+    /**
+     * Status is the only field left for this to check: {@code dependencyType} and
+     * {@code downstreamCriticality} are now normalised by their vocabularies at the two sites where a
+     * caller's value arrives, so re-checking them here would be a second opinion nobody reads
+     * (F2-190). Status never comes from a caller at all — it is checked because this method runs on
+     * both write paths and a status the vocabulary does not declare would be a defect somewhere else
+     * in this class.
+     */
     private void validate(FourthPartyExposure r) {
-        if (r.getDependencyType() == null || !DEPENDENCY_TYPES.contains(r.getDependencyType()))
-            throw new IllegalArgumentException("dependencyType must be one of " + DEPENDENCY_TYPES);
-        if (r.getDownstreamCriticality() == null || !CRIT.contains(r.getDownstreamCriticality()))
-            throw new IllegalArgumentException("downstreamCriticality must be one of " + CRIT);
-        if (r.getStatus() != null && !STATUSES.contains(r.getStatus()))
-            throw new IllegalArgumentException("status must be one of " + STATUSES);
+        if (r.getStatus() != null && !STATUS.tokens().contains(r.getStatus()))
+            throw new IllegalArgumentException("status must be one of " + STATUS.tokens());
     }
 
-    /** Recompute concentration tier across the whole tenant. */
+    /**
+     * Raise every row in the tenant to the concentration tier its live multiplicity justifies.
+     *
+     * <p><b>Elevation only.</b> See {@link ConcentrationTier} for what this method used to do and
+     * what it cost: it assigned the computed tier unconditionally, and because all 13 live rows carry
+     * distinct fourth-party names the computed tier is LOW for every one of them, so any create or
+     * update anywhere in the register flattened nine of thirteen — every HIGH row and the sole
+     * CRITICAL one — in both dev and prod.
+     *
+     * <p><b>A RETIRED edge earns nobody a floor.</b> Concentration is the exposure that exists
+     * because several primaries depend on the same fourth party; a retired dependency is not one of
+     * them. This matters more under elevation than it did under assignment: an inflated floor is now
+     * permanent, because nothing lowers a tier. Latent today — no fourth-party name appears twice in
+     * either database — so it is asserted by test rather than observed in data.
+     */
     private void recomputeConcentration() {
         Long org = TenantContext.getCurrentTenant();
-        List<Object[]> rows = repo.concentrationCounts(org);
-        Map<String, Long> counts = new HashMap<>();
-        for (Object[] r : rows) counts.put((String) r[0], ((Number) r[1]).longValue());
+        List<FourthPartyExposure> all = repo.findByOrganisationId(org);
 
-        Page<FourthPartyExposure> all = repo.findByOrganisationIdOrderByConcentrationRiskDescDownstreamCriticalityDesc(
-                org, Pageable.unpaged());
+        Map<String, Long> livePrimaries = new HashMap<>();
         for (FourthPartyExposure ex : all) {
-            long n = counts.getOrDefault(ex.getFourthPartyName(), 1L);
-            String tier = n >= 3 ? "HIGH" : n == 2 ? "MEDIUM" : "LOW";
-            String previous = ex.getConcentrationRisk();
-            if (!tier.equals(previous)) {
-                ex.setConcentrationRisk(tier);
-                FourthPartyExposure saved = repo.save(ex);
-                // Enhancement E: only fire the auto-CAPA on the rising edge —
-                // when concentration is newly elevated to HIGH.
-                if ("HIGH".equals(tier) && !"HIGH".equals(previous) && automation != null) {
-                    automation.onFourthPartyHighConcentration(saved);
-                }
+            if (RETIRED.equals(ex.getStatus())) continue;
+            livePrimaries.merge(ex.getFourthPartyName(), 1L, Long::sum);
+        }
+
+        for (FourthPartyExposure ex : all) {
+            String stored = ex.getConcentrationRisk();
+            String floor = ConcentrationTier.multiplicityFloor(
+                    livePrimaries.getOrDefault(ex.getFourthPartyName(), 0L));
+            if (!ConcentrationTier.outranks(floor, stored)) continue;
+
+            ex.setConcentrationRisk(floor);
+            FourthPartyExposure saved = repo.save(ex);
+            // Enhancement E: fire the auto-CAPA only on the rising edge into HIGH. Asking `atLeast`
+            // rather than `equals` is what keeps that honest now CRITICAL exists: a row already at
+            // CRITICAL has not newly become highly concentrated.
+            if (ConcentrationTier.atLeast(floor, "HIGH")
+                    && !ConcentrationTier.atLeast(stored, "HIGH")
+                    && automation != null) {
+                automation.onFourthPartyHighConcentration(saved);
             }
         }
     }

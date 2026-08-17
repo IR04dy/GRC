@@ -9,7 +9,7 @@ import { HeatMap, type HeatCell } from '../../components/viz/HeatMap';
 import { BarChart3D } from '../../components/viz/BarChart3D';
 import type { DashboardStats, ComplianceFindingDto } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
-import { listFourthParty } from '../../lib/fourthParty';
+import { listFourthParty, isConcentrationAtLeast } from '../../lib/fourthParty';
 // W2-1a-ii: these four widgets used to compute from mock datasets (mockTprm, mockChanges,
 // mockCompliance) imported at module scope, so the dashboard's regulator RAG, CAB queue and
 // overdue-reassessment KPIs were derived from records that do not exist in the tenant.
@@ -664,7 +664,8 @@ function TprmSnapshotWidget({ t }: { t: (k: string) => string }) {
         ]);
         setC({
           fp:           a.content.length,
-          fpHigh:       a.content.filter((r: any) => r.concentrationRisk === 'HIGH').length,
+          // F2-229: a threshold over the declared ladder — `=== 'HIGH'` skipped the CRITICAL row.
+          fpHigh:       a.content.filter((r: any) => isConcentrationAtLeast(r.concentrationRisk, 'HIGH')).length,
           tpc:          b.content.length,
           tpcHigh:      b.content.filter((r: any) => r.residualRiskTier === 'HIGH' || r.residualRiskTier === 'CRITICAL').length,
           proc:         p.content.length,

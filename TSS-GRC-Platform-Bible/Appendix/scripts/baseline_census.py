@@ -111,8 +111,8 @@ PUBLISHED = {
     "zero_test_packages": 7,
     "jpa_schemas": 50,                  # code census; the DB holds 51 — `audit` is unknown to JPA
     "db_schemas_dev": 51,
-    "migration_files": 364,          # +V376 (F2-221, the two status vocabularies F2-220 filed)
-    "migration_head": 376,
+    "migration_files": 365,          # +V377 (F2-229, the fourth-party register's first CHECKs)
+    "migration_head": 377,
     "flyway_baseline": 292,             # read from prod's flyway_schema_history, never from prose
     "fe_pages": 353,          # F2-142 -3; F2-16 +12; F2-163 +1; F2-198 -1 (/ropa); F2-199 -1 (/nca-ecc-export); F2-203 +1 (AuditLifecycleTabs); F2-204 +1 (RiskLifecycleCards)
                              # -1 F2-198: RopaPage retired — 9 invented PDPL Art.31 activities against

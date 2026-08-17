@@ -8,7 +8,7 @@ import { Card } from '../ui/Card';
 import { Kpi } from '../ui/Kpi';
 import { Badge } from '../ui/Badge';
 import { useI18n } from '../../lib/i18n';
-import { listFourthParty,        type FourthPartyExposure } from '../../lib/fourthParty';
+import { listFourthParty, isConcentrationAtLeast, type FourthPartyExposure } from '../../lib/fourthParty';
 import { listTpc,                type ThirdPartyCyberAssessment } from '../../lib/thirdPartyCyber';
 import { listSrt,                type SupplierResilienceTest } from '../../lib/resilienceTests';
 import { listProcessorAssessments, type ProcessorAssessment } from '../../lib/processorAssessments';
@@ -55,7 +55,9 @@ export function TprmConsolidatedOverview() {
   }, []);
 
   // ── Roll-ups ─────────────────────────────────────────────────────────────
-  const fpHighConc   = fp.filter(r => r.concentrationRisk === 'HIGH').length;
+  // F2-229: a threshold over the declared ladder. `=== 'HIGH'` skipped the CRITICAL row — and this
+  // file already ranked the adjacent residual tier with tierRank(), so the idiom was here all along.
+  const fpHighConc   = fp.filter(r => isConcentrationAtLeast(r.concentrationRisk, 'HIGH')).length;
   const tpcHigh      = tpc.filter(r => r.residualRiskTier === 'HIGH' || r.residualRiskTier === 'CRITICAL').length;
   const tpcOk        = tpc.filter(r => r.residualRiskTier === 'LOW' || r.residualRiskTier === 'MODERATE').length;
   const procFail     = proc.filter(r => r.overallOutcome === 'FAIL').length;
@@ -81,7 +83,7 @@ export function TprmConsolidatedOverview() {
     if (!r) { r = { vendor: name, fpEdges: 0, fpHighConc: 0, tpcResidual: null, procFails: 0, procPwc: 0, srtFail: 0, srtNextDue: null, dsaActive: 0 }; byVendor.set(name, r); }
     return r;
   }
-  fp.forEach(r => { const row = getRow(r.primaryVendorName); row.fpEdges++; if (r.concentrationRisk === 'HIGH') row.fpHighConc++; });
+  fp.forEach(r => { const row = getRow(r.primaryVendorName); row.fpEdges++; if (isConcentrationAtLeast(r.concentrationRisk, 'HIGH')) row.fpHighConc++; });
   tpc.forEach(r => { const row = getRow(r.vendorName); if (!row.tpcResidual || tierRank(r.residualRiskTier) > tierRank(row.tpcResidual)) row.tpcResidual = r.residualRiskTier; });
   proc.forEach(r => { const row = getRow(r.processorName); if (r.overallOutcome === 'FAIL') row.procFails++; if (r.overallOutcome === 'PASS_WITH_CONDITIONS') row.procPwc++; });
   srt.forEach(r => { const row = getRow(r.vendorName); if (r.outcome === 'FAIL') row.srtFail++; if (r.status === 'SCHEDULED' && r.scheduledFor && (!row.srtNextDue || r.scheduledFor < row.srtNextDue)) row.srtNextDue = r.scheduledFor; });
