@@ -15,12 +15,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -293,6 +296,49 @@ class CmaDisclosureServiceTest {
     /** An authenticated principal whose username is the approver identity. */
     private static GrcUserDetails user(String username) {
         return new GrcUserDetails(7L, ORG_ID, username, "x", true, true, List.of());
+    }
+
+    // ── F2-231 — an echo is not a review, and a change is ────────────
+    //
+    // ⚠ These exist because the mutation harness predicted the gap and then proved it: reverting the
+    // TCFD half was KILLED by its own tests, and reverting THIS half — the service TcfdItemService's
+    // javadoc says it mirrors — SURVIVED the whole build. 🔑 Fixing two services and testing one
+    // leaves the untested one free to drift back, which is how the pair diverged in the first place
+    // (the SEC-ESG-003 scrub that lived here and not there).
+
+    @Test
+    void update_echoingTheSameStatusIsNotAReview() {
+        CmaDisclosure cur = disclosure("UNDER_REVIEW", "EV-1");
+        cur.setLastReviewedAt(LocalDateTime.of(2026, 1, 1, 9, 0));
+        when(repo.findByIdAndOrganisationId(5L, ORG_ID)).thenReturn(Optional.of(cur));
+        when(repo.save(any(CmaDisclosure.class))).thenAnswer(i -> i.getArgument(0));
+
+        CmaDisclosure req = new CmaDisclosure();
+        req.setTitleEn("Test disclosure (reworded)");
+        req.setDisclosureStatus("UNDER_REVIEW");          // the echo the ESG tab always sends
+
+        CmaDisclosure saved = service.update(5L, req);
+
+        assertThat(saved.getLastReviewedAt()).isEqualTo(LocalDateTime.of(2026, 1, 1, 9, 0));
+        verify(audit).log(eq("UPDATE"), eq("CmaDisclosure"), any(), anyString());
+    }
+
+    @Test
+    void update_changingTheStatusStampsTheReviewClockAndLogsATransition() {
+        CmaDisclosure cur = disclosure("UNDER_REVIEW", "EV-1");
+        cur.setLastReviewedAt(LocalDateTime.of(2026, 1, 1, 9, 0));
+        when(repo.findByIdAndOrganisationId(5L, ORG_ID)).thenReturn(Optional.of(cur));
+        when(repo.save(any(CmaDisclosure.class))).thenAnswer(i -> i.getArgument(0));
+
+        CmaDisclosure req = new CmaDisclosure();
+        req.setDisclosureStatus("DISCLOSED");
+
+        CmaDisclosure saved = service.update(5L, req);
+
+        assertThat(saved.getDisclosureStatus()).isEqualTo("DISCLOSED");
+        assertThat(saved.getLastReviewedAt()).isAfter(LocalDateTime.of(2026, 1, 1, 9, 0));
+        verify(audit).log(eq("TRANSITION"), eq("CmaDisclosure"), any(),
+                          contains("UNDER_REVIEW -> DISCLOSED"));
     }
 
     // ── Helpers ─────────────────────────────────────────────────────

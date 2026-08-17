@@ -123,28 +123,67 @@ class ServerStampedFieldContractTest {
      * deleted in the same commit, so it cannot quietly outlive its subject.
      *
      * <p>The honest artefact for an <i>unread</i> population is still {@link #REPORT} plus
-     * {@link #BASELINE_CONTRADICTED_SERVICES}, which is why that figure survives at zero rather than
-     * being replaced by this map.
+     * {@link #BASELINE_CONTRADICTED_SERVICES}, which is why that figure survives as a work list
+     * rather than being replaced by this map.
+     *
+     * <p>⚠⚠ <b>F2-231 re-keyed this map from a SERVICE to a {@code Service::Type#field}.</b> A
+     * per-service exemption cannot say "closed except for this one field, for this reason", so the
+     * moment a CLOSED service turned out to have one genuinely-by-design field the model forced a
+     * false choice: drop the whole service out of the hard zero, or refuse a correct design. That is
+     * F2-185b's headline one level up — <b>the granularity of the verdict has to match the
+     * granularity of the finding</b> — and it also means a service already carrying an exemption no
+     * longer hides a NEW contradiction on a different field of the same type.
      */
-    private static final Map<String, String> BY_DESIGN = Map.of(
-        "NdiSettingService",
+    private static final Map<String, String> BY_DESIGN = Map.ofEntries(
+        Map.entry("NdiSettingService::NdiSetting#valueText",
         "resetToDefault() restores value_text FROM THE ROW's own default_value, which is a server "
         + "value only because the row already holds it. Supplying the value is the entire point of "
-        + "creating a setting; there is no decision, no attribution and no state being reached.",
+        + "creating a setting; there is no decision, no attribution and no state being reached."),
 
-        "SgiCommitmentService",
+        Map.entry("SgiCommitmentService::SgiCommitment#currentValue",
         "refreshValue() pulls current_value from a linked ESG_METRIC or GHG_TOTAL source, and gates "
         + "on value_source != MANUAL. For a MANUAL commitment the class javadoc states that a human "
         + "owns the number, so create/update writing it is the declared design. The APPROVE-guarded "
         + "achieve() reads it, and is defended separately: Rule C refuses an achiever who is the "
-        + "last editor, and Rule D requires attached evidence.",
+        + "last editor, and Rule D requires attached evidence."),
 
-        "NdiComplianceAssessmentService",
+        Map.entry("SgiCommitmentService::SgiCommitment#currentValueAsOf",
+        "The as-of date of the number above, and it travels with it: for a MANUAL commitment the "
+        + "human supplying current_value is the only source of when that value was true. "
+        + "refreshValue() stamps both together for a LINKED commitment, which is why the pair "
+        + "appears here as a pair rather than one field with a clock the caller must not name."),
+
+        Map.entry("NdiComplianceAssessmentService::NdiComplianceAssessment#complianceStatus",
         "update() is a null-guarded partial update on the same NDI:WRITE authority as setStatus() "
-        + "and attachEvidence(); recording compliance_status and evidence_status is what an assessor "
-        + "does on this register. The approval that IS guarded is lifecycle_status, and both paths "
-        + "refuse an APPROVED row outright. complianceStatus additionally goes through "
-        + "ClosedVocabulary#require on both routes, so the vocabularies cannot diverge.");
+        + "and attachEvidence(); recording compliance_status is what an assessor does on this "
+        + "register. The approval that IS guarded is lifecycle_status, and both paths refuse an "
+        + "APPROVED row outright. It additionally goes through ClosedVocabulary#require on both "
+        + "routes, so the vocabularies cannot diverge."),
+
+        Map.entry("NdiComplianceAssessmentService::NdiComplianceAssessment#evidenceStatus",
+        "The sibling of the field above, on the same route, under the same NDI:WRITE authority and "
+        + "the same refusal for an APPROVED row: recording whether the evidence for a control is "
+        + "present is the assessor's own observation, not the outcome of a guarded decision."),
+
+        // ── F2-231 — read in this slice, both halves, both services ────────────────────────
+        Map.entry("TcfdItemService::TcfdItem#disclosureStatus",
+        "The entity declares `= \"UNDER_REVIEW\"` as a FIELD INITIALISER, so an omitted key "
+        + "deserialises to that value and update()'s null-guard cannot tell absence from a real "
+        + "UNDER_REVIEW. EsgTcfdTab therefore echoes the current status back on every save and says "
+        + "so in a comment; refusing the field would silently downgrade every reviewer's "
+        + "classification, and refusing it on create would break a form that sends it explicitly. "
+        + "What F2-231 DID fix is the part that was wrong: update() now routes a CHANGED status "
+        + "through markReviewed(), the one writer of the (status, last_reviewed_at) pair that "
+        + "transition() uses, and logs a TRANSITION row naming from and to — so the two routes no "
+        + "longer differ on the review clock and the audit trail (F2-188/F2-191's shape). An echo is "
+        + "not a review and is left alone."),
+
+        Map.entry("CmaDisclosureService::CmaDisclosure#disclosureStatus",
+        "The same field, the same initialiser, the same echoing tab comment, and the same F2-231 fix "
+        + "in the service TcfdItemService's javadoc says it mirrors. Recorded separately rather than "
+        + "as one entry for both, because a shared reason is how two registers drift while looking "
+        + "reviewed — and CMA's create additionally carries the SEC-ESG-003 scrub that the TCFD "
+        + "mirror was missing, which is what F2-231 found."));
 
     /**
      * Everything else, as a decrease-only figure rather than a set of hand-written verdicts.
@@ -159,8 +198,29 @@ class ServerStampedFieldContractTest {
      * <p>Lower this in the commit that closes a service, having re-derived it from the gate's own
      * output rather than subtracting from the number written here (F2-207's rule: a ceiling left in
      * place after a sweep makes a tolerated member indistinguishable from a reviewed one).
+     *
+     * <p>⚠⚠ <b>F2-231 raised this from 0 to 13, and the reason is the point.</b> The figure was a hard
+     * zero over a population {@code isGuardedRoute} could see 280 of 409 members of — so it was
+     * green over three real contradictions that F2-218/219/220 never had a chance to adjudicate.
+     * Widening the predicate moved the ANSWER, not the question, so the number moves and says why
+     * (F2-205's rule, and the opposite of F2-204's, where a ratchet's question was wrong and it was
+     * re-scoped instead). It stays decrease-only and may never be raised again for any other reason.
+     *
+     * <p>⚙ <b>All five sites the widening exposed were adjudicated in F2-231 itself</b> — and the
+     * gate's own output said <b>five in three services</b> where my prose had said three, which is why
+     * the run is the authority and not the note. Two were REFUTED by narrowing the detector
+     * ({@code NdiImprovementPlanService#addItem/#updateItem} :: {@code sequenceOrder} — see
+     * {@link #IDENTITY_ACCESSORS}), one was FIXED and probed live
+     * ({@code PolicyManagementService#createException}), and two are BY DESIGN with the residual
+     * defect inside them fixed ({@code TcfdItemService#create/#update} :: {@code disclosureStatus}).
+     *
+     * <p>13 → 11, re-derived from the gate's own printed figure rather than subtracted from the number
+     * that was here (F2-207). The remaining eleven are a WORK LIST with <b>no verdicts</b> (F2-188):
+     * read the service, record CLOSED / INERT / BY DESIGN, lower this in the same commit. Do not write
+     * reasons for them here first — that is the failure mode F2-188 measured at five claims, five false.
      */
-    private static final int BASELINE_CONTRADICTED_SERVICES = 0;
+    private static final int BASELINE_CONTRADICTED_SERVICES = 11;
+
 
     // ── source plumbing ──────────────────────────────────────────────────────
 
@@ -368,6 +428,23 @@ class ServerStampedFieldContractTest {
      */
     static Set<String> stampsServerValue(String body, Map<String, String> types,
                                          Set<String> requestLocals, Set<String> paramNames) {
+        return stampsServerValue(body, types, requestLocals, paramNames, Map.of());
+    }
+
+    /**
+     * As above, following a one-hop call to a private helper that does the stamping.
+     *
+     * <p>F2-231 — the mirror of {@link #writesFromRequest(String, Map, Set, Map)}, and it was found by
+     * a corpus rather than by reasoning: a test written for the write half returned an empty set,
+     * because the fixture relocated <b>both</b> setters into the helper and nothing was left for the
+     * stamp half to see. 🔑 The two halves have the same blind spot, and the stamp half is the worse
+     * one — a service that extracts its stamping into a helper does not merely lose a field, it drops
+     * out of the population entirely, because {@code measure()} skips a source whose stamped map is
+     * empty. One instrument, both directions.
+     */
+    static Set<String> stampsServerValue(String body, Map<String, String> types,
+                                         Set<String> requestLocals, Set<String> paramNames,
+                                         Map<String, Set<String>> helperStamps) {
         Set<String> out = new TreeSet<>();
         Matcher m = SETTER.matcher(body);
         while (m.find()) {
@@ -379,12 +456,41 @@ class ServerStampedFieldContractTest {
             String type = types.get(m.group(1));
             if (type != null) out.add(key(type, lower(m.group(2))));
         }
+        for (var e : helperStamps.entrySet()) {
+            if (Pattern.compile("\\b" + Pattern.quote(e.getKey()) + "\\s*\\(").matcher(body).find()) {
+                out.addAll(e.getValue());
+            }
+        }
         return out;
     }
 
     /** Fields this method writes FROM the request object, on any target. */
     static Set<String> writesFromRequest(String body, Map<String, String> types,
                                          Set<String> requestLocals) {
+        return writesFromRequest(body, types, requestLocals, Map.of());
+    }
+
+    /**
+     * As above, following a one-hop call to a private helper that does the setting.
+     *
+     * <p>⚠⚠ <b>F2-231 — this gate followed a private helper for the REFUSAL half
+     * ({@link #refusingHelperNames}) and not for the WRITE half, and my own fix in the same slice
+     * walked into the gap.</b> Extracting {@code markReviewed(cur, req.getDisclosureStatus())} — the
+     * right design, one writer of the (status, review-stamp) pair — moved the {@code setDisclosureStatus}
+     * call out of the route's own body, so {@link #SETTER} stopped matching and
+     * {@code TcfdItemService#update} left the population <b>looking closed</b>. 🔑 A refactor that
+     * relocates a write into a helper is indistinguishable, to a setter-site scan, from a fix that
+     * removed it — and the direction is the quiet one: the population shrinks.
+     *
+     * <p>Same shape as F2-182's rule ("a guard sits in at least four places a setter-site regex
+     * cannot see", one of them a shared validate), now on the write side. The helper's fields are
+     * keyed by its own <b>declared parameter types</b>, and it counts only when the call passes
+     * something that reads the request — a helper called with two server values writes nothing of the
+     * caller's.
+     */
+    static Set<String> writesFromRequest(String body, Map<String, String> types,
+                                         Set<String> requestLocals,
+                                         Map<String, Set<String>> helperWrites) {
         Set<String> out = new TreeSet<>();
         Matcher m = SETTER.matcher(body);
         while (m.find()) {
@@ -394,8 +500,80 @@ class ServerStampedFieldContractTest {
             String type = types.get(m.group(1));
             if (type != null) out.add(key(type, lower(m.group(2))));
         }
+        for (var e : helperWrites.entrySet()) {
+            Matcher c = Pattern.compile("\\b" + Pattern.quote(e.getKey()) + "\\s*\\(([^;]*?)\\)\\s*;")
+                .matcher(body);
+            while (c.find()) {
+                if (readsRequest(c.group(1), requestLocals)) out.addAll(e.getValue());
+            }
+        }
         return out;
     }
+
+    /**
+     * Private helpers in this source, and the {@code Type#field}s each writes on its own parameters.
+     *
+     * <p>Only setters whose value comes from one of the helper's <b>scalar parameters</b> count: that
+     * is the shape that forwards caller data (F2-218's fourth detector correction — a scalar method
+     * parameter is still caller data). A helper writing a literal or a clock reading of its own is
+     * stamping, not forwarding, and must not be attributed to whoever called it.
+     */
+    static Map<String, Set<String>> helperWrittenFields(String src) {
+        return helperFields(src, true);
+    }
+
+    /**
+     * The mirror: private helpers and the {@code Type#field}s each stamps with a value of the
+     * <b>server's</b> own (a literal, a clock reading, the principal) rather than forwarding a
+     * parameter. See {@link #stampsServerValue(String, Map, Set, Set, Map)} for why both are needed.
+     */
+    static Map<String, Set<String>> helperStampedFields(String src) {
+        return helperFields(src, false);
+    }
+
+    /**
+     * One walk, two answers, so the forwarding and stamping halves cannot disagree about what a
+     * helper does — {@code markReviewed(cur, to)} does BOTH (it forwards {@code to} into
+     * {@code setDisclosureStatus} and stamps {@code setLastReviewedAt(now())}), which is why the
+     * classification is per SETTER and never per helper.
+     *
+     * @param forwarding {@code true} for setters whose value is one of the helper's scalar parameters
+     *                   (caller data — F2-218's fourth correction), {@code false} for the rest.
+     */
+    private static Map<String, Set<String>> helperFields(String src, boolean forwarding) {
+        Map<String, Set<String>> out = new LinkedHashMap<>();
+        Matcher m = Pattern.compile(
+            "(?m)^\\s*private\\s+(?:static\\s+)?[\\w.<>\\[\\], ]+?\\s+([a-z]\\w*)\\s*\\(([^)]*)\\)")
+            .matcher(src);
+        while (m.find()) {
+            int brace = src.indexOf('{', m.end());
+            if (brace < 0) continue;
+            String body = balancedBlock(src, brace);
+            Map<String, String> types = localTypes(m.group(2), body);
+            Set<String> scalars = new TreeSet<>();
+            for (String p : m.group(2).split(",")) {
+                String[] parts = p.trim().split("\\s+");
+                if (parts.length == 2 && SCALAR_PARAM_TYPES.contains(parts[0])) scalars.add(parts[1]);
+            }
+            Set<String> fields = new TreeSet<>();
+            Matcher s = SETTER.matcher(body);
+            while (s.find()) {
+                String type = types.get(s.group(1));
+                if (type == null) continue;
+                String value = s.group(3).trim();
+                boolean isForward = scalars.contains(value);
+                if (isForward != forwarding) continue;
+                if (!forwarding && (value.isEmpty() || value.equals("null"))) continue;
+                fields.add(key(type, lower(s.group(2))));
+            }
+            if (!fields.isEmpty()) out.put(m.group(1), fields);
+        }
+        return out;
+    }
+
+    /** Parameter types that carry a single caller value rather than a payload object. */
+    private static final Set<String> SCALAR_PARAM_TYPES = Set.of(
+        "String", "Long", "Integer", "Short", "Boolean", "BigDecimal", "LocalDate", "LocalDateTime");
 
     // ── F2-219 — a DEFAULT is not a settlement ───────────────────────────────
 
@@ -613,45 +791,228 @@ class ServerStampedFieldContractTest {
      * A guarded route: it loads a row and refuses a wrong current state. Both halves matter — the
      * load is what makes it a transition rather than a create, and the refusal is what makes it a
      * control rather than a setter with a longer name.
+     *
+     * <p>⚠⚠ <b>F2-231 — this predicate recognised 280 of 409 server-stamped field pairs, and the
+     * hard zero below was green over the 32% it could not see.</b> Two clauses were narrower than
+     * their intent, and both fired on {@code PrivacyService}, hiding <em>all five</em> guarded routes
+     * in the PDPL module at once:
+     * <ol>
+     *   <li>{@code if (isWritePath(name)) return false;} — {@code isWritePath} matches
+     *       {@code record|save|add|upsert|ingest}, so a guarded TRANSITION named with a write verb
+     *       was excluded. {@code PrivacyService#recordSdaiaSubmission} throws
+     *       {@code IllegalStateException} on the terminal ACKNOWLEDGED state and stamps
+     *       {@code sdaiaSubmittedAt} — the discharge of the PDPL Article 31 clock — and never
+     *       reached line two of this method.</li>
+     *   <li>{@code refuses} named exactly two exception families. {@code containBreach},
+     *       {@code closeBreach}, {@code startDsr}, {@code fulfilDsr} and {@code rejectDsr} all refuse
+     *       with {@code IllegalArgumentException}, and {@code DpiaService#approve} refuses through a
+     *       shared {@code require(d, "IN_REVIEW")} helper whose body throws it — F2-182's rule ("a
+     *       guard sits in at least four places a setter-site regex cannot see", one of them a shared
+     *       validate) applied to refusal detection rather than to setter detection.</li>
+     * </ol>
+     *
+     * <p>🔑 <b>The name test was never load-bearing.</b> A {@code create} cannot refuse on a state it
+     * has not loaded, because the row does not exist yet — so "loads a row AND refuses on that row's
+     * own state" is the whole discriminator, and the name clause only ever removed transitions.
+     *
+     * <p>The corrected predicate is a <b>UNION</b> with the original, deliberately: replacing it
+     * outright LOST 96 pairs the original finds (it counts a stamp on any type once the method loads
+     * and refuses, where the corrected one requires the stamped type to be the one it loaded). F2-225:
+     * verify a widening by what it ADDS, in both directions. 280 + 129 = 409.
      */
-    private static boolean isGuardedRoute(String name, String body) {
-        if (isWritePath(name)) return false;
-        boolean loads = body.matches("(?s).*\\b(get|find\\w*)\\s*\\(.*");
-        boolean refuses = body.matches("(?s).*\\bthrow new (IllegalState|IllegalTransition)\\w*Exception.*");
-        return loads && refuses;
+    static boolean isGuardedRoute(String name, String body, Set<String> refusingHelpers) {
+        return isLegacyGuardedRoute(name, body) || !guardedTypes(body, refusingHelpers).isEmpty();
+    }
+
+    /** Every refusal convention this codebase uses — F2-226 measured three, not one. */
+    private static final Pattern ANY_REFUSAL = Pattern.compile(
+        "\\bthrow new (IllegalState|IllegalTransition|IllegalArgument|BusinessRule"
+        + "|DomainAccessDenied|Conflict)\\w*Exception");
+    /** {@code Foo f = repo.findByIdAnd…(…)} / {@code mustGet(…)} — a row loaded, with its type. */
+    private static final Pattern LOAD_ASSIGN = Pattern.compile(
+        "\\b([A-Z]\\w*)\\s+([a-z]\\w*)\\s*=\\s*[\\w.]*\\b(?:mustGet|get\\w*|find\\w*)\\s*\\(");
+    private static final Pattern CALL_NAME = Pattern.compile("\\b([a-z]\\w*)\\s*\\(");
+
+    /**
+     * The entity types this body loaded a row of AND then refused on, by declared type.
+     *
+     * <p>Returning types rather than a boolean is what keeps the widening honest: the row a method
+     * refused on must be the row it stamps. Without that clause a {@code create} that loads a PARENT
+     * and validates it reads as a transition of its child, which put
+     * {@code AuthorityDocumentService#createCitation} and {@code QuestionnaireService#createQuestion}
+     * in the population "stamped by themselves".
+     */
+    private static Set<String> guardedTypes(String body, Set<String> refusingHelpers) {
+        Set<String> out = new TreeSet<>();
+        Map<String, String> loaded = new LinkedHashMap<>();
+        Matcher lm = LOAD_ASSIGN.matcher(body);
+        while (lm.find()) loaded.put(lm.group(2), lm.group(1));
+        if (loaded.isEmpty()) return out;
+        for (Map.Entry<String, String> e : loaded.entrySet()) {
+            String local = e.getKey();
+            boolean readsOwnState = readsAStateOf(local, body);
+            if (readsOwnState && ANY_REFUSAL.matcher(body).find()) {
+                out.add(e.getValue());
+                continue;
+            }
+            for (String h : refusingHelpers) {
+                if (Pattern.compile("\\b" + Pattern.quote(h) + "\\s*\\(\\s*" + Pattern.quote(local)
+                        + "\\b").matcher(body).find()) {
+                    out.add(e.getValue());
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Accessors that identify a row rather than describe its state.
+     *
+     * <p>F2-231 — reading a primary key, a tenant or an external reference tells you nothing about
+     * the value already there, so a refusal that follows is about <b>existence or membership</b>, not
+     * about the row's state. {@code NdiImprovementPlanService#reorder} was classified as a guarded
+     * transition of {@code sequenceOrder} on exactly that evidence: it does
+     * {@code byId.put(r.getId(), r)} and {@code if (r == null) throw new IllegalArgumentException(
+     * "Plan item " + id + " not in plan " + planId)} — a membership check — and then renumbers every
+     * item from a counter <b>without ever reading the previous value</b>. F2-220's discriminator is
+     * that the value a route accepts depends on the value already there; a bulk renumber is the
+     * opposite of that, and {@code sequence_order} is display order (no CHECK, 1–4 and 10–40 across
+     * 15 rows, dev = prod), which {@code addItem} openly defaults when absent.
+     *
+     * <p>⚠ A narrowing is a claim too (F2-222). This one is asserted in both directions by
+     * {@link #anIdentityReadIsNotAStateRead()}: deleting it puts {@code sequenceOrder} back in the
+     * population, and it must not remove any pair the gate reports today.
+     */
+    private static final Set<String> IDENTITY_ACCESSORS =
+        Set.of("getId", "getOrganisationId", "getExternalId");
+
+    /** True when {@code local} has a getter read that is not merely an identity read. */
+    static boolean readsAStateOf(String local, String body) {
+        Matcher m = Pattern.compile(Pattern.quote(local) + "\\s*\\.\\s*((?:get|is)[A-Z]\\w*)\\s*\\(")
+            .matcher(body);
+        while (m.find()) {
+            if (!IDENTITY_ACCESSORS.contains(m.group(1))) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Names of private helpers declared in the same source whose own body refuses.
+     *
+     * <p>Resolved per SOURCE, not per method, because the helper is declared elsewhere in the class —
+     * which is exactly why an inline-throw regex could not see {@code DpiaService#approve}'s guard.
+     */
+    static Set<String> refusingHelperNames(String src) {
+        Set<String> out = new LinkedHashSet<>();
+        Matcher m = Pattern.compile(
+            "(?m)^\\s*private\\s+(?:static\\s+)?[\\w.<>\\[\\], ]+?\\s+([a-z]\\w*)\\s*\\(").matcher(src);
+        while (m.find()) {
+            int brace = src.indexOf('{', m.end());
+            if (brace < 0) continue;
+            if (ANY_REFUSAL.matcher(balancedBlock(src, brace)).find()) out.add(m.group(1));
+        }
+        return out;
+    }
+
+    private static String balancedBlock(String src, int open) {
+        int depth = 0;
+        for (int i = open; i < src.length(); i++) {
+            char ch = src.charAt(i);
+            if (ch == '{') depth++;
+            else if (ch == '}') {
+                depth--;
+                if (depth == 0) return src.substring(open, i + 1);
+            }
+        }
+        return src.substring(open);
     }
 
     private record Contradiction(String service, String writeMethod, Set<String> fields,
                                  Set<String> stampedBy) { }
 
-    /** {@code Type#field} → the guarded routes that stamp it. */
-    static Map<String, Set<String>> stampedBy(List<Method> methods,
+    /**
+     * {@code Type#field} → the guarded routes that stamp it.
+     *
+     * <p>F2-231 — {@code src} is a REQUIRED parameter, not a convenience: the refusing-helper names
+     * are declared elsewhere in the class, so a caller that could not supply the source would get a
+     * silently narrower answer, which is the exact failure mode this finding is about. Making it a
+     * parameter turns forgetting it into a compile error rather than an under-report.
+     */
+    static Map<String, Set<String>> stampedBy(String src, List<Method> methods,
                                               Map<String, Set<String>> readOnly) {
+        // F2-231 — Map.of(), NOT helperStampedFields(src): following helper STAMPS is a measured
+        // blind spot that is deliberately left open. See
+        // followingHelperStampsIsAMeasuredBlindSpotAndNotCoverage() for the numbers and the
+        // demonstrated false positive that stopped it shipping.
+        return stampedBy(src, methods, readOnly, Map.of());
+    }
+
+    /**
+     * As above, with the helper-stamp map the caller considers VISIBLE.
+     *
+     * <p>F2-231 — {@code measure()} removes the helpers the examined write path calls itself, because
+     * a shared invariant is not a control that path bypasses. Every other caller passes the full map.
+     */
+    static Map<String, Set<String>> stampedBy(String src, List<Method> methods,
+                                              Map<String, Set<String>> readOnly,
+                                              Map<String, Set<String>> visibleHelperStamps) {
         Map<String, Set<String>> out = new LinkedHashMap<>();
+        Set<String> refusingHelpers = refusingHelperNames(src);
         for (Method m : methods) {
-            if (!isGuardedRoute(m.name(), m.body())) continue;
+            boolean legacyMatch = isLegacyGuardedRoute(m.name(), m.body());
+            Set<String> guarded = guardedTypes(m.body(), refusingHelpers);
+            if (!legacyMatch && guarded.isEmpty()) continue;
             Map<String, String> types = localTypes(m.params(), m.body());
             Set<String> params = allParamNames(m.params());
-            for (String f : stampsServerValue(m.body(), types, requestParams(m.params()), params)) {
+            for (String f : stampsServerValue(m.body(), types, requestParams(m.params()), params,
+                                              visibleHelperStamps)) {
                 String type = f.substring(0, f.indexOf('#'));
                 String field = f.substring(f.indexOf('#') + 1);
                 if (CLOSED_AT_THE_WIRE.contains(field)) continue;
                 if (readOnly.getOrDefault(type, Set.of()).contains(field)) continue;
+                // The UNION, decided per FIELD rather than per method: the original predicate's
+                // answer, OR the corrected one's. The corrected arm additionally requires that the
+                // row refused on is the row stamped, and that the method is not BUILDING that row —
+                // `generateFromBia` and `clone` load a source, refuse on it and INSERT, which is a
+                // second create path rather than a control, and one create may legitimately supply
+                // whatever another create supplies.
+                boolean correctedMatch = guarded.contains(type)
+                    && !Pattern.compile("new\\s+" + Pattern.quote(type) + "\\s*\\(")
+                               .matcher(m.body()).find();
+                if (!legacyMatch && !correctedMatch) continue;
                 out.computeIfAbsent(f, k -> new TreeSet<>()).add(m.name());
             }
         }
         return out;
     }
 
+    /** The original F2-218 predicate, kept intact so the widening is provably additive. */
+    private static boolean isLegacyGuardedRoute(String name, String body) {
+        if (isWritePath(name)) return false;
+        return body.matches("(?s).*\\b(get|find\\w*)\\s*\\(.*")
+            && body.matches("(?s).*\\bthrow new (IllegalState|IllegalTransition)\\w*Exception.*");
+    }
+
     /** The {@code Type#field}s this write path takes from the caller AND the service stamps. */
     static Set<String> acceptedAndStamped(Method m, Map<String, Set<String>> stampedBy) {
+        return acceptedAndStamped(m, stampedBy, Map.of(), Map.of());
+    }
+
+    /**
+     * As above, with the source's helper-write map so a write relocated into a private helper is
+     * still attributed to the route that passed the caller's value (F2-231).
+     */
+    static Set<String> acceptedAndStamped(Method m, Map<String, Set<String>> stampedBy,
+                                          Map<String, Set<String>> helperWrites,
+                                          Map<String, Set<String>> helperStamps) {
         if (!isWritePath(m.name())) return Set.of();
         Map<String, String> paramTypes = requestParamTypes(m.params());
         if (paramTypes.isEmpty()) return Set.of();
         Map<String, String> types = localTypes(m.params(), m.body());
         Set<String> req = paramTypes.keySet();
 
-        Set<String> accepted = new TreeSet<>(writesFromRequest(m.body(), types, req));
+        Set<String> accepted = new TreeSet<>(writesFromRequest(m.body(), types, req, helperWrites));
         // Persisting the request object accepts every field of THAT TYPE it did not first
         // overwrite or clear — scoped to the persisted parameter's own type, never the service's.
         for (var e : paramTypes.entrySet()) {
@@ -659,7 +1020,7 @@ class ServerStampedFieldContractTest {
                 continue;
             }
             Set<String> settled = new TreeSet<>(
-                stampsServerValue(m.body(), types, req, allParamNames(m.params())));
+                stampsServerValue(m.body(), types, req, allParamNames(m.params()), helperStamps));
             settled.addAll(clears(m.body(), types));
             // F2-219 — a literal written only when the caller sent nothing has settled nothing.
             settled.removeAll(defaults(m.body(), types, req));
@@ -680,16 +1041,30 @@ class ServerStampedFieldContractTest {
             String src = stripComments(read(p));
             List<Method> methods = publicMethods(src);
 
-            Map<String, Set<String>> stampedBy = stampedBy(methods, readOnly);
+            Map<String, Set<String>> stampedBy = stampedBy(src, methods, readOnly);
             if (stampedBy.isEmpty()) continue;
+            Map<String, Set<String>> helperWrites = helperWrittenFields(src);
 
             for (Method m : methods) {
-                Set<String> hit = acceptedAndStamped(m, stampedBy);
-                if (!hit.isEmpty()) {
-                    Set<String> routes = new TreeSet<>();
-                    hit.forEach(f -> routes.addAll(stampedBy.get(f)));
-                    out.add(new Contradiction(cls, m.name(), hit, routes));
-                }
+                Set<String> hit = new TreeSet<>(
+                    acceptedAndStamped(m, stampedBy, helperWrites, Map.of()));
+                // ⚠⚠ F2-231 — A ROUTE CANNOT CONTRADICT ITSELF, and following helpers on the stamp
+                // half resurrected exactly that. `maybeAutoCapa(TcfdItem t)` back-links the CAPA it
+                // opens, and every route calls it — so every route read as "stamping" linkedCapaId,
+                // and update() was reported as its own stamping route. 🔑 A helper called from the
+                // write path makes the write path its own stamper: the "stamped by themselves" false
+                // positive this gate already had a clause for, re-entering through the widening.
+                // F2-228's rule — a detector wrong in both directions produces a green neither half
+                // earns — so the widening and this narrowing land together.
+                Set<String> routes = new TreeSet<>();
+                hit.removeIf(f -> {
+                    Set<String> others = new TreeSet<>(stampedBy.get(f));
+                    others.remove(m.name());
+                    if (others.isEmpty()) return true;
+                    routes.addAll(others);
+                    return false;
+                });
+                if (!hit.isEmpty()) out.add(new Contradiction(cls, m.name(), hit, routes));
             }
         }
         return out;
@@ -697,10 +1072,23 @@ class ServerStampedFieldContractTest {
 
     // ── the assertions ───────────────────────────────────────────────────────
 
+    /**
+     * The fields of this contradiction that carry no verified BY_DESIGN reason.
+     *
+     * <p>F2-231 — per FIELD, not per service: a contradiction whose every field is adjudicated drops
+     * out, and one that gains a new field on the same type does not.
+     */
+    private static Set<String> unexplained(Contradiction c) {
+        Set<String> out = new TreeSet<>(c.fields());
+        out.removeIf(f -> BY_DESIGN.containsKey(c.service() + "::" + f));
+        return out;
+    }
+
     @Test
     void aClosedServiceAcceptsNothingItsOwnGuardedRoutesStamp() {
         Map<String, List<Contradiction>> byService = measure().stream()
             .filter(c -> CLOSED.contains(c.service()))
+            .filter(c -> !unexplained(c).isEmpty())
             .collect(Collectors.groupingBy(Contradiction::service));
 
         assertThat(byService)
@@ -716,8 +1104,10 @@ class ServerStampedFieldContractTest {
     @Test
     void theRemainingPopulationIsMeasuredAndOnlyEverShrinks() throws IOException {
         List<Contradiction> all = measure();
-        Set<String> services = all.stream().map(Contradiction::service)
-            .filter(s -> !CLOSED.contains(s) && !BY_DESIGN.containsKey(s))
+        Set<String> services = all.stream()
+            .filter(c -> !unexplained(c).isEmpty())
+            .map(Contradiction::service)
+            .filter(s -> !CLOSED.contains(s))
             .collect(Collectors.toCollection(TreeSet::new));
 
         Map<String, List<Contradiction>> grouped = new TreeMap<>(all.stream()
@@ -738,6 +1128,13 @@ class ServerStampedFieldContractTest {
         lines.add("# such reasons in a predecessor artefact and all five were false.");
         lines.add("#");
         lines.add("# CLOSED (hard zero, asserted separately): " + new TreeSet<>(CLOSED));
+        // F2-231 — the measured figure is printed here so the next slice can RE-DERIVE the ceiling
+        // instead of subtracting from the constant (F2-207: a ceiling left above the truth makes a
+        // tolerated member indistinguishable from a reviewed one, and F2-195: a baseline copied from
+        // a measurement of something else looks measured).
+        lines.add("# MEASURED unexplained services: " + services.size()
+                  + "  (ceiling " + BASELINE_CONTRADICTED_SERVICES + ")   " + services);
+        lines.add("# BY_DESIGN field verdicts: " + new TreeSet<>(BY_DESIGN.keySet()));
         lines.add("");
         grouped.forEach((svc, cs) -> {
             lines.add(svc);
@@ -780,21 +1177,28 @@ class ServerStampedFieldContractTest {
      */
     @Test
     void everyByDesignEntryStillDescribesSomethingTheScanFinds() {
-        Set<String> measured = measure().stream().map(Contradiction::service)
-            .collect(Collectors.toCollection(TreeSet::new));
+        Set<String> measured = new TreeSet<>();
+        for (Contradiction c : measure()) {
+            c.fields().forEach(f -> measured.add(c.service() + "::" + f));
+        }
 
         assertThat(measured)
             .as("""
-                A BY_DESIGN entry names a service whose write path accepts a field its own guarded \
-                routes stamp, WITH a reason that was verified by reading. If the scan no longer \
-                finds it, either the code changed (delete the entry in the same commit) or a \
-                detector rotted (fix the detector — a shrinking population is not progress).""")
+                A BY_DESIGN entry names a Service::Type#field whose write path accepts a field the \
+                same service's guarded routes stamp, WITH a reason that was verified by reading. If \
+                the scan no longer finds it, either the code changed (delete the entry in the same \
+                commit) or a detector rotted (fix the detector — a shrinking population is not \
+                progress). F2-231 is why the key is a field: a per-service key could not express \
+                "closed except for this one field", and it hid every other field of the same type.""")
             .containsAll(BY_DESIGN.keySet());
 
-        assertThat(BY_DESIGN.keySet()).doesNotContainAnyElementsOf(CLOSED);
-        BY_DESIGN.forEach((svc, why) -> assertThat(why.length())
-            .as("%s's reason must say why the field is genuinely the caller's, not label it", svc)
+        BY_DESIGN.forEach((site, why) -> assertThat(why.length())
+            .as("%s's reason must say why the field is genuinely the caller's, not label it", site)
             .isGreaterThan(120));
+        assertThat(BY_DESIGN.keySet()).allSatisfy(k -> assertThat(k)
+            .as("a BY_DESIGN key is Service::Type#field, so the verdict is at the finding's own "
+                + "granularity and cannot silently cover a sibling")
+            .matches("\\w+::\\w+#\\w+"));
     }
 
     /**
@@ -994,12 +1398,192 @@ class ServerStampedFieldContractTest {
      * {@link #acceptedAndStamped}, the same two calls {@link #measure} makes. A control that
      * reimplements the logic it is controlling proves only that the copy agrees with itself.
      */
+    /**
+     * The corpus helper, resolving EXACTLY as {@link #measure()} does.
+     *
+     * <p>⚠ F2-231 — it has to, and getting that wrong cost an iteration: with the per-method
+     * helper filtering in {@code measure()} and not here, {@code aRouteIsNotItsOwnStampingRoute} kept
+     * reporting a field the build no longer reported. 🔑 A test helper that resolves more loosely than
+     * the gate proves nothing about the gate — and one that resolves more tightly hides its holes.
+     */
     private static Set<String> contradictionsIn(String src) {
         List<Method> methods = publicMethods(src);
-        Map<String, Set<String>> stamped = stampedBy(methods, Map.of());
+        Map<String, Set<String>> helperWrites = helperWrittenFields(src);
+        Map<String, Set<String>> stamped = stampedBy(src, methods, Map.of());
         Set<String> hits = new TreeSet<>();
-        for (Method m : methods) hits.addAll(acceptedAndStamped(m, stamped));
+        for (Method m : methods) {
+            for (String f : acceptedAndStamped(m, stamped, helperWrites, Map.of())) {
+                Set<String> others = new TreeSet<>(stamped.get(f));
+                others.remove(m.name());
+                if (!others.isEmpty()) hits.add(f);
+            }
+        }
         return hits;
+    }
+
+    /**
+     * F2-231 — an IDENTITY read is not a state read, asserted in both directions.
+     *
+     * <p>The narrowing is a claim about the codebase (F2-222), so it owes both legs: deleting it must
+     * change an answer, and it must not remove a pair the gate reports today. The first corpus is
+     * {@code NdiImprovementPlanService#reorder} reduced to its load-refuse-write shape — the site that
+     * put {@code sequenceOrder} in the population — and the second is the same shape with one real
+     * state read added, which must still count.
+     */
+    @Test
+    void anIdentityReadIsNotAStateRead() {
+        String membershipCheckOnly = """
+            public List<Item> reorder(Long planId, List<Long> ordered) {
+              List<Item> all = items.findByPlanId(planId);
+              Map<Long, Item> byId = new HashMap<>();
+              for (Item r : all) byId.put(r.getId(), r);
+              int seq = 10;
+              for (Long id : ordered) { Item r = byId.get(id);
+                if (r == null) throw new IllegalArgumentException("not in plan");
+                r.setSequenceOrder(seq); items.save(r); seq += 10; }
+              return items.findByPlanId(planId); }
+            public Item addItem(Long planId, Item body) { body.setId(null); return items.save(body); }
+            """;
+        assertThat(contradictionsIn(membershipCheckOnly))
+            .as("""
+                reorder() reads only r.getId() and refuses on MEMBERSHIP, then renumbers from a \
+                counter without ever reading the previous value — F2-220's discriminator (the value \
+                accepted depends on the value already there) is not satisfied, so this is a bulk \
+                renumber and not a guarded transition of sequenceOrder.""")
+            .isEmpty();
+
+        String realStateRead = membershipCheckOnly.replace(
+            "if (r == null) throw new IllegalArgumentException(\"not in plan\");",
+            "if (r == null || \"LOCKED\".equals(r.getPriority())) throw new IllegalArgumentException(\"no\");");
+        assertThat(contradictionsIn(realStateRead))
+            .as("add one read of a real state field and the same shape IS a guarded route — the "
+                + "narrowing must not be a blanket exemption for methods that call getId()")
+            .contains("Item#sequenceOrder");
+
+        assertThat(readsAStateOf("r", "byId.put(r.getId(), r); r.setSequenceOrder(seq);")).isFalse();
+        assertThat(readsAStateOf("r", "if (r.getOrganisationId() == null) throw new X();")).isFalse();
+        assertThat(readsAStateOf("r", "if (\"X\".equals(r.getStatus())) throw new X();")).isTrue();
+    }
+
+    /**
+     * F2-231 — a write relocated into a private helper is still the caller's write.
+     *
+     * <p>⚠⚠ This is the gap my own fix in the same slice fell into. The gate followed a private helper
+     * for the REFUSAL half and not for the WRITE half, so extracting {@code markReviewed(cur, to)} —
+     * the correct design, one writer of the (status, review-clock) pair — took the setter out of the
+     * route's body and {@code TcfdItemService#update} left the population <b>looking closed</b>.
+     * 🔑 To a setter-site scan, a refactor that relocates a write is indistinguishable from a fix that
+     * removed it, and the population shrinks either way — the quiet direction.
+     */
+    @Test
+    void aWriteRelocatedIntoAPrivateHelperIsStillTheCallersWrite() {
+        // Faithful to the real shape: `attach` stamps the status with a LITERAL behind a state check
+        // (TcfdItemService#attachEvidence), and `update` forwards the caller's status through the
+        // extracted helper. ⚠ My first draft asserted this on a corpus where BOTH setters lived in the
+        // helper and nothing stamped anything — it returned empty, and the honest reading was that the
+        // FIXTURE was wrong, not the detector: `transition(id, to)` writes a scalar PARAMETER, which is
+        // caller data (F2-218's fourth correction), so it never was a server stamp. That is F2-219's
+        // filed blind spot — a transition whose target state arrives as a parameter — and bending the
+        // detector to make the test pass would have re-broken it.
+        String viaHelper = """
+            public Foo update(Long id, Foo req) { Foo cur = get(id);
+              if ("APPROVED".equals(cur.getStatus())) throw new IllegalStateException("locked");
+              if (req.getTitle() != null) cur.setTitle(req.getTitle());
+              mark(cur, req.getStatus());
+              return repo.save(cur); }
+            public Foo attach(Long id, String ref) { Foo cur = get(id);
+              if ("APPROVED".equals(cur.getStatus())) throw new IllegalStateException("locked");
+              cur.setEvidenceRef(ref);
+              if ("EVIDENCE_REQUIRED".equals(cur.getStatus())) cur.setStatus("UNDER_REVIEW");
+              return repo.save(cur); }
+            private void mark(Foo cur, String to) { cur.setStatus(to); }
+            """;
+        assertThat(contradictionsIn(viaHelper))
+            .as("update() passes the caller's status into a helper that sets it; the field is still "
+                + "accepted from the request even though no setter appears in update()'s own body")
+            .contains("Foo#status");
+
+        assertThat(helperWrittenFields(viaHelper))
+            .as("the helper's forwarded fields are keyed by its own declared parameter type")
+            .containsEntry("mark", new TreeSet<>(Set.of("Foo#status")));
+
+        String literalArg = viaHelper.replace("mark(cur, req.getStatus());", "mark(cur, \"DRAFT\");");
+        assertThat(contradictionsIn(literalArg))
+            .as("a helper called with a LITERAL forwards nothing of the caller's — attributing the "
+                + "helper's write to every caller would fail on correct code (F2-214)")
+            .doesNotContain("Foo#status");
+    }
+
+    /**
+     * ⚠⚠ F2-231 — <b>the mirror of the write-half widening is a MEASURED BLIND SPOT, not coverage</b>,
+     * and this test exists so it cannot be mistaken for one (F2-224's shape).
+     *
+     * <p>{@link #writesFromRequest(String, Map, Set, Map)} follows a one-hop private helper because a
+     * relocated write is still the caller's write. The symmetric question — a relocated <b>stamp</b> —
+     * was built, measured and <b>rejected</b>. Enabling it moved the unexplained population from
+     * <b>11 services to 15</b>, and it needed two narrowings to get back to 13 (a route may not be its
+     * own stamping route; a helper the write path itself calls is not a control it bypasses). At 13,
+     * one of the two net-new findings was still a demonstrated false positive:
+     * {@code ChangeManagementService#addLink} was reported as accepting
+     * {@code ChangeLink#changeRequestId, entityId, entityType, linkType, notes} "stamped by
+     * transition" — the link's own data fields, on the route whose entire purpose is to supply them.
+     *
+     * <p>🔑 <b>F2-214 settles it: a gate that fails on correct code is worse than no gate</b>, and
+     * raising a decrease-only ceiling to accommodate noise is house rule 3's own warning. So the write
+     * half ships and the stamp half is recorded here with its numbers.
+     *
+     * <p>The consequence is worth stating plainly, because it is the sharper half: a service that
+     * extracts its stamping into a private helper <b>drops out of the population entirely</b> — not
+     * one field, the whole service — because {@code measure()} skips a source whose stamped map is
+     * empty. The one lead worth reading first is {@code CommitteeResolutionService#create}, reported
+     * as accepting {@code voteFor / voteAgainst / voteAbstain} against {@code recordVote}: a committee
+     * resolution created with its vote tallies already filled in. <b>Unread — no verdict is offered
+     * here</b> (F2-188).
+     */
+    @Test
+    void followingHelperStampsIsAMeasuredBlindSpotAndNotCoverage() {
+        int helpersThatStamp = 0;
+        for (Path p : serviceSources()) {
+            helpersThatStamp += helperStampedFields(stripComments(read(p))).size();
+        }
+        assertThat(helpersThatStamp)
+            .as("""
+                The blind spot is real and sizeable — this many private helpers in shipped services \
+                write a field with a value of the server's own, and no route calling one is credited \
+                with that stamp. If this reaches zero the measurement has rotted, not the codebase.""")
+            .isGreaterThan(50);
+
+        // The write half IS followed. Asserted here as well as in its own test, because the pair is
+        // the claim: one direction closed, the other measured and named.
+        String relocatedWrite = """
+            public Foo update(Long id, Foo req) { Foo cur = get(id);
+              if ("APPROVED".equals(cur.getStatus())) throw new IllegalStateException("locked");
+              mark(cur, req.getStatus()); return repo.save(cur); }
+            public Foo attach(Long id, String ref) { Foo cur = get(id);
+              if ("APPROVED".equals(cur.getStatus())) throw new IllegalStateException("locked");
+              cur.setEvidenceRef(ref);
+              if ("EVIDENCE_REQUIRED".equals(cur.getStatus())) cur.setStatus("UNDER_REVIEW");
+              return repo.save(cur); }
+            private void mark(Foo cur, String to) { cur.setStatus(to); }
+            """;
+        assertThat(contradictionsIn(relocatedWrite)).contains("Foo#status");
+
+        String relocatedStamp = """
+            public Foo update(Long id, Foo req) { Foo cur = get(id);
+              if ("APPROVED".equals(cur.getStatus())) throw new IllegalStateException("locked");
+              if (req.getStatus() != null) cur.setStatus(req.getStatus()); return repo.save(cur); }
+            public Foo close(Long id) { Foo cur = get(id);
+              if ("CLOSED".equals(cur.getStatus())) throw new IllegalStateException("already");
+              stampClosed(cur); return repo.save(cur); }
+            private void stampClosed(Foo cur) { cur.setStatus("CLOSED"); }
+            """;
+        assertThat(contradictionsIn(relocatedStamp))
+            .as("""
+                The blind spot, demonstrated rather than described: close() stamps the status with a \
+                literal through a helper, update() takes it from the caller, and the gate reports \
+                nothing. This assertion is the record — do not "fix" it by enabling the stamp half \
+                without re-measuring the four services that widening adds.""")
+            .isEmpty();
     }
 
     /**
@@ -1140,6 +1724,17 @@ class ServerStampedFieldContractTest {
 
     /** As {@link #acceptedAndStamped}, against the machine-owned map instead of the stamped one. */
     static Set<String> acceptedAndMachineOwned(Method m, Map<String, Set<String>> owned) {
+        return acceptedAndMachineOwned(m, owned, Map.of());
+    }
+
+    /**
+     * As above, following the same one-hop helper as the stamped leg (F2-231).
+     *
+     * <p>Threaded here too because the blindness is a property of the SCAN, not of the question: a
+     * create that scrubs its state through a private helper would otherwise read as accepting it.
+     */
+    static Set<String> acceptedAndMachineOwned(Method m, Map<String, Set<String>> owned,
+                                               Map<String, Set<String>> helperStamps) {
         if (!isWritePath(m.name())) return Set.of();
         Map<String, String> paramTypes = requestParamTypes(m.params());
         if (paramTypes.isEmpty()) return Set.of();
@@ -1152,7 +1747,7 @@ class ServerStampedFieldContractTest {
                 continue;
             }
             Set<String> settled = new TreeSet<>(
-                stampsServerValue(m.body(), types, req, allParamNames(m.params())));
+                stampsServerValue(m.body(), types, req, allParamNames(m.params()), helperStamps));
             settled.addAll(clears(m.body(), types));
             settled.removeAll(defaults(m.body(), types, req));   // F2-219 — a default settles nothing
             String prefix = e.getValue() + "#";
@@ -1175,7 +1770,7 @@ class ServerStampedFieldContractTest {
             Map<String, Set<String>> owned = machineOwned(methods);
             if (owned.isEmpty()) continue;
             for (Method m : methods) {
-                Set<String> hit = acceptedAndMachineOwned(m, owned);
+                Set<String> hit = acceptedAndMachineOwned(m, owned, helperStampedFields(src));
                 if (!hit.isEmpty()) {
                     Set<String> routes = new TreeSet<>();
                     hit.forEach(f -> routes.addAll(owned.get(f)));

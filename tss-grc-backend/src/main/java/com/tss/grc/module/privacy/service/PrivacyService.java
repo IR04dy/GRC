@@ -69,8 +69,40 @@ public class PrivacyService {
     }
 
     @Transactional
+    /**
+     * F2-231 — the SDAIA discharge stamps are {@link #recordSdaiaSubmission}'s to write and the
+     * Data Office stamp is {@link #notifyDataOffice}'s, so this create must not accept either.
+     *
+     * <p>{@code PrivacyController} binds the {@code DataBreach} ENTITY (F2-214's shape), so before
+     * this every column outside {@code ServerOwnedFieldsModule}'s nine was caller-writable at
+     * create — including {@code sdaiaSubmittedAt}, which the entity's own javadoc calls the
+     * discharge of the PDPL Article 31 clock. A caller could file a breach already recorded as
+     * SUBMITTED to the regulator, skipping the four-state machine, with no audit row and no
+     * {@code BREACH_REPORTED_TO_SDAIA} event.
+     *
+     * <p>⚠ Why F2-213 and F2-214 both missed it: each wrote a careful comment on
+     * {@link #updateBreach} / {@link #updateDsr} explaining that exactly these fields must not come
+     * from a payload — and the create two lines above accepted all of them. F2-215's headline:
+     * fixing the field you noticed leaves the remainder looking covered, because the mechanism that
+     * covers them is visibly present.
+     *
+     * <p>Latent, measured 2026-08-17: {@code sdaia_submitted_at}, {@code sdaia_submission_ref} and
+     * {@code pdpc_notified_at} are null on all 17 dev / 18 prod rows and no client type declares
+     * any of them, which is why clearing them cannot break a request that works today (F2-182).
+     * {@code sdaia_notification_status} is NOT_REPORTED on 100% of rows in both databases, so
+     * forcing the initial value is equally free.
+     *
+     * <p>⚠ {@code status} is deliberately NOT constrained here. The column has no CHECK, no declared
+     * machine and seven stored values across two databases (F2-209 filed the vocabulary itself), so
+     * naming a creatable set is a decision about live rows in two real databases — F2-183/F2-196's
+     * owner boundary, not a side effect of closing a stamp. FILED.
+     */
     public DataBreach createBreach(DataBreach req) {
         req.setOrganisationId(TenantContext.getCurrentTenant());
+        req.setSdaiaNotificationStatus(SDAIA_NOT_REPORTED);
+        req.setSdaiaSubmittedAt(null);
+        req.setSdaiaSubmissionRef(null);
+        req.setPdpcNotifiedAt(null);
         return breachRepo.save(req);
     }
 
@@ -120,6 +152,16 @@ public class PrivacyService {
         "NOT_REPORTED", "IN_PREPARATION", "SUBMITTED", "ACKNOWLEDGED");
 
     /**
+     * The state a breach starts in — nothing has been said to the regulator yet.
+     *
+     * <p>F2-231 declares this once and gives it three readers rather than adding a fourth literal:
+     * {@link #createBreach} forces it, the {@code prior} fallback below reads it, and
+     * {@link #recordSdaiaSubmission}'s own vocabulary contains it. F2-190's rule — an unread second
+     * copy is how the next reader decides which one is the authority.
+     */
+    static final String SDAIA_NOT_REPORTED = "NOT_REPORTED";
+
+    /**
      * Record a manual SDAIA submission outcome (Open Issue #006).
      *
      * <p>Called by the DPO (or CISO/PLATFORM_ADMIN) after they have posted the
@@ -142,7 +184,7 @@ public class PrivacyService {
                 " (allowed: NOT_REPORTED, IN_PREPARATION, SUBMITTED, ACKNOWLEDGED)");
         }
         String prior = breach.getSdaiaNotificationStatus() == null
-            ? "NOT_REPORTED" : breach.getSdaiaNotificationStatus();
+            ? SDAIA_NOT_REPORTED : breach.getSdaiaNotificationStatus();
         // Guard: ACKNOWLEDGED is terminal — re-opening would lose the regulator
         // closure record. Only an explicit re-classification (handled outside
         // this endpoint, via the privacy admin path) can roll it back.
@@ -270,8 +312,29 @@ public class PrivacyService {
     }
 
     @Transactional
+    /**
+     * F2-231 — {@code completedAt} is {@link #fulfilDsr}'s to stamp, so this create must not accept
+     * it. It is the timestamp evidencing that the PDPL Article 23 response was made in time; a
+     * caller could file a request already carrying proof it had been answered.
+     *
+     * <p>Latent: null on all 20 rows in dev and prod, and {@code PrivacyDsrRequest} — the only
+     * client type — does not declare it, so clearing it cannot break a working request (F2-182).
+     * Same field, same reason, as the comment on {@link #updateDsr} directly below; F2-213 fixed
+     * the update and this create sat two lines above it.
+     *
+     * <p>⚠ {@code dueDate} is deliberately left alone and FILED. It is the Article 4 statutory
+     * deadline and the server ought to mint it (F2-202: only the server may issue a statutory
+     * deadline) — but {@code PrivacyDsrRequest} DOES declare it, it is non-null on 20 of 20 rows in
+     * both databases, and nothing refuses a caller-supplied value today. So by F2-182's test every
+     * value that succeeds now is a client-chosen deadline, and refusing one would break requests
+     * that work: an owner decision, not a side effect. {@code status} is filed for the same reason
+     * as the breach half — no CHECK, no declared machine, and {@code DsrRequestLifecycle} declares
+     * only TERMINAL, so {@code requireInitial} would refuse the NEW/OPEN/PENDING creates the
+     * register already holds (F2-220's measured lesson).
+     */
     public DataSubjectRequest createDsr(DataSubjectRequest req) {
         req.setOrganisationId(TenantContext.getCurrentTenant());
+        req.setCompletedAt(null);
         return dsrRepo.save(req);
     }
 

@@ -96,6 +96,7 @@ public class CmaDisclosureService {
     public CmaDisclosure update(Long id, CmaDisclosure req) {
         CmaDisclosure cur = get(id);
         assertNotApproved(cur);
+        String priorStatus = cur.getDisclosureStatus();
         if (req.getTitleEn() != null)              cur.setTitleEn(req.getTitleEn());
         if (req.getTitleAr() != null)              cur.setTitleAr(req.getTitleAr());
         if (req.getRequirementEn() != null)        cur.setRequirementEn(req.getRequirementEn());
@@ -110,14 +111,36 @@ public class CmaDisclosureService {
         if (req.getReviewerEmail() != null)        cur.setReviewerEmail(req.getReviewerEmail());
         if (req.getNotes() != null)                cur.setNotes(req.getNotes());
         if (req.getLinkedCapaId() != null)         cur.setLinkedCapaId(req.getLinkedCapaId());
-        if (req.getDisclosureStatus() != null)     cur.setDisclosureStatus(req.getDisclosureStatus());
+        // F2-231 — an ECHO is not a review, and a CHANGE is. Same fix, same reason, as
+        // TcfdItemService#update: this route legitimately accepts disclosureStatus (the entity's
+        // field initialiser makes an omitted key indistinguishable from a real UNDER_REVIEW, which
+        // is why the ESG tab echoes it back and says so in a comment), and it must not perform the
+        // classification change transition() performs while leaving the review clock stale.
+        // Fixed here as well as in the mirror on purpose: this class is the one TcfdItemService's
+        // javadoc says it mirrors, and closing one instance of a shape is not closing the shape.
+        boolean statusChanged = req.getDisclosureStatus() != null
+            && !req.getDisclosureStatus().equals(priorStatus);
+        if (statusChanged) markReviewed(cur, req.getDisclosureStatus());
         validate(cur);
         applyRules(cur);
         CmaDisclosure saved = repo.save(cur);
-        audit.log("UPDATE", "CmaDisclosure", saved.getId(),
-                "CMA disclosure updated");
+        audit.log(statusChanged ? "TRANSITION" : "UPDATE", "CmaDisclosure", saved.getId(),
+                statusChanged ? "CMA disclosure " + priorStatus + " -> " + saved.getDisclosureStatus()
+                              : "CMA disclosure updated");
         maybeAutoCapa(saved);
         return saved;
+    }
+
+    /**
+     * F2-231 — the one writer of the {@code (disclosure_status, last_reviewed_at)} pair.
+     *
+     * <p>{@link #transition} calls it unconditionally (an explicit re-mark IS a review, even to the
+     * same value); {@link #update} calls it only when the incoming value differs from the stored
+     * one, because the edit form echoes the current status back and echoing is not reviewing.
+     */
+    private void markReviewed(CmaDisclosure cur, String to) {
+        cur.setDisclosureStatus(to);
+        cur.setLastReviewedAt(LocalDateTime.now());
     }
 
     /**
@@ -130,8 +153,7 @@ public class CmaDisclosureService {
         assertNotApproved(cur);
         if (!STATUSES.contains(to))
             throw new IllegalArgumentException("Unknown disclosure_status: " + to);
-        cur.setDisclosureStatus(to);
-        cur.setLastReviewedAt(LocalDateTime.now());
+        markReviewed(cur, to);
         validate(cur);
         applyRules(cur);
         CmaDisclosure saved = repo.save(cur);
