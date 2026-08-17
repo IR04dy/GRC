@@ -286,14 +286,26 @@ public class CoiService {
         d.setSubmittedOn(LocalDateTime.now());
         d.setReviewOutcome("PENDING");
 
-        CoiDeclaration savedDecl = declarationRepo.save(d);
-
-        // Persist disclosed items.
-        List<CoiDisclosedItem> savedItems = new java.util.ArrayList<>();
+        // F2-228 — ROWVERSION rule: build the items and decide the auto-outcome BEFORE the
+        // single save of the declaration.
+        //
+        // This used to save the declaration, insert the items to get their declarationId,
+        // then set reviewOutcome and save the declaration a SECOND time. That is the shape
+        // CLAUDE.md's ROWVERSION landmine describes, in its INSERT form: BaseEntity maps
+        // row_version @Version insertable=false updatable=false over a SQL Server ROWVERSION,
+        // so after the IDENTITY insert the in-memory version is null, and the follow-up
+        // UPDATE ... WHERE row_version = null matched zero rows. Probed live: any declaration
+        // that disclosed at least ONE item answered HTTP 409 and rolled back — a
+        // conflict-of-interest register that could record everything EXCEPT a conflict.
+        // A declaration with nothing to disclose worked, because computeAutoOutcome returns
+        // PENDING, which is the value already set, so nothing was dirty.
+        //
+        // The items only need declarationId, and the outcome only reads item fields, so both
+        // can be decided first. Nothing here needs the declaration's id (F2-175's rule).
+        List<CoiDisclosedItem> items = new java.util.ArrayList<>();
         if (req.disclosedItems() != null) {
             for (DisclosedItemDto dto : req.disclosedItems()) {
                 CoiDisclosedItem item = new CoiDisclosedItem();
-                item.setDeclarationId(savedDecl.getId());
                 item.setItemType(dto.itemType());
                 item.setCounterpartyEn(dto.counterpartyEn());
                 item.setCounterpartyAr(dto.counterpartyAr());
@@ -305,14 +317,18 @@ public class CoiService {
                 item.setIsActive(dto.isActive() == null ? Boolean.TRUE : dto.isActive());
                 item.setMitigationActionEn(dto.mitigationActionEn());
                 item.setMitigationActionAr(dto.mitigationActionAr());
-                savedItems.add(itemRepo.save(item));
+                items.add(item);
             }
         }
+        d.setReviewOutcome(computeAutoOutcome(items));
 
-        // Apply auto-flag rules.
-        String autoOutcome = computeAutoOutcome(savedItems);
-        savedDecl.setReviewOutcome(autoOutcome);
-        CoiDeclaration finalDecl = declarationRepo.save(savedDecl);
+        CoiDeclaration finalDecl = declarationRepo.save(d);
+
+        List<CoiDisclosedItem> savedItems = new java.util.ArrayList<>();
+        for (CoiDisclosedItem item : items) {
+            item.setDeclarationId(finalDecl.getId());
+            savedItems.add(itemRepo.save(item));
+        }
 
         // Bump campaign counter.
         campaign.setDeclaredUserCount(
@@ -339,10 +355,12 @@ public class CoiService {
         emit("COI_DECLARATION_SUBMITTED", "CoiDeclaration", finalDecl.getId(),
                 campaign.getCode(), payload);
 
-        if ("RECUSAL_REQUIRED".equals(autoOutcome)) {
+        // Read the outcome off the SAVED row, not a local copy of what we meant to store
+        // (F2-223): the row is what an ethics reviewer will see.
+        if ("RECUSAL_REQUIRED".equals(finalDecl.getReviewOutcome())) {
             emit("COI_AUTO_FLAGGED_RECUSAL", "CoiDeclaration", finalDecl.getId(),
                     campaign.getCode(), payload);
-        } else if ("MITIGATION_REQUIRED".equals(autoOutcome)) {
+        } else if ("MITIGATION_REQUIRED".equals(finalDecl.getReviewOutcome())) {
             emit("COI_AUTO_FLAGGED_MITIGATION", "CoiDeclaration", finalDecl.getId(),
                     campaign.getCode(), payload);
         }

@@ -38,6 +38,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -272,6 +273,54 @@ class CcmServiceTest {
         ControlTestDefinition saved = cap.getAllValues().get(cap.getAllValues().size() - 1);
         assertThat(saved.getConsecutiveFailures()).isEqualTo(1);
         verify(issueService, never()).create(any(Issue.class));
+    }
+
+    /**
+     * F2-228 — the run row must be written EXACTLY ONCE, even on the escalation path.
+     *
+     * <p>It used to be saved, then re-saved to carry the auto-opened Issue's id. The first save is
+     * an IDENTITY INSERT and {@code BaseEntity} maps {@code row_version}
+     * {@code @Version insertable=false updatable=false} over a SQL Server ROWVERSION, so the
+     * in-memory version was null and the follow-up UPDATE matched zero rows. Probed live: the
+     * <b>third consecutive failure of a CRITICAL control test answered HTTP 409 and rolled the
+     * whole transaction back</b> — so neither the Issue nor the failing run itself was recorded,
+     * on both {@code POST /ccm/tests/{id}/run-now} and the 60-second scheduler tick. F2-175's
+     * defect, in another module.
+     *
+     * <p>⚠ No mock can reproduce the failure — a mocked repository has no {@code row_version} —
+     * so the assertion is the structure the fix guarantees: the Issue is opened first and its id
+     * is present on the one and only save.
+     */
+    @Test
+    void runTestNow_atTheConsecutiveFailureThreshold_savesTheRunOnceCarryingTheIssueId() {
+        ControlTestDefinition d = def("CRITICAL");
+        // Read the threshold off the service, never a second copy of the number (F2-196).
+        d.setConsecutiveFailures(CcmService.CONSECUTIVE_FAILURE_THRESHOLD - 1);
+        when(defRepo.findByOrganisationIdAndExternalIdAndIsDeletedFalse(ORG_ID, DEF_EX))
+                .thenReturn(Optional.of(d));
+        when(defRepo.save(any(ControlTestDefinition.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ControlTestRunner runner = new TestRunnerStub("LDAP_GROUP_MEMBERSHIP",
+                ControlTestRunner.RunResult.fail("{\"members\":99}", "way too many", 9));
+        when(runners.find("LDAP_GROUP_MEMBERSHIP")).thenReturn(Optional.of(runner));
+
+        AtomicLong seq = new AtomicLong(900);
+        when(runRepo.save(any(ControlTestRun.class))).thenAnswer(assignId(seq));
+        Issue opened = new Issue();
+        opened.setId(4242L);
+        when(issueService.create(any(Issue.class))).thenReturn(opened);
+
+        ArgumentCaptor<ControlTestRun> runs = ArgumentCaptor.forClass(ControlTestRun.class);
+        TestRunResponse out = service.runTestNow(DEF_EX);
+
+        assertThat(out.status()).isEqualTo("FAIL");
+        verify(issueService).create(any(Issue.class));
+        verify(runRepo, times(1)).save(runs.capture());
+        assertThat(runs.getValue().getCapaTaskId())
+                .as("the Issue must be opened BEFORE the single save, so its id rides on the "
+                    + "INSERT rather than needing a second UPDATE of a row whose ROWVERSION "
+                    + "Hibernate does not yet hold")
+                .isEqualTo(4242L);
     }
 
     @Test

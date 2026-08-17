@@ -228,7 +228,6 @@ public class CcmService {
         run.setFailureReason(result.failureReason());
         run.setDurationMs(result.durationMs());
         run.setEvidenceHash(computeEvidenceHash(result.actualValueJson(), now));
-        run = runRepo.save(run);
 
         // Update parent definition counters.
         d.setLastRunAt(now);
@@ -244,15 +243,30 @@ public class CcmService {
 
         // Issue auto-open ladder — only CRITICAL-severity tests trigger
         // the cross-module Issue.
+        //
+        // F2-228 — ROWVERSION rule: this runs BEFORE the run row is saved, and the run is
+        // saved exactly once afterwards. It used to save the run, open the Issue (which
+        // flushes), then stamp capaTaskId and save the run a SECOND time. Because the first
+        // save is an IDENTITY INSERT and BaseEntity maps row_version @Version
+        // insertable=false updatable=false over a SQL Server ROWVERSION, the in-memory
+        // version was null and the follow-up UPDATE ... WHERE row_version = null matched zero
+        // rows. Probed live: the THIRD consecutive failure of a CRITICAL control test
+        // answered HTTP 409 and rolled the whole transaction back — so neither the Issue nor
+        // the failing run itself was recorded, on both POST /ccm/tests/{id}/run-now and the
+        // 60-second CcmSchedulerService tick. Exactly F2-175's defect, in another module.
+        //
+        // openConsecutiveFailureIssue reads only the run's failureReason, never its id, so
+        // nothing here needed the run to exist first (F2-175: do the other work FIRST, then
+        // save once).
         if (isFailureLike && "CRITICAL".equals(d.getSeverity())
-                && d.getConsecutiveFailures() >= CONSECUTIVE_FAILURE_THRESHOLD
-                && run.getCapaTaskId() == null) {
+                && d.getConsecutiveFailures() >= CONSECUTIVE_FAILURE_THRESHOLD) {
             Long issueId = openConsecutiveFailureIssue(d, run);
             if (issueId != null) {
                 run.setCapaTaskId(issueId);
-                run = runRepo.save(run);
             }
         }
+
+        run = runRepo.save(run);
 
         audit.log("RUN_COMPLETED", "ControlTestDefinition", d.getId(),
                 "CCM run " + result.status() + " for " + d.getTestCode()
