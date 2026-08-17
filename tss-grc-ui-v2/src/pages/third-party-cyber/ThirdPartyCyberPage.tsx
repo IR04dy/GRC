@@ -18,7 +18,7 @@ import { useI18n } from '../../lib/i18n';
 import { useToast } from '../../lib/toast';
 import {
   listTpc, submitTpc, approveTpc, retireTpc,
-  TPC_STATUS_TONE, TPC_RESIDUAL_TONE, TPC_INHERENT_TONE,
+  TPC_STATUS_TONE, TPC_RESIDUAL_TONE, TPC_INHERENT_TONE, isResidualAtLeast,
   type ThirdPartyCyberAssessment,
 } from '../../lib/thirdPartyCyber';
 
@@ -43,23 +43,33 @@ export function ThirdPartyCyberPage() {
     finally { setLoading(false); }
   }
 
+  // F2-230 — ONE predicate for "this vendor needs attention", read by the tab filter, the tab count
+  // and the KPI tile, so a tile's figure is by construction the length of the list it opens (F2-197).
+  // It replaced two separately-spelled inclusion lists: `=== 'HIGH' || === 'CRITICAL' || === 'ELEVATED'`
+  // on the filter and `['ELEVATED','HIGH','CRITICAL'].includes(...)` on the count. They happened to
+  // agree, which is exactly what made them look maintained.
+  const needsAttention = (r: ThirdPartyCyberAssessment) =>
+    isResidualAtLeast(r.residualRiskTier, 'ELEVATED');
+
   const stats = useMemo(() => {
-    const s = { DRAFT:0, IN_REVIEW:0, APPROVED:0, RETIRED:0, high:0, critical:0 };
+    const s = { DRAFT:0, IN_REVIEW:0, APPROVED:0, RETIRED:0, elevated:0, critical:0 };
     rows.forEach(r => {
       s[r.status]++;
-      if (r.residualRiskTier === 'HIGH') s.high++;
-      if (r.residualRiskTier === 'CRITICAL') s.critical++;
+      // Both of these were equality tests against a single rung, so on 16 real rows they read 0 and 0
+      // while the tab beneath them showed 2. The register's whole point is the top of the ladder.
+      if (needsAttention(r)) s.elevated++;
+      if (isResidualAtLeast(r.residualRiskTier, 'CRITICAL')) s.critical++;
     });
     return s;
   }, [rows]);
 
   const filtered = useMemo(() => {
     if (tab === 'all') return rows;
-    if (tab === 'high-risk') return rows.filter(r => r.residualRiskTier === 'HIGH' || r.residualRiskTier === 'CRITICAL' || r.residualRiskTier === 'ELEVATED');
+    if (tab === 'high-risk') return rows.filter(needsAttention);
     return rows.filter(r => r.status === tab);
   }, [tab, rows]);
 
-  const highRiskCount = rows.filter(r => ['ELEVATED','HIGH','CRITICAL'].includes(r.residualRiskTier)).length;
+  const highRiskCount = rows.filter(needsAttention).length;
   const tabs: TabItem<TabId>[] = [
     { id: 'all',       label: t('tpcTabAll') },
     { id: 'DRAFT',     label: t('tpcTabDraft'),     count: stats.DRAFT },
@@ -121,8 +131,11 @@ export function ThirdPartyCyberPage() {
 
       <div className="kpi-grid">
         <Kpi Icon={CheckCircle2}   label={t('tpcKpiApproved')} value={stats.APPROVED} tone="success" onClick={() => setTab('APPROVED')} active={tab === 'APPROVED'} />
-        <Kpi Icon={AlertTriangle}  label={t('tpcKpiHigh')}     value={stats.high}     tone="warning" onClick={() => setTab('high-risk')} active={tab === 'high-risk'} />
-        <Kpi Icon={Bug}            label={t('tpcKpiCritical')} value={stats.critical} tone="danger"  onClick={() => setTab('high-risk')} active={tab === 'high-risk'} />
+        <Kpi Icon={AlertTriangle}  label={t('tpcKpiHigh')}     value={stats.elevated} tone="warning" onClick={() => setTab('high-risk')} active={tab === 'high-risk'} />
+        {/* No onClick: this counts the TOP rung, and the only list this page can open is the
+            ≥ ELEVATED tab. A tile that navigates somewhere its own figure does not describe is
+            F2-197's defect, and the tile above already carries that navigation. */}
+        <Kpi Icon={Bug}            label={t('tpcKpiCritical')} value={stats.critical} tone="danger" />
         <Kpi Icon={Lock}           label={t('tpcKpiReview')}   value={stats.IN_REVIEW + stats.DRAFT} tone="primary" onClick={() => setTab('IN_REVIEW')} active={tab === 'IN_REVIEW'} />
       </div>
 

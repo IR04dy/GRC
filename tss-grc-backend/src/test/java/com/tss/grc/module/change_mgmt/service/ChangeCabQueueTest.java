@@ -68,7 +68,7 @@ class ChangeCabQueueTest {
     void setUp() {
         TenantContext.setCurrentTenant(ORG);
         service = new ChangeCabQueueService(changeRepo, matrixRepo, committeePort);
-        when(matrixRepo.findByOrganisationIdOrderByChangeTypeAscRiskLevelAsc(anyLong()))
+        when(matrixRepo.findMatrixRanked(anyLong()))
             .thenReturn(List.of(cell("NORMAL", "HIGH", "CAB", 2), cell("EMERGENCY", "HIGH", "ECAB", 1)));
         when(committeePort.gateMap()).thenReturn(List.of(
             gateRow("CAB", 13L, "IT Steering Committee", true, null),

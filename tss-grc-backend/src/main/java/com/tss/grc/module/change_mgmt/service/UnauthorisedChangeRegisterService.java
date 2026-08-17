@@ -152,7 +152,7 @@ public class UnauthorisedChangeRegisterService {
 
         // The cell for each (type x risk), read once. A missing cell is a finding, not a default.
         Map<String, ChangeAuthorisationMatrix> cells = new HashMap<>();
-        for (ChangeAuthorisationMatrix m : matrixRepo.findByOrganisationIdOrderByChangeTypeAscRiskLevelAsc(org))
+        for (ChangeAuthorisationMatrix m : matrixRepo.findMatrixRanked(org))
             cells.put(cellKey(m.getChangeType(), m.getRiskLevel()), m);
 
         Map<Long, Long> approveCounts = approveCountsFor(population);

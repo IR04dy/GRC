@@ -16,15 +16,35 @@ public interface CommitteeMemberSkillRepository extends JpaRepository<CommitteeM
     List<CommitteeMemberSkill> findByOrganisationIdAndCommitteeIdOrderByMemberNameAsc(
         Long organisationId, Long committeeId);
 
-    /** Members in a committee who hold a specific skill at a given level
-     *  or above. Used to answer "does this committee have a financial
-     *  expert?" (CMA Article 54, SAMA RGov § 5.3.2). */
+    /**
+     * Every member holding a skill in one dimension, <b>most competent first</b>. Used to answer
+     * "does this committee have a financial expert?" (CMA Article 54, SAMA RGov § 5.3.2).
+     *
+     * <p>⚠ It returns <b>all</b> levels in that dimension and takes no threshold. Until F2-230 this
+     * javadoc claimed it returned members "at a given level or above", describing a parameter the
+     * method has never had — F2-184's shape, a comment answering the question a reader was about to
+     * ask. The threshold was not added to make the sentence true: no caller asks for one, and
+     * {@code SkillLevel.atLeast} is where it belongs when one does.
+     *
+     * <p>⚠⚠ <b>The ordering was {@code ORDER BY s.skillLevel DESC}</b> — a lexical sort of
+     * {@code BASIC | INTERMEDIATE | EXPERT}, which descending alphabetically reads INTERMEDIATE,
+     * EXPERT, BASIC. So the CMA Article 54 question was answered with the <em>intermediate</em> member
+     * at the top of the list, on 31 live rows in dev and prod, both of whose stored values (EXPERT and
+     * INTERMEDIATE) are on the wrong side of that transposition.
+     *
+     * <p>The {@code CASE} is a second copy of {@code SkillLevel.ladder()} because {@code @Query} takes
+     * a compile-time constant; {@code OrderedVocabularySortContractTest} compares them by reflection.
+     */
     @Query("""
         SELECT s FROM CommitteeMemberSkill s
         WHERE s.organisationId = :organisationId
           AND s.committeeId = :committeeId
           AND s.skillDimension = :dimension
-        ORDER BY s.skillLevel DESC, s.memberName ASC
+        ORDER BY
+          CASE s.skillLevel
+              WHEN 'BASIC' THEN 0 WHEN 'INTERMEDIATE' THEN 1 WHEN 'EXPERT' THEN 2
+              ELSE -1 END DESC,
+          s.memberName ASC
     """)
     List<CommitteeMemberSkill> findByDimension(Long organisationId, Long committeeId, String dimension);
 

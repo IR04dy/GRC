@@ -1,6 +1,8 @@
 package com.tss.grc.module.tprm.cyber.service;
 
 import com.tss.grc.common.tenant.TenantContext;
+import com.tss.grc.common.validation.ClosedVocabulary;
+import com.tss.grc.common.validation.ServerOwnedState;
 import com.tss.grc.module.tprm.cyber.entity.ThirdPartyCyberAssessment;
 import com.tss.grc.module.tprm.cyber.repository.ThirdPartyCyberAssessmentRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -35,18 +37,52 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ThirdPartyCyberAssessmentService {
 
-    private static final Set<String> STATUSES = Set.of("DRAFT", "IN_REVIEW", "APPROVED", "RETIRED");
-    private static final Set<String> INHERENT = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
+    /**
+     * The lifecycle vocabulary, mirroring the {@code CHECK} V378 adds. Categorical in the sense that
+     * matters here — DRAFT → IN_REVIEW → APPROVED → RETIRED is a progression, but nothing sorts or
+     * thresholds it, so it is a {@link ClosedVocabulary} and not an {@code OrderedVocabulary}.
+     */
+    static final ClosedVocabulary STATUS = ClosedVocabulary.of(
+            "status", "CK_tpc_status", "DRAFT", "IN_REVIEW", "APPROVED", "RETIRED");
+    static final String DRAFT = "DRAFT";
+
+    /**
+     * Inherent risk is its <b>own</b> four-token vocabulary and deliberately not the residual ladder:
+     * they overlap only at LOW. Two risk vocabularies on one entity is what let the residual ladder go
+     * undeclared for so long (F2-196's shape inside a single table), so both are named now.
+     */
+    private static final ClosedVocabulary INHERENT = ClosedVocabulary.of(
+            "inherentCyberRisk", "CK_tpc_inherent_cyber_risk",
+            "LOW", "MEDIUM", "HIGH", "CRITICAL");
+
+    /**
+     * Upper bound (exclusive) of every rung except the top, in {@link ResidualRiskTier} order.
+     *
+     * <p>Held as bands over the declared ladder rather than as a ternary chain naming the five tokens
+     * again: the derivation and the ordering now read the same list, so a rung cannot be added to one
+     * without the other. The static check below is what makes that a build failure rather than a
+     * silent cap at whatever rung the bands run out on.
+     */
+    private static final int[] SCORE_BANDS = {25, 45, 65, 85};
+
+    static {
+        if (SCORE_BANDS.length != ResidualRiskTier.ladder().size() - 1) {
+            throw new IllegalStateException(
+                "the residual score bands " + java.util.Arrays.toString(SCORE_BANDS)
+                + " must divide the ladder " + ResidualRiskTier.ladder()
+                + " into exactly its own number of rungs");
+        }
+    }
 
     private final ThirdPartyCyberAssessmentRepository repo;
 
     @Transactional(readOnly = true)
     public Page<ThirdPartyCyberAssessment> list(Pageable p) {
-        return repo.findByOrganisationIdOrderByResidualRiskTierDescIdDesc(TenantContext.getCurrentTenant(), p);
+        return repo.findRegisterByResidualRisk(TenantContext.getCurrentTenant(), p);
     }
     @Transactional(readOnly = true)
     public Page<ThirdPartyCyberAssessment> listByStatus(String status, Pageable p) {
-        return repo.findByOrganisationIdAndStatusOrderByResidualRiskTierDescIdDesc(TenantContext.getCurrentTenant(), status, p);
+        return repo.findRegisterByResidualRiskAndStatus(TenantContext.getCurrentTenant(), status, p);
     }
     @Transactional(readOnly = true)
     public ThirdPartyCyberAssessment get(Long id) {
@@ -56,11 +92,15 @@ public class ThirdPartyCyberAssessmentService {
 
     @Transactional
     public ThirdPartyCyberAssessment create(ThirdPartyCyberAssessment req) {
-        if (!INHERENT.contains(req.getInherentCyberRisk()))
-            throw new IllegalArgumentException("inherentCyberRisk must be one of " + INHERENT);
+        req.setInherentCyberRisk(INHERENT.require(req.getInherentCyberRisk()));
         req.setOrganisationId(TenantContext.getCurrentTenant());
         req.setId(null);
-        if (req.getStatus() == null) req.setStatus("DRAFT");
+        // F2-220's shape, tenth instance: `if (status == null) status = "DRAFT"` is a DEFAULT, not a
+        // guard, so a caller could create an assessment already APPROVED — skipping submit() and
+        // approve(), which are the only things that stamp assessedAt, approvedAt and approverName.
+        // No create form exists on any screen, so nothing that works today sends a status (F2-182).
+        req.setStatus(ServerOwnedState.requireInitial(
+                req.getStatus(), DRAFT, "third-party cyber assessment"));
         recompute(req);
         return repo.save(req);
     }
@@ -115,13 +155,26 @@ public class ThirdPartyCyberAssessmentService {
         if (score > 100) score = 100;
         a.setRiskScore(BigDecimal.valueOf(score).setScale(2, RoundingMode.HALF_UP));
 
-        String tier = score < 25 ? "LOW"
-                    : score < 45 ? "MODERATE"
-                    : score < 65 ? "ELEVATED"
-                    : score < 85 ? "HIGH"
-                                 : "CRITICAL";
-        // floor: a CRITICAL-inherent vendor cannot fall below MODERATE
-        if ("CRITICAL".equals(a.getInherentCyberRisk()) && "LOW".equals(tier)) tier = "MODERATE";
+        String tier = tierForScore(score);
+        // Floor: a CRITICAL-inherent vendor cannot fall below MODERATE. Expressed as an elevation over
+        // the declared ladder rather than as a pair of string equalities, so it stays a floor if a rung
+        // is ever inserted below MODERATE (F2-229: a derived value must never lower a stored judgement,
+        // and a floor written as `equals` silently stops being one when the ladder changes).
+        String floor = ResidualRiskTier.ladder().get(1);
+        if (INHERENT.is(a.getInherentCyberRisk(), ResidualRiskTier.LADDER.top())
+                && !ResidualRiskTier.atLeast(tier, floor)) {
+            tier = floor;
+        }
         a.setResidualRiskTier(tier);
+    }
+
+    /**
+     * The rung {@code score} lands on — the count of bands it has passed, indexed into the declared
+     * ladder. Deliberately not a ternary chain naming the five tokens a second time.
+     */
+    private static String tierForScore(double score) {
+        int rung = 0;
+        while (rung < SCORE_BANDS.length && score >= SCORE_BANDS[rung]) rung++;
+        return ResidualRiskTier.ladder().get(rung);
     }
 }

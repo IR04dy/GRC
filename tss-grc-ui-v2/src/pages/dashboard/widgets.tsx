@@ -16,7 +16,7 @@ import { listFourthParty, isConcentrationAtLeast } from '../../lib/fourthParty';
 import { complianceApi, changeApi, tprmApi } from '../../lib/api';
 import { listVendorAssessments } from '../../lib/tprmQuestionnaire';
 import { loadActivity, subscribeActivity, type ActivityEvent } from '../../lib/activityLog';
-import { listTpc } from '../../lib/thirdPartyCyber';
+import { listTpc, isResidualAtLeast } from '../../lib/thirdPartyCyber';
 import { listSrt } from '../../lib/resilienceTests';
 import { listProcessorAssessments } from '../../lib/processorAssessments';
 import { listDsas } from '../../lib/dataSharing';
@@ -667,7 +667,9 @@ function TprmSnapshotWidget({ t }: { t: (k: string) => string }) {
           // F2-229: a threshold over the declared ladder — `=== 'HIGH'` skipped the CRITICAL row.
           fpHigh:       a.content.filter((r: any) => isConcentrationAtLeast(r.concentrationRisk, 'HIGH')).length,
           tpc:          b.content.length,
-          tpcHigh:      b.content.filter((r: any) => r.residualRiskTier === 'HIGH' || r.residualRiskTier === 'CRITICAL').length,
+          // F2-230: a threshold over the declared ladder. `HIGH || CRITICAL` skipped ELEVATED, so
+          // this tile read 0 while two vendors sat on the register's highest occupied rung.
+          tpcHigh:      b.content.filter((r: any) => isResidualAtLeast(r.residualRiskTier, 'ELEVATED')).length,
           proc:         p.content.length,
           procFail:     p.content.filter((r: any) => r.overallOutcome === 'FAIL').length,
           srt:          s.content.length,

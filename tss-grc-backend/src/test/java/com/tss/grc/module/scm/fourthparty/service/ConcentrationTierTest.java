@@ -67,7 +67,10 @@ class ConcentrationTierTest {
         assertThat(ConcentrationTier.atLeast(null, "LOW")).isFalse();
         assertThatThrownBy(() -> ConcentrationTier.atLeast("HIGH", "SEVERE"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("not a concentration tier");
+            // F2-230: the message now comes from OrderedVocabulary and names the FIELD and the ladder,
+            // which is strictly more useful than the old wording it replaced.
+            .hasMessageContaining("is not a rung of concentrationRisk")
+            .hasMessageContaining("[LOW, MEDIUM, HIGH, CRITICAL]");
     }
 
     @Test

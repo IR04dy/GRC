@@ -226,7 +226,7 @@ public class ChangeCabQueueService {
         // this (type × risk), which S8f already reports as a finding, and inventing a gate here would
         // put a change in a queue no rule sent it to.
         Map<String, ChangeAuthorisationMatrix> cells = new HashMap<>();
-        for (ChangeAuthorisationMatrix m : matrixRepo.findByOrganisationIdOrderByChangeTypeAscRiskLevelAsc(org))
+        for (ChangeAuthorisationMatrix m : matrixRepo.findMatrixRanked(org))
             cells.put(cellKey(m.getChangeType(), m.getRiskLevel()), m);
 
         Map<String, List<ChangeRequest>> byGate = new LinkedHashMap<>();

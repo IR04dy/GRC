@@ -60,7 +60,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * those alphabetically is a deterministic grouping that claims nothing. Only a ladder —
  * {@code admin.committee_member_skills.skill_level} [BASIC, INTERMEDIATE, EXPERT],
  * {@code ndi.gap.severity} [CRITICAL, HIGH, MEDIUM, LOW] — turns an alphabetical sort into an
- * assertion about which row matters most. So {@link #everyLexicalSortOfAClosedVocabularyIsCensused}
+ * assertion about which row matters most. So {@code OrderedVocabularySortContractTest#everyLexicalSortOfAClosedVocabularyIsClassified}
  * is an exactly-asserted census rather than a zero, and it carries <b>no verdicts</b>: F2-188 measured
  * what happens when a slice writes reasons for code it has not read (five claims, five false, and the
  * fluency was what made them look verified).
@@ -71,7 +71,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code @Table(schema)}. Every lookup therefore missed, every column read as having <b>no CHECK</b>,
  * and the hard zero I had written <em>passed</em> — over a population of 15. The throwaway census that
  * used the same key printed "total columns affected: 0" and I read that as a measurement. What caught
- * it was {@link #theCheckDrivenLegIsNotVacuous} asserting that V377's own constraints are findable.
+ * it was {@code OrderedVocabularySortContractTest#theCensusIsNotVacuous} asserting that V377's own constraints are findable.
  * 🔑 <b>A detector that cannot match reads exactly like a clean tree, and it under-reports — the quiet
  * direction.</b> Two of the fifteen sit in {@code admin}, four in {@code sust}: nothing about the
  * shape of the answer looked wrong.
@@ -106,49 +106,6 @@ class LexicalSeveritySortContractTest {
     /** Column names that sound like a graded judgement. A locator, never a verdict (F2-217). */
     private static final Pattern GRADED = Pattern.compile(
         "(?i)(severity|critical|priority|risk|impact|likelihood|tier|rating|band|level|grade)");
-
-    /**
-     * Every column with a {@code CHECK} vocabulary of 3+ tokens that some repository sorts as text.
-     *
-     * <p>Exactly asserted, <b>with no verdicts</b>. A defect here needs the vocabulary to be ORDERED,
-     * which is a question about what the tokens mean and therefore a question for a reader. What this
-     * set does guarantee is that nobody adds a sixteenth without noticing, and that a column which
-     * gets ranked loses its entry in the same commit. The two {@code scm.fourth_party_exposures}
-     * columns were members until this slice and are now required to be absent.
-     */
-    private static final Set<String> LEXICALLY_SORTED_CLOSED_VOCABULARIES = Set.of(
-        "admin.committee_form_templates.form_type",
-        "admin.committee_member_skills.skill_level",
-        "admin.committee_templates.committee_type",
-        "admin.committee_templates.regulatory_domain",
-        "ai_governance.ml_model.risk_tier",
-        "change_mgmt.change_authorisation_matrix.change_type",
-        "change_mgmt.change_authorisation_matrix.risk_level",
-        "evidence.evidence_connectors.category",
-        "ndi.framework_item.component",
-        "ndi.gap.severity",
-        "scm.alternate_suppliers.alternate_vendor_role",
-        "scm.contract_clauses.category",
-        "sust.esg_metric.category",
-        "sust.financed_emissions_record.asset_class",
-        "sust.tcfd_item.pillar");
-
-    /**
-     * String-typed graded-SOUNDING columns still sorted lexically, exactly asserted, no verdicts.
-     *
-     * <p>This is the complement of the set above rather than a subset of it: two members
-     * ({@code bcm.mtpd_inheritance_finding.severity},
-     * {@code tprm.third_party_cyber_assessments.residual_risk_tier}) have <b>no CHECK at all</b>, so
-     * the closed-vocabulary census cannot see them — F2-221 measured 201 such columns platform-wide.
-     */
-    private static final Set<String> GRADED_STRING_SORT_WORK_LIST = Set.of(
-        "admin.committee_member_skills.skill_level",
-        "ai_governance.ml_model.risk_tier",
-        "bcm.mtpd_inheritance_finding.severity",
-        "change_mgmt.change_authorisation_matrix.risk_level",
-        "ndi.gap.severity",
-        "tprm.third_party_cyber_assessments.residual_risk_tier");
-
     /**
      * Graded-sounding columns that are NUMERIC, where a lexical sort IS a correct numeric sort.
      * Held so the narrowing is pinned by measurement: delete the String narrowing above and the work
@@ -161,6 +118,14 @@ class LexicalSeveritySortContractTest {
         "sust.climate_risk_opportunity.risk_score");
 
     /** Anti-vacuity: the reflection sweep must keep finding the corpus it is written against. */
+    // ⚠ F2-229's PLATFORM-WIDE census and its six-entry graded-String work list have MOVED to
+    // OrderedVocabularySortContractTest (F2-230). Two instruments answering one question is this
+    // programme's own recurring defect, and after F2-230 ranked three of the four filed columns those
+    // numbers were stale — a stale ceiling is indistinguishable from a reviewed one (house rule 3).
+    // What stays here is what is specific to the fourth-party register: its CASE ladder mirroring
+    // ConcentrationTier, its hard zero, and the numeric/String narrowing that stops the census being a
+    // pile of correct code.
+
     private static final int MIN_REPOSITORIES = 400;
     private static final int MIN_LEXICAL_TERMS = 700;
     private static final int MIN_CHECK_VOCABULARIES = 300;
@@ -226,74 +191,6 @@ class LexicalSeveritySortContractTest {
                 + "of a ladder, and the CRITICAL row sorted last of 13")
             .isEmpty();
     }
-
-    // ── the platform-wide census ──────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("every lexical sort of a closed vocabulary is censused, in both directions")
-    void everyLexicalSortOfAClosedVocabularyIsCensused() throws Exception {
-        Map<String, Set<String>> vocab = checkVocabulariesByColumn();
-        Set<String> found = new TreeSet<>();
-        for (Site s : lexicalOrderTerms()) {
-            String column = columnOf(s);
-            if (column == null) continue;
-            Set<String> tokens = vocab.get(column);
-            if (tokens != null && tokens.size() >= 3) found.add(column);
-        }
-        assertThat(found)
-            .as("a new lexical sort of a closed vocabulary must be ranked or censused. NOT a hard "
-                + "zero: an alphabetical sort of a CATEGORICAL vocabulary is a legitimate grouping, "
-                + "and asserting zero here would fail on correct code")
-            .containsExactlyInAnyOrderElementsOf(LEXICALLY_SORTED_CLOSED_VOCABULARIES);
-        assertThat(found)
-            .as("both fourth-party columns are ranked now, so they must have left the census")
-            .doesNotContain("scm.fourth_party_exposures.concentration_risk",
-                            "scm.fourth_party_exposures.downstream_criticality");
-    }
-
-    @Test
-    @DisplayName("the census is not vacuous: V377's own constraints must be findable")
-    void theCheckDrivenLegIsNotVacuous() throws Exception {
-        Map<String, Set<String>> vocab = checkVocabulariesByColumn();
-        assertThat(vocab).as("MigrationVocabularies must still be parsing the migration corpus")
-            .hasSizeGreaterThan(MIN_CHECK_VOCABULARIES);
-        // These four are V377's. They are asserted here because this is the leg that caught the
-        // schema-qualification bug described in the class javadoc: without it, every lookup missed
-        // and the census read as empty.
-        assertThat(vocab).containsKeys(
-            "scm.fourth_party_exposures.concentration_risk",
-            "scm.fourth_party_exposures.downstream_criticality",
-            "scm.fourth_party_exposures.dependency_type",
-            "scm.fourth_party_exposures.status");
-        assertThat(vocab.get("scm.fourth_party_exposures.concentration_risk"))
-            .as("CRITICAL is the token no artefact declared while the column held it")
-            .containsExactlyInAnyOrder("LOW", "MEDIUM", "HIGH", "CRITICAL");
-        assertThat(repositories()).hasSizeGreaterThan(MIN_REPOSITORIES);
-        assertThat(lexicalOrderTerms()).hasSizeGreaterThan(MIN_LEXICAL_TERMS);
-    }
-
-    // ── the graded-name complement, and its narrowing ─────────────────────────────────────────
-
-    @Test
-    @DisplayName("the graded-String work list is exactly what it says, in both directions")
-    void theWorkListIsExact() throws Exception {
-        Set<String> found = new TreeSet<>();
-        for (Site s : lexicalOrderTerms()) {
-            if (!GRADED.matcher(s.property()).find()) continue;
-            String column = columnOf(s);
-            if (column == null || !"String".equals(typeOf(s))) continue;
-            found.add(column);
-        }
-        assertThat(found)
-            .as("a new lexical sort of a graded String column must be ranked or listed; a listed one "
-                + "that gets ranked must lose its entry in the same commit")
-            .containsExactlyInAnyOrderElementsOf(GRADED_STRING_SORT_WORK_LIST);
-        assertThat(found)
-            .as("the two fourth-party columns are ranked now, so they must be absent")
-            .doesNotContain("scm.fourth_party_exposures.concentration_risk",
-                            "scm.fourth_party_exposures.downstream_criticality");
-    }
-
     @Test
     @DisplayName("the numeric narrowing is load-bearing, not an argument")
     void theNumericNarrowingIsLoadBearing() throws Exception {
@@ -337,27 +234,6 @@ class LexicalSeveritySortContractTest {
         assertThat(parsed).hasSize(1);
         assertThat(parsed.get(0)).containsExactlyInAnyOrderEntriesOf(Map.of("LOW", 0, "HIGH", 9));
     }
-
-    @Test
-    @DisplayName("positive control: an unqualified key finds nothing, which is the bug that hid 15")
-    void theSchemaSegmentOfTheKeyIsLoadBearing() throws Exception {
-        Map<String, Set<String>> vocab = checkVocabulariesByColumn();
-        // Every key in the migration side is schema-qualified. An entity-side key built without the
-        // schema therefore matches nothing at all -- silently, and in the direction that reads as a
-        // clean tree. This asserts the failure mode rather than trusting the fix.
-        assertThat(vocab.keySet().stream().filter(k -> !k.contains(".")).toList()).isEmpty();
-        assertThat(vocab).doesNotContainKey("fourth_party_exposures.concentration_risk");
-        assertThat(vocab).containsKey("scm.fourth_party_exposures.concentration_risk");
-        long unqualifiedHits = LEXICALLY_SORTED_CLOSED_VOCABULARIES.stream()
-            .map(k -> k.substring(k.indexOf('.') + 1))
-            .filter(vocab::containsKey)
-            .count();
-        assertThat(unqualifiedHits)
-            .as("if this were ever non-zero the unqualified key would partially work, which is worse "
-                + "than failing outright — it would hide some members and not others")
-            .isZero();
-    }
-
     // ── machinery ─────────────────────────────────────────────────────────────────────────────
 
     /** {@code WHEN 'TOKEN' THEN n} pairs, grouped per CASE expression, within ORDER BY only. */
@@ -462,7 +338,7 @@ class LexicalSeveritySortContractTest {
      * {@code schema.table.column}, in {@link MigrationVocabularies}' own key space.
      *
      * <p>⚠ <b>The schema segment is load-bearing and omitting it is silent.</b> See the class javadoc
-     * and {@link #theSchemaSegmentOfTheKeyIsLoadBearing}.
+     * and the schema-qualified key in {@code OrderedVocabularySortContractTest}.
      */
     private static String columnOf(Site s) throws IOException {
         Class<?> entity = entityOfRepo(s.repo());

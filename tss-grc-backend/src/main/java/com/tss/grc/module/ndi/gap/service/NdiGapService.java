@@ -70,9 +70,9 @@ public class NdiGapService {
     @Transactional(readOnly = true)
     public Page<NdiGap> listGaps(Long cycleId, String status, String severity, Pageable p) {
         Long o = org();
-        if (status != null)   return gaps.findByOrganisationIdAndCycleIdAndStatusOrderBySeverityAscIdAsc(o, cycleId, status, p);
+        if (status != null)   return gaps.findRegisterBySeverityAndStatus(o, cycleId, status, p);
         if (severity != null) return gaps.findByOrganisationIdAndCycleIdAndSeverityOrderByIdAsc(o, cycleId, severity, p);
-        return gaps.findByOrganisationIdAndCycleIdOrderBySeverityAscIdAsc(o, cycleId, p);
+        return gaps.findRegisterBySeverity(o, cycleId, p);
     }
 
     @Transactional(readOnly = true)

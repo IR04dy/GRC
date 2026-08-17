@@ -1,9 +1,9 @@
 package com.tss.grc.module.scm.fourthparty.service;
 
 import com.tss.grc.common.validation.ClosedVocabulary;
+import com.tss.grc.common.validation.OrderedVocabulary;
 
 import java.util.List;
-import java.util.Locale;
 
 /**
  * F2-229 — the concentration ladder for {@code scm.fourth_party_exposures.concentration_risk}.
@@ -49,54 +49,46 @@ import java.util.Locale;
 public final class ConcentrationTier {
 
     /**
-     * The vocabulary, naming the {@code CHECK} V377 adds. Before V377 this table had <b>zero</b>
-     * check constraints of any kind, so the vocabulary lived only in the heads of its readers —
-     * F2-196's sentence, on a different column.
+     * The ladder, least to most concentrated, naming the {@code CHECK} V377 adds. Before V377 this
+     * table had <b>zero</b> check constraints of any kind, so the vocabulary lived only in the heads
+     * of its readers — F2-196's sentence, on a different column.
+     *
+     * <p><b>The order of these arguments is the entire point of the class</b> — it is what
+     * {@code ORDER BY concentration_risk DESC} was silently substituting an alphabetical sort for,
+     * and alphabetically DESC these four read MEDIUM, LOW, HIGH, CRITICAL.
+     *
+     * <p>⚙ F2-230 moved the mechanism into {@link OrderedVocabulary}, where three other ladders in
+     * this platform now share it. The accessors below are kept as a thin facade because the register
+     * ordering, the recompute and the CAPA edge all read them; what is deliberately <em>not</em> kept
+     * is a second implementation of rank/outranks/atLeast, since an unread second opinion is how the
+     * next reader decides it is the authority (F2-190).
      */
-    public static final ClosedVocabulary VOCABULARY = ClosedVocabulary.of(
+    public static final OrderedVocabulary LADDER = OrderedVocabulary.of(
             "concentrationRisk", "CK_fpe_concentration_risk",
             "LOW", "MEDIUM", "HIGH", "CRITICAL");
 
-    /**
-     * Least to most concentrated. <b>The order of this list is the entire point of the class</b> —
-     * it is what {@code ORDER BY concentration_risk DESC} was silently substituting an alphabetical
-     * sort for, and alphabetically DESC these four read MEDIUM, LOW, HIGH, CRITICAL.
-     */
-    private static final List<String> LADDER = List.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
+    /** The underlying set, for {@code require} and for {@code ClosedVocabularyPinTest}. */
+    public static final ClosedVocabulary VOCABULARY = LADDER.vocabulary();
 
     /** Rank of a token this class does not recognise. Sorts below LOW; see {@link #outranks}. */
-    public static final int UNRECOGNISED = -1;
-
-    static {
-        // A ladder that disagreed with the vocabulary would make require() and rank() answer
-        // different questions about the same column. Neither is the authority over the other, so
-        // they are checked against each other rather than one being derived from the other: the
-        // vocabulary carries the CHECK name, the ladder carries the order, and only both together
-        // describe the column.
-        if (!VOCABULARY.tokens().equals(java.util.Set.copyOf(LADDER))) {
-            throw new IllegalStateException(
-                "the concentration ladder " + LADDER + " and its vocabulary " + VOCABULARY.tokens()
-                + " must contain the same tokens");
-        }
-    }
+    public static final int UNRECOGNISED = OrderedVocabulary.UNRECOGNISED;
 
     private ConcentrationTier() {}
 
     /** Least-to-most-concentrated, as declared. */
     public static List<String> ladder() {
-        return LADDER;
+        return LADDER.ladder();
     }
 
     /**
      * Position on the ladder, or {@link #UNRECOGNISED} for anything else.
      *
-     * <p>Case-normalising here rather than trusting the column: every text column in this database
-     * is collated case-insensitively, so {@code 'high'} is storable and {@code "HIGH".equals(…)}
-     * would then be false (F2-179).
+     * <p>Case-normalising rather than trusting the column: every text column in this database is
+     * collated case-insensitively, so {@code 'high'} is storable and {@code "HIGH".equals(…)} would
+     * then be false (F2-179).
      */
     public static int rank(String tier) {
-        if (tier == null || tier.isBlank()) return UNRECOGNISED;
-        return LADDER.indexOf(tier.trim().toUpperCase(Locale.ROOT));
+        return LADDER.rank(tier);
     }
 
     /**
@@ -111,17 +103,12 @@ public final class ConcentrationTier {
      * assessment worth protecting — and after V377 the column cannot hold one anyway.
      */
     public static boolean outranks(String candidate, String current) {
-        return rank(candidate) > rank(current);
+        return LADDER.outranks(candidate, current);
     }
 
     /** Is {@code tier} at or above {@code threshold}? Throws if the threshold is not a tier. */
     public static boolean atLeast(String tier, String threshold) {
-        int floor = rank(threshold);
-        if (floor == UNRECOGNISED) {
-            throw new IllegalArgumentException(
-                "'" + threshold + "' is not a concentration tier; expected one of " + LADDER);
-        }
-        return rank(tier) >= floor;
+        return LADDER.atLeast(tier, threshold);
     }
 
     /**

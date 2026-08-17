@@ -62,3 +62,40 @@ export const TPC_RESIDUAL_TONE: Record<TpcResidual, 'primary'|'success'|'danger'
 export const TPC_INHERENT_TONE: Record<TpcInherent, 'primary'|'success'|'danger'|'warning'|'info'> = {
   LOW: 'info', MEDIUM: 'warning', HIGH: 'danger', CRITICAL: 'danger',
 };
+
+/**
+ * F2-230 — the residual ladder, least to most exposed. The mirror of the backend's
+ * `ResidualRiskTier`, which is what `OrderedVocabularySortContractTest` compares it against.
+ *
+ * The type above already declared these five in this order; what was missing was anything that
+ * treated the order as data. Six readers each spelled "is this vendor a concern?" for themselves and
+ * between them produced three different answers to it:
+ *
+ *   - `ThirdPartyCyberPage`'s two KPI tiles counted `=== 'HIGH'` and `=== 'CRITICAL'`, so on 16 real
+ *     rows (dev = prod) both read **0** — while the tab they both navigate to showed **2**, the
+ *     ELEVATED rows neither tile could see. F2-197: a tile whose figure disagrees with the list it
+ *     opens is worse than a tile with no figure.
+ *   - `TprmConsolidatedOverview` counted `HIGH || CRITICAL` as concerning and `LOW || MODERATE` as
+ *     fine, two inclusion lists that between them **omit ELEVATED entirely** — so every ELEVATED
+ *     assessment fell into neither bucket and the two KPIs did not sum to the register.
+ *   - the page's own "high-risk" tab did include ELEVATED, so the page and the overview held two
+ *     different thresholds for one question and each looked self-consistent.
+ */
+export const TPC_RESIDUAL_LADDER: readonly TpcResidual[] =
+  ['LOW', 'MODERATE', 'ELEVATED', 'HIGH', 'CRITICAL'] as const;
+
+/** Position on the ladder; -1 for null, blank or anything unrecognised. */
+export function tpcResidualRank(tier: string | null | undefined): number {
+  if (!tier) return -1;
+  return TPC_RESIDUAL_LADDER.indexOf(tier.trim().toUpperCase() as TpcResidual);
+}
+
+/**
+ * The threshold question, asked once. This is what replaces the inclusion lists — and the reason it
+ * takes a threshold rather than exposing a fixed "is high risk" predicate is that the register has two
+ * legitimate thresholds (≥ ELEVATED for "needs attention", CRITICAL for the top rung) and hard-coding
+ * either is how the second one gets written as a fresh inclusion list.
+ */
+export function isResidualAtLeast(tier: string | null | undefined, threshold: TpcResidual): boolean {
+  return tpcResidualRank(tier) >= TPC_RESIDUAL_LADDER.indexOf(threshold);
+}
