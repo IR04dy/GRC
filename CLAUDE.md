@@ -1872,6 +1872,114 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A WORK LIST AND ITS CLASSIFIER ARE TWO ARTEFACTS, AND THE SLICE THAT BUILT BOTH DID NOT
+  MAKE THEM AGREE** (F2-226, measured 2026-08-17). Executing F2-225's filed field-initialiser work
+  list, the population was re-derived first (F2-221) — and the filing had measured **one of
+  F2-215's four filling mechanisms**. F2-225's scan matched only the field INITIALISER
+  (`private LocalDateTime x = …now()`); across all four — initialiser, `@PrePersist`/`@PreUpdate`
+  callback, `@CreationTimestamp`, and `insertable = false` where the database default fills the
+  column — the denominator is **82 entities / 87 act-clock fields, not 68** (73 / 6 / 8).
+  🔑 **The two mechanisms it missed are the ones a caller can NEVER reach**: a `@PrePersist` fires
+  at flush time *after* every setter and an `insertable = false` column is never sent at all, so
+  both are **stronger** evidence that the server owns WHEN than an initialiser — which F2-225
+  itself found can be overridden. Permissively re-paired: **30 sites, 17 candidate / 11 assignment
+  / 2 noise**. The widening surfaced no new confirmed attribution, which is a result and not a dead
+  end (F2-216).
+  ⚠⚠ **2 of the 4 filed sites were mis-bucketed, and F2-225's OWN CLASSIFIER said so.**
+  `AuditEngagementService#create::leadAuditor` (and `::auditCommitteeChair`) sit beside
+  `auditorFirm` — an IIA engagement is routinely led by an external firm's partner, who is not a
+  platform principal at all (F2-224's `auditorExternalParty` lesson) — and a lead auditor is
+  ASSIGNED to an engagement rather than being its recorder. `InvocationService#create::
+  incidentCommander` and `::bcmCoordinator` are crisis ROLE assignments, refuted **decisively by
+  the sibling column**: `Invocation` declares `declaredBy` separately, and that is the attribution
+  F2-224 closed. 🔑 **F2-225's headline was *"the classification is as much the finding as the
+  count"* and it then hand-filed a work list its own classifier contradicts — this programme's
+  most-repeated shape (two artefacts, nobody maintaining the agreement, F2-177) committed inside
+  the instrument built to answer it.** `theWorkListAgreesWithTheClassifier` now runs the classifier
+  over the work list mechanically. ⚠ Note what it does NOT do: `participantUserId` classifies as an
+  ASSIGNMENT and was still fixed, because the classifier reads a NAME and that site was adjudicated
+  by reading the CODE. **A classifier triages a population; it never decides a verdict** — recorded
+  in the gate rather than papered over by special-casing the word *participant*.
+  ⚠⚠ **The live half: an approval register that recorded a raiser the caller invented, and let
+  that caller name the only principal permitted to approve it.** `approvals.requests.requested_at`
+  is a field initialiser, so the server owns WHEN with no `setRequestedAt` anywhere for the F2-223
+  detector to pair, while `requested_by` was `@NotBlank` from the body — the **fifth** instance of
+  a server *requiring* an attribution it never verifies. Probed as `viewer` (holds
+  `WORKFLOW:WRITE`, **not** `WORKFLOW:APPROVE`): a POLICY-publication approval stored
+  `requested_by = "Nobody Who Raised This"` beside a server clock, and omitting the field was a
+  **400**. 🔑 **The rule was already written down IN THE CLIENT** — `lib/approvalsApi.ts` says of
+  the transition payload *"There is no `decidedBy` here on purpose. The server takes the deciding
+  identity from the authenticated principal (SEC-IAM-002) — sending one would be a field the server
+  ignores"*, one screenful above the `requestedBy: string` the service trusted. F2-215's headline:
+  generalising an invariant one field at a time leaves the remainder looking covered, because the
+  mechanism that covers them is visibly present.
+  ⚠⚠ **Leg 2 is the sharper one: `assignedTo` IS `transition()`'s authorisation input**
+  (`callerUsername.equals(r.getAssignedTo())`, SEC-IAM-002), so whoever creates the request decides
+  who may approve it. Probed as `compliance`, who holds WRITE **and** APPROVE: raised a P1
+  risk-acceptance approval assigned to `compliance`, then **approved it** — 200 then 200, with
+  `decided_by` correctly recording them both times. **The audit trail told the truth about who
+  acted while nothing stopped them** (F2-222's leg 2). The gate compares case-**insensitively**
+  because the column collates CI (F2-179).
+  ⚠⚠ **A FOUR-EYES REFUSAL IS A 409, AND THE CONVENTION HAD TO BE MEASURED RATHER THAN READ.** My
+  first draft threw `DomainAccessDeniedException` → **403**, and the live probe caught it. There are
+  two conventions in the tree and one is the outlier: `BusinessRuleException`'s javadoc says *"Use
+  this when the rule itself is the message — e.g. segregation-of-duties"* and maps to **403**, and it
+  is used **once in all of `module/`**; the one real self-approval gate,
+  `NdiEvidenceItemService.approve` (SEC-NDI-003, the maker/checker control F2-218 probed at 409),
+  throws `IllegalStateException` with a *"Segregation of duties:"* message, which the handler maps to
+  CONFLICT — and CLAUDE.md's own house rule says the same. 🔑 **F2-205's question applied to an
+  exception type: consistency among copies is not evidence, so ask which one the platform actually
+  runs.** 403 is also wrong in substance: the caller IS entitled to raise approval requests, so this
+  is a conflict with a rule, not a missing permission.
+  ⚠⚠ **The third site is one where the server does not merely record WHO, it MEASURES them.**
+  `ExerciseRuntimeService#recordResponse` took `participantUserId` from the body
+  (`@NotNull(message = "participantUserId is required")`) while `responseAt` is initialiser-stamped
+  *and* re-stamped, and `responseTimeSeconds` is **computed** from the inject's dispatch — so the row
+  is the evidence an ISO 22301 / NCEMA reviewer reads to accept that a named participant reacted
+  within N seconds. Probed: `viewer` (id 6) filed a response **as `compliance` (id 3)**, and the
+  audit row **quoted the caller's claim** (F2-223's exact defect). Every trail now reads off the
+  saved row. ⚠ The route is `isAuthenticated()` and that is CORRECT — filing a response is a duty,
+  the ADR-010 shape — which made this **worse** rather than better: the population who could forge
+  was every authenticated user. The honest client already sent `user.userId` from the decoded JWT;
+  a machine caller sent whatever it liked, which is where this class of defect lives (F2-179).
+  ⚠⚠ **FILED, and the sharpest one is a register reading 11 PENDING that admits nobody: 9 of those
+  11 can be decided by NO ONE.** `transition()` authorises on `callerUsername.equals(assignedTo)`,
+  and 9 rows hold a free-text person name (`Khalid Al-Shehri`, `Faisal Al-Dosari`, …) matching no
+  username in `iam.users` — so the assignee cannot decide, `myInbox` never returns them, and only a
+  PLATFORM_ADMIN override moves them. Identical in dev and prod, and **every one is self-assigned to
+  the same invented officer named as its requester** (F2-207's measured cast of 65, now in a *server*
+  register). `requested_by` and `assigned_to` both hold **two vocabularies** — usernames and display
+  names — under **zero CHECK constraints** (F2-222's shape). Repair rewrites 21 live rows in two
+  databases (F2-183/F2-196's rule) and a resolvability check at create needs a user-directory port
+  `approvals` does not have: **owner decision.**
+  ⚠ **Also filed, found while planting the fixture: `POST /exercise-runs/{id}/custom-inject`
+  answers 500 on its DEFAULT path.** `dispatchNow` defaults to **true**, and the combined path is a
+  ROWVERSION double-flush — `addCustomInject` saves the INSERT, `audit.log` + `emit` flush, then
+  `dispatchInject` re-loads and saves the same row again in one transaction. The dedicated dispatch
+  route answers **200 on the identical row**, which is the discriminator. Exactly the landmine
+  F2-175 widened: *any* flush between the two saves does it. Plus `StartRunRequest.runCode` as an
+  *"optional override"* — F2-172(d)'s family on a code cited in the NCEMA after-action record,
+  outside `ClientSuppliedReferenceRatchetTest`'s `setExternalId`/`setRefNumber` key.
+  ⚠⚠ **MASTER WAS RED BEFORE THIS SLICE, ON A DOCS GATE, AND F2-219 HAD ALREADY RECORDED THE
+  LESSON.** `FindingsRegisterCoverageTest#specsOwedOnlyEverDecreases` was failing 30 > 29: F2-225's
+  docs commit referenced F2-225 in the plan and wrote **no register spec**. F2-219's words were *"a
+  targeted re-run after a docs commit is not the suite, and the docs gate is precisely the gate a
+  docs commit can break"* — and it recurred in the **next** slice, on a **different** docs gate,
+  because the targeted re-run named four gate classes and this was not one of them. 🔑 **Naming the
+  trap does not exempt you from it, and the fix is a rule about the COMMAND rather than about the
+  list: after a docs commit, run the suite.** Both specs written; owed 30 → 28. ⚙ Its reverse leg
+  then fired correctly on the new spec until the plan row landed — **both documents must reference a
+  finding, because one recorded in only one of them is one an audience cannot see.**
+  ⚠ **Three instrument errors of mine, all caught by running things.** (a) The re-derivation's first
+  pairing reported **3** sites where F2-225's permissive scan found **19** — I had re-imposed the
+  root pairing, which is the narrowing this blind spot is *about*, since a clock with no setter has
+  no verb root to take; **under-reporting reads exactly like a clean tree** (F2-223's seven
+  corrections, all seven shrinking). (b) The pre-fix control compared `master` with `HEAD` before
+  anything was committed, so it compared master with **itself** and reported **all 12 legs SILENT**
+  — loud rather than quiet, which is the only reason it cost one iteration. (c) `classify()` asked a
+  **second** `Matcher` instance for `.start()` after calling `.find()` on a first, which throws *"No
+  match available"*; `lookingAt()` is the anchored-prefix primitive that was wanted.
+
 - ⚠⚠ **A NOMINALISED CLOCK HIDES AN ATTRIBUTION: THE HALVES ARE NAMED AFTER THE NOUN AND THE
   VERB, SO THEY SHARE NO ROOT** (F2-225, measured 2026-08-17). Executing F2-224's filed blind spot,
   the population was re-derived first (F2-221): a permissive (clock, actor) co-occurrence scan

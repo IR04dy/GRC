@@ -2400,6 +2400,228 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-226 · The clock the caller cannot reach at all — and a request that named its own approver
+
+**Found** 2026-08-17, executing F2-225's filed field-initialiser work list. **P2** — the
+cross-module approval register recorded a raiser the caller named and let that caller choose who
+may approve it; a BCM exercise response recorded a participant the caller named while the server
+measured their reaction time. **Closed** the same day. No migration; 2 backend services, 2 request
+DTOs, 2 frontend surfaces.
+
+### Re-deriving the filing found that it measured one of four mechanisms
+
+F2-225 filed four sites, measured over entities carrying a clock-**initialised** act field. That is
+**one of F2-215's four filling mechanisms**. Re-derived across all four — initialiser, lifecycle
+callback (`@PrePersist`/`@PreUpdate`), Hibernate `@CreationTimestamp`, and `insertable = false`
+where the database default fills the column — the denominator is **82 entities / 87 act-clock
+fields**, not 68: **73 initialiser · 6 callback · 8 database default**.
+
+🔑 **The two mechanisms it missed are the ones a caller can never reach at all.** A `@PrePersist`
+fires at flush time *after* every setter and an `insertable = false` column is never sent, so both
+are **stronger** evidence that the server owns WHEN than an initialiser — which F2-225 itself found
+can be overridden (`CoiService#recordRecusal`). Permissively re-paired: **30 sites — 17 candidate,
+11 assignment, 2 noise**. The widening surfaced no new confirmed attribution, which is a result
+rather than a dead end (F2-216).
+
+### ⚠⚠ Two of the four filed sites were mis-bucketed, and F2-225's own classifier said so
+
+- `AuditEngagementService#create::leadAuditor` and `::auditCommitteeChair` — **assignments.** They
+  sit beside `auditorFirm`: an IIA engagement is routinely led by an external firm's partner, who
+  is not a platform principal at all (F2-224's `auditorExternalParty` lesson).
+- `InvocationService#create::incidentCommander` and `::bcmCoordinator` — **crisis role
+  assignments**, refuted decisively by the sibling column. `Invocation` declares `declaredBy`
+  separately, and that is the attribution F2-224 closed.
+
+🔑 **F2-225 built the three-bucket classifier AND hand-filed a work list its own classifier
+contradicts, and nothing compared the two.** Its headline was *"the classification is as much the
+finding as the count"*; the work list was then filed by hand. This is the shape this register keeps
+recording — two artefacts, nobody maintaining the agreement (F2-177) — committed inside the
+instrument built to answer it. `theWorkListAgreesWithTheClassifier` now applies the classifier to
+the work list mechanically, so a member that classifies as an assignment cannot sit in a list of
+unadjudicated attributions.
+
+⚠ **`participantUserId` classifies as an ASSIGNMENT and was still fixed, which is not a
+contradiction.** The classifier reads a NAME; that site was adjudicated by reading the CODE. It is
+the reason a classifier triages a population and never decides a verdict, and it is recorded in the
+gate rather than papered over by special-casing the word *participant*.
+
+### The two confirmed sites, probed live against PLANTED rows (F2-206)
+
+**Leg A — `ApprovalRequestService#create::requestedBy`.** `approvals.requests.requested_at` is a
+field initialiser (`= LocalDateTime.now()`), so the server owns WHEN with no `setRequestedAt`
+anywhere for the F2-223 detector to pair; `requested_by` is NOT NULL and was `@NotBlank` from the
+body — the **fifth** instance of a server *requiring* an attribution it never verifies. Probed as
+`viewer` (holds `WORKFLOW:WRITE`, **not** `WORKFLOW:APPROVE`): a request for a POLICY publication
+stored `requested_by = "Nobody Who Raised This"` beside a server clock, and omitting the field was
+a **400**.
+
+🔑 **The rule was already written down in the client.** `lib/approvalsApi.ts` says of the transition
+payload: *"There is no `decidedBy` here on purpose. The server takes the deciding identity from the
+authenticated principal (SEC-IAM-002) — sending one would be a field the server ignores."* That
+comment sits one screenful above the `requestedBy: string` the service trusted. F2-215's headline
+again: generalising an invariant one field at a time leaves the remainder looking covered, because
+the mechanism that covers them is visibly present.
+
+**Leg B — four eyes, and it is the sharper half.** `assignedTo` is not decoration: it **is** the
+authorisation input `transition()` checks (`callerUsername.equals(r.getAssignedTo())`, SEC-IAM-002).
+So whoever creates the request decides who may approve it. Probed as `compliance`, who holds both
+`WORKFLOW:WRITE` and `WORKFLOW:APPROVE`: raised a P1 risk-acceptance approval assigned to
+`compliance`, then **approved it** — 200 then 200, with `decided_by` correctly recording them both
+times. **The audit trail told the truth about who acted while nothing stopped them** (F2-222's leg
+2). The gate compares case-**insensitively** because the column collates CI (F2-179).
+
+**Leg C — `ExerciseRuntimeService#recordResponse::participantUserId`.** `responseAt` is initialiser-
+stamped *and* re-stamped, the route is `isAuthenticated()` (correctly — filing a response is a duty,
+the ADR-010 shape), and `participantUserId` was `@NotNull` from the body. Probed: `viewer` (id 6)
+filed a response **as `compliance` (id 3)**, stored verbatim; omitting it was a **400**.
+
+🔑 **The server does not merely record WHO here, it MEASURES them.** `responseTimeSeconds` is
+computed from the inject's dispatch to now, so the row is the evidence an ISO 22301 / NCEMA reviewer
+reads to accept that a named participant reacted within N seconds. The audit row **quoted the
+caller's claim** (`" by participant " + req.participantUserId()`) — F2-223's exact defect, and what
+makes a forged attribution invisible to whoever audits it. Every audit line and event payload now
+reads off the saved row. The open route made this worse rather than better: the population who could
+forge was every authenticated user.
+
+### What the measurement passed on the way — filed, not fixed
+
+| finding | measured |
+|---|---|
+| **9 of 11 PENDING approval requests can be decided by nobody** | `assigned_to` holds a free-text person name matching no username in `iam.users`, so `transition()`'s check can never pass and `myInbox` never returns them. Identical in dev and prod. Every one is self-assigned to the same invented officer named as its requester — F2-207's cast, in a server register. Repair is an owner decision (rewriting 21 live rows in two databases, F2-183/F2-196); a resolvability check at create needs a user-directory port `approvals` does not have. |
+| `FindingService#transition::mgmtResponseAuthor` | The author of a **management** response is the auditee, who need not be the caller — the same judgement as F2-224's `standDownAuthoriser`. `mgmt_response_author` is null on all 20 rows in both databases, so it is latent. Owner decision. |
+| `POST /exercise-runs/{id}/custom-inject` answers **500** on its default path | `dispatchNow` defaults to **true**, and the combined path is a ROWVERSION double-flush: `addCustomInject` saves the INSERT, `audit.log` + `emit` flush, then `dispatchInject` re-loads and saves the same row again in one transaction. The dedicated dispatch route answers 200 on the identical row, which is the discriminator. Exactly the landmine F2-175 widened — *any* flush between the two saves does it. Found while planting this slice's fixture. |
+| `StartRunRequest.runCode` is an *"optional override; otherwise auto-generated"* | F2-172(d)'s family on a code cited in the NCEMA after-action record. `ClientSuppliedReferenceRatchetTest` keys on `setExternalId`/`setRefNumber`, so a `runCode` sits outside it. |
+
+### ⚠ Master was red before this slice, on a docs gate
+
+`FindingsRegisterCoverageTest#specsOwedOnlyEverDecreases` was failing 30 > 29: F2-225's docs commit
+referenced F2-225 in the plan and wrote no register spec. F2-219 recorded the lesson —
+*"a targeted re-run after a docs commit is not the suite, and the docs gate is precisely the gate a
+docs commit can break"* — and it recurred in the **next** slice, on a **different** docs gate,
+because the targeted re-run named four gate classes and this was not one of them. 🔑 **Naming the
+trap does not exempt you from it, and the fix is a rule about the command rather than about the
+list: after a docs commit, run the suite.** Both specs are written here, so owed goes 30 → 28.
+
+### My own instrument errors
+
+- **The re-derivation's first pairing under-reported: 3 sites where F2-225's permissive scan found
+  19.** I had re-imposed the root pairing — which is the narrowing this blind spot is *about*, since
+  a clock with no setter has no verb root to take. Under-reporting is the direction that reads
+  exactly like a clean tree (F2-223's seven corrections, all seven shrinking).
+- **The pre-fix control compared `master` with `HEAD` before anything was committed**, so it compared
+  master with itself and reported **all 12 legs SILENT** — which reads exactly like every detector
+  being broken. Loud rather than quiet, which is the only reason it cost one iteration.
+- **`classify()` called `.start()` on a second matcher instance after `.find()` on a first**, which
+  throws *"No match available"*. `lookingAt()` is the anchored-prefix primitive that was wanted.
+
+### Lesson
+
+🔑 **A work list and its classifier are two artefacts, and a slice that builds both must make them
+agree — otherwise the next slice inherits confident false candidates from the instrument that was
+supposed to prevent them.** And: **when a filing's population was measured by one mechanism, ask how
+many mechanisms exist** — F2-215 had already enumerated four, and F2-225 measured one of them.
+
+| | |
+|---|---|
+| **ID** | F2-226 |
+| **Severity** | **P2.** A cross-module approval register that records a raiser the caller invented, and lets that caller name the only principal permitted to approve it. A BCM exercise response whose measured reaction time is attributed to whoever the caller named. |
+| **Status** | ✅ **CLOSED 2026-08-17.** Both actors resolved from `CurrentActor`; four-eyes gate added at create; both request DTOs and both frontend surfaces cleaned. Backend 3,987/0/0, gate 16/16, probe 14/14 pre-fix and 14/14 post-fix, pre-fix control 12/12 FIRE. |
+| **Filed by this slice** | The 9 undecidable PENDING approvals (owner); `mgmtResponseAuthor` (owner); the `custom-inject` 500; `runCode` as a client-supplied reference. |
+
+## F2-225 · A nominalised clock, and a forged field that decided who may withdraw
+
+**Found** 2026-08-17, executing F2-224's filed blind spot. **P2** — the NCA ECC regulator
+self-assessment recorded a CISO approver the caller named, and an approval chain recorded an
+originator the caller named on the one field its withdraw route reads. **Closed** the same day.
+No migration; 2 backend services, 3 request records, 2 frontend surfaces.
+
+*(Spec written 2026-08-17 alongside [[F2-226]], because the register is what an external auditor is
+handed and a finding recorded only in the plan disappears when the plan is superseded. Master was
+red on `FindingsRegisterCoverageTest` until this was written — see [[F2-226]] for why the targeted
+re-run missed it.)*
+
+### The population was re-derived first, and the classification was as much the finding as the count
+
+A permissive (clock, actor) co-occurrence scan reports **79** unpaired candidates where the shipped
+gate reports 4. The honest split: **18 NOISE-WORD** (ordinary English words the agent-noun suffix
+matches — `lineNumber`, `stepOrder`, `isCrossBorder`, `regulatoryAnchor`), **34 ASSIGNMENT** (who
+WILL act, or the act's target), **27 CANDIDATE**. 🔑 **A suffix rule measures spellings, and two
+thirds of what it returns is not an attribution at all.**
+
+### DETECTOR GAP 9 — a nominalised clock, on a regulator return
+
+`NcaEccFilingService#transition` stamps `cisoApprovalAt` from the server's own clock and copied
+`cisoApprover` out of the request body **in the same `switch` branch** — F2-223's shape exactly, on
+the NCA ECC self-assessment this organisation files with the National Cybersecurity Authority. It
+was invisible because `cisoApprover` reduces to `approv` while `cisoApprovalAt` reduces to
+`approval`: 🔑 **the clock half is named after the NOUN and the actor half after the VERB, so one
+attribution's two halves share no root.** Probed 13/13 pre-fix and 13/13 post-fix as `compliance`
+against planted rows: *"Nobody Who Approved This"* stored as the CISO who approved the filing,
+beside two server clocks 0.14 s apart. Structurally different from F2-224's role-named actor
+(`standDownAuthoriser`), which is still blind and still asserted — **two distinct ways for the
+halves to share no root; assume a third.**
+
+### The same register carries a second split no setter-matching scan can ever see
+
+`drafted_at` is a **field initialiser** (F2-215's third of four filling mechanisms), so the server
+owns WHEN with no `setX(now())` anywhere, while `draftedBy` was `@NotBlank` from the body. Found by
+reading the entity, not by any instrument. Measured before filing (F2-221): of 67 entities carrying
+a clock-initialised act field, **19 sites** also take an actor from the request — 4 noise, 6
+assignments, 9 attributions; 1 fixed, 4 refuted, 4 filed. One refutation is its own rule:
+`CoiService#recordRecusal`'s clock is `req.recusalDate() != null ? … : now()`, so **a field
+initialiser is only a server stamp while no writer overrides it.** ⚠ `createdAt`/`updatedAt` are
+**row** stamps, never act clocks — every row has one, so they can never be the proof F2-223's rule
+rests on; including them inflates 19 to 46.
+
+### A forged attribution that is also an authorisation input has three outcomes
+
+`ApprovalChainInstanceService#startChain` took `originatorUserId` from the body, and `withdraw()`
+reads that column with **no other input**. Probed as `compliance`(3) naming `so_officer`(8): the
+chain stored 8, **the real raiser was then refused 403 on their own chain, the named stranger was
+GRANTED the withdraw, and naming a nonexistent id left the chain withdrawable by nobody.**
+
+🔑 **`ApprovalChainController` had hardened AND documented the other two identity-bearing routes
+(SEC-IAM-001, on `recordAction` and `withdraw`) and left this one — the route that ESTABLISHES the
+identity the other two check against.** All three request records declared
+`@NotNull @Positive Long <x>UserId`: **identical wire shapes, opposite fates** — two
+required-and-ignored, one required-and-honoured, with nothing a caller or a reader could see
+distinguishing them. All three deleted.
+
+### F2-117 is half closed, and the half that moved is the one its blocker said could not
+
+That row reasoned a four-eyes comparison would be inert because **0 of 4 people-labels resolve to a
+platform user** — correct about **SEGREGATION** (approver ≠ reviewer, which does need identity
+columns) and **applied to ATTRIBUTION** (who the approver IS, which needed nothing but
+`CurrentActor`). 🔑 **The dependency ran the other way: comparing a reviewer against an approver is
+meaningless while the approver is whatever the caller typed, so attribution was the PREREQUISITE
+for the comparison the blocker was protecting.** Segregation stays OPEN, blocker unchanged.
+
+### The codebase's own record of this defect was invisible
+
+`NcaEccFilingLifecycleTest` pinned the mechanism honestly, with an explicit exit condition — and
+surfaced nothing, because 🔑 **a pinned known-defect test passes on a defective tree BY DESIGN, so
+a green pin and a green clean tree are indistinguishable from outside.** The finding had to be made
+twice, independently. Its tripwire then fired exactly as designed the moment the service read a
+principal, and `FindingsRegisterConsistencyTest` refused the commit until the register cell was
+updated. ⚠ **A binary closure gate cannot express a half-closed finding, and the safe direction is
+for the TEST to under-claim rather than the register to over-claim** — the register is what an
+auditor is handed, so marking a P1 closed to satisfy a regex would have retired a control that is
+still half unbuilt.
+
+### Lesson
+
+🔑 **Two distinct ways for one attribution's two halves to share no root have now been found — a
+nominalised clock and a role-named actor — so assume a third.** And: **a required field the server
+discards tells the caller their value matters; one it TRUSTS for an authorisation decision is worse
+again, and nothing on the wire distinguishes the two.**
+
+| | |
+|---|---|
+| **ID** | F2-225 |
+| **Severity** | **P2.** A regulator self-assessment naming an approver the server cannot vouch for, and an approval chain whose withdraw authority was decided by an unverified body field. |
+| **Status** | ✅ **CLOSED 2026-08-17** (`b0d3906f`). Backend 3,976/0/0, FE 756/756, gate 14/14, probe 13/13 both ways, pre-fix control 4 narrow / 5 widened. |
+| **Still open** | F2-117's **segregation** half — no `*_user_id` column on `nca_ecc.filings` for either assurance role; V357's shape is the remedy. The 4 field-initialiser work-list sites → executed by [[F2-226]]. `standDownAuthoriser` (F2-224, owner). |
+
 ## F2-224 · Two detector errors in opposite directions, and the green neither earned
 
 **Found** 2026-08-16, executing F2-223's filed work list. **P2** — six governance registers,
