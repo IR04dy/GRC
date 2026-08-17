@@ -92,8 +92,27 @@ class ExerciseRuntimeServiceTest {
     @Mock private RealtimeBroadcaster realtime;
     @InjectMocks private ExerciseRuntimeService service;
 
-    @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
-    @AfterEach  void tearDown() { TenantContext.clear(); }
+    /** F2-226 — the participant on a response is resolved from the principal. */
+    private static final Long PARTICIPANT_ID = 7L;
+
+    @BeforeEach void setUp() {
+        TenantContext.setCurrentTenant(ORG_ID);
+        authAs("exercise.participant", PARTICIPANT_ID);
+    }
+
+    @AfterEach  void tearDown() {
+        TenantContext.clear();
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    private static void authAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, ORG_ID, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
+    }
 
     // ─── Fixtures ────────────────────────────────────────────────────────
 
@@ -343,13 +362,19 @@ class ExerciseRuntimeServiceTest {
         when(runInjectRepo.save(any(ExerciseRunInject.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ResponseView out = service.recordResponse(RUN_ID, 700L,
-            new ResponseRequest(7L, "I'd isolate core banking",
+            new ResponseRequest("I'd isolate core banking",
                 "سأعزل النظام المصرفي", "ISOLATE", "عزل"));
 
         assertThat(out.id()).isEqualTo(900L);
         // Allow a 5-second tolerance — between 40 and 60 seconds is reasonable
         assertThat(out.responseTimeSeconds()).isBetween(40, 60);
-        assertThat(out.participantUserId()).isEqualTo(7L);
+        // ⚠ F2-226 — this assertion used to read `isEqualTo(7L)` against a `participantUserId`
+        // the REQUEST carried, i.e. it asserted that the value the caller passed is the value
+        // stored. That is the defect, not the contract (F2-159: a test can lock in a defect,
+        // and it is hardest to spot when it describes the code accurately). It now asserts the
+        // property that matters: the participant is whoever the principal is. The literal 7L
+        // is unchanged only because `setUp()` authenticates as user 7.
+        assertThat(out.participantUserId()).isEqualTo(PARTICIPANT_ID);
         assertThat(out.responseTextEn()).contains("isolate");
 
         // Auto-ACK: the inject must have moved to ACKNOWLEDGED.
@@ -373,9 +398,70 @@ class ExerciseRuntimeServiceTest {
         when(runInjectRepo.findByIdAndOrganisationId(700L, ORG_ID)).thenReturn(Optional.of(ri));
 
         assertThatThrownBy(() -> service.recordResponse(RUN_ID, 700L,
-            new ResponseRequest(7L, "early", null, null, null)))
+            new ResponseRequest("early", null, null, null)))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("has not been dispatched");
+    }
+
+    /**
+     * F2-226 — the participant is the authenticated principal, and a response with no
+     * principal is refused rather than stored unattributed.
+     *
+     * <p>The row carries a SERVER-COMPUTED reaction time, so it is the evidence an ISO 22301
+     * reviewer reads to accept that a named person reacted within N seconds. Before this
+     * slice the caller supplied {@code participantUserId} — {@code @NotNull}, so the server
+     * demanded an attribution it never verified — while stamping {@code responseAt} from a
+     * field initialiser, which is why no setter-matching scan could pair the two halves.
+     */
+    @Test
+    void recordResponse_attributesTheResponseToThePrincipal_notAnyBodyField() {
+        ExerciseRun run = runFixture("IN_PROGRESS");
+        ExerciseRunInject ri = runInjectFixture(700L, RUN_ID, "DISPATCHED", 1L);
+        ri.setActualDispatchedAt(LocalDateTime.now().minusSeconds(10));
+        when(runRepo.findByIdAndOrganisationId(RUN_ID, ORG_ID)).thenReturn(Optional.of(run));
+        when(runInjectRepo.findByIdAndOrganisationId(700L, ORG_ID)).thenReturn(Optional.of(ri));
+        when(responseRepo.save(any(ExerciseRunResponse.class))).thenAnswer(inv -> {
+            ExerciseRunResponse r = inv.getArgument(0);
+            r.setId(901L);
+            return r;
+        });
+        when(runInjectRepo.save(any(ExerciseRunInject.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // A DIFFERENT principal from the default fixture, so the assertion cannot pass by
+        // coincidence: if the service ignored the security context entirely, the stored id
+        // would still be PARTICIPANT_ID and this would read as working.
+        authAs("someone.else", 4242L);
+        service.recordResponse(RUN_ID, 700L, new ResponseRequest("mine", null, null, null));
+
+        ArgumentCaptor<ExerciseRunResponse> saved =
+            ArgumentCaptor.forClass(ExerciseRunResponse.class);
+        verify(responseRepo).save(saved.capture());
+        assertThat(saved.getValue().getParticipantUserId())
+            .as("the participant is the acting principal")
+            .isEqualTo(4242L);
+
+        // The audit row must quote the SAVED row, never the request — F2-223 found trails
+        // repeating the caller's own claim, which is what hides a forged attribution from
+        // whoever audits it.
+        verify(audit).log(eq("CREATE"), eq("ExerciseRunResponse"), eq(901L),
+            org.mockito.ArgumentMatchers.contains("participant 4242"));
+    }
+
+    @Test
+    void recordResponse_withNoAuthenticatedPrincipal_isRefused() {
+        ExerciseRun run = runFixture("IN_PROGRESS");
+        ExerciseRunInject ri = runInjectFixture(700L, RUN_ID, "DISPATCHED", 1L);
+        ri.setActualDispatchedAt(LocalDateTime.now().minusSeconds(10));
+        when(runRepo.findByIdAndOrganisationId(RUN_ID, ORG_ID)).thenReturn(Optional.of(run));
+        when(runInjectRepo.findByIdAndOrganisationId(700L, ORG_ID)).thenReturn(Optional.of(ri));
+
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+
+        assertThatThrownBy(() -> service.recordResponse(RUN_ID, 700L,
+            new ResponseRequest("orphan", null, null, null)))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("not evidence");
+        verify(responseRepo, never()).save(any(ExerciseRunResponse.class));
     }
 
     // ─── State machine ───────────────────────────────────────────────────

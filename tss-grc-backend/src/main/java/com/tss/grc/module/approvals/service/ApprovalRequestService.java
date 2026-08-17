@@ -1,6 +1,7 @@
 package com.tss.grc.module.approvals.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.approvals.dto.ApprovalRequestDto;
 import com.tss.grc.module.approvals.entity.ApprovalRequest;
@@ -91,6 +92,28 @@ public class ApprovalRequestService {
             "approval:" + r.getExternalId(), payloadFor(r, previousStatus)));
     }
 
+    /**
+     * The principal raising this approval request (F2-226).
+     *
+     * <p>Refuses rather than storing null. That is safe precisely because the field was
+     * already mandatory — {@code @NotBlank} on the DTO — so no request that works today
+     * starts failing (F2-182: ask what is already refusing). What changes is only WHERE the
+     * value comes from.
+     *
+     * <p>The refusal is not defensive noise either: {@code requestedBy} is what an approver
+     * reads to know who asked, and {@code transition()} compares the caller against
+     * {@code assignedTo}, so an unattributed request is one nobody can be answerable for.
+     */
+    private static String requireRaiser() {
+        String who = CurrentActor.username();
+        if (who == null || who.isBlank()) {
+            throw new IllegalStateException(
+                "No authenticated principal to record as the raiser of this approval request. "
+                + "An approval request with no requester is one nobody can be answerable for.");
+        }
+        return who;
+    }
+
     // ── Reads ─────────────────────────────────────────────────────────────────
 
     public List<ApprovalRequestDto> listForOrg() {
@@ -137,17 +160,76 @@ public class ApprovalRequestService {
         r.setTitleAr(req.getTitleAr());
         r.setSummaryEn(req.getSummaryEn());
         r.setSummaryAr(req.getSummaryAr());
-        r.setRequestedBy(req.getRequestedBy());
-        r.setAssignedTo(req.getAssignedTo());
-        r.setOriginalAssignedTo(req.getAssignedTo());
+
+        // ⚠⚠ F2-226. `requestedBy` is the AUTHENTICATED PRINCIPAL, never the body.
+        //
+        // This was `r.setRequestedBy(req.getRequestedBy())` — with `@NotBlank` on the DTO,
+        // so the server REQUIRED an attribution it never verified (the fifth instance of
+        // that shape, after F2-223's IIA annual plan, F2-224's obligation attestation and
+        // review, and this slice's exercise response). Meanwhile `requested_at` is a FIELD
+        // INITIALISER on the entity — `= LocalDateTime.now()` — so the server owns WHEN with
+        // no `setRequestedAt(now())` anywhere for a detector to find. F2-223's rule: by
+        // stamping the time itself the server has already declared that it is the recorder
+        // of this act, and taking WHO from the caller splits one attribution across two
+        // owners. F2-215's third of four filling mechanisms is what hid it.
+        //
+        // Probed live pre-fix as `viewer` (holds WORKFLOW:WRITE, NOT WORKFLOW:APPROVE):
+        // `{"requestedBy": "Nobody Who Raised This"}` was stored verbatim, beside a server
+        // clock, on an approval request for a POLICY publication.
+        //
+        // 🔑 The rule was already written down IN THE CLIENT. `lib/approvalsApi.ts` says of
+        // the transition payload: "There is no `decidedBy` here on purpose. The server takes
+        // the deciding identity from the authenticated principal (SEC-IAM-002) — sending one
+        // would be a field the server ignores." That comment sits one screenful above the
+        // `requestedBy: string` this method used to trust. F2-215's headline: generalising an
+        // invariant one field at a time leaves the remainder looking covered, because the
+        // mechanism that covers them is visibly present.
+        r.setRequestedBy(requireRaiser());
+
+        // ⚠⚠ F2-226 leg 2 — four eyes. `assignedTo` is not decoration: it IS the
+        // authorisation input `transition()` checks (SEC-IAM-002, `callerUsername.equals(
+        // r.getAssignedTo())`). So whoever creates the request decides who may approve it,
+        // and until this check existed a WORKFLOW:WRITE+APPROVE holder could raise a request
+        // to themselves and approve it — probed live: `compliance` did exactly that, 200 then
+        // 200, with `decided_by` correctly recording them both times. The audit trail told
+        // the truth about who acted while nothing stopped them (F2-222's leg 2).
+        //
+        // Compared case-INSENSITIVELY on purpose: the column collates CI (F2-179), so
+        // `Compliance` and `compliance` are one principal to the database and a
+        // case-sensitive Java `equals` would let a capitalisation walk through the gate.
+        // ⚠ `IllegalStateException` → 409, deliberately, and it was MEASURED rather than picked.
+        // My first draft threw DomainAccessDeniedException (403); the live probe reported the
+        // mismatch and reading the tree settled it. `NdiEvidenceItemService.approve` — the
+        // SEC-NDI-003 maker/checker control, the one real self-approval gate in the platform —
+        // throws IllegalStateException with a "Segregation of duties:" message, which the handler
+        // maps to CONFLICT, and CLAUDE.md's convention says the same: a four-eyes gate is a
+        // server-enforced 409. 403 would be wrong in substance too: the caller IS entitled to
+        // raise approval requests, so this is a conflict with a rule, not a missing permission.
+        // (`BusinessRuleException`'s javadoc claims SoD is 403 — it is used ONCE in all of
+        // module/, so it is the outlier and not the convention. F2-205: consistency among copies
+        // is not evidence; ask which one the platform actually runs.)
+        String assignee = req.getAssignedTo();
+        if (assignee != null && assignee.trim().equalsIgnoreCase(r.getRequestedBy())) {
+            throw new IllegalStateException(
+                "Segregation of duties: an approval request may not be assigned to the person "
+                + "raising it. " + r.getRequestedBy() + " would be the only principal permitted "
+                + "to decide it, which is a formality rather than an approval. Assign it to a "
+                + "reviewer.");
+        }
+        r.setAssignedTo(assignee);
+        r.setOriginalAssignedTo(assignee);
         r.setPriority(req.getPriority());
         r.setSlaDeadline(req.getSlaDeadline());
         r.setStatus("PENDING");
         r = repo.save(r);
+        // Every value here is read off the SAVED ROW, never off `req` — F2-223 found audit
+        // lines quoting the caller's own claim, which is what makes a forged attribution
+        // invisible to whoever audits it.
         audit.log("CREATE", "ApprovalRequest", r.getId(),
             "Approval requested: " + nullSafe(r.getExternalId())
                 + " on " + nullSafe(r.getEntityType()) + " "
-                + nullSafe(r.getEntityId()) + " (assigned to " + nullSafe(r.getAssignedTo()) + ")");
+                + nullSafe(r.getEntityId()) + " by " + nullSafe(r.getRequestedBy())
+                + " (assigned to " + nullSafe(r.getAssignedTo()) + ")");
         emit(orgId, "APPROVAL_CREATED", r, null);
         ApprovalRequestDto out = ApprovalRequestDto.from(r);
         if (broadcaster != null) broadcaster.broadcastEntityUpdate(orgId, "approval", r.getExternalId(), out);

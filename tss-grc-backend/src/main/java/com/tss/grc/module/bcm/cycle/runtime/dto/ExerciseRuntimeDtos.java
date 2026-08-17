@@ -64,9 +64,18 @@ public final class ExerciseRuntimeDtos {
         Boolean dispatchNow
     ) {}
 
-    /** {@code POST .../injects/{id}/responses}. */
+    /**
+     * {@code POST .../injects/{id}/responses}.
+     *
+     * <p>⚠ F2-226 — there is deliberately NO {@code participantUserId} here. It used to be
+     * {@code @NotNull(message = "participantUserId is required")}, so the server demanded an
+     * attribution it never verified, while stamping {@code responseAt} from its own clock and
+     * COMPUTING the reaction time it certifies. The participant is now the authenticated
+     * principal ({@code CurrentActor.userId()}). Do not re-add it: a required field the server
+     * discards tells the caller their value matters (F2-184), and one it trusts for the
+     * attribution on ISO 22301 exercise evidence is worse again.
+     */
     public record ResponseRequest(
-        @NotNull(message = "participantUserId is required") Long participantUserId,
         @Size(max = 2000) String responseTextEn,
         @Size(max = 2000) String responseTextAr,
         @Size(max = 1000) String decisionMadeEn,

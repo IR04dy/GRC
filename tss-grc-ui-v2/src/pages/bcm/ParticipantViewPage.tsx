@@ -110,8 +110,11 @@ export function ParticipantViewPage() {
     }
     setBusy(true);
     try {
+      // F2-226: `participantUserId` is gone. This used to send `user.userId` from the
+      // decoded JWT — honest, and beside the point: the server stored whatever arrived,
+      // so any other caller could file a response as somebody else and have their
+      // reaction time certified. The attribution is now the authenticated principal.
       await recordResponse(summary.id, active.id, {
-        participantUserId: user.userId,
         responseTextEn: respEn || undefined,
         responseTextAr: respAr || undefined,
         decisionMadeEn: decisionEn || undefined,

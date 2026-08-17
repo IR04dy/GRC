@@ -128,8 +128,13 @@ export interface CustomInjectRequest {
   dispatchNow?: boolean;
 }
 
+/**
+ * ⚠ F2-226 — there is deliberately no `participantUserId` here. The server takes the
+ * participant from the authenticated principal, so sending one would be a field it
+ * ignores (the F2-184 decoy shape). `ResponseView` below still carries it, because
+ * reading who responded is the whole point of the facilitator console.
+ */
 export interface ResponseRequest {
-  participantUserId: number;
   responseTextEn?: string;
   responseTextAr?: string;
   decisionMadeEn?: string;

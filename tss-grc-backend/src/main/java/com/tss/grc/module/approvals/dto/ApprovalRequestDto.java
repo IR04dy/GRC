@@ -1,5 +1,6 @@
 package com.tss.grc.module.approvals.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.tss.grc.module.approvals.entity.ApprovalRequest;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -14,7 +15,17 @@ public class ApprovalRequestDto {
     @NotBlank private String titleAr;
     private String summaryEn;
     private String summaryAr;
-    @NotBlank private String requestedBy;
+    /**
+     * F2-226 — the raiser is the authenticated principal, never a body field.
+     *
+     * <p>{@code READ_ONLY} and not {@code @JsonIgnore}: this one class is BOTH the request
+     * and the response shape, and every reader of an approval needs to see who raised it.
+     * The {@code @NotBlank} that used to sit here is gone with the caller's ability to set
+     * it — a required field the server discards tells the caller their value matters
+     * (F2-184), and one it TRUSTS for an attribution is worse again.
+     */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String requestedBy;
     private LocalDateTime requestedAt;
     @NotBlank private String assignedTo;
     private String originalAssignedTo;

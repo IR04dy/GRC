@@ -714,16 +714,45 @@ class SplitAttributionContractTest {
      * of the slice that filed it). Of 67 entities carrying a clock-initialised field that
      * names an ACT rather than the row, <b>19 sites</b> also take an actor-shaped field
      * from the request — 4 noise words, 6 assignments, and 9 in the attribution bucket, of
-     * which this slice fixed 1 ({@code NcaEccFilingService#create}) and refuted 4 by
+     * which F2-225 fixed 1 ({@code NcaEccFilingService#create}) and refuted 4 by
      * reading: two are the SUBJECT of a public complaint or whistleblowing report, and
      * {@code CoiService#recordRecusal}'s clock is
      * {@code req.recusalDate() != null ? … : now()} — F2-224's caller-overridable clock,
      * arriving through an initialiser this time, which is worth knowing on its own:
      * <b>a field initialiser is only a server stamp while no writer overrides it.</b>
      *
-     * <p>The remaining 4 are a WORK LIST and deliberately not reasons (F2-188): they need
-     * their callers read, and a plausible reason for something nobody has read is the
-     * failure mode this register keeps recording.
+     * <p>⚠⚠ <b>CORRECTION (F2-226): "67 entities" measured ONE of F2-215's FOUR filling
+     * mechanisms.</b> F2-225's scan matched only the field INITIALISER
+     * ({@code private LocalDateTime x = …now()}). Re-derived across all four, the denominator
+     * is <b>82 entities / 87 act-clock fields</b>: 73 initialiser, <b>6 lifecycle callback</b>
+     * ({@code @PrePersist}/{@code @PreUpdate}) and <b>8 database default</b>
+     * ({@code insertable = false}). The two mechanisms it missed are the ones a caller can
+     * NEVER reach — a {@code @PrePersist} fires at flush time after every setter and an
+     * {@code insertable = false} column is never sent at all — so they are STRONGER evidence
+     * of server ownership than an initialiser, which F2-225 itself found can be overridden.
+     * Permissively re-paired, the population is <b>30 sites: 17 candidate, 11 assignment,
+     * 2 noise</b>. The widening added no new confirmed attribution, which is a result and not
+     * a dead end (F2-216).
+     *
+     * <p>⚠⚠ <b>And 2 of the 4 filed sites were mis-bucketed as attributions.</b>
+     * {@code AuditEngagementService#create::leadAuditor} sits beside {@code auditorFirm} — an
+     * IIA engagement is routinely led by an external firm's partner, who is not a platform
+     * principal at all (F2-224's {@code auditorExternalParty} lesson), and a lead auditor is
+     * ASSIGNED to an engagement rather than being its recorder.
+     * {@code InvocationService#create::incidentCommander} and {@code ::bcmCoordinator} are
+     * crisis ROLE assignments, refuted decisively by the sibling column: {@code Invocation}
+     * declares {@code declaredBy} separately, and that is the attribution F2-224 closed.
+     *
+     * <p>🔑 <b>F2-225 built the three-bucket classifier AND hand-filed a work list whose
+     * members its own classifier contradicts, and nothing compared the two.</b> That is this
+     * programme's most-repeated shape — two artefacts, nobody comparing them — committed
+     * inside the instrument built to answer it. {@link #theWorkListAgreesWithTheClassifier()}
+     * is the leg that would have caught it.
+     *
+     * <p>Confirmed and CLOSED by F2-226: {@code ApprovalRequestService#create::requestedBy}
+     * and {@code ExerciseRuntimeService#recordResponse::participantUserId}. FILED as an owner
+     * decision: {@code FindingService#transition::mgmtResponseAuthor} — a management response
+     * is authored by the auditee, who need not be the caller.
      */
     @Test
     @DisplayName("KNOWN BLIND SPOT: a clock filled by a field initialiser is never seen")
@@ -746,7 +775,104 @@ class SplitAttributionContractTest {
     }
 
     /**
-     * The two registers this slice closed must not drift back. Structural, because the
+     * F2-226 — <b>a work list must agree with its own classifier.</b>
+     *
+     * <p>F2-225 measured 79 candidates, built a three-bucket classifier to separate NOISE
+     * from ASSIGNMENT from CANDIDATE (its own headline: "the classification is as much the
+     * finding as the count"), and then hand-filed four sites into the attribution bucket —
+     * <b>two of which its classifier calls assignments.</b> Nothing compared the two, so the
+     * next slice inherited two confident false candidates. That is the shape this register
+     * keeps recording: two artefacts and nobody comparing them (F2-177), here inside the
+     * instrument built to answer it.
+     *
+     * <p>So the classifier is applied to the WORK_LIST mechanically. An entry whose actor
+     * field classifies as an assignment or a noise word may not sit in a list of unadjudicated
+     * ATTRIBUTIONS: either it is not one, or the classifier is wrong — and both of those are
+     * findings that belong in a commit rather than in a reader's head.
+     *
+     * <p>The list is empty today, so this leg is currently vacuous by construction. That is
+     * exactly why it also asserts the classifier against the cases F2-226 measured: without
+     * those, a green here would prove nothing (F2-219's rule about a floor that cannot fail).
+     */
+    @Test
+    @DisplayName("a work-list entry may not classify as an assignment or a noise word")
+    void theWorkListAgreesWithTheClassifier() {
+        for (String site : WORK_LIST) {
+            String field = site.contains("::")
+                ? site.substring(site.lastIndexOf("::") + 2) : site;
+            assertThat(classify(field))
+                .as("%s is on the unadjudicated ATTRIBUTION work list, but the classifier "
+                    + "calls its actor field a %s. F2-225 filed two such entries — a lead "
+                    + "auditor and an incident commander are ASSIGNED, and neither is the "
+                    + "recorder of the act. Resolve the disagreement, do not carry it",
+                    site, classify(field))
+                .isEqualTo(Bucket.CANDIDATE);
+        }
+
+        // The classifier itself, against what F2-226 measured by READING each site. Without
+        // these the loop above is vacuous on an empty list and proves nothing.
+        assertThat(classify("requestedBy")).isEqualTo(Bucket.CANDIDATE);
+        assertThat(classify("participantUserId")).isEqualTo(Bucket.ASSIGNMENT);
+        assertThat(classify("mgmtResponseAuthor")).isEqualTo(Bucket.CANDIDATE);
+        assertThat(classify("leadAuditor")).isEqualTo(Bucket.ASSIGNMENT);
+        assertThat(classify("incidentCommander")).isEqualTo(Bucket.ASSIGNMENT);
+        assertThat(classify("bcmCoordinator")).isEqualTo(Bucket.ASSIGNMENT);
+        assertThat(classify("escalatedToUserId")).isEqualTo(Bucket.ASSIGNMENT);
+        assertThat(classify("assignedInvestigatorUserId")).isEqualTo(Bucket.ASSIGNMENT);
+        assertThat(classify("stepOrder")).isEqualTo(Bucket.NOISE);
+        assertThat(classify("regulatoryAnchor")).isEqualTo(Bucket.NOISE);
+        assertThat(classify("vendorName")).isEqualTo(Bucket.NOISE);
+        assertThat(classify("cycleQuarter")).isEqualTo(Bucket.NOISE);
+
+        // ⚠ `participantUserId` classifies as an ASSIGNMENT and F2-226 still fixed it, which
+        // is not a contradiction: the classifier reads a NAME, and this site was adjudicated
+        // by reading the CODE — the row carries a server-computed reaction time, so the
+        // participant is unambiguously the performer. That is the whole reason a classifier
+        // triages a population and never decides a verdict (F2-225's own lesson, kept honest
+        // here rather than papered over by special-casing the word "participant").
+    }
+
+    private enum Bucket { NOISE, ASSIGNMENT, CANDIDATE }
+
+    /**
+     * F2-225's three buckets, as code rather than as a paragraph. Ordinary English words the
+     * agent-noun suffix happens to match, then fields naming who WILL act or the target of
+     * the act, then everything left over.
+     */
+    private static final Pattern NOISE_WORD = Pattern.compile(
+        "^(?:lineNumber|stepOrder|isCrossBorder|regulatoryAnchor|vendorName|order|number"
+        + "|other|major|minor|sector|factor|vector|error|folder|header|footer|filter|master"
+        + "|corner|center|centre|counter|quarter|matter|charter|register|parameter|character"
+        + "|trigger|driver|provider|container|indicator|descriptor|monitor|behaviou?r|colou?r"
+        + "|prior|senior|junior|interior|exterior|anchor|tenor|donor|floor|door|poor|scanner"
+        + "|banner|manner|partner|winner|inner|outer|upper|lower|larger|smaller|higher"
+        + "|denominator|numerator|separator|operator|iterator|generator|calculator|title"
+        + "|summary|cycleQuarter)$", Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern ASSIGNMENT_WORD = Pattern.compile(
+        "^(?:assigned|assignee|owner|delegate|delegated|escalated|routed|nominated|nominee"
+        + "|candidate|proposed|target|recipient|notified|informed|responsible|accountable"
+        + "|preparer|next|current|default|primary|secondary|backup|alternate|deputy"
+        + "|successor|referred|forwarded|participant|attendee|member|contact|custodian"
+        + "|steward|sponsor|supervisor|manager|lead|leader|coordinator|commander)",
+        Pattern.CASE_INSENSITIVE);
+
+    private static Bucket classify(String field) {
+        if (NOISE_WORD.matcher(field).matches()) return Bucket.NOISE;
+        // `lookingAt()`, not `find()`: an assignment word must be the PREFIX. `find()` would
+        // match `owner` inside `changeOwnerName` and `lead` inside `misleadingBy`, and asking
+        // a second matcher instance for `start()` after calling `find()` on a first one throws
+        // "No match available" — which is how this leg failed on its first run.
+        if (ASSIGNMENT_WORD.matcher(field).lookingAt()) return Bucket.ASSIGNMENT;
+        // `incidentCommander` / `bcmCoordinator` name a ROLE somebody takes on, not the verb
+        // performed — F2-224's blind spot, and the reason it is a distinct bucket here.
+        if (Pattern.compile("(?:Commander|Coordinator|Auditor|Chair|Facilitator|Observer)$")
+                .matcher(field).find()) return Bucket.ASSIGNMENT;
+        return Bucket.CANDIDATE;
+    }
+
+    /**
+     * The two registers F2-225 closed must not drift back. Structural, because the
      * pairing detector cannot see either of them: the ECC one is GAP 9's nominalisation
      * (now closed) and the chain one has no clock/actor name relationship at all —
      * {@code startedAt} against {@code originatorUserId}.
@@ -878,6 +1004,63 @@ class SplitAttributionContractTest {
                 + "KycService#disposition's rule, which is the reason the throw is kept rather "
                 + "than deleted with the field")
             .contains("An audit-plan approval with no approver is not an approval");
+    }
+
+    /**
+     * F2-226 — the two registers whose clock is filled by a mechanism no setter-matching scan
+     * can see. Structural for exactly that reason: {@code ApprovalRequest.requestedAt} and
+     * {@code ExerciseRunResponse.responseAt} are FIELD INITIALISERS, so
+     * {@link #splitsIn(String)} is blind to both by construction, and
+     * {@link #aClockFilledByAFieldInitialiserIsNotSeen()} asserts that blindness.
+     */
+    @Test
+    @DisplayName("F2-226's two closed registers still resolve their actor from the principal")
+    void theInitialiserClockRegistersResolveTheirActorFromThePrincipal() {
+        String approvals = strip(read("module/approvals/service/ApprovalRequestService.java"));
+        assertThat(approvals)
+            .as("the raiser of an approval request is the authenticated principal. The clock "
+                + "half is `requested_at = LocalDateTime.now()` ON THE ENTITY, which is why "
+                + "the pairing detector could never report this")
+            .contains("r.setRequestedBy(requireRaiser())")
+            .doesNotContain("req.getRequestedBy()");
+        assertThat(approvals)
+            .as("and it refuses rather than storing an unattributed request — safe because the "
+                + "field was already @NotBlank, so no working request starts failing (F2-182)")
+            .contains("no requester is one nobody can be answerable for");
+
+        // Four eyes. `assignedTo` IS transition()'s authorisation input (SEC-IAM-002), so the
+        // create decided who may approve. Asserted as a SHAPE, not as a token: the comparison
+        // must be case-insensitive because the column collates CI (F2-179), and a
+        // case-sensitive equals would let a capitalisation through the gate.
+        assertThat(approvals)
+            .as("a request may not be assigned to the person raising it — and the comparison "
+                + "must be case-INSENSITIVE, because the column collates CI")
+            .containsPattern("equalsIgnoreCase\\(r\\.getRequestedBy\\(\\)\\)")
+            .contains("Segregation of duties: an approval request may not be assigned");
+
+        assertThat(strip(read("module/approvals/dto/ApprovalRequestDto.java")))
+            .as("READ_ONLY on the wire, and NOT @JsonIgnore — every reader of an approval "
+                + "needs to see who raised it")
+            .containsPattern("Access\\.READ_ONLY\\s*\\)\\s*private String requestedBy");
+
+        String runtime = strip(
+            read("module/bcm/cycle/runtime/service/ExerciseRuntimeService.java"));
+        assertThat(runtime)
+            .as("the exercise participant is the authenticated principal. The server does not "
+                + "merely record WHO here, it MEASURES them — responseTimeSeconds is computed "
+                + "from the dispatch — so this row is the evidence an ISO 22301 reviewer reads")
+            .contains("r.setParticipantUserId(requireParticipant(")
+            .doesNotContain("req.participantUserId()");
+        assertThat(runtime)
+            .as("the audit row and the emitted event must quote the SAVED row, never the "
+                + "request (F2-223: a trail repeating the claim hides the forgery)")
+            .contains("saved.getParticipantUserId()");
+
+        assertThat(strip(read("module/bcm/cycle/runtime/dto/ExerciseRuntimeDtos.java")))
+            .as("and the field is gone from the request record — a required field the server "
+                + "discards tells the caller their value matters (F2-184)")
+            .containsPattern("record ResponseRequest\\(\\s*@Size")
+            .doesNotContain("participantUserId is required");
     }
 
     private static String read(String relative) {

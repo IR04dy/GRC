@@ -1,6 +1,7 @@
 package com.tss.grc.module.bcm.cycle.runtime.service;
 
 import com.tss.grc.common.exception.IllegalTransitionException;
+import com.tss.grc.common.security.CurrentActor;
 import com.tss.grc.common.tenant.TenantContext;
 import com.tss.grc.module.bcm.cycle.entity.ExerciseScenarioInject;
 import com.tss.grc.module.bcm.cycle.repository.ExerciseScenarioInjectRepository;
@@ -118,6 +119,27 @@ public class ExerciseRuntimeService {
 
     private static Long org() {
         return TenantContext.requireOrganisationId();
+    }
+
+    /**
+     * The participant whose response this is (F2-226) — the authenticated principal.
+     *
+     * <p>Refuses rather than storing null. Safe because the field was already mandatory
+     * ({@code @NotNull} on {@link ResponseRequest}), so no request that works today starts
+     * failing (F2-182: ask what is already refusing). Only the SOURCE of the value changes.
+     *
+     * <p>Refusing also matters on its own: the row records a measured reaction time, and a
+     * reaction time attributed to nobody is not exercise evidence.
+     */
+    private static Long requireParticipant(String runCode) {
+        Long who = CurrentActor.userId();
+        if (who == null) {
+            throw new IllegalStateException(
+                "No authenticated principal to record as the participant responding on run "
+                + runCode + ". A measured response attributed to nobody is not evidence that "
+                + "the exercise was performed.");
+        }
+        return who;
     }
 
     // ─── Run lifecycle ──────────────────────────────────────────────────
@@ -439,7 +461,30 @@ public class ExerciseRuntimeService {
         ExerciseRunResponse r = new ExerciseRunResponse();
         r.setOrganisationId(orgId);
         r.setRunInjectId(inj.getId());
-        r.setParticipantUserId(req.participantUserId());
+
+        // ⚠⚠ F2-226. The participant is the AUTHENTICATED PRINCIPAL, never the body.
+        //
+        // This was `r.setParticipantUserId(req.participantUserId())`, with
+        // `@NotNull(message = "participantUserId is required")` on the request — so the
+        // server REQUIRED an attribution it never verified while owning the clock itself.
+        // `ExerciseRunResponse.responseAt` is a FIELD INITIALISER (`= LocalDateTime.now()`),
+        // F2-215's third of four filling mechanisms, which is why no setter-matching scan
+        // could ever pair the two halves of this attribution (F2-223's rule).
+        //
+        // 🔑 What makes it worse than an ordinary forged name: the server does not merely
+        // record WHO, it MEASURES them. `responseTimeSeconds` below is computed from the
+        // inject's dispatch to now, so this row is the evidence that a named participant
+        // reacted within N seconds — the artefact an ISO 22301 / NCEMA reviewer reads to
+        // accept that the exercise was performed. Probed live pre-fix: `viewer` (id 6) filed
+        // a response as `compliance` (id 3) and the server certified their reaction time.
+        //
+        // ⚠ The route is `isAuthenticated()` and that is CORRECT — participants are ordinary
+        // employees and filing a response is a duty, the ADR-010 shape. It also means the
+        // population who could forge was every authenticated user, so the open route made
+        // this worse rather than better. The honest client already sent `user.userId` from
+        // the decoded JWT; a machine caller sent whatever it liked, which is where this class
+        // of defect lives (F2-179).
+        r.setParticipantUserId(requireParticipant(run.getRunCode()));
         r.setResponseTextEn(req.responseTextEn());
         r.setResponseTextAr(req.responseTextAr());
         r.setDecisionMadeEn(req.decisionMadeEn());
@@ -457,16 +502,19 @@ public class ExerciseRuntimeService {
             runInjectRepo.save(inj);
         }
 
+        // Read off the SAVED ROW, not `req` — F2-223 found audit rows quoting the caller's
+        // own claim, which is exactly what makes a forged attribution invisible to whoever
+        // audits it.
         audit.log("CREATE", "ExerciseRunResponse", saved.getId(),
             "Response captured on run " + run.getRunCode()
                 + " inject " + inj.getId()
-                + " by participant " + req.participantUserId()
+                + " by participant " + saved.getParticipantUserId()
                 + " (" + saved.getResponseTimeSeconds() + "s after dispatch)");
 
         emit(orgId, "EXERCISE_RESPONSE_RECORDED", "ExerciseRunResponse", saved.getId(), Map.of(
             "runId",              String.valueOf(run.getId()),
             "runInjectId",        String.valueOf(inj.getId()),
-            "participantUserId",  String.valueOf(req.participantUserId()),
+            "participantUserId",  String.valueOf(saved.getParticipantUserId()),
             "responseTimeSeconds", String.valueOf(saved.getResponseTimeSeconds())
         ));
 
@@ -475,7 +523,7 @@ public class ExerciseRuntimeService {
             "runId",               String.valueOf(run.getId()),
             "runInjectId",         String.valueOf(inj.getId()),
             "responseId",          String.valueOf(saved.getId()),
-            "participantUserId",   String.valueOf(req.participantUserId()),
+            "participantUserId",   String.valueOf(saved.getParticipantUserId()),
             "responseTimeSeconds", String.valueOf(saved.getResponseTimeSeconds())
         ));
         return toResponseView(saved);

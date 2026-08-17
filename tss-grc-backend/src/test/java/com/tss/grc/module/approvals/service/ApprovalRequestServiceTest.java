@@ -49,8 +49,27 @@ class ApprovalRequestServiceTest {
     @Mock private ApplicationEventPublisher publisher;
     @InjectMocks private ApprovalRequestService service;
 
-    @BeforeEach void setUp()    { TenantContext.setCurrentTenant(ORG_ID); }
-    @AfterEach  void tearDown() { TenantContext.clear(); }
+    /** F2-226 — the raiser on a create is resolved from the principal, never the body. */
+    private static final String RAISER = "raiser";
+
+    @BeforeEach void setUp() {
+        TenantContext.setCurrentTenant(ORG_ID);
+        authAs(RAISER, 31L);
+    }
+
+    @AfterEach  void tearDown() {
+        TenantContext.clear();
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    private static void authAs(String username, Long userId) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+            .setAuthentication(new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(
+                    new com.tss.grc.security.GrcUserDetails(
+                        userId, ORG_ID, username, "x", true, true, java.util.List.of()),
+                    "x", java.util.List.of()));
+    }
 
     private static ApprovalRequest req(String status) {
         ApprovalRequest r = new ApprovalRequest();
@@ -80,7 +99,10 @@ class ApprovalRequestServiceTest {
         d.setEntityId("TP-2026-001");
         d.setTitleEn("Approve");
         d.setTitleAr("اعتماد");
-        d.setRequestedBy("admin");
+        // ⚠ F2-226 — `requestedBy` is deliberately NOT set here. It is READ_ONLY on the wire
+        // and the service takes it from the principal; a fixture that sets it would be
+        // asserting the defect (F2-159). The one test that still sets it does so to prove the
+        // server ignores it.
         d.setAssignedTo("riskmanager");
         d.setPriority("P1");
         return d;
@@ -177,6 +199,107 @@ class ApprovalRequestServiceTest {
         assertThat(out.getStatus()).isEqualTo("APPROVED");
         // Decider attribution still binds to the (admin) principal, not the body.
         assertThat(out.getDecidedBy()).isEqualTo("admin");
+    }
+
+    // ── F2-226: the raiser and the four-eyes gate ─────────────────────────────
+
+    /**
+     * The raiser is the authenticated principal, and a body field claiming otherwise is
+     * ignored.
+     *
+     * <p>{@code requested_at} is a FIELD INITIALISER on {@link ApprovalRequest} —
+     * {@code = LocalDateTime.now()} — so the server owns WHEN with no {@code setRequestedAt}
+     * anywhere. F2-223's rule: having stamped the time itself, the server is already the
+     * recorder of this act, and taking WHO from the caller split one attribution across two
+     * owners. F2-215's third of four filling mechanisms is why no scan could see it.
+     */
+    @Test
+    void create_recordsTheActingPrincipalAsRaiser_notAnyBodyField() {
+        when(repo.save(any(ApprovalRequest.class))).thenAnswer(inv -> {
+            ApprovalRequest r = inv.getArgument(0);
+            r.setId(43L);
+            return r;
+        });
+
+        ApprovalRequestDto d = createReq();
+        d.setRequestedBy("Nobody Who Raised This");   // the pre-fix forgery, verbatim
+
+        ApprovalRequestDto out = service.create(d);
+
+        assertThat(out.getRequestedBy())
+            .as("the raiser is the principal, and the body's claim is discarded")
+            .isEqualTo(RAISER);
+
+        ArgumentCaptor<ApprovalRequest> saved = ArgumentCaptor.forClass(ApprovalRequest.class);
+        verify(repo).save(saved.capture());
+        assertThat(saved.getValue().getRequestedBy()).isEqualTo(RAISER);
+        assertThat(saved.getValue().getRequestedAt())
+            .as("the clock half of the attribution — the entity's own initialiser")
+            .isNotNull();
+
+        // The audit line must name the SAVED raiser, never the request's (F2-223).
+        verify(audit).log(eq("CREATE"), eq("ApprovalRequest"), eq(43L),
+            org.mockito.ArgumentMatchers.contains("by " + RAISER));
+    }
+
+    @Test
+    void create_withNoAuthenticatedPrincipal_isRefused() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+
+        assertThatThrownBy(() -> service.create(createReq()))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("answerable for");
+        verify(repo, org.mockito.Mockito.never()).save(any(ApprovalRequest.class));
+    }
+
+    /**
+     * Four eyes. {@code assignedTo} is the authorisation input {@code transition()} checks
+     * (SEC-IAM-002), so whoever creates the request decides who may approve it — and before
+     * this gate a WORKFLOW:WRITE+APPROVE holder could raise one to themselves and approve it.
+     * Probed live pre-fix: {@code compliance} did exactly that, 200 then 200.
+     */
+    @Test
+    void create_assignedToTheRaiser_isRefused() {
+        ApprovalRequestDto d = createReq();
+        d.setAssignedTo(RAISER);
+
+        assertThatThrownBy(() -> service.create(d))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Segregation of duties")
+            .hasMessageContaining("may not be assigned to the person raising it");
+        verify(repo, org.mockito.Mockito.never()).save(any(ApprovalRequest.class));
+    }
+
+    /**
+     * The column collates case-INSENSITIVELY (F2-179), so `RAISER` and `raiser` are one
+     * principal to the database. A case-sensitive Java {@code equals} would let a
+     * capitalisation walk straight through the gate above.
+     */
+    @Test
+    void create_assignedToTheRaiserInDifferentCase_isAlsoRefused() {
+        ApprovalRequestDto d = createReq();
+        d.setAssignedTo("  " + RAISER.toUpperCase(java.util.Locale.ROOT) + "  ");
+
+        assertThatThrownBy(() -> service.create(d))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Segregation of duties")
+            .hasMessageContaining("may not be assigned to the person raising it");
+    }
+
+    @Test
+    void create_assignedToSomebodyElse_stillWorks() {
+        when(repo.save(any(ApprovalRequest.class))).thenAnswer(inv -> {
+            ApprovalRequest r = inv.getArgument(0);
+            r.setId(44L);
+            return r;
+        });
+
+        ApprovalRequestDto out = service.create(createReq());   // assignedTo = riskmanager
+
+        assertThat(out.getAssignedTo()).isEqualTo("riskmanager");
+        assertThat(out.getOriginalAssignedTo()).isEqualTo("riskmanager");
+        assertThat(out.getRequestedBy()).isEqualTo(RAISER);
+        assertThat(out.getStatus()).isEqualTo("PENDING");
     }
 
     // ── F7 / F8 emission contract ─────────────────────────────────────────────
