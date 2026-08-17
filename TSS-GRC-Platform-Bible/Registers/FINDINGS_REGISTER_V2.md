@@ -2400,6 +2400,109 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-228 · The reading confirmed three sites the probe refuted, and the fatal one is the INSERT
+
+**Found** 2026-08-17, executing F2-227's filed six-site work list. **P2** — the
+conflict-of-interest register could record everything except a conflict, and the CCM
+consecutive-failure escalation recorded neither the Issue nor the failing run. **Closed** the same
+day. No migration; 2 backend services, 1 gate, 2 behaviour tests.
+
+### Two detector errors in opposite directions, which is why a green build pinned the wrong set
+
+The population was re-derived before the filing was executed (F2-221). F2-227's detector was wrong
+**both ways**, and the errors cancelled:
+
+* It **over-matched**. The query receiver was unconstrained, so `all.stream()`, `gates.count()` and
+  `x.findFirst()` — Java Stream API calls on an in-memory `List` — read as database queries. That
+  alone is why `WorkflowRequestService#advanceRouting` was on the work list: it touches no
+  repository at all. ⚠ Keying the receiver on the field NAME is also wrong —
+  `PolicyManagementService` calls its repository `docs`, so a `*repo*` rule cannot see it (F2-197).
+  Resolve it from `private final …Repository`.
+* It **under-matched**. `findById(` is **not** a flusher: `EntityManager#find` raises a LoadEvent,
+  not an AutoFlushEvent, and returns the managed instance straight from the persistence context. A
+  *derived* query method (`findByIdAndOrganisationId`) compiles to JPQL and does auto-flush. And the
+  flush may be **transitive**, one level deeper than the callee.
+
+🔑 **The loose `find\w*` matched `assetRepo.findById(` and so put `recomputeRiskScore` in the
+population for a reason that is not true, while the real flush sat in `pickHighestOpenSeverity`.
+Fixing either error alone would have been worse than fixing neither** — the over-match fix deletes a
+site, the under-match fix keeps a phantom. F2-224's headline, one slice later, in the same gate.
+
+### The reading confirmed three sites and the live probe refuted all three
+
+| Site | Read as | Probed |
+|---|---|---|
+| `AttackSurfaceAssetService#recomputeRiskScore` | confirmed | **200, twice** |
+| `ObService#recountTpp` | confirmed | **200** |
+| `FourthPartyExposureService#recomputeConcentration` | confirmed | **201** |
+
+🔑 **The load-bearing premise was never checked: `FourthPartyExposure` does not extend
+`BaseEntity`, so it carries no `@Version` and no `row_version` column at all.** Two UPDATEs of it
+are simply two UPDATEs. Only **172 of 432** entities inherit the version, so for 260 of them this
+whole family is unrepresentable — F2-206's *"an invariant enforced by a superclass covers exactly
+its subclasses"*, inverted: **the defect enabled by a superclass reaches exactly its subclasses.**
+
+### The discriminator the probe forced
+
+F2-227's site differed from these in exactly one way: **its first save was of a freshly-constructed
+entity.** `@GeneratedValue(IDENTITY)` makes Hibernate execute that INSERT immediately to obtain the
+id, and `row_version` is `insertable = false`, so the in-memory version is **null** afterwards and
+the follow-up `UPDATE … WHERE row_version = null` matches zero rows. That is precisely what
+Hibernate's own hint — *"or unsaved-value mapping was incorrect"* — had been saying all along. A row
+that was **loaded** carries a real version and two UPDATEs of it both succeed.
+
+🔑 **For an INSERT the first save IS the flush**, so no intervening query is needed and the
+flush-between requirement F2-227's gate rests on does not apply to the shape that actually fires.
+
+### The two live sites, both probed at 409 against planted rows
+
+**`CoiService#submitDeclaration`** saved the declaration, inserted the disclosed items to get their
+`declarationId`, then re-saved the declaration to carry the auto-flagged outcome. Probed as
+`viewer`: a declaration disclosing **nothing** returns 201 (because `computeAutoOutcome` returns
+`PENDING`, the value already set, so nothing is dirty), and a declaration disclosing **an actual
+conflict of interest** answers **409** and rolls back. 🔑 **A conflict-of-interest register that
+could record everything except a conflict.** The route is `isAuthenticated()`, so the affected
+population is every employee.
+
+**`CcmService#recordRunInternal`** saved the run, opened the Issue, then re-saved the run to carry
+the Issue id. Probed: the **third consecutive failure of a CRITICAL control test** answers **409**
+and rolls the whole transaction back, so **neither the Issue nor the failing run itself is
+recorded** — on both `POST /ccm/tests/{id}/run-now` and the 60-second `CcmSchedulerService` tick.
+F2-175's defect, in another module, on the escalation ladder.
+
+Both fixed F2-175's way — **do the other work first, save once**. The COI items are built in memory
+and the outcome decided before the single save; the CCM Issue is opened before the run is inserted,
+and `openConsecutiveFailureIssue` only ever read the run's `failureReason`, never its id.
+
+### The gate's question was wrong, so it was re-scoped rather than raised
+
+Per F2-204: a cross-method re-save of a **loaded** row is not a defect, so a hard zero over that
+population would be a gate failing on correct code — the one failure a gate must never have
+(F2-214). It becomes an **exactly-asserted census** of 7 measured-harmless sites, each carrying a
+verdict that names its evidence, enforced in both directions so a new member forces the next reader
+to ask the only question that matters: *is the first save an INSERT?* The **hard zero moves to the
+INSERT shape**, with the two literal pre-fix shapes, both fixed forms, F2-227's own site and one
+must-not-count refutation as positive controls.
+
+⚠ **My own verdict vocabulary rejected a correct, verified verdict.** The first draft enumerated
+`REFUTED BY LIVE PROBE` and `REFUTED BY READING` — the two sources this slice happened to reach
+first — and then refused `REFUTED BY THE ENTITY`, which is the strongest of the seven. That is
+**F2-224's own lesson recurring inside a gate written after quoting it**: the rule is that a verdict
+must NAME its evidence, not that it must be one of the sources already used.
+
+⚠ **A probe of `recomputeConcentration` altered 9 real seeded rows.** That recompute is
+authoritative over the whole tenant and disagrees with the seed, so it reset 9 of 13
+`concentration_risk` values to `LOW`. Restored field-for-field from prod, which holds the identical
+seed and was never in scope (F2-206's precedent). **Filed as its own defect** — any create or update
+in the fourth-party register silently rewrites other rows' SAMA concentration tier.
+
+| | |
+|---|---|
+| **ID** | F2-228 |
+| **Severity** | **P2.** A conflict-of-interest declaration that disclosed a conflict could not be filed by any employee; the CCM CRITICAL escalation recorded neither its Issue nor its failing run. |
+| **Status** | ✅ **CLOSED 2026-08-17** (`PENDING`). Backend 3,995/0/0, gate 7/7, probe 8/8 post-fix; 2 live sites closed, 7 refuted (3 of them by live probe against the reading). |
+| **Filed** | The fourth-party concentration recompute rewriting 9 of 13 seeded rows on any create or update; `openbanking.ob_tpp` having zero CHECK constraints; and the structural root carried from F2-227 — `@Generated(INSERT, UPDATE)` on `rowVersion` would make the family unrepresentable at the cost of a post-write select on all 172 `BaseEntity` subclasses. |
+
 ## F2-227 · The double save nobody could gate, and the handler that hid it
 
 **Found** 2026-08-17, executing F2-226's filed 500. **P2** — the facilitator's ordinary

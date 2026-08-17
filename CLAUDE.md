@@ -1872,6 +1872,79 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **THE FATAL DOUBLE SAVE IS THE ONE WHOSE FIRST SAVE IS AN *INSERT*, AND THE READING
+  CONFIRMED THREE SITES THE PROBE REFUTED** (F2-228, measured 2026-08-17). Executing F2-227's filed
+  six-site work list, the population was re-derived first (F2-221) and **the detector was wrong in
+  BOTH directions, which is exactly what let a green build pin the wrong set.** It **over**-matched:
+  the query receiver was unconstrained, so `all.stream()`, `gates.count()` and `x.findFirst()` —
+  Java Stream API calls on an in-memory `List` — read as database queries, which is the whole
+  reason `WorkflowRequestService#advanceRouting` was on the list (it touches no repository at all).
+  ⚠ Keying the receiver on the field NAME is also wrong: `PolicyManagementService` calls its
+  repository `docs`, so a `*repo*` rule cannot see it (F2-197) — resolve it from
+  `private final …Repository`. It **under**-matched: `findById(` is **not** a flusher
+  (`EntityManager#find` raises a LoadEvent, not an AutoFlushEvent, and returns the managed instance
+  straight from the persistence context), and the flush may be **TRANSITIVE**, one level deeper than
+  the callee. 🔑 **The two errors cancelled** — the loose `find\w*` matched
+  `assetRepo.findById(` and so put `recomputeRiskScore` in the population *for a reason that is not
+  true*, while the real flush sat in `pickHighestOpenSeverity`. **Fixing either one alone would have
+  been worse than fixing neither**: the over-match fix deletes a real site, the under-match fix keeps
+  a phantom. F2-224's headline, one slice later, inside the same gate.
+  ⚠⚠ **CORRECTION to the landmine above: *"Hibernate never re-reads"* is true of the value
+  and does NOT mean two saves of a loaded row fail.** Probed 200 twice each on the ASM asset update
+  (`PUT /api/v1/asm/assets/{externalId}` with exposure AND criticality changed so the early return is
+  not taken) and the Open Banking TPP revocation (`POST /tpps/{id}/transition` to REVOKED, the branch
+  that queries consents and then recounts the same row). A **loaded** row carries a real
+  `row_version`, and both UPDATEs match. 🔑 **F2-227's site differed in exactly one way: its
+  first save was of a `new` entity.** `@GeneratedValue(IDENTITY)` makes Hibernate execute that INSERT
+  immediately to obtain the id, `row_version` is `insertable = false`, so the in-memory version is
+  **null** afterwards and the follow-up `UPDATE … WHERE row_version = null` matches zero rows —
+  which is precisely what Hibernate's own hint *"or unsaved-value mapping was incorrect"* has been
+  saying all along. **For an INSERT the first save IS the flush**, so no intervening query is needed
+  and F2-227's flush-between requirement does not apply to the shape that actually fires.
+  ⚠⚠ **And the premise the reading never checked: only 172 of 432 entities extend
+  `BaseEntity`, so for 260 of them this family is UNREPRESENTABLE.**
+  `FourthPartyExposure` is one of them — no `@Version`, no `row_version` column — so its create
+  was never at risk however many times it re-saved the row. F2-206's *"an invariant enforced by a
+  superclass covers exactly its subclasses"*, inverted: **the defect ENABLED by a superclass reaches
+  exactly its subclasses.** Check the entity before believing any instance of this shape.
+  ⚠⚠ **The two live sites, both probed at 409 against PLANTED rows, and both are governance
+  controls.** `CoiService#submitDeclaration` saved the declaration, inserted the disclosed items to
+  get their `declarationId`, then re-saved the declaration to carry the auto-flagged outcome: a
+  declaration disclosing **nothing** returns 201 (because `computeAutoOutcome` returns `PENDING`, the
+  value already set, so nothing is dirty) and one disclosing **an actual conflict of interest** rolled
+  back — 🔑 **a conflict-of-interest register that could record everything EXCEPT a
+  conflict**, on a route guarded `isAuthenticated()`, so the population is every employee.
+  `CcmService#recordRunInternal` saved the run, opened the Issue, then re-saved the run to carry the
+  Issue id: the **third consecutive failure of a CRITICAL control test** rolled the whole transaction
+  back, so **neither the auto-opened Issue nor the failing run itself was recorded** — on both
+  `POST /ccm/tests/{id}/run-now` and the 60-second `CcmSchedulerService` tick. F2-175's defect, in
+  another module, on the escalation ladder. Both fixed F2-175's way: **do the other work FIRST, save
+  ONCE** — the COI items are built in memory and the outcome decided before the single save, and
+  `openConsecutiveFailureIssue` only ever read the run's `failureReason`, never its id.
+  ⚠⚠ **The gate's QUESTION was wrong, so it was re-scoped rather than raised** (F2-204). A
+  cross-method re-save of a **loaded** row is not a defect, so a hard zero over that population would
+  be a gate failing on correct code — the one failure a gate must never have (F2-214). It is now an
+  **exactly-asserted census** of 7 measured-harmless sites, each with a verdict naming its evidence,
+  enforced both ways so a new member forces the next reader to ask the only question that matters; the
+  **hard zero moved to the INSERT shape**, with both literal pre-fix shapes, both fixed forms,
+  F2-227's own site and one must-not-count refutation as positive controls.
+  ⚠ **My own verdict vocabulary then rejected a correct, verified verdict.** The first draft
+  enumerated `REFUTED BY LIVE PROBE` and `REFUTED BY READING` — the two sources this slice happened
+  to reach first — and refused `REFUTED BY THE ENTITY`, the strongest of the seven. **F2-224's own
+  lesson recurring inside a gate written after quoting it**: the rule is that a verdict must NAME its
+  evidence, not that it must be one of the sources already used.
+  ⚠⚠ **A probe of `recomputeConcentration` ALTERED 9 REAL SEEDED ROWS, and that is its own
+  finding.** The recompute is authoritative over the whole tenant and disagrees with the seed, so it
+  reset 9 of 13 `scm.fourth_party_exposures.concentration_risk` values (MEDIUM/HIGH/CRITICAL) to
+  `LOW`. Restored field-for-field from prod, which holds the identical seed and was never in scope
+  (F2-206's precedent). 🔑 **Any create or update in that register silently rewrites other
+  rows' SAMA concentration tier** — filed. **Before probing a method whose name starts `recompute`,
+  ask what population it recomputes.**
+  ⚙ **Filed:** the fourth-party concentration flattening; `openbanking.ob_tpp` has **zero** CHECK
+  constraints (F2-221's shape); and the structural root carried from F2-227 — `@Generated(event =
+  {INSERT, UPDATE})` on `rowVersion` would make the family unrepresentable at the cost of a post-write
+  `SELECT` on all 172 `BaseEntity` subclasses, an owner trade-off.
+
 - ⚠⚠ **A LANDMINE THAT CANNOT BE DIAGNOSED FROM A RESPONSE GETS REDISCOVERED INSTEAD OF FIXED**
   (F2-227, measured 2026-08-17). The ROWVERSION double-flush above has been recorded three times —
   F2-175 fixed one instance, F2-226 tripped over a live one by accident — and had **never once been
