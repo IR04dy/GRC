@@ -54,6 +54,27 @@ public class MaterialTopicService {
     /** A topic is material on an axis when that axis scores at/above this (the HIGH-tier floor). */
     private static final BigDecimal MATERIAL_THRESHOLD = new BigDecimal("3.0");
 
+    /**
+     * F2-237 — the declared range of both double-materiality axes, as ONE rule with several
+     * readers rather than a copy per write path.
+     *
+     * <p>⚠⚠ {@code score()} refused anything outside 0..5 and {@code create()}/{@code update()}
+     * wrote both axes raw, so the range was a property of one route rather than of the column.
+     * The database says the same thing about half the columns and not the other half:
+     * {@code ck_mt_stake_score} and {@code ck_mt_biz_score} bound the LEGACY mirror pair 0..5 and
+     * there was no constraint at all on the canonical {@code impact_materiality} /
+     * {@code financial_materiality} — F2-215's two-of-N shape, at the schema. V379 adds the two
+     * that were missing, and this pair is what the service checks so the two cannot drift.
+     *
+     * <p>🔑 The pattern was already in the tree, in the sibling artefact:
+     * {@code NdiAssessmentCycleService.validate()} carries its own range rule
+     * (<i>"reportingYear must be 2020..2100"</i>) so no write path can miss it, while
+     * {@code MaterialTopicService.validate()} — right here — checked the topic name, the category,
+     * the reporting year and the status, and not the two axes the whole register exists to record.
+     */
+    private static final BigDecimal AXIS_MIN = BigDecimal.ZERO;
+    private static final BigDecimal AXIS_MAX = new BigDecimal("5");
+
     private final MaterialTopicRepository repo;
     private final AuditLogService audit;
 
@@ -86,8 +107,12 @@ public class MaterialTopicService {
         req.setApprovedAt(null);
         req.setCreatedBy(null);
         req.setUpdatedBy(null);
+        // F2-237 — the axes go through the one writer, so a created topic cannot carry a score
+        // outside the declared range or a legacy mirror that disagrees with it. The canonical axis
+        // wins where a caller supplies both (MaterialTopicCreateRequest already resolves the other
+        // direction: an omitted canonical value falls back to the legacy field).
+        applyAxes(req, req.getImpactMateriality(), req.getFinancialMateriality());
         validate(req);
-        recomputeScore(req);
         MaterialTopic saved = repo.save(req);
         audit.log("CREATE", "MaterialTopic", saved.getId(),
                 "Material topic created");
@@ -100,15 +125,13 @@ public class MaterialTopicService {
         if ("ARCHIVED".equals(cur.getStatus())) {
             throw new IllegalStateException("Topic is ARCHIVED and cannot be modified.");
         }
+        BigDecimal beforeScore = cur.getMaterialityScore();
+        String beforeTier = cur.getPriorityTier();
         if (req.getCategory() != null)               cur.setCategory(req.getCategory());
         if (req.getTopicEn() != null)                cur.setTopicEn(req.getTopicEn());
         if (req.getTopicAr() != null)                cur.setTopicAr(req.getTopicAr());
         if (req.getDescriptionEn() != null)          cur.setDescriptionEn(req.getDescriptionEn());
         if (req.getDescriptionAr() != null)          cur.setDescriptionAr(req.getDescriptionAr());
-        if (req.getStakeholderImportance() != null)  cur.setStakeholderImportance(req.getStakeholderImportance());
-        if (req.getBusinessImpact() != null)         cur.setBusinessImpact(req.getBusinessImpact());
-        if (req.getImpactMateriality() != null)      cur.setImpactMateriality(req.getImpactMateriality());
-        if (req.getFinancialMateriality() != null)   cur.setFinancialMateriality(req.getFinancialMateriality());
         if (req.getStakeholderGroups() != null)      cur.setStakeholderGroups(req.getStakeholderGroups());
         if (req.getLinkedCmaDisclosureId() != null)  cur.setLinkedCmaDisclosureId(req.getLinkedCmaDisclosureId());
         if (req.getLinkedClimateRiskId() != null)    cur.setLinkedClimateRiskId(req.getLinkedClimateRiskId());
@@ -117,13 +140,93 @@ public class MaterialTopicService {
         if (req.getOwnerName() != null)              cur.setOwnerName(req.getOwnerName());
         if (req.getOwnerEmail() != null)             cur.setOwnerEmail(req.getOwnerEmail());
         if (req.getNotes() != null)                  cur.setNotes(req.getNotes());
+        // ⚠⚠ F2-237 — THE FOUR SCORE COLUMNS ARE DELIBERATELY NOT WRITTEN HERE, and the reason is
+        // that the null-guard which used to write them COULD NEVER FIRE.
+        //
+        // This route binds the ENTITY, and MaterialTopic declares
+        //     private BigDecimal impactMateriality = BigDecimal.ZERO;
+        // on all four score columns (they are NOT NULL). So a PUT that omits the key deserialises
+        // to ZERO, not to null — `if (req.getImpactMateriality() != null)` was true on every single
+        // request, and the line READ as a partial update while BEHAVING as a full replace. Probed
+        // live: a PUT carrying only topicEn and category zeroed a CRITICAL topic's axes, and
+        // recomputeScore then took materiality_score to 0.0 and priority_tier to LOW — a CMA
+        // Article 92(a) double-materiality input, destroyed by an edit to an unrelated field.
+        //
+        // 🔑 The frontend was carrying the workaround: EsgMaterialityTab's edit handler echoes both
+        // axes back with a comment explaining that "an omitted value would zero out the score +
+        // tier". A defence in one client is not a defence — the next caller does not have it.
+        //
+        // The axes are owned by create() and by score(), which is what this register already says
+        // out loud ("Scoring is owned by the dedicated Score action"). An edit route that cannot
+        // write them cannot zero them, and the legacy mirror cannot be driven apart from the
+        // canonical pair either, because applyAxes is then the only writer of all four.
         validate(cur);
         recomputeScore(cur);
         MaterialTopic saved = repo.save(cur);
+        // 🔑 F2-188 — recomputeScore runs on every save, so an edit to a topic's owner name can
+        // move its materiality score and its priority tier. The old line read "Material topic
+        // updated" whatever moved: a duplicated derivation agrees with the original on the row and
+        // differs on the audit trail, which is the part nothing asserts. Say what moved.
         audit.log("UPDATE", "MaterialTopic", saved.getId(),
-                "Material topic updated");
+                "Material topic updated" + derivedMove(beforeScore, beforeTier, saved));
         return saved;
     }
+
+    /**
+     * The ONE writer of the double-materiality axis pair.
+     *
+     * <p>Three routes wrote these columns and only {@code score()} enforced the declared range,
+     * kept the legacy mirror in step and recomputed the derived values. Everything that writes an
+     * axis now comes through here, so the range, the mirror and the derivation are properties of
+     * the field rather than of whichever route the caller reached.
+     *
+     * <p>⚠ The mirror matters because {@code stakeholder_importance} / {@code business_impact} are
+     * the same two facts under their pre-S-Q names, read by the legacy ESG surfaces and by the
+     * frontend's own {@code impactMateriality ?? stakeholderImportance} fallback. {@code update()}
+     * wrote all four independently, so one row could carry an impact of 5 and a stakeholder
+     * importance of 1 — F2-196's disjoint-vocabulary shape inside a single row. Measured 2026-08-18:
+     * 0 rows disagree in dev or prod, so this was latent.
+     */
+    private void applyAxes(MaterialTopic t, BigDecimal impact, BigDecimal financial) {
+        t.setImpactMateriality(requireAxis(impact, "impactMateriality"));
+        t.setFinancialMateriality(requireAxis(financial, "financialMateriality"));
+        t.setStakeholderImportance(t.getImpactMateriality());   // legacy mirror — never a 2nd writer
+        t.setBusinessImpact(t.getFinancialMateriality());
+        recomputeScore(t);
+    }
+
+    /**
+     * A double-materiality axis is 0..5, and saying so names the field.
+     *
+     * <p>{@code require}, not {@code coerce} (F2-182's test: what already refuses this?). The
+     * frontend gates 0..5 in the create form, the edit form and the score dialog, so no request a
+     * human can make through the platform starts failing — which is exactly why the hole was only
+     * reachable by a machine caller, and machine callers are where this family of defect lives
+     * (F2-179). Clamping instead would silently record a materiality score nobody chose.
+     */
+    private static BigDecimal requireAxis(BigDecimal v, String field) {
+        if (v == null) {
+            throw new IllegalArgumentException(field + " is required (0..5)");
+        }
+        if (v.compareTo(AXIS_MIN) < 0 || v.compareTo(AXIS_MAX) > 0) {
+            throw new IllegalArgumentException(
+                field + " must be between " + AXIS_MIN.toPlainString() + " and "
+                    + AXIS_MAX.toPlainString() + " — got " + v.toPlainString());
+        }
+        return v;
+    }
+
+    /** "" when neither derived value moved, else what moved — for the audit line. */
+    private static String derivedMove(BigDecimal beforeScore, String beforeTier, MaterialTopic after) {
+        boolean sameScore = beforeScore != null && after.getMaterialityScore() != null
+            && beforeScore.compareTo(after.getMaterialityScore()) == 0;
+        boolean sameTier = Objects.equals(beforeTier, after.getPriorityTier());
+        if (sameScore && sameTier) return "";
+        return " · materiality " + str(beforeScore) + " → " + str(after.getMaterialityScore())
+            + " (" + beforeTier + " → " + after.getPriorityTier() + ")";
+    }
+
+    private static String str(BigDecimal v) { return v == null ? "—" : v.toPlainString(); }
 
     /**
      * Score a topic on the two double-materiality axes. Transitions
@@ -139,14 +242,10 @@ public class MaterialTopicService {
         MaterialTopic cur = get(id);
         if (impact == null || financial == null)
             throw new IllegalArgumentException("Both impact and financial materiality scores required.");
-        if (impact.signum() < 0 || impact.compareTo(new BigDecimal("5")) > 0
-            || financial.signum() < 0 || financial.compareTo(new BigDecimal("5")) > 0)
-            throw new IllegalArgumentException("Scores must be 0..5.");
-        cur.setImpactMateriality(impact);
-        cur.setFinancialMateriality(financial);
-        cur.setStakeholderImportance(impact);   // legacy mirror
-        cur.setBusinessImpact(financial);       // legacy mirror
-        recomputeScore(cur);
+        // F2-237 — the range, the legacy mirror and the recompute were all HERE and nowhere else,
+        // which is what made this route's guarantees a property of the route rather than of the
+        // column. They now live in applyAxes, which create() and update() also go through.
+        applyAxes(cur, impact, financial);
         if ("DRAFT".equals(cur.getStatus())) cur.setStatus("SCORED");
         MaterialTopic saved = repo.save(cur);
         audit.log("SCORE", "MaterialTopic", saved.getId(),
@@ -284,6 +383,15 @@ public class MaterialTopicService {
             throw new IllegalArgumentException("reportingYear required");
         if (!STATUSES.contains(t.getStatus()))
             throw new IllegalArgumentException("status must be one of " + STATUSES);
+        // F2-237 — the range rule as a property of the ROW, so a future write path that forgets
+        // applyAxes still cannot store a score outside the axes the register declares. This is the
+        // shape NdiAssessmentCycleService.validate() already had for its reporting year, and the
+        // reason it is worth having twice: applyAxes names the field for the caller, this catches
+        // the writer nobody has written yet.
+        requireAxis(t.getImpactMateriality(), "impactMateriality");
+        requireAxis(t.getFinancialMateriality(), "financialMateriality");
+        requireAxis(t.getStakeholderImportance(), "stakeholderImportance");
+        requireAxis(t.getBusinessImpact(), "businessImpact");
     }
 
     private static BigDecimal nz(BigDecimal v) { return v == null ? BigDecimal.ZERO : v; }

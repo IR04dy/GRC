@@ -1872,6 +1872,109 @@ with per-module LoC/tests/coupling: `TSS-GRC-Platform-Bible/Appendix/MEASURED_BA
   endpoints stamp the tenant on their create path, and `TenantWriteGuardInterceptor` is wired and enabled in
   **dev and prod** with both legs. Probed live — a body naming org 2 from an org-1 caller stores org 1.
   `externalId` likewise stays per-service (F2-172(d)).
+- ⚠⚠ **A NULL-GUARD ON A FIELD WHOSE ENTITY DECLARES AN INITIALISER CAN NEVER FIRE, SO THE LINE
+  READS AS A PARTIAL UPDATE AND BEHAVES AS A FULL REPLACE** (F2-237, measured 2026-08-18). Executing
+  F2-220's filed *"the population of transition-by-parameter registers is unmeasured"*, the population
+  was re-derived first (F2-221) in Java over the same tree as the shipped detector (F2-213). **The nine
+  registers `MEASURED_MACHINES` names are an anti-vacuity guard and never a census — the detector
+  already saw 28**; a permissive scan that also walks NON-PUBLIC methods sees **30**, and the delta it
+  can never see is 15 sites / 13 keys with 6 create-side hits. The real figure is now asserted beside
+  the nine so the next reader cannot mistake one for the other.
+  ⚠⚠ **FOUR GENUINE MACHINES ARE INVISIBLE TO THAT GATE FOR THREE DISTINCT STRUCTURAL REASONS.**
+  A **different exception family** — `RecertificationService#decide` (the IAM four-eyes *"reviewers
+  cannot certify their own access"*) and `SodService#disposition` both refuse with
+  `ResponseStatusException`, which the inline `IllegalState|IllegalArgument|IllegalTransition` test
+  cannot match: F2-231's headline on the machine side. A **refusal in a shared helper PLUS a write-verb
+  name** — `EvidenceRequestService#updateStatus` fails two clauses at once. And **a PRIVATE
+  machine** — `EvidenceItemService#transitionStatus`, behind five public wrappers; this gate's
+  population is `publicMethods`, so it is invisible **by construction**. 🔑 **F2-198's shape at
+  an ACCESS MODIFIER**, the eleventh narrowing after a filename, a three-entry allow-list, a module
+  name, a controller-bearing table, an `extends` clause and a field-name list.
+  `PlanDistributionService#transition` and `ChangeManagementService#closeCondition` are the other two
+  private ones, which is exactly the 30 minus 28. All four are closed on the create side **today** by
+  their own mechanism — a fact about today, not a property of the control (F2-182) — so they
+  are asserted rather than assumed.
+  ⚠ **9 of the 15 delta sites were my own detector over-matching** (a helper satisfying *"reads F
+  on that row"* pulled in `titleEn`, `notesEn`, `planType`), and it pointed at a real defect anyway, of
+  an **adjacent shape**: not a state machine but a **validated range**. Measured as its own population
+  — 13 range-guarded fields, 11 bypassed pairs, 3 services — with **2 of the 3 refuted by
+  reading**: `NdiAssessmentCycle#reportingYear` because `validate()` already carries the rule and both
+  write paths call it (F2-182's shared-`validate()` lesson), and `ProcessorAssessment#assessedBy`
+  because it is an actor id, not a range. 🔑 **The pattern was already in the tree, in the
+  sibling artefact**: `NdiAssessmentCycleService.validate()` carries its range rule so no write path
+  can miss it, while `MaterialTopicService.validate()` checked the topic name, the category, the
+  reporting year and the status — and **not the two axes the whole register exists to record**.
+  ⚠⚠ **THE LIVE DEFECT IS NOT THE RANGE, AND A UNIT TEST'S FAILURE WAS THE FINDING.**
+  `MaterialTopic` declares `= BigDecimal.ZERO` on all four score columns because they are NOT NULL, so
+  a PUT that omits the key deserialises to **ZERO, not null** — `if (req.getImpactMateriality()
+  != null)` was true on **every single request**. Probed live as `compliance` against a topic the probe
+  plants itself (F2-206), pre-fix control 5 legs firing and post-fix 11/11: a `PUT` carrying only
+  `topicEn` and `category` took a scored topic from `3.5 / 2.0 / 3.5 / HIGH` to **`0 / 0 / 0.0 / LOW`**
+  — **an edit that changed only the title destroyed a CMA Article 92(a) / CSRD-ESRS
+  double-materiality input**, and `recomputeScore` runs on every save so the score and the tier
+  followed it down.
+  🔑 **THE FRONTEND WAS CARRYING THE WORKAROUND.** `EsgMaterialityTab`'s edit handler echoed
+  both axes back with a comment explaining that *"an omitted value would zero out the score + tier"*.
+  **A defence in one client is not a defence** — the next caller does not have it, and this family
+  is reachable exactly where machine callers live (F2-179). ⚠ **And the create was worse than
+  latent**: the pre-fix probe stored `impact=4.6` beside `stakeholderImportance=0`, so the two
+  spellings of one fact **disagreed from birth** — 0 disagreeing rows in dev and prod only because
+  every seeded row came from `seed_real_data.py` rather than through the API.
+  ⚠⚠ **NO GATE IN THIS TREE COULD SEE IT, AND ONE OF THEM WAS BLIND FOR THIS EXACT REASON.**
+  `FullReplaceUpdateContractTest`'s structural leg asks whether a method persists its own request
+  parameter (this one persists the loaded row); its coverage leg asks whether a written field is
+  *declarable*, and with a `Partial<MaterialTopic>` client every field is (F2-214); and
+  `ServerStampedFieldContractTest` **subtracts anything a null-guard protects — the exact
+  subtraction this defect defeats**, because the guard is decorative. **Before trusting a
+  null-guard, check whether the entity gives the field an initialiser.**
+  ⚙ Fixed with one private `applyAxes()` as the only writer of all four columns (range via
+  `requireAxis`, the legacy mirror written FROM the canonical axis, then recompute), the range **also**
+  in `validate()` so a future write path that forgets the writer still cannot store an out-of-range
+  score, and **the edit route writing none of the four** — the axes belong to `create()` and to the
+  dedicated Score action, which is what the register already said out loud. `require` not `coerce`
+  (F2-182). The UPDATE audit line now **names the derived move** instead of reading *"Material topic
+  updated"* whatever changed (F2-188).
+  ⚠⚠ **V379 ADDS THE TWO RANGE CHECKS THE CANONICAL PAIR NEVER HAD, AND *WHICH* TWO WERE
+  MISSING IS THE POINT.** `sust.material_topic` already carried **five** CHECK constraints, two of them
+  bounding `stakeholder_importance` and `business_impact` to 0..5 — the **LEGACY** mirror pair
+  — while the canonical `impact_materiality` / `financial_materiality` that every current reader
+  prefers had none. **F2-215's two-of-N shape, at the schema**: a reader who finds range CHECKs on this
+  table does not then ask which columns they name. Scope tied to the writers the same commit closed
+  (F2-183); measured in both databases first (26 live rows each, 0 outside range, 0 disagreeing
+  mirrors) so no `WITH NOCHECK`; no casing normalisation, because `decimal(3,1)` cannot carry F2-179's
+  collation trap. ⚠ The pre-fix probe shows the migration and the writer are two halves: with V379
+  applied and the service reverted, an out-of-range create answered **409 naming no field**; the
+  service fix is what makes it a **400 naming `impactMateriality`**.
+  ⚠⚠ **THE GENERAL SHAPE IS 46 SITES ACROSS 20 SERVICES, SHIPPED AS A WORK LIST WITH NO
+  VERDICTS** (F2-188). `NeverFiringNullGuardContractTest` derives every entity-bound update guarding
+  `if (req.getX() != null)` on a field the entity initialises — 50 before this slice — exactly
+  asserted in both directions, with a synthetic self-test driving the detector against the literal
+  pre-fix shape and three shapes it must NOT flag (F2-195). A DTO cannot have this shape (a record
+  component has no default), so the population is exactly the entity-bound writes. Two things are clear
+  from the initialisers alone: **a reset is worse than a null** (F2-213 — `false`, `0`,
+  `"MEDIUM"` and `new BigDecimal("100.00")` read as facts rather than as missing data), and several are
+  **flattering in the direction that matters** — `GhgEmissionRecord#coveragePercent` resets to
+  **100.00** (an ISAE 3410 assurance input), `CloudService#encryptionInTransit` to **true**, while
+  `CrisisEvent#severity` resets to **1** and `AuthorityDocument#isPlaceholder` to **true**, marking a
+  real regulatory instrument a placeholder. **Read the route and probe it before writing a reason.**
+  ⚠ **My own claim was refuted by my own gate on its first run**: the first draft asserted
+  `EvidenceItemCreateRequest` declares no `status` — *"the strongest closure there is, because a
+  field the bound type does not declare can never arrive"* — and **it declares one**. The closure
+  is the weaker kind, where the client may send it and `applyRequest` silently drops it (F2-184's
+  shape, safe here but not the same claim). Roughly two in ten of a new instrument's own claims fall on
+  first run (F2-188, F2-192, F2-204, F2-211), and the reverse-facing assertion is what found it.
+  ⚠ **The heredoc landmine fired again**, on a `python - <<'PYEOF'` patch script whose `\\b` and
+  `\\w` collapsed — loud this time (an `AssertionError` on a pattern that no longer matched).
+  **Use the Write/Edit tools for any file content carrying escapes**, and note that the standing
+  instruction to prefer Bash does not extend to that.
+  ⚙ **Filed:** the 46-site work list; and `sust.material_topic`'s stored derived values, which are
+  **larger than F2-230's** — **20 of 26 live rows hold a `materiality_score` LOWER than
+  `MAX(impact, financial)` and 0 higher**, so the register under-states materiality; **14 priority tiers
+  would move on the next save, 12 of them to CRITICAL**; and **8 rows' tier contradicts their own stored
+  score** (id 14 stores 4.5 with tier HIGH where the declared bucket is CRITICAL, which proves the
+  stored tier was never computed by this code). Identical in dev and prod, each self-repairing the first
+  time an operator edits it — which is why the audit line now names the move. Re-deriving 26 live
+  rows in two real databases is an **owner decision** (F2-183, F2-196, F2-230).
 - ⚠⚠ **THE SERVER STAMPS *WHEN* FROM ITS OWN CLOCK AND THE CALLER NAMES *WHO*, AND TWO
   CONTROLLERS DEFAULTED THAT NAME TO A LITERAL** (F2-236, measured 2026-08-18). Executing F2-234's
   filed nine parameter-borne splits, every one was read — the service **and its controller**, since

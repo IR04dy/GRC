@@ -2547,6 +2547,206 @@ instance** of an invented officer in a placeholder teaching an operator to type 
 - `scm.fourth_party_exposures.validator_name` holds **5 invented person names** on live rows in a
   *server* register (F2-207's measured cast of 65). Repair rewrites live rows: owner decision.
 
+## F2-237 · A null-guard on a field whose entity declares an initialiser can never fire
+
+|  |  |
+|---|---|
+| **ID** | F2-237 |
+| **Title** | `if (req.getX() != null)` reads as a partial update and behaves as a full replace — an edit to a topic's title took a CRITICAL double-materiality score to 0.0 / LOW, and the frontend was carrying the workaround |
+| **Severity** | 🔴 P2 (live: silent destruction of a CMA Article 92(a) / CSRD-ESRS double-materiality input on every edit that omitted the axes) |
+| **Status** | 🟢 CLOSED 2026-08-18 |
+| **Programme** | Platform Bible F2 · server-owned state |
+| **Modules** | `sust/materiality`, `db/migration` (V379), FE (1 file), 2 gates |
+
+### What was measured — F2-220's filed population, re-derived first (F2-221)
+
+F2-220 filed *"the population of transition-by-parameter registers is unmeasured"*. Re-derived in
+Java over the same tree as the shipped detector (F2-213: a Python locator with a narrower resolver
+reports *absent* where the gate reports *classified*):
+
+| | |
+|---|---|
+| machines `ServerStampedFieldContractTest.machineOwned` sees | **28** |
+| machines a permissive scan that also walks NON-PUBLIC methods sees | **30** |
+| delta the shipped detector can never see | **15 sites / 13 keys** |
+| create-side hits in that delta | **6**, all delta-only |
+| confirmed live | **1** |
+
+🔑 **The nine registers named in `MEASURED_MACHINES` are an anti-vacuity guard, not a census** — the
+detector already saw 28. That is now asserted with the real figure beside it, so the next reader
+cannot mistake one for the other.
+
+**The four genuine machines the gate is blind to, for three distinct structural reasons** — all four
+closed on the create side today by their own mechanism, which is a fact about today and not a
+property of the control (F2-182), and therefore asserted rather than assumed:
+
+- **a different exception family** — `RecertificationService#decide` (IAM access recertification,
+  four-eyes: *"reviewers cannot certify their own access"*) and `SodService#disposition` both refuse
+  with `ResponseStatusException`, which the detector's inline
+  `IllegalState|IllegalArgument|IllegalTransition` test cannot match. F2-231's headline, on the
+  machine side this time.
+- **a refusal in a shared helper, plus a write-verb name** — `EvidenceRequestService#updateStatus`
+  fails two clauses at once.
+- **a PRIVATE machine** — `EvidenceItemService#transitionStatus`, called by five public wrappers.
+  This gate's population is `publicMethods`, so it is invisible *by construction*. Two more are
+  private and otherwise fully visible: `PlanDistributionService#transition` and
+  `ChangeManagementService#closeCondition`, which is exactly the 30 − 28. **F2-198's shape at an
+  ACCESS MODIFIER** — the eleventh narrowing this programme has met, after a filename, a three-entry
+  allow-list, a module name, a controller-bearing table, an `extends` clause and a field-name list.
+
+⚠ **9 of the 15 delta sites are my own detector over-matching.** The relaxation that let a helper
+satisfy *"reads F on that row"* pulled in `CorrectiveAction#titleEn`, `EvidenceReview#notesEn`,
+`BcpPlan#planType` and `NdiComplianceAssessment#evidenceRef` — none of them state. It pointed at a
+real defect anyway, of an **adjacent shape**: not a state machine but a **validated range**.
+
+### The adjacent shape, measured as its own population
+
+*A method that refuses a numeric parameter outside a range and writes field F from it, in a service
+whose create/update writes F from the request with no such refusal.* **13 range-guarded fields, 11
+bypassed pairs, 3 services** — and 2 of the 3 refuted by reading:
+
+- `NdiAssessmentCycle#reportingYear` — **REFUTED**: `validate()` already throws *"reportingYear must
+  be 2020..2100"* and both write paths call it. F2-182's recorded lesson exactly (a guard sits in a
+  shared `validate()` a setter-site regex cannot see).
+- `ProcessorAssessment#assessedBy` — **REFUTED**: an actor id, not a range.
+- `MaterialTopic` — **CONFIRMED**, 8 of the 11 pairs.
+
+🔑 **The pattern was already in the tree, in the sibling artefact.**
+`NdiAssessmentCycleService.validate()` carries its range rule so no write path can miss it;
+`MaterialTopicService.validate()` checked the topic name, the category, the reporting year and the
+status — and not the two axes the whole register exists to record.
+
+### 🔑 The live defect, and it is not the range
+
+The unit test written for the range failed on a fixture built the way Jackson builds a request
+(`new MaterialTopic()`), and **that failure was the finding**. `MaterialTopic` declares
+`= BigDecimal.ZERO` on all four score columns because they are NOT NULL, so a PUT that omits the key
+deserialises to ZERO rather than to null: **`if (req.getImpactMateriality() != null)` was true on
+every single request.** The line read as a partial update and behaved as a full replace.
+
+Probed live as `compliance` (SUST:WRITE, not PLATFORM_ADMIN) against a topic the probe plants itself
+(F2-206) — **pre-fix control 5 legs firing, post-fix 11/11**:
+
+```
+PUT /api/sustainability/materiality/{id}  {"topicEn": "...", "category": "GOVERNANCE"}
+  pre-fix   HTTP 200   impact=0  financial=0  score=0.0  tier=LOW      ← was 3.5 / 2.0 / 3.5 / HIGH
+  post-fix  HTTP 200   impact=3.5 financial=2.0 score=3.5 tier=HIGH
+```
+
+**An edit that changed only the title took a scored topic to LOW.** `recomputeScore` runs on every
+save, so `materiality_score` and `priority_tier` followed it down.
+
+🔑 **The frontend was carrying the workaround.** `EsgMaterialityTab`'s edit handler echoed both axes
+back with a comment explaining that *"an omitted value would zero out the score + tier"*. **A defence
+in one client is not a defence** — the next caller does not have it, and this whole family is
+reachable exactly where machine callers live (F2-179). The echo is now deleted along with the reason
+for it.
+
+⚠ **And the create was worse than latent.** The pre-fix probe stored `impact=4.6` with
+`stakeholderImportance=0`: the create never mirrored the legacy pair, so **the two spellings of one
+fact disagreed from birth**. Measured 0 disagreeing rows in dev and prod only because every seeded
+row was written by `seed_real_data.py` and not through the API.
+
+### Why no gate in this tree could already see it
+
+| gate | why it was green |
+|---|---|
+| `FullReplaceUpdateContractTest` structural leg | asks whether a method persists its own request parameter; this one persists the loaded row |
+| its coverage leg | asks whether a written field is *declarable* by the frontend type — with a `Partial<MaterialTopic>` client every field is (F2-214's recorded reason) |
+| `ServerStampedFieldContractTest` | subtracts anything a null-guard protects — **the exact subtraction this defect defeats**, because the guard is decorative |
+| `WireContractTest` | the types agree; the payload builder is free to omit |
+
+### The fix
+
+One private `applyAxes()` is the only writer of all four score columns: it calls `requireAxis()`
+(0..5, naming the field), mirrors the legacy pair **from** the canonical axis, and recomputes. The
+range also goes into `validate()`, so a future write path that forgets the writer still cannot store
+an out-of-range score — the shape `NdiAssessmentCycleService` already had.
+
+**The edit route writes none of the four.** The axes belong to `create()` and to the dedicated Score
+action, which is what the register already said out loud (*"Scoring is owned by the dedicated Score
+action"*). A route that cannot write them cannot zero them, and the mirror cannot be driven apart.
+
+`require`, not `coerce` (F2-182's test — what already refuses this?): the frontend gates 0..5 in the
+create form and the score dialog, so no request a human can make starts failing, and clamping would
+silently record a materiality score nobody chose.
+
+⚠ **The audit line now names the derived move.** `recomputeScore` runs on every save, so an edit to
+an owner name can move a CMA disclosure input; the old line read `"Material topic updated"` whatever
+changed (F2-188: a duplicated derivation agrees on the row and differs on the trail, which is the
+part nothing asserts).
+
+### V379 — the two CHECKs, and *which* two were missing
+
+`sust.material_topic` already carried **five** CHECK constraints, two of them bounding
+`stakeholder_importance` and `business_impact` to 0..5 — the **legacy** mirror pair — while the
+canonical `impact_materiality` / `financial_materiality` had none. **F2-215's two-of-N shape, at the
+schema.** Scope tied to the writers the same commit closed (F2-183); measured in both databases first
+(26 live rows each, 0 outside range, 0 disagreeing mirrors), so no `WITH NOCHECK`; applied twice to
+dev, both constraints trusted, all four columns proven to refuse against a planted `[REVIEW-TEST]`
+row that a legal value still updates.
+
+⚠ The pre-fix probe shows the migration and the writer are two halves: with V379 applied and the
+service reverted, an out-of-range create answered **409 with a diagnostic naming no field**; the
+service fix is what makes it a **400 naming `impactMateriality`**.
+
+### The general shape — 46 sites, shipped as a work list with NO verdicts
+
+`NeverFiringNullGuardContractTest` derives every entity-bound update that guards
+`if (req.getX() != null)` on a field the entity initialises: **46 sites across 20 services** (50
+before this slice), exactly asserted in both directions, **no reasons attached** (F2-188: five reasons
+written for code nobody had read were five false claims, and fluency read as verification). Whether
+each is live depends on what its callers omit — a fact to establish per site.
+
+Two things are clear from the initialisers alone:
+
+- **a reset is worse than a null** (F2-213) — `false`, `0`, `"MEDIUM"` and `new BigDecimal("100.00")`
+  all read as facts rather than as missing data;
+- **several are flattering in the direction that matters** —
+  `GhgEmissionRecord#coveragePercent` resets to **100.00** (an ISAE 3410 assurance input),
+  `CloudService#encryptionInTransit` to **true**, while `CrisisEvent#severity` resets to **1** and
+  `AuthorityDocument#isPlaceholder` to **true**, marking a real regulatory instrument a placeholder.
+
+### Verification
+
+- Live probe **11/11 post-fix**, and a **pre-fix control** run against the stashed service on the same
+  live stack — 5 legs fire, including the zeroing.
+- `MaterialTopicServiceTest` **11/11** (6 new: the range per route, the omitted-axis case with the
+  initialiser asserted, the mirror, the audit both ways, and a structural leg that each of the four
+  setters has exactly one writer).
+- `NeverFiringNullGuardContractTest` **4/4**, including a synthetic self-test driving the detector
+  against the literal pre-fix shape and three shapes it must NOT flag (F2-195).
+- `ServerStampedFieldContractTest` **21/21** with the four blind-spot machines named.
+- Full suite **4,099** tests; the only two failures were `MeasuredBaselineFreshnessTest` demanding the
+  migration count and pending set be updated for V379 — the gate doing its job.
+- FE `tsc` clean. 26 live rows before and after; 3 soft-deleted probe rows hard-deleted with
+  `CHARINDEX`, 0 residual.
+
+### 🔑 My own claim, refuted by my own gate on its first run
+
+The first draft asserted that `EvidenceItemCreateRequest` declares no `status` — *"the strongest
+closure there is, because a field the bound type does not declare can never arrive"*. **It declares
+one.** The closure is the weaker kind: the client may send a status and `applyRequest` silently drops
+it. Roughly two in ten of a new instrument's own claims fall on first run (F2-188, F2-192, F2-204,
+F2-211), and the reverse-facing assertion is what found this one. Recorded in the gate so nobody
+re-derives the stronger claim from the SEC-EVD-002 comment, which only says the service must not read
+it.
+
+### Filed
+
+- **The 46-site work list** — read the route, probe it, record the verdict, lower the figure in the
+  same commit. Do NOT write 46 reasons.
+- **`sust.material_topic`'s stored derived values, and this one is larger than F2-230's**: 20 of 26
+  live rows hold a `materiality_score` LOWER than `MAX(impact, financial)` and **0 higher**, so the
+  register under-states materiality; **14 priority tiers would move on the next save, 12 to
+  CRITICAL**; **8 rows' tier contradicts their own stored score** (id 14 stores 4.5 with tier HIGH
+  where the bucket says CRITICAL, which proves the stored tier was never computed by this code).
+  Identical in dev and prod. `recomputeScore` runs on every save, so each self-repairs the first time
+  an operator edits it — which is why the audit line now names the move. Re-deriving 26 live rows in
+  two real databases is an **owner decision** (F2-183, F2-196, F2-230).
+- **`MaterialTopicCreateRequest` has no Arabic topic field on the create form's required set** while
+  `topic_ar` is offered — house rule 7 territory, unchanged by this slice.
+
 ## F2-235 · The corpus an instrument cannot read scores exactly like a clean one
 
 |  |  |
