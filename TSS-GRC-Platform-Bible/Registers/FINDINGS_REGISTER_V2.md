@@ -2400,6 +2400,190 @@ Start-Service TssGrcBackend
 | **Status** | ⬜ **OPEN — filed, not worked.** Nothing has been changed in `lib/mfa.ts` or the culled folder. Treat the P3 grade as conditional on the route staying absent; if anything re-routes `/mfa`, this becomes P1 in the same commit. |
 | **Lesson** | 🔑 **An unrouted defect is not a fixed defect, it is a defect with a missing trigger** — and "the page is culled" is a fact that a later slice can undo without noticing it was load-bearing for a severity grade. |
 
+## F2-233 · Roughly a third of what a work list reports is the instrument
+
+|  |  |
+|---|---|
+| **ID** | F2-233 |
+| **Title** | Four detector holes inflated the server-stamped-field work list; two creates named a state |
+| **Severity** | 🔴 P2 (live: PDPL Article 25 DPIA + SAMA/NCA regulatory-change register) + instrument correction |
+| **Status** | 🟢 CLOSED 2026-08-18 |
+| **Programme** | Platform Bible F2 · instrument integrity + server-owned state |
+| **Modules** | `privacy` (DPIA), `compliance` (regulatory change), `security` (the gate) |
+
+### What was measured
+
+Executing F2-231's filed **11-service work list**. Every one of the eleven was read. The population
+then split almost evenly between *the code was wrong* and *the instrument was wrong*:
+
+| | |
+|---|---|
+| Narrowed away (detector holes) | `NdiGapService`, `ProcessorAssessmentService`, and 8 fields across 5 others |
+| Fixed and probed live | `DpiaService#create`, `RegulatoryChangeService#create` |
+| Verdicts in two new buckets | `SustainabilityReportService`, `PolicyService`, `PrivacyService` |
+| Still a work list, no verdicts | the 4 BCM services |
+
+`BASELINE_CONTRADICTED_SERVICES` **11 → 4**, re-derived from the gate's own printed figure (F2-207).
+
+🔑 **Roughly a third of what an instrument like this reports is the instrument.** The corrected
+headline is *not* "seven services were fixed", and saying so would have been the more flattering and
+less true story — F2-228's lesson about two detector errors producing a green neither earned.
+
+### The four detector holes
+
+**(a) A comma in a character class, wrong in BOTH directions at once.**
+`readOnlyOnTheWire()` parsed field names out of entity source with
+`\b\w[\w<>,.\[\]]*\s+(\w+)\s*[;=]` — "type token, then field name". That class contains a **comma**, so
+
+```java
+@JsonProperty(access = JsonProperty.Access.READ_ONLY)
+@Column(name = "risk_score", precision = 4, scale = 1) private BigDecimal riskScore;
+```
+
+parsed the token `4,` as the type and **`scale` as the field name.** Measured tree-wide: **4 phantom
+names** (`scale` ×3, `length` ×1) and **4 genuinely closed fields never subtracted** —
+`ProcessorAssessment#riskScore`, `NdiAssessmentCycle#complianceScore`,
+`VendorAssessment#workflowStatus`, `VendorAssessment#computedScorePct`.
+
+🔑 **One regex, two opposite errors.** Losing the real field **over**-reports — a field the wire already
+refuses is published as an open contradiction. Inventing `scale` **under**-reports — a phantom entry in
+the closed set would silently subtract any real field of that name, the quiet direction. The second half
+is latent only because none of those three entities declares a field called `scale` or `length`, which
+is precisely why it was invisible: **a phantom exclusion that matches nothing scores exactly like a
+correct one.**
+
+⚠ **My reading of that regex said `riskScore`, twice.** Only running it against the entity gave `scale`.
+The gate now carries the self-check the derivation never had —
+`everyDerivedReadOnlyNameIsARealField` — which resolves every captured name against the entity's own
+declarations.
+
+**(b) `instanceof` pattern variables, and the house idiom is TWO hops.** Every `/{id}/action` route whose
+payload is a `Map<String, Object> body` writes its fields as
+`Object lvl = body.get("impactLevel"); if (lvl instanceof String s) e.setImpactLevel(s);` — so the value
+at the setter is `s`, bound **by a pattern, not an assignment**, to a local that is itself an alias of the
+request. The old resolver looked for `s = …`, found nothing, and read the caller's own value as a server
+stamp. **12 setter sites across 6 services**, including `Dpia#conclusion`/`#rejectionReason` (the
+substance of an Article 25 assessment) and `RegulatoryChange#impactLevel`/`#impactSummary`.
+
+**(c) Lambda parameters.** `controls.forEach((k, v) -> … a.setC1WrittenInstructions(v))` —
+`allParamNames` parses the *method's* parameters and never a lambda's, so all eight PDPL Article 28
+control answers read as stamps. **8 sites in exactly 1 service**, which is the argument for fixing the
+detector rather than writing eight near-identical `BY_DESIGN` reasons: 🔑 **a verdict says the code is
+right; a narrowing says the instrument was wrong, and eight fluent reasons for one detector bug is the
+artefact F2-188 measured at five claims, five false.**
+
+**(d) A fallback is not an ownership claim.** `if (p.getEffectiveFrom() == null) p.setEffectiveFrom(now())`
+supplies a value only when the caller did not; and a field the same method **also writes from the
+caller** at another site is not owned by it however many literals appear elsewhere.
+🔑 **F2-218's headline — `if (x == null) x = INITIAL` is a default, not a guard — read on the STAMPING
+side.** The accepting side has carried the mirror of this since F2-219
+(`settled.removeAll(defaults(...))`); the stamping side never did, and **that asymmetry is the
+finding**: one question, asked of the request on one side and of the loaded row on the other, answered on
+only one. The fields it hit are exactly the ones a professional is supposed to fill in —
+`Dpia#nextReviewDate` (the Article 25 review cadence), `Policy#effectiveFrom`,
+`NdiCorrectiveAction#completionDate` — so every one was a gate failing on correct code (F2-214).
+
+⚠⚠ **The narrowing's own limit was found by my own gate's REVERSE leg.** Following every identifier
+reached `c` in `SgiCommitment c = get(id);`, and `callerSupplied` answers TRUE for `get(id)` because
+`id` is a parameter — so a row **loaded from the database** read as caller data and
+`refreshValue`'s `c.setCurrentValue(sv.value())` stopped counting as a stamp.
+`everyByDesignEntryStillDescribesSomethingTheScanFinds` failed, naming `SgiCommitment#currentValue`.
+🔑 **The id is the caller's; the row it names is the server's** — and the error direction is the
+opposite of the bug the widening fixes (a real stamp read as caller data HIDES a contradiction), which
+is why the leg that caught it is the one nobody writes first (F2-199).
+
+### The live half
+
+**`DpiaService#create` — PDPL Article 25.** `DpiaController` binds the `Dpia` ENTITY and the create did
+nothing but `setId(null)`, `setOrganisationId(…)`, `save(req)`. Probed live as `compliance`, **19/19
+pre-fix**: `POST /api/v1/privacy/dpias` with `status=APPROVED` answered **201** storing APPROVED,
+skipping DRAFT → IN_REVIEW → APPROVED entirely, plus a caller-chosen `rejectedAt` of 2001 and an
+invented rejection reason. `PRIVACY:WRITE` guards the create **and** `/approve`, so there is no
+escalation to find: the state machine was the only control and the create sat beside it without one.
+The audit row said `DPIA_DRAFTED` whatever status was stored.
+
+🔑 **`approvedAt` was already refused, because `Dpia` annotates that ONE field
+`@JsonProperty(READ_ONLY)` and not `status`, `rejectedAt`, `rejectionReason` or `conclusion`** —
+F2-215's two-of-N shape at one of five. Its side effect is the interesting part: the probe confirmed
+`approved_at = NULL` on the forged APPROVED row, so **the single annotation left the dangerous forgery
+internally detectable and the REJECTED one seamless** (both of those columns are writable) — and
+nothing reads either.
+
+**`RegulatoryChangeService#create`.** Same shape on the register that records how a SAMA/NCA/SDAIA
+change was assessed: filed **CLOSED** with a caller-chosen `closedAt`, having passed through none of
+NEW → APPLICABILITY_ASSESSED → IMPACT_ASSESSED → CONTROLS_UPDATED → CLOSED, each of which demands
+something on the way through (F2-220). 🔑 **F2-213 fixed the UPDATE and wrote the reasoning onto it;
+the create two methods above was not touched** — F2-215's headline for the fourth time in this lineage.
+
+Both refusals are `require`, not `coerce`, and neither can break a working request (F2-182):
+`dpiaApi.create` is dark (`apiClientMethodReachability` records it as a HOLE — *"a DPIA can be approved,
+rejected and expired but never created"*, which reads as an invitation to build the screen that would
+have fired this), and `RegulatoryChangeRequest` declares neither `status` nor `closedAt`.
+
+### Two new verdict buckets
+
+**`CLOSED_ELSEWHERE`** — a **fourth wire-closing mechanism, and the strongest of the four.** The gate
+subtracts `BaseEntity`'s nine (F2-218) and per-field `READ_ONLY` (F2-219); neither knows about a create
+whose ENDPOINT binds a purpose-built record and hands the service an entity it built itself.
+`SustainabilityAnnexController` binds `ReportingYearCreateRequest` and calls
+`service.createYear(req.toEntity())`, and that record's own javadoc states the rule: *"a year can never
+be born APPROVED/PUBLISHED"*. A field the bound type does not declare can never arrive. Also holds
+`PolicyService`'s four stamps, closed by a **retired route** (CH-6 / PM-C1 removed the `/policies`
+write mappings; `DarkServiceMethodTest` holds all nine legacy methods; the service exits at CH-9) —
+recorded as a verdict rather than "fixed", because adding a guard to a class scheduled for deletion is
+code on a corpse. Every entry is resolved **mechanically** — reflection over the record's components,
+absence of a write mapping — because an exclusion nobody can audit is an assumption wearing a citation.
+
+**`FILED_OWNER_DECISION`** — because filing these under `BY_DESIGN` would **assert they are correct.**
+`PrivacyService`'s `DataBreach#status` and `DataSubjectRequest#status` are live holes deliberately left
+open: no CHECK, no declared machine, and `DsrRequestLifecycle` declares only a TERMINAL set, so
+`requireInitial` has no initial state and would refuse the NEW/OPEN/PENDING creates the register already
+holds. 🔑 **F2-197's rule one level up: an invented figure invites a question, an invented all-clear
+closes one.** A verdict vocabulary limited to *"the caller legitimately owns this"* cannot express
+*"the caller must not own this and closing it rewrites live rows"*, so the defect would have been
+recorded as a design — F2-224's lesson, which landed on this gate's verdict vocabulary once already.
+
+⚠ Note what left the gate's output silently: `DataSubjectRequest#dueDate`, the **PDPL Article 4
+statutory deadline** and the sharper half of F2-231's filing. `startDsr()` only supplies it as a
+FALLBACK, so under (d) it is correctly not a stamp. **The filing stands on F2-202's rule — only the
+server may issue a statutory deadline — and does not depend on this instrument.** Recorded in the
+verdict so it cannot vanish with the detector change.
+
+### Verification
+
+- Backend suite **4,058 / 0 / 0** (was 4,047; 11 new tests).
+- Gate **20/20**, including 5 new legs: the derivation self-check, the three binding forms + the
+  fallback rule pinned in both directions over literal source, the reverse leg for both new buckets,
+  and mechanical resolution of every `CLOSED_ELSEWHERE` claim.
+- Live probe **19/19 pre-fix** and **16/16 post-fix** as `compliance`, against rows the probe plants
+  itself and removes with `CHARINDEX` (house rule 5 / F2-206). Post-fix asserts **both** directions:
+  the forgeries are refused with a message naming the owning route, the honest payloads still return
+  201 at the machine's root, the assessor's own fields survive, and the guarded routes still reach
+  APPROVED / APPLICABILITY_ASSESSED and still stamp `approved_at`.
+- Mutation **9 killed / 0 survived / 0 anchor-miss** — one per narrowing and one per fix, each naming
+  the test that must die. Every narrowing is load-bearing rather than decorative, and the two create
+  guards are each asserted by a behaviour test rather than only by the gate.
+- Two in-flight catches by the gate's own legs, both recorded above: the `SgiCommitment` over-widening,
+  and `VendorAssessment` being declared in **two** packages (F2-222's filed hazard) so a merged derived
+  set was compared against one file's fields — 🔑 **a keying ambiguity is harmless until two things key
+  on it differently.**
+
+### Filed
+
+- The **4 BCM services** (`BcmService`, `BcmRemediationService`, `BcmComplianceMappingService`,
+  `BcpPlanService`) with per-site evidence in `target/server-stamped-fields.txt` and deliberately **no
+  verdicts** (F2-188). All four controllers bind the **entity** — checked, not assumed — so they are
+  genuinely open. `BcmService#createPlan` has two internal callers (`BcmBiaAssessmentController`'s
+  BCP/DRP generation), both of which explicitly pass `DRAFT`, so the fix is safe but needs its own probe.
+- `BcmRemediationService#createCapa` is the sharpest: `if (status == null) "OPEN"` followed by a
+  **membership** check, so a BCM CAPA can be created `CLOSED` — and `transitionCapa` refuses CLOSE
+  without evidence, so the create skips an evidence requirement (F2-217's `audit_lc` shape).
+- `SustainabilityReportService`'s `ReportingYear#status` is stamped through a **scalar parameter**, so
+  it is invisible to this gate either way — F2-220's filed transition-by-parameter blind spot, still
+  unmeasured as a population.
+- `PrivacyService`'s two `status` columns and `data_subject_requests.due_date` (carried from F2-231).
+- The remaining **45** `MassAssignmentRatchetTest` NEEDS-VERDICT rows.
+
 ## F2-232 · Reading the one unread lead refuted it, and that is the argument for the rejection
 
 |  |  |
