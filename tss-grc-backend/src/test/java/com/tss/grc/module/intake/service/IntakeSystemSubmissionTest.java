@@ -211,7 +211,7 @@ class IntakeSystemSubmissionTest {
         // esc() escaped backslash, quote, \n and \r — JSON requires every C0 control character
         // escaped, so this produced a payload Jackson refuses (verified against Jackson directly:
         // "Illegal unquoted character ((CTRL-CHAR, code 9))").
-        String nasty = "Credit\tscoring \"v2\" model\nrevision";
+        String nasty = "Credit\tscoring \"v2\"\001 model\nrevision";
         service.fileSystemSubmission(drift(payload(nasty)));
 
         String json = saved().getPayload();
