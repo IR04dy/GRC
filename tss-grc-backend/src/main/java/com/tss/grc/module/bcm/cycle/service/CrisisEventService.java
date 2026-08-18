@@ -326,6 +326,14 @@ public class CrisisEventService {
         }
         if (body.getDetectionTime() == null) body.setDetectionTime(LocalDateTime.now());
         if (body.getStartTime() == null)     body.setStartTime(body.getDetectionTime());
+        // F2-238 — these four were field initialisers on CrisisEvent, which made update()'s
+        // null-guards decorative: a PATCH naming only crisisManagerId reset the crisis to
+        // severity 1 and cleared all three impact flags. They are NOT NULL columns, so the
+        // default has to live on the create path; see the class-level note on update().
+        if (body.getSeverity() == null)             body.setSeverity(1);
+        if (body.getPersonalDataAffected() == null) body.setPersonalDataAffected(false);
+        if (body.getCyberRelated() == null)         body.setCyberRelated(false);
+        if (body.getSupplierInvolved() == null)     body.setSupplierInvolved(false);
 
         CrisisEvent saved = events.save(body);
         audit.log("CREATE", "CrisisEvent", saved.getId(),

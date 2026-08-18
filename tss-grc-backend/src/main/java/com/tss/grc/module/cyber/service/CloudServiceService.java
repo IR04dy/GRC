@@ -26,7 +26,19 @@ import java.util.Set;
 public class CloudServiceService {
 
     private static final Set<String> SERVICE_MODELS    = Set.of("IAAS", "PAAS", "SAAS", "FAAS", "DBAAS");
-    private static final Set<String> DEPLOYMENT_MODELS = Set.of("PUBLIC", "PRIVATE", "HYBRID", "COMMUNITY");
+    // GOV_PRIVATE is the Saudi government private cloud (the National Government Cloud / SDAIA
+    // NDMO platforms). F2-238 measured it stored on 3 of the 15 live rows in BOTH databases while
+    // this Set refused it and `cyber.cloud_services` carries no CHECK constraint at all — so the
+    // only narrowing was wrong about what the register holds (F2-180, inverted).
+    //
+    // ⚠ IT WAS THE RESET THAT HID THIS. update() ends with validate(existing), and until F2-238 the
+    // never-firing null-guard overwrote deploymentModel with the entity initialiser "PUBLIC" before
+    // validate() ever saw the stored value. Preserving GOV_PRIVATE — the correct behaviour — is
+    // therefore what makes validate() reachable for it, so declaring the token here is not a
+    // separate tidy-up: omit it and the fix below turns a silent reset into a 400 on the National
+    // Government Cloud (F2-203 — fixing one defect detonates the next).
+    private static final Set<String> DEPLOYMENT_MODELS =
+        Set.of("PUBLIC", "PRIVATE", "HYBRID", "COMMUNITY", "GOV_PRIVATE");
     private static final Set<String> CRITICALITIES     = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
     private static final Set<String> STATUSES          = Set.of("ACTIVE", "UNDER_REVIEW", "DEPROVISIONED", "ARCHIVED");
 
@@ -46,6 +58,7 @@ public class CloudServiceService {
 
     @Transactional
     public CloudService create(CloudService body) {
+        applyCreateDefaults(body);
         validate(body);
         body.setId(null);
         body.setOrganisationId(TenantContext.getCurrentTenant());
@@ -93,6 +106,37 @@ public class CloudServiceService {
         out.put("ksa_resident", repo.countByOrganisationIdAndKingdomDataResident(org, true));
         out.put("off_kingdom",  repo.countByOrganisationIdAndKingdomDataResident(org, false));
         return out;
+    }
+
+    /**
+     * The nine server-owned defaults that used to live as field initialisers on {@link CloudService}.
+     *
+     * <p><b>F2-238.</b> They moved here because an initialiser is what an omitted key deserialises
+     * to, so {@code if (patch.getSsoEnabled() != null)} in {@link #update} could never be false and
+     * a PATCH that named only {@code status} rewrote eight other columns. Measured in dev and prod
+     * (identical, 15 live rows): SSO, MFA and encryption-at-rest were true on <b>14 of 15</b>,
+     * kingdom-data-residency on <b>10 of 15</b>, and the only write the register's screen offers is
+     * {@code update(id, { status })}.
+     *
+     * <p>Applied on the create path only, so the entity carries no default a partial update can
+     * mistake for a value the caller supplied. Every field here is NOT NULL in the schema, so this
+     * method is what keeps a create legal — do not inline it into {@code validate}, which also runs
+     * on update, where filling a null would be the defect all over again.
+     */
+    private void applyCreateDefaults(CloudService c) {
+        if (c.getServiceModel()        == null) c.setServiceModel("SAAS");
+        if (c.getDeploymentModel()     == null) c.setDeploymentModel("PUBLIC");
+        if (c.getCriticality()         == null) c.setCriticality("MEDIUM");
+        if (c.getStatus()              == null) c.setStatus("ACTIVE");
+        if (c.getKingdomDataResident() == null) c.setKingdomDataResident(false);
+        if (c.getSsoEnabled()          == null) c.setSsoEnabled(false);
+        if (c.getMfaEnforced()         == null) c.setMfaEnforced(false);
+        if (c.getEncryptionAtRest()    == null) c.setEncryptionAtRest(false);
+        // ⚠ true, unlike its four siblings. That asymmetry is why the reset was the dangerous
+        // direction here: every other flag reset to false LOST an assurance, but this one reset to
+        // true would MANUFACTURE one — a service recorded as not encrypting in transit becoming one
+        // that does. 0 of 15 rows hold false today, so it is the latent half of the same defect.
+        if (c.getEncryptionInTransit() == null) c.setEncryptionInTransit(true);
     }
 
     private void validate(CloudService c) {

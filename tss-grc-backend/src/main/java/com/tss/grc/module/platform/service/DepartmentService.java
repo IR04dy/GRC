@@ -51,6 +51,11 @@ public class DepartmentService {
         validate(body, /*existingId*/ null);
         body.setId(null);
         body.setOrganisationId(TenantContext.getCurrentTenant());
+        // F2-238 — was a field initialiser, which made update()'s `if (patch.getStatus() != null)`
+        // unable to be false. All 34 live rows in dev and prod are ACTIVE, so nothing was lost
+        // yet; the guard was decorative, and a department deactivated through /transition would
+        // have been silently reactivated by the next edit to its name.
+        if (body.getStatus() == null) body.setStatus("ACTIVE");
         Department saved = repo.save(body);
         audit.log("CREATE", "Department", saved.getId(),
             "Department created: " + saved.getCode());

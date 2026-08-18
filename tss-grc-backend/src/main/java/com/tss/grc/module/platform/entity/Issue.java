@@ -68,11 +68,11 @@ public class Issue extends BaseEntity {
 
     /** LOW | MEDIUM | HIGH | CRITICAL */
     @Column(name = "severity", nullable = false, length = 20)
-    private String severity = "MEDIUM";
+    private String severity;
 
     /** LOW | NORMAL | HIGH | URGENT */
     @Column(name = "priority", nullable = false, length = 20)
-    private String priority = "NORMAL";
+    private String priority;
 
     @Column(name = "assignee_user_id") private Long   assigneeUserId;
     @Column(name = "assignee_role", length = 100)     private String assigneeRole;
@@ -80,7 +80,7 @@ public class Issue extends BaseEntity {
 
     /** OPEN | IN_PROGRESS | BLOCKED | RESOLVED | CLOSED | CANCELLED */
     @Column(name = "status", nullable = false, length = 20)
-    private String status = "OPEN";
+    private String status;
 
     /** FIXED | WONT_FIX | DUPLICATE | NOT_REPRODUCIBLE | DEFERRED — only set on resolve/close. */
     @Column(name = "resolution", length = 20)

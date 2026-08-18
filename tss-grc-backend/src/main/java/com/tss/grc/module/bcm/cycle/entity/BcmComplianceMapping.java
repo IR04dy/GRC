@@ -56,7 +56,7 @@ public class BcmComplianceMapping {
     private String domain;
 
     @Column(name = "is_placeholder", nullable = false)
-    private Boolean isPlaceholder = true;
+    private Boolean isPlaceholder;
 
     /** GOVERNANCE | BIA | BCP | DRP | EXERCISE | CRISIS | CALL_TREE | STRATEGY | TRAINING | EVIDENCE | OTHER */
     @Column(name = "related_workflow", length = 50)
@@ -71,7 +71,7 @@ public class BcmComplianceMapping {
 
     /** NOT_ASSESSED | COMPLIANT | PARTIAL | NON_COMPLIANT | NOT_APPLICABLE */
     @Column(name = "compliance_status", nullable = false, length = 30)
-    private String complianceStatus = "NOT_ASSESSED";
+    private String complianceStatus;
 
     @Column(name = "assessed_at")               private LocalDateTime assessedAt;
     @Column(name = "assessed_by", length = 255) private String        assessedBy;

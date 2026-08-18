@@ -109,6 +109,13 @@ public class IssueService {
         body.setResolution(null);
         body.setResolvedAt(null);
         body.setClosedAt(null);
+        // F2-238 — severity and priority were field initialisers, so update()'s vocabulary-checked
+        // guards could never be false and every PATCH reset them to MEDIUM/NORMAL: measured 8 of 13
+        // and 12 of 13 live rows in both databases, including the CRITICAL/URGENT issues CcmService
+        // and KriBreachService open on a third consecutive control-test failure and a sustained-RED
+        // KRI. Both producers set the pair explicitly, so this default only serves a bare API create.
+        if (body.getSeverity() == null) body.setSeverity("MEDIUM");
+        if (body.getPriority() == null) body.setPriority("NORMAL");
         if (body.getIssueCode() == null || body.getIssueCode().isBlank()) {
             body.setIssueCode(nextCode());
         }
