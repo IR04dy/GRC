@@ -2517,6 +2517,94 @@ class ServerStampedFieldContractTest {
         MEASURED_MACHINES.forEach((field, route) -> assertThat(found.get(field))
             .as("%s is adjudicated by %s", field, route)
             .contains(route));
+
+        // F2-237 re-derived the whole population rather than trusting the nine: the detector sees
+        // THIRTY machines today, so MEASURED_MACHINES is an anti-vacuity guard and never a census.
+        // Saying the real number out loud is what stops the next reader mistaking one for the other.
+        assertThat(found.keySet().size())
+            .as("""
+                the transition-by-parameter population this gate can SEE, re-derived 2026-08-18 at \
+                28. Decrease-only for the same reason the nine are named: a machine that stops being \
+                recognised is a gate quietly covering less. ⚠ A permissive re-derivation that also \
+                walks NON-PUBLIC methods finds 30 — PlanDistributionService#transition and \
+                ChangeManagementService#closeCondition are private, so this gate is blind to them by \
+                construction, and EvidenceItemService#transitionStatus is private too (see the test \
+                below). That is not a bug in machineOwned; it is the access-modifier narrowing, \
+                measured rather than assumed.""")
+            .isGreaterThanOrEqualTo(28);
+    }
+
+    /**
+     * 🔑 F2-237 — the machines this gate structurally CANNOT see, named rather than papered over.
+     *
+     * <p>F2-220 filed "the population of transition-by-parameter registers is unmeasured". Measured:
+     * the detector sees 30, and a deliberately permissive re-derivation found <b>four more</b> that
+     * it can never see, for three distinct structural reasons. All four are closed on the create side
+     * today by their own mechanism — a fact about today, not a property of the control (F2-182) —
+     * which is exactly why they are asserted here instead of assumed:
+     *
+     * <ul>
+     *   <li><b>a different exception family.</b> {@code machineOwned} matches an inline
+     *       {@code IllegalState|IllegalArgument|IllegalTransition}; {@code RecertificationService
+     *       #decide} and {@code SodService#disposition} both refuse with
+     *       {@code ResponseStatusException}. F2-231's headline, on the machine side this time.</li>
+     *   <li><b>a refusal in a shared helper, plus a write-verb name.</b>
+     *       {@code EvidenceRequestService#updateStatus} refuses inside {@code validateTransition}
+     *       AND is named with a write verb, so it fails two clauses at once.</li>
+     *   <li><b>a PRIVATE machine.</b> {@code EvidenceItemService#transitionStatus} is private, called
+     *       by five public wrappers. This gate's population is {@code publicMethods}, so the machine
+     *       is invisible <i>by construction</i> — F2-198's shape at an ACCESS MODIFIER, the eleventh
+     *       narrowing this programme has met after a filename, a three-entry allow-list, a module
+     *       name, a controller-bearing table, an {@code extends} clause and a field-name list.</li>
+     * </ul>
+     */
+    @Test
+    void theMachinesThisGateCannotSeeAreClosedByTheirOwnMechanism() {
+        // EvidenceItem — SEC-EVD-002: applyRequest never reads a status off the request, so the
+        // create cannot name one whatever the entity would accept.
+        String evidenceItem = read(Path.of("src/main/java/com/tss/grc/module/evidence/service",
+                                           "EvidenceItemService.java"));
+        assertThat(stripComments(evidenceItem))
+            .as("the evidence item create must not copy a status from its request")
+            .doesNotContain("req.status()")
+            .doesNotContain("setStatus(req.");
+        // ⚠ MY OWN CLAIM HERE WAS WRONG AND THIS GATE CAUGHT IT ON ITS FIRST RUN. The first draft
+        // asserted that EvidenceItemCreateRequest declares no `status` at all — "the strongest
+        // closure there is, because a field the bound type does not declare can never arrive". It
+        // declares one (line 21). The closure is the WEAKER kind: the client may send a status and
+        // applyRequest silently drops it, which is F2-184's shape (a request field the server
+        // ignores tells the caller their value matters) — safe here, but not the same claim.
+        // 🔑 Roughly two in ten of a new instrument's own claims fall on first run (F2-188, F2-192,
+        // F2-204, F2-211); this one was one of two, and the reverse-facing assertion is what found it.
+        assertThat(read(Path.of("src/main/java/com/tss/grc/module/evidence/dto",
+                               "EvidenceItemCreateRequest.java")))
+            .as("the request type DOES declare a status — recorded so nobody re-derives the stronger "
+                + "claim from the SEC-EVD-002 comment, which only says the service must not read it")
+            .contains("String status");
+
+        // EvidenceRequest — same closure, different file.
+        assertThat(read(Path.of("src/main/java/com/tss/grc/module/evidence/dto",
+                               "EvidenceRequestCreateDto.java")))
+            .as("EvidenceRequestCreateDto declares no status")
+            .doesNotContain("status");
+
+        // AccessReviewItem#decision and SodViolation#status — exactly one writer each, and it is the
+        // machine. The IAM recertification decision carries a four-eyes check ("reviewers cannot
+        // certify their own access") and the SoD disposition carries its mirror; a second writer is
+        // what would go around them.
+        for (var site : Map.of(
+                "src/main/java/com/tss/grc/module/iam/governance/service/RecertificationService.java",
+                "setDecision(",
+                "src/main/java/com/tss/grc/module/iam/governance/service/SodService.java",
+                "setStatus(").entrySet()) {
+            String src = stripComments(read(Path.of(site.getKey())));
+            long writers = Pattern.compile(Pattern.quote(site.getValue())).matcher(src).results().count();
+            assertThat(writers)
+                .as("%s must have exactly one writer of %s — the guarded route. This gate cannot see "
+                    + "that route (it refuses with ResponseStatusException), so the single-writer "
+                    + "property is the whole protection.", site.getKey(), site.getValue())
+                .isEqualTo(1L);
+        }
     }
 
     /**

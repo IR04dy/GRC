@@ -211,12 +211,17 @@ export function MaterialityTab() {
         ownerName: str(values.ownerName),
         ownerEmail: str(values.ownerEmail),
         notes: str(values.notes),
-        // Preserve the double-materiality axes: the entity defaults both to 0
-        // and the service recomputes materiality_score = max(impact, financial)
-        // on every save, so an omitted value would zero out the score + tier.
-        // Scoring is owned by the dedicated "Score" action.
-        impactMateriality: editTopic.impactMateriality ?? editTopic.stakeholderImportance,
-        financialMateriality: editTopic.financialMateriality ?? editTopic.businessImpact,
+        // F2-237 — the axis echo is GONE, and so is the reason for it. This handler used to send
+        // both axes back unchanged with a comment explaining that "an omitted value would zero out
+        // the score + tier": true, because MaterialTopic declares `= BigDecimal.ZERO` on all four
+        // score columns, so `if (req.getImpactMateriality() != null)` on the server could never be
+        // false and an omitted key was written as 0. Probed live — an edit to the TITLE took a
+        // CRITICAL topic to score 0.0 / tier LOW.
+        //
+        // 🔑 A defence in one client is not a defence: the next caller does not have it, and this
+        // page was the only one that did. The edit route no longer writes the axes at all — they
+        // belong to create() and to the dedicated Score action — so echoing them would now be a
+        // payload field the server ignores (F2-184).
       });
       toast.success(isAr ? 'حُدّث الموضوع' : 'Topic updated');
       setEditTopic(null);
@@ -253,7 +258,11 @@ export function MaterialityTab() {
         stakeholderGroups: str(values.stakeholderGroups),
         ownerName: str(values.ownerName),
         descriptionEn: str(values.descriptionEn),
-        status: 'DRAFT',
+        // F2-237 — `status` was sent and silently discarded: MaterialTopicCreateRequest has no such
+        // component, and Spring Boot disables FAIL_ON_UNKNOWN_PROPERTIES, so the key never bound.
+        // It happened to agree with what the server forces (SEC-ESG-003 sets DRAFT on every create),
+        // which is exactly why nobody noticed. The server owns the initial state; saying so twice is
+        // how the two come to disagree.
       });
       toast.success(isAr
         ? `تمت إضافة الموضوع ${created.topicCode ?? created.topicEn}`
